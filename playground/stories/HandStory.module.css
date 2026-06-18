@@ -1,0 +1,59 @@
+.root {
+  padding: 28px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--fg);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.count {
+  min-width: 24px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  opacity: 0.85;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+.hint {
+  font-size: 12px;
+  opacity: 0.5;
+  margin: 0;
+}
+
+.stage {
+  flex: 1;
+  min-height: 360px;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 24px;
+}

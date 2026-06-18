@@ -1,0 +1,207 @@
+.root {
+  position: relative;
+  padding: 28px;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.hint {
+  font-size: 12px;
+  opacity: 0.65;
+  margin: 0 0 14px;
+  max-width: 780px;
+  line-height: 1.5;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.reset {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--fg);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+}
+
+.reset:hover {
+  border-color: var(--brand-green);
+  color: var(--brand-green);
+}
+
+.log {
+  font-size: 12px;
+  color: var(--brand-green);
+  opacity: 0.85;
+}
+
+/* цели атаки — сверху */
+.targets {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin-top: 14px;
+}
+
+.target {
+  width: 200px;
+  height: 92px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.45;
+  transition: border-color var(--t-base) var(--ease-soft),
+    box-shadow var(--t-base) var(--ease-soft), color var(--t-base) var(--ease-soft),
+    opacity var(--t-base) var(--ease-soft);
+}
+
+.lit {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--hl);
+  color: var(--hl);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--hl) 45%, transparent);
+  cursor: pointer;
+}
+
+/* центр стола — куда ложатся не-релизы */
+.centerSlot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 160px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(-50%, -50%);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+}
+
+/* сброс — правый нижний угол */
+.discard {
+  position: absolute;
+  right: 28px;
+  bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.discardSlot {
+  position: relative;
+  width: 104px;
+  aspect-ratio: var(--card-aspect);
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.discardCard {
+  position: absolute;
+  inset: 0;
+}
+
+.cap {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  opacity: 0.5;
+}
+
+/* низ: зона релиза над рукой */
+.bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.releaseZone {
+  display: flex;
+  gap: 12px;
+}
+
+.slot {
+  position: relative;
+  width: 92px;
+  aspect-ratio: var(--card-aspect);
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.4;
+}
+
+/* пара: основная карта сверху, вспомогательная под углом снизу (виден верх) */
+.pair {
+  position: relative;
+  aspect-ratio: var(--card-aspect);
+}
+
+.aux {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  transform: translateY(-26%) rotate(-7deg);
+  transform-origin: bottom center;
+  filter: brightness(0.82);
+}
+
+.mainCard {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.hand {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.cell {
+  position: relative;
+  cursor: pointer;
+  border-radius: 14px;
+  transition: box-shadow var(--t-base) var(--ease-soft);
+}
+
+.valid,
+.partner {
+  box-shadow: 0 0 26px color-mix(in srgb, var(--hl) 55%, transparent);
+}
+
+/* летящая карта (overlay) */
+.flyer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  pointer-events: none;
+  z-index: var(--z-modal);
+}

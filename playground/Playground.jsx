@@ -1,0 +1,50 @@
+import { useState } from 'react'
+import TokenPreview from '@/design/TokenPreview.jsx'
+import TypographyPreview from '@/design/TypographyPreview.jsx'
+import CardStory from './stories/CardStory.jsx'
+import HandStory from './stories/HandStory.jsx'
+import AnimationsStory from './stories/AnimationsStory.jsx'
+import TableStory from './stories/TableStory.jsx'
+import ArrowStory from './stories/ArrowStory.jsx'
+import ComboStory from './stories/ComboStory.jsx'
+import styles from './Playground.module.css'
+
+// Реестр «историй». Каждая фаза добавляет сюда изолированные сцены
+// (Card, Hand, ReactionWindow, экраны Lobby/GameOver и т.д.) —
+// чтобы любой момент можно было открыть напрямую, не проходя всю игру.
+const stories = [
+  { id: 'design-tokens', title: 'Design Tokens', render: () => <TokenPreview /> },
+  { id: 'typography', title: 'Typography', render: () => <TypographyPreview /> },
+  { id: 'card', title: 'Card', render: () => <CardStory /> },
+  { id: 'hand', title: 'Hand', render: () => <HandStory /> },
+  { id: 'animations', title: 'Animations', render: () => <AnimationsStory /> },
+  { id: 'table', title: 'Table', render: () => <TableStory /> },
+  { id: 'arrow', title: 'Arrow', render: () => <ArrowStory /> },
+  { id: 'combo', title: 'Combo', render: () => <ComboStory /> },
+  // { id: 'reaction', title: 'Reaction window', render: () => ... },   // Фаза 6
+]
+
+export default function Playground() {
+  const [active, setActive] = useState(stories[0].id)
+  const story = stories.find((s) => s.id === active)
+
+  return (
+    <div className={styles.wrap}>
+      <aside className={styles.sidebar}>
+        <div className={styles.title}>playground</div>
+        <nav className={styles.nav}>
+          {stories.map((s) => (
+            <button
+              key={s.id}
+              className={s.id === active ? styles.itemActive : styles.item}
+              onClick={() => setActive(s.id)}
+            >
+              {s.title}
+            </button>
+          ))}
+        </nav>
+      </aside>
+      <main className={styles.stage}>{story?.render()}</main>
+    </div>
+  )
+}

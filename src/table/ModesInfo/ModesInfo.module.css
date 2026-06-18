@@ -1,0 +1,55 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.title {
+  padding: 0 4px 16px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.5;
+}
+
+.list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.opt,
+.optOn {
+  padding: 6px 11px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.opt {
+  opacity: 0.38;
+}
+
+.optOn {
+  border-color: var(--brand-green);
+  background: rgba(41, 224, 122, 0.12);
+  color: var(--brand-green);
+}

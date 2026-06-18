@@ -1,0 +1,86 @@
+.root {
+  padding: 28px;
+}
+
+.h {
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  margin: 0 0 20px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 760px;
+}
+
+.item {
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: var(--surface-1);
+}
+
+.meta {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.role {
+  font-family: var(--font-text);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(41, 224, 122, 0.12);
+  color: var(--brand-green);
+}
+
+.name {
+  font-family: var(--font-text);
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.var {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.4;
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.text {
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-feature-settings: "calt" off, "liga" off;
+}
+
+.where {
+  margin: 12px 0 0;
+  font-family: var(--font-text);
+  font-size: 12px;
+  opacity: 0.5;
+  line-height: 1.5;
+}

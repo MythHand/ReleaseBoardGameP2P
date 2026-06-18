@@ -1,0 +1,75 @@
+.root {
+  position: relative;
+  aspect-ratio: var(--card-aspect);
+  perspective: 1100px;
+  cursor: pointer;
+  user-select: none;
+  container-type: inline-size; /* чтобы радиус масштабировался (cqw) */
+}
+
+.tilt {
+  width: 100%;
+  height: 100%;
+  transition: transform var(--t-base) var(--ease-out);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  /* переворот ведёт словарь анимаций (play('flipCard')), не CSS */
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  border-radius: 6cqw; /* масштабируется с шириной карты, не фиксировано */
+  overflow: hidden;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.back {
+  transform: rotateY(180deg);
+}
+
+.img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ===== Состояния-оверлеи =====
+   Свечение в цвете типа карты. Внутри .tilt и чуть приподнято по Z —
+   привязано к краям карты, наклоняется/масштабируется вместе с ней. */
+.glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 6cqw;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateZ(1px);
+  transition: opacity var(--t-base) var(--ease-out);
+}
+
+/* «можно сыграть» — рамка/свечение в ЦВЕТЕ типа карты.
+   NB: selected пока на ТОМ ЖЕ базовом уровне. Полноценный UI выбора — позже. */
+.root[data-state="playable"] .glow,
+.root[data-state="selected"] .glow {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent),
+    0 0 22px 2px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
+.root[data-state="disabled"] {
+  cursor: default;
+}
+
+.root[data-state="disabled"] .tilt {
+  filter: grayscale(0.7) brightness(0.55);
+}

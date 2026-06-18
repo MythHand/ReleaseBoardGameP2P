@@ -1,0 +1,58 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    linear-gradient(0deg, var(--surface-0), var(--surface-0)),
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 28px);
+}
+
+.shell {
+  text-align: center;
+  padding: 40px;
+}
+
+.brand {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--brand-green);
+  letter-spacing: 0.02em;
+}
+
+.sub {
+  color: var(--fg);
+  opacity: 0.85;
+  font-weight: 500;
+}
+
+.tag {
+  margin: 10px 0 0;
+  font-size: 12px;
+  letter-spacing: var(--tracking);
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+.hint {
+  margin: 28px 0 0;
+  font-size: 13px;
+  opacity: 0.55;
+}
+
+.dev {
+  margin: 8px 0 0;
+  font-size: 12px;
+  opacity: 0.4;
+}
+
+.link {
+  color: var(--brand-green);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}

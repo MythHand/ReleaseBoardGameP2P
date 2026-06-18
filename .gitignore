@@ -1,0 +1,32 @@
+# --- Transfer folder: NEVER commit ---
+# user_input is a one-way drop zone for source materials.
+# We only copy OUT of it into the project — it must never reach GitHub.
+user_input/
+
+# --- Internal documentation: keep out of the repo ---
+# Рабочие заметки/разборы по проекту — не пушим.
+docs/
+CLAUDE.md
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- Node / build ---
+node_modules/
+dist/
+build/
+.cache/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
