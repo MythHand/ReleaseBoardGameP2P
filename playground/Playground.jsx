@@ -7,6 +7,9 @@ import AnimationsStory from './stories/AnimationsStory.jsx'
 import TableStory from './stories/TableStory.jsx'
 import ArrowStory from './stories/ArrowStory.jsx'
 import ComboStory from './stories/ComboStory.jsx'
+import LoaderStory from './stories/LoaderStory.jsx'
+import DeckStory from './stories/DeckStory.jsx'
+import StartStory from './stories/StartStory.jsx'
 import styles from './Playground.module.css'
 
 // Реестр «историй». Каждая фаза добавляет сюда изолированные сцены
@@ -16,11 +19,14 @@ const stories = [
   { id: 'design-tokens', title: 'Design Tokens', render: () => <TokenPreview /> },
   { id: 'typography', title: 'Typography', render: () => <TypographyPreview /> },
   { id: 'card', title: 'Card', render: () => <CardStory /> },
+  { id: 'deck', title: 'Deck (all)', render: () => <DeckStory /> },
   { id: 'hand', title: 'Hand', render: () => <HandStory /> },
   { id: 'animations', title: 'Animations', render: () => <AnimationsStory /> },
   { id: 'table', title: 'Table', render: () => <TableStory /> },
   { id: 'arrow', title: 'Arrow', render: () => <ArrowStory /> },
   { id: 'combo', title: 'Combo', render: () => <ComboStory /> },
+  { id: 'loader', title: 'Loader', render: () => <LoaderStory /> },
+  { id: 'start', title: 'Start screen', render: () => <StartStory /> },
   // { id: 'reaction', title: 'Reaction window', render: () => ... },   // Фаза 6
 ]
 

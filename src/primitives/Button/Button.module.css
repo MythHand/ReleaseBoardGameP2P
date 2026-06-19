@@ -1,0 +1,42 @@
+.btn {
+  font-family: var(--font-mono); /* терминальный шрифт лоадера */
+  text-transform: uppercase;
+  cursor: pointer;
+  background: transparent;
+  color: #fff;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+}
+
+/* основная — брекеты [ TEXT ] */
+.primary {
+  font-size: 17px;
+  letter-spacing: 0.18em;
+  padding: 10px 2px;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+.primary:hover {
+  opacity: 0.78;
+}
+.primary .bracket {
+  opacity: 0.45;
+}
+
+/* техническая — бордер-бокс */
+.tech {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  padding: 6px 10px;
+  color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  transition: color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
+}
+.tech:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.55);
+}

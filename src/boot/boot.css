@@ -1,0 +1,217 @@
+/* Стили лоадера (порт styles.css), заскоуплены под .boot — не текут глобально.
+   Корень .boot заполняет своего родителя; терминальная эстетика локальна здесь. */
+.boot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: "JetBrains Mono", "IBM Plex Mono", "Menlo", "Consolas", monospace;
+  overflow: hidden;
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+  font-feature-settings: "ss01" on, "calt" off, "liga" off;
+}
+.boot * {
+  box-sizing: border-box;
+}
+
+.boot .root {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  overflow: hidden;
+}
+
+/* ---------- Start gate ---------- */
+.boot .start-gate {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: max-content;
+  height: max-content;
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font-family: inherit;
+  font-size: 18px;
+  letter-spacing: 0.18em;
+  cursor: pointer;
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-direction: column;
+  text-transform: uppercase;
+}
+.boot .start-gate .bracket-l,
+.boot .start-gate .bracket-r {
+  opacity: 0.5;
+}
+.boot .start-gate .start-hint {
+  font-size: 10px;
+  letter-spacing: 0.25em;
+  opacity: 0.4;
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+.boot .start-gate:hover {
+  opacity: 0.8;
+}
+
+/* ---------- Terminal ---------- */
+.boot .terminal {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #ffffff;
+  background: #000;
+}
+.boot .terminal-inner {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 4px 6px;
+}
+.boot .line {
+  white-space: pre;
+  font-variant-ligatures: none;
+}
+.boot .cursor-line {
+  display: flex;
+  align-items: center;
+  height: 1.35em;
+}
+.boot .cursor {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  background: #fff;
+  animation: boot-blink 1s steps(2) infinite;
+}
+@keyframes boot-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---------- Logo stage ---------- */
+.boot .logo-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  z-index: 5;
+}
+.boot .logo-wrap {
+  position: relative;
+  width: 242px;
+  height: auto;
+  flex: 0 0 auto;
+  padding: 14px;
+  overflow: visible;
+  display: block;
+  box-sizing: content-box;
+}
+.boot .logo-frame {
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid #fff;
+  pointer-events: none;
+}
+.boot .logo-fill {
+  position: absolute;
+  inset: 1.5px;
+  background: #fff;
+  pointer-events: none;
+  z-index: 3;
+}
+.boot .logo-svg-wrap {
+  position: relative;
+  width: 242px;
+  height: calc(242px * 150 / 1339);
+  z-index: 2;
+  overflow: visible;
+}
+.boot .logo-svg-wrap svg {
+  width: 242px;
+  height: calc(242px * 150 / 1339);
+  display: block;
+  overflow: visible;
+}
+
+/* ---------- Restart screen ---------- */
+.boot .restart-screen {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  background: #000;
+  opacity: 0;
+  transition: opacity 350ms ease-out;
+}
+.boot .restart-screen.shown {
+  opacity: 1;
+}
+.boot .restart-btn {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font-family: inherit;
+  font-size: 24px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 18px 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+}
+.boot .restart-btn .bracket-l,
+.boot .restart-btn .bracket-r {
+  opacity: 0.45;
+}
+.boot .restart-btn:hover {
+  opacity: 0.85;
+}
+.boot .restart-hint {
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  opacity: 0.35;
+  text-transform: uppercase;
+}
+
+/* ---------- Audio toggle ---------- */
+.boot .audio-toggle {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.55);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  cursor: pointer;
+  z-index: 100;
+}
+.boot .audio-toggle:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.55);
+}
