@@ -20,14 +20,8 @@
     "enabled": true,
     "rules": {
       "recommended": true,
-      "style": {
-        "noNonNullAssertion": "off"
-      },
-      "complexity": {
-        "noForEach": "off"
-      },
-      "suspicious": {
-        "noArrayIndexKey": "off"
+      "nursery": {
+        "useSortedClasses": "error"
       }
     }
   },
