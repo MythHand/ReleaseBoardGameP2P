@@ -6,6 +6,7 @@
   pointer-events: none;
   overflow: visible;
   z-index: var(--z-arrow);
+
   /* приглушённый цвет: акцент типа, смешанный с серым (менее яркий) */
   --arrow-c: color-mix(in srgb, var(--arrow) 64%, #8a8a8a);
 }

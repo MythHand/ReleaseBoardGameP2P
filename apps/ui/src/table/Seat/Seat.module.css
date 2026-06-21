@@ -1,7 +1,7 @@
 .seat {
   width: 264px;
   padding: 14px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgb(255 255 255 / 8%);
   border-radius: 12px;
   background: var(--surface-1);
   display: flex;
@@ -27,7 +27,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
+  background: rgb(255 255 255 / 25%);
   flex: 0 0 auto;
 }
 

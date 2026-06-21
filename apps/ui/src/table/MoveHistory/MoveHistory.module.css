@@ -74,5 +74,5 @@
 .who {
   margin-left: auto;
   flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgb(255 255 255 / 50%);
 }

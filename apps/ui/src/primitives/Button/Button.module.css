@@ -18,9 +18,11 @@
   padding: 10px 2px;
   transition: opacity var(--t-fast) var(--ease-out);
 }
+
 .primary:hover {
   opacity: 0.78;
 }
+
 .primary .bracket {
   opacity: 0.45;
 }
@@ -30,13 +32,14 @@
   font-size: 11px;
   letter-spacing: 0.18em;
   padding: 6px 10px;
-  color: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgb(255 255 255 / 60%);
+  border: 1px solid rgb(255 255 255 / 18%);
   border-radius: 4px;
   transition: color var(--t-fast) var(--ease-out),
     border-color var(--t-fast) var(--ease-out);
 }
+
 .tech:hover {
   color: #fff;
-  border-color: rgba(255, 255, 255, 0.55);
+  border-color: rgb(255 255 255 / 55%);
 }

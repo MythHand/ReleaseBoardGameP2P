@@ -1,4 +1,4 @@
-@import "./tokens.css";
+@import url("./tokens.css");
 
 * {
   box-sizing: border-box;
@@ -14,6 +14,7 @@ body {
 body {
   background: var(--bg);
   color: var(--fg);
+
   /* Основной текст настолки — Fira Mono. Терминальная эстетика без сглаживания
      остаётся локально в модуле лоадера (boot), а не глобально. */
   font-family: var(--font-text);

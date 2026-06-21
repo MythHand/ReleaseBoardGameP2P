@@ -31,7 +31,7 @@
 .chip {
   height: 56px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgb(255 255 255 / 12%);
 }
 
 .label {
@@ -56,7 +56,7 @@
   width: var(--card-w);
   aspect-ratio: var(--card-aspect);
   border-radius: var(--card-radius);
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border: 1px dashed rgb(255 255 255 / 20%);
   background: var(--surface-1);
   display: flex;
   align-items: center;
