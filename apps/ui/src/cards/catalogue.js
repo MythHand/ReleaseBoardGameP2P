@@ -14,15 +14,29 @@
  * @property {number} qty
  */
 
-export const assetUrl = (path) => path.split('/').map(encodeURIComponent).join('/')
+// Resolve every card image bundled in this package to its final URL.
+// import.meta.glob runs relative to THIS file, so consuming apps resolve the
+// same assets without a duplicated public/ tree.
+const ART = import.meta.glob('../assets/cards/**/*.png', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+})
 
-export const COVERS = {
-  base: '/assets/cards/covers/Cover - base - 104 qty.png',
-  ai: '/assets/cards/covers/Cover - ai - 21 qty.png',
+// key like "cards/base/Release 3 - 4 qty.png" -> resolved URL
+export const assetUrl = (key) => {
+  const hit = ART[`../assets/${key}`]
+  if (!hit) throw new Error(`Unknown card asset: ${key}`)
+  return hit
 }
 
-const B = (file) => `/assets/cards/base/${file}`
-const A = (file) => `/assets/cards/ai/${file}`
+export const COVERS = {
+  base: assetUrl('cards/covers/Cover - base - 104 qty.png'),
+  ai: assetUrl('cards/covers/Cover - ai - 21 qty.png'),
+}
+
+const B = (file) => assetUrl(`cards/base/${file}`)
+const A = (file) => assetUrl(`cards/ai/${file}`)
 
 /** @type {Card[]} */
 export const CARDS = [

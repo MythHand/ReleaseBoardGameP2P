@@ -1,5 +1,7 @@
 // Loader audio (порт из user_input/Loader): tickThink() — клик строки;
-// playTheme() — тема лого-фазы (~3с). Семплы в /assets/audio/.
+// playTheme() — тема лого-фазы (~3с). Семплы в assets/audio/.
+import toneUrl from '../assets/audio/tone2a.wav'
+import themeWavUrl from '../assets/audio/theme.wav'
 
 const LoaderAudio = (function () {
   let ctx = null
@@ -29,7 +31,7 @@ const LoaderAudio = (function () {
     if (tickLoadStarted || !ctx) return
     tickLoadStarted = true
     try {
-      const res = await fetch('/assets/audio/tone2a.wav')
+      const res = await fetch(toneUrl)
       const arr = await res.arrayBuffer()
       tickBuffer = await ctx.decodeAudioData(arr)
     } catch (e) {
@@ -41,7 +43,7 @@ const LoaderAudio = (function () {
     if (themeLoadStarted || !ctx) return
     themeLoadStarted = true
     try {
-      const res = await fetch('/assets/audio/theme.wav')
+      const res = await fetch(themeWavUrl)
       const arr = await res.arrayBuffer()
       themeBuffer = await ctx.decodeAudioData(arr)
     } catch (e) {

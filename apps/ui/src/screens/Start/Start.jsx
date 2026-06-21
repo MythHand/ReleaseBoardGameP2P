@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import Button from '@/primitives/Button'
 import Modal from '@/primitives/Modal'
 import styles from './Start.module.css'
-
-const LOGO = '/assets/brand/release_logo.svg'
+import LOGO from '../../assets/brand/release_logo.svg'
 
 export default function Start() {
   const [modal, setModal] = useState(null) // 'create' | 'join' | null
