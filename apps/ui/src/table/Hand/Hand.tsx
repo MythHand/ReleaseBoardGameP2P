@@ -12,7 +12,7 @@ const HOVER_SCALE = 1.75 // для читаемости
 const NEIGHBOR_PUSH = 64 // насколько соседи расступаются
 const CARD_W = '150px'
 
-interface HandItem {
+export interface HandItem {
   uid: string
   card: CardType
 }

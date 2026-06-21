@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import styles from './MoveHistory.module.css'
 
-interface HistoryEntry {
+export interface HistoryEntry {
   id: number
   who: string
   kind?: string

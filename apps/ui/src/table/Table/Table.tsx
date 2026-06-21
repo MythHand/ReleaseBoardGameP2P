@@ -1,45 +1,22 @@
 import { useState } from 'react'
 import type { Card } from '@/cards/types'
 import Hand from '@/table/Hand'
+import type { HandItem } from '@/table/Hand/Hand'
 import Seat from '@/table/Seat'
 import ReleaseZone from '@/table/ReleaseZone'
+import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Pile from '@/primitives/Pile'
 import MoveHistory from '@/table/MoveHistory'
+import type { HistoryEntry } from '@/table/MoveHistory/MoveHistory'
 import ModesInfo from '@/table/ModesInfo'
+import type { GameMode } from '@/table/ModesInfo/ModesInfo'
 import styles from './Table.module.css'
-
-interface ReleaseSlots {
-  frontend?: Card | null
-  backend?: Card | null
-  database?: Card | null
-}
-
-interface HandItem {
-  uid: string
-  card: Card
-}
 
 interface Opponent {
   id: string
   name: string
   handCount: number
   release: ReleaseSlots
-}
-
-interface HistoryEntry {
-  id: number
-  who: string
-  kind?: string
-  card?: string
-  cat?: string
-  text?: string
-  children?: HistoryEntry[]
-}
-
-interface GameMode {
-  label: string
-  options: string[]
-  active: string
 }
 
 interface TableState {

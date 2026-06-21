@@ -1,6 +1,6 @@
 import styles from './ModesInfo.module.css'
 
-interface GameMode {
+export interface GameMode {
   label: string
   options: string[]
   active: string

@@ -1,12 +1,6 @@
-import type { Card } from '@/cards/types'
 import ReleaseZone from '@/table/ReleaseZone'
+import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import styles from './Seat.module.css'
-
-interface ReleaseSlots {
-  frontend?: Card | null
-  backend?: Card | null
-  database?: Card | null
-}
 
 interface Player {
   id: string

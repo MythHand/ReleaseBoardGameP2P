@@ -2,7 +2,7 @@ import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
 import styles from './ReleaseZone.module.css'
 
-interface ReleaseSlots {
+export interface ReleaseSlots {
   frontend?: CardType | null
   backend?: CardType | null
   database?: CardType | null
