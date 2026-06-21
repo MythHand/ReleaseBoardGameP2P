@@ -1,7 +1,7 @@
 import websocket from '@fastify/websocket'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { createSession, getSession, joinSessionById } from './sessions'
-import { joinRoom, leaveRoom, relay } from './signaling'
+import { createSession, getSession, joinSessionById } from './sessions.js'
+import { joinRoom, leaveRoom, relay } from './signaling.js'
 
 export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({ logger: true })

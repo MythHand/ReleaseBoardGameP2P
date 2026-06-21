@@ -1,4 +1,4 @@
-import { buildServer } from './server'
+import { buildServer } from './server.js'
 
 const PORT = Number(process.env.PORT ?? 3001)
 
