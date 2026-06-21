@@ -1,15 +1,15 @@
-import { useState } from 'react'
 import type { Card } from '@/cards/types'
+import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
-import Seat from '@/table/Seat'
-import ReleaseZone from '@/table/ReleaseZone'
-import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
-import Pile from '@/primitives/Pile'
-import MoveHistory from '@/table/MoveHistory'
-import type { HistoryEntry } from '@/table/MoveHistory/MoveHistory'
 import ModesInfo from '@/table/ModesInfo'
 import type { GameMode } from '@/table/ModesInfo/ModesInfo'
+import MoveHistory from '@/table/MoveHistory'
+import type { HistoryEntry } from '@/table/MoveHistory/MoveHistory'
+import ReleaseZone from '@/table/ReleaseZone'
+import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
+import Seat from '@/table/Seat'
+import { useState } from 'react'
 import styles from './Table.module.css'
 
 interface Opponent {
@@ -76,12 +76,14 @@ export default function Table({ state }: TableProps) {
       {/* полоса кнопок во всю высоту у правого края (поверх контента) */}
       <div className={styles.bar}>
         <button
+          type="button"
           className={`${styles.tab} ${panel === 'history' ? styles.tabOn : ''}`}
           onClick={() => toggle('history')}
         >
           история
         </button>
         <button
+          type="button"
           className={`${styles.tab} ${panel === 'settings' ? styles.tabOn : ''}`}
           onClick={() => toggle('settings')}
         >

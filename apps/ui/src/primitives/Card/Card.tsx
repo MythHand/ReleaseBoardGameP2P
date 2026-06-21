@@ -1,11 +1,11 @@
+import { play } from '@/animations'
+import { CATEGORIES } from '@/cards'
+import type { Card as CardType } from '@/cards/types'
 import type { CSSProperties } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import type { Card as CardType } from '@/cards/types'
-import { CATEGORIES } from '@/cards'
-import { play } from '@/animations'
-import CardFace from './CardFace'
-import CardBack from './CardBack'
 import styles from './Card.module.css'
+import CardBack from './CardBack'
+import CardFace from './CardFace'
 
 // Скромный наклон, чтобы не «кринж» в вебе. Тюнингуется.
 const TILT_MAX = 7
@@ -90,15 +90,26 @@ export default function Card({
       ref={ref}
       className={styles.root}
       data-state={state}
-      style={{
-        '--accent': accent,
-        width: width ?? 'var(--card-w)',
-        zIndex: lifted ? 'var(--z-card-lifted)' : 'auto',
-      } as CSSProperties}
+      style={
+        {
+          '--accent': accent,
+          width: width ?? 'var(--card-w)',
+          zIndex: lifted ? 'var(--z-card-lifted)' : 'auto',
+        } as CSSProperties
+      }
       onMouseEnter={handleEnter}
       onMouseMove={handleMove}
       onMouseLeave={handleLeave}
       onClick={!disabled ? onClick : undefined}
+      onKeyDown={
+        !disabled && onClick
+          ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') onClick()
+            }
+          : undefined
+      }
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick && !disabled ? 0 : undefined}
     >
       <div className={styles.tilt} style={{ transform }}>
         <div

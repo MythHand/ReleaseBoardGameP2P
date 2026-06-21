@@ -1,17 +1,17 @@
-import { useState } from 'react'
-import type { ReactNode } from 'react'
 import TokenPreview from '@/design/TokenPreview'
 import TypographyPreview from '@/design/TypographyPreview'
-import CardStory from './stories/CardStory'
-import HandStory from './stories/HandStory'
-import AnimationsStory from './stories/AnimationsStory'
-import TableStory from './stories/TableStory'
-import ArrowStory from './stories/ArrowStory'
-import ComboStory from './stories/ComboStory'
-import LoaderStory from './stories/LoaderStory'
-import DeckStory from './stories/DeckStory'
-import StartStory from './stories/StartStory'
+import { useState } from 'react'
+import type { ReactNode } from 'react'
 import styles from './Playground.module.css'
+import AnimationsStory from './stories/AnimationsStory'
+import ArrowStory from './stories/ArrowStory'
+import CardStory from './stories/CardStory'
+import ComboStory from './stories/ComboStory'
+import DeckStory from './stories/DeckStory'
+import HandStory from './stories/HandStory'
+import LoaderStory from './stories/LoaderStory'
+import StartStory from './stories/StartStory'
+import TableStory from './stories/TableStory'
 
 interface Story {
   id: string
@@ -48,6 +48,7 @@ export default function Playground() {
         <nav className={styles.nav}>
           {stories.map((s) => (
             <button
+              type="button"
               key={s.id}
               className={s.id === active ? styles.itemActive : styles.item}
               onClick={() => setActive(s.id)}

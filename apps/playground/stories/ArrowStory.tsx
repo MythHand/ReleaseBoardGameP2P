@@ -1,12 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
-import type { CardData } from '@release/ui'
-import Card from '@/primitives/Card'
-import Arrow from '@/primitives/Arrow'
 import { cardById, cardCanTarget } from '@/cards'
+import Arrow from '@/primitives/Arrow'
+import Card from '@/primitives/Card'
+import type { CardData } from '@release/ui'
+import type React from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import styles from './ArrowStory.module.css'
 
-interface Point { x: number; y: number }
+interface Point {
+  x: number
+  y: number
+}
 
 const SOURCE = cardById('attack-security-bug')! // целится только то, что умеет (атака)
 const TARGETS = [
@@ -51,13 +55,15 @@ export default function ArrowStory() {
   return (
     <div className={styles.root}>
       <p className={styles.hint}>
-        Клик по карте атаки — стрелка идёт за курсором. Наведи на цель — она
-        подсветится цветом карты. Клик ещё раз — отмена.
+        Клик по карте атаки — стрелка идёт за курсором. Наведи на цель — она подсветится цветом
+        карты. Клик ещё раз — отмена.
       </p>
 
       <div className={styles.stage}>
         <div
-          ref={(el) => { refs.current[SOURCE.id] = el }}
+          ref={(el) => {
+            refs.current[SOURCE.id] = el
+          }}
           className={styles.src}
           onMouseDown={(e) => arm(e, SOURCE)}
         >
@@ -71,7 +77,7 @@ export default function ArrowStory() {
               <div
                 key={t.id}
                 className={`${styles.target} ${lit ? styles.targeted : ''}`}
-                style={lit ? { '--hl': color } as CSSProperties : undefined}
+                style={lit ? ({ '--hl': color } as CSSProperties) : undefined}
                 onMouseEnter={() => active && setHovered(t.id)}
                 onMouseLeave={() => setHovered((h: string | null) => (h === t.id ? null : h))}
               >

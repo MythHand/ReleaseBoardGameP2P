@@ -3,7 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./tokens.css": "./src/design/tokens.css", "./global.css": "./src/design/global.css" },
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./src/design/tokens.css",
+    "./global.css": "./src/design/global.css"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "stylelint": "stylelint \"src/**/*.css\"",

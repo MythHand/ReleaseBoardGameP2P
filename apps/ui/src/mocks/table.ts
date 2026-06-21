@@ -59,11 +59,36 @@ interface TableState {
 }
 
 const OPPONENT_POOL: OpponentTemplate[] = [
-  { id: 'p2', name: 'kernel_panic', handCount: 5, release: { frontend: null, backend: 'release-backend', database: null } },
-  { id: 'p3', name: 'segfault', handCount: 7, release: { frontend: null, backend: null, database: null } },
-  { id: 'p4', name: 'null_ptr', handCount: 3, release: { frontend: 'release-frontend', backend: null, database: null } },
-  { id: 'p5', name: 'race_cond', handCount: 6, release: { frontend: null, backend: null, database: 'release-database' } },
-  { id: 'p6', name: 'off_by_one', handCount: 4, release: { frontend: null, backend: 'release-backend', database: null } },
+  {
+    id: 'p2',
+    name: 'kernel_panic',
+    handCount: 5,
+    release: { frontend: null, backend: 'release-backend', database: null },
+  },
+  {
+    id: 'p3',
+    name: 'segfault',
+    handCount: 7,
+    release: { frontend: null, backend: null, database: null },
+  },
+  {
+    id: 'p4',
+    name: 'null_ptr',
+    handCount: 3,
+    release: { frontend: 'release-frontend', backend: null, database: null },
+  },
+  {
+    id: 'p5',
+    name: 'race_cond',
+    handCount: 6,
+    release: { frontend: null, backend: null, database: 'release-database' },
+  },
+  {
+    id: 'p6',
+    name: 'off_by_one',
+    handCount: 4,
+    release: { frontend: null, backend: 'release-backend', database: null },
+  },
 ]
 
 const resolveRelease = (r: OpponentTemplate['release']): ReleaseSlots => ({
@@ -102,7 +127,11 @@ export function makeTable(opponentCount = 3): TableState {
     // Атаки/защиты по релизу — вложены под действием релиза (children).
     history: [
       {
-        id: 1, who: 'kernel_panic', kind: 'релиз', card: 'Backend', cat: 'release',
+        id: 1,
+        who: 'kernel_panic',
+        kind: 'релиз',
+        card: 'Backend',
+        cat: 'release',
         children: [
           { id: 11, who: 'you', kind: 'атака', card: 'Security Bug', cat: 'attack' },
           { id: 12, who: 'kernel_panic', kind: 'защита', card: 'Not a Bug', cat: 'defense' },
@@ -112,7 +141,11 @@ export function makeTable(opponentCount = 3): TableState {
       { id: 3, who: 'segfault', kind: 'AI', card: 'Crush Database', cat: 'ai' },
       { id: 4, who: 'null_ptr', kind: 'выложил', card: 'Monitoring', cat: 'protection' },
       {
-        id: 5, who: 'you', kind: 'релиз', card: 'Frontend', cat: 'release',
+        id: 5,
+        who: 'you',
+        kind: 'релиз',
+        card: 'Frontend',
+        cat: 'release',
         children: [
           { id: 51, who: 'segfault', kind: 'атака', card: 'DDoS', cat: 'attack' },
           { id: 52, who: 'you', kind: 'защита', card: 'Works on my Machine', cat: 'defense' },

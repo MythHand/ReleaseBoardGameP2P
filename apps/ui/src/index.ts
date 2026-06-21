@@ -1,7 +1,13 @@
 // Data + logic
 export { CATEGORIES } from './cards/categories'
 export {
-  CARDS, COVERS, assetUrl, cardById, cardCanTarget, isComboSource, validComboTarget,
+  CARDS,
+  COVERS,
+  assetUrl,
+  cardById,
+  cardCanTarget,
+  isComboSource,
+  validComboTarget,
 } from './cards/catalogue'
 // The card *type* is re-exported as `CardData` to avoid colliding with the `Card`
 // *component* default export below. Internally the type stays named `Card`.

@@ -1,10 +1,19 @@
-import type { CSSProperties } from 'react'
-import type { CategoryId } from '@release/ui'
-import Card from '@/primitives/Card'
 import { CARDS, CATEGORIES } from '@/cards'
+import Card from '@/primitives/Card'
+import type { CategoryId } from '@release/ui'
+import type { CSSProperties } from 'react'
 import styles from './DeckStory.module.css'
 
-const ORDER: CategoryId[] = ['release', 'attack', 'defense', 'protection', 'operation', 'support', 'trigger', 'ai']
+const ORDER: CategoryId[] = [
+  'release',
+  'attack',
+  'defense',
+  'protection',
+  'operation',
+  'support',
+  'trigger',
+  'ai',
+]
 
 export default function DeckStory() {
   const groups = ORDER.map((cat) => ({

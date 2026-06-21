@@ -22,10 +22,7 @@ export default function ModesInfo({ modes = [] }: ModesInfoProps) {
             <div className={styles.label}>{m.label}</div>
             <div className={styles.options}>
               {m.options.map((opt) => (
-                <span
-                  key={opt}
-                  className={opt === m.active ? styles.optOn : styles.opt}
-                >
+                <span key={opt} className={opt === m.active ? styles.optOn : styles.opt}>
                   {opt}
                 </span>
               ))}

@@ -1,5 +1,5 @@
-import { useTranslation } from 'react-i18next'
 import { Start, type StartCopy } from '@release/ui'
+import { useTranslation } from 'react-i18next'
 
 export function StartScreen() {
   const { t } = useTranslation()

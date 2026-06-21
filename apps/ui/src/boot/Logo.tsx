@@ -22,7 +22,13 @@ interface LogoSvgProps {
 }
 
 // LogoSvg — лого с опциональным клипом для split-эффекта.
-export default function LogoSvg({ fillOverlay = 0, splitOffset = 0, glitchY = 0, color = '#ffffff', style }: LogoSvgProps) {
+export default function LogoSvg({
+  fillOverlay = 0,
+  splitOffset = 0,
+  glitchY = 0,
+  color = '#ffffff',
+  style,
+}: LogoSvgProps) {
   const id = useId()
   const topClipId = `${id}-top`
   const botClipId = `${id}-bot`
@@ -33,6 +39,8 @@ export default function LogoSvg({ fillOverlay = 0, splitOffset = 0, glitchY = 0,
       xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid meet"
       style={style}
+      role="img"
+      aria-label="MythHand"
     >
       <defs>
         <clipPath id={topClipId}>

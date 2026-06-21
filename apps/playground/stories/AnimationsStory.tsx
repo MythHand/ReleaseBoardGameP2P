@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
-import Card from '@/primitives/Card'
-import { CARDS } from '@/cards'
 import { play, presetNames } from '@/animations'
+import { CARDS } from '@/cards'
+import Card from '@/primitives/Card'
+import { useRef, useState } from 'react'
 import styles from './AnimationsStory.module.css'
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -50,7 +50,13 @@ export default function AnimationsStory() {
 
       <div className={styles.buttons}>
         {presetNames().map((name) => (
-          <button key={name} className={styles.btn} onClick={() => run(name)} disabled={busy}>
+          <button
+            type="button"
+            key={name}
+            className={styles.btn}
+            onClick={() => run(name)}
+            disabled={busy}
+          >
             {name}
           </button>
         ))}

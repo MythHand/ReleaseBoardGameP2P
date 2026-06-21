@@ -10,7 +10,12 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   className?: string
 }
 
-export default function Button({ children, variant = 'primary', className = '', ...rest }: ButtonProps) {
+export default function Button({
+  children,
+  variant = 'primary',
+  className = '',
+  ...rest
+}: ButtonProps) {
   const isPrimary = variant === 'primary'
   return (
     <button className={`${styles.btn} ${styles[variant]} ${className}`} type="button" {...rest}>

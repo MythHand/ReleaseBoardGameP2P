@@ -1,6 +1,6 @@
+import { COVERS, assetUrl } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
-import { COVERS, assetUrl } from '@/cards'
 import styles from './Pile.module.css'
 
 interface PileProps {

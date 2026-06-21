@@ -1,9 +1,9 @@
-import type { TransitionEvent } from 'react'
-import { useEffect, useState } from 'react'
 import Button from '@/primitives/Button'
 import Modal from '@/primitives/Modal'
-import styles from './Start.module.css'
+import type { TransitionEvent } from 'react'
+import { useEffect, useState } from 'react'
 import LOGO from '../../assets/brand/release_logo.svg'
+import styles from './Start.module.css'
 
 export interface StartCopy {
   logoAlt: string
@@ -56,7 +56,9 @@ export default function Start({ copy }: { copy: StartCopy }) {
           <img className={styles.logo} src={LOGO} alt={copy.logoAlt} />
           <div className={styles.tags}>
             {copy.tags.map((tag) => (
-              <span key={tag} className={styles.tag}>{tag}</span>
+              <span key={tag} className={styles.tag}>
+                {tag}
+              </span>
             ))}
           </div>
           <p className={styles.desc}>{copy.description}</p>
@@ -73,6 +75,7 @@ export default function Start({ copy }: { copy: StartCopy }) {
         onTransitionEnd={onPlayerTransEnd}
       >
         <button
+          type="button"
           className={styles.playFace}
           onClick={openVideo}
           aria-label={copy.videoReview}
@@ -84,7 +87,12 @@ export default function Start({ copy }: { copy: StartCopy }) {
 
         {videoMounted && (
           <div className={`${styles.videoFace} ${videoOpen ? styles.videoShown : ''}`}>
-            <button className={styles.bigClose} onClick={closeVideo} aria-label={copy.close}>
+            <button
+              type="button"
+              className={styles.bigClose}
+              onClick={closeVideo}
+              aria-label={copy.close}
+            >
               ✕
             </button>
             <iframe

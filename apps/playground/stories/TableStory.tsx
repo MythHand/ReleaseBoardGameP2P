@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
-import Table from '@/table/Table'
 import { makeTable } from '@/mocks/table'
+import Table from '@/table/Table'
+import { useMemo, useState } from 'react'
 import styles from './TableStory.module.css'
 
 export default function TableStory() {
@@ -13,6 +13,7 @@ export default function TableStory() {
         <span className={styles.label}>оппонентов:</span>
         {[1, 2, 3, 4, 5].map((n) => (
           <button
+            type="button"
             key={n}
             className={n === opps ? styles.on : styles.btn}
             onClick={() => setOpps(n)}

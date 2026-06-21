@@ -1,10 +1,21 @@
 export type CategoryId =
-  | 'release' | 'attack' | 'defense' | 'protection'
-  | 'operation' | 'support' | 'trigger' | 'ai'
+  | 'release'
+  | 'attack'
+  | 'defense'
+  | 'protection'
+  | 'operation'
+  | 'support'
+  | 'trigger'
+  | 'ai'
 
 export type CardTag =
-  | 'lightning' | 'sudo' | 'cancel' | 'unicorn'
-  | 'trigger' | 'ai' | 'combo-source'
+  | 'lightning'
+  | 'sudo'
+  | 'cancel'
+  | 'unicorn'
+  | 'trigger'
+  | 'ai'
+  | 'combo-source'
 
 export interface Card {
   id: string

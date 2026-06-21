@@ -47,16 +47,23 @@ export default function Modal({ open, onClose, title, children }: ModalProps) {
     <div
       className={`${styles.overlay} ${shown ? styles.shown : ''}`}
       onClick={onClose}
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}
+      role="presentation"
     >
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <dialog
+        className={styles.modal}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        open
+      >
         <div className={styles.head}>
           <span className={styles.title}>{title}</span>
-          <button className={styles.close} onClick={onClose} aria-label="закрыть">
+          <button type="button" className={styles.close} onClick={onClose} aria-label="закрыть">
             ✕
           </button>
         </div>
         <div className={styles.body}>{children}</div>
-      </div>
+      </dialog>
     </div>
   )
 }

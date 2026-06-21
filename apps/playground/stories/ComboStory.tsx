@@ -1,18 +1,34 @@
-import React, { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
-import type { CardData } from '@release/ui'
-import Card from '@/primitives/Card'
-import Arrow from '@/primitives/Arrow'
-import { cardById, isComboSource, validComboTarget, cardCanTarget } from '@/cards'
 import { play } from '@/animations'
+import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
+import Arrow from '@/primitives/Arrow'
+import Card from '@/primitives/Card'
+import type { CardData } from '@release/ui'
+import type React from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import styles from './ComboStory.module.css'
 
-interface Point { x: number; y: number }
+interface Point {
+  x: number
+  y: number
+}
 
-interface HandItem { uid: string; card: CardData }
+interface HandItem {
+  uid: string
+  card: CardData
+}
 
-interface DiscardEntry { main: CardData; aux: CardData; rot: number; dx: number; dy: number }
-interface ReleasedEntry { card: CardData; aux: CardData }
+interface DiscardEntry {
+  main: CardData
+  aux: CardData
+  rot: number
+  dx: number
+  dy: number
+}
+interface ReleasedEntry {
+  card: CardData
+  aux: CardData
+}
 
 let _u = 0
 const uid = () => `c${++_u}`
@@ -88,8 +104,8 @@ export default function ComboStory() {
     phase === 'target' && partner
       ? `var(--cat-${partner.card.category})`
       : source
-      ? `var(--cat-${source.card.category})`
-      : 'var(--brand-green)'
+        ? `var(--cat-${source.card.category})`
+        : 'var(--brand-green)'
 
   const cancel = () => {
     setPhase('idle')
@@ -97,6 +113,7 @@ export default function ComboStory() {
     setPartner(null)
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cancel is an inline fn; adding it would cause re-subscription on every render
   useEffect(() => {
     if (!active) return
     const onMove = (e: MouseEvent) => setTo({ x: e.clientX, y: e.clientY })
@@ -252,12 +269,12 @@ export default function ComboStory() {
   return (
     <div className={styles.root}>
       <p className={styles.hint}>
-        Клик по <b>Sudo</b> / <b>Code Review</b> → стрелка к партнёру. Атака даёт 2-ю стрелку
-        цели. На розыгрыше вспомогательная карта тукается под основную под углом, затем пара
-        летит: релиз — в зону релиза, прочее — в центр и в сброс.
+        Клик по <b>Sudo</b> / <b>Code Review</b> → стрелка к партнёру. Атака даёт 2-ю стрелку цели.
+        На розыгрыше вспомогательная карта тукается под основную под углом, затем пара летит: релиз
+        — в зону релиза, прочее — в центр и в сброс.
       </p>
       <div className={styles.toolbar}>
-        <button className={styles.reset} onClick={reset}>
+        <button type="button" className={styles.reset} onClick={reset}>
           сброс
         </button>
         {log && <span className={styles.log}>сыграно: {log}</span>}
@@ -270,7 +287,7 @@ export default function ComboStory() {
             <div
               key={t.id}
               className={`${styles.target} ${lit ? styles.lit : ''}`}
-              style={lit ? { '--hl': color } as CSSProperties : undefined}
+              style={lit ? ({ '--hl': color } as CSSProperties) : undefined}
               onMouseDown={(e) => onTargetDown(e, t)}
             >
               {t.label}
@@ -307,7 +324,13 @@ export default function ComboStory() {
           {RELEASE_SLOTS.map((key) => {
             const r = released[key]
             return (
-              <div key={key} ref={(el) => { slotRefs.current[key] = el }} className={styles.slot}>
+              <div
+                key={key}
+                ref={(el) => {
+                  slotRefs.current[key] = el
+                }}
+                className={styles.slot}
+              >
                 {r ? (
                   <ComboPair main={r.card} aux={r.aux} width="100%" />
                 ) : (
@@ -329,11 +352,13 @@ export default function ComboStory() {
             return (
               <div
                 key={item.uid}
-                ref={(el) => { refs.current[item.uid] = el }}
+                ref={(el) => {
+                  refs.current[item.uid] = el
+                }}
                 className={`${styles.cell} ${valid ? styles.valid : ''} ${
                   isPartner ? styles.partner : ''
                 }`}
-                style={valid || isPartner ? { '--hl': color } as CSSProperties : undefined}
+                style={valid || isPartner ? ({ '--hl': color } as CSSProperties) : undefined}
                 onMouseDown={(e) => onCardDown(e, item)}
               >
                 <Card card={item.card} interactive={false} width="118px" />

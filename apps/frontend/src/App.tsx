@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import LanguageSwitch from './components/LanguageSwitch'
 import styles from './App.module.css'
+import LanguageSwitch from './components/LanguageSwitch'
 
 // Фаза 0 — фундамент. Корень = реальное приложение (НЕ песочница).
 // Пока это нейтральная заглушка-оболочка; по фазам станет роутером экранов:
@@ -17,7 +17,10 @@ export default function App() {
         <p className={styles.tag}>{t('app.foundationTag')}</p>
         <p className={styles.hint}>{t('app.phasesHint')}</p>
         <p className={styles.dev}>
-          {t('app.devShowcase')} <a className={styles.link} href="/playground/">/playground/</a>
+          {t('app.devShowcase')}{' '}
+          <a className={styles.link} href="/playground/">
+            /playground/
+          </a>
         </p>
       </main>
     </div>

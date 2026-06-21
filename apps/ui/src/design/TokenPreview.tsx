@@ -22,7 +22,7 @@ export default function TokenPreview() {
   return (
     <section className={styles.root}>
       <h2 className={styles.h}>
-        design tokens <span className={styles.note}>// провизорно</span>
+        design tokens <span className={styles.note}>{'// провизорно'}</span>
       </h2>
 
       <div className={styles.grid}>

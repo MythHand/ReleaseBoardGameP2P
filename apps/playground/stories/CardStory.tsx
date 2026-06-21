@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
-import Card from '@/primitives/Card'
 import { CARDS } from '@/cards'
+import Card from '@/primitives/Card'
+import type React from 'react'
+import { useState } from 'react'
 import styles from './CardStory.module.css'
 
 type CardState = 'idle' | 'playable' | 'selected' | 'disabled'
@@ -24,6 +25,7 @@ export default function CardStory() {
         <div className={styles.states}>
           {STATES.map((s) => (
             <button
+              type="button"
               key={s}
               className={s === state ? styles.on : styles.btn}
               onClick={() => setState(s)}

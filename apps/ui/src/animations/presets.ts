@@ -31,7 +31,12 @@ interface MoveParams {
 // (translate по центрам + масштаб по ширине). Базис под все «полёты» карт.
 // rotate/dx/dy — финальный разворот и доп. смещение (чтобы прилёт сразу был
 // в правильной конечной позиции, без последующего рывка).
-const move = (el: Element, { from, to, rotate = 0, dx = 0, dy = 0 }: MoveParams = {}, duration = 460, easing = EASE): Animation | null => {
+const move = (
+  el: Element,
+  { from, to, rotate = 0, dx = 0, dy = 0 }: MoveParams = {},
+  duration = 460,
+  easing = EASE,
+): Animation | null => {
   if (!el || !from || !to) return null
   const mx = to.left + to.width / 2 - (from.left + from.width / 2) + dx
   const my = to.top + to.height / 2 - (from.top + from.height / 2) + dy
@@ -77,9 +82,12 @@ export const PRESETS: Record<string, Preset> = {
 
   // ===== Розыгрыш карт (travel) =====
   // Выкладывание не-релиза в центр стола (видно всем).
-  playToCenter: (el: Element, p?: Record<string, unknown>): Animation | null => move(el, p as MoveParams, 480, EASE),
+  playToCenter: (el: Element, p?: Record<string, unknown>): Animation | null =>
+    move(el, p as MoveParams, 480, EASE),
   // Релиз — в слот зоны релиза, с лёгким снап-приземлением.
-  playToReleaseZone: (el: Element, p?: Record<string, unknown>): Animation | null => move(el, p as MoveParams, 480, SNAP),
+  playToReleaseZone: (el: Element, p?: Record<string, unknown>): Animation | null =>
+    move(el, p as MoveParams, 480, SNAP),
   // Перенос разыгранной карты из центра в сброс.
-  centerToDiscard: (el: Element, p?: Record<string, unknown>): Animation | null => move(el, p as MoveParams, 420, EASE),
+  centerToDiscard: (el: Element, p?: Record<string, unknown>): Animation | null =>
+    move(el, p as MoveParams, 420, EASE),
 }

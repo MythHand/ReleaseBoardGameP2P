@@ -1,9 +1,9 @@
 // Лоадер игры (порт из user_input/Loader). Самостоятельный декоративный boot-экран:
 // blank → terminal → blank → logo (frame → fill flash → split+shake → reassemble → hold → fade) → restart.
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { buildSequence } from './lines'
-import LoaderAudio from './audio'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import LogoSvg from './Logo'
+import LoaderAudio from './audio'
+import { buildSequence } from './lines'
 import './boot.css'
 
 // ---------------- Terminal ----------------
@@ -59,27 +59,36 @@ function Terminal({ active, onComplete }: TerminalProps) {
           schedule(360)
           return
         }
-        timer = setTimeout(() => {
-          if (cancelled) return
-          const done2 = emitOne()
-          if (done2) {
-            schedule(360)
-            return
-          }
-          schedule(40 + Math.random() * 140)
-        }, 40 + Math.random() * 100)
+        timer = setTimeout(
+          () => {
+            if (cancelled) return
+            const done2 = emitOne()
+            if (done2) {
+              schedule(360)
+              return
+            }
+            schedule(40 + Math.random() * 140)
+          },
+          40 + Math.random() * 100,
+        )
       } else if (r < 0.94) {
-        timer = setTimeout(() => {
-          if (cancelled) return
-          const done = emitOne()
-          schedule(done ? 360 : 30 + Math.random() * 100)
-        }, 320 + Math.random() * 420)
+        timer = setTimeout(
+          () => {
+            if (cancelled) return
+            const done = emitOne()
+            schedule(done ? 360 : 30 + Math.random() * 100)
+          },
+          320 + Math.random() * 420,
+        )
       } else {
-        timer = setTimeout(() => {
-          if (cancelled) return
-          const done = emitOne()
-          schedule(done ? 360 : 30 + Math.random() * 100)
-        }, 700 + Math.random() * 600)
+        timer = setTimeout(
+          () => {
+            if (cancelled) return
+            const done = emitOne()
+            schedule(done ? 360 : 30 + Math.random() * 100)
+          },
+          700 + Math.random() * 600,
+        )
       }
     }
 
@@ -99,6 +108,7 @@ function Terminal({ active, onComplete }: TerminalProps) {
     }
   }, [active, onComplete])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: lines triggers scroll-to-bottom; containerRef is a ref (stable)
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -248,7 +258,7 @@ function RestartScreen({ onRestart }: RestartScreenProps) {
   }, [])
   return (
     <div className={`restart-screen ${shown ? 'shown' : ''}`}>
-      <button className="restart-btn" onClick={onRestart}>
+      <button type="button" className="restart-btn" onClick={onRestart}>
         <span className="bracket-l">[</span>
         <span className="restart-label">REBOOT</span>
         <span className="bracket-r">]</span>
@@ -267,7 +277,7 @@ function AudioToggle() {
     LoaderAudio.setMuted(next)
   }
   return (
-    <button className="audio-toggle" onClick={toggle} aria-label="toggle audio">
+    <button type="button" className="audio-toggle" onClick={toggle} aria-label="toggle audio">
       {muted ? 'audio: off' : 'audio: on'}
     </button>
   )
@@ -307,7 +317,7 @@ function App() {
   return (
     <div className="root" key={runId}>
       {!armed && stage === 'idle' && (
-        <button className="start-gate" onClick={start}>
+        <button type="button" className="start-gate" onClick={start}>
           <span>
             <span className="bracket-l">[</span> POWER ON <span className="bracket-r">]</span>
           </span>

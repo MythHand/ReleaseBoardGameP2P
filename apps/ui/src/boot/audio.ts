@@ -1,7 +1,7 @@
+import themeWavUrl from '../assets/audio/theme.wav'
 // Loader audio (порт из user_input/Loader): tickThink() — клик строки;
 // playTheme() — тема лого-фазы (~3с). Семплы в assets/audio/.
 import toneUrl from '../assets/audio/tone2a.wav'
-import themeWavUrl from '../assets/audio/theme.wav'
 
 // webkitAudioContext is non-standard; declare it to satisfy strict TS
 declare global {
@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-const LoaderAudio = (function () {
+const LoaderAudio = (() => {
   let ctx: AudioContext | null = null
   let masterGain: GainNode | null = null
   let muted = false

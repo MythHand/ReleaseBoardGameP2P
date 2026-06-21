@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
+import { useState } from 'react'
 import styles from './Hand.module.css'
 
 // Геометрия веера — тюнингуется.
