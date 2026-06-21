@@ -1,6 +1,6 @@
 import websocket from '@fastify/websocket'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { createSession, getSession, joinSession } from './sessions'
+import { createSession, getSession, joinSessionById } from './sessions'
 import { joinRoom, leaveRoom, relay } from './signaling'
 
 export async function buildServer(): Promise<FastifyInstance> {
@@ -15,9 +15,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   })
 
   app.post<{ Params: { id: string } }>('/sessions/:id/join', async (req, reply) => {
-    const session = getSession(req.params.id)
-    if (!session) return reply.code(404).send({ error: 'session not found' })
-    const result = joinSession(session.code)
+    const result = joinSessionById(req.params.id)
     if (!result) return reply.code(404).send({ error: 'session not found' })
     return { sessionId: result.session.id, peerId: result.peerId }
   })

@@ -11,3 +11,10 @@ it('POST /sessions then GET /sessions/:id returns the session', async () => {
   expect(fetched.json<{ id: string }>().id).toBe(id)
   await app.close()
 })
+
+it('GET /sessions/:id returns 404 for unknown id', async () => {
+  const app = await buildServer()
+  const res = await app.inject({ method: 'GET', url: '/sessions/does-not-exist' })
+  expect(res.statusCode).toBe(404)
+  await app.close()
+})

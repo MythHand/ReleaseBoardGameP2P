@@ -10,7 +10,13 @@ export interface Session {
 const sessions = new Map<string, Session>()
 const byCode = new Map<string, string>()
 
-const makeCode = (): string => randomBytes(4).toString('hex').toUpperCase().slice(0, 8)
+const makeCode = (): string => {
+  let code: string
+  do {
+    code = randomBytes(4).toString('hex').toUpperCase().slice(0, 8)
+  } while (byCode.has(code))
+  return code
+}
 
 export function createSession(): Session {
   const session: Session = { id: randomUUID(), code: makeCode(), createdAt: Date.now(), peers: [] }
@@ -23,12 +29,16 @@ export function getSession(id: string): Session | undefined {
   return sessions.get(id)
 }
 
-export function joinSession(code: string): { session: Session; peerId: string } | null {
-  const id = byCode.get(code)
-  if (!id) return null
+export function joinSessionById(id: string): { session: Session; peerId: string } | null {
   const session = sessions.get(id)
   if (!session) return null
   const peerId = randomUUID()
   session.peers.push(peerId)
   return { session, peerId }
+}
+
+export function joinSession(code: string): { session: Session; peerId: string } | null {
+  const id = byCode.get(code)
+  if (!id) return null
+  return joinSessionById(id)
 }
