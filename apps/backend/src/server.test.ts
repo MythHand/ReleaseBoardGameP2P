@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { buildServer } from './server'
+import { buildServer } from './server.js'
 
 it('POST /sessions then GET /sessions/:id returns the session', async () => {
   const app = await buildServer()

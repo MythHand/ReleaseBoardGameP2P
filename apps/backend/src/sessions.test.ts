@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSession, getSession, joinSession } from './sessions'
+import { createSession, getSession, joinSession } from './sessions.js'
 
 describe('sessions', () => {
   it('creates a session with a unique id and a join code', () => {
