@@ -1,0 +1,38 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: claude-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Claude PR review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Claude Code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this pull request for correctness bugs, security issues, and
+            code quality. This is a pnpm monorepo (apps/ui, apps/playground,
+            apps/frontend, apps/backend). Respect the project conventions:
+            CSS Modules stay as authored, Tailwind is frontend-only, @release/ui
+            is i18n-agnostic (copy via props), and the backend is signaling-only
+            (no game rules). Post specific, actionable inline comments; keep
+            praise brief and focus on real issues.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
