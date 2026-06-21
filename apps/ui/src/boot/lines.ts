@@ -1,43 +1,69 @@
 // Boot-line generator (порт из user_input/Loader). Реальная телеметрия устройства
 // + системные/devops/app-строки. Длины строк сильно варьируются.
 
+interface NavigatorConnection { effectiveType?: string; downlink?: number }
+interface ExtendedNavigator extends Navigator {
+  connection?: NavigatorConnection
+  deviceMemory?: number
+  userAgentData?: { platform?: string }
+}
+
 const LineGen = (function () {
   const HEX = '0123456789abcdef'
-  const rand = (n) => Math.floor(Math.random() * n)
-  const hex = (n) => Array.from({ length: n }, () => HEX[rand(16)]).join('')
-  const pick = (arr) => arr[rand(arr.length)]
+  const rand = (n: number): number => Math.floor(Math.random() * n)
+  const hex = (n: number): string => Array.from({ length: n }, () => HEX[rand(16)]).join('')
+  const pick = <T>(arr: T[]): T => arr[rand(arr.length)]
 
-  function uuid() {
+  function uuid(): string {
     return `${hex(8)}-${hex(4)}-${hex(4)}-${hex(4)}-${hex(12)}`
   }
-  function ipv4() {
+  function ipv4(): string {
     return `${10 + rand(245)}.${rand(255)}.${rand(255)}.${1 + rand(254)}`
   }
-  function ipv6() {
+  function ipv6(): string {
     return `${hex(4)}:${hex(4)}:${hex(4)}:${hex(4)}:${hex(4)}:${hex(4)}:${hex(4)}:${hex(4)}`
   }
-  function mac() {
+  function mac(): string {
     return Array.from({ length: 6 }, () => hex(2)).join(':').toUpperCase()
   }
 
-  function getGPU() {
+  function getGPU(): string {
     try {
       const canvas = document.createElement('canvas')
       const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
       if (!gl) return 'software-renderer'
-      const ext = gl.getExtension('WEBGL_debug_renderer_info')
+      const ext = (gl as WebGLRenderingContext).getExtension('WEBGL_debug_renderer_info')
       if (ext) {
-        const r = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)
+        const r = (gl as WebGLRenderingContext).getParameter(ext.UNMASKED_RENDERER_WEBGL)
         if (r) return String(r)
       }
-      return gl.getParameter(gl.RENDERER) || 'unknown-gpu'
-    } catch (e) {
+      return (gl as WebGLRenderingContext).getParameter(WebGLRenderingContext.RENDERER) || 'unknown-gpu'
+    } catch (_e) {
       return 'gpu-probe-failed'
     }
   }
 
-  function deviceFacts() {
-    const n = navigator
+  interface DeviceFacts {
+    platform: string
+    lang: string
+    langs: string
+    cores: number | string
+    mem: string
+    screen: string
+    avail: string
+    vp: string
+    dpr: string
+    depth: number
+    tz: string
+    online: string
+    eff: string
+    down: string
+    gpu: string
+    now: string
+  }
+
+  function deviceFacts(): DeviceFacts {
+    const n = navigator as ExtendedNavigator
     const s = screen
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
     const conn = n.connection || {}
@@ -61,7 +87,7 @@ const LineGen = (function () {
     }
   }
 
-  function* sysLines(f) {
+  function* sysLines(f: DeviceFacts): Generator<string> {
     yield `mythhand bootloader v4.2.1-stable  build=${hex(7)}  signed-by=mythhand-systems-rsa4096`
     yield `Copyright (c) MythHand Systems. All rights reserved. Protected under the MythHand End-User Agreement.`
     yield ``
@@ -108,7 +134,7 @@ const LineGen = (function () {
     yield `net  firewall.policy applied: 247 rules across 14 chains  default=DROP  log_dropped=true`
   }
 
-  function* devopsLines() {
+  function* devopsLines(): Generator<string> {
     yield `containerd v1.7.${rand(20)}  snapshotter=overlayfs  runtime=io.containerd.runc.v2  cgroup=systemd`
     yield `pulling registry.mythhand.io/release-engine:${1 + rand(9)}.${rand(40)}.${rand(99)}  digest=sha256:${hex(64)}`
     yield `extracting layer ${hex(12)}...  ${1 + rand(30)}MB  decompress=zstd  ${pick(['pulling', 'extracting', 'verified', 'cached'])}`
@@ -135,7 +161,7 @@ const LineGen = (function () {
     yield `service.mesh  envoy v1.${rand(40)}.${rand(20)}  active_connections=${100 + rand(9000)}  upstream_p99=${5 + rand(80)}ms`
   }
 
-  function* appLines() {
+  function* appLines(): Generator<string> {
     yield `mythhand.core   initializing subsystem registry  manifest=/etc/mythhand/registry.toml  signature=verified`
     yield `subsystem  input      handshake ok  rev=${hex(8)}  protocol=v3.2  capabilities=keyboard,pointer,gamepad,touch`
     yield `subsystem  render     handshake ok  rev=${hex(8)}  backend=webgl2  msaa=4x  anisotropy=16x`
@@ -153,16 +179,16 @@ const LineGen = (function () {
     yield `bootstrap complete  total=${(2 + Math.random() * 3).toFixed(3)}s  cold_start=true  next=handover`
   }
 
-  function shuffle(a) {
+  function shuffle(a: string[]): void {
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1))
       ;[a[i], a[j]] = [a[j], a[i]]
     }
   }
 
-  function buildSequence() {
+  function buildSequence(): string[] {
     const f = deviceFacts()
-    const out = []
+    const out: string[] = []
 
     const sys = Array.from(sysLines(f))
     const sysTake = Math.round(sys.length * 0.8)

@@ -1,18 +1,9 @@
 // Каталог карт = «сущности карт»: статические определения (арт + метаданные).
-// Источник арта — public/assets/cards/. Имена/категории/теги считаны с самих артов.
+// Источник арта — assets/cards/. Имена/категории/теги считаны с самих артов.
 // tags: lightning (атака), sudo (есть sudo-эффект), cancel/unicorn (тип защиты),
 //       trigger, ai, combo-source (Sudo/Code Review).
 
-/**
- * @typedef {Object} Card
- * @property {string} id
- * @property {string} name
- * @property {string} category
- * @property {'base'|'ai'} deck
- * @property {string} art
- * @property {string[]} tags
- * @property {number} qty
- */
+import type { Card } from './types'
 
 // Resolve every card image bundled in this package to its final URL.
 // import.meta.glob runs relative to THIS file, so consuming apps resolve the
@@ -21,25 +12,24 @@ const ART = import.meta.glob('../assets/cards/**/*.png', {
   eager: true,
   query: '?url',
   import: 'default',
-})
+}) as Record<string, string>
 
 // key like "cards/base/Release 3 - 4 qty.png" -> resolved URL
-export const assetUrl = (key) => {
+export const assetUrl = (key: string): string => {
   const hit = ART[`../assets/${key}`]
   if (!hit) throw new Error(`Unknown card asset: ${key}`)
   return hit
 }
 
-export const COVERS = {
+export const COVERS: Record<'base' | 'ai', string> = {
   base: assetUrl('cards/covers/Cover - base - 104 qty.png'),
   ai: assetUrl('cards/covers/Cover - ai - 21 qty.png'),
 }
 
-const B = (file) => assetUrl(`cards/base/${file}`)
-const A = (file) => assetUrl(`cards/ai/${file}`)
+const B = (file: string): string => assetUrl(`cards/base/${file}`)
+const A = (file: string): string => assetUrl(`cards/ai/${file}`)
 
-/** @type {Card[]} */
-export const CARDS = [
+export const CARDS: Card[] = [
   // ===== Release =====
   { id: 'release-frontend', name: 'Frontend', category: 'release', deck: 'base', art: B('Release 3 - 4 qty.png'), tags: [], qty: 4 },
   { id: 'release-backend', name: 'Backend', category: 'release', deck: 'base', art: B('Release 2 - 4 qty.png'), tags: [], qty: 4 },
@@ -94,15 +84,15 @@ export const CARDS = [
   { id: 'ai-error-503', name: 'Error 503', category: 'ai', deck: 'ai', art: A('AI 12 - purple cover - 1 qty.png'), tags: ['ai'], qty: 1 },
 ]
 
-export const cardById = (id) => CARDS.find((c) => c.id === id)
+export const cardById = (id: string): Card | undefined => CARDS.find((c) => c.id === id)
 
 // МОК ЛОГИКИ: может ли карта выбирать цель (атаки — да). Реально решает логика друга.
-export const cardCanTarget = (card) => !!card?.tags?.includes('lightning')
+export const cardCanTarget = (card?: Card): boolean => !!card?.tags?.includes('lightning')
 
 // МОК ЛОГИКИ комбо «две карты как одно действие» (Sudo / Code Review).
-export const isComboSource = (card) => !!card?.tags?.includes('combo-source')
+export const isComboSource = (card?: Card): boolean => !!card?.tags?.includes('combo-source')
 
-export const validComboTarget = (source, target) => {
+export const validComboTarget = (source?: Card, target?: Card): boolean => {
   if (!source || !target || source.id === target.id) return false
   if (source.id === 'support-sudo') return !!target.tags?.includes('sudo')
   if (source.id === 'support-code-review') return target.category === 'release'

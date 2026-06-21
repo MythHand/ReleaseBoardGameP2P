@@ -1,5 +1,7 @@
+import type { Category, CategoryId } from './types'
+
 // Категории карт основной + AI колоды. accent тянется из design-токенов.
-export const CATEGORIES = {
+export const CATEGORIES: Record<CategoryId, Category> = {
   release: { id: 'release', label: 'Release', accent: 'var(--cat-release)' },
   attack: { id: 'attack', label: 'Attack', accent: 'var(--cat-attack)' },
   defense: { id: 'defense', label: 'Defense', accent: 'var(--cat-defense)' },

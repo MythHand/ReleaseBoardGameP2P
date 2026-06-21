@@ -1,8 +1,64 @@
 import { cardById } from '@/cards'
+import type { Card } from '@/cards/types'
 import { makeHand } from './hand'
+import type { HandCard } from './hand'
 
 // Пул возможных оппонентов (для вариативности 1-5; всего 2-6 игроков).
-const OPPONENT_POOL = [
+interface OpponentTemplate {
+  id: string
+  name: string
+  handCount: number
+  release: { frontend: string | null; backend: string | null; database: string | null }
+}
+
+interface ReleaseSlots {
+  frontend: Card | undefined
+  backend: Card | undefined
+  database: Card | undefined
+}
+
+interface Opponent {
+  id: string
+  name: string
+  handCount: number
+  release: ReleaseSlots
+}
+
+interface HistoryEntry {
+  id: number
+  who: string
+  kind: string
+  card?: string
+  cat?: string
+  text?: string
+  children?: HistoryEntry[]
+}
+
+interface GameMode {
+  label: string
+  options: string[]
+  active: string
+}
+
+interface TableState {
+  you: {
+    name: string
+    hand: HandCard[]
+    release: ReleaseSlots
+  }
+  opponents: Opponent[]
+  decks: {
+    main: number
+    events: number
+    discard: Card | undefined
+    discardCount: number
+  }
+  turn: string | undefined
+  history: HistoryEntry[]
+  modes: GameMode[]
+}
+
+const OPPONENT_POOL: OpponentTemplate[] = [
   { id: 'p2', name: 'kernel_panic', handCount: 5, release: { frontend: null, backend: 'release-backend', database: null } },
   { id: 'p3', name: 'segfault', handCount: 7, release: { frontend: null, backend: null, database: null } },
   { id: 'p4', name: 'null_ptr', handCount: 3, release: { frontend: 'release-frontend', backend: null, database: null } },
@@ -10,15 +66,15 @@ const OPPONENT_POOL = [
   { id: 'p6', name: 'off_by_one', handCount: 4, release: { frontend: null, backend: 'release-backend', database: null } },
 ]
 
-const resolveRelease = (r) => ({
-  frontend: r.frontend ? cardById(r.frontend) : null,
-  backend: r.backend ? cardById(r.backend) : null,
-  database: r.database ? cardById(r.database) : null,
+const resolveRelease = (r: OpponentTemplate['release']): ReleaseSlots => ({
+  frontend: r.frontend ? cardById(r.frontend) : undefined,
+  backend: r.backend ? cardById(r.backend) : undefined,
+  database: r.database ? cardById(r.database) : undefined,
 })
 
 // Мок-снимок стола. opponentCount: 1..5 — проверка вариативности раскладки.
-export function makeTable(opponentCount = 3) {
-  const opponents = OPPONENT_POOL.slice(0, opponentCount).map((o) => ({
+export function makeTable(opponentCount = 3): TableState {
+  const opponents: Opponent[] = OPPONENT_POOL.slice(0, opponentCount).map((o) => ({
     ...o,
     release: resolveRelease(o.release),
   }))
@@ -29,7 +85,7 @@ export function makeTable(opponentCount = 3) {
       hand: makeHand(6),
       release: {
         frontend: cardById('release-frontend'),
-        backend: null,
+        backend: undefined,
         database: cardById('release-database'),
       },
     },

@@ -1,4 +1,4 @@
-export { CATEGORIES } from './categories.js'
+export { CATEGORIES } from './categories'
 export {
   CARDS,
   COVERS,
@@ -7,4 +7,4 @@ export {
   cardCanTarget,
   isComboSource,
   validComboTarget,
-} from './catalogue.js'
+} from './catalogue'

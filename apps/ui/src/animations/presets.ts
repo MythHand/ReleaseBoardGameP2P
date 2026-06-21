@@ -12,11 +12,26 @@
 const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
 const SNAP = 'cubic-bezier(0.2, 0.9, 0.1, 1)'
 
+interface Rect {
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+interface MoveParams {
+  from?: Rect
+  to?: Rect
+  rotate?: number
+  dx?: number
+  dy?: number
+}
+
 // Общий travel: перелёт элемента из прямоугольника from в прямоугольник to
 // (translate по центрам + масштаб по ширине). Базис под все «полёты» карт.
 // rotate/dx/dy — финальный разворот и доп. смещение (чтобы прилёт сразу был
 // в правильной конечной позиции, без последующего рывка).
-const move = (el, { from, to, rotate = 0, dx = 0, dy = 0 } = {}, duration = 460, easing = EASE) => {
+const move = (el: Element, { from, to, rotate = 0, dx = 0, dy = 0 }: MoveParams = {}, duration = 460, easing = EASE): Animation | null => {
   if (!el || !from || !to) return null
   const mx = to.left + to.width / 2 - (from.left + from.width / 2) + dx
   const my = to.top + to.height / 2 - (from.top + from.height / 2) + dy
@@ -30,9 +45,18 @@ const move = (el, { from, to, rotate = 0, dx = 0, dy = 0 } = {}, duration = 460,
   )
 }
 
-export const PRESETS = {
+export type PresetFn = (el: Element, params?: Record<string, unknown>) => Animation | null
+
+export interface PresetData {
+  keyframes: Keyframe[]
+  options: KeyframeAnimationOptions
+}
+
+export type Preset = PresetFn | PresetData
+
+export const PRESETS: Record<string, Preset> = {
   // Переворот карты лицо↔рубашка. Используется самим компонентом Card.
-  flipCard: (el, { faceDown = false } = {}) =>
+  flipCard: (el: Element, { faceDown = false }: { faceDown?: boolean } = {}): Animation =>
     el.animate(
       [
         { transform: `rotateY(${faceDown ? 0 : 180}deg)` },
@@ -53,9 +77,9 @@ export const PRESETS = {
 
   // ===== Розыгрыш карт (travel) =====
   // Выкладывание не-релиза в центр стола (видно всем).
-  playToCenter: (el, p) => move(el, p, 480, EASE),
+  playToCenter: (el: Element, p?: Record<string, unknown>): Animation | null => move(el, p as MoveParams, 480, EASE),
   // Релиз — в слот зоны релиза, с лёгким снап-приземлением.
-  playToReleaseZone: (el, p) => move(el, p, 480, SNAP),
+  playToReleaseZone: (el: Element, p?: Record<string, unknown>): Animation | null => move(el, p as MoveParams, 480, SNAP),
   // Перенос разыгранной карты из центра в сброс.
-  centerToDiscard: (el, p) => move(el, p, 420, EASE),
+  centerToDiscard: (el: Element, p?: Record<string, unknown>): Animation | null => move(el, p as MoveParams, 420, EASE),
 }
