@@ -9,6 +9,7 @@
     "dev": "pnpm --filter @release/web dev",
     "dev:playground": "pnpm --filter @release/playground dev",
     "dev:server": "pnpm --filter @release/server dev",
+    "dev:all": "concurrently -n web,playground -c green,magenta \"pnpm dev\" \"pnpm dev:playground\"",
     "build": "pnpm -r build",
     "lint": "biome check . && pnpm -r stylelint",
     "format": "biome format --write .",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "concurrently": "^9.1.0",
     "stylelint": "^16.10.0",
     "stylelint-config-standard": "^36.0.1",
     "typescript": "^5.6.3",

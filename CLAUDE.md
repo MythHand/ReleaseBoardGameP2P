@@ -63,6 +63,10 @@ pnpm dev
 # Run the playground dev server (apps/playground)
 pnpm dev:playground
 
+# Run frontend + playground together (so the frontend's /playground/ link
+# proxies to the running playground app). Needed only when using that link.
+pnpm dev:all
+
 # Run the backend signaling server in watch mode (apps/backend)
 pnpm dev:server
 
