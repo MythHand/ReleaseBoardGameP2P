@@ -8,7 +8,7 @@ import { PRESETS } from './presets'
  *                для данных-пресета — переопределение options
  * @returns объект анимации (anim.finished — промис) либо null
  */
-export function play(name: string, el: Element, params: Record<string, unknown> = {}): Animation | null {
+export function play(name: string, el: Element | null, params: Record<string, unknown> = {}): Animation | null {
   const preset = PRESETS[name]
   if (!preset) {
     console.warn(`[animations] неизвестный пресет: "${name}"`)
