@@ -5,7 +5,7 @@
 }
 
 .sidebar {
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid rgb(255 255 255 / 8%);
   background: var(--surface-1);
   padding: 18px 0;
 }
@@ -37,12 +37,12 @@
 }
 
 .item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgb(255 255 255 / 4%);
 }
 
 .itemActive {
   border-left-color: var(--brand-green);
-  background: rgba(41, 224, 122, 0.08);
+  background: rgb(41 224 122 / 8%);
 }
 
 .stage {

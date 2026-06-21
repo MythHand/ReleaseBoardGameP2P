@@ -14,7 +14,7 @@
 
 .btn {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgb(255 255 255 / 15%);
   color: var(--fg);
   padding: 6px 12px;
   border-radius: 6px;

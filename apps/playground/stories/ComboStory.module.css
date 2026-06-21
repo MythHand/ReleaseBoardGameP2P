@@ -22,7 +22,7 @@
 
 .reset {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgb(255 255 255 / 15%);
   color: var(--fg);
   padding: 6px 14px;
   border-radius: 6px;
@@ -53,7 +53,7 @@
 .target {
   width: 200px;
   height: 92px;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border: 1px dashed rgb(255 255 255 / 18%);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -84,7 +84,7 @@
   width: 160px;
   aspect-ratio: var(--card-aspect);
   transform: translate(-50%, -50%);
-  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border: 1px dashed rgb(255 255 255 / 10%);
   border-radius: 14px;
 }
 
@@ -103,7 +103,7 @@
   position: relative;
   width: 104px;
   aspect-ratio: var(--card-aspect);
-  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border: 1px dashed rgb(255 255 255 / 16%);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -142,7 +142,7 @@
   position: relative;
   width: 92px;
   aspect-ratio: var(--card-aspect);
-  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border: 1px dashed rgb(255 255 255 / 16%);
   border-radius: 12px;
   display: flex;
   align-items: center;

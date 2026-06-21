@@ -27,7 +27,7 @@
 .btn,
 .on {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgb(255 255 255 / 15%);
   color: var(--fg);
   padding: 6px 12px;
   border-radius: 6px;
@@ -38,7 +38,7 @@
 
 .on {
   border-color: var(--brand-green);
-  background: rgba(41, 224, 122, 0.1);
+  background: rgb(41 224 122 / 10%);
   color: var(--brand-green);
 }
 

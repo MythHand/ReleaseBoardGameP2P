@@ -22,7 +22,7 @@
 
 .btn {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid rgb(255 255 255 / 15%);
   color: var(--fg);
   padding: 8px 14px;
   border-radius: 6px;
@@ -59,7 +59,7 @@
 .target {
   width: 150px;
   aspect-ratio: var(--card-aspect);
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border: 1px dashed rgb(255 255 255 / 20%);
   border-radius: 12px;
   display: flex;
   align-items: center;
