@@ -6,18 +6,17 @@
 
 html,
 body {
-  margin: 0;
+  block-size: 100%;
   padding: 0;
-  height: 100%;
+  margin: 0;
 }
 
 body {
-  background: var(--bg);
-  color: var(--fg);
-
   /* Основной текст настолки — Fira Mono. Терминальная эстетика без сглаживания
      остаётся локально в модуле лоадера (boot), а не глобально. */
   font-family: var(--font-text);
+  color: var(--fg);
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -31,7 +30,7 @@ h4 {
 
 #root,
 #playground {
-  min-height: 100%;
+  min-block-size: 100%;
 }
 
 button {

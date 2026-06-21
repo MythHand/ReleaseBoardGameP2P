@@ -3,43 +3,43 @@
 }
 
 .h {
+  margin: 0 0 20px;
   font-size: 14px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: var(--tracking);
-  margin: 0 0 20px;
 }
 
 .list {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 760px;
+  max-inline-size: 760px;
 }
 
 .item {
   padding: 18px 20px;
+  background: var(--surface-1);
   border: 1px solid rgb(255 255 255 / 8%);
   border-radius: 10px;
-  background: var(--surface-1);
 }
 
 .meta {
   display: flex;
-  align-items: baseline;
   gap: 12px;
-  margin-bottom: 14px;
+  align-items: baseline;
+  margin-block-end: 14px;
 }
 
 .role {
+  padding: 3px 8px;
   font-family: var(--font-text);
   font-size: 11px;
+  color: var(--brand-green);
   text-transform: uppercase;
   letter-spacing: var(--tracking);
-  padding: 3px 8px;
-  border-radius: 4px;
   background: rgb(41 224 122 / 12%);
-  color: var(--brand-green);
+  border-radius: 4px;
 }
 
 .name {
@@ -49,7 +49,7 @@
 }
 
 .var {
-  margin-left: auto;
+  margin-inline-start: auto;
   font-family: var(--font-mono);
   font-size: 11px;
   opacity: 0.4;
@@ -71,16 +71,16 @@
 .mono {
   font-family: var(--font-mono);
   font-size: 15px;
+  font-feature-settings: "calt" off, "liga" off;
+  font-smooth: never;
   line-height: 1.5;
   -webkit-font-smoothing: none;
-  font-smooth: never;
-  font-feature-settings: "calt" off, "liga" off;
 }
 
 .where {
   margin: 12px 0 0;
   font-family: var(--font-text);
   font-size: 12px;
-  opacity: 0.5;
   line-height: 1.5;
+  opacity: 0.5;
 }

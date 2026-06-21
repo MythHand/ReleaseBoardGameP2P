@@ -1,13 +1,13 @@
 .pile {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 8px;
+  align-items: center;
 }
 
 .stack {
   position: relative;
-  width: 100%;
+  inline-size: 100%;
   aspect-ratio: var(--card-aspect);
   container-type: inline-size;
 }
@@ -15,9 +15,9 @@
 .layer {
   position: absolute;
   inset: 0;
-  border-radius: 6cqw;
   background: var(--surface-1);
   border: 1px solid rgb(255 255 255 / 6%);
+  border-radius: 6cqw;
 }
 
 .layer:nth-child(1) {
@@ -35,8 +35,8 @@
 
 .back {
   display: block;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   object-fit: cover;
   border-radius: 6cqw;
   box-shadow: 0 6px 18px rgb(0 0 0 / 50%);
@@ -44,10 +44,10 @@
 
 .count {
   position: absolute;
-  font-size: 15px;
 
   /* шрифт кода из лоадера — «кодовая заметка» */
   font-family: var(--font-mono);
+  font-size: 15px;
   letter-spacing: 0.02em;
 }
 
@@ -58,19 +58,19 @@
 
 /* колоды добора — только текст, левый верхний угол */
 .tl {
-  top: 8px;
-  left: 8px;
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
   text-shadow: 0 1px 3px rgb(0 0 0 / 90%);
 }
 
 /* сброс — бейдж в правом нижнем углу */
 .br {
-  bottom: 8px;
-  right: 8px;
+  inset-block-end: 8px;
+  inset-inline-end: 8px;
+  padding: 3px 9px;
   background: rgb(0 0 0 / 78%);
   border: 1px solid rgb(255 255 255 / 20%);
   border-radius: 6px;
-  padding: 3px 9px;
 }
 
 .label {

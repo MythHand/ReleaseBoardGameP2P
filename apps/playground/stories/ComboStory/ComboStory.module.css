@@ -1,39 +1,39 @@
 .root {
   position: relative;
+  block-size: 100vh;
   padding: 28px;
-  height: 100vh;
   overflow: hidden;
 }
 
 .hint {
-  font-size: 12px;
-  opacity: 0.65;
+  max-inline-size: 780px;
   margin: 0 0 14px;
-  max-width: 780px;
+  font-size: 12px;
   line-height: 1.5;
+  opacity: 0.65;
 }
 
 .toolbar {
   display: flex;
-  align-items: center;
   gap: 16px;
-  margin-bottom: 8px;
+  align-items: center;
+  margin-block-end: 8px;
 }
 
 .reset {
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 15%);
-  color: var(--fg);
   padding: 6px 14px;
-  border-radius: 6px;
   font-size: 12px;
+  color: var(--fg);
   letter-spacing: var(--tracking);
   cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
 }
 
 .reset:hover {
-  border-color: var(--brand-green);
   color: var(--brand-green);
+  border-color: var(--brand-green);
 }
 
 .log {
@@ -45,22 +45,22 @@
 /* цели атаки — сверху */
 .targets {
   display: flex;
-  justify-content: center;
   gap: 28px;
-  margin-top: 14px;
+  justify-content: center;
+  margin-block-start: 14px;
 }
 
 .target {
-  width: 200px;
-  height: 92px;
-  border: 1px dashed rgb(255 255 255 / 18%);
-  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  inline-size: 200px;
+  block-size: 92px;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: var(--tracking);
+  border: 1px dashed rgb(255 255 255 / 18%);
+  border-radius: 12px;
   opacity: 0.45;
   transition: border-color var(--t-base) var(--ease-soft),
     box-shadow var(--t-base) var(--ease-soft), color var(--t-base) var(--ease-soft),
@@ -68,46 +68,46 @@
 }
 
 .lit {
-  opacity: 1;
-  border-style: solid;
-  border-color: var(--hl);
   color: var(--hl);
-  box-shadow: 0 0 20px color-mix(in srgb, var(--hl) 45%, transparent);
   cursor: pointer;
+  border-color: var(--hl);
+  border-style: solid;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--hl) 45%, transparent);
+  opacity: 1;
 }
 
 /* центр стола — куда ложатся не-релизы */
 .centerSlot {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 160px;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 160px;
   aspect-ratio: var(--card-aspect);
-  transform: translate(-50%, -50%);
   border: 1px dashed rgb(255 255 255 / 10%);
   border-radius: 14px;
+  transform: translate(-50%, -50%);
 }
 
 /* сброс — правый нижний угол */
 .discard {
   position: absolute;
-  right: 28px;
-  bottom: 28px;
+  inset-block-end: 28px;
+  inset-inline-end: 28px;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 8px;
+  align-items: center;
 }
 
 .discardSlot {
   position: relative;
-  width: 104px;
-  aspect-ratio: var(--card-aspect);
-  border: 1px dashed rgb(255 255 255 / 16%);
-  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  inline-size: 104px;
+  aspect-ratio: var(--card-aspect);
+  border: 1px dashed rgb(255 255 255 / 16%);
+  border-radius: 12px;
 }
 
 .discardCard {
@@ -116,21 +116,20 @@
 }
 
 .cap {
-  font-size: 11px;
   font-family: var(--font-mono);
+  font-size: 11px;
   opacity: 0.5;
 }
 
 /* низ: зона релиза над рукой */
 .bottom {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 24px;
+  inset-block-end: 24px;
+  inset-inline: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 14px;
+  align-items: center;
 }
 
 .releaseZone {
@@ -140,13 +139,13 @@
 
 .slot {
   position: relative;
-  width: 92px;
-  aspect-ratio: var(--card-aspect);
-  border: 1px dashed rgb(255 255 255 / 16%);
-  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  inline-size: 92px;
+  aspect-ratio: var(--card-aspect);
+  border: 1px dashed rgb(255 255 255 / 16%);
+  border-radius: 12px;
 }
 
 .empty {
@@ -166,9 +165,9 @@
   position: absolute;
   inset: 0;
   z-index: 0;
+  filter: brightness(0.82);
   transform: translateY(-26%) rotate(-7deg);
   transform-origin: bottom center;
-  filter: brightness(0.82);
 }
 
 .mainCard {
@@ -179,9 +178,9 @@
 
 .hand {
   display: flex;
-  justify-content: center;
-  gap: 18px;
   flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
 }
 
 .cell {
@@ -199,9 +198,9 @@
 /* летящая карта (overlay) */
 .flyer {
   position: fixed;
-  left: 0;
-  top: 0;
-  opacity: 0;
-  pointer-events: none;
+  inset-block-start: 0;
+  inset-inline-start: 0;
   z-index: var(--z-modal);
+  pointer-events: none;
+  opacity: 0;
 }

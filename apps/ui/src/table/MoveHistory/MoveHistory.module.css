@@ -1,8 +1,8 @@
 .box {
-  flex: 1;
-  min-height: 0;
   display: flex;
+  flex: 1;
   flex-direction: column;
+  min-block-size: 0;
 }
 
 .title {
@@ -14,19 +14,19 @@
 }
 
 .list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 3px;
+  min-block-size: 0;
+  overflow-y: auto;
 }
 
 .row {
   position: relative;
   display: flex;
-  align-items: baseline;
   gap: 8px;
+  align-items: baseline;
   padding: 8px 12px;
   font-size: 12px;
   line-height: 1.3;
@@ -43,15 +43,15 @@
 }
 
 .nested {
-  margin-left: 18px;
+  margin-inline-start: 18px;
   font-size: 11px;
 }
 
 .nested::before {
-  content: "↳";
   position: absolute;
-  left: -14px;
-  top: 7px;
+  inset-block-start: 7px;
+  inset-inline-start: -14px;
+  content: "↳";
   opacity: 0.35;
 }
 
@@ -72,7 +72,7 @@
 
 /* справа — кто сделал */
 .who {
-  margin-left: auto;
   flex: 0 0 auto;
+  margin-inline-start: auto;
   color: rgb(255 255 255 / 50%);
 }

@@ -1,53 +1,53 @@
 .root {
-  padding: 28px;
-  height: 100%;
   display: flex;
   flex-direction: column;
+  block-size: 100%;
+  padding: 28px;
 }
 
 .hint {
-  font-size: 12px;
-  opacity: 0.55;
+  max-inline-size: 700px;
   margin: 0 0 20px;
-  max-width: 700px;
+  font-size: 12px;
   line-height: 1.5;
+  opacity: 0.55;
 }
 
 .buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 28px;
+  margin-block-end: 28px;
 }
 
 .btn {
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 15%);
-  color: var(--fg);
   padding: 8px 14px;
-  border-radius: 6px;
   font-size: 12px;
+  color: var(--fg);
   letter-spacing: var(--tracking);
   cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
 }
 
 .btn:hover {
-  border-color: var(--brand-green);
   color: var(--brand-green);
+  border-color: var(--brand-green);
 }
 
 .btn:disabled {
-  opacity: 0.4;
   cursor: default;
+  opacity: 0.4;
 }
 
 .stage {
-  flex: 1;
   display: flex;
+  flex: 1;
+  gap: 40px;
   align-items: center;
   justify-content: space-between;
-  gap: 40px;
-  min-height: 320px;
+  min-block-size: 320px;
   padding: 0 60px;
 }
 
@@ -57,15 +57,15 @@
 }
 
 .target {
-  width: 150px;
-  aspect-ratio: var(--card-aspect);
-  border: 1px dashed rgb(255 255 255 / 20%);
-  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: var(--tracking);
+  border: 1px dashed rgb(255 255 255 / 20%);
+  border-radius: 12px;
   opacity: 0.5;
 }

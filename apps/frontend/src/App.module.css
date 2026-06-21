@@ -1,8 +1,8 @@
 .app {
-  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-block-size: 100vh;
   background:
     linear-gradient(0deg, var(--surface-0), var(--surface-0)),
     repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
@@ -10,8 +10,8 @@
 }
 
 .shell {
-  text-align: center;
   padding: 40px;
+  text-align: center;
 }
 
 .brand {
@@ -23,16 +23,16 @@
 }
 
 .sub {
+  font-weight: 500;
   color: var(--fg);
   opacity: 0.85;
-  font-weight: 500;
 }
 
 .tag {
   margin: 10px 0 0;
   font-size: 12px;
-  letter-spacing: var(--tracking);
   text-transform: uppercase;
+  letter-spacing: var(--tracking);
   opacity: 0.5;
 }
 

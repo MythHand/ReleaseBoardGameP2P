@@ -1,24 +1,24 @@
 .root {
   position: relative;
   aspect-ratio: var(--card-aspect);
-  perspective: 1100px;
+  container-type: inline-size; /* чтобы радиус масштабировался (cqw) */
   cursor: pointer;
   user-select: none;
-  container-type: inline-size; /* чтобы радиус масштабировался (cqw) */
+  perspective: 1100px;
 }
 
 .tilt {
-  width: 100%;
-  height: 100%;
-  transition: transform var(--t-base) var(--ease-out);
+  inline-size: 100%;
+  block-size: 100%;
   transform-style: preserve-3d;
+  transition: transform var(--t-base) var(--ease-out);
   will-change: transform;
 }
 
 .flip {
   position: relative;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   transform-style: preserve-3d;
 
   /* переворот ведёт словарь анимаций (play('flipCard')), не CSS */
@@ -27,11 +27,11 @@
 .face {
   position: absolute;
   inset: 0;
-  border-radius: 6cqw; /* масштабируется с шириной карты, не фиксировано */
   overflow: hidden;
+  border-radius: 6cqw; /* масштабируется с шириной карты, не фиксировано */
   box-shadow: 0 6px 16px rgb(0 0 0 / 50%);
-  backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 .back {
@@ -40,8 +40,8 @@
 
 .img {
   display: block;
-  width: 100%;
-  height: 100%;
+  inline-size: 100%;
+  block-size: 100%;
   object-fit: cover;
 }
 
@@ -51,8 +51,8 @@
 .glow {
   position: absolute;
   inset: 0;
-  border-radius: 6cqw;
   pointer-events: none;
+  border-radius: 6cqw;
   opacity: 0;
   transform: translateZ(1px);
   transition: opacity var(--t-base) var(--ease-out);
@@ -62,9 +62,9 @@
    NB: selected пока на ТОМ ЖЕ базовом уровне. Полноценный UI выбора — позже. */
 .root[data-state="playable"] .glow,
 .root[data-state="selected"] .glow {
-  opacity: 1;
   box-shadow: 0 0 0 2px var(--accent),
     0 0 22px 2px color-mix(in srgb, var(--accent) 50%, transparent);
+  opacity: 1;
 }
 
 .root[data-state="disabled"] {

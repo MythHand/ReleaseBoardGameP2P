@@ -4,22 +4,22 @@
 }
 
 .h {
+  margin: 0 0 20px;
   font-size: 14px;
   font-weight: 500;
   text-transform: uppercase;
-  margin: 0 0 20px;
 }
 
 .note {
-  opacity: 0.4;
   font-weight: 400;
+  opacity: 0.4;
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 14px;
-  max-width: 920px;
+  max-inline-size: 920px;
 }
 
 .swatch {
@@ -29,9 +29,9 @@
 }
 
 .chip {
-  height: 56px;
-  border-radius: 8px;
+  block-size: 56px;
   border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
 }
 
 .label {
@@ -47,23 +47,23 @@
 
 .cardrow {
   display: flex;
-  align-items: center;
   gap: 28px;
-  margin-top: 36px;
+  align-items: center;
+  margin-block-start: 36px;
 }
 
 .cardSlot {
-  width: var(--card-w);
-  aspect-ratio: var(--card-aspect);
-  border-radius: var(--card-radius);
-  border: 1px dashed rgb(255 255 255 / 20%);
-  background: var(--surface-1);
   display: flex;
   align-items: center;
   justify-content: center;
+  inline-size: var(--card-w);
+  aspect-ratio: var(--card-aspect);
   font-size: 11px;
-  opacity: 0.6;
   text-transform: uppercase;
+  background: var(--surface-1);
+  border: 1px dashed rgb(255 255 255 / 20%);
+  border-radius: var(--card-radius);
+  opacity: 0.6;
 }
 
 .typo {

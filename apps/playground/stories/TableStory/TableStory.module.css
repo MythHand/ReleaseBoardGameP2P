@@ -1,53 +1,53 @@
 .root {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  block-size: 100vh;
   overflow: hidden;
 }
 
 .controls {
-  flex: 0 0 auto;
   display: flex;
-  align-items: center;
+  flex: 0 0 auto;
   gap: 8px;
+  align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
 }
 
 .label {
   font-size: 12px;
-  opacity: 0.5;
   letter-spacing: var(--tracking);
+  opacity: 0.5;
 }
 
 .btn,
 .on {
-  width: 30px;
-  height: 30px;
+  inline-size: 30px;
+  block-size: 30px;
+  font-size: 12px;
+  color: var(--fg);
+  cursor: pointer;
   background: transparent;
   border: 1px solid rgb(255 255 255 / 15%);
-  color: var(--fg);
   border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
 }
 
 .on {
-  border-color: var(--brand-green);
-  background: rgb(41 224 122 / 10%);
   color: var(--brand-green);
+  background: rgb(41 224 122 / 10%);
+  border-color: var(--brand-green);
 }
 
 .total {
-  margin-left: 12px;
+  margin-inline-start: 12px;
   font-size: 12px;
   opacity: 0.45;
 }
 
 .stage {
-  flex: 1;
-  min-height: 0;
   display: flex;
+  flex: 1;
+  min-block-size: 0;
 }
 
 .stage > * {

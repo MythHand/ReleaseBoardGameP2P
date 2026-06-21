@@ -2,15 +2,15 @@
    Корень .boot заполняет своего родителя; терминальная эстетика локальна здесь. */
 .boot {
   position: relative;
-  width: 100%;
-  height: 100%;
-  background: #000;
-  color: #fff;
-  font-family: "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
+  inline-size: 100%;
+  block-size: 100%;
   overflow: hidden;
-  -webkit-font-smoothing: none;
-  font-smooth: never;
+  font-family: "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
   font-feature-settings: "ss01" on, "calt" off, "liga" off;
+  font-smooth: never;
+  color: #fff;
+  background: #000;
+  -webkit-font-smoothing: none;
 }
 
 .boot * {
@@ -20,30 +20,30 @@
 .boot .root {
   position: absolute;
   inset: 0;
-  background: #000;
   overflow: hidden;
+  background: #000;
 }
 
 /* ---------- Start gate ---------- */
 .boot .start-gate {
   position: absolute;
   inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  inline-size: max-content;
+  block-size: max-content;
+  padding: 14px 22px;
   margin: auto;
-  width: max-content;
-  height: max-content;
-  background: transparent;
-  border: 0;
-  color: #fff;
   font-family: inherit;
   font-size: 18px;
+  color: #fff;
+  text-transform: uppercase;
   letter-spacing: 0.18em;
   cursor: pointer;
-  padding: 14px 22px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-direction: column;
-  text-transform: uppercase;
+  background: transparent;
+  border: 0;
 }
 
 .boot .start-gate .bracket-l,
@@ -52,11 +52,11 @@
 }
 
 .boot .start-gate .start-hint {
+  margin-block-start: 8px;
   font-size: 10px;
+  text-transform: uppercase;
   letter-spacing: 0.25em;
   opacity: 0.4;
-  margin-top: 8px;
-  text-transform: uppercase;
 }
 
 .boot .start-gate:hover {
@@ -76,28 +76,28 @@
 }
 
 .boot .terminal-inner {
-  min-height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  min-block-size: 100%;
   padding: 4px 6px;
 }
 
 .boot .line {
-  white-space: pre;
   font-variant-ligatures: none;
+  white-space: pre;
 }
 
 .boot .cursor-line {
   display: flex;
   align-items: center;
-  height: 1.35em;
+  block-size: 1.35em;
 }
 
 .boot .cursor {
   display: inline-block;
-  width: 0.55em;
-  height: 1em;
+  inline-size: 0.55em;
+  block-size: 1em;
   background: #fff;
   animation: boot-blink 1s steps(2) infinite;
 }
@@ -118,51 +118,51 @@
 .boot .logo-stage {
   position: absolute;
   inset: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #000;
-  z-index: 5;
 }
 
 .boot .logo-wrap {
   position: relative;
-  width: 242px;
-  height: auto;
+  box-sizing: content-box;
+  display: block;
   flex: 0 0 auto;
+  inline-size: 242px;
+  block-size: auto;
   padding: 14px;
   overflow: visible;
-  display: block;
-  box-sizing: content-box;
 }
 
 .boot .logo-frame {
   position: absolute;
   inset: 0;
-  border: 1.5px solid #fff;
   pointer-events: none;
+  border: 1.5px solid #fff;
 }
 
 .boot .logo-fill {
   position: absolute;
   inset: 1.5px;
-  background: #fff;
-  pointer-events: none;
   z-index: 3;
+  pointer-events: none;
+  background: #fff;
 }
 
 .boot .logo-svg-wrap {
   position: relative;
-  width: 242px;
-  height: calc(242px * 150 / 1339);
   z-index: 2;
+  inline-size: 242px;
+  block-size: calc(242px * 150 / 1339);
   overflow: visible;
 }
 
 .boot .logo-svg-wrap svg {
-  width: 242px;
-  height: calc(242px * 150 / 1339);
   display: block;
+  inline-size: 242px;
+  block-size: calc(242px * 150 / 1339);
   overflow: visible;
 }
 
@@ -171,9 +171,9 @@
   position: absolute;
   inset: 0;
   display: grid;
+  gap: 18px;
   place-items: center;
   align-content: center;
-  gap: 18px;
   background: #000;
   opacity: 0;
   transition: opacity 350ms ease-out;
@@ -184,18 +184,18 @@
 }
 
 .boot .restart-btn {
-  background: transparent;
-  border: 0;
-  color: #fff;
+  display: inline-flex;
+  gap: 14px;
+  align-items: center;
+  padding: 18px 24px;
   font-family: inherit;
   font-size: 24px;
-  letter-spacing: 0.22em;
+  color: #fff;
   text-transform: uppercase;
+  letter-spacing: 0.22em;
   cursor: pointer;
-  padding: 18px 24px;
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
+  background: transparent;
+  border: 0;
   transition: opacity 120ms ease-out, transform 120ms ease-out;
 }
 
@@ -210,26 +210,26 @@
 
 .boot .restart-hint {
   font-size: 10px;
+  text-transform: uppercase;
   letter-spacing: 0.3em;
   opacity: 0.35;
-  text-transform: uppercase;
 }
 
 /* ---------- Audio toggle ---------- */
 .boot .audio-toggle {
   position: absolute;
-  right: 12px;
-  bottom: 10px;
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 18%);
-  color: rgb(255 255 255 / 55%);
+  inset-block-end: 10px;
+  inset-inline-end: 12px;
+  z-index: 100;
+  padding: 5px 8px;
   font-family: inherit;
   font-size: 10px;
-  letter-spacing: 0.18em;
+  color: rgb(255 255 255 / 55%);
   text-transform: uppercase;
-  padding: 5px 8px;
+  letter-spacing: 0.18em;
   cursor: pointer;
-  z-index: 100;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 18%);
 }
 
 .boot .audio-toggle:hover {

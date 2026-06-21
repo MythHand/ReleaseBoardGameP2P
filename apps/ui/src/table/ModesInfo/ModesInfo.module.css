@@ -1,7 +1,7 @@
 .box {
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-block-size: 0;
 }
 
 .title {
@@ -13,10 +13,10 @@
 }
 
 .list {
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow-y: auto;
 }
 
 .group {
@@ -39,9 +39,9 @@
 .opt,
 .optOn {
   padding: 6px 11px;
-  border-radius: 6px;
   font-size: 12px;
   border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 6px;
 }
 
 .opt {
@@ -49,7 +49,7 @@
 }
 
 .optOn {
-  border-color: var(--brand-green);
-  background: rgb(41 224 122 / 12%);
   color: var(--brand-green);
+  background: rgb(41 224 122 / 12%);
+  border-color: var(--brand-green);
 }

@@ -1,39 +1,39 @@
 .svg {
   position: fixed;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  overflow: visible;
   z-index: var(--z-arrow);
+  inline-size: 100vw;
+  block-size: 100vh;
+  overflow: visible;
+  pointer-events: none;
 
   /* приглушённый цвет: акцент типа, смешанный с серым (менее яркий) */
   --arrow-c: color-mix(in srgb, var(--arrow) 64%, #8a8a8a);
 }
 
 .origin {
-  fill: var(--arrow-c);
   opacity: 0.5;
+  fill: var(--arrow-c);
 }
 
 /* тело дуги — мягкое, негромкое */
 .base {
+  opacity: 0.28;
+  filter: drop-shadow(0 0 7px var(--arrow-c));
   fill: none;
   stroke: var(--arrow-c);
   stroke-width: 6;
   stroke-linecap: round;
-  opacity: 0.28;
-  filter: drop-shadow(0 0 7px var(--arrow-c));
 }
 
 /* поток пунктира к цели — ненавязчивое направление */
 .flow {
+  opacity: 0.6;
   fill: none;
   stroke: var(--arrow-c);
   stroke-width: 6;
   stroke-linecap: round;
   stroke-dasharray: 6 19;
-  opacity: 0.6;
   animation: flow 0.75s linear infinite;
 }
 
@@ -44,9 +44,9 @@
 }
 
 .head {
-  fill: var(--arrow-c);
   opacity: 0.85;
   filter: drop-shadow(0 0 6px var(--arrow-c));
+  fill: var(--arrow-c);
 }
 
 @media (prefers-reduced-motion: reduce) {
