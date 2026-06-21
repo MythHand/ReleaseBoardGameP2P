@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import LanguageSwitch from './components/LanguageSwitch'
 import styles from './App.module.css'
 
 // Фаза 0 — фундамент. Корень = реальное приложение (НЕ песочница).
@@ -8,6 +9,7 @@ export default function App() {
   const { t } = useTranslation()
   return (
     <div className={styles.app}>
+      <LanguageSwitch />
       <main className={styles.shell}>
         <h1 className={styles.brand}>
           {t('app.titleLead')} <span className={styles.sub}>{t('app.titleSub')}</span>
