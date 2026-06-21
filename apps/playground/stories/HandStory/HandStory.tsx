@@ -1,7 +1,7 @@
+import { useState } from 'react'
 import { CARDS } from '@/cards'
 import { makeHand } from '@/mocks/hand'
 import Hand from '@/table/Hand'
-import { useState } from 'react'
 import styles from './HandStory.module.css'
 
 let _u = 0

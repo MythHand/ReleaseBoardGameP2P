@@ -13,15 +13,18 @@
     "stylelint": "stylelint \"src/**/*.css\"",
     "test": "vitest run"
   },
-  "peerDependencies": { "react": "^19.2.7", "react-dom": "^19.2.7" },
+  "peerDependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
   "devDependencies": {
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^4.3.4",
-    "jsdom": "^25.0.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "jsdom": "^29.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "vite": "^6.0.7"
+    "vite": "^8.0.16"
   }
 }

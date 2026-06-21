@@ -2,8 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "allowJs": false,
-    "baseUrl": "src",
-    "paths": { "@/*": ["*"] },
+    "paths": { "@/*": ["./src/*"] },
     "types": ["vite/client", "vitest/globals"]
   },
   "include": ["src"]

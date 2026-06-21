@@ -1,7 +1,7 @@
+import { useRef, useState } from 'react'
 import { play, presetNames } from '@/animations'
 import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
-import { useRef, useState } from 'react'
 import styles from './AnimationsStory.module.css'
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
@@ -22,7 +22,7 @@ export default function AnimationsStory() {
       return
     }
     const el = cardRef.current!
-    el.getAnimations().forEach((a) => a.cancel())
+    for (const a of el.getAnimations()) a.cancel()
 
     if (name === 'snap') {
       play('snap', el)
@@ -36,7 +36,7 @@ export default function AnimationsStory() {
       const anim = play(name, el, { from, to })
       if (anim) await anim.finished
       await wait(500)
-      el.getAnimations().forEach((a) => a.cancel()) // вернуть карту домой
+      for (const a of el.getAnimations()) a.cancel() // вернуть карту домой
       setBusy(false)
     }
   }

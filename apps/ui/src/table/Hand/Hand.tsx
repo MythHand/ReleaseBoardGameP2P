@@ -1,6 +1,6 @@
+import { useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
-import { useState } from 'react'
 import styles from './Hand.module.css'
 
 // Геометрия веера — тюнингуется.
@@ -59,6 +59,7 @@ export default function Hand({ items, faceDown = false }: HandProps) {
           `rotate(${rotate}deg) scale(${scale})`
 
         return (
+          // biome-ignore lint/a11y/noStaticElementInteractions: hover only drives the decorative fan-spread (lift/read the hovered card); cards are non-interactive here, no keyboard affordance implied
           <div
             key={item.uid}
             className={styles.slot}

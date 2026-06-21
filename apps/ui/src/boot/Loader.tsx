@@ -1,8 +1,8 @@
 // Лоадер игры (порт из user_input/Loader). Самостоятельный декоративный boot-экран:
 // blank → terminal → blank → logo (frame → fill flash → split+shake → reassemble → hold → fade) → restart.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import LogoSvg from './Logo'
 import LoaderAudio from './audio'
+import LogoSvg from './Logo'
 import { buildSequence } from './lines'
 import './boot.css'
 

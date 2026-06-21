@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Card } from '@/cards/types'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
@@ -9,7 +10,6 @@ import type { HistoryEntry } from '@/table/MoveHistory/MoveHistory'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
-import { useState } from 'react'
 import styles from './Table.module.css'
 
 interface Opponent {

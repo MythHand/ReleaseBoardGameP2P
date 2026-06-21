@@ -1,7 +1,7 @@
-import Button from '@/primitives/Button'
-import Modal from '@/primitives/Modal'
 import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
+import Button from '@/primitives/Button'
+import Modal from '@/primitives/Modal'
 import LOGO from '../../assets/brand/release_logo.svg'
 import styles from './Start.module.css'
 

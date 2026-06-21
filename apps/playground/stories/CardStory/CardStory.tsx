@@ -1,7 +1,7 @@
-import { CARDS } from '@/cards'
-import Card from '@/primitives/Card'
 import type React from 'react'
 import { useState } from 'react'
+import { CARDS } from '@/cards'
+import Card from '@/primitives/Card'
 import styles from './CardStory.module.css'
 
 type CardState = 'idle' | 'playable' | 'selected' | 'disabled'

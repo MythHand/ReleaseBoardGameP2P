@@ -1,6 +1,6 @@
+import { useMemo, useState } from 'react'
 import { makeTable } from '@/mocks/table'
 import Table from '@/table/Table'
-import { useMemo, useState } from 'react'
 import styles from './TableStory.module.css'
 
 export default function TableStory() {

@@ -1,10 +1,10 @@
+import type { CardData } from '@release/ui'
+import type React from 'react'
+import type { CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cardById, cardCanTarget } from '@/cards'
 import Arrow from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
-import type { CardData } from '@release/ui'
-import type React from 'react'
-import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import styles from './ArrowStory.module.css'
 
 interface Point {
@@ -60,6 +60,7 @@ export default function ArrowStory() {
       </p>
 
       <div className={styles.stage}>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only targeting demo (drag an arrow); sandbox story, no keyboard affordance */}
         <div
           ref={(el) => {
             refs.current[SOURCE.id] = el
@@ -74,6 +75,7 @@ export default function ArrowStory() {
           {TARGETS.map((t) => {
             const lit = active && hovered === t.id
             return (
+              // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only hover target for the arrow demo; sandbox story
               <div
                 key={t.id}
                 className={`${styles.target} ${lit ? styles.targeted : ''}`}

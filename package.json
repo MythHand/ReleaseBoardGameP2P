@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "packageManager": "pnpm@9.15.0",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "pnpm --filter @release/web dev",
     "dev:playground": "pnpm --filter @release/playground dev",
@@ -17,14 +19,14 @@
     "test": "pnpm -r test"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "concurrently": "^9.1.0",
-    "stylelint": "^16.10.0",
+    "@biomejs/biome": "^2.5.0",
+    "concurrently": "^10.0.3",
+    "stylelint": "^17.13.0",
     "stylelint-config-recess-order": "^7.7.0",
-    "stylelint-config-standard": "^36.0.1",
+    "stylelint-config-standard": "^40.0.0",
     "stylelint-order": "^8.1.1",
     "stylelint-use-logical": "^2.1.3",
-    "typescript": "^5.6.3",
-    "vitest": "^2.1.8"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

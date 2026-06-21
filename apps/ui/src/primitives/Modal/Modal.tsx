@@ -44,10 +44,10 @@ export default function Modal({ open, onClose, title, children }: ModalProps) {
   if (!mounted) return null
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-dismiss convenience; accessible affordances are the close <button> + global Escape handler (useEffect above); overlay is presentational
     <div
       className={`${styles.overlay} ${shown ? styles.shown : ''}`}
       onClick={onClose}
-      onKeyDown={(e) => e.key === 'Escape' && onClose()}
       role="presentation"
     >
       <dialog

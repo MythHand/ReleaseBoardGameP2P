@@ -1,7 +1,7 @@
 import { cardById } from '@/cards'
 import type { Card } from '@/cards/types'
-import { makeHand } from './hand'
 import type { HandCard } from './hand'
+import { makeHand } from './hand'
 
 // Пул возможных оппонентов (для вариативности 1-5; всего 2-6 игроков).
 interface OpponentTemplate {

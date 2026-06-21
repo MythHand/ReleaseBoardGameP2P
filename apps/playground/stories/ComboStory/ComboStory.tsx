@@ -1,11 +1,11 @@
+import type { CardData } from '@release/ui'
+import type React from 'react'
+import type { CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { play } from '@/animations'
 import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
 import Arrow from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
-import type { CardData } from '@release/ui'
-import type React from 'react'
-import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import styles from './ComboStory.module.css'
 
 interface Point {
@@ -156,7 +156,7 @@ export default function ComboStory() {
     const el = flyRef.current!
     // ВАЖНО: гасим все анимации поддерева (контейнер + вложенные карты),
     // иначе остаточный fill:forwards перетирает новые transform → хаос.
-    el.getAnimations?.({ subtree: true }).forEach((a) => a.cancel())
+    for (const a of el.getAnimations?.({ subtree: true }) ?? []) a.cancel()
     el.style.left = `${cRect.left}px`
     el.style.top = `${cRect.top}px`
     el.style.width = `${cRect.width}px`
@@ -284,6 +284,7 @@ export default function ComboStory() {
         {TARGETS.map((t) => {
           const lit = phase === 'target'
           return (
+            // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only combo target (mousedown to play); sandbox story
             <div
               key={t.id}
               className={`${styles.target} ${lit ? styles.lit : ''}`}
@@ -350,6 +351,7 @@ export default function ComboStory() {
               validComboTarget(source.card, item.card)
             const isPartner = phase === 'target' && partner?.uid === item.uid
             return (
+              // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only hand card (mousedown to pick combo source/partner); sandbox story
               <div
                 key={item.uid}
                 ref={(el) => {

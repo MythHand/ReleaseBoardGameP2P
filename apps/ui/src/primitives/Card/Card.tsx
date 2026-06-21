@@ -1,8 +1,8 @@
+import type { CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { play } from '@/animations'
 import { CATEGORIES } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
-import type { CSSProperties } from 'react'
-import { useEffect, useRef, useState } from 'react'
 import styles from './Card.module.css'
 import CardBack from './CardBack'
 import CardFace from './CardFace'
@@ -86,6 +86,7 @@ export default function Card({
     `rotateX(${rot.rx}deg) rotateY(${rot.ry}deg)`
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: mouse handlers drive decorative hover-lift/parallax only; actionable cards (onClick) get role=button + onKeyDown + tabIndex below
     <div
       ref={ref}
       className={styles.root}

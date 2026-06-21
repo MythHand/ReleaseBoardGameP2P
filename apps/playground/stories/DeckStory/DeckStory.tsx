@@ -1,7 +1,7 @@
-import { CARDS, CATEGORIES } from '@/cards'
-import Card from '@/primitives/Card'
 import type { CategoryId } from '@release/ui'
 import type { CSSProperties } from 'react'
+import { CARDS, CATEGORIES } from '@/cards'
+import Card from '@/primitives/Card'
 import styles from './DeckStory.module.css'
 
 const ORDER: CategoryId[] = [
