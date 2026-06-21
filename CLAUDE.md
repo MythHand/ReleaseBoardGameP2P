@@ -85,10 +85,13 @@ The `lint` script runs `biome check .` (root-level) followed by `pnpm -r styleli
 
 ## Styling Rule
 
-- **CSS Modules stay as authored** — do not rewrite CSS Modules into Tailwind utilities.
-- **Tailwind is frontend-only** (`@release/web`) — it must not be added to `@release/ui` or `@release/playground`.
-- Tailwind v4 is themed off UI design tokens via `@theme` blocks in `apps/frontend/src/index.css`. All color utilities resolve to the same CSS variables defined in `apps/ui/src/design/tokens.css`.
-- Stylelint is configured (`.stylelintrc.json`) to allow Tailwind v4 at-rules (`@theme`, `@apply`, `@utility`, `@variant`, `@custom-variant`, etc.).
+Styling is **per-package** — the approach depends on which app the component lives in:
+
+- **`@release/ui` (shared library): CSS Modules only.** Its CSS Modules stay as authored — do not rewrite them into Tailwind. The library must have **no Tailwind dependency** so it stays portable for any consumer.
+- **`@release/web` (frontend app): Tailwind first.** Style frontend components with Tailwind utility classes in JSX. Do **not** add new `*.module.css` files to the frontend; use Tailwind utilities (and `@apply`/`@utility`/`@layer` in `index.css` for anything that can't be expressed inline). The shell may keep a small `App.module.css` for page layout, but new components are Tailwind.
+- **`@release/playground` (sandbox): CSS Modules.** It renders `@release/ui` in isolation and has no Tailwind.
+- Tailwind v4 (frontend only) is themed off the UI design tokens via the `@theme` bridge in `apps/frontend/src/index.css`, so utilities like `bg-surface-1`, `text-brand-green`, `text-cat-release` resolve to the same CSS variables defined in `apps/ui/src/design/tokens.css`. Add new token-backed utilities by extending that `@theme` block.
+- Stylelint (`.stylelintrc.json`) allows Tailwind v4 at-rules (`@theme`, `@apply`, `@utility`, `@variant`, `@custom-variant`, etc.).
 
 ---
 

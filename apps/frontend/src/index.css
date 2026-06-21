@@ -16,4 +16,7 @@
   --color-cat-support: var(--cat-support);
   --color-cat-ai: var(--cat-ai);
   --color-cat-trigger: var(--cat-trigger);
+
+  /* Letter-spacing token → `tracking-base` utility */
+  --tracking-base: var(--tracking);
 }
