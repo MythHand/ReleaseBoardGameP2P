@@ -15,4 +15,17 @@ export default defineConfig({
       { find: '@', replacement: uiSrc },
     ],
   },
+  server: {
+    // The /playground/ link opens the playground app (a separate Vite app on
+    // :5174). Proxy keeps it same-origin in dev so href="/playground/" works;
+    // ws:true forwards the playground's HMR socket. In prod, co-locate the
+    // playground build under /playground/ behind the same host.
+    proxy: {
+      '/playground': {
+        target: 'http://localhost:5174',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
 })

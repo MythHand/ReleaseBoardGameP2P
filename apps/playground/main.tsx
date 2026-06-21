@@ -4,11 +4,13 @@ import { BrowserRouter } from 'react-router'
 import Playground from './Playground'
 import '@/design/global.css'
 
-// Served at root in dev/preview, so routes are /card, /combo, … with no basename.
-// If deployed under a sub-path, set Vite `base` and pass a matching `basename` here.
+// Served under Vite's BASE_URL ('/playground/'), so the router resolves routes
+// relative to it (e.g. /playground/card). basename wants no trailing slash.
+const basename = import.meta.env.BASE_URL.replace(/\/$/, '')
+
 ReactDOM.createRoot(document.getElementById('playground')!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <Playground />
     </BrowserRouter>
   </React.StrictMode>,

@@ -34,6 +34,7 @@
   letter-spacing: var(--tracking);
   cursor: pointer;
   border-left: 2px solid transparent;
+  text-decoration: none;
 }
 
 .item:hover {
@@ -48,7 +49,15 @@
 .stage {
   background:
     linear-gradient(0deg, var(--surface-0), var(--surface-0)),
-    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
-    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 28px);
+    repeating-linear-gradient(
+      0deg,
+      var(--grid-line) 0 1px,
+      transparent 1px 28px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--grid-line) 0 1px,
+      transparent 1px 28px
+    );
   overflow: auto;
 }
