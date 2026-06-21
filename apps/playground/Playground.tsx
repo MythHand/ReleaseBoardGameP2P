@@ -1,7 +1,7 @@
 import TokenPreview from '@/design/TokenPreview'
 import TypographyPreview from '@/design/TypographyPreview'
-import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { NavLink, Navigate, Route, Routes } from 'react-router'
 import styles from './Playground.module.css'
 import AnimationsStory from './stories/AnimationsStory'
 import ArrowStory from './stories/ArrowStory'
@@ -14,6 +14,7 @@ import StartStory from './stories/StartStory'
 import TableStory from './stories/TableStory'
 
 interface Story {
+  // Path segment for the story's route (e.g. 'card' → /card).
   id: string
   title: string
   render: () => ReactNode
@@ -21,7 +22,7 @@ interface Story {
 
 // Реестр «историй». Каждая фаза добавляет сюда изолированные сцены
 // (Card, Hand, ReactionWindow, экраны Lobby/GameOver и т.д.) —
-// чтобы любой момент можно было открыть напрямую, не проходя всю игру.
+// чтобы любой момент можно было открыть напрямую (по URL), не проходя всю игру.
 const stories: Story[] = [
   { id: 'design-tokens', title: 'Design Tokens', render: () => <TokenPreview /> },
   { id: 'typography', title: 'Typography', render: () => <TypographyPreview /> },
@@ -38,27 +39,32 @@ const stories: Story[] = [
 ]
 
 export default function Playground() {
-  const [active, setActive] = useState(stories[0].id)
-  const story = stories.find((s) => s.id === active)
-
   return (
     <div className={styles.wrap}>
       <aside className={styles.sidebar}>
         <div className={styles.title}>playground</div>
         <nav className={styles.nav}>
           {stories.map((s) => (
-            <button
-              type="button"
+            <NavLink
               key={s.id}
-              className={s.id === active ? styles.itemActive : styles.item}
-              onClick={() => setActive(s.id)}
+              to={`/${s.id}`}
+              className={({ isActive }) => (isActive ? styles.itemActive : styles.item)}
             >
               {s.title}
-            </button>
+            </NavLink>
           ))}
         </nav>
       </aside>
-      <main className={styles.stage}>{story?.render()}</main>
+      <main className={styles.stage}>
+        <Routes>
+          <Route index element={<Navigate to={`/${stories[0].id}`} replace />} />
+          {stories.map((s) => (
+            <Route key={s.id} path={`/${s.id}`} element={s.render()} />
+          ))}
+          {/* Unknown path → first story */}
+          <Route path="*" element={<Navigate to={`/${stories[0].id}`} replace />} />
+        </Routes>
+      </main>
     </div>
   )
 }
