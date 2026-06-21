@@ -1,4 +1,4 @@
-import { COVERS, assetUrl } from '@/cards'
+import { COVERS } from '@/cards'
 import styles from './Card.module.css'
 
 interface CardBackProps {
@@ -6,11 +6,12 @@ interface CardBackProps {
 }
 
 // Рубашка определяется колодой: base → зелёная, ai → фиолетовая.
+// COVERS значения — уже разрешённые URL (assetUrl вызван в каталоге), берём напрямую.
 export default function CardBack({ deck = 'base' }: CardBackProps) {
   return (
     <img
       className={styles.img}
-      src={assetUrl(COVERS[deck] ?? COVERS.base)}
+      src={COVERS[deck] ?? COVERS.base}
       alt=""
       draggable={false}
     />

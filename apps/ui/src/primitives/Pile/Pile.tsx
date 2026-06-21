@@ -1,4 +1,4 @@
-import { COVERS, assetUrl } from '@/cards'
+import { COVERS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
 import styles from './Pile.module.css'
@@ -34,7 +34,7 @@ export default function Pile({
           ) : (
             <img
               className={styles.back}
-              src={assetUrl(COVERS[deck] ?? COVERS.base)}
+              src={COVERS[deck] ?? COVERS.base}
               alt=""
               draggable={false}
             />
