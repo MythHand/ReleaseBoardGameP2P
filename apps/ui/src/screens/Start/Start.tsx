@@ -5,7 +5,24 @@ import Modal from '@/primitives/Modal'
 import styles from './Start.module.css'
 import LOGO from '../../assets/brand/release_logo.svg'
 
-export default function Start() {
+export interface StartCopy {
+  logoAlt: string
+  tags: string[]
+  description: string
+  createGame: string
+  joinGame: string
+  videoReview: string
+  close: string
+  createTitle: string
+  createStub: string
+  createCta: string
+  joinTitle: string
+  gameCodeLabel: string
+  gameCodePlaceholder: string
+  joinCta: string
+}
+
+export default function Start({ copy }: { copy: StartCopy }) {
   const [modal, setModal] = useState<'create' | 'join' | null>(null)
   const [videoMounted, setVideoMounted] = useState(false)
   const [videoOpen, setVideoOpen] = useState(false)
@@ -36,18 +53,16 @@ export default function Start() {
 
       <div className={styles.content}>
         <div className={styles.col}>
-          <img className={styles.logo} src={LOGO} alt="Release любой ценой" />
+          <img className={styles.logo} src={LOGO} alt={copy.logoAlt} />
           <div className={styles.tags}>
-            <span className={styles.tag}>Открытый P2P-проект</span>
-            <span className={styles.tag}>Настольная карточная игра</span>
+            {copy.tags.map((tag) => (
+              <span key={tag} className={styles.tag}>{tag}</span>
+            ))}
           </div>
-          <p className={styles.desc}>
-            Стратегическая карточная игра про реальные будни разработки. Баги, неожиданные
-            события, атаки соперников — преодолевай всё это и зарелизь первым.
-          </p>
+          <p className={styles.desc}>{copy.description}</p>
           <div className={styles.actions}>
-            <Button onClick={() => setModal('create')}>создать игру</Button>
-            <Button onClick={() => setModal('join')}>подключиться</Button>
+            <Button onClick={() => setModal('create')}>{copy.createGame}</Button>
+            <Button onClick={() => setModal('join')}>{copy.joinGame}</Button>
           </div>
         </div>
       </div>
@@ -60,22 +75,22 @@ export default function Start() {
         <button
           className={styles.playFace}
           onClick={openVideo}
-          aria-label="видео-обзор"
+          aria-label={copy.videoReview}
           tabIndex={videoMounted ? -1 : 0}
         >
           <span className={styles.playIcon}>▶</span>
-          <span className={styles.playCap}>видео-обзор</span>
+          <span className={styles.playCap}>{copy.videoReview}</span>
         </button>
 
         {videoMounted && (
           <div className={`${styles.videoFace} ${videoOpen ? styles.videoShown : ''}`}>
-            <button className={styles.bigClose} onClick={closeVideo} aria-label="закрыть">
+            <button className={styles.bigClose} onClick={closeVideo} aria-label={copy.close}>
               ✕
             </button>
             <iframe
               className={styles.iframe}
               src="https://www.youtube.com/embed/bxGtRnoYW4g?autoplay=1"
-              title="Release любой ценой — обзор"
+              title={copy.logoAlt}
               allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
               allowFullScreen
             />
@@ -83,20 +98,17 @@ export default function Start() {
         )}
       </div>
 
-      <Modal open={modal === 'create'} onClose={close} title="Создать игру">
-        <p className={styles.stub}>
-          Настройки партии — выбор режимов (лимит руки, Fast Release, условие релиза и т.д.).
-          Скоро.
-        </p>
-        <Button onClick={close}>создать</Button>
+      <Modal open={modal === 'create'} onClose={close} title={copy.createTitle}>
+        <p className={styles.stub}>{copy.createStub}</p>
+        <Button onClick={close}>{copy.createCta}</Button>
       </Modal>
 
-      <Modal open={modal === 'join'} onClose={close} title="Подключиться">
+      <Modal open={modal === 'join'} onClose={close} title={copy.joinTitle}>
         <label className={styles.field}>
-          <span className={styles.fieldLabel}>код игры</span>
-          <input className={styles.input} placeholder="напр. 4F2A-9K" />
+          <span className={styles.fieldLabel}>{copy.gameCodeLabel}</span>
+          <input className={styles.input} placeholder={copy.gameCodePlaceholder} />
         </label>
-        <Button onClick={close}>войти</Button>
+        <Button onClick={close}>{copy.joinCta}</Button>
       </Modal>
     </div>
   )

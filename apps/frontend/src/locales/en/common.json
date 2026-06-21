@@ -1,0 +1,27 @@
+{
+  "app": {
+    "titleLead": "Release",
+    "titleSub": "at any cost",
+    "foundationTag": "visual layer — foundation",
+    "phasesHint": "Screens (boot → lobby → game → game over) arrive in phases.",
+    "devShowcase": "component dev showcase →"
+  },
+  "start": {
+    "logoAlt": "Release at any cost",
+    "tagOpenP2P": "Open P2P project",
+    "tagBoardCard": "Board card game",
+    "description": "A strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all and release first.",
+    "createGame": "create game",
+    "joinGame": "join",
+    "videoReview": "video overview",
+    "close": "close",
+    "createTitle": "Create game",
+    "createStub": "Match settings — mode selection (hand limit, Fast Release, release condition, etc.). Soon.",
+    "createCta": "create",
+    "joinTitle": "Join",
+    "gameCodeLabel": "game code",
+    "gameCodePlaceholder": "e.g. 4F2A-9K",
+    "joinCta": "enter"
+  },
+  "language": { "en": "EN", "ru": "RU" }
+}
