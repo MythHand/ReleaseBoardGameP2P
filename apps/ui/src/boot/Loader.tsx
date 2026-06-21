@@ -119,6 +119,7 @@ function Terminal({ active, onComplete }: TerminalProps) {
     <div className="terminal" ref={containerRef}>
       <div className="terminal-inner">
         {lines.map((l, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: terminal lines are append-only (never reordered/removed), index is a stable key
           <div className="line" key={i}>
             {l === '' ? ' ' : l}
           </div>

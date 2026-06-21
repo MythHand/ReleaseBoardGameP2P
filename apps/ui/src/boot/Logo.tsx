@@ -53,12 +53,14 @@ export default function LogoSvg({
 
       <g clipPath={`url(#${topClipId})`} transform={`translate(${-splitOffset}, ${-glitchY})`}>
         {MYTHHAND_PATHS.map((d, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: MYTHHAND_PATHS is a fixed constant array (never reordered), index is a stable key
           <path key={`t-${i}`} d={d} fill={color} />
         ))}
       </g>
 
       <g clipPath={`url(#${botClipId})`} transform={`translate(${splitOffset}, ${glitchY})`}>
         {MYTHHAND_PATHS.map((d, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: MYTHHAND_PATHS is a fixed constant array (never reordered), index is a stable key
           <path key={`b-${i}`} d={d} fill={color} />
         ))}
       </g>

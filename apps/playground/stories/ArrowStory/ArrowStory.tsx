@@ -12,6 +12,7 @@ interface Point {
   y: number
 }
 
+// biome-ignore lint/style/noNonNullAssertion: 'attack-security-bug' is a known catalogue id
 const SOURCE = cardById('attack-security-bug')! // целится только то, что умеет (атака)
 const TARGETS = [
   { id: 't1', label: 'свежий релиз' },
@@ -46,6 +47,7 @@ export default function ArrowStory() {
   const arm = (e: React.MouseEvent, card: CardData) => {
     if (!cardCanTarget(card)) return // релиз не выбирает цель
     e.stopPropagation()
+    // biome-ignore lint/style/noNonNullAssertion: the source card's ref is registered before it can be armed
     const r = refs.current[card.id]!.getBoundingClientRect()
     setFrom({ x: r.left + r.width / 2, y: r.top + r.height / 2 })
     setTo({ x: e.clientX, y: e.clientY })

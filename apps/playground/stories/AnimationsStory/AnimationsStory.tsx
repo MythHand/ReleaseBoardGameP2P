@@ -21,6 +21,7 @@ export default function AnimationsStory() {
       setFaceDown((v) => !v) // Card сам играет flipCard через словарь
       return
     }
+    // biome-ignore lint/style/noNonNullAssertion: cardRef is always attached to the rendered card element
     const el = cardRef.current!
     for (const a of el.getAnimations()) a.cancel()
 
@@ -32,6 +33,7 @@ export default function AnimationsStory() {
     if (TRAVEL.has(name)) {
       setBusy(true)
       const from = el.getBoundingClientRect()
+      // biome-ignore lint/style/noNonNullAssertion: targetRef is always attached to the rendered target element
       const to = targetRef.current!.getBoundingClientRect()
       const anim = play(name, el, { from, to })
       if (anim) await anim.finished

@@ -75,6 +75,7 @@ const LoaderAudio = (() => {
       const src = c.createBufferSource()
       src.buffer = tickBuffer
       src.playbackRate.value = 1.0
+      // biome-ignore lint/style/noNonNullAssertion: masterGain is assigned in ensureCtx() alongside ctx; non-null whenever c is truthy
       src.connect(masterGain!)
       src.start()
       return
@@ -87,6 +88,7 @@ const LoaderAudio = (() => {
     g.gain.setValueAtTime(0, t)
     g.gain.linearRampToValueAtTime(0.04, t + 0.003)
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05)
+    // biome-ignore lint/style/noNonNullAssertion: masterGain is assigned in ensureCtx() alongside ctx; non-null whenever c is truthy
     o.connect(g).connect(masterGain!)
     o.start(t)
     o.stop(t + 0.06)
@@ -99,6 +101,7 @@ const LoaderAudio = (() => {
     src.buffer = themeBuffer
     const g = c.createGain()
     g.gain.value = 0.9
+    // biome-ignore lint/style/noNonNullAssertion: masterGain is assigned in ensureCtx() alongside ctx; non-null whenever c is truthy
     src.connect(g).connect(masterGain!)
     src.start()
     return src

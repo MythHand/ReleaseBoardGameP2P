@@ -41,6 +41,7 @@ const makeHand = (): HandItem[] =>
     'support-code-review',
     'release-frontend', // release → зона релиза
     'release-database',
+    // biome-ignore lint/style/noNonNullAssertion: every id above is a known catalogue id
   ].map((id) => ({ uid: uid(), card: cardById(id)! }))
 
 const TARGETS = [
@@ -50,6 +51,7 @@ const TARGETS = [
 const RELEASE_SLOTS = ['frontend', 'backend', 'database']
 
 const centerOf = (el: HTMLElement | null | undefined): Point => {
+  // biome-ignore lint/style/noNonNullAssertion: only called with refs that are registered/mounted at call time
   const r = el!.getBoundingClientRect()
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
 }
@@ -144,8 +146,11 @@ export default function ComboStory() {
   const runPlay = async (src: HandItem, prt: HandItem, targetLabel?: string) => {
     setPlaying(true)
     cancel()
+    // biome-ignore lint/style/noNonNullAssertion: hand-card refs are registered for every rendered card before play
     const mainHand = refs.current[prt.uid]!.getBoundingClientRect()
+    // biome-ignore lint/style/noNonNullAssertion: hand-card refs are registered for every rendered card before play
     const auxHand = refs.current[src.uid]!.getBoundingClientRect()
+    // biome-ignore lint/style/noNonNullAssertion: centerRef is attached to the always-rendered center slot
     const cRect = centerRef.current!.getBoundingClientRect()
 
     setHand((h) => h.filter((it) => it.uid !== src.uid && it.uid !== prt.uid))
@@ -153,6 +158,7 @@ export default function ComboStory() {
     // контейнер-пара в центре; карты — на свои места в руке (через transform)
     setFlyPair({ main: prt.card, aux: src.card })
     await nextFrames()
+    // biome-ignore lint/style/noNonNullAssertion: flyRef is attached to the always-rendered flyer element
     const el = flyRef.current!
     // ВАЖНО: гасим все анимации поддерева (контейнер + вложенные карты),
     // иначе остаточный fill:forwards перетирает новые transform → хаос.
@@ -161,7 +167,9 @@ export default function ComboStory() {
     el.style.top = `${cRect.top}px`
     el.style.width = `${cRect.width}px`
     el.style.transform = 'none'
+    // biome-ignore lint/style/noNonNullAssertion: [data-main] always exists inside the flyer's ComboPair
     const mainEl = el.querySelector<HTMLElement>('[data-main]')!
+    // biome-ignore lint/style/noNonNullAssertion: [data-aux] always exists inside the flyer's ComboPair
     const auxEl = el.querySelector<HTMLElement>('[data-aux]')!
     const enterMain = enterTransform(mainHand, cRect)
     const enterAux = enterTransform(auxHand, cRect)
@@ -185,6 +193,7 @@ export default function ComboStory() {
     if (prt.card.category === 'release') {
       // из центра — в нужный слот зоны релиза игрока
       const key = prt.card.name.toLowerCase()
+      // biome-ignore lint/style/noNonNullAssertion: a release card's name maps to one of the always-rendered release slots
       const toRect = slotRefs.current[key]!.getBoundingClientRect()
       const anim = play('playToReleaseZone', el, { from: cRect, to: toRect })
       if (anim) await anim.finished
@@ -194,6 +203,7 @@ export default function ComboStory() {
     } else {
       // из центра — в сброс (хаотичный разброс/угол), парой (Sudo остаётся снизу).
       // разброс считаем ДО полёта и летим сразу в эту позицию (без рывка в финале)
+      // biome-ignore lint/style/noNonNullAssertion: discardRef is attached to the always-rendered discard slot
       const dRect = discardRef.current!.getBoundingClientRect()
       const j = jitter()
       const anim = play('centerToDiscard', el, {
@@ -232,6 +242,7 @@ export default function ComboStory() {
     }
 
     if (phase === 'partner') {
+      // biome-ignore lint/style/noNonNullAssertion: phase==='partner' is only set after source is assigned
       const src = source!
       if (item.uid !== src.uid && validComboTarget(src.card, item.card)) {
         if (cardCanTarget(item.card)) {
@@ -253,6 +264,7 @@ export default function ComboStory() {
 
   const onTargetDown = (e: React.MouseEvent, t: { id: string; label: string }) => {
     e.stopPropagation()
+    // biome-ignore lint/style/noNonNullAssertion: phase==='target' is only set after both source and partner are assigned
     if (phase === 'target') runPlay(source!, partner!, t.label)
   }
 
@@ -304,6 +316,7 @@ export default function ComboStory() {
           {discardPile.length === 0 && <span className={styles.empty}>сброс</span>}
           {discardPile.map((d, i) => (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: discard pile is append-only (never reordered/removed), index is a stable key
               key={i}
               className={styles.discardCard}
               style={{
