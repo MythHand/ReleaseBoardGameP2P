@@ -4,24 +4,24 @@ import { CARDS } from '@/cards'
 import { play, presetNames } from '@/animations'
 import styles from './AnimationsStory.module.css'
 
-const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 const TRAVEL = new Set(['playToCenter', 'playToReleaseZone', 'centerToDiscard'])
 
 // Витрина словаря анимаций: каждый пресет вызывается по имени play('name', el).
 export default function AnimationsStory() {
-  const cardRef = useRef(null)
-  const targetRef = useRef(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+  const targetRef = useRef<HTMLDivElement>(null)
   const [faceDown, setFaceDown] = useState(false)
   const [busy, setBusy] = useState(false)
   const card = CARDS[1] // Security Bug
 
-  const run = async (name) => {
+  const run = async (name: string) => {
     if (busy) return
     if (name === 'flipCard') {
       setFaceDown((v) => !v) // Card сам играет flipCard через словарь
       return
     }
-    const el = cardRef.current
+    const el = cardRef.current!
     el.getAnimations().forEach((a) => a.cancel())
 
     if (name === 'snap') {
@@ -32,7 +32,7 @@ export default function AnimationsStory() {
     if (TRAVEL.has(name)) {
       setBusy(true)
       const from = el.getBoundingClientRect()
-      const to = targetRef.current.getBoundingClientRect()
+      const to = targetRef.current!.getBoundingClientRect()
       const anim = play(name, el, { from, to })
       if (anim) await anim.finished
       await wait(500)

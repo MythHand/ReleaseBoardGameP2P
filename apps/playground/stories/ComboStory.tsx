@@ -1,14 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
+import type { CardData } from '@release/ui'
 import Card from '@/primitives/Card'
 import Arrow from '@/primitives/Arrow'
 import { cardById, isComboSource, validComboTarget, cardCanTarget } from '@/cards'
 import { play } from '@/animations'
 import styles from './ComboStory.module.css'
 
+interface Point { x: number; y: number }
+
+interface HandItem { uid: string; card: CardData }
+
+interface DiscardEntry { main: CardData; aux: CardData; rot: number; dx: number; dy: number }
+interface ReleasedEntry { card: CardData; aux: CardData }
+
 let _u = 0
 const uid = () => `c${++_u}`
 
-const makeHand = () =>
+const makeHand = (): HandItem[] =>
   [
     'support-sudo',
     'attack-security-bug', // sudo-able + целится → центр → сброс
@@ -16,7 +25,7 @@ const makeHand = () =>
     'support-code-review',
     'release-frontend', // release → зона релиза
     'release-database',
-  ].map((id) => ({ uid: uid(), card: cardById(id) }))
+  ].map((id) => ({ uid: uid(), card: cardById(id)! }))
 
 const TARGETS = [
   { id: 'tr', label: 'свежий релиз оппонента' },
@@ -24,13 +33,13 @@ const TARGETS = [
 ]
 const RELEASE_SLOTS = ['frontend', 'backend', 'database']
 
-const centerOf = (el) => {
-  const r = el.getBoundingClientRect()
+const centerOf = (el: HTMLElement | null | undefined): Point => {
+  const r = el!.getBoundingClientRect()
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
 }
-const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 const nextFrames = () =>
-  new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+  new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
 
 // хаотичный разброс карты в сбросе
 const jitter = () => ({
@@ -40,7 +49,7 @@ const jitter = () => ({
 })
 
 // Пара карт: основная сверху, вспомогательная под углом снизу (виден верхний край).
-function ComboPair({ main, aux, width }) {
+function ComboPair({ main, aux, width }: { main: CardData; aux: CardData; width?: string }) {
   return (
     <div className={styles.pair} style={width ? { width } : undefined}>
       {aux && (
@@ -56,23 +65,23 @@ function ComboPair({ main, aux, width }) {
 }
 
 export default function ComboStory() {
-  const refs = useRef({})
-  const slotRefs = useRef({})
-  const centerRef = useRef(null)
-  const discardRef = useRef(null)
-  const flyRef = useRef(null)
+  const refs = useRef<Record<string, HTMLDivElement | null>>({})
+  const slotRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const centerRef = useRef<HTMLDivElement>(null)
+  const discardRef = useRef<HTMLDivElement>(null)
+  const flyRef = useRef<HTMLDivElement>(null)
 
-  const [hand, setHand] = useState(makeHand)
-  const [phase, setPhase] = useState('idle') // idle | partner | target
-  const [source, setSource] = useState(null)
-  const [partner, setPartner] = useState(null)
-  const [from, setFrom] = useState(null)
-  const [to, setTo] = useState(null)
+  const [hand, setHand] = useState<HandItem[]>(makeHand)
+  const [phase, setPhase] = useState<'idle' | 'partner' | 'target'>('idle') // idle | partner | target
+  const [source, setSource] = useState<HandItem | null>(null)
+  const [partner, setPartner] = useState<HandItem | null>(null)
+  const [from, setFrom] = useState<Point | null>(null)
+  const [to, setTo] = useState<Point | null>(null)
   const [playing, setPlaying] = useState(false)
-  const [released, setReleased] = useState({})
-  const [discardPile, setDiscardPile] = useState([]) // [{main, aux, rot, dx, dy}]
-  const [flyPair, setFlyPair] = useState(null)
-  const [log, setLog] = useState(null)
+  const [released, setReleased] = useState<Record<string, ReleasedEntry>>({})
+  const [discardPile, setDiscardPile] = useState<DiscardEntry[]>([]) // [{main, aux, rot, dx, dy}]
+  const [flyPair, setFlyPair] = useState<{ main: CardData; aux: CardData } | null>(null)
+  const [log, setLog] = useState<string | null>(null)
 
   const active = phase !== 'idle'
   const color =
@@ -90,7 +99,7 @@ export default function ComboStory() {
 
   useEffect(() => {
     if (!active) return
-    const onMove = (e) => setTo({ x: e.clientX, y: e.clientY })
+    const onMove = (e: MouseEvent) => setTo({ x: e.clientX, y: e.clientY })
     const onDown = () => cancel()
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mousedown', onDown)
@@ -106,7 +115,7 @@ export default function ComboStory() {
   }
 
   // transform, помещающий карту из её места в руке в систему координат центра
-  const enterTransform = (handRect, boxRect) => {
+  const enterTransform = (handRect: DOMRect, boxRect: DOMRect) => {
     const dx = handRect.left + handRect.width / 2 - (boxRect.left + boxRect.width / 2)
     const dy = handRect.top + handRect.height / 2 - (boxRect.top + boxRect.height / 2)
     const s = handRect.width / boxRect.width
@@ -115,19 +124,19 @@ export default function ComboStory() {
 
   // оркестратор: карты слетаются со своих мест В ЦЕНТР и там совмещаются (видно всем),
   // затем пара летит к назначению (релиз — в зону, прочее — в сброс).
-  const runPlay = async (src, prt, targetLabel) => {
+  const runPlay = async (src: HandItem, prt: HandItem, targetLabel?: string) => {
     setPlaying(true)
     cancel()
-    const mainHand = refs.current[prt.uid].getBoundingClientRect()
-    const auxHand = refs.current[src.uid].getBoundingClientRect()
-    const cRect = centerRef.current.getBoundingClientRect()
+    const mainHand = refs.current[prt.uid]!.getBoundingClientRect()
+    const auxHand = refs.current[src.uid]!.getBoundingClientRect()
+    const cRect = centerRef.current!.getBoundingClientRect()
 
     setHand((h) => h.filter((it) => it.uid !== src.uid && it.uid !== prt.uid))
 
     // контейнер-пара в центре; карты — на свои места в руке (через transform)
     setFlyPair({ main: prt.card, aux: src.card })
     await nextFrames()
-    const el = flyRef.current
+    const el = flyRef.current!
     // ВАЖНО: гасим все анимации поддерева (контейнер + вложенные карты),
     // иначе остаточный fill:forwards перетирает новые transform → хаос.
     el.getAnimations?.({ subtree: true }).forEach((a) => a.cancel())
@@ -135,8 +144,8 @@ export default function ComboStory() {
     el.style.top = `${cRect.top}px`
     el.style.width = `${cRect.width}px`
     el.style.transform = 'none'
-    const mainEl = el.querySelector('[data-main]')
-    const auxEl = el.querySelector('[data-aux]')
+    const mainEl = el.querySelector<HTMLElement>('[data-main]')!
+    const auxEl = el.querySelector<HTMLElement>('[data-aux]')!
     const enterMain = enterTransform(mainHand, cRect)
     const enterAux = enterTransform(auxHand, cRect)
     mainEl.style.transform = enterMain
@@ -159,7 +168,7 @@ export default function ComboStory() {
     if (prt.card.category === 'release') {
       // из центра — в нужный слот зоны релиза игрока
       const key = prt.card.name.toLowerCase()
-      const toRect = slotRefs.current[key].getBoundingClientRect()
+      const toRect = slotRefs.current[key]!.getBoundingClientRect()
       const anim = play('playToReleaseZone', el, { from: cRect, to: toRect })
       if (anim) await anim.finished
       setReleased((r) => ({ ...r, [key]: { card: prt.card, aux: src.card } }))
@@ -168,7 +177,7 @@ export default function ComboStory() {
     } else {
       // из центра — в сброс (хаотичный разброс/угол), парой (Sudo остаётся снизу).
       // разброс считаем ДО полёта и летим сразу в эту позицию (без рывка в финале)
-      const dRect = discardRef.current.getBoundingClientRect()
+      const dRect = discardRef.current!.getBoundingClientRect()
       const j = jitter()
       const anim = play('centerToDiscard', el, {
         from: cRect,
@@ -191,7 +200,7 @@ export default function ComboStory() {
     setPlaying(false)
   }
 
-  const onCardDown = (e, item) => {
+  const onCardDown = (e: React.MouseEvent, item: HandItem) => {
     e.stopPropagation()
     if (playing) return
 
@@ -206,14 +215,15 @@ export default function ComboStory() {
     }
 
     if (phase === 'partner') {
-      if (item.uid !== source.uid && validComboTarget(source.card, item.card)) {
+      const src = source!
+      if (item.uid !== src.uid && validComboTarget(src.card, item.card)) {
         if (cardCanTarget(item.card)) {
           setPartner(item)
           setFrom(centerOf(refs.current[item.uid]))
           setTo({ x: e.clientX, y: e.clientY })
           setPhase('target')
         } else {
-          runPlay(source, item)
+          runPlay(src, item)
         }
       } else {
         cancel()
@@ -224,9 +234,9 @@ export default function ComboStory() {
     cancel()
   }
 
-  const onTargetDown = (e, t) => {
+  const onTargetDown = (e: React.MouseEvent, t: { id: string; label: string }) => {
     e.stopPropagation()
-    if (phase === 'target') runPlay(source, partner, t.label)
+    if (phase === 'target') runPlay(source!, partner!, t.label)
   }
 
   const reset = () => {
@@ -260,7 +270,7 @@ export default function ComboStory() {
             <div
               key={t.id}
               className={`${styles.target} ${lit ? styles.lit : ''}`}
-              style={lit ? { '--hl': color } : undefined}
+              style={lit ? { '--hl': color } as CSSProperties : undefined}
               onMouseDown={(e) => onTargetDown(e, t)}
             >
               {t.label}
@@ -297,7 +307,7 @@ export default function ComboStory() {
           {RELEASE_SLOTS.map((key) => {
             const r = released[key]
             return (
-              <div key={key} ref={(el) => (slotRefs.current[key] = el)} className={styles.slot}>
+              <div key={key} ref={(el) => { slotRefs.current[key] = el }} className={styles.slot}>
                 {r ? (
                   <ComboPair main={r.card} aux={r.aux} width="100%" />
                 ) : (
@@ -312,17 +322,18 @@ export default function ComboStory() {
           {hand.map((item) => {
             const valid =
               phase === 'partner' &&
-              item.uid !== source?.uid &&
+              source != null &&
+              item.uid !== source.uid &&
               validComboTarget(source.card, item.card)
             const isPartner = phase === 'target' && partner?.uid === item.uid
             return (
               <div
                 key={item.uid}
-                ref={(el) => (refs.current[item.uid] = el)}
+                ref={(el) => { refs.current[item.uid] = el }}
                 className={`${styles.cell} ${valid ? styles.valid : ''} ${
                   isPartner ? styles.partner : ''
                 }`}
-                style={valid || isPartner ? { '--hl': color } : undefined}
+                style={valid || isPartner ? { '--hl': color } as CSSProperties : undefined}
                 onMouseDown={(e) => onCardDown(e, item)}
               >
                 <Card card={item.card} interactive={false} width="118px" />

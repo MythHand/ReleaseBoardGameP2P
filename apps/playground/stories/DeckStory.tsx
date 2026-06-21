@@ -1,8 +1,10 @@
+import type { CSSProperties } from 'react'
+import type { CategoryId } from '@release/ui'
 import Card from '@/primitives/Card'
 import { CARDS, CATEGORIES } from '@/cards'
 import styles from './DeckStory.module.css'
 
-const ORDER = ['release', 'attack', 'defense', 'protection', 'operation', 'support', 'trigger', 'ai']
+const ORDER: CategoryId[] = ['release', 'attack', 'defense', 'protection', 'operation', 'support', 'trigger', 'ai']
 
 export default function DeckStory() {
   const groups = ORDER.map((cat) => ({
@@ -20,7 +22,7 @@ export default function DeckStory() {
 
       {groups.map((g) => (
         <section key={g.cat} className={styles.group}>
-          <h3 className={styles.h} style={{ '--accent': g.accent }}>
+          <h3 className={styles.h} style={{ '--accent': g.accent } as CSSProperties}>
             {g.label}
             <span className={styles.count}>{g.cards.length}</span>
           </h3>

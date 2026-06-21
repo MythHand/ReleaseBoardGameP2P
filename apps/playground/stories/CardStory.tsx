@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import Card from '@/primitives/Card'
 import { CARDS } from '@/cards'
 import styles from './CardStory.module.css'
 
-const STATES = ['idle', 'playable', 'selected', 'disabled']
+type CardState = 'idle' | 'playable' | 'selected' | 'disabled'
+const STATES: CardState[] = ['idle', 'playable', 'selected', 'disabled']
 
 export default function CardStory() {
-  const [state, setState] = useState('idle')
+  const [state, setState] = useState<CardState>('idle')
   const [tilt, setTilt] = useState(true)
 
   return (
@@ -16,7 +17,7 @@ export default function CardStory() {
           <input
             type="checkbox"
             checked={tilt}
-            onChange={(e) => setTilt(e.target.checked)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTilt(e.target.checked)}
           />
           parallax-наклон
         </label>

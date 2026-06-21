@@ -1,21 +1,28 @@
 import { useState } from 'react'
-import TokenPreview from '@/design/TokenPreview.jsx'
-import TypographyPreview from '@/design/TypographyPreview.jsx'
-import CardStory from './stories/CardStory.jsx'
-import HandStory from './stories/HandStory.jsx'
-import AnimationsStory from './stories/AnimationsStory.jsx'
-import TableStory from './stories/TableStory.jsx'
-import ArrowStory from './stories/ArrowStory.jsx'
-import ComboStory from './stories/ComboStory.jsx'
-import LoaderStory from './stories/LoaderStory.jsx'
-import DeckStory from './stories/DeckStory.jsx'
-import StartStory from './stories/StartStory.jsx'
+import type { ReactNode } from 'react'
+import TokenPreview from '@/design/TokenPreview'
+import TypographyPreview from '@/design/TypographyPreview'
+import CardStory from './stories/CardStory'
+import HandStory from './stories/HandStory'
+import AnimationsStory from './stories/AnimationsStory'
+import TableStory from './stories/TableStory'
+import ArrowStory from './stories/ArrowStory'
+import ComboStory from './stories/ComboStory'
+import LoaderStory from './stories/LoaderStory'
+import DeckStory from './stories/DeckStory'
+import StartStory from './stories/StartStory'
 import styles from './Playground.module.css'
+
+interface Story {
+  id: string
+  title: string
+  render: () => ReactNode
+}
 
 // Реестр «историй». Каждая фаза добавляет сюда изолированные сцены
 // (Card, Hand, ReactionWindow, экраны Lobby/GameOver и т.д.) —
 // чтобы любой момент можно было открыть напрямую, не проходя всю игру.
-const stories = [
+const stories: Story[] = [
   { id: 'design-tokens', title: 'Design Tokens', render: () => <TokenPreview /> },
   { id: 'typography', title: 'Typography', render: () => <TypographyPreview /> },
   { id: 'card', title: 'Card', render: () => <CardStory /> },
