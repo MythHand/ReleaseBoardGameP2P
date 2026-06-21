@@ -3,11 +3,6 @@
 # We only copy OUT of it into the project — it must never reach GitHub.
 user_input/
 
-# --- Internal documentation: keep out of the repo ---
-# Рабочие заметки/разборы по проекту — не пушим.
-docs/
-CLAUDE.md
-
 # --- OS / editor cruft ---
 .DS_Store
 Thumbs.db
