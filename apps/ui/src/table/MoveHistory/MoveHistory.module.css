@@ -1,0 +1,78 @@
+.box {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.title {
+  padding: 0 4px 14px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.5;
+}
+
+.list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.3;
+  border-radius: 6px;
+}
+
+/* левый градиент из цвета типа карты в прозрачный */
+.row[data-accented="true"] {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 28%, transparent),
+    transparent 62%
+  );
+}
+
+.nested {
+  margin-inline-start: 18px;
+  font-size: 11px;
+}
+
+.nested::before {
+  position: absolute;
+  inset-block-start: 7px;
+  inset-inline-start: -14px;
+  content: "↳";
+  opacity: 0.35;
+}
+
+/* слева — название карты (главный акцент) */
+.card {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.row[data-accented="true"] .card {
+  color: var(--accent);
+}
+
+/* слева — действие без карты (добор/конец хода) */
+.action {
+  opacity: 0.7;
+}
+
+/* справа — кто сделал */
+.who {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  color: rgb(255 255 255 / 50%);
+}

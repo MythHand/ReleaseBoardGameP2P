@@ -1,0 +1,206 @@
+.root {
+  position: relative;
+  block-size: 100vh;
+  padding: 28px;
+  overflow: hidden;
+}
+
+.hint {
+  max-inline-size: 780px;
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.65;
+}
+
+.toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-block-end: 8px;
+}
+
+.reset {
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+}
+
+.reset:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.log {
+  font-size: 12px;
+  color: var(--brand-green);
+  opacity: 0.85;
+}
+
+/* цели атаки — сверху */
+.targets {
+  display: flex;
+  gap: 28px;
+  justify-content: center;
+  margin-block-start: 14px;
+}
+
+.target {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 200px;
+  block-size: 92px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  border: 1px dashed rgb(255 255 255 / 18%);
+  border-radius: 12px;
+  opacity: 0.45;
+  transition: border-color var(--t-base) var(--ease-soft),
+    box-shadow var(--t-base) var(--ease-soft), color var(--t-base) var(--ease-soft),
+    opacity var(--t-base) var(--ease-soft);
+}
+
+.lit {
+  color: var(--hl);
+  cursor: pointer;
+  border-color: var(--hl);
+  border-style: solid;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--hl) 45%, transparent);
+  opacity: 1;
+}
+
+/* центр стола — куда ложатся не-релизы */
+.centerSlot {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 160px;
+  aspect-ratio: var(--card-aspect);
+  border: 1px dashed rgb(255 255 255 / 10%);
+  border-radius: 14px;
+  transform: translate(-50%, -50%);
+}
+
+/* сброс — правый нижний угол */
+.discard {
+  position: absolute;
+  inset-block-end: 28px;
+  inset-inline-end: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.discardSlot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 104px;
+  aspect-ratio: var(--card-aspect);
+  border: 1px dashed rgb(255 255 255 / 16%);
+  border-radius: 12px;
+}
+
+.discardCard {
+  position: absolute;
+  inset: 0;
+}
+
+.cap {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+/* низ: зона релиза над рукой */
+.bottom {
+  position: absolute;
+  inset-block-end: 24px;
+  inset-inline: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+}
+
+.releaseZone {
+  display: flex;
+  gap: 12px;
+}
+
+.slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 92px;
+  aspect-ratio: var(--card-aspect);
+  border: 1px dashed rgb(255 255 255 / 16%);
+  border-radius: 12px;
+}
+
+.empty {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.4;
+}
+
+/* пара: основная карта сверху, вспомогательная под углом снизу (виден верх) */
+.pair {
+  position: relative;
+  aspect-ratio: var(--card-aspect);
+}
+
+.aux {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  filter: brightness(0.82);
+  transform: translateY(-26%) rotate(-7deg);
+  transform-origin: bottom center;
+}
+
+.mainCard {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+}
+
+.cell {
+  position: relative;
+  cursor: pointer;
+  border-radius: 14px;
+  transition: box-shadow var(--t-base) var(--ease-soft);
+}
+
+.valid,
+.partner {
+  box-shadow: 0 0 26px color-mix(in srgb, var(--hl) 55%, transparent);
+}
+
+/* летящая карта (overlay) */
+.flyer {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: var(--z-modal);
+  pointer-events: none;
+  opacity: 0;
+}

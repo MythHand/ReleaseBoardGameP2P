@@ -1,0 +1,26 @@
+.zone {
+  display: flex;
+  gap: 10px;
+}
+
+.slot {
+  flex: 0 0 auto;
+  aspect-ratio: var(--card-aspect);
+  container-type: inline-size;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  block-size: 100%;
+  padding: 4px;
+  font-size: 10px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  border: 1px dashed rgb(255 255 255 / 18%);
+  border-radius: 6cqw;
+  opacity: 0.4;
+}

@@ -1,0 +1,121 @@
+.table {
+  position: relative;
+  block-size: 100%;
+  overflow: hidden; /* без скролла — стол по размеру экрана */
+  background:
+    linear-gradient(0deg, var(--surface-0), var(--surface-0)),
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 28px);
+}
+
+/* ===== независимые блоки ===== */
+.opponents {
+  position: absolute;
+  inset-block-start: 22px;
+  inset-inline-start: 50%;
+  display: flex;
+  flex-wrap: nowrap; /* всегда один ряд сверху */
+  gap: 18px;
+  justify-content: center;
+  max-inline-size: calc(100% - 80px);
+  transform: translateX(-50%);
+}
+
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  transform: translateY(-50%);
+}
+
+.discard {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 86px; /* слева от полосы кнопок */
+  transform: translateY(-50%);
+}
+
+.you {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline: 0 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.handWrap {
+  inline-size: 100%;
+}
+
+/* ===== полоса кнопок во всю высоту ===== */
+.bar {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  inline-size: 56px;
+  background: var(--surface-1);
+  border-inline-start: 1px solid rgb(255 255 255 / 10%);
+}
+
+.tab {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  opacity: 0.6;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transition: opacity var(--t-base) var(--ease-soft),
+    color var(--t-base) var(--ease-soft);
+}
+
+.tab:last-child {
+  border-block-end: none;
+}
+
+.tab:hover {
+  opacity: 1;
+}
+
+.tabOn {
+  color: var(--brand-green);
+  background: rgb(41 224 122 / 8%);
+  opacity: 1;
+}
+
+/* ===== выезжающая панель ===== */
+.drawer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 56px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  inline-size: 360px;
+  padding: 20px;
+  background: color-mix(in srgb, var(--surface-1) 92%, #000);
+  border-inline-start: 1px solid rgb(255 255 255 / 10%);
+  box-shadow: -24px 0 48px rgb(0 0 0 / 55%);
+  transform: translateX(calc(100% + 56px));
+  transition: transform 320ms var(--ease-soft);
+}
+
+.drawerOpen {
+  transform: translateX(0);
+}

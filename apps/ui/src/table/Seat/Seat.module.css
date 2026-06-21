@@ -1,0 +1,52 @@
+.seat {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  inline-size: 264px;
+  padding: 14px 16px;
+  background: var(--surface-1);
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 12px;
+  transition: box-shadow var(--t-base) var(--ease-soft),
+    border-color var(--t-base) var(--ease-soft);
+}
+
+.active {
+  border-color: var(--brand-green);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--brand-green) 32%, transparent);
+}
+
+.head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.dot {
+  flex: 0 0 auto;
+  inline-size: 7px;
+  block-size: 7px;
+  background: rgb(255 255 255 / 25%);
+  border-radius: 50%;
+}
+
+.active .dot {
+  background: var(--brand-green);
+  box-shadow: 0 0 8px var(--brand-green);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-text);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.hand {
+  margin-inline-start: auto;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.5;
+}

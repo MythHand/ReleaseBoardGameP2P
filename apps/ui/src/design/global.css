@@ -1,0 +1,38 @@
+@import url("./tokens.css");
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  block-size: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  /* Основной текст настолки — Fira Mono. Терминальная эстетика без сглаживания
+     остаётся локально в модуле лоадера (boot), а не глобально. */
+  font-family: var(--font-text);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading); /* заголовки — Onest */
+}
+
+#root,
+#playground {
+  min-block-size: 100%;
+}
+
+button {
+  font-family: inherit;
+}

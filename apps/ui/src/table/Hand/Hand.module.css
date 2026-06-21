@@ -1,0 +1,14 @@
+.hand {
+  position: relative;
+  inline-size: 100%;
+  block-size: 224px;
+}
+
+.slot {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-start: 50%;
+  transform-origin: bottom center;
+  transition: transform 320ms var(--ease-soft);
+  will-change: transform;
+}

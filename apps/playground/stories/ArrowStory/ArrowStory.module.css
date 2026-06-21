@@ -1,0 +1,64 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  padding: 28px;
+}
+
+.hint {
+  max-inline-size: 640px;
+  margin: 0 0 24px;
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+.stage {
+  display: flex;
+  flex: 1;
+  gap: 40px;
+  align-items: center;
+  justify-content: space-between;
+  min-block-size: 360px;
+}
+
+.sources {
+  display: flex;
+  gap: 28px;
+}
+
+.src {
+  cursor: crosshair;
+}
+
+.targets {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.target {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 180px;
+  block-size: 92px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  border: 1px dashed rgb(255 255 255 / 20%);
+  border-radius: 12px;
+  opacity: 0.6;
+  transition: border-color var(--t-base) var(--ease-soft),
+    box-shadow var(--t-base) var(--ease-soft), color var(--t-base) var(--ease-soft),
+    opacity var(--t-base) var(--ease-soft);
+}
+
+/* подсветка цели в ЦВЕТЕ карты */
+.targeted {
+  color: var(--hl);
+  border-color: var(--hl);
+  border-style: solid;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--hl) 45%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--hl) 18%, transparent);
+  opacity: 1;
+}

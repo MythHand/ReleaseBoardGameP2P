@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["vite/client"],
+    "paths": { "@release/ui": ["../ui/src/index.ts"], "@/*": ["../ui/src/*"] }
+  },
+  "include": ["."],
+  "exclude": ["vite.config.ts"]
+}

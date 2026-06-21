@@ -1,0 +1,55 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.title {
+  padding: 0 4px 16px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.5;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.opt,
+.optOn {
+  padding: 6px 11px;
+  font-size: 12px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 6px;
+}
+
+.opt {
+  opacity: 0.38;
+}
+
+.optOn {
+  color: var(--brand-green);
+  background: rgb(41 224 122 / 12%);
+  border-color: var(--brand-green);
+}

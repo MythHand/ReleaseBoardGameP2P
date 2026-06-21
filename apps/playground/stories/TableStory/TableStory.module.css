@@ -1,0 +1,55 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
+  overflow: hidden;
+}
+
+.controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 16px;
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+.label {
+  font-size: 12px;
+  letter-spacing: var(--tracking);
+  opacity: 0.5;
+}
+
+.btn,
+.on {
+  inline-size: 30px;
+  block-size: 30px;
+  font-size: 12px;
+  color: var(--fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+}
+
+.on {
+  color: var(--brand-green);
+  background: rgb(41 224 122 / 10%);
+  border-color: var(--brand-green);
+}
+
+.total {
+  margin-inline-start: 12px;
+  font-size: 12px;
+  opacity: 0.45;
+}
+
+.stage {
+  display: flex;
+  flex: 1;
+  min-block-size: 0;
+}
+
+.stage > * {
+  flex: 1;
+}

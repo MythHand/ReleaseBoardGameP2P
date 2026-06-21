@@ -1,20 +1,42 @@
 {
-  "name": "release-at-any-cost-web",
+  "name": "release-board-game-p2p",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "«Release любой ценой» — визуальный слой P2P веб-версии карточной игры",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=24"
   },
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+  "scripts": {
+    "dev": "pnpm --filter @release/web dev",
+    "dev:playground": "pnpm --filter @release/playground dev",
+    "dev:server": "pnpm --filter @release/server dev",
+    "dev:all": "concurrently -n web,playground -c green,magenta \"pnpm dev\" \"pnpm dev:playground\"",
+    "build": "pnpm -r build",
+    "lint": "biome check . && pnpm -r stylelint",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "prepare": "simple-git-hooks"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.7"
+    "@biomejs/biome": "^2.5.0",
+    "concurrently": "^10.0.3",
+    "stylelint": "^17.13.0",
+    "stylelint-config-recess-order": "^7.7.0",
+    "stylelint-config-standard": "^40.0.0",
+    "stylelint-order": "^8.1.1",
+    "stylelint-use-logical": "^2.1.3",
+    "lint-staged": "^15.2.0",
+    "simple-git-hooks": "^2.11.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,jsonc}": "biome check --write",
+    "*.css": "stylelint --fix"
   }
 }

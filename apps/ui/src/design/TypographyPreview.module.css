@@ -1,0 +1,86 @@
+.root {
+  padding: 28px;
+}
+
+.h {
+  margin: 0 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-inline-size: 760px;
+}
+
+.item {
+  padding: 18px 20px;
+  background: var(--surface-1);
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 10px;
+}
+
+.meta {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin-block-end: 14px;
+}
+
+.role {
+  padding: 3px 8px;
+  font-family: var(--font-text);
+  font-size: 11px;
+  color: var(--brand-green);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  background: rgb(41 224 122 / 12%);
+  border-radius: 4px;
+}
+
+.name {
+  font-family: var(--font-text);
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.var {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.4;
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.text {
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-feature-settings: "calt" off, "liga" off;
+  font-smooth: never;
+  line-height: 1.5;
+  -webkit-font-smoothing: none;
+}
+
+.where {
+  margin: 12px 0 0;
+  font-family: var(--font-text);
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.5;
+}

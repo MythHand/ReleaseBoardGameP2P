@@ -1,0 +1,81 @@
+.pile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.stack {
+  position: relative;
+  inline-size: 100%;
+  aspect-ratio: var(--card-aspect);
+  container-type: inline-size;
+}
+
+.layer {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-1);
+  border: 1px solid rgb(255 255 255 / 6%);
+  border-radius: 6cqw;
+}
+
+.layer:nth-child(1) {
+  transform: translate(5px, 5px);
+}
+
+.layer:nth-child(2) {
+  transform: translate(2.5px, 2.5px);
+}
+
+.top {
+  position: absolute;
+  inset: 0;
+}
+
+.back {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  border-radius: 6cqw;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 50%);
+}
+
+.count {
+  position: absolute;
+
+  /* шрифт кода из лоадера — «кодовая заметка» */
+  font-family: var(--font-mono);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.count::before {
+  content: "// ";
+  opacity: 0.4;
+}
+
+/* колоды добора — только текст, левый верхний угол */
+.tl {
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 90%);
+}
+
+/* сброс — бейдж в правом нижнем углу */
+.br {
+  inset-block-end: 8px;
+  inset-inline-end: 8px;
+  padding: 3px 9px;
+  background: rgb(0 0 0 / 78%);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 6px;
+}
+
+.label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.5;
+}
