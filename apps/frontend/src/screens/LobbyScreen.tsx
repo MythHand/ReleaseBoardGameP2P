@@ -88,8 +88,14 @@ export default function LobbyScreen() {
               key={p.id}
               className="flex items-center justify-between rounded bg-surface-1 px-3 py-2"
             >
-              <span>
-                {p.name} · {roleLabel(p.role, t)} {p.ready ? '✓' : ''}
+              <span className="flex items-center gap-2">
+                <span>{p.name}</span>
+                <span className="opacity-70">{roleLabel(p.role, t)}</span>
+                {p.ready ? (
+                  <span role="img" aria-label={t('lobby.ready')}>
+                    {t('lobby.readyMark')}
+                  </span>
+                ) : null}
               </span>
               {lobby.isHost && p.role !== 'host' && (
                 <button
