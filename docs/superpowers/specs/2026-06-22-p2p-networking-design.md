@@ -166,7 +166,7 @@ PLAYER_ELIMINATED  { player }                  // if Error 503 / Crush not neutr
 ```
 HAND_ATTACK        { card, target, sudo?, requestedCard? }   // turn player → target via host
 HAND_GIVE          { card }                                   // target → attacker (private)
-HAND_ATTACK_RESULT { ... }                                    // → all; count deltas only, no card identity
+HAND_ATTACK_RESULT { attacker, target, attackerHandSize, targetHandSize }  // → all; counts only, no card identity
 ```
 
 **System Upgrade** (every other player discards one card):
@@ -225,7 +225,7 @@ NEUTRALIZE           { method, releaseCard? }
 PLAYER_ELIMINATED    { player }
 HAND_ATTACK          { card, target, sudo?, requestedCard? }
 HAND_GIVE            { card }
-HAND_ATTACK_RESULT   { ... }
+HAND_ATTACK_RESULT   { attacker, target, attackerHandSize, targetHandSize }
 DISCARD_REQUEST      { fromCard }
 DISCARD_CHOICE       { card }
 GIT_OP               { op, sudo? }
