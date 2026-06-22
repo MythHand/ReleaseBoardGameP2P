@@ -1,0 +1,103 @@
+.rules {
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgb(255 255 255 / 86%);
+}
+
+.rules b {
+  font-weight: 600;
+  color: #fff;
+}
+
+/* поиск по правилам */
+.search {
+  inline-size: 100%;
+  padding: 10px 14px;
+  margin-block-end: 18px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: #fff;
+  letter-spacing: 0.04em;
+  outline: none;
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 16%);
+}
+
+.search:focus {
+  border-color: var(--brand-green);
+}
+
+.search::placeholder {
+  color: rgb(255 255 255 / 35%);
+}
+
+.empty {
+  margin: 0;
+  color: rgb(255 255 255 / 50%);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  padding: 0 0 18px;
+  margin: 0 0 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 55%);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  list-style: none;
+  border-block-end: 1px solid rgb(255 255 255 / 10%);
+}
+
+.meta b {
+  color: var(--cat-release);
+}
+
+.sec {
+  margin-block-start: 18px;
+}
+
+.sec p {
+  margin: 0;
+}
+
+.h {
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.muted {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-inline-start: 18px;
+  margin: 0;
+}
+
+.list li::marker {
+  color: var(--cat-release);
+}
+
+.foot {
+  padding-block-start: 16px;
+  margin: 24px 0 0;
+  font-size: 13px;
+  color: rgb(255 255 255 / 55%);
+  border-block-start: 1px solid rgb(255 255 255 / 10%);
+}

@@ -1,0 +1,70 @@
+.root {
+  padding: 28px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  align-items: center;
+  margin-block-end: 10px;
+}
+
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.states {
+  display: flex;
+  gap: 6px;
+}
+
+.btn,
+.on {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+}
+
+.on {
+  color: var(--brand-green);
+  background: rgb(41 224 122 / 10%);
+  border-color: var(--brand-green);
+}
+
+.hint {
+  margin: 0 0 26px;
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 40px 28px;
+  padding-block-start: 16px;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.cap {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.6;
+}

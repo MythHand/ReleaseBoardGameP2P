@@ -1,0 +1,282 @@
+.stats {
+  inline-size: 100%;
+  min-block-size: 100vh;
+  padding: 56px clamp(40px, 8vw, 120px);
+  color: #fff;
+  background: #000;
+}
+
+/* ===== шапка ===== */
+.head {
+  padding-block-end: 28px;
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 32px;
+  letter-spacing: 0.04em;
+}
+
+.sub {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/* ===== победитель ===== */
+.winner {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 24px 28px;
+  margin: 32px 0;
+  background: rgb(143 217 176 / 6%);
+  border: 1px solid rgb(143 217 176 / 45%);
+}
+
+.crown {
+  font-size: 40px;
+  line-height: 1;
+  color: #8fd9b0;
+}
+
+.winnerLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #8fd9b0;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+.winnerName {
+  margin-block-start: 4px;
+  font-family: var(--font-heading);
+  font-size: 26px;
+  letter-spacing: 0.02em;
+}
+
+/* ===== таблица игроков ===== */
+.table {
+  display: flex;
+  flex-direction: column;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 110px 110px;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+}
+
+.thead {
+  padding-block-end: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 40%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+.rows .row {
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 8%);
+}
+
+.rowWin {
+  background: rgb(143 217 176 / 6%);
+  border-color: rgb(143 217 176 / 45%);
+}
+
+.colName {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: 30px;
+  block-size: 30px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  background: rgb(255 255 255 / 8%);
+}
+
+.name {
+  font-size: 15px;
+}
+
+.winTag {
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #8fd9b0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border: 1px solid rgb(143 217 176 / 50%);
+}
+
+.colNum {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  text-align: center;
+}
+
+/* заголовки колонок карт — в цвет категорий */
+.hAttack {
+  color: var(--cat-attack);
+}
+
+.hDefense {
+  color: transparent;
+
+  /* «защитные» = синие + фиолетовые → намёк градиентом текста */
+  background: linear-gradient(90deg, var(--cat-defense), var(--cat-protection));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.numAttack {
+  color: color-mix(in srgb, var(--cat-attack) 75%, #fff);
+}
+
+.numDefense {
+  color: color-mix(in srgb, var(--cat-defense) 70%, #fff);
+}
+
+/* статус «где сейчас» */
+.loc {
+  padding: 4px 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid rgb(255 255 255 / 18%);
+}
+
+.loc_game {
+  color: #e3b341;
+  border-color: rgb(227 179 65 / 40%);
+}
+
+.loc_stats {
+  color: #8fd9b0;
+  border-color: rgb(143 217 176 / 40%);
+}
+
+.loc_lobby {
+  color: #7fb0ff;
+  border-color: rgb(127 176 255 / 40%);
+}
+
+.loc_offline {
+  color: rgb(255 255 255 / 35%);
+  border-color: rgb(255 255 255 / 14%);
+}
+
+/* ===== кнопка между таблицами ===== */
+.foot {
+  display: flex;
+  justify-content: center;
+  margin: 88px 0;
+}
+
+/* ===== ачивки ===== */
+.achievements {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.ach {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  padding: 22px 24px;
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 8%);
+}
+
+.achWide {
+  grid-column: span 2;
+}
+
+/* арт карт(ы) */
+.achArt {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+/* «веер» из 6 карт у Забагованного — внахлёст */
+.achFan > * + * {
+  margin-inline-start: -36px;
+}
+
+.achBody {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+/* имя игрока — сверху */
+.achHolder {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: rgb(255 255 255 / 60%);
+  letter-spacing: 0.04em;
+}
+
+.achTitle {
+  margin-block-start: 6px;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* цифра + подпись на одной линии текста */
+.achStat {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin-block-start: 14px;
+}
+
+.achValue {
+  font-family: var(--font-mono);
+  font-size: 52px;
+  font-weight: 300;
+  line-height: 0.95;
+  color: #fff;
+  letter-spacing: 0;
+}
+
+.achUnit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}

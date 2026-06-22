@@ -1,0 +1,35 @@
+.root {
+  position: relative;
+  block-size: 100vh;
+  overflow: hidden;
+}
+
+/* переключатель роли — только для песочницы, не часть экрана */
+.switch {
+  position: absolute;
+  inset-block-start: 14px;
+  inset-inline-start: 50%;
+  z-index: 10;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: rgb(255 255 255 / 8%);
+  transform: translateX(-50%);
+}
+
+.switch button {
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 55%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.switch .on {
+  color: #fff;
+  background: rgb(255 255 255 / 16%);
+}

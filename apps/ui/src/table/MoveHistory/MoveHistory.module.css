@@ -1,0 +1,131 @@
+.box {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.3;
+  border-radius: 6px;
+}
+
+/* левый градиент из цвета типа карты в прозрачный */
+.row[data-accented="true"] {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 28%, transparent),
+    transparent 62%
+  );
+}
+
+.nested {
+  margin-inline-start: 18px;
+  font-size: 11px;
+}
+
+.nested::before {
+  position: absolute;
+  inset-block-start: 7px;
+  inset-inline-start: -14px;
+  content: "↳";
+  opacity: 0.35;
+}
+
+/* слева — название карты (главный акцент) */
+.card {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.row[data-accented="true"] .card {
+  color: var(--accent);
+}
+
+/* слева — действие без карты (добор/конец хода) */
+.action {
+  opacity: 0.7;
+}
+
+/* иконки-связки между картой и доп. сущностью (мечик / возврат / отскок) */
+.icon {
+  flex: 0 0 auto;
+  align-self: center;
+  inline-size: 13px;
+  block-size: 13px;
+  color: rgb(255 255 255 / 45%);
+}
+
+/* выделенное имя (цель-карта) — цветом задаётся инлайн */
+.strong {
+  font-weight: 600;
+}
+
+/* цель-игрок — нейтрально (у игрока нет типа карты) */
+.targetPlayer {
+  font-weight: 600;
+  color: rgb(255 255 255 / 85%);
+}
+
+/* «добор» — пометка вскрытой публичной карты (503 / AI) */
+.drawTag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: rgb(255 255 255 / 40%);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* связка с жёлтой поддержкой: Bug + Sudo */
+.combo {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+.plus {
+  color: rgb(255 255 255 / 40%);
+}
+
+/* хвост возврата (карта/эффект → атакующий) */
+.tail {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.tailName {
+  color: rgb(255 255 255 / 60%);
+}
+
+/* системная строка (выбывание) — нейтрально-серая, техническая */
+.system {
+  position: relative;
+  padding: 7px 12px;
+  font-size: 11px;
+  color: rgb(255 255 255 / 40%);
+  letter-spacing: 0.04em;
+}
+
+/* справа — кто сделал */
+.who {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  color: rgb(255 255 255 / 50%);
+}

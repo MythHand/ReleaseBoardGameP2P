@@ -1,0 +1,33 @@
+{
+  "app": {
+    "titleLead": "Release",
+    "titleSub": "at any cost",
+    "foundationTag": "visual layer — foundation",
+    "phasesHint": "Screens (boot → lobby → game → game over) arrive in phases.",
+    "devShowcase": "component dev showcase →"
+  },
+  "start": {
+    "logoAlt": "Release at any cost",
+    "tagOpenP2P": "Open P2P project",
+    "tagBoardCard": "По настольной карточной игре",
+    "description": "A strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all and release first.",
+    "createGame": "create game",
+    "joinGame": "join",
+    "rules": "правила",
+    "github": "GitHub",
+    "videoReview": "video overview",
+    "close": "close",
+    "createTitle": "Create game",
+    "lobbyParams": "Параметры лобби",
+    "nicknameLabel": "Ваш никнейм",
+    "nicknamePlaceholder": "напр. dimbo",
+    "createCta": "создать лобби",
+    "lobbyNote": "Лимит игроков и режимы партии настраиваются уже в лобби — пересоздавать ничего не нужно.",
+    "joinTitle": "Join",
+    "gameCodeLabel": "game code",
+    "gameCodePlaceholder": "e.g. 4F2A-9K",
+    "joinCta": "enter",
+    "rulesTitle": "Правила"
+  },
+  "language": { "en": "EN", "ru": "RU" }
+}

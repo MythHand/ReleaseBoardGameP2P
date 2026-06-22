@@ -1,0 +1,73 @@
+.root {
+  padding: 28px;
+  letter-spacing: var(--tracking);
+}
+
+.h {
+  margin: 0 0 20px;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.note {
+  font-weight: 400;
+  opacity: 0.4;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 14px;
+  max-inline-size: 920px;
+}
+
+.swatch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chip {
+  block-size: 56px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+}
+
+.label {
+  font-size: 11px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.var {
+  font-size: 10px;
+  opacity: 0.4;
+}
+
+.cardrow {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+  margin-block-start: 36px;
+}
+
+.cardSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--card-w);
+  aspect-ratio: var(--card-aspect);
+  font-size: 11px;
+  text-transform: uppercase;
+  background: var(--surface-1);
+  border: 1px dashed rgb(255 255 255 / 20%);
+  border-radius: var(--card-radius);
+  opacity: 0.6;
+}
+
+.typo {
+  font-size: 13px;
+  line-height: 1.8;
+  opacity: 0.85;
+}

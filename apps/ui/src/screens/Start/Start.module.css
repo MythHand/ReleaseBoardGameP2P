@@ -1,0 +1,308 @@
+.root {
+  position: relative;
+  inline-size: 100%;
+  block-size: 100vh;
+  overflow: hidden;
+  background: #000;
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("../../assets/home/photo.jpg");
+  background-position: center right;
+  background-size: cover;
+}
+
+/* блюр сильнее слева, к правому краю исчезает (через mask) */
+.blur {
+  position: absolute;
+  inset: 0;
+  -webkit-backdrop-filter: blur(11px);
+  backdrop-filter: blur(11px);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, rgb(0 0 0 / 70%) 38%, transparent 66%);
+  mask-image: linear-gradient(90deg, #000 0%, rgb(0 0 0 / 70%) 38%, transparent 66%);
+}
+
+/* градиент легче слева, растянут вправо, не до полной прозрачности */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 80%) 0%,
+    rgb(0 0 0 / 66%) 36%,
+    rgb(0 0 0 / 48%) 70%,
+    rgb(0 0 0 / 32%) 100%
+  );
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  block-size: 100%;
+  padding-inline-start: 76px;
+}
+
+/* col по визуальной ширине контента; разные отступы по теории близости */
+.col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  inline-size: 460px;
+
+  /* выше математического центра — оптически приятнее */
+  transform: translateY(-8vh);
+}
+
+.logo {
+  inline-size: 480px;
+  block-size: auto;
+
+  /* компенсация glow/инсета глифа в SVG — «R» на левую линию */
+  margin: 0 0 12px -11px;
+}
+
+/* теги — в столбик, плотно к логотипу */
+.tags {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block-end: 38px; /* ощутимый отступ до описания */
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--cat-release);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  opacity: 0.85;
+}
+
+.desc {
+  margin: 0 0 96px;
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.65;
+  opacity: 0.85;
+}
+
+/* кнопки — по визуальному центру ЛОГОТИПА (ширина 300, тот же левый сдвиг) */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  align-self: flex-start;
+  inline-size: 300px;
+  margin-inline-start: -11px;
+}
+
+/* вторая группа кнопок (правила / GitHub) — отдельная визуальная группа ниже */
+.actionsSecondary {
+  margin-block-start: 44px;
+}
+
+/* знак автора — по визуальному центру оси кнопок
+   (колонка кнопок: width 300, margin-left -11 → центр = -11 + 150 = 139) */
+.brandMark {
+  align-self: flex-start;
+  inline-size: 132px;
+  block-size: auto;
+  margin: 96px 0 0 73px; /* 139 − 132/2 */
+  opacity: 0.28;
+}
+
+/* ===== play-кнопка → разворачивается на месте в плеер ===== */
+.player {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 24%; /* левее, чем было; правый край-якорь не меняется при раскрытии */
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 76px;
+  block-size: 76px;
+  overflow: visible;
+  transform: translateY(-50%);
+  transition: inline-size 380ms var(--ease-soft), block-size 380ms var(--ease-soft);
+}
+
+.playerOpen {
+  inline-size: min(360px, 42vw);
+  block-size: min(640px, 86vh);
+  overflow: hidden;
+}
+
+.playFace {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.playIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 76px;
+  block-size: 76px;
+  padding-inline-start: 5px;
+  font-size: 23px;
+  background: rgb(0 0 0 / 35%);
+  border: 1.5px solid rgb(255 255 255 / 70%);
+  border-radius: 50%;
+  backdrop-filter: blur(2px);
+  transition: transform var(--t-base) var(--ease-out),
+    border-color var(--t-base) var(--ease-out);
+}
+
+.playFace:hover .playIcon {
+  border-color: #fff;
+  transform: scale(1.08);
+}
+
+.playCap {
+  position: absolute;
+  inset-block-start: 100%;
+  margin-block-start: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+/* видео поверх кнопки, фейдит вместе со сворачиванием контейнера */
+.videoFace {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 280ms var(--ease-soft);
+}
+
+.videoShown {
+  opacity: 1;
+}
+
+.iframe {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border: 0;
+}
+
+.bigClose {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 46px;
+  block-size: 46px;
+  font-size: 30px;
+  line-height: 1;
+  color: #fff;
+  cursor: pointer;
+  background: rgb(0 0 0 / 55%);
+  border: 1px solid rgb(255 255 255 / 35%);
+  transition: background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
+}
+
+.bigClose:hover {
+  background: rgb(0 0 0 / 85%);
+  border-color: #fff;
+}
+
+/* ===== содержимое модалок ===== */
+
+/* создание игры: слева — модификации, справа — техническая часть */
+.createGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  align-items: stretch;
+}
+
+.createMods {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding-inline-end: 36px;
+}
+
+.createTech {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-inline-start: 36px;
+  border-inline-start: 1px solid rgb(255 255 255 / 8%);
+}
+
+.techTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
+/* текст-успокоитель прижат вниз колонки; CTA остаётся вверху у поля */
+.note {
+  margin: auto 0 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgb(255 255 255 / 50%);
+}
+
+.stub {
+  max-inline-size: 420px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.7;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  opacity: 0.55;
+}
+
+.input {
+  max-inline-size: 320px;
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  outline: none;
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 18%);
+}
+
+.input:focus {
+  border-color: var(--brand-green);
+}
