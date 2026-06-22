@@ -29,5 +29,24 @@
     "joinCta": "войти",
     "rulesTitle": "Правила"
   },
-  "language": { "en": "EN", "ru": "RU" }
+  "language": { "en": "EN", "ru": "RU" },
+  "lobby": {
+    "createTitle": "Создать игру",
+    "joinTitle": "Присоединиться",
+    "namePlaceholder": "Ваше имя",
+    "maxPlayers": "Макс. игроков",
+    "create": "Создать",
+    "join": "Войти",
+    "roomCode": "Код комнаты",
+    "shareLink": "Ссылка",
+    "players": "Игроки",
+    "ready": "Готов",
+    "waiting": "Ожидание…",
+    "kick": "Исключить",
+    "start": "Начать игру",
+    "kickedMessage": "Вас исключили из игры.",
+    "roleHost": "Хост",
+    "rolePlayer": "Игрок",
+    "roleGuest": "Зритель"
+  }
 }

@@ -29,5 +29,24 @@
     "joinCta": "enter",
     "rulesTitle": "Правила"
   },
-  "language": { "en": "EN", "ru": "RU" }
+  "language": { "en": "EN", "ru": "RU" },
+  "lobby": {
+    "createTitle": "Create game",
+    "joinTitle": "Join game",
+    "namePlaceholder": "Your name",
+    "maxPlayers": "Max players",
+    "create": "Create",
+    "join": "Join",
+    "roomCode": "Room code",
+    "shareLink": "Share link",
+    "players": "Players",
+    "ready": "Ready",
+    "waiting": "Waiting…",
+    "kick": "Kick",
+    "start": "Start game",
+    "kickedMessage": "You were removed from the game.",
+    "roleHost": "Host",
+    "rolePlayer": "Player",
+    "roleGuest": "Spectator"
+  }
 }
