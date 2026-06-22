@@ -1,4 +1,4 @@
-import { Start, type StartCopy } from '@release/ui'
+import { type ModesCopy, Start, type StartCopy } from '@release/ui'
 import { useTranslation } from 'react-i18next'
 
 export function StartScreen() {
@@ -24,6 +24,7 @@ export function StartScreen() {
     gameCodePlaceholder: t('start.gameCodePlaceholder'),
     joinCta: t('start.joinCta'),
     rulesTitle: t('start.rulesTitle'),
+    modes: t('gameModes', { returnObjects: true }) as ModesCopy,
   }
   return <Start copy={copy} />
 }

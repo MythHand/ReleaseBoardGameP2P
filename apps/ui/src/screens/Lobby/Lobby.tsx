@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
 import ReleaseLogo from '@/brand/ReleaseLogo'
-import { DEFAULT_SETUP, GAME_MODES, type Setup } from '@/game/modes'
+import { buildModes, DEFAULT_SETUP, type ModesCopy, type Setup } from '@/game/modes'
 import Button from '@/primitives/Button'
 import Modal from '@/primitives/Modal'
 import ModeSelect from '@/primitives/ModeSelect'
@@ -32,6 +32,7 @@ interface LobbyProps {
   initialPlayers?: Player[]
   role?: 'host' | 'guest'
   initialSetup?: Setup
+  modesCopy: ModesCopy
 }
 
 // ⚠️ Каркас (WIP). Данные — моки. Сетевой/presence-слой придёт от логики;
@@ -61,6 +62,7 @@ export default function Lobby({
   initialPlayers = MOCK_PLAYERS,
   role = 'host',
   initialSetup = DEFAULT_SETUP,
+  modesCopy,
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
@@ -230,7 +232,7 @@ export default function Lobby({
             {!isHost && <span className={styles.lockTag}>настраивает host</span>}
           </h2>
           <div className={styles.modeList}>
-            {GAME_MODES.map((m) => (
+            {buildModes(modesCopy).map((m) => (
               <ModeSelect
                 key={m.key}
                 title={m.title}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Card } from '@/cards/types'
-import type { Setup } from '@/game/modes'
+import type { ModesCopy, Setup } from '@/game/modes'
 import Pile from '@/primitives/Pile'
 import Rules from '@/screens/Start/Rules'
 import GameModes from '@/table/GameModes'
@@ -57,6 +57,7 @@ interface TableProps {
   over?: Over | null
   onOverContinue?: () => void
   view?: View | null
+  modesCopy: ModesCopy
 }
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
@@ -75,7 +76,13 @@ const EMPTY_RELEASE: ReleaseSlots = {
 
 // Стол = активное состояние игры. Каждый блок позиционируется независимо
 // (абсолютно), без жёсткой сетки. Заполняет экран без скролла.
-export default function Table({ state, over = null, onOverContinue, view = null }: TableProps) {
+export default function Table({
+  state,
+  over = null,
+  onOverContinue,
+  view = null,
+  modesCopy,
+}: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
 
@@ -181,7 +188,7 @@ export default function Table({ state, over = null, onOverContinue, view = null 
             <Rules />
           </div>
         )}
-        {panel === 'modes' && <GameModes setup={setup} />}
+        {panel === 'modes' && <GameModes setup={setup} copy={modesCopy} />}
       </div>
 
       {view === 'youDisconnect' && (

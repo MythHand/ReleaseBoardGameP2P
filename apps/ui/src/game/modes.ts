@@ -1,65 +1,57 @@
 import type { ModeOption } from '@/primitives/ModeSelect'
 
+// Structural definition of the game-mode groups — keys and option values only,
+// no display copy. The library stays i18n-agnostic; consumers inject the copy
+// (see ModesCopy / buildModes below).
+export interface GameModeDef {
+  key: string
+  options: string[]
+}
+
+export const GAME_MODE_DEFS: GameModeDef[] = [
+  { key: 'handLimit', options: ['base', '8bit', 'memory'] },
+  { key: 'releases', options: ['base', 'fast'] },
+  { key: 'releaseCond', options: ['base', 'easy'] },
+  { key: 'ai', options: ['base', 'less', 'no'] },
+  { key: 'gitBranch', options: ['base', 'strategic'] },
+]
+
+export type Setup = Record<string, string>
+
+// дефолтный выбор — первый вариант (Base) в каждой группе
+export const DEFAULT_SETUP: Setup = Object.fromEntries(
+  GAME_MODE_DEFS.map((m): [string, string] => [m.key, m.options[0] ?? '']),
+)
+
+// Display copy for the mode groups, injected by the consuming app. Keyed by
+// mode key, then by option value — so the structural defs and the copy stay in
+// sync by key without the library embedding any user-visible strings.
+export interface ModeOptionCopy {
+  label: string
+  desc: string
+}
+export interface GameModeCopy {
+  title: string
+  options: Record<string, ModeOptionCopy>
+}
+export type ModesCopy = Record<string, GameModeCopy>
+
+// Render-ready shape consumed by ModeSelect.
 export interface GameMode {
   key: string
   title: string
   options: ModeOption[]
 }
 
-export type Setup = Record<string, string>
-
-// Конфиг режимов/модификаций партии. Общий для создания/лобби/стола,
-// чтобы выбор хоста переносился без дублирования.
-export const GAME_MODES: GameMode[] = [
-  {
-    key: 'handLimit',
-    title: 'Лимит карт в руке (в конце хода)',
-    options: [
-      { value: 'base', label: 'Base', desc: 'Без ограничений' },
-      { value: '8bit', label: '8 bit', desc: 'Не более 8 карт' },
-      { value: 'memory', label: 'Memory Problem', desc: 'Не более 5 карт' },
-    ],
-  },
-  {
-    key: 'releases',
-    title: 'Количество релизов за ход',
-    options: [
-      { value: 'base', label: 'Base', desc: 'Не более 1' },
-      { value: 'fast', label: 'Fast Release', desc: 'Без ограничений' },
-    ],
-  },
-  {
-    key: 'releaseCond',
-    title: 'Условие релиза',
-    options: [
-      { value: 'base', label: 'Base', desc: 'Сброс 1 карты за релиз' },
-      { value: 'easy', label: 'Easy Release', desc: 'Без сброса карт за релиз' },
-    ],
-  },
-  {
-    key: 'ai',
-    title: 'Кол-во AI в игре',
-    options: [
-      { value: 'base', label: 'Base', desc: 'Без изменений' },
-      {
-        value: 'less',
-        label: 'Less AI Random',
-        desc: 'Убрать: 6 AI карт, 1 Error 503, 1 Debugger',
-      },
-      { value: 'no', label: 'No AI', desc: 'Убрать: все AI карты, 1 Error 503, 2 Debugger' },
-    ],
-  },
-  {
-    key: 'gitBranch',
-    title: 'Последствия Git Branch',
-    options: [
-      { value: 'base', label: 'Base', desc: 'Добор из всех колод' },
-      { value: 'strategic', label: 'Strategic', desc: 'Добор только из одной колоды' },
-    ],
-  },
-]
-
-// дефолтный выбор — первый вариант (Base) в каждой группе
-export const DEFAULT_SETUP: Setup = Object.fromEntries(
-  GAME_MODES.map((m): [string, string] => [m.key, m.options[0]?.value ?? '']),
-)
+// Merge the structural defs with injected copy into render-ready modes.
+export function buildModes(copy: ModesCopy): GameMode[] {
+  return GAME_MODE_DEFS.map((m) => ({
+    key: m.key,
+    title: copy[m.key]?.title ?? m.key,
+    options: m.options.map((value) => ({
+      value,
+      label: copy[m.key]?.options[value]?.label ?? value,
+      desc: copy[m.key]?.options[value]?.desc ?? '',
+    })),
+  }))
+}

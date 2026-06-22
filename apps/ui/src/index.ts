@@ -16,8 +16,15 @@ export { CATEGORIES } from './cards/categories'
 // The card *type* is re-exported as `CardData` to avoid colliding with the `Card`
 // *component* default export below. Internally the type stays named `Card`.
 export type { Card as CardData, CardTag, Category, CategoryId } from './cards/types'
-export type { GameMode, Setup } from './game/modes'
-export { DEFAULT_SETUP, GAME_MODES } from './game/modes'
+export type {
+  GameMode,
+  GameModeCopy,
+  GameModeDef,
+  ModeOptionCopy,
+  ModesCopy,
+  Setup,
+} from './game/modes'
+export { buildModes, DEFAULT_SETUP, GAME_MODE_DEFS } from './game/modes'
 export { default as Arrow } from './primitives/Arrow'
 export { default as Button } from './primitives/Button'
 // Components (added/uncommented as Task 4 migrates each)

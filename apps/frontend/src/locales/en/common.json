@@ -29,5 +29,47 @@
     "joinCta": "enter",
     "rulesTitle": "Правила"
   },
+  "gameModes": {
+    "handLimit": {
+      "title": "Hand limit (end of turn)",
+      "options": {
+        "base": { "label": "Base", "desc": "No limit" },
+        "8bit": { "label": "8 bit", "desc": "Max 8 cards" },
+        "memory": { "label": "Memory Problem", "desc": "Max 5 cards" }
+      }
+    },
+    "releases": {
+      "title": "Releases per turn",
+      "options": {
+        "base": { "label": "Base", "desc": "Max 1" },
+        "fast": { "label": "Fast Release", "desc": "No limit" }
+      }
+    },
+    "releaseCond": {
+      "title": "Release condition",
+      "options": {
+        "base": { "label": "Base", "desc": "Discard 1 card per release" },
+        "easy": { "label": "Easy Release", "desc": "No discard per release" }
+      }
+    },
+    "ai": {
+      "title": "AI count",
+      "options": {
+        "base": { "label": "Base", "desc": "No change" },
+        "less": {
+          "label": "Less AI Random",
+          "desc": "Remove: 6 AI cards, 1 Error 503, 1 Debugger"
+        },
+        "no": { "label": "No AI", "desc": "Remove: all AI cards, 1 Error 503, 2 Debugger" }
+      }
+    },
+    "gitBranch": {
+      "title": "Git Branch effect",
+      "options": {
+        "base": { "label": "Base", "desc": "Draw from all decks" },
+        "strategic": { "label": "Strategic", "desc": "Draw from one deck only" }
+      }
+    }
+  },
   "language": { "en": "EN", "ru": "RU" }
 }

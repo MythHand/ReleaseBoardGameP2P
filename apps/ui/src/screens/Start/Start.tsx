@@ -1,7 +1,7 @@
 import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
 import ReleaseLogo from '@/brand/ReleaseLogo'
-import { DEFAULT_SETUP, GAME_MODES, type Setup } from '@/game/modes'
+import { buildModes, DEFAULT_SETUP, type ModesCopy, type Setup } from '@/game/modes'
 import Button from '@/primitives/Button'
 import Modal from '@/primitives/Modal'
 import ModeSelect from '@/primitives/ModeSelect'
@@ -32,11 +32,13 @@ export interface StartCopy {
   gameCodePlaceholder: string
   joinCta: string
   rulesTitle: string
+  modes: ModesCopy
 }
 
 export default function Start({ copy }: { copy: StartCopy }) {
   const [modal, setModal] = useState<'create' | 'join' | 'rules' | null>(null)
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
+  const modes = buildModes(copy.modes)
   // никнейм нужен до создания/входа: лобби должно сразу показать игрока
   const [host, setHost] = useState('')
   const [joinName, setJoinName] = useState('')
@@ -135,7 +137,7 @@ export default function Start({ copy }: { copy: StartCopy }) {
       <Modal open={modal === 'create'} onClose={close} title={copy.createTitle} wide>
         <div className={styles.createGrid}>
           <div className={styles.createMods}>
-            {GAME_MODES.map((m) => (
+            {modes.map((m) => (
               <ModeSelect
                 key={m.key}
                 title={m.title}
