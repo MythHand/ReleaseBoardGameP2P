@@ -1,0 +1,29 @@
+.wrap {
+  display: block;
+  line-height: 0;
+}
+.wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* единственный rect в макете — курсор-квадрат справа от слова.
+   мигание в ритме терминального курсора, чуть медленнее обычного (~1.2s) */
+.wrap rect {
+  animation: cursorBlink 1.2s steps(1, end) infinite;
+}
+/* статичный вариант — без мигающего курсора (напр. в хедере) */
+.static rect {
+  animation: none;
+}
+@keyframes cursorBlink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}

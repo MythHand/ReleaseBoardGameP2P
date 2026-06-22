@@ -42,9 +42,26 @@ export function makeTable(opponentCount = 3) {
     },
     turn: opponents[Math.min(1, opponents.length - 1)]?.id,
 
-    // История ходов: акцент на названиях карт + цвет типа карты (cat).
-    // Атаки/защиты по релизу — вложены под действием релиза (children).
+    // Полный состав: игроки (в игре / выбыл) + зрители.
+    participants: [
+      { id: 'you', name: 'you', eliminated: false, connected: true },
+      // i===0: в игре, но потеряна связь (красный); i===1: выбыл и без связи (серый)
+      ...opponents.map((o, i) => ({
+        id: o.id,
+        name: o.name,
+        eliminated: i === 1,
+        connected: i > 1,
+      })),
+    ],
+    spectators: [
+      { id: 'sp1', name: 'oracle' },
+      { id: 'sp2', name: 'cypher' },
+    ],
+
+    // История ходов (сверху — раньше). Акцент на названиях карт + цвет типа (cat).
+    // Реакции и последствия — иерархией (children). Демонстрирует все кейсы.
     history: [
+      // релиз → атака → отмена защитой (Not a Bug, работает даже против Sudo)
       {
         id: 1, who: 'kernel_panic', kind: 'релиз', card: 'Backend', cat: 'release',
         children: [
@@ -52,29 +69,58 @@ export function makeTable(opponentCount = 3) {
           { id: 12, who: 'kernel_panic', kind: 'защита', card: 'Not a Bug', cat: 'defense' },
         ],
       },
-      { id: 2, who: 'segfault', kind: 'добор', text: 'взял карту' },
-      { id: 3, who: 'segfault', kind: 'AI', card: 'Crush Database', cat: 'ai' },
-      { id: 4, who: 'null_ptr', kind: 'выложил', card: 'Monitoring', cat: 'protection' },
+      // релиз → усиленная атака (Bug + Sudo) → возврат эффекта (Works on my Machine)
       {
-        id: 5, who: 'you', kind: 'релиз', card: 'Frontend', cat: 'release',
+        id: 2, who: 'you', kind: 'релиз', card: 'Frontend', cat: 'release',
         children: [
-          { id: 51, who: 'segfault', kind: 'атака', card: 'DDoS', cat: 'attack' },
-          { id: 52, who: 'you', kind: 'защита', card: 'Works on my Machine', cat: 'defense' },
+          { id: 21, who: 'segfault', kind: 'атака', card: 'Bug', cat: 'attack', combo: { card: 'Sudo', cat: 'support' } },
+          { id: 22, who: 'you', kind: 'защита', card: 'Works on my Machine', cat: 'defense', redirect: 'segfault' },
         ],
       },
-      { id: 6, who: 'race_cond', kind: 'усиление', card: 'Sudo', cat: 'support' },
-      { id: 7, who: 'kernel_panic', kind: 'git', card: 'System Upgrade', cat: 'operation' },
-      { id: 8, who: 'null_ptr', kind: 'конец хода', text: 'PUSH' },
+      // выкладывание защиты на стол
+      { id: 3, who: 'null_ptr', kind: 'выложил', card: 'Monitoring', cat: 'protection' },
+      // целенаправленный розыгрыш по карте: DDoS → Monitoring (мечик)
+      { id: 4, who: 'segfault', kind: 'атака', card: 'DDoS', cat: 'attack', target: { card: 'Monitoring', cat: 'protection' } },
+      // целенаправленная атака по игроку (забрать карту из руки) → Rollback вернул карту
+      {
+        id: 5, who: 'race_cond', kind: 'атака', card: 'Out of Memory', cat: 'attack', target: { player: 'null_ptr' },
+        children: [
+          { id: 51, who: 'null_ptr', kind: 'защита', card: 'Rollback', cat: 'defense', returnCard: 'race_cond' },
+        ],
+      },
+      // вскрытый добор Error 503 → нейтрализован Debugger (protection)
+      {
+        id: 6, who: 'kernel_panic', kind: 'добор', card: 'Error 503', cat: 'trigger',
+        children: [
+          { id: 61, who: 'kernel_panic', kind: 'защита', card: 'Debugger', cat: 'protection' },
+        ],
+      },
+      // релиз со связкой Code Review (неуязвим к атакам)
+      { id: 7, who: 'you', kind: 'релиз', card: 'Backend', cat: 'release', combo: { card: 'Code Review', cat: 'support' } },
+      // вскрытый добор AI → случайный эффект из AI-колоды (иерархией), у него своя цель
+      {
+        id: 8, who: 'segfault', kind: 'добор', card: 'AI', cat: 'trigger',
+        children: [
+          { id: 81, who: 'segfault', kind: 'эффект', card: 'Crush Database', cat: 'ai', target: { card: 'Database', cat: 'release' } },
+        ],
+      },
+      // вскрытый добор Error 503 → не нейтрализован → выбывание (серая строка)
+      {
+        id: 9, who: 'null_ptr', kind: 'добор', card: 'Error 503', cat: 'trigger',
+        children: [
+          { id: 91, who: 'null_ptr', kind: 'выбыл' },
+        ],
+      },
     ],
 
-    // Настройки партии — строчные табы (выбор хоста до старта). Read-only.
-    modes: [
-      { label: 'Лимит карт в руке', options: ['Base', '8 bit', 'Memory Problem'], active: 'Base' },
-      { label: 'Релизов за ход', options: ['Base', 'Fast Release'], active: 'Fast Release' },
-      { label: 'Условие релиза', options: ['Base', 'Easy Release'], active: 'Base' },
-      { label: 'Кол-во AI', options: ['Base', 'Less AI Random', 'No AI'], active: 'Base' },
-      { label: 'Release Profit', options: ['Выкл', 'Вкл'], active: 'Вкл' },
-      { label: 'AI Dice (d12)', options: ['Выкл', 'Вкл'], active: 'Выкл' },
-    ],
+    // Игровой режим — выбор хоста до старта (read-only на столе).
+    // Ключи соответствуют GAME_MODES; значения — выбранные варианты.
+    setup: {
+      handLimit: '8bit',
+      releases: 'fast',
+      releaseCond: 'base',
+      ai: 'less',
+      gitBranch: 'strategic',
+    },
   }
 }

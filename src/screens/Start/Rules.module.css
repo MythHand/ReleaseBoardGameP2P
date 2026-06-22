@@ -1,0 +1,96 @@
+.rules {
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.86);
+}
+.rules b {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* поиск по правилам */
+.search {
+  width: 100%;
+  margin-bottom: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  padding: 10px 14px;
+  outline: none;
+}
+.search:focus {
+  border-color: var(--brand-green);
+}
+.search::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.empty {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.meta {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0 0 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.meta b {
+  color: var(--cat-release);
+}
+
+.sec {
+  margin-top: 18px;
+}
+.sec p {
+  margin: 0;
+}
+.h {
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.muted {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0 0 8px;
+}
+
+.list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.list li::marker {
+  color: var(--cat-release);
+}
+
+.foot {
+  margin: 24px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}

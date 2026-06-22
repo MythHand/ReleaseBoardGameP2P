@@ -3,7 +3,7 @@ import styles from './Modal.module.css'
 
 // Переиспользуемая модалка с плавным появлением/закрытием (fade + scale).
 // Остаётся смонтированной на время exit-анимации.
-export default function Modal({ open, onClose, title, children }) {
+export default function Modal({ open, onClose, title, children, wide = false }) {
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
 
@@ -40,7 +40,10 @@ export default function Modal({ open, onClose, title, children }) {
       className={`${styles.overlay} ${shown ? styles.shown : ''}`}
       onClick={onClose}
     >
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div
+        className={`${styles.modal} ${wide ? styles.wide : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={styles.head}>
           <span className={styles.title}>{title}</span>
           <button className={styles.close} onClick={onClose} aria-label="закрыть">

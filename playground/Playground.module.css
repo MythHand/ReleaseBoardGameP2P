@@ -23,6 +23,23 @@
   flex-direction: column;
 }
 
+/* группы навигации */
+.group {
+  display: flex;
+  flex-direction: column;
+}
+.group + .group {
+  margin-top: 18px;
+}
+.groupTitle {
+  padding: 6px 18px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--brand-green);
+  opacity: 0.55;
+}
+
 .item,
 .itemActive {
   text-align: left;

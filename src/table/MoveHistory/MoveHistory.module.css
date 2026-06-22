@@ -5,14 +5,6 @@
   flex-direction: column;
 }
 
-.title {
-  padding: 0 4px 14px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
-  opacity: 0.5;
-}
-
 .list {
   flex: 1;
   min-height: 0;
@@ -68,6 +60,64 @@
 /* слева — действие без карты (добор/конец хода) */
 .action {
   opacity: 0.7;
+}
+
+/* иконки-связки между картой и доп. сущностью (мечик / возврат / отскок) */
+.icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  align-self: center;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* выделенное имя (цель-карта) — цветом задаётся инлайн */
+.strong {
+  font-weight: 600;
+}
+/* цель-игрок — нейтрально (у игрока нет типа карты) */
+.targetPlayer {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* «добор» — пометка вскрытой публичной карты (503 / AI) */
+.drawTag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* связка с жёлтой поддержкой: Bug + Sudo */
+.combo {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-weight: 600;
+}
+.plus {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* хвост возврата (карта/эффект → атакующий) */
+.tail {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tailName {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* системная строка (выбывание) — нейтрально-серая, техническая */
+.system {
+  position: relative;
+  padding: 7px 12px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* справа — кто сделал */

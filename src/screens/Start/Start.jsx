@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react'
 import Button from '@/primitives/Button'
 import Modal from '@/primitives/Modal'
+import ReleaseLogo from '@/brand/ReleaseLogo'
+import ModeSelect from '@/primitives/ModeSelect'
+import { GAME_MODES, DEFAULT_SETUP } from '@/game/modes'
+import Rules from './Rules'
 import styles from './Start.module.css'
 
-const LOGO = '/assets/brand/release_logo.svg'
+const MYTHHAND = '/assets/brand/mythhand.svg'
+const REPO_URL = 'https://github.com/dimbo-design/ReleaseBoardGameP2P'
 
 export default function Start() {
-  const [modal, setModal] = useState(null) // 'create' | 'join' | null
+  const [modal, setModal] = useState(null) // 'create' | 'join' | 'rules' | null
+  const [setup, setSetup] = useState(DEFAULT_SETUP)
+  // никнейм нужен до создания/входа: лобби должно сразу показать игрока
+  const [host, setHost] = useState('')
+  const [joinName, setJoinName] = useState('')
   const [videoMounted, setVideoMounted] = useState(false)
   const [videoOpen, setVideoOpen] = useState(false)
   const close = () => setModal(null)
+  const setMode = (key, value) => setSetup((s) => ({ ...s, [key]: value }))
 
   const openVideo = () => {
     setVideoMounted(true)
@@ -36,10 +46,10 @@ export default function Start() {
 
       <div className={styles.content}>
         <div className={styles.col}>
-          <img className={styles.logo} src={LOGO} alt="Release любой ценой" />
+          <ReleaseLogo className={styles.logo} />
           <div className={styles.tags}>
             <span className={styles.tag}>Открытый P2P-проект</span>
-            <span className={styles.tag}>Настольная карточная игра</span>
+            <span className={styles.tag}>По настольной карточной игре</span>
           </div>
           <p className={styles.desc}>
             Стратегическая карточная игра про реальные будни разработки. Баги, неожиданные
@@ -49,6 +59,13 @@ export default function Start() {
             <Button onClick={() => setModal('create')}>создать игру</Button>
             <Button onClick={() => setModal('join')}>подключиться</Button>
           </div>
+          <div className={`${styles.actions} ${styles.actionsSecondary}`}>
+            <Button onClick={() => setModal('rules')}>правила</Button>
+            <Button onClick={() => window.open(REPO_URL, '_blank', 'noopener')}>
+              GitHub
+            </Button>
+          </div>
+          <img className={styles.brandMark} src={MYTHHAND} alt="MythHand" />
         </div>
       </div>
 
@@ -83,20 +100,63 @@ export default function Start() {
         )}
       </div>
 
-      <Modal open={modal === 'create'} onClose={close} title="Создать игру">
-        <p className={styles.stub}>
-          Настройки партии — выбор режимов (лимит руки, Fast Release, условие релиза и т.д.).
-          Скоро.
-        </p>
-        <Button onClick={close}>создать</Button>
+      <Modal open={modal === 'create'} onClose={close} title="Создать игру" wide>
+        <div className={styles.createGrid}>
+          <div className={styles.createMods}>
+            {GAME_MODES.map((m) => (
+              <ModeSelect
+                key={m.key}
+                title={m.title}
+                options={m.options}
+                value={setup[m.key]}
+                onChange={(v) => setMode(m.key, v)}
+              />
+            ))}
+          </div>
+          <div className={styles.createTech}>
+            <h4 className={styles.techTitle}>Параметры лобби</h4>
+
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>Ваш никнейм</span>
+              <input
+                className={styles.input}
+                value={host}
+                onChange={(e) => setHost(e.target.value)}
+                placeholder="напр. dimbo"
+                maxLength={20}
+              />
+            </label>
+
+            <Button onClick={close}>создать лобби</Button>
+
+            <p className={styles.note}>
+              Лимит игроков и режимы партии настраиваются уже в лобби — пересоздавать
+              ничего не нужно.
+            </p>
+          </div>
+        </div>
       </Modal>
 
       <Modal open={modal === 'join'} onClose={close} title="Подключиться">
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Ваш никнейм</span>
+          <input
+            className={styles.input}
+            value={joinName}
+            onChange={(e) => setJoinName(e.target.value)}
+            placeholder="напр. dimbo"
+            maxLength={20}
+          />
+        </label>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>код игры</span>
           <input className={styles.input} placeholder="напр. 4F2A-9K" />
         </label>
         <Button onClick={close}>войти</Button>
+      </Modal>
+
+      <Modal open={modal === 'rules'} onClose={close} title="Правила">
+        <Rules />
       </Modal>
     </div>
   )

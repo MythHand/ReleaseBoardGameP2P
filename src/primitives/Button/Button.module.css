@@ -10,6 +10,11 @@
   gap: 9px;
   white-space: nowrap;
 }
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
 
 /* основная — брекеты [ TEXT ] */
 .primary {

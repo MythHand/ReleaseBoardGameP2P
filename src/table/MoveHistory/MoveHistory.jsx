@@ -1,8 +1,52 @@
 import styles from './MoveHistory.module.css'
 
+// мечик — целенаправленный розыгрыш по другой карте (DDoS → Monitoring/релиз)
+function IconSword() {
+  return (
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14.5 17.5 3 6V3h3l11.5 11.5" />
+      <path d="M13 19l6-6" />
+      <path d="M16 16l4 4" />
+      <path d="M19 21l2-2" />
+    </svg>
+  )
+}
+
+// возврат карты в руку (Rollback) — карта уезжает обратно
+function IconReturnCard() {
+  return (
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="10" y="4" width="10" height="15" rx="2" />
+      <path d="M10 12H4" />
+      <path d="m7 9-3 3 3 3" />
+    </svg>
+  )
+}
+
+// возврат эффекта в атакующего (Works on my Machine) — отскок
+function IconRedirect() {
+  return (
+    <svg className={styles.icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h9a5 5 0 0 1 5 5v3" />
+    </svg>
+  )
+}
+
 function Row({ e, nested = false }) {
-  const accent = e.cat ? `var(--cat-${e.cat})` : undefined
-  const label = e.card ?? e.kind ?? e.text
+  // системная строка (выбывание) — нейтрально-серая, без акцента/карты
+  if (e.kind === 'выбыл' || e.system) {
+    return (
+      <div className={`${styles.system} ${nested ? styles.nested : ''}`}>
+        {e.text ?? `${e.who} выбыл из игры`}
+      </div>
+    )
+  }
+
+  // добор — техническая запись: без цветного градиента, даже если вскрыта карта
+  const isDraw = e.kind === 'добор'
+  const accent = e.cat && !isDraw ? `var(--cat-${e.cat})` : undefined
+  const label = e.card ?? e.text ?? e.kind
   return (
     <>
       <div
@@ -10,7 +54,49 @@ function Row({ e, nested = false }) {
         data-accented={accent ? 'true' : 'false'}
         style={accent ? { '--accent': accent } : undefined}
       >
+        {/* вскрытый добор: помечаем «добор», карта показывается публично */}
+        {isDraw && e.card && <span className={styles.drawTag}>добор</span>}
         <span className={e.card ? styles.card : styles.action}>{label}</span>
+
+        {/* связка с жёлтой поддержкой: + Sudo / + Code Review */}
+        {e.combo && (
+          <span className={styles.combo}>
+            <span className={styles.plus}>+</span>
+            <span style={{ color: `var(--cat-${e.combo.cat})` }}>{e.combo.card}</span>
+          </span>
+        )}
+
+        {/* целенаправленный розыгрыш: мечик + цель.
+            карта — цветом её типа; игрок — нейтрально */}
+        {e.target && (
+          <>
+            <IconSword />
+            {e.target.player ? (
+              <span className={styles.targetPlayer}>{e.target.player}</span>
+            ) : (
+              <span className={styles.strong} style={{ color: `var(--cat-${e.target.cat})` }}>
+                {e.target.card}
+              </span>
+            )}
+          </>
+        )}
+
+        {/* Rollback: карта атаки вернулась в руку атакующего */}
+        {e.returnCard && (
+          <span className={styles.tail}>
+            <IconReturnCard />
+            <span className={styles.tailName}>{e.returnCard}</span>
+          </span>
+        )}
+
+        {/* Works on my Machine: эффект отскочил в атакующего */}
+        {e.redirect && (
+          <span className={styles.tail}>
+            <IconRedirect />
+            <span className={styles.tailName}>{e.redirect}</span>
+          </span>
+        )}
+
         <span className={styles.who}>{e.who}</span>
       </div>
       {e.children?.map((c) => (
@@ -20,12 +106,11 @@ function Row({ e, nested = false }) {
   )
 }
 
-// История: слева — название карты/действия, справа — кто сделал;
-// атаки/защиты по релизу вложены; слева фон-градиент из цвета типа карты.
+// История: слева — карта/действие (+ связка/цель/возврат), справа — кто;
+// реакции и последствия вложены иерархией; слева фон-градиент из цвета типа.
 export default function MoveHistory({ entries = [] }) {
   return (
     <div className={styles.box}>
-      <div className={styles.title}>история ходов</div>
       <div className={styles.list}>
         {entries.map((e) => (
           <Row key={e.id} e={e} />

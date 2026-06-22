@@ -38,6 +38,11 @@
   transform: none;
 }
 
+/* широкий вариант — для двухколоночных форм (создание игры) */
+.wide {
+  width: min(1040px, 95vw);
+}
+
 .head {
   display: flex;
   align-items: center;
