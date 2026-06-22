@@ -1,0 +1,4 @@
+.root {
+  block-size: 100vh;
+  overflow: auto;
+}

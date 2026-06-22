@@ -1,9 +1,15 @@
 import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
+import ReleaseLogo from '@/brand/ReleaseLogo'
+import { DEFAULT_SETUP, GAME_MODES, type Setup } from '@/game/modes'
 import Button from '@/primitives/Button'
 import Modal from '@/primitives/Modal'
-import LOGO from '../../assets/brand/release_logo.svg'
+import ModeSelect from '@/primitives/ModeSelect'
+import MYTHHAND from '../../assets/brand/mythhand.svg'
+import Rules from './Rules'
 import styles from './Start.module.css'
+
+const REPO_URL = 'https://github.com/dimbo-design/ReleaseBoardGameP2P'
 
 export interface StartCopy {
   logoAlt: string
@@ -11,22 +17,33 @@ export interface StartCopy {
   description: string
   createGame: string
   joinGame: string
+  rules: string
+  github: string
   videoReview: string
   close: string
   createTitle: string
-  createStub: string
+  lobbyParams: string
+  nicknameLabel: string
+  nicknamePlaceholder: string
   createCta: string
+  lobbyNote: string
   joinTitle: string
   gameCodeLabel: string
   gameCodePlaceholder: string
   joinCta: string
+  rulesTitle: string
 }
 
 export default function Start({ copy }: { copy: StartCopy }) {
-  const [modal, setModal] = useState<'create' | 'join' | null>(null)
+  const [modal, setModal] = useState<'create' | 'join' | 'rules' | null>(null)
+  const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
+  // никнейм нужен до создания/входа: лобби должно сразу показать игрока
+  const [host, setHost] = useState('')
+  const [joinName, setJoinName] = useState('')
   const [videoMounted, setVideoMounted] = useState(false)
   const [videoOpen, setVideoOpen] = useState(false)
   const close = () => setModal(null)
+  const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
 
   const openVideo = () => {
     setVideoMounted(true)
@@ -35,7 +52,9 @@ export default function Start({ copy }: { copy: StartCopy }) {
   const closeVideo = () => setVideoOpen(false)
   // видео-плеер остаётся смонтированным до конца сворачивания — без перескоков
   const onPlayerTransEnd = (e: TransitionEvent) => {
-    if (e.propertyName === 'width' && !videoOpen) setVideoMounted(false)
+    if ((e.propertyName === 'inline-size' || e.propertyName === 'width') && !videoOpen) {
+      setVideoMounted(false)
+    }
   }
 
   useEffect(() => {
@@ -53,7 +72,7 @@ export default function Start({ copy }: { copy: StartCopy }) {
 
       <div className={styles.content}>
         <div className={styles.col}>
-          <img className={styles.logo} src={LOGO} alt={copy.logoAlt} />
+          <ReleaseLogo className={styles.logo} />
           <div className={styles.tags}>
             {copy.tags.map((tag) => (
               <span key={tag} className={styles.tag}>
@@ -66,6 +85,13 @@ export default function Start({ copy }: { copy: StartCopy }) {
             <Button onClick={() => setModal('create')}>{copy.createGame}</Button>
             <Button onClick={() => setModal('join')}>{copy.joinGame}</Button>
           </div>
+          <div className={`${styles.actions} ${styles.actionsSecondary}`}>
+            <Button onClick={() => setModal('rules')}>{copy.rules}</Button>
+            <Button onClick={() => window.open(REPO_URL, '_blank', 'noopener')}>
+              {copy.github}
+            </Button>
+          </div>
+          <img className={styles.brandMark} src={MYTHHAND} alt="MythHand" />
         </div>
       </div>
 
@@ -106,17 +132,60 @@ export default function Start({ copy }: { copy: StartCopy }) {
         )}
       </div>
 
-      <Modal open={modal === 'create'} onClose={close} title={copy.createTitle}>
-        <p className={styles.stub}>{copy.createStub}</p>
-        <Button onClick={close}>{copy.createCta}</Button>
+      <Modal open={modal === 'create'} onClose={close} title={copy.createTitle} wide>
+        <div className={styles.createGrid}>
+          <div className={styles.createMods}>
+            {GAME_MODES.map((m) => (
+              <ModeSelect
+                key={m.key}
+                title={m.title}
+                options={m.options}
+                value={setup[m.key] ?? ''}
+                onChange={(v) => setMode(m.key, v)}
+              />
+            ))}
+          </div>
+          <div className={styles.createTech}>
+            <h4 className={styles.techTitle}>{copy.lobbyParams}</h4>
+
+            <label className={styles.field}>
+              <span className={styles.fieldLabel}>{copy.nicknameLabel}</span>
+              <input
+                className={styles.input}
+                value={host}
+                onChange={(e) => setHost(e.target.value)}
+                placeholder={copy.nicknamePlaceholder}
+                maxLength={20}
+              />
+            </label>
+
+            <Button onClick={close}>{copy.createCta}</Button>
+
+            <p className={styles.note}>{copy.lobbyNote}</p>
+          </div>
+        </div>
       </Modal>
 
       <Modal open={modal === 'join'} onClose={close} title={copy.joinTitle}>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>{copy.nicknameLabel}</span>
+          <input
+            className={styles.input}
+            value={joinName}
+            onChange={(e) => setJoinName(e.target.value)}
+            placeholder={copy.nicknamePlaceholder}
+            maxLength={20}
+          />
+        </label>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>{copy.gameCodeLabel}</span>
           <input className={styles.input} placeholder={copy.gameCodePlaceholder} />
         </label>
         <Button onClick={close}>{copy.joinCta}</Button>
+      </Modal>
+
+      <Modal open={modal === 'rules'} onClose={close} title={copy.rulesTitle}>
+        <Rules />
       </Modal>
     </div>
   )

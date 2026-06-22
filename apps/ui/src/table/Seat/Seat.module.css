@@ -50,3 +50,41 @@
   white-space: nowrap;
   opacity: 0.5;
 }
+
+/* статус вместо счётчика карт */
+.status {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.out {
+  color: rgb(255 255 255 / 40%);
+}
+
+.lost {
+  color: #ff6b81;
+}
+
+/* выбыл — карты ушли в сброс (зона пустеет), приглушаем место и имя */
+.eliminated {
+  background: color-mix(in srgb, var(--surface-1) 70%, transparent);
+  border-color: rgb(255 255 255 / 6%);
+}
+
+.eliminated .name {
+  color: rgb(255 255 255 / 50%);
+}
+
+/* потеря связи (ещё в игре) — красный акцент, карты остаются как есть */
+.disconnected {
+  border-color: rgb(255 107 129 / 45%);
+}
+
+.disconnected .dot {
+  background: #ff6b81;
+  box-shadow: 0 0 8px rgb(255 107 129 / 60%);
+}

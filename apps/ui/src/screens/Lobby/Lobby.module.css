@@ -1,0 +1,505 @@
+.lobby {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  block-size: 100vh;
+  padding: 48px clamp(40px, 7vw, 96px);
+  overflow: hidden;
+  color: #fff;
+  background: #000;
+}
+
+/* ===== шапка ===== */
+.head {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-block-end: 28px;
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+.titleRow {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+/* логотип игры в хедере — высота под заголовок, без мигающего курсора */
+.headLogo {
+  flex: none;
+  inline-size: 96px; /* viewBox 301×105 → высота ≈ 33px */
+}
+
+.headDivider {
+  inline-size: 1px;
+  block-size: 30px;
+  background: rgb(255 255 255 / 20%);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 30px;
+  letter-spacing: 0.04em;
+}
+
+/* кнопка расформирования в хедере — деструктивный акцент на ховере */
+.disbandBtn:hover {
+  color: #ff6b81;
+  border-color: rgb(255 107 129 / 50%);
+}
+
+.sub {
+  /* выровнено под слово «Лобби»: лого 96 + gap 18 + линия 1 + gap 18 */
+  margin: 6px 0 0 133px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.codeBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.codeLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+.codeRow {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  color: #8fd9b0;
+  letter-spacing: 0.2em;
+}
+
+.copy {
+  padding: 7px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 70%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 18%);
+  transition: color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
+}
+
+.copy:hover {
+  color: #fff;
+  border-color: rgb(255 255 255 / 55%);
+}
+
+/* ===== контент: слева режимы, справа игроки ===== */
+.grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 48px;
+  min-block-size: 0;
+  padding: 32px 0;
+}
+
+.h {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin: 0 0 20px;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.count {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: rgb(255 255 255 / 45%);
+  letter-spacing: 0.1em;
+}
+
+.lockTag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 40%);
+  text-transform: none;
+  letter-spacing: 0.1em;
+}
+
+/* режимы — скроллятся независимо, если не помещаются */
+.modes {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.modeList {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-inline-end: 8px;
+  overflow-y: auto;
+}
+
+/* ===== колонка игроков ===== */
+.players {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+/* игроки + зрители скроллятся вместе, действия остаются внизу */
+.scrollArea {
+  flex: 1;
+  min-block-size: 0;
+  padding-inline-end: 8px;
+  overflow-y: auto;
+}
+
+.hSpectators {
+  margin-block-start: 30px;
+}
+
+.specTag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 40%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* вместимость комнаты — ползунок (host) */
+.capRow {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-block-end: 18px;
+}
+
+.capLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.slider {
+  flex: 1;
+  block-size: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+  background: rgb(255 255 255 / 18%);
+}
+
+.slider::-webkit-slider-thumb {
+  inline-size: 16px;
+  block-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  background: #8fd9b0;
+  border-radius: 50%;
+}
+
+.slider::-moz-range-thumb {
+  inline-size: 16px;
+  block-size: 16px;
+  cursor: pointer;
+  background: #8fd9b0;
+  border: 0;
+  border-radius: 50%;
+}
+
+/* светофорный ползунок зрителей — цвет бегунка из --spec-color */
+.sliderSpec::-webkit-slider-thumb {
+  background: var(--spec-color, #8fd9b0);
+}
+
+.sliderSpec::-moz-range-thumb {
+  background: var(--spec-color, #8fd9b0);
+}
+
+.capVal {
+  min-inline-size: 18px;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  text-align: center;
+}
+
+/* список игроков / зрителей */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.slot,
+.slotEmpty {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid rgb(255 255 255 / 10%);
+}
+
+.slot {
+  background: rgb(255 255 255 / 4%);
+}
+
+.slotMe {
+  border-color: rgb(143 217 176 / 50%);
+}
+
+/* offline — приглушаем точечно цветом, без opacity на всей карточке
+   (иначе бы тускнело и меню «⋯») */
+.slotOff {
+  background: rgb(255 255 255 / 2%);
+  border-color: rgb(255 255 255 / 7%);
+}
+
+.avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: 34px;
+  block-size: 34px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: #fff;
+  background: rgb(255 255 255 / 8%);
+}
+
+.name {
+  font-family: var(--font-text);
+  font-size: 15px;
+}
+
+.slotOff .avatar {
+  color: rgb(255 255 255 / 35%);
+  background: rgb(255 255 255 / 5%);
+}
+
+.slotOff .name {
+  color: rgb(255 255 255 / 40%);
+}
+
+.you {
+  font-size: 13px;
+  color: rgb(255 255 255 / 40%);
+}
+
+.hostTag {
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #8fd9b0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border: 1px solid rgb(143 217 176 / 50%);
+}
+
+/* правый край карточки: статус + меню «…» */
+.rowEnd {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+/* статусы справа в карточке */
+.stat,
+.statOff {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 40%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.statReady {
+  color: #8fd9b0;
+}
+
+/* кнопка «…» — действия хоста над игроком (кик) */
+.menuWrap {
+  position: relative;
+  display: flex;
+}
+
+.kebab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 28px;
+  block-size: 28px;
+  font-size: 18px;
+  line-height: 1;
+  color: rgb(255 255 255 / 50%);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.kebab:hover {
+  color: #fff;
+}
+
+.menu {
+  position: absolute;
+  inset-block-start: calc(100% + 6px);
+  inset-inline-end: 0;
+  z-index: 5;
+  inline-size: max-content;
+  background: color-mix(in srgb, var(--surface-1) 96%, #000);
+  border: 1px solid rgb(255 255 255 / 14%);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 50%);
+}
+
+.menuItem {
+  display: block;
+  inline-size: 100%;
+  padding: 11px 18px;
+  font-family: var(--font-text);
+  font-size: 14px;
+  color: rgb(255 255 255 / 85%);
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+}
+
+.menuItem:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 8%);
+}
+
+/* деструктивный пункт (Исключить) */
+.menuItemDanger {
+  color: #ff6b81;
+}
+
+.menuItemDanger:hover {
+  color: #ff6b81;
+  background: rgb(255 107 129 / 12%);
+}
+
+/* недоступный пункт — серый, но кликабельный (показывает подсказку) */
+.menuItemDisabled,
+.menuItemDisabled:hover {
+  color: rgb(255 255 255 / 30%);
+  cursor: default;
+  background: transparent;
+}
+
+.menuHint {
+  padding: 9px 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #e3b341;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  border-block-start: 1px solid rgb(255 255 255 / 10%);
+}
+
+/* кнопка готовности на своей карточке: серая → зелёная */
+.readyBtn {
+  padding: 7px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 60%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  background: rgb(255 255 255 / 6%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  transition: all var(--t-fast) var(--ease-out);
+}
+
+.readyBtn:hover {
+  color: #fff;
+  border-color: rgb(255 255 255 / 40%);
+}
+
+.readyOn,
+.readyOn:hover {
+  color: #04140c;
+  background: #8fd9b0;
+  border-color: #8fd9b0;
+}
+
+.slotEmpty {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(255 255 255 / 30%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border-style: dashed;
+}
+
+/* действия лобби — всегда на виду внизу колонки игроков */
+.actions {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  padding-block-start: 22px;
+  margin-block-start: 22px;
+  border-block-start: 1px solid rgb(255 255 255 / 8%);
+}
+
+/* ===== модалка подтверждения расформирования ===== */
+.confirmText {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgb(255 255 255 / 75%);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 18px;
+  justify-content: flex-end;
+  margin-block-start: auto;
+}
+
+/* деструктивная кнопка в модалке (выше специфичности .tech) */
+button.danger {
+  color: #ff6b81;
+  border-color: rgb(255 107 129 / 45%);
+}
+
+button.danger:hover {
+  color: #fff;
+  background: rgb(255 107 129 / 12%);
+  border-color: #ff6b81;
+}

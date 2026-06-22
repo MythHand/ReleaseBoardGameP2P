@@ -6,22 +6,28 @@ export default function StartStory() {
     <div className={styles.root}>
       <Start
         copy={{
-          logoAlt: 'Release at any cost',
-          tags: ['Open P2P project', 'Board card game'],
+          logoAlt: 'Release любой ценой',
+          tags: ['Открытый P2P-проект', 'По настольной карточной игре'],
           description:
-            'A strategic card game about the real grind of software development. Bugs, surprise events, rivals’ attacks — beat it all and release first.',
-          createGame: 'create game',
-          joinGame: 'join',
-          videoReview: 'video overview',
-          close: 'close',
-          createTitle: 'Create game',
-          createStub:
-            'Match settings — mode selection (hand limit, Fast Release, release condition, etc.). Soon.',
-          createCta: 'create',
-          joinTitle: 'Join',
-          gameCodeLabel: 'game code',
-          gameCodePlaceholder: 'e.g. 4F2A-9K',
-          joinCta: 'enter',
+            'Стратегическая карточная игра про реальные будни разработки. Баги, неожиданные события, атаки соперников — преодолевай всё это и зарелизь первым.',
+          createGame: 'создать игру',
+          joinGame: 'подключиться',
+          rules: 'правила',
+          github: 'GitHub',
+          videoReview: 'видео-обзор',
+          close: 'закрыть',
+          createTitle: 'Создать игру',
+          lobbyParams: 'Параметры лобби',
+          nicknameLabel: 'Ваш никнейм',
+          nicknamePlaceholder: 'напр. dimbo',
+          createCta: 'создать лобби',
+          lobbyNote:
+            'Лимит игроков и режимы партии настраиваются уже в лобби — пересоздавать ничего не нужно.',
+          joinTitle: 'Подключиться',
+          gameCodeLabel: 'код игры',
+          gameCodePlaceholder: 'напр. 4F2A-9K',
+          joinCta: 'войти',
+          rulesTitle: 'Правила',
         }}
       />
     </div>

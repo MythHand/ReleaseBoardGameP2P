@@ -7,11 +7,12 @@ interface ModalProps {
   onClose: () => void
   title?: ReactNode
   children: ReactNode
+  wide?: boolean
 }
 
 // Переиспользуемая модалка с плавным появлением/закрытием (fade + scale).
-// Остаётся смонтированной на время exit-анимации.
-export default function Modal({ open, onClose, title, children }: ModalProps) {
+// Остаётся смонтированной на время exit-анимации. wide — широкий вариант (двухколоночные формы).
+export default function Modal({ open, onClose, title, children, wide = false }: ModalProps) {
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
 
@@ -51,7 +52,7 @@ export default function Modal({ open, onClose, title, children }: ModalProps) {
       role="presentation"
     >
       <dialog
-        className={styles.modal}
+        className={`${styles.modal} ${wide ? styles.wide : ''}`}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         open

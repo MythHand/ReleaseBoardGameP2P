@@ -9,19 +9,25 @@
   "start": {
     "logoAlt": "Release любой ценой",
     "tagOpenP2P": "Открытый P2P-проект",
-    "tagBoardCard": "Настольная карточная игра",
+    "tagBoardCard": "По настольной карточной игре",
     "description": "Стратегическая карточная игра про реальные будни разработки. Баги, неожиданные события, атаки соперников — преодолевай всё это и зарелизь первым.",
     "createGame": "создать игру",
     "joinGame": "подключиться",
+    "rules": "правила",
+    "github": "GitHub",
     "videoReview": "видео-обзор",
     "close": "закрыть",
     "createTitle": "Создать игру",
-    "createStub": "Настройки партии — выбор режимов (лимит руки, Fast Release, условие релиза и т.д.). Скоро.",
-    "createCta": "создать",
+    "lobbyParams": "Параметры лобби",
+    "nicknameLabel": "Ваш никнейм",
+    "nicknamePlaceholder": "напр. dimbo",
+    "createCta": "создать лобби",
+    "lobbyNote": "Лимит игроков и режимы партии настраиваются уже в лобби — пересоздавать ничего не нужно.",
     "joinTitle": "Подключиться",
     "gameCodeLabel": "код игры",
     "gameCodePlaceholder": "напр. 4F2A-9K",
-    "joinCta": "войти"
+    "joinCta": "войти",
+    "rulesTitle": "Правила"
   },
   "language": { "en": "EN", "ru": "RU" }
 }

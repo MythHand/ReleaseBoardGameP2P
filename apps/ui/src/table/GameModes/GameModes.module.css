@@ -1,0 +1,12 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  overflow-y: auto;
+}

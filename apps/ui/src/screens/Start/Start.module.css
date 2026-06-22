@@ -58,7 +58,7 @@
 }
 
 .logo {
-  inline-size: 300px;
+  inline-size: 480px;
   block-size: auto;
 
   /* компенсация glow/инсета глифа в SVG — «R» на левую линию */
@@ -83,7 +83,7 @@
 }
 
 .desc {
-  margin: 0 0 30px;
+  margin: 0 0 96px;
   font-family: var(--font-text);
   font-size: 15px;
   line-height: 1.65;
@@ -101,6 +101,21 @@
   margin-inline-start: -11px;
 }
 
+/* вторая группа кнопок (правила / GitHub) — отдельная визуальная группа ниже */
+.actionsSecondary {
+  margin-block-start: 44px;
+}
+
+/* знак автора — по визуальному центру оси кнопок
+   (колонка кнопок: width 300, margin-left -11 → центр = -11 + 150 = 139) */
+.brandMark {
+  align-self: flex-start;
+  inline-size: 132px;
+  block-size: auto;
+  margin: 96px 0 0 73px; /* 139 − 132/2 */
+  opacity: 0.28;
+}
+
 /* ===== play-кнопка → разворачивается на месте в плеер ===== */
 .player {
   position: absolute;
@@ -114,7 +129,7 @@
   block-size: 76px;
   overflow: visible;
   transform: translateY(-50%);
-  transition: width 380ms var(--ease-soft), height 380ms var(--ease-soft);
+  transition: inline-size 380ms var(--ease-soft), block-size 380ms var(--ease-soft);
 }
 
 .playerOpen {
@@ -213,6 +228,46 @@
 }
 
 /* ===== содержимое модалок ===== */
+
+/* создание игры: слева — модификации, справа — техническая часть */
+.createGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  align-items: stretch;
+}
+
+.createMods {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding-inline-end: 36px;
+}
+
+.createTech {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-inline-start: 36px;
+  border-inline-start: 1px solid rgb(255 255 255 / 8%);
+}
+
+.techTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
+/* текст-успокоитель прижат вниз колонки; CTA остаётся вверху у поля */
+.note {
+  margin: auto 0 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgb(255 255 255 / 50%);
+}
+
 .stub {
   max-inline-size: 420px;
   margin: 0;

@@ -9,15 +9,21 @@ export function StartScreen() {
     description: t('start.description'),
     createGame: t('start.createGame'),
     joinGame: t('start.joinGame'),
+    rules: t('start.rules'),
+    github: t('start.github'),
     videoReview: t('start.videoReview'),
     close: t('start.close'),
     createTitle: t('start.createTitle'),
-    createStub: t('start.createStub'),
+    lobbyParams: t('start.lobbyParams'),
+    nicknameLabel: t('start.nicknameLabel'),
+    nicknamePlaceholder: t('start.nicknamePlaceholder'),
     createCta: t('start.createCta'),
+    lobbyNote: t('start.lobbyNote'),
     joinTitle: t('start.joinTitle'),
     gameCodeLabel: t('start.gameCodeLabel'),
     gameCodePlaceholder: t('start.gameCodePlaceholder'),
     joinCta: t('start.joinCta'),
+    rulesTitle: t('start.rulesTitle'),
   }
   return <Start copy={copy} />
 }

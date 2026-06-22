@@ -11,6 +11,12 @@
   border: 0;
 }
 
+.btn:disabled {
+  pointer-events: none;
+  cursor: default;
+  opacity: 0.4;
+}
+
 /* основная — брекеты [ TEXT ] */
 .primary {
   padding: 10px 2px;
