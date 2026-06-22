@@ -22,6 +22,9 @@ class FakeConn {
   close() {}
 }
 
+// Records every outbound connection by peer id so tests can inspect what was sent.
+const outboundConns = new Map<string, FakeConn>()
+
 class FakePeer {
   id: string
   private handlers: Record<string, ((arg: unknown) => void)[]> = {}
@@ -38,6 +41,7 @@ class FakePeer {
   }
   connect(peerId: string) {
     const conn = new FakeConn(peerId)
+    outboundConns.set(peerId, conn)
     queueMicrotask(() => conn.emit('open'))
     return conn
   }
@@ -52,6 +56,7 @@ beforeEach(async () => {
 })
 afterEach(() => {
   vi.clearAllMocks()
+  outboundConns.clear()
 })
 
 it('resolves with an id when the peer opens', async () => {
@@ -70,5 +75,15 @@ it('send serializes an envelope to the target connection', async () => {
   await Promise.resolve()
   const msg: Message = { type: 'PLAYER_READY', payload: {} }
   t.send('peer-2', msg)
+
   expect(t.connectedIds()).toContain('peer-2')
+
+  // The serialized envelope must have reached the target connection.
+  const conn = outboundConns.get('peer-2')
+  expect(conn).toBeDefined()
+  expect(conn?.sent).toHaveLength(1)
+  const frame = JSON.parse(conn?.sent[0] as string) as Record<string, unknown>
+  expect(frame.type).toBe('PLAYER_READY')
+  expect(typeof frame.seq).toBe('number')
+  expect(frame.from).toBe(t.id)
 })
