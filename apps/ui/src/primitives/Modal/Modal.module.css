@@ -19,13 +19,19 @@
 }
 
 .modal {
+  /* сброс UA-дефолтов нативного <dialog open>, которые ломают вёрстку:
+     position:absolute + margin:auto (центрирование), padding:1em, color:CanvasText (чёрный) */
+  position: static;
   display: flex;
   flex-direction: column;
   inline-size: min(640px, 92vw);
   max-inline-size: 92vw;
   min-block-size: 440px;
   max-block-size: 90vh;
+  padding: 0;
+  margin: 0;
   overflow: auto;
+  color: var(--fg);
   background: color-mix(in srgb, var(--surface-1) 94%, #000);
   border: 1px solid rgb(255 255 255 / 14%);
   border-radius: 0; /* острые углы — терминальная эстетика */
