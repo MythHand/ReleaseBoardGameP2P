@@ -3,7 +3,9 @@
 // the playground (a consuming app) supplies the copy here. Real apps pass their
 // own translated copy (e.g. via react-i18next in the frontend).
 import type { ModesCopy } from '@/game/modes'
+import type { RulesCopy } from '@/screens/Start/Rules'
 import type { StatsCopy } from '@/screens/Stats'
+import type { TableCopy } from '@/table/Table/Table'
 
 export const RU_MODES: ModesCopy = {
   handLimit: {
@@ -68,4 +70,92 @@ export const RU_STATS: StatsCopy = {
     cherryPick: { title: 'Кладоискатель', unit: 'раз достал из сброса' },
     attackedInto: { title: 'Забагованный', unit: 'карт атаки прилетело' },
   },
+}
+
+export const RU_RULES: RulesCopy = {
+  searchPlaceholder: 'поиск по правилам…',
+  empty: 'Ничего не найдено',
+  meta: ['2–6 игроков', '15–45 минут', '104 карты + 21 событие'],
+  foot: 'Режимы (лимит руки, Fast Release, условие релиза, кол-во AI) выбираются перед партией — подробности появятся в окне создания игры.',
+  sections: [
+    {
+      title: 'Цель',
+      body: [
+        'Первым собрать три разные карты Release (Frontend, Backend, Database) в своей зоне релиза, отразив все атаки противников, — или остаться последним игроком в партии.',
+      ],
+    },
+    {
+      title: 'Подготовка',
+      body: [
+        'Две колоды по цвету рубашки: зелёная — основная, фиолетовая — события.',
+        'Каждому: 1 карта Debugger + 4 случайные (всего 5 на руке).',
+        'Карты AI и Error 503 на старте недопустимы — замените их на руке.',
+        'Перетасуйте и положите обе колоды рубашкой вверх.',
+      ],
+    },
+    {
+      title: 'Ход игрока',
+      note: 'действие / добор / действие / конец хода',
+      body: [
+        'До и после добора можно сыграть любое число карт (в том числе 0).',
+        'Добор — ровно одна карта сверху основной колоды (обязателен).',
+        'Конец хода обозначается словом «PUSH», ход идёт по часовой стрелке.',
+      ],
+    },
+    {
+      title: 'Релиз карт',
+      body: [
+        'Зона релиза — место для карт Release; по одной каждого типа.',
+        'За ход — только один релиз; при выкладывании сбрасывается 1 карта с руки.',
+        'На свежий релиз соперники могут мгновенно ответить атакой со значком молнии (Bug, Out of Memory, Legacy Code, Security Bug).',
+        'Code Review играется вместе с Release и делает его неуязвимым к этим атакам (даже с Sudo). К уже выложенному релизу не применяется.',
+      ],
+    },
+    {
+      title: 'Атака и оборона',
+      body: [
+        'Атакующие карты (молния) играются мгновенно — на релиз или по руке.',
+        'Оборона: Cancel (Hotfix, Rubber Ducky, PR Approved, Rollback) и Unicorn (Not a Bug, Works on my Machine).',
+        'Sudo усиливает карты с эффектом sudo; Cancel против усиления не работает, Unicorn — работает.',
+        'DDoS — единственная атака против защищённого релиза и Monitoring.',
+      ],
+    },
+    {
+      title: 'Карты-триггеры',
+      body: [
+        'AI: при доборе покажите всем и разыграйте случайный эффект из колоды событий.',
+        'Error 503: при доборе покажите всем и нейтрализуйте (Debugger, Monitoring или жертва релиза) — иначе выбываете.',
+      ],
+    },
+    {
+      title: 'Конец игры',
+      body: [
+        'Партия заканчивается, когда у игрока в зоне релиза одновременно три разные карты Release — либо когда остаётся единственный игрок.',
+      ],
+    },
+  ],
+}
+
+export const RU_TABLE: TableCopy = {
+  tabs: { history: 'история', participants: 'участники', rules: 'правила', modes: 'игровой режим' },
+  decks: { main: 'колода', events: 'события', discard: 'сброс' },
+  youEliminated: 'вы выбыли из игры',
+  reconnecting: 'переподключение…',
+  seat: { eliminated: 'выбыл', disconnected: 'нет связи', cards: 'карт' },
+  participants: {
+    playersTitle: 'игроки',
+    spectatorsTitle: 'зрители',
+    inGame: 'в игре',
+    eliminated: 'выбыл',
+    disconnected: 'потеряно соединение',
+    spectatorTag: 'зритель',
+    noSpectators: 'пока без зрителей',
+  },
+  gameOver: {
+    winnerLabel: 'победитель',
+    condition: { release: 'Собраны 3 релиза', lastStanding: 'Остался последним' },
+    continue: 'к статистике',
+  },
+  rules: RU_RULES,
+  modes: RU_MODES,
 }

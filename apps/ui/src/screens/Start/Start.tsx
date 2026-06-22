@@ -6,7 +6,7 @@ import Button from '@/primitives/Button'
 import Modal from '@/primitives/Modal'
 import ModeSelect from '@/primitives/ModeSelect'
 import MYTHHAND from '../../assets/brand/mythhand.svg'
-import Rules from './Rules'
+import Rules, { type RulesCopy } from './Rules'
 import styles from './Start.module.css'
 
 const REPO_URL = 'https://github.com/dimbo-design/ReleaseBoardGameP2P'
@@ -33,6 +33,7 @@ export interface StartCopy {
   joinCta: string
   rulesTitle: string
   modes: ModesCopy
+  rulesContent: RulesCopy
 }
 
 export default function Start({ copy }: { copy: StartCopy }) {
@@ -187,7 +188,7 @@ export default function Start({ copy }: { copy: StartCopy }) {
       </Modal>
 
       <Modal open={modal === 'rules'} onClose={close} title={copy.rulesTitle}>
-        <Rules />
+        <Rules copy={copy.rulesContent} />
       </Modal>
     </div>
   )

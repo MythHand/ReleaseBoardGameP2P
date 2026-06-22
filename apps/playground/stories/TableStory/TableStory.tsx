@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { makeTable } from '@/mocks/table'
 import Table from '@/table/Table'
-import { RU_MODES } from '../ru-copy'
+import { RU_TABLE } from '../ru-copy'
 import styles from './TableStory.module.css'
 
 type GameOverCondition = 'release' | 'lastStanding'
@@ -93,7 +93,7 @@ export default function TableStory() {
           view={view}
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
           onOverContinue={() => setEnd(null)}
-          modesCopy={RU_MODES}
+          copy={RU_TABLE}
         />
       </div>
     </div>

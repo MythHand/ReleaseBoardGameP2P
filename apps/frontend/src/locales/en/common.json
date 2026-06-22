@@ -29,6 +29,69 @@
     "joinCta": "enter",
     "rulesTitle": "Правила"
   },
+  "rulesContent": {
+    "searchPlaceholder": "search rules…",
+    "empty": "Nothing found",
+    "meta": ["2–6 players", "15–45 minutes", "104 cards + 21 events"],
+    "foot": "Modes (hand limit, Fast Release, release condition, AI count) are chosen before the game — details will appear in the create-game dialog.",
+    "sections": [
+      {
+        "title": "Goal",
+        "body": [
+          "Be the first to collect three different Release cards (Frontend, Backend, Database) in your release zone, fending off all opponents' attacks — or be the last player standing."
+        ]
+      },
+      {
+        "title": "Setup",
+        "body": [
+          "Two decks by back color: green — main, purple — events.",
+          "Each player: 1 Debugger card + 4 random (5 in hand total).",
+          "AI and Error 503 cards are not allowed at the start — replace them in hand.",
+          "Shuffle and place both decks face down."
+        ]
+      },
+      {
+        "title": "Player turn",
+        "note": "action / draw / action / end of turn",
+        "body": [
+          "Before and after the draw you may play any number of cards (including 0).",
+          "Draw — exactly one card from the top of the main deck (mandatory).",
+          "End of turn is announced with the word \"PUSH\"; play goes clockwise."
+        ]
+      },
+      {
+        "title": "Releasing cards",
+        "body": [
+          "The release zone holds Release cards; one of each type.",
+          "Only one release per turn; placing one discards 1 card from hand.",
+          "A fresh release can be instantly answered by opponents with a lightning-icon attack (Bug, Out of Memory, Legacy Code, Security Bug).",
+          "Code Review is played together with a Release and makes it immune to those attacks (even with Sudo). It cannot be applied to an already-placed release."
+        ]
+      },
+      {
+        "title": "Attack and defense",
+        "body": [
+          "Attack cards (lightning) are played instantly — on a release or against a hand.",
+          "Defense: Cancel (Hotfix, Rubber Ducky, PR Approved, Rollback) and Unicorn (Not a Bug, Works on my Machine).",
+          "Sudo boosts cards with a sudo effect; Cancel does not work against a boost, Unicorn does.",
+          "DDoS is the only attack against a protected release and Monitoring."
+        ]
+      },
+      {
+        "title": "Trigger cards",
+        "body": [
+          "AI: on draw, reveal to everyone and play a random effect from the events deck.",
+          "Error 503: on draw, reveal to everyone and neutralize it (Debugger, Monitoring, or sacrifice a release) — otherwise you are out."
+        ]
+      },
+      {
+        "title": "End of game",
+        "body": [
+          "The game ends when a player has three different Release cards in their release zone at once — or when only one player remains."
+        ]
+      }
+    ]
+  },
   "gameModes": {
     "handLimit": {
       "title": "Hand limit (end of turn)",

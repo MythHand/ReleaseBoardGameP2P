@@ -4,19 +4,26 @@ import styles from './GameOver.module.css'
 
 export type GameOverCondition = 'release' | 'lastStanding'
 
-const CONDITION: Record<GameOverCondition, string> = {
-  release: 'Собраны 3 релиза',
-  lastStanding: 'Остался последним',
+export interface GameOverCopy {
+  winnerLabel: string
+  condition: Record<GameOverCondition, string>
+  continue: string
 }
 
 interface GameOverProps {
   winner?: { name: string } | null
   condition?: GameOverCondition
   onContinue?: () => void
+  copy: GameOverCopy
 }
 
 // Оверлей завершения партии поверх стола: победитель + условие победы + CTA.
-export default function GameOver({ winner, condition = 'release', onContinue }: GameOverProps) {
+export default function GameOver({
+  winner,
+  condition = 'release',
+  onContinue,
+  copy,
+}: GameOverProps) {
   const [shown, setShown] = useState(false)
 
   // двойной rAF — гарантируем плавное появление (как у Modal)
@@ -35,11 +42,11 @@ export default function GameOver({ winner, condition = 'release', onContinue }: 
     <div className={`${styles.overlay} ${shown ? styles.shown : ''}`}>
       <div className={styles.card}>
         <span className={styles.crown}>♛</span>
-        <div className={styles.label}>победитель</div>
+        <div className={styles.label}>{copy.winnerLabel}</div>
         <div className={styles.name}>{winner?.name}</div>
-        <div className={styles.condition}>{CONDITION[condition]}</div>
+        <div className={styles.condition}>{copy.condition[condition]}</div>
         <div className={styles.actions}>
-          <Button onClick={onContinue}>к статистике</Button>
+          <Button onClick={onContinue}>{copy.continue}</Button>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import Start from '@/screens/Start'
-import { RU_MODES } from '../ru-copy'
+import { RU_MODES, RU_RULES } from '../ru-copy'
 import styles from './StartStory.module.css'
 
 export default function StartStory() {
@@ -30,6 +30,7 @@ export default function StartStory() {
           joinCta: 'войти',
           rulesTitle: 'Правила',
           modes: RU_MODES,
+          rulesContent: RU_RULES,
         }}
       />
     </div>

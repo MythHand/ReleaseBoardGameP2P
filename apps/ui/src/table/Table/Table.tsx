@@ -2,20 +2,34 @@ import { useEffect, useRef, useState } from 'react'
 import type { Card } from '@/cards/types'
 import type { ModesCopy, Setup } from '@/game/modes'
 import Pile from '@/primitives/Pile'
+import type { RulesCopy } from '@/screens/Start/Rules'
 import Rules from '@/screens/Start/Rules'
 import GameModes from '@/table/GameModes'
 import GameOver from '@/table/GameOver'
-import type { GameOverCondition } from '@/table/GameOver/GameOver'
+import type { GameOverCondition, GameOverCopy } from '@/table/GameOver/GameOver'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import MoveHistory from '@/table/MoveHistory'
 import type { HistoryEntry } from '@/table/MoveHistory/MoveHistory'
 import Participants from '@/table/Participants'
-import type { Participant, Spectator } from '@/table/Participants/Participants'
+import type { Participant, ParticipantsCopy, Spectator } from '@/table/Participants/Participants'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
+import type { SeatCopy } from '@/table/Seat/Seat'
 import styles from './Table.module.css'
+
+export interface TableCopy {
+  tabs: { history: string; participants: string; rules: string; modes: string }
+  decks: { main: string; events: string; discard: string }
+  youEliminated: string
+  reconnecting: string
+  seat: SeatCopy
+  participants: ParticipantsCopy
+  gameOver: GameOverCopy
+  rules: RulesCopy
+  modes: ModesCopy
+}
 
 interface Opponent {
   id: string
@@ -57,7 +71,7 @@ interface TableProps {
   over?: Over | null
   onOverContinue?: () => void
   view?: View | null
-  modesCopy: ModesCopy
+  copy: TableCopy
 }
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
@@ -81,7 +95,7 @@ export default function Table({
   over = null,
   onOverContinue,
   view = null,
-  modesCopy,
+  copy,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
@@ -115,23 +129,35 @@ export default function Table({
               active={turn === p.id}
               eliminated={eliminated}
               disconnected={disconnected}
+              copy={copy.seat}
             />
           )
         })}
       </div>
 
       <div className={styles.decks}>
-        <Pile label="колода" deck="base" count={decks.main} width="150px" countPos="tl" />
-        <Pile label="события" deck="ai" count={decks.events} width="150px" countPos="tl" />
+        <Pile label={copy.decks.main} deck="base" count={decks.main} width="150px" countPos="tl" />
+        <Pile
+          label={copy.decks.events}
+          deck="ai"
+          count={decks.events}
+          width="150px"
+          countPos="tl"
+        />
       </div>
 
       <div className={styles.discard}>
-        <Pile label="сброс" topCard={decks.discard} count={decks.discardCount} width="116px" />
+        <Pile
+          label={copy.decks.discard}
+          topCard={decks.discard}
+          count={decks.discardCount}
+          width="116px"
+        />
       </div>
 
       <div className={styles.you}>
         {youEliminated ? (
-          <div className={styles.youBadge}>вы выбыли из игры</div>
+          <div className={styles.youBadge}>{copy.youEliminated}</div>
         ) : (
           <>
             <ReleaseZone release={you.release} size="100px" />
@@ -149,28 +175,28 @@ export default function Table({
           className={`${styles.tab} ${panel === 'history' ? styles.tabOn : ''}`}
           onClick={() => toggle('history')}
         >
-          история
+          {copy.tabs.history}
         </button>
         <button
           type="button"
           className={`${styles.tab} ${panel === 'participants' ? styles.tabOn : ''}`}
           onClick={() => toggle('participants')}
         >
-          участники
+          {copy.tabs.participants}
         </button>
         <button
           type="button"
           className={`${styles.tab} ${panel === 'rules' ? styles.tabOn : ''}`}
           onClick={() => toggle('rules')}
         >
-          правила
+          {copy.tabs.rules}
         </button>
         <button
           type="button"
           className={`${styles.tab} ${panel === 'modes' ? styles.tabOn : ''}`}
           onClick={() => toggle('modes')}
         >
-          игровой режим
+          {copy.tabs.modes}
         </button>
       </div>
 
@@ -181,27 +207,32 @@ export default function Table({
       >
         {panel === 'history' && <MoveHistory entries={history} />}
         {panel === 'participants' && (
-          <Participants players={participants} spectators={spectators} />
+          <Participants players={participants} spectators={spectators} copy={copy.participants} />
         )}
         {panel === 'rules' && (
           <div className={styles.scrollPanel}>
-            <Rules />
+            <Rules copy={copy.rules} />
           </div>
         )}
-        {panel === 'modes' && <GameModes setup={setup} copy={modesCopy} />}
+        {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
       </div>
 
       {view === 'youDisconnect' && (
         <div className={styles.reconnect}>
           <div className={styles.reconnectBox}>
             <span className={styles.spinner} aria-hidden="true" />
-            переподключение…
+            {copy.reconnecting}
           </div>
         </div>
       )}
 
       {over && (
-        <GameOver winner={overWinner} condition={over.condition} onContinue={onOverContinue} />
+        <GameOver
+          winner={overWinner}
+          condition={over.condition}
+          onContinue={onOverContinue}
+          copy={copy.gameOver}
+        />
       )}
     </div>
   )
