@@ -43,6 +43,8 @@ export interface UseLobby {
 export function useLobby(): UseLobby {
   const [state, setState] = useState<LobbyState | null>(null)
   const [status, setStatus] = useState<LobbyStatus>('idle')
+  const [isHost, setIsHost] = useState(false)
+  const [roomCode, setRoomCode] = useState<string | null>(null)
   const transportRef = useRef<Transport | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
@@ -107,6 +109,8 @@ export function useLobby(): UseLobby {
       const t = await createTransport({ onMessage })
       transportRef.current = t
       isHostRef.current = true
+      setIsHost(true)
+      setRoomCode(formatRoomCode(t.id))
       const initial = createLobbyState({
         selfId: t.id,
         hostId: t.id,
@@ -125,6 +129,8 @@ export function useLobby(): UseLobby {
       const t = await createTransport({ onMessage })
       transportRef.current = t
       isHostRef.current = false
+      setIsHost(false)
+      setRoomCode(null)
       commit(
         createLobbyState({
           selfId: t.id,
@@ -189,9 +195,8 @@ export function useLobby(): UseLobby {
   return {
     state,
     status,
-    roomCode:
-      transportRef.current && isHostRef.current ? formatRoomCode(transportRef.current.id) : null,
-    isHost: isHostRef.current,
+    roomCode,
+    isHost,
     canStart: state ? canStartFn(state) : false,
     createRoom,
     joinRoom,
