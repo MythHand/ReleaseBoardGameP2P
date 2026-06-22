@@ -5,6 +5,8 @@
 **Release любой ценой** — a P2P web version of the board card game.
 Rules and card mechanics: [`docs/rules-board-game.md`](./docs/rules-board-game.md).
 
+**Design specs live in [`docs/specs/`](./docs/specs/)** (`YYYY-MM-DD-<topic>-design.md`) — not under `docs/superpowers/`.
+
 The app is in early scaffolding. Game logic (WebRTC client, full game screens) is out of scope for this phase and lives in later specs. What exists today: the monorepo skeleton, the UI component library, the Tailwind-themed frontend shell, and the signaling backend.
 
 ---
