@@ -1,4 +1,4 @@
-import { canStart, handleJoinRequest, kick, setMaxPlayers } from './host'
+import { canStart, handleJoinRequest, handleReady, kick, setMaxPlayers } from './host'
 import { createLobbyState } from './state'
 
 const host = { id: 'h', name: 'Host', role: 'host' as const, ready: true }
@@ -17,6 +17,15 @@ it('assigns player role and emits PEER_LIST + PEER_JOINED', () => {
 
   const joined = outgoing.find((o) => o.message.type === 'PEER_JOINED')
   expect(joined?.to).toBe('broadcast')
+  expect(joined?.message.type === 'PEER_JOINED' && joined.message.payload.ready).toBe(false)
+})
+
+it('handleReady broadcasts PEER_JOINED with ready: true', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'Pam').state
+  const { outgoing } = handleReady(joined, 'p1')
+  const broadcast = outgoing.find((o) => o.message.type === 'PEER_JOINED')
+  expect(broadcast?.to).toBe('broadcast')
+  expect(broadcast?.message.type === 'PEER_JOINED' && broadcast.message.payload.ready).toBe(true)
 })
 
 it('assigns guest when player slots are full', () => {

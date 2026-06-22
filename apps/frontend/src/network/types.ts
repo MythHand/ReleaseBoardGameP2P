@@ -25,10 +25,13 @@ export type Message =
   // --- Lobby ---
   | { type: 'JOIN_REQUEST'; payload: { name: string } }
   | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: 'player' | 'guest' } }
-  | { type: 'PEER_JOINED'; payload: { id: string; name: string; role: Role } }
+  | { type: 'PEER_JOINED'; payload: { id: string; name: string; role: Role; ready: boolean } }
   | { type: 'PLAYER_READY'; payload: Record<string, never> }
   | { type: 'LOBBY_CONFIG_UPDATED'; payload: { maxPlayers: number } }
   | { type: 'PLAYER_KICKED'; payload: { peerId: string; reason?: string } }
+  // TRANSFER_HOST / HOST_TRANSFERRED: types defined here for future use.
+  // Runtime handoff (reconnect to new host, state re-broadcast, HOST_TRANSFERRED confirm)
+  // is intentionally deferred — depends on the game-engine spec / deck-keeper decision.
   | { type: 'TRANSFER_HOST'; payload: { newHostId: string } }
   | { type: 'HOST_TRANSFERRED'; payload: { from: string; to: string } }
   // --- Game start ---

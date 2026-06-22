@@ -85,7 +85,7 @@ export function useLobby(): UseLobby {
           commit(applyPeerList(current, msg.payload.peers))
           break
         case 'PEER_JOINED': {
-          const peer: PeerInfo = { ...msg.payload, ready: false }
+          const peer: PeerInfo = { ...msg.payload }
           commit(applyPeerJoined(current, peer))
           break
         }
@@ -126,7 +126,16 @@ export function useLobby(): UseLobby {
   const joinRoom = useCallback(
     async (hostId: string, name: string) => {
       setStatus('connecting')
-      const t = await createTransport({ onMessage })
+      const t = await createTransport({
+        onMessage,
+        onConnection: (peerId) => {
+          // Send JOIN_REQUEST exactly when the host DataChannel opens — a
+          // setTimeout(0) is not sufficient over real WebRTC because the channel
+          // may not be open after a single macrotask.
+          if (peerId === hostId)
+            transportRef.current?.send(hostId, { type: 'JOIN_REQUEST', payload: { name } })
+        },
+      })
       transportRef.current = t
       isHostRef.current = false
       setIsHost(false)
@@ -140,8 +149,6 @@ export function useLobby(): UseLobby {
         }),
       )
       t.connectTo(hostId)
-      // Give the channel a tick to open before the JOIN_REQUEST.
-      setTimeout(() => t.send(hostId, { type: 'JOIN_REQUEST', payload: { name } }), 0)
       setStatus('in-lobby')
     },
     [onMessage, commit],
@@ -182,6 +189,11 @@ export function useLobby(): UseLobby {
     [commit, dispatch],
   )
 
+  // NOTE: transferHost currently only broadcasts the intent (TRANSFER_HOST).
+  // The actual host handoff — reconnecting peers to the new host, re-broadcasting
+  // the last TURN_RESOLVED state, and sending HOST_TRANSFERRED confirmation — is
+  // intentionally not implemented yet. It depends on the game-engine spec and the
+  // open deck-keeper decision, both deferred to a later milestone.
   const transferHost = useCallback(
     (id: string) => {
       const current = stateRef.current

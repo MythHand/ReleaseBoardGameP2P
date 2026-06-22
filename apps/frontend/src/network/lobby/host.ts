@@ -33,7 +33,10 @@ export function handleJoinRequest(state: LobbyState, fromId: string, name: strin
         to: fromId,
         message: { type: 'PEER_LIST', payload: { peers: peerList(next), yourRole: role } },
       },
-      { to: 'broadcast', message: { type: 'PEER_JOINED', payload: { id: fromId, name, role } } },
+      {
+        to: 'broadcast',
+        message: { type: 'PEER_JOINED', payload: { id: fromId, name, role, ready: false } },
+      },
     ],
   }
 }
@@ -50,7 +53,7 @@ export function handleReady(state: LobbyState, fromId: string): Result {
         to: 'broadcast',
         message: {
           type: 'PEER_JOINED',
-          payload: { id: updated.id, name: updated.name, role: updated.role },
+          payload: { id: updated.id, name: updated.name, role: updated.role, ready: updated.ready },
         },
       },
     ],
