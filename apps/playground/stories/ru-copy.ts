@@ -3,6 +3,7 @@
 // the playground (a consuming app) supplies the copy here. Real apps pass their
 // own translated copy (e.g. via react-i18next in the frontend).
 import type { ModesCopy } from '@/game/modes'
+import type { LobbyCopy } from '@/screens/Lobby/Lobby'
 import type { RulesCopy } from '@/screens/Start/Rules'
 import type { StatsCopy } from '@/screens/Stats'
 import type { TableCopy } from '@/table/Table/Table'
@@ -157,5 +158,41 @@ export const RU_TABLE: TableCopy = {
     continue: 'к статистике',
   },
   rules: RU_RULES,
+  modes: RU_MODES,
+}
+
+export const RU_LOBBY: LobbyCopy = {
+  title: 'Лобби',
+  disband: 'расформировать',
+  waiting: 'Ожидание игроков…',
+  gameCode: 'код игры',
+  copyCode: 'копировать',
+  modesTitle: 'Режимы партии',
+  hostConfigures: 'настраивает host',
+  playersTitle: 'Игроки',
+  capacity: 'Вместимость',
+  spectatorsTitle: 'Зрители',
+  specLimit: 'Лимит',
+  you: '(вы)',
+  hostTag: 'host',
+  ready: 'готов',
+  notReady: 'не готов',
+  waitingStatus: 'ожидание',
+  offline: 'не в сети',
+  makeSpectator: 'Сделать зрителем',
+  makePlayer: 'Сделать игроком',
+  noSlot: 'Нет доступного слота',
+  kick: 'Исключить',
+  emptySlot: 'свободный слот',
+  spectatorTag: 'зритель',
+  noSpectators: 'пока без зрителей',
+  startGame: 'начать игру',
+  leave: 'покинуть',
+  actions: 'действия',
+  unavailable: 'Недоступно',
+  disbandTitle: 'Расформировать лобби?',
+  disbandText:
+    'Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить.',
+  cancel: 'отмена',
   modes: RU_MODES,
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Lobby from '@/screens/Lobby'
-import { RU_MODES } from '../ru-copy'
+import { RU_LOBBY } from '../ru-copy'
 import styles from './LobbyStory.module.css'
 
 export default function LobbyStory() {
@@ -23,7 +23,7 @@ export default function LobbyStory() {
           guest
         </button>
       </div>
-      <Lobby role={role} modesCopy={RU_MODES} />
+      <Lobby role={role} copy={RU_LOBBY} />
     </div>
   )
 }
