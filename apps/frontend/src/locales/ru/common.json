@@ -4,6 +4,7 @@
     "titleSub": "любой ценой",
     "foundationTag": "visual layer — foundation",
     "phasesHint": "Экраны (boot → lobby → game → game over) появятся по фазам.",
+    "enterLobby": "Играть онлайн",
     "devShowcase": "dev-витрина компонентов →"
   },
   "start": {

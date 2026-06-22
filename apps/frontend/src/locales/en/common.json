@@ -4,6 +4,7 @@
     "titleSub": "at any cost",
     "foundationTag": "visual layer — foundation",
     "phasesHint": "Screens (boot → lobby → game → game over) arrive in phases.",
+    "enterLobby": "Play online",
     "devShowcase": "component dev showcase →"
   },
   "start": {

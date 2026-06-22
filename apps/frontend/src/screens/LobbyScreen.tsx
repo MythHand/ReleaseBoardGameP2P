@@ -68,7 +68,9 @@ export default function LobbyScreen() {
   }
 
   const peers = lobby.state ? Object.values(lobby.state.peers) : []
-  const shareLink = lobby.roomCode ? `${window.location.origin}/?room=${lobby.state?.hostId}` : null
+  const shareLink = lobby.roomCode
+    ? `${window.location.origin}/lobby?room=${lobby.state?.hostId}`
+    : null
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-4 p-8">
