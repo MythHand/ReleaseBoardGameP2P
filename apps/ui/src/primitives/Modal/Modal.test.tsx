@@ -50,7 +50,7 @@ it('restores focus to the previously focused element on close', async () => {
 
 it('wraps Tab from the last focusable element to the first', async () => {
   vi.useFakeTimers()
-  const { container, getByText } = render(
+  const { container } = render(
     <Modal open onClose={() => {}}>
       <button type="button">First</button>
       <button type="button">Last</button>
@@ -62,7 +62,9 @@ it('wraps Tab from the last focusable element to the first', async () => {
 
   // biome-ignore lint/style/noNonNullAssertion: dialog is guaranteed to exist in this test
   const dialog = container.querySelector('dialog')!
-  ;(getByText('Last') as HTMLButtonElement).focus()
+  const buttons = dialog.querySelectorAll('button')
+  // The close button is last in DOM order — focus it to test wrap-around
+  ;(buttons[buttons.length - 1] as HTMLButtonElement).focus()
   dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
 
   expect(document.activeElement?.textContent).toBe('First')
@@ -86,7 +88,8 @@ it('wraps Shift+Tab from the first focusable element to the last', async () => {
   ;(getByText('First') as HTMLButtonElement).focus()
   dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }))
 
-  expect(document.activeElement?.textContent).toBe('Last')
+  // The close button is now the last focusable element — it has aria-label="close"
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('close')
   vi.useRealTimers()
 })
 

@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import styles from './Modal.module.css'
 
 const FOCUSABLE =
-  'button:not([disabled]):not([data-modal-close]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+  'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
 
 interface ModalProps {
   open: boolean
@@ -107,13 +107,7 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
           </span>
         </div>
         <div className={styles.body}>{children}</div>
-        <button
-          type="button"
-          className={styles.close}
-          onClick={onClose}
-          aria-label="закрыть"
-          data-modal-close
-        >
+        <button type="button" className={styles.close} onClick={onClose} aria-label="close">
           ✕
         </button>
       </dialog>
