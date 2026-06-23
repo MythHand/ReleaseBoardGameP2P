@@ -6,6 +6,7 @@ import type { UseLobby } from '~/entities/lobby'
 import CreateForm from '../_CreateForm'
 import JoinForm from '../_JoinForm'
 import LobbyFlow from '../_LobbyFlow'
+import SessionView from '../_SessionView'
 import LobbyIndexPage from '../index'
 
 vi.mock('@release/translation', () => ({
@@ -120,14 +121,14 @@ it('LobbyFlow clears a stale error on mount', () => {
   expect(sessionValue.clearError).toHaveBeenCalledOnce()
 })
 
-it('pre-session Leave tears the (failed) session down', () => {
+it('pre-session Back resets the (failed) session', () => {
   sessionValue = { ...base(), status: 'error', error: 'peer-unavailable' }
   renderInRouter(
     <LobbyFlow>
       <div>FORM-SLOT</div>
     </LobbyFlow>,
   )
-  fireEvent.click(screen.getByText('lobby.leave'))
+  fireEvent.click(screen.getByText('lobby.back'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 
@@ -160,7 +161,7 @@ function inSession(): UseLobby {
   }
 }
 
-it('LobbyFlow offers Continue/Leave when arriving with an active session', () => {
+it('LobbyFlow offers Continue/Drop when arriving with an active session', () => {
   sessionValue = inSession()
   renderInRouter(
     <LobbyFlow>
@@ -169,19 +170,20 @@ it('LobbyFlow offers Continue/Leave when arriving with an active session', () =>
   )
   expect(screen.getByText('lobby.activeSession')).toBeTruthy()
   expect(screen.getByText('lobby.continue')).toBeTruthy()
+  expect(screen.getByText('lobby.drop')).toBeTruthy()
   // Neither the form nor the live session view is shown yet.
   expect(screen.queryByText('FORM-SLOT')).toBeNull()
   expect(screen.queryByText('lobby.players')).toBeNull()
 })
 
-it('Leave from the interstitial tears the session down', () => {
+it('Drop from the interstitial tears the session down', () => {
   sessionValue = inSession()
   renderInRouter(
     <LobbyFlow>
       <div>FORM-SLOT</div>
     </LobbyFlow>,
   )
-  fireEvent.click(screen.getByText('lobby.leave'))
+  fireEvent.click(screen.getByText('lobby.drop'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 
@@ -197,4 +199,13 @@ it('Continue reveals the live session view (room code, roster, share link)', () 
   expect(screen.getByText('Host')).toBeTruthy()
   expect(screen.getByText('Pat')).toBeTruthy()
   expect(screen.getByDisplayValue(/\/lobby\/ABC-23D$/)).toBeTruthy()
+})
+
+it('SessionView Back keeps the session; Drop tears it down', () => {
+  sessionValue = inSession()
+  renderInRouter(<SessionView />)
+  fireEvent.click(screen.getByText('lobby.back'))
+  expect(sessionValue.leaveSession).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByText('lobby.drop'))
+  expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })

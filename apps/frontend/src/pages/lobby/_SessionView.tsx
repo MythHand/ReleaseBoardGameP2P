@@ -4,7 +4,17 @@ import { useNavigate } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import type { Role } from '~/entities/lobby'
 import { useStartGame } from '~/features/start-game/useStartGame'
-import { card, field, ghostBtn, input, label, MAX_PLAYER_OPTIONS, primaryBtn, Shell } from './_ui'
+import {
+  card,
+  dangerBtn,
+  field,
+  ghostBtn,
+  input,
+  label,
+  MAX_PLAYER_OPTIONS,
+  primaryBtn,
+  Shell,
+} from './_ui'
 
 // The live-session view, shared by host and guest once a room exists: room code,
 // share link, roster, and ready/kick/start controls. Rendered by _LobbyFlow only
@@ -26,8 +36,10 @@ export default function SessionView() {
     navigator.clipboard?.writeText(shareUrl)
     setCopied(true)
   }
-  // Real teardown: close the transport and reset, then return to the chooser.
-  const leave = () => {
+  // Back keeps the session alive (resume later via the re-entry Continue prompt);
+  // Drop tears it down. Both return to the chooser.
+  const back = () => navigate('/start')
+  const drop = () => {
     session.leaveSession()
     navigate('/start')
   }
@@ -142,8 +154,11 @@ export default function SessionView() {
               {t('lobby.start')}
             </button>
           )}
-          <button type="button" className={`${ghostBtn} ml-auto`} onClick={leave}>
-            {t('lobby.leave')}
+          <button type="button" className={`${ghostBtn} ml-auto`} onClick={back}>
+            {t('lobby.back')}
+          </button>
+          <button type="button" className={dangerBtn} onClick={drop}>
+            {t('lobby.drop')}
           </button>
         </div>
       </div>

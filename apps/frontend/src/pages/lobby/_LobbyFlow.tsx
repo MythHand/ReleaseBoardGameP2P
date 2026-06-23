@@ -3,7 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import SessionView from './_SessionView'
-import { card, ghostBtn, label, primaryBtn, Shell } from './_ui'
+import { card, dangerBtn, ghostBtn, label, primaryBtn, Shell } from './_ui'
 
 // Owns the session status flow shared by both lobby modes. The mode-specific
 // pre-session form (_CreateForm / _JoinForm) is passed as `children` and only
@@ -30,8 +30,12 @@ export default function LobbyFlow({ children }: { children: ReactNode }) {
       <Shell>
         <div className={card}>
           <p className="text-fg/80">{t('lobby.kickedMessage')}</p>
-          <Link to="/" className={`${ghostBtn} mt-4 inline-block`}>
-            {t('lobby.leave')}
+          <Link
+            to="/start"
+            className={`${ghostBtn} mt-4 inline-block`}
+            onClick={() => session.leaveSession()}
+          >
+            {t('lobby.back')}
           </Link>
         </div>
       </Shell>
@@ -53,8 +57,8 @@ export default function LobbyFlow({ children }: { children: ReactNode }) {
               <button type="button" className={primaryBtn} onClick={() => setContinued(true)}>
                 {t('lobby.continue')}
               </button>
-              <button type="button" className={ghostBtn} onClick={() => session.leaveSession()}>
-                {t('lobby.leave')}
+              <button type="button" className={dangerBtn} onClick={() => session.leaveSession()}>
+                {t('lobby.drop')}
               </button>
             </div>
           </div>
@@ -75,8 +79,10 @@ export default function LobbyFlow({ children }: { children: ReactNode }) {
         <p className="text-fg/60 text-sm">{t('lobby.connecting')}</p>
       )}
       {children}
+      {/* No live session here (idle/connecting/error) — Back just resets any
+          dangling transport/error and returns to the chooser. */}
       <Link to="/start" className={`${ghostBtn} self-start`} onClick={() => session.leaveSession()}>
-        {t('lobby.leave')}
+        {t('lobby.back')}
       </Link>
     </Shell>
   )

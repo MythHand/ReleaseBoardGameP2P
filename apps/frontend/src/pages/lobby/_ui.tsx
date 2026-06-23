@@ -11,6 +11,8 @@ export const primaryBtn =
   'rounded-lg bg-brand-green px-5 py-2.5 font-semibold text-bg tracking-base transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40'
 export const ghostBtn =
   'rounded-lg border border-fg/15 px-4 py-2 font-semibold text-fg/80 tracking-base transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40'
+export const dangerBtn =
+  'rounded-lg border border-red-500/30 px-4 py-2 font-semibold text-red-400 tracking-base transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40'
 export const card = 'rounded-2xl border border-fg/10 bg-surface-1 p-6'
 
 export const MAX_PLAYER_OPTIONS = [2, 3, 4, 5, 6]

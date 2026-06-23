@@ -68,6 +68,8 @@
     "copy": "Copy",
     "copied": "Copied",
     "activeSession": "You're already in a session",
-    "continue": "Continue"
+    "continue": "Continue",
+    "back": "Back",
+    "drop": "Drop session"
   }
 }
