@@ -21,7 +21,7 @@
 .modal {
   /* сброс UA-дефолтов нативного <dialog open>, которые ломают вёрстку:
      position:absolute + margin:auto (центрирование), padding:1em, color:CanvasText (чёрный) */
-  position: static;
+  position: relative;
   display: flex;
   flex-direction: column;
   inline-size: min(640px, 92vw);
@@ -69,6 +69,9 @@
 }
 
 .close {
+  position: absolute;
+  inset-block-start: 18px;
+  inset-inline-end: 20px;
   padding: 0 4px;
   font-size: 30px;
   line-height: 1;
