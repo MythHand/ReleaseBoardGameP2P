@@ -72,7 +72,30 @@ export function kick(state: LobbyState, peerId: string, reason?: string): Result
 
 export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
   const clamped = Math.min(6, Math.max(2, Math.trunc(maxPlayers)))
-  const next = applyConfig(state, clamped)
+  // Lowering the cap must demote the now over-capacity players to guests in
+  // join order, otherwise playerCount()/canStart() would still count them and
+  // the game could start above the new cap. The host always keeps a slot.
+  const peers: Record<string, PeerInfo> = {}
+  const demoted: PeerInfo[] = []
+  let players = 0
+  for (const peer of Object.values(state.peers)) {
+    if (peer.role === 'host') {
+      peers[peer.id] = peer
+      players += 1
+    } else if (peer.role === 'player') {
+      if (players < clamped) {
+        peers[peer.id] = peer
+        players += 1
+      } else {
+        const guest: PeerInfo = { ...peer, role: 'guest' }
+        peers[peer.id] = guest
+        demoted.push(guest)
+      }
+    } else {
+      peers[peer.id] = peer
+    }
+  }
+  const next = applyConfig({ ...state, peers }, clamped)
   return {
     state: next,
     outgoing: [
@@ -80,6 +103,14 @@ export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
         to: 'broadcast',
         message: { type: 'LOBBY_CONFIG_UPDATED', payload: { maxPlayers: clamped } },
       },
+      // Propagate each demotion so guests' rosters stay consistent with the host.
+      ...demoted.map((peer) => ({
+        to: 'broadcast' as const,
+        message: {
+          type: 'PEER_JOINED' as const,
+          payload: { id: peer.id, name: peer.name, role: peer.role, ready: peer.ready },
+        },
+      })),
     ],
   }
 }

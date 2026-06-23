@@ -14,5 +14,6 @@ vi.mock('~/app/providers/SessionProvider', () => ({
 it('navigates to the board route keyed by the host id', () => {
   const { result } = renderHook(() => useStartGame())
   result.current()
-  expect(navigate).toHaveBeenCalledWith('/board/host-peer-1', { viewTransition: true })
+  // runViewTransition owns the transition; navigate must not start a second one.
+  expect(navigate).toHaveBeenCalledWith('/board/host-peer-1')
 })

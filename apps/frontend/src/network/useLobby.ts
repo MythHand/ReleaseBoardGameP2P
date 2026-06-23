@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   canStart as canStartFn,
   handleJoinRequest,
@@ -16,12 +16,30 @@ import {
   createLobbyState,
   type LobbyState,
 } from './lobby/state'
+import { relayTargets } from './session/relay'
 import { createTransport, type Transport } from './transport/peer'
 import type { PeerInfo, WireMessage } from './types'
+
+// Room codes double as the host's PeerJS id, so the displayed code is exactly
+// what a joiner connects to — formatRoomCode/parseRoomCode are inverses.
+// Ambiguous characters (0/o/1/l/i) are omitted from the alphabet.
+const ROOM_CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'
+
+export function makeRoomCode(): string {
+  const bytes = new Uint8Array(6)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, (b) => ROOM_CODE_ALPHABET[b % ROOM_CODE_ALPHABET.length]).join('')
+}
 
 export function formatRoomCode(peerId: string): string {
   const head = peerId.slice(0, 6).toUpperCase()
   return head.length > 3 ? `${head.slice(0, 3)}-${head.slice(3)}` : head
+}
+
+// Inverse of formatRoomCode: strip the separator/whitespace and lowercase back
+// to the host peer id a joiner can connect to.
+export function parseRoomCode(code: string): string {
+  return code.replace(/[^a-z0-9]/gi, '').toLowerCase()
 }
 
 export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'error'
@@ -34,7 +52,7 @@ export interface UseLobby {
   canStart: boolean
   error: string | null
   createRoom(name: string, maxPlayers: number): Promise<void>
-  joinRoom(hostId: string, name: string): Promise<void>
+  joinRoom(code: string, name: string): Promise<void>
   ready(): void
   kick(peerId: string): void
   setMaxPlayers(n: number): void
@@ -73,6 +91,28 @@ export function useLobby(): UseLobby {
     }
   }, [])
 
+  // A peer (or the host) dropping its DataChannel must update the roster, or the
+  // lobby keeps counting a ghost player toward canStart()/turn rotation.
+  const onDisconnect = useCallback(
+    (peerId: string) => {
+      const current = stateRef.current
+      if (!current) return
+      if (isHostRef.current) {
+        // Host owns the roster: prune the peer and tell everyone else.
+        if (!current.peers[peerId]) return
+        commit(applyPeerLeft(current, peerId))
+        dispatch([{ to: 'broadcast', message: { type: 'PLAYER_KICKED', payload: { peerId } } }])
+      } else if (peerId === current.hostId) {
+        // The host vanished — the guest can't proceed without it.
+        setError('disconnected: host left the lobby')
+        setStatus('error')
+      } else {
+        commit(applyPeerLeft(current, peerId))
+      }
+    },
+    [commit, dispatch],
+  )
+
   const onMessage = useCallback(
     (msg: WireMessage) => {
       const current = stateRef.current
@@ -86,23 +126,39 @@ export function useLobby(): UseLobby {
           const r = handleReady(current, msg.from)
           commit(r.state)
           dispatch(r.outgoing)
+        } else {
+          // Star topology: the host forwards any other peer-originated message
+          // to every other connected peer (never back to the sender or itself),
+          // preserving the original sender via relay() rather than re-stamping.
+          const t = transportRef.current
+          if (!t) return
+          const targets = relayTargets({
+            connectedPeerIds: t.connectedIds(),
+            hostId: current.hostId,
+            from: msg.from,
+          })
+          t.relay(targets, msg)
         }
         return
       }
-      // Guest-side application of host broadcasts.
+      // Guest-side application of host broadcasts. Only the host is authoritative
+      // for the roster, so ignore PEER_LIST/PEER_JOINED that don't come from it.
+      const fromHost = msg.from === current.hostId
       switch (msg.type) {
         case 'PEER_LIST':
-          commit(applyPeerList(current, msg.payload.peers))
+          if (fromHost) commit(applyPeerList(current, msg.payload.peers))
           break
         case 'PEER_JOINED': {
+          if (!fromHost) break
           const peer: PeerInfo = { ...msg.payload }
           commit(applyPeerJoined(current, peer))
           break
         }
         case 'LOBBY_CONFIG_UPDATED':
-          commit(applyConfig(current, msg.payload.maxPlayers))
+          if (fromHost) commit(applyConfig(current, msg.payload.maxPlayers))
           break
         case 'PLAYER_KICKED':
+          if (!fromHost) break
           if (msg.payload.peerId === current.selfId) setStatus('kicked')
           else commit(applyPeerLeft(current, msg.payload.peerId))
           break
@@ -117,7 +173,9 @@ export function useLobby(): UseLobby {
     async (name: string, maxPlayers: number) => {
       setStatus('connecting')
       setError(null)
-      const t = await createTransport({ onMessage, onError })
+      // The host's peer id IS the room code, so the displayed code is exactly
+      // what a joiner connects to — formatRoomCode/parseRoomCode round-trip it.
+      const t = await createTransport({ peerId: makeRoomCode(), onMessage, onError, onDisconnect })
       transportRef.current = t
       isHostRef.current = true
       setIsHost(true)
@@ -131,28 +189,34 @@ export function useLobby(): UseLobby {
       commit(initial)
       setStatus('in-lobby')
     },
-    [onMessage, onError, commit],
+    [onMessage, onError, onDisconnect, commit],
   )
 
   const joinRoom = useCallback(
-    async (hostId: string, name: string) => {
+    async (code: string, name: string) => {
       setStatus('connecting')
       setError(null)
+      const hostId = parseRoomCode(code)
       const t = await createTransport({
         onMessage,
         onError,
+        onDisconnect,
         onConnection: (peerId) => {
           // Send JOIN_REQUEST exactly when the host DataChannel opens — a
           // setTimeout(0) is not sufficient over real WebRTC because the channel
-          // may not be open after a single macrotask.
-          if (peerId === hostId)
+          // may not be open after a single macrotask. Only now is the join
+          // confirmed, so flip to 'in-lobby' here rather than optimistically:
+          // a bad/expired code never opens and surfaces as a PeerJS error.
+          if (peerId === hostId) {
             transportRef.current?.send(hostId, { type: 'JOIN_REQUEST', payload: { name } })
+            setStatus('in-lobby')
+          }
         },
       })
       transportRef.current = t
       isHostRef.current = false
       setIsHost(false)
-      setRoomCode(null)
+      setRoomCode(formatRoomCode(hostId))
       commit(
         createLobbyState({
           selfId: t.id,
@@ -162,9 +226,8 @@ export function useLobby(): UseLobby {
         }),
       )
       t.connectTo(hostId)
-      setStatus('in-lobby')
     },
-    [onMessage, onError, commit],
+    [onMessage, onError, onDisconnect, commit],
   )
 
   const ready = useCallback(() => {
@@ -217,18 +280,37 @@ export function useLobby(): UseLobby {
     [dispatch],
   )
 
-  return {
-    state,
-    status,
-    roomCode,
-    isHost,
-    canStart: state ? canStartFn(state) : false,
-    error,
-    createRoom,
-    joinRoom,
-    ready,
-    kick,
-    setMaxPlayers,
-    transferHost,
-  }
+  // Memoized so the value handed to the root SessionContext keeps a stable
+  // identity across renders — consumers only re-render when state actually
+  // changes, not on every render of the always-mounted _app layout. The
+  // callbacks are already stable (useCallback), so only the values vary.
+  return useMemo<UseLobby>(
+    () => ({
+      state,
+      status,
+      roomCode,
+      isHost,
+      canStart: state ? canStartFn(state) : false,
+      error,
+      createRoom,
+      joinRoom,
+      ready,
+      kick,
+      setMaxPlayers,
+      transferHost,
+    }),
+    [
+      state,
+      status,
+      roomCode,
+      isHost,
+      error,
+      createRoom,
+      joinRoom,
+      ready,
+      kick,
+      setMaxPlayers,
+      transferHost,
+    ],
+  )
 }

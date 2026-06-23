@@ -10,8 +10,10 @@ export function useStartGame() {
   return () => {
     const gameId = session.state?.hostId
     if (!gameId) return
+    // runViewTransition already wraps the navigation in a single View Transition;
+    // passing { viewTransition: true } too would start a second, overlapping one.
     runViewTransition(() => {
-      navigate(`/board/${gameId}`, { viewTransition: true })
+      navigate(`/board/${gameId}`)
     })
   }
 }
