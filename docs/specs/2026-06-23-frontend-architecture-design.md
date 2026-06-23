@@ -14,7 +14,7 @@ Give `@release/web` a clear, one-directional architecture so screens, use-cases,
 
 | # | Decision | Choice |
 |---|----------|--------|
-| 1 | Build scope | **Architecture + wiring only** — FSD skeleton, routing, screens wired to `@release/ui` + network. `entities/game` is a typed placeholder, no rule logic. |
+| 1 | Build scope | **Architecture this phase; action-wiring deferred.** FSD skeleton, file-based routing, `SessionProvider`, view-transition, and `feature`/`entity` homes. `@release/ui` screens are presentation-only (see Constraint below), so they render with display data only; create/join/ready/kick/start and screen-driven navigation are deferred. `entities/game` is a typed placeholder, no rule logic. |
 | 2 | FSD flavour | **Pragmatic subset** — layers `app / pages / features / entities / shared`. No `widgets` layer (composed screen pieces already ship from `@release/ui`). |
 | 3 | Import direction | One-way by convention: `app → pages → features → entities → shared`, plus `network` as the API/transport segment consumed by entities/features. |
 | 4 | Network layer | **Stays at `apps/frontend/src/network/`** (unchanged). It is the FSD API/transport segment; nothing outside it imports `peerjs`. |
@@ -77,25 +77,33 @@ The exact file-naming follows the chosen plugin's convention (above uses `genero
 
 Routes are generated from the `pages/` folder by the plugin. The generated tree is wrapped by the `_app.tsx` root layout (`SessionProvider` + `<Outlet/>`), so every screen shares one live connection. `react-router@8`, `BrowserRouter`, no `/playground` basename. `gameId` is the room/lobby id (the host peer id), carried over from `/lobby/:lobbyId`.
 
+## Component API constraint (drives the deferral)
+
+The `@release/ui` screen components (`Start`, `Lobby`, `Table`, `Stats`) are **presentation-only WIP**: `Start` accepts only `copy`; `Lobby` accepts display props (`code`, `initialCapacity`, `initialPlayers`, `role`, `initialSetup`) but manages ready/kick/capacity on internal state and exposes **no action callbacks**; `Stats`/`Table` are data-in, display-out. They cannot yet drive navigation or the P2P connection from their own controls.
+
+**Consequence:** this phase builds the architecture and feeds the screens display data, but does **not** wire actions through them. The `feature/*` slices are created as the designated homes for that wiring; they stay thin/placeholder until `@release/ui` exposes callback props (a follow-up, see Open questions). Routing, session persistence, and the transition are validated by tests and direct-URL navigation rather than by clicking through the screens.
+
 ## Session ownership & transition
 
 - `SessionProvider` calls `useLobby()` **once** in the `_app.tsx` root layout and exposes it through a `useSession()` context hook. The transport ref lives here — above the route outlet — so navigating lobby→board never unmounts the hook or tears down the DataChannel.
-- **Host start:** the `start-game` feature triggers the session start and `navigate('/board/' + gameId, { viewTransition: true })`. Guests receive `GAME_STARTED` over the wire (per the P2P spec) and navigate to `/board/:gameId` the same way.
+- **Transition mechanism (built this phase, trigger deferred):** a `navigateWithTransition(to)` helper wraps `navigate(to, { viewTransition: true })`. The `start-game` feature will call it to go to `/board/:gameId` once host-start is wired; for now it is exercised directly (tests / a temporary dev affordance), not from a `@release/ui` screen button.
 - The slide is CSS via `::view-transition-old/new` (root or a named group), guarded by `@media (prefers-reduced-motion: reduce)`. No animation dependency.
 
 ## Pages vs. UI
 
-Pages own layout (Tailwind) and data (from `useSession`, i18n) and hand it to `@release/ui` screen components. They contain no presentational component definitions and no CSS Modules — consistent with the project styling and i18n rules (all copy via `t()`).
+Pages own layout (Tailwind) and display data (from `useSession`, i18n) handed to `@release/ui` screen components. Where a screen exposes a matching prop, the page derives it from session state (e.g. `Lobby`'s `initialPlayers`/`code`/`role` from `useSession`); otherwise the screen renders with its own defaults. Pages contain no presentational component definitions and no CSS Modules — consistent with the project styling and i18n rules (all copy via `t()`).
 
 ## Testing
 
 - Co-located `*.test.tsx` per page: each route renders the expected `@release/ui` screen.
-- A `SessionProvider` test: the connection persists across a simulated lobby→board navigation (no transport re-create).
+- A `SessionProvider`/`useSession` test: the context exposes the lobby and the transport instance is created once and reused across a simulated lobby→board navigation (no transport re-create).
+- A `navigateWithTransition` test: it falls back to a plain navigate when `document.startViewTransition` is unavailable (jsdom) and respects `prefers-reduced-motion`.
 - Existing `network/` tests are untouched.
 
 ## Open questions
 
 - **Plugin × `react-router@8` compatibility.** `generouted`/`vite-plugin-pages` track react-router's data-router APIs; the project is on `react-router@8`. Verify the chosen plugin supports v8 (and that `viewTransition` navigation works through the generated router) during implementation planning; if `generouted` lags v8, fall back to `vite-plugin-pages` (router-agnostic — it emits a route array we feed into our own `BrowserRouter`).
+- **`@release/ui` callback API (follow-up that unblocks wiring).** A later task (likely in `apps/ui`, outside this spec) must add optional action/data callback props to `Start`/`Lobby`/`Table`/`Stats` (e.g. `onCreateGame`, `onJoin`, `onReady`, `onKick`, `onStart`). Once present, the `feature/*` slices connect them to `network/useLobby` and the transition trigger moves onto the host-start button.
 
 ## Out of scope (other specs / later)
 
