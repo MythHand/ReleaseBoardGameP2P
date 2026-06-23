@@ -1,26 +1,14 @@
-import { createContext, memo, type ReactNode, useContext, useRef } from 'react'
+import { createContext, type ReactNode, useContext } from 'react'
 import { type UseLobby, useLobby } from '~/network'
 
 const SessionContext = createContext<UseLobby | null>(null)
 
-// StableLobbyBridge is intentionally never re-rendered after mount.
-// useLobby holds the PeerJS transport in a ref; re-invoking it would create a
-// second transport instance and drop the existing DataChannel. The bridge
-// receives children through a mutable ref so the latest subtree is always
-// available without triggering a re-render of this component.
-const StableLobbyBridge = memo(
-  function StableLobbyBridge({ childrenRef }: { childrenRef: React.MutableRefObject<ReactNode> }) {
-    const lobby = useLobby()
-    return <SessionContext.Provider value={lobby}>{childrenRef.current}</SessionContext.Provider>
-  },
-  // Always bail out — lobby transport is stable via internal refs.
-  () => true,
-)
-
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const childrenRef = useRef<ReactNode>(children)
-  childrenRef.current = children
-  return <StableLobbyBridge childrenRef={childrenRef} />
+  // useLobby holds the PeerJS transport in a ref. SessionProvider lives in the
+  // _app root layout, which stays mounted across route changes, and refs persist
+  // across re-renders — so the DataChannel survives lobby→board navigation.
+  const lobby = useLobby()
+  return <SessionContext.Provider value={lobby}>{children}</SessionContext.Provider>
 }
 
 export function useSession(): UseLobby {
