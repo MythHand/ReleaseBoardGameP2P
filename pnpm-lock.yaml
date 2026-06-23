@@ -44,6 +44,9 @@ importers:
 
   apps/frontend:
     dependencies:
+      '@generouted/react-router':
+        specifier: ^1.20.2
+        version: 1.20.2(react-router@8.0.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(vite@6.4.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
       '@release/ui':
         specifier: workspace:*
         version: link:../ui
@@ -709,6 +712,13 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@generouted/react-router@1.20.2':
+    resolution: {integrity: sha512-bvcQ23n4lba130bGNL0rLwRvggvh6pNdgAYIY2EiGSQxrgQLhocAaRZMrD6RvM+4vb8nmAoEMPyF00RzEMQSPA==}
+    peerDependencies:
+      react: '>=18'
+      react-router: '>=7'
+      vite: '>=5'
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1627,6 +1637,11 @@ packages:
 
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
+
+  generouted@1.20.2:
+    resolution: {integrity: sha512-Sx+aEC5o0MZIOs0FiqFJDAOQ1ZeWedrJ8SVr/sEK5quzI4kLRTZBHZAR+ivIb1Dw/lV5LrLWUBRsgeaR1UJ6qg==}
+    peerDependencies:
+      vite: '>=5'
 
   gensync@1.0.0-beta.2:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
@@ -3173,6 +3188,14 @@ snapshots:
 
   '@exodus/bytes@1.15.1': {}
 
+  '@generouted/react-router@1.20.2(react-router@8.0.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(vite@6.4.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))':
+    dependencies:
+      fast-glob: 3.3.3
+      generouted: 1.20.2(vite@6.4.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
+      react: 19.2.7
+      react-router: 8.0.1(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      vite: 6.4.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0)
+
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -4065,6 +4088,10 @@ snapshots:
     optional: true
 
   function-bind@1.1.2: {}
+
+  generouted@1.20.2(vite@6.4.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0)):
+    dependencies:
+      vite: 6.4.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0)
 
   gensync@1.0.0-beta.2: {}
 

@@ -1,7 +1,14 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
   "files": {
-    "includes": ["**", "!**/dist", "!**/node_modules", "!**/*.css", "!**/*.svg"]
+    "includes": [
+      "**",
+      "!**/dist",
+      "!**/node_modules",
+      "!**/*.css",
+      "!**/*.svg",
+      "!apps/frontend/src/router.ts"
+    ]
   },
   "assist": {
     "actions": {

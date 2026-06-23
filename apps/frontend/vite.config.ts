@@ -1,4 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
+import generouted from '@generouted/react-router/plugin'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
@@ -7,7 +8,7 @@ const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 const appSrc = fileURLToPath(new URL('./src', import.meta.url))
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), generouted({ format: false })],
   resolve: {
     alias: [
       { find: '@release/ui/global.css', replacement: `${uiSrc}/design/global.css` },
