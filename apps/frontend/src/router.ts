@@ -6,10 +6,12 @@ import { components, hooks, utils } from '@generouted/react-router/client'
 export type Path =
   | `/`
   | `/help`
+  | `/lobby`
+  | `/lobby/:lobbyId`
   | `/start`
 
 export type Params = {
-  
+  '/lobby/:lobbyId': { lobbyId: string }
 }
 
 export type ModalPath = never
