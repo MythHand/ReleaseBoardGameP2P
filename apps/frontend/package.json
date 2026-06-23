@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "peerserver": "peerjs --port 9000 --path /",
+    "dev:p2p": "concurrently -n vite,peer -c green,blue \"VITE_PEER_HOST=localhost VITE_PEER_PORT=9000 VITE_PEER_PATH=/ vite\" \"pnpm peerserver\"",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -27,7 +29,9 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^9.1.0",
     "jsdom": "^29.1.1",
+    "peer": "^1.0.2",
     "tailwindcss": "^4.3.1",
     "vite": "^6.4.3"
   }

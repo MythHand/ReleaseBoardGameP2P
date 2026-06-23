@@ -21,6 +21,15 @@ export default function LobbyScreen() {
     return <p className="p-8 text-center text-lg">{t('lobby.kickedMessage')}</p>
   }
 
+  if (lobby.status === 'error') {
+    return (
+      <div className="mx-auto flex max-w-md flex-col gap-2 p-8 text-center">
+        <p className="font-semibold text-cat-attack text-lg">{t('lobby.connectionError')}</p>
+        {lobby.error && <p className="break-all text-sm opacity-70">{lobby.error}</p>}
+      </div>
+    )
+  }
+
   if (lobby.status === 'idle') {
     return (
       <div className="mx-auto flex max-w-md flex-col gap-4 p-8">
@@ -74,6 +83,9 @@ export default function LobbyScreen() {
 
   return (
     <div className="mx-auto flex max-w-md flex-col gap-4 p-8">
+      {lobby.error && (
+        <p className="rounded bg-cat-attack/10 px-3 py-2 text-cat-attack text-sm">{lobby.error}</p>
+      )}
       {lobby.roomCode && (
         <div className="rounded bg-surface-1 p-4">
           <p className="text-sm opacity-70">{t('lobby.roomCode')}</p>

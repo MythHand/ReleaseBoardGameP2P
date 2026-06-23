@@ -24,7 +24,7 @@ export function formatRoomCode(peerId: string): string {
   return head.length > 3 ? `${head.slice(0, 3)}-${head.slice(3)}` : head
 }
 
-export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked'
+export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'error'
 
 export interface UseLobby {
   state: LobbyState | null
@@ -32,6 +32,7 @@ export interface UseLobby {
   roomCode: string | null
   isHost: boolean
   canStart: boolean
+  error: string | null
   createRoom(name: string, maxPlayers: number): Promise<void>
   joinRoom(hostId: string, name: string): Promise<void>
   ready(): void
@@ -45,9 +46,18 @@ export function useLobby(): UseLobby {
   const [status, setStatus] = useState<LobbyStatus>('idle')
   const [isHost, setIsHost] = useState(false)
   const [roomCode, setRoomCode] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const transportRef = useRef<Transport | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
+
+  const onError = useCallback((err: { type?: string; message: string }) => {
+    // A connection-level error after the lobby is up shouldn't tear down the
+    // whole session, but signaling/peer errors (peer-unavailable, network,
+    // disconnected) mean the session can't proceed — surface them.
+    setError(err.type ? `${err.type}: ${err.message}` : err.message)
+    if (err.type !== 'connection') setStatus('error')
+  }, [])
 
   const commit = useCallback((next: LobbyState) => {
     stateRef.current = next
@@ -106,7 +116,8 @@ export function useLobby(): UseLobby {
   const createRoom = useCallback(
     async (name: string, maxPlayers: number) => {
       setStatus('connecting')
-      const t = await createTransport({ onMessage })
+      setError(null)
+      const t = await createTransport({ onMessage, onError })
       transportRef.current = t
       isHostRef.current = true
       setIsHost(true)
@@ -120,14 +131,16 @@ export function useLobby(): UseLobby {
       commit(initial)
       setStatus('in-lobby')
     },
-    [onMessage, commit],
+    [onMessage, onError, commit],
   )
 
   const joinRoom = useCallback(
     async (hostId: string, name: string) => {
       setStatus('connecting')
+      setError(null)
       const t = await createTransport({
         onMessage,
+        onError,
         onConnection: (peerId) => {
           // Send JOIN_REQUEST exactly when the host DataChannel opens — a
           // setTimeout(0) is not sufficient over real WebRTC because the channel
@@ -151,7 +164,7 @@ export function useLobby(): UseLobby {
       t.connectTo(hostId)
       setStatus('in-lobby')
     },
-    [onMessage, commit],
+    [onMessage, onError, commit],
   )
 
   const ready = useCallback(() => {
@@ -210,6 +223,7 @@ export function useLobby(): UseLobby {
     roomCode,
     isHost,
     canStart: state ? canStartFn(state) : false,
+    error,
     createRoom,
     joinRoom,
     ready,

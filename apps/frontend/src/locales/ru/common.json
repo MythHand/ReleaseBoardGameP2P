@@ -47,6 +47,7 @@
     "kick": "Исключить",
     "start": "Начать игру",
     "kickedMessage": "Вас исключили из игры.",
+    "connectionError": "Не удалось установить соединение.",
     "roleHost": "Хост",
     "rolePlayer": "Игрок",
     "roleGuest": "Зритель"

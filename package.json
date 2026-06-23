@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @release/web dev",
+    "dev:p2p": "pnpm --filter @release/web dev:p2p",
     "dev:playground": "pnpm --filter @release/playground dev",
     "dev:all": "concurrently -n web,playground -c green,magenta \"pnpm dev\" \"pnpm dev:playground\"",
     "build": "pnpm -r build",
