@@ -1,0 +1,35 @@
+.menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.menuBtn {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  padding: 10px 2px;
+  font-family: var(--font-mono);
+  font-size: 17px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: opacity var(--t-fast, 150ms) var(--ease-out, ease-out);
+}
+
+.menuBtn:hover {
+  opacity: 0.78;
+}
+
+.menuBtn:disabled {
+  pointer-events: none;
+  cursor: default;
+  opacity: 0.4;
+}
+
+.bracket {
+  opacity: 0.45;
+}
