@@ -2,7 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["vite/client", "vitest/globals"],
-    "paths": { "@release/ui": ["../ui/src/index.ts"], "@/*": ["../ui/src/*"], "~/*": ["./src/*"] }
+    "paths": {
+      "@release/ui": ["../ui/src/index.ts"],
+      "@release/translation": ["../../packages/translation/src/index.ts"],
+      "@/*": ["../ui/src/*"],
+      "~/*": ["./src/*"]
+    }
   },
   "include": ["src"]
 }

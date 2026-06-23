@@ -8,16 +8,18 @@ Layers, top to bottom — a module may import only from layers **below** it:
 
 | Layer | Holds |
 |---|---|
-| `app/` | Providers + app-wide libs (`SessionProvider`, `viewTransition`) |
+| `app/` | Composition root: entry (`main.tsx`), generated router (`router.ts`), providers (`SessionProvider`), app-wide libs (`viewTransition`) |
 | `pages/` | generouted route modules — thin wrappers over `@release/ui` + features |
 | `features/` | User-facing use-cases (hooks over the session/network) |
 | `entities/` | Domain models + adapters (`lobby`, `game`, `player`, `card`) |
 | `shared/` | Reusable, domain-agnostic (`LanguageSwitch`, helpers) |
 | `network/` | Fixed P2P/transport segment (the API layer). Only `entities`/`features` consume it; **nothing else imports `peerjs`**. |
 
+Translations are **not** in `src/` — they live in the `@release/translation` workspace package (i18next init + `en`/`ru` catalogs + typed-key augmentation). `app/main.tsx` imports `@release/translation` to initialise i18n; components use `useTranslation()` from `react-i18next`.
+
 ## Rules
 
 - **One-way imports.** A module imports only from layers below it (plus `network` via `entities`/`features`). Use the `~` alias for `src` (`~/app`, `~/entities/...`).
-- **Routing is file-based (generouted).** The folder tree under `pages/` mirrors the URL: `_app.tsx` = root layout, `_layout.tsx` = nested layout, `[param].tsx` = dynamic segment, `index.tsx` = the segment's index. Files prefixed `_` and files without a default-exported component (e.g. `*.test.tsx`, shared helpers like `_LobbyPage.tsx`) are ignored by the router. **`src/router.ts` is generated — never edit it by hand.**
+- **Routing is file-based (generouted).** The folder tree under `pages/` mirrors the URL: `_app.tsx` = root layout, `_layout.tsx` = nested layout, `[param].tsx` = dynamic segment, `index.tsx` = the segment's index. Files prefixed `_` and files without a default-exported component (e.g. `*.test.tsx`, shared helpers like `_LobbyPage.tsx`) are ignored by the router. **`app/router.ts` is generated (generouted `output`) — never edit it by hand.**
 - **All visuals come from `@release/ui`.** Pages add layout/Tailwind only — never new visual components, never `*.module.css`.
 - **Where new code goes:** a new screen → a thin `pages/` route file + its logic in `features/`/`entities/`; a new interaction → `features/`; a new domain model → `entities/`.

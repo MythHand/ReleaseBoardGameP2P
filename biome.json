@@ -7,7 +7,7 @@
       "!**/node_modules",
       "!**/*.css",
       "!**/*.svg",
-      "!apps/frontend/src/router.ts"
+      "!apps/frontend/src/app/router.ts"
     ]
   },
   "assist": {

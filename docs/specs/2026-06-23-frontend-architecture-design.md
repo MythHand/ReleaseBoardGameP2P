@@ -110,3 +110,10 @@ Pages own layout (Tailwind) and display data (from `useSession`, i18n) handed to
 - Game-rules engine (card resolution) — fills `entities/game` and the placeholder `features/*`.
 - Host-transfer runtime, deck-keeper, reconnection beyond `TURN_RESOLVED` (see P2P spec open questions).
 - Any change to `apps/playground` (showcase) or `apps/ui`.
+
+## Addendum — packages layer & app entry (post-review refinements)
+
+Two FSD refinements applied after the initial build:
+
+- **Translation extracted to a workspace package.** `i18next` init, the `en`/`ru` locale catalogs, and the typed-key augmentation moved out of `apps/frontend/src/` into a new **`packages/translation`** package (`@release/translation`). `pnpm-workspace.yaml` now globs `apps/*` **and** `packages/*`. The frontend consumes it from source via the `@release/translation` alias (vite + vitest + tsconfig); `app/main.tsx` imports the package to initialise i18n. The augmentation reaches the app through a `/// <reference>` in the package entry, so typed `t()` keys still hold (verified: an unknown key fails typecheck).
+- **App entry + router moved into the `app/` layer.** `main.tsx` → `app/main.tsx` (with `index.html` pointing at `/src/app/main.tsx`), and the generouted-generated `router.ts` is emitted to `app/router.ts` (plugin `output` option; biome-ignore path updated). The `app/` layer is now the full composition root: entry, router, providers, app libs.
