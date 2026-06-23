@@ -60,6 +60,12 @@
   color: rgb(255 255 255 / 85%);
 }
 
+.disabled {
+  pointer-events: none;
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 /* активный текст — тёмный, для контраста на ярко-зелёном ползунке */
 .active,
 .active:hover {
