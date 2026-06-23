@@ -6,7 +6,7 @@ import NotFound from '~/pages/404'
 import Index from '~/pages/index'
 import StartPage from '~/pages/start'
 
-vi.mock('react-i18next', () => ({
+vi.mock('@release/translation', () => ({
   useTranslation: () => ({
     t: (k: string) => k,
     i18n: { resolvedLanguage: 'en', changeLanguage: () => Promise.resolve() },

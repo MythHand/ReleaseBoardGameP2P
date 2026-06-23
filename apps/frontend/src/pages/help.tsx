@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next'
+import { useTranslation } from '@release/translation'
 import { Link } from 'react-router'
 
 export default function HelpPage() {

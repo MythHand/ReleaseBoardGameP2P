@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 import StartPage from './start'
 
-vi.mock('react-i18next', () => ({
+vi.mock('@release/translation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }))
 

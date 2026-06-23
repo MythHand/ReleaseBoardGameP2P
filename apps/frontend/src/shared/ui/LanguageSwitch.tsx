@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next'
+import { useTranslation } from '@release/translation'
 
 const baseBtn =
   'rounded-md px-2.5 py-1 text-xs font-semibold tracking-base transition-[color,background,opacity] duration-150'

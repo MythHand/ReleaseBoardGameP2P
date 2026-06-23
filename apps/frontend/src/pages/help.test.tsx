@@ -3,7 +3,7 @@ import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 import HelpPage from './help'
 
-vi.mock('react-i18next', () => ({
+vi.mock('@release/translation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }))
 

@@ -1,5 +1,5 @@
+import { useTranslation } from '@release/translation'
 import { Start, type StartCopy } from '@release/ui'
-import { useTranslation } from 'react-i18next'
 
 export default function StartPage() {
   const { t } = useTranslation()

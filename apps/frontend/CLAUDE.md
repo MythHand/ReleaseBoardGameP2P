@@ -15,7 +15,7 @@ Layers, top to bottom — a module may import only from layers **below** it:
 | `shared/` | Reusable, domain-agnostic (`LanguageSwitch`, helpers) |
 | `network/` | Fixed P2P/transport segment (the API layer). Only `entities`/`features` consume it; **nothing else imports `peerjs`**. |
 
-Translations are **not** in `src/` — they live in the `@release/translation` workspace package (i18next init + `en`/`ru` catalogs + typed-key augmentation). `app/main.tsx` imports `@release/translation` to initialise i18n; components use `useTranslation()` from `react-i18next`.
+Translations are **not** in `src/` — they live in the `@release/translation` workspace package (i18next init + `en`/`ru` catalogs + typed-key augmentation). `app/main.tsx` imports `@release/translation` to initialise i18n; components get `useTranslation()` **from `@release/translation`** (it re-exports the react-i18next binding). The frontend does not depend on `react-i18next` directly — `@release/translation` is the single i18n surface.
 
 ## Rules
 
