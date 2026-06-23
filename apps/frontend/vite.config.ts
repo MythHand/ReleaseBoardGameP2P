@@ -8,7 +8,20 @@ const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 const appSrc = fileURLToPath(new URL('./src', import.meta.url))
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), generouted({ format: false })],
+  plugins: [
+    react(),
+    tailwindcss(),
+    generouted({
+      format: false,
+      source: {
+        routes: [
+          './src/pages/**/[\\w[-]*.{jsx,tsx,mdx}',
+          '!./src/pages/**/*.{test,spec}.{jsx,tsx,mdx}',
+        ],
+        modals: './src/pages/**/[+]*.{jsx,tsx,mdx}',
+      },
+    }),
+  ],
   resolve: {
     alias: [
       { find: '@release/ui/global.css', replacement: `${uiSrc}/design/global.css` },
