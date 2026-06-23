@@ -7,6 +7,10 @@ export interface Transport {
   connectTo(peerId: string): void
   send(to: string, message: Message): void
   broadcast(message: Message): void
+  // Forward an already-received wire frame to the given peers verbatim. Unlike
+  // send(), it preserves the original `from`/`seq` (the host must not rewrite
+  // itself as the sender when relaying) and serializes once for all recipients.
+  relay(toIds: string[], frame: WireMessage): void
   connectedIds(): string[]
   close(): void
 }
@@ -88,6 +92,10 @@ export function createTransport(args: {
         broadcast(message) {
           const frame = JSON.stringify(createEnvelope(message, id as string, nextSeq()))
           for (const conn of connections.values()) conn.send(frame)
+        },
+        relay(toIds, frame) {
+          const serialized = JSON.stringify(frame)
+          for (const to of toIds) connections.get(to)?.send(serialized)
         },
         connectedIds() {
           return [...connections.keys()]

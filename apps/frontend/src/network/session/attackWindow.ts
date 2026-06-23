@@ -34,6 +34,18 @@ export function recordResponse(window: AttackWindow, response: AttackResponse): 
   }
 }
 
+// Remove a player who left mid-window (WebRTC disconnect) from the pending set
+// and the seating so the window can still complete. Without this, isComplete()
+// never returns true for a player who never responds and the turn deadlocks.
+export function dropPlayer(window: AttackWindow, player: string): AttackWindow {
+  if (!window.pending.includes(player) && !window.seating.includes(player)) return window
+  return {
+    ...window,
+    seating: window.seating.filter((id) => id !== player),
+    pending: window.pending.filter((id) => id !== player),
+  }
+}
+
 export function isComplete(window: AttackWindow): boolean {
   return window.pending.length === 0
 }
