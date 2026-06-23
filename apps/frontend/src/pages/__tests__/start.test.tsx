@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
-import StartPage from './start'
+import StartPage from '../start'
 
 vi.mock('@release/translation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),

@@ -31,6 +31,12 @@
     "rulesTitle": "Rules"
   },
   "help": { "title": "How to play", "back": "Back to start" },
+  "error": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Try reloading the page.",
+    "reload": "Reload",
+    "backToStart": "Back to start"
+  },
   "language": { "en": "EN", "ru": "RU" },
   "lobby": {
     "createTitle": "Create game",

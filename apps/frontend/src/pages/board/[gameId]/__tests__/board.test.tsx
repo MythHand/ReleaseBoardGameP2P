@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
-import BoardPage from './_layout'
-import StatsPage from './stats'
+import BoardPage from '../_layout'
+import StatsPage from '../stats'
 
 it('keeps the board mounted and shows stats in its outlet', async () => {
   const router = createMemoryRouter(

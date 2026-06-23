@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
-import HelpPage from './help'
+import HelpPage from '../help'
 
 vi.mock('@release/translation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
