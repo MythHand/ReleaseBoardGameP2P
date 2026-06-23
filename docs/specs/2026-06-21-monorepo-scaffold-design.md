@@ -36,7 +36,7 @@ ReleaseBoardGameP2P/
 ├─ AGENTS.md               # → pointer to CLAUDE.md
 ├─ docs/
 │  ├─ rules-board-game.md
-│  └─ superpowers/specs/2026-06-21-monorepo-scaffold-design.md
+│  └─ specs/2026-06-21-monorepo-scaffold-design.md
 └─ apps/
    ├─ ui/          # @release/ui          — migrated src/, TS, CSS Modules + tokens, Stylelint
    ├─ playground/  # @release/playground  — Vite, depends on @release/ui

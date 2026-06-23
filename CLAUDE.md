@@ -5,7 +5,9 @@
 **Release любой ценой** — a P2P web version of the board card game.
 Rules and card mechanics: [`docs/rules-board-game.md`](./docs/rules-board-game.md).
 
-The app is in early scaffolding. Game logic (WebRTC client, full game screens) is out of scope for this phase and lives in later specs. What exists today: the monorepo skeleton, the UI component library, the Tailwind-themed frontend shell, and the signaling backend.
+**Design specs live in [`docs/specs/`](./docs/specs/)** (`YYYY-MM-DD-<topic>-design.md`).
+
+The app is in early scaffolding. Game logic (full game screens) is out of scope for this phase and lives in later specs. What exists today: the monorepo skeleton, the UI component library, and the Tailwind-themed frontend shell.
 
 ---
 
@@ -16,7 +18,6 @@ The app is in early scaffolding. Game logic (WebRTC client, full game screens) i
 | `apps/ui` | `@release/ui` | Shared component library — TypeScript + CSS Modules + design tokens; i18n-agnostic |
 | `apps/playground` | `@release/playground` | Vite sandbox for developing and previewing UI components in isolation |
 | `apps/frontend` | `@release/web` | Main web app — Vite + React + Tailwind v4 + react-i18next |
-| `apps/backend` | `@release/server` | Fastify + ws signaling server — lobby and WebRTC handshake only |
 
 Package manager: **pnpm** (workspace defined in `pnpm-workspace.yaml` as `apps/*`).
 
@@ -43,12 +44,6 @@ Package manager: **pnpm** (workspace defined in `pnpm-workspace.yaml` as `apps/*
 - react-i18next — translation catalogs under `src/locales/en/` and `src/locales/ru/`
 - Consumes `@release/ui` from source via Vite alias
 
-### `@release/server` (backend)
-- Fastify v5 + `@fastify/websocket` + `ws`
-- TypeScript, compiled to `dist/` by `tsc`
-- Dev: `tsx watch`; production: `node dist/index.js`
-- **Signaling and lobby only** — no game rules, no game state
-
 ---
 
 ## Commands
@@ -66,9 +61,6 @@ pnpm dev:playground
 # Run frontend + playground together (so the frontend's /playground/ link
 # proxies to the running playground app). Needed only when using that link.
 pnpm dev:all
-
-# Run the backend signaling server in watch mode (apps/backend)
-pnpm dev:server
 
 # Build all packages (pnpm -r build)
 pnpm build
@@ -110,9 +102,10 @@ Styling is **per-package** — the approach depends on which app the component l
 
 ## Architecture Rule
 
-- The **backend is P2P signaling and lobby only**. It facilitates WebRTC handshakes (offer/answer/ICE exchange) and room/lobby management.
-- **Game state lives on the peers** (browsers). No game rules are evaluated or enforced server-side.
-- Do not add game logic to `apps/backend`.
+- Networking is **peer-to-peer over WebRTC**, signaled by **PeerJS** (hosted or self-hosted `peerjs-server`). There is no game backend.
+- Topology is a **star through the host peer**: non-host peers hold one DataChannel to the host, who relays messages to the others.
+- **Game state lives on the peers** (browsers). No game rules are evaluated or enforced by any server.
+- All P2P code lives in `apps/frontend/src/network/`.
 
 ---
 

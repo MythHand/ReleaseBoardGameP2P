@@ -1,28 +1,16 @@
-import { useTranslation } from 'react-i18next'
-import styles from './App.module.css'
+import { Route, Routes } from 'react-router'
 import LanguageSwitch from './components/LanguageSwitch'
+import HomeScreen from './screens/HomeScreen'
+import LobbyScreen from './screens/LobbyScreen'
 
-// Фаза 0 — фундамент. Корень = реальное приложение (НЕ песочница).
-// Пока это нейтральная заглушка-оболочка; по фазам станет роутером экранов:
-// boot → start → lobby → game → game over. Превью токенов/типографики живёт в /playground/.
 export default function App() {
-  const { t } = useTranslation()
   return (
-    <div className={styles.app}>
+    <div className="min-h-screen bg-bg text-fg">
       <LanguageSwitch />
-      <main className={styles.shell}>
-        <h1 className={styles.brand}>
-          {t('app.titleLead')} <span className={styles.sub}>{t('app.titleSub')}</span>
-        </h1>
-        <p className={styles.tag}>{t('app.foundationTag')}</p>
-        <p className={styles.hint}>{t('app.phasesHint')}</p>
-        <p className={styles.dev}>
-          {t('app.devShowcase')}{' '}
-          <a className={styles.link} href="/playground/">
-            /playground/
-          </a>
-        </p>
-      </main>
+      <Routes>
+        <Route path="/" element={<HomeScreen />} />
+        <Route path="/lobby" element={<LobbyScreen />} />
+      </Routes>
     </div>
   )
 }

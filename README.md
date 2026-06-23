@@ -5,8 +5,8 @@ card game about the real grind of software development (bugs, surprise events, r
 attacks; release first to win).
 
 The project is in early scaffolding: the monorepo skeleton, the shared UI component
-library, the Tailwind-themed frontend shell, and the P2P signaling backend exist today.
-Full game screens and the WebRTC client come in later phases.
+library, and the Tailwind-themed frontend shell exist today. Full game screens and the
+P2P networking layer (WebRTC via PeerJS) come in later phases.
 
 Game rules and card mechanics: [`docs/rules-board-game.md`](./docs/rules-board-game.md).
 
@@ -19,7 +19,6 @@ A pnpm workspace under `apps/*`:
 | `apps/ui` | `@release/ui` | Shared component library — TypeScript + CSS Modules + design tokens; i18n-agnostic |
 | `apps/playground` | `@release/playground` | Vite sandbox for developing UI components in isolation (route per story) |
 | `apps/frontend` | `@release/web` | Main web app — Vite + React + Tailwind v4 + react-i18next |
-| `apps/backend` | `@release/server` | Fastify + ws signaling server — lobby and WebRTC handshake only |
 
 The frontend and playground consume `@release/ui` **from source** via a Vite/tsconfig alias —
 no build step for the library.
@@ -38,7 +37,6 @@ pnpm dev            # frontend           → http://localhost:5173
 pnpm dev:playground # component sandbox   → http://localhost:5174/playground/
 pnpm dev:all        # frontend + playground together (the frontend's
                     # /playground/ link proxies to the running playground)
-pnpm dev:server     # backend signaling server (watch mode)
 ```
 
 ## Common commands
@@ -56,7 +54,7 @@ pnpm format     # Biome format --write
 - **pnpm workspaces**, **TypeScript 5**, **Vite 6**, **React 19**
 - **Tailwind v4** (frontend only), themed off the UI design tokens via `@theme`
 - **react-i18next** (frontend) — English + Russian
-- **Fastify 5 + ws** (backend) — P2P signaling/lobby only; game state lives on the peers
+- **PeerJS** — WebRTC signaling; game state lives on the peers
 - **Biome** lints/formats JS/TS; **Stylelint** lints CSS; **Vitest** for tests
 
 ## Contributing / agent guidance

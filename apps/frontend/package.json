@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "peerserver": "peerjs --port 9000 --path /",
+    "dev:p2p": "concurrently -n vite,peer -c green,blue \"VITE_PEER_HOST=localhost VITE_PEER_PORT=9000 VITE_PEER_PATH=/ vite\" \"pnpm peerserver\"",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -15,15 +17,21 @@
     "@release/ui": "workspace:*",
     "i18next": "^24.2.3",
     "i18next-browser-languagedetector": "^8.2.1",
+    "peerjs": "^1.5.5",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-i18next": "^15.1.0"
+    "react-i18next": "^15.1.0",
+    "react-router": "^8.0.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.1",
+    "@testing-library/react": "^16.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^9.1.0",
+    "jsdom": "^29.1.1",
+    "peer": "^1.0.2",
     "tailwindcss": "^4.3.1",
     "vite": "^6.4.3"
   }

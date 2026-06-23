@@ -71,8 +71,13 @@ const ACHIEVEMENTS: Achievement[] = [
 
 export default function Stats({ winnerId, players = [] }: StatsProps) {
   const winner = players.find((p) => p.id === winnerId)
-  const leader = (key: MetricKey): StatPlayer | undefined =>
-    players.length ? players.reduce((best, p) => (p[key] > best[key] ? p : best)) : undefined
+  const leader = (key: MetricKey): StatPlayer | undefined => {
+    if (!players.length) return undefined
+    const top = players.reduce((best, p) => (p[key] > best[key] ? p : best))
+    // Skip the achievement when nobody actually triggered the metric (max is 0),
+    // otherwise a player who never did it is shown as the leader.
+    return top[key] > 0 ? top : undefined
+  }
 
   return (
     <div className={styles.stats}>

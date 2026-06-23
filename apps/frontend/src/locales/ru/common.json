@@ -4,6 +4,7 @@
     "titleSub": "любой ценой",
     "foundationTag": "visual layer — foundation",
     "phasesHint": "Экраны (boot → lobby → game → game over) появятся по фазам.",
+    "enterLobby": "Играть онлайн",
     "devShowcase": "dev-витрина компонентов →"
   },
   "start": {
@@ -29,5 +30,26 @@
     "joinCta": "войти",
     "rulesTitle": "Правила"
   },
-  "language": { "en": "EN", "ru": "RU" }
+  "language": { "en": "EN", "ru": "RU" },
+  "lobby": {
+    "createTitle": "Создать игру",
+    "joinTitle": "Присоединиться",
+    "namePlaceholder": "Ваше имя",
+    "maxPlayers": "Макс. игроков",
+    "create": "Создать",
+    "join": "Войти",
+    "roomCode": "Код комнаты",
+    "shareLink": "Ссылка",
+    "players": "Игроки",
+    "ready": "Готов",
+    "readyMark": "✓",
+    "waiting": "Ожидание…",
+    "kick": "Исключить",
+    "start": "Начать игру",
+    "kickedMessage": "Вас исключили из игры.",
+    "connectionError": "Не удалось установить соединение.",
+    "roleHost": "Хост",
+    "rolePlayer": "Игрок",
+    "roleGuest": "Зритель"
+  }
 }
