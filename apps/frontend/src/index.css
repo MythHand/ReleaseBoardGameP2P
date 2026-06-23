@@ -20,3 +20,34 @@
   /* Letter-spacing token → `tracking-base` utility */
   --tracking-base: var(--tracking);
 }
+
+/* Lobby→board slide via the native View Transitions API. The helper guards
+   reduced motion in JS; this also disables the animation at the CSS layer. */
+@keyframes vt-slide-out-left {
+  to {
+    opacity: 0;
+    transform: translateX(-3%);
+  }
+}
+
+@keyframes vt-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(3%);
+  }
+}
+
+::view-transition-old(root) {
+  animation: 220ms ease both vt-slide-out-left;
+}
+
+::view-transition-new(root) {
+  animation: 240ms ease both vt-slide-in-right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}

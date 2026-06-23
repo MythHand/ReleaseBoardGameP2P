@@ -14,5 +14,5 @@ export default defineConfig({
       { find: '@', replacement: uiSrc },
     ],
   },
-  test: { environment: 'jsdom', globals: true },
+  test: { environment: 'jsdom', globals: true, setupFiles: ['./src/test-setup.ts'] },
 })
