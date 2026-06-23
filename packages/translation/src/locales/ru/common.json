@@ -57,6 +57,17 @@
     "connectionError": "Не удалось установить соединение.",
     "roleHost": "Хост",
     "rolePlayer": "Игрок",
-    "roleGuest": "Зритель"
+    "roleGuest": "Зритель",
+    "connecting": "Подключение…",
+    "you": "вы",
+    "code": "Код игры",
+    "codePlaceholder": "напр. ABC-23D",
+    "modes": "Режимы партии",
+    "leave": "Выйти",
+    "startHint": "Для старта все должны быть готовы.",
+    "copy": "Копировать",
+    "copied": "Скопировано",
+    "activeSession": "Вы уже в сессии",
+    "continue": "Продолжить"
   }
 }

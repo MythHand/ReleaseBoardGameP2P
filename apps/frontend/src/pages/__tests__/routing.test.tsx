@@ -4,7 +4,6 @@ import { vi } from 'vitest'
 import App from '~/pages/_app'
 import NotFound from '~/pages/404'
 import Index from '~/pages/index'
-import StartPage from '~/pages/start'
 
 vi.mock('@release/translation', () => ({
   useTranslation: () => ({
@@ -15,22 +14,29 @@ vi.mock('@release/translation', () => ({
 
 // The generated route TREE can't be imported in Vitest (generouted builds it via
 // import.meta.glob at Vite build time). This mirrors generouted's nesting — _app
-// root layout with index/start and a catch-all — to verify the redirect behavior.
-// The actual generated tree is verified by `pnpm --filter @release/web build`.
-it('redirects unknown paths to the start page', async () => {
-  const router = createMemoryRouter(
+// root layout with the index landing and a catch-all — to verify routing. The
+// actual generated tree is verified by `pnpm --filter @release/web build`.
+function routerFor(path: string) {
+  return createMemoryRouter(
     [
       {
         element: <App />,
         children: [
           { index: true, element: <Index /> },
-          { path: 'start', element: <StartPage /> },
           { path: '*', element: <NotFound /> },
         ],
       },
     ],
-    { initialEntries: ['/does-not-exist'] },
+    { initialEntries: [path] },
   )
-  render(<RouterProvider router={router} />)
-  expect(await screen.findByText('start.createGame')).toBeTruthy()
+}
+
+it('renders the landing at /', () => {
+  render(<RouterProvider router={routerFor('/')} />)
+  expect(screen.getByText('start.description')).toBeTruthy()
+})
+
+it('redirects unknown paths to the landing', async () => {
+  render(<RouterProvider router={routerFor('/does-not-exist')} />)
+  expect(await screen.findByText('start.description')).toBeTruthy()
 })

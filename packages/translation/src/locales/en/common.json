@@ -57,6 +57,17 @@
     "connectionError": "Connection failed.",
     "roleHost": "Host",
     "rolePlayer": "Player",
-    "roleGuest": "Spectator"
+    "roleGuest": "Spectator",
+    "connecting": "Connecting…",
+    "you": "you",
+    "code": "Game code",
+    "codePlaceholder": "e.g. ABC-23D",
+    "modes": "Match modes",
+    "leave": "Leave",
+    "startHint": "Everyone must be ready to start.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "activeSession": "You're already in a session",
+    "continue": "Continue"
   }
 }

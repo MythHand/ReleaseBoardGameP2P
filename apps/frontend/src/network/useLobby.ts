@@ -57,6 +57,8 @@ export interface UseLobby {
   kick(peerId: string): void
   setMaxPlayers(n: number): void
   transferHost(id: string): void
+  leaveSession(): void
+  clearError(): void
 }
 
 export function useLobby(): UseLobby {
@@ -280,6 +282,29 @@ export function useLobby(): UseLobby {
     [dispatch],
   )
 
+  // Tear the session down: close the PeerJS transport and reset to idle. Without
+  // this, navigating away leaves the connection open and the state alive, so the
+  // user is bounced back into their old session.
+  const leaveSession = useCallback(() => {
+    transportRef.current?.close()
+    transportRef.current = null
+    stateRef.current = null
+    isHostRef.current = false
+    setState(null)
+    setStatus('idle')
+    setRoomCode(null)
+    setError(null)
+    setIsHost(false)
+  }, [])
+
+  // Dismiss a sticky error (e.g. a failed join) without tearing down a live
+  // session. Returns the status to idle only when it was 'error', so calling
+  // this on mount can't kill an in-lobby session.
+  const clearError = useCallback(() => {
+    setError(null)
+    setStatus((s) => (s === 'error' ? 'idle' : s))
+  }, [])
+
   // Memoized so the value handed to the root SessionContext keeps a stable
   // identity across renders — consumers only re-render when state actually
   // changes, not on every render of the always-mounted _app layout. The
@@ -298,6 +323,8 @@ export function useLobby(): UseLobby {
       kick,
       setMaxPlayers,
       transferHost,
+      leaveSession,
+      clearError,
     }),
     [
       state,
@@ -311,6 +338,8 @@ export function useLobby(): UseLobby {
       kick,
       setMaxPlayers,
       transferHost,
+      leaveSession,
+      clearError,
     ],
   )
 }

@@ -28,7 +28,7 @@ export default function ErrorScreen({ error }: { error?: unknown }) {
       )}
       <div className="inline-flex gap-2">
         <Button onClick={() => window.location.reload()}>{t('error.reload')}</Button>
-        <Button variant="tech" onClick={() => window.location.assign('/start')}>
+        <Button variant="tech" onClick={() => window.location.assign('/')}>
           {t('error.backToStart')}
         </Button>
       </div>
