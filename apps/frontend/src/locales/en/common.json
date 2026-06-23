@@ -30,6 +30,7 @@
     "joinCta": "enter",
     "rulesTitle": "Rules"
   },
+  "help": { "title": "How to play", "back": "Back to start" },
   "language": { "en": "EN", "ru": "RU" },
   "lobby": {
     "createTitle": "Create game",

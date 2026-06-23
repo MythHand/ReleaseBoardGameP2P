@@ -32,5 +32,5 @@ it('redirects unknown paths to the start page', async () => {
     { initialEntries: ['/does-not-exist'] },
   )
   render(<RouterProvider router={router} />)
-  expect(await screen.findByTestId('start-page')).toBeTruthy()
+  expect(await screen.findByText('start.createGame')).toBeTruthy()
 })
