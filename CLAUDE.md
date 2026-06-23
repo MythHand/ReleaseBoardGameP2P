@@ -18,8 +18,9 @@ The app is in early scaffolding. Game logic (full game screens) is out of scope 
 | `apps/ui` | `@release/ui` | Shared component library — TypeScript + CSS Modules + design tokens; i18n-agnostic |
 | `apps/playground` | `@release/playground` | Vite sandbox for developing and previewing UI components in isolation |
 | `apps/frontend` | `@release/web` | Main web app — Vite + React + Tailwind v4 + react-i18next |
+| `packages/translation` | `@release/translation` | i18next setup + locale catalogs (`en`/`ru`) + typed-key augmentation; consumed by `@release/web` |
 
-Package manager: **pnpm** (workspace defined in `pnpm-workspace.yaml` as `apps/*`).
+Package manager: **pnpm** (workspace defined in `pnpm-workspace.yaml` as `apps/*` and `packages/*`).
 
 ---
 

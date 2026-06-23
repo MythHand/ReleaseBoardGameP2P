@@ -1,5 +1,5 @@
 import { canStart, handleJoinRequest, handleReady, kick, setMaxPlayers } from './host'
-import { createLobbyState } from './state'
+import { createLobbyState, playerCount } from './state'
 
 const host = { id: 'h', name: 'Host', role: 'host' as const, ready: true }
 
@@ -48,6 +48,27 @@ it('kick removes the peer and broadcasts PLAYER_KICKED', () => {
 it('setMaxPlayers clamps to 2..6', () => {
   expect(setMaxPlayers(base(4), 9).state.maxPlayers).toBe(6)
   expect(setMaxPlayers(base(4), 1).state.maxPlayers).toBe(2)
+})
+
+it('setMaxPlayers demotes over-capacity players to guests when lowering the cap', () => {
+  // 6-max lobby: host + 3 players all assigned 'player'.
+  let s = base(6)
+  s = handleJoinRequest(s, 'p1', 'P1').state
+  s = handleJoinRequest(s, 'p2', 'P2').state
+  s = handleJoinRequest(s, 'p3', 'P3').state
+  expect(playerCount(s)).toBe(4)
+
+  const { state, outgoing } = setMaxPlayers(s, 2)
+  // Host keeps a slot, first joiner keeps player; the rest demoted to guest.
+  expect(state.peers.h.role).toBe('host')
+  expect(state.peers.p1.role).toBe('player')
+  expect(state.peers.p2.role).toBe('guest')
+  expect(state.peers.p3.role).toBe('guest')
+  expect(playerCount(state)).toBe(2)
+
+  // Each demotion is broadcast so guests stay consistent.
+  const demotions = outgoing.filter((o) => o.message.type === 'PEER_JOINED')
+  expect(demotions).toHaveLength(2)
 })
 
 it('canStart requires >=2 players all ready', () => {

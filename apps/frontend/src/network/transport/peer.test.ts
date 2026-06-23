@@ -87,3 +87,20 @@ it('send serializes an envelope to the target connection', async () => {
   expect(typeof frame.seq).toBe('number')
   expect(frame.from).toBe(t.id)
 })
+
+it('relay forwards a wire frame verbatim, preserving the original sender', async () => {
+  const t = await createTransport({ peerId: 'host-1', onMessage: () => {} })
+  t.connectTo('peer-2')
+  await Promise.resolve()
+
+  // A frame that originated from another peer (from: 'peer-9'), being relayed.
+  const frame = { type: 'PLAYER_READY', payload: {}, from: 'peer-9', seq: 7 } as const
+  t.relay(['peer-2'], frame)
+
+  const conn = outboundConns.get('peer-2')
+  expect(conn?.sent).toHaveLength(1)
+  const received = JSON.parse(conn?.sent[0] as string) as Record<string, unknown>
+  // The host must NOT rewrite itself as the sender when relaying.
+  expect(received.from).toBe('peer-9')
+  expect(received.seq).toBe(7)
+})
