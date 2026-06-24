@@ -1,4 +1,12 @@
-import { applyPeerJoined, applyPeerLeft, assignRole, createLobbyState, playerCount } from './state'
+import {
+  applyConfig,
+  applyPeerJoined,
+  applyPeerLeft,
+  applyPeerList,
+  assignRole,
+  createLobbyState,
+  playerCount,
+} from './state'
 
 const host = { id: 'h', name: 'Host', role: 'host' as const, ready: false }
 
@@ -32,4 +40,49 @@ it('does not mutate the input state', () => {
   const next = applyPeerJoined(s, { id: 'p1', name: 'P1', role: 'player', ready: false })
   expect(s.peers.p1).toBeUndefined()
   expect(next).not.toBe(s)
+})
+
+it('createLobbyState defaults setup to empty record', () => {
+  const s = createLobbyState({ selfId: 'h', hostId: 'h', maxPlayers: 4, peers: [] })
+  expect(s.setup).toEqual({})
+})
+
+it('createLobbyState uses provided setup', () => {
+  const setup = { handLimit: 'base', releases: 'fast' }
+  const s = createLobbyState({ selfId: 'h', hostId: 'h', maxPlayers: 4, setup, peers: [] })
+  expect(s.setup).toEqual(setup)
+})
+
+it('applyConfig updates maxPlayers, preserves setup', () => {
+  const s = createLobbyState({
+    selfId: 'h',
+    hostId: 'h',
+    maxPlayers: 4,
+    setup: { handLimit: 'base' },
+    peers: [],
+  })
+  const next = applyConfig(s, { maxPlayers: 6 })
+  expect(next.maxPlayers).toBe(6)
+  expect(next.setup).toEqual({ handLimit: 'base' })
+})
+
+it('applyConfig updates setup, preserves maxPlayers', () => {
+  const s = createLobbyState({
+    selfId: 'h',
+    hostId: 'h',
+    maxPlayers: 4,
+    setup: { handLimit: 'base' },
+    peers: [],
+  })
+  const next = applyConfig(s, { setup: { handLimit: 'memory' } })
+  expect(next.maxPlayers).toBe(4)
+  expect(next.setup).toEqual({ handLimit: 'memory' })
+})
+
+it('applyPeerList preserves setup', () => {
+  const setup = { handLimit: 'fast' }
+  const host = { id: 'h', name: 'Host', role: 'host' as const, ready: false }
+  const s = createLobbyState({ selfId: 'h', hostId: 'h', maxPlayers: 4, setup, peers: [host] })
+  const next = applyPeerList(s, [host])
+  expect(next.setup).toEqual(setup)
 })

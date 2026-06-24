@@ -1,4 +1,4 @@
-import { canStart, handleJoinRequest, handleReady, kick, setMaxPlayers } from './host'
+import { canStart, disbandLobby, handleJoinRequest, handleReady, kick, setMaxPlayers } from './host'
 import { createLobbyState, playerCount } from './state'
 
 const host = { id: 'h', name: 'Host', role: 'host' as const, ready: true }
@@ -78,4 +78,15 @@ it('canStart requires >=2 players all ready', () => {
   expect(canStart(withReady)).toBe(false) // p1 not ready
   withReady.peers.p1.ready = true
   expect(canStart(withReady)).toBe(true)
+})
+
+it('disbandLobby broadcasts LOBBY_DISBANDED without mutating state', () => {
+  const s = base(4)
+  const { state, outgoing } = disbandLobby(s)
+  expect(state).toBe(s)
+  expect(outgoing).toHaveLength(1)
+  expect(outgoing[0]).toEqual({
+    to: 'broadcast',
+    message: { type: 'LOBBY_DISBANDED', payload: {} },
+  })
 })

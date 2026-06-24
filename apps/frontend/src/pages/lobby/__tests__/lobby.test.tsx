@@ -153,6 +153,7 @@ function inSession(): UseLobby {
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
+      setup: {},
       peers: {
         h: { id: 'h', name: 'Host', role: 'host', ready: true },
         p1: { id: 'p1', name: 'Pat', role: 'player', ready: false },

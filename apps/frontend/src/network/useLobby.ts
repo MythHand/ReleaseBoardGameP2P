@@ -157,7 +157,7 @@ export function useLobby(): UseLobby {
           break
         }
         case 'LOBBY_CONFIG_UPDATED':
-          if (fromHost) commit(applyConfig(current, msg.payload.maxPlayers))
+          if (fromHost) commit(applyConfig(current, msg.payload))
           break
         case 'PLAYER_KICKED':
           if (!fromHost) break

@@ -95,7 +95,7 @@ export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
       peers[peer.id] = peer
     }
   }
-  const next = applyConfig({ ...state, peers }, clamped)
+  const next = applyConfig({ ...state, peers }, { maxPlayers: clamped })
   return {
     state: next,
     outgoing: [
@@ -127,4 +127,11 @@ export function canStart(state: LobbyState): boolean {
   return Object.values(state.peers)
     .filter((p) => p.role === 'host' || p.role === 'player')
     .every((p) => p.ready)
+}
+
+export function disbandLobby(state: LobbyState): Result {
+  return {
+    state,
+    outgoing: [{ to: 'broadcast', message: { type: 'LOBBY_DISBANDED', payload: {} } }],
+  }
 }
