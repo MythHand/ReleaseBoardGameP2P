@@ -9,8 +9,8 @@ vi.mock('@release/translation', () => ({
   }),
 }))
 
-it('renders both language buttons', () => {
+it('renders both language options', () => {
   render(<LanguageSwitch />)
-  expect(screen.getByText('language.en')).toBeTruthy()
-  expect(screen.getByText('language.ru')).toBeTruthy()
+  expect(screen.getByText('EN')).toBeTruthy()
+  expect(screen.getByText('RU')).toBeTruthy()
 })

@@ -26,10 +26,27 @@
 }
 
 .input:focus {
-  border-color: var(--brand-green);
+  outline-color: var(--brand-green);
 }
 
-/* строка «поле + trailing-элемент»: инпут тянется, элемент справа по высоте */
+.inputError {
+  border-color: var(--cat-attack);
+}
+
+.inputError:focus {
+  outline-color: var(--cat-attack);
+  border-color: var(--cat-attack);
+}
+
+.errorMsg {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cat-attack);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* row: input stretches, trailing element aligns by height */
 .row {
   display: flex;
   gap: 10px;

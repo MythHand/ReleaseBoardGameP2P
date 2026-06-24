@@ -4,15 +4,16 @@ import styles from './ModeSelect.module.css'
 export interface ModeOption {
   value: string
   label: string
-  desc: string
+  desc?: string
 }
 
 interface ModeSelectProps {
-  title: string
+  title?: string
   options: ModeOption[]
   value: string
   onChange?: (value: string) => void
   readOnly?: boolean
+  disabled?: boolean
 }
 
 // Выбор режима: заголовок + варианты в строчку + «ползунок» (подсветка),
@@ -24,6 +25,7 @@ export default function ModeSelect({
   value,
   onChange,
   readOnly = false,
+  disabled = false,
 }: ModeSelectProps) {
   const index = Math.max(
     0,
@@ -32,9 +34,9 @@ export default function ModeSelect({
 
   return (
     <div className={styles.group}>
-      <h4 className={styles.title}>{title}</h4>
+      {title && <h4 className={styles.title}>{title}</h4>}
       <div
-        className={`${styles.track} ${readOnly ? styles.readOnly : ''}`}
+        className={`${styles.track} ${readOnly ? styles.readOnly : ''} ${disabled ? styles.disabled : ''}`}
         style={{ '--n': options.length, '--i': index } as CSSProperties}
       >
         <span className={styles.thumb} aria-hidden="true" />
@@ -42,12 +44,13 @@ export default function ModeSelect({
           <button
             key={o.value}
             type="button"
+            disabled={disabled}
             className={`${styles.opt} ${i === index ? styles.active : ''}`}
-            onClick={() => !readOnly && onChange?.(o.value)}
-            tabIndex={readOnly ? -1 : 0}
+            onClick={() => !readOnly && !disabled && onChange?.(o.value)}
+            tabIndex={readOnly || disabled ? -1 : 0}
           >
             <span className={styles.label}>{o.label}</span>
-            <span className={styles.desc}>{o.desc}</span>
+            {o.desc && <span className={styles.desc}>{o.desc}</span>}
           </button>
         ))}
       </div>

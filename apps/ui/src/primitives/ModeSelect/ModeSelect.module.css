@@ -48,7 +48,12 @@
   cursor: pointer;
   background: transparent;
   border: 0;
+  border-radius: 9px;
   transition: color 200ms var(--ease-out);
+}
+
+.opt:focus-visible {
+  outline-offset: -2px;
 }
 
 /* read-only (guest): без ховера и без «руки» — менять нельзя */
@@ -58,6 +63,12 @@
 
 .track:not(.readOnly) .opt:hover {
   color: rgb(255 255 255 / 85%);
+}
+
+.disabled {
+  pointer-events: none;
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 /* активный текст — тёмный, для контраста на ярко-зелёном ползунке */

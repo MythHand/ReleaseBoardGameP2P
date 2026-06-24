@@ -1,35 +1,38 @@
-import { type InputHTMLAttributes, type ReactNode, useId } from 'react'
+import type { InputHTMLAttributes, ReactNode } from 'react'
+import { useId } from 'react'
 import styles from './Input.module.css'
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  // подпись над полем; если не задана — рендерится только инпут
-  label?: string
-  // элемент справа от поля (напр. иконочная кнопка), выровнен по высоте инпута
+export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  label?: ReactNode
+  error?: string
   trailing?: ReactNode
-  className?: string
 }
 
-// Текстовое поле в моно-стиле форм. Подпись опциональна, i18n-agnostic (текст — пропсом).
-export default function Input({ label, trailing, className = '', id, ...rest }: InputProps) {
+export default function Input({ label, error, trailing, className, id, ...rest }: InputProps) {
   const autoId = useId()
   const inputId = id ?? autoId
-  const control = <input id={inputId} className={styles.input} {...rest} />
+  const inputClassName = `${styles.input}${error ? ` ${styles.inputError}` : ''}`
 
+  // The label is associated to the input via htmlFor/id rather than wrapping it,
+  // so an interactive `trailing` control (e.g. a random-nickname / copy button)
+  // is not nested inside a <label> — clicking it would otherwise also forward a
+  // focus/activation to the text input.
   return (
-    <div className={`${styles.field} ${className}`}>
+    <div className={`${styles.field}${className ? ` ${className}` : ''}`}>
       {label && (
-        <label className={styles.label} htmlFor={inputId}>
+        <label htmlFor={inputId} className={styles.label}>
           {label}
         </label>
       )}
       {trailing ? (
         <div className={styles.row}>
-          {control}
+          <input id={inputId} className={inputClassName} {...rest} />
           {trailing}
         </div>
       ) : (
-        control
+        <input id={inputId} className={inputClassName} {...rest} />
       )}
+      {error && <span className={styles.errorMsg}>{error}</span>}
     </div>
   )
 }

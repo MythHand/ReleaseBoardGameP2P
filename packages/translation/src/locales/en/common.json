@@ -5,6 +5,7 @@
     "foundationTag": "visual layer — foundation",
     "phasesHint": "Screens (boot → lobby → game → game over) arrive in phases.",
     "enterLobby": "Play online",
+    "home": "← HOME",
     "devShowcase": "component dev showcase →"
   },
   "start": {
@@ -31,7 +32,8 @@
     "rulesTitle": "Rules",
     "randomNick": "random name",
     "authorDesign": "Game & Design:",
-    "authorDev": "Development:"
+    "authorDev": "Development:",
+    "required": "Required"
   },
   "stats": {
     "title": "Match results",
@@ -65,6 +67,69 @@
     "backToStart": "Back to start"
   },
   "language": { "en": "EN", "ru": "RU" },
+  "rules": {
+    "searchPlaceholder": "search rules…",
+    "notFound": "Nothing found",
+    "foot": "Match modes (hand limit, Fast Release, release condition, AI count) are chosen before the match — details will appear in the game creation window.",
+    "meta": ["2–6 players", "15–45 minutes", "104 cards + 21 events"],
+    "sections": [
+      {
+        "title": "Goal",
+        "body": [
+          "Be the first to place three different Release cards (Frontend, Backend, Database) in your release zone, repelling all opponents' attacks — or be the last player standing."
+        ]
+      },
+      {
+        "title": "Setup",
+        "body": [
+          "Two decks by card back colour: green — main, purple — events.",
+          "Each player: 1 Debugger card + 4 random cards (5 in hand total).",
+          "AI and Error 503 cards are not allowed at start — swap them from your hand.",
+          "Shuffle both decks and place them face down."
+        ]
+      },
+      {
+        "title": "Player turn",
+        "note": "action / draw / action / end of turn",
+        "body": [
+          "Before and after drawing you may play any number of cards (including 0).",
+          "Draw — exactly one card from the top of the main deck (mandatory).",
+          "End of turn is declared with the word \"PUSH\"; play passes clockwise."
+        ]
+      },
+      {
+        "title": "Releasing cards",
+        "body": [
+          "Release zone — place for Release cards; one of each type.",
+          "Only one release per turn; when played, discard 1 card from hand.",
+          "Opponents may immediately respond to a fresh release with a lightning attack (Bug, Out of Memory, Legacy Code, Security Bug).",
+          "Code Review is played together with Release and makes it immune to these attacks (even with Sudo). Cannot be applied to an already-placed release."
+        ]
+      },
+      {
+        "title": "Attack and defence",
+        "body": [
+          "Attack cards (lightning) are played instantly — targeting a release or a hand.",
+          "Defence: Cancel (Hotfix, Rubber Ducky, PR Approved, Rollback) and Unicorn (Not a Bug, Works on my Machine).",
+          "Sudo enhances cards with the sudo effect; Cancel does not work against the enhancement, Unicorn does.",
+          "DDoS — the only attack against a protected release and Monitoring."
+        ]
+      },
+      {
+        "title": "Trigger cards",
+        "body": [
+          "AI: when drawn, reveal to all and play a random effect from the events deck.",
+          "Error 503: when drawn, reveal to all and neutralise (Debugger, Monitoring, or sacrifice a release) — otherwise you're eliminated."
+        ]
+      },
+      {
+        "title": "End of game",
+        "body": [
+          "The game ends when a player simultaneously has three different Release cards in their release zone — or when only one player remains."
+        ]
+      }
+    ]
+  },
   "lobby": {
     "createTitle": "Create game",
     "joinTitle": "Join game",

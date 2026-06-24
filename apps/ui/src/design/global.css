@@ -25,7 +25,9 @@ h1,
 h2,
 h3,
 h4 {
-  font-family: var(--font-heading); /* заголовки — Onest */
+  font-family: var(--font-heading);
+
+  /* заголовки — Onest */
 }
 
 #root,
@@ -35,4 +37,8 @@ h4 {
 
 button {
   font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-green);
 }

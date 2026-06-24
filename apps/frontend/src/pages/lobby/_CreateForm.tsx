@@ -3,50 +3,44 @@ import type { Setup } from '@release/ui'
 import {
   Button,
   DEFAULT_SETUP,
-  GameSettings,
-  Input,
+  GAME_MODES,
   MODES_COPY_EN,
   MODES_COPY_RU,
+  ModeSelect,
 } from '@release/ui'
 import { useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useCreateLobby } from '~/features/create-lobby/useCreateLobby'
+import Form, { FormField } from '~/shared/ui/Form'
 import { card, field, input, label, MAX_PLAYER_OPTIONS } from './_ui'
 
-// Host form: create a room. Match modes are prototype-only (shown but not yet
-// carried in the lobby protocol — createRoom takes name + maxPlayers).
 export default function CreateForm() {
   const { t, i18n } = useTranslation()
   const modesCopy = i18n.language.startsWith('en') ? MODES_COPY_EN : MODES_COPY_RU
   const createLobby = useCreateLobby()
   const connecting = useSession().status === 'connecting'
 
-  const [name, setName] = useState('')
   const [maxPlayers, setMaxPlayers] = useState(4)
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
   const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
 
-  const canCreate = name.trim().length > 0 && !connecting
-  const create = () => {
-    if (canCreate) createLobby(name.trim(), maxPlayers)
-  }
-
   return (
-    <form
+    <Form
       className={`${card} flex flex-col gap-4`}
-      onSubmit={(e) => {
-        e.preventDefault()
-        create()
+      onSubmit={(data) => {
+        const name = data.name?.trim() ?? ''
+        if (name && !connecting) createLobby(name, maxPlayers)
       }}
+      requiredMessage={t('start.required')}
     >
       <h2 className="font-bold text-lg tracking-base">{t('lobby.createTitle')}</h2>
 
-      <Input
+      <FormField
+        name="name"
         label={t('lobby.namePlaceholder')}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
         placeholder={t('lobby.namePlaceholder')}
         maxLength={20}
+        required
       />
 
       <label className={field}>
@@ -67,13 +61,28 @@ export default function CreateForm() {
       <details className="text-sm">
         <summary className={`${label} cursor-pointer`}>{t('lobby.modes')}</summary>
         <div className="mt-3 flex flex-col gap-3">
-          <GameSettings setup={setup} onChange={setMode} copy={modesCopy} />
+          {GAME_MODES.map((m) => {
+            const mc = modesCopy[m.key]
+            return (
+              <ModeSelect
+                key={m.key}
+                title={mc?.title ?? ''}
+                options={m.options.map((o) => ({
+                  value: o.value,
+                  label: o.label,
+                  desc: mc?.options[o.value] ?? '',
+                }))}
+                value={setup[m.key] ?? ''}
+                onChange={(v) => setMode(m.key, v)}
+              />
+            )
+          })}
         </div>
       </details>
 
-      <Button onClick={create} disabled={!canCreate}>
+      <Button type="submit" disabled={connecting}>
         {t('lobby.create')}
       </Button>
-    </form>
+    </Form>
   )
 }

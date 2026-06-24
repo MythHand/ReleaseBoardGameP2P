@@ -3,7 +3,7 @@ import styles from './Rules.module.css'
 
 // Текст правил по docs/rules-board-game.md (сжато и структурно).
 // Вынесен в данные, чтобы работал поиск; формулировки — без изменений.
-interface Section {
+export interface RulesSection {
   title: string
   note?: string
   body: string[]
@@ -11,7 +11,7 @@ interface Section {
 
 const META = ['2–6 игроков', '15–45 минут', '104 карты + 21 событие']
 
-const SECTIONS: Section[] = [
+const SECTIONS: RulesSection[] = [
   {
     title: 'Цель',
     body: [
@@ -72,16 +72,32 @@ const SECTIONS: Section[] = [
 const FOOT =
   'Режимы (лимит руки, Fast Release, условие релиза, кол-во AI) выбираются перед партией — подробности появятся в окне создания игры.'
 
-export default function Rules() {
+export interface RulesProps {
+  meta?: string[]
+  sections?: RulesSection[]
+  foot?: string
+  searchPlaceholder?: string
+  notFoundText?: string
+}
+
+// Presentational + i18n-agnostic: copy is passed in as props (in-game callers
+// use the bundled RU defaults; the frontend modal injects translated strings).
+export default function Rules({
+  meta = META,
+  sections = SECTIONS,
+  foot = FOOT,
+  searchPlaceholder = 'поиск по правилам…',
+  notFoundText = 'Ничего не найдено',
+}: RulesProps = {}) {
   const [q, setQ] = useState('')
   const query = q.trim().toLowerCase()
 
-  const matches = (s: Section) => {
+  const matches = (s: RulesSection) => {
     if (!query) return true
     const hay = [s.title, s.note, ...s.body].filter(Boolean).join(' ').toLowerCase()
     return hay.includes(query)
   }
-  const shown = SECTIONS.filter(matches)
+  const shown = sections.filter(matches)
 
   return (
     <div className={styles.rules}>
@@ -89,12 +105,12 @@ export default function Rules() {
         className={styles.search}
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="поиск по правилам…"
+        placeholder={searchPlaceholder}
       />
 
       {!query && (
         <ul className={styles.meta}>
-          {META.map((m) => (
+          {meta.map((m) => (
             <li key={m}>{m}</li>
           ))}
         </ul>
@@ -116,9 +132,9 @@ export default function Rules() {
         </section>
       ))}
 
-      {shown.length === 0 && <p className={styles.empty}>Ничего не найдено</p>}
+      {shown.length === 0 && <p className={styles.empty}>{notFoundText}</p>}
 
-      {!query && <p className={styles.foot}>{FOOT}</p>}
+      {!query && <p className={styles.foot}>{foot}</p>}
     </div>
   )
 }
