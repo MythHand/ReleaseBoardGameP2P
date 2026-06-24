@@ -98,8 +98,9 @@ case 'LOBBY_DISBANDED':
 ### Part 2 — LobbyView component
 
 **Files changed:**
-- `apps/frontend/src/pages/lobby/_SessionView.tsx` (rewrite in-place with full lobby design)
-- `apps/frontend/src/pages/lobby/_LobbyFlow.tsx` (update: handle `'disbanded'` status)
+- `apps/frontend/src/pages/lobby/_LobbyView.tsx` (new — full lobby design)
+- `apps/frontend/src/pages/lobby/_LobbyFlow.tsx` (update: render `<LobbyView />` instead of `<SessionView />`; handle `'disbanded'` status)
+- `apps/frontend/src/pages/lobby/_SessionView.tsx` (delete — replaced by `_LobbyView.tsx`)
 
 #### Layout
 
