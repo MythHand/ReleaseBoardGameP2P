@@ -7,7 +7,7 @@ export default function LanguageSwitch() {
   const { i18n, t } = useTranslation()
   const langs = ['en', 'ru'] as const
   return (
-    <div className="fixed top-4 right-4 inline-flex gap-0.5 rounded-lg border border-fg/10 bg-surface-1 p-0.5">
+    <div className="fixed top-4 right-4 z-10 inline-flex gap-0.5 rounded-lg border border-fg/10 bg-surface-1 p-0.5">
       {langs.map((lng) => {
         const selected = i18n.resolvedLanguage === lng
         return (

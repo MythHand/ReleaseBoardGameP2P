@@ -31,7 +31,8 @@
     "rulesTitle": "Rules",
     "randomNick": "random name",
     "authorDesign": "Game & Design:",
-    "authorDev": "Development:"
+    "authorDev": "Development:",
+    "required": "Required"
   },
   "stats": {
     "title": "Match results",

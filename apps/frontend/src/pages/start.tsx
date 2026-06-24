@@ -73,14 +73,14 @@ export default function StartPage() {
             {t('start.description')}
           </p>
 
-          <Menu className="-ml-[11px]">
+          <Menu className="-ml-[11px] items-center">
             <MenuButton autoFocus value="create" onClick={handleMenuClick}>
               {t('start.createGame')}
             </MenuButton>
             <MenuButton value="join" onClick={handleMenuClick}>
               {t('start.joinGame')}
             </MenuButton>
-            <div className="mt-9 flex flex-col pt-6">
+            <div className="flex flex-col pt-6">
               <MenuButton value="rules" onClick={handleMenuClick}>
                 {t('start.rules')}
               </MenuButton>

@@ -31,7 +31,8 @@
     "rulesTitle": "Правила",
     "randomNick": "случайный ник",
     "authorDesign": "Game & Design:",
-    "authorDev": "Development:"
+    "authorDev": "Development:",
+    "required": "Обязательное поле"
   },
   "stats": {
     "title": "Итоги партии",

@@ -28,3 +28,19 @@
 .input:focus {
   border-color: var(--brand-green);
 }
+
+.inputError {
+  border-color: var(--cat-attack);
+}
+
+.inputError:focus {
+  border-color: var(--cat-attack);
+}
+
+.errorMsg {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cat-attack);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
