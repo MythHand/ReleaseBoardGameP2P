@@ -33,7 +33,8 @@
     "randomNick": "случайный ник",
     "authorDesign": "Game & Design:",
     "authorDev": "Development:",
-    "required": "Обязательное поле"
+    "required": "Обязательное поле",
+    "continueSession": "продолжить сессию"
   },
   "stats": {
     "title": "Итоги партии",
@@ -162,6 +163,11 @@
     "activeSession": "Вы уже в сессии",
     "continue": "Продолжить",
     "back": "Назад",
-    "drop": "Покинуть сессию"
+    "drop": "Покинуть сессию",
+    "modesLockedHint": "настраивает хост",
+    "disbandTitle": "Расформировать лобби?",
+    "disbandConfirm": "Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить.",
+    "disband": "расформировать",
+    "disbandedMessage": "Лобби было расформировано."
   }
 }
