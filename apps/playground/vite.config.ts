@@ -5,9 +5,10 @@ import { defineConfig } from 'vite'
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 
 export default defineConfig({
-  // Served under /playground/ — both for the frontend dev proxy and prod
-  // co-location behind one origin. BrowserRouter uses a matching basename.
-  base: '/playground/',
+  // Served under /playground/ in dev; in prod it is co-located under the
+  // frontend's base path (e.g. /ReleaseBoardGameP2P/playground/) via
+  // VITE_BASE_URL. BrowserRouter derives its basename from import.meta.env.BASE_URL.
+  base: process.env.VITE_BASE_URL ?? '/playground/',
   plugins: [react()],
   resolve: {
     alias: [

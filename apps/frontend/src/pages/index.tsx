@@ -17,9 +17,10 @@ export default function Index() {
       >
         {t('app.enterLobby')}
       </Link>
-      {/* Plain anchor: the playground is a separate app served at /playground/, outside this router. */}
+      {/* Plain anchor: the playground is a separate app served under the app's
+          base path (BASE_URL + "playground/"), outside this router. */}
       <a
-        href="/playground/"
+        href={`${import.meta.env.BASE_URL}playground/`}
         className="text-fg/50 text-sm underline transition-colors hover:text-fg/80"
       >
         {t('app.devShowcase')}
