@@ -24,7 +24,12 @@ export default function SessionView() {
 
   const peers = Object.values(state.peers)
   const self = state.peers[state.selfId]
-  const shareUrl = session.roomCode ? `${window.location.origin}/lobby/${session.roomCode}` : ''
+  // Include the Vite base path (import.meta.env.BASE_URL, e.g. "/ReleaseBoardGameP2P/"
+  // on Pages, "/" in dev) so the invite link resolves under the deployed sub-path
+  // instead of the domain root. BASE_URL always ends with a slash.
+  const shareUrl = session.roomCode
+    ? `${window.location.origin}${import.meta.env.BASE_URL}lobby/${session.roomCode}`
+    : ''
   const copyShareLink = () => {
     navigator.clipboard?.writeText(shareUrl)
     setCopied(true)
