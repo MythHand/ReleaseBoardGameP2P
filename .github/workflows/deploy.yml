@@ -41,6 +41,12 @@ jobs:
         env:
           VITE_BASE_URL: /ReleaseBoardGameP2P/
 
+      # SPA fallback: @generouted/react-router uses the history API, so deep
+      # links / hard refreshes (e.g. /lobby) would 404 on Pages without a
+      # catch-all. Serving index.html as 404.html lets the client router resolve.
+      - name: Add SPA 404 fallback
+        run: cp apps/frontend/dist/index.html apps/frontend/dist/404.html
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
