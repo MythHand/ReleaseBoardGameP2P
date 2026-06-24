@@ -1,6 +1,5 @@
 import { useTranslation } from '@release/translation'
 import { Link, Outlet, useLocation, useRouteError } from 'react-router'
-import AppModals from '~/app/AppModals'
 import { SessionProvider } from '~/app/providers/SessionProvider'
 import ErrorScreen from '~/shared/ui/ErrorScreen'
 import LanguageSwitch from '~/shared/ui/LanguageSwitch'
@@ -21,7 +20,6 @@ export default function App() {
         )}
         <LanguageSwitch />
         <Outlet />
-        <AppModals />
       </div>
     </SessionProvider>
   )
