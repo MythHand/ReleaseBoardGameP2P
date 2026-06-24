@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* Bridge the @release/ui design tokens (defined in tokens.css :root) into the
+   Tailwind v4 theme so utilities resolve to the SAME CSS variables. */
+@theme {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-brand-green: var(--brand-green);
+  --color-cat-release: var(--cat-release);
+  --color-cat-attack: var(--cat-attack);
+  --color-cat-protection: var(--cat-protection);
+  --color-cat-defense: var(--cat-defense);
+  --color-cat-operation: var(--cat-operation);
+  --color-cat-support: var(--cat-support);
+  --color-cat-ai: var(--cat-ai);
+  --color-cat-trigger: var(--cat-trigger);
+
+  /* Letter-spacing token → `tracking-base` utility */
+  --tracking-base: var(--tracking);
+}
+
+/* Lobby→board slide via the native View Transitions API. The helper guards
+   reduced motion in JS; this also disables the animation at the CSS layer. */
+@keyframes vt-slide-out-left {
+  to {
+    opacity: 0;
+    transform: translateX(-3%);
+  }
+}
+
+@keyframes vt-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(3%);
+  }
+}
+
+::view-transition-old(root) {
+  animation: 220ms ease both vt-slide-out-left;
+}
+
+::view-transition-new(root) {
+  animation: 240ms ease both vt-slide-in-right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}

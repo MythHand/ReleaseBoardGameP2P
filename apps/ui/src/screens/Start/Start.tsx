@@ -51,12 +51,20 @@ export interface StartCopy {
   modes: GameModesCopy
 }
 
-export default function Start({ copy }: { copy: StartCopy }) {
+interface StartProps {
+  copy: StartCopy
+  // точки подключения сетевой логики (создание/вход) — реализует консьюмер
+  onCreate?: (nickname: string) => void
+  onJoin?: (nickname: string, code: string) => void
+}
+
+export default function Start({ copy, onCreate, onJoin }: StartProps) {
   const [modal, setModal] = useState<'create' | 'join' | 'rules' | null>(null)
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
   // никнейм нужен до создания/входа: лобби должно сразу показать игрока
   const [host, setHost] = useState('')
   const [joinName, setJoinName] = useState('')
+  const [joinCode, setJoinCode] = useState('')
   const [videoMounted, setVideoMounted] = useState(false)
   const [videoOpen, setVideoOpen] = useState(false)
   const close = () => setModal(null)
@@ -195,7 +203,14 @@ export default function Start({ copy }: { copy: StartCopy }) {
               }
             />
 
-            <Button onClick={close}>{copy.createCta}</Button>
+            <Button
+              onClick={() => {
+                onCreate?.(host)
+                close()
+              }}
+            >
+              {copy.createCta}
+            </Button>
 
             <p className={styles.note}>{copy.lobbyNote}</p>
           </div>
@@ -220,8 +235,20 @@ export default function Start({ copy }: { copy: StartCopy }) {
             </Button>
           }
         />
-        <Input label={copy.gameCodeLabel} placeholder={copy.gameCodePlaceholder} />
-        <Button onClick={close}>{copy.joinCta}</Button>
+        <Input
+          label={copy.gameCodeLabel}
+          value={joinCode}
+          onChange={(e) => setJoinCode(e.target.value)}
+          placeholder={copy.gameCodePlaceholder}
+        />
+        <Button
+          onClick={() => {
+            onJoin?.(joinName, joinCode)
+            close()
+          }}
+        >
+          {copy.joinCta}
+        </Button>
       </Modal>
 
       <Modal open={modal === 'rules'} onClose={close} title={copy.rulesTitle}>

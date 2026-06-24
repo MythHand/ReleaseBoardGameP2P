@@ -50,6 +50,25 @@
   border-color: rgb(255 255 255 / 55%);
 }
 
+/* деструктивная — как tech, но красный акцент */
+.danger {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #ff6b81;
+  letter-spacing: 0.18em;
+  border: 1px solid rgb(255 107 129 / 45%);
+  border-radius: 4px;
+  transition: color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out);
+}
+
+.danger:hover {
+  color: #fff;
+  background: rgb(255 107 129 / 12%);
+  border-color: #ff6b81;
+}
+
 /* иконочная — фиксированный квадрат под высоту поля ввода (52px).
    aspect-ratio у flex-элемента не годится: ширина считается до растяжки по высоте. */
 .icon {
