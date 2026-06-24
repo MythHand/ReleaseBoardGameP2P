@@ -8,9 +8,11 @@ import {
   ModeSelect,
   randomNickname,
   type Setup,
+  sanitizeNickname,
 } from '@release/ui'
 import { useState } from 'react'
 import DiceIcon from '@/icons/DiceIcon'
+import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import Form, { FormField } from '~/shared/ui/Form'
 import { useCreateLobby } from './useCreateLobby'
@@ -20,14 +22,18 @@ export default function CreateLobbyForm() {
   const modesCopy = i18n.language.startsWith('en') ? MODES_COPY_EN : MODES_COPY_RU
   const navigate = useNavigate()
   const createLobby = useCreateLobby()
+  const connecting = useSession().status === 'connecting'
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
   const [name, setName] = useState('')
 
   return (
     <Form
       onSubmit={(data) => {
-        createLobby(data.name, 4)
-        navigate('/lobby')
+        const name = sanitizeNickname(data.name ?? '').trim()
+        if (name && !connecting) {
+          createLobby(name, 4)
+          navigate('/lobby')
+        }
       }}
       requiredMessage={t('start.required')}
     >
@@ -62,7 +68,7 @@ export default function CreateLobbyForm() {
             maxLength={20}
             required
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setName(sanitizeNickname(e.target.value))}
             trailing={
               <Button
                 variant="icon"
@@ -74,7 +80,9 @@ export default function CreateLobbyForm() {
               </Button>
             }
           />
-          <Button type="submit">{t('start.createCta')}</Button>
+          <Button type="submit" disabled={connecting}>
+            {t('start.createCta')}
+          </Button>
           <p className="mt-auto mb-0 text-[13px] text-white/50 leading-[1.55]">
             {t('start.lobbyNote')}
           </p>

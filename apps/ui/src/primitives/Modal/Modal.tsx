@@ -35,7 +35,11 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
     setShown(false)
     const t = setTimeout(() => {
       setMounted(false)
-      returnRef.current?.focus()
+      // Only restore focus if the trigger is still in the document. After a
+      // submit that navigates away the trigger is unmounted, and focusing a
+      // detached node is a silent no-op that strands focus at the document root.
+      if (returnRef.current?.isConnected) returnRef.current.focus()
+      returnRef.current = null
     }, 380)
     return () => clearTimeout(t)
   }, [open])
@@ -48,13 +52,12 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
   }, [shown])
 
   // Keyboard: Escape to close + Tab-cycle focus trap.
-  // Listener is on the dialog element (not window) so it fires before the
-  // dialog's React onKeyDown stopPropagation, which would otherwise swallow
-  // the event before it reaches a window-level listener.
+  // The listener is on `window` in the CAPTURE phase so it (a) fires for Escape
+  // even when focus has left the dialog (e.g. a click on the presentational
+  // backdrop) and (b) runs before the dialog's bubble-phase onKeyDown
+  // stopPropagation, which would otherwise swallow the event.
   useEffect(() => {
     if (!mounted) return
-    const dialog = dialogRef.current
-    if (!dialog) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
@@ -62,10 +65,13 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
         return
       }
       if (e.key !== 'Tab') return
+      const dialog = dialogRef.current
+      if (!dialog) return
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
       if (focusable.length === 0) return
       // Always drive Tab manually so Safari (which skips buttons by default)
-      // still cycles through every focusable element inside the dialog.
+      // still cycles through every focusable element inside the dialog; a -1
+      // index (focus outside the dialog) pulls it back to the first/last item.
       e.preventDefault()
       const current = focusable.indexOf(document.activeElement as HTMLElement)
       if (e.shiftKey) {
@@ -74,8 +80,8 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
         focusable[current >= focusable.length - 1 ? 0 : current + 1].focus()
       }
     }
-    dialog.addEventListener('keydown', onKeyDown)
-    return () => dialog.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [mounted, onClose])
 
   if (!mounted) return null

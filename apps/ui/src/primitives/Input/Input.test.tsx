@@ -20,9 +20,9 @@ it('calls onChange when the input value changes', () => {
   expect(onChange).toHaveBeenCalledOnce()
 })
 
-it('wraps the input inside a label element', () => {
-  const { getByRole } = render(<Input label="Nickname" />)
-  expect(getByRole('textbox').closest('label')).toBeTruthy()
+it('associates the label with the input via htmlFor', () => {
+  const { getByLabelText } = render(<Input label="Nickname" />)
+  expect(getByLabelText('Nickname')).toBeTruthy()
 })
 
 it('shows error message and applies error class', () => {

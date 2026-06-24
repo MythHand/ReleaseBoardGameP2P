@@ -13,9 +13,17 @@ export default function Input({ label, error, trailing, className, id, ...rest }
   const inputId = id ?? autoId
   const inputClassName = `${styles.input}${error ? ` ${styles.inputError}` : ''}`
 
+  // The label is associated to the input via htmlFor/id rather than wrapping it,
+  // so an interactive `trailing` control (e.g. a random-nickname / copy button)
+  // is not nested inside a <label> — clicking it would otherwise also forward a
+  // focus/activation to the text input.
   return (
-    <label htmlFor={inputId} className={`${styles.field}${className ? ` ${className}` : ''}`}>
-      {label && <span className={styles.label}>{label}</span>}
+    <div className={`${styles.field}${className ? ` ${className}` : ''}`}>
+      {label && (
+        <label htmlFor={inputId} className={styles.label}>
+          {label}
+        </label>
+      )}
       {trailing ? (
         <div className={styles.row}>
           <input id={inputId} className={inputClassName} {...rest} />
@@ -25,6 +33,6 @@ export default function Input({ label, error, trailing, className, id, ...rest }
         <input id={inputId} className={inputClassName} {...rest} />
       )}
       {error && <span className={styles.errorMsg}>{error}</span>}
-    </label>
+    </div>
   )
 }

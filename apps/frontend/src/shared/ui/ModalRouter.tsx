@@ -16,13 +16,26 @@ interface ModalRouterProps {
 
 export function useModalRoute(param = 'modal') {
   const [, setParams] = useSearchParams()
-  return (e: MouseEvent<HTMLButtonElement>) => setParams({ [param]: e.currentTarget.value })
+  // Merge into the current query so any unrelated params (e.g. invite/ref) survive.
+  return (e: MouseEvent<HTMLButtonElement>) => {
+    const value = e.currentTarget.value
+    setParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set(param, value)
+      return next
+    })
+  }
 }
 
 export default function ModalRouter({ param = 'modal', routes }: ModalRouterProps) {
   const [params, setParams] = useSearchParams()
   const active = params.get(param)
-  const close = () => setParams({})
+  const close = () =>
+    setParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete(param)
+      return next
+    })
 
   const config = active ? routes[active] : null
   // Preserve content during exit animation so it doesn't flash empty while fading out
