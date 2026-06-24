@@ -1,17 +1,62 @@
+import type { InputFieldProps } from '@release/ui'
+import { InputField } from '@release/ui'
 import type { FormHTMLAttributes } from 'react'
+import { createContext, useContext, useState } from 'react'
 
-interface FormProps extends Omit<FormHTMLAttributes<HTMLFormElement>, 'onSubmit'> {
-  onSubmit: () => void
+type Errors = Record<string, string>
+
+const FormCtx = createContext<Errors>({})
+
+function useFormError(name: string): string {
+  return useContext(FormCtx)[name] ?? ''
 }
 
-export default function Form({ onSubmit, ...rest }: FormProps) {
+export function FormField({ name = '', error, ...rest }: InputFieldProps) {
+  const contextError = useFormError(name)
+  return <InputField name={name} error={error ?? (contextError || undefined)} {...rest} />
+}
+
+interface FormProps extends Omit<FormHTMLAttributes<HTMLFormElement>, 'onSubmit'> {
+  onSubmit: (data: Record<string, string>) => void
+  requiredMessage?: string
+}
+
+export default function Form({ onSubmit, requiredMessage = 'Required', ...rest }: FormProps) {
+  const [errors, setErrors] = useState<Errors>({})
+
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        onSubmit()
-      }}
-      {...rest}
-    />
+    <FormCtx.Provider value={errors}>
+      <form
+        noValidate
+        {...rest}
+        onSubmit={(e) => {
+          e.preventDefault()
+          const newErrors: Errors = {}
+          for (const el of Array.from(e.currentTarget.elements)) {
+            const input = el as HTMLInputElement
+            if (input.name && input.required && !input.value.trim()) {
+              newErrors[input.name] = requiredMessage
+            }
+          }
+          if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors)
+            return
+          }
+          setErrors({})
+          onSubmit(Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>)
+        }}
+        onChange={(e) => {
+          const input = e.target as unknown as HTMLInputElement
+          if (input.name && errors[input.name]) {
+            setErrors((prev) => {
+              const next = { ...prev }
+              delete next[input.name]
+              return next
+            })
+          }
+          rest.onChange?.(e)
+        }}
+      />
+    </FormCtx.Provider>
   )
 }

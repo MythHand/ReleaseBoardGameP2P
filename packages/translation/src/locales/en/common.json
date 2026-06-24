@@ -5,6 +5,7 @@
     "foundationTag": "visual layer — foundation",
     "phasesHint": "Screens (boot → lobby → game → game over) arrive in phases.",
     "enterLobby": "Play online",
+    "home": "← HOME",
     "devShowcase": "component dev showcase →"
   },
   "start": {
