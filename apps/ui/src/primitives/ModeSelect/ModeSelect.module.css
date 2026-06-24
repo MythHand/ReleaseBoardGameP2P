@@ -48,7 +48,13 @@
   cursor: pointer;
   background: transparent;
   border: 0;
+  border-radius: 9px;
   transition: color 200ms var(--ease-out);
+}
+
+.opt:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: -2px;
 }
 
 /* read-only (guest): без ховера и без «руки» — менять нельзя */

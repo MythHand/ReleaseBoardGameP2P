@@ -47,12 +47,20 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
     ;(first ?? dialogRef.current).focus()
   }, [shown])
 
-  // Tab-cycle focus trap
+  // Keyboard: Escape to close + Tab-cycle focus trap.
+  // Listener is on the dialog element (not window) so it fires before the
+  // dialog's React onKeyDown stopPropagation, which would otherwise swallow
+  // the event before it reaches a window-level listener.
   useEffect(() => {
     if (!mounted) return
     const dialog = dialogRef.current
     if (!dialog) return
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        return
+      }
       if (e.key !== 'Tab') return
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
       if (focusable.length === 0) return
@@ -72,14 +80,6 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
     }
     dialog.addEventListener('keydown', onKeyDown)
     return () => dialog.removeEventListener('keydown', onKeyDown)
-  }, [mounted])
-
-  // Escape to close
-  useEffect(() => {
-    if (!mounted) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose?.()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
   }, [mounted, onClose])
 
   if (!mounted) return null

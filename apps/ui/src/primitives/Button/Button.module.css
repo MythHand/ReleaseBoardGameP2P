@@ -17,6 +17,11 @@
   opacity: 0.4;
 }
 
+.btn:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 3px;
+}
+
 /* основная — брекеты [ TEXT ] */
 .primary {
   padding: 10px 2px;
@@ -69,13 +74,12 @@
   border-color: #ff6b81;
 }
 
-/* иконочная — фиксированный квадрат под высоту поля ввода (52px).
-   aspect-ratio у flex-элемента не годится: ширина считается до растяжки по высоте. */
+/* иконочная — квадрат, высота от flex-родителя (stretch) или min 52px standalone. */
 .icon {
   flex: none;
   justify-content: center;
-  inline-size: 52px;
-  block-size: 52px;
+  min-block-size: 52px;
+  aspect-ratio: 1;
   padding: 0;
   font-size: 20px;
   color: rgb(255 255 255 / 65%);

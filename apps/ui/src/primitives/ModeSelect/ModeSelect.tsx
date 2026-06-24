@@ -4,11 +4,11 @@ import styles from './ModeSelect.module.css'
 export interface ModeOption {
   value: string
   label: string
-  desc: string
+  desc?: string
 }
 
 interface ModeSelectProps {
-  title: string
+  title?: string
   options: ModeOption[]
   value: string
   onChange?: (value: string) => void
@@ -34,7 +34,7 @@ export default function ModeSelect({
 
   return (
     <div className={styles.group}>
-      <h4 className={styles.title}>{title}</h4>
+      {title && <h4 className={styles.title}>{title}</h4>}
       <div
         className={`${styles.track} ${readOnly ? styles.readOnly : ''} ${disabled ? styles.disabled : ''}`}
         style={{ '--n': options.length, '--i': index } as CSSProperties}
@@ -50,7 +50,7 @@ export default function ModeSelect({
             tabIndex={readOnly || disabled ? -1 : 0}
           >
             <span className={styles.label}>{o.label}</span>
-            <span className={styles.desc}>{o.desc}</span>
+            {o.desc && <span className={styles.desc}>{o.desc}</span>}
           </button>
         ))}
       </div>

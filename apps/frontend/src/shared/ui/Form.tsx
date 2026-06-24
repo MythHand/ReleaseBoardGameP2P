@@ -1,5 +1,5 @@
-import type { InputFieldProps } from '@release/ui'
-import { InputField } from '@release/ui'
+import type { InputProps } from '@release/ui'
+import { Input } from '@release/ui'
 import type { FormHTMLAttributes } from 'react'
 import { createContext, useContext, useState } from 'react'
 
@@ -11,9 +11,9 @@ function useFormError(name: string): string {
   return useContext(FormCtx)[name] ?? ''
 }
 
-export function FormField({ name = '', error, ...rest }: InputFieldProps) {
+export function FormField({ name = '', error, ...rest }: InputProps) {
   const contextError = useFormError(name)
-  return <InputField name={name} error={error ?? (contextError || undefined)} {...rest} />
+  return <Input name={name} error={error ?? (contextError || undefined)} {...rest} />
 }
 
 interface FormProps extends Omit<FormHTMLAttributes<HTMLFormElement>, 'onSubmit'> {
