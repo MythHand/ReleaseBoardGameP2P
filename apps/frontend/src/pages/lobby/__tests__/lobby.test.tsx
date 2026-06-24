@@ -34,6 +34,8 @@ function base(): UseLobby {
     kick: vi.fn(),
     setMaxPlayers: vi.fn(),
     transferHost: vi.fn(),
+    setSetup: vi.fn(),
+    disband: vi.fn(),
     leaveSession: vi.fn(),
     clearError: vi.fn(),
   }
@@ -153,7 +155,13 @@ function inSession(): UseLobby {
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
-      setup: {},
+      setup: {
+        handLimit: 'base',
+        releases: 'base',
+        releaseCond: 'base',
+        ai: 'base',
+        gitBranch: 'base',
+      },
       peers: {
         h: { id: 'h', name: 'Host', role: 'host', ready: true },
         p1: { id: 'p1', name: 'Pat', role: 'player', ready: false },

@@ -1,6 +1,8 @@
+import { DEFAULT_SETUP } from '@release/ui'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   canStart as canStartFn,
+  disbandLobby as disbandLobbyFn,
   handleJoinRequest,
   handleReady,
   kick as kickFn,
@@ -18,7 +20,7 @@ import {
 } from './lobby/state'
 import { relayTargets } from './session/relay'
 import { createTransport, type Transport } from './transport/peer'
-import type { PeerInfo, WireMessage } from './types'
+import type { PeerInfo, Setup, WireMessage } from './types'
 
 // Room codes double as the host's PeerJS id, so the displayed code is exactly
 // what a joiner connects to — formatRoomCode/parseRoomCode are inverses.
@@ -42,7 +44,7 @@ export function parseRoomCode(code: string): string {
   return code.replace(/[^a-z0-9]/gi, '').toLowerCase()
 }
 
-export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'error'
+export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'disbanded' | 'error'
 
 export interface UseLobby {
   state: LobbyState | null
@@ -57,6 +59,8 @@ export interface UseLobby {
   kick(peerId: string): void
   setMaxPlayers(n: number): void
   transferHost(id: string): void
+  setSetup(setup: Setup): void
+  disband(): void
   leaveSession(): void
   clearError(): void
 }
@@ -70,6 +74,7 @@ export function useLobby(): UseLobby {
   const transportRef = useRef<Transport | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
+  const leaveSessionRef = useRef<() => void>(() => {})
 
   const onError = useCallback((err: { type?: string; message: string }) => {
     // A connection-level error after the lobby is up shouldn't tear down the
@@ -164,6 +169,12 @@ export function useLobby(): UseLobby {
           if (msg.payload.peerId === current.selfId) setStatus('kicked')
           else commit(applyPeerLeft(current, msg.payload.peerId))
           break
+        case 'LOBBY_DISBANDED':
+          if (fromHost) {
+            leaveSessionRef.current()
+            setStatus('disbanded')
+          }
+          break
         default:
           break
       }
@@ -186,6 +197,7 @@ export function useLobby(): UseLobby {
         selfId: t.id,
         hostId: t.id,
         maxPlayers,
+        setup: DEFAULT_SETUP,
         peers: [{ id: t.id, name, role: 'host', ready: true }],
       })
       commit(initial)
@@ -224,6 +236,7 @@ export function useLobby(): UseLobby {
           selfId: t.id,
           hostId,
           maxPlayers: 6,
+          setup: DEFAULT_SETUP,
           peers: [{ id: t.id, name, role: 'guest', ready: false }],
         }),
       )
@@ -296,6 +309,25 @@ export function useLobby(): UseLobby {
     setError(null)
     setIsHost(false)
   }, [])
+  leaveSessionRef.current = leaveSession
+
+  const setSetup = useCallback(
+    (setup: Setup) => {
+      const current = stateRef.current
+      if (!current || !isHostRef.current) return
+      commit(applyConfig(current, { setup }))
+      dispatch([{ to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { setup } } }])
+    },
+    [commit, dispatch],
+  )
+
+  const disband = useCallback(() => {
+    const current = stateRef.current
+    if (!current || !isHostRef.current) return
+    const r = disbandLobbyFn(current)
+    dispatch(r.outgoing)
+    leaveSession()
+  }, [dispatch, leaveSession])
 
   // Dismiss a sticky error (e.g. a failed join) without tearing down a live
   // session. Returns the status to idle only when it was 'error', so calling
@@ -323,6 +355,8 @@ export function useLobby(): UseLobby {
       kick,
       setMaxPlayers,
       transferHost,
+      setSetup,
+      disband,
       leaveSession,
       clearError,
     }),
@@ -338,6 +372,8 @@ export function useLobby(): UseLobby {
       kick,
       setMaxPlayers,
       transferHost,
+      setSetup,
+      disband,
       leaveSession,
       clearError,
     ],
