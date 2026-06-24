@@ -1,13 +1,11 @@
 import { useTranslation } from '@release/translation'
-import { Button, Input } from '@release/ui'
+import { Button, InputField } from '@release/ui'
 import { useState } from 'react'
 import { useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useJoinLobby } from '~/features/join-lobby/useJoinLobby'
 import { card } from './_ui'
 
-// Guest form: connect to a room. The code is pre-filled from a shared
-// `/lobby/:lobbyId` invite link when present.
 export default function JoinForm() {
   const { t } = useTranslation()
   const joinLobby = useJoinLobby()
@@ -32,21 +30,22 @@ export default function JoinForm() {
     >
       <h2 className="font-bold text-lg tracking-base">{t('lobby.joinTitle')}</h2>
 
-      <Input
+      <InputField
         label={t('lobby.namePlaceholder')}
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder={t('lobby.namePlaceholder')}
         maxLength={20}
       />
-      <Input
+
+      <InputField
         label={t('lobby.code')}
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder={t('lobby.codePlaceholder')}
       />
 
-      <Button onClick={join} disabled={!canJoin}>
+      <Button type="submit" disabled={!canJoin}>
         {t('lobby.join')}
       </Button>
     </form>

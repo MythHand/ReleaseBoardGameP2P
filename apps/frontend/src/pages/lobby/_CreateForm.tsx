@@ -4,7 +4,7 @@ import {
   Button,
   DEFAULT_SETUP,
   GameSettings,
-  Input,
+  InputField,
   MODES_COPY_EN,
   MODES_COPY_RU,
 } from '@release/ui'
@@ -13,8 +13,6 @@ import { useSession } from '~/app/providers/SessionProvider'
 import { useCreateLobby } from '~/features/create-lobby/useCreateLobby'
 import { card, field, input, label, MAX_PLAYER_OPTIONS } from './_ui'
 
-// Host form: create a room. Match modes are prototype-only (shown but not yet
-// carried in the lobby protocol — createRoom takes name + maxPlayers).
 export default function CreateForm() {
   const { t, i18n } = useTranslation()
   const modesCopy = i18n.language.startsWith('en') ? MODES_COPY_EN : MODES_COPY_RU
@@ -41,7 +39,7 @@ export default function CreateForm() {
     >
       <h2 className="font-bold text-lg tracking-base">{t('lobby.createTitle')}</h2>
 
-      <Input
+      <InputField
         label={t('lobby.namePlaceholder')}
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -71,7 +69,7 @@ export default function CreateForm() {
         </div>
       </details>
 
-      <Button onClick={create} disabled={!canCreate}>
+      <Button type="submit" disabled={!canCreate}>
         {t('lobby.create')}
       </Button>
     </form>
