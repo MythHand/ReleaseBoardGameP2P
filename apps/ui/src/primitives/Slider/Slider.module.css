@@ -1,0 +1,49 @@
+.row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.slider {
+  flex: 1;
+  block-size: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+  background: rgb(255 255 255 / 18%);
+}
+
+.slider::-webkit-slider-thumb {
+  inline-size: 16px;
+  block-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  background: var(--thumb, #8fd9b0);
+  border-radius: 50%;
+}
+
+.slider::-moz-range-thumb {
+  inline-size: 16px;
+  block-size: 16px;
+  cursor: pointer;
+  background: var(--thumb, #8fd9b0);
+  border: 0;
+  border-radius: 50%;
+}
+
+.value {
+  min-inline-size: 18px;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  text-align: center;
+}

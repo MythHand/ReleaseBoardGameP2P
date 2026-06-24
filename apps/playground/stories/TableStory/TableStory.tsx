@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
+import { MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
 import { makeTable } from '@/mocks/table'
 import Table from '@/table/Table'
+import { pick, useLang } from '../../Playground/lang'
+import HoverSelect from '../controls/HoverSelect'
 import styles from './TableStory.module.css'
 
 type GameOverCondition = 'release' | 'lastStanding'
@@ -33,58 +36,44 @@ const VIEW_STATES: ViewItem[] = [
 ]
 
 export default function TableStory() {
+  const { lang } = useLang()
   const [opps, setOpps] = useState(3)
   const [end, setEnd] = useState<string | null>(null)
   const [view, setView] = useState<ViewState | null>(null)
   const state = useMemo(() => makeTable(opps), [opps])
 
   const variant = END_VARIANTS.find((v) => v.id === end)
-  const toggleEnd = (id: string) => setEnd((cur) => (cur === id ? null : id))
-  const toggleView = (id: ViewState) => setView((cur) => (cur === id ? null : id))
 
   return (
     <div className={styles.root}>
       <div className={styles.controls}>
-        <span className={styles.label}>оппонентов:</span>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            type="button"
-            key={n}
-            className={n === opps ? styles.on : styles.btn}
-            onClick={() => setOpps(n)}
-          >
-            {n}
-          </button>
-        ))}
-        <span className={styles.total}>всего игроков: {opps + 1}</span>
+        <HoverSelect
+          label="оппонентов"
+          value={String(opps)}
+          options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
+          onChange={(v) => setOpps(Number(v))}
+        />
+        <span className={styles.total}>всего: {opps + 1}</span>
 
-        <div className={styles.group}>
-          <span className={styles.label}>состояние:</span>
-          {VIEW_STATES.map((v) => (
-            <button
-              type="button"
-              key={v.id}
-              className={view === v.id ? styles.actionOn : styles.action}
-              onClick={() => toggleView(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <HoverSelect
+          label="состояние"
+          value={view ?? ''}
+          options={[
+            { value: '', label: '— нет —' },
+            ...VIEW_STATES.map((v) => ({ value: v.id, label: v.label })),
+          ]}
+          onChange={(v) => setView(v === '' ? null : (v as ViewState))}
+        />
 
-        <div className={styles.group}>
-          <span className={styles.label}>завершение:</span>
-          {END_VARIANTS.map((v) => (
-            <button
-              type="button"
-              key={v.id}
-              className={end === v.id ? styles.actionOn : styles.action}
-              onClick={() => toggleEnd(v.id)}
-            >
-              {v.label}
-            </button>
-          ))}
-        </div>
+        <HoverSelect
+          label="завершение"
+          value={end ?? ''}
+          options={[
+            { value: '', label: '— нет —' },
+            ...END_VARIANTS.map((v) => ({ value: v.id, label: v.label })),
+          ]}
+          onChange={(v) => setEnd(v === '' ? null : v)}
+        />
       </div>
       <div className={styles.stage}>
         <Table
@@ -92,6 +81,7 @@ export default function TableStory() {
           view={view}
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
           onOverContinue={() => setEnd(null)}
+          modesCopy={pick(lang, { ru: MODES_COPY_RU, en: MODES_COPY_EN })}
         />
       </div>
     </div>

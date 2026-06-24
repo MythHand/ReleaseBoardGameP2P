@@ -1,3 +1,5 @@
+import Avatar from '@/primitives/Avatar'
+import Badge, { type BadgeTone } from '@/primitives/Badge'
 import styles from './Participants.module.css'
 
 export interface Participant {
@@ -30,13 +32,15 @@ export default function Participants({ players = [], spectators = [] }: Particip
             {players.map((p) => {
               const lost = p.connected === false
               // выбывшим — серым (исход не важен); тем, кто в игре, потеря связи — красным
-              const cls = p.eliminated ? styles.out : lost ? styles.lost : styles.in
+              const tone: BadgeTone = p.eliminated ? 'muted' : lost ? 'danger' : 'success'
               const text = lost ? 'потеряно соединение' : p.eliminated ? 'выбыл' : 'в игре'
               return (
                 <li key={p.id} className={styles.row}>
-                  <span className={styles.avatar}>{p.name[0]?.toUpperCase()}</span>
+                  <Avatar name={p.name} size={28} />
                   <span className={styles.name}>{p.name}</span>
-                  <span className={`${styles.status} ${cls}`}>{text}</span>
+                  <Badge tone={tone} className={styles.pushEnd}>
+                    {text}
+                  </Badge>
                 </li>
               )
             })}
@@ -50,9 +54,11 @@ export default function Participants({ players = [], spectators = [] }: Particip
           <ul className={styles.list}>
             {spectators.map((s) => (
               <li key={s.id} className={styles.row}>
-                <span className={styles.avatar}>{s.name[0]?.toUpperCase()}</span>
+                <Avatar name={s.name} size={28} />
                 <span className={styles.name}>{s.name}</span>
-                <span className={styles.specTag}>зритель</span>
+                <Badge tone="muted" className={styles.pushEnd}>
+                  зритель
+                </Badge>
               </li>
             ))}
             {spectators.length === 0 && <li className={styles.empty}>пока без зрителей</li>}

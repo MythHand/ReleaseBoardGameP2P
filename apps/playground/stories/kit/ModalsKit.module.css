@@ -1,0 +1,13 @@
+.text {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgb(255 255 255 / 78%);
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-block-start: 24px;
+}

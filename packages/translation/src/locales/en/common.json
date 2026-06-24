@@ -28,7 +28,34 @@
     "gameCodeLabel": "game code",
     "gameCodePlaceholder": "e.g. 4F2A-9K",
     "joinCta": "enter",
-    "rulesTitle": "Rules"
+    "rulesTitle": "Rules",
+    "randomNick": "random name",
+    "authorDesign": "Game & Design:",
+    "authorDev": "Development:"
+  },
+  "stats": {
+    "title": "Match results",
+    "subtitle": "Match over",
+    "winnerLabel": "winner",
+    "winnerTag": "winner",
+    "colName": "player",
+    "colLoc": "location",
+    "colAttack": "attack",
+    "colDefense": "defense",
+    "toLobby": "to lobby",
+    "location": {
+      "game": "in game",
+      "stats": "on stats",
+      "lobby": "in lobby",
+      "offline": "offline"
+    },
+    "achievements": {
+      "ddos": { "title": "King of DDoS", "unit": "times played DDoS" },
+      "ai": { "title": "AI Addict", "unit": "AI cards from deck" },
+      "err503": { "title": "Lucky One", "unit": "Error 503s from deck" },
+      "cherryPick": { "title": "Treasure Hunter", "unit": "times pulled from discard" },
+      "attackedInto": { "title": "Bug Magnet", "unit": "attack cards taken" }
+    }
   },
   "help": { "title": "How to play", "back": "Back to start" },
   "error": {

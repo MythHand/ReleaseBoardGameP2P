@@ -1,2 +1,2 @@
-export type { StatPlayer } from './Stats'
+export type { StatPlayer, StatsCopy } from './Stats'
 export { default } from './Stats'

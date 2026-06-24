@@ -1,0 +1,62 @@
+.page {
+  min-block-size: 100vh;
+  padding: 48px 56px;
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--brand-green);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  opacity: 0.6;
+}
+
+.title {
+  margin: 6px 0 0;
+  font-family: var(--font-heading);
+  font-size: 28px;
+  letter-spacing: 0.01em;
+}
+
+.section {
+  margin-block-start: 40px;
+}
+
+.sectionH {
+  padding-block-end: 8px;
+  margin: 0 0 20px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  opacity: 0.5;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: flex-end;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.cellBody {
+  display: flex;
+  align-items: center;
+}
+
+.caption {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  opacity: 0.38;
+}

@@ -1,3 +1,4 @@
+import Badge from '@/primitives/Badge'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import styles from './Seat.module.css'
@@ -33,9 +34,13 @@ export default function Seat({
         <span className={styles.dot} aria-hidden="true" />
         <span className={styles.name}>{player.name}</span>
         {eliminated ? (
-          <span className={`${styles.status} ${styles.out}`}>выбыл</span>
+          <Badge tone="muted" size="sm" className={styles.status}>
+            выбыл
+          </Badge>
         ) : disconnected ? (
-          <span className={`${styles.status} ${styles.lost}`}>нет связи</span>
+          <Badge tone="danger" size="sm" className={styles.status}>
+            нет связи
+          </Badge>
         ) : (
           <span className={styles.hand}>{player.handCount} карт</span>
         )}

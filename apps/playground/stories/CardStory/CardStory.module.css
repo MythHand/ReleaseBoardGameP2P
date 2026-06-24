@@ -48,6 +48,39 @@
   opacity: 0.5;
 }
 
+/* сегментация по типам карт — линия-разделитель с подписью и счётчиком */
+.group {
+  margin-block-start: 44px;
+}
+
+.divider {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin: 0 0 22px;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.dividerLine {
+  flex: 1;
+  block-size: 1px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 55%, transparent),
+    transparent
+  );
+}
+
+.count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0.5;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

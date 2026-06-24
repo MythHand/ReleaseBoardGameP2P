@@ -10,7 +10,7 @@ import SessionView from '../_SessionView'
 import LobbyIndexPage from '../index'
 
 vi.mock('@release/translation', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'ru' } }),
 }))
 
 // All the lobby pieces read the session through useSession, so a single mock

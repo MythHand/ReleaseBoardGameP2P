@@ -1,9 +1,10 @@
 import { useTranslation } from '@release/translation'
+import { Button } from '@release/ui'
 import { type ReactNode, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import SessionView from './_SessionView'
-import { card, dangerBtn, ghostBtn, label, primaryBtn, Shell } from './_ui'
+import { card, ghostBtn, label, Shell } from './_ui'
 
 // Owns the session status flow shared by both lobby modes. The mode-specific
 // pre-session form (_CreateForm / _JoinForm) is passed as `children` and only
@@ -54,12 +55,10 @@ export default function LobbyFlow({ children }: { children: ReactNode }) {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button type="button" className={primaryBtn} onClick={() => setContinued(true)}>
-                {t('lobby.continue')}
-              </button>
-              <button type="button" className={dangerBtn} onClick={() => session.leaveSession()}>
+              <Button onClick={() => setContinued(true)}>{t('lobby.continue')}</Button>
+              <Button variant="danger" onClick={() => session.leaveSession()}>
                 {t('lobby.drop')}
-              </button>
+              </Button>
             </div>
           </div>
         </Shell>

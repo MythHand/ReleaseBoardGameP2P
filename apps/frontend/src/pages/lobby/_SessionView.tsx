@@ -1,20 +1,13 @@
 import { useTranslation } from '@release/translation'
+import { Avatar, Badge, type BadgeTone, Button, Input } from '@release/ui'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import type { Role } from '~/entities/lobby'
 import { useStartGame } from '~/features/start-game/useStartGame'
-import {
-  card,
-  dangerBtn,
-  field,
-  ghostBtn,
-  input,
-  label,
-  MAX_PLAYER_OPTIONS,
-  primaryBtn,
-  Shell,
-} from './_ui'
+import { card, field, input, label, MAX_PLAYER_OPTIONS, Shell } from './_ui'
+
+const ROLE_TONE: Record<Role, BadgeTone> = { host: 'success', player: 'info', guest: 'muted' }
 
 // The live-session view, shared by host and guest once a room exists: room code,
 // share link, roster, and ready/kick/start controls. Rendered by _LobbyFlow only
@@ -61,23 +54,22 @@ export default function SessionView() {
               {session.roomCode}
             </p>
           </div>
-          <span className="text-fg/50 text-sm">{roleLabel(self?.role ?? 'guest')}</span>
+          <Badge tone={ROLE_TONE[self?.role ?? 'guest']} outlined>
+            {roleLabel(self?.role ?? 'guest')}
+          </Badge>
         </div>
 
-        <label className={field}>
-          <span className={label}>{t('lobby.shareLink')}</span>
-          <div className="flex gap-2">
-            <input
-              className={`${input} flex-1`}
-              readOnly
-              value={shareUrl}
-              onFocus={(e) => e.target.select()}
-            />
-            <button type="button" className={ghostBtn} onClick={copyShareLink}>
+        <Input
+          label={t('lobby.shareLink')}
+          value={shareUrl}
+          readOnly
+          onFocus={(e) => e.target.select()}
+          trailing={
+            <Button variant="tech" onClick={copyShareLink}>
               {copied ? t('lobby.copied') : t('lobby.copy')}
-            </button>
-          </div>
-        </label>
+            </Button>
+          }
+        />
 
         {session.isHost && (
           <label className={field}>
@@ -107,26 +99,21 @@ export default function SessionView() {
                 className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2"
               >
                 <span className="flex items-center gap-2">
+                  <Avatar name={peer.name} size={28} />
                   <span className="font-medium text-fg">{peer.name}</span>
                   {peer.id === state.selfId && (
                     <span className="text-fg/40 text-xs">({t('lobby.you')})</span>
                   )}
-                  <span className="text-fg/40 text-xs">{roleLabel(peer.role)}</span>
+                  <Badge tone={ROLE_TONE[peer.role]}>{roleLabel(peer.role)}</Badge>
                 </span>
                 <span className="flex items-center gap-3">
-                  <span className={peer.ready ? 'text-brand-green text-sm' : 'text-fg/40 text-sm'}>
-                    {peer.ready
-                      ? `${t('lobby.readyMark')} ${t('lobby.ready')}`
-                      : t('lobby.waiting')}
-                  </span>
+                  <Badge tone={peer.ready ? 'success' : 'muted'}>
+                    {peer.ready ? t('lobby.ready') : t('lobby.waiting')}
+                  </Badge>
                   {session.isHost && peer.role !== 'host' && (
-                    <button
-                      type="button"
-                      className={ghostBtn}
-                      onClick={() => session.kick(peer.id)}
-                    >
+                    <Button variant="tech" onClick={() => session.kick(peer.id)}>
                       {t('lobby.kick')}
-                    </button>
+                    </Button>
                   )}
                 </span>
               </li>
@@ -135,31 +122,24 @@ export default function SessionView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className={ghostBtn}
-            onClick={() => session.ready()}
-            disabled={self?.ready}
-          >
+          <Button variant="tech" onClick={() => session.ready()} disabled={self?.ready}>
             {t('lobby.ready')}
-          </button>
+          </Button>
           {session.isHost && (
-            <button
-              type="button"
-              className={primaryBtn}
+            <Button
               onClick={() => startGame()}
               disabled={!session.canStart}
               title={session.canStart ? undefined : t('lobby.startHint')}
             >
               {t('lobby.start')}
-            </button>
+            </Button>
           )}
-          <button type="button" className={`${ghostBtn} ml-auto`} onClick={back}>
+          <Button variant="tech" className="ml-auto" onClick={back}>
             {t('lobby.back')}
-          </button>
-          <button type="button" className={dangerBtn} onClick={drop}>
+          </Button>
+          <Button variant="danger" onClick={drop}>
             {t('lobby.drop')}
-          </button>
+          </Button>
         </div>
       </div>
     </Shell>

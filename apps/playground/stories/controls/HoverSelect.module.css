@@ -1,0 +1,94 @@
+.field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.5;
+}
+
+.select {
+  position: relative;
+}
+
+.trigger {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-inline-size: 150px;
+  block-size: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--fg);
+  cursor: default;
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+}
+
+.select:hover .trigger {
+  border-color: rgb(255 255 255 / 35%);
+}
+
+.caret {
+  font-size: 10px;
+  opacity: 0.6;
+  transition: transform var(--t-fast) var(--ease-out);
+}
+
+.select:hover .caret {
+  transform: rotate(180deg);
+}
+
+/* выпадает вниз по наведению на .select (без клика) */
+.menu {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-start: 0;
+  z-index: 200;
+  display: flex;
+  visibility: hidden;
+  flex-direction: column;
+  min-inline-size: 100%;
+  background: color-mix(in srgb, var(--surface-1) 96%, #000);
+  border: 1px solid rgb(255 255 255 / 15%);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 50%);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-out),
+    visibility var(--t-fast);
+}
+
+.select:hover .menu {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.opt,
+.optOn {
+  padding: 9px 12px;
+  font-size: 12px;
+  color: var(--fg);
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.opt:hover {
+  background: rgb(255 255 255 / 8%);
+}
+
+.optOn {
+  color: var(--brand-green);
+  background: rgb(41 224 122 / 10%);
+}

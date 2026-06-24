@@ -1,0 +1,10 @@
+.root {
+  padding: 48px 56px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-inline-size: 560px;
+}

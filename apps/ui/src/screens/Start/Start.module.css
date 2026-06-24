@@ -41,8 +41,9 @@
   position: relative;
   z-index: 2;
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* контент от верхнего края, без центрирования */
   block-size: 100%;
+  padding-block-start: 72px;
   padding-inline-start: 76px;
 }
 
@@ -52,9 +53,6 @@
   flex-direction: column;
   align-items: flex-start;
   inline-size: 460px;
-
-  /* выше математического центра — оптически приятнее */
-  transform: translateY(-8vh);
 }
 
 .logo {
@@ -106,14 +104,41 @@
   margin-block-start: 44px;
 }
 
-/* знак автора — по визуальному центру оси кнопок
-   (колонка кнопок: width 300, margin-left -11 → центр = -11 + 150 = 139) */
-.brandMark {
-  align-self: flex-start;
-  inline-size: 132px;
-  block-size: auto;
-  margin: 96px 0 0 73px; /* 139 − 132/2 */
-  opacity: 0.28;
+/* авторство — прижато к левому нижнему углу экрана */
+.credits {
+  position: absolute;
+  inset-block-end: 30px;
+  inset-inline-start: 76px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.credit {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.creditLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  opacity: 0.4;
+}
+
+.creditLink {
+  color: rgb(255 255 255 / 72%);
+  text-decoration: none;
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.creditLink:hover {
+  color: var(--brand-green);
+  text-decoration: underline;
 }
 
 /* ===== play-кнопка → разворачивается на месте в плеер ===== */
@@ -274,35 +299,4 @@
   font-size: 14px;
   line-height: 1.6;
   opacity: 0.7;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.fieldLabel {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  opacity: 0.55;
-}
-
-.input {
-  max-inline-size: 320px;
-  padding: 14px 16px;
-  font-family: var(--font-mono);
-  font-size: 18px;
-  color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  outline: none;
-  background: rgb(255 255 255 / 5%);
-  border: 1px solid rgb(255 255 255 / 18%);
-}
-
-.input:focus {
-  border-color: var(--brand-green);
 }

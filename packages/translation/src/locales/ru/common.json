@@ -28,7 +28,34 @@
     "gameCodeLabel": "код игры",
     "gameCodePlaceholder": "напр. 4F2A-9K",
     "joinCta": "войти",
-    "rulesTitle": "Правила"
+    "rulesTitle": "Правила",
+    "randomNick": "случайный ник",
+    "authorDesign": "Game & Design:",
+    "authorDev": "Development:"
+  },
+  "stats": {
+    "title": "Итоги партии",
+    "subtitle": "Партия завершена",
+    "winnerLabel": "победитель",
+    "winnerTag": "winner",
+    "colName": "игрок",
+    "colLoc": "где сейчас",
+    "colAttack": "атакующих",
+    "colDefense": "защитных",
+    "toLobby": "в лобби",
+    "location": {
+      "game": "в игре",
+      "stats": "на статистике",
+      "lobby": "в лобби",
+      "offline": "не в сети"
+    },
+    "achievements": {
+      "ddos": { "title": "King of DDoS", "unit": "раз сыграл DDoS" },
+      "ai": { "title": "AI зависимый", "unit": "карт AI из колоды" },
+      "err503": { "title": "Везучий", "unit": "ошибок 503 из колоды" },
+      "cherryPick": { "title": "Кладоискатель", "unit": "раз достал из сброса" },
+      "attackedInto": { "title": "Забагованный", "unit": "карт атаки прилетело" }
+    }
   },
   "help": { "title": "Как играть", "back": "Назад" },
   "error": {

@@ -1,28 +1,53 @@
 import { useTranslation } from '@release/translation'
-import { Link } from 'react-router'
+import { MODES_COPY_EN, MODES_COPY_RU, Start, type StartCopy } from '@release/ui'
+import { useCreateLobby } from '~/features/create-lobby/useCreateLobby'
+import { useJoinLobby } from '~/features/join-lobby/useJoinLobby'
 
-const primaryBtn =
-  'rounded-lg bg-brand-green px-6 py-3 font-semibold text-bg tracking-base transition-opacity hover:opacity-90'
-const ghostBtn =
-  'rounded-lg border border-fg/15 px-6 py-3 font-semibold text-fg/80 tracking-base transition-colors hover:bg-surface-2'
+// Лобби-протокол пока берёт name + maxPlayers; лимит игроков задаётся уже в лобби,
+// так что на создании используем дефолт.
+const DEFAULT_MAX_PLAYERS = 4
 
-// Play chooser. The polished <Start> screen is being reimplemented; for now this
-// routes into the two lobby modes: create (host) and connect (guest).
+// Стартовый экран — полированный <Start> из @release/ui (наш дизайн).
+// Создание/вход прокидываются в сетевые хуки сессии (логика друга).
 export default function StartPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const isEn = i18n.language.startsWith('en')
+  const createLobby = useCreateLobby()
+  const joinLobby = useJoinLobby()
+
+  const copy: StartCopy = {
+    logoAlt: t('start.logoAlt'),
+    logoVariant: isEn ? 'en' : 'ru',
+    tags: [t('start.tagOpenP2P'), t('start.tagBoardCard')],
+    description: t('start.description'),
+    createGame: t('start.createGame'),
+    joinGame: t('start.joinGame'),
+    rules: t('start.rules'),
+    github: t('start.github'),
+    videoReview: t('start.videoReview'),
+    close: t('start.close'),
+    createTitle: t('start.createTitle'),
+    lobbyParams: t('start.lobbyParams'),
+    nicknameLabel: t('start.nicknameLabel'),
+    nicknamePlaceholder: t('start.nicknamePlaceholder'),
+    randomNick: t('start.randomNick'),
+    createCta: t('start.createCta'),
+    lobbyNote: t('start.lobbyNote'),
+    joinTitle: t('start.joinTitle'),
+    gameCodeLabel: t('start.gameCodeLabel'),
+    gameCodePlaceholder: t('start.gameCodePlaceholder'),
+    joinCta: t('start.joinCta'),
+    rulesTitle: t('start.rulesTitle'),
+    authorDesign: t('start.authorDesign'),
+    authorDev: t('start.authorDev'),
+    modes: isEn ? MODES_COPY_EN : MODES_COPY_RU,
+  }
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-8 px-6 text-center">
-      <h1 className="font-bold text-4xl tracking-base">
-        {t('app.titleLead')} <span className="text-brand-green">{t('app.titleSub')}</span>
-      </h1>
-      <div className="flex flex-wrap items-center justify-center gap-4">
-        <Link to="/lobby?mode=create" className={primaryBtn}>
-          {t('start.createGame')}
-        </Link>
-        <Link to="/lobby?mode=join" className={ghostBtn}>
-          {t('start.joinGame')}
-        </Link>
-      </div>
-    </main>
+    <Start
+      copy={copy}
+      onCreate={(nickname) => createLobby(nickname, DEFAULT_MAX_PLAYERS)}
+      onJoin={(nickname, code) => joinLobby(code, nickname)}
+    />
   )
 }
