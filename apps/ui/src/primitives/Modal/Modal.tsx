@@ -64,18 +64,14 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
       if (e.key !== 'Tab') return
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
       if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
+      // Always drive Tab manually so Safari (which skips buttons by default)
+      // still cycles through every focusable element inside the dialog.
+      e.preventDefault()
+      const current = focusable.indexOf(document.activeElement as HTMLElement)
       if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        }
+        focusable[current <= 0 ? focusable.length - 1 : current - 1].focus()
       } else {
-        if (document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        }
+        focusable[current >= focusable.length - 1 ? 0 : current + 1].focus()
       }
     }
     dialog.addEventListener('keydown', onKeyDown)

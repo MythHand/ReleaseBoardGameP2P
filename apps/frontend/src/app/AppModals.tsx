@@ -1,7 +1,7 @@
 import { useTranslation } from '@release/translation'
-import Rules from '@/screens/Start/Rules'
 import CreateLobbyForm from '~/features/create-lobby/CreateLobbyForm'
 import JoinLobbyForm from '~/features/join-lobby/JoinLobbyForm'
+import Rules from '~/features/rules/Rules'
 import ModalRouter from '~/shared/ui/ModalRouter'
 
 export default function AppModals() {
