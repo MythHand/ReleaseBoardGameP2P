@@ -51,22 +51,9 @@
   opacity: 0.5;
 }
 
-/* статус вместо счётчика карт */
+/* статус-бейдж вместо счётчика карт — прижат вправо (вид даёт Badge) */
 .status {
   margin-inline-start: auto;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  white-space: nowrap;
-}
-
-.out {
-  color: rgb(255 255 255 / 40%);
-}
-
-.lost {
-  color: #ff6b81;
 }
 
 /* выбыл — карты ушли в сброс (зона пустеет), приглушаем место и имя */

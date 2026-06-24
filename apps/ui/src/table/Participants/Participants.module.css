@@ -52,46 +52,13 @@
   border: 1px solid rgb(255 255 255 / 8%);
 }
 
-.avatar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  inline-size: 28px;
-  block-size: 28px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  background: rgb(255 255 255 / 8%);
-}
-
 .name {
   font-size: 14px;
 }
 
-.status,
-.specTag {
+/* статус-бейдж / тег зрителя прижаты вправо (вид даёт Badge) */
+.pushEnd {
   margin-inline-start: auto;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.in {
-  color: var(--brand-green);
-}
-
-.out {
-  color: rgb(255 255 255 / 35%);
-}
-
-/* потеря связи у игрока, который ещё в игре */
-.lost {
-  color: #ff6b81;
-}
-
-.specTag {
-  color: rgb(255 255 255 / 40%);
 }
 
 .empty {

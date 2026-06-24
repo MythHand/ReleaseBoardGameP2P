@@ -1,0 +1,14 @@
+.avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  background: rgb(255 255 255 / 8%);
+}
+
+/* приглушённый — игрок не в сети */
+.muted {
+  color: rgb(255 255 255 / 35%);
+  background: rgb(255 255 255 / 5%);
+}

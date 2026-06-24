@@ -21,13 +21,16 @@
     "lobbyParams": "Параметры лобби",
     "nicknameLabel": "Ваш никнейм",
     "nicknamePlaceholder": "напр. dimbo",
+    "randomNick": "случайный ник",
     "createCta": "создать лобби",
     "lobbyNote": "Лимит игроков и режимы партии настраиваются уже в лобби — пересоздавать ничего не нужно.",
     "joinTitle": "Подключиться",
     "gameCodeLabel": "код игры",
     "gameCodePlaceholder": "напр. 4F2A-9K",
     "joinCta": "войти",
-    "rulesTitle": "Правила"
+    "rulesTitle": "Правила",
+    "authorDesign": "Game & Design:",
+    "authorDev": "Development:"
   },
   "language": { "en": "EN", "ru": "RU" }
 }

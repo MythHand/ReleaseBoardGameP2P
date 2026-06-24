@@ -6,71 +6,22 @@
 }
 
 .controls {
+  position: relative;
+  z-index: 1000; /* выше оверлея GameOver (100) и прочих слоёв стола — дропдауны всегда сверху */
   display: flex;
   flex: 0 0 auto;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 22px;
   row-gap: 10px;
   align-items: center;
   padding: 12px 16px;
   border-block-end: 1px solid rgb(255 255 255 / 8%);
 }
 
-.label {
-  font-size: 12px;
-  letter-spacing: var(--tracking);
-  opacity: 0.5;
-}
-
-.btn,
-.on {
-  inline-size: 30px;
-  block-size: 30px;
-  font-size: 12px;
-  color: var(--fg);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 15%);
-  border-radius: 6px;
-}
-
-.on {
-  color: var(--brand-green);
-  background: rgb(41 224 122 / 10%);
-  border-color: var(--brand-green);
-}
-
 .total {
-  margin-inline-start: 12px;
+  margin-inline-start: -12px; /* прижать к селекту «оппонентов» */
   font-size: 12px;
   opacity: 0.45;
-}
-
-/* группа тумблеров (состояние / завершение) */
-.group {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-inline-start: 16px;
-}
-
-/* текстовый тумблер в плашке (триггер оверлеев) */
-.action,
-.actionOn {
-  block-size: 30px;
-  padding: 0 14px;
-  font-size: 12px;
-  color: var(--fg);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 15%);
-  border-radius: 6px;
-}
-
-.actionOn {
-  color: var(--brand-green);
-  background: rgb(41 224 122 / 10%);
-  border-color: var(--brand-green);
 }
 
 .stage {

@@ -1,18 +1,29 @@
 import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
+import GameSettings from '@/blocks/GameSettings'
 import ReleaseLogo from '@/brand/ReleaseLogo'
-import { DEFAULT_SETUP, GAME_MODES, type Setup } from '@/game/modes'
+import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
+import { randomNickname, sanitizeNickname } from '@/game/nicknames'
+import DiceIcon from '@/icons/DiceIcon'
 import Button from '@/primitives/Button'
+import Input from '@/primitives/Input'
 import Modal from '@/primitives/Modal'
-import ModeSelect from '@/primitives/ModeSelect'
-import MYTHHAND from '../../assets/brand/mythhand.svg'
 import Rules from './Rules'
 import styles from './Start.module.css'
 
-const REPO_URL = 'https://github.com/dimbo-design/ReleaseBoardGameP2P'
+// внешние ссылки (открываются в новой вкладке)
+const GITHUB_URL = 'https://github.com/MythHand'
+const DESIGN_URL = 'https://github.com/dimbo-design'
+const DEV_URL = 'https://github.com/ditayler'
+
+// авторы — собственные имена, одинаковы для всех языков
+const DESIGN_NAME = 'Togulev Dmitry'
+const DEV_NAME = 'Andrey Konnov'
 
 export interface StartCopy {
   logoAlt: string
+  // вариант начертания логотипа под язык интерфейса
+  logoVariant?: 'ru' | 'en'
   tags: string[]
   description: string
   createGame: string
@@ -25,6 +36,7 @@ export interface StartCopy {
   lobbyParams: string
   nicknameLabel: string
   nicknamePlaceholder: string
+  randomNick: string
   createCta: string
   lobbyNote: string
   joinTitle: string
@@ -32,6 +44,11 @@ export interface StartCopy {
   gameCodePlaceholder: string
   joinCta: string
   rulesTitle: string
+  // подписи авторства в левом нижнем углу
+  authorDesign: string
+  authorDev: string
+  // текст режимов партии (заголовки + описания опций)
+  modes: GameModesCopy
 }
 
 export default function Start({ copy }: { copy: StartCopy }) {
@@ -72,7 +89,7 @@ export default function Start({ copy }: { copy: StartCopy }) {
 
       <div className={styles.content}>
         <div className={styles.col}>
-          <ReleaseLogo className={styles.logo} />
+          <ReleaseLogo className={styles.logo} variant={copy.logoVariant} />
           <div className={styles.tags}>
             {copy.tags.map((tag) => (
               <span key={tag} className={styles.tag}>
@@ -87,12 +104,32 @@ export default function Start({ copy }: { copy: StartCopy }) {
           </div>
           <div className={`${styles.actions} ${styles.actionsSecondary}`}>
             <Button onClick={() => setModal('rules')}>{copy.rules}</Button>
-            <Button onClick={() => window.open(REPO_URL, '_blank', 'noopener')}>
+            <Button onClick={() => window.open(GITHUB_URL, '_blank', 'noopener')}>
               {copy.github}
             </Button>
           </div>
-          <img className={styles.brandMark} src={MYTHHAND} alt="MythHand" />
         </div>
+      </div>
+
+      {/* авторство — левый нижний угол экрана; имена ведут на профили GitHub */}
+      <div className={styles.credits}>
+        <span className={styles.credit}>
+          <span className={styles.creditLabel}>{copy.authorDesign}</span>
+          <a
+            className={styles.creditLink}
+            href={DESIGN_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {DESIGN_NAME}
+          </a>
+        </span>
+        <span className={styles.credit}>
+          <span className={styles.creditLabel}>{copy.authorDev}</span>
+          <a className={styles.creditLink} href={DEV_URL} target="_blank" rel="noopener noreferrer">
+            {DEV_NAME}
+          </a>
+        </span>
       </div>
 
       {/* play-кнопка, разворачивающаяся на месте в видео-плеер */}
@@ -135,29 +172,28 @@ export default function Start({ copy }: { copy: StartCopy }) {
       <Modal open={modal === 'create'} onClose={close} title={copy.createTitle} wide>
         <div className={styles.createGrid}>
           <div className={styles.createMods}>
-            {GAME_MODES.map((m) => (
-              <ModeSelect
-                key={m.key}
-                title={m.title}
-                options={m.options}
-                value={setup[m.key] ?? ''}
-                onChange={(v) => setMode(m.key, v)}
-              />
-            ))}
+            <GameSettings setup={setup} onChange={setMode} copy={copy.modes} />
           </div>
           <div className={styles.createTech}>
             <h4 className={styles.techTitle}>{copy.lobbyParams}</h4>
 
-            <label className={styles.field}>
-              <span className={styles.fieldLabel}>{copy.nicknameLabel}</span>
-              <input
-                className={styles.input}
-                value={host}
-                onChange={(e) => setHost(e.target.value)}
-                placeholder={copy.nicknamePlaceholder}
-                maxLength={20}
-              />
-            </label>
+            <Input
+              label={copy.nicknameLabel}
+              value={host}
+              onChange={(e) => setHost(sanitizeNickname(e.target.value))}
+              placeholder={copy.nicknamePlaceholder}
+              maxLength={20}
+              trailing={
+                <Button
+                  variant="icon"
+                  onClick={() => setHost(randomNickname())}
+                  aria-label={copy.randomNick}
+                  title={copy.randomNick}
+                >
+                  <DiceIcon />
+                </Button>
+              }
+            />
 
             <Button onClick={close}>{copy.createCta}</Button>
 
@@ -167,20 +203,24 @@ export default function Start({ copy }: { copy: StartCopy }) {
       </Modal>
 
       <Modal open={modal === 'join'} onClose={close} title={copy.joinTitle}>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>{copy.nicknameLabel}</span>
-          <input
-            className={styles.input}
-            value={joinName}
-            onChange={(e) => setJoinName(e.target.value)}
-            placeholder={copy.nicknamePlaceholder}
-            maxLength={20}
-          />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>{copy.gameCodeLabel}</span>
-          <input className={styles.input} placeholder={copy.gameCodePlaceholder} />
-        </label>
+        <Input
+          label={copy.nicknameLabel}
+          value={joinName}
+          onChange={(e) => setJoinName(sanitizeNickname(e.target.value))}
+          placeholder={copy.nicknamePlaceholder}
+          maxLength={20}
+          trailing={
+            <Button
+              variant="icon"
+              onClick={() => setJoinName(randomNickname())}
+              aria-label={copy.randomNick}
+              title={copy.randomNick}
+            >
+              <DiceIcon />
+            </Button>
+          }
+        />
+        <Input label={copy.gameCodeLabel} placeholder={copy.gameCodePlaceholder} />
         <Button onClick={close}>{copy.joinCta}</Button>
       </Modal>
 

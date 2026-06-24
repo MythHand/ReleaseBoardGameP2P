@@ -1,0 +1,47 @@
+.badge {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.sm {
+  font-size: 10px;
+}
+
+.md {
+  font-size: 11px;
+}
+
+.success {
+  color: #8fd9b0;
+}
+
+.muted {
+  color: rgb(255 255 255 / 42%);
+}
+
+.danger {
+  color: #ff6b81;
+}
+
+.warning {
+  color: #e3b341;
+}
+
+.info {
+  color: #7fb0ff;
+}
+
+.outlined {
+  border: 1px solid color-mix(in srgb, currentcolor 50%, transparent);
+}
+
+/* паддинг обводки масштабируется с кеглем: sm — компактнее, md — крупнее (как пилюля «где сейчас») */
+.sm.outlined {
+  padding: 2px 6px;
+}
+
+.md.outlined {
+  padding: 4px 9px;
+}

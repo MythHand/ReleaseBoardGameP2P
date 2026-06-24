@@ -1,13 +1,69 @@
 .wrap {
   display: grid;
   grid-template-columns: 220px 1fr;
-  min-block-size: 100vh;
+  block-size: 100vh; /* фиксируем высоту вьюпорта — колонки скроллятся независимо */
+  overflow: hidden;
 }
 
 .sidebar {
   padding: 18px 0;
+  overflow-y: auto; /* свой скролл навигации, не двигает контент */
   background: var(--surface-1);
   border-inline-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+/* переключатель языка предпросмотра — самый верх сайдбара */
+.langRow {
+  padding: 0 18px 16px;
+}
+
+.langSwitch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  background: rgb(0 0 0 / 28%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 999px;
+}
+
+.langThumb {
+  position: absolute;
+  inset-block: 3px;
+  inset-inline-start: 3px;
+  inline-size: calc(50% - 3px);
+  background: rgb(41 224 122 / 16%);
+  border: 1px solid rgb(41 224 122 / 35%);
+  border-radius: 999px;
+  transition: transform var(--t-base) var(--ease-soft);
+}
+
+.langOn,
+.langOff {
+  position: relative;
+  z-index: 1;
+  padding: 5px 0;
+  font-size: 11px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: color var(--t-base) var(--ease-soft);
+}
+
+.langOn {
+  color: var(--brand-green);
+}
+
+.langOff {
+  color: var(--fg);
+  opacity: 0.5;
+}
+
+.langOff:hover {
+  opacity: 0.8;
 }
 
 .title {
@@ -21,6 +77,7 @@
 .nav {
   display: flex;
   flex-direction: column;
+  padding-block-end: 56px; /* декоративный низ — последний пункт не прижат к краю */
 }
 
 /* группы навигации */

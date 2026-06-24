@@ -109,30 +109,8 @@
   align-items: center;
 }
 
-.avatar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  inline-size: 30px;
-  block-size: 30px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  background: rgb(255 255 255 / 8%);
-}
-
 .name {
   font-size: 15px;
-}
-
-.winTag {
-  padding: 2px 6px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: #8fd9b0;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  border: 1px solid rgb(143 217 176 / 50%);
 }
 
 .colNum {
@@ -161,36 +139,6 @@
 
 .numDefense {
   color: color-mix(in srgb, var(--cat-defense) 70%, #fff);
-}
-
-/* статус «где сейчас» */
-.loc {
-  padding: 4px 9px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  border: 1px solid rgb(255 255 255 / 18%);
-}
-
-.loc_game {
-  color: #e3b341;
-  border-color: rgb(227 179 65 / 40%);
-}
-
-.loc_stats {
-  color: #8fd9b0;
-  border-color: rgb(143 217 176 / 40%);
-}
-
-.loc_lobby {
-  color: #7fb0ff;
-  border-color: rgb(127 176 255 / 40%);
-}
-
-.loc_offline {
-  color: rgb(255 255 255 / 35%);
-  border-color: rgb(255 255 255 / 14%);
 }
 
 /* ===== кнопка между таблицами ===== */

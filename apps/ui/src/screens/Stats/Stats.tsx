@@ -1,9 +1,19 @@
 import { cardById } from '@/cards'
+import Avatar from '@/primitives/Avatar'
+import Badge, { type BadgeTone } from '@/primitives/Badge'
 import Button from '@/primitives/Button'
 import Card from '@/primitives/Card'
 import styles from './Stats.module.css'
 
 type Location = 'game' | 'stats' | 'lobby' | 'offline'
+
+// тон пилюли «где сейчас» по локации
+const LOC_TONE: Record<Location, BadgeTone> = {
+  game: 'warning',
+  stats: 'success',
+  lobby: 'info',
+  offline: 'muted',
+}
 type MetricKey = 'ddos' | 'ai' | 'err503' | 'cherryPick' | 'attackedInto'
 
 export interface StatPlayer {
@@ -19,43 +29,43 @@ export interface StatPlayer {
   cherryPick: number
 }
 
+// Весь текст экрана — пропсом (i18n-agnostic). Ачивки/локации — по ключам.
+export interface StatsCopy {
+  title: string
+  subtitle: string
+  winnerLabel: string
+  winnerTag: string
+  colName: string
+  colLoc: string
+  colAttack: string
+  colDefense: string
+  toLobby: string
+  location: Record<Location, string>
+  achievements: Record<MetricKey, { title: string; unit: string }>
+}
+
 interface StatsProps {
   winnerId: string
+  copy: StatsCopy
   players?: StatPlayer[]
 }
 
 interface Achievement {
   key: MetricKey
-  title: string
-  unit: string
   cards: string[]
   wide?: boolean
 }
 
-const LOCATION: Record<Location, string> = {
-  game: 'в игре',
-  stats: 'на статистике',
-  lobby: 'в лобби',
-  offline: 'не в сети',
-}
-
-// Ачивки: обладатель — игрок с максимумом по показателю. cards — превью карт.
+// Структура ачивок: какой показатель и какие карты-превью. Тексты — из copy.
 // Порядок задаёт раскладку: 3 равных в ряд, затем 1 обычной ширины и широкий
 // «Забагованный» (на 2 карточки) со всеми картами атаки + Error 503.
 const ACHIEVEMENTS: Achievement[] = [
-  { key: 'ddos', title: 'King of DDoS', unit: 'раз сыграл DDoS', cards: ['attack-ddos'] },
-  { key: 'ai', title: 'AI зависимый', unit: 'карт AI из колоды', cards: ['trigger-ai'] },
-  { key: 'err503', title: 'Везучий', unit: 'ошибок 503 из колоды', cards: ['trigger-error-503'] },
-  {
-    key: 'cherryPick',
-    title: 'Кладоискатель',
-    unit: 'раз достал из сброса',
-    cards: ['operation-git-cherry-pick'],
-  },
+  { key: 'ddos', cards: ['attack-ddos'] },
+  { key: 'ai', cards: ['trigger-ai'] },
+  { key: 'err503', cards: ['trigger-error-503'] },
+  { key: 'cherryPick', cards: ['operation-git-cherry-pick'] },
   {
     key: 'attackedInto',
-    title: 'Забагованный',
-    unit: 'карт атаки прилетело',
     wide: true,
     // первая в DOM — ниже всех в стопке; последняя — сверху. Error 503 снизу, Bug сверху.
     cards: [
@@ -69,7 +79,7 @@ const ACHIEVEMENTS: Achievement[] = [
   },
 ]
 
-export default function Stats({ winnerId, players = [] }: StatsProps) {
+export default function Stats({ winnerId, copy, players = [] }: StatsProps) {
   const winner = players.find((p) => p.id === winnerId)
   const leader = (key: MetricKey): StatPlayer | undefined =>
     players.length ? players.reduce((best, p) => (p[key] > best[key] ? p : best)) : undefined
@@ -77,15 +87,15 @@ export default function Stats({ winnerId, players = [] }: StatsProps) {
   return (
     <div className={styles.stats}>
       <header className={styles.head}>
-        <h1 className={styles.title}>Итоги партии</h1>
-        <p className={styles.sub}>Партия завершена</p>
+        <h1 className={styles.title}>{copy.title}</h1>
+        <p className={styles.sub}>{copy.subtitle}</p>
       </header>
 
       {winner && (
         <div className={styles.winner}>
           <span className={styles.crown}>♛</span>
           <div>
-            <div className={styles.winnerLabel}>победитель</div>
+            <div className={styles.winnerLabel}>{copy.winnerLabel}</div>
             <div className={styles.winnerName}>{winner.name}</div>
           </div>
         </div>
@@ -93,23 +103,27 @@ export default function Stats({ winnerId, players = [] }: StatsProps) {
 
       <div className={styles.table}>
         <div className={`${styles.row} ${styles.thead}`}>
-          <span className={styles.colName}>игрок</span>
-          <span className={styles.colLoc}>где сейчас</span>
-          <span className={`${styles.colNum} ${styles.hAttack}`}>атакующих</span>
-          <span className={`${styles.colNum} ${styles.hDefense}`}>защитных</span>
+          <span className={styles.colName}>{copy.colName}</span>
+          <span className={styles.colLoc}>{copy.colLoc}</span>
+          <span className={`${styles.colNum} ${styles.hAttack}`}>{copy.colAttack}</span>
+          <span className={`${styles.colNum} ${styles.hDefense}`}>{copy.colDefense}</span>
         </div>
         <ul className={styles.rows}>
           {players.map((p) => (
             <li key={p.id} className={`${styles.row} ${p.id === winnerId ? styles.rowWin : ''}`}>
               <span className={styles.colName}>
-                <span className={styles.avatar}>{p.name[0]?.toUpperCase()}</span>
+                <Avatar name={p.name} size={30} />
                 <span className={styles.name}>{p.name}</span>
-                {p.id === winnerId && <span className={styles.winTag}>winner</span>}
+                {p.id === winnerId && (
+                  <Badge tone="success" size="sm" outlined>
+                    {copy.winnerTag}
+                  </Badge>
+                )}
               </span>
               <span className={styles.colLoc}>
-                <span className={`${styles.loc} ${styles[`loc_${p.location}`] ?? ''}`}>
-                  {LOCATION[p.location]}
-                </span>
+                <Badge tone={LOC_TONE[p.location]} size="md" outlined>
+                  {copy.location[p.location]}
+                </Badge>
               </span>
               <span className={`${styles.colNum} ${styles.numAttack}`}>{p.attack}</span>
               <span className={`${styles.colNum} ${styles.numDefense}`}>{p.defense}</span>
@@ -119,13 +133,14 @@ export default function Stats({ winnerId, players = [] }: StatsProps) {
       </div>
 
       <footer className={styles.foot}>
-        <Button>в лобби</Button>
+        <Button>{copy.toLobby}</Button>
       </footer>
 
       <div className={styles.achievements}>
         {ACHIEVEMENTS.map((a) => {
           const top = leader(a.key)
           if (!top) return null
+          const ach = copy.achievements[a.key]
           return (
             <div key={a.key} className={`${styles.ach} ${a.wide ? styles.achWide : ''}`}>
               <div className={`${styles.achArt} ${a.wide ? styles.achFan : ''}`}>
@@ -143,10 +158,10 @@ export default function Stats({ winnerId, players = [] }: StatsProps) {
               </div>
               <div className={styles.achBody}>
                 <div className={styles.achHolder}>{top.name}</div>
-                <div className={styles.achTitle}>{a.title}</div>
+                <div className={styles.achTitle}>{ach.title}</div>
                 <div className={styles.achStat}>
                   <span className={styles.achValue}>{top[a.key]}</span>
-                  <span className={styles.achUnit}>{a.unit}</span>
+                  <span className={styles.achUnit}>{ach.unit}</span>
                 </div>
               </div>
             </div>

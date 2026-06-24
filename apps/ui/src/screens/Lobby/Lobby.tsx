@@ -1,10 +1,13 @@
-import type { CSSProperties } from 'react'
 import { useEffect, useState } from 'react'
+import GameSettings from '@/blocks/GameSettings'
 import ReleaseLogo from '@/brand/ReleaseLogo'
-import { DEFAULT_SETUP, GAME_MODES, type Setup } from '@/game/modes'
+import { DEFAULT_SETUP, type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
+import Avatar from '@/primitives/Avatar'
+import Badge from '@/primitives/Badge'
 import Button from '@/primitives/Button'
 import Modal from '@/primitives/Modal'
-import ModeSelect from '@/primitives/ModeSelect'
+import Slider from '@/primitives/Slider'
+import Toggle from '@/primitives/Toggle'
 import styles from './Lobby.module.css'
 
 interface Player {
@@ -32,6 +35,7 @@ interface LobbyProps {
   initialPlayers?: Player[]
   role?: 'host' | 'guest'
   initialSetup?: Setup
+  modesCopy?: GameModesCopy
 }
 
 // ⚠️ Каркас (WIP). Данные — моки. Сетевой/presence-слой придёт от логики;
@@ -61,6 +65,7 @@ export default function Lobby({
   initialPlayers = MOCK_PLAYERS,
   role = 'host',
   initialSetup = DEFAULT_SETUP,
+  modesCopy = MODES_COPY_RU,
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
@@ -80,7 +85,6 @@ export default function Lobby({
   }
 
   const specColor = specColorFor(specCapacity)
-  const specPercent = (specCapacity / SPEC_MAX) * 100
 
   const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
   const toggleReady = (id: number) =>
@@ -133,23 +137,15 @@ export default function Lobby({
   while (slots.length < capacity) slots.push(null)
 
   const renderStatus = (p: Player) => {
-    if (!p.online) return <span className={styles.statOff}>не в сети</span>
+    if (!p.online) return <Badge tone="muted">не в сети</Badge>
     if (p.id === meId) {
       return (
-        <button
-          type="button"
-          className={`${styles.readyBtn} ${p.ready ? styles.readyOn : ''}`}
-          onClick={() => toggleReady(p.id)}
-        >
+        <Toggle on={p.ready} onChange={() => toggleReady(p.id)}>
           {p.ready ? 'готов' : 'не готов'}
-        </button>
+        </Toggle>
       )
     }
-    return (
-      <span className={`${styles.stat} ${p.ready ? styles.statReady : ''}`}>
-        {p.ready ? 'готов' : 'ожидание'}
-      </span>
-    )
+    return <Badge tone={p.ready ? 'success' : 'muted'}>{p.ready ? 'готов' : 'ожидание'}</Badge>
   }
 
   // меню «⋯» хоста
@@ -230,16 +226,7 @@ export default function Lobby({
             {!isHost && <span className={styles.lockTag}>настраивает host</span>}
           </h2>
           <div className={styles.modeList}>
-            {GAME_MODES.map((m) => (
-              <ModeSelect
-                key={m.key}
-                title={m.title}
-                options={m.options}
-                value={setup[m.key] ?? ''}
-                onChange={(v) => setMode(m.key, v)}
-                readOnly={!isHost}
-              />
-            ))}
+            <GameSettings setup={setup} onChange={setMode} readOnly={!isHost} copy={modesCopy} />
           </div>
         </section>
 
@@ -254,19 +241,14 @@ export default function Lobby({
             </h2>
 
             {isHost && (
-              <div className={styles.capRow}>
-                <span className={styles.capLabel}>Вместимость</span>
-                <input
-                  type="range"
-                  className={styles.slider}
-                  min={minCapacity}
-                  max={6}
-                  step={1}
-                  value={capacity}
-                  onChange={(e) => setCapacity(Number(e.target.value))}
-                />
-                <span className={styles.capVal}>{capacity}</span>
-              </div>
+              <Slider
+                className={styles.capRow}
+                label="Вместимость"
+                value={capacity}
+                min={minCapacity}
+                max={6}
+                onChange={setCapacity}
+              />
             )}
 
             <ul className={styles.list}>
@@ -278,12 +260,16 @@ export default function Lobby({
                       p.id === meId ? styles.slotMe : ''
                     }`}
                   >
-                    <span className={styles.avatar}>{p.name[0]?.toUpperCase()}</span>
+                    <Avatar name={p.name} size={34} muted={!p.online} />
                     <span className={styles.name}>
                       {p.name}
                       {p.id === meId && <span className={styles.you}> (вы)</span>}
                     </span>
-                    {p.host && <span className={styles.hostTag}>host</span>}
+                    {p.host && (
+                      <Badge tone="success" size="sm" outlined>
+                        host
+                      </Badge>
+                    )}
 
                     <div className={styles.rowEnd}>
                       {renderStatus(p)}
@@ -318,36 +304,25 @@ export default function Lobby({
             </h2>
 
             {isHost && (
-              <div className={styles.capRow}>
-                <span className={styles.capLabel}>Лимит</span>
-                <input
-                  type="range"
-                  className={`${styles.slider} ${styles.sliderSpec}`}
-                  min={0}
-                  max={SPEC_MAX}
-                  step={1}
-                  value={specCapacity}
-                  onChange={(e) => setSpecCapacity(Number(e.target.value))}
-                  style={
-                    {
-                      '--spec-color': specColor,
-                      background: `linear-gradient(90deg, ${specColor} ${specPercent}%, rgba(255,255,255,0.18) ${specPercent}%)`,
-                    } as CSSProperties
-                  }
-                />
-                <span className={styles.capVal} style={{ color: specColor }}>
-                  {specCapacity}
-                </span>
-              </div>
+              <Slider
+                className={styles.capRow}
+                label="Лимит"
+                value={specCapacity}
+                min={0}
+                max={SPEC_MAX}
+                onChange={setSpecCapacity}
+                color={specColor}
+                fill
+              />
             )}
 
             <ul className={styles.list}>
               {spectators.map((s) => (
                 <li key={s.id} className={styles.slot}>
-                  <span className={styles.avatar}>{s.name[0]?.toUpperCase()}</span>
+                  <Avatar name={s.name} size={34} />
                   <span className={styles.name}>{s.name}</span>
                   <div className={styles.rowEnd}>
-                    <span className={styles.specTag}>зритель</span>
+                    <Badge tone="muted">зритель</Badge>
                     {isHost &&
                       renderMenu(s.id, [
                         {
