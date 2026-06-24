@@ -26,6 +26,8 @@ export default function Menu({ children, className = '' }: MenuProps) {
   const [activeIndex, setActiveIndex] = useState(0)
 
   const registerItem = useCallback((ref: React.RefObject<HTMLButtonElement | null>) => {
+    const existing = refs.current.indexOf(ref)
+    if (existing !== -1) return existing // StrictMode double-call: return existing index
     const index = refs.current.length
     refs.current.push(ref)
     return index

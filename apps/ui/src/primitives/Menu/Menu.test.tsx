@@ -1,4 +1,5 @@
 import { act, fireEvent, render } from '@testing-library/react'
+import { StrictMode } from 'react'
 import Menu from './Menu'
 import MenuButton from './MenuButton'
 
@@ -96,4 +97,22 @@ it('calls onClick when a MenuButton is clicked', () => {
   )
   ;(getAllByRole('menuitem')[0] as HTMLButtonElement).click()
   expect(onClick).toHaveBeenCalledOnce()
+})
+
+it('ArrowDown navigates correctly under StrictMode', () => {
+  const { getAllByRole, getByRole } = render(
+    <StrictMode>
+      <Menu>
+        <MenuButton>First</MenuButton>
+        <MenuButton>Second</MenuButton>
+        <MenuButton>Third</MenuButton>
+      </Menu>
+    </StrictMode>,
+  )
+  const [first, second] = getAllByRole('menuitem') as HTMLButtonElement[]
+  act(() => {
+    first.focus()
+  })
+  fireEvent.keyDown(getByRole('menu'), { key: 'ArrowDown' })
+  expect(document.activeElement).toBe(second)
 })
