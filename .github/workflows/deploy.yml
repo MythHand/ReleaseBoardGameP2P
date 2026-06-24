@@ -48,6 +48,17 @@ jobs:
       - name: Add SPA 404 fallback
         run: cp apps/frontend/dist/index.html apps/frontend/dist/404.html
 
+      # Co-locate the playground showcase under <base>/playground/. Its router
+      # derives basename from import.meta.env.BASE_URL, so the build base must be
+      # the full sub-path. Published alongside the app inside the same dist dir.
+      - name: Build playground
+        run: pnpm --filter @release/playground build
+        env:
+          VITE_BASE_URL: /ReleaseBoardGameP2P/playground/
+
+      - name: Stage playground under /playground
+        run: cp -r apps/playground/dist apps/frontend/dist/playground
+
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
         with:
