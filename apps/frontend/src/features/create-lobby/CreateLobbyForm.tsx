@@ -3,6 +3,8 @@ import {
   Button,
   DEFAULT_SETUP,
   GAME_MODES,
+  MODES_COPY_EN,
+  MODES_COPY_RU,
   ModeSelect,
   randomNickname,
   type Setup,
@@ -14,7 +16,8 @@ import Form, { FormField } from '~/shared/ui/Form'
 import { useCreateLobby } from './useCreateLobby'
 
 export default function CreateLobbyForm() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const modesCopy = i18n.language.startsWith('en') ? MODES_COPY_EN : MODES_COPY_RU
   const navigate = useNavigate()
   const createLobby = useCreateLobby()
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
@@ -30,16 +33,23 @@ export default function CreateLobbyForm() {
     >
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] items-stretch">
         <div className="flex flex-col gap-6.5 pe-9">
-          {GAME_MODES.map((m) => (
-            <ModeSelect
-              key={m.key}
-              title={m.title}
-              options={m.options}
-              value={setup[m.key] ?? ''}
-              disabled
-              onChange={(v) => setSetup((s) => ({ ...s, [m.key]: v }))}
-            />
-          ))}
+          {GAME_MODES.map((m) => {
+            const mc = modesCopy[m.key]
+            return (
+              <ModeSelect
+                key={m.key}
+                title={mc?.title ?? ''}
+                options={m.options.map((o) => ({
+                  value: o.value,
+                  label: o.label,
+                  desc: mc?.options[o.value] ?? '',
+                }))}
+                value={setup[m.key] ?? ''}
+                disabled
+                onChange={(v) => setSetup((s) => ({ ...s, [m.key]: v }))}
+              />
+            )
+          })}
         </div>
         <div className="flex flex-col gap-5 border-white/8 border-s ps-9">
           <h4 className="m-0 font-heading text-base text-white tracking-[0.02em]">
