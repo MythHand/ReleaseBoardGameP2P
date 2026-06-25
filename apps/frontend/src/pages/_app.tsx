@@ -19,7 +19,9 @@ export default function App() {
             {t('app.home')}
           </Link>
         )}
-        <LanguageSwitch />
+        {/* Only on the landing and start screens — elsewhere (e.g. the lobby)
+            it would overlay the page header. */}
+        {(pathname === '/' || pathname === '/start') && <LanguageSwitch />}
         <Outlet />
         <AppModals />
       </div>
