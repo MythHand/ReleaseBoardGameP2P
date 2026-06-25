@@ -33,6 +33,16 @@ export function handleJoinRequest(state: LobbyState, fromId: string, name: strin
         to: fromId,
         message: { type: 'PEER_LIST', payload: { peers: peerList(next), yourRole: role } },
       },
+      // Seed the joiner with the host's current config so the modes/capacity
+      // panels show the agreed match settings immediately — without this a guest
+      // sees its DEFAULT_SETUP seed until the host happens to change a setting.
+      {
+        to: fromId,
+        message: {
+          type: 'LOBBY_CONFIG_UPDATED',
+          payload: { maxPlayers: state.maxPlayers, setup: state.setup },
+        },
+      },
       {
         to: 'broadcast',
         message: { type: 'PEER_JOINED', payload: { id: fromId, name, role, ready: false } },
@@ -41,10 +51,12 @@ export function handleJoinRequest(state: LobbyState, fromId: string, name: strin
   }
 }
 
+// Ready is a reversible toggle: a player can retract readiness (e.g. after
+// spotting a wrong setting), matching the Toggle control in the lobby UI.
 export function handleReady(state: LobbyState, fromId: string): Result {
   const existing = state.peers[fromId]
   if (!existing) return { state, outgoing: [] }
-  const updated: PeerInfo = { ...existing, ready: true }
+  const updated: PeerInfo = { ...existing, ready: !existing.ready }
   const next = applyPeerJoined(state, updated)
   return {
     state: next,
