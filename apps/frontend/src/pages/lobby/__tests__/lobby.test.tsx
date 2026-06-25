@@ -6,7 +6,7 @@ import type { UseLobby } from '~/entities/lobby'
 import CreateForm from '../_CreateForm'
 import JoinForm from '../_JoinForm'
 import LobbyFlow from '../_LobbyFlow'
-import SessionView from '../_SessionView'
+import LobbyView from '../_LobbyView'
 import LobbyIndexPage from '../index'
 
 vi.mock('@release/translation', () => ({
@@ -210,11 +210,78 @@ it('Continue reveals the live session view (room code, roster, share link)', () 
   expect(screen.getByDisplayValue(/\/lobby\/ABC-23D$/)).toBeTruthy()
 })
 
-it('SessionView Back keeps the session; Drop tears it down', () => {
+it('LobbyView Back keeps the session; Leave tears it down', () => {
   sessionValue = inSession()
-  renderInRouter(<SessionView />)
+  renderInRouter(<LobbyView />)
   fireEvent.click(screen.getByText('lobby.back'))
   expect(sessionValue.leaveSession).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByText('lobby.drop'))
+  fireEvent.click(screen.getByText('lobby.leave'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
+})
+
+it('LobbyView renders game modes section', () => {
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  expect(screen.getByText('lobby.modes')).toBeTruthy()
+})
+
+it('LobbyView renders spectator section when guests present', () => {
+  sessionValue = {
+    ...inSession(),
+    state: {
+      selfId: 'h',
+      hostId: 'h',
+      maxPlayers: 4,
+      setup: {
+        handLimit: 'base',
+        releases: 'base',
+        releaseCond: 'base',
+        ai: 'base',
+        gitBranch: 'base',
+      },
+      peers: {
+        h: { id: 'h', name: 'Host', role: 'host', ready: true },
+        g1: { id: 'g1', name: 'Gus', role: 'guest', ready: false },
+      },
+    },
+  }
+  renderInRouter(<LobbyView />)
+  expect(screen.getByText('Gus')).toBeTruthy()
+  expect(screen.getByText('lobby.roleGuest')).toBeTruthy()
+})
+
+it('LobbyView host sees disband button', () => {
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  expect(screen.getByText('lobby.disband')).toBeTruthy()
+})
+
+it('LobbyView guest does not see disband button', () => {
+  sessionValue = { ...inSession(), isHost: false }
+  renderInRouter(<LobbyView />)
+  expect(screen.queryByText('lobby.disband')).toBeNull()
+})
+
+it('LobbyFlow shows disbanded message instead of the form', () => {
+  sessionValue = { ...base(), status: 'disbanded' }
+  renderInRouter(
+    <LobbyFlow>
+      <div>FORM-SLOT</div>
+    </LobbyFlow>,
+  )
+  expect(screen.getByText('lobby.disbandedMessage')).toBeTruthy()
+  expect(screen.queryByText('FORM-SLOT')).toBeNull()
+})
+
+it('LobbyFlow skips the interstitial when resumed=true', () => {
+  sessionValue = inSession()
+  render(
+    <MemoryRouter initialEntries={[{ pathname: '/lobby', state: { resumed: true } }]}>
+      <LobbyFlow>
+        <div>FORM-SLOT</div>
+      </LobbyFlow>
+    </MemoryRouter>,
+  )
+  expect(screen.queryByText('lobby.activeSession')).toBeNull()
+  expect(screen.getByText('ABC-23D')).toBeTruthy()
 })

@@ -1,9 +1,9 @@
 import { useTranslation } from '@release/translation'
 import { Button } from '@release/ui'
 import { type ReactNode, useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
-import SessionView from './_SessionView'
+import LobbyView from './_LobbyView'
 import { card, ghostBtn, label, Shell } from './_ui'
 
 // Owns the session status flow shared by both lobby modes. The mode-specific
@@ -16,7 +16,10 @@ export default function LobbyFlow({ children }: { children: ReactNode }) {
   // already running": seed from the mount-time status. Fresh mount (idle) →
   // go straight into the session once it starts; mount already in a session →
   // offer Continue / Leave first so clicking Create/Connect isn't a dead end.
-  const [continued, setContinued] = useState(session.status !== 'in-lobby')
+  const location = useLocation()
+  const [continued, setContinued] = useState(
+    session.status !== 'in-lobby' || !!(location.state as { resumed?: boolean } | null)?.resumed,
+  )
 
   // Clear a stale error left by a previous visit (e.g. a failed join) when the
   // lobby mounts, so arriving fresh shows the form, not an old error banner.
@@ -26,11 +29,13 @@ export default function LobbyFlow({ children }: { children: ReactNode }) {
     clearError()
   }, [clearError])
 
-  if (session.status === 'kicked') {
+  if (session.status === 'kicked' || session.status === 'disbanded') {
     return (
       <Shell>
         <div className={card}>
-          <p className="text-fg/80">{t('lobby.kickedMessage')}</p>
+          <p className="text-fg/80">
+            {session.status === 'kicked' ? t('lobby.kickedMessage') : t('lobby.disbandedMessage')}
+          </p>
           <Link
             to="/start"
             className={`${ghostBtn} mt-4 inline-block`}
@@ -64,7 +69,7 @@ export default function LobbyFlow({ children }: { children: ReactNode }) {
         </Shell>
       )
     }
-    return <SessionView />
+    return <LobbyView />
   }
 
   return (
