@@ -15,6 +15,7 @@ import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { useStartGame } from '~/features/start-game/useStartGame'
 import type { PeerInfo } from '~/network/types'
+import { BASE_URL } from '~/shared/config'
 import AppLogo from '~/shared/ui/AppLogo'
 
 interface MenuItemDef {
@@ -54,7 +55,7 @@ export default function LobbyView() {
   const minCapacity = Math.max(2, players.length)
 
   const shareUrl = session.roomCode
-    ? `${window.location.origin}${import.meta.env.BASE_URL}lobby/${session.roomCode}`
+    ? `${window.location.origin}${BASE_URL}lobby/${session.roomCode}`
     : ''
 
   const copyLink = () => {
