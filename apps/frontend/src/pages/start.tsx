@@ -4,15 +4,14 @@ import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import MYTHHAND from '@/assets/brand/mythhand.svg'
-import ReleaseLogo from '@/brand/ReleaseLogo'
 import { useSession } from '~/app/providers/SessionProvider'
+import AppLogo from '~/shared/ui/AppLogo'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
 
 const REPO_URL = 'https://github.com/dimbo-design/ReleaseBoardGameP2P'
 
 export default function StartPage() {
-  const { i18n, t } = useTranslation()
-  const variant = i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'
+  const { t } = useTranslation()
   const handleMenuClick = useModalRoute()
   const session = useSession()
   const navigate = useNavigate()
@@ -50,7 +49,7 @@ export default function StartPage() {
 
       <div className="relative z-2 flex h-full items-center ps-19">
         <div className="flex w-115 translate-y-[-8vh] flex-col items-start">
-          <ReleaseLogo className="mb-3 -ml-2.75 h-auto w-120" variant={variant} />
+          <AppLogo className="mb-3 -ml-2.75 h-auto w-120" />
 
           <div className="mb-9.5 flex flex-col gap-1.5">
             <span className="font-mono text-[12px] text-cat-release uppercase tracking-[0.16em] opacity-85">

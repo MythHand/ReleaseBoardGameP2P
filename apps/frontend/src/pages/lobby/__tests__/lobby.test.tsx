@@ -3,9 +3,8 @@ import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
-import JoinForm from '../_JoinForm'
-import LobbyFlow from '../_LobbyFlow'
 import LobbyView from '../_LobbyView'
+import LobbyPage from '../[lobbyId]'
 
 vi.mock('@release/translation', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'ru' } }),
@@ -43,65 +42,43 @@ function renderInRouter(ui: ReactNode) {
   return render(<MemoryRouter>{ui}</MemoryRouter>)
 }
 
-it('JoinForm renders only the connect form', () => {
+it('shows the join form when there is no session', () => {
   sessionValue = base()
-  renderInRouter(<JoinForm />)
+  renderInRouter(<LobbyPage />)
   expect(screen.getByText('lobby.joinTitle')).toBeTruthy()
-  expect(screen.queryByText('lobby.createTitle')).toBeNull()
+  expect(screen.getByText('start.joinCta')).toBeTruthy()
 })
 
-it('JoinForm pre-fills the code from a shared /lobby/:lobbyId link', () => {
+it('pre-fills the code from a shared /lobby/:lobbyId link', () => {
   sessionValue = base()
   render(
     <MemoryRouter initialEntries={['/lobby/ABC-23D']}>
       <Routes>
-        <Route path="/lobby/:lobbyId" element={<JoinForm />} />
+        <Route path="/lobby/:lobbyId" element={<LobbyPage />} />
       </Routes>
     </MemoryRouter>,
   )
   expect(screen.getByDisplayValue('ABC-23D')).toBeTruthy()
 })
 
-it('LobbyFlow renders the form (children) before a session exists', () => {
-  sessionValue = base()
-  renderInRouter(
-    <LobbyFlow>
-      <div>FORM-SLOT</div>
-    </LobbyFlow>,
-  )
-  expect(screen.getByText('FORM-SLOT')).toBeTruthy()
-})
-
-it('LobbyFlow clears a stale error on mount', () => {
+it('clears a stale error on mount', () => {
   sessionValue = { ...base(), status: 'error', error: 'peer-unavailable' }
-  renderInRouter(
-    <LobbyFlow>
-      <div>FORM-SLOT</div>
-    </LobbyFlow>,
-  )
+  renderInRouter(<LobbyPage />)
   expect(sessionValue.clearError).toHaveBeenCalledOnce()
 })
 
 it('pre-session Back resets the (failed) session', () => {
   sessionValue = { ...base(), status: 'error', error: 'peer-unavailable' }
-  renderInRouter(
-    <LobbyFlow>
-      <div>FORM-SLOT</div>
-    </LobbyFlow>,
-  )
+  renderInRouter(<LobbyPage />)
   fireEvent.click(screen.getByText('lobby.back'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 
-it('LobbyFlow shows the kicked message instead of the form', () => {
+it('shows the kicked message instead of the form', () => {
   sessionValue = { ...base(), status: 'kicked' }
-  renderInRouter(
-    <LobbyFlow>
-      <div>FORM-SLOT</div>
-    </LobbyFlow>,
-  )
+  renderInRouter(<LobbyPage />)
   expect(screen.getByText('lobby.kickedMessage')).toBeTruthy()
-  expect(screen.queryByText('FORM-SLOT')).toBeNull()
+  expect(screen.queryByText('lobby.joinTitle')).toBeNull()
 })
 
 function inSession(): UseLobby {
@@ -129,39 +106,27 @@ function inSession(): UseLobby {
   }
 }
 
-it('LobbyFlow offers Continue/Drop when arriving with an active session', () => {
+it('offers Continue/Leave when arriving with an active session', () => {
   sessionValue = inSession()
-  renderInRouter(
-    <LobbyFlow>
-      <div>FORM-SLOT</div>
-    </LobbyFlow>,
-  )
+  renderInRouter(<LobbyPage />)
   expect(screen.getByText('lobby.activeSession')).toBeTruthy()
   expect(screen.getByText('lobby.continue')).toBeTruthy()
   expect(screen.getByText('lobby.leave')).toBeTruthy()
-  // Neither the form nor the live session view is shown yet.
-  expect(screen.queryByText('FORM-SLOT')).toBeNull()
+  // Neither the join form nor the live session view is shown yet.
+  expect(screen.queryByText('lobby.joinTitle')).toBeNull()
   expect(screen.queryByText('lobby.players')).toBeNull()
 })
 
-it('Drop from the interstitial tears the session down', () => {
+it('Leave from the interstitial tears the session down', () => {
   sessionValue = inSession()
-  renderInRouter(
-    <LobbyFlow>
-      <div>FORM-SLOT</div>
-    </LobbyFlow>,
-  )
+  renderInRouter(<LobbyPage />)
   fireEvent.click(screen.getByText('lobby.leave'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 
 it('Continue reveals the live session view (room code, roster, copy)', () => {
   sessionValue = inSession()
-  renderInRouter(
-    <LobbyFlow>
-      <div>FORM-SLOT</div>
-    </LobbyFlow>,
-  )
+  renderInRouter(<LobbyPage />)
   fireEvent.click(screen.getByText('lobby.continue'))
   expect(screen.getByText('ABC-23D')).toBeTruthy()
   expect(screen.getByText('Host')).toBeTruthy()
@@ -230,24 +195,18 @@ it('LobbyView guest does not see disband button', () => {
   expect(screen.queryByText('lobby.disband')).toBeNull()
 })
 
-it('LobbyFlow shows disbanded message instead of the form', () => {
+it('shows the disbanded message instead of the form', () => {
   sessionValue = { ...base(), status: 'disbanded' }
-  renderInRouter(
-    <LobbyFlow>
-      <div>FORM-SLOT</div>
-    </LobbyFlow>,
-  )
+  renderInRouter(<LobbyPage />)
   expect(screen.getByText('lobby.disbandedMessage')).toBeTruthy()
-  expect(screen.queryByText('FORM-SLOT')).toBeNull()
+  expect(screen.queryByText('lobby.joinTitle')).toBeNull()
 })
 
-it('LobbyFlow skips the interstitial when resumed=true', () => {
+it('skips the interstitial when resumed=true', () => {
   sessionValue = inSession()
   render(
     <MemoryRouter initialEntries={[{ pathname: '/lobby/ABC-23D', state: { resumed: true } }]}>
-      <LobbyFlow>
-        <div>FORM-SLOT</div>
-      </LobbyFlow>
+      <LobbyPage />
     </MemoryRouter>,
   )
   expect(screen.queryByText('lobby.activeSession')).toBeNull()

@@ -1,7 +1,7 @@
 import { useTranslation } from '@release/translation'
 import { Button, randomNickname, sanitizeNickname } from '@release/ui'
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import DiceIcon from '@/icons/DiceIcon'
 import { useSession } from '~/app/providers/SessionProvider'
 import Form, { FormField } from '~/shared/ui/Form'
@@ -13,6 +13,9 @@ export default function JoinLobbyForm() {
   const joinLobby = useJoinLobby()
   const connecting = useSession().status === 'connecting'
   const [name, setName] = useState('')
+  // On an invite link (/lobby/:lobbyId) the code is in the URL; pre-fill it.
+  // On the start-screen modal there is no route param, so this is empty.
+  const { lobbyId } = useParams()
 
   return (
     <Form
@@ -51,6 +54,7 @@ export default function JoinLobbyForm() {
       <FormField
         name="code"
         label={t('start.gameCodeLabel')}
+        defaultValue={lobbyId ?? ''}
         placeholder={t('start.gameCodePlaceholder')}
         required
       />

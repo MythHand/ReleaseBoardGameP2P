@@ -12,10 +12,10 @@ import {
 } from '@release/ui'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import ReleaseLogo from '@/brand/ReleaseLogo'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useStartGame } from '~/features/start-game/useStartGame'
 import type { PeerInfo } from '~/network/types'
+import AppLogo from '~/shared/ui/AppLogo'
 import styles from './_LobbyView.module.css'
 
 interface MenuItemDef {
@@ -136,7 +136,7 @@ export default function LobbyView() {
       <header className={styles.head}>
         <div>
           <div className={styles.titleRow}>
-            <ReleaseLogo className={styles.headLogo} blink={false} variant={isEn ? 'en' : 'ru'} />
+            <AppLogo className={styles.headLogo} blink={false} />
             <span className={styles.headDivider} />
             <h1 className={styles.title}>{t('lobby.title')}</h1>
             {isHost && (
