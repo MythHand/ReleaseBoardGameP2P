@@ -30,7 +30,7 @@ it('renders the start screen with create and join actions', () => {
   expect(screen.getByText('start.joinGame')).toBeTruthy()
 })
 
-it('shows continue session button when session is active', () => {
+it('shows an interactive continue session button when session is active', () => {
   sessionValue = {
     status: 'in-lobby',
     state: {
@@ -46,15 +46,22 @@ it('shows continue session button when session is active', () => {
       <StartPage />
     </MemoryRouter>,
   )
-  expect(screen.getByText('start.continueSession')).toBeTruthy()
+  const btn = screen.getByText('start.continueSession').closest('button')
+  expect(btn?.className ?? '').not.toContain('invisible')
+  expect(btn?.disabled).toBe(false)
 })
 
-it('hides continue session button when no session', () => {
+// The button stays mounted (just hidden + inert) so toggling a session never
+// reflows the vertically-centred menu column — see start.tsx.
+it('keeps the continue session slot reserved but hidden when no session', () => {
   sessionValue = { status: 'idle', state: null }
   render(
     <MemoryRouter>
       <StartPage />
     </MemoryRouter>,
   )
-  expect(screen.queryByText('start.continueSession')).toBeNull()
+  const btn = screen.getByText('start.continueSession').closest('button')
+  expect(btn?.className ?? '').toContain('invisible')
+  expect(btn?.disabled).toBe(true)
+  expect(btn?.getAttribute('aria-hidden')).toBe('true')
 })

@@ -65,13 +65,6 @@ export default function StartPage() {
           </p>
 
           <Menu className="-ml-2.75 items-center">
-            {hasSession && (
-              <MenuButton
-                onClick={() => navigate(`/lobby/${session.roomCode}`, { state: { resumed: true } })}
-              >
-                {t('start.continueSession')}
-              </MenuButton>
-            )}
             <MenuButton autoFocus value="create" onClick={handleMenuClick}>
               {t('start.createGame')}
             </MenuButton>
@@ -86,6 +79,18 @@ export default function StartPage() {
                 {t('start.github')}
               </MenuButton>
             </div>
+            {/* Always rendered (last) so toggling it never reflows the column —
+                without a reserved slot, mounting/unmounting would change the
+                vertically-centred column's height and shift everything. Hidden
+                and inert when there is no session to resume. */}
+            <MenuButton
+              aria-hidden={!hasSession}
+              disabled={!hasSession}
+              className={hasSession ? undefined : 'pointer-events-none invisible'}
+              onClick={() => navigate(`/lobby/${session.roomCode}`, { state: { resumed: true } })}
+            >
+              {t('start.continueSession')}
+            </MenuButton>
           </Menu>
 
           <img
