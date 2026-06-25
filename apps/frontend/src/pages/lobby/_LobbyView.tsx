@@ -45,6 +45,7 @@ export default function LobbyView() {
   const copyShareLink = () => {
     navigator.clipboard?.writeText(shareUrl)
     setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const roleLabel = (role: Role) =>
@@ -55,7 +56,7 @@ export default function LobbyView() {
         : t('lobby.roleGuest')
 
   const back = () => navigate('/start')
-  const drop = () => {
+  const leave = () => {
     session.leaveSession()
     navigate('/start')
   }
@@ -211,7 +212,7 @@ export default function LobbyView() {
           <Button variant="tech" className="ml-auto" onClick={back}>
             {t('lobby.back')}
           </Button>
-          <Button variant="danger" onClick={drop}>
+          <Button variant="danger" onClick={leave}>
             {t('lobby.leave')}
           </Button>
           {session.isHost && (
