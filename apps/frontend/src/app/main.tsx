@@ -2,6 +2,7 @@ import { routes } from '@generouted/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router'
+import { BASE_URL } from '~/shared/config'
 import '@release/ui/global.css'
 import './index.css'
 import '@release/translation'
@@ -12,8 +13,7 @@ import '@release/translation'
 // through to the 404 catch-all. Build the router from generouted's exported
 // `routes` ourselves so it knows the base path. Vite guarantees BASE_URL has a
 // trailing slash; react-router wants none except for the root "/".
-const base = import.meta.env.BASE_URL
-const basename = base === '/' ? '/' : base.replace(/\/$/, '')
+const basename = BASE_URL === '/' ? '/' : BASE_URL.replace(/\/$/, '')
 const router = createBrowserRouter(routes, { basename })
 
 const root = document.getElementById('root')

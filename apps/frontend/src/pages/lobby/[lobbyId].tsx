@@ -76,11 +76,8 @@ export default function LobbyPage() {
 
   return (
     <Shell>
-      {session.error && (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-400 text-sm">
-          {session.error}
-        </p>
-      )}
+      {/* A failed join surfaces its error inside JoinLobbyForm itself (shared
+          with the start-screen modal), so it isn't repeated here. */}
       {session.status === 'connecting' && (
         <p className="text-fg/60 text-sm">{t('lobby.connecting')}</p>
       )}

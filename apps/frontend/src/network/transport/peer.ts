@@ -1,4 +1,13 @@
 import { type DataConnection, Peer } from 'peerjs'
+import {
+  PEER_HOST,
+  PEER_PATH,
+  PEER_PORT,
+  STUN_URL,
+  TURN_CREDENTIAL,
+  TURN_URL,
+  TURN_USERNAME,
+} from '~/shared/config'
 import { createEnvelope, nextSeq, parseEnvelope } from '../envelope'
 import type { Message, WireMessage } from '../types'
 
@@ -15,17 +24,37 @@ export interface Transport {
   close(): void
 }
 
-// Signaling broker. Defaults to the PeerJS public cloud (0.peerjs.com); set
-// VITE_PEER_HOST (+ optional VITE_PEER_PORT/VITE_PEER_PATH) to point dev at a
-// local PeerServer (see `pnpm dev:p2p`). When VITE_PEER_HOST is unset the
-// options stay undefined so production behaviour (public cloud) is unchanged.
-function peerOptions() {
-  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {}
-  if (!env.VITE_PEER_HOST) return undefined
+// Custom ICE servers (STUN/TURN). PeerJS's default config ships only a free,
+// rate-limited public TURN (turn:eu-0/us-0.turn.peerjs.com), so peers that
+// can't connect directly (symmetric NAT, blocked UDP, restrictive firewalls)
+// frequently fail ICE negotiation. Configure TURN_URL (+ creds) to point at a
+// reliable TURN — self-hosted coturn or a managed service. When unset, PeerJS
+// keeps its default config so existing behaviour is unchanged. A custom config
+// REPLACES the default entirely, so include a STUN server here too.
+function iceConfig(): RTCConfiguration | undefined {
+  if (!TURN_URL) return undefined
   return {
-    host: env.VITE_PEER_HOST,
-    port: env.VITE_PEER_PORT ? Number(env.VITE_PEER_PORT) : 9000,
-    path: env.VITE_PEER_PATH ?? '/',
+    iceServers: [
+      { urls: STUN_URL },
+      { urls: TURN_URL, username: TURN_USERNAME, credential: TURN_CREDENTIAL },
+    ],
+  }
+}
+
+// Signaling broker. Defaults to the PeerJS public cloud (0.peerjs.com); set
+// PEER_HOST (+ optional PEER_PORT/PEER_PATH) to point dev at a local PeerServer
+// (see `pnpm dev:p2p`). ICE servers are configured independently (see
+// iceConfig), so a custom TURN works with either signaling broker. Returns
+// undefined only when nothing is configured, keeping the default public-cloud +
+// default-ICE behaviour.
+function peerOptions() {
+  const config = iceConfig()
+  if (!PEER_HOST) return config ? { config } : undefined
+  return {
+    host: PEER_HOST,
+    port: PEER_PORT,
+    path: PEER_PATH,
+    ...(config && { config }),
   }
 }
 
