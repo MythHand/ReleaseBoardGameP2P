@@ -64,6 +64,7 @@ export default function LobbyView() {
   const onDisbandConfirm = () => {
     setDisbandOpen(false)
     session.disband()
+    navigate('/start')
   }
 
   return (

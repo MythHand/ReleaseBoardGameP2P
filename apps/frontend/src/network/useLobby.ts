@@ -172,6 +172,8 @@ export function useLobby(): UseLobby {
         case 'LOBBY_DISBANDED':
           if (fromHost) {
             leaveSessionRef.current()
+            // leaveSession sets status to 'idle'; this override is batched in the
+            // same React update, so 'disbanded' wins in the final render.
             setStatus('disbanded')
           }
           break

@@ -62,7 +62,7 @@ export default function LobbyFlow({ children }: { children: ReactNode }) {
             <div className="flex flex-wrap gap-3">
               <Button onClick={() => setContinued(true)}>{t('lobby.continue')}</Button>
               <Button variant="danger" onClick={() => session.leaveSession()}>
-                {t('lobby.drop')}
+                {t('lobby.leave')}
               </Button>
             </div>
           </div>

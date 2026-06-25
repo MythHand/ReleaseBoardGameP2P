@@ -179,7 +179,7 @@ it('LobbyFlow offers Continue/Drop when arriving with an active session', () => 
   )
   expect(screen.getByText('lobby.activeSession')).toBeTruthy()
   expect(screen.getByText('lobby.continue')).toBeTruthy()
-  expect(screen.getByText('lobby.drop')).toBeTruthy()
+  expect(screen.getByText('lobby.leave')).toBeTruthy()
   // Neither the form nor the live session view is shown yet.
   expect(screen.queryByText('FORM-SLOT')).toBeNull()
   expect(screen.queryByText('lobby.players')).toBeNull()
@@ -192,7 +192,7 @@ it('Drop from the interstitial tears the session down', () => {
       <div>FORM-SLOT</div>
     </LobbyFlow>,
   )
-  fireEvent.click(screen.getByText('lobby.drop'))
+  fireEvent.click(screen.getByText('lobby.leave'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 
