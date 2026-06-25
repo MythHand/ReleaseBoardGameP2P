@@ -1,6 +1,8 @@
+import { DEFAULT_SETUP } from '@release/ui'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import {
   canStart as canStartFn,
+  disbandLobby as disbandLobbyFn,
   handleJoinRequest,
   handleReady,
   kick as kickFn,
@@ -18,7 +20,7 @@ import {
 } from './lobby/state'
 import { relayTargets } from './session/relay'
 import { createTransport, type Transport } from './transport/peer'
-import type { PeerInfo, WireMessage } from './types'
+import type { PeerInfo, Setup, WireMessage } from './types'
 
 // Room codes double as the host's PeerJS id, so the displayed code is exactly
 // what a joiner connects to — formatRoomCode/parseRoomCode are inverses.
@@ -42,7 +44,11 @@ export function parseRoomCode(code: string): string {
   return code.replace(/[^a-z0-9]/gi, '').toLowerCase()
 }
 
-export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'error'
+// How long to keep the transport alive after broadcasting LOBBY_DISBANDED, so
+// the buffered frame can flush over the DataChannels before peer.destroy().
+const DISBAND_FLUSH_MS = 200
+
+export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'disbanded' | 'error'
 
 export interface UseLobby {
   state: LobbyState | null
@@ -51,12 +57,14 @@ export interface UseLobby {
   isHost: boolean
   canStart: boolean
   error: string | null
-  createRoom(name: string, maxPlayers: number): Promise<void>
-  joinRoom(code: string, name: string): Promise<void>
+  createRoom(name: string, maxPlayers: number, setup?: Setup): Promise<string>
+  joinRoom(code: string, name: string): Promise<string>
   ready(): void
   kick(peerId: string): void
   setMaxPlayers(n: number): void
   transferHost(id: string): void
+  setSetup(setup: Setup): void
+  disband(): void
   leaveSession(): void
   clearError(): void
 }
@@ -70,6 +78,7 @@ export function useLobby(): UseLobby {
   const transportRef = useRef<Transport | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
+  const leaveSessionRef = useRef<() => void>(() => {})
 
   const onError = useCallback((err: { type?: string; message: string }) => {
     // A connection-level error after the lobby is up shouldn't tear down the
@@ -77,6 +86,16 @@ export function useLobby(): UseLobby {
     // disconnected) mean the session can't proceed — surface them.
     setError(err.type ? `${err.type}: ${err.message}` : err.message)
     if (err.type !== 'connection') setStatus('error')
+  }, [])
+
+  // A rejected createTransport (setup failed before the peer opened) bypasses
+  // onError, so route it through the same error/status machinery to avoid a
+  // stuck 'connecting' spinner.
+  const surfaceSetupError = useCallback((err: unknown) => {
+    const e = err as { type?: string; message?: string }
+    const message = e?.message ?? String(err)
+    setError(e?.type ? `${e.type}: ${message}` : message)
+    setStatus('error')
   }, [])
 
   const commit = useCallback((next: LobbyState) => {
@@ -157,12 +176,20 @@ export function useLobby(): UseLobby {
           break
         }
         case 'LOBBY_CONFIG_UPDATED':
-          if (fromHost) commit(applyConfig(current, msg.payload.maxPlayers))
+          if (fromHost) commit(applyConfig(current, msg.payload))
           break
         case 'PLAYER_KICKED':
           if (!fromHost) break
           if (msg.payload.peerId === current.selfId) setStatus('kicked')
           else commit(applyPeerLeft(current, msg.payload.peerId))
+          break
+        case 'LOBBY_DISBANDED':
+          if (fromHost) {
+            leaveSessionRef.current()
+            // leaveSession sets status to 'idle'; this override is batched in the
+            // same React update, so 'disbanded' wins in the final render.
+            setStatus('disbanded')
+          }
           break
         default:
           break
@@ -172,26 +199,44 @@ export function useLobby(): UseLobby {
   )
 
   const createRoom = useCallback(
-    async (name: string, maxPlayers: number) => {
+    async (name: string, maxPlayers: number, setup?: Setup) => {
       setStatus('connecting')
       setError(null)
-      // The host's peer id IS the room code, so the displayed code is exactly
-      // what a joiner connects to — formatRoomCode/parseRoomCode round-trip it.
-      const t = await createTransport({ peerId: makeRoomCode(), onMessage, onError, onDisconnect })
-      transportRef.current = t
-      isHostRef.current = true
-      setIsHost(true)
-      setRoomCode(formatRoomCode(t.id))
-      const initial = createLobbyState({
-        selfId: t.id,
-        hostId: t.id,
-        maxPlayers,
-        peers: [{ id: t.id, name, role: 'host', ready: true }],
-      })
-      commit(initial)
-      setStatus('in-lobby')
+      try {
+        // The host's peer id IS the room code, so the displayed code is exactly
+        // what a joiner connects to — formatRoomCode/parseRoomCode round-trip it.
+        const t = await createTransport({
+          peerId: makeRoomCode(),
+          onMessage,
+          onError,
+          onDisconnect,
+        })
+        transportRef.current = t
+        isHostRef.current = true
+        setIsHost(true)
+        setRoomCode(formatRoomCode(t.id))
+        const initial = createLobbyState({
+          selfId: t.id,
+          hostId: t.id,
+          maxPlayers,
+          setup: setup ?? DEFAULT_SETUP,
+          peers: [{ id: t.id, name, role: 'host', ready: true }],
+        })
+        commit(initial)
+        setStatus('in-lobby')
+        // The room code is the host peer id — known synchronously, so callers can
+        // navigate straight to /lobby/:code without awaiting a roster round-trip.
+        return formatRoomCode(t.id)
+      } catch (err) {
+        // createTransport rejects on a setup failure (taken peer id, signaling
+        // server unreachable) WITHOUT going through onError, so surface it here —
+        // otherwise status would stay 'connecting' forever. Re-throw so the
+        // caller skips the post-await navigate.
+        surfaceSetupError(err)
+        throw err
+      }
     },
-    [onMessage, onError, onDisconnect, commit],
+    [onMessage, onError, onDisconnect, commit, surfaceSetupError],
   )
 
   const joinRoom = useCallback(
@@ -199,37 +244,50 @@ export function useLobby(): UseLobby {
       setStatus('connecting')
       setError(null)
       const hostId = parseRoomCode(code)
-      const t = await createTransport({
-        onMessage,
-        onError,
-        onDisconnect,
-        onConnection: (peerId) => {
-          // Send JOIN_REQUEST exactly when the host DataChannel opens — a
-          // setTimeout(0) is not sufficient over real WebRTC because the channel
-          // may not be open after a single macrotask. Only now is the join
-          // confirmed, so flip to 'in-lobby' here rather than optimistically:
-          // a bad/expired code never opens and surfaces as a PeerJS error.
-          if (peerId === hostId) {
-            transportRef.current?.send(hostId, { type: 'JOIN_REQUEST', payload: { name } })
-            setStatus('in-lobby')
-          }
-        },
-      })
-      transportRef.current = t
-      isHostRef.current = false
-      setIsHost(false)
-      setRoomCode(formatRoomCode(hostId))
-      commit(
-        createLobbyState({
-          selfId: t.id,
-          hostId,
-          maxPlayers: 6,
-          peers: [{ id: t.id, name, role: 'guest', ready: false }],
-        }),
-      )
-      t.connectTo(hostId)
+      try {
+        const t = await createTransport({
+          onMessage,
+          onError,
+          onDisconnect,
+          onConnection: (peerId) => {
+            // Send JOIN_REQUEST exactly when the host DataChannel opens — a
+            // setTimeout(0) is not sufficient over real WebRTC because the channel
+            // may not be open after a single macrotask. Only now is the join
+            // confirmed, so flip to 'in-lobby' here rather than optimistically:
+            // a bad/expired code never opens and surfaces as a PeerJS error.
+            if (peerId === hostId) {
+              transportRef.current?.send(hostId, { type: 'JOIN_REQUEST', payload: { name } })
+              setStatus('in-lobby')
+            }
+          },
+        })
+        transportRef.current = t
+        isHostRef.current = false
+        setIsHost(false)
+        setRoomCode(formatRoomCode(hostId))
+        commit(
+          createLobbyState({
+            selfId: t.id,
+            hostId,
+            maxPlayers: 6,
+            setup: DEFAULT_SETUP,
+            peers: [{ id: t.id, name, role: 'guest', ready: false }],
+          }),
+        )
+        t.connectTo(hostId)
+        // The code resolves to the host id synchronously (parseRoomCode), so the
+        // caller can route to /lobby/:code immediately; a bad code surfaces later
+        // as a connection error on that same route.
+        return formatRoomCode(hostId)
+      } catch (err) {
+        // Peer setup failed before opening (bad code, signaling unreachable);
+        // surface it instead of leaving the form stuck on 'connecting', and
+        // re-throw so the caller skips the post-await navigate.
+        surfaceSetupError(err)
+        throw err
+      }
     },
-    [onMessage, onError, onDisconnect, commit],
+    [onMessage, onError, onDisconnect, commit, surfaceSetupError],
   )
 
   const ready = useCallback(() => {
@@ -284,9 +342,11 @@ export function useLobby(): UseLobby {
 
   // Tear the session down: close the PeerJS transport and reset to idle. Without
   // this, navigating away leaves the connection open and the state alive, so the
-  // user is bounced back into their old session.
-  const leaveSession = useCallback(() => {
-    transportRef.current?.close()
+  // user is bounced back into their old session. `flushMs` defers only the
+  // transport close (state resets immediately) so a final broadcast can flush
+  // over the DataChannels before peer.destroy() — see disband().
+  const leaveSession = useCallback((flushMs?: number) => {
+    const t = transportRef.current
     transportRef.current = null
     stateRef.current = null
     isHostRef.current = false
@@ -295,7 +355,33 @@ export function useLobby(): UseLobby {
     setRoomCode(null)
     setError(null)
     setIsHost(false)
+    if (!t) return
+    if (flushMs) setTimeout(() => t.close(), flushMs)
+    else t.close()
   }, [])
+  leaveSessionRef.current = leaveSession
+
+  const setSetup = useCallback(
+    (setup: Setup) => {
+      const current = stateRef.current
+      if (!current || !isHostRef.current) return
+      commit(applyConfig(current, { setup }))
+      dispatch([{ to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { setup } } }])
+    },
+    [commit, dispatch],
+  )
+
+  const disband = useCallback(() => {
+    const current = stateRef.current
+    if (!current || !isHostRef.current) return
+    const r = disbandLobbyFn(current)
+    dispatch(r.outgoing)
+    // Defer the transport teardown so the just-queued LOBBY_DISBANDED frame can
+    // flush over the DataChannels before peer.destroy() closes them — otherwise
+    // guests may never receive it and would only notice via the host-disconnect
+    // path. Local state still resets immediately.
+    leaveSession(DISBAND_FLUSH_MS)
+  }, [dispatch, leaveSession])
 
   // Dismiss a sticky error (e.g. a failed join) without tearing down a live
   // session. Returns the status to idle only when it was 'error', so calling
@@ -323,6 +409,8 @@ export function useLobby(): UseLobby {
       kick,
       setMaxPlayers,
       transferHost,
+      setSetup,
+      disband,
       leaveSession,
       clearError,
     }),
@@ -338,6 +426,8 @@ export function useLobby(): UseLobby {
       kick,
       setMaxPlayers,
       transferHost,
+      setSetup,
+      disband,
       leaveSession,
       clearError,
     ],

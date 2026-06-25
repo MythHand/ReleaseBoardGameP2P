@@ -11,9 +11,9 @@ import {
   sanitizeNickname,
 } from '@release/ui'
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import DiceIcon from '@/icons/DiceIcon'
 import { useSession } from '~/app/providers/SessionProvider'
-import { useNavigate } from '~/app/router'
 import Form, { FormField } from '~/shared/ui/Form'
 import { useCreateLobby } from './useCreateLobby'
 
@@ -28,11 +28,11 @@ export default function CreateLobbyForm() {
 
   return (
     <Form
-      onSubmit={(data) => {
+      onSubmit={async (data) => {
         const name = sanitizeNickname(data.name ?? '').trim()
         if (name && !connecting) {
-          createLobby(name, 4)
-          navigate('/lobby')
+          const code = await createLobby(name, 4)
+          navigate(`/lobby/${code}`, { state: { resumed: true } })
         }
       }}
       requiredMessage={t('start.required')}
@@ -51,7 +51,6 @@ export default function CreateLobbyForm() {
                   desc: mc?.options[o.value] ?? '',
                 }))}
                 value={setup[m.key] ?? ''}
-                disabled
                 onChange={(v) => setSetup((s) => ({ ...s, [m.key]: v }))}
               />
             )

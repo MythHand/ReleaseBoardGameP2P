@@ -7,7 +7,6 @@ export type Path =
   | `/`
   | `/board/:gameId/stats`
   | `/help`
-  | `/lobby`
   | `/lobby/:lobbyId`
   | `/start`
 

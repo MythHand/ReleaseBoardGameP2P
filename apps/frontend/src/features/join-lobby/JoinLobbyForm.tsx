@@ -1,9 +1,9 @@
 import { useTranslation } from '@release/translation'
 import { Button, randomNickname, sanitizeNickname } from '@release/ui'
 import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import DiceIcon from '@/icons/DiceIcon'
 import { useSession } from '~/app/providers/SessionProvider'
-import { useNavigate } from '~/app/router'
 import Form, { FormField } from '~/shared/ui/Form'
 import { useJoinLobby } from './useJoinLobby'
 
@@ -13,17 +13,20 @@ export default function JoinLobbyForm() {
   const joinLobby = useJoinLobby()
   const connecting = useSession().status === 'connecting'
   const [name, setName] = useState('')
+  // On an invite link (/lobby/:lobbyId) the code is in the URL; pre-fill it.
+  // On the start-screen modal there is no route param, so this is empty.
+  const { lobbyId } = useParams()
 
   return (
     <Form
-      onSubmit={(data) => {
+      onSubmit={async (data) => {
         // parseRoomCode normalizes the code (strips separators/casing/spaces),
         // so the raw code is passed through; only the nickname needs cleaning.
         const name = sanitizeNickname(data.name ?? '').trim()
         const code = data.code ?? ''
         if (name && code.trim() && !connecting) {
-          joinLobby(code, name)
-          navigate('/lobby')
+          const formatted = await joinLobby(code, name)
+          navigate(`/lobby/${formatted}`, { state: { resumed: true } })
         }
       }}
       requiredMessage={t('start.required')}
@@ -51,6 +54,7 @@ export default function JoinLobbyForm() {
       <FormField
         name="code"
         label={t('start.gameCodeLabel')}
+        defaultValue={lobbyId ?? ''}
         placeholder={t('start.gameCodePlaceholder')}
         required
       />

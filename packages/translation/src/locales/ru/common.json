@@ -33,7 +33,8 @@
     "randomNick": "случайный ник",
     "authorDesign": "Game & Design:",
     "authorDev": "Development:",
-    "required": "Обязательное поле"
+    "required": "Обязательное поле",
+    "continueSession": "продолжить игру"
   },
   "stats": {
     "title": "Итоги партии",
@@ -162,6 +163,18 @@
     "activeSession": "Вы уже в сессии",
     "continue": "Продолжить",
     "back": "Назад",
-    "drop": "Покинуть сессию"
+    "drop": "Покинуть сессию",
+    "modesLockedHint": "настраивает хост",
+    "title": "Лобби",
+    "subtitle": "Ожидание игроков…",
+    "capacity": "Вместимость",
+    "freeSlot": "свободный слот",
+    "notReady": "не готов",
+    "spectators": "Зрители",
+    "noSpectators": "пока без зрителей",
+    "disbandTitle": "Расформировать лобби?",
+    "disbandConfirm": "Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить.",
+    "disband": "расформировать",
+    "disbandedMessage": "Лобби было расформировано."
   }
 }

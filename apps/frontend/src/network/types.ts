@@ -4,6 +4,10 @@
 export type CardId = string
 export type GameStateSnapshot = Record<string, unknown>
 
+// Opaque key→value map for game mode settings (handLimit, releases, etc.).
+// Defined here so network/ doesn't import from @release/ui.
+export type Setup = Record<string, string>
+
 export type Role = 'host' | 'player' | 'guest'
 
 export interface PeerInfo {
@@ -27,11 +31,9 @@ export type Message =
   | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: 'player' | 'guest' } }
   | { type: 'PEER_JOINED'; payload: { id: string; name: string; role: Role; ready: boolean } }
   | { type: 'PLAYER_READY'; payload: Record<string, never> }
-  | { type: 'LOBBY_CONFIG_UPDATED'; payload: { maxPlayers: number } }
+  | { type: 'LOBBY_CONFIG_UPDATED'; payload: { maxPlayers?: number; setup?: Setup } }
+  | { type: 'LOBBY_DISBANDED'; payload: Record<string, never> }
   | { type: 'PLAYER_KICKED'; payload: { peerId: string; reason?: string } }
-  // TRANSFER_HOST / HOST_TRANSFERRED: types defined here for future use.
-  // Runtime handoff (reconnect to new host, state re-broadcast, HOST_TRANSFERRED confirm)
-  // is intentionally deferred — depends on the game-engine spec / deck-keeper decision.
   | { type: 'TRANSFER_HOST'; payload: { newHostId: string } }
   | { type: 'HOST_TRANSFERRED'; payload: { from: string; to: string } }
   // --- Game start ---
