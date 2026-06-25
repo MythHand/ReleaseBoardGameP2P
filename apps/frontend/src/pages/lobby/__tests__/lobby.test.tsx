@@ -196,7 +196,7 @@ it('Drop from the interstitial tears the session down', () => {
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 
-it('Continue reveals the live session view (room code, roster, share link)', () => {
+it('Continue reveals the live session view (room code, roster, copy)', () => {
   sessionValue = inSession()
   renderInRouter(
     <LobbyFlow>
@@ -207,16 +207,25 @@ it('Continue reveals the live session view (room code, roster, share link)', () 
   expect(screen.getByText('ABC-23D')).toBeTruthy()
   expect(screen.getByText('Host')).toBeTruthy()
   expect(screen.getByText('Pat')).toBeTruthy()
-  expect(screen.getByDisplayValue(/\/lobby\/ABC-23D$/)).toBeTruthy()
+  expect(screen.getByText('lobby.copy')).toBeTruthy()
 })
 
-it('LobbyView Back keeps the session; Leave tears it down', () => {
-  sessionValue = inSession()
+it('LobbyView guest Leave tears the session down', () => {
+  const s = inSession()
+  sessionValue = { ...s, isHost: false, state: { ...s.state!, selfId: 'p1' } }
   renderInRouter(<LobbyView />)
-  fireEvent.click(screen.getByText('lobby.back'))
-  expect(sessionValue.leaveSession).not.toHaveBeenCalled()
   fireEvent.click(screen.getByText('lobby.leave'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
+})
+
+it('LobbyView host disband confirm tears the session down', () => {
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  // Header disband opens the confirm modal; the modal's own disband confirms.
+  fireEvent.click(screen.getByText('lobby.disband'))
+  const disbandButtons = screen.getAllByText('lobby.disband')
+  fireEvent.click(disbandButtons[disbandButtons.length - 1])
+  expect(sessionValue.disband).toHaveBeenCalledOnce()
 })
 
 it('LobbyView renders game modes section', () => {

@@ -51,7 +51,6 @@ export default function CreateLobbyForm() {
                   desc: mc?.options[o.value] ?? '',
                 }))}
                 value={setup[m.key] ?? ''}
-                disabled
                 onChange={(v) => setSetup((s) => ({ ...s, [m.key]: v }))}
               />
             )

@@ -2,243 +2,303 @@ import { useTranslation } from '@release/translation'
 import {
   Avatar,
   Badge,
-  type BadgeTone,
   Button,
-  GAME_MODES,
-  Input,
+  GameSettings,
   MODES_COPY_EN,
   MODES_COPY_RU,
   Modal,
-  ModeSelect,
   Slider,
+  Toggle,
 } from '@release/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
+import ReleaseLogo from '@/brand/ReleaseLogo'
 import { useSession } from '~/app/providers/SessionProvider'
-import type { Role } from '~/entities/lobby'
 import { useStartGame } from '~/features/start-game/useStartGame'
+import type { PeerInfo } from '~/network/types'
+import styles from './_LobbyView.module.css'
 
-const ROLE_TONE: Record<Role, BadgeTone> = { host: 'success', player: 'info', guest: 'muted' }
+interface MenuItemDef {
+  label: string
+  danger?: boolean
+  onClick: () => void
+}
 
 export default function LobbyView() {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const startGame = useStartGame()
   const navigate = useNavigate()
+
   const [copied, setCopied] = useState(false)
+  const [menuFor, setMenuFor] = useState<string | null>(null)
   const [disbandOpen, setDisbandOpen] = useState(false)
+
+  // Close the kebab menu on any outside click.
+  useEffect(() => {
+    if (menuFor == null) return
+    const onDoc = () => setMenuFor(null)
+    window.addEventListener('click', onDoc)
+    return () => window.removeEventListener('click', onDoc)
+  }, [menuFor])
 
   const state = session.state
   if (!state) return null
 
-  const modesCopy = i18n.language.startsWith('en') ? MODES_COPY_EN : MODES_COPY_RU
+  const isEn = i18n.language.startsWith('en')
+  const modesCopy = isEn ? MODES_COPY_EN : MODES_COPY_RU
 
+  const isHost = session.isHost
   const players = Object.values(state.peers).filter((p) => p.role === 'host' || p.role === 'player')
   const spectators = Object.values(state.peers).filter((p) => p.role === 'guest')
-  const self = state.peers[state.selfId]
-  const playerSlots = players.length
+  const capacity = state.maxPlayers
+  const minCapacity = Math.max(2, players.length)
 
   const shareUrl = session.roomCode
     ? `${window.location.origin}${import.meta.env.BASE_URL}lobby/${session.roomCode}`
     : ''
 
-  const copyShareLink = () => {
+  const copyLink = () => {
     navigator.clipboard?.writeText(shareUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const roleLabel = (role: Role) =>
-    role === 'host'
-      ? t('lobby.roleHost')
-      : role === 'player'
-        ? t('lobby.rolePlayer')
-        : t('lobby.roleGuest')
+  const setMode = (key: string, value: string) => session.setSetup({ ...state.setup, [key]: value })
 
-  const back = () => navigate('/start')
   const leave = () => {
     session.leaveSession()
     navigate('/start')
   }
-
   const onDisbandConfirm = () => {
     setDisbandOpen(false)
     session.disband()
     navigate('/start')
   }
 
+  const openMenu = (id: string) => setMenuFor((cur) => (cur === id ? null : id))
+
+  // Fill the player column with empty slots up to the capacity.
+  const slots: (PeerInfo | null)[] = [...players]
+  while (slots.length < capacity) slots.push(null)
+
+  const renderStatus = (p: PeerInfo) => {
+    if (p.id === state.selfId) {
+      return (
+        <Toggle on={p.ready} onChange={() => session.ready()}>
+          {p.ready ? t('lobby.ready') : t('lobby.notReady')}
+        </Toggle>
+      )
+    }
+    return (
+      <Badge tone={p.ready ? 'success' : 'muted'}>
+        {p.ready ? t('lobby.ready') : t('lobby.waiting')}
+      </Badge>
+    )
+  }
+
+  const renderMenu = (id: string, items: MenuItemDef[]) => (
+    <div className={styles.menuWrap}>
+      <button
+        type="button"
+        className={styles.kebab}
+        aria-label={t('lobby.kick')}
+        onClick={(e) => {
+          e.stopPropagation()
+          openMenu(id)
+        }}
+      >
+        ⋯
+      </button>
+      {menuFor === id && (
+        <div className={styles.menu}>
+          {items.map((it) => (
+            <button
+              key={it.label}
+              type="button"
+              className={`${styles.menuItem} ${it.danger ? styles.menuItemDanger : ''}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                it.onClick()
+                setMenuFor(null)
+              }}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col gap-6 px-6 py-16 lg:flex-row">
-      {/* Left column — game modes */}
-      <section className="flex flex-col gap-4 lg:w-96">
-        <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-fg text-sm tracking-base">{t('lobby.modes')}</h2>
-          {!session.isHost && (
-            <span className="text-fg/40 text-xs">{t('lobby.modesLockedHint')}</span>
-          )}
-        </div>
-        {GAME_MODES.map((m) => {
-          const mc = modesCopy[m.key]
-          return (
-            <ModeSelect
-              key={m.key}
-              title={mc?.title ?? ''}
-              options={m.options.map((o) => ({
-                value: o.value,
-                label: o.label,
-                desc: mc?.options[o.value] ?? '',
-              }))}
-              value={state.setup[m.key] ?? ''}
-              readOnly={!session.isHost}
-              onChange={(v) => session.setSetup({ ...state.setup, [m.key]: v })}
-            />
-          )
-        })}
-      </section>
-
-      {/* Right column — roster */}
-      <section className="flex flex-1 flex-col gap-5 rounded-2xl border border-fg/10 bg-surface-1 p-6">
-        <div className="flex items-baseline justify-between gap-4">
-          <div>
-            <p className="font-semibold text-fg/70 text-xs tracking-base">{t('lobby.roomCode')}</p>
-            <p className="font-bold text-2xl text-brand-green tracking-widest">
-              {session.roomCode}
-            </p>
-          </div>
-          <Badge tone={ROLE_TONE[self?.role ?? 'guest']} outlined>
-            {roleLabel(self?.role ?? 'guest')}
-          </Badge>
-        </div>
-
-        <Input
-          label={t('lobby.shareLink')}
-          value={shareUrl}
-          readOnly
-          onFocus={(e) => e.target.select()}
-          trailing={
-            <Button variant="tech" onClick={copyShareLink}>
-              {copied ? t('lobby.copied') : t('lobby.copy')}
-            </Button>
-          }
-        />
-
-        {session.isHost && (
-          <Slider
-            label={t('lobby.maxPlayers')}
-            value={state.maxPlayers}
-            min={Math.max(2, playerSlots)}
-            max={6}
-            onChange={session.setMaxPlayers}
-          />
-        )}
-
-        <div className="flex flex-col gap-2">
-          <p className="font-semibold text-fg/70 text-xs tracking-base">
-            {t('lobby.players')} ({players.length})
-          </p>
-          <ul className="flex flex-col gap-1.5">
-            {players.map((peer) => (
-              <li
-                key={peer.id}
-                className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2"
+    <div className={styles.lobby}>
+      <header className={styles.head}>
+        <div>
+          <div className={styles.titleRow}>
+            <ReleaseLogo className={styles.headLogo} blink={false} variant={isEn ? 'en' : 'ru'} />
+            <span className={styles.headDivider} />
+            <h1 className={styles.title}>{t('lobby.title')}</h1>
+            {isHost && (
+              <Button
+                variant="tech"
+                className={styles.disbandBtn}
+                onClick={() => setDisbandOpen(true)}
               >
-                <span className="flex items-center gap-2">
-                  <Avatar name={peer.name} size={28} />
-                  <span className="font-medium text-fg">{peer.name}</span>
-                  {peer.id === state.selfId && (
-                    <span className="text-fg/40 text-xs">({t('lobby.you')})</span>
-                  )}
-                  <Badge tone={ROLE_TONE[peer.role]}>{roleLabel(peer.role)}</Badge>
-                </span>
-                <span className="flex items-center gap-3">
-                  <Badge tone={peer.ready ? 'success' : 'muted'}>
-                    {peer.ready ? t('lobby.ready') : t('lobby.waiting')}
-                  </Badge>
-                  {session.isHost && peer.role !== 'host' && (
-                    <Button variant="tech" onClick={() => session.kick(peer.id)}>
-                      {t('lobby.kick')}
-                    </Button>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
+                {t('lobby.disband')}
+              </Button>
+            )}
+          </div>
+          <p className={styles.sub}>{t('lobby.subtitle')}</p>
         </div>
+        <div className={styles.codeBox}>
+          <span className={styles.codeLabel}>{t('lobby.code')}</span>
+          <div className={styles.codeRow}>
+            <span className={styles.code}>{session.roomCode}</span>
+            <button className={styles.copy} type="button" onClick={copyLink}>
+              {copied ? t('lobby.copied') : t('lobby.copy')}
+            </button>
+          </div>
+        </div>
+      </header>
 
-        {spectators.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="font-semibold text-fg/70 text-xs tracking-base">
-              {t('lobby.roleGuest')} ({spectators.length})
-            </p>
-            <ul className="flex flex-col gap-1.5">
-              {spectators.map((peer) => (
-                <li
-                  key={peer.id}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-surface-2 px-3 py-2"
-                >
-                  <span className="flex items-center gap-2">
-                    <Avatar name={peer.name} size={28} />
-                    <span className="font-medium text-fg">{peer.name}</span>
-                    {peer.id === state.selfId && (
-                      <span className="text-fg/40 text-xs">({t('lobby.you')})</span>
+      <div className={styles.grid}>
+        {/* Left — match modes */}
+        <section className={styles.modes}>
+          <h2 className={styles.h}>
+            {t('lobby.modes')}
+            {!isHost && <span className={styles.lockTag}>{t('lobby.modesLockedHint')}</span>}
+          </h2>
+          <div className={styles.modeList}>
+            <GameSettings
+              setup={state.setup}
+              onChange={setMode}
+              readOnly={!isHost}
+              copy={modesCopy}
+            />
+          </div>
+        </section>
+
+        {/* Right — players, spectators, lobby controls */}
+        <section className={styles.players}>
+          <div className={styles.scrollArea}>
+            <h2 className={styles.h}>
+              {t('lobby.players')}
+              <span className={styles.count}>
+                {players.length} / {capacity}
+              </span>
+            </h2>
+
+            {isHost && (
+              <Slider
+                className={styles.capRow}
+                label={t('lobby.capacity')}
+                value={capacity}
+                min={minCapacity}
+                max={6}
+                onChange={session.setMaxPlayers}
+              />
+            )}
+
+            <ul className={styles.list}>
+              {slots.map((p, i) =>
+                p ? (
+                  <li
+                    key={p.id}
+                    className={`${styles.slot} ${p.id === state.selfId ? styles.slotMe : ''}`}
+                  >
+                    <Avatar name={p.name} size={34} />
+                    <span className={styles.name}>
+                      {p.name}
+                      {p.id === state.selfId && (
+                        <span className={styles.you}> ({t('lobby.you')})</span>
+                      )}
+                    </span>
+                    {p.role === 'host' && (
+                      <Badge tone="success" size="sm" outlined>
+                        {t('lobby.roleHost')}
+                      </Badge>
                     )}
-                    <Badge tone="muted">{t('lobby.roleGuest')}</Badge>
+
+                    <div className={styles.rowEnd}>
+                      {renderStatus(p)}
+                      {isHost &&
+                        p.id !== state.selfId &&
+                        renderMenu(p.id, [
+                          {
+                            label: t('lobby.kick'),
+                            danger: true,
+                            onClick: () => session.kick(p.id),
+                          },
+                        ])}
+                    </div>
+                  </li>
+                ) : (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: empty slots are positional placeholders without a stable id
+                  <li key={`empty-${i}`} className={styles.slotEmpty}>
+                    {t('lobby.freeSlot')}
+                  </li>
+                ),
+              )}
+            </ul>
+
+            <h2 className={`${styles.h} ${styles.hSpectators}`}>
+              {t('lobby.spectators')}
+              <span className={styles.count}>{spectators.length}</span>
+            </h2>
+
+            <ul className={styles.list}>
+              {spectators.map((s) => (
+                <li key={s.id} className={styles.slot}>
+                  <Avatar name={s.name} size={34} />
+                  <span className={styles.name}>
+                    {s.name}
+                    {s.id === state.selfId && (
+                      <span className={styles.you}> ({t('lobby.you')})</span>
+                    )}
                   </span>
-                  {session.isHost && (
-                    <Button variant="tech" onClick={() => session.kick(peer.id)}>
-                      {t('lobby.kick')}
-                    </Button>
-                  )}
+                  <div className={styles.rowEnd}>
+                    <Badge tone="muted">{t('lobby.roleGuest')}</Badge>
+                    {isHost &&
+                      renderMenu(s.id, [
+                        { label: t('lobby.kick'), danger: true, onClick: () => session.kick(s.id) },
+                      ])}
+                  </div>
                 </li>
               ))}
+              {spectators.length === 0 && (
+                <li className={styles.slotEmpty}>{t('lobby.noSpectators')}</li>
+              )}
             </ul>
           </div>
-        )}
 
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          {!session.isHost && (
-            <Button variant="tech" onClick={() => session.ready()} disabled={self?.ready}>
-              {t('lobby.ready')}
-            </Button>
-          )}
-          {session.isHost && (
-            <Button
-              onClick={startGame}
-              disabled={!session.canStart}
-              title={session.canStart ? undefined : t('lobby.startHint')}
-            >
-              {t('lobby.start')}
-            </Button>
-          )}
-          <Button variant="tech" className="ml-auto" onClick={back}>
-            {t('lobby.back')}
-          </Button>
-          <Button variant="danger" onClick={leave}>
-            {t('lobby.leave')}
-          </Button>
-          {session.isHost && (
-            <Button variant="danger" onClick={() => setDisbandOpen(true)}>
-              {t('lobby.disband')}
-            </Button>
-          )}
-        </div>
-      </section>
+          <div className={styles.actions}>
+            {isHost ? (
+              <Button disabled={!session.canStart} onClick={startGame}>
+                {t('lobby.start')}
+              </Button>
+            ) : (
+              <Button onClick={leave}>{t('lobby.leave')}</Button>
+            )}
+          </div>
+        </section>
+      </div>
 
       <Modal
         open={disbandOpen}
         onClose={() => setDisbandOpen(false)}
         title={t('lobby.disbandTitle')}
       >
-        <p className="text-fg/80 text-sm">{t('lobby.disbandConfirm')}</p>
-        <div className="mt-6 flex justify-end gap-3">
+        <p className={styles.confirmText}>{t('lobby.disbandConfirm')}</p>
+        <div className={styles.confirmActions}>
           <Button variant="tech" onClick={() => setDisbandOpen(false)}>
             {t('start.close')}
           </Button>
-          <Button variant="danger" onClick={onDisbandConfirm}>
+          <Button variant="tech" className={styles.danger} onClick={onDisbandConfirm}>
             {t('lobby.disband')}
           </Button>
         </div>
       </Modal>
-    </main>
+    </div>
   )
 }

@@ -66,17 +66,17 @@ export default function StartPage() {
           </p>
 
           <Menu className="-ml-2.75 items-center">
+            {hasSession && (
+              <MenuButton onClick={() => navigate('/lobby', { state: { resumed: true } })}>
+                {t('start.continueSession')}
+              </MenuButton>
+            )}
             <MenuButton autoFocus value="create" onClick={handleMenuClick}>
               {t('start.createGame')}
             </MenuButton>
             <MenuButton value="join" onClick={handleMenuClick}>
               {t('start.joinGame')}
             </MenuButton>
-            {hasSession && (
-              <MenuButton onClick={() => navigate('/lobby', { state: { resumed: true } })}>
-                {t('start.continueSession')}
-              </MenuButton>
-            )}
             <div className="flex flex-col pt-6">
               <MenuButton value="rules" onClick={handleMenuClick}>
                 {t('start.rules')}
