@@ -1,9 +1,9 @@
 import { useTranslation } from '@release/translation'
 import { Button, randomNickname, sanitizeNickname } from '@release/ui'
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import DiceIcon from '@/icons/DiceIcon'
 import { useSession } from '~/app/providers/SessionProvider'
-import { useNavigate } from '~/app/router'
 import Form, { FormField } from '~/shared/ui/Form'
 import { useJoinLobby } from './useJoinLobby'
 
@@ -16,14 +16,14 @@ export default function JoinLobbyForm() {
 
   return (
     <Form
-      onSubmit={(data) => {
+      onSubmit={async (data) => {
         // parseRoomCode normalizes the code (strips separators/casing/spaces),
         // so the raw code is passed through; only the nickname needs cleaning.
         const name = sanitizeNickname(data.name ?? '').trim()
         const code = data.code ?? ''
         if (name && code.trim() && !connecting) {
-          joinLobby(code, name)
-          navigate('/lobby')
+          const formatted = await joinLobby(code, name)
+          navigate(`/lobby/${formatted}`, { state: { resumed: true } })
         }
       }}
       requiredMessage={t('start.required')}

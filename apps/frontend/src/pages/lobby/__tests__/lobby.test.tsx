@@ -3,11 +3,9 @@ import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
-import CreateForm from '../_CreateForm'
 import JoinForm from '../_JoinForm'
 import LobbyFlow from '../_LobbyFlow'
 import LobbyView from '../_LobbyView'
-import LobbyIndexPage from '../index'
 
 vi.mock('@release/translation', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'ru' } }),
@@ -45,13 +43,6 @@ function renderInRouter(ui: ReactNode) {
   return render(<MemoryRouter>{ui}</MemoryRouter>)
 }
 
-it('CreateForm renders only the create form', () => {
-  sessionValue = base()
-  renderInRouter(<CreateForm />)
-  expect(screen.getByText('lobby.createTitle')).toBeTruthy()
-  expect(screen.queryByText('lobby.joinTitle')).toBeNull()
-})
-
 it('JoinForm renders only the connect form', () => {
   sessionValue = base()
   renderInRouter(<JoinForm />)
@@ -69,38 +60,6 @@ it('JoinForm pre-fills the code from a shared /lobby/:lobbyId link', () => {
     </MemoryRouter>,
   )
   expect(screen.getByDisplayValue('ABC-23D')).toBeTruthy()
-})
-
-it('/lobby opens the connect form when ?mode=join, create otherwise', () => {
-  sessionValue = base()
-  const { unmount } = render(
-    <MemoryRouter initialEntries={['/lobby?mode=join']}>
-      <LobbyIndexPage />
-    </MemoryRouter>,
-  )
-  expect(screen.getByText('lobby.joinTitle')).toBeTruthy()
-  expect(screen.queryByText('lobby.createTitle')).toBeNull()
-  unmount()
-
-  render(
-    <MemoryRouter initialEntries={['/lobby']}>
-      <LobbyIndexPage />
-    </MemoryRouter>,
-  )
-  expect(screen.getByText('lobby.createTitle')).toBeTruthy()
-})
-
-it('/lobby toggle switches between the two forms', () => {
-  sessionValue = base()
-  render(
-    <MemoryRouter initialEntries={['/lobby?mode=create']}>
-      <LobbyIndexPage />
-    </MemoryRouter>,
-  )
-  expect(screen.getByText('lobby.createTitle')).toBeTruthy()
-  fireEvent.click(screen.getByText('lobby.join'))
-  expect(screen.getByText('lobby.joinTitle')).toBeTruthy()
-  expect(screen.queryByText('lobby.createTitle')).toBeNull()
 })
 
 it('LobbyFlow renders the form (children) before a session exists', () => {
@@ -285,7 +244,7 @@ it('LobbyFlow shows disbanded message instead of the form', () => {
 it('LobbyFlow skips the interstitial when resumed=true', () => {
   sessionValue = inSession()
   render(
-    <MemoryRouter initialEntries={[{ pathname: '/lobby', state: { resumed: true } }]}>
+    <MemoryRouter initialEntries={[{ pathname: '/lobby/ABC-23D', state: { resumed: true } }]}>
       <LobbyFlow>
         <div>FORM-SLOT</div>
       </LobbyFlow>

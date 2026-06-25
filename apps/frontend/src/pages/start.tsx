@@ -67,7 +67,9 @@ export default function StartPage() {
 
           <Menu className="-ml-2.75 items-center">
             {hasSession && (
-              <MenuButton onClick={() => navigate('/lobby', { state: { resumed: true } })}>
+              <MenuButton
+                onClick={() => navigate(`/lobby/${session.roomCode}`, { state: { resumed: true } })}
+              >
                 {t('start.continueSession')}
               </MenuButton>
             )}

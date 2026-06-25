@@ -53,8 +53,8 @@ export interface UseLobby {
   isHost: boolean
   canStart: boolean
   error: string | null
-  createRoom(name: string, maxPlayers: number): Promise<void>
-  joinRoom(code: string, name: string): Promise<void>
+  createRoom(name: string, maxPlayers: number): Promise<string>
+  joinRoom(code: string, name: string): Promise<string>
   ready(): void
   kick(peerId: string): void
   setMaxPlayers(n: number): void
@@ -204,6 +204,9 @@ export function useLobby(): UseLobby {
       })
       commit(initial)
       setStatus('in-lobby')
+      // The room code is the host peer id — known synchronously, so callers can
+      // navigate straight to /lobby/:code without awaiting a roster round-trip.
+      return formatRoomCode(t.id)
     },
     [onMessage, onError, onDisconnect, commit],
   )
@@ -243,6 +246,10 @@ export function useLobby(): UseLobby {
         }),
       )
       t.connectTo(hostId)
+      // The code resolves to the host id synchronously (parseRoomCode), so the
+      // caller can route to /lobby/:code immediately; a bad code surfaces later
+      // as a connection error on that same route.
+      return formatRoomCode(hostId)
     },
     [onMessage, onError, onDisconnect, commit],
   )
