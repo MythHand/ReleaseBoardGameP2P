@@ -2,8 +2,10 @@ import { useTranslation } from '@release/translation'
 import { Menu, MenuButton } from '@release/ui'
 import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import MYTHHAND from '@/assets/brand/mythhand.svg'
 import ReleaseLogo from '@/brand/ReleaseLogo'
+import { useSession } from '~/app/providers/SessionProvider'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
 
 const REPO_URL = 'https://github.com/dimbo-design/ReleaseBoardGameP2P'
@@ -12,6 +14,9 @@ export default function StartPage() {
   const { i18n, t } = useTranslation()
   const variant = i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'
   const handleMenuClick = useModalRoute()
+  const session = useSession()
+  const navigate = useNavigate()
+  const hasSession = session.status === 'in-lobby' && !!session.state
 
   const [videoMounted, setVideoMounted] = useState(false)
   const [videoOpen, setVideoOpen] = useState(false)
@@ -67,6 +72,11 @@ export default function StartPage() {
             <MenuButton value="join" onClick={handleMenuClick}>
               {t('start.joinGame')}
             </MenuButton>
+            {hasSession && (
+              <MenuButton onClick={() => navigate('/lobby', { state: { resumed: true } })}>
+                {t('start.continueSession')}
+              </MenuButton>
+            )}
             <div className="flex flex-col pt-6">
               <MenuButton value="rules" onClick={handleMenuClick}>
                 {t('start.rules')}
