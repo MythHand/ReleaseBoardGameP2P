@@ -87,8 +87,17 @@ export default function StartPage() {
               <MenuButton value="rules" onClick={handleMenuClick}>
                 {t('start.rules')}
               </MenuButton>
+            </div>
+            <div className="flex flex-col pt-6">
               <MenuButton onClick={() => window.open(REPO_URL, '_blank', 'noopener')}>
                 {t('start.github')}
+              </MenuButton>
+              <MenuButton
+                onClick={() => {
+                  window.location.href = `${import.meta.env.BASE_URL}playground/`
+                }}
+              >
+                {t('start.playground')}
               </MenuButton>
             </div>
           </Menu>

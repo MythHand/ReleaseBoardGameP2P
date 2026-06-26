@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Card } from '@/cards/types'
 import { type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
 import Pile from '@/primitives/Pile'
-import Rules from '@/screens/Start/Rules'
+import Rules, { RULES_COPY_RU, type RulesCopy } from '@/screens/Start/Rules'
 import GameModes from '@/table/GameModes'
 import GameOver from '@/table/GameOver'
 import type { GameOverCondition } from '@/table/GameOver/GameOver'
@@ -59,6 +59,8 @@ interface TableProps {
   view?: View | null
   // текст режимов по языку (read-only панель «игровой режим»)
   modesCopy?: GameModesCopy
+  // текст правил по языку (панель «правила»)
+  rulesCopy?: RulesCopy
 }
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
@@ -83,6 +85,7 @@ export default function Table({
   onOverContinue,
   view = null,
   modesCopy = MODES_COPY_RU,
+  rulesCopy = RULES_COPY_RU,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
@@ -186,7 +189,7 @@ export default function Table({
         )}
         {panel === 'rules' && (
           <div className={styles.scrollPanel}>
-            <Rules />
+            <Rules copy={rulesCopy} />
           </div>
         )}
         {panel === 'modes' && <GameModes setup={setup} copy={modesCopy} />}

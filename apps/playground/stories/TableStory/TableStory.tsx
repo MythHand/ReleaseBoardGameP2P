@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
 import { makeTable } from '@/mocks/table'
+import { RULES_COPY_EN, RULES_COPY_RU } from '@/screens/Start/Rules'
 import Table from '@/table/Table'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
@@ -82,6 +83,7 @@ export default function TableStory() {
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
           onOverContinue={() => setEnd(null)}
           modesCopy={pick(lang, { ru: MODES_COPY_RU, en: MODES_COPY_EN })}
+          rulesCopy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })}
         />
       </div>
     </div>
