@@ -1,0 +1,55 @@
+/* Вертикальная полоса-переключатель во всю высоту, прижатая к краю.
+   Текст вкладок — вертикальный (writing-mode). Активная — brand-зелёным. */
+.rail {
+  position: absolute;
+  inset-block: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  inline-size: 56px;
+  background: var(--surface-1);
+}
+
+.right {
+  inset-inline-end: 0;
+  border-inline-start: 1px solid rgb(255 255 255 / 10%);
+}
+
+.left {
+  inset-inline-start: 0;
+  border-inline-end: 1px solid rgb(255 255 255 / 10%);
+}
+
+.tab {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  opacity: 0.6;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transition: opacity var(--t-base) var(--ease-soft),
+    color var(--t-base) var(--ease-soft);
+}
+
+.tab:last-child {
+  border-block-end: none;
+}
+
+.tab:hover {
+  opacity: 1;
+}
+
+.tabOn {
+  color: var(--brand-green);
+  background: rgb(41 224 122 / 8%);
+  opacity: 1;
+}

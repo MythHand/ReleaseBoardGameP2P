@@ -1,0 +1,10 @@
+/* летящая карта универсального шага вставки: z задаётся инлайном (travel → слот),
+   едет из source-прямоугольника в bottom-center промежутка веера */
+.flying {
+  position: fixed;
+
+  /* тот же пивот, что у слота веера (.slot Hand) — поворот/масштаб совпадают */
+  transform-origin: bottom center;
+  transition: transform 480ms var(--ease-soft);
+  will-change: transform;
+}

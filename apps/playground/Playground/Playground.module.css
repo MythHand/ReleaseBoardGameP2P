@@ -6,15 +6,24 @@
 }
 
 .sidebar {
-  padding: 18px 0;
-  overflow-y: auto; /* свой скролл навигации, не двигает контент */
+  overflow-y: auto; /* собственный скролл навигации, не двигает контент */
   background: var(--surface-1);
   border-inline-end: 1px solid rgb(255 255 255 / 8%);
 }
 
-/* переключатель языка предпросмотра — самый верх сайдбара */
+/* шапка (название + язык) прилипает к верху при скролле навигации */
+.head {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  padding: 18px 18px 14px;
+  background: var(--surface-1);
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+/* переключатель языка предпросмотра — под названием */
 .langRow {
-  padding: 0 18px 16px;
+  padding: 0;
 }
 
 .langSwitch {
@@ -67,7 +76,7 @@
 }
 
 .title {
-  padding: 0 18px 16px;
+  margin-block-end: 14px;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: var(--tracking);
@@ -77,7 +86,7 @@
 .nav {
   display: flex;
   flex-direction: column;
-  padding-block-end: 56px; /* декоративный низ — последний пункт не прижат к краю */
+  padding-block: 14px 56px; /* декоративный низ — последний пункт не прижат к краю */
 }
 
 /* группы навигации */

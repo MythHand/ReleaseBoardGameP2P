@@ -66,116 +66,13 @@
   border: 1px solid rgb(255 255 255 / 20%);
 }
 
-/* твой дисконнект — оверлей переподключения поверх стола */
-.reconnect {
-  position: absolute;
-  inset: 0;
-  z-index: 90; /* ниже game-over (100), выше полосы (60) */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(0 0 0 / 55%);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-}
+/* окно переподключения (Reconnect) и завершения (GameOver) — отдельные
+   компоненты поверх стола, см. @/table/Reconnect и @/table/GameOver */
 
-.reconnectBox {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  padding: 20px 28px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  background: color-mix(in srgb, var(--surface-1) 94%, #000);
-  border: 1px solid rgb(255 255 255 / 14%);
-}
-
-.spinner {
-  inline-size: 18px;
-  block-size: 18px;
-  border: 2px solid rgb(255 255 255 / 20%);
-  border-block-start-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ===== полоса кнопок во всю высоту ===== */
-.bar {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: 0;
-  z-index: 60;
-  display: flex;
-  flex-direction: column;
-  inline-size: 56px;
-  background: var(--surface-1);
-  border-inline-start: 1px solid rgb(255 255 255 / 10%);
-}
-
-.tab {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  color: var(--fg);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  border-block-end: 1px solid rgb(255 255 255 / 8%);
-  opacity: 0.6;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  transition: opacity var(--t-base) var(--ease-soft),
-    color var(--t-base) var(--ease-soft);
-}
-
-.tab:last-child {
-  border-block-end: none;
-}
-
-.tab:hover {
-  opacity: 1;
-}
-
-.tabOn {
-  color: var(--brand-green);
-  background: rgb(41 224 122 / 8%);
-  opacity: 1;
-}
-
-/* ===== выезжающая панель ===== */
+/* рейл (TabRail) и выезжающая панель (Drawer) — примитивы. Стол лишь задаёт
+   зазор: drawer уезжает за рейл (56px) и в открытом виде стоит слева от него. */
 .drawer {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: 56px;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  inline-size: 360px; /* fallback; реальная ширина задаётся per-tab инлайном (inlineSize) */
-  padding: 20px;
-  background: color-mix(in srgb, var(--surface-1) 92%, #000);
-  border-inline-start: 1px solid rgb(255 255 255 / 10%);
-  box-shadow: -24px 0 48px rgb(0 0 0 / 55%);
-  transform: translateX(calc(100% + 56px));
-
-  /* inline-size анимируется вместе со сдвигом — плавная смена ширины при переключении вкладок */
-  transition: transform 320ms var(--ease-soft), inline-size 320ms var(--ease-soft);
-}
-
-.drawerOpen {
-  transform: translateX(0);
+  --drawer-offset: 56px;
 }
 
 /* контент, который сам по себе длинный (правила) — скроллится внутри drawer */

@@ -1,0 +1,34 @@
+/* Выезжающая поверхность, прижатая к краю (side-sheet). Закрытая — уезжает за
+   край на свою ширину + опциональный зазор `--drawer-offset` (например, под
+   ширину рейла, который стоит у того же края). */
+.drawer {
+  position: absolute;
+  inset-block: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  background: color-mix(in srgb, var(--surface-1) 92%, #000);
+
+  /* inline-size анимируется вместе со сдвигом — плавная смена ширины контента */
+  transition: transform 320ms var(--ease-soft), inline-size 320ms var(--ease-soft);
+}
+
+.right {
+  inset-inline-end: var(--drawer-offset, 0);
+  border-inline-start: 1px solid rgb(255 255 255 / 10%);
+  box-shadow: -24px 0 48px rgb(0 0 0 / 55%);
+  transform: translateX(calc(100% + var(--drawer-offset, 0px)));
+}
+
+.left {
+  inset-inline-start: var(--drawer-offset, 0);
+  border-inline-end: 1px solid rgb(255 255 255 / 10%);
+  box-shadow: 24px 0 48px rgb(0 0 0 / 55%);
+  transform: translateX(calc(-100% - var(--drawer-offset, 0px)));
+}
+
+/* открытое состояние перебивает закрытый сдвиг обоих краёв */
+.open {
+  transform: translateX(0);
+}

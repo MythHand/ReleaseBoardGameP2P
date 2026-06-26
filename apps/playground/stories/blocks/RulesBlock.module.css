@@ -1,10 +1,4 @@
 /* Контентная область = ширина широкой модалки (см. Modal .wide). */
-.stage {
-  display: flex;
-  justify-content: center;
-  padding: 40px 24px;
-}
-
 .panel {
   inline-size: min(1040px, 95vw);
   padding: 24px 26px;

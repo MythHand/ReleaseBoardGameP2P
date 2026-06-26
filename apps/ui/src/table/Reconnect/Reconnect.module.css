@@ -1,0 +1,18 @@
+/* ниже game-over (100), выше полосы (60) */
+.over {
+  --overlay-z: 90;
+}
+
+.box {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 20px 28px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: color-mix(in srgb, var(--surface-1) 94%, #000);
+  border: 1px solid rgb(255 255 255 / 14%);
+}

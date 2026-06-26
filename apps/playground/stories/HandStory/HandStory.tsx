@@ -1,33 +1,40 @@
 import { useState } from 'react'
 import { CARDS } from '@/cards'
-import { makeHand } from '@/mocks/hand'
+import type { Card as CardType } from '@/cards/types'
+import Slider from '@/primitives/Slider'
 import Hand from '@/table/Hand'
+import { handStep } from '@/table/Hand/Hand'
 import styles from './HandStory.module.css'
 
 let _u = 0
 const uid = () => `s${++_u}`
 
+interface Item {
+  uid: string
+  card: CardType
+}
+
+// меняем длину, сохраняя существующие uid — веер плавно переукладывается
+function resize(n: number, prev: Item[] = []): Item[] {
+  const next = prev.slice(0, n)
+  while (next.length < n) next.push({ uid: uid(), card: CARDS[next.length % CARDS.length] })
+  return next
+}
+
 export default function HandStory() {
-  const [items, setItems] = useState(() => makeHand(6))
+  const [items, setItems] = useState<Item[]>(() => resize(6))
   const [faceDown, setFaceDown] = useState(false)
 
-  const add = () => setItems((p) => [...p, { uid: uid(), card: CARDS[p.length % CARDS.length] }])
-  const remove = () => setItems((p) => p.slice(0, -1))
-  const reset = () => setItems(makeHand(6))
+  const setCount = (n: number) => setItems((prev) => resize(n, prev))
+  const step = items.length >= 2 ? Math.round(handStep(items.length)) : 0
+  const span = items.length >= 2 ? Math.round((items.length - 1) * handStep(items.length)) : 0
 
   return (
     <div className={styles.root}>
       <div className={styles.controls}>
-        <button type="button" className={styles.btn} onClick={remove} disabled={items.length <= 1}>
-          − карта
-        </button>
-        <span className={styles.count}>{items.length}</span>
-        <button type="button" className={styles.btn} onClick={add} disabled={items.length >= 10}>
-          + карта
-        </button>
-        <button type="button" className={styles.btn} onClick={reset}>
-          сброс
-        </button>
+        <div className={styles.sliderWrap}>
+          <Slider label="карт в руке" value={items.length} min={0} max={20} onChange={setCount} />
+        </div>
         <label className={styles.check}>
           <input
             type="checkbox"
@@ -38,9 +45,8 @@ export default function HandStory() {
         </label>
       </div>
 
-      <p className={styles.hint}>
-        Наведи на карту — поднимается и читается, соседи расступаются. Добавляй/убирай — веер плавно
-        переукладывается.
+      <p className={styles.readout}>
+        шаг между картами: <b>{step}px</b> · ширина веера: <b>{span}px</b>
       </p>
 
       <div className={styles.stage}>

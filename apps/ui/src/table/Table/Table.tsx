@@ -1,20 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
+import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import type { Card } from '@/cards/types'
 import { type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
+import Drawer from '@/primitives/Drawer'
 import Pile from '@/primitives/Pile'
-import Rules, { RULES_COPY_RU, type RulesCopy } from '@/screens/Start/Rules'
+import TabRail, { type TabRailItem } from '@/primitives/TabRail'
 import GameModes from '@/table/GameModes'
 import GameOver from '@/table/GameOver'
-import type { GameOverCondition } from '@/table/GameOver/GameOver'
+import {
+  GAME_OVER_COPY_RU,
+  type GameOverCondition,
+  type GameOverCopy,
+} from '@/table/GameOver/GameOver'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import MoveHistory from '@/table/MoveHistory'
-import type { HistoryEntry } from '@/table/MoveHistory/MoveHistory'
+import {
+  type HistoryEntry,
+  MOVE_HISTORY_COPY_RU,
+  type MoveHistoryCopy,
+} from '@/table/MoveHistory/MoveHistory'
 import Participants from '@/table/Participants'
-import type { Participant, Spectator } from '@/table/Participants/Participants'
+import {
+  PARTICIPANTS_COPY_RU,
+  type Participant,
+  type ParticipantsCopy,
+  type Spectator,
+} from '@/table/Participants/Participants'
+import Reconnect, { RECONNECT_COPY_RU, type ReconnectCopy } from '@/table/Reconnect'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
+import { SEAT_COPY_RU, type SeatCopy } from '@/table/Seat/Seat'
 import styles from './Table.module.css'
 
 interface Opponent {
@@ -61,6 +78,18 @@ interface TableProps {
   modesCopy?: GameModesCopy
   // текст правил по языку (панель «правила»)
   rulesCopy?: RulesCopy
+  // текст мест оппонентов по языку (статус / счётчик карт)
+  seatCopy?: SeatCopy
+  // текст панели «участники» по языку
+  participantsCopy?: ParticipantsCopy
+  // текст ленты ходов по языку
+  historyCopy?: MoveHistoryCopy
+  // текст окна переподключения по языку
+  reconnectCopy?: ReconnectCopy
+  // текст окна завершения партии по языку
+  gameOverCopy?: GameOverCopy
+  // собственный «хром»-текст стола по языку
+  copy?: TableCopy
 }
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
@@ -69,6 +98,36 @@ const DRAWER_WIDTH: Record<Panel, number> = {
   participants: 420, // участники — как история
   modes: 460, // режимы — немного шире
   rules: 680, // правила — сильно шире
+}
+
+// Вкладки рейла (порядок = сверху вниз). Текст — собственный «хром» стола.
+const RAIL_ITEMS: TabRailItem[] = [
+  { id: 'history', label: 'история' },
+  { id: 'participants', label: 'участники' },
+  { id: 'rules', label: 'правила' },
+  { id: 'modes', label: 'игровой режим' },
+]
+
+// Собственный «хром»-текст стола по языку (бейдж выбывания + подписи стопок).
+export interface TableCopy {
+  youEliminated: string
+  deck: string
+  events: string
+  discard: string
+}
+
+export const TABLE_COPY_RU: TableCopy = {
+  youEliminated: 'вы выбыли из игры',
+  deck: 'колода',
+  events: 'события',
+  discard: 'сброс',
+}
+
+export const TABLE_COPY_EN: TableCopy = {
+  youEliminated: 'you are out',
+  deck: 'deck',
+  events: 'events',
+  discard: 'discard',
 }
 
 const EMPTY_RELEASE: ReleaseSlots = {
@@ -86,6 +145,12 @@ export default function Table({
   view = null,
   modesCopy = MODES_COPY_RU,
   rulesCopy = RULES_COPY_RU,
+  seatCopy = SEAT_COPY_RU,
+  participantsCopy = PARTICIPANTS_COPY_RU,
+  historyCopy = MOVE_HISTORY_COPY_RU,
+  reconnectCopy = RECONNECT_COPY_RU,
+  gameOverCopy = GAME_OVER_COPY_RU,
+  copy = TABLE_COPY_RU,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
@@ -119,23 +184,29 @@ export default function Table({
               active={turn === p.id}
               eliminated={eliminated}
               disconnected={disconnected}
+              copy={seatCopy}
             />
           )
         })}
       </div>
 
       <div className={styles.decks}>
-        <Pile label="колода" deck="base" count={decks.main} width="150px" countPos="tl" />
-        <Pile label="события" deck="ai" count={decks.events} width="150px" countPos="tl" />
+        <Pile label={copy.deck} deck="base" count={decks.main} width="150px" countPos="tl" />
+        <Pile label={copy.events} deck="ai" count={decks.events} width="150px" countPos="tl" />
       </div>
 
       <div className={styles.discard}>
-        <Pile label="сброс" topCard={decks.discard} count={decks.discardCount} width="116px" />
+        <Pile
+          label={copy.discard}
+          topCard={decks.discard}
+          count={decks.discardCount}
+          width="116px"
+        />
       </div>
 
       <div className={styles.you}>
         {youEliminated ? (
-          <div className={styles.youBadge}>вы выбыли из игры</div>
+          <div className={styles.youBadge}>{copy.youEliminated}</div>
         ) : (
           <>
             <ReleaseZone release={you.release} size="100px" />
@@ -146,46 +217,14 @@ export default function Table({
         )}
       </div>
 
-      {/* полоса кнопок во всю высоту у правого края (поверх контента) */}
-      <div className={styles.bar}>
-        <button
-          type="button"
-          className={`${styles.tab} ${panel === 'history' ? styles.tabOn : ''}`}
-          onClick={() => toggle('history')}
-        >
-          история
-        </button>
-        <button
-          type="button"
-          className={`${styles.tab} ${panel === 'participants' ? styles.tabOn : ''}`}
-          onClick={() => toggle('participants')}
-        >
-          участники
-        </button>
-        <button
-          type="button"
-          className={`${styles.tab} ${panel === 'rules' ? styles.tabOn : ''}`}
-          onClick={() => toggle('rules')}
-        >
-          правила
-        </button>
-        <button
-          type="button"
-          className={`${styles.tab} ${panel === 'modes' ? styles.tabOn : ''}`}
-          onClick={() => toggle('modes')}
-        >
-          игровой режим
-        </button>
-      </div>
+      {/* вертикальный рейл у правого края — переключает панели drawer */}
+      <TabRail items={RAIL_ITEMS} active={panel} onSelect={(id) => toggle(id as Panel)} />
 
-      {/* выезжающая панель поверх контента */}
-      <div
-        className={`${styles.drawer} ${panel ? styles.drawerOpen : ''}`}
-        style={{ inlineSize: drawerWidth }}
-      >
-        {panel === 'history' && <MoveHistory entries={history} />}
+      {/* выезжающая панель поверх контента (ширина — per-tab) */}
+      <Drawer open={panel !== null} width={drawerWidth} className={styles.drawer}>
+        {panel === 'history' && <MoveHistory entries={history} copy={historyCopy} />}
         {panel === 'participants' && (
-          <Participants players={participants} spectators={spectators} />
+          <Participants players={participants} spectators={spectators} copy={participantsCopy} />
         )}
         {panel === 'rules' && (
           <div className={styles.scrollPanel}>
@@ -193,19 +232,17 @@ export default function Table({
           </div>
         )}
         {panel === 'modes' && <GameModes setup={setup} copy={modesCopy} />}
-      </div>
+      </Drawer>
 
-      {view === 'youDisconnect' && (
-        <div className={styles.reconnect}>
-          <div className={styles.reconnectBox}>
-            <span className={styles.spinner} aria-hidden="true" />
-            переподключение…
-          </div>
-        </div>
-      )}
+      {view === 'youDisconnect' && <Reconnect copy={reconnectCopy} />}
 
       {over && (
-        <GameOver winner={overWinner} condition={over.condition} onContinue={onOverContinue} />
+        <GameOver
+          winner={overWinner}
+          condition={over.condition}
+          onContinue={onOverContinue}
+          copy={gameOverCopy}
+        />
       )}
     </div>
   )

@@ -1,6 +1,7 @@
 import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
 import GameSettings from '@/blocks/GameSettings'
+import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
 import { randomNickname, sanitizeNickname } from '@/game/nicknames'
@@ -8,7 +9,6 @@ import DiceIcon from '@/icons/DiceIcon'
 import Button from '@/primitives/Button'
 import Input from '@/primitives/Input'
 import Modal from '@/primitives/Modal'
-import Rules, { RULES_COPY_RU, type RulesCopy } from './Rules'
 import styles from './Start.module.css'
 
 // внешние ссылки (открываются в новой вкладке)
