@@ -89,6 +89,7 @@ Styling is **per-package** — the approach depends on which app the component l
 - **`@release/playground` (sandbox): CSS Modules.** It renders `@release/ui` in isolation and has no Tailwind.
 - Tailwind v4 (frontend only) is themed off the UI design tokens via the `@theme` bridge in `apps/frontend/src/index.css`, so utilities like `bg-surface-1`, `text-brand-green`, `text-cat-release` resolve to the same CSS variables defined in `apps/ui/src/design/tokens.css`. Add new token-backed utilities by extending that `@theme` block.
 - Stylelint (`.stylelintrc.json`) allows Tailwind v4 at-rules (`@theme`, `@apply`, `@utility`, `@variant`, `@custom-variant`, etc.).
+- 📌 Послание от дизайнера проекта про потребление `@release/ui` вместо ручного Tailwind на фронте — [`NO_TAILWIND.md`](./NO_TAILWIND.md). Прочитай перед работой над фронтом.
 
 ---
 
