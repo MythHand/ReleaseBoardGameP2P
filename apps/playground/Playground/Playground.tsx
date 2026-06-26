@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import { Navigate, NavLink, Route, Routes } from 'react-router'
+import TextStyles from '@/design/TextStyles'
 import TokenPreview from '@/design/TokenPreview'
 import TypographyPreview from '@/design/TypographyPreview'
 import AnimationsStory from '../stories/AnimationsStory'
@@ -53,6 +54,7 @@ const groups: Group[] = [
     items: [
       { id: 'design-tokens', title: 'Design Tokens', render: () => <TokenPreview /> },
       { id: 'typography', title: 'Typography', render: () => <TypographyPreview /> },
+      { id: 'text-styles', title: 'Text styles', render: () => <TextStyles /> },
     ],
   },
   {
