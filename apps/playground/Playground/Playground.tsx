@@ -1,10 +1,12 @@
 import { type ReactNode, useState } from 'react'
 import { Navigate, NavLink, Route, Routes } from 'react-router'
+import TextStyles from '@/design/TextStyles'
 import TokenPreview from '@/design/TokenPreview'
 import TypographyPreview from '@/design/TypographyPreview'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
 import GameSettingsBlock from '../stories/blocks/GameSettingsBlock'
+import RulesBlock from '../stories/blocks/RulesBlock'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import HandStory from '../stories/HandStory'
@@ -52,6 +54,7 @@ const groups: Group[] = [
     items: [
       { id: 'design-tokens', title: 'Design Tokens', render: () => <TokenPreview /> },
       { id: 'typography', title: 'Typography', render: () => <TypographyPreview /> },
+      { id: 'text-styles', title: 'Text styles', render: () => <TextStyles /> },
     ],
   },
   {
@@ -91,6 +94,7 @@ const groups: Group[] = [
         title: 'Game settings',
         render: () => <GameSettingsBlock />,
       },
+      { id: 'block-rules', title: 'Rules', render: () => <RulesBlock /> },
     ],
   },
 ]

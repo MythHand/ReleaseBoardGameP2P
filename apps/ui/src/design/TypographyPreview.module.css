@@ -10,11 +10,13 @@
   letter-spacing: var(--tracking);
 }
 
+/* 2 колонки на широком экране, схлопываются в 1 по минимальной ширине колонки;
+   max-inline-size кэпит ровно на 2 столбца (3 × 440 > 1280). */
 .list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
   gap: 20px;
-  max-inline-size: 760px;
+  max-inline-size: 1280px;
 }
 
 .item {
@@ -83,4 +85,53 @@
   font-size: 12px;
   line-height: 1.5;
   opacity: 0.5;
+}
+
+/* подзаголовок раздела (Шрифты / Начертания / Стили правил) */
+.subH {
+  margin: 38px 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.7;
+}
+
+/* начертания шрифта */
+.weights {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.weightRow {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+}
+
+.weightLabel {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.4;
+}
+
+/* образец стиля текста + технический CSS под ним */
+.sampleRow {
+  display: flex;
+  align-items: center;
+  min-block-size: 40px;
+}
+
+.css {
+  padding: 10px 12px;
+  margin: 14px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgb(255 255 255 / 45%);
+  white-space: pre-wrap;
+  background: rgb(0 0 0 / 25%);
+  border-radius: 6px;
 }

@@ -69,6 +69,26 @@
   border-color: #ff6b81;
 }
 
+/* деструктивная «призрак» — серая в покое (как tech), заливается красным на
+   ховере (кнопка «расформировать» в хедере лобби) */
+.dangerGhost {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: rgb(255 255 255 / 60%);
+  letter-spacing: 0.18em;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 4px;
+  transition: color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out);
+}
+
+.dangerGhost:hover {
+  color: #fff;
+  background: rgb(255 107 129 / 12%);
+  border-color: #ff6b81;
+}
+
 /* иконочная — квадрат, высота от flex-родителя (stretch) или min 52px standalone. */
 .icon {
   flex: none;

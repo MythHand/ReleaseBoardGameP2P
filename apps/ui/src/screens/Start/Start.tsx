@@ -8,7 +8,7 @@ import DiceIcon from '@/icons/DiceIcon'
 import Button from '@/primitives/Button'
 import Input from '@/primitives/Input'
 import Modal from '@/primitives/Modal'
-import Rules from './Rules'
+import Rules, { RULES_COPY_RU, type RulesCopy } from './Rules'
 import styles from './Start.module.css'
 
 // внешние ссылки (открываются в новой вкладке)
@@ -30,6 +30,7 @@ export interface StartCopy {
   joinGame: string
   rules: string
   github: string
+  playground: string
   videoReview: string
   close: string
   createTitle: string
@@ -53,12 +54,22 @@ export interface StartCopy {
 
 interface StartProps {
   copy: StartCopy
+  // текст правил по языку (модалка «Правила»)
+  rulesCopy?: RulesCopy
   // точки подключения сетевой логики (создание/вход) — реализует консьюмер
   onCreate?: (nickname: string) => void
   onJoin?: (nickname: string, code: string) => void
+  // переход в playground (на фронте ведёт на /playground/)
+  onPlayground?: () => void
 }
 
-export default function Start({ copy, onCreate, onJoin }: StartProps) {
+export default function Start({
+  copy,
+  onCreate,
+  onJoin,
+  onPlayground,
+  rulesCopy = RULES_COPY_RU,
+}: StartProps) {
   const [modal, setModal] = useState<'create' | 'join' | 'rules' | null>(null)
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
   // никнейм нужен до создания/входа: лобби должно сразу показать игрока
@@ -112,9 +123,12 @@ export default function Start({ copy, onCreate, onJoin }: StartProps) {
           </div>
           <div className={`${styles.actions} ${styles.actionsSecondary}`}>
             <Button onClick={() => setModal('rules')}>{copy.rules}</Button>
+          </div>
+          <div className={`${styles.actions} ${styles.actionsSecondary}`}>
             <Button onClick={() => window.open(GITHUB_URL, '_blank', 'noopener')}>
               {copy.github}
             </Button>
+            <Button onClick={() => onPlayground?.()}>{copy.playground}</Button>
           </div>
         </div>
       </div>
@@ -252,7 +266,7 @@ export default function Start({ copy, onCreate, onJoin }: StartProps) {
       </Modal>
 
       <Modal open={modal === 'rules'} onClose={close} title={copy.rulesTitle}>
-        <Rules />
+        <Rules copy={rulesCopy} />
       </Modal>
     </div>
   )
