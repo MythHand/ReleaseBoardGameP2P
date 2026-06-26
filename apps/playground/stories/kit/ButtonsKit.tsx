@@ -1,6 +1,5 @@
 import DiceIcon from '@/icons/DiceIcon'
 import Button from '@/primitives/Button'
-import styles from './ButtonsKit.module.css'
 import { KitCell, KitPage, KitSection } from './KitShell'
 
 // Реальный примитив Button во всех вариациях.
@@ -25,10 +24,14 @@ export default function ButtonsKit() {
             правила
           </Button>
         </KitCell>
-        <KitCell caption="danger">
-          <Button variant="tech" className={styles.danger}>
-            расформировать
-          </Button>
+      </KitSection>
+
+      <KitSection title="Danger — деструктивные">
+        <KitCell caption="danger — сплошная (модалка)">
+          <Button variant="danger">расформировать</Button>
+        </KitCell>
+        <KitCell caption="dangerGhost — серая → заливка (хедер)">
+          <Button variant="dangerGhost">расформировать</Button>
         </KitCell>
       </KitSection>
 

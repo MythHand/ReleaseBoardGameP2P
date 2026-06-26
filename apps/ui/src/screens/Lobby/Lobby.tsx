@@ -196,11 +196,7 @@ export default function Lobby({
             <span className={styles.headDivider} />
             <h1 className={styles.title}>Лобби</h1>
             {isHost && (
-              <Button
-                variant="tech"
-                className={styles.disbandBtn}
-                onClick={() => setDisbandOpen(true)}
-              >
+              <Button variant="dangerGhost" onClick={() => setDisbandOpen(true)}>
                 расформировать
               </Button>
             )}

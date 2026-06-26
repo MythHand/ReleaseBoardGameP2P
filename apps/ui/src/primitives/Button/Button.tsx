@@ -3,7 +3,7 @@ import styles from './Button.module.css'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
-  variant?: 'primary' | 'tech' | 'danger' | 'icon'
+  variant?: 'primary' | 'tech' | 'danger' | 'dangerGhost' | 'icon'
   className?: string
   ref?: Ref<HTMLButtonElement>
 }
