@@ -16,6 +16,7 @@ import SeatBlock from '../stories/blocks/SeatBlock'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import HandStory from '../stories/HandStory'
+import CardToHandStory from '../stories/interactive/CardToHandStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
 import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
 import PlayAiCardStory from '../stories/interactive/PlayAiCardStory'
@@ -98,6 +99,7 @@ const groups: Group[] = [
         title: 'Random opponent card',
         render: () => <PickOpponentCardStory />,
       },
+      { id: 'card-to-hand', title: 'Card to Hand', render: () => <CardToHandStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
       { id: 'split-deck', title: 'Split deck', render: () => <SplitDeckStory /> },
       { id: 'play-ai-card', title: 'Play AI card', render: () => <PlayAiCardStory /> },

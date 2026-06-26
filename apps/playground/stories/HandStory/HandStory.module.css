@@ -12,26 +12,8 @@
   margin-block-end: 10px;
 }
 
-.btn {
-  padding: 6px 12px;
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid rgb(255 255 255 / 15%);
-  border-radius: 6px;
-}
-
-.btn:disabled {
-  cursor: default;
-  opacity: 0.3;
-}
-
-.count {
-  min-inline-size: 24px;
-  text-align: center;
-  opacity: 0.7;
+.sliderWrap {
+  inline-size: 280px;
 }
 
 .check {
@@ -44,10 +26,17 @@
   opacity: 0.85;
 }
 
-.hint {
+.readout {
   margin: 0;
+  font-family: var(--font-mono);
   font-size: 12px;
-  opacity: 0.5;
+  color: rgb(255 255 255 / 55%);
+  letter-spacing: 0.04em;
+}
+
+.readout b {
+  font-weight: 400;
+  color: var(--brand-green);
 }
 
 .stage {

@@ -1,0 +1,55 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* техническая верхняя линия */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+.btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* превью: ряд из 5 карт по центру сверху */
+.source {
+  position: absolute;
+  inset-block-start: 104px;
+  inset-inline: 0;
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+}
+
+.sourceCard {
+  transition: opacity 200ms var(--ease-out);
+}
+
+.handWrap {
+  position: absolute;
+  inset-block-end: 24px;
+  inset-inline: 0;
+}

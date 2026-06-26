@@ -1,0 +1,107 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* техническая верхняя линия управления */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+.sliderWrap {
+  inline-size: 240px;
+}
+
+/* кнопка действия — дев-стиль плейграунда (как в AnimationsStory) */
+.btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* область раздачи; карты внутри позиционируются абсолютно от её верх-центра.
+   z выше руки — спред всегда над ней, не уходит под руку */
+.deal {
+  position: absolute;
+  inset-block: 104px 248px;
+  inset-inline: 0;
+  z-index: 50;
+}
+
+.slot {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 50%;
+  inline-size: max-content;
+  transition: transform 480ms var(--ease-soft), opacity 480ms var(--ease-soft);
+  will-change: transform, opacity;
+}
+
+/* кнопка вызова — по центру, в стиле плейграунда */
+.controls {
+  position: absolute;
+  inset-block-start: 44%;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.callBtn {
+  padding: 14px 28px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 8px;
+  transition: color var(--t-base) var(--ease-out),
+    border-color var(--t-base) var(--ease-out);
+}
+
+.callBtn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.hint {
+  position: absolute;
+  inset-block-start: 76px;
+  inset-inline: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(255 255 255 / 45%);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+/* без z-index — карты руки в общем контексте, чтобы летящая карта затыкалась
+   между половинками веера (спред над рукой держит z-index у .deal) */
+.handWrap {
+  position: absolute;
+  inset-block-end: 24px;
+  inset-inline: 0;
+}
