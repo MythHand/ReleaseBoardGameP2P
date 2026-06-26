@@ -42,3 +42,9 @@ button {
 :focus-visible {
   outline: 2px solid var(--brand-green);
 }
+
+/* выделение текста — приглушённый зелёный, читаемо (на весь проект) */
+::selection {
+  color: #fff;
+  background: rgb(41 224 122 / 30%);
+}

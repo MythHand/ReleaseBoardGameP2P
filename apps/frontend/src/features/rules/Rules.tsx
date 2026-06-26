@@ -1,20 +1,8 @@
-import { useTranslation } from '@release/translation'
-import { type RulesSection, Rules as RulesView } from '@release/ui'
+import { Rules as RulesView } from '@release/ui'
 
-// Thin i18n wrapper around the @release/ui Rules view: pulls translated copy and
-// passes it as props, so search/filter/markup live in one place in the UI package.
+// Единый источник правил — готовый компонент @release/ui Rules (тот же, что и
+// превью «Rules» в playground и панель «правила» на столе). RU-текст зашит в
+// компоненте; EN подключится позже через его copy-пропсы (UI i18n-агностичен).
 export default function Rules() {
-  const { t } = useTranslation()
-  const meta = t('rules.meta', { returnObjects: true }) as string[]
-  const sections = t('rules.sections', { returnObjects: true }) as RulesSection[]
-
-  return (
-    <RulesView
-      meta={meta}
-      sections={sections}
-      foot={t('rules.foot')}
-      searchPlaceholder={t('rules.searchPlaceholder')}
-      notFoundText={t('rules.notFound')}
-    />
-  )
+  return <RulesView />
 }

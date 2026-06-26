@@ -1,0 +1,14 @@
+/* Контентная область = ширина широкой модалки (см. Modal .wide). */
+.stage {
+  display: flex;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.panel {
+  inline-size: min(1040px, 95vw);
+  padding: 24px 26px;
+  background: color-mix(in srgb, var(--surface-1) 94%, #000);
+  border: 1px solid rgb(255 255 255 / 14%);
+  box-shadow: 0 30px 80px rgb(0 0 0 / 60%);
+}

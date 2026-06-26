@@ -5,6 +5,7 @@ import TypographyPreview from '@/design/TypographyPreview'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
 import GameSettingsBlock from '../stories/blocks/GameSettingsBlock'
+import RulesBlock from '../stories/blocks/RulesBlock'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import HandStory from '../stories/HandStory'
@@ -91,6 +92,7 @@ const groups: Group[] = [
         title: 'Game settings',
         render: () => <GameSettingsBlock />,
       },
+      { id: 'block-rules', title: 'Rules', render: () => <RulesBlock /> },
     ],
   },
 ]

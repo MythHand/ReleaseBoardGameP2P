@@ -1,20 +1,33 @@
+/* stylelint-disable no-descending-specificity -- намеренная многослойность:
+   override'ы отступов/состояний (.sec > .h + .group поверх .sec > .group и т.п.)
+   читаются в логическом порядке, а не по возрастанию специфичности. */
+
 .rules {
   font-family: var(--font-text);
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.62;
   color: rgb(255 255 255 / 86%);
 }
 
 .rules b {
-  font-weight: 600;
+  font-weight: 700;
   color: #fff;
 }
 
-/* поиск по правилам */
+/* ── поиск ─────────────────────────────────────────── */
+
+/* поиск — sticky-строка, не скроллится с правилами */
+.searchBar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  margin-block-end: 18px;
+  background: color-mix(in srgb, var(--surface-1) 94%, #000);
+}
+
 .search {
   inline-size: 100%;
-  padding: 10px 14px;
-  margin-block-end: 18px;
+  padding: 10px 104px 10px 14px;
   font-family: var(--font-mono);
   font-size: 13px;
   color: #fff;
@@ -32,72 +45,303 @@
   color: rgb(255 255 255 / 35%);
 }
 
+/* счётчик совпадений + стрелки навигации + крестик очистки */
+.searchTools {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 8px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  transform: translateY(-50%);
+}
+
+.count {
+  margin-inline-end: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 55%);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.navBtn,
+.clearBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 22px;
+  block-size: 22px;
+  padding: 0;
+  font-size: 13px;
+  color: rgb(255 255 255 / 70%);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 14%);
+}
+
+.navBtn:hover:not(:disabled),
+.clearBtn:hover {
+  color: #fff;
+  border-color: rgb(255 255 255 / 32%);
+}
+
+.navBtn:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+/* крестик чуть отделён от стрелок */
+.clearBtn {
+  margin-inline-start: 6px;
+}
+
+/* подсветка совпадений: все — приглушённый жёлтый, активное — яркое */
+.mark {
+  color: #fff;
+  background: rgb(255 230 120 / 28%);
+  border-radius: 2px;
+}
+
+.markActive {
+  color: #1c1c1c;
+  background: rgb(255 168 12 / 95%);
+  border-radius: 2px;
+}
+
 .empty {
   margin: 0;
   color: rgb(255 255 255 / 50%);
 }
 
+/* ── мета-строка ───────────────────────────────────── */
+
+/* мета — таблица 2×2 (4 ячейки), без линии-разделителя */
 .meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 22px;
-  padding: 0 0 18px;
-  margin: 0 0 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 0;
+  margin: 0 0 30px;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: rgb(255 255 255 / 55%);
+  color: rgb(255 255 255 / 60%);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   list-style: none;
-  border-block-end: 1px solid rgb(255 255 255 / 10%);
+  border: 1px solid rgb(255 255 255 / 12%);
 }
 
-.meta b {
-  color: var(--cat-release);
+.meta li {
+  padding: 9px 13px;
+  border-block-start: 1px solid rgb(255 255 255 / 8%);
+  border-inline-start: 1px solid rgb(255 255 255 / 8%);
 }
 
+.meta li:nth-child(-n + 2) {
+  border-block-start: none;
+}
+
+.meta li:nth-child(odd) {
+  border-inline-start: none;
+}
+
+/* ── секция (## в источнике) ───────────────────────── */
+
+/* Вертикальный ритм держим «совой» (* + *): расстояние задаётся между
+   соседними блоками, а не на каждом элементе — поэтому списки, абзацы и
+   карты выстраиваются в одну сетку независимо от их порядка. */
 .sec {
-  margin-block-start: 18px;
+  margin-block-start: 30px;
 }
 
-.sec p {
-  margin: 0;
+.sec:first-of-type {
+  margin-block-start: 0;
+}
+
+/* большой разрыв между 3 смысловыми блоками (описание карт / режимы) */
+.secGap {
+  margin-block-start: 60px;
+}
+
+.sec > * + * {
+  margin-block-start: 16px;
+}
+
+.sec > .group {
+  margin-block-start: 24px;
+}
+
+/* нижний отступ заголовка секции (заголовок → текст ниже) */
+.sec > .h + * {
+  margin-block-start: 5px;
+}
+
+/* но если сразу после h4 идёт h5 (заголовок группы) — больше */
+.sec > .h + .group {
+  margin-block-start: 12px;
 }
 
 .h {
-  margin: 0 0 8px;
+  margin: 0;
   font-family: var(--font-heading);
-  font-size: 13px;
+  font-size: 19px;
   color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.05em;
 }
 
-.muted {
-  margin: 0 0 8px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: rgb(255 255 255 / 45%);
+/* ── подраздел (### в источнике) ───────────────────── */
+
+/* Подраздел = ряд: опциональный арт триггер-карты слева, контент справа. */
+.group {
+  display: flex;
+  gap: 16px;
+}
+
+.groupBody {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.groupBody > * + * {
+  margin-block-start: 14px;
+}
+
+.groupBody > .sub + * {
+  margin-block-start: 5px;
+}
+
+.groupBody > .card {
+  margin-block-start: 18px;
+}
+
+.sub {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
+}
+
+/* ── абзацы и списки ───────────────────────────────── */
+.para {
+  margin: 0;
 }
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   padding-inline-start: 18px;
   margin: 0;
+  line-height: 1.45;
 }
 
 .list li::marker {
   color: var(--cat-release);
 }
 
-.foot {
-  padding-block-start: 16px;
-  margin: 24px 0 0;
-  font-size: 13px;
-  color: rgb(255 255 255 / 55%);
-  border-block-start: 1px solid rgb(255 255 255 / 10%);
+/* ── карточная запись: превью карт слева, текст справа ─ */
+.card {
+  display: flex;
+  gap: 14px;
+}
+
+.cardArt {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.cardThumb {
+  align-self: flex-start;
+  inline-size: 98px;
+  block-size: auto;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 4px;
+}
+
+.cardText {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.cardName {
+  margin: 0 0 3px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cat-release);
+  letter-spacing: 0.04em;
+}
+
+.cardDesc {
+  margin: 0;
+  color: rgb(255 255 255 / 78%);
+}
+
+/* список и ремарка внутри богатой карты (триггер-карты) */
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-inline-start: 18px;
+  margin: 7px 0 0;
+  line-height: 1.45;
+}
+
+.cardList li::marker {
+  color: var(--cat-release);
+}
+
+.cardOutro {
+  margin: 7px 0 0;
+  color: rgb(255 255 255 / 86%);
+}
+
+/* усиленный (sudo) эффект — отдельной строкой; жёлтым только метка «sudo + имя» */
+.sudoLine {
+  margin: 6px 0 0;
+}
+
+.sudoMark {
+  padding: 1px 6px;
+  color: rgb(255 255 255 / 90%);
+  background: rgb(255 206 70 / 20%);
+}
+
+/* игровые режимы — таблица «опция → эффект» */
+.modeTable {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  border: 1px solid rgb(255 255 255 / 12%);
+}
+
+.modeName,
+.modeVal {
+  padding: 7px 12px;
+}
+
+.modeName {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cat-release);
+  white-space: nowrap;
+  border-inline-end: 1px solid rgb(255 255 255 / 10%);
+}
+
+.modeVal {
+  color: rgb(255 255 255 / 82%);
+}
+
+.modeTable > *:nth-child(n + 3) {
+  border-block-start: 1px solid rgb(255 255 255 / 8%);
+}
+
+/* ── завершающая ремарка секции/подраздела — обычный текст ─ */
+.outro {
+  margin: 28px 0 8px;
+  color: rgb(255 255 255 / 86%);
 }
