@@ -86,17 +86,36 @@ function IconRedirect() {
   )
 }
 
+// Текст ленты — приходит пропсом (компонент i18n-agnostic). Дефолт — русский.
+export interface MoveHistoryCopy {
+  // бейдж вскрытого добора
+  draw: string
+  // суффикс системной строки выбывания: «{who} <eliminated>»
+  eliminated: string
+}
+
+export const MOVE_HISTORY_COPY_RU: MoveHistoryCopy = {
+  draw: 'добор',
+  eliminated: 'выбыл из игры',
+}
+
+export const MOVE_HISTORY_COPY_EN: MoveHistoryCopy = {
+  draw: 'draw',
+  eliminated: 'is out',
+}
+
 interface RowProps {
   e: HistoryEntry
+  copy: MoveHistoryCopy
   nested?: boolean
 }
 
-function Row({ e, nested = false }: RowProps) {
+function Row({ e, copy, nested = false }: RowProps) {
   // системная строка (выбывание) — нейтрально-серая, без акцента/карты
   if (e.kind === 'выбыл' || e.system) {
     return (
       <div className={`${styles.system} ${nested ? styles.nested : ''}`}>
-        {e.text ?? `${e.who} выбыл из игры`}
+        {e.text ?? `${e.who} ${copy.eliminated}`}
       </div>
     )
   }
@@ -113,7 +132,7 @@ function Row({ e, nested = false }: RowProps) {
         style={accent ? ({ '--accent': accent } as CSSProperties) : undefined}
       >
         {/* вскрытый добор: помечаем «добор», карта показывается публично */}
-        {isDraw && e.card && <span className={styles.drawTag}>добор</span>}
+        {isDraw && e.card && <span className={styles.drawTag}>{copy.draw}</span>}
         <span className={e.card ? styles.card : styles.action}>{label}</span>
 
         {/* связка с жёлтой поддержкой: + Sudo / + Code Review */}
@@ -158,7 +177,7 @@ function Row({ e, nested = false }: RowProps) {
         <span className={styles.who}>{e.who}</span>
       </div>
       {e.children?.map((c) => (
-        <Row key={c.id} e={c} nested />
+        <Row key={c.id} e={c} copy={copy} nested />
       ))}
     </>
   )
@@ -166,16 +185,20 @@ function Row({ e, nested = false }: RowProps) {
 
 interface MoveHistoryProps {
   entries?: HistoryEntry[]
+  copy?: MoveHistoryCopy
 }
 
 // История: слева — карта/действие (+ связка/цель/возврат), справа — кто;
 // реакции и последствия вложены иерархией; слева фон-градиент из цвета типа.
-export default function MoveHistory({ entries = [] }: MoveHistoryProps) {
+export default function MoveHistory({
+  entries = [],
+  copy = MOVE_HISTORY_COPY_RU,
+}: MoveHistoryProps) {
   return (
     <div className={styles.box}>
       <div className={styles.list}>
         {entries.map((e) => (
-          <Row key={e.id} e={e} />
+          <Row key={e.id} e={e} copy={copy} />
         ))}
       </div>
     </div>

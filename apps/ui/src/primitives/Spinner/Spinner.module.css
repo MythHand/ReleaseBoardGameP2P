@@ -1,0 +1,15 @@
+/* Крутящееся кольцо-индикатор. Размер — через inline-стиль (size), толщина 2px. */
+.spinner {
+  display: inline-block;
+  flex: none;
+  border: 2px solid rgb(255 255 255 / 20%);
+  border-block-start-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

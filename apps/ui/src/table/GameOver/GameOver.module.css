@@ -1,19 +1,6 @@
-.overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 100; /* выше боковой полосы (60) и drawer (50) */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(0 0 0 / 62%);
-  opacity: 0;
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-  transition: opacity 320ms var(--ease-soft);
-}
-
-.shown {
-  opacity: 1;
+/* выше боковой полосы (60), drawer (50) и реконекта (90) */
+.over {
+  --overlay-z: 100;
 }
 
 .card {
@@ -25,12 +12,17 @@
   background: color-mix(in srgb, var(--surface-1) 94%, #000);
   border: 1px solid rgb(143 217 176 / 40%);
   box-shadow: 0 30px 80px rgb(0 0 0 / 60%);
-  transform: translateY(14px) scale(0.96);
-  transition: transform 360ms var(--ease-soft);
+  animation: game-over-in 360ms var(--ease-soft);
 }
 
-.shown .card {
-  transform: none;
+@keyframes game-over-in {
+  from {
+    transform: translateY(14px) scale(0.96);
+  }
+
+  to {
+    transform: none;
+  }
 }
 
 .crown {

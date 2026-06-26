@@ -1,6 +1,6 @@
+import { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
 import { MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
 import Start from '@/screens/Start'
-import { RULES_COPY_EN, RULES_COPY_RU } from '@/screens/Start/Rules'
 import type { StartCopy } from '@/screens/Start/Start'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './StartStory.module.css'

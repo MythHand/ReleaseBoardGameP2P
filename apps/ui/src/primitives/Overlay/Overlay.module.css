@@ -1,0 +1,20 @@
+/* Затемняющий scrim поверх ближайшего позиционированного контейнера: центрирует
+   контент и плавно появляется. z-index — через --overlay-z (дефолт 100); тон и
+   блюр можно переопределить классом потребителя. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--overlay-z, 100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 60%);
+  opacity: 0;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  transition: opacity 320ms var(--ease-soft);
+}
+
+.shown {
+  opacity: 1;
+}

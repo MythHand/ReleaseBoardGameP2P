@@ -1,8 +1,14 @@
 import { useMemo, useState } from 'react'
+import { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
 import { MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
 import { makeTable } from '@/mocks/table'
-import { RULES_COPY_EN, RULES_COPY_RU } from '@/screens/Start/Rules'
+import { GAME_OVER_COPY_EN, GAME_OVER_COPY_RU } from '@/table/GameOver/GameOver'
+import { MOVE_HISTORY_COPY_EN, MOVE_HISTORY_COPY_RU } from '@/table/MoveHistory/MoveHistory'
+import { PARTICIPANTS_COPY_EN, PARTICIPANTS_COPY_RU } from '@/table/Participants/Participants'
+import { RECONNECT_COPY_EN, RECONNECT_COPY_RU } from '@/table/Reconnect'
+import { SEAT_COPY_EN, SEAT_COPY_RU } from '@/table/Seat/Seat'
 import Table from '@/table/Table'
+import { TABLE_COPY_EN, TABLE_COPY_RU } from '@/table/Table/Table'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './TableStory.module.css'
@@ -84,6 +90,12 @@ export default function TableStory() {
           onOverContinue={() => setEnd(null)}
           modesCopy={pick(lang, { ru: MODES_COPY_RU, en: MODES_COPY_EN })}
           rulesCopy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })}
+          seatCopy={pick(lang, { ru: SEAT_COPY_RU, en: SEAT_COPY_EN })}
+          participantsCopy={pick(lang, { ru: PARTICIPANTS_COPY_RU, en: PARTICIPANTS_COPY_EN })}
+          historyCopy={pick(lang, { ru: MOVE_HISTORY_COPY_RU, en: MOVE_HISTORY_COPY_EN })}
+          reconnectCopy={pick(lang, { ru: RECONNECT_COPY_RU, en: RECONNECT_COPY_EN })}
+          gameOverCopy={pick(lang, { ru: GAME_OVER_COPY_RU, en: GAME_OVER_COPY_EN })}
+          copy={pick(lang, { ru: TABLE_COPY_RU, en: TABLE_COPY_EN })}
         />
       </div>
     </div>

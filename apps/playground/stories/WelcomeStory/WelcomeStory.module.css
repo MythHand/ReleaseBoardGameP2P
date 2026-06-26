@@ -1,0 +1,40 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-inline-size: 720px;
+  min-block-size: 100vh;
+  padding: 48px 56px;
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--brand-green);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  opacity: 0.6;
+}
+
+.title {
+  margin: 10px 0 0;
+  font-family: var(--font-heading);
+  font-size: 44px;
+  letter-spacing: 0.01em;
+}
+
+.lead {
+  margin: 18px 0 0;
+  font-family: var(--font-text);
+  font-size: 17px;
+  color: rgb(255 255 255 / 75%);
+}
+
+.body {
+  max-inline-size: 560px;
+  margin: 14px 0 0;
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgb(255 255 255 / 50%);
+}

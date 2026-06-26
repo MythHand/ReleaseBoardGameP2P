@@ -5,23 +5,41 @@ import TokenPreview from '@/design/TokenPreview'
 import TypographyPreview from '@/design/TypographyPreview'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
+import GameOverBlock from '../stories/blocks/GameOverBlock'
 import GameSettingsBlock from '../stories/blocks/GameSettingsBlock'
+import MoveHistoryBlock from '../stories/blocks/MoveHistoryBlock'
+import ParticipantsBlock from '../stories/blocks/ParticipantsBlock'
+import ReconnectBlock from '../stories/blocks/ReconnectBlock'
+import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
 import RulesBlock from '../stories/blocks/RulesBlock'
+import SeatBlock from '../stories/blocks/SeatBlock'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import HandStory from '../stories/HandStory'
+import DrawCardStory from '../stories/interactive/DrawCardStory'
+import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
+import PlayAiCardStory from '../stories/interactive/PlayAiCardStory'
+import SplitDeckStory from '../stories/interactive/SplitDeckStory'
 import AvatarsKit from '../stories/kit/AvatarsKit'
 import BadgesKit from '../stories/kit/BadgesKit'
 import ButtonsKit from '../stories/kit/ButtonsKit'
+import DrawerKit from '../stories/kit/DrawerKit'
 import InputsKit from '../stories/kit/InputsKit'
+import MenuKit from '../stories/kit/MenuKit'
 import ModalsKit from '../stories/kit/ModalsKit'
+import ModeSelectKit from '../stories/kit/ModeSelectKit'
+import OverlayKit from '../stories/kit/OverlayKit'
+import PilesKit from '../stories/kit/PilesKit'
 import SlidersKit from '../stories/kit/SlidersKit'
+import SpinnerKit from '../stories/kit/SpinnerKit'
+import TabRailKit from '../stories/kit/TabRailKit'
 import TogglesKit from '../stories/kit/TogglesKit'
 import LoaderStory from '../stories/LoaderStory'
 import LobbyStory from '../stories/LobbyStory'
 import StartStory from '../stories/StartStory'
 import StatsStory from '../stories/StatsStory'
 import TableStory from '../stories/TableStory'
+import WelcomeStory from '../stories/WelcomeStory'
 import { type Lang, LangContext } from './lang'
 import styles from './Playground.module.css'
 
@@ -39,6 +57,11 @@ interface Group {
 // Реестр «историй», сгруппированный по смыслу. Каждая группа — раздел навигации;
 // «Экраны» — слепки целых экранов, остальные — изолированные сущности/элементы.
 const groups: Group[] = [
+  {
+    // приветственная вкладка — первой и без заголовка группы
+    title: '',
+    items: [{ id: 'welcome', title: 'Welcome', render: () => <WelcomeStory /> }],
+  },
   {
     title: 'Экраны',
     items: [
@@ -70,6 +93,14 @@ const groups: Group[] = [
       { id: 'animations', title: 'Animations', render: () => <AnimationsStory /> },
       { id: 'arrow', title: 'Arrow', render: () => <ArrowStory /> },
       { id: 'combo', title: 'Combo', render: () => <ComboStory /> },
+      {
+        id: 'pick-opponent-card',
+        title: 'Random opponent card',
+        render: () => <PickOpponentCardStory />,
+      },
+      { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
+      { id: 'split-deck', title: 'Split deck', render: () => <SplitDeckStory /> },
+      { id: 'play-ai-card', title: 'Play AI card', render: () => <PlayAiCardStory /> },
     ],
   },
   {
@@ -82,7 +113,14 @@ const groups: Group[] = [
       { id: 'kit-sliders', title: 'Sliders', render: () => <SlidersKit /> },
       { id: 'kit-badges', title: 'Badges', render: () => <BadgesKit /> },
       { id: 'kit-avatars', title: 'Avatars', render: () => <AvatarsKit /> },
-      { id: 'kit-modals', title: 'Modals', render: () => <ModalsKit /> },
+      { id: 'kit-menu', title: 'Menu', render: () => <MenuKit /> },
+      { id: 'kit-mode-select', title: 'Mode select', render: () => <ModeSelectKit /> },
+      { id: 'kit-piles', title: 'Piles', render: () => <PilesKit /> },
+      { id: 'kit-modals', title: 'Modal', render: () => <ModalsKit /> },
+      { id: 'kit-drawer', title: 'Drawer', render: () => <DrawerKit /> },
+      { id: 'kit-tab-rail', title: 'Tab rail', render: () => <TabRailKit /> },
+      { id: 'kit-overlay', title: 'Overlay', render: () => <OverlayKit /> },
+      { id: 'kit-spinner', title: 'Spinner', render: () => <SpinnerKit /> },
     ],
   },
   {
@@ -95,6 +133,12 @@ const groups: Group[] = [
         render: () => <GameSettingsBlock />,
       },
       { id: 'block-rules', title: 'Rules', render: () => <RulesBlock /> },
+      { id: 'block-seat', title: 'Seat', render: () => <SeatBlock /> },
+      { id: 'block-release-zone', title: 'Release zone', render: () => <ReleaseZoneBlock /> },
+      { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },
+      { id: 'block-move-history', title: 'Move history', render: () => <MoveHistoryBlock /> },
+      { id: 'block-reconnect', title: 'Reconnect', render: () => <ReconnectBlock /> },
+      { id: 'block-game-over', title: 'Game over', render: () => <GameOverBlock /> },
     ],
   },
 ]
@@ -111,30 +155,32 @@ export default function Playground() {
     <LangContext.Provider value={{ lang, setLang }}>
       <div className={styles.wrap}>
         <aside className={styles.sidebar}>
-          <div className={styles.langRow}>
-            <div className={styles.langSwitch}>
-              <span
-                className={styles.langThumb}
-                style={{ transform: lang === 'en' ? 'translateX(100%)' : 'translateX(0)' }}
-                aria-hidden="true"
-              />
-              {LANGS.map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  className={lang === l ? styles.langOn : styles.langOff}
-                  onClick={() => setLang(l)}
-                >
-                  {l}
-                </button>
-              ))}
+          <div className={styles.head}>
+            <div className={styles.title}>Playground</div>
+            <div className={styles.langRow}>
+              <div className={styles.langSwitch}>
+                <span
+                  className={styles.langThumb}
+                  style={{ transform: lang === 'en' ? 'translateX(100%)' : 'translateX(0)' }}
+                  aria-hidden="true"
+                />
+                {LANGS.map((l) => (
+                  <button
+                    key={l}
+                    type="button"
+                    className={lang === l ? styles.langOn : styles.langOff}
+                    onClick={() => setLang(l)}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-          <div className={styles.title}>playground</div>
           <nav className={styles.nav}>
             {groups.map((g) => (
-              <div key={g.title} className={styles.group}>
-                <div className={styles.groupTitle}>{g.title}</div>
+              <div key={g.title || g.items[0]?.id} className={styles.group}>
+                {g.title && <div className={styles.groupTitle}>{g.title}</div>}
                 {g.items.map((s) => (
                   <NavLink
                     key={s.id}

@@ -1,11 +1,20 @@
 import type { ReactNode } from 'react'
 import styles from './KitShell.module.css'
 
-// Общий каркас страниц UI KIT: заголовок раздела, секции и ячейки с подписями.
-export function KitPage({ title, children }: { title: string; children: ReactNode }) {
+// Общий каркас страниц-витрин: метка раздела, заголовок, секции и ячейки.
+// `tag` по умолчанию «ui kit»; для блоков передаём «блок».
+export function KitPage({
+  title,
+  tag = 'ui kit',
+  children,
+}: {
+  title: string
+  tag?: string
+  children: ReactNode
+}) {
   return (
     <div className={styles.page}>
-      <div className={styles.tag}>ui kit</div>
+      <div className={styles.tag}>{tag}</div>
       <h1 className={styles.title}>{title}</h1>
       {children}
     </div>

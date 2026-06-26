@@ -118,7 +118,7 @@ export default function Card({
           ref={flipRef}
           style={{ transform: `rotateY(${initialDown.current ? 180 : 0}deg)` }}
         >
-          <div className={`${styles.face} ${styles.front}`}>
+          <div className={styles.face}>
             <CardFace card={card} />
           </div>
           <div className={`${styles.face} ${styles.back}`}>
