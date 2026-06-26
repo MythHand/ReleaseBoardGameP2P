@@ -11,18 +11,24 @@ import {
   sanitizeNickname,
 } from '@release/ui'
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
 import DiceIcon from '@/icons/DiceIcon'
+import { useGoToLobby } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
 import Form, { FormField } from '~/shared/ui/Form'
 import { useCreateLobby } from './useCreateLobby'
 
+// Default lobby capacity: the maximum the host can later narrow with the
+// in-lobby slider. Seeding the max means early joiners are always admitted as
+// players, never silently relegated to spectators.
+const DEFAULT_CAPACITY = 6
+
 export default function CreateLobbyForm() {
   const { t, i18n } = useTranslation()
   const modesCopy = i18n.language.startsWith('en') ? MODES_COPY_EN : MODES_COPY_RU
-  const navigate = useNavigate()
+  const goToLobby = useGoToLobby()
   const createLobby = useCreateLobby()
-  const connecting = useSession().status === 'connecting'
+  const session = useSession()
+  const connecting = session.status === 'connecting'
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
   const [name, setName] = useState('')
 
@@ -31,8 +37,15 @@ export default function CreateLobbyForm() {
       onSubmit={async (data) => {
         const name = sanitizeNickname(data.name ?? '').trim()
         if (name && !connecting) {
-          const code = await createLobby(name, 4)
-          navigate(`/lobby/${code}`, { state: { resumed: true } })
+          try {
+            // Pass the host's mode picks so the lobby seeds them instead of
+            // DEFAULT_SETUP. A setup failure rejects here and is surfaced via
+            // session.error below, so only navigate on success.
+            const code = await createLobby(name, DEFAULT_CAPACITY, setup)
+            goToLobby(code)
+          } catch {
+            // Error already surfaced through session.error; stay on the form.
+          }
         }
       }}
       requiredMessage={t('start.required')}
@@ -82,6 +95,11 @@ export default function CreateLobbyForm() {
           <Button type="submit" disabled={connecting}>
             {t('start.createCta')}
           </Button>
+          {session.error && (
+            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-400 text-sm">
+              {session.error}
+            </p>
+          )}
           <p className="mt-auto mb-0 text-[13px] text-white/50 leading-[1.55]">
             {t('start.lobbyNote')}
           </p>

@@ -1,5 +1,6 @@
 import { useTranslation } from '@release/translation'
 import { Button } from '@release/ui'
+import { BASE_URL, IS_DEV } from '~/shared/config'
 
 function messageOf(error: unknown): string | null {
   if (error instanceof Error) return error.message
@@ -13,7 +14,7 @@ function messageOf(error: unknown): string | null {
  */
 export default function ErrorScreen({ error }: { error?: unknown }) {
   const { t } = useTranslation()
-  const detail = import.meta.env.DEV ? messageOf(error) : null
+  const detail = IS_DEV ? messageOf(error) : null
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-bg p-6 text-center text-fg">
@@ -28,7 +29,7 @@ export default function ErrorScreen({ error }: { error?: unknown }) {
       )}
       <div className="inline-flex gap-2">
         <Button onClick={() => window.location.reload()}>{t('error.reload')}</Button>
-        <Button variant="tech" onClick={() => window.location.assign(import.meta.env.BASE_URL)}>
+        <Button variant="tech" onClick={() => window.location.assign(BASE_URL)}>
           {t('error.backToStart')}
         </Button>
       </div>

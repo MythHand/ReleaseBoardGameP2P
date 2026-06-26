@@ -2,8 +2,8 @@ import { useTranslation } from '@release/translation'
 import { Menu, MenuButton } from '@release/ui'
 import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
 import MYTHHAND from '@/assets/brand/mythhand.svg'
+import { useGoToLobby } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
 import AppLogo from '~/shared/ui/AppLogo'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
@@ -14,7 +14,7 @@ export default function StartPage() {
   const { t } = useTranslation()
   const handleMenuClick = useModalRoute()
   const session = useSession()
-  const navigate = useNavigate()
+  const goToLobby = useGoToLobby()
   const hasSession = session.status === 'in-lobby' && !!session.state
 
   const [videoMounted, setVideoMounted] = useState(false)
@@ -73,7 +73,7 @@ export default function StartPage() {
               aria-hidden={!hasSession}
               disabled={!hasSession}
               className={hasSession ? undefined : 'pointer-events-none invisible'}
-              onClick={() => navigate(`/lobby/${session.roomCode}`, { state: { resumed: true } })}
+              onClick={() => session.roomCode && goToLobby(session.roomCode)}
             >
               {t('start.continueSession')}
             </MenuButton>

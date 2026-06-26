@@ -78,6 +78,11 @@ export function useLobby(): UseLobby {
   const transportRef = useRef<Transport | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
+  // Whether the guest's DataChannel to the host ever opened. Distinguishes a
+  // host that genuinely left (channel was up, then dropped) from a connection
+  // that never established (ICE/negotiation failure) — so the two report
+  // different, accurate errors.
+  const hostConnectedRef = useRef(false)
   const leaveSessionRef = useRef<() => void>(() => {})
 
   const onError = useCallback((err: { type?: string; message: string }) => {
@@ -124,8 +129,14 @@ export function useLobby(): UseLobby {
         commit(applyPeerLeft(current, peerId))
         dispatch([{ to: 'broadcast', message: { type: 'PLAYER_KICKED', payload: { peerId } } }])
       } else if (peerId === current.hostId) {
-        // The host vanished — the guest can't proceed without it.
-        setError('disconnected: host left the lobby')
+        // The guest can't proceed without the host. Only call it "host left" if
+        // we were actually connected; a channel that never opened means the
+        // connection failed (ICE/negotiation) — keep that more specific error.
+        if (hostConnectedRef.current) {
+          setError('disconnected: host left the lobby')
+        } else {
+          setError((prev) => prev ?? 'could not connect to the lobby')
+        }
         setStatus('error')
       } else {
         commit(applyPeerLeft(current, peerId))
@@ -243,6 +254,7 @@ export function useLobby(): UseLobby {
     async (code: string, name: string) => {
       setStatus('connecting')
       setError(null)
+      hostConnectedRef.current = false
       const hostId = parseRoomCode(code)
       try {
         const t = await createTransport({
@@ -256,6 +268,7 @@ export function useLobby(): UseLobby {
             // confirmed, so flip to 'in-lobby' here rather than optimistically:
             // a bad/expired code never opens and surfaces as a PeerJS error.
             if (peerId === hostId) {
+              hostConnectedRef.current = true
               transportRef.current?.send(hostId, { type: 'JOIN_REQUEST', payload: { name } })
               setStatus('in-lobby')
             }
@@ -350,6 +363,7 @@ export function useLobby(): UseLobby {
     transportRef.current = null
     stateRef.current = null
     isHostRef.current = false
+    hostConnectedRef.current = false
     setState(null)
     setStatus('idle')
     setRoomCode(null)

@@ -1,17 +1,19 @@
 import { useTranslation } from '@release/translation'
 import { Button, randomNickname, sanitizeNickname } from '@release/ui'
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import DiceIcon from '@/icons/DiceIcon'
+import { useGoToLobby } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
 import Form, { FormField } from '~/shared/ui/Form'
 import { useJoinLobby } from './useJoinLobby'
 
 export default function JoinLobbyForm() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const goToLobby = useGoToLobby()
   const joinLobby = useJoinLobby()
-  const connecting = useSession().status === 'connecting'
+  const session = useSession()
+  const connecting = session.status === 'connecting'
   const [name, setName] = useState('')
   // On an invite link (/lobby/:lobbyId) the code is in the URL; pre-fill it.
   // On the start-screen modal there is no route param, so this is empty.
@@ -25,8 +27,14 @@ export default function JoinLobbyForm() {
         const name = sanitizeNickname(data.name ?? '').trim()
         const code = data.code ?? ''
         if (name && code.trim() && !connecting) {
-          const formatted = await joinLobby(code, name)
-          navigate(`/lobby/${formatted}`, { state: { resumed: true } })
+          try {
+            // A setup failure (bad code, signaling unreachable) rejects here and
+            // is surfaced via session.error below, so only navigate on success.
+            const formatted = await joinLobby(code, name)
+            goToLobby(formatted)
+          } catch {
+            // Error already surfaced through session.error; stay on the form.
+          }
         }
       }}
       requiredMessage={t('start.required')}
@@ -61,6 +69,11 @@ export default function JoinLobbyForm() {
       <Button type="submit" disabled={connecting}>
         {t('start.joinCta')}
       </Button>
+      {session.error && (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-400 text-sm">
+          {session.error}
+        </p>
+      )}
     </Form>
   )
 }

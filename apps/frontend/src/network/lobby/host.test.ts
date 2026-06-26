@@ -28,6 +28,16 @@ it('handleReady broadcasts PEER_JOINED with ready: true', () => {
   expect(broadcast?.message.type === 'PEER_JOINED' && broadcast.message.payload.ready).toBe(true)
 })
 
+it('handleReady toggles readiness back off (reversible)', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'Pam').state
+  const readied = handleReady(joined, 'p1').state // false -> true
+  expect(readied.peers.p1.ready).toBe(true)
+  const { state, outgoing } = handleReady(readied, 'p1') // true -> false
+  expect(state.peers.p1.ready).toBe(false)
+  const broadcast = outgoing.find((o) => o.message.type === 'PEER_JOINED')
+  expect(broadcast?.message.type === 'PEER_JOINED' && broadcast.message.payload.ready).toBe(false)
+})
+
 it('assigns guest when player slots are full', () => {
   const { state } = handleJoinRequest(base(2), 'p1', 'Pam') // host fills 1, p1 fills 2
   const second = handleJoinRequest(state, 'p2', 'Pat')
