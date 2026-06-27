@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import GameSettings from '@/blocks/GameSettings'
+import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
+import LobbyCode, { LOBBY_CODE_COPY_EN, LOBBY_CODE_COPY_RU } from '@/blocks/LobbyCode'
+import PlayerSlot, { EmptySlot } from '@/blocks/PlayerSlot'
 import ReleaseLogo from '@/brand/ReleaseLogo'
-import { DEFAULT_SETUP, type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
-import Avatar from '@/primitives/Avatar'
+import { DEFAULT_SETUP, MODES_COPY_EN, MODES_COPY_RU, type Setup } from '@/game/modes'
 import Badge from '@/primitives/Badge'
 import Button from '@/primitives/Button'
 import Modal from '@/primitives/Modal'
@@ -21,21 +23,116 @@ interface Spectator {
   id: number
   name: string
 }
-interface MenuItemDef {
-  label: string
-  danger?: boolean
-  disabled?: boolean
-  hint?: string
-  onClick: () => void
-}
-
 interface LobbyProps {
   code?: string
   initialCapacity?: number
   initialPlayers?: Player[]
   role?: 'host' | 'guest'
   initialSetup?: Setup
-  modesCopy?: GameModesCopy
+  initialLang?: SwitchLang
+}
+
+// Весь видимый текст лобби приходит из набора по языку — экран сам переключает
+// язык встроенным свитчером, поэтому держит оба набора и выбирает по lang.
+export interface LobbyCopy {
+  title: string
+  subtitle: string
+  language: string
+  disband: string
+  modes: string
+  modesLockedHint: string
+  players: string
+  capacity: string
+  spectators: string
+  specLimit: string
+  freeSlot: string
+  noSpectators: string
+  roleHost: string
+  roleGuest: string
+  you: string
+  ready: string
+  notReady: string
+  waiting: string
+  offline: string
+  makeSpectator: string
+  makePlayer: string
+  kick: string
+  noSlot: string
+  unavailable: string
+  actions: string
+  start: string
+  leave: string
+  disbandTitle: string
+  disbandText: string
+  cancel: string
+}
+
+export const LOBBY_COPY_RU: LobbyCopy = {
+  title: 'Лобби',
+  subtitle: 'Ожидание игроков…',
+  language: 'язык',
+  disband: 'расформировать',
+  modes: 'Режимы партии',
+  modesLockedHint: 'настраивает host',
+  players: 'Игроки',
+  capacity: 'Вместимость',
+  spectators: 'Зрители',
+  specLimit: 'Лимит',
+  freeSlot: 'свободный слот',
+  noSpectators: 'пока без зрителей',
+  roleHost: 'host',
+  roleGuest: 'зритель',
+  you: 'вы',
+  ready: 'готов',
+  notReady: 'не готов',
+  waiting: 'ожидание',
+  offline: 'не в сети',
+  makeSpectator: 'Сделать зрителем',
+  makePlayer: 'Сделать игроком',
+  kick: 'Исключить',
+  noSlot: 'Нет доступного слота',
+  unavailable: 'Недоступно',
+  actions: 'действия',
+  start: 'начать игру',
+  leave: 'покинуть',
+  disbandTitle: 'Расформировать лобби?',
+  disbandText:
+    'Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить.',
+  cancel: 'отмена',
+}
+
+export const LOBBY_COPY_EN: LobbyCopy = {
+  title: 'Lobby',
+  subtitle: 'Waiting for players…',
+  language: 'language',
+  disband: 'disband',
+  modes: 'Match modes',
+  modesLockedHint: 'set by host',
+  players: 'Players',
+  capacity: 'Capacity',
+  spectators: 'Spectators',
+  specLimit: 'Limit',
+  freeSlot: 'free slot',
+  noSpectators: 'no spectators yet',
+  roleHost: 'host',
+  roleGuest: 'spectator',
+  you: 'you',
+  ready: 'ready',
+  notReady: 'not ready',
+  waiting: 'waiting',
+  offline: 'offline',
+  makeSpectator: 'Make spectator',
+  makePlayer: 'Make player',
+  kick: 'Kick',
+  noSlot: 'No free slot',
+  unavailable: 'Unavailable',
+  actions: 'actions',
+  start: 'start game',
+  leave: 'leave',
+  disbandTitle: 'Disband lobby?',
+  disbandText:
+    'The lobby will be closed and all connected players disconnected. This cannot be undone.',
+  cancel: 'cancel',
 }
 
 // ⚠️ Каркас (WIP). Данные — моки. Сетевой/presence-слой придёт от логики;
@@ -65,7 +162,7 @@ export default function Lobby({
   initialPlayers = MOCK_PLAYERS,
   role = 'host',
   initialSetup = DEFAULT_SETUP,
-  modesCopy = MODES_COPY_RU,
+  initialLang = 'ru',
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
@@ -75,14 +172,13 @@ export default function Lobby({
   const [capacity, setCapacity] = useState(initialCapacity)
   const [spectators, setSpectators] = useState<Spectator[]>(MOCK_SPECTATORS)
   const [specCapacity, setSpecCapacity] = useState(8)
-  const [menuFor, setMenuFor] = useState<number | null>(null)
-  const [menuHint, setMenuHint] = useState('')
   const [disbandOpen, setDisbandOpen] = useState(false)
+  const [lang, setLang] = useState<SwitchLang>(initialLang)
 
-  const openMenu = (id: number) => {
-    setMenuHint('')
-    setMenuFor((cur) => (cur === id ? null : id))
-  }
+  // наборы текста по языку — экран держит оба и выбирает встроенным свитчером
+  const copy = lang === 'en' ? LOBBY_COPY_EN : LOBBY_COPY_RU
+  const modesCopy = lang === 'en' ? MODES_COPY_EN : MODES_COPY_RU
+  const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
 
   const specColor = specColorFor(specCapacity)
 
@@ -91,39 +187,20 @@ export default function Lobby({
     setPlayers((ps) => ps.map((p) => (p.id === id ? { ...p, ready: !p.ready } : p)))
 
   // модерация (host)
-  const kick = (id: number) => {
-    setPlayers((ps) => ps.filter((p) => p.id !== id))
-    setMenuFor(null)
-  }
-  const kickSpectator = (id: number) => {
-    setSpectators((ss) => ss.filter((s) => s.id !== id))
-    setMenuFor(null)
-  }
+  const kick = (id: number) => setPlayers((ps) => ps.filter((p) => p.id !== id))
+  const kickSpectator = (id: number) => setSpectators((ss) => ss.filter((s) => s.id !== id))
   const toSpectator = (id: number) => {
     const p = players.find((x) => x.id === id)
     if (!p) return
     setPlayers((ps) => ps.filter((x) => x.id !== id))
     setSpectators((ss) => [...ss, { id: p.id, name: p.name }])
-    setMenuFor(null)
   }
   const toPlayer = (id: number) => {
     const s = spectators.find((x) => x.id === id)
     if (!s) return
     setSpectators((ss) => ss.filter((x) => x.id !== id))
     setPlayers((ps) => [...ps, { id: s.id, name: s.name, host: false, ready: false, online: true }])
-    setMenuFor(null)
   }
-
-  // закрываем меню «…» по клику вне его
-  useEffect(() => {
-    if (menuFor == null) return
-    const onDoc = () => {
-      setMenuFor(null)
-      setMenuHint('')
-    }
-    window.addEventListener('click', onDoc)
-    return () => window.removeEventListener('click', onDoc)
-  }, [menuFor])
 
   // старт доступен, когда все онлайн-игроки готовы и их ≥2
   const online = players.filter((p) => p.online)
@@ -137,55 +214,16 @@ export default function Lobby({
   while (slots.length < capacity) slots.push(null)
 
   const renderStatus = (p: Player) => {
-    if (!p.online) return <Badge tone="muted">не в сети</Badge>
+    if (!p.online) return <Badge tone="muted">{copy.offline}</Badge>
     if (p.id === meId) {
       return (
         <Toggle on={p.ready} onChange={() => toggleReady(p.id)}>
-          {p.ready ? 'готов' : 'не готов'}
+          {p.ready ? copy.ready : copy.notReady}
         </Toggle>
       )
     }
-    return <Badge tone={p.ready ? 'success' : 'muted'}>{p.ready ? 'готов' : 'ожидание'}</Badge>
+    return <Badge tone={p.ready ? 'success' : 'muted'}>{p.ready ? copy.ready : copy.waiting}</Badge>
   }
-
-  // меню «⋯» хоста
-  const renderMenu = (id: number, items: MenuItemDef[]) => (
-    <div className={styles.menuWrap}>
-      <button
-        type="button"
-        className={styles.kebab}
-        aria-label="действия"
-        onClick={(e) => {
-          e.stopPropagation()
-          openMenu(id)
-        }}
-      >
-        ⋯
-      </button>
-      {menuFor === id && (
-        <div className={styles.menu}>
-          {items.map((it) => (
-            <button
-              key={it.label}
-              type="button"
-              className={`${styles.menuItem} ${it.danger ? styles.menuItemDanger : ''} ${
-                it.disabled ? styles.menuItemDisabled : ''
-              }`}
-              onClick={(e) => {
-                e.stopPropagation()
-                // клик по задизейбленному пункту — показываем подсказку, не действуем
-                if (it.disabled) setMenuHint(it.hint || 'Недоступно')
-                else it.onClick()
-              }}
-            >
-              {it.label}
-            </button>
-          ))}
-          {menuHint && <div className={styles.menuHint}>{menuHint}</div>}
-        </div>
-      )}
-    </div>
-  )
 
   return (
     <div className={styles.lobby}>
@@ -194,23 +232,18 @@ export default function Lobby({
           <div className={styles.titleRow}>
             <ReleaseLogo className={styles.headLogo} blink={false} />
             <span className={styles.headDivider} />
-            <h1 className={styles.title}>Лобби</h1>
+            <h1 className={styles.title}>{copy.title}</h1>
             {isHost && (
               <Button variant="dangerGhost" onClick={() => setDisbandOpen(true)}>
-                расформировать
+                {copy.disband}
               </Button>
             )}
           </div>
-          <p className={styles.sub}>Ожидание игроков…</p>
+          <p className={styles.sub}>{copy.subtitle}</p>
         </div>
-        <div className={styles.codeBox}>
-          <span className={styles.codeLabel}>код игры</span>
-          <div className={styles.codeRow}>
-            <span className={styles.code}>{code}</span>
-            <button className={styles.copy} type="button">
-              копировать
-            </button>
-          </div>
+        <div className={styles.headRight}>
+          <LobbyCode code={code} copy={codeCopy} />
+          <LangSwitcher value={lang} onChange={setLang} label={copy.language} />
         </div>
       </header>
 
@@ -218,8 +251,8 @@ export default function Lobby({
         {/* слева — режимы */}
         <section className={styles.modes}>
           <h2 className={styles.h}>
-            Режимы партии
-            {!isHost && <span className={styles.lockTag}>настраивает host</span>}
+            {copy.modes}
+            {!isHost && <span className={styles.lockTag}>{copy.modesLockedHint}</span>}
           </h2>
           <div className={styles.modeList}>
             <GameSettings setup={setup} onChange={setMode} readOnly={!isHost} copy={modesCopy} />
@@ -230,7 +263,7 @@ export default function Lobby({
         <section className={styles.players}>
           <div className={styles.scrollArea}>
             <h2 className={styles.h}>
-              Игроки
+              {copy.players}
               <span className={styles.count}>
                 {players.length} / {capacity}
               </span>
@@ -239,7 +272,7 @@ export default function Lobby({
             {isHost && (
               <Slider
                 className={styles.capRow}
-                label="Вместимость"
+                label={copy.capacity}
                 value={capacity}
                 min={minCapacity}
                 max={6}
@@ -247,53 +280,48 @@ export default function Lobby({
               />
             )}
 
-            <ul className={styles.list}>
+            <div className={styles.list}>
               {slots.map((p, i) =>
                 p ? (
-                  <li
+                  <PlayerSlot
                     key={p.id}
-                    className={`${styles.slot} ${!p.online ? styles.slotOff : ''} ${
-                      p.id === meId ? styles.slotMe : ''
-                    }`}
-                  >
-                    <Avatar name={p.name} size={34} muted={!p.online} />
-                    <span className={styles.name}>
-                      {p.name}
-                      {p.id === meId && <span className={styles.you}> (вы)</span>}
-                    </span>
-                    {p.host && (
-                      <Badge tone="success" size="sm" outlined>
-                        host
-                      </Badge>
-                    )}
-
-                    <div className={styles.rowEnd}>
-                      {renderStatus(p)}
-                      {isHost &&
-                        p.id !== meId &&
-                        renderMenu(p.id, [
-                          {
-                            label: 'Сделать зрителем',
-                            onClick: () => toSpectator(p.id),
-                            disabled: spectatorsFull,
-                            hint: 'Нет доступного слота',
-                          },
-                          { label: 'Исключить', danger: true, onClick: () => kick(p.id) },
-                        ])}
-                    </div>
-                  </li>
+                    name={p.name}
+                    me={p.id === meId}
+                    youLabel={copy.you}
+                    offline={!p.online}
+                    badge={
+                      p.host ? (
+                        <Badge tone="success" size="sm" outlined>
+                          {copy.roleHost}
+                        </Badge>
+                      ) : undefined
+                    }
+                    status={renderStatus(p)}
+                    dropdownLabel={copy.actions}
+                    dropdown={
+                      isHost && p.id !== meId
+                        ? [
+                            {
+                              label: copy.makeSpectator,
+                              onClick: () => toSpectator(p.id),
+                              disabled: spectatorsFull,
+                              hint: copy.noSlot,
+                            },
+                            { label: copy.kick, danger: true, onClick: () => kick(p.id) },
+                          ]
+                        : undefined
+                    }
+                  />
                 ) : (
                   // biome-ignore lint/suspicious/noArrayIndexKey: пустые слоты — позиционные заглушки без стабильного id
-                  <li key={`empty-${i}`} className={styles.slotEmpty}>
-                    свободный слот
-                  </li>
+                  <EmptySlot key={`empty-${i}`}>{copy.freeSlot}</EmptySlot>
                 ),
               )}
-            </ul>
+            </div>
 
             {/* зрители — второй независимый список */}
             <h2 className={`${styles.h} ${styles.hSpectators}`}>
-              Зрители
+              {copy.spectators}
               <span className={styles.count}>
                 {spectators.length} / {specCapacity}
               </span>
@@ -302,7 +330,7 @@ export default function Lobby({
             {isHost && (
               <Slider
                 className={styles.capRow}
-                label="Лимит"
+                label={copy.specLimit}
                 value={specCapacity}
                 min={0}
                 max={SPEC_MAX}
@@ -312,46 +340,50 @@ export default function Lobby({
               />
             )}
 
-            <ul className={styles.list}>
+            <div className={styles.list}>
               {spectators.map((s) => (
-                <li key={s.id} className={styles.slot}>
-                  <Avatar name={s.name} size={34} />
-                  <span className={styles.name}>{s.name}</span>
-                  <div className={styles.rowEnd}>
-                    <Badge tone="muted">зритель</Badge>
-                    {isHost &&
-                      renderMenu(s.id, [
-                        {
-                          label: 'Сделать игроком',
-                          onClick: () => toPlayer(s.id),
-                          disabled: playersFull,
-                          hint: 'Нет доступного слота',
-                        },
-                        { label: 'Исключить', danger: true, onClick: () => kickSpectator(s.id) },
-                      ])}
-                  </div>
-                </li>
+                <PlayerSlot
+                  key={s.id}
+                  name={s.name}
+                  status={<Badge tone="muted">{copy.roleGuest}</Badge>}
+                  dropdownLabel={copy.actions}
+                  dropdown={
+                    isHost
+                      ? [
+                          {
+                            label: copy.makePlayer,
+                            onClick: () => toPlayer(s.id),
+                            disabled: playersFull,
+                            hint: copy.noSlot,
+                          },
+                          { label: copy.kick, danger: true, onClick: () => kickSpectator(s.id) },
+                        ]
+                      : undefined
+                  }
+                />
               ))}
-              {spectators.length === 0 && <li className={styles.slotEmpty}>пока без зрителей</li>}
-            </ul>
+              {spectators.length === 0 && <EmptySlot>{copy.noSpectators}</EmptySlot>}
+            </div>
           </div>
 
           <div className={styles.actions}>
-            {isHost ? <Button disabled={!canStart}>начать игру</Button> : <Button>покинуть</Button>}
+            {isHost ? (
+              <Button disabled={!canStart}>{copy.start}</Button>
+            ) : (
+              <Button>{copy.leave}</Button>
+            )}
           </div>
         </section>
       </div>
 
-      <Modal open={disbandOpen} onClose={() => setDisbandOpen(false)} title="Расформировать лобби?">
-        <p className={styles.confirmText}>
-          Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить.
-        </p>
+      <Modal open={disbandOpen} onClose={() => setDisbandOpen(false)} title={copy.disbandTitle}>
+        <p className={styles.confirmText}>{copy.disbandText}</p>
         <div className={styles.confirmActions}>
           <Button variant="tech" onClick={() => setDisbandOpen(false)}>
-            отмена
+            {copy.cancel}
           </Button>
           <Button variant="tech" className={styles.danger} onClick={() => setDisbandOpen(false)}>
-            расформировать
+            {copy.disband}
           </Button>
         </div>
       </Modal>

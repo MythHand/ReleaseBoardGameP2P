@@ -1,0 +1,83 @@
+.wrap {
+  position: relative;
+  display: flex;
+}
+
+/* кнопка-триггер «⋯» */
+.kebab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 28px;
+  block-size: 28px;
+  font-size: 18px;
+  line-height: 1;
+  color: rgb(255 255 255 / 50%);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.kebab:hover {
+  color: #fff;
+}
+
+.menu {
+  position: absolute;
+  inset-block-start: calc(100% + 6px);
+  inset-inline-end: 0;
+  z-index: 5;
+  inline-size: max-content;
+  background: color-mix(in srgb, var(--surface-1) 96%, #000);
+  border: 1px solid rgb(255 255 255 / 14%);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 50%);
+}
+
+.item {
+  display: block;
+  inline-size: 100%;
+  padding: 11px 18px;
+  font-family: var(--font-text);
+  font-size: 14px;
+  color: rgb(255 255 255 / 85%);
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+}
+
+.item:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 8%);
+}
+
+/* деструктивный пункт */
+.itemDanger {
+  color: #ff6b81;
+}
+
+.itemDanger:hover {
+  color: #ff6b81;
+  background: rgb(255 107 129 / 12%);
+}
+
+/* недоступный пункт — серый, но кликабельный (показывает подсказку) */
+.itemDisabled,
+.itemDisabled:hover {
+  color: rgb(255 255 255 / 30%);
+  cursor: default;
+  background: transparent;
+}
+
+.hint {
+  padding: 9px 18px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #e3b341;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  border-block-start: 1px solid rgb(255 255 255 / 10%);
+}

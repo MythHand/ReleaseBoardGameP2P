@@ -42,6 +42,14 @@ export default function ButtonsKit() {
           </Button>
         </KitCell>
       </KitSection>
+
+      <KitSection title="Copy — клик копирует, подпись на миг меняется">
+        <KitCell caption="copyValue + copiedChildren">
+          <Button variant="tech" copyValue="RLS-7F3K" copiedChildren="скопировано">
+            копировать
+          </Button>
+        </KitCell>
+      </KitSection>
     </KitPage>
   )
 }

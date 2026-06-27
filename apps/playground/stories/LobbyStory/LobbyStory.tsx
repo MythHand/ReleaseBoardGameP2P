@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
 import Lobby from '@/screens/Lobby'
-import { pick, useLang } from '../../Playground/lang'
+import { useLang } from '../../Playground/lang'
 import styles from './LobbyStory.module.css'
 
 export default function LobbyStory() {
@@ -25,7 +24,10 @@ export default function LobbyStory() {
           guest
         </button>
       </div>
-      <Lobby role={role} modesCopy={pick(lang, { ru: MODES_COPY_RU, en: MODES_COPY_EN })} />
+      {/* стартовый язык лобби берём из языка плейграунда; дальше им управляет
+          встроенный в лобби свитчер. key переинициализирует экран при смене
+          языка плейграунда из шапки */}
+      <Lobby key={lang} role={role} initialLang={lang} />
     </div>
   )
 }

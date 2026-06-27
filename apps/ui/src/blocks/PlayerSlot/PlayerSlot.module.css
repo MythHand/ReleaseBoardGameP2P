@@ -1,0 +1,55 @@
+.slot,
+.slotEmpty {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid rgb(255 255 255 / 10%);
+}
+
+.slot {
+  background: rgb(255 255 255 / 4%);
+}
+
+.slotMe {
+  border-color: rgb(143 217 176 / 50%);
+}
+
+/* offline — приглушаем точечно цветом, без opacity на всей строке
+   (иначе бы тускнел и дропдаун «⋯») */
+.slotOff {
+  background: rgb(255 255 255 / 2%);
+  border-color: rgb(255 255 255 / 7%);
+}
+
+.name {
+  font-family: var(--font-text);
+  font-size: 15px;
+}
+
+.slotOff .name {
+  color: rgb(255 255 255 / 40%);
+}
+
+.you {
+  font-size: 13px;
+  color: rgb(255 255 255 / 40%);
+}
+
+/* правый край строки: статус + дропдаун «…» */
+.rowEnd {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.slotEmpty {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(255 255 255 / 30%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border-style: dashed;
+}
