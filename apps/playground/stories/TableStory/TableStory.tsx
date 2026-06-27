@@ -43,7 +43,7 @@ const VIEW_STATES: ViewItem[] = [
 ]
 
 export default function TableStory() {
-  const { lang } = useLang()
+  const { lang, setLang } = useLang()
   const [opps, setOpps] = useState(3)
   const [end, setEnd] = useState<string | null>(null)
   const [view, setView] = useState<ViewState | null>(null)
@@ -96,6 +96,9 @@ export default function TableStory() {
           reconnectCopy={pick(lang, { ru: RECONNECT_COPY_RU, en: RECONNECT_COPY_EN })}
           gameOverCopy={pick(lang, { ru: GAME_OVER_COPY_RU, en: GAME_OVER_COPY_EN })}
           copy={pick(lang, { ru: TABLE_COPY_RU, en: TABLE_COPY_EN })}
+          lang={lang}
+          onLangChange={setLang}
+          code="4F2A-9K"
         />
       </div>
     </div>

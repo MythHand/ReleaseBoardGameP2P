@@ -5,6 +5,10 @@
   align-items: flex-end;
 }
 
+.start {
+  align-items: flex-start;
+}
+
 .label {
   font-family: var(--font-mono);
   font-size: 11px;

@@ -23,19 +23,44 @@ export const LOBBY_CODE_COPY_EN: LobbyCodeCopy = {
 interface LobbyCodeProps {
   code: string
   copy?: LobbyCodeCopy
+  // своя подпись «код игры» (true по умолч.); выключаем, когда заголовок внешний
+  showLabel?: boolean
+  // выравнивание: end (по умолч., как в шапке лобби) / start
+  align?: 'start' | 'end'
+  // порядок в ряду: false — кнопка слева + код (лобби); true — код + кнопка справа
+  reverse?: boolean
 }
 
-// Блок «код игры»: метка сверху, ниже — кнопка копирования слева и сам код
-// справа. Копирование через режим Button (copyValue → буфер + «скопировано»).
-export default function LobbyCode({ code, copy = LOBBY_CODE_COPY_RU }: LobbyCodeProps) {
+// Блок «код игры»: метка сверху, ниже — кнопка копирования и сам код.
+// Копирование через режим Button (copyValue → буфер + «скопировано»).
+export default function LobbyCode({
+  code,
+  copy = LOBBY_CODE_COPY_RU,
+  showLabel = true,
+  align = 'end',
+  reverse = false,
+}: LobbyCodeProps) {
+  const copyBtn = (
+    <Button variant="tech" copyValue={code} copiedChildren={copy.copied}>
+      {copy.copy}
+    </Button>
+  )
+  const codeEl = <span className={styles.code}>{code}</span>
   return (
-    <div className={styles.box}>
-      <span className={styles.label}>{copy.label}</span>
+    <div className={`${styles.box} ${align === 'start' ? styles.start : ''}`}>
+      {showLabel && <span className={styles.label}>{copy.label}</span>}
       <div className={styles.row}>
-        <Button variant="tech" copyValue={code} copiedChildren={copy.copied}>
-          {copy.copy}
-        </Button>
-        <span className={styles.code}>{code}</span>
+        {reverse ? (
+          <>
+            {codeEl}
+            {copyBtn}
+          </>
+        ) : (
+          <>
+            {copyBtn}
+            {codeEl}
+          </>
+        )}
       </div>
     </div>
   )

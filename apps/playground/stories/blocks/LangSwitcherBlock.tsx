@@ -10,8 +10,12 @@ export default function LangSwitcherBlock() {
 
   return (
     <KitPage title="Lang switcher" tag="блок">
-      <KitSection title="Язык">
+      <KitSection title="Компактный (code) — RU / EN">
         <LangSwitcher value={lang} onChange={setLang} label={label} />
+      </KitSection>
+
+      <KitSection title="Широкий (full) — полные имена">
+        <LangSwitcher value={lang} onChange={setLang} variant="full" />
       </KitSection>
     </KitPage>
   )
