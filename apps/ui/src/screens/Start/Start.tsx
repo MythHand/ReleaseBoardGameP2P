@@ -1,6 +1,7 @@
 import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
 import GameSettings from '@/blocks/GameSettings'
+import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
@@ -61,6 +62,10 @@ interface StartProps {
   onJoin?: (nickname: string, code: string) => void
   // переход в playground (на фронте ведёт на /playground/)
   onPlayground?: () => void
+  // язык + смена: когда оба переданы — в правом верхнем углу рисуется свитчер.
+  // Каталоги экран не держит (i18n-agnostic) — copy свапает консьюмер.
+  lang?: SwitchLang
+  onLangChange?: (lang: SwitchLang) => void
 }
 
 export default function Start({
@@ -69,6 +74,8 @@ export default function Start({
   onJoin,
   onPlayground,
   rulesCopy = RULES_COPY_RU,
+  lang,
+  onLangChange,
 }: StartProps) {
   const [modal, setModal] = useState<'create' | 'join' | 'rules' | null>(null)
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
@@ -105,6 +112,15 @@ export default function Start({
       <div className={styles.bg} />
       <div className={styles.blur} />
       <div className={styles.scrim} />
+
+      {lang && onLangChange && (
+        <>
+          <div className={styles.langShade} />
+          <div className={styles.langCorner}>
+            <LangSwitcher value={lang} onChange={onLangChange} />
+          </div>
+        </>
+      )}
 
       <div className={styles.content}>
         <div className={styles.col}>

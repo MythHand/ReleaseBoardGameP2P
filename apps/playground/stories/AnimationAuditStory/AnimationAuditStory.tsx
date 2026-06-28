@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import styles from './AnimationAuditStory.module.css'
 
 // АУДИТ АНИМАЦИЙ — источник состояния работы с анимациями (карта местности, не
@@ -117,6 +117,12 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
+    mod: 'EdgeGlow',
+    what: 'Краевое свечение контейнера внутрь (инсет-вуаль) с плавным fade появления/затухания (CSS-transition). Два варианта силы: strong (стол игрока) / weak (место соперника). Цвет/интенсивность — пропсами.',
+    where: 'primitives/EdgeGlow → DrawCard (тревога Error 503), UI KIT',
+    status: 'ok',
+  },
+  {
     mod: 'jitter()',
     what: 'Разброс карты в сбросе (угол ±14°, смещение ±10/±8). Пара к centerToDiscard.',
     where: 'animations/scatter → Combo, CardPlay, DeckAnimations',
@@ -149,50 +155,62 @@ const MODULES: Module[] = [
 ]
 
 // ===== 2. Сценарные комбинации — последовательности под ситуации (без статусов) =====
+// Средняя колонка — техническая: модули + ключевые моменты реализации
+// (rect-замеры, FLIP, порядок в DOM, key-remount, фиксы), а не общий пересказ.
 const SCENARIOS: Scenario[] = [
   {
     name: 'Розыгрыш карты',
-    from: 'playToCenter → wait → centerToDiscard + jitter (между шагами nextFrames)',
+    from: 'flyer (fixed) от rect карты → playToCenter (move 480, EASE) по центрам; wait — удержание; nextFrames перед стартом, чтобы новый узел успел отрисоваться; затем centerToDiscard (move 420) + jitter() на финальные rotate/dx/dy разброса.',
     where: 'CardPlay, DeckAnimations',
   },
   {
     name: 'Розыгрыш комбо (пара)',
-    from: 'useArrow → совмещение в пару (CardPair) → релиз: playToReleaseZone; в сброс: пара распадается на две одиночки (centerToDiscard + jitter каждой)',
+    from: 'useArrow + centerOf ведёт прицел; совмещение через CardPair (доп. карта подтыкается под углом); релиз → playToReleaseZone (move 480, SNAP-приземление); в сброс — пара распадается на 2 одиночки, каждой свой centerToDiscard + jitter().',
     where: 'Combo',
   },
   {
     name: 'Адресная атака стрелкой',
-    from: 'useArrow + centerOf — прицел от карты к цели',
+    from: 'useArrow строит from/to по centerOf карты и цели, слежение за курсором (mousemove), старт/стоп по фазе розыгрыша.',
     where: 'Arrow, Combo',
   },
   {
     name: 'Разделение колоды',
-    from: 'половина уезжает в новую стопку через flyFrom',
+    from: 'FLIP-вылет flyFrom: половина уже в новом DOM-месте, анимируем «из» прошлого rect (getBoundingClientRect до→после ремаунта) в текущую позицию.',
     where: 'DeckAnimations',
   },
   {
     name: 'Слияние колод (+ сброс)',
-    from: 'все стопки и сброс одновременно поглощаются первой колодой (absorbToDeck)',
+    from: 'все стопки и сброс — параллельные absorbToDeck (move + fade) в один rect первой колоды; цель измеряется однажды, расходятся только источники.',
     where: 'DeckAnimations',
   },
   {
     name: 'Сброс → новая колода',
-    from: 'собрать сброс в стопку → gatherToDeck к месту колоды → flipCard рубашкой вверх',
+    from: 'собрать разбросанный сброс в стопку → gatherToDeck (move, центр-в-центр) к месту колоды → flipCard рубашкой вверх по приземлении.',
     where: 'DeckAnimations',
   },
   {
     name: 'Добор карты (одиночный)',
-    from: 'drawToCenter (колода→центр, рубашкой вверх) → обычная: игрок (flipCard + useHandInsert) или соперник (dealToSeat, рубашкой вверх); триггер Error 503 / AI: flipCard в центре для всех; AI — ещё добор эффекта из AI-колоды рядом. Мультидобор — в работе.',
+    from: 'drawToCenter (move 480) колода→центр рубашкой вверх; ветвление по карте: игрок — flipCard + useHandInsert.insert (садится в слот руки); соперник — dealToSeat (move + fade) в card-area места ×0.7, без скейла вверх; триггер/AI — flipCard в центре (reveal для всех), AI ещё добирает эффект из AI-колоды рядом (flyer с key={seq}, чтобы Card не переиспользовалась и не крутилась).',
+    where: 'DrawCard',
+  },
+  {
+    name: 'Мультидобор (по кнопке)',
+    from: 'батч из N карт (N = число колод) гонит тот же одиночный сценарий через drawOne → boolean; на неразрешённом триггере (Error 503) drawOne возвращает false и серия рвётся — ждёт ручного разбора карты (фикс-сценариев под триггеры нет).',
     where: 'DrawCard',
   },
   {
     name: 'Разрешение AI (уход карт)',
-    from: 'пауза (wait, имитация логики) → одновременно: триггер centerToDiscard в сброс; эффект flipCard рубашкой на месте (стаггер) → returnToDeck в AI-колоду с уменьшением.',
+    from: 'resolveAi(trig, eff) — карты приходят аргументами, не из стейта (фикс stale-closure на клике); wait (имитация логики) → параллельно: триггер centerToDiscard + jitter() в сброс; эффект flipCard рубашкой на месте со стаггером → returnToDeck (move) в AI-колоду с уменьшением до её размера.',
+    where: 'DrawCard',
+  },
+  {
+    name: 'Тревога Error 503 (краевое свечение)',
+    from: 'EdgeGlow внутри контейнера зоны стола (.glowBounds от измеренной высоты тех-бара — край экрана ≠ край стола); своя вытяжка — strong ДО Hand в DOM (ПОД рукой); соперник — weak ПОСЛЕ Hand (НАД рукой) + pointer-events:none, чтобы не глушить ховер-реакцию руки; появление/затухание — CSS-transition opacity.',
     where: 'DrawCard',
   },
   {
     name: 'Взятие карты соперника',
-    from: 'раздача-грид → reveal (flipCard) → useHandInsert (карта встаёт в руку)',
+    from: 'раздача-грид карт рубашкой → flipCard reveal выбранной → useHandInsert (зазор в руке + посадка в bottom-center слота по slotPlacement).',
     where: 'PickOpponentCard',
   },
 ]
@@ -206,6 +224,28 @@ const ISSUES: Issue[] = []
 function Badge({ status }: { status: Status }) {
   const s = STATUS[status]
   return <span className={`${styles.badge} ${s.cls}`}>{s.label}</span>
+}
+
+// микро-кнопка «копировать имя модуля» — проявляется на ховере строки
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1100)
+    })
+  }
+  return (
+    <button
+      type="button"
+      className={styles.copyBtn}
+      onClick={copy}
+      aria-label={`копировать ${text}`}
+      title="копировать"
+    >
+      {copied ? '✓' : '❐'}
+    </button>
+  )
 }
 
 function LegendItem({ status, children }: { status: Status; children: ReactNode }) {
@@ -231,7 +271,12 @@ function ModuleTable({ rows }: { rows: Module[] }) {
       <tbody>
         {rows.map((r) => (
           <tr key={r.mod}>
-            <td className={styles.mod}>{r.mod}</td>
+            <td className={styles.mod}>
+              <span className={styles.modCell}>
+                <span>{r.mod}</span>
+                <CopyButton text={r.mod} />
+              </span>
+            </td>
             <td className={styles.what}>{r.what}</td>
             <td className={styles.where}>{r.where}</td>
             <td>
@@ -250,7 +295,7 @@ function ScenarioTable({ rows }: { rows: Scenario[] }) {
       <thead>
         <tr>
           <th>сценарий</th>
-          <th>из каких модулей собран</th>
+          <th>реализация · модули и ключевые моменты</th>
           <th>где</th>
         </tr>
       </thead>

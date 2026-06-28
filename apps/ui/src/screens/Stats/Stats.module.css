@@ -6,8 +6,12 @@
   background: #000;
 }
 
-/* ===== шапка ===== */
+/* ===== шапка ===== заголовок слева, свитчер языка по правой линии контента */
 .head {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  justify-content: space-between;
   padding-block-end: 28px;
   border-block-end: 1px solid rgb(255 255 255 / 8%);
 }

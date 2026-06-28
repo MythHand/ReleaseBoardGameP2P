@@ -69,13 +69,15 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
 }
 
 export default function StartStory() {
-  const { lang } = useLang()
+  const { lang, setLang } = useLang()
   return (
     <div className={styles.root}>
       <Start
         copy={pick(lang, COPY)}
         rulesCopy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })}
         onPlayground={() => {}}
+        lang={lang}
+        onLangChange={setLang}
       />
     </div>
   )

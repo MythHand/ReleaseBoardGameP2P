@@ -14,6 +14,33 @@
   background-size: cover;
 }
 
+/* мягкое затемнение фона под свитчером языка — фон справа светлый и пёстрый,
+   радиальный градиент из угла даёт читаемую подложку независимо от картинки */
+.langShade {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  z-index: 2;
+  inline-size: 340px;
+  block-size: 200px;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 120% at 100% 0%,
+    rgb(0 0 0 / 42%) 0%,
+    rgb(0 0 0 / 20%) 42%,
+    transparent 72%
+  );
+}
+
+/* переключатель языка — правый верхний угол, симметрично логотипу слева
+   (контент сидит на 72/76 — отражаем те же отступы), над затемнением */
+.langCorner {
+  position: absolute;
+  inset-block-start: 72px;
+  inset-inline-end: 76px;
+  z-index: 3;
+}
+
 /* блюр сильнее слева, к правому краю исчезает (через mask) */
 .blur {
   position: absolute;

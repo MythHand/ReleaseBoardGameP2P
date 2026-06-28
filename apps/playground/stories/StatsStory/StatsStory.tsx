@@ -56,11 +56,11 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
 }
 
 export default function StatsStory() {
-  const { lang } = useLang()
+  const { lang, setLang } = useLang()
   const data = makeStats()
   return (
     <div className={styles.root}>
-      <Stats {...data} copy={pick(lang, COPY)} />
+      <Stats {...data} copy={pick(lang, COPY)} lang={lang} onLangChange={setLang} />
     </div>
   )
 }
