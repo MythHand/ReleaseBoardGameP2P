@@ -133,7 +133,7 @@ const SCENARIOS: Scenario[] = [
   },
   {
     name: 'Розыгрыш комбо (пара)',
-    from: 'useArrow → совмещение карт в пару (CardPair) → playToReleaseZone (релиз) или centerToDiscard + jitter (прочее)',
+    from: 'useArrow → совмещение в пару (CardPair) → релиз: playToReleaseZone; в сброс: пара распадается на две одиночки (centerToDiscard + jitter каждой)',
     where: 'Combo',
   },
   {
@@ -163,25 +163,11 @@ const SCENARIOS: Scenario[] = [
   },
 ]
 
-// ===== 3. Требует доработок — где криво =====
-// Эти две связаны и рассматриваются СТРОГО ВМЕСТЕ: комбо-пара тянется единой
-// нитью (совмещение в центре → полёт → приземление в сброс), трогать одно без
-// другого нельзя. Текущее поведение работает приемлемо — правим осознанно вместе.
-const ISSUES: Issue[] = [
-  {
-    what: 'Совмещение карт в пару (связано со «сброс хранит пары»)',
-    problem: 'Bespoke el.animate с самописным enterTransform — не выражено через общий travel.',
-    where: 'Combo (runPlay a1/a2)',
-    status: 'rework',
-  },
-  {
-    what: 'Сброс хранит пары (связано с «совмещением в пару»)',
-    problem:
-      'Запись сброса держит группу карт; должна — одиночные. Комбо при уходе в сброс должно раскладываться на отдельные карты, а не лежать парой.',
-    where: 'DeckAnimations (DiscardEntry.cards)',
-    status: 'rework',
-  },
-]
+// ===== 3. Требует доработок =====
+// Пусто: всё свелось к модулям. (Совмещение в пару в Combo осознанно оставлено
+// как есть — это съезд карт в стопку, а не rect→rect перелёт; гнать через move()
+// было бы лишним усложнением, не проблемой.)
+const ISSUES: Issue[] = []
 
 function Badge({ status }: { status: Status }) {
   const s = STATUS[status]
@@ -282,8 +268,8 @@ export default function AnimationAuditStory() {
         Источник состояния работы с анимациями. Сначала готовые <b>модули</b> — кирпичики для
         сборки. Затем <b>сценарные комбинации</b> — как кирпичики складываются под игровые ситуации
         (сценарий — это последовательность, а не модуль: его не оформляют отдельно, поэтому без
-        статусов). И в конце <b>что требует доработок</b>: где висит дубль инлайном или самописный
-        полёт вместо готового <code>move()</code>.
+        статусов). И в конце — раздел <b>что требует доработок</b> (сейчас пусто: всё свелось к
+        модулям).
       </p>
 
       <div className={styles.legend}>
@@ -308,10 +294,11 @@ export default function AnimationAuditStory() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Требует доработок</h2>
-        <p className={styles.sectionNote}>
-          Две связанные правки — рассматривать вместе. Текущее поведение приемлемо.
-        </p>
-        <IssueTable rows={ISSUES} />
+        {ISSUES.length > 0 ? (
+          <IssueTable rows={ISSUES} />
+        ) : (
+          <p className={styles.sectionNote}>Открытых проблем нет — всё свелось к модулям.</p>
+        )}
       </section>
     </div>
   )
