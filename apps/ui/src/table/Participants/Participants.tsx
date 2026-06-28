@@ -1,5 +1,6 @@
 import Avatar from '@/primitives/Avatar'
 import Badge, { type BadgeTone } from '@/primitives/Badge'
+import Dropdown from '@/primitives/Dropdown'
 import styles from './Participants.module.css'
 
 export interface Participant {
@@ -23,6 +24,9 @@ export interface ParticipantsCopy {
   connectionLost: string
   spectator: string
   noSpectators: string
+  // подпись дропдауна действий (a11y) и пункт исключения зрителя — для хоста
+  actions: string
+  kick: string
 }
 
 export const PARTICIPANTS_COPY_RU: ParticipantsCopy = {
@@ -33,6 +37,8 @@ export const PARTICIPANTS_COPY_RU: ParticipantsCopy = {
   connectionLost: 'потеряно соединение',
   spectator: 'зритель',
   noSpectators: 'пока без зрителей',
+  actions: 'действия',
+  kick: 'исключить',
 }
 
 export const PARTICIPANTS_COPY_EN: ParticipantsCopy = {
@@ -43,12 +49,17 @@ export const PARTICIPANTS_COPY_EN: ParticipantsCopy = {
   connectionLost: 'connection lost',
   spectator: 'spectator',
   noSpectators: 'no spectators yet',
+  actions: 'actions',
+  kick: 'kick',
 }
 
 interface ParticipantsProps {
   players?: Participant[]
   spectators?: Spectator[]
   copy?: ParticipantsCopy
+  // хост видит у зрителей дропдаун «⋯» с исключением
+  isHost?: boolean
+  onKickSpectator?: (id: string) => void
 }
 
 // Полный состав стола: список игроков (в игре / выбыл / нет связи) и зрители.
@@ -56,6 +67,8 @@ export default function Participants({
   players = [],
   spectators = [],
   copy = PARTICIPANTS_COPY_RU,
+  isHost = false,
+  onKickSpectator,
 }: ParticipantsProps) {
   return (
     <div className={styles.box}>
@@ -95,6 +108,14 @@ export default function Participants({
                 <Badge tone="muted" className={styles.pushEnd}>
                   {copy.spectator}
                 </Badge>
+                {isHost && onKickSpectator && (
+                  <Dropdown
+                    items={[
+                      { label: copy.kick, danger: true, onClick: () => onKickSpectator(s.id) },
+                    ]}
+                    ariaLabel={copy.actions}
+                  />
+                )}
               </li>
             ))}
             {spectators.length === 0 && <li className={styles.empty}>{copy.noSpectators}</li>}

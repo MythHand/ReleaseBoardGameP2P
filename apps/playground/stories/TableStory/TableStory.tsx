@@ -47,13 +47,36 @@ export default function TableStory() {
   const [opps, setOpps] = useState(3)
   const [end, setEnd] = useState<string | null>(null)
   const [view, setView] = useState<ViewState | null>(null)
-  const state = useMemo(() => makeTable(opps), [opps])
+  const [role, setRole] = useState<'host' | 'guest'>('host')
+  const [specLimit, setSpecLimit] = useState(8)
+  const [kicked, setKicked] = useState<Set<string>>(() => new Set())
+
+  const base = useMemo(() => makeTable(opps), [opps])
+  // исключённых хостом зрителей убираем из состава
+  const state = { ...base, spectators: base.spectators.filter((s) => !kicked.has(s.id)) }
 
   const variant = END_VARIANTS.find((v) => v.id === end)
 
   return (
     <div className={styles.root}>
       <div className={styles.controls}>
+        <div className={styles.switch}>
+          <button
+            type="button"
+            className={role === 'host' ? styles.on : ''}
+            onClick={() => setRole('host')}
+          >
+            host
+          </button>
+          <button
+            type="button"
+            className={role === 'guest' ? styles.on : ''}
+            onClick={() => setRole('guest')}
+          >
+            guest
+          </button>
+        </div>
+
         <HoverSelect
           label="оппонентов"
           value={String(opps)}
@@ -99,6 +122,10 @@ export default function TableStory() {
           lang={lang}
           onLangChange={setLang}
           code="4F2A-9K"
+          role={role}
+          spectatorLimit={specLimit}
+          onSpectatorLimitChange={setSpecLimit}
+          onKickSpectator={(id) => setKicked((k) => new Set(k).add(id))}
         />
       </div>
     </div>

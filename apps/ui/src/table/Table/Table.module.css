@@ -95,3 +95,27 @@
   letter-spacing: 0.1em;
   opacity: 0.6;
 }
+
+/* разделитель между общими настройками и блоком управления хоста */
+.divider {
+  block-size: 1px;
+  margin: 4px 0;
+  background: rgb(255 255 255 / 10%);
+}
+
+/* лимит зрителей: подпись над слайдером (две строки), слайдер на всю ширину */
+.specField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: stretch;
+}
+
+.specLabel {
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}

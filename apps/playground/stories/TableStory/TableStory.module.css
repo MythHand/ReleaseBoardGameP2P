@@ -18,6 +18,31 @@
   border-block-end: 1px solid rgb(255 255 255 / 8%);
 }
 
+/* переключатель роли host/guest — только песочница, как в LobbyStory */
+.switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: rgb(255 255 255 / 8%);
+}
+
+.switch button {
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 55%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.switch .on {
+  color: #fff;
+  background: rgb(255 255 255 / 16%);
+}
+
 .total {
   margin-inline-start: -12px; /* прижать к селекту «оппонентов» */
   font-size: 12px;
