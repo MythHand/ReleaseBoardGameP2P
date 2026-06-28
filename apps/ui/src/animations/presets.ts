@@ -112,4 +112,17 @@ export const PRESETS: Record<string, Preset> = {
   // Поглощение: стопка/колода летит в целевую и растворяется (слияние колод).
   absorbToDeck: (el: Element, p?: Record<string, unknown>): Animation | null =>
     move(el, { ...(p as MoveParams), fade: true }, durationOf(p), EASE),
+
+  // ===== Добор карт (travel) =====
+  // Карта выходит из колоды добора в центр стола. Отдельно от playToCenter:
+  // у добора своя вариативность (число карт, спец-механики) — растёт независимо.
+  drawToCenter: (el: Element, p?: Record<string, unknown>): Animation | null =>
+    move(el, p as MoveParams, durationOf(p, 480), EASE),
+  // Карта из центра уходит к игроку (его место/рука) и растворяется в скрытой руке.
+  dealToSeat: (el: Element, p?: Record<string, unknown>): Animation | null =>
+    move(el, { ...(p as MoveParams), fade: true }, durationOf(p, 460), EASE),
+  // Карта возвращается из центра обратно в колоду (центр→колода) — парный к
+  // drawToCenter; move уменьшает по ширине до карточной области колоды.
+  returnToDeck: (el: Element, p?: Record<string, unknown>): Animation | null =>
+    move(el, p as MoveParams, durationOf(p, 480), EASE),
 }

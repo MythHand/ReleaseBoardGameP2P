@@ -87,6 +87,24 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
+    mod: "play('drawToCenter')",
+    what: 'Карта выходит из колоды добора в центр стола. Отдельно от playToCenter — у добора своя вариативность (число карт, спец-механики).',
+    where: 'словарь → DrawCard',
+    status: 'ok',
+  },
+  {
+    mod: "play('dealToSeat')",
+    what: 'Карта из центра уходит к месту игрока и растворяется в скрытой руке (move + fade).',
+    where: 'словарь → DrawCard',
+    status: 'ok',
+  },
+  {
+    mod: "play('returnToDeck')",
+    what: 'Карта возвращается из центра обратно в колоду (центр→колода) с уменьшением до размера колоды. Парный к drawToCenter.',
+    where: 'словарь → DrawCard',
+    status: 'ok',
+  },
+  {
     mod: 'useArrow() + centerOf()',
     what: 'Геометрия адресной стрелки: точки from/to, слежение за курсором, старт/стоп.',
     where: 'primitives/Arrow → Arrow, Combo, DeckAnimations',
@@ -107,19 +125,25 @@ const MODULES: Module[] = [
   {
     mod: 'nextFrames()',
     what: 'Двойной requestAnimationFrame — дождаться отрисовки нового узла перед стартом анимации.',
-    where: 'animations/timing → Combo, CardPlay, DeckAnimations',
+    where: 'animations/timing → Combo, CardPlay, DeckAnimations, DrawCard',
     status: 'ok',
   },
   {
     mod: 'wait(ms)',
     what: 'Пауза-таймер для держания фаз между анимациями.',
-    where: 'animations/timing → Combo, CardPlay, DeckAnimations, Animations',
+    where: 'animations/timing → Combo, CardPlay, DeckAnimations, DrawCard, Animations',
+    status: 'ok',
+  },
+  {
+    mod: 'slotPlacement() / handStep()',
+    what: 'Единый источник геометрии веера руки: наклон, дуга, ширина и шаг-от-кол-ва карт. Раскладка слотов в Hand и приземление вставки считаются по ОДНОЙ формуле — без копий, которые разъезжаются при тюнинге.',
+    where: 'table/Hand/fan → Hand, useHandInsert',
     status: 'ok',
   },
   {
     mod: 'useHandInsert()',
-    what: 'Карта «встаёт в руку»: рука раздвигает зазор, карта подгоняет размер и садится в bottom-center слота.',
-    where: 'stories/interactive → PickOpponentCard',
+    what: 'Карта «встаёт в руку»: рука раздвигает зазор, карта подгоняет размер и садится в bottom-center слота. Место слота берёт из table/Hand/fan (slotPlacement).',
+    where: 'stories/interactive → DrawCard, CardToHand, PickOpponentCard',
     status: 'ok',
   },
 ]
@@ -155,6 +179,16 @@ const SCENARIOS: Scenario[] = [
     name: 'Сброс → новая колода',
     from: 'собрать сброс в стопку → gatherToDeck к месту колоды → flipCard рубашкой вверх',
     where: 'DeckAnimations',
+  },
+  {
+    name: 'Добор карты (одиночный)',
+    from: 'drawToCenter (колода→центр, рубашкой вверх) → обычная: игрок (flipCard + useHandInsert) или соперник (dealToSeat, рубашкой вверх); триггер Error 503 / AI: flipCard в центре для всех; AI — ещё добор эффекта из AI-колоды рядом. Мультидобор — в работе.',
+    where: 'DrawCard',
+  },
+  {
+    name: 'Разрешение AI (уход карт)',
+    from: 'пауза (wait, имитация логики) → одновременно: триггер centerToDiscard в сброс; эффект flipCard рубашкой на месте (стаггер) → returnToDeck в AI-колоду с уменьшением.',
+    where: 'DrawCard',
   },
   {
     name: 'Взятие карты соперника',

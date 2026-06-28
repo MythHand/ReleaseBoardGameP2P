@@ -22,10 +22,10 @@ import ComboStory from '../stories/ComboStory'
 import HandStory from '../stories/HandStory'
 import CardPlayStory from '../stories/interactive/CardPlayStory'
 import CardToHandStory from '../stories/interactive/CardToHandStory'
+import DealCardsStory from '../stories/interactive/DealCardsStory'
 import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
 import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
-import PlayAiCardStory from '../stories/interactive/PlayAiCardStory'
 import AvatarsKit from '../stories/kit/AvatarsKit'
 import BadgesKit from '../stories/kit/BadgesKit'
 import ButtonsKit from '../stories/kit/ButtonsKit'
@@ -114,7 +114,7 @@ const groups: Group[] = [
       { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
       { id: 'deck-animations', title: 'Deck animations', render: () => <DeckAnimationsStory /> },
-      { id: 'play-ai-card', title: 'Play AI card', render: () => <PlayAiCardStory /> },
+      { id: 'deal-cards', title: 'Deal cards', render: () => <DealCardsStory /> },
     ],
   },
   {
