@@ -164,15 +164,18 @@ const SCENARIOS: Scenario[] = [
 ]
 
 // ===== 3. Требует доработок — где криво =====
+// Эти две связаны и рассматриваются СТРОГО ВМЕСТЕ: комбо-пара тянется единой
+// нитью (совмещение в центре → полёт → приземление в сброс), трогать одно без
+// другого нельзя. Текущее поведение работает приемлемо — правим осознанно вместе.
 const ISSUES: Issue[] = [
   {
-    what: 'Совмещение карт в пару',
+    what: 'Совмещение карт в пару (связано со «сброс хранит пары»)',
     problem: 'Bespoke el.animate с самописным enterTransform — не выражено через общий travel.',
     where: 'Combo (runPlay a1/a2)',
     status: 'rework',
   },
   {
-    what: 'Сброс хранит пары',
+    what: 'Сброс хранит пары (связано с «совмещением в пару»)',
     problem:
       'Запись сброса держит группу карт; должна — одиночные. Комбо при уходе в сброс должно раскладываться на отдельные карты, а не лежать парой.',
     where: 'DeckAnimations (DiscardEntry.cards)',
@@ -305,7 +308,9 @@ export default function AnimationAuditStory() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Требует доработок</h2>
-        <p className={styles.sectionNote}>Где криво: дубли и самописные полёты вместо словаря.</p>
+        <p className={styles.sectionNote}>
+          Две связанные правки — рассматривать вместе. Текущее поведение приемлемо.
+        </p>
         <IssueTable rows={ISSUES} />
       </section>
     </div>
