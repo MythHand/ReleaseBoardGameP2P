@@ -31,6 +31,7 @@ import BadgesKit from '../stories/kit/BadgesKit'
 import ButtonsKit from '../stories/kit/ButtonsKit'
 import DrawerKit from '../stories/kit/DrawerKit'
 import DropdownKit from '../stories/kit/DropdownKit'
+import EdgeGlowKit from '../stories/kit/EdgeGlowKit'
 import InputsKit from '../stories/kit/InputsKit'
 import MenuKit from '../stories/kit/MenuKit'
 import ModalsKit from '../stories/kit/ModalsKit'
@@ -135,6 +136,7 @@ const groups: Group[] = [
       { id: 'kit-drawer', title: 'Drawer', render: () => <DrawerKit /> },
       { id: 'kit-tab-rail', title: 'Tab rail', render: () => <TabRailKit /> },
       { id: 'kit-overlay', title: 'Overlay', render: () => <OverlayKit /> },
+      { id: 'kit-edge-glow', title: 'Edge glow', render: () => <EdgeGlowKit /> },
       { id: 'kit-spinner', title: 'Spinner', render: () => <SpinnerKit /> },
     ],
   },

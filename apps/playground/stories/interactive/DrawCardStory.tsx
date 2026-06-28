@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { nextFrames, play, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
+import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
@@ -94,6 +95,9 @@ export default function DrawCardStory() {
   })
   // уходящие карты при разрешении AI (триггер → сброс, эффект → колода)
   const [outs, setOuts] = useState<{ key: string; card: CardType; faceDown: boolean }[]>([])
+  // красная краевая подсветка при Error 503 (полноэкранная): self — ты вытянул
+  // (большая, ПОД рукой); other — вытянул соперник (мелкая, НАД рукой, не блокирует)
+  const [alert, setAlert] = useState<'self' | 'other' | null>(null)
   const [busy, setBusy] = useState(false)
 
   const nextCard = useMemo(() => resolveForced(forced), [forced])
@@ -108,7 +112,15 @@ export default function DrawCardStory() {
   const flyerRef = useRef<HTMLDivElement>(null)
   const outRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const handRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
   const flightSeq = useRef(0)
+
+  // высота тех-панели — чтобы краевое свечение жило в зоне СТОЛА (под баром),
+  // а не на всём экране (иначе край стола = край экрана, игнорируя тех-элементы)
+  const [barH, setBarH] = useState(0)
+  useLayoutEffect(() => {
+    if (barRef.current) setBarH(barRef.current.offsetHeight)
+  }, [])
 
   const {
     gapAt,
@@ -290,8 +302,10 @@ export default function DrawCardStory() {
         if (eff) await resolveAi(card, eff)
         return true // AI отыграл — можно тянуть дальше
       }
-      // Error 503: остаётся раскрытым, разрешение — игровая логика (нет фикс.
-      // сценария) → пачка ждёт его завершения, дальше пока не тянем
+      // Error 503: полноэкранная красная подсветка (self — ты тянул: большая, под
+      // рукой; other — соперник: мелкая, над рукой). Остаётся раскрытым,
+      // разрешение — игровая логика (нет фикс. сценария) → пачка ждёт, дальше не тянем
+      setAlert(drawer === 'you' ? 'self' : 'other')
       return false
     }
     if (drawer === 'you') await toPlayerHand(card)
@@ -305,6 +319,7 @@ export default function DrawCardStory() {
     setBusy(true)
     setCenterCard(null)
     setAiCard(null)
+    setAlert(null)
     await drawOne(nextCard, deckIndex)
     setBusy(false)
   }
@@ -316,6 +331,7 @@ export default function DrawCardStory() {
     setBusy(true)
     setCenterCard(null)
     setAiCard(null)
+    setAlert(null)
     const forcedCard = resolveForced(forced)
     const seq: CardType[] = Array.from({ length: deckCount }, (_, i) =>
       i + 1 === forcedAt ? (forcedCard ?? randomNonTrigger()) : randomNonTrigger(),
@@ -334,6 +350,7 @@ export default function DrawCardStory() {
     setFlyer(null)
     setCenterCard(null)
     setAiCard(null)
+    setAlert(null)
     setDiscard({ top: null, count: 0 })
     setOuts([])
     setBusy(false)
@@ -342,7 +359,7 @@ export default function DrawCardStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar}>
+      <div className={styles.bar} ref={barRef}>
         <button type="button" className={styles.btn} onClick={reset}>
           сброс
         </button>
@@ -449,9 +466,20 @@ export default function DrawCardStory() {
         <Pile label="сброс" topCard={discard.top} count={discard.count} width="116px" />
       </div>
 
+      {/* Error 503, ты вытянул — большая подсветка ПОД рукой (перед рукой в DOM).
+          Свечение живёт в зоне СТОЛА (под баром), не на всём экране. */}
+      <div className={styles.glowBounds} style={{ insetBlockStart: barH }}>
+        <EdgeGlow visible={alert === 'self'} intensity="strong" />
+      </div>
+
       {/* рука игрока — снизу веером */}
       <div className={styles.handWrap} ref={handRef}>
         <Hand items={hand} gapAt={gapAt} />
+      </div>
+
+      {/* Error 503, вытянул соперник — мелкая подсветка НАД рукой (не блокирует ховер) */}
+      <div className={styles.glowBounds} style={{ insetBlockStart: barH }}>
+        <EdgeGlow visible={alert === 'other'} intensity="weak" />
       </div>
 
       {/* летящая карта добора — key по seq: новый полёт = свежий Card (без флипа) */}
