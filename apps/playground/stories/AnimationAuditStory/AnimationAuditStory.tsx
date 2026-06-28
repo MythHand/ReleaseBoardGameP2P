@@ -51,6 +51,12 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
+    mod: "play('shake')",
+    what: 'Тряска влево-вправо — фидбек «поле не заполнено». Разовый триггер по событию (как flipCard): затухающая амплитуда, возврат в исходную точку. Перезапускается на повторный вызов.',
+    where: 'словарь → Invite, Start (модалка входа)',
+    status: 'ok',
+  },
+  {
     mod: "play('playToCenter')",
     what: 'Выкладывание карты в центр стола (move, 480/ease).',
     where: 'словарь → CardPlay, DeckAnimations',

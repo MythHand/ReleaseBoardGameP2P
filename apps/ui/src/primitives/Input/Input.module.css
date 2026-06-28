@@ -29,6 +29,11 @@
   outline-color: var(--brand-green);
 }
 
+/* натуральный регистр — для никнейма (в игре используется как написан) */
+.plain {
+  text-transform: none;
+}
+
 .inputError {
   border-color: var(--cat-attack);
 }
