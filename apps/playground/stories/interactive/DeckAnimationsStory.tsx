@@ -37,7 +37,7 @@ interface HandItem {
   card: CardData
 }
 interface DiscardEntry {
-  cards: CardData[] // 1 карта или пара (комбо с Sudo) — рендерится через PlayedCards
+  card: CardData // сброс хранит ОДИНОЧНЫЕ карты; комбо ложится двумя записями
   rot: number
   dx: number
   dy: number
@@ -72,13 +72,11 @@ function makeHand(): HandItem[] {
 }
 
 function makeDiscard(): DiscardEntry[] {
-  return BASE.slice(0, DISCARD_N).map((card) => ({ cards: [card], ...jitter() }))
+  return BASE.slice(0, DISCARD_N).map((card) => ({ card, ...jitter() }))
 }
-const countCards = (entries: DiscardEntry[]) => entries.reduce((s, e) => s + e.cards.length, 0)
 
 const OPERATION = 'var(--cat-operation)'
 const SUPPORT = 'var(--cat-support)'
-const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)'
 
 const FLIP_MS = 520 // разлёт новой колоды при разделении
 const SPLIT_HOLD = 600 // пауза после разделения перед работой со сбросом
@@ -111,13 +109,16 @@ export default function DeckAnimationsStory() {
   const [hovered, setHovered] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [flyer, setFlyer] = useState<{ card: CardData; faceDown: boolean } | null>(null) // сброс
-  const [playFlyer, setPlayFlyer] = useState<CardData[] | null>(null) // разыгранные карты в полёте
+  const [playFlyer, setPlayFlyer] = useState<CardData[] | null>(null) // рука → центр (пара/одна)
   const [centerCards, setCenterCards] = useState<CardData[]>([]) // карты, лежащие в центре
+  // центр → сброс: каждая карта летит отдельной одиночкой (комбо распадается)
+  const [discardFlyers, setDiscardFlyers] = useState<{ key: string; card: CardData }[]>([])
 
   const pileRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const discardRef = useRef<HTMLDivElement>(null)
   const flyerRef = useRef<HTMLDivElement>(null)
   const playFlyerRef = useRef<HTMLDivElement>(null)
+  const discardFlyerRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const centerRef = useRef<HTMLDivElement>(null)
   const flip = useRef<{ id: number; from: DOMRect } | null>(null)
   const { from, to, aim, stop } = useArrow()
@@ -125,7 +126,7 @@ export default function DeckAnimationsStory() {
   const choosingDeck = armed?.kind === 'branch' || armed?.kind === 'branchSudo'
   const choosingCard = armed?.kind === 'sudo'
   const armColor = choosingCard ? SUPPORT : OPERATION
-  const discardCardCount = countCards(discard.cards)
+  const discardCardCount = discard.cards.length
 
   // FLIP новой колоды при разделении: вылетает из колоды-источника на своё место
   // (пресет flyFrom — анимация «из прошлого прямоугольника» в текущую позицию)
@@ -155,7 +156,7 @@ export default function DeckAnimationsStory() {
   // лицом вверх на месте сброса. Возвращает rect позиции сброса.
   const gatherDiscardToFlyer = useCallback(async (): Promise<DOMRect | undefined> => {
     if (discard.cards.length === 0) return undefined
-    const top = discard.cards[discard.cards.length - 1].cards[0]
+    const top = discard.cards[discard.cards.length - 1].card
     setDiscard((d) => ({ ...d, showCount: false, gathered: true }))
     await wait(GATHER_MS)
     await wait(HOLD)
@@ -177,19 +178,22 @@ export default function DeckAnimationsStory() {
     async (toRect: DOMRect) => {
       const fromRect = await gatherDiscardToFlyer()
       if (!fromRect) return
-      const el = flyerRef.current
-      if (el) {
-        const dx = toRect.left - fromRect.left
-        const dy = toRect.top - fromRect.top
-        const sc = toRect.width / fromRect.width
-        await el.animate(
-          [
-            { transform: 'translate(0, 0) scale(1)' },
-            { transform: `translate(${dx}px, ${dy}px) scale(${sc})` },
-          ],
-          { duration: 560, easing: EASE, fill: 'forwards' },
-        ).finished
+      // Pile содержит подпись под картой, поэтому rect ячейки выше самой карты —
+      // целимся в верхнюю карточную область (иначе посадка уезжает вниз и при
+      // появлении реальной колоды карту телепортирует вверх на своё место)
+      const aspect = fromRect.height / fromRect.width
+      const cardTo = {
+        left: toRect.left,
+        top: toRect.top,
+        width: toRect.width,
+        height: toRect.width * aspect,
       }
+      const anim = play('gatherToDeck', flyerRef.current, {
+        from: fromRect,
+        to: cardTo,
+        duration: 560,
+      })
+      if (anim) await anim.finished
       await wait(HOLD)
       setFlyer((f) => (f ? { ...f, faceDown: true } : f))
       await wait(TURN_MS)
@@ -202,7 +206,7 @@ export default function DeckAnimationsStory() {
   // переворот сброса в НОВУЮ колоду добора
   const flipDiscardToNewDeck = useCallback(async () => {
     if (discard.cards.length === 0) return
-    const count = countCards(discard.cards)
+    const count = discard.cards.length
     const newId = nextDeckId()
     setDecks((ds) => [...ds, { id: newId, count, hidden: true }])
     await nextFrames()
@@ -232,7 +236,7 @@ export default function DeckAnimationsStory() {
   const mergeEffect = async (withDiscard: boolean) => {
     const target = decks[0]
     if (!target) return
-    const discardCount = withDiscard ? countCards(discard.cards) : 0
+    const discardCount = withDiscard ? discard.cards.length : 0
     let discardFrom: DOMRect | undefined
     if (discardCount) {
       discardFrom = await gatherDiscardToFlyer()
@@ -247,33 +251,16 @@ export default function DeckAnimationsStory() {
         const el = pileRefs.current[d.id]
         if (!el) continue
         const r = el.getBoundingClientRect()
-        flights.push(
-          el.animate(
-            [
-              { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-              {
-                transform: `translate(${tRect.left - r.left}px, ${tRect.top - r.top}px) scale(0.96)`,
-                opacity: 0,
-              },
-            ],
-            { duration: MERGE_MS, easing: EASE, fill: 'forwards' },
-          ).finished,
-        )
+        const a = play('absorbToDeck', el, { from: r, to: tRect, duration: MERGE_MS })
+        if (a) flights.push(a.finished)
       }
-      const fel = flyerRef.current
-      if (discardCount && discardFrom && fel) {
-        flights.push(
-          fel.animate(
-            [
-              { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-              {
-                transform: `translate(${tRect.left - discardFrom.left}px, ${tRect.top - discardFrom.top}px) scale(0.96)`,
-                opacity: 0,
-              },
-            ],
-            { duration: MERGE_MS, easing: EASE, fill: 'forwards' },
-          ).finished,
-        )
+      if (discardCount && discardFrom) {
+        const a = play('absorbToDeck', flyerRef.current, {
+          from: discardFrom,
+          to: tRect,
+          duration: MERGE_MS,
+        })
+        if (a) flights.push(a.finished)
       }
     }
     await Promise.all(flights)
@@ -300,35 +287,34 @@ export default function DeckAnimationsStory() {
     setPlayFlyer(null)
   }
 
+  // центр → сброс: комбо распадается, каждая карта летит отдельной одиночкой со
+  // своим разбросом и ложится отдельной записью (полёт = финал, сброс из одиночек)
   const flyCenterToDiscard = async (cards: CardData[]) => {
     const fromRect = centerRef.current?.getBoundingClientRect()
     const toRect = discardRef.current?.getBoundingClientRect()
-    const j0 = jitter()
-    setPlayFlyer(cards)
+    const entries = cards.map((card) => ({ card, ...jitter() }))
+    setDiscardFlyers(entries.map((e, i) => ({ key: `df${i}`, card: e.card })))
     setCenterCards([])
     await nextFrames()
-    const el = playFlyerRef.current
-    if (el && fromRect && toRect) {
-      el.style.left = `${fromRect.left}px`
-      el.style.top = `${fromRect.top}px`
-      el.style.width = `${fromRect.width}px`
-      const anim = play('centerToDiscard', el, {
-        from: fromRect,
-        to: toRect,
-        rotate: j0.rot,
-        dx: j0.dx,
-        dy: j0.dy,
-      })
-      if (anim) await anim.finished
-    }
-    // разыгранные карты ложатся в сброс ОДНОЙ записью (1 карта или пара) — тем же
-    // представлением, что и в полёте; чтобы финал совпал с анимацией
-    setDiscard((d) => ({
-      cards: [...d.cards, { cards, rot: j0.rot, dx: j0.dx, dy: j0.dy }],
-      showCount: true,
-      gathered: false,
-    }))
-    setPlayFlyer(null)
+    await Promise.all(
+      entries.map((e, i) => {
+        const el = discardFlyerRefs.current[`df${i}`]
+        if (!el || !fromRect || !toRect) return undefined
+        el.style.left = `${fromRect.left}px`
+        el.style.top = `${fromRect.top}px`
+        el.style.width = `${fromRect.width}px`
+        const anim = play('centerToDiscard', el, {
+          from: fromRect,
+          to: toRect,
+          rotate: e.rot,
+          dx: e.dx,
+          dy: e.dy,
+        })
+        return anim?.finished
+      }),
+    )
+    setDiscard((d) => ({ cards: [...d.cards, ...entries], showCount: true, gathered: false }))
+    setDiscardFlyers([])
   }
 
   const playSequence = async (played: HandItem[], fromRect: Rect, effect: () => Promise<void>) => {
@@ -435,6 +421,7 @@ export default function DeckAnimationsStory() {
     setDiscard({ cards: makeDiscard(), showCount: true, gathered: false })
     setCenterCards([])
     setPlayFlyer(null)
+    setDiscardFlyers([])
     setFlyer(null)
     setBusy(false)
   }
@@ -504,7 +491,7 @@ export default function DeckAnimationsStory() {
                 zIndex: i,
               }}
             >
-              <PlayedCards cards={entry.cards} />
+              <Card card={entry.card} interactive={false} width="100%" />
             </div>
           ))}
           {discard.showCount && discardCardCount > 0 && (
@@ -526,12 +513,25 @@ export default function DeckAnimationsStory() {
         </div>
       )}
 
-      {/* летящие разыгранные карты (одна или пара CardPair) */}
+      {/* рука → центр: летят одной записью (одна карта или пара CardPair) */}
       {playFlyer && (
         <div className={styles.playFlyer} ref={playFlyerRef}>
           <PlayedCards cards={playFlyer} />
         </div>
       )}
+
+      {/* центр → сброс: каждая карта летит отдельной одиночкой */}
+      {discardFlyers.map((f) => (
+        <div
+          key={f.key}
+          className={styles.playFlyer}
+          ref={(el) => {
+            discardFlyerRefs.current[f.key] = el
+          }}
+        >
+          <Card card={f.card} interactive={false} width="100%" />
+        </div>
+      ))}
 
       {armed && <Arrow from={from} to={to} color={armColor} />}
     </div>

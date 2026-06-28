@@ -2,31 +2,17 @@ import type React from 'react'
 import { useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
+import { CARD_W, slotPlacement } from './fan'
 import styles from './Hand.module.css'
 
-// Геометрия веера — тюнингуется.
-const SPREAD_DEG = 4.5 // наклон между соседними картами
-const ARC_DROP = 6 // насколько «провисают» края дуги
+// Геометрия веера (наклон/дуга/шаг/ширина) — в едином модуле ./fan.
+// handStep ре-экспортируем, чтобы потребители не зависели от пути модуля.
+export { handStep } from './fan'
+
+// Ховер-ручки — только к наведению, к раскладке слота отношения не имеют.
 const HOVER_LIFT = 36 // подъём наведённой карты
 const HOVER_SCALE = 1.75 // для читаемости
 const NEIGHBOR_PUSH = 64 // насколько соседи расступаются
-const CARD_W = '150px'
-
-// Шаг между картами плавно ужимается с ростом руки — гладкая (квадратичная)
-// кривая через опорные точки [кол-во, шаг_px]. Меньше шаг → плотнее нахлёст.
-const STEP_ANCHORS: [number, number][] = [
-  [2, 124],
-  [8, 82],
-  [20, 48],
-]
-
-export function handStep(n: number): number {
-  const [[x0, y0], [x1, y1], [x2, y2]] = STEP_ANCHORS
-  const l0 = ((n - x1) * (n - x2)) / ((x0 - x1) * (x0 - x2))
-  const l1 = ((n - x0) * (n - x2)) / ((x1 - x0) * (x1 - x2))
-  const l2 = ((n - x0) * (n - x1)) / ((x2 - x0) * (x2 - x1))
-  return y0 * l0 + y1 * l1 + y2 * l2
-}
 
 export interface HandItem {
   uid: string
@@ -61,20 +47,19 @@ export default function Hand({
   const n = items.length
   // при открытом промежутке раскладываем как на n+1 слотов
   const total = gapAt != null ? n + 1 : n
-  const mid = (total - 1) / 2
-  const xGap = handStep(total) // шаг зависит от кол-ва карт
 
   return (
     <div className={styles.hand}>
       {items.map((item, i) => {
         // карты после промежутка съезжают на слот вперёд
         const slot = gapAt != null && i >= gapAt ? i + 1 : i
-        const off = slot - mid
-        let rotate = off * SPREAD_DEG
-        let x = off * xGap
-        let y = Math.abs(off) ** 2 * ARC_DROP
+        // базовое место слота — из единого источника геометрии веера
+        const base = slotPlacement(slot, total)
+        let rotate = base.rotate
+        let x = base.x
+        let y = base.y
         let scale = 1
-        let z = slot
+        let z = base.z
 
         // ховер-раздвижка только у обычной руки (не во время вставки)
         if (hovered != null && gapAt == null) {
@@ -109,7 +94,7 @@ export default function Hand({
               faceDown={faceDown}
               interactive={false}
               tilt={hovered === i}
-              width={CARD_W}
+              width={`${CARD_W}px`}
               state={accentAt?.(i) ? 'selected' : 'idle'}
               accent={accentAt?.(i)}
             />

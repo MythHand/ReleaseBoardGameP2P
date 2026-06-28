@@ -1,0 +1,180 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* техническая верхняя линия — контролы сцены */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 12px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+/* кнопка действия — дев-стиль плейграунда */
+.btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* превью карты, которая точно вытянется */
+.preview {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.previewLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* соперники — сверху по центру */
+.opponents {
+  position: absolute;
+  inset-block-start: 96px;
+  inset-inline-start: 50%;
+  display: flex;
+  gap: 28px;
+  transform: translateX(-50%);
+}
+
+/* колоды — слева по центру, гридом в 2 строки (как на сцене операций) */
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  gap: 22px;
+  transform: translateY(-50%);
+}
+
+.deck {
+  position: relative;
+}
+
+.drawable {
+  cursor: pointer;
+}
+
+/* центр стола — точка staging добора (якорь для измерения) */
+.center {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(-50%, -50%);
+}
+
+/* AI-триггер (причина) — слева от центра, обычный размер карты */
+.causeSlot {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(calc(-50% - 107px), -50%);
+}
+
+/* AI-эффект (главная) — в центре, крупнее триггера */
+.effectSlot {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  z-index: 1;
+  inline-size: 200px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(calc(-50% + 82px), -50%);
+}
+
+/* летящая карта добора — позиционируется и анимируется императивно (пресеты) */
+.flyer {
+  position: fixed;
+  z-index: 80;
+  pointer-events: none;
+}
+
+/* колода событий (AI) — закреплена в нижней-левой ячейке */
+.ai {
+  grid-row: 2;
+  grid-column: 1;
+}
+
+/* сброс — справа по центру, как на столе */
+.discard {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 40px;
+  transform: translateY(-50%);
+}
+
+/* кнопка добора — под блоком колод (колоды не двигаем, позиционируем отдельно) */
+.drawBtn {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  min-inline-size: 150px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 6px;
+  transform: translateY(236px);
+}
+
+.drawBtn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.drawBtn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+/* контейнер зоны стола для краевого свечения — ниже тех-панели (inset-block-start
+   задаётся инлайном по высоте бара), чтобы свечение не считало край экрана краем
+   стола; inset-inline:0 — справа на реальном столе тут будет граница навигации */
+.glowBounds {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  pointer-events: none;
+}
+
+/* рука игрока снизу — компонент Hand (веер).
+   Без z-index намеренно: оверлей вставки (useHandInsert) подтыкается под веер
+   по z слотов — общий stacking-контекст с рукой нужен, чтобы карта не пряталась. */
+.handWrap {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+}

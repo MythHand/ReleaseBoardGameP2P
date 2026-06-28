@@ -230,7 +230,7 @@ export default function Lobby({
       <header className={styles.head}>
         <div>
           <div className={styles.titleRow}>
-            <ReleaseLogo className={styles.headLogo} blink={false} />
+            <ReleaseLogo className={styles.headLogo} blink={false} variant={lang} />
             <span className={styles.headDivider} />
             <h1 className={styles.title}>{copy.title}</h1>
             {isHost && (

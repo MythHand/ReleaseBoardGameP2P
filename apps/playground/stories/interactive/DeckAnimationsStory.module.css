@@ -139,13 +139,12 @@
   transform: translate(-50%, -50%);
 }
 
-/* летящая стопка сброса (сброс → колода): translate по верх-левому углу,
-   поэтому transform-origin: top left (иначе масштаб от центра даёт рывок) */
+/* летящая стопка сброса (сброс → колода / слияние): полёт через пресеты
+   gatherToDeck/absorbToDeck (move, центр-в-центр) — origin по умолчанию (центр) */
 .flyer {
   position: fixed;
   z-index: 80;
   pointer-events: none;
-  transform-origin: top left;
 }
 
 /* летящие разыгранные карты (рука → центр → сброс): пресет move считает по

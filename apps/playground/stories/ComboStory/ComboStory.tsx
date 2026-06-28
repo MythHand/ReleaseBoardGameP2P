@@ -15,8 +15,7 @@ interface HandItem {
 }
 
 interface DiscardEntry {
-  main: CardData
-  aux: CardData
+  card: CardData // сброс хранит ОДИНОЧНЫЕ карты; комбо распадается на две записи
   rot: number
   dx: number
   dy: number
@@ -160,20 +159,28 @@ export default function ComboStory() {
       await nextFrames() // дать финальной карте отрисоваться до скрытия флайера
       hideFlyer()
     } else {
-      // из центра — в сброс (хаотичный разброс/угол), парой (Sudo остаётся снизу).
-      // разброс считаем ДО полёта и летим сразу в эту позицию (без рывка в финале)
+      // из центра — в сброс: пара распадается, каждая карта летит ОТДЕЛЬНОЙ
+      // одиночкой со своим разбросом и ложится отдельной записью (сброс — одиночки)
       // biome-ignore lint/style/noNonNullAssertion: discardRef is attached to the always-rendered discard slot
       const dRect = discardRef.current!.getBoundingClientRect()
-      const j = jitter()
-      const anim = play('centerToDiscard', el, {
+      const jMain = jitter()
+      const jAux = jitter()
+      const am = play('centerToDiscard', mainEl, {
         from: cRect,
         to: dRect,
-        rotate: j.rot,
-        dx: j.dx,
-        dy: j.dy,
+        rotate: jMain.rot,
+        dx: jMain.dx,
+        dy: jMain.dy,
       })
-      if (anim) await anim.finished
-      setDiscardPile((p) => [...p, { main: prt.card, aux: src.card, ...j }])
+      const aa = play('centerToDiscard', auxEl, {
+        from: cRect,
+        to: dRect,
+        rotate: jAux.rot,
+        dx: jAux.dx,
+        dy: jAux.dy,
+      })
+      await Promise.all([am?.finished, aa?.finished])
+      setDiscardPile((p) => [...p, { card: prt.card, ...jMain }, { card: src.card, ...jAux }])
       await nextFrames()
       hideFlyer()
     }
@@ -283,12 +290,12 @@ export default function ComboStory() {
                 zIndex: i,
               }}
             >
-              <CardPair main={d.main} aux={d.aux} width="100%" />
+              <Card card={d.card} interactive={false} width="100%" />
             </div>
           ))}
         </div>
         <span className={styles.cap}>
-          сброс{discardPile.length > 0 ? ` // ${discardPile.length * 2}` : ''}
+          сброс{discardPile.length > 0 ? ` // ${discardPile.length}` : ''}
         </span>
       </div>
 

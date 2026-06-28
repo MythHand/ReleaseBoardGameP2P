@@ -22,15 +22,16 @@ import ComboStory from '../stories/ComboStory'
 import HandStory from '../stories/HandStory'
 import CardPlayStory from '../stories/interactive/CardPlayStory'
 import CardToHandStory from '../stories/interactive/CardToHandStory'
+import DealCardsStory from '../stories/interactive/DealCardsStory'
 import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
 import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
-import PlayAiCardStory from '../stories/interactive/PlayAiCardStory'
 import AvatarsKit from '../stories/kit/AvatarsKit'
 import BadgesKit from '../stories/kit/BadgesKit'
 import ButtonsKit from '../stories/kit/ButtonsKit'
 import DrawerKit from '../stories/kit/DrawerKit'
 import DropdownKit from '../stories/kit/DropdownKit'
+import EdgeGlowKit from '../stories/kit/EdgeGlowKit'
 import InputsKit from '../stories/kit/InputsKit'
 import MenuKit from '../stories/kit/MenuKit'
 import ModalsKit from '../stories/kit/ModalsKit'
@@ -114,7 +115,7 @@ const groups: Group[] = [
       { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
       { id: 'deck-animations', title: 'Deck animations', render: () => <DeckAnimationsStory /> },
-      { id: 'play-ai-card', title: 'Play AI card', render: () => <PlayAiCardStory /> },
+      { id: 'deal-cards', title: 'Deal cards', render: () => <DealCardsStory /> },
     ],
   },
   {
@@ -135,6 +136,7 @@ const groups: Group[] = [
       { id: 'kit-drawer', title: 'Drawer', render: () => <DrawerKit /> },
       { id: 'kit-tab-rail', title: 'Tab rail', render: () => <TabRailKit /> },
       { id: 'kit-overlay', title: 'Overlay', render: () => <OverlayKit /> },
+      { id: 'kit-edge-glow', title: 'Edge glow', render: () => <EdgeGlowKit /> },
       { id: 'kit-spinner', title: 'Spinner', render: () => <SpinnerKit /> },
     ],
   },

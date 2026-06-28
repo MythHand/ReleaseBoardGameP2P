@@ -75,6 +75,36 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
+    mod: "play('gatherToDeck')",
+    what: 'Стопка летит к целевой стопке и приземляется (сброс → новая колода). move, центр-в-центр.',
+    where: 'словарь → DeckAnimations',
+    status: 'ok',
+  },
+  {
+    mod: "play('absorbToDeck')",
+    what: 'Поглощение: стопка/колода летит в целевую и растворяется по ходу (слияние колод). move + fade.',
+    where: 'словарь → DeckAnimations',
+    status: 'ok',
+  },
+  {
+    mod: "play('drawToCenter')",
+    what: 'Карта выходит из колоды добора в центр стола. Отдельно от playToCenter — у добора своя вариативность (число карт, спец-механики).',
+    where: 'словарь → DrawCard',
+    status: 'ok',
+  },
+  {
+    mod: "play('dealToSeat')",
+    what: 'Карта из центра уходит к месту игрока и растворяется в скрытой руке (move + fade).',
+    where: 'словарь → DrawCard',
+    status: 'ok',
+  },
+  {
+    mod: "play('returnToDeck')",
+    what: 'Карта возвращается из центра обратно в колоду (центр→колода) с уменьшением до размера колоды. Парный к drawToCenter.',
+    where: 'словарь → DrawCard',
+    status: 'ok',
+  },
+  {
     mod: 'useArrow() + centerOf()',
     what: 'Геометрия адресной стрелки: точки from/to, слежение за курсором, старт/стоп.',
     where: 'primitives/Arrow → Arrow, Combo, DeckAnimations',
@@ -95,19 +125,25 @@ const MODULES: Module[] = [
   {
     mod: 'nextFrames()',
     what: 'Двойной requestAnimationFrame — дождаться отрисовки нового узла перед стартом анимации.',
-    where: 'animations/timing → Combo, CardPlay, DeckAnimations',
+    where: 'animations/timing → Combo, CardPlay, DeckAnimations, DrawCard',
     status: 'ok',
   },
   {
     mod: 'wait(ms)',
     what: 'Пауза-таймер для держания фаз между анимациями.',
-    where: 'animations/timing → Combo, CardPlay, DeckAnimations, Animations',
+    where: 'animations/timing → Combo, CardPlay, DeckAnimations, DrawCard, Animations',
+    status: 'ok',
+  },
+  {
+    mod: 'slotPlacement() / handStep()',
+    what: 'Единый источник геометрии веера руки: наклон, дуга, ширина и шаг-от-кол-ва карт. Раскладка слотов в Hand и приземление вставки считаются по ОДНОЙ формуле — без копий, которые разъезжаются при тюнинге.',
+    where: 'table/Hand/fan → Hand, useHandInsert',
     status: 'ok',
   },
   {
     mod: 'useHandInsert()',
-    what: 'Карта «встаёт в руку»: рука раздвигает зазор, карта подгоняет размер и садится в bottom-center слота.',
-    where: 'stories/interactive → PickOpponentCard',
+    what: 'Карта «встаёт в руку»: рука раздвигает зазор, карта подгоняет размер и садится в bottom-center слота. Место слота берёт из table/Hand/fan (slotPlacement).',
+    where: 'stories/interactive → DrawCard, CardToHand, PickOpponentCard',
     status: 'ok',
   },
 ]
@@ -121,7 +157,7 @@ const SCENARIOS: Scenario[] = [
   },
   {
     name: 'Розыгрыш комбо (пара)',
-    from: 'useArrow → совмещение карт в пару (CardPair) → playToReleaseZone (релиз) или centerToDiscard + jitter (прочее)',
+    from: 'useArrow → совмещение в пару (CardPair) → релиз: playToReleaseZone; в сброс: пара распадается на две одиночки (centerToDiscard + jitter каждой)',
     where: 'Combo',
   },
   {
@@ -136,13 +172,23 @@ const SCENARIOS: Scenario[] = [
   },
   {
     name: 'Слияние колод (+ сброс)',
-    from: 'все стопки и сброс одновременно слетаются в первую колоду',
+    from: 'все стопки и сброс одновременно поглощаются первой колодой (absorbToDeck)',
     where: 'DeckAnimations',
   },
   {
     name: 'Сброс → новая колода',
-    from: 'собрать сброс в стопку → перелёт к месту колоды → flipCard рубашкой вверх',
+    from: 'собрать сброс в стопку → gatherToDeck к месту колоды → flipCard рубашкой вверх',
     where: 'DeckAnimations',
+  },
+  {
+    name: 'Добор карты (одиночный)',
+    from: 'drawToCenter (колода→центр, рубашкой вверх) → обычная: игрок (flipCard + useHandInsert) или соперник (dealToSeat, рубашкой вверх); триггер Error 503 / AI: flipCard в центре для всех; AI — ещё добор эффекта из AI-колоды рядом. Мультидобор — в работе.',
+    where: 'DrawCard',
+  },
+  {
+    name: 'Разрешение AI (уход карт)',
+    from: 'пауза (wait, имитация логики) → одновременно: триггер centerToDiscard в сброс; эффект flipCard рубашкой на месте (стаггер) → returnToDeck в AI-колоду с уменьшением.',
+    where: 'DrawCard',
   },
   {
     name: 'Взятие карты соперника',
@@ -151,36 +197,11 @@ const SCENARIOS: Scenario[] = [
   },
 ]
 
-// ===== 3. Требует доработок — где криво =====
-const ISSUES: Issue[] = [
-  {
-    what: 'Полёты сброса и слияния',
-    problem:
-      'Написаны вручную (translate по верх-левому углу + scale) вместо move() — отсюда хак transform-origin: top left и рассинхрон анимации с финальным положением.',
-    where: 'DeckAnimations (runDiscardFlight, mergeEffect)',
-    status: 'reuse',
-  },
-  {
-    what: 'Сценарий «рука → центр → сброс»',
-    problem:
-      'Один и тот же розыгрыш написан дважды и слегка по-разному — стоит свести в один общий сценарный хелпер.',
-    where: 'CardPlay (flyToCenter/flyToDiscard) + DeckAnimations (playSequence)',
-    status: 'rework',
-  },
-  {
-    what: 'Совмещение карт в пару',
-    problem: 'Bespoke el.animate с самописным enterTransform — не выражено через общий travel.',
-    where: 'Combo (runPlay a1/a2)',
-    status: 'rework',
-  },
-  {
-    what: 'Сброс хранит пары',
-    problem:
-      'Запись сброса держит группу карт; должна — одиночные. Комбо при уходе в сброс должно раскладываться на отдельные карты, а не лежать парой.',
-    where: 'DeckAnimations (DiscardEntry.cards)',
-    status: 'rework',
-  },
-]
+// ===== 3. Требует доработок =====
+// Пусто: всё свелось к модулям. (Совмещение в пару в Combo осознанно оставлено
+// как есть — это съезд карт в стопку, а не rect→rect перелёт; гнать через move()
+// было бы лишним усложнением, не проблемой.)
+const ISSUES: Issue[] = []
 
 function Badge({ status }: { status: Status }) {
   const s = STATUS[status]
@@ -281,8 +302,8 @@ export default function AnimationAuditStory() {
         Источник состояния работы с анимациями. Сначала готовые <b>модули</b> — кирпичики для
         сборки. Затем <b>сценарные комбинации</b> — как кирпичики складываются под игровые ситуации
         (сценарий — это последовательность, а не модуль: его не оформляют отдельно, поэтому без
-        статусов). И в конце <b>что требует доработок</b>: где висит дубль инлайном или самописный
-        полёт вместо готового <code>move()</code>.
+        статусов). И в конце — раздел <b>что требует доработок</b> (сейчас пусто: всё свелось к
+        модулям).
       </p>
 
       <div className={styles.legend}>
@@ -307,8 +328,11 @@ export default function AnimationAuditStory() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Требует доработок</h2>
-        <p className={styles.sectionNote}>Где криво: дубли и самописные полёты вместо словаря.</p>
-        <IssueTable rows={ISSUES} />
+        {ISSUES.length > 0 ? (
+          <IssueTable rows={ISSUES} />
+        ) : (
+          <p className={styles.sectionNote}>Открытых проблем нет — всё свелось к модулям.</p>
+        )}
       </section>
     </div>
   )

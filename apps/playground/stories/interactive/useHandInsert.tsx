@@ -1,16 +1,14 @@
 import { type RefObject, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
-import { handStep } from '@/table/Hand/Hand'
+import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import styles from './useHandInsert.module.css'
 
 // Универсальный шаг «карта встаёт в руку» (вынесено из Card to Hand, переиспользуется).
 // Рука раздвигается под карту (gapAt), карта адаптирует размер и опускается в
 // промежуток; высокий travel-слой держим короткий старт, дальше — слот-слой
 // (затыкается под правую половину веера), прилёт в bottom-center слота.
-const HAND_CARD_W = 150 // ширина карты в руке (как внутри Hand)
-const HAND_SPREAD_DEG = 4.5 // = SPREAD_DEG в Hand
-const HAND_ARC_DROP = 6 // = ARC_DROP в Hand
+// Место слота берём из единого источника геометрии веера (@/table/Hand/fan).
 const TRAVEL_Z = 500
 const START_HIGH_MS = 140 // сколько держим высокий слой после старта
 const FLIGHT_MS = 480 // = transition в .flying
@@ -53,20 +51,21 @@ export function useHandInsert(
     if (!handEl || flying) return
 
     const gap = Math.round(handLength / 2) // промежуток ~по центру веера
-    const off = gap - handLength / 2
+    // место gap-слота — из единого источника (раскладка как на handLength+1 слотов)
+    const place = slotPlacement(gap, handLength + 1)
     const hr = handEl.getBoundingClientRect()
     // целимся в bottom-center слота веера (как у .slot Hand) — пивот совпадает
-    const targetBcX = hr.left + hr.width / 2 + off * handStep(handLength + 1)
-    const targetBcY = hr.bottom + off ** 2 * HAND_ARC_DROP
+    const targetBcX = hr.left + hr.width / 2 + place.x
+    const targetBcY = hr.bottom + place.y
     const dx = targetBcX - (source.left + source.width / 2)
     const dy = targetBcY - (source.top + source.height)
-    const rot = off * HAND_SPREAD_DEG
-    const scale = HAND_CARD_W / source.width // адаптация размера к руке
+    const rot = place.rotate
+    const scale = CARD_W / source.width // адаптация размера к руке
 
     setGapAt(gap)
     setFlying({
       card,
-      z: gap, // = индекс слота: правая половина веера остаётся над картой
+      z: place.z, // = индекс слота: правая половина веера остаётся над картой
       from: { left: source.left, top: source.top, width: source.width },
       to: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(${scale})`,
     })

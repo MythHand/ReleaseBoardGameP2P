@@ -8,6 +8,7 @@ import GearIcon from '@/icons/GearIcon'
 import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
 import Pile from '@/primitives/Pile'
+import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
 import GameModes from '@/table/GameModes'
 import GameOver from '@/table/GameOver'
@@ -99,6 +100,22 @@ interface TableProps {
   onLangChange?: (lang: SwitchLang) => void
   // код игры — показывается в служебной вкладке (для зрителей), с копированием
   code?: string
+  // роль: хост видит управление (лимит зрителей, исключение зрителей)
+  role?: 'host' | 'guest'
+  // лимит зрителей и его смена — слайдер в служебной вкладке (только для хоста)
+  spectatorLimit?: number
+  onSpectatorLimitChange?: (n: number) => void
+  // исключение зрителя из панели «участники» (только для хоста)
+  onKickSpectator?: (id: string) => void
+}
+
+// светофор для лимита зрителей (зеркало палитры из экрана Lobby):
+// 0–8 зелёный, 9–18 жёлтый, 19–28 красный
+const SPEC_MAX = 28
+function specColorFor(n: number) {
+  if (n <= 8) return '#8fd9b0'
+  if (n <= 18) return '#e3b341'
+  return '#ff6b81'
 }
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
@@ -121,6 +138,9 @@ export interface TableCopy {
   // заголовки секций в панели настроек
   langTitle: string
   codeTitle: string
+  // заголовок секции управления хоста + подпись слайдера лимита зрителей
+  hostTitle: string
+  specLimit: string
   // подписи текстовых вкладок рейла
   tabHistory: string
   tabParticipants: string
@@ -136,6 +156,8 @@ export const TABLE_COPY_RU: TableCopy = {
   settings: 'настройки',
   langTitle: 'язык',
   codeTitle: 'код игры',
+  hostTitle: 'управление',
+  specLimit: 'лимит зрителей',
   tabHistory: 'история',
   tabParticipants: 'участники',
   tabRules: 'правила',
@@ -150,6 +172,8 @@ export const TABLE_COPY_EN: TableCopy = {
   settings: 'settings',
   langTitle: 'language',
   codeTitle: 'game code',
+  hostTitle: 'controls',
+  specLimit: 'spectator limit',
   tabHistory: 'history',
   tabParticipants: 'participants',
   tabRules: 'rules',
@@ -180,11 +204,19 @@ export default function Table({
   lang,
   onLangChange,
   code,
+  role = 'guest',
+  spectatorLimit,
+  onSpectatorLimitChange,
+  onKickSpectator,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
 
+  const isHost = role === 'host'
   const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
+  // секция управления хоста в настройках (сейчас — лимит зрителей)
+  const hostControls = isHost && onSpectatorLimitChange && spectatorLimit != null
+  const hasUpperSettings = Boolean((lang && onLangChange) || code)
 
   // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
   const textTabs: TabRailItem[] = [
@@ -196,7 +228,7 @@ export default function Table({
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
   // (свитчер языка и/или код игры); служебный слот под визуальные опции
-  const hasSettings = Boolean(onLangChange || code)
+  const hasSettings = Boolean(onLangChange || code || hostControls)
   const railItems: TabRailItem[] = hasSettings
     ? [{ id: 'settings', label: copy.settings, icon: <GearIcon /> }, ...textTabs]
     : textTabs
@@ -284,11 +316,36 @@ export default function Table({
                 <LobbyCode code={code} copy={codeCopy} align="start" reverse showLabel={false} />
               </section>
             )}
+            {isHost && onSpectatorLimitChange && spectatorLimit != null && (
+              <>
+                {hasUpperSettings && <div className={styles.divider} />}
+                <section className={styles.settingsSection}>
+                  <div className={styles.settingsHead}>{copy.hostTitle}</div>
+                  <div className={styles.specField}>
+                    <div className={styles.specLabel}>{copy.specLimit}</div>
+                    <Slider
+                      value={spectatorLimit}
+                      min={0}
+                      max={SPEC_MAX}
+                      onChange={onSpectatorLimitChange}
+                      color={specColorFor(spectatorLimit)}
+                      fill
+                    />
+                  </div>
+                </section>
+              </>
+            )}
           </div>
         )}
         {panel === 'history' && <MoveHistory entries={history} copy={historyCopy} />}
         {panel === 'participants' && (
-          <Participants players={participants} spectators={spectators} copy={participantsCopy} />
+          <Participants
+            players={participants}
+            spectators={spectators}
+            copy={participantsCopy}
+            isHost={isHost}
+            onKickSpectator={onKickSpectator}
+          />
         )}
         {panel === 'rules' && (
           <div className={styles.scrollPanel}>
