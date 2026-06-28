@@ -70,14 +70,20 @@ export const PRESETS: Record<string, Preset> = {
       { duration: 420, easing: EASE, fill: 'forwards' },
     ),
 
-  // «Сцепление» при подтверждении комбо (Sudo / Code Review).
-  snap: {
-    keyframes: [
-      { transform: 'scale(1.14)' },
-      { transform: 'scale(0.97)', offset: 0.6 },
-      { transform: 'scale(1)' },
-    ],
-    options: { duration: 300, easing: SNAP },
+  // FLIP-вылет: элемент уже стоит на новом месте, анимируем его «из» прошлого
+  // прямоугольника from в текущую позицию (identity). Появление новой колоды/
+  // карты из источника.
+  flyFrom: (el: Element, p?: Record<string, unknown>): Animation | null => {
+    const { from, duration = 520 } = (p ?? {}) as { from?: Rect; duration?: number }
+    if (!from) return null
+    const r = el.getBoundingClientRect()
+    return el.animate(
+      [
+        { transform: `translate(${from.left - r.left}px, ${from.top - r.top}px)` },
+        { transform: 'translate(0, 0)' },
+      ],
+      { duration, easing: EASE, fill: 'forwards' },
+    )
   },
 
   // ===== Розыгрыш карт (travel) =====

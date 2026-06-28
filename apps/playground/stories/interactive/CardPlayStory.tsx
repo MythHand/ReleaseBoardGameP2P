@@ -1,7 +1,7 @@
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useRef, useState } from 'react'
-import { play } from '@/animations'
+import { jitter, nextFrames, play } from '@/animations'
 import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
@@ -39,16 +39,6 @@ interface DiscardEntry {
 let seq = 0
 const uid = () => `p${++seq}`
 const makeHand = (cards: CardData[]): HandItem[] => cards.map((card) => ({ uid: uid(), card }))
-
-// лёгкий разброс карты в сбросе
-const jitter = () => ({
-  rot: (Math.random() * 2 - 1) * 14,
-  dx: (Math.random() * 2 - 1) * 10,
-  dy: (Math.random() * 2 - 1) * 8,
-})
-
-const nextFrames = () =>
-  new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
 
 export default function CardPlayStory() {
   const [playerHand, setPlayerHand] = useState(() => makeHand(BASE.slice(0, 5)))

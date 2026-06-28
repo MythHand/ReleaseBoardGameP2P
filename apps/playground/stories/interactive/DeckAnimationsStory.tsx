@@ -1,7 +1,7 @@
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { play } from '@/animations'
+import { jitter, nextFrames, play, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
@@ -71,12 +71,6 @@ function makeHand(): HandItem[] {
   )
 }
 
-// разброс карты в сбросе
-const jitter = () => ({
-  rot: (Math.random() * 2 - 1) * 14,
-  dx: (Math.random() * 2 - 1) * 10,
-  dy: (Math.random() * 2 - 1) * 8,
-})
 function makeDiscard(): DiscardEntry[] {
   return BASE.slice(0, DISCARD_N).map((card) => ({ cards: [card], ...jitter() }))
 }
@@ -93,10 +87,6 @@ const GATHER_MS = 360
 const TURN_MS = 460
 const HOLD = 360
 const CENTER_HOLD = 420 // пауза карты в центре после эффекта перед уходом в сброс
-
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
-const nextFrames = () =>
-  new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
 
 // разыгранные карты: одна — обычная карта; две (комбо с Sudo) — пара CardPair
 // (Sudo подтыкается под основную), как на странице Combo
@@ -138,20 +128,12 @@ export default function DeckAnimationsStory() {
   const discardCardCount = countCards(discard.cards)
 
   // FLIP новой колоды при разделении: вылетает из колоды-источника на своё место
+  // (пресет flyFrom — анимация «из прошлого прямоугольника» в текущую позицию)
   useLayoutEffect(() => {
     const f = flip.current
     if (!f) return
     flip.current = null
-    const el = pileRefs.current[f.id]
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    el.animate(
-      [
-        { transform: `translate(${f.from.left - rect.left}px, ${f.from.top - rect.top}px)` },
-        { transform: 'translate(0, 0)' },
-      ],
-      { duration: FLIP_MS, easing: EASE },
-    )
+    play('flyFrom', pileRefs.current[f.id], { from: f.from, duration: FLIP_MS })
   })
 
   // ===== эффекты (без управления busy — им управляет playSequence) =====

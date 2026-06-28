@@ -3,6 +3,7 @@ import { Navigate, NavLink, Route, Routes } from 'react-router'
 import TextStyles from '@/design/TextStyles'
 import TokenPreview from '@/design/TokenPreview'
 import TypographyPreview from '@/design/TypographyPreview'
+import AnimationAuditStory from '../stories/AnimationAuditStory'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
 import GameOverBlock from '../stories/blocks/GameOverBlock'
@@ -96,6 +97,11 @@ const groups: Group[] = [
   {
     title: 'Интерактив',
     items: [
+      {
+        id: 'interaction-audit',
+        title: 'Interaction audit',
+        render: () => <AnimationAuditStory />,
+      },
       { id: 'animations', title: 'Animations', render: () => <AnimationsStory /> },
       { id: 'arrow', title: 'Arrow', render: () => <ArrowStory /> },
       { id: 'combo', title: 'Combo', render: () => <ComboStory /> },

@@ -2,7 +2,7 @@ import type { CardData } from '@release/ui'
 import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { play } from '@/animations'
+import { jitter, nextFrames, play, wait } from '@/animations'
 import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
@@ -45,17 +45,6 @@ const TARGETS = [
   { id: 'th', label: 'рука оппонента' },
 ]
 const RELEASE_SLOTS = ['frontend', 'backend', 'database']
-
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
-const nextFrames = () =>
-  new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
-
-// хаотичный разброс карты в сбросе
-const jitter = () => ({
-  rot: (Math.random() * 2 - 1) * 14,
-  dx: (Math.random() * 2 - 1) * 10,
-  dy: (Math.random() * 2 - 1) * 8,
-})
 
 export default function ComboStory() {
   const refs = useRef<Record<string, HTMLDivElement | null>>({})
