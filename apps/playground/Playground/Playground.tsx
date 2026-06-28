@@ -222,6 +222,8 @@ export default function Playground() {
             {allStories.map((s) => (
               <Route key={s.id} path={`/${s.id}`} element={s.render()} />
             ))}
+            {/* словарь анимаций — суб-роут на конкретный пресет */}
+            <Route path="/animations/:preset" element={<AnimationsStory />} />
             {/* Unknown path → first story */}
             <Route path="*" element={<Navigate to={`/${firstId}`} replace />} />
           </Routes>

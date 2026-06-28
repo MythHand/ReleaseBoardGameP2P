@@ -1,71 +1,340 @@
 .root {
   display: flex;
-  flex-direction: column;
   block-size: 100%;
-  padding: 28px;
+}
+
+/* ===== левый каталог — навигация по пресетам ===== */
+.catalog {
+  flex: 0 0 380px;
+  inline-size: 380px;
+  padding: 24px;
+  overflow-y: auto;
+  border-inline-end: 1px solid rgb(255 255 255 / 8%);
 }
 
 .hint {
-  max-inline-size: 700px;
   margin: 0 0 20px;
   font-size: 12px;
   line-height: 1.5;
   opacity: 0.55;
 }
 
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-block-end: 28px;
+.hint code {
+  font-family: var(--font-mono);
+  color: var(--brand-green);
 }
 
-.btn {
-  padding: 8px 14px;
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block-end: 22px;
+}
+
+.groupTitle {
+  margin-block-end: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  inline-size: 100%;
+  padding: 9px 12px;
+  text-align: start;
   cursor: pointer;
   background: transparent;
-  border: 1px solid rgb(255 255 255 / 15%);
-  border-radius: 6px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 8px;
 }
 
-.btn:hover {
-  color: var(--brand-green);
+.rowActive {
   border-color: var(--brand-green);
 }
 
-.btn:disabled {
-  cursor: default;
-  opacity: 0.4;
+.row:hover {
+  border-color: rgb(255 255 255 / 25%);
+}
+
+.name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.rowDesc {
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgb(255 255 255 / 50%);
+}
+
+/* ===== правая часть — сцена + нижняя область ===== */
+.stageWrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-inline-size: 0;
 }
 
 .stage {
-  display: flex;
-  flex: 1;
-  gap: 40px;
-  align-items: center;
-  justify-content: space-between;
-  min-block-size: 320px;
-  padding: 0 60px;
-}
-
-.card {
   position: relative;
-  z-index: 2;
+  flex: 1;
+  min-block-size: 380px;
+  overflow: hidden;
 }
 
-.target {
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: rgb(255 255 255 / 40%);
+}
+
+/* «места» сцены — откуда / куда летит карта */
+.end {
+  position: absolute;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+}
+
+.endLeft {
+  inset-inline-start: 48px;
+}
+
+.endRight {
+  inset-inline-end: 48px;
+}
+
+.endLabel {
+  position: absolute;
+  inset-block-end: calc(100% + 8px);
+  inset-inline-start: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.endBox {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
-  border: 1px dashed rgb(255 255 255 / 20%);
   border-radius: 12px;
-  opacity: 0.5;
+}
+
+/* невидимый якорь прилёта — его ширина задаёт масштаб усадки карты */
+.landing {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  aspect-ratio: var(--card-aspect);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.endDashed {
+  border: 1px dashed rgb(255 255 255 / 20%);
+}
+
+.endRelease {
+  border: 1px dashed var(--cat-release);
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--cat-release) 14%, transparent);
+}
+
+/* колода — стопка рубашек со смещением; сброс — пара карт разбросом */
+.deck,
+.discard {
+  position: relative;
+  inline-size: 96px;
+  aspect-ratio: var(--card-aspect);
+}
+
+.deck > *,
+.discard > * {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+}
+
+.deck > *:nth-child(2) {
+  transform: translate(5px, 5px);
+}
+
+.deck > *:nth-child(3) {
+  transform: translate(10px, 10px);
+}
+
+.discard > *:nth-child(1) {
+  transform: rotate(-9deg) translate(-7px, 2px);
+}
+
+.discard > *:nth-child(2) {
+  transform: rotate(7deg) translate(7px, -2px);
+}
+
+/* место игрока — аватар + слот руки */
+.seat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.seatAvatar {
+  inline-size: 34px;
+  block-size: 34px;
+  background: rgb(255 255 255 / 14%);
+  border-radius: 50%;
+}
+
+.seatSlot {
+  inline-size: 70px;
+  aspect-ratio: var(--card-aspect);
+  border: 1px dashed rgb(255 255 255 / 22%);
+  border-radius: 8px;
+}
+
+/* рука — веер из трёх карт */
+.hand {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+}
+
+.handCard {
+  inline-size: 26px;
+  block-size: 70px;
+  background: rgb(255 255 255 / 12%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 5px;
+}
+
+.handCard:nth-child(1) {
+  transform: rotate(-7deg);
+}
+
+.handCard:nth-child(3) {
+  transform: rotate(7deg);
+}
+
+/* призрак-источник для flyFrom */
+.ghost {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgb(255 255 255 / 40%);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px dashed rgb(255 255 255 / 18%);
+  border-radius: 12px;
+  transform: translateY(-50%);
+}
+
+/* летящая карта — слот задаёт позицию, WAAPI крутит внутреннюю .card */
+.cardSlot {
+  position: absolute;
+  inset-block-start: 50%;
+  z-index: 5;
+}
+
+.slotLeft {
+  inset-inline-start: 48px;
+  transform: translateY(-50%);
+}
+
+.slotCenter {
+  inset-inline-start: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.card {
+  position: relative;
+}
+
+/* ===== верхняя область: заголовок → описание → дивайдер → play ===== */
+.header {
+  flex: 0 0 auto;
+  padding: 20px 24px;
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+.title {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--brand-green);
+}
+
+.desc {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-block-end: 14px;
+}
+
+.descMain {
+  font-size: 13px;
+  color: rgb(255 255 255 / 75%);
+}
+
+.descDetail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgb(255 255 255 / 45%);
+}
+
+.divider {
+  block-size: 1px;
+  margin-block-end: 14px;
+  background: rgb(255 255 255 / 12%);
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.playBtn {
+  padding: 9px 18px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 6px;
+}
+
+.playBtn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.playBtn:hover:not(:disabled) {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
 }
