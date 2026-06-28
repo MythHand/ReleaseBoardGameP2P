@@ -53,12 +53,12 @@
     opacity var(--t-base) var(--ease-soft);
 }
 
-/* подсветка цели в ЦВЕТЕ карты */
+/* подсветка цели в ЦВЕТЕ карты — обводка + свечение, как у обложки (Card .glow) */
 .targeted {
   color: var(--hl);
   border-color: var(--hl);
   border-style: solid;
-  box-shadow: 0 0 20px color-mix(in srgb, var(--hl) 45%, transparent),
-    inset 0 0 14px color-mix(in srgb, var(--hl) 18%, transparent);
+  box-shadow: 0 0 0 2px var(--hl),
+    0 0 22px 2px color-mix(in srgb, var(--hl) 50%, transparent);
   opacity: 1;
 }

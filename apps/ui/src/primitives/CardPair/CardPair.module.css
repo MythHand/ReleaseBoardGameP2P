@@ -1,0 +1,20 @@
+/* пара: основная карта сверху, вспомогательная под углом снизу (виден верх) */
+.pair {
+  position: relative;
+  aspect-ratio: var(--card-aspect);
+}
+
+.aux {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  filter: brightness(0.82);
+  transform: translateY(-26%) rotate(-7deg);
+  transform-origin: bottom center;
+}
+
+.main {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}

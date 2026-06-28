@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react'
 import styles from './Arrow.module.css'
 
-interface Point {
+export interface Point {
   x: number
   y: number
 }

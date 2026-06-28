@@ -1,3 +1,4 @@
+import type React from 'react'
 import { useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
@@ -38,6 +39,10 @@ interface HandProps {
   // индекс «вставочного» промежутка: веер раскладывается как на n+1 карт,
   // оставляя слот gapAt пустым (под прилетающую карту). null — обычная рука.
   gapAt?: number | null
+  // клик по карте (для розыгрыша): отдаёт индекс, DOM-элемент слота и событие
+  onCardClick?: (index: number, el: HTMLElement, e: React.MouseEvent) => void
+  // подсветка карты по индексу: вернуть цвет свечения (цель стрелки) или undefined
+  accentAt?: (index: number) => string | undefined
 }
 
 /**
@@ -45,7 +50,13 @@ interface HandProps {
  * добавление/удаление карт плавно переукладывает веер (CSS-transition).
  * gapAt открывает промежуток под вставку — сосед­ние карты разъезжаются.
  */
-export default function Hand({ items, faceDown = false, gapAt = null }: HandProps) {
+export default function Hand({
+  items,
+  faceDown = false,
+  gapAt = null,
+  onCardClick,
+  accentAt,
+}: HandProps) {
   const [hovered, setHovered] = useState<number | null>(null)
   const n = items.length
   // при открытом промежутке раскладываем как на n+1 слотов
@@ -87,10 +98,11 @@ export default function Hand({ items, faceDown = false, gapAt = null }: HandProp
           // biome-ignore lint/a11y/noStaticElementInteractions: hover only drives the decorative fan-spread (lift/read the hovered card); cards are non-interactive here, no keyboard affordance implied
           <div
             key={item.uid}
-            className={styles.slot}
+            className={`${styles.slot} ${onCardClick ? styles.clickable : ''}`}
             style={{ transform, zIndex: z }}
             onMouseEnter={() => setHovered(i)}
             onMouseLeave={() => setHovered((h) => (h === i ? null : h))}
+            onMouseDown={onCardClick ? (e) => onCardClick(i, e.currentTarget, e) : undefined}
           >
             <Card
               card={item.card}
@@ -98,6 +110,8 @@ export default function Hand({ items, faceDown = false, gapAt = null }: HandProp
               interactive={false}
               tilt={hovered === i}
               width={CARD_W}
+              state={accentAt?.(i) ? 'selected' : 'idle'}
+              accent={accentAt?.(i)}
             />
           </div>
         )

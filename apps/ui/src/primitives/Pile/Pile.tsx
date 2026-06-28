@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { COVERS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
@@ -11,6 +12,9 @@ interface PileProps {
   width?: string
   /** 'br' — бейдж в правом нижнем (сброс) | 'tl' — текст в левом верхнем (колоды) */
   countPos?: 'br' | 'tl'
+  /** выделение обложки: обводка + свечение в цвете accent (как у Card) */
+  selected?: boolean
+  accent?: string
 }
 
 // Стопка карт: колода (рубашкой вверх) или сброс (верхняя карта лицом).
@@ -22,10 +26,16 @@ export default function Pile({
   topCard = null,
   width = '88px',
   countPos = 'br',
+  selected = false,
+  accent = 'var(--brand-green)',
 }: PileProps) {
   return (
     <div className={styles.pile} style={{ width }}>
-      <div className={styles.stack}>
+      <div
+        className={styles.stack}
+        data-selected={selected}
+        style={{ '--accent': accent } as CSSProperties}
+      >
         <span className={styles.layer} aria-hidden="true" />
         <span className={styles.layer} aria-hidden="true" />
         <div className={styles.top}>
@@ -40,6 +50,8 @@ export default function Pile({
             />
           )}
         </div>
+        {/* выделение обложки — поверх стопки, по краям карты */}
+        <span className={styles.glow} aria-hidden="true" />
         {count > 0 && (
           <span className={`${styles.count} ${countPos === 'tl' ? styles.tl : styles.br}`}>
             {count}

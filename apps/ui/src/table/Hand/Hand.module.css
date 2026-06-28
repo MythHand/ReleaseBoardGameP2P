@@ -12,3 +12,7 @@
   transition: transform 320ms var(--ease-soft);
   will-change: transform;
 }
+
+.clickable {
+  cursor: pointer;
+}

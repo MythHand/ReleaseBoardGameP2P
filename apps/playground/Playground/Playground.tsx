@@ -19,11 +19,12 @@ import SeatBlock from '../stories/blocks/SeatBlock'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import HandStory from '../stories/HandStory'
+import CardPlayStory from '../stories/interactive/CardPlayStory'
 import CardToHandStory from '../stories/interactive/CardToHandStory'
+import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
 import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
 import PlayAiCardStory from '../stories/interactive/PlayAiCardStory'
-import SplitDeckStory from '../stories/interactive/SplitDeckStory'
 import AvatarsKit from '../stories/kit/AvatarsKit'
 import BadgesKit from '../stories/kit/BadgesKit'
 import ButtonsKit from '../stories/kit/ButtonsKit'
@@ -104,8 +105,9 @@ const groups: Group[] = [
         render: () => <PickOpponentCardStory />,
       },
       { id: 'card-to-hand', title: 'Card to Hand', render: () => <CardToHandStory /> },
+      { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
-      { id: 'split-deck', title: 'Split deck', render: () => <SplitDeckStory /> },
+      { id: 'deck-animations', title: 'Deck animations', render: () => <DeckAnimationsStory /> },
       { id: 'play-ai-card', title: 'Play AI card', render: () => <PlayAiCardStory /> },
     ],
   },

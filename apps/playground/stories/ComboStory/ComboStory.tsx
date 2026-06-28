@@ -4,14 +4,10 @@ import type { CSSProperties } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { play } from '@/animations'
 import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
-import Arrow from '@/primitives/Arrow'
+import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
+import CardPair from '@/primitives/CardPair'
 import styles from './ComboStory.module.css'
-
-interface Point {
-  x: number
-  y: number
-}
 
 interface HandItem {
   uid: string
@@ -50,11 +46,6 @@ const TARGETS = [
 ]
 const RELEASE_SLOTS = ['frontend', 'backend', 'database']
 
-const centerOf = (el: HTMLElement | null | undefined): Point => {
-  // biome-ignore lint/style/noNonNullAssertion: only called with refs that are registered/mounted at call time
-  const r = el!.getBoundingClientRect()
-  return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
-}
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 const nextFrames = () =>
   new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
@@ -65,22 +56,6 @@ const jitter = () => ({
   dx: (Math.random() * 2 - 1) * 10,
   dy: (Math.random() * 2 - 1) * 8,
 })
-
-// Пара карт: основная сверху, вспомогательная под углом снизу (виден верхний край).
-function ComboPair({ main, aux, width }: { main: CardData; aux: CardData; width?: string }) {
-  return (
-    <div className={styles.pair} style={width ? { width } : undefined}>
-      {aux && (
-        <div className={styles.aux} data-aux>
-          <Card card={aux} interactive={false} width="100%" />
-        </div>
-      )}
-      <div className={styles.mainCard} data-main>
-        <Card card={main} interactive={false} width="100%" />
-      </div>
-    </div>
-  )
-}
 
 export default function ComboStory() {
   const refs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -93,8 +68,7 @@ export default function ComboStory() {
   const [phase, setPhase] = useState<'idle' | 'partner' | 'target'>('idle') // idle | partner | target
   const [source, setSource] = useState<HandItem | null>(null)
   const [partner, setPartner] = useState<HandItem | null>(null)
-  const [from, setFrom] = useState<Point | null>(null)
-  const [to, setTo] = useState<Point | null>(null)
+  const { from, to, aim, stop } = useArrow() // геометрия стрелки + слежение за курсором
   const [playing, setPlaying] = useState(false)
   const [released, setReleased] = useState<Record<string, ReleasedEntry>>({})
   const [discardPile, setDiscardPile] = useState<DiscardEntry[]>([]) // [{main, aux, rot, dx, dy}]
@@ -113,19 +87,15 @@ export default function ComboStory() {
     setPhase('idle')
     setSource(null)
     setPartner(null)
+    stop()
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: cancel is an inline fn; adding it would cause re-subscription on every render
   useEffect(() => {
     if (!active) return
-    const onMove = (e: MouseEvent) => setTo({ x: e.clientX, y: e.clientY })
     const onDown = () => cancel()
-    window.addEventListener('mousemove', onMove)
     window.addEventListener('mousedown', onDown)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mousedown', onDown)
-    }
+    return () => window.removeEventListener('mousedown', onDown)
   }, [active])
 
   const hideFlyer = () => {
@@ -234,8 +204,8 @@ export default function ComboStory() {
     if (phase === 'idle') {
       if (isComboSource(item.card)) {
         setSource(item)
-        setFrom(centerOf(refs.current[item.uid]))
-        setTo({ x: e.clientX, y: e.clientY })
+        // biome-ignore lint/style/noNonNullAssertion: the just-picked card's ref is mounted
+        aim(centerOf(refs.current[item.uid]!), { x: e.clientX, y: e.clientY })
         setPhase('partner')
       }
       return
@@ -247,8 +217,8 @@ export default function ComboStory() {
       if (item.uid !== src.uid && validComboTarget(src.card, item.card)) {
         if (cardCanTarget(item.card)) {
           setPartner(item)
-          setFrom(centerOf(refs.current[item.uid]))
-          setTo({ x: e.clientX, y: e.clientY })
+          // biome-ignore lint/style/noNonNullAssertion: the just-picked partner's ref is mounted
+          aim(centerOf(refs.current[item.uid]!), { x: e.clientX, y: e.clientY })
           setPhase('target')
         } else {
           runPlay(src, item)
@@ -324,7 +294,7 @@ export default function ComboStory() {
                 zIndex: i,
               }}
             >
-              <ComboPair main={d.main} aux={d.aux} width="100%" />
+              <CardPair main={d.main} aux={d.aux} width="100%" />
             </div>
           ))}
         </div>
@@ -346,7 +316,7 @@ export default function ComboStory() {
                 className={styles.slot}
               >
                 {r ? (
-                  <ComboPair main={r.card} aux={r.aux} width="100%" />
+                  <CardPair main={r.card} aux={r.aux} width="100%" />
                 ) : (
                   <span className={styles.empty}>{key}</span>
                 )}
@@ -386,7 +356,7 @@ export default function ComboStory() {
       {active && <Arrow from={from} to={to} color={color} />}
 
       <div className={styles.flyer} ref={flyRef} aria-hidden="true">
-        {flyPair && <ComboPair main={flyPair.main} aux={flyPair.aux} width="100%" />}
+        {flyPair && <CardPair main={flyPair.main} aux={flyPair.aux} width="100%" />}
       </div>
     </div>
   )
