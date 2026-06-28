@@ -22,7 +22,7 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
     createTitle: 'Создать игру',
     lobbyParams: 'Параметры лобби',
     nicknameLabel: 'Ваш никнейм',
-    nicknamePlaceholder: 'напр. dimbo',
+    nicknamePlaceholder: 'НАПР. Dimbo',
     randomNick: 'случайный ник',
     createCta: 'создать лобби',
     lobbyNote:
@@ -30,7 +30,7 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
     joinTitle: 'Подключиться',
     gameCodeLabel: 'код игры',
     gameCodePlaceholder: 'напр. 4F2A-9K',
-    joinCta: 'войти',
+    joinCta: 'подключиться',
     rulesTitle: 'Правила',
     authorDesign: 'Game & Design:',
     authorDev: 'Development:',
@@ -52,7 +52,7 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
     createTitle: 'Create game',
     lobbyParams: 'Lobby settings',
     nicknameLabel: 'Your nickname',
-    nicknamePlaceholder: 'e.g. dimbo',
+    nicknamePlaceholder: 'E.G. Dimbo',
     randomNick: 'random name',
     createCta: 'create lobby',
     lobbyNote:
@@ -60,7 +60,7 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
     joinTitle: 'Join',
     gameCodeLabel: 'game code',
     gameCodePlaceholder: 'e.g. 4F2A-9K',
-    joinCta: 'enter',
+    joinCta: 'connect',
     rulesTitle: 'Rules',
     authorDesign: 'Game & Design:',
     authorDev: 'Development:',
@@ -69,13 +69,15 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
 }
 
 export default function StartStory() {
-  const { lang } = useLang()
+  const { lang, setLang } = useLang()
   return (
     <div className={styles.root}>
       <Start
         copy={pick(lang, COPY)}
         rulesCopy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })}
         onPlayground={() => {}}
+        lang={lang}
+        onLangChange={setLang}
       />
     </div>
   )

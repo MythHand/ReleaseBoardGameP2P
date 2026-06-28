@@ -1,6 +1,8 @@
 import type { TransitionEvent } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { play } from '@/animations'
 import GameSettings from '@/blocks/GameSettings'
+import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
@@ -61,6 +63,10 @@ interface StartProps {
   onJoin?: (nickname: string, code: string) => void
   // переход в playground (на фронте ведёт на /playground/)
   onPlayground?: () => void
+  // язык + смена: когда оба переданы — в правом верхнем углу рисуется свитчер.
+  // Каталоги экран не держит (i18n-agnostic) — copy свапает консьюмер.
+  lang?: SwitchLang
+  onLangChange?: (lang: SwitchLang) => void
 }
 
 export default function Start({
@@ -69,6 +75,8 @@ export default function Start({
   onJoin,
   onPlayground,
   rulesCopy = RULES_COPY_RU,
+  lang,
+  onLangChange,
 }: StartProps) {
   const [modal, setModal] = useState<'create' | 'join' | 'rules' | null>(null)
   const [setup, setSetup] = useState<Setup>(DEFAULT_SETUP)
@@ -80,6 +88,22 @@ export default function Start({
   const [videoOpen, setVideoOpen] = useState(false)
   const close = () => setModal(null)
   const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
+
+  // тряска незаполненных полей при попытке войти (play('shake') — тот же модуль,
+  // что в экране приглашения): встряхиваем первое пустое поле
+  const joinNameRef = useRef<HTMLDivElement>(null)
+  const joinCodeRef = useRef<HTMLDivElement>(null)
+  const joinValid = joinName.trim().length > 0 && joinCode.trim().length > 0
+  const submitJoin = () => {
+    if (joinValid) {
+      onJoin?.(joinName, joinCode)
+      close()
+      return
+    }
+    // трясём все незаполненные поля
+    if (!joinName.trim()) play('shake', joinNameRef.current)
+    if (!joinCode.trim()) play('shake', joinCodeRef.current)
+  }
 
   const openVideo = () => {
     setVideoMounted(true)
@@ -105,6 +129,15 @@ export default function Start({
       <div className={styles.bg} />
       <div className={styles.blur} />
       <div className={styles.scrim} />
+
+      {lang && onLangChange && (
+        <>
+          <div className={styles.langShade} />
+          <div className={styles.langCorner}>
+            <LangSwitcher value={lang} onChange={onLangChange} />
+          </div>
+        </>
+      )}
 
       <div className={styles.content}>
         <div className={styles.col}>
@@ -205,6 +238,7 @@ export default function Start({
               onChange={(e) => setHost(sanitizeNickname(e.target.value))}
               placeholder={copy.nicknamePlaceholder}
               maxLength={20}
+              plain
               trailing={
                 <Button
                   variant="icon"
@@ -232,35 +266,35 @@ export default function Start({
       </Modal>
 
       <Modal open={modal === 'join'} onClose={close} title={copy.joinTitle}>
-        <Input
-          label={copy.nicknameLabel}
-          value={joinName}
-          onChange={(e) => setJoinName(sanitizeNickname(e.target.value))}
-          placeholder={copy.nicknamePlaceholder}
-          maxLength={20}
-          trailing={
-            <Button
-              variant="icon"
-              onClick={() => setJoinName(randomNickname())}
-              aria-label={copy.randomNick}
-              title={copy.randomNick}
-            >
-              <DiceIcon />
-            </Button>
-          }
-        />
-        <Input
-          label={copy.gameCodeLabel}
-          value={joinCode}
-          onChange={(e) => setJoinCode(e.target.value)}
-          placeholder={copy.gameCodePlaceholder}
-        />
-        <Button
-          onClick={() => {
-            onJoin?.(joinName, joinCode)
-            close()
-          }}
-        >
+        <div ref={joinNameRef}>
+          <Input
+            label={copy.nicknameLabel}
+            value={joinName}
+            onChange={(e) => setJoinName(sanitizeNickname(e.target.value))}
+            placeholder={copy.nicknamePlaceholder}
+            maxLength={20}
+            plain
+            trailing={
+              <Button
+                variant="icon"
+                onClick={() => setJoinName(randomNickname())}
+                aria-label={copy.randomNick}
+                title={copy.randomNick}
+              >
+                <DiceIcon />
+              </Button>
+            }
+          />
+        </div>
+        <div ref={joinCodeRef}>
+          <Input
+            label={copy.gameCodeLabel}
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)}
+            placeholder={copy.gameCodePlaceholder}
+          />
+        </div>
+        <Button className={joinValid ? '' : styles.ctaIdle} onClick={submitJoin}>
           {copy.joinCta}
         </Button>
       </Modal>

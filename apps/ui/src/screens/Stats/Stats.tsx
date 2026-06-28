@@ -1,3 +1,4 @@
+import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import { cardById } from '@/cards'
 import Avatar from '@/primitives/Avatar'
 import Badge, { type BadgeTone } from '@/primitives/Badge'
@@ -48,6 +49,10 @@ interface StatsProps {
   winnerId: string
   copy: StatsCopy
   players?: StatPlayer[]
+  // язык + смена: когда оба переданы — в правом верхнем углу рисуется свитчер.
+  // Каталоги экран не держит (i18n-agnostic) — copy свапает консьюмер.
+  lang?: SwitchLang
+  onLangChange?: (lang: SwitchLang) => void
 }
 
 interface Achievement {
@@ -79,7 +84,7 @@ const ACHIEVEMENTS: Achievement[] = [
   },
 ]
 
-export default function Stats({ winnerId, copy, players = [] }: StatsProps) {
+export default function Stats({ winnerId, copy, players = [], lang, onLangChange }: StatsProps) {
   const winner = players.find((p) => p.id === winnerId)
   const leader = (key: MetricKey): StatPlayer | undefined => {
     if (!players.length) return undefined
@@ -92,8 +97,11 @@ export default function Stats({ winnerId, copy, players = [] }: StatsProps) {
   return (
     <div className={styles.stats}>
       <header className={styles.head}>
-        <h1 className={styles.title}>{copy.title}</h1>
-        <p className={styles.sub}>{copy.subtitle}</p>
+        <div>
+          <h1 className={styles.title}>{copy.title}</h1>
+          <p className={styles.sub}>{copy.subtitle}</p>
+        </div>
+        {lang && onLangChange && <LangSwitcher value={lang} onChange={onLangChange} />}
       </header>
 
       {winner && (

@@ -125,4 +125,20 @@ export const PRESETS: Record<string, Preset> = {
   // drawToCenter; move уменьшает по ширине до карточной области колоды.
   returnToDeck: (el: Element, p?: Record<string, unknown>): Animation | null =>
     move(el, p as MoveParams, durationOf(p, 480), EASE),
+
+  // ===== Фидбек ввода =====
+  // Тряска влево-вправо — «поле не заполнено». Разовый триггер по событию
+  // (как flipCard), с затухающей амплитудой и возвратом в исходную точку.
+  shake: (el: Element): Animation =>
+    el.animate(
+      [
+        { transform: 'translateX(0)' },
+        { transform: 'translateX(-7px)' },
+        { transform: 'translateX(6px)' },
+        { transform: 'translateX(-4px)' },
+        { transform: 'translateX(3px)' },
+        { transform: 'translateX(0)' },
+      ],
+      { duration: 380, easing: EASE },
+    ),
 }

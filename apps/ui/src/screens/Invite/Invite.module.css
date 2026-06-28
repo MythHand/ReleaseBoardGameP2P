@@ -1,0 +1,264 @@
+/* Экран приглашения (/lobby/:code) — наследует визуальный язык Start:
+   слоёный фон (фото + блюр + затемнение), левая колонка, свитчер в углу.
+   Высота 100% — экран живёт внутри контейнера консьюмера (стори/фронт). */
+.root {
+  position: relative;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("../../assets/home/photo.jpg");
+  background-position: center right;
+  background-size: cover;
+}
+
+/* блюр сильнее слева, к правому краю исчезает (через mask) */
+.blur {
+  position: absolute;
+  inset: 0;
+  -webkit-backdrop-filter: blur(11px);
+  backdrop-filter: blur(11px);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, rgb(0 0 0 / 70%) 38%, transparent 66%);
+  mask-image: linear-gradient(90deg, #000 0%, rgb(0 0 0 / 70%) 38%, transparent 66%);
+}
+
+/* градиент легче слева, растянут вправо, не до полной прозрачности */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 80%) 0%,
+    rgb(0 0 0 / 66%) 36%,
+    rgb(0 0 0 / 48%) 70%,
+    rgb(0 0 0 / 32%) 100%
+  );
+}
+
+/* мягкое затемнение фона под свитчером языка (как на Start) */
+.langShade {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  z-index: 2;
+  inline-size: 340px;
+  block-size: 200px;
+  pointer-events: none;
+  background: radial-gradient(
+    120% 120% at 100% 0%,
+    rgb(0 0 0 / 42%) 0%,
+    rgb(0 0 0 / 20%) 42%,
+    transparent 72%
+  );
+}
+
+/* свитчер языка — правый верхний угол, симметрично логотипу слева */
+.langCorner {
+  position: absolute;
+  inset-block-start: 72px;
+  inset-inline-end: 76px;
+  z-index: 3;
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  block-size: 100%;
+  padding-block: 64px;
+  padding-inline-start: 76px;
+  overflow-y: auto;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  inline-size: 460px;
+}
+
+/* ===== область 1 — описание игры ===== */
+.about {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.logo {
+  inline-size: 263px;
+  block-size: auto;
+
+  /* компенсация glow/инсета глифа в SVG — «R» на левую линию (масштаб ширины) */
+  margin: 0 0 12px -7px;
+}
+
+.tags {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block-end: 22px;
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--cat-release);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  opacity: 0.85;
+}
+
+.desc {
+  max-inline-size: 420px;
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.82;
+}
+
+/* ===== область 2 — форма приглашения ===== */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  inline-size: 360px;
+  margin-block-start: 44px;
+}
+
+/* обёртка поля ввода — цель тряски play('shake') */
+.fieldWrap {
+  inline-size: 100%;
+}
+
+.formTitle {
+  margin: 0 0 4px;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* выбор роли — в стиле полей ввода: лейбл как у Input, сегменты как поле */
+.role {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roleLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  opacity: 0.55;
+}
+
+.roleOptions {
+  display: flex;
+  inline-size: 320px;
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 18%);
+}
+
+.roleOpt {
+  flex: 1;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: rgb(255 255 255 / 55%);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.roleOptOn {
+  color: #fff;
+  background: rgb(255 255 255 / 12%);
+}
+
+.roleOpt + .roleOpt {
+  border-inline-start: 1px solid rgb(255 255 255 / 18%);
+}
+
+.roleOpt:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.roleOpt:hover:not(:disabled) {
+  color: #fff;
+}
+
+/* подпись под выбором роли (режим «только зритель») */
+.note {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--cat-support);
+}
+
+/* кнопка подключения — по центру инпута кода игры (его ширина 320),
+   обёртка по этой ширине; саму форму не сужаем */
+.joinRow {
+  display: flex;
+  justify-content: center;
+  inline-size: 320px;
+  margin-block-start: 4px;
+}
+
+/* «выключенный» вид, но кнопка кликабельна (для тряски пустой формы) */
+.joinIdle {
+  opacity: 0.4;
+}
+
+/* состояние «мест нет» / «игра не найдена» — вместо полей */
+.blocked {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  inline-size: 360px;
+  padding: 20px 22px;
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+}
+
+.blockedTitle {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--cat-attack);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.blockedNote {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.55;
+  opacity: 0.75;
+}
+
+.refresh {
+  margin-block-start: 8px;
+}
+
+/* ===== область 3 — уход на стартовый экран ===== отделено заметным отступом,
+   кнопка по той же центральной вертикали, что и «подключиться» */
+.home {
+  display: flex;
+  justify-content: center;
+  inline-size: 320px;
+  margin-block-start: 64px;
+}

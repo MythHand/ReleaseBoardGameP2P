@@ -20,6 +20,7 @@ import SeatBlock from '../stories/blocks/SeatBlock'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import HandStory from '../stories/HandStory'
+import InviteStory from '../stories/InviteStory'
 import CardPlayStory from '../stories/interactive/CardPlayStory'
 import CardToHandStory from '../stories/interactive/CardToHandStory'
 import DealCardsStory from '../stories/interactive/DealCardsStory'
@@ -73,8 +74,9 @@ const groups: Group[] = [
   {
     title: 'Экраны',
     items: [
-      { id: 'start', title: 'Start screen', render: () => <StartStory /> },
       { id: 'loader', title: 'Loader', render: () => <LoaderStory /> },
+      { id: 'start', title: 'Start screen', render: () => <StartStory /> },
+      { id: 'invite', title: 'Invite', render: () => <InviteStory /> },
       { id: 'lobby', title: 'Lobby', render: () => <LobbyStory /> },
       { id: 'table', title: 'Table', render: () => <TableStory /> },
       { id: 'stats', title: 'Stats', render: () => <StatsStory /> },
@@ -220,6 +222,8 @@ export default function Playground() {
             {allStories.map((s) => (
               <Route key={s.id} path={`/${s.id}`} element={s.render()} />
             ))}
+            {/* словарь анимаций — суб-роут на конкретный пресет */}
+            <Route path="/animations/:preset" element={<AnimationsStory />} />
             {/* Unknown path → first story */}
             <Route path="*" element={<Navigate to={`/${firstId}`} replace />} />
           </Routes>
