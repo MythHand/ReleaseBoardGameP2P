@@ -40,6 +40,14 @@
     color var(--t-base) var(--ease-soft);
 }
 
+/* вкладка-иконка (напр. настройки) — квадрат сверху, без растяжения и
+   вертикального текста */
+.square {
+  flex: none;
+  block-size: 56px;
+  writing-mode: horizontal-tb;
+}
+
 .tab:last-child {
   border-block-end: none;
 }

@@ -33,6 +33,17 @@
   color: #7fb0ff;
 }
 
+/* крупная «плашка» — тёмный фон + нейтральная рамка (напр. «вы выбыли» на столе).
+   Своя заливка/рамка/цвет перекрывают тон, поэтому стоит после тонов. */
+.lg {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: rgb(255 255 255 / 70%);
+  letter-spacing: 0.14em;
+  background: rgb(0 0 0 / 45%);
+  border: 1px solid rgb(255 255 255 / 20%);
+}
+
 .outlined {
   border: 1px solid color-mix(in srgb, currentcolor 50%, transparent);
 }

@@ -41,6 +41,12 @@ export default function BadgesKit() {
         </KitCell>
       </KitSection>
 
+      <KitSection title="Плашка (lg) — тёмный фон + рамка, напр. «вы выбыли»">
+        <KitCell caption="lg">
+          <Badge size="lg">вы выбыли из игры</Badge>
+        </KitCell>
+      </KitSection>
+
       <KitSection title="«Где сейчас» — outlined md, все тона">
         <KitCell caption="warning">
           <Badge tone="warning" size="md" outlined>

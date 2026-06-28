@@ -1,0 +1,166 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* техническая верхняя линия управления */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+/* кнопка действия — дев-стиль плейграунда */
+.btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.hint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+/* блок колод — как на столе (слева, по центру по вертикали), но гридом в 2 строки:
+   новые колоды добора заполняют сверху-вниз, слева-направо */
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  gap: 22px;
+  transform: translateY(-50%);
+}
+
+/* обёртка-стопка (грид-ячейка) */
+.deck {
+  position: relative;
+}
+
+.selectable {
+  cursor: pointer;
+}
+
+/* колода событий (AI) — закреплена в нижней-левой ячейке */
+.ai {
+  grid-row: 2;
+  grid-column: 1;
+}
+
+/* сброс — справа, как на столе; лицом вверх, вразброс.
+   Центрируем по вертикали через margin:auto (без transform) — иначе transform
+   создаёт stacking context и счётчик не поднять выше летящих карт. */
+.discard {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 86px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  inline-size: 116px;
+  block-size: fit-content;
+  margin-block: auto;
+}
+
+.discardStack {
+  position: relative;
+  inline-size: 100%;
+  aspect-ratio: var(--card-aspect);
+}
+
+/* карта сброса — собирается в стопку (transform → identity) при перевороте */
+.discardCard {
+  position: absolute;
+  inset: 0;
+  transition: transform 320ms var(--ease-soft);
+}
+
+/* счётчик сброса — бейдж в правом нижнем; всегда верхний слой (выше летящих
+   карт z80), чтобы карта не перекрывала его при приземлении */
+.discardCount {
+  position: absolute;
+  inset-block-end: 8px;
+  inset-inline-end: 8px;
+  z-index: 90;
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  background: rgb(0 0 0 / 78%);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 6px;
+}
+
+.discardCount::before {
+  content: "// ";
+  opacity: 0.4;
+}
+
+.label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.5;
+}
+
+/* центр стола — разыгранные карты лежат тут на время эффекта */
+.center {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  z-index: 50;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(-50%, -50%);
+}
+
+/* летящая стопка сброса (сброс → колода): translate по верх-левому углу,
+   поэтому transform-origin: top left (иначе масштаб от центра даёт рывок) */
+.flyer {
+  position: fixed;
+  z-index: 80;
+  pointer-events: none;
+  transform-origin: top left;
+}
+
+/* летящие разыгранные карты (рука → центр → сброс): пресет move считает по
+   центрам, поэтому transform-origin по умолчанию (центр) */
+.playFlyer {
+  position: fixed;
+  z-index: 80;
+  aspect-ratio: var(--card-aspect);
+  pointer-events: none;
+}
+
+/* рука игрока снизу — компонент Hand (веер) */
+.handWrap {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: 40;
+}

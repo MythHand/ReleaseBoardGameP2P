@@ -18,6 +18,8 @@ interface CardProps {
   interactive?: boolean
   width?: string
   onClick?: () => void
+  // переопределить цвет свечения (по умолчанию — акцент категории карты)
+  accent?: string
 }
 
 /**
@@ -31,6 +33,7 @@ export default function Card({
   interactive = true,
   width,
   onClick,
+  accent: accentProp,
 }: CardProps) {
   const ref = useRef<HTMLDivElement>(null)
   const flipRef = useRef<HTMLDivElement>(null)
@@ -54,7 +57,7 @@ export default function Card({
   // параллакс: по умолчанию следует за interactive, но Рука включает его точечно
   // для наведённой (увеличенной) карты — tilt={true}
   const tiltOn = (tilt ?? interactive) && !disabled
-  const accent = CATEGORIES[card?.category]?.accent ?? 'var(--brand-green)'
+  const accent = accentProp ?? CATEGORIES[card?.category]?.accent ?? 'var(--brand-green)'
 
   // сбрасываем наклон, когда параллакс выключается (карта ушла из наведения)
   useEffect(() => {

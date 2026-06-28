@@ -1,10 +1,9 @@
 import { useRef, useState } from 'react'
-import { play, presetNames } from '@/animations'
+import { play, presetNames, wait } from '@/animations'
 import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
 import styles from './AnimationsStory.module.css'
 
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 const TRAVEL = new Set(['playToCenter', 'playToReleaseZone', 'centerToDiscard'])
 
 // Витрина словаря анимаций: каждый пресет вызывается по имени play('name', el).
@@ -25,8 +24,12 @@ export default function AnimationsStory() {
     const el = cardRef.current!
     for (const a of el.getAnimations()) a.cancel()
 
-    if (name === 'snap') {
-      play('snap', el)
+    if (name === 'flyFrom') {
+      // демо: карта влетает «из» смещённого прямоугольника в свою позицию
+      const r = el.getBoundingClientRect()
+      play('flyFrom', el, {
+        from: { left: r.left - 160, top: r.top - 70, width: r.width, height: r.height },
+      })
       return
     }
 

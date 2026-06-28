@@ -52,18 +52,10 @@
   inline-size: 100%;
 }
 
-/* ты выбыл — карты ушли в сброс; бейдж в нижней зоне (где была рука),
-   приподнят от самого низа */
+/* ты выбыл — карты ушли в сброс; бейдж (Badge size="lg") в нижней зоне
+   (где была рука), приподнят от самого низа */
 .youBadge {
-  padding: 8px 16px;
   margin-block-end: 92px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: rgb(255 255 255 / 70%);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  background: rgb(0 0 0 / 45%);
-  border: 1px solid rgb(255 255 255 / 20%);
 }
 
 /* окно переподключения (Reconnect) и завершения (GameOver) — отдельные
@@ -79,4 +71,27 @@
 .scrollPanel {
   min-block-size: 0;
   overflow-y: auto;
+}
+
+/* служебная панель «настройки»: секции с заголовками (как в «участниках»).
+   Внутренний отступ даёт сам Drawer (padding 20px) — свой не добавляем. */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settingsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.settingsHead {
+  padding: 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
 }

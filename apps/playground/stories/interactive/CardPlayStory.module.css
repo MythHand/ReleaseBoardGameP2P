@@ -1,0 +1,173 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* техническая верхняя линия */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+}
+
+.btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.hint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(255 255 255 / 45%);
+  letter-spacing: 0.1em;
+}
+
+/* соперник — сверху по центру, как на столе (Seat); клик разыгрывает карту */
+.opponent {
+  position: absolute;
+  inset-block-start: 84px;
+  inset-inline-start: 50%;
+  cursor: pointer;
+  transform: translateX(-50%);
+}
+
+/* центр стола */
+.center {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(-50%, -50%);
+}
+
+.centerCard {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+
+.centerSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(255 255 255 / 28%);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  border: 1px dashed rgb(255 255 255 / 14%);
+  border-radius: 8px;
+}
+
+/* сброс — справа; карты ложатся вразброс. Центрируем margin:auto (без transform),
+   чтобы не создавать stacking context и держать счётчик верхним слоем. */
+.discard {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 86px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  inline-size: 116px;
+  block-size: fit-content;
+  margin-block: auto;
+}
+
+.discardStack {
+  position: relative;
+  inline-size: 100%;
+  aspect-ratio: var(--card-aspect);
+}
+
+.discardCard {
+  position: absolute;
+  inset: 0;
+}
+
+.discardEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgb(255 255 255 / 28%);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  border: 1px dashed rgb(255 255 255 / 14%);
+  border-radius: 8px;
+}
+
+.discardCount {
+  position: absolute;
+  inset-block-end: 8px;
+  inset-inline-end: 8px;
+  z-index: 90;
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  background: rgb(0 0 0 / 78%);
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 6px;
+}
+
+.discardCount::before {
+  content: "// ";
+  opacity: 0.4;
+}
+
+.label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  opacity: 0.5;
+}
+
+/* рука игрока — снизу по центру */
+.hand {
+  position: absolute;
+  inset-block-end: 28px;
+  inset-inline-start: 50%;
+  display: flex;
+  gap: 12px;
+  transform: translateX(-50%);
+}
+
+.card {
+  cursor: pointer;
+  transition: transform var(--t-fast) var(--ease-out);
+}
+
+.card:hover {
+  transform: translateY(-10px);
+}
+
+/* летящая карта — позиционируется и анимируется императивно (пресеты move) */
+.flyer {
+  position: fixed;
+  z-index: 80;
+  pointer-events: none;
+}

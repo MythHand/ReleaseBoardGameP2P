@@ -42,6 +42,22 @@
   box-shadow: 0 6px 18px rgb(0 0 0 / 50%);
 }
 
+/* выделение обложки — обводка + свечение в цвете accent (как у Card .glow) */
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 6cqw;
+  opacity: 0;
+  transition: opacity var(--t-base) var(--ease-out);
+}
+
+.stack[data-selected="true"] .glow {
+  box-shadow: 0 0 0 2px var(--accent),
+    0 0 22px 2px color-mix(in srgb, var(--accent) 50%, transparent);
+  opacity: 1;
+}
+
 .count {
   position: absolute;
 

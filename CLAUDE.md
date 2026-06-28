@@ -102,6 +102,13 @@ Styling is **per-package** — the approach depends on which app the component l
 
 ---
 
+## Animations Rule
+
+- Анимации собираются **из модулей**, а не пишутся полётами вручную. Словарь и хелперы — в `apps/ui/src/animations/`: пресеты через `play('name', el, params)` плюс `move`, `jitter`, `wait`, `nextFrames`. Нужен новый кусочек — оформляй его модулем, потом используй.
+- **Источник состояния работы с анимациями — страница плейграунда `Interaction audit`** (`apps/playground/stories/AnimationAuditStory`): какие модули готовы (со статусами), какие сценарии из них собраны, и что требует доработок. Перед работой над анимациями сверяй актуальные статусы там; при изменениях вписывай их обратно в эту страницу.
+
+---
+
 ## Architecture Rule
 
 - Networking is **peer-to-peer over WebRTC**, signaled by **PeerJS** (hosted or self-hosted `peerjs-server`). There is no game backend.

@@ -9,7 +9,7 @@ interface BadgeProps {
   tone?: BadgeTone
   // обведённый бейдж (как роль host)
   outlined?: boolean
-  size?: 'sm' | 'md'
+  size?: 'sm' | 'md' | 'lg'
   className?: string
 }
 

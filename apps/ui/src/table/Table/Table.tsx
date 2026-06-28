@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
+import LobbyCode, { LOBBY_CODE_COPY_EN, LOBBY_CODE_COPY_RU } from '@/blocks/LobbyCode'
 import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import type { Card } from '@/cards/types'
 import { type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
+import GearIcon from '@/icons/GearIcon'
+import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
 import Pile from '@/primitives/Pile'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
@@ -61,7 +65,7 @@ interface TableState {
   spectators: Spectator[]
 }
 
-type Panel = 'history' | 'participants' | 'rules' | 'modes'
+type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes'
 type View = 'oppEliminated' | 'youEliminated' | 'oppDisconnect' | 'youDisconnect'
 
 interface Over {
@@ -90,23 +94,21 @@ interface TableProps {
   gameOverCopy?: GameOverCopy
   // собственный «хром»-текст стола по языку
   copy?: TableCopy
+  // текущий язык и его смена — для свитчера языка в служебной вкладке
+  lang?: SwitchLang
+  onLangChange?: (lang: SwitchLang) => void
+  // код игры — показывается в служебной вкладке (для зрителей), с копированием
+  code?: string
 }
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
 const DRAWER_WIDTH: Record<Panel, number> = {
+  settings: 320, // настройки — узкая
   history: 420, // история — немного шире
   participants: 420, // участники — как история
-  modes: 460, // режимы — немного шире
+  modes: 680, // режимы — как правила
   rules: 680, // правила — сильно шире
 }
-
-// Вкладки рейла (порядок = сверху вниз). Текст — собственный «хром» стола.
-const RAIL_ITEMS: TabRailItem[] = [
-  { id: 'history', label: 'история' },
-  { id: 'participants', label: 'участники' },
-  { id: 'rules', label: 'правила' },
-  { id: 'modes', label: 'игровой режим' },
-]
 
 // Собственный «хром»-текст стола по языку (бейдж выбывания + подписи стопок).
 export interface TableCopy {
@@ -114,6 +116,16 @@ export interface TableCopy {
   deck: string
   events: string
   discard: string
+  // подпись вкладки-настроек (для screen-reader на иконке-шестерёнке)
+  settings: string
+  // заголовки секций в панели настроек
+  langTitle: string
+  codeTitle: string
+  // подписи текстовых вкладок рейла
+  tabHistory: string
+  tabParticipants: string
+  tabRules: string
+  tabModes: string
 }
 
 export const TABLE_COPY_RU: TableCopy = {
@@ -121,6 +133,13 @@ export const TABLE_COPY_RU: TableCopy = {
   deck: 'колода',
   events: 'события',
   discard: 'сброс',
+  settings: 'настройки',
+  langTitle: 'язык',
+  codeTitle: 'код игры',
+  tabHistory: 'история',
+  tabParticipants: 'участники',
+  tabRules: 'правила',
+  tabModes: 'игровой режим',
 }
 
 export const TABLE_COPY_EN: TableCopy = {
@@ -128,6 +147,13 @@ export const TABLE_COPY_EN: TableCopy = {
   deck: 'deck',
   events: 'events',
   discard: 'discard',
+  settings: 'settings',
+  langTitle: 'language',
+  codeTitle: 'game code',
+  tabHistory: 'history',
+  tabParticipants: 'participants',
+  tabRules: 'rules',
+  tabModes: 'game mode',
 }
 
 const EMPTY_RELEASE: ReleaseSlots = {
@@ -151,9 +177,29 @@ export default function Table({
   reconnectCopy = RECONNECT_COPY_RU,
   gameOverCopy = GAME_OVER_COPY_RU,
   copy = TABLE_COPY_RU,
+  lang,
+  onLangChange,
+  code,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
+
+  const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
+
+  // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
+  const textTabs: TabRailItem[] = [
+    { id: 'history', label: copy.tabHistory },
+    { id: 'participants', label: copy.tabParticipants },
+    { id: 'rules', label: copy.tabRules },
+    { id: 'modes', label: copy.tabModes },
+  ]
+
+  // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
+  // (свитчер языка и/или код игры); служебный слот под визуальные опции
+  const hasSettings = Boolean(onLangChange || code)
+  const railItems: TabRailItem[] = hasSettings
+    ? [{ id: 'settings', label: copy.settings, icon: <GearIcon /> }, ...textTabs]
+    : textTabs
 
   // завершение партии — оверлей поверх стола (триггерится извне)
   const overWinner = over ? participants.find((p) => p.id === over.winnerId) : null
@@ -206,7 +252,9 @@ export default function Table({
 
       <div className={styles.you}>
         {youEliminated ? (
-          <div className={styles.youBadge}>{copy.youEliminated}</div>
+          <Badge size="lg" className={styles.youBadge}>
+            {copy.youEliminated}
+          </Badge>
         ) : (
           <>
             <ReleaseZone release={you.release} size="100px" />
@@ -218,10 +266,26 @@ export default function Table({
       </div>
 
       {/* вертикальный рейл у правого края — переключает панели drawer */}
-      <TabRail items={RAIL_ITEMS} active={panel} onSelect={(id) => toggle(id as Panel)} />
+      <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
 
       {/* выезжающая панель поверх контента (ширина — per-tab) */}
       <Drawer open={panel !== null} width={drawerWidth} className={styles.drawer}>
+        {panel === 'settings' && (
+          <div className={styles.settings}>
+            {lang && onLangChange && (
+              <section className={styles.settingsSection}>
+                <div className={styles.settingsHead}>{copy.langTitle}</div>
+                <LangSwitcher value={lang} onChange={onLangChange} variant="full" align="start" />
+              </section>
+            )}
+            {code && (
+              <section className={styles.settingsSection}>
+                <div className={styles.settingsHead}>{copy.codeTitle}</div>
+                <LobbyCode code={code} copy={codeCopy} align="start" reverse showLabel={false} />
+              </section>
+            )}
+          </div>
+        )}
         {panel === 'history' && <MoveHistory entries={history} copy={historyCopy} />}
         {panel === 'participants' && (
           <Participants players={participants} spectators={spectators} copy={participantsCopy} />

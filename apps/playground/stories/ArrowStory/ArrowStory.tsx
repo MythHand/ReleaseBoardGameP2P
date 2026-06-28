@@ -2,90 +2,86 @@ import type { CardData } from '@release/ui'
 import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { cardById, cardCanTarget } from '@/cards'
-import Arrow from '@/primitives/Arrow'
+import { cardById } from '@/cards'
+import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
 import styles from './ArrowStory.module.css'
 
-interface Point {
-  x: number
-  y: number
-}
+// Демонстрация цветовой цепочки: цвет карты (по группе) → цвет стрелки → цвет
+// выделения цели. Карты четырёх цветов: красная (attack), оранжевая (operation),
+// жёлтая (support), зелёная (release). Цели обезличены — это просто зоны.
+const SOURCES = ['attack-security-bug', 'operation-git-branch', 'support-sudo', 'release-frontend']
+  // biome-ignore lint/style/noNonNullAssertion: все id — из каталога
+  .map((id) => cardById(id)!)
 
-// biome-ignore lint/style/noNonNullAssertion: 'attack-security-bug' is a known catalogue id
-const SOURCE = cardById('attack-security-bug')! // целится только то, что умеет (атака)
-const TARGETS = [
-  { id: 't1', label: 'свежий релиз' },
-  { id: 't2', label: 'рука оппонента' },
-  { id: 't3', label: 'monitoring' },
-]
+const TARGETS = ['зона 1', 'зона 2', 'зона 3']
 
 export default function ArrowStory() {
   const refs = useRef<Record<string, HTMLDivElement | null>>({})
-  const [active, setActive] = useState<CardData | null>(null) // карта, которой целимся, или null
-  const [from, setFrom] = useState<Point | null>(null)
-  const [to, setTo] = useState<Point | null>(null)
+  // геометрия и слежение за курсором — общий хук стрелки
+  const { from, to, active, aim, stop } = useArrow()
+  const [armed, setArmed] = useState<CardData | null>(null) // какой картой целимся (для цвета)
   const [hovered, setHovered] = useState<string | null>(null)
 
-  const color = active ? `var(--cat-${active.category})` : 'var(--brand-green)'
+  const color = armed ? `var(--cat-${armed.category})` : 'var(--brand-green)'
 
+  // клик в пустоту — отмена прицеливания
   useEffect(() => {
     if (!active) return
-    const onMove = (e: MouseEvent) => setTo({ x: e.clientX, y: e.clientY })
     const onDown = () => {
-      setActive(null)
+      setArmed(null)
       setHovered(null)
+      stop()
     }
-    window.addEventListener('mousemove', onMove)
     window.addEventListener('mousedown', onDown)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mousedown', onDown)
-    }
-  }, [active])
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [active, stop])
 
   const arm = (e: React.MouseEvent, card: CardData) => {
-    if (!cardCanTarget(card)) return // релиз не выбирает цель
     e.stopPropagation()
-    // biome-ignore lint/style/noNonNullAssertion: the source card's ref is registered before it can be armed
-    const r = refs.current[card.id]!.getBoundingClientRect()
-    setFrom({ x: r.left + r.width / 2, y: r.top + r.height / 2 })
-    setTo({ x: e.clientX, y: e.clientY })
-    setActive(card)
+    const el = refs.current[card.id]
+    if (!el) return
+    aim(centerOf(el), { x: e.clientX, y: e.clientY })
+    setArmed(card)
   }
 
   return (
     <div className={styles.root}>
       <p className={styles.hint}>
-        Клик по карте атаки — стрелка идёт за курсором. Наведи на цель — она подсветится цветом
-        карты. Клик ещё раз — отмена.
+        Клик по карте — стрелка её цвета идёт за курсором. Наведи на зону — она подсветится тем же
+        цветом (обводка + свечение, как у обложки). Клик ещё раз — отмена.
       </p>
 
       <div className={styles.stage}>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only targeting demo (drag an arrow); sandbox story, no keyboard affordance */}
-        <div
-          ref={(el) => {
-            refs.current[SOURCE.id] = el
-          }}
-          className={styles.src}
-          onMouseDown={(e) => arm(e, SOURCE)}
-        >
-          <Card card={SOURCE} interactive={false} width="150px" />
+        <div className={styles.sources}>
+          {SOURCES.map((card) => (
+            // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only targeting demo (drag an arrow); sandbox story
+            <div
+              key={card.id}
+              ref={(el) => {
+                refs.current[card.id] = el
+              }}
+              className={styles.src}
+              onMouseDown={(e) => arm(e, card)}
+            >
+              <Card card={card} interactive={false} width="130px" />
+            </div>
+          ))}
         </div>
 
         <div className={styles.targets}>
-          {TARGETS.map((t) => {
-            const lit = active && hovered === t.id
+          {TARGETS.map((label) => {
+            const lit = active && hovered === label
             return (
               // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only hover target for the arrow demo; sandbox story
               <div
-                key={t.id}
+                key={label}
                 className={`${styles.target} ${lit ? styles.targeted : ''}`}
                 style={lit ? ({ '--hl': color } as CSSProperties) : undefined}
-                onMouseEnter={() => active && setHovered(t.id)}
-                onMouseLeave={() => setHovered((h: string | null) => (h === t.id ? null : h))}
+                onMouseEnter={() => active && setHovered(label)}
+                onMouseLeave={() => setHovered((h: string | null) => (h === label ? null : h))}
               >
-                {t.label}
+                {label}
               </div>
             )
           })}

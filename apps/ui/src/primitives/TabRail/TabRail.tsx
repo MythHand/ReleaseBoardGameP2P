@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react'
 import styles from './TabRail.module.css'
 
 export interface TabRailItem {
   id: string
   label: string
+  // если задана — вкладка рендерит иконку (квадратная), а не вертикальный текст
+  icon?: ReactNode
 }
 
 interface TabRailProps {
@@ -29,10 +32,13 @@ export default function TabRail({
         <button
           key={it.id}
           type="button"
-          className={`${styles.tab} ${active === it.id ? styles.tabOn : ''}`}
+          className={`${styles.tab} ${it.icon ? styles.square : ''} ${
+            active === it.id ? styles.tabOn : ''
+          }`}
+          aria-label={it.icon ? it.label : undefined}
           onClick={() => onSelect(it.id)}
         >
-          {it.label}
+          {it.icon ?? it.label}
         </button>
       ))}
     </div>

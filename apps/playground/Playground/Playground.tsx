@@ -3,12 +3,16 @@ import { Navigate, NavLink, Route, Routes } from 'react-router'
 import TextStyles from '@/design/TextStyles'
 import TokenPreview from '@/design/TokenPreview'
 import TypographyPreview from '@/design/TypographyPreview'
+import AnimationAuditStory from '../stories/AnimationAuditStory'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
 import GameOverBlock from '../stories/blocks/GameOverBlock'
 import GameSettingsBlock from '../stories/blocks/GameSettingsBlock'
+import LangSwitcherBlock from '../stories/blocks/LangSwitcherBlock'
+import LobbyCodeBlock from '../stories/blocks/LobbyCodeBlock'
 import MoveHistoryBlock from '../stories/blocks/MoveHistoryBlock'
 import ParticipantsBlock from '../stories/blocks/ParticipantsBlock'
+import PlayerSlotBlock from '../stories/blocks/PlayerSlotBlock'
 import ReconnectBlock from '../stories/blocks/ReconnectBlock'
 import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
 import RulesBlock from '../stories/blocks/RulesBlock'
@@ -16,15 +20,17 @@ import SeatBlock from '../stories/blocks/SeatBlock'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import HandStory from '../stories/HandStory'
+import CardPlayStory from '../stories/interactive/CardPlayStory'
 import CardToHandStory from '../stories/interactive/CardToHandStory'
+import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
 import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
 import PlayAiCardStory from '../stories/interactive/PlayAiCardStory'
-import SplitDeckStory from '../stories/interactive/SplitDeckStory'
 import AvatarsKit from '../stories/kit/AvatarsKit'
 import BadgesKit from '../stories/kit/BadgesKit'
 import ButtonsKit from '../stories/kit/ButtonsKit'
 import DrawerKit from '../stories/kit/DrawerKit'
+import DropdownKit from '../stories/kit/DropdownKit'
 import InputsKit from '../stories/kit/InputsKit'
 import MenuKit from '../stories/kit/MenuKit'
 import ModalsKit from '../stories/kit/ModalsKit'
@@ -91,6 +97,11 @@ const groups: Group[] = [
   {
     title: 'Интерактив',
     items: [
+      {
+        id: 'interaction-audit',
+        title: 'Interaction audit',
+        render: () => <AnimationAuditStory />,
+      },
       { id: 'animations', title: 'Animations', render: () => <AnimationsStory /> },
       { id: 'arrow', title: 'Arrow', render: () => <ArrowStory /> },
       { id: 'combo', title: 'Combo', render: () => <ComboStory /> },
@@ -100,8 +111,9 @@ const groups: Group[] = [
         render: () => <PickOpponentCardStory />,
       },
       { id: 'card-to-hand', title: 'Card to Hand', render: () => <CardToHandStory /> },
+      { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
-      { id: 'split-deck', title: 'Split deck', render: () => <SplitDeckStory /> },
+      { id: 'deck-animations', title: 'Deck animations', render: () => <DeckAnimationsStory /> },
       { id: 'play-ai-card', title: 'Play AI card', render: () => <PlayAiCardStory /> },
     ],
   },
@@ -116,6 +128,7 @@ const groups: Group[] = [
       { id: 'kit-badges', title: 'Badges', render: () => <BadgesKit /> },
       { id: 'kit-avatars', title: 'Avatars', render: () => <AvatarsKit /> },
       { id: 'kit-menu', title: 'Menu', render: () => <MenuKit /> },
+      { id: 'kit-dropdown', title: 'Dropdown', render: () => <DropdownKit /> },
       { id: 'kit-mode-select', title: 'Mode select', render: () => <ModeSelectKit /> },
       { id: 'kit-piles', title: 'Piles', render: () => <PilesKit /> },
       { id: 'kit-modals', title: 'Modal', render: () => <ModalsKit /> },
@@ -138,6 +151,9 @@ const groups: Group[] = [
       { id: 'block-seat', title: 'Seat', render: () => <SeatBlock /> },
       { id: 'block-release-zone', title: 'Release zone', render: () => <ReleaseZoneBlock /> },
       { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },
+      { id: 'block-player-slot', title: 'Player slot', render: () => <PlayerSlotBlock /> },
+      { id: 'block-lobby-code', title: 'Lobby code', render: () => <LobbyCodeBlock /> },
+      { id: 'block-lang-switcher', title: 'Lang switcher', render: () => <LangSwitcherBlock /> },
       { id: 'block-move-history', title: 'Move history', render: () => <MoveHistoryBlock /> },
       { id: 'block-reconnect', title: 'Reconnect', render: () => <ReconnectBlock /> },
       { id: 'block-game-over', title: 'Game over', render: () => <GameOverBlock /> },
