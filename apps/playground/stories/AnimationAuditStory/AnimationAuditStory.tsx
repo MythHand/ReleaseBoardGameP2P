@@ -75,6 +75,18 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
+    mod: "play('gatherToDeck')",
+    what: 'Стопка летит к целевой стопке и приземляется (сброс → новая колода). move, центр-в-центр.',
+    where: 'словарь → DeckAnimations',
+    status: 'ok',
+  },
+  {
+    mod: "play('absorbToDeck')",
+    what: 'Поглощение: стопка/колода летит в целевую и растворяется по ходу (слияние колод). move + fade.',
+    where: 'словарь → DeckAnimations',
+    status: 'ok',
+  },
+  {
     mod: 'useArrow() + centerOf()',
     what: 'Геометрия адресной стрелки: точки from/to, слежение за курсором, старт/стоп.',
     where: 'primitives/Arrow → Arrow, Combo, DeckAnimations',
@@ -136,12 +148,12 @@ const SCENARIOS: Scenario[] = [
   },
   {
     name: 'Слияние колод (+ сброс)',
-    from: 'все стопки и сброс одновременно слетаются в первую колоду',
+    from: 'все стопки и сброс одновременно поглощаются первой колодой (absorbToDeck)',
     where: 'DeckAnimations',
   },
   {
     name: 'Сброс → новая колода',
-    from: 'собрать сброс в стопку → перелёт к месту колоды → flipCard рубашкой вверх',
+    from: 'собрать сброс в стопку → gatherToDeck к месту колоды → flipCard рубашкой вверх',
     where: 'DeckAnimations',
   },
   {
@@ -153,20 +165,6 @@ const SCENARIOS: Scenario[] = [
 
 // ===== 3. Требует доработок — где криво =====
 const ISSUES: Issue[] = [
-  {
-    what: 'Полёты сброса и слияния',
-    problem:
-      'Написаны вручную (translate по верх-левому углу + scale) вместо move() — отсюда хак transform-origin: top left и рассинхрон анимации с финальным положением.',
-    where: 'DeckAnimations (runDiscardFlight, mergeEffect)',
-    status: 'reuse',
-  },
-  {
-    what: 'Сценарий «рука → центр → сброс»',
-    problem:
-      'Один и тот же розыгрыш написан дважды и слегка по-разному — стоит свести в один общий сценарный хелпер.',
-    where: 'CardPlay (flyToCenter/flyToDiscard) + DeckAnimations (playSequence)',
-    status: 'rework',
-  },
   {
     what: 'Совмещение карт в пару',
     problem: 'Bespoke el.animate с самописным enterTransform — не выражено через общий travel.',

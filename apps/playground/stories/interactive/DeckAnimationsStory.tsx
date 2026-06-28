@@ -78,7 +78,6 @@ const countCards = (entries: DiscardEntry[]) => entries.reduce((s, e) => s + e.c
 
 const OPERATION = 'var(--cat-operation)'
 const SUPPORT = 'var(--cat-support)'
-const EASE = 'cubic-bezier(0.2, 0.8, 0.2, 1)'
 
 const FLIP_MS = 520 // разлёт новой колоды при разделении
 const SPLIT_HOLD = 600 // пауза после разделения перед работой со сбросом
@@ -177,19 +176,12 @@ export default function DeckAnimationsStory() {
     async (toRect: DOMRect) => {
       const fromRect = await gatherDiscardToFlyer()
       if (!fromRect) return
-      const el = flyerRef.current
-      if (el) {
-        const dx = toRect.left - fromRect.left
-        const dy = toRect.top - fromRect.top
-        const sc = toRect.width / fromRect.width
-        await el.animate(
-          [
-            { transform: 'translate(0, 0) scale(1)' },
-            { transform: `translate(${dx}px, ${dy}px) scale(${sc})` },
-          ],
-          { duration: 560, easing: EASE, fill: 'forwards' },
-        ).finished
-      }
+      const anim = play('gatherToDeck', flyerRef.current, {
+        from: fromRect,
+        to: toRect,
+        duration: 560,
+      })
+      if (anim) await anim.finished
       await wait(HOLD)
       setFlyer((f) => (f ? { ...f, faceDown: true } : f))
       await wait(TURN_MS)
@@ -247,33 +239,16 @@ export default function DeckAnimationsStory() {
         const el = pileRefs.current[d.id]
         if (!el) continue
         const r = el.getBoundingClientRect()
-        flights.push(
-          el.animate(
-            [
-              { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-              {
-                transform: `translate(${tRect.left - r.left}px, ${tRect.top - r.top}px) scale(0.96)`,
-                opacity: 0,
-              },
-            ],
-            { duration: MERGE_MS, easing: EASE, fill: 'forwards' },
-          ).finished,
-        )
+        const a = play('absorbToDeck', el, { from: r, to: tRect, duration: MERGE_MS })
+        if (a) flights.push(a.finished)
       }
-      const fel = flyerRef.current
-      if (discardCount && discardFrom && fel) {
-        flights.push(
-          fel.animate(
-            [
-              { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-              {
-                transform: `translate(${tRect.left - discardFrom.left}px, ${tRect.top - discardFrom.top}px) scale(0.96)`,
-                opacity: 0,
-              },
-            ],
-            { duration: MERGE_MS, easing: EASE, fill: 'forwards' },
-          ).finished,
-        )
+      if (discardCount && discardFrom) {
+        const a = play('absorbToDeck', flyerRef.current, {
+          from: discardFrom,
+          to: tRect,
+          duration: MERGE_MS,
+        })
+        if (a) flights.push(a.finished)
       }
     }
     await Promise.all(flights)

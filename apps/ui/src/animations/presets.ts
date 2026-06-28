@@ -25,15 +25,17 @@ interface MoveParams {
   rotate?: number
   dx?: number
   dy?: number
+  // растворение по ходу полёта (для «поглощения» стопки целевой колодой)
+  fade?: boolean
 }
 
 // Общий travel: перелёт элемента из прямоугольника from в прямоугольник to
 // (translate по центрам + масштаб по ширине). Базис под все «полёты» карт.
 // rotate/dx/dy — финальный разворот и доп. смещение (чтобы прилёт сразу был
-// в правильной конечной позиции, без последующего рывка).
+// в правильной конечной позиции, без последующего рывка). fade — гасит opacity.
 const move = (
   el: Element,
-  { from, to, rotate = 0, dx = 0, dy = 0 }: MoveParams = {},
+  { from, to, rotate = 0, dx = 0, dy = 0, fade = false }: MoveParams = {},
   duration = 460,
   easing = EASE,
 ): Animation | null => {
@@ -41,14 +43,20 @@ const move = (
   const mx = to.left + to.width / 2 - (from.left + from.width / 2) + dx
   const my = to.top + to.height / 2 - (from.top + from.height / 2) + dy
   const scale = to.width / from.width
-  return el.animate(
-    [
-      { transform: 'translate(0, 0) scale(1) rotate(0deg)' },
-      { transform: `translate(${mx}px, ${my}px) scale(${scale}) rotate(${rotate}deg)` },
-    ],
-    { duration, easing, fill: 'forwards' },
-  )
+  const start: Keyframe = { transform: 'translate(0, 0) scale(1) rotate(0deg)' }
+  const end: Keyframe = {
+    transform: `translate(${mx}px, ${my}px) scale(${scale}) rotate(${rotate}deg)`,
+  }
+  if (fade) {
+    start.opacity = 1
+    end.opacity = 0
+  }
+  return el.animate([start, end], { duration, easing, fill: 'forwards' })
 }
+
+// длительность из params (для travel-пресетов с переменным временем)
+const durationOf = (p?: Record<string, unknown>, fallback = 520): number =>
+  typeof p?.duration === 'number' ? p.duration : fallback
 
 export type PresetFn = (el: Element, params?: Record<string, unknown>) => Animation | null
 
@@ -96,4 +104,12 @@ export const PRESETS: Record<string, Preset> = {
   // Перенос разыгранной карты из центра в сброс.
   centerToDiscard: (el: Element, p?: Record<string, unknown>): Animation | null =>
     move(el, p as MoveParams, 420, EASE),
+
+  // ===== Операции над колодами (travel) =====
+  // Стопка летит к целевой стопке и приземляется (сброс → новая колода).
+  gatherToDeck: (el: Element, p?: Record<string, unknown>): Animation | null =>
+    move(el, p as MoveParams, durationOf(p), EASE),
+  // Поглощение: стопка/колода летит в целевую и растворяется (слияние колод).
+  absorbToDeck: (el: Element, p?: Record<string, unknown>): Animation | null =>
+    move(el, { ...(p as MoveParams), fade: true }, durationOf(p), EASE),
 }
