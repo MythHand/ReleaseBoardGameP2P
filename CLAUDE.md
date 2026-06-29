@@ -93,12 +93,6 @@ Styling is **per-package** — the approach depends on which app the component l
 
 ---
 
-## Typography Rule
-
-- **All text is set through `<Typography>` from `@release/ui`** (semantic `variant`, or raw `base` + `tk`) — never hand-written font CSS or Tailwind text utilities. The full rule, the scale (source of values), and the live showcase live in the ui package: [apps/ui/CLAUDE.md](apps/ui/CLAUDE.md#typography-rule).
-
----
-
 ## i18n Rule
 
 - **`@release/web`** uses react-i18next with `i18next-browser-languagedetector`.
