@@ -9,7 +9,7 @@
     "./global.css": "./src/design/global.css"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "release-tsc --noEmit -p tsconfig.json",
     "stylelint": "stylelint \"src/**/*.css\"",
     "test": "vitest run"
   },
@@ -25,6 +25,7 @@
     "jsdom": "^29.1.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "@release/lint": "workspace:*"
   }
 }

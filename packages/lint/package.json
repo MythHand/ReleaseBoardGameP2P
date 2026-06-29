@@ -1,0 +1,24 @@
+{
+  "name": "@release/lint",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "release-tsc": "./bin/tsc.mjs",
+    "release-lint": "./bin/lint.mjs"
+  },
+  "exports": {
+    "./biome": "./biome.json",
+    "./stylelint": "./stylelint.config.json",
+    "./tsconfig": "./tsconfig.json",
+    "./no-untranslated.grit": "./no-untranslated.grit"
+  },
+  "dependencies": {
+    "@biomejs/biome": "^2.5.0",
+    "typescript": "^6.0.3",
+    "stylelint-config-recess-order": "^7.7.0",
+    "stylelint-config-standard": "^40.0.0",
+    "stylelint-order": "^8.1.1",
+    "stylelint-use-logical": "^2.1.3"
+  }
+}

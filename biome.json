@@ -1,8 +1,9 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+  "extends": ["@release/lint/biome"],
   "plugins": [
     {
-      "path": "./no-untranslated.grit",
+      "path": "./packages/lint/no-untranslated.grit",
       "includes": [
         "**",
         "!**/playground/**",
@@ -22,115 +23,6 @@
       "!**/*.svg",
       "!apps/frontend/src/app/router.ts"
     ]
-  },
-  "assist": {
-    "actions": {
-      "source": {
-        "organizeImports": "on"
-      }
-    }
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 100
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "preset": "recommended",
-      "a11y": {
-        "useSemanticElements": "error",
-        "useAriaPropsSupportedByRole": "error",
-        "useValidAutocomplete": "error",
-        "useFocusableInteractive": "error"
-      },
-      "complexity": {
-        "noUselessFragments": "error",
-        "noExcessiveNestedTestSuites": "error"
-      },
-      "correctness": {
-        "noPrivateImports": "error",
-        "useExhaustiveDependencies": "error",
-        "useJsxKeyInIterable": "error",
-        "noNestedComponentDefinitions": "error",
-        "useHookAtTopLevel": "error",
-        "noReactPropAssignments": "error",
-        "useUniqueElementIds": "error"
-      },
-      "style": {
-        "noRestrictedImports": {
-          "level": "error",
-          "options": {
-            "paths": {
-              "react-i18next": "Import from @release/translation instead — the app keeps a single i18n surface."
-            }
-          }
-        },
-        "useImportType": "error",
-        "useExportType": "error",
-        "useConsistentTypeDefinitions": "error",
-        "noInferrableTypes": "error",
-        "useFragmentSyntax": "error",
-        "useShorthandFunctionType": "error",
-        "useConsistentArrayType": "error",
-        "useThrowNewError": "error",
-        "useThrowOnlyError": "error",
-        "noNegationElse": "error",
-        "useExplicitLengthCheck": "error",
-        "noProcessEnv": "error",
-        "noNonNullAssertion": "error",
-        "useNamingConvention": {
-          "level": "error",
-          "options": {
-            "strictCase": false,
-            "conventions": [
-              {
-                "selector": { "kind": "objectLiteralProperty" },
-                "match": ".*"
-              }
-            ]
-          }
-        }
-      },
-      "suspicious": {
-        "noImportCycles": "error",
-        "noShadow": "error",
-        "useAwait": "error",
-        "noFocusedTests": "error",
-        "noSkippedTests": "error",
-        "noDoubleEquals": "error",
-        "noConsole": {
-          "level": "error",
-          "options": {
-            "allow": ["warn", "error"]
-          }
-        },
-        "noEvolvingTypes": "error",
-        "noConfusingVoidType": "error",
-        "noDuplicateTestHooks": "error",
-        "noExportsInTest": "error",
-        "noMisplacedAssertion": "error"
-      },
-      "nursery": {
-        "useSortedClasses": "error",
-        "noFloatingPromises": "error",
-        "noExcessiveSelectorClasses": {
-          "level": "on",
-          "options": {
-            "maxClasses": 3
-          }
-        },
-        "useExhaustiveSwitchCases": "error",
-        "noMisusedPromises": "error",
-        "useNullishCoalescing": "error",
-        "noImpliedEval": "error",
-        "useConsistentTestIt": "error",
-        "noIdenticalTestTitle": "error",
-        "useExpect": "error"
-      }
-    }
   },
   "overrides": [
     {
@@ -153,11 +45,5 @@
         }
       }
     }
-  ],
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "semicolons": "asNeeded"
-    }
-  }
+  ]
 }

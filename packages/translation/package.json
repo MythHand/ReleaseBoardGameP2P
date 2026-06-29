@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "release-tsc --noEmit -p tsconfig.json",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
@@ -21,6 +21,6 @@
   "devDependencies": {
     "@types/react": "^19.2.17",
     "react": "^19.2.7",
-    "typescript": "^6.0.3"
+    "@release/lint": "workspace:*"
   }
 }

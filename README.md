@@ -25,7 +25,7 @@ no build step for the library.
 
 ## Requirements
 
-- Node `>=20`
+- Node `>=24`
 - [pnpm](https://pnpm.io) (`pnpm@9.15.0`, see `packageManager` in `package.json`)
 
 ## Quick start
