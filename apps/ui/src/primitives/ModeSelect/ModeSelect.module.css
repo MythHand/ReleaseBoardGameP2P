@@ -5,11 +5,9 @@
 }
 
 .title {
+  composes: subtitle tk-02 from '../../design/typography.module.css';
   margin: 0;
-  font-family: var(--font-heading);
-  font-size: 16px;
   color: #fff;
-  letter-spacing: 0.02em;
 }
 
 /* дорожка с вариантами; колонки равной ширины */
@@ -78,14 +76,9 @@
 }
 
 .label {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  composes: mono-strong tk-02 from '../../design/typography.module.css';
 }
 
 .desc {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.01em;
+  composes: mono-sm tk-01 from '../../design/typography.module.css';
 }

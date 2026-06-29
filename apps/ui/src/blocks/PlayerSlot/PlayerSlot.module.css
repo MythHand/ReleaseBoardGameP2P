@@ -23,8 +23,7 @@
 }
 
 .name {
-  font-family: var(--font-text);
-  font-size: 15px;
+  composes: body-lg from '../../design/typography.module.css';
 }
 
 .slotOff .name {
@@ -32,7 +31,7 @@
 }
 
 .you {
-  font-size: 13px;
+  composes: body-sm from '../../design/typography.module.css';
   color: rgb(255 255 255 / 40%);
 }
 
@@ -46,10 +45,7 @@
 }
 
 .slotEmpty {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  composes: label tk-12 from '../../design/typography.module.css';
   color: rgb(255 255 255 / 30%);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   border-style: dashed;
 }

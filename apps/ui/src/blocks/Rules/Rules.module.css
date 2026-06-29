@@ -3,9 +3,7 @@
    читаются в логическом порядке, а не по возрастанию специфичности. */
 
 .rules {
-  font-family: var(--font-text);
-  font-size: 14px;
-  line-height: 1.62;
+  composes: body from '../../design/typography.module.css';
   color: rgb(255 255 255 / 86%);
 }
 
@@ -26,12 +24,10 @@
 }
 
 .search {
+  composes: mono-md tk-04 from '../../design/typography.module.css';
   inline-size: 100%;
   padding: 10px 104px 10px 14px;
-  font-family: var(--font-mono);
-  font-size: 13px;
   color: #fff;
-  letter-spacing: 0.04em;
   outline: none;
   background: rgb(255 255 255 / 5%);
   border: 1px solid rgb(255 255 255 / 16%);
@@ -57,11 +53,9 @@
 }
 
 .count {
+  composes: mono-xs tk-04 from '../../design/typography.module.css';
   margin-inline-end: 2px;
-  font-family: var(--font-mono);
-  font-size: 11px;
   color: rgb(255 255 255 / 55%);
-  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
@@ -118,15 +112,12 @@
 
 /* мета — таблица 2×2 (4 ячейки), без линии-разделителя */
 .meta {
+  composes: label-sm tk-08 from '../../design/typography.module.css';
   display: grid;
   grid-template-columns: 1fr 1fr;
   padding: 0;
   margin: 0 0 30px;
-  font-family: var(--font-mono);
-  font-size: 11px;
   color: rgb(255 255 255 / 60%);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
   list-style: none;
   border: 1px solid rgb(255 255 255 / 12%);
 }
@@ -182,12 +173,9 @@
 }
 
 .h {
+  composes: heading-6 tk-05 from '../../design/typography.module.css';
   margin: 0;
-  font-family: var(--font-heading);
-  font-size: 19px;
   color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 /* ── подраздел (### в источнике) ───────────────────── */
@@ -216,12 +204,9 @@
 }
 
 .sub {
+  composes: heading-9 tk-08 from '../../design/typography.module.css';
   margin: 0;
-  font-family: var(--font-heading);
-  font-size: 15px;
   color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 /* ── абзацы и списки ───────────────────────────────── */
@@ -268,12 +253,9 @@
 }
 
 .cardName {
+  composes: code-sm tk-04 from '../../design/typography.module.css';
   margin: 0 0 3px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
   color: var(--cat-release);
-  letter-spacing: 0.04em;
 }
 
 .cardDesc {
@@ -324,9 +306,7 @@
 }
 
 .modeName {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
+  composes: code-sm from '../../design/typography.module.css';
   color: var(--cat-release);
   white-space: nowrap;
   border-inline-end: 1px solid rgb(255 255 255 / 10%);

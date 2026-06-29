@@ -10,16 +10,14 @@
 }
 
 .empty {
+  composes: tag-sm tk-08 from '../../design/typography.module.css';
   display: flex;
   align-items: center;
   justify-content: center;
   inline-size: 100%;
   block-size: 100%;
   padding: 4px;
-  font-size: 10px;
   text-align: center;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
   border: 1px dashed rgb(255 255 255 / 18%);
   border-radius: 6cqw;
   opacity: 0.4;

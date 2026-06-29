@@ -18,19 +18,16 @@
 }
 
 .head {
+  composes: tag tk-10 from '../../design/typography.module.css';
   display: flex;
   gap: 8px;
   align-items: baseline;
   padding: 0 4px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   opacity: 0.6;
 }
 
 .count {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  composes: mono-sm from '../../design/typography.module.css';
   opacity: 0.7;
 }
 
@@ -53,7 +50,7 @@
 }
 
 .name {
-  font-size: 14px;
+  composes: body from '../../design/typography.module.css';
 }
 
 /* статус-бейдж / тег зрителя прижаты вправо (вид даёт Badge) */
@@ -62,11 +59,8 @@
 }
 
 .empty {
+  composes: label tk-10 from '../../design/typography.module.css';
   padding: 10px 12px;
-  font-family: var(--font-mono);
-  font-size: 12px;
   color: rgb(255 255 255 / 30%);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   border: 1px dashed rgb(255 255 255 / 12%);
 }

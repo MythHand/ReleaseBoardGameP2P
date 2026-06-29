@@ -17,19 +17,14 @@
 }
 
 .title {
+  composes: heading-2 tk-04 from '../../design/typography.module.css';
   margin: 0;
-  font-family: var(--font-heading);
-  font-size: 32px;
-  letter-spacing: 0.04em;
 }
 
 .sub {
+  composes: label tk-14 from '../../design/typography.module.css';
   margin: 6px 0 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
   color: rgb(255 255 255 / 45%);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
 }
 
 /* ===== победитель ===== */
@@ -50,18 +45,13 @@
 }
 
 .winnerLabel {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  composes: label-sm tk-18 from '../../design/typography.module.css';
   color: #8fd9b0;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
 }
 
 .winnerName {
+  composes: heading-4 tk-02 from '../../design/typography.module.css';
   margin-block-start: 4px;
-  font-family: var(--font-heading);
-  font-size: 26px;
-  letter-spacing: 0.02em;
 }
 
 /* ===== таблица игроков ===== */
@@ -88,12 +78,9 @@
 }
 
 .thead {
+  composes: label-sm tk-12 from '../../design/typography.module.css';
   padding-block-end: 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
   color: rgb(255 255 255 / 40%);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   border-block-end: 1px solid rgb(255 255 255 / 8%);
 }
 
@@ -114,12 +101,11 @@
 }
 
 .name {
-  font-size: 15px;
+  composes: body-lg from '../../design/typography.module.css';
 }
 
 .colNum {
-  font-family: var(--font-mono);
-  font-size: 16px;
+  composes: numeric from '../../design/typography.module.css';
   text-align: center;
 }
 
@@ -192,20 +178,14 @@
 
 /* имя игрока — сверху */
 .achHolder {
-  font-family: var(--font-mono);
-  font-size: 14px;
+  composes: mono tk-04 from '../../design/typography.module.css';
   color: rgb(255 255 255 / 60%);
-  letter-spacing: 0.04em;
 }
 
 .achTitle {
+  composes: heading-7 tk-02 from '../../design/typography.module.css';
   margin-block-start: 6px;
-  font-family: var(--font-heading);
-  font-size: 18px;
-  font-weight: 700;
   color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
 /* цифра + подпись на одной линии текста */
@@ -217,18 +197,12 @@
 }
 
 .achValue {
-  font-family: var(--font-mono);
-  font-size: 52px;
-  font-weight: 300;
-  line-height: 0.95;
+  composes: numeric-xl tk-0 from '../../design/typography.module.css';
+  line-height: 0.95; /* плотная посадка крупного числа на одной линии с подписью */
   color: #fff;
-  letter-spacing: 0;
 }
 
 .achUnit {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  composes: label-sm tk-12 from '../../design/typography.module.css';
   color: rgb(255 255 255 / 45%);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }

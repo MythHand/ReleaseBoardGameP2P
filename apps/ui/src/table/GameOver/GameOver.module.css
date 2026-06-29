@@ -32,29 +32,21 @@
 }
 
 .label {
+  composes: label-sm tk-20 from '../../design/typography.module.css';
   margin-block-start: 16px;
-  font-family: var(--font-mono);
-  font-size: 11px;
   color: #8fd9b0;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
 }
 
 .name {
+  composes: heading-1 tk-02 from '../../design/typography.module.css';
   margin-block-start: 8px;
-  font-family: var(--font-heading);
-  font-size: 34px;
   color: #fff;
-  letter-spacing: 0.02em;
 }
 
 .condition {
+  composes: label tk-12 from '../../design/typography.module.css';
   margin-block-start: 10px;
-  font-family: var(--font-mono);
-  font-size: 12px;
   color: rgb(255 255 255 / 50%);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }
 
 .actions {

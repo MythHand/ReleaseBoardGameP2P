@@ -35,11 +35,10 @@
 }
 
 .item {
+  composes: body from '../../design/typography.module.css';
   display: block;
   inline-size: 100%;
   padding: 11px 18px;
-  font-family: var(--font-text);
-  font-size: 14px;
   color: rgb(255 255 255 / 85%);
   text-align: start;
   white-space: nowrap;
@@ -73,11 +72,9 @@
 }
 
 .hint {
+  composes: mono-xs tk-04 from '../../design/typography.module.css';
   padding: 9px 18px;
-  font-family: var(--font-mono);
-  font-size: 11px;
   color: #e3b341;
-  letter-spacing: 0.04em;
   white-space: nowrap;
   border-block-start: 1px solid rgb(255 255 255 / 10%);
 }

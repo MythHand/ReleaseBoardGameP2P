@@ -1,9 +1,23 @@
-import type { InputHTMLAttributes, ReactNode } from 'react'
-import { useId } from 'react'
+import {
+  forwardRef,
+  type InputHTMLAttributes,
+  type ReactNode,
+  useId,
+  useImperativeHandle,
+  useRef,
+} from 'react'
+import { play } from '@/animations'
 import styles from './Input.module.css'
+
+export interface InputHandle {
+  // тряхнуть поле — фидбек ошибки (напр. незаполнено при сабмите). Дёргает весь
+  // .field (лейбл + поле + trailing), как делалось вручную на экранах.
+  shake: () => void
+}
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: ReactNode
+  // строка ошибки: красная рамка + сообщение под полем
   error?: string
   trailing?: ReactNode
   // по умолчанию значение капсится (коды, лобби); plain — натуральный регистр
@@ -11,17 +25,24 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   plain?: boolean
 }
 
-export default function Input({
-  label,
-  error,
-  trailing,
-  plain,
-  className,
-  id,
-  ...rest
-}: InputProps) {
+const Input = forwardRef<InputHandle, InputProps>(function Input(
+  { label, error, trailing, plain, className, id, ...rest },
+  ref,
+) {
   const autoId = useId()
   const inputId = id ?? autoId
+  const fieldRef = useRef<HTMLDivElement>(null)
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      shake: () => {
+        play('shake', fieldRef.current)
+      },
+    }),
+    [],
+  )
+
   const inputClassName = `${styles.input}${plain ? ` ${styles.plain}` : ''}${
     error ? ` ${styles.inputError}` : ''
   }`
@@ -31,7 +52,7 @@ export default function Input({
   // is not nested inside a <label> — clicking it would otherwise also forward a
   // focus/activation to the text input.
   return (
-    <div className={`${styles.field}${className ? ` ${className}` : ''}`}>
+    <div ref={fieldRef} className={`${styles.field}${className ? ` ${className}` : ''}`}>
       {label && (
         <label htmlFor={inputId} className={styles.label}>
           {label}
@@ -48,4 +69,6 @@ export default function Input({
       {error && <span className={styles.errorMsg}>{error}</span>}
     </div>
   )
-}
+})
+
+export default Input

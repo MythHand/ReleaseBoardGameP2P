@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { play } from '@/animations'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
+import Menu, { MenuButton, MenuGroup } from '@/blocks/Menu'
 import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
@@ -150,19 +151,21 @@ export default function Start({
             ))}
           </div>
           <p className={styles.desc}>{copy.description}</p>
-          <div className={styles.actions}>
-            <Button onClick={() => setModal('create')}>{copy.createGame}</Button>
-            <Button onClick={() => setModal('join')}>{copy.joinGame}</Button>
-          </div>
-          <div className={`${styles.actions} ${styles.actionsSecondary}`}>
-            <Button onClick={() => setModal('rules')}>{copy.rules}</Button>
-          </div>
-          <div className={`${styles.actions} ${styles.actionsSecondary}`}>
-            <Button onClick={() => window.open(GITHUB_URL, '_blank', 'noopener')}>
-              {copy.github}
-            </Button>
-            <Button onClick={() => onPlayground?.()}>{copy.playground}</Button>
-          </div>
+          <Menu className={styles.menu}>
+            <MenuGroup>
+              <MenuButton onClick={() => setModal('create')}>{copy.createGame}</MenuButton>
+              <MenuButton onClick={() => setModal('join')}>{copy.joinGame}</MenuButton>
+            </MenuGroup>
+            <MenuGroup>
+              <MenuButton onClick={() => setModal('rules')}>{copy.rules}</MenuButton>
+            </MenuGroup>
+            <MenuGroup>
+              <MenuButton onClick={() => window.open(GITHUB_URL, '_blank', 'noopener')}>
+                {copy.github}
+              </MenuButton>
+              <MenuButton onClick={() => onPlayground?.()}>{copy.playground}</MenuButton>
+            </MenuGroup>
+          </Menu>
         </div>
       </div>
 

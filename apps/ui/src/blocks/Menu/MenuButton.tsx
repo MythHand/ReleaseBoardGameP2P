@@ -1,5 +1,5 @@
 import { type ButtonHTMLAttributes, type ReactNode, useContext, useRef, useState } from 'react'
-import Button from '../Button'
+import Button from '../../primitives/Button'
 import { MenuContext } from './Menu'
 
 interface MenuButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

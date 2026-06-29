@@ -36,7 +36,7 @@ export default function LangSwitcher({
           <button
             key={l}
             type="button"
-            className={`${styles.lang} ${full ? styles.langFull : ''} ${
+            className={`${styles.lang} ${full ? styles.langFull : styles.langCode} ${
               value === l ? styles.langOn : ''
             }`}
             aria-pressed={value === l}

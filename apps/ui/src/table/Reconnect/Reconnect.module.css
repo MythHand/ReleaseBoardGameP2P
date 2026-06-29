@@ -4,15 +4,12 @@
 }
 
 .box {
+  composes: notice tk-10 from '../../design/typography.module.css';
   display: flex;
   gap: 14px;
   align-items: center;
   padding: 20px 28px;
-  font-family: var(--font-mono);
-  font-size: 14px;
   color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   background: color-mix(in srgb, var(--surface-1) 94%, #000);
   border: 1px solid rgb(255 255 255 / 14%);
 }
