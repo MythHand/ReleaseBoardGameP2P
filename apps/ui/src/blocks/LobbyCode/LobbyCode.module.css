@@ -10,11 +10,8 @@
 }
 
 .label {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  composes: label-sm tk-16 from '../../design/typography.module.css';
   color: rgb(255 255 255 / 45%);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
 }
 
 .row {
@@ -24,8 +21,6 @@
 }
 
 .code {
-  font-family: var(--font-mono);
-  font-size: 26px;
+  composes: code tk-20 from '../../design/typography.module.css';
   color: #8fd9b0;
-  letter-spacing: 0.2em;
 }

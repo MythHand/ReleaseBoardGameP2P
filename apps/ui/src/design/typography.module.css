@@ -197,10 +197,16 @@
   font-weight: 700;
 }
 
-/* 13 mono полужирный — имя карты (Rules) */
-.code-sm {
+/* 13 mono — поле поиска правил (Rules) */
+.mono-md {
   font-family: var(--font-mono);
   font-size: 13px;
+}
+
+/* 12 mono ·600 — имя карты / название режима (Rules) */
+.code-sm {
+  font-family: var(--font-mono);
+  font-size: 12px;
   font-weight: 600;
 }
 
