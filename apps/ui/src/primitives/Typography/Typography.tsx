@@ -95,8 +95,16 @@ type CommonProps = {
 } & Omit<HTMLAttributes<HTMLElement>, 'className' | 'children'>
 
 // Discriminated: either a semantic variant or a raw base (+tk). Exactly one path.
-type VariantPath = { variant: TypographyVariant; base?: never; tk?: never }
-type RawPath = { variant?: never; base: TypographyBase; tk?: TypographyTk }
+interface VariantPath {
+  variant: TypographyVariant
+  base?: never
+  tk?: never
+}
+interface RawPath {
+  variant?: never
+  base: TypographyBase
+  tk?: TypographyTk
+}
 
 export type TypographyProps = CommonProps & (VariantPath | RawPath)
 
