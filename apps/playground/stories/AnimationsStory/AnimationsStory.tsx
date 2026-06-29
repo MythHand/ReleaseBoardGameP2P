@@ -286,7 +286,7 @@ export default function AnimationsStory() {
         </p>
         {GROUP_ORDER.map((group) => {
           const rows = ALL.filter((s) => s.group === group)
-          if (!rows.length) return null
+          if (rows.length === 0) return null
           return (
             <div key={group} className={styles.group}>
               <div className={styles.groupTitle}>{group}</div>

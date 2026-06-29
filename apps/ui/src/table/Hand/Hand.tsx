@@ -46,7 +46,7 @@ export default function Hand({
   const [hovered, setHovered] = useState<number | null>(null)
   const n = items.length
   // при открытом промежутке раскладываем как на n+1 слотов
-  const total = gapAt != null ? n + 1 : n
+  const total = gapAt == null ? n : n + 1
 
   return (
     <div className={styles.hand}>

@@ -17,7 +17,7 @@ import styles from './DeckAnimationsStory.module.css'
 // отрабатывает эффект, затем карта летит в сброс (centerToDiscard, вразброс).
 
 const BASE = CARDS.filter((c) => c.deck === 'base')
-const HAND_SPEC: Array<[string, number]> = [
+const HAND_SPEC: [string, number][] = [
   ['operation-git-branch', 3],
   ['operation-git-merge', 2],
   ['support-sudo', 4],
@@ -245,7 +245,7 @@ export default function DeckAnimationsStory() {
       await wait(HOLD)
     }
     const tRect = pileRefs.current[target.id]?.getBoundingClientRect()
-    const flights: Array<Promise<unknown>> = []
+    const flights: Promise<unknown>[] = []
     if (tRect) {
       for (const d of decks.slice(1)) {
         const el = pileRefs.current[d.id]

@@ -769,13 +769,13 @@ export default function Rules({ copy = RULES_COPY_RU }: RulesProps = {}) {
   const groupView = (g: RuleGroup): RuleGroup | null => {
     if (inc(groupHay(g), ql)) return g
     const cards = (g.cards ?? []).filter((c) => inc(cardHay(c), ql))
-    return cards.length ? { ...g, cards } : null
+    return cards.length > 0 ? { ...g, cards } : null
   }
   const sectionView = (s: RulesSection): RulesSection | null => {
     if (!query) return s
     if (inc(sectionHay(s), ql)) return s
     const groups = (s.groups ?? []).map(groupView).filter((g): g is RuleGroup => g !== null)
-    return groups.length ? { ...s, groups } : null
+    return groups.length > 0 ? { ...s, groups } : null
   }
   const shown = sections.map(sectionView).filter((s): s is RulesSection => s !== null)
 

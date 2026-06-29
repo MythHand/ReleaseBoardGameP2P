@@ -152,19 +152,19 @@ function LogoStage({ active, onComplete }: LogoStageProps) {
     let raf = 0
     const T = (fn: () => void, ms: number) => timers.push(setTimeout(() => !cancelled && fn(), ms))
 
-    const T_FRAME_ONLY = 540
-    const T_FILL_RAMP_END = 710
-    const T_FILL_OFF = 850
-    const T_SLAM = 1600
-    const T_HOLD_AFTER_SLAM = 2400
-    const T_FADE_OUT = 320
+    const tFrameOnly = 540
+    const tFillRampEnd = 710
+    const tFillOff = 850
+    const tSlam = 1600
+    const tHoldAfterSlam = 2400
+    const tFadeOut = 320
 
     setFrameOpacity(1)
     setLogoOpacity(1)
     LoaderAudio.playTheme()
 
-    const rampStart = T_FRAME_ONLY
-    const rampDur = T_FILL_RAMP_END - T_FRAME_ONLY
+    const rampStart = tFrameOnly
+    const rampDur = tFillRampEnd - tFrameOnly
     const rampT0 = performance.now() + rampStart
     function rampFill(now: number) {
       if (cancelled) return
@@ -183,7 +183,7 @@ function LogoStage({ active, onComplete }: LogoStageProps) {
     T(() => {
       setFillOverlay(0)
       const t0 = performance.now()
-      const splitDur = T_SLAM - T_FILL_OFF
+      const splitDur = tSlam - tFillOff
       const targetOffset = 100
       function shake(now: number) {
         if (cancelled) return
@@ -201,22 +201,22 @@ function LogoStage({ active, onComplete }: LogoStageProps) {
         raf = requestAnimationFrame(shake)
       }
       raf = requestAnimationFrame(shake)
-    }, T_FILL_OFF)
+    }, tFillOff)
 
     T(() => {
       if (raf) cancelAnimationFrame(raf)
       setSplitOffset(0)
       setGlitchY(0)
       setFrameOpacity(1)
-    }, T_SLAM)
+    }, tSlam)
 
-    const fadeStart = T_SLAM + T_HOLD_AFTER_SLAM
+    const fadeStart = tSlam + tHoldAfterSlam
     T(() => {
       setLogoOpacity(0)
       setFrameOpacity(0)
     }, fadeStart)
 
-    T(() => onComplete(), fadeStart + T_FADE_OUT)
+    T(() => onComplete(), fadeStart + tFadeOut)
 
     return () => {
       cancelled = true

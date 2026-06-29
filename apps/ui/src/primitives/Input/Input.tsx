@@ -57,13 +57,13 @@ function Input({ label, error, trailing, plain, className, id, ref, ...rest }: I
           {label}
         </label>
       )}
-      {trailing != null ? (
+      {trailing == null ? (
+        <input id={inputId} className={inputClassName} {...rest} />
+      ) : (
         <div className={styles.row}>
           <input id={inputId} className={inputClassName} {...rest} />
           {trailing}
         </div>
-      ) : (
-        <input id={inputId} className={inputClassName} {...rest} />
       )}
       {error && <span className={styles.errorMsg}>{error}</span>}
     </div>

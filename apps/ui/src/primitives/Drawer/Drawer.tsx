@@ -20,9 +20,9 @@ export default function Drawer({
   className = '',
 }: DrawerProps) {
   const style =
-    width != null
-      ? ({ inlineSize: typeof width === 'number' ? `${width}px` : width } as CSSProperties)
-      : undefined
+    width == null
+      ? undefined
+      : ({ inlineSize: typeof width === 'number' ? `${width}px` : width } as CSSProperties)
 
   return (
     <div

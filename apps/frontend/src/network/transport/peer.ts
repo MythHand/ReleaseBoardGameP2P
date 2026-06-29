@@ -102,8 +102,8 @@ export function createTransport(args: {
       const e = err as { type?: string; message: string }
       // Before the peer opens, an error means setup failed — reject the promise.
       // After it opens, surface the error instead of discarding it silently.
-      if (!opened) reject(err)
-      else args.onError?.({ type: e.type, message: e.message })
+      if (opened) args.onError?.({ type: e.type, message: e.message })
+      else reject(err)
     })
     peer.on('open', (id) => {
       opened = true

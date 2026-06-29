@@ -13,7 +13,7 @@ interface ReleaseZoneProps {
   size?: string
 }
 
-const SLOTS: Array<[keyof ReleaseSlots, string]> = [
+const SLOTS: [keyof ReleaseSlots, string][] = [
   ['frontend', 'Frontend'],
   ['backend', 'Backend'],
   ['database', 'Database'],
