@@ -1,12 +1,8 @@
 {
   "app": {
-    "titleLead": "Release",
-    "titleSub": "любой ценой",
     "foundationTag": "visual layer — foundation",
     "phasesHint": "Экраны (boot → lobby → game → game over) появятся по фазам.",
-    "enterLobby": "Играть онлайн",
-    "home": "← ГЛАВНАЯ",
-    "devShowcase": "dev-витрина компонентов →"
+    "home": "← ГЛАВНАЯ"
   },
   "start": {
     "logoAlt": "Release любой ценой",

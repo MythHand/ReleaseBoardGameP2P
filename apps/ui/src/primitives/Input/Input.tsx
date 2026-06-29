@@ -2,6 +2,7 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
   type Ref,
+  useCallback,
   useId,
   useImperativeHandle,
   useRef,
@@ -17,7 +18,8 @@ export interface InputHandle {
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: ReactNode
-  // строка ошибки: красная рамка + сообщение под полем
+  // error feedback: marks the field invalid (aria-invalid). The actual prompt is
+  // a shake — triggered per submit by the Form, or imperatively via the handle.
   error?: string
   trailing?: ReactNode
   // по умолчанию значение капсится (коды, лобби); plain — натуральный регистр
@@ -32,40 +34,35 @@ function Input({ label, error, trailing, plain, className, id, ref, ...rest }: I
   const inputId = id ?? autoId
   const fieldRef = useRef<HTMLDivElement>(null)
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      shake: () => {
-        play('shake', fieldRef.current)
-      },
-    }),
-    [],
-  )
+  // Shakes the whole .field (label + input + trailing) — the error feedback.
+  const shake = useCallback(() => play('shake', fieldRef.current), [])
 
-  const inputClassName = `${styles.input}${plain ? ` ${styles.plain}` : ''}${
-    error ? ` ${styles.inputError}` : ''
-  }`
+  useImperativeHandle(ref, () => ({ shake }), [shake])
 
+  const inputClassName = `${styles.input}${plain ? ` ${styles.plain}` : ''}`
+  const invalid = error ? true : undefined
+
+  // `data-field` marks the shake target so a parent (e.g. the Form) can shake the
+  // whole field on a failed submit without reaching for a ref.
   // The label is associated to the input via htmlFor/id rather than wrapping it,
   // so an interactive `trailing` control (e.g. a random-nickname / copy button)
   // is not nested inside a <label> — clicking it would otherwise also forward a
   // focus/activation to the text input.
   return (
-    <div ref={fieldRef} className={`${styles.field}${className ? ` ${className}` : ''}`}>
+    <div ref={fieldRef} data-field className={`${styles.field}${className ? ` ${className}` : ''}`}>
       {label && (
         <label htmlFor={inputId} className={styles.label}>
           {label}
         </label>
       )}
       {trailing == null ? (
-        <input id={inputId} className={inputClassName} {...rest} />
+        <input id={inputId} className={inputClassName} aria-invalid={invalid} {...rest} />
       ) : (
         <div className={styles.row}>
-          <input id={inputId} className={inputClassName} {...rest} />
+          <input id={inputId} className={inputClassName} aria-invalid={invalid} {...rest} />
           {trailing}
         </div>
       )}
-      {error && <span className={styles.errorMsg}>{error}</span>}
     </div>
   )
 }

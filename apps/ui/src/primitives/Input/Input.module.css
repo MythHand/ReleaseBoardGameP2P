@@ -30,20 +30,6 @@
   text-transform: none;
 }
 
-.inputError {
-  border-color: var(--cat-attack);
-}
-
-.inputError:focus {
-  outline-color: var(--cat-attack);
-  border-color: var(--cat-attack);
-}
-
-.errorMsg {
-  composes: label-sm tk-10 from '../../design/typography.module.css';
-  color: var(--cat-attack);
-}
-
 /* row: input stretches, trailing element aligns by height */
 .row {
   display: flex;

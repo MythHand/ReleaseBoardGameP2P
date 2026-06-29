@@ -13,6 +13,11 @@ Shared component library — TypeScript + React + CSS Modules + design tokens; n
 - **`composes` from the scale is legacy.** The library's internal components migrate from `composes` to `<Typography>` in phases (separate plan). New code goes through the component from the start.
 - Allowed locally outside the component: glyphs / icons (`font-size` only), a `line-height` nuance for the rhythm of a specific spot, an inline weight accent (like `<b>`), and a contextual `text-transform` reset (when an element sits inside an `uppercase` parent).
 
+## Color Rule
+
+- **Colors are design tokens only.** In CSS Modules never hardcode a color literal — no `#hex`, `rgb()/hsl()`, or named colors. Reference the `var(--token)` custom properties from [`src/design/tokens.css`](src/design/tokens.css) (`var(--fg)`, `var(--bg)`, `var(--surface-1)`, `var(--brand-green)`, `var(--cat-attack)`…). Opacity variants compose on a token (`color-mix(in srgb, var(--fg) 18%, transparent)`), not a raw `rgb(255 255 255 / 18%)`.
+- **Source of values — [`src/design/tokens.css`](src/design/tokens.css).** Missing a color → add a token there, don't inline a raw value. Tokens are the single surface the frontend bridges into Tailwind via `@theme`, so a literal here can't be themed downstream.
+
 ## Component Composition Rule
 
 - **Prefer composition over polymorphism for primitives.** A primitive (`Button`, `Input`, …) renders one element and owns one responsibility. When you need extra behaviour on top — e.g. copy-to-clipboard with a transient "copied" label — add a sibling component that wraps the primitive and reuses its styles (`CopyButton` renders a `Button` and owns only the copy concern) rather than growing the behaviour onto the primitive itself.

@@ -1,12 +1,8 @@
 {
   "app": {
-    "titleLead": "Release",
-    "titleSub": "at any cost",
     "foundationTag": "visual layer — foundation",
     "phasesHint": "Screens (boot → lobby → game → game over) arrive in phases.",
-    "enterLobby": "Play online",
-    "home": "← HOME",
-    "devShowcase": "component dev showcase →"
+    "home": "← HOME"
   },
   "start": {
     "logoAlt": "Release at any cost",

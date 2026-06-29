@@ -1,20 +1,14 @@
 import { useTranslation } from '@release/translation'
-import { ModeSelect } from '@release/ui'
+import { LangSwitcher, type SwitchLang } from '@release/ui'
 
-const LANG_OPTIONS = [
-  { value: 'en', label: 'EN' },
-  { value: 'ru', label: 'RU' },
-]
-
+// Frontend adapter for the i18n-agnostic LangSwitcher block: binds it to
+// react-i18next and fixes it to the top-right corner.
 export default function LanguageSwitch() {
   const { i18n } = useTranslation()
+  const value: SwitchLang = i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'
   return (
     <div className="fixed top-4 right-4 z-10">
-      <ModeSelect
-        options={LANG_OPTIONS}
-        value={i18n.resolvedLanguage ?? 'en'}
-        onChange={(lng) => i18n.changeLanguage(lng)}
-      />
+      <LangSwitcher value={value} onChange={(lang) => i18n.changeLanguage(lang)} />
     </div>
   )
 }

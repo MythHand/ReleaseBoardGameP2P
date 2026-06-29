@@ -14,8 +14,9 @@ vi.mock('@release/translation', () => ({
 
 // The generated route TREE can't be imported in Vitest (generouted builds it via
 // import.meta.glob at Vite build time). This mirrors generouted's nesting — _app
-// root layout with the index landing and a catch-all — to verify routing. The
-// actual generated tree is verified by `pnpm --filter @release/web build`.
+// root layout with the index redirect, the /start entry, and a catch-all — to
+// verify routing. The actual generated tree is verified by
+// `pnpm --filter @release/web build`.
 function routerFor(path: string) {
   return createMemoryRouter(
     [
@@ -23,6 +24,7 @@ function routerFor(path: string) {
         element: <App />,
         children: [
           { index: true, element: <Index /> },
+          { path: 'start', element: <div>start screen</div> },
           { path: '*', element: <NotFound /> },
         ],
       },
@@ -31,12 +33,12 @@ function routerFor(path: string) {
   )
 }
 
-it('renders the landing at /', () => {
+it('redirects / to the start screen', async () => {
   render(<RouterProvider router={routerFor('/')} />)
-  expect(screen.getByText('start.description')).toBeTruthy()
+  expect(await screen.findByText('start screen')).toBeTruthy()
 })
 
-it('redirects unknown paths to the landing', async () => {
+it('redirects unknown paths to the start screen', async () => {
   render(<RouterProvider router={routerFor('/does-not-exist')} />)
-  expect(await screen.findByText('start.description')).toBeTruthy()
+  expect(await screen.findByText('start screen')).toBeTruthy()
 })

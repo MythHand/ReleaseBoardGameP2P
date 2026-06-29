@@ -25,10 +25,11 @@ it('associates the label with the input via htmlFor', () => {
   expect(getByLabelText('Nickname')).toBeTruthy()
 })
 
-it('shows error message and applies error class', () => {
-  const { getByText, getByRole } = render(<Input label="Name" error="Required" />)
-  expect(getByText('Required')).toBeTruthy()
-  expect(getByRole('textbox').className).toContain('inputError')
+it('marks the field invalid via aria-invalid, with no message under the field', () => {
+  const { getByRole, queryByText } = render(<Input label="Name" error="Required" />)
+  // error feedback is aria-invalid + a shake (driven by the Form), not a message
+  expect(getByRole('textbox').getAttribute('aria-invalid')).toBe('true')
+  expect(queryByText('Required')).toBeNull()
 })
 
 it('renders trailing element inside a row wrapper', () => {

@@ -30,7 +30,9 @@ export default function StartPage() {
             <Typography variant="tag">{t('start.tagBoardCard')}</Typography>
           </div>
 
-          <Typography variant="body">{t('start.description')}</Typography>
+          <Typography variant="body" className="mb-24">
+            {t('start.description')}
+          </Typography>
 
           <Menu>
             {/* Always rendered so toggling it never reflows the column — without

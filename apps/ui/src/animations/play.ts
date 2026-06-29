@@ -18,7 +18,9 @@ export function play(
     console.warn(`[animations] неизвестный пресет: "${name}"`)
     return null
   }
-  if (!el) return null
+  // No element, or an environment without the Web Animations API (e.g. jsdom in
+  // tests) — nothing to animate, so this is a safe no-op.
+  if (!el || typeof el.animate !== 'function') return null
   if (typeof preset === 'function') return preset(el, params)
   return el.animate(preset.keyframes, { ...preset.options, ...params })
 }
