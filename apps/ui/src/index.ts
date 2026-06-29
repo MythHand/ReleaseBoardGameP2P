@@ -60,6 +60,13 @@ export { default as Spinner } from './primitives/Spinner'
 export type { TabRailItem } from './primitives/TabRail'
 export { default as TabRail } from './primitives/TabRail'
 export { default as Toggle } from './primitives/Toggle'
+export type {
+  TypographyBase,
+  TypographyProps,
+  TypographyTk,
+  TypographyVariant,
+} from './primitives/Typography'
+export { default as Typography } from './primitives/Typography'
 export type { InviteCopy, InviteState, JoinRole, SlotAvailability } from './screens/Invite'
 export { default as Invite } from './screens/Invite'
 export { default as Lobby } from './screens/Lobby'
