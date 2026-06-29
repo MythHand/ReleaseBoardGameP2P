@@ -99,19 +99,15 @@
 }
 
 .tag {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  composes: label tk-16 from '../../design/typography.module.css';
   color: var(--cat-release);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
   opacity: 0.85;
 }
 
 .desc {
+  composes: body-lg from '../../design/typography.module.css';
   margin: 0 0 96px;
-  font-family: var(--font-text);
-  font-size: 15px;
-  line-height: 1.65;
+  line-height: 1.65; /* нюанс интерлиньяжа описания — плотнее базового 1.6 */
   opacity: 0.85;
 }
 
@@ -136,17 +132,14 @@
 }
 
 .credit {
+  composes: mono-sm tk-04 from '../../design/typography.module.css';
   display: flex;
   gap: 10px;
   align-items: baseline;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
 }
 
 .creditLabel {
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
+  composes: label tk-16 from '../../design/typography.module.css';
   opacity: 0.4;
 }
 
@@ -216,13 +209,10 @@
 }
 
 .playCap {
+  composes: overline tk-22 from '../../design/typography.module.css';
   position: absolute;
   inset-block-start: 100%;
   margin-block-start: 10px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
   white-space: nowrap;
   opacity: 0.7;
 }
@@ -297,11 +287,9 @@
 }
 
 .techTitle {
+  composes: subtitle tk-02 from '../../design/typography.module.css';
   margin: 0;
-  font-family: var(--font-heading);
-  font-size: 16px;
   color: #fff;
-  letter-spacing: 0.02em;
 }
 
 /* «выключенный» вид CTA, но кнопка кликабельна — клик встряхивает пустое поле */
@@ -311,17 +299,8 @@
 
 /* текст-успокоитель прижат вниз колонки; CTA остаётся вверху у поля */
 .note {
+  composes: body-sm from '../../design/typography.module.css';
   margin: auto 0 0;
-  font-family: var(--font-text);
-  font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.55; /* нюанс интерлиньяжа сноски */
   color: rgb(255 255 255 / 50%);
-}
-
-.stub {
-  max-inline-size: 420px;
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
-  opacity: 0.7;
 }

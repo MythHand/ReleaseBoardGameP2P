@@ -117,7 +117,7 @@ export default function Stats({ winnerId, copy, players = [], lang, onLangChange
       <div className={styles.table}>
         <div className={`${styles.row} ${styles.thead}`}>
           <span className={styles.colName}>{copy.colName}</span>
-          <span className={styles.colLoc}>{copy.colLoc}</span>
+          <span>{copy.colLoc}</span>
           <span className={`${styles.colNum} ${styles.hAttack}`}>{copy.colAttack}</span>
           <span className={`${styles.colNum} ${styles.hDefense}`}>{copy.colDefense}</span>
         </div>
@@ -133,7 +133,7 @@ export default function Stats({ winnerId, copy, players = [], lang, onLangChange
                   </Badge>
                 )}
               </span>
-              <span className={styles.colLoc}>
+              <span>
                 <Badge tone={LOC_TONE[p.location]} size="md" outlined>
                   {copy.location[p.location]}
                 </Badge>

@@ -61,6 +61,10 @@
   letter-spacing: 0.2em;
 }
 
+.tk-22 {
+  letter-spacing: 0.22em;
+}
+
 /* ===== Базы — Onest (заголовки) ===== */
 .heading-1 {
   font-family: var(--font-heading);

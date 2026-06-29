@@ -106,20 +106,16 @@
 }
 
 .tag {
-  font-family: var(--font-mono);
-  font-size: 12px;
+  composes: label tk-16 from '../../design/typography.module.css';
   color: var(--cat-release);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
   opacity: 0.85;
 }
 
 .desc {
+  composes: body from '../../design/typography.module.css';
   max-inline-size: 420px;
   margin: 0;
-  font-family: var(--font-text);
-  font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.6; /* нюанс интерлиньяжа — чуть плотнее базового 1.62 */
   opacity: 0.82;
 }
 
@@ -138,12 +134,9 @@
 }
 
 .formTitle {
+  composes: heading-8 tk-05 from '../../design/typography.module.css';
   margin: 0 0 4px;
-  font-family: var(--font-heading);
-  font-size: 16px;
   color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 /* выбор роли — в стиле полей ввода: лейбл как у Input, сегменты как поле */
@@ -154,10 +147,7 @@
 }
 
 .roleLabel {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
+  composes: label-sm tk-16 from '../../design/typography.module.css';
   opacity: 0.55;
 }
 
@@ -169,13 +159,10 @@
 }
 
 .roleOpt {
+  composes: label-md tk-12 from '../../design/typography.module.css';
   flex: 1;
   padding: 12px 14px;
-  font-family: var(--font-mono);
-  font-size: 13px;
   color: rgb(255 255 255 / 55%);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   cursor: pointer;
   background: transparent;
   border: 0;
@@ -201,9 +188,8 @@
 
 /* подпись под выбором роли (режим «только зритель») */
 .note {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.5;
+  composes: mono-xs from '../../design/typography.module.css';
+  line-height: 1.5; /* нюанс интерлиньяжа подписи */
   color: var(--cat-support);
 }
 
@@ -235,18 +221,14 @@
 }
 
 .blockedTitle {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  composes: label-md tk-12 from '../../design/typography.module.css';
   color: var(--cat-attack);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }
 
 .blockedNote {
+  composes: body-sm from '../../design/typography.module.css';
   margin: 0;
-  font-family: var(--font-text);
-  font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.55; /* нюанс интерлиньяжа */
   opacity: 0.75;
 }
 

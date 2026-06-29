@@ -313,8 +313,8 @@ const scale: ScaleRow[] = [
     size: 10,
     tracking: '0.2em',
     upper: true,
-    sample: 'Открытый P2P-проект',
-    where: 'Теги (Start), метки (MoveHistory, ReleaseZone)',
+    sample: 'смотреть обзор',
+    where: 'Капшен play-кнопки (Start), метки (MoveHistory, ReleaseZone)',
   },
 ]
 
@@ -350,6 +350,7 @@ const trackings: { name: string; em: string }[] = [
   { name: 'tk-16', em: '0.16em' },
   { name: 'tk-18', em: '0.18em' },
   { name: 'tk-20', em: '0.2em' },
+  { name: 'tk-22', em: '0.22em' },
 ]
 
 // Документация по типографике: шрифты и доступные начертания.
