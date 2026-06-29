@@ -95,14 +95,7 @@ Styling is **per-package** — the approach depends on which app the component l
 
 ## Typography Rule
 
-- **All text is set through the `<Typography>` component from `@release/ui`** — the single typography path for both the frontend (`@release/web`) and the library. Do not write `font-family` / `font-size` / `text-transform` / `letter-spacing` by hand, and do not use Tailwind text utilities. Color / spacing / layout stay local (via `className`).
-- Two ways to pick a style:
-  - **Semantic variant** (primary): `<Typography variant="tag">…</Typography>`.
-  - **Raw `base` + `tk`** (long tail, when no variant fits): `<Typography base="mono-strong" tk="tk-02">…</Typography>`. Exactly one of `variant` / `base` is required; `tk` is valid only alongside `base`.
-- **Source of values — the scale `apps/ui/src/design/typography.module.css`** (base = family + size + weight + case; `tk-NN` = tracking). The component applies exactly those classes and hardcodes nothing. Missing a step — add the base/`tk` to the scale rather than bending text to a near match. Don't swap fonts (Fira Mono `--font-text` and JetBrains Mono `--font-mono` are distinct roles).
-- **Live showcase — the playground `Typography` page** (`apps/ui/src/design/TypographyPreview.tsx`): all bases, tk variations, and the curated component variants. Check it before working on text and keep it in sync on changes.
-- **`composes` from the scale is legacy.** The library's internal components migrate from `composes` to `<Typography>` in phases (separate plan). New code goes through the component from the start.
-- Allowed locally outside the component: glyphs / icons (`font-size` only), a `line-height` nuance for the rhythm of a specific spot, an inline weight accent (like `<b>`), and a contextual `text-transform` reset (when an element sits inside an `uppercase` parent).
+- **All text is set through `<Typography>` from `@release/ui`** (semantic `variant`, or raw `base` + `tk`) — never hand-written font CSS or Tailwind text utilities. The full rule, the scale (source of values), and the live showcase live in the ui package: [apps/ui/CLAUDE.md](apps/ui/CLAUDE.md#typography-rule).
 
 ---
 
