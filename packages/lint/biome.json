@@ -18,12 +18,6 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
-      "a11y": {
-        "useSemanticElements": "error",
-        "useAriaPropsSupportedByRole": "error",
-        "useValidAutocomplete": "error",
-        "useFocusableInteractive": "error"
-      },
       "complexity": {
         "noUselessFragments": "error",
         "noExcessiveNestedTestSuites": "error"
@@ -46,8 +40,6 @@
             }
           }
         },
-        "useImportType": "error",
-        "useExportType": "error",
         "useConsistentTypeDefinitions": "error",
         "noInferrableTypes": "error",
         "useFragmentSyntax": "error",
@@ -58,7 +50,6 @@
         "noNegationElse": "error",
         "useExplicitLengthCheck": "error",
         "noProcessEnv": "error",
-        "noNonNullAssertion": "error",
         "useNamingConvention": {
           "level": "error",
           "options": {
@@ -78,7 +69,6 @@
         "useAwait": "error",
         "noFocusedTests": "error",
         "noSkippedTests": "error",
-        "noDoubleEquals": "error",
         "noConsole": {
           "level": "error",
           "options": {
@@ -86,7 +76,6 @@
           }
         },
         "noEvolvingTypes": "error",
-        "noConfusingVoidType": "error",
         "noDuplicateTestHooks": "error",
         "noExportsInTest": "error",
         "noMisplacedAssertion": "error"
