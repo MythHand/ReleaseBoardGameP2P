@@ -4,4 +4,4 @@ export type {
   TypographyTk,
   TypographyVariant,
 } from './Typography'
-export { default } from './Typography'
+export { default, VARIANTS } from './Typography'

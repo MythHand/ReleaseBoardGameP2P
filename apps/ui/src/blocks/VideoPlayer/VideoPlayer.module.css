@@ -26,7 +26,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  color: #fff;
+  color: var(--fg);
   cursor: pointer;
   background: transparent;
   border: 0;
@@ -40,8 +40,8 @@
   block-size: 76px;
   padding-inline-start: 5px;
   font-size: 23px;
-  background: rgb(0 0 0 / 35%);
-  border: 1.5px solid rgb(255 255 255 / 70%);
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--fg) 70%, transparent);
   border-radius: 50%;
   backdrop-filter: blur(2px);
   transition: transform var(--t-base) var(--ease-out),
@@ -49,7 +49,7 @@
 }
 
 .playFace:hover .playIcon {
-  border-color: #fff;
+  border-color: var(--fg);
   transform: scale(1.08);
 }
 
@@ -66,7 +66,7 @@
 .videoFace {
   position: absolute;
   inset: 0;
-  background: #000;
+  background: var(--bg);
   opacity: 0;
   transition: opacity 280ms var(--ease-soft);
 }
@@ -94,15 +94,15 @@
   block-size: 46px;
   font-size: 30px;
   line-height: 1;
-  color: #fff;
+  color: var(--fg);
   cursor: pointer;
-  background: rgb(0 0 0 / 55%);
-  border: 1px solid rgb(255 255 255 / 35%);
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg) 35%, transparent);
   transition: background var(--t-fast) var(--ease-out),
     border-color var(--t-fast) var(--ease-out);
 }
 
 .bigClose:hover {
-  background: rgb(0 0 0 / 85%);
-  border-color: #fff;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  border-color: var(--fg);
 }

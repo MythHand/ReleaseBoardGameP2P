@@ -41,6 +41,7 @@ function Input({ label, error, trailing, plain, className, id, ref, ...rest }: I
 
   const inputClassName = `${styles.input}${plain ? ` ${styles.plain}` : ''}`
   const invalid = error ? true : undefined
+  const inputEl = <input id={inputId} className={inputClassName} aria-invalid={invalid} {...rest} />
 
   // `data-field` marks the shake target so a parent (e.g. the Form) can shake the
   // whole field on a failed submit without reaching for a ref.
@@ -56,10 +57,10 @@ function Input({ label, error, trailing, plain, className, id, ref, ...rest }: I
         </label>
       )}
       {trailing == null ? (
-        <input id={inputId} className={inputClassName} aria-invalid={invalid} {...rest} />
+        inputEl
       ) : (
         <div className={styles.row}>
-          <input id={inputId} className={inputClassName} aria-invalid={invalid} {...rest} />
+          {inputEl}
           {trailing}
         </div>
       )}

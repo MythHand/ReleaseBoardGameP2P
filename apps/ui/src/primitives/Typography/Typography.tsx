@@ -77,7 +77,7 @@ interface VariantConfig {
   tag: ElementType
 }
 
-const VARIANTS: Record<TypographyVariant, VariantConfig> = {
+export const VARIANTS: Record<TypographyVariant, VariantConfig> = {
   pageTitle: { base: 'heading-3', tk: 'tk-04', tag: 'h1' },
   sectionTitle: { base: 'heading-8', tk: 'tk-04', tag: 'h2' },
   panelTitle: { base: 'subtitle', tk: 'tk-02', tag: 'h3' },

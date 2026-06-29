@@ -44,7 +44,9 @@ export default function Form({ onSubmit, requiredMessage = 'Required', ...rest }
             setErrors(newErrors)
             // Shake every offending field on every attempt — fires even when the
             // error is unchanged (a repeat submit of the same empty field).
-            for (const input of invalid) play('shake', input.closest('[data-field]'))
+            // Fall back to the control itself for fields without a [data-field]
+            // wrapper (e.g. a raw input), so they still get visible feedback.
+            for (const input of invalid) play('shake', input.closest('[data-field]') ?? input)
             return
           }
           setErrors({})

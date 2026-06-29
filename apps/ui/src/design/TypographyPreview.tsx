@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import Typography, { type TypographyVariant } from '../primitives/Typography'
+import Typography, { type TypographyVariant, VARIANTS } from '../primitives/Typography'
 import styles from './TypographyPreview.module.css'
 
 // ШКАЛА ТЕКСТА — витрина живого фундамента design/typography.module.css.
@@ -401,16 +401,23 @@ const trackings: { name: string; em: string }[] = [
   { name: 'tk-22', em: '0.22em' },
 ]
 
+// The base+tk composition for a variant, read from Typography's VARIANTS so the
+// table never drifts from the component's actual definitions.
+const composesOf = (variant: TypographyVariant): string => {
+  const { base, tk } = VARIANTS[variant]
+  return tk ? `${base} · ${tk}` : base
+}
+
 // Curated <Typography> variants — each is a base + tk composition from the scale above.
-const curated: { variant: TypographyVariant; composes: string; sample: string }[] = [
-  { variant: 'pageTitle', composes: 'heading-3 · tk-04', sample: 'Lobby' },
-  { variant: 'sectionTitle', composes: 'heading-8 · tk-04', sample: 'Lobby settings' },
-  { variant: 'panelTitle', composes: 'subtitle · tk-02', sample: 'Game mode' },
-  { variant: 'body', composes: 'body-lg', sample: 'Game description on the start screen.' },
-  { variant: 'footnote', composes: 'body-sm', sample: 'Footnote under a field.' },
-  { variant: 'tag', composes: 'label · tk-16', sample: 'players' },
-  { variant: 'metaLabel', composes: 'label-sm · tk-14', sample: 'design' },
-  { variant: 'code', composes: 'code · tk-20', sample: '4F2A-9K' },
+const curated: { variant: TypographyVariant; sample: string }[] = [
+  { variant: 'pageTitle', sample: 'Lobby' },
+  { variant: 'sectionTitle', sample: 'Lobby settings' },
+  { variant: 'panelTitle', sample: 'Game mode' },
+  { variant: 'body', sample: 'Game description on the start screen.' },
+  { variant: 'footnote', sample: 'Footnote under a field.' },
+  { variant: 'tag', sample: 'players' },
+  { variant: 'metaLabel', sample: 'design' },
+  { variant: 'code', sample: '4F2A-9K' },
 ]
 
 // Документация по типографике: шрифты и доступные начертания.
@@ -606,7 +613,7 @@ export default function TypographyPreview() {
               <td>
                 <Typography variant={c.variant}>{c.sample}</Typography>
               </td>
-              <td className={styles.scaleMeta}>{c.composes}</td>
+              <td className={styles.scaleMeta}>{composesOf(c.variant)}</td>
             </tr>
           ))}
         </tbody>

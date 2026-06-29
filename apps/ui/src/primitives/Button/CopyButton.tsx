@@ -29,10 +29,20 @@ export default function CopyButton({
 
   const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
     onClick?.(e)
-    navigator.clipboard?.writeText(copyValue)
-    setCopied(true)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => setCopied(false), COPIED_HOLD_MS)
+    // Nothing to copy, or no clipboard (insecure context) — don't show a false
+    // "copied" confirmation the user would trust.
+    if (!copyValue.trim() || !navigator.clipboard) return
+    navigator.clipboard
+      .writeText(copyValue)
+      .then(() => {
+        // Only confirm once the write actually succeeds.
+        setCopied(true)
+        clearTimeout(timer.current)
+        timer.current = setTimeout(() => setCopied(false), COPIED_HOLD_MS)
+      })
+      .catch(() => {
+        // Write rejected (denied permission / insecure context) — stay silent.
+      })
   }
 
   const showCopied = copied && copiedChildren != null

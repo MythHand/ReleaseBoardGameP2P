@@ -11,7 +11,9 @@ export default function App() {
   return (
     <SessionProvider>
       <div className="min-h-screen bg-bg text-fg">
-        {pathname !== '/start' && (
+        {/* Exclude '/' too: it renders briefly before redirecting to /start, and
+            the link would flash on the entry frame. */}
+        {pathname !== '/start' && pathname !== '/' && (
           <Link
             to="/start"
             className="fixed top-4 left-4 z-10 rounded-lg border border-fg/10 bg-surface-1 px-3 py-1.5 font-semibold text-brand-green text-xs tracking-base transition-opacity hover:opacity-80"
