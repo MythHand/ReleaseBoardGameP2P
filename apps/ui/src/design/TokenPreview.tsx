@@ -1,26 +1,26 @@
 import { useEffect, useState } from 'react'
 import styles from './TokenPreview.module.css'
 
-// Один и тот же компонент используется и реальным приложением, и песочницей —
-// демонстрация принципа «общие компоненты, две точки входа».
+// The same component is used by both the real app and the sandbox —
+// demonstrating the "shared components, two entry points" principle.
 
 interface ColorToken {
   name: string
   value: string
 }
 
-// Значения-цвета: hex, rgb/hsl/hwb, oklch/oklab/lab/lch, color-mix.
+// Color values: hex, rgb/hsl/hwb, oklch/oklab/lab/lch, color-mix.
 const COLOR_RE = /^(#|rgb|hsl|hwb|okl|lab|lch|color-mix)/i
 
-// Сбор всех кастомных свойств-цветов из :root — включая токены, подключённые
-// через @import (CSSImportRule). Источник — живые стили, поэтому витрина не
-// расходится с tokens.css: показываем ровно то, что объявлено.
+// Collect every color custom property from :root — including tokens pulled in
+// via @import (CSSImportRule). The source is the live styles, so the showcase
+// never drifts from tokens.css: we show exactly what's declared.
 function collectVars(sheet: CSSStyleSheet, into: Map<string, string>): void {
   let rules: CSSRuleList
   try {
     rules = sheet.cssRules
   } catch {
-    return // кросс-доменный лист — пропускаем
+    return // cross-origin sheet — skip
   }
   for (const rule of Array.from(rules)) {
     if (rule instanceof CSSImportRule && rule.styleSheet) {
@@ -43,7 +43,7 @@ function readColorTokens(): ColorToken[] {
   return Array.from(map, ([name, value]) => ({ name, value }))
 }
 
-// Группы в порядке вывода. Раскладка по префиксу имени токена.
+// Groups in display order. Bucketed by token-name prefix.
 const GROUP_ORDER = [
   'Base & surfaces',
   'Brand & categories',
@@ -59,14 +59,14 @@ function groupOf(name: string): (typeof GROUP_ORDER)[number] {
   if (name === '--brand-green' || name.startsWith('--cat-')) return 'Brand & categories'
   if (name.startsWith('--white-')) return 'White overlays'
   if (name.startsWith('--black-')) return 'Black overlays'
-  // alpha-варианты оттенков несут трейлинг -NN (--mint-40, --coral-12, --yellow-28…)
+  // alpha variants of the hues carry a trailing -NN (--mint-40, --coral-12, --yellow-28…)
   if (/-\d/.test(name)) return 'Tinted overlays'
   return 'Named hues'
 }
 
 export default function TokenPreview() {
-  // Стили подключены глобально до маунта, но читаем в эффекте — на всякий случай
-  // (StrictMode/таймингов ради), результат стабилен.
+  // Styles are attached globally before mount, but we read in an effect just in
+  // case (StrictMode / timing); the result is stable.
   const [tokens, setTokens] = useState<ColorToken[]>([])
   useEffect(() => setTokens(readColorTokens()), [])
 

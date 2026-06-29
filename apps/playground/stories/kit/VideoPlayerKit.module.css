@@ -8,8 +8,8 @@
   border-radius: 12px;
 }
 
-/* Центрируем плеер в сцене — перебивает дефолтные insets компонента
-   (две класса селектор > одиночный .player самого компонента). */
+/* Center the player in the stage — overrides the component's default insets
+   (two-class selector > the component's single .player). */
 .stage .player {
   inset: 50% auto auto 50%;
   transform: translate(-50%, -50%);

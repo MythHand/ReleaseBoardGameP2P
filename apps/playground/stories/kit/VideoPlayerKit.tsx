@@ -2,8 +2,8 @@ import VideoPlayer from '@/blocks/VideoPlayer'
 import { KitPage, KitSection } from './KitShell'
 import styles from './VideoPlayerKit.module.css'
 
-// Реальный embed-плеер: кнопка ▶ разворачивается на месте в инлайн-видео.
-// Сцена даёт позиционированный контейнер — компонент абсолютно спозиционирован.
+// The real embed player: the ▶ button expands in place into the inline video.
+// The stage provides a positioned container — the component is absolutely positioned.
 const VIDEO_SRC = 'https://www.youtube.com/embed/bxGtRnoYW4g'
 
 export default function VideoPlayerKit() {

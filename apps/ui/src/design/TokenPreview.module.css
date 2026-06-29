@@ -40,7 +40,7 @@
   gap: 5px;
 }
 
-/* Checkerboard под цветом — чтобы прозрачность overlay-токенов читалась. */
+/* Checkerboard behind the color so overlay tokens' transparency reads. */
 .chip {
   position: relative;
   block-size: 56px;
