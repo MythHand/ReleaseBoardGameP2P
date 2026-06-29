@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "release-tsc --noEmit -p tsconfig.json",
     "stylelint": "stylelint \"**/*.css\" --allow-empty-input",
     "test": "vitest run --passWithNoTests"
   },
@@ -22,6 +22,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
-    "vite": "^8.0.16"
+    "vite": "^8.0.16",
+    "@release/lint": "workspace:*"
   }
 }

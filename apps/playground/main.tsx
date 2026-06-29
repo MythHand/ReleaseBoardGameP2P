@@ -1,5 +1,5 @@
 import React from 'react'
-import ReactDOM from 'react-dom/client'
+import ReactDom from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import Playground from './Playground'
 import '@/design/global.css'
@@ -10,7 +10,7 @@ import './favicon'
 const basename = import.meta.env.BASE_URL.replace(/\/$/, '')
 
 // biome-ignore lint/style/noNonNullAssertion: #playground mount node is defined in index.html
-ReactDOM.createRoot(document.getElementById('playground')!).render(
+ReactDom.createRoot(document.getElementById('playground')!).render(
   <React.StrictMode>
     <BrowserRouter basename={basename}>
       <Playground />

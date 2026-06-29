@@ -12,9 +12,9 @@ interface ExtendedNavigator extends Navigator {
 }
 
 const LineGen = (() => {
-  const HEX = '0123456789abcdef'
+  const Hex = '0123456789abcdef'
   const rand = (n: number): number => Math.floor(Math.random() * n)
-  const hex = (n: number): string => Array.from({ length: n }, () => HEX[rand(16)]).join('')
+  const hex = (n: number): string => Array.from({ length: n }, () => Hex[rand(16)]).join('')
   const pick = <T>(arr: T[]): T => arr[rand(arr.length)]
 
   function uuid(): string {
@@ -32,7 +32,7 @@ const LineGen = (() => {
       .toUpperCase()
   }
 
-  function getGPU(): string {
+  function getGpu(): string {
     try {
       const canvas = document.createElement('canvas')
       const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
@@ -89,7 +89,7 @@ const LineGen = (() => {
       online: n.onLine ? 'yes' : 'no',
       eff: conn.effectiveType || 'n/a',
       down: conn.downlink ? `${conn.downlink}Mb/s` : 'n/a',
-      gpu: getGPU(),
+      gpu: getGpu(),
       now: new Date().toISOString(),
     }
   }
@@ -193,7 +193,7 @@ const LineGen = (() => {
     }
   }
 
-  function buildSequence(): string[] {
+  function build(): string[] {
     const f = deviceFacts()
     const out: string[] = []
 
@@ -216,7 +216,7 @@ const LineGen = (() => {
     return out
   }
 
-  return { buildSequence }
+  return { buildSequence: build }
 })()
 
 export const buildSequence = LineGen.buildSequence

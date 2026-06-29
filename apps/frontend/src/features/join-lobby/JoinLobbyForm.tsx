@@ -24,13 +24,13 @@ export default function JoinLobbyForm() {
       onSubmit={async (data) => {
         // parseRoomCode normalizes the code (strips separators/casing/spaces),
         // so the raw code is passed through; only the nickname needs cleaning.
-        const name = sanitizeNickname(data.name ?? '').trim()
+        const nickname = sanitizeNickname(data.name ?? '').trim()
         const code = data.code ?? ''
-        if (name && code.trim() && !connecting) {
+        if (nickname && code.trim() && !connecting) {
           try {
             // A setup failure (bad code, signaling unreachable) rejects here and
             // is surfaced via session.error below, so only navigate on success.
-            const formatted = await joinLobby(code, name)
+            const formatted = await joinLobby(code, nickname)
             goToLobby(formatted)
           } catch {
             // Error already surfaced through session.error; stay on the form.

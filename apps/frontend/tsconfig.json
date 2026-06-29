@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@release/lint/tsconfig",
   "compilerOptions": {
     "types": ["vite/client", "vitest/globals"],
     "paths": {

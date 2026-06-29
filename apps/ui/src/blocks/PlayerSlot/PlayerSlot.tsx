@@ -41,7 +41,7 @@ export default function PlayerSlot({
         {me && <span className={styles.you}> ({youLabel})</span>}
       </span>
       {badge}
-      {(status || dropdown) && (
+      {(Boolean(status) || Boolean(dropdown)) && (
         <div className={styles.rowEnd}>
           {status}
           {dropdown && <Dropdown items={dropdown} ariaLabel={dropdownLabel} />}

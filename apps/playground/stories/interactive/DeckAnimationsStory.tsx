@@ -17,7 +17,7 @@ import styles from './DeckAnimationsStory.module.css'
 // отрабатывает эффект, затем карта летит в сброс (centerToDiscard, вразброс).
 
 const BASE = CARDS.filter((c) => c.deck === 'base')
-const HAND_SPEC: Array<[string, number]> = [
+const HAND_SPEC: [string, number][] = [
   ['operation-git-branch', 3],
   ['operation-git-merge', 2],
   ['support-sudo', 4],
@@ -245,7 +245,7 @@ export default function DeckAnimationsStory() {
       await wait(HOLD)
     }
     const tRect = pileRefs.current[target.id]?.getBoundingClientRect()
-    const flights: Array<Promise<unknown>> = []
+    const flights: Promise<unknown>[] = []
     if (tRect) {
       for (const d of decks.slice(1)) {
         const el = pileRefs.current[d.id]
@@ -353,14 +353,15 @@ export default function DeckAnimationsStory() {
         if (decks.length <= 1) {
           const deckId = decks[0]?.id
           cancelAim()
-          if (deckId != null) playSequence([sudo, item], rect, () => enhancedBranchEffect(deckId))
+          if (deckId != null)
+            void playSequence([sudo, item], rect, () => enhancedBranchEffect(deckId))
           return
         }
         setArmed({ kind: 'branchSudo', branch: item, sudo, el: cardEl })
         aimFromCard()
       } else if (id === MERGE) {
         cancelAim()
-        playSequence([sudo, item], rect, () => mergeEffect(true))
+        void playSequence([sudo, item], rect, () => mergeEffect(true))
       } else {
         cancelAim()
       }
@@ -376,7 +377,7 @@ export default function DeckAnimationsStory() {
     if (id === BRANCH) {
       if (decks.length <= 1) {
         const deckId = decks[0]?.id
-        if (deckId != null) playSequence([item], rect, () => splitEffect(deckId))
+        if (deckId != null) void playSequence([item], rect, () => splitEffect(deckId))
         return
       }
       setArmed({ kind: 'branch', branch: item, el: cardEl })
@@ -385,7 +386,7 @@ export default function DeckAnimationsStory() {
     }
 
     if (id === MERGE) {
-      if (decks.length >= 2) playSequence([item], rect, () => mergeEffect(false))
+      if (decks.length >= 2) void playSequence([item], rect, () => mergeEffect(false))
     }
   }
 
@@ -403,12 +404,12 @@ export default function DeckAnimationsStory() {
       const { branch, el } = armed
       const rect = el.getBoundingClientRect()
       cancelAim()
-      playSequence([branch], rect, () => splitEffect(id))
+      void playSequence([branch], rect, () => splitEffect(id))
     } else if (armed?.kind === 'branchSudo') {
       const { branch, sudo, el } = armed
       const rect = el.getBoundingClientRect()
       cancelAim()
-      playSequence([sudo, branch], rect, () => enhancedBranchEffect(id))
+      void playSequence([sudo, branch], rect, () => enhancedBranchEffect(id))
     }
   }
 

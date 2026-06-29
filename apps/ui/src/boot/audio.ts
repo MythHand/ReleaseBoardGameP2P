@@ -23,14 +23,14 @@ const LoaderAudio = (() => {
 
   function ensureCtx(): AudioContext | null {
     if (ctx) return ctx
-    const AC = window.AudioContext || window.webkitAudioContext
-    if (!AC) return null
-    ctx = new AC()
+    const Ac = window.AudioContext || window.webkitAudioContext
+    if (!Ac) return null
+    ctx = new Ac()
     masterGain = ctx.createGain()
     masterGain.gain.value = 1.0
     masterGain.connect(ctx.destination)
-    loadTick()
-    loadTheme()
+    void loadTick()
+    void loadTheme()
     return ctx
   }
 

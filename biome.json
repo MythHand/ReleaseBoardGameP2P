@@ -1,5 +1,19 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+  "extends": ["@release/lint/biome"],
+  "plugins": [
+    {
+      "path": "./packages/lint/no-untranslated.grit",
+      "includes": [
+        "**",
+        "!**/playground/**",
+        "!**/design/**",
+        "!**/boot/**",
+        "!**/*.test.*",
+        "!**/*.stories.*"
+      ]
+    }
+  ],
   "files": {
     "includes": [
       "**",
@@ -10,32 +24,26 @@
       "!apps/frontend/src/app/router.ts"
     ]
   },
-  "assist": {
-    "actions": {
-      "source": {
-        "organizeImports": "on"
+  "overrides": [
+    {
+      "includes": ["packages/translation/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/vite.config.ts", "**/vitest.config.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          }
+        }
       }
     }
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 2,
-    "lineWidth": 100
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "preset": "recommended",
-      "nursery": {
-        "useSortedClasses": "error"
-      }
-    }
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "semicolons": "asNeeded"
-    }
-  }
+  ]
 }

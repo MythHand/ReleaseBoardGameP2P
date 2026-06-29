@@ -4,7 +4,7 @@ import Modal from './Modal'
 // jsdom polyfills requestAnimationFrame as setTimeout(fn, 0).
 // Fake timers let us advance through both rAF frames synchronously.
 
-it('focuses the first focusable element when opened', async () => {
+it('focuses the first focusable element when opened', () => {
   vi.useFakeTimers()
   render(
     <Modal open onClose={() => {}}>
@@ -12,14 +12,14 @@ it('focuses the first focusable element when opened', async () => {
       <button type="button">Second</button>
     </Modal>,
   )
-  await act(async () => {
+  act(() => {
     vi.runAllTimers()
   })
   expect(document.activeElement?.textContent).toBe('First')
   vi.useRealTimers()
 })
 
-it('restores focus to the previously focused element on close', async () => {
+it('restores focus to the previously focused element on close', () => {
   vi.useFakeTimers()
   const trigger = document.createElement('button')
   document.body.appendChild(trigger)
@@ -30,7 +30,7 @@ it('restores focus to the previously focused element on close', async () => {
       <button type="button">Inside</button>
     </Modal>,
   )
-  await act(async () => {
+  act(() => {
     vi.runAllTimers()
   })
 
@@ -39,7 +39,7 @@ it('restores focus to the previously focused element on close', async () => {
       <button type="button">Inside</button>
     </Modal>,
   )
-  await act(async () => {
+  act(() => {
     vi.runAllTimers()
   })
 
@@ -48,7 +48,7 @@ it('restores focus to the previously focused element on close', async () => {
   vi.useRealTimers()
 })
 
-it('wraps Tab from the last focusable element to the first', async () => {
+it('wraps Tab from the last focusable element to the first', () => {
   vi.useFakeTimers()
   const { container } = render(
     <Modal open onClose={() => {}}>
@@ -56,7 +56,7 @@ it('wraps Tab from the last focusable element to the first', async () => {
       <button type="button">Last</button>
     </Modal>,
   )
-  await act(async () => {
+  act(() => {
     vi.runAllTimers()
   })
 
@@ -71,7 +71,7 @@ it('wraps Tab from the last focusable element to the first', async () => {
   vi.useRealTimers()
 })
 
-it('wraps Shift+Tab from the first focusable element to the last', async () => {
+it('wraps Shift+Tab from the first focusable element to the last', () => {
   vi.useFakeTimers()
   const { container, getByText } = render(
     <Modal open onClose={() => {}}>
@@ -79,7 +79,7 @@ it('wraps Shift+Tab from the first focusable element to the last', async () => {
       <button type="button">Last</button>
     </Modal>,
   )
-  await act(async () => {
+  act(() => {
     vi.runAllTimers()
   })
 

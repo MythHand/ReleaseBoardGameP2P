@@ -104,7 +104,7 @@ export default function Card({
       onMouseEnter={handleEnter}
       onMouseMove={handleMove}
       onMouseLeave={handleLeave}
-      onClick={!disabled ? onClick : undefined}
+      onClick={disabled ? undefined : onClick}
       onKeyDown={
         !disabled && onClick
           ? (e) => {

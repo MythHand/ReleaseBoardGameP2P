@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "@release/lint/tsconfig",
   "compilerOptions": {
     "types": ["vite/client"],
     "paths": { "@release/ui": ["../ui/src/index.ts"], "@/*": ["../ui/src/*"] }

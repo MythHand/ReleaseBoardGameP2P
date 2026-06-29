@@ -136,6 +136,7 @@ it('Continue reveals the live session view (room code, roster, copy)', () => {
 
 it('LobbyView guest Leave tears the session down', () => {
   const s = inSession()
+  // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
   sessionValue = { ...s, isHost: false, state: { ...s.state!, selfId: 'p1' } }
   renderInRouter(<LobbyView />)
   fireEvent.click(screen.getByText('lobby.leave'))
