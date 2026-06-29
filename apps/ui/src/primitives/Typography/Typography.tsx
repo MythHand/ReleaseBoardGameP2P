@@ -1,8 +1,8 @@
 import { createElement, type ElementType, type HTMLAttributes, type ReactNode } from 'react'
 import styles from '../../design/typography.module.css'
 
-// Базы шкалы (роль = семейство + размер + начертание + регистр).
-// Зеркалит имена классов в design/typography.module.css — единый источник значений.
+// Scale bases (role = family + size + weight + case).
+// Mirrors the class names in design/typography.module.css — the single source of values.
 export type TypographyBase =
   | 'heading-1'
   | 'heading-2'
@@ -41,7 +41,7 @@ export type TypographyBase =
   | 'mono-xs'
   | 'overline'
 
-// Вариации трекинга (letter-spacing) — модификаторы поверх базы.
+// Tracking variations (letter-spacing) — modifiers layered on top of a base.
 export type TypographyTk =
   | 'tk-0'
   | 'tk-01'
@@ -59,8 +59,8 @@ export type TypographyTk =
   | 'tk-20'
   | 'tk-22'
 
-// Семантические варианты — основной (curated) способ. Каждый = композиция базы + tk
-// из шкалы; значения не дублируются. Длинный хвост — через сырые base/tk.
+// Curated semantic variants — the primary API. Each is a base + tk composition
+// from the scale; values are not duplicated. The long tail goes through raw base/tk.
 export type TypographyVariant =
   | 'pageTitle'
   | 'sectionTitle'
@@ -94,7 +94,7 @@ type CommonProps = {
   children: ReactNode
 } & Omit<HTMLAttributes<HTMLElement>, 'className' | 'children'>
 
-// Дискриминация: либо семантический variant, либо сырой base (+tk). Ровно один путь.
+// Discriminated: either a semantic variant or a raw base (+tk). Exactly one path.
 type VariantPath = { variant: TypographyVariant; base?: never; tk?: never }
 type RawPath = { variant?: never; base: TypographyBase; tk?: TypographyTk }
 

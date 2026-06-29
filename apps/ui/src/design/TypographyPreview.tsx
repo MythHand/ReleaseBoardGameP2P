@@ -401,15 +401,15 @@ const trackings: { name: string; em: string }[] = [
   { name: 'tk-22', em: '0.22em' },
 ]
 
-// Готовые варианты <Typography> — каждый = композиция базы + tk из шкалы выше.
+// Curated <Typography> variants — each is a base + tk composition from the scale above.
 const curated: { variant: TypographyVariant; composes: string; sample: string }[] = [
-  { variant: 'pageTitle', composes: 'heading-3 · tk-04', sample: 'Лобби' },
-  { variant: 'sectionTitle', composes: 'heading-8 · tk-04', sample: 'Параметры лобби' },
-  { variant: 'panelTitle', composes: 'subtitle · tk-02', sample: 'Режим партии' },
-  { variant: 'body', composes: 'body-lg', sample: 'Описание игры на старте.' },
-  { variant: 'footnote', composes: 'body-sm', sample: 'Сноска под полем.' },
-  { variant: 'tag', composes: 'label · tk-16', sample: 'игроки' },
-  { variant: 'metaLabel', composes: 'label-sm · tk-14', sample: 'дизайн' },
+  { variant: 'pageTitle', composes: 'heading-3 · tk-04', sample: 'Lobby' },
+  { variant: 'sectionTitle', composes: 'heading-8 · tk-04', sample: 'Lobby settings' },
+  { variant: 'panelTitle', composes: 'subtitle · tk-02', sample: 'Game mode' },
+  { variant: 'body', composes: 'body-lg', sample: 'Game description on the start screen.' },
+  { variant: 'footnote', composes: 'body-sm', sample: 'Footnote under a field.' },
+  { variant: 'tag', composes: 'label · tk-16', sample: 'players' },
+  { variant: 'metaLabel', composes: 'label-sm · tk-14', sample: 'design' },
   { variant: 'code', composes: 'code · tk-20', sample: '4F2A-9K' },
 ]
 
@@ -584,17 +584,18 @@ export default function TypographyPreview() {
           ))}
         </tbody>
       </table>
-      <h3 className={styles.subH}>Готовые варианты (Typography)</h3>
+      <h3 className={styles.subH}>Curated variants (Typography)</h3>
       <p className={styles.scaleNote}>
-        Семантические варианты компонента <code>{'<Typography>'}</code> — основной способ набора
-        текста (фронт и библиотека). Каждый = композиция базы и <code>tk</code> из шкалы выше;
-        значения не дублируются. Длинный хвост — через сырые <code>base</code>/<code>tk</code>.
+        Semantic variants of the <code>{'<Typography>'}</code> component — the primary way to set
+        text (frontend and library). Each is a composition of a base and <code>tk</code> from the
+        scale above; values are not duplicated. The long tail goes through raw <code>base</code>/
+        <code>tk</code>.
       </p>
       <table className={styles.scaleTable}>
         <thead>
           <tr>
             <th>variant</th>
-            <th>образец</th>
+            <th>sample</th>
             <th>composes</th>
           </tr>
         </thead>
