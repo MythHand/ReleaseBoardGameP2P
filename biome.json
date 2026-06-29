@@ -1,5 +1,18 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+  "plugins": [
+    {
+      "path": "./no-untranslated.grit",
+      "includes": [
+        "**",
+        "!**/playground/**",
+        "!**/design/**",
+        "!**/boot/**",
+        "!**/*.test.*",
+        "!**/*.stories.*"
+      ]
+    }
+  ],
   "files": {
     "includes": [
       "**",
@@ -27,11 +40,42 @@
     "enabled": true,
     "rules": {
       "preset": "recommended",
+      "correctness": {
+        "noPrivateImports": "error",
+        "useExhaustiveDependencies": "error"
+      },
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "react-i18next": "Import from @release/translation instead — the app keeps a single i18n surface."
+            }
+          }
+        }
+      },
+      "suspicious": {
+        "noImportCycles": "error",
+        "noShadow": "error"
+      },
       "nursery": {
-        "useSortedClasses": "error"
+        "useSortedClasses": "error",
+        "noFloatingPromises": "error"
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["packages/translation/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "single",

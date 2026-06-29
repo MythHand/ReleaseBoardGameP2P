@@ -1,0 +1,46 @@
+language js
+
+// Guardrail: visible UI copy must go through i18next (`t()` / `<Trans>`),
+// never hardcoded. Two things are flagged:
+//   1. JSX *text nodes*      — `<h1>Hello</h1>`
+//   2. String literals used  — `<h1>{'Hello'}</h1>`
+//      directly as JSX children
+//
+// String literals at large (import paths, CSS-module keys, data-*/aria-*/
+// className attrs, object keys, `t()` arguments) are intentionally NOT
+// flagged, to keep the signal clean. Biome's `string()` already skips JSX
+// attribute values, so `className="…"` / `to="…"` need no special-casing.
+//
+// LIMITATION — indirection is not caught. GritQL has no data-flow, so a
+// literal that reaches JSX through a variable is invisible to this rule:
+//   const label = 'Hello'      // looks identical to `const cls = 'flex'`
+//   return <h1>{label}</h1>    // NOT flagged
+// Catching it would mean flagging every string-literal declaration in the
+// repo (~1.5k sites, >90% noise: class lists, ids, enum values, CSS values),
+// so the loophole is left open by design. Prefer inlining UI copy as JSX
+// text or `{t('…')}` rather than hoisting it into a bare variable.
+//
+// `{t('key')}` is a call, not a string literal, so it is already exempt.
+// Content inside <Trans>…</Trans> (with or without props) is a translation
+// boundary and is excluded.
+// For legitimate raw text (brand names, code samples) suppress inline:
+//   {/* biome-ignore lint/plugin: brand name */}
+//
+// Each regex matches the whole node (Biome's GritQL regex is full-match) and
+// requires >=2 Unicode letters, so pure whitespace, arrows, numbers and the
+// empty string are ignored while Latin and Cyrillic copy is caught.
+
+or {
+  $text where {
+    $text <: jsx_text(),
+    $text <: r"(?s).*\p{L}\p{L}.*",
+    ! $text <: within `<Trans $...>$...</Trans>` ,
+    register_diagnostic(span=$text, message="Untranslated JSX text — wrap it in t() or <Trans>.")
+  },
+  `{$lit}` where {
+    $lit <: string(),
+    $lit <: r"(?s).*\p{L}\p{L}.*",
+    ! $lit <: within `<Trans $...>$...</Trans>` ,
+    register_diagnostic(span=$lit, message="Untranslated string literal in JSX — wrap it in t() or <Trans>.")
+  }
+}

@@ -81,8 +81,8 @@ it('applyConfig updates setup, preserves maxPlayers', () => {
 
 it('applyPeerList preserves setup', () => {
   const setup = { handLimit: 'fast' }
-  const host = { id: 'h', name: 'Host', role: 'host' as const, ready: false }
-  const s = createLobbyState({ selfId: 'h', hostId: 'h', maxPlayers: 4, setup, peers: [host] })
-  const next = applyPeerList(s, [host])
+  const hostPeer = { id: 'h', name: 'Host', role: 'host' as const, ready: false }
+  const s = createLobbyState({ selfId: 'h', hostId: 'h', maxPlayers: 4, setup, peers: [hostPeer] })
+  const next = applyPeerList(s, [hostPeer])
   expect(next.setup).toEqual(setup)
 })

@@ -13,7 +13,7 @@ export function useStartGame() {
     // runViewTransition already wraps the navigation in a single View Transition;
     // passing { viewTransition: true } too would start a second, overlapping one.
     runViewTransition(() => {
-      navigate(`/board/${gameId}`)
+      void navigate(`/board/${gameId}`)
     })
   }
 }

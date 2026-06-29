@@ -1,7 +1,7 @@
 import {
-  forwardRef,
   type InputHTMLAttributes,
   type ReactNode,
+  type Ref,
   useId,
   useImperativeHandle,
   useRef,
@@ -23,12 +23,11 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   // по умолчанию значение капсится (коды, лобби); plain — натуральный регистр
   // (никнейм: в игре он используется как написан, без стилизации в капс)
   plain?: boolean
+  // React 19: ref передаётся обычным пропом, forwardRef не нужен
+  ref?: Ref<InputHandle>
 }
 
-const Input = forwardRef<InputHandle, InputProps>(function Input(
-  { label, error, trailing, plain, className, id, ...rest },
-  ref,
-) {
+function Input({ label, error, trailing, plain, className, id, ref, ...rest }: InputProps) {
   const autoId = useId()
   const inputId = id ?? autoId
   const fieldRef = useRef<HTMLDivElement>(null)
@@ -69,6 +68,6 @@ const Input = forwardRef<InputHandle, InputProps>(function Input(
       {error && <span className={styles.errorMsg}>{error}</span>}
     </div>
   )
-})
+}
 
 export default Input

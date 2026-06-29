@@ -29,8 +29,8 @@ const LoaderAudio = (() => {
     masterGain = ctx.createGain()
     masterGain.gain.value = 1.0
     masterGain.connect(ctx.destination)
-    loadTick()
-    loadTheme()
+    void loadTick()
+    void loadTheme()
     return ctx
   }
 

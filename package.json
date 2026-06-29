@@ -13,7 +13,7 @@
     "dev:playground": "pnpm --filter @release/playground dev",
     "dev:all": "concurrently -n web,playground -c green,magenta \"pnpm dev\" \"pnpm dev:playground\"",
     "build": "pnpm -r build",
-    "lint": "biome check . && pnpm -r stylelint",
+    "lint": "biome check --error-on-warnings . && pnpm -r stylelint",
     "format": "biome format --write .",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
@@ -36,7 +36,7 @@
     "pre-commit": "pnpm exec lint-staged && pnpm typecheck"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,json,jsonc}": "biome check --write",
+    "*.{js,jsx,ts,tsx,json,jsonc}": "biome check --write --error-on-warnings",
     "*.css": "stylelint --fix"
   }
 }

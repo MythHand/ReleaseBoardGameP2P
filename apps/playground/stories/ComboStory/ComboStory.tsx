@@ -217,7 +217,7 @@ export default function ComboStory() {
           aim(centerOf(refs.current[item.uid]!), { x: e.clientX, y: e.clientY })
           setPhase('target')
         } else {
-          runPlay(src, item)
+          void runPlay(src, item)
         }
       } else {
         cancel()
@@ -231,7 +231,7 @@ export default function ComboStory() {
   const onTargetDown = (e: React.MouseEvent, t: { id: string; label: string }) => {
     e.stopPropagation()
     // biome-ignore lint/style/noNonNullAssertion: phase==='target' is only set after both source and partner are assigned
-    if (phase === 'target') runPlay(source!, partner!, t.label)
+    if (phase === 'target') void runPlay(source!, partner!, t.label)
   }
 
   const reset = () => {

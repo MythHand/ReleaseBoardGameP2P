@@ -193,7 +193,7 @@ const LineGen = (() => {
     }
   }
 
-  function buildSequence(): string[] {
+  function build(): string[] {
     const f = deviceFacts()
     const out: string[] = []
 
@@ -216,7 +216,7 @@ const LineGen = (() => {
     return out
   }
 
-  return { buildSequence }
+  return { buildSequence: build }
 })()
 
 export const buildSequence = LineGen.buildSequence

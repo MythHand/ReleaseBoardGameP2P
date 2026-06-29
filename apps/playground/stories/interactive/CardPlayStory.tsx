@@ -109,7 +109,7 @@ export default function CardPlayStory() {
     const el = handRefs.current[item.uid]
     if (!el || busy || center) return
     setPlayerHand((h) => h.filter((it) => it.uid !== item.uid))
-    flyToCenter(item.card, el.getBoundingClientRect())
+    void flyToCenter(item.card, el.getBoundingClientRect())
   }
 
   // соперник «разыгрывает» — карта вылетает из места Seat'а (card-размером)
@@ -122,7 +122,7 @@ export default function CardPlayStory() {
     const r = el.getBoundingClientRect()
     const w = 108
     const h = w * CARD_RATIO
-    flyToCenter(card, {
+    void flyToCenter(card, {
       left: r.left + r.width / 2 - w / 2,
       top: r.top + r.height / 2 - h / 2,
       width: w,
