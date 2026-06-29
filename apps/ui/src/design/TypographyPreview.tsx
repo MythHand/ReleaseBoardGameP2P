@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import Typography, { type TypographyVariant } from '../primitives/Typography'
 import styles from './TypographyPreview.module.css'
 
 // ШКАЛА ТЕКСТА — витрина живого фундамента design/typography.module.css.
@@ -400,6 +401,18 @@ const trackings: { name: string; em: string }[] = [
   { name: 'tk-22', em: '0.22em' },
 ]
 
+// Готовые варианты <Typography> — каждый = композиция базы + tk из шкалы выше.
+const curated: { variant: TypographyVariant; composes: string; sample: string }[] = [
+  { variant: 'pageTitle', composes: 'heading-3 · tk-04', sample: 'Лобби' },
+  { variant: 'sectionTitle', composes: 'heading-8 · tk-04', sample: 'Параметры лобби' },
+  { variant: 'panelTitle', composes: 'subtitle · tk-02', sample: 'Режим партии' },
+  { variant: 'body', composes: 'body-lg', sample: 'Описание игры на старте.' },
+  { variant: 'footnote', composes: 'body-sm', sample: 'Сноска под полем.' },
+  { variant: 'tag', composes: 'label · tk-16', sample: 'игроки' },
+  { variant: 'metaLabel', composes: 'label-sm · tk-14', sample: 'дизайн' },
+  { variant: 'code', composes: 'code · tk-20', sample: '4F2A-9K' },
+]
+
 // Документация по типографике: шрифты и доступные начертания.
 // Текстовые стили правил вынесены в отдельную страницу (RulesStyles).
 const fonts = [
@@ -567,6 +580,32 @@ export default function TypographyPreview() {
               <td className={styles.scaleMeta} style={{ letterSpacing: t.em }}>
                 RELEASE
               </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h3 className={styles.subH}>Готовые варианты (Typography)</h3>
+      <p className={styles.scaleNote}>
+        Семантические варианты компонента <code>{'<Typography>'}</code> — основной способ набора
+        текста (фронт и библиотека). Каждый = композиция базы и <code>tk</code> из шкалы выше;
+        значения не дублируются. Длинный хвост — через сырые <code>base</code>/<code>tk</code>.
+      </p>
+      <table className={styles.scaleTable}>
+        <thead>
+          <tr>
+            <th>variant</th>
+            <th>образец</th>
+            <th>composes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {curated.map((c) => (
+            <tr key={c.variant}>
+              <td className={styles.scaleName}>{c.variant}</td>
+              <td>
+                <Typography variant={c.variant}>{c.sample}</Typography>
+              </td>
+              <td className={styles.scaleMeta}>{c.composes}</td>
             </tr>
           ))}
         </tbody>
