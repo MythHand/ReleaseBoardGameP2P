@@ -216,7 +216,7 @@ export default function Table({
   const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
   // секция управления хоста в настройках (сейчас — лимит зрителей)
   const hostControls = isHost && onSpectatorLimitChange && spectatorLimit != null
-  const hasUpperSettings = Boolean((lang && onLangChange) || code)
+  const hasUpperSettings = Boolean(lang && onLangChange) || Boolean(code)
 
   // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
   const textTabs: TabRailItem[] = [
@@ -228,7 +228,7 @@ export default function Table({
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
   // (свитчер языка и/или код игры); служебный слот под визуальные опции
-  const hasSettings = Boolean(onLangChange || code || hostControls)
+  const hasSettings = Boolean(onLangChange) || Boolean(code) || Boolean(hostControls)
   const railItems: TabRailItem[] = hasSettings
     ? [{ id: 'settings', label: copy.settings, icon: <GearIcon /> }, ...textTabs]
     : textTabs

@@ -42,7 +42,9 @@
       "preset": "recommended",
       "correctness": {
         "noPrivateImports": "error",
-        "useExhaustiveDependencies": "error"
+        "useExhaustiveDependencies": "error",
+        "useJsxKeyInIterable": "error",
+        "noNestedComponentDefinitions": "error"
       },
       "style": {
         "noRestrictedImports": {
@@ -56,11 +58,30 @@
       },
       "suspicious": {
         "noImportCycles": "error",
-        "noShadow": "error"
+        "noShadow": "error",
+        "useAwait": "error",
+        "noFocusedTests": "error",
+        "noSkippedTests": "error",
+        "noDoubleEquals": "error",
+        "noConsole": {
+          "level": "error",
+          "options": {
+            "allow": ["warn", "error"]
+          }
+        }
       },
       "nursery": {
         "useSortedClasses": "error",
-        "noFloatingPromises": "error"
+        "noFloatingPromises": "error",
+        "noExcessiveSelectorClasses": {
+          "level": "on",
+          "options": {
+            "maxClasses": 3
+          }
+        },
+        "useExhaustiveSwitchCases": "error",
+        "noMisusedPromises": "error",
+        "useNullishCoalescing": "error"
       }
     }
   },

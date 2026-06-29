@@ -57,7 +57,7 @@ function Input({ label, error, trailing, plain, className, id, ref, ...rest }: I
           {label}
         </label>
       )}
-      {trailing ? (
+      {trailing != null ? (
         <div className={styles.row}>
           <input id={inputId} className={inputClassName} {...rest} />
           {trailing}
