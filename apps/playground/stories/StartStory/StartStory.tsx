@@ -34,12 +34,6 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
     rulesTitle: 'Правила',
     authorDesign: 'Game & Design:',
     authorDev: 'Development:',
-    physicalTitle: 'Печатная версия',
-    physicalLead:
-      'У «Release любой ценой» есть печатное издание — приятный способ поддержать проект и сыграть вживую.',
-    physicalOrder: 'Заказать копию или оформить предзаказ —',
-    physicalLinkLabel: 'в нашем Instagram',
-    physicalImageAlt: 'Коробка печатной версии игры',
     modes: MODES_COPY_RU,
   },
   en: {
@@ -70,12 +64,6 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
     rulesTitle: 'Rules',
     authorDesign: 'Game & Design:',
     authorDev: 'Development:',
-    physicalTitle: 'Printed edition',
-    physicalLead:
-      '“Release at any cost” has a printed edition — a nice way to support the project and play it for real.',
-    physicalOrder: 'Order a copy or place a pre-order —',
-    physicalLinkLabel: 'on our Instagram',
-    physicalImageAlt: 'Printed edition box',
     modes: MODES_COPY_EN,
   },
 }

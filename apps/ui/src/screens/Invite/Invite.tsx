@@ -1,6 +1,10 @@
 import { useRef, useState } from 'react'
 import { play } from '@/animations'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
+import PhysicalEdition, {
+  PHYSICAL_EDITION_COPY_EN,
+  PHYSICAL_EDITION_COPY_RU,
+} from '@/blocks/PhysicalEdition'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { randomNickname, sanitizeNickname } from '@/game/nicknames'
 import DiceIcon from '@/icons/DiceIcon'
@@ -8,6 +12,9 @@ import Button from '@/primitives/Button'
 import Input from '@/primitives/Input'
 import Spinner from '@/primitives/Spinner'
 import styles from './Invite.module.css'
+
+// ссылка на заказ/предзаказ печатной версии — Instagram команды (как на Start)
+const INSTAGRAM_URL = 'https://www.instagram.com/mythhand.team/'
 
 // Доступность слота по ссылке-приглашению — техническая ось «про форму»:
 //   open          — есть места и игрока, и зрителя
@@ -262,6 +269,15 @@ export default function Invite({
           </section>
         </div>
       </div>
+
+      {/* печатная версия — готовый блок @release/ui со своим копирайтом; правый
+          нижний угол (как на Start). Язык — по тому же сигналу, что у логотипа
+          (logoVariant). Здесь задаём только позицию/ширину через styles.physical */}
+      <PhysicalEdition
+        href={INSTAGRAM_URL}
+        copy={copy.logoVariant === 'en' ? PHYSICAL_EDITION_COPY_EN : PHYSICAL_EDITION_COPY_RU}
+        className={styles.physical}
+      />
     </div>
   )
 }

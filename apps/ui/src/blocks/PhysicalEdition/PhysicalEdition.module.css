@@ -1,0 +1,55 @@
+/* матовая плашка из материала проекта (как модалки/дровер): полупрозрачный
+   surface-1 + backdrop-blur — роднит с языком экрана, острые углы. Позицию и
+   ширину задаёт место использования через className. */
+.box {
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 30%, transparent);
+  border: 1px solid rgb(255 255 255 / 18%); /* как обводка свитчера языка */
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-inline-size: 0;
+}
+
+/* заголовок-метка — как подписи авторства на Start (label tk-16) */
+.title {
+  composes: label tk-16 from '../../design/typography.module.css';
+  margin: 0;
+  color: #fff;
+}
+
+.note {
+  composes: body-sm from '../../design/typography.module.css';
+  margin: 0;
+  line-height: 1.5;
+  color: rgb(255 255 255 / 60%);
+}
+
+.link {
+  color: var(--brand-green);
+  text-decoration: none;
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* плейсхолдер под PNG коробки — квадрат, поднят над верхней гранью плашки */
+.image {
+  flex: none;
+  inline-size: 128px;
+  block-size: 128px;
+  margin-block-start: -94px;
+  background: rgb(255 255 255 / 6%);
+  border: 1px dashed rgb(255 255 255 / 22%);
+}

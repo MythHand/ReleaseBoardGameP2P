@@ -4,6 +4,10 @@ import { play } from '@/animations'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import Menu, { MenuButton, MenuGroup } from '@/blocks/Menu'
+import PhysicalEdition, {
+  PHYSICAL_EDITION_COPY_EN,
+  PHYSICAL_EDITION_COPY_RU,
+} from '@/blocks/PhysicalEdition'
 import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
@@ -53,12 +57,6 @@ export interface StartCopy {
   // подписи авторства в левом нижнем углу
   authorDesign: string
   authorDev: string
-  // блок про печатную версию (правый нижний угол): два предложения + ссылка
-  physicalTitle: string
-  physicalLead: string
-  physicalOrder: string
-  physicalLinkLabel: string
-  physicalImageAlt: string
   // текст режимов партии (заголовки + описания опций)
   modes: GameModesCopy
 }
@@ -211,25 +209,14 @@ export default function Start({
         </span>
       </div>
 
-      {/* настольная версия — правый нижний угол, симметрично авторству слева;
-          картинка коробки (пока плейсхолдер) выпирает за верхнюю грань блока */}
-      <div className={styles.physical}>
-        <div className={styles.physicalText}>
-          <h3 className={styles.physicalTitle}>{copy.physicalTitle}</h3>
-          <p className={styles.physicalNote}>
-            {copy.physicalLead} {copy.physicalOrder}{' '}
-            <a
-              className={styles.physicalLink}
-              href={INSTAGRAM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {copy.physicalLinkLabel}
-            </a>
-          </p>
-        </div>
-        <div className={styles.physicalImage} role="img" aria-label={copy.physicalImageAlt} />
-      </div>
+      {/* печатная версия — готовый блок @release/ui со своим копирайтом; правый
+          нижний угол, симметрично авторству слева. Язык — по тому же сигналу, что
+          у логотипа (logoVariant). Здесь только позиция/ширина через styles.physical */}
+      <PhysicalEdition
+        href={INSTAGRAM_URL}
+        copy={copy.logoVariant === 'en' ? PHYSICAL_EDITION_COPY_EN : PHYSICAL_EDITION_COPY_RU}
+        className={styles.physical}
+      />
 
       {/* play-кнопка, разворачивающаяся на месте в видео-плеер */}
       <div

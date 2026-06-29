@@ -154,70 +154,16 @@
   text-decoration: underline;
 }
 
-/* ===== настольная версия — правый нижний угол ===== позиционируется поверх
-   экрана (как .credits слева), не влияет на раскладку остального контента.
-   Картинка коробки выпирает за верхнюю грань: align-items:flex-end + отрицательный
-   верхний отступ держат высоту блока по тексту, а квадрат поднимается над ним. */
+/* ===== печатная версия (блок PhysicalEdition) — правый нижний угол ===== только
+   позиция/ширина; сам вид плашки живёт в блоке. Поверх экрана (как .credits
+   слева), не влияет на раскладку остального контента. */
 .physical {
   position: absolute;
   inset-block-end: 15px;
   inset-inline-end: 51px;
   z-index: 2;
-  display: flex;
-  gap: 24px;
-  align-items: flex-end;
   inline-size: 56%;
   min-inline-size: 440px;
-  padding: 16px 24px;
-
-  /* матовая панель из материала проекта (как модалки/дровер): полупрозрачный
-     surface-1 + backdrop-blur — роднит с языком экрана (.blur), острые углы. */
-  background: color-mix(in srgb, var(--surface-1) 30%, transparent);
-  border: 1px solid rgb(255 255 255 / 18%); /* как обводка свитчера языка */
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-}
-
-.physicalText {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 8px;
-  min-inline-size: 0;
-}
-
-/* без капса — заголовок не «кричит» */
-.physicalTitle {
-  composes: subtitle tk-02 from '../../design/typography.module.css';
-  margin: 0;
-  color: #fff;
-}
-
-.physicalNote {
-  composes: body-sm from '../../design/typography.module.css';
-  margin: 0;
-  line-height: 1.5;
-  color: rgb(255 255 255 / 60%);
-}
-
-.physicalLink {
-  color: var(--brand-green);
-  text-decoration: none;
-  transition: color var(--t-fast) var(--ease-out);
-}
-
-.physicalLink:hover {
-  text-decoration: underline;
-}
-
-/* плейсхолдер под PNG коробки — квадрат, поднят над верхней гранью контейнера */
-.physicalImage {
-  flex: none;
-  inline-size: 128px;
-  block-size: 128px;
-  margin-block-start: -94px;
-  background: rgb(255 255 255 / 6%);
-  border: 1px dashed rgb(255 255 255 / 22%);
 }
 
 /* ===== play-кнопка → разворачивается на месте в плеер ===== */

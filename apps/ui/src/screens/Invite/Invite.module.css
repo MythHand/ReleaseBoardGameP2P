@@ -119,6 +119,17 @@
   opacity: 0.82;
 }
 
+/* ===== печатная версия (блок PhysicalEdition) — правый нижний угол ===== только
+   позиция/ширина; сам вид плашки живёт в блоке. Как на Start. */
+.physical {
+  position: absolute;
+  inset-block-end: 15px;
+  inset-inline-end: 51px;
+  z-index: 2;
+  inline-size: 56%;
+  min-inline-size: 440px;
+}
+
 /* ===== область 2 — форма приглашения ===== */
 .form {
   display: flex;
