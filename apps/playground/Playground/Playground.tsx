@@ -13,6 +13,7 @@ import LobbyCodeBlock from '../stories/blocks/LobbyCodeBlock'
 import MenuBlock from '../stories/blocks/MenuBlock'
 import MoveHistoryBlock from '../stories/blocks/MoveHistoryBlock'
 import ParticipantsBlock from '../stories/blocks/ParticipantsBlock'
+import PhysicalEditionBlock from '../stories/blocks/PhysicalEditionBlock'
 import PlayerSlotBlock from '../stories/blocks/PlayerSlotBlock'
 import ReconnectBlock from '../stories/blocks/ReconnectBlock'
 import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
@@ -158,6 +159,11 @@ const groups: Group[] = [
       },
       { id: 'block-rules', title: 'Rules', render: () => <RulesBlock /> },
       { id: 'block-menu', title: 'Menu', render: () => <MenuBlock /> },
+      {
+        id: 'block-physical-edition',
+        title: 'Physical edition',
+        render: () => <PhysicalEditionBlock />,
+      },
       { id: 'block-seat', title: 'Seat', render: () => <SeatBlock /> },
       { id: 'block-release-zone', title: 'Release zone', render: () => <ReleaseZoneBlock /> },
       { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },

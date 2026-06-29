@@ -7,6 +7,12 @@ export { default as LangSwitcher } from './blocks/LangSwitcher'
 export type { LobbyCodeCopy } from './blocks/LobbyCode'
 export { default as LobbyCode, LOBBY_CODE_COPY_EN, LOBBY_CODE_COPY_RU } from './blocks/LobbyCode'
 export { default as Menu, MenuButton, MenuGroup } from './blocks/Menu'
+export type { PhysicalEditionCopy } from './blocks/PhysicalEdition'
+export {
+  default as PhysicalEdition,
+  PHYSICAL_EDITION_COPY_EN,
+  PHYSICAL_EDITION_COPY_RU,
+} from './blocks/PhysicalEdition'
 export { default as PlayerSlot, EmptySlot } from './blocks/PlayerSlot'
 export type { RulesCopy, RulesProps, RulesSection } from './blocks/Rules'
 export { default as Rules, RULES_COPY_EN, RULES_COPY_RU } from './blocks/Rules'
@@ -54,7 +60,7 @@ export { default as Spinner } from './primitives/Spinner'
 export type { TabRailItem } from './primitives/TabRail'
 export { default as TabRail } from './primitives/TabRail'
 export { default as Toggle } from './primitives/Toggle'
-export type { InviteCopy, JoinRole, SlotAvailability } from './screens/Invite'
+export type { InviteCopy, InviteState, JoinRole, SlotAvailability } from './screens/Invite'
 export { default as Invite } from './screens/Invite'
 export { default as Lobby } from './screens/Lobby'
 export { default as Start } from './screens/Start'

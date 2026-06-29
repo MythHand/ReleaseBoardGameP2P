@@ -154,6 +154,18 @@
   text-decoration: underline;
 }
 
+/* ===== печатная версия (блок PhysicalEdition) — правый нижний угол ===== только
+   позиция/ширина; сам вид плашки живёт в блоке. Поверх экрана (как .credits
+   слева), не влияет на раскладку остального контента. */
+.physical {
+  position: absolute;
+  inset-block-end: 15px;
+  inset-inline-end: 51px;
+  z-index: 2;
+  inline-size: 56%;
+  min-inline-size: 440px;
+}
+
 /* ===== play-кнопка → разворачивается на месте в плеер ===== */
 .player {
   position: absolute;

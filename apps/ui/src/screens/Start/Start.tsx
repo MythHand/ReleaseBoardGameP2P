@@ -4,6 +4,10 @@ import { play } from '@/animations'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import Menu, { MenuButton, MenuGroup } from '@/blocks/Menu'
+import PhysicalEdition, {
+  PHYSICAL_EDITION_COPY_EN,
+  PHYSICAL_EDITION_COPY_RU,
+} from '@/blocks/PhysicalEdition'
 import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
@@ -18,6 +22,8 @@ import styles from './Start.module.css'
 const GITHUB_URL = 'https://github.com/MythHand'
 const DESIGN_URL = 'https://github.com/dimbo-design'
 const DEV_URL = 'https://github.com/ditayler'
+// печатная версия — заказ/предзаказ ведём через Instagram команды
+const INSTAGRAM_URL = 'https://www.instagram.com/mythhand.team/'
 
 // авторы — собственные имена, одинаковы для всех языков
 const DESIGN_NAME = 'Togulev Dmitry'
@@ -106,6 +112,19 @@ export default function Start({
     if (!joinCode.trim()) play('shake', joinCodeRef.current)
   }
 
+  // создание лобби — та же реакция на заполненность, что у входа: пустой ник
+  // даёт «выключенный» вид CTA и тряску поля вместо создания
+  const hostRef = useRef<HTMLDivElement>(null)
+  const createValid = host.trim().length > 0
+  const submitCreate = () => {
+    if (createValid) {
+      onCreate?.(host)
+      close()
+      return
+    }
+    play('shake', hostRef.current)
+  }
+
   const openVideo = () => {
     setVideoMounted(true)
     requestAnimationFrame(() => setVideoOpen(true))
@@ -190,6 +209,15 @@ export default function Start({
         </span>
       </div>
 
+      {/* печатная версия — готовый блок @release/ui со своим копирайтом; правый
+          нижний угол, симметрично авторству слева. Язык — по тому же сигналу, что
+          у логотипа (logoVariant). Здесь только позиция/ширина через styles.physical */}
+      <PhysicalEdition
+        href={INSTAGRAM_URL}
+        copy={copy.logoVariant === 'en' ? PHYSICAL_EDITION_COPY_EN : PHYSICAL_EDITION_COPY_RU}
+        className={styles.physical}
+      />
+
       {/* play-кнопка, разворачивающаяся на месте в видео-плеер */}
       <div
         className={`${styles.player} ${videoOpen ? styles.playerOpen : ''}`}
@@ -235,31 +263,28 @@ export default function Start({
           <div className={styles.createTech}>
             <h4 className={styles.techTitle}>{copy.lobbyParams}</h4>
 
-            <Input
-              label={copy.nicknameLabel}
-              value={host}
-              onChange={(e) => setHost(sanitizeNickname(e.target.value))}
-              placeholder={copy.nicknamePlaceholder}
-              maxLength={20}
-              plain
-              trailing={
-                <Button
-                  variant="icon"
-                  onClick={() => setHost(randomNickname())}
-                  aria-label={copy.randomNick}
-                  title={copy.randomNick}
-                >
-                  <DiceIcon />
-                </Button>
-              }
-            />
+            <div ref={hostRef}>
+              <Input
+                label={copy.nicknameLabel}
+                value={host}
+                onChange={(e) => setHost(sanitizeNickname(e.target.value))}
+                placeholder={copy.nicknamePlaceholder}
+                maxLength={20}
+                plain
+                trailing={
+                  <Button
+                    variant="icon"
+                    onClick={() => setHost(randomNickname())}
+                    aria-label={copy.randomNick}
+                    title={copy.randomNick}
+                  >
+                    <DiceIcon />
+                  </Button>
+                }
+              />
+            </div>
 
-            <Button
-              onClick={() => {
-                onCreate?.(host)
-                close()
-              }}
-            >
+            <Button className={createValid ? '' : styles.ctaIdle} onClick={submitCreate}>
               {copy.createCta}
             </Button>
 
