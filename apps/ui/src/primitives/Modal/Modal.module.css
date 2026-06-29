@@ -62,10 +62,7 @@
 }
 
 .title {
-  font-family: var(--font-heading);
-  font-size: 20px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  composes: heading-5 tk-06 from '../../design/typography.module.css';
 }
 
 .close {

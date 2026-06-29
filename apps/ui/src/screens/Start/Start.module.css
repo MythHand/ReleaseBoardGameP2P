@@ -115,20 +115,13 @@
   opacity: 0.85;
 }
 
-/* кнопки — по визуальному центру ЛОГОТИПА (ширина 300, тот же левый сдвиг) */
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
+/* меню действий (блок Menu) — по визуальному центру ЛОГОТИПА: ширину 300 и тот же
+   левый сдвиг задаём здесь (привязка к лого), а раскладку групп и центрирование
+   пунктов даёт сам блок Menu/MenuGroup */
+.menu {
   align-self: flex-start;
   inline-size: 300px;
   margin-inline-start: -11px;
-}
-
-/* вторая группа кнопок (правила / GitHub) — отдельная визуальная группа ниже */
-.actionsSecondary {
-  margin-block-start: 44px;
 }
 
 /* авторство — прижато к левому нижнему углу экрана */

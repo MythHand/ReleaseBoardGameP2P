@@ -10,6 +10,7 @@ import GameOverBlock from '../stories/blocks/GameOverBlock'
 import GameSettingsBlock from '../stories/blocks/GameSettingsBlock'
 import LangSwitcherBlock from '../stories/blocks/LangSwitcherBlock'
 import LobbyCodeBlock from '../stories/blocks/LobbyCodeBlock'
+import MenuBlock from '../stories/blocks/MenuBlock'
 import MoveHistoryBlock from '../stories/blocks/MoveHistoryBlock'
 import ParticipantsBlock from '../stories/blocks/ParticipantsBlock'
 import PlayerSlotBlock from '../stories/blocks/PlayerSlotBlock'
@@ -34,7 +35,6 @@ import DrawerKit from '../stories/kit/DrawerKit'
 import DropdownKit from '../stories/kit/DropdownKit'
 import EdgeGlowKit from '../stories/kit/EdgeGlowKit'
 import InputsKit from '../stories/kit/InputsKit'
-import MenuKit from '../stories/kit/MenuKit'
 import ModalsKit from '../stories/kit/ModalsKit'
 import ModeSelectKit from '../stories/kit/ModeSelectKit'
 import OverlayKit from '../stories/kit/OverlayKit'
@@ -121,22 +121,27 @@ const groups: Group[] = [
     ],
   },
   {
-    // Каталог дизайн-элементов — пока заглушки, наполняем по мере сборки.
-    title: 'UI KIT',
+    // Контролы — интерактивные элементы ввода/выбора (как правило, с текстом).
+    title: 'UI KIT · контролы',
     items: [
       { id: 'kit-buttons', title: 'Buttons', render: () => <ButtonsKit /> },
       { id: 'kit-inputs', title: 'Inputs', render: () => <InputsKit /> },
       { id: 'kit-toggles', title: 'Toggles', render: () => <TogglesKit /> },
       { id: 'kit-sliders', title: 'Sliders', render: () => <SlidersKit /> },
-      { id: 'kit-badges', title: 'Badges', render: () => <BadgesKit /> },
-      { id: 'kit-avatars', title: 'Avatars', render: () => <AvatarsKit /> },
-      { id: 'kit-menu', title: 'Menu', render: () => <MenuKit /> },
       { id: 'kit-dropdown', title: 'Dropdown', render: () => <DropdownKit /> },
       { id: 'kit-mode-select', title: 'Mode select', render: () => <ModeSelectKit /> },
+      { id: 'kit-tab-rail', title: 'Tab rail', render: () => <TabRailKit /> },
+    ],
+  },
+  {
+    // Поверхности и индикаторы — бейджи, аватары, стопки, оверлеи и т.п.
+    title: 'UI KIT · поверхности',
+    items: [
+      { id: 'kit-badges', title: 'Badges', render: () => <BadgesKit /> },
+      { id: 'kit-avatars', title: 'Avatars', render: () => <AvatarsKit /> },
       { id: 'kit-piles', title: 'Piles', render: () => <PilesKit /> },
       { id: 'kit-modals', title: 'Modal', render: () => <ModalsKit /> },
       { id: 'kit-drawer', title: 'Drawer', render: () => <DrawerKit /> },
-      { id: 'kit-tab-rail', title: 'Tab rail', render: () => <TabRailKit /> },
       { id: 'kit-overlay', title: 'Overlay', render: () => <OverlayKit /> },
       { id: 'kit-edge-glow', title: 'Edge glow', render: () => <EdgeGlowKit /> },
       { id: 'kit-spinner', title: 'Spinner', render: () => <SpinnerKit /> },
@@ -152,6 +157,7 @@ const groups: Group[] = [
         render: () => <GameSettingsBlock />,
       },
       { id: 'block-rules', title: 'Rules', render: () => <RulesBlock /> },
+      { id: 'block-menu', title: 'Menu', render: () => <MenuBlock /> },
       { id: 'block-seat', title: 'Seat', render: () => <SeatBlock /> },
       { id: 'block-release-zone', title: 'Release zone', render: () => <ReleaseZoneBlock /> },
       { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },

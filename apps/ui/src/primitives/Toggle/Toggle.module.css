@@ -1,10 +1,7 @@
 .toggle {
+  composes: label-sm tk-12 from '../../design/typography.module.css';
   padding: 7px 14px;
-  font-family: var(--font-mono);
-  font-size: 11px;
   color: rgb(255 255 255 / 60%);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
   cursor: pointer;
   background: rgb(255 255 255 / 6%);
   border: 1px solid rgb(255 255 255 / 18%);

@@ -5,11 +5,8 @@
 }
 
 .label {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  composes: label-sm tk-12 from '../../design/typography.module.css';
   color: rgb(255 255 255 / 45%);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }
 
 .slider {
@@ -42,8 +39,7 @@
 }
 
 .value {
+  composes: numeric from '../../design/typography.module.css';
   min-inline-size: 18px;
-  font-family: var(--font-mono);
-  font-size: 16px;
   text-align: center;
 }

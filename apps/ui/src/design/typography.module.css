@@ -1,0 +1,242 @@
+/* ШКАЛА ТЕКСТА — два слоя (см. страницу Typography):
+   1) БАЗА (роль): семейство + размер + начертание + интерлиньяж + регистр.
+      Трекинг в базе НЕ задаём.
+   2) ВАРИАЦИЯ трекинга: модификаторы .tk-NN (= 0.NN em). letter-spacing живёт
+      только тут — дизайн держится на нюансах трекинга, поэтому он ортогонален.
+   Подключение в компоненте: composes: <база> <tk> from '...'
+     .label { composes: label-sm tk-16 from '../../design/typography.module.css'; }
+   Базы без явного трекинга (body, numeric) идут без .tk-* — у них letter-spacing
+   нормальный. Цвет/паддинг/прочее остаётся локально в компонентах. */
+
+/* ===== Вариации трекинга ===== */
+.tk-0 {
+  letter-spacing: 0;
+}
+
+.tk-01 {
+  letter-spacing: 0.01em;
+}
+
+.tk-02 {
+  letter-spacing: 0.02em;
+}
+
+.tk-04 {
+  letter-spacing: 0.04em;
+}
+
+.tk-05 {
+  letter-spacing: 0.05em;
+}
+
+.tk-06 {
+  letter-spacing: 0.06em;
+}
+
+.tk-08 {
+  letter-spacing: 0.08em;
+}
+
+.tk-10 {
+  letter-spacing: 0.1em;
+}
+
+.tk-12 {
+  letter-spacing: 0.12em;
+}
+
+.tk-14 {
+  letter-spacing: 0.14em;
+}
+
+.tk-16 {
+  letter-spacing: 0.16em;
+}
+
+.tk-18 {
+  letter-spacing: 0.18em;
+}
+
+.tk-20 {
+  letter-spacing: 0.2em;
+}
+
+/* ===== Базы — Onest (заголовки) ===== */
+.heading-1 {
+  font-family: var(--font-heading);
+  font-size: 34px;
+}
+
+.heading-2 {
+  font-family: var(--font-heading);
+  font-size: 32px;
+}
+
+.heading-3 {
+  font-family: var(--font-heading);
+  font-size: 30px;
+}
+
+.heading-4 {
+  font-family: var(--font-heading);
+  font-size: 26px;
+}
+
+.heading-5 {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  text-transform: uppercase;
+}
+
+.heading-6 {
+  font-family: var(--font-heading);
+  font-size: 19px;
+  text-transform: uppercase;
+}
+
+.heading-7 {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.heading-8 {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+/* 16 Onest без капса — мягкий заголовок секции (модалка, режимы) */
+.subtitle {
+  font-family: var(--font-heading);
+  font-size: 16px;
+}
+
+.heading-9 {
+  font-family: var(--font-heading);
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+/* ===== Базы — Fira (тело) ===== */
+.body-lg {
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* 15 Fira КАПС — вкладки боковой полосы (TabRail) */
+.label-lg {
+  font-family: var(--font-text);
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+/* 11 Fira КАПС — лейбл стопки/колоды (Pile) */
+.pile-label {
+  font-family: var(--font-text);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.body {
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.62;
+}
+
+.body-sm {
+  font-family: var(--font-text);
+  font-size: 13px;
+}
+
+/* ===== Базы — JetBrains Mono (значения, код, лейблы) ===== */
+.numeric-xl {
+  font-family: var(--font-mono);
+  font-size: 52px;
+  font-weight: 300;
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 26px;
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  text-transform: uppercase;
+}
+
+.button {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  text-transform: uppercase;
+}
+
+.numeric {
+  font-family: var(--font-mono);
+  font-size: 16px;
+}
+
+.mono-lg {
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+/* 14 mono полужирный — заголовок опции (ModeSelect) */
+.mono-strong {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* 13 mono полужирный — имя карты (Rules) */
+.code-sm {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 13 mono КАПС — крупный бейдж-плашка */
+.label-md {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+/* 12 mono без капса — описание опции, второстепенные тех-строки */
+.mono-sm {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.label-sm {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* 11 mono без капса — подсказки, мелкие тех-строки */
+.mono-xs {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.overline {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+}

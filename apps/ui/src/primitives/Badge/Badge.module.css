@@ -1,16 +1,13 @@
 .badge {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   white-space: nowrap;
 }
 
 .sm {
-  font-size: 10px;
+  composes: overline tk-10 from '../../design/typography.module.css';
 }
 
 .md {
-  font-size: 11px;
+  composes: label-sm tk-10 from '../../design/typography.module.css';
 }
 
 .success {
@@ -36,10 +33,9 @@
 /* крупная «плашка» — тёмный фон + нейтральная рамка (напр. «вы выбыли» на столе).
    Своя заливка/рамка/цвет перекрывают тон, поэтому стоит после тонов. */
 .lg {
+  composes: label-md tk-14 from '../../design/typography.module.css';
   padding: 8px 16px;
-  font-size: 13px;
   color: rgb(255 255 255 / 70%);
-  letter-spacing: 0.14em;
   background: rgb(0 0 0 / 45%);
   border: 1px solid rgb(255 255 255 / 20%);
 }

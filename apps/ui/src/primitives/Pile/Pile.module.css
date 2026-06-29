@@ -59,12 +59,8 @@
 }
 
 .count {
+  composes: mono-lg tk-02 from '../../design/typography.module.css';
   position: absolute;
-
-  /* шрифт кода из лоадера — «кодовая заметка» */
-  font-family: var(--font-mono);
-  font-size: 15px;
-  letter-spacing: 0.02em;
 }
 
 .count::before {
@@ -90,8 +86,6 @@
 }
 
 .label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
+  composes: pile-label tk-08 from '../../design/typography.module.css';
   opacity: 0.5;
 }
