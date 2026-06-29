@@ -95,12 +95,14 @@ Styling is **per-package** — the approach depends on which app the component l
 
 ## Typography Rule
 
-- **Любой текст оформляется ТОЛЬКО через шкалу текста** — `apps/ui/src/design/typography.module.css`. В компоненте подключаешь её классы через `composes`, а не пишешь `font-family` / `font-size` / `text-transform` / `letter-spacing` руками. Локально у текстового правила остаются только цвет, отступы, рамки и т.п.
-- Шкала **двухслойная**: `composes: <база> <tk> from '...'`. **База** (роль) = семейство + размер + начертание + регистр; **`tk-NN`** = вариация трекинга (`letter-spacing`, `= 0.NN em`), живёт только тут. Пример: `composes: label-sm tk-16 from '../../design/typography.module.css'`.
-- **Один элемент = одна база + один tk.** Никогда не вешай две базы на один элемент (порядок в собранном CSS решает, кто победит — будет плавать). Если у элемента геометрия + разные типографические роли по состоянию — выноси геометрию отдельным классом, а роль навешивай по варианту (см. `LangSwitcher`).
-- **Нет нужной ступени — добавляй её в шкалу**, а не подгоняй текст под близкую. Дизайн держится на нюансах размеров/трекинга — **ничего не унифицируем и шрифт не подменяем** (Fira Mono `--font-text` и JetBrains Mono `--font-mono` — разные роли, путать нельзя). Новую базу/tk вписывай и в `typography.module.css`, и в витрину `TypographyPreview`.
-- **Источник истины и живая витрина — страница плейграунда `Typography`** (`apps/ui/src/design/TypographyPreview.tsx`): все базы (с образцом/размером/tk/где используется) и таблица tk-вариаций. Сверяйся с ней перед работой над текстом; при изменениях держи её в синхроне со шкалой.
-- Вне шкалы допустимо локально: глифы/иконки (только `font-size`), `line-height`-нюанс под конкретное место (ритм), инлайн-вес-акцент (как `<b>`), контекстный сброс `text-transform` (когда элемент сидит внутри `uppercase`-родителя).
+- **All text is set through the `<Typography>` component from `@release/ui`** — the single typography path for both the frontend (`@release/web`) and the library. Do not write `font-family` / `font-size` / `text-transform` / `letter-spacing` by hand, and do not use Tailwind text utilities. Color / spacing / layout stay local (via `className`).
+- Two ways to pick a style:
+  - **Semantic variant** (primary): `<Typography variant="tag">…</Typography>`.
+  - **Raw `base` + `tk`** (long tail, when no variant fits): `<Typography base="mono-strong" tk="tk-02">…</Typography>`. Exactly one of `variant` / `base` is required; `tk` is valid only alongside `base`.
+- **Source of values — the scale `apps/ui/src/design/typography.module.css`** (base = family + size + weight + case; `tk-NN` = tracking). The component applies exactly those classes and hardcodes nothing. Missing a step — add the base/`tk` to the scale rather than bending text to a near match. Don't swap fonts (Fira Mono `--font-text` and JetBrains Mono `--font-mono` are distinct roles).
+- **Live showcase — the playground `Typography` page** (`apps/ui/src/design/TypographyPreview.tsx`): all bases, tk variations, and the curated component variants. Check it before working on text and keep it in sync on changes.
+- **`composes` from the scale is legacy.** The library's internal components migrate from `composes` to `<Typography>` in phases (separate plan). New code goes through the component from the start.
+- Allowed locally outside the component: glyphs / icons (`font-size` only), a `line-height` nuance for the rhythm of a specific spot, an inline weight accent (like `<b>`), and a contextual `text-transform` reset (when an element sits inside an `uppercase` parent).
 
 ---
 
