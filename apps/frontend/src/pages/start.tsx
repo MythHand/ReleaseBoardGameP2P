@@ -1,5 +1,5 @@
 import { useTranslation } from '@release/translation'
-import { Menu, MenuButton } from '@release/ui'
+import { Menu, MenuButton, Typography } from '@release/ui'
 import type { TransitionEvent } from 'react'
 import { useEffect, useState } from 'react'
 import MYTHHAND from '@/assets/brand/mythhand.svg'
@@ -52,17 +52,17 @@ export default function StartPage() {
           <AppLogo className="mb-3 -ml-2.75 h-auto w-120" />
 
           <div className="mb-9.5 flex flex-col gap-1.5">
-            <span className="font-mono text-[12px] text-cat-release uppercase tracking-[0.16em] opacity-85">
+            <Typography variant="tag" className="text-cat-release opacity-85">
               {t('start.tagOpenP2P')}
-            </span>
-            <span className="font-mono text-[12px] text-cat-release uppercase tracking-[0.16em] opacity-85">
+            </Typography>
+            <Typography variant="tag" className="text-cat-release opacity-85">
               {t('start.tagBoardCard')}
-            </span>
+            </Typography>
           </div>
 
-          <p className="m-0 mb-24 text-[15px] leading-[1.65] opacity-85">
+          <Typography variant="body" className="m-0 mb-24 opacity-85">
             {t('start.description')}
-          </p>
+          </Typography>
 
           <Menu className="-ml-2.75 items-center">
             {/* Always rendered so toggling it never reflows the column — without
