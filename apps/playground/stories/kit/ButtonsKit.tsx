@@ -1,5 +1,5 @@
 import DiceIcon from '@/icons/DiceIcon'
-import Button from '@/primitives/Button'
+import Button, { CopyButton } from '@/primitives/Button'
 import { KitCell, KitPage, KitSection } from './KitShell'
 
 // Реальный примитив Button во всех вариациях.
@@ -45,9 +45,9 @@ export default function ButtonsKit() {
 
       <KitSection title="Copy — клик копирует, подпись на миг меняется">
         <KitCell caption="copyValue + copiedChildren">
-          <Button variant="tech" copyValue="RLS-7F3K" copiedChildren="скопировано">
+          <CopyButton variant="tech" copyValue="RLS-7F3K" copiedChildren="скопировано">
             копировать
-          </Button>
+          </CopyButton>
         </KitCell>
       </KitSection>
     </KitPage>

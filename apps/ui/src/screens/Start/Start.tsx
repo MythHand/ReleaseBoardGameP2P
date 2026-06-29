@@ -1,5 +1,4 @@
-import type { TransitionEvent } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { play } from '@/animations'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
@@ -9,6 +8,7 @@ import PhysicalEdition, {
   PHYSICAL_EDITION_COPY_RU,
 } from '@/blocks/PhysicalEdition'
 import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
+import VideoPlayer from '@/blocks/VideoPlayer'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
 import { randomNickname, sanitizeNickname } from '@/game/nicknames'
@@ -24,6 +24,8 @@ const DESIGN_URL = 'https://github.com/dimbo-design'
 const DEV_URL = 'https://github.com/ditayler'
 // печатная версия — заказ/предзаказ ведём через Instagram команды
 const INSTAGRAM_URL = 'https://www.instagram.com/mythhand.team/'
+// game review — the embed shown in the start-screen video player
+const VIDEO_URL = 'https://www.youtube.com/embed/bxGtRnoYW4g?autoplay=1'
 
 // авторы — собственные имена, одинаковы для всех языков
 const DESIGN_NAME = 'Togulev Dmitry'
@@ -91,8 +93,6 @@ export default function Start({
   const [host, setHost] = useState('')
   const [joinName, setJoinName] = useState('')
   const [joinCode, setJoinCode] = useState('')
-  const [videoMounted, setVideoMounted] = useState(false)
-  const [videoOpen, setVideoOpen] = useState(false)
   const close = () => setModal(null)
   const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
 
@@ -124,25 +124,6 @@ export default function Start({
     }
     play('shake', hostRef.current)
   }
-
-  const openVideo = () => {
-    setVideoMounted(true)
-    requestAnimationFrame(() => setVideoOpen(true))
-  }
-  const closeVideo = () => setVideoOpen(false)
-  // видео-плеер остаётся смонтированным до конца сворачивания — без перескоков
-  const onPlayerTransEnd = (e: TransitionEvent) => {
-    if ((e.propertyName === 'inline-size' || e.propertyName === 'width') && !videoOpen) {
-      setVideoMounted(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!videoOpen) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setVideoOpen(false)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [videoOpen])
 
   return (
     <div className={styles.root}>
@@ -218,42 +199,11 @@ export default function Start({
         className={styles.physical}
       />
 
-      {/* play-кнопка, разворачивающаяся на месте в видео-плеер */}
-      <div
-        className={`${styles.player} ${videoOpen ? styles.playerOpen : ''}`}
-        onTransitionEnd={onPlayerTransEnd}
-      >
-        <button
-          type="button"
-          className={styles.playFace}
-          onClick={openVideo}
-          aria-label={copy.videoReview}
-          tabIndex={videoMounted ? -1 : 0}
-        >
-          <span className={styles.playIcon}>▶</span>
-          <span className={styles.playCap}>{copy.videoReview}</span>
-        </button>
-
-        {videoMounted && (
-          <div className={`${styles.videoFace} ${videoOpen ? styles.videoShown : ''}`}>
-            <button
-              type="button"
-              className={styles.bigClose}
-              onClick={closeVideo}
-              aria-label={copy.close}
-            >
-              ✕
-            </button>
-            <iframe
-              className={styles.iframe}
-              src="https://www.youtube.com/embed/bxGtRnoYW4g?autoplay=1"
-              title={copy.logoAlt}
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              allowFullScreen
-            />
-          </div>
-        )}
-      </div>
+      {/* play button that expands in place into the video embed */}
+      <VideoPlayer
+        src={VIDEO_URL}
+        copy={{ videoReview: copy.videoReview, close: copy.close, title: copy.logoAlt }}
+      />
 
       <Modal open={modal === 'create'} onClose={close} title={copy.createTitle} wide>
         <div className={styles.createGrid}>

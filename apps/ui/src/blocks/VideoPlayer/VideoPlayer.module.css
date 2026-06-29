@@ -1,0 +1,108 @@
+/* Play button that expands in place into the video embed. Positioning comes
+   from the consumer via className; this owns size + the expand/collapse motion. */
+.player {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 24%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 76px;
+  block-size: 76px;
+  overflow: visible;
+  transform: translateY(-50%);
+  transition: inline-size 380ms var(--ease-soft), block-size 380ms var(--ease-soft);
+}
+
+.playerOpen {
+  inline-size: min(360px, 42vw);
+  block-size: min(640px, 86vh);
+  overflow: hidden;
+}
+
+.playFace {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.playIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 76px;
+  block-size: 76px;
+  padding-inline-start: 5px;
+  font-size: 23px;
+  background: rgb(0 0 0 / 35%);
+  border: 1.5px solid rgb(255 255 255 / 70%);
+  border-radius: 50%;
+  backdrop-filter: blur(2px);
+  transition: transform var(--t-base) var(--ease-out),
+    border-color var(--t-base) var(--ease-out);
+}
+
+.playFace:hover .playIcon {
+  border-color: #fff;
+  transform: scale(1.08);
+}
+
+/* Font comes from <Typography base="overline" tk="tk-22">; this is position only. */
+.playCap {
+  position: absolute;
+  inset-block-start: 100%;
+  margin-block-start: 10px;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
+/* video over the button, fading in/out with the container expand/collapse */
+.videoFace {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 280ms var(--ease-soft);
+}
+
+.videoShown {
+  opacity: 1;
+}
+
+.iframe {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border: 0;
+}
+
+.bigClose {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 46px;
+  block-size: 46px;
+  font-size: 30px;
+  line-height: 1;
+  color: #fff;
+  cursor: pointer;
+  background: rgb(0 0 0 / 55%);
+  border: 1px solid rgb(255 255 255 / 35%);
+  transition: background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
+}
+
+.bigClose:hover {
+  background: rgb(0 0 0 / 85%);
+  border-color: #fff;
+}

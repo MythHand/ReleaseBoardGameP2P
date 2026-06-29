@@ -93,6 +93,12 @@ Styling is **per-package** — the approach depends on which app the component l
 
 ---
 
+## Code Comments Rule
+
+- **Write code comments in English.** Do not add Russian comments to source files (existing Russian comments are legacy).
+
+---
+
 ## i18n Rule
 
 - **`@release/web`** uses react-i18next with `i18next-browser-languagedetector`.

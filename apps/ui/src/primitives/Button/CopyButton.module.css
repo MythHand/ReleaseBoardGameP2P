@@ -1,0 +1,5 @@
+/* Transient "copied" feedback — green text (matches the switcher's selection).
+   Sits inside Button's label, so this color wins over the inherited button color. */
+.copied {
+  color: #8fd9b0;
+}
