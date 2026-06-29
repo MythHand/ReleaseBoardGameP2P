@@ -26,6 +26,87 @@
   --cat-ai: #d900ff;
   --cat-trigger: #fff; /* триггеры (503/AI) не выделяются; технически белый */
 
+  /* ===== Named hues — collected from component CSS modules ===== */
+  --mint: #8fd9b0; /* positive / selection mint — Toggle on, win, "copied" */
+  --mint-light: #9ed9b6; /* selection thumb gradient — light stop (ModeSelect) */
+  --mint-dark: #6dbf96; /* selection thumb gradient — dark stop (ModeSelect) */
+  --deep-green: #04140c; /* text on a --mint fill */
+  --coral: #ff6b81; /* destructive / error — distinct from --cat-attack */
+  --gold: #e3b341; /* caution accent (Badge warning, Dropdown) */
+  --periwinkle: #7fb0ff; /* informational blue (Badge info) */
+  --gray: #8a8a8a; /* mid grey — arrow desaturation mix */
+  --charcoal: #1c1c1c; /* near-black — dark text on light surfaces (Rules) */
+
+  /* ===== White overlays — --fg at an alpha (borders, text, faint surfaces) ===== */
+  --white-02: rgb(255 255 255 / 2%);
+  --white-04: rgb(255 255 255 / 4%);
+  --white-04-5: rgb(255 255 255 / 4.5%);
+  --white-05: rgb(255 255 255 / 5%);
+  --white-06: rgb(255 255 255 / 6%);
+  --white-07: rgb(255 255 255 / 7%);
+  --white-08: rgb(255 255 255 / 8%);
+  --white-10: rgb(255 255 255 / 10%);
+  --white-12: rgb(255 255 255 / 12%);
+  --white-14: rgb(255 255 255 / 14%);
+  --white-16: rgb(255 255 255 / 16%);
+  --white-18: rgb(255 255 255 / 18%);
+  --white-20: rgb(255 255 255 / 20%);
+  --white-22: rgb(255 255 255 / 22%);
+  --white-25: rgb(255 255 255 / 25%);
+  --white-30: rgb(255 255 255 / 30%);
+  --white-32: rgb(255 255 255 / 32%);
+  --white-35: rgb(255 255 255 / 35%);
+  --white-40: rgb(255 255 255 / 40%);
+  --white-42: rgb(255 255 255 / 42%);
+  --white-45: rgb(255 255 255 / 45%);
+  --white-50: rgb(255 255 255 / 50%);
+  --white-55: rgb(255 255 255 / 55%);
+  --white-60: rgb(255 255 255 / 60%);
+  --white-65: rgb(255 255 255 / 65%);
+  --white-70: rgb(255 255 255 / 70%);
+  --white-72: rgb(255 255 255 / 72%);
+  --white-75: rgb(255 255 255 / 75%);
+  --white-78: rgb(255 255 255 / 78%);
+  --white-82: rgb(255 255 255 / 82%);
+  --white-85: rgb(255 255 255 / 85%);
+  --white-86: rgb(255 255 255 / 86%);
+  --white-90: rgb(255 255 255 / 90%);
+
+  /* ===== Black overlays — --bg at an alpha (scrims, shadows) ===== */
+  --black-20: rgb(0 0 0 / 20%);
+  --black-25: rgb(0 0 0 / 25%);
+  --black-32: rgb(0 0 0 / 32%);
+  --black-35: rgb(0 0 0 / 35%);
+  --black-42: rgb(0 0 0 / 42%);
+  --black-45: rgb(0 0 0 / 45%);
+  --black-48: rgb(0 0 0 / 48%);
+  --black-50: rgb(0 0 0 / 50%);
+  --black-55: rgb(0 0 0 / 55%);
+  --black-60: rgb(0 0 0 / 60%);
+  --black-66: rgb(0 0 0 / 66%);
+  --black-70: rgb(0 0 0 / 70%);
+  --black-72: rgb(0 0 0 / 72%);
+  --black-78: rgb(0 0 0 / 78%);
+  --black-80: rgb(0 0 0 / 80%);
+  --black-85: rgb(0 0 0 / 85%);
+  --black-90: rgb(0 0 0 / 90%);
+
+  /* ===== Tinted overlays — alpha variants of the hues ===== */
+  --mint-06: rgb(143 217 176 / 6%);
+  --mint-40: rgb(143 217 176 / 40%);
+  --mint-45: rgb(143 217 176 / 45%);
+  --mint-50: rgb(143 217 176 / 50%);
+  --coral-12: rgb(255 107 129 / 12%);
+  --coral-45: rgb(255 107 129 / 45%);
+  --coral-60: rgb(255 107 129 / 60%);
+  --brand-green-08: rgb(41 224 122 / 8%);
+  --brand-green-12: rgb(41 224 122 / 12%);
+
+  /* ===== Yellow / amber / orange — Rules highlight fills ===== */
+  --yellow-28: rgb(255 230 120 / 28%);
+  --amber-20: rgb(255 206 70 / 20%);
+  --orange-95: rgb(255 168 12 / 95%);
+
   /* ===== Типографика =====
      Настолка: Onest — заголовки, Fira Mono — основной текст.
      Лоадер/терминал (boot): JetBrains Mono — НЕ затираем, остаётся за модулем лоадера. */
