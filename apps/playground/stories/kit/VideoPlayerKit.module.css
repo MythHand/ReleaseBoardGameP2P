@@ -1,0 +1,16 @@
+.stage {
+  position: relative;
+  inline-size: 520px;
+  max-inline-size: 100%;
+  block-size: 480px;
+  background: var(--surface-1);
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border-radius: 12px;
+}
+
+/* Центрируем плеер в сцене — перебивает дефолтные insets компонента
+   (две класса селектор > одиночный .player самого компонента). */
+.stage .player {
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+}

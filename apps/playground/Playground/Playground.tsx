@@ -44,6 +44,7 @@ import SlidersKit from '../stories/kit/SlidersKit'
 import SpinnerKit from '../stories/kit/SpinnerKit'
 import TabRailKit from '../stories/kit/TabRailKit'
 import TogglesKit from '../stories/kit/TogglesKit'
+import VideoPlayerKit from '../stories/kit/VideoPlayerKit'
 import LoaderStory from '../stories/LoaderStory'
 import LobbyStory from '../stories/LobbyStory'
 import StartStory from '../stories/StartStory'
@@ -146,6 +147,7 @@ const groups: Group[] = [
       { id: 'kit-overlay', title: 'Overlay', render: () => <OverlayKit /> },
       { id: 'kit-edge-glow', title: 'Edge glow', render: () => <EdgeGlowKit /> },
       { id: 'kit-spinner', title: 'Spinner', render: () => <SpinnerKit /> },
+      { id: 'kit-video-player', title: 'Video player', render: () => <VideoPlayerKit /> },
     ],
   },
   {

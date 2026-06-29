@@ -16,13 +16,13 @@ export default function StartPage() {
   const hasSession = session.status === 'in-lobby' && !!session.state
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-black">
+    <div className="relative h-screen w-full overflow-hidden bg-bg">
       <div className="absolute inset-0 bg-[url(@/assets/home/photo.jpg)] bg-center bg-cover" />
       <div className="absolute inset-0 start-blur-mask" />
       <div className="absolute inset-0 start-scrim" />
 
       <div className="relative z-2 flex h-full items-center ps-19">
-        <div className="flex w-115 translate-y-[-8vh] flex-col items-start">
+        <div className="flex w-115 flex-col items-start">
           <AppLogo className="mb-3 -ml-2.75 h-auto w-120" />
 
           <div className="mb-9.5 flex flex-col gap-1.5 text-cat-release opacity-85">
@@ -30,7 +30,7 @@ export default function StartPage() {
             <Typography variant="tag">{t('start.tagBoardCard')}</Typography>
           </div>
 
-          <Typography variant="body" className="mb-24">
+          <Typography variant="body" className="mb-18">
             {t('start.description')}
           </Typography>
 
