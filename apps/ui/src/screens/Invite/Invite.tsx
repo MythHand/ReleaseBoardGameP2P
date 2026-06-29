@@ -6,15 +6,25 @@ import { randomNickname, sanitizeNickname } from '@/game/nicknames'
 import DiceIcon from '@/icons/DiceIcon'
 import Button from '@/primitives/Button'
 import Input from '@/primitives/Input'
+import Spinner from '@/primitives/Spinner'
 import styles from './Invite.module.css'
 
-// Доступность слота в игре, на которую ведёт ссылка-приглашение:
+// Доступность слота по ссылке-приглашению — техническая ось «про форму»:
 //   open          — есть места и игрока, и зрителя
-//   spectatorOnly — игрок занят, можно войти только зрителем
-//   full          — свободных слотов нет вовсе, подключиться нельзя
-//   notFound      — игры по коду нет (закрыта/неверная ссылка)
-export type SlotAvailability = 'open' | 'spectatorOnly' | 'full' | 'notFound'
+//   spectatorOnly — игрок занят, войти можно только зрителем (жёлтая подпись)
+//   full          — мест нет вовсе: обе роли недоступны, жёлтая «нет доступных
+//                   мест», действие — «проверить слоты» (без красной строки)
+export type SlotAvailability = 'open' | 'spectatorOnly' | 'full'
 export type JoinRole = 'player' | 'spectator'
+
+// Состояние экрана-приглашения — отдельная техническая ось от доступности слота:
+//   form        — форма готова к вводу
+//   connecting  — идёт подключение (спиннер + «отмена»)
+//   connected   — подключились; консьюмер сейчас перебросит в лобби
+//   failed      — подключение не удалось (красная строка + «повторить»)
+//   full        — «мест нет» как результат: к жёлтой подписи добавляется красная
+//   notFound    — игры по коду нет (красная строка)
+export type InviteState = 'form' | 'connecting' | 'connected' | 'failed' | 'full' | 'notFound'
 
 // Весь текст — пропсом (i18n-agnostic). Каталоги держит консьюмер.
 export interface InviteCopy {
@@ -31,13 +41,21 @@ export interface InviteCopy {
   roleTitle: string
   rolePlayer: string
   roleSpectator: string
+  // жёлтые подписи под выбором роли: только зритель / совсем нет мест
   spectatorOnlyNote: string
-  fullTitle: string
-  fullNote: string
-  notFoundTitle: string
-  notFoundNote: string
-  refresh: string
+  noSlotsNote: string
   joinCta: string
+  // ярлык действия, когда мест нет (перепроверка вместимости)
+  checkSlots: string
+  // статус-строки слота действия — единый паттерн «результат» (как ошибка):
+  // подключение / успех / ошибка / мест нет / игра не найдена
+  connecting: string
+  connected: string
+  cancel: string
+  retry: string
+  connectError: string
+  fullStatus: string
+  notFoundStatus: string
   homePage: string
 }
 
@@ -45,12 +63,14 @@ interface InviteProps {
   // код игры из ссылки-приглашения (/lobby/:code) — предзаполняет поле
   code: string
   availability: SlotAvailability
+  // состояние экрана; ведёт его консьюмер (сетевой слой). По умолчанию — форма
+  state?: InviteState
   copy: InviteCopy
-  // подключение к игре — реализует консьюмер (сетевой слой)
+  // подключение к игре — реализует консьюмер (сетевой слой). Повтор после
+  // ошибки — тот же колбэк (та же форма), отдельного onRetry не нужно
   onJoin?: (nickname: string, code: string, role: JoinRole) => void
-  // перепроверить доступность (для «мест нет» / «игра не найдена»);
-  // кнопка обновления рисуется только когда колбэк передан — легко скрыть
-  onRefresh?: () => void
+  // отмена подключения (видна в состоянии connecting)
+  onCancel?: () => void
   // уход на стартовый экран проекта
   onHome?: () => void
   // язык + смена: когда оба переданы — в правом верхнем углу рисуется свитчер
@@ -61,17 +81,32 @@ interface InviteProps {
 export default function Invite({
   code,
   availability,
+  state = 'form',
   copy,
   onJoin,
-  onRefresh,
+  onCancel,
   onHome,
   lang,
   onLangChange,
 }: InviteProps) {
   const specOnly = availability === 'spectatorOnly'
-  const isNotFound = availability === 'notFound'
-  // и «мест нет», и «игра не найдена» — подключения нет, вместо формы сообщение
-  const blocked = availability === 'full' || isNotFound
+  // мест нет вовсе — обе роли недоступны, жёлтая «нет доступных мест», действие
+  // «проверить слоты». Красная строка добавляется уже состоянием (state==='full')
+  const noSlots = availability === 'full'
+  // фазы подключения — состояния слота действия (форма всегда видна)
+  const connecting = state === 'connecting'
+  const connected = state === 'connected'
+  const failed = state === 'failed'
+  // во время подключения форма заблокирована (поля + выбор роли)
+  const busy = connecting || connected
+  // строка-статус в слоте действия (как у ошибки): ошибка / мест нет / не найдена
+  const status = failed
+    ? copy.connectError
+    : state === 'full'
+      ? copy.fullStatus
+      : state === 'notFound'
+        ? copy.notFoundStatus
+        : null
 
   const [nickname, setNickname] = useState('')
   const [codeValue, setCodeValue] = useState(code)
@@ -128,80 +163,97 @@ export default function Invite({
           <section className={styles.form}>
             <h2 className={styles.formTitle}>{copy.formTitle}</h2>
 
-            {blocked ? (
-              <div className={styles.blocked}>
-                <div className={styles.blockedTitle}>
-                  {isNotFound ? copy.notFoundTitle : copy.fullTitle}
+            {/* поля ввода в контейнере фикс-высоты — высота учитывает жёлтую
+                подпись: форма дышит внутри, а кнопки под контейнером не двигаются */}
+            <div className={styles.fields}>
+              {/* выбор роли — первым; в стиле полей ввода (лейбл + сегменты) */}
+              <div className={styles.role}>
+                <span className={styles.roleLabel}>{copy.roleTitle}</span>
+                <div className={styles.roleOptions}>
+                  <button
+                    type="button"
+                    disabled={specOnly || noSlots || busy}
+                    className={`${styles.roleOpt} ${!noSlots && effectiveRole === 'player' ? styles.roleOptOn : ''}`}
+                    onClick={() => setRole('player')}
+                  >
+                    {copy.rolePlayer}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={noSlots || busy}
+                    className={`${styles.roleOpt} ${!noSlots && effectiveRole === 'spectator' ? styles.roleOptOn : ''}`}
+                    onClick={() => setRole('spectator')}
+                  >
+                    {copy.roleSpectator}
+                  </button>
                 </div>
-                <p className={styles.blockedNote}>
-                  {isNotFound ? copy.notFoundNote : copy.fullNote}
-                </p>
-                {onRefresh && (
-                  <Button className={styles.refresh} variant="tech" onClick={onRefresh}>
-                    {copy.refresh}
+                {(specOnly || noSlots) && (
+                  <span className={styles.note}>
+                    {noSlots ? copy.noSlotsNote : copy.spectatorOnlyNote}
+                  </span>
+                )}
+              </div>
+
+              <div ref={nickRef} className={styles.fieldWrap}>
+                <Input
+                  label={copy.nicknameLabel}
+                  value={nickname}
+                  onChange={(e) => setNickname(sanitizeNickname(e.target.value))}
+                  placeholder={copy.nicknamePlaceholder}
+                  maxLength={20}
+                  plain
+                  disabled={busy}
+                  trailing={
+                    <Button
+                      variant="icon"
+                      onClick={() => setNickname(randomNickname())}
+                      aria-label={copy.randomNick}
+                      title={copy.randomNick}
+                    >
+                      <DiceIcon />
+                    </Button>
+                  }
+                />
+              </div>
+              <div ref={codeRef} className={styles.fieldWrap}>
+                <Input
+                  label={copy.codeLabel}
+                  value={codeValue}
+                  onChange={(e) => setCodeValue(e.target.value)}
+                  disabled={busy}
+                />
+              </div>
+            </div>
+
+            {/* слот действия — фикс. высоты; статус сверху, действие снизу. Единый
+                паттерн результата: ошибка / мест нет / не найдена — строка + кнопка */}
+            <div className={styles.action}>
+              {status && <span className={styles.actionError}>{status}</span>}
+              <div className={styles.actionRow}>
+                {connecting ? (
+                  <div className={styles.connecting}>
+                    <span className={styles.connectingStatus}>
+                      <Spinner size={16} />
+                      {copy.connecting}
+                    </span>
+                    {onCancel && (
+                      <Button variant="tech" onClick={onCancel}>
+                        {copy.cancel}
+                      </Button>
+                    )}
+                  </div>
+                ) : connected ? (
+                  <span className={styles.connected}>{copy.connected}</span>
+                ) : (
+                  // одна и та же кнопка (всегда handleJoin — ник обязателен и для
+                  // проверки слотов); меняется лишь ярлык: проверить слоты / повторить
+                  // / подключиться, и статус-строка сверху
+                  <Button className={canJoin ? '' : styles.joinIdle} onClick={handleJoin}>
+                    {noSlots ? copy.checkSlots : status ? copy.retry : copy.joinCta}
                   </Button>
                 )}
               </div>
-            ) : (
-              <>
-                {/* выбор роли — первым; в стиле полей ввода (лейбл + сегменты) */}
-                <div className={styles.role}>
-                  <span className={styles.roleLabel}>{copy.roleTitle}</span>
-                  <div className={styles.roleOptions}>
-                    <button
-                      type="button"
-                      disabled={specOnly}
-                      className={`${styles.roleOpt} ${effectiveRole === 'player' ? styles.roleOptOn : ''}`}
-                      onClick={() => setRole('player')}
-                    >
-                      {copy.rolePlayer}
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.roleOpt} ${effectiveRole === 'spectator' ? styles.roleOptOn : ''}`}
-                      onClick={() => setRole('spectator')}
-                    >
-                      {copy.roleSpectator}
-                    </button>
-                  </div>
-                  {specOnly && <span className={styles.note}>{copy.spectatorOnlyNote}</span>}
-                </div>
-
-                <div ref={nickRef} className={styles.fieldWrap}>
-                  <Input
-                    label={copy.nicknameLabel}
-                    value={nickname}
-                    onChange={(e) => setNickname(sanitizeNickname(e.target.value))}
-                    placeholder={copy.nicknamePlaceholder}
-                    maxLength={20}
-                    plain
-                    trailing={
-                      <Button
-                        variant="icon"
-                        onClick={() => setNickname(randomNickname())}
-                        aria-label={copy.randomNick}
-                        title={copy.randomNick}
-                      >
-                        <DiceIcon />
-                      </Button>
-                    }
-                  />
-                </div>
-                <div ref={codeRef} className={styles.fieldWrap}>
-                  <Input
-                    label={copy.codeLabel}
-                    value={codeValue}
-                    onChange={(e) => setCodeValue(e.target.value)}
-                  />
-                </div>
-
-                <div className={styles.joinRow}>
-                  <Button className={canJoin ? '' : styles.joinIdle} onClick={handleJoin}>
-                    {copy.joinCta}
-                  </Button>
-                </div>
-              </>
-            )}
+            </div>
           </section>
 
           {/* область 3 — уход на стартовый экран проекта (в скобках, по центру) */}

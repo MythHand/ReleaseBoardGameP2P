@@ -18,6 +18,8 @@ import styles from './Start.module.css'
 const GITHUB_URL = 'https://github.com/MythHand'
 const DESIGN_URL = 'https://github.com/dimbo-design'
 const DEV_URL = 'https://github.com/ditayler'
+// печатная версия — заказ/предзаказ ведём через Instagram команды
+const INSTAGRAM_URL = 'https://www.instagram.com/mythhand.team/'
 
 // авторы — собственные имена, одинаковы для всех языков
 const DESIGN_NAME = 'Togulev Dmitry'
@@ -51,6 +53,12 @@ export interface StartCopy {
   // подписи авторства в левом нижнем углу
   authorDesign: string
   authorDev: string
+  // блок про печатную версию (правый нижний угол): два предложения + ссылка
+  physicalTitle: string
+  physicalLead: string
+  physicalOrder: string
+  physicalLinkLabel: string
+  physicalImageAlt: string
   // текст режимов партии (заголовки + описания опций)
   modes: GameModesCopy
 }
@@ -104,6 +112,19 @@ export default function Start({
     // трясём все незаполненные поля
     if (!joinName.trim()) play('shake', joinNameRef.current)
     if (!joinCode.trim()) play('shake', joinCodeRef.current)
+  }
+
+  // создание лобби — та же реакция на заполненность, что у входа: пустой ник
+  // даёт «выключенный» вид CTA и тряску поля вместо создания
+  const hostRef = useRef<HTMLDivElement>(null)
+  const createValid = host.trim().length > 0
+  const submitCreate = () => {
+    if (createValid) {
+      onCreate?.(host)
+      close()
+      return
+    }
+    play('shake', hostRef.current)
   }
 
   const openVideo = () => {
@@ -190,6 +211,26 @@ export default function Start({
         </span>
       </div>
 
+      {/* настольная версия — правый нижний угол, симметрично авторству слева;
+          картинка коробки (пока плейсхолдер) выпирает за верхнюю грань блока */}
+      <div className={styles.physical}>
+        <div className={styles.physicalText}>
+          <h3 className={styles.physicalTitle}>{copy.physicalTitle}</h3>
+          <p className={styles.physicalNote}>
+            {copy.physicalLead} {copy.physicalOrder}{' '}
+            <a
+              className={styles.physicalLink}
+              href={INSTAGRAM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {copy.physicalLinkLabel}
+            </a>
+          </p>
+        </div>
+        <div className={styles.physicalImage} role="img" aria-label={copy.physicalImageAlt} />
+      </div>
+
       {/* play-кнопка, разворачивающаяся на месте в видео-плеер */}
       <div
         className={`${styles.player} ${videoOpen ? styles.playerOpen : ''}`}
@@ -235,31 +276,28 @@ export default function Start({
           <div className={styles.createTech}>
             <h4 className={styles.techTitle}>{copy.lobbyParams}</h4>
 
-            <Input
-              label={copy.nicknameLabel}
-              value={host}
-              onChange={(e) => setHost(sanitizeNickname(e.target.value))}
-              placeholder={copy.nicknamePlaceholder}
-              maxLength={20}
-              plain
-              trailing={
-                <Button
-                  variant="icon"
-                  onClick={() => setHost(randomNickname())}
-                  aria-label={copy.randomNick}
-                  title={copy.randomNick}
-                >
-                  <DiceIcon />
-                </Button>
-              }
-            />
+            <div ref={hostRef}>
+              <Input
+                label={copy.nicknameLabel}
+                value={host}
+                onChange={(e) => setHost(sanitizeNickname(e.target.value))}
+                placeholder={copy.nicknamePlaceholder}
+                maxLength={20}
+                plain
+                trailing={
+                  <Button
+                    variant="icon"
+                    onClick={() => setHost(randomNickname())}
+                    aria-label={copy.randomNick}
+                    title={copy.randomNick}
+                  >
+                    <DiceIcon />
+                  </Button>
+                }
+              />
+            </div>
 
-            <Button
-              onClick={() => {
-                onCreate?.(host)
-                close()
-              }}
-            >
+            <Button className={createValid ? '' : styles.ctaIdle} onClick={submitCreate}>
               {copy.createCta}
             </Button>
 

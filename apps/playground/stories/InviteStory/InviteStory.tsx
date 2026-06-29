@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { InviteCopy, SlotAvailability } from '@/screens/Invite'
+import type { InviteCopy, InviteState, SlotAvailability } from '@/screens/Invite'
 import Invite from '@/screens/Invite'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './InviteStory.module.css'
@@ -20,12 +20,16 @@ const COPY: Record<'ru' | 'en', InviteCopy> = {
     rolePlayer: 'игрок',
     roleSpectator: 'зритель',
     spectatorOnlyNote: 'мест игрока нет — доступно только подключение зрителем',
-    fullTitle: 'мест нет',
-    fullNote: 'в этой игре не осталось свободных слотов — ни игрока, ни зрителя',
-    notFoundTitle: 'игра не найдена',
-    notFoundNote: 'игры по этому коду нет — возможно, она уже закрыта или ссылка неверна',
-    refresh: 'обновить',
+    noSlotsNote: 'нет доступных мест',
     joinCta: 'подключиться',
+    checkSlots: 'проверить слоты',
+    connecting: 'подключение',
+    connected: 'подключено',
+    cancel: 'отмена',
+    retry: 'повторить',
+    connectError: 'не удалось подключиться',
+    fullStatus: 'мест нет',
+    notFoundStatus: 'игра не найдена',
     homePage: 'главная страница',
   },
   en: {
@@ -43,27 +47,53 @@ const COPY: Record<'ru' | 'en', InviteCopy> = {
     rolePlayer: 'player',
     roleSpectator: 'spectator',
     spectatorOnlyNote: 'no player slots left — you can only join as a spectator',
-    fullTitle: 'no slots',
-    fullNote: 'this game has no free slots left — neither player nor spectator',
-    notFoundTitle: 'game not found',
-    notFoundNote: 'no game for this code — it may have closed already or the link is wrong',
-    refresh: 'refresh',
+    noSlotsNote: 'no slots available',
     joinCta: 'connect',
+    checkSlots: 'check slots',
+    connecting: 'connecting',
+    connected: 'connected',
+    cancel: 'cancel',
+    retry: 'retry',
+    connectError: 'couldn’t connect',
+    fullStatus: 'no free slots',
+    notFoundStatus: 'game not found',
     homePage: 'home page',
   },
 }
 
-// техническая линия: какие слоты доступны по ссылке (имитация ответа лобби)
+// доступность слота — имитация ответа лобби
 const AVAILABILITY: { value: SlotAvailability; label: string }[] = [
   { value: 'open', label: 'игрок + зритель' },
   { value: 'spectatorOnly', label: 'только зритель' },
   { value: 'full', label: 'мест нет' },
-  { value: 'notFound', label: 'игра не найдена' },
+]
+
+// состояние экрана зависит от доступности: при full подключаться некуда, поэтому
+// фаз коннекта нет — остаются только форма и «мест нет» (красная строка)
+const STATES_DEFAULT: { value: InviteState; label: string }[] = [
+  { value: 'form', label: 'форма' },
+  { value: 'connecting', label: 'подключение' },
+  { value: 'connected', label: 'подключено' },
+  { value: 'failed', label: 'ошибка' },
+  { value: 'notFound', label: 'не найдена' },
+]
+const STATES_FULL: { value: InviteState; label: string }[] = [
+  { value: 'form', label: 'форма' },
+  { value: 'full', label: 'мест нет' },
 ]
 
 export default function InviteStory() {
   const { lang, setLang } = useLang()
   const [availability, setAvailability] = useState<SlotAvailability>('open')
+  const [state, setState] = useState<InviteState>('form')
+  const stateOptions = availability === 'full' ? STATES_FULL : STATES_DEFAULT
+
+  // правый селектор зависит от левого — при смене сбрасываем недоступное состояние
+  const changeAvailability = (a: SlotAvailability) => {
+    setAvailability(a)
+    if (a === 'full' && state !== 'form' && state !== 'full') setState('form')
+    if (a !== 'full' && state === 'full') setState('form')
+  }
 
   return (
     <div className={styles.root}>
@@ -75,9 +105,22 @@ export default function InviteStory() {
               key={a.value}
               type="button"
               className={availability === a.value ? styles.on : ''}
-              onClick={() => setAvailability(a.value)}
+              onClick={() => changeAvailability(a.value)}
             >
               {a.label}
+            </button>
+          ))}
+        </div>
+        <span className={styles.controlsLabel}>состояние</span>
+        <div className={styles.switch}>
+          {stateOptions.map((s) => (
+            <button
+              key={s.value}
+              type="button"
+              className={state === s.value ? styles.on : ''}
+              onClick={() => setState(s.value)}
+            >
+              {s.label}
             </button>
           ))}
         </div>
@@ -86,9 +129,11 @@ export default function InviteStory() {
         <Invite
           code="F96-NMT"
           availability={availability}
+          state={state}
           copy={pick(lang, COPY)}
-          // в песочнице «обновить» имитирует перепроверку: слот освободился
-          onRefresh={() => setAvailability('open')}
+          // клик по «подключиться» в песочнице запускает фазу подключения
+          onJoin={() => setState('connecting')}
+          onCancel={() => setState('form')}
           lang={lang}
           onLangChange={setLang}
         />

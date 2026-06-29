@@ -128,6 +128,16 @@
   margin-block-start: 44px;
 }
 
+/* контейнер полей ввода — фикс. высота с запасом под жёлтую подпись: подпись
+   появляется/исчезает ВНУТРИ (форма дышит), слабина копится снизу контейнера, а
+   слот действия и .home под ним остаются на месте. 270px — подбирается под контент */
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-block-size: 295px;
+}
+
 /* обёртка поля ввода — цель тряски play('shake') */
 .fieldWrap {
   inline-size: 100%;
@@ -186,54 +196,65 @@
   color: #fff;
 }
 
-/* подпись под выбором роли (режим «только зритель») */
+/* подпись под выбором роли (только зритель / нет мест) — условная, форма дышит */
 .note {
   composes: mono-xs from '../../design/typography.module.css';
   line-height: 1.5; /* нюанс интерлиньяжа подписи */
   color: var(--cat-support);
 }
 
-/* кнопка подключения — по центру инпута кода игры (его ширина 320),
-   обёртка по этой ширине; саму форму не сужаем */
-.joinRow {
+/* слот действия — по ширине инпута кода (320), фикс. высота под самое высокое
+   состояние (ошибка + кнопка). Действие прижато к низу: кнопка не прыгает между
+   form/failed, а сообщение прибавляется сверху → низ формы и .home не дёргаются. */
+.action {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: flex-end;
   inline-size: 320px;
+  block-size: 70px; /* жёстко фикс. высота — содержимое меняется, низ не дёргается */
   margin-block-start: 4px;
+}
+
+/* строка ошибки над действием (только failed) — язык ошибок поля (красный) */
+.actionError {
+  composes: label-sm tk-10 from '../../design/typography.module.css';
+  color: var(--cat-attack);
+  text-align: center;
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* подключение: спиннер + статус + «отмена» одной группой по центру */
+.connecting {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.connectingStatus {
+  composes: button tk-18 from '../../design/typography.module.css';
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-block: 10px; /* коробка как у кнопки (padding 10px) — текст на той же линии */
+  color: rgb(255 255 255 / 70%);
+}
+
+/* успех — зелёным, до переброса в лобби */
+.connected {
+  composes: button tk-18 from '../../design/typography.module.css';
+  padding-block: 10px;
+  color: var(--brand-green);
 }
 
 /* «выключенный» вид, но кнопка кликабельна (для тряски пустой формы) */
 .joinIdle {
   opacity: 0.4;
-}
-
-/* состояние «мест нет» / «игра не найдена» — вместо полей */
-.blocked {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-  inline-size: 360px;
-  padding: 20px 22px;
-  background: rgb(255 255 255 / 4%);
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 8px;
-}
-
-.blockedTitle {
-  composes: label-md tk-12 from '../../design/typography.module.css';
-  color: var(--cat-attack);
-}
-
-.blockedNote {
-  composes: body-sm from '../../design/typography.module.css';
-  margin: 0;
-  line-height: 1.55; /* нюанс интерлиньяжа */
-  opacity: 0.75;
-}
-
-.refresh {
-  margin-block-start: 8px;
 }
 
 /* ===== область 3 — уход на стартовый экран ===== отделено заметным отступом,
