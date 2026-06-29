@@ -15,12 +15,12 @@
 }
 
 .row {
+  composes: body-xs from '../../design/typography.module.css';
   position: relative;
   display: flex;
   gap: 8px;
   align-items: baseline;
   padding: 8px 12px;
-  font-size: 12px;
   line-height: 1.3;
   border-radius: 6px;
 }
@@ -36,7 +36,6 @@
 
 .nested {
   margin-inline-start: 18px;
-  font-size: 11px;
 }
 
 .nested::before {
@@ -45,6 +44,13 @@
   inset-inline-start: -14px;
   content: "↳";
   opacity: 0.35;
+}
+
+/* вложенная строка — на ступень мельче базовой (.row = body-xs 12);
+   compound бьёт композ-базу по специфичности, не зависит от порядка сборки.
+   .system.nested уже 11 (body-2xs), доп. правила не требует. */
+.row.nested {
+  font-size: 11px;
 }
 
 /* слева — название карты (главный акцент) */
@@ -84,11 +90,9 @@
 
 /* «добор» — пометка вскрытой публичной карты (503 / AI) */
 .drawTag {
+  composes: tag-sm tk-08 from '../../design/typography.module.css';
   flex: 0 0 auto;
-  font-size: 10px;
   color: rgb(255 255 255 / 40%);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 /* связка с жёлтой поддержкой: Bug + Sudo */
@@ -116,11 +120,10 @@
 
 /* системная строка (выбывание) — нейтрально-серая, техническая */
 .system {
+  composes: body-2xs tk-04 from '../../design/typography.module.css';
   position: relative;
   padding: 7px 12px;
-  font-size: 11px;
   color: rgb(255 255 255 / 40%);
-  letter-spacing: 0.04em;
 }
 
 /* справа — кто сделал */

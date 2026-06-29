@@ -89,10 +89,8 @@
 }
 
 .settingsHead {
+  composes: tag tk-10 from '../../design/typography.module.css';
   padding: 0 4px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   opacity: 0.6;
 }
 
@@ -112,10 +110,7 @@
 }
 
 .specLabel {
+  composes: label-sm tk-12 from '../../design/typography.module.css';
   padding: 0 4px;
-  font-family: var(--font-mono);
-  font-size: 11px;
   color: rgb(255 255 255 / 45%);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }

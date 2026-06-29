@@ -39,20 +39,16 @@
 }
 
 .title {
+  composes: heading-3 tk-04 from '../../design/typography.module.css';
   margin: 0;
-  font-family: var(--font-heading);
-  font-size: 30px;
-  letter-spacing: 0.04em;
 }
 
 .sub {
+  composes: label tk-14 from '../../design/typography.module.css';
+
   /* выровнено под слово «Лобби»: лого 96 + gap 18 + линия 1 + gap 18 */
   margin: 6px 0 0 133px;
-  font-family: var(--font-mono);
-  font-size: 12px;
   color: rgb(255 255 255 / 45%);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
 }
 
 /* правая часть шапки: код игры + переключатель языка в одну линию */
@@ -73,29 +69,22 @@
 }
 
 .h {
+  composes: heading-8 tk-04 from '../../design/typography.module.css';
   display: flex;
   gap: 12px;
   align-items: baseline;
   margin: 0 0 20px;
-  font-family: var(--font-heading);
-  font-size: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .count {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  composes: mono-md tk-10 from '../../design/typography.module.css';
   color: rgb(255 255 255 / 45%);
-  letter-spacing: 0.1em;
 }
 
 .lockTag {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  composes: mono-xs tk-10 from '../../design/typography.module.css';
   color: rgb(255 255 255 / 40%);
-  text-transform: none;
-  letter-spacing: 0.1em;
+  text-transform: none; /* сброс капса родителя .h (заголовок uppercase) */
 }
 
 /* режимы — скроллятся независимо, если не помещаются */
@@ -160,10 +149,8 @@
 
 /* ===== модалка подтверждения расформирования ===== */
 .confirmText {
+  composes: body-lg from '../../design/typography.module.css';
   margin: 0;
-  font-family: var(--font-text);
-  font-size: 15px;
-  line-height: 1.6;
   color: rgb(255 255 255 / 75%);
 }
 

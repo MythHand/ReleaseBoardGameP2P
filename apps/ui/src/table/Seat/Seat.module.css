@@ -17,10 +17,10 @@
 }
 
 .head {
+  composes: body-sm from '../../design/typography.module.css';
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 13px;
 }
 
 .dot {
@@ -37,16 +37,15 @@
 }
 
 .name {
+  composes: body-sm tk-03 from '../../design/typography.module.css';
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: var(--font-text);
-  letter-spacing: 0.03em;
   white-space: nowrap;
 }
 
 .hand {
+  composes: body-2xs from '../../design/typography.module.css';
   margin-inline-start: auto;
-  font-size: 11px;
   white-space: nowrap;
   opacity: 0.5;
 }

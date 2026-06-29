@@ -21,6 +21,10 @@
   letter-spacing: 0.02em;
 }
 
+.tk-03 {
+  letter-spacing: 0.03em;
+}
+
 .tk-04 {
   letter-spacing: 0.04em;
 }
@@ -130,10 +134,42 @@
   line-height: 1.6;
 }
 
+.body {
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 1.62;
+}
+
+.body-sm {
+  font-family: var(--font-text);
+  font-size: 13px;
+}
+
+/* 12 Fira — строка лога ходов (MoveHistory) */
+.body-xs {
+  font-family: var(--font-text);
+  font-size: 12px;
+}
+
+/* 11 Fira — мелкие тех-строки стола (system/nested лога, рука в Seat) */
+.body-2xs {
+  font-family: var(--font-text);
+  font-size: 11px;
+}
+
+/* ----- Fira КАПС (теги, лейблы) ----- */
+
 /* 15 Fira КАПС — вкладки боковой полосы (TabRail) */
 .label-lg {
   font-family: var(--font-text);
   font-size: 15px;
+  text-transform: uppercase;
+}
+
+/* 12 Fira КАПС — заголовки секций стола (Participants, Table settings) */
+.tag {
+  font-family: var(--font-text);
+  font-size: 12px;
   text-transform: uppercase;
 }
 
@@ -144,15 +180,11 @@
   text-transform: uppercase;
 }
 
-.body {
+/* 10 Fira КАПС — микро-теги (добор в MoveHistory, пустой слот ReleaseZone) */
+.tag-sm {
   font-family: var(--font-text);
-  font-size: 14px;
-  line-height: 1.62;
-}
-
-.body-sm {
-  font-family: var(--font-text);
-  font-size: 13px;
+  font-size: 10px;
+  text-transform: uppercase;
 }
 
 /* ===== Базы — JetBrains Mono (значения, код, лейблы) ===== */
@@ -199,6 +231,13 @@
   font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 700;
+}
+
+/* 14 mono КАПС — плашка переподключения (Reconnect) */
+.notice {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  text-transform: uppercase;
 }
 
 /* 13 mono — поле поиска правил (Rules) */
