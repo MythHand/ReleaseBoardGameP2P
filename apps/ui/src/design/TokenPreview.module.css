@@ -76,30 +76,3 @@
   word-break: break-all;
   opacity: 0.35;
 }
-
-.cardrow {
-  display: flex;
-  gap: 28px;
-  align-items: center;
-  margin-block-start: 36px;
-}
-
-.cardSlot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: var(--card-w);
-  aspect-ratio: var(--card-aspect);
-  font-size: 11px;
-  text-transform: uppercase;
-  background: var(--surface-1);
-  border: 1px dashed rgb(255 255 255 / 20%);
-  border-radius: var(--card-radius);
-  opacity: 0.6;
-}
-
-.typo {
-  font-size: 13px;
-  line-height: 1.8;
-  opacity: 0.85;
-}

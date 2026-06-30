@@ -81,7 +81,7 @@ export default function TokenPreview() {
   return (
     <section className={styles.root}>
       <h2 className={styles.h}>
-        design tokens · palette <span className={styles.note}>{`// ${tokens.length} colors`}</span>
+        colors <span className={styles.note}>{`// ${tokens.length}`}</span>
       </h2>
 
       {groups.map((g) => (
@@ -101,17 +101,6 @@ export default function TokenPreview() {
           </div>
         </div>
       ))}
-
-      <div className={styles.cardrow}>
-        <div className={styles.cardSlot}>
-          <span>card 368×515</span>
-        </div>
-        <p className={styles.typo}>
-          JetBrains Mono — ABCDEF abcdef 0123456789
-          <br />
-          «Release любой ценой»
-        </p>
-      </div>
     </section>
   )
 }
