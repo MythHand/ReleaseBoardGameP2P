@@ -1,88 +1,138 @@
-/* Play button that expands in place into the video embed. Positioning comes
-   from the consumer via className; this owns size + the expand/collapse motion. */
-.player {
+/* Невидимый контейнер — заложенное пространство под развёрнутый вид (рилс 9:16).
+   Держит морфящийся фрейм и подпись, чтобы ничего не перекомпоновывалось.
+   Позиция по умолчанию — под стартовый экран; место использования может
+   переопределить через className. Сам контейнер прозрачный и не кликается. */
+.videoPlayer {
   position: absolute;
   inset-block-start: 50%;
   inset-inline-end: 24%;
   z-index: 3;
+  block-size: min(720px, 90vh);
+  aspect-ratio: 9 / 16;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+/* подпись — слой ниже фрейма, под свёрнутой кнопкой */
+.caption {
+  position: absolute;
+  inset-block-start: calc(50% + 48px);
+  inset-inline-start: 50%;
+  white-space: nowrap;
+  opacity: 0.7;
+  transform: translateX(-50%);
+}
+
+/* Единый морфящийся фрейм: круглая плей-кнопка ⇄ квадратный плеер. Центрирован
+   в контейнере; свёрнут — круг 76px, раскрыт — на весь контейнер. Рамка/фон —
+   общие; внутри только меняется контент. */
+.frame {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 76px;
+  block-size: 76px;
+  overflow: hidden;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+  border-radius: 50%;
+  backdrop-filter: blur(2px);
+  transform: translate(-50%, -50%);
+
+  /* СВОРАЧИВАНИЕ (~400ms): видео прячется первым, фрейм сужается с микро-задержкой
+     (96ms, не дожидаясь полного скрытия). Размер/скругление/фон — одной кривой и
+     длительностью (консистентно). Transform отдельно и быстро — для ховера.
+     Бордер живёт в оверлее ::after (ниже). */
+  transition: inline-size 400ms var(--ease-soft) 96ms,
+    block-size 400ms var(--ease-soft) 96ms, border-radius 400ms var(--ease-soft) 96ms,
+    background 400ms var(--ease-soft) 96ms, box-shadow 400ms var(--ease-soft) 96ms,
+    transform 200ms var(--ease-out);
+}
+
+.frameOpen {
+  inline-size: 100%;
+  block-size: 100%;
+  background: var(--bg);
+  border-radius: 0;
+  box-shadow: 0 30px 80px var(--black-60);
+  backdrop-filter: none;
+
+  /* РАСКРЫТИЕ (~480ms): рост с «оттяжкой» (микро-сжатие перед расширением) —
+     размер/скругление/тень одной кривой. Фон становится непрозрачным быстро
+     (~224ms) — длинная анимация color-mix даёт лишний репейнт на кадр. Бордер —
+     в оверлее ::after (истончается позже, ~376ms). */
+  transition: inline-size 480ms cubic-bezier(0.34, -0.08, 0.22, 1),
+    block-size 480ms cubic-bezier(0.34, -0.08, 0.22, 1),
+    border-radius 480ms cubic-bezier(0.34, -0.08, 0.22, 1),
+    box-shadow 480ms cubic-bezier(0.34, -0.08, 0.22, 1),
+    background 224ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+
+/* бордер — оверлей ПОВЕРХ видео (pointer-events: none), чтобы загруженный iframe
+   не перекрывал анимацию его истончения. Радиус наследует фрейм (круг ⇄ квадрат). */
+.frame::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  border: 1.5px solid color-mix(in srgb, var(--fg) 70%, transparent);
+  border-radius: inherit;
+
+  /* сворачивание: утолщается вместе с сужением фрейма */
+  transition: border-width 400ms var(--ease-soft) 96ms,
+    border-color 400ms var(--ease-soft) 96ms;
+}
+
+.frameOpen::after {
+  border-color: var(--white-14);
+  border-width: 1px;
+
+  /* раскрытие: истончается поздно, синхронно с появлением видео (~376ms) */
+  transition: border-width 176ms var(--ease-out) 376ms, border-color 176ms var(--ease-out) 376ms;
+}
+
+/* свёрнутое состояние = кнопка */
+.trigger {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  inline-size: 76px;
-  block-size: 76px;
-  overflow: visible;
-  transform: translateY(-50%);
-  transition: inline-size 380ms var(--ease-soft), block-size 380ms var(--ease-soft);
-}
-
-.playerOpen {
-  inline-size: min(360px, 42vw);
-  block-size: min(640px, 86vh);
-  overflow: hidden;
-}
-
-.playFace {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   color: var(--fg);
   cursor: pointer;
   background: transparent;
   border: 0;
 }
 
+/* оптическая центровка ▶ — сдвиг вправо к визуальному центру (не математическому) */
 .playIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 76px;
-  block-size: 76px;
-  padding-inline-start: 5px;
   font-size: 23px;
-  background: color-mix(in srgb, var(--bg) 35%, transparent);
-  border: 1.5px solid color-mix(in srgb, var(--fg) 70%, transparent);
-  border-radius: 50%;
-  backdrop-filter: blur(2px);
-  transition: transform var(--t-base) var(--ease-out),
-    border-color var(--t-base) var(--ease-out);
+  transform: translateX(2px);
 }
 
-.playFace:hover .playIcon {
-  border-color: var(--fg);
-  transform: scale(1.08);
+/* отзывчивость кнопки — реакция РАЗМЕРОМ круга на ховер */
+.frame:not(.frameOpen):hover {
+  transform: translate(-50%, -50%) scale(1.06);
 }
 
-/* Font comes from <Typography base="overline" tk="tk-22">; this is position only. */
-.playCap {
-  position: absolute;
-  inset-block-start: 100%;
-  margin-block-start: 10px;
-  white-space: nowrap;
-  opacity: 0.7;
-}
-
-/* video over the button, fading in/out with the container expand/collapse */
-.videoFace {
-  position: absolute;
-  inset: 0;
-  background: var(--bg);
-  opacity: 0;
-  transition: opacity 280ms var(--ease-soft);
-}
-
-.videoShown {
-  opacity: 1;
-}
-
-.iframe {
+/* видео: на раскрытии проявляется поздно (≈90%), на сворачивании прячется первым */
+.video {
   display: block;
   inline-size: 100%;
   block-size: 100%;
   border: 0;
+  opacity: 0;
+  transition: opacity 120ms var(--ease-out);
 }
 
-.bigClose {
+.frameOpen .video {
+  opacity: 1;
+  transition: opacity 176ms var(--ease-out) 384ms;
+}
+
+/* крестик — появляется только когда фрейм раскрыт ПОЛНОСТЬЮ (по transitionend) */
+.close {
   position: absolute;
   inset-block-start: 10px;
   inset-inline-end: 10px;
@@ -98,11 +148,17 @@
   cursor: pointer;
   background: color-mix(in srgb, var(--bg) 55%, transparent);
   border: 1px solid color-mix(in srgb, var(--fg) 35%, transparent);
-  transition: background var(--t-fast) var(--ease-out),
-    border-color var(--t-fast) var(--ease-out);
+  transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+  animation: close-in 160ms var(--ease-out);
 }
 
-.bigClose:hover {
+.close:hover {
   background: color-mix(in srgb, var(--bg) 85%, transparent);
   border-color: var(--fg);
+}
+
+@keyframes close-in {
+  from {
+    opacity: 0;
+  }
 }
