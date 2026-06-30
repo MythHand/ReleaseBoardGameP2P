@@ -2,8 +2,8 @@
   inline-size: 100%;
   min-block-size: 100vh;
   padding: 56px clamp(40px, 8vw, 120px);
-  color: #fff;
-  background: #000;
+  color: var(--fg);
+  background: var(--bg);
 }
 
 /* ===== шапка ===== заголовок слева, свитчер языка по правой линии контента */
@@ -13,7 +13,7 @@
   align-items: flex-start;
   justify-content: space-between;
   padding-block-end: 28px;
-  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  border-block-end: 1px solid var(--white-08);
 }
 
 .title {
@@ -24,7 +24,7 @@
 .sub {
   composes: label tk-14 from '../../design/typography.module.css';
   margin: 6px 0 0;
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
 }
 
 /* ===== победитель ===== */
@@ -34,19 +34,19 @@
   align-items: center;
   padding: 24px 28px;
   margin: 32px 0;
-  background: rgb(143 217 176 / 6%);
-  border: 1px solid rgb(143 217 176 / 45%);
+  background: var(--mint-06);
+  border: 1px solid var(--mint-45);
 }
 
 .crown {
   font-size: 40px;
   line-height: 1;
-  color: #8fd9b0;
+  color: var(--mint);
 }
 
 .winnerLabel {
   composes: label-sm tk-18 from '../../design/typography.module.css';
-  color: #8fd9b0;
+  color: var(--mint);
 }
 
 .winnerName {
@@ -80,18 +80,18 @@
 .thead {
   composes: label-sm tk-12 from '../../design/typography.module.css';
   padding-block-end: 10px;
-  color: rgb(255 255 255 / 40%);
-  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  color: var(--white-40);
+  border-block-end: 1px solid var(--white-08);
 }
 
 .rows .row {
-  background: rgb(255 255 255 / 4%);
-  border: 1px solid rgb(255 255 255 / 8%);
+  background: var(--white-04);
+  border: 1px solid var(--white-08);
 }
 
 .rowWin {
-  background: rgb(143 217 176 / 6%);
-  border-color: rgb(143 217 176 / 45%);
+  background: var(--mint-06);
+  border-color: var(--mint-45);
 }
 
 .colName {
@@ -124,11 +124,11 @@
 }
 
 .numAttack {
-  color: color-mix(in srgb, var(--cat-attack) 75%, #fff);
+  color: color-mix(in srgb, var(--cat-attack) 75%, var(--fg));
 }
 
 .numDefense {
-  color: color-mix(in srgb, var(--cat-defense) 70%, #fff);
+  color: color-mix(in srgb, var(--cat-defense) 70%, var(--fg));
 }
 
 /* ===== кнопка между таблицами ===== */
@@ -150,8 +150,8 @@
   gap: 22px;
   align-items: center;
   padding: 22px 24px;
-  background: rgb(255 255 255 / 4%);
-  border: 1px solid rgb(255 255 255 / 8%);
+  background: var(--white-04);
+  border: 1px solid var(--white-08);
 }
 
 .achWide {
@@ -179,13 +179,13 @@
 /* имя игрока — сверху */
 .achHolder {
   composes: mono tk-04 from '../../design/typography.module.css';
-  color: rgb(255 255 255 / 60%);
+  color: var(--white-60);
 }
 
 .achTitle {
   composes: heading-7 tk-02 from '../../design/typography.module.css';
   margin-block-start: 6px;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* цифра + подпись на одной линии текста */
@@ -199,10 +199,10 @@
 .achValue {
   composes: numeric-xl tk-0 from '../../design/typography.module.css';
   line-height: 0.95; /* плотная посадка крупного числа на одной линии с подписью */
-  color: #fff;
+  color: var(--fg);
 }
 
 .achUnit {
   composes: label-sm tk-12 from '../../design/typography.module.css';
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
 }
