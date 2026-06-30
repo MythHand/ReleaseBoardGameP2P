@@ -118,7 +118,7 @@
   color: transparent;
 
   /* «защитные» = синие + фиолетовые → намёк градиентом текста */
-  background: linear-gradient(90deg, var(--cat-defense), var(--cat-protection));
+  background: var(--grad-defense);
   -webkit-background-clip: text;
   background-clip: text;
 }

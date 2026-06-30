@@ -6,7 +6,7 @@
   inline-size: 100%;
   block-size: 100%;
   overflow: hidden;
-  background: #000;
+  background: var(--bg);
 }
 
 .bg {
@@ -31,13 +31,7 @@
 .scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgb(0 0 0 / 80%) 0%,
-    rgb(0 0 0 / 66%) 36%,
-    rgb(0 0 0 / 48%) 70%,
-    rgb(0 0 0 / 32%) 100%
-  );
+  background: var(--grad-scrim);
 }
 
 /* мягкое затемнение фона под свитчером языка (как на Start) */
@@ -49,12 +43,7 @@
   inline-size: 340px;
   block-size: 200px;
   pointer-events: none;
-  background: radial-gradient(
-    120% 120% at 100% 0%,
-    rgb(0 0 0 / 42%) 0%,
-    rgb(0 0 0 / 20%) 42%,
-    transparent 72%
-  );
+  background: var(--grad-corner-shade);
 }
 
 /* свитчер языка — правый верхний угол, симметрично логотипу слева */
@@ -157,7 +146,7 @@
 .formTitle {
   composes: heading-8 tk-05 from '../../design/typography.module.css';
   margin: 0 0 4px;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* выбор роли — в стиле полей ввода: лейбл как у Input, сегменты как поле */
@@ -175,27 +164,27 @@
 .roleOptions {
   display: flex;
   inline-size: 320px;
-  background: rgb(255 255 255 / 5%);
-  border: 1px solid rgb(255 255 255 / 18%);
+  background: var(--white-05);
+  border: 1px solid var(--white-18);
 }
 
 .roleOpt {
   composes: label-md tk-12 from '../../design/typography.module.css';
   flex: 1;
   padding: 12px 14px;
-  color: rgb(255 255 255 / 55%);
+  color: var(--white-55);
   cursor: pointer;
   background: transparent;
   border: 0;
 }
 
 .roleOptOn {
-  color: #fff;
-  background: rgb(255 255 255 / 12%);
+  color: var(--fg);
+  background: var(--white-12);
 }
 
 .roleOpt + .roleOpt {
-  border-inline-start: 1px solid rgb(255 255 255 / 18%);
+  border-inline-start: 1px solid var(--white-18);
 }
 
 .roleOpt:disabled {
@@ -204,7 +193,7 @@
 }
 
 .roleOpt:hover:not(:disabled) {
-  color: #fff;
+  color: var(--fg);
 }
 
 /* подпись под выбором роли (только зритель / нет мест) — условная, форма дышит */
@@ -253,7 +242,7 @@
   gap: 10px;
   align-items: center;
   padding-block: 10px; /* коробка как у кнопки (padding 10px) — текст на той же линии */
-  color: rgb(255 255 255 / 70%);
+  color: var(--white-70);
 }
 
 /* успех — зелёным, до переброса в лобби */

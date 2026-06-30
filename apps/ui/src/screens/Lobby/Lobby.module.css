@@ -6,8 +6,8 @@
   block-size: 100vh;
   padding: 48px clamp(40px, 7vw, 96px);
   overflow: hidden;
-  color: #fff;
-  background: #000;
+  color: var(--fg);
+  background: var(--bg);
 }
 
 /* ===== шапка ===== */
@@ -17,7 +17,7 @@
   align-items: flex-start;
   justify-content: space-between;
   padding-block-end: 28px;
-  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  border-block-end: 1px solid var(--white-08);
 }
 
 .titleRow {
@@ -35,7 +35,7 @@
 .headDivider {
   inline-size: 1px;
   block-size: 30px;
-  background: rgb(255 255 255 / 20%);
+  background: var(--white-20);
 }
 
 .title {
@@ -48,7 +48,7 @@
 
   /* выровнено под слово «Лобби»: лого 96 + gap 18 + линия 1 + gap 18 */
   margin: 6px 0 0 133px;
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
 }
 
 /* правая часть шапки: код игры + переключатель языка в одну линию */
@@ -78,12 +78,12 @@
 
 .count {
   composes: mono-md tk-10 from '../../design/typography.module.css';
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
 }
 
 .lockTag {
   composes: mono-xs tk-10 from '../../design/typography.module.css';
-  color: rgb(255 255 255 / 40%);
+  color: var(--white-40);
   text-transform: none; /* сброс капса родителя .h (заголовок uppercase) */
 }
 
@@ -144,14 +144,14 @@
   justify-content: center;
   padding-block-start: 22px;
   margin-block-start: 22px;
-  border-block-start: 1px solid rgb(255 255 255 / 8%);
+  border-block-start: 1px solid var(--white-08);
 }
 
 /* ===== модалка подтверждения расформирования ===== */
 .confirmText {
   composes: body-lg from '../../design/typography.module.css';
   margin: 0;
-  color: rgb(255 255 255 / 75%);
+  color: var(--white-75);
 }
 
 .confirmActions {
@@ -159,16 +159,4 @@
   gap: 18px;
   justify-content: flex-end;
   margin-block-start: auto;
-}
-
-/* деструктивная кнопка в модалке (выше специфичности .tech) */
-button.danger {
-  color: #ff6b81;
-  border-color: rgb(255 107 129 / 45%);
-}
-
-button.danger:hover {
-  color: #fff;
-  background: rgb(255 107 129 / 12%);
-  border-color: #ff6b81;
 }
