@@ -98,7 +98,7 @@
 .divider {
   block-size: 1px;
   margin: 4px 0;
-  background: rgb(255 255 255 / 10%);
+  background: var(--white-10);
 }
 
 /* лимит зрителей: подпись над слайдером (две строки), слайдер на всю ширину */
@@ -112,5 +112,5 @@
 .specLabel {
   composes: label-sm tk-12 from '../../design/typography.module.css';
   padding: 0 4px;
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
 }

@@ -74,7 +74,7 @@
   align-self: center;
   inline-size: 13px;
   block-size: 13px;
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
 }
 
 /* выделенное имя (цель-карта) — цветом задаётся инлайн */
@@ -85,14 +85,14 @@
 /* цель-игрок — нейтрально (у игрока нет типа карты) */
 .targetPlayer {
   font-weight: 600;
-  color: rgb(255 255 255 / 85%);
+  color: var(--white-85);
 }
 
 /* «добор» — пометка вскрытой публичной карты (503 / AI) */
 .drawTag {
   composes: tag-sm tk-08 from '../../design/typography.module.css';
   flex: 0 0 auto;
-  color: rgb(255 255 255 / 40%);
+  color: var(--white-40);
 }
 
 /* связка с жёлтой поддержкой: Bug + Sudo */
@@ -104,7 +104,7 @@
 }
 
 .plus {
-  color: rgb(255 255 255 / 40%);
+  color: var(--white-40);
 }
 
 /* хвост возврата (карта/эффект → атакующий) */
@@ -115,7 +115,7 @@
 }
 
 .tailName {
-  color: rgb(255 255 255 / 60%);
+  color: var(--white-60);
 }
 
 /* системная строка (выбывание) — нейтрально-серая, техническая */
@@ -123,12 +123,12 @@
   composes: body-2xs tk-04 from '../../design/typography.module.css';
   position: relative;
   padding: 7px 12px;
-  color: rgb(255 255 255 / 40%);
+  color: var(--white-40);
 }
 
 /* справа — кто сделал */
 .who {
   flex: 0 0 auto;
   margin-inline-start: auto;
-  color: rgb(255 255 255 / 50%);
+  color: var(--white-50);
 }

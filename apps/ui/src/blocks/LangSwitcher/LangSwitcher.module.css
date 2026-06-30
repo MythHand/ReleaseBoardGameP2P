@@ -11,7 +11,7 @@
 
 .label {
   composes: label-sm tk-16 from '../../design/typography.module.css';
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
 }
 
 .row {
@@ -27,10 +27,10 @@
    Типографика — отдельной ролью по варианту: .langCode (компакт) / .langFull. */
 .lang {
   padding: 6px 10px;
-  color: rgb(255 255 255 / 55%);
+  color: var(--white-55);
   cursor: pointer;
   background: transparent;
-  border: 1px solid rgb(255 255 255 / 18%);
+  border: 1px solid var(--white-18);
   transition: color var(--t-fast) var(--ease-out),
     border-color var(--t-fast) var(--ease-out);
 }
@@ -56,8 +56,8 @@
 }
 
 .lang:hover {
-  color: #fff;
-  border-color: rgb(255 255 255 / 55%);
+  color: var(--fg);
+  border-color: var(--white-55);
 }
 
 /* широкий вариант — полные имена «Русский/English», без капса, шире */
@@ -69,5 +69,5 @@
 /* выбранный — только зелёный текст, без заливки */
 .langOn,
 .langOn:hover {
-  color: #8fd9b0;
+  color: var(--mint);
 }

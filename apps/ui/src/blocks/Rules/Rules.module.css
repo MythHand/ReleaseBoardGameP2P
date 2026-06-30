@@ -4,12 +4,12 @@
 
 .rules {
   composes: body from '../../design/typography.module.css';
-  color: rgb(255 255 255 / 86%);
+  color: var(--white-86);
 }
 
 .rules b {
   font-weight: 700;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* ── поиск ─────────────────────────────────────────── */
@@ -20,17 +20,17 @@
   inset-block-start: 0;
   z-index: 2;
   margin-block-end: 18px;
-  background: color-mix(in srgb, var(--surface-1) 94%, #000);
+  background: color-mix(in srgb, var(--surface-1) 94%, var(--bg));
 }
 
 .search {
   composes: mono-md tk-04 from '../../design/typography.module.css';
   inline-size: 100%;
   padding: 10px 104px 10px 14px;
-  color: #fff;
+  color: var(--fg);
   outline: none;
-  background: rgb(255 255 255 / 5%);
-  border: 1px solid rgb(255 255 255 / 16%);
+  background: var(--white-05);
+  border: 1px solid var(--white-16);
 }
 
 .search:focus {
@@ -38,7 +38,7 @@
 }
 
 .search::placeholder {
-  color: rgb(255 255 255 / 35%);
+  color: var(--white-35);
 }
 
 /* счётчик совпадений + стрелки навигации + крестик очистки */
@@ -55,7 +55,7 @@
 .count {
   composes: mono-xs tk-04 from '../../design/typography.module.css';
   margin-inline-end: 2px;
-  color: rgb(255 255 255 / 55%);
+  color: var(--white-55);
   white-space: nowrap;
 }
 
@@ -68,16 +68,16 @@
   block-size: 22px;
   padding: 0;
   font-size: 13px;
-  color: rgb(255 255 255 / 70%);
+  color: var(--white-70);
   cursor: pointer;
   background: transparent;
-  border: 1px solid rgb(255 255 255 / 14%);
+  border: 1px solid var(--white-14);
 }
 
 .navBtn:hover:not(:disabled),
 .clearBtn:hover {
-  color: #fff;
-  border-color: rgb(255 255 255 / 32%);
+  color: var(--fg);
+  border-color: var(--white-32);
 }
 
 .navBtn:disabled {
@@ -92,20 +92,20 @@
 
 /* подсветка совпадений: все — приглушённый жёлтый, активное — яркое */
 .mark {
-  color: #fff;
-  background: rgb(255 230 120 / 28%);
+  color: var(--fg);
+  background: var(--yellow-28);
   border-radius: 2px;
 }
 
 .markActive {
-  color: #1c1c1c;
-  background: rgb(255 168 12 / 95%);
+  color: var(--charcoal);
+  background: var(--orange-95);
   border-radius: 2px;
 }
 
 .empty {
   margin: 0;
-  color: rgb(255 255 255 / 50%);
+  color: var(--white-50);
 }
 
 /* ── мета-строка ───────────────────────────────────── */
@@ -117,15 +117,15 @@
   grid-template-columns: 1fr 1fr;
   padding: 0;
   margin: 0 0 30px;
-  color: rgb(255 255 255 / 60%);
+  color: var(--white-60);
   list-style: none;
-  border: 1px solid rgb(255 255 255 / 12%);
+  border: 1px solid var(--white-12);
 }
 
 .meta li {
   padding: 9px 13px;
-  border-block-start: 1px solid rgb(255 255 255 / 8%);
-  border-inline-start: 1px solid rgb(255 255 255 / 8%);
+  border-block-start: 1px solid var(--white-08);
+  border-inline-start: 1px solid var(--white-08);
 }
 
 .meta li:nth-child(-n + 2) {
@@ -175,7 +175,7 @@
 .h {
   composes: heading-6 tk-05 from '../../design/typography.module.css';
   margin: 0;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* ── подраздел (### в источнике) ───────────────────── */
@@ -206,7 +206,7 @@
 .sub {
   composes: heading-9 tk-08 from '../../design/typography.module.css';
   margin: 0;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* ── абзацы и списки ───────────────────────────────── */
@@ -243,7 +243,7 @@
   align-self: flex-start;
   inline-size: 98px;
   block-size: auto;
-  border: 1px solid rgb(255 255 255 / 12%);
+  border: 1px solid var(--white-12);
   border-radius: 4px;
 }
 
@@ -260,7 +260,7 @@
 
 .cardDesc {
   margin: 0;
-  color: rgb(255 255 255 / 78%);
+  color: var(--white-78);
 }
 
 /* список и ремарка внутри богатой карты (триггер-карты) */
@@ -279,7 +279,7 @@
 
 .cardOutro {
   margin: 7px 0 0;
-  color: rgb(255 255 255 / 86%);
+  color: var(--white-86);
 }
 
 /* усиленный (sudo) эффект — отдельной строкой; жёлтым только метка «sudo + имя» */
@@ -289,15 +289,15 @@
 
 .sudoMark {
   padding: 1px 6px;
-  color: rgb(255 255 255 / 90%);
-  background: rgb(255 206 70 / 20%);
+  color: var(--white-90);
+  background: var(--amber-20);
 }
 
 /* игровые режимы — таблица «опция → эффект» */
 .modeTable {
   display: grid;
   grid-template-columns: max-content 1fr;
-  border: 1px solid rgb(255 255 255 / 12%);
+  border: 1px solid var(--white-12);
 }
 
 .modeName,
@@ -309,19 +309,19 @@
   composes: code-sm from '../../design/typography.module.css';
   color: var(--cat-release);
   white-space: nowrap;
-  border-inline-end: 1px solid rgb(255 255 255 / 10%);
+  border-inline-end: 1px solid var(--white-10);
 }
 
 .modeVal {
-  color: rgb(255 255 255 / 82%);
+  color: var(--white-82);
 }
 
 .modeTable > *:nth-child(n + 3) {
-  border-block-start: 1px solid rgb(255 255 255 / 8%);
+  border-block-start: 1px solid var(--white-08);
 }
 
 /* ── завершающая ремарка секции/подраздела — обычный текст ─ */
 .outro {
   margin: 28px 0 8px;
-  color: rgb(255 255 255 / 86%);
+  color: var(--white-86);
 }
