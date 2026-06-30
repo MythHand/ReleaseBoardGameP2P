@@ -12,12 +12,12 @@
 
 .right {
   inset-inline-end: 0;
-  border-inline-start: 1px solid rgb(255 255 255 / 10%);
+  border-inline-start: 1px solid var(--white-10);
 }
 
 .left {
   inset-inline-start: 0;
-  border-inline-end: 1px solid rgb(255 255 255 / 10%);
+  border-inline-end: 1px solid var(--white-10);
 }
 
 .tab {
@@ -30,7 +30,7 @@
   cursor: pointer;
   background: transparent;
   border: none;
-  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  border-block-end: 1px solid var(--white-08);
   opacity: 0.6;
   writing-mode: vertical-rl;
   text-orientation: mixed;
@@ -56,6 +56,6 @@
 
 .tabOn {
   color: var(--brand-green);
-  background: rgb(41 224 122 / 8%);
+  background: var(--brand-green-08);
   opacity: 1;
 }

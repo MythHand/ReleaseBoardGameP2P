@@ -45,6 +45,6 @@ button {
 
 /* выделение текста — приглушённый зелёный, читаемо (на весь проект) */
 ::selection {
-  color: #fff;
+  color: var(--fg);
   background: color-mix(in srgb, var(--brand-green) 30%, transparent);
 }

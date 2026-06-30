@@ -2,7 +2,7 @@
   display: inline-flex;
   gap: 9px;
   align-items: center;
-  color: #fff;
+  color: var(--fg);
   white-space: nowrap;
   cursor: pointer;
   background: transparent;
@@ -39,23 +39,23 @@
 /* техническая — бордер-бокс */
 .tech {
   padding: 6px 10px;
-  color: rgb(255 255 255 / 60%);
-  border: 1px solid rgb(255 255 255 / 18%);
+  color: var(--white-60);
+  border: 1px solid var(--white-18);
   border-radius: 4px;
   transition: color var(--t-fast) var(--ease-out),
     border-color var(--t-fast) var(--ease-out);
 }
 
 .tech:hover {
-  color: #fff;
-  border-color: rgb(255 255 255 / 55%);
+  color: var(--fg);
+  border-color: var(--white-55);
 }
 
 /* деструктивная — как tech, но красный акцент */
 .danger {
   padding: 6px 10px;
-  color: #ff6b81;
-  border: 1px solid rgb(255 107 129 / 45%);
+  color: var(--coral);
+  border: 1px solid var(--coral-45);
   border-radius: 4px;
   transition: color var(--t-fast) var(--ease-out),
     border-color var(--t-fast) var(--ease-out),
@@ -63,17 +63,17 @@
 }
 
 .danger:hover {
-  color: #fff;
-  background: rgb(255 107 129 / 12%);
-  border-color: #ff6b81;
+  color: var(--fg);
+  background: var(--coral-12);
+  border-color: var(--coral);
 }
 
 /* деструктивная «призрак» — серая в покое (как tech), заливается красным на
    ховере (кнопка «расформировать» в хедере лобби) */
 .dangerGhost {
   padding: 6px 10px;
-  color: rgb(255 255 255 / 60%);
-  border: 1px solid rgb(255 255 255 / 18%);
+  color: var(--white-60);
+  border: 1px solid var(--white-18);
   border-radius: 4px;
   transition: color var(--t-fast) var(--ease-out),
     border-color var(--t-fast) var(--ease-out),
@@ -81,9 +81,9 @@
 }
 
 .dangerGhost:hover {
-  color: #fff;
-  background: rgb(255 107 129 / 12%);
-  border-color: #ff6b81;
+  color: var(--fg);
+  background: var(--coral-12);
+  border-color: var(--coral);
 }
 
 /* иконочная — квадрат, высота от flex-родителя (stretch) или min 52px standalone. */
@@ -94,17 +94,17 @@
   aspect-ratio: 1;
   padding: 0;
   font-size: 20px;
-  color: rgb(255 255 255 / 65%);
-  background: rgb(255 255 255 / 5%);
-  border: 1px solid rgb(255 255 255 / 18%);
+  color: var(--white-65);
+  background: var(--white-05);
+  border: 1px solid var(--white-18);
   transition: color var(--t-fast) var(--ease-out),
     border-color var(--t-fast) var(--ease-out),
     background var(--t-fast) var(--ease-out);
 }
 
 .icon:hover {
-  color: #fff;
-  background: rgb(255 255 255 / 8%);
+  color: var(--fg);
+  background: var(--white-08);
   border-color: var(--brand-green);
 }
 

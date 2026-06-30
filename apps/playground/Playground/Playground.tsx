@@ -87,7 +87,7 @@ const groups: Group[] = [
   {
     title: 'Основа',
     items: [
-      { id: 'design-tokens', title: 'Design Tokens', render: () => <TokenPreview /> },
+      { id: 'colors', title: 'Colors', render: () => <TokenPreview /> },
       { id: 'typography', title: 'Typography', render: () => <TypographyPreview /> },
       { id: 'text-styles', title: 'Text styles', render: () => <TextStyles /> },
     ],

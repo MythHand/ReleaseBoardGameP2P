@@ -382,7 +382,7 @@ export default function Lobby({
           <Button variant="tech" onClick={() => setDisbandOpen(false)}>
             {copy.cancel}
           </Button>
-          <Button variant="tech" className={styles.danger} onClick={() => setDisbandOpen(false)}>
+          <Button variant="danger" onClick={() => setDisbandOpen(false)}>
             {copy.disband}
           </Button>
         </div>

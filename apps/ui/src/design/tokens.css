@@ -107,6 +107,31 @@
   --amber-20: rgb(255 206 70 / 20%);
   --orange-95: rgb(255 168 12 / 95%);
 
+  /* ===== Gradients ===== */
+  --grad-selection: linear-gradient(
+    165deg,
+    var(--mint-light) 0%,
+    var(--mint-dark) 100%
+  ); /* выделенный сегмент ModeSelect (мятная заливка ползунка) */
+  --grad-scrim: linear-gradient(
+    90deg,
+    var(--black-80) 0%,
+    var(--black-66) 36%,
+    var(--black-48) 70%,
+    var(--black-32) 100%
+  ); /* затемнение фона слева→направо (Start/Invite) */
+  --grad-corner-shade: radial-gradient(
+    120% 120% at 100% 0%,
+    var(--black-42) 0%,
+    var(--black-20) 42%,
+    transparent 72%
+  ); /* мягкое затемнение в углу под свитчером языка (Start/Invite) */
+  --grad-defense: linear-gradient(
+    90deg,
+    var(--cat-defense),
+    var(--cat-protection)
+  ); /* «защитные» категории — синий→фиолетовый (текст-градиент в Stats) */
+
   /* ===== Типографика =====
      Настолка: Onest — заголовки, Fira Mono — основной текст.
      Лоадер/терминал (boot): JetBrains Mono — НЕ затираем, остаётся за модулем лоадера. */

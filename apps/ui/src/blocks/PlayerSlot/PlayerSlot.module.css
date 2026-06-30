@@ -4,22 +4,22 @@
   gap: 14px;
   align-items: center;
   padding: 14px 16px;
-  border: 1px solid rgb(255 255 255 / 10%);
+  border: 1px solid var(--white-10);
 }
 
 .slot {
-  background: rgb(255 255 255 / 4%);
+  background: var(--white-04);
 }
 
 .slotMe {
-  border-color: rgb(143 217 176 / 50%);
+  border-color: var(--mint-50);
 }
 
 /* offline — приглушаем точечно цветом, без opacity на всей строке
    (иначе бы тускнел и дропдаун «⋯») */
 .slotOff {
-  background: rgb(255 255 255 / 2%);
-  border-color: rgb(255 255 255 / 7%);
+  background: var(--white-02);
+  border-color: var(--white-07);
 }
 
 .name {
@@ -27,12 +27,12 @@
 }
 
 .slotOff .name {
-  color: rgb(255 255 255 / 40%);
+  color: var(--white-40);
 }
 
 .you {
   composes: body-sm from '../../design/typography.module.css';
-  color: rgb(255 255 255 / 40%);
+  color: var(--white-40);
 }
 
 /* правый край строки: статус + дропдаун «…» */
@@ -46,6 +46,6 @@
 
 .slotEmpty {
   composes: label tk-12 from '../../design/typography.module.css';
-  color: rgb(255 255 255 / 30%);
+  color: var(--white-30);
   border-style: dashed;
 }

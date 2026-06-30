@@ -9,9 +9,9 @@
   align-items: center;
   padding: 44px 60px;
   text-align: center;
-  background: color-mix(in srgb, var(--surface-1) 94%, #000);
-  border: 1px solid rgb(143 217 176 / 40%);
-  box-shadow: 0 30px 80px rgb(0 0 0 / 60%);
+  background: color-mix(in srgb, var(--surface-1) 94%, var(--bg));
+  border: 1px solid var(--mint-40);
+  box-shadow: 0 30px 80px var(--black-60);
   animation: game-over-in 360ms var(--ease-soft);
 }
 
@@ -28,25 +28,25 @@
 .crown {
   font-size: 48px;
   line-height: 1;
-  color: #8fd9b0;
+  color: var(--mint);
 }
 
 .label {
   composes: label-sm tk-20 from '../../design/typography.module.css';
   margin-block-start: 16px;
-  color: #8fd9b0;
+  color: var(--mint);
 }
 
 .name {
   composes: heading-1 tk-02 from '../../design/typography.module.css';
   margin-block-start: 8px;
-  color: #fff;
+  color: var(--fg);
 }
 
 .condition {
   composes: label tk-12 from '../../design/typography.module.css';
   margin-block-start: 10px;
-  color: rgb(255 255 255 / 50%);
+  color: var(--white-50);
 }
 
 .actions {

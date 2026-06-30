@@ -1,5 +1,8 @@
-import type { CSSProperties } from 'react'
-import Typography, { type TypographyVariant, VARIANTS } from '../primitives/Typography'
+import Typography, {
+  type TypographyBase,
+  type TypographyVariant,
+  VARIANTS,
+} from '../primitives/Typography'
 import styles from './TypographyPreview.module.css'
 
 // ШКАЛА ТЕКСТА — витрина живого фундамента design/typography.module.css.
@@ -9,11 +12,9 @@ import styles from './TypographyPreview.module.css'
 interface ScaleRow {
   cls: string
   font: string
-  fontVar: string
   size: number
   weight?: number
   lh?: number
-  tracking?: string
   upper?: boolean
   sample: string
   where: string
@@ -24,45 +25,35 @@ const scale: ScaleRow[] = [
   {
     cls: 'heading-1',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 34,
-    tracking: '0.02em',
     sample: 'dimbo',
     where: 'Имя победителя (GameOver)',
   },
   {
     cls: 'heading-2',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 32,
-    tracking: '0.04em',
     sample: 'Итоги партии',
     where: 'Заголовок экрана (Stats)',
   },
   {
     cls: 'heading-3',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 30,
-    tracking: '0.04em',
     sample: 'Лобби',
     where: 'Заголовок экрана (Lobby)',
   },
   {
     cls: 'heading-4',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 26,
-    tracking: '0.02em',
     sample: 'dimbo',
     where: 'Имя победителя (Stats)',
   },
   {
     cls: 'heading-5',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 20,
-    tracking: '0.06em',
     upper: true,
     sample: 'Создать игру',
     where: 'Заголовок модалки',
@@ -70,9 +61,7 @@ const scale: ScaleRow[] = [
   {
     cls: 'heading-6',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 19,
-    tracking: '0.05em',
     upper: true,
     sample: 'Описание карт',
     where: 'Заголовок секции (Rules)',
@@ -80,10 +69,8 @@ const scale: ScaleRow[] = [
   {
     cls: 'heading-7',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 18,
     weight: 700,
-    tracking: '0.02em',
     upper: true,
     sample: 'AI зависимый',
     where: 'Заголовок ачивки (Stats)',
@@ -91,9 +78,7 @@ const scale: ScaleRow[] = [
   {
     cls: 'heading-8',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 16,
-    tracking: '0.04em',
     upper: true,
     sample: 'Параметры лобби',
     where: 'Заголовки блоков/секций (Lobby, Start, Invite, ModeSelect)',
@@ -101,18 +86,14 @@ const scale: ScaleRow[] = [
   {
     cls: 'subtitle',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 16,
-    tracking: '0.02em',
     sample: 'Режим партии',
     where: 'Заголовок режима (ModeSelect), tech-заголовок модалки (Start) — без капса',
   },
   {
     cls: 'heading-9',
     font: 'Onest',
-    fontVar: 'var(--font-heading)',
     size: 15,
-    tracking: '0.08em',
     upper: true,
     sample: 'Атакующие карты',
     where: 'Подзаголовок правил (Rules)',
@@ -121,7 +102,6 @@ const scale: ScaleRow[] = [
   {
     cls: 'body-lg',
     font: 'Fira Mono',
-    fontVar: 'var(--font-text)',
     size: 15,
     lh: 1.6,
     sample: 'Описание игры на стартовом экране.',
@@ -130,7 +110,6 @@ const scale: ScaleRow[] = [
   {
     cls: 'body',
     font: 'Fira Mono',
-    fontVar: 'var(--font-text)',
     size: 14,
     lh: 1.62,
     sample: 'Тело правил и описаний карт.',
@@ -139,7 +118,6 @@ const scale: ScaleRow[] = [
   {
     cls: 'body-sm',
     font: 'Fira Mono',
-    fontVar: 'var(--font-text)',
     size: 13,
     sample: 'dimbo выложил Frontend',
     where: 'Имя игрока (Seat), сноска (Start)',
@@ -147,7 +125,6 @@ const scale: ScaleRow[] = [
   {
     cls: 'body-xs',
     font: 'Fira Mono',
-    fontVar: 'var(--font-text)',
     size: 12,
     sample: 'dimbo выложил Frontend',
     where: 'Строка лога ходов (MoveHistory)',
@@ -155,7 +132,6 @@ const scale: ScaleRow[] = [
   {
     cls: 'body-2xs',
     font: 'Fira Mono',
-    fontVar: 'var(--font-text)',
     size: 11,
     sample: 'игрок выбыл из партии',
     where: 'Мелкие тех-строки стола (system/nested лога, рука в Seat)',
@@ -163,9 +139,7 @@ const scale: ScaleRow[] = [
   {
     cls: 'label-lg',
     font: 'Fira Mono',
-    fontVar: 'var(--font-text)',
     size: 15,
-    tracking: '0.16em',
     upper: true,
     sample: 'правила',
     where: 'Вкладки боковой полосы (TabRail)',
@@ -173,9 +147,7 @@ const scale: ScaleRow[] = [
   {
     cls: 'tag',
     font: 'Fira Mono',
-    fontVar: 'var(--font-text)',
     size: 12,
-    tracking: '0.1em',
     upper: true,
     sample: 'игроки',
     where: 'Заголовки секций стола (Participants, Table settings)',
@@ -183,9 +155,7 @@ const scale: ScaleRow[] = [
   {
     cls: 'pile-label',
     font: 'Fira Mono',
-    fontVar: 'var(--font-text)',
     size: 11,
-    tracking: '0.08em',
     upper: true,
     sample: 'колода',
     where: 'Лейбл стопки/колоды (Pile)',
@@ -193,9 +163,7 @@ const scale: ScaleRow[] = [
   {
     cls: 'tag-sm',
     font: 'Fira Mono',
-    fontVar: 'var(--font-text)',
     size: 10,
-    tracking: '0.08em',
     upper: true,
     sample: 'добор',
     where: 'Микро-теги (добор в MoveHistory, пустой слот ReleaseZone)',
@@ -204,28 +172,22 @@ const scale: ScaleRow[] = [
   {
     cls: 'numeric-xl',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 52,
     weight: 300,
-    tracking: '0',
     sample: '12',
     where: 'Большое число ачивки (Stats)',
   },
   {
     cls: 'code',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 26,
-    tracking: '0.2em',
     sample: '4F2A-9K',
     where: 'Код игры (Lobby)',
   },
   {
     cls: 'value',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 18,
-    tracking: '0.14em',
     upper: true,
     sample: 'DIMBO',
     where: 'Значение поля ввода (Input)',
@@ -233,9 +195,7 @@ const scale: ScaleRow[] = [
   {
     cls: 'button',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 17,
-    tracking: '0.18em',
     upper: true,
     sample: 'создать игру',
     where: 'Primary-кнопка (в брекетах)',
@@ -243,7 +203,6 @@ const scale: ScaleRow[] = [
   {
     cls: 'numeric',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 16,
     sample: '12',
     where: 'Числа таблицы (Stats), значение слайдера',
@@ -251,37 +210,29 @@ const scale: ScaleRow[] = [
   {
     cls: 'mono-lg',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 15,
-    tracking: '0.02em',
     sample: 'release-note',
     where: 'Код-заметка (Pile); таб (TabRail, UPPERCASE)',
   },
   {
     cls: 'mono',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 14,
-    tracking: '0.04em',
     sample: 'dimbo',
     where: 'Имя игрока (Stats), Reconnect',
   },
   {
     cls: 'mono-strong',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 14,
     weight: 700,
-    tracking: '0.02em',
     sample: 'Соло',
     where: 'Заголовок опции (ModeSelect)',
   },
   {
     cls: 'notice',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 14,
-    tracking: '0.1em',
     upper: true,
     sample: 'переподключение',
     where: 'Плашка переподключения (Reconnect)',
@@ -289,28 +240,22 @@ const scale: ScaleRow[] = [
   {
     cls: 'mono-md',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 13,
-    tracking: '0.04em',
     sample: 'поиск по правилам',
     where: 'Поле поиска правил (Rules)',
   },
   {
     cls: 'code-sm',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 12,
     weight: 600,
-    tracking: '0.04em',
     sample: 'Code Review',
     where: 'Имя карты / название режима (Rules)',
   },
   {
     cls: 'label-md',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 13,
-    tracking: '0.14em',
     upper: true,
     sample: 'вы выбыли',
     where: 'Крупный бейдж-плашка (Badge lg)',
@@ -318,9 +263,7 @@ const scale: ScaleRow[] = [
   {
     cls: 'label',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 12,
-    tracking: '0.12em',
     upper: true,
     sample: 'Победы',
     where: 'Лейблы секций, теги, бейджи (Lobby, Stats, Participants…)',
@@ -328,18 +271,14 @@ const scale: ScaleRow[] = [
   {
     cls: 'mono-sm',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 12,
-    tracking: '0.01em',
     sample: 'игра против ИИ',
     where: 'Описание опции (ModeSelect), второстепенные тех-строки',
   },
   {
     cls: 'label-sm',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 11,
-    tracking: '0.16em',
     upper: true,
     sample: 'Ваш никнейм',
     where: 'Лейблы полей (Input), бейджи, tech/danger-кнопки',
@@ -347,40 +286,19 @@ const scale: ScaleRow[] = [
   {
     cls: 'mono-xs',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 11,
-    tracking: '0.04em',
     sample: 'недоступно',
     where: 'Подсказка дропдауна, мелкие тех-строки',
   },
   {
     cls: 'overline',
     font: 'JetBrains Mono',
-    fontVar: 'var(--font-mono)',
     size: 10,
-    tracking: '0.2em',
     upper: true,
     sample: 'смотреть обзор',
     where: 'Капшен play-кнопки (Start), метки (MoveHistory, ReleaseZone)',
   },
 ]
-
-const sampleStyle = (r: ScaleRow): CSSProperties => ({
-  fontFamily: r.fontVar,
-  fontSize: r.size,
-  fontWeight: r.weight,
-  lineHeight: r.lh,
-  letterSpacing: r.tracking,
-  textTransform: r.upper ? 'uppercase' : undefined,
-})
-
-// имя tk-модификатора по значению трекинга (0.16em → tk-16, 0 → tk-0, нет → —)
-const tkName = (t?: string): string => {
-  if (t == null) return '—'
-  if (t === '0') return 'tk-0'
-  const nn = Math.round(Number.parseFloat(t) * 100)
-  return `tk-${nn.toString().padStart(2, '0')}`
-}
 
 // вариации трекинга, заложенные в typography.module.css
 const trackings: { name: string; em: string }[] = [
@@ -528,10 +446,9 @@ export default function TypographyPreview() {
       <p className={styles.scaleNote}>
         Двухслойная: <b>база</b> (роль — семейство + размер + начертание + регистр) и{' '}
         <b>вариация трекинга</b> <code>tk-NN</code>. В компоненте —{' '}
-        <code>composes: база tk-NN</code> (трекинг живёт только в tk, дизайн держится на этих
-        нюансах). Колонка «tk» — модификатор для типового применения базы; «—» = трекинг нормальный,
-        без модификатора. Реализовано в <code>design/typography.module.css</code>. Исключены глифы
-        (♛, ×, ▶) и шрифт лоадера.
+        <code>composes: база tk-NN</code> (трекинг живёт только в tk). Образцы ниже отрендерены
+        самой базой — без трекинга; вариации tk показаны отдельной таблицей. Реализовано в{' '}
+        <code>design/typography.module.css</code>. Исключены глифы (♛, ×, ▶) и шрифт лоадера.
       </p>
       <table className={styles.scaleTable}>
         <thead>
@@ -540,7 +457,6 @@ export default function TypographyPreview() {
             <th>образец</th>
             <th>шрифт</th>
             <th>размер</th>
-            <th>tk</th>
             <th>регистр</th>
             <th>где используется</th>
           </tr>
@@ -550,14 +466,13 @@ export default function TypographyPreview() {
             <tr key={r.cls}>
               <td className={styles.scaleName}>{r.cls}</td>
               <td>
-                <span style={sampleStyle(r)}>{r.sample}</span>
+                <Typography base={r.cls as TypographyBase}>{r.sample}</Typography>
               </td>
               <td className={styles.scaleMeta}>{r.font}</td>
               <td className={styles.scaleMeta}>
                 {r.size}px{r.lh ? ` / ${r.lh}` : ''}
                 {r.weight ? ` · ${r.weight}` : ''}
               </td>
-              <td className={styles.scaleMeta}>{tkName(r.tracking)}</td>
               <td className={styles.scaleMeta}>{r.upper ? 'UPPERCASE' : '—'}</td>
               <td className={styles.scaleWhere}>{r.where}</td>
             </tr>

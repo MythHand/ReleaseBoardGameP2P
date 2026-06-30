@@ -11,23 +11,23 @@
 }
 
 .success {
-  color: #8fd9b0;
+  color: var(--mint);
 }
 
 .muted {
-  color: rgb(255 255 255 / 42%);
+  color: var(--white-42);
 }
 
 .danger {
-  color: #ff6b81;
+  color: var(--coral);
 }
 
 .warning {
-  color: #e3b341;
+  color: var(--gold);
 }
 
 .info {
-  color: #7fb0ff;
+  color: var(--periwinkle);
 }
 
 /* крупная «плашка» — тёмный фон + нейтральная рамка (напр. «вы выбыли» на столе).
@@ -35,9 +35,9 @@
 .lg {
   composes: label-md tk-14 from '../../design/typography.module.css';
   padding: 8px 16px;
-  color: rgb(255 255 255 / 70%);
-  background: rgb(0 0 0 / 45%);
-  border: 1px solid rgb(255 255 255 / 20%);
+  color: var(--white-70);
+  background: var(--black-45);
+  border: 1px solid var(--white-20);
 }
 
 .outlined {

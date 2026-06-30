@@ -12,7 +12,7 @@
   block-size: 28px;
   font-size: 18px;
   line-height: 1;
-  color: rgb(255 255 255 / 50%);
+  color: var(--white-50);
   cursor: pointer;
   background: transparent;
   border: 0;
@@ -20,7 +20,7 @@
 }
 
 .kebab:hover {
-  color: #fff;
+  color: var(--fg);
 }
 
 .menu {
@@ -29,9 +29,9 @@
   inset-inline-end: 0;
   z-index: 5;
   inline-size: max-content;
-  background: color-mix(in srgb, var(--surface-1) 96%, #000);
-  border: 1px solid rgb(255 255 255 / 14%);
-  box-shadow: 0 16px 40px rgb(0 0 0 / 50%);
+  background: color-mix(in srgb, var(--surface-1) 96%, var(--bg));
+  border: 1px solid var(--white-14);
+  box-shadow: 0 16px 40px var(--black-50);
 }
 
 .item {
@@ -39,7 +39,7 @@
   display: block;
   inline-size: 100%;
   padding: 11px 18px;
-  color: rgb(255 255 255 / 85%);
+  color: var(--white-85);
   text-align: start;
   white-space: nowrap;
   cursor: pointer;
@@ -49,24 +49,24 @@
 }
 
 .item:hover {
-  color: #fff;
-  background: rgb(255 255 255 / 8%);
+  color: var(--fg);
+  background: var(--white-08);
 }
 
 /* деструктивный пункт */
 .itemDanger {
-  color: #ff6b81;
+  color: var(--coral);
 }
 
 .itemDanger:hover {
-  color: #ff6b81;
-  background: rgb(255 107 129 / 12%);
+  color: var(--coral);
+  background: var(--coral-12);
 }
 
 /* недоступный пункт — серый, но кликабельный (показывает подсказку) */
 .itemDisabled,
 .itemDisabled:hover {
-  color: rgb(255 255 255 / 30%);
+  color: var(--white-30);
   cursor: default;
   background: transparent;
 }
@@ -74,7 +74,7 @@
 .hint {
   composes: mono-xs tk-04 from '../../design/typography.module.css';
   padding: 9px 18px;
-  color: #e3b341;
+  color: var(--gold);
   white-space: nowrap;
-  border-block-start: 1px solid rgb(255 255 255 / 10%);
+  border-block-start: 1px solid var(--white-10);
 }

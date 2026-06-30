@@ -7,7 +7,7 @@
   align-items: flex-end;
   padding: 16px 24px;
   background: color-mix(in srgb, var(--surface-1) 30%, transparent);
-  border: 1px solid rgb(255 255 255 / 18%); /* как обводка свитчера языка */
+  border: 1px solid var(--white-18); /* как обводка свитчера языка */
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
@@ -24,14 +24,14 @@
 .title {
   composes: label tk-16 from '../../design/typography.module.css';
   margin: 0;
-  color: #fff;
+  color: var(--fg);
 }
 
 .note {
   composes: body-sm from '../../design/typography.module.css';
   margin: 0;
   line-height: 1.5;
-  color: rgb(255 255 255 / 60%);
+  color: var(--white-60);
 }
 
 .link {
@@ -50,6 +50,6 @@
   inline-size: 128px;
   block-size: 128px;
   margin-block-start: -94px;
-  background: rgb(255 255 255 / 6%);
-  border: 1px dashed rgb(255 255 255 / 22%);
+  background: var(--white-06);
+  border: 1px dashed var(--white-22);
 }

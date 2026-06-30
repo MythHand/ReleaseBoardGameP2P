@@ -9,8 +9,9 @@ interface ColorToken {
   value: string
 }
 
-// Color values: hex, rgb/hsl/hwb, oklch/oklab/lab/lch, color-mix.
-const COLOR_RE = /^(#|rgb|hsl|hwb|okl|lab|lch|color-mix)/i
+// Color values: hex, rgb/hsl/hwb, oklch/oklab/lab/lch, color-mix, and gradients.
+const COLOR_RE =
+  /^(#|rgb|hsl|hwb|okl|lab|lch|color-mix|(repeating-)?(linear|radial|conic)-gradient)/i
 
 // Collect every color custom property from :root — including tokens pulled in
 // via @import (CSSImportRule). The source is the live styles, so the showcase
@@ -51,12 +52,14 @@ const GROUP_ORDER = [
   'White overlays',
   'Black overlays',
   'Tinted overlays',
+  'Gradients',
 ] as const
 
 function groupOf(name: string): (typeof GROUP_ORDER)[number] {
   if (name === '--bg' || name === '--fg' || name === '--grid-line' || name.startsWith('--surface'))
     return 'Base & surfaces'
   if (name === '--brand-green' || name.startsWith('--cat-')) return 'Brand & categories'
+  if (name.startsWith('--grad')) return 'Gradients'
   if (name.startsWith('--white-')) return 'White overlays'
   if (name.startsWith('--black-')) return 'Black overlays'
   // alpha variants of the hues carry a trailing -NN (--mint-40, --coral-12, --yellow-28…)
@@ -78,7 +81,7 @@ export default function TokenPreview() {
   return (
     <section className={styles.root}>
       <h2 className={styles.h}>
-        design tokens · palette <span className={styles.note}>{`// ${tokens.length} colors`}</span>
+        colors <span className={styles.note}>{`// ${tokens.length}`}</span>
       </h2>
 
       {groups.map((g) => (
@@ -98,17 +101,6 @@ export default function TokenPreview() {
           </div>
         </div>
       ))}
-
-      <div className={styles.cardrow}>
-        <div className={styles.cardSlot}>
-          <span>card 368×515</span>
-        </div>
-        <p className={styles.typo}>
-          JetBrains Mono — ABCDEF abcdef 0123456789
-          <br />
-          «Release любой ценой»
-        </p>
-      </div>
     </section>
   )
 }

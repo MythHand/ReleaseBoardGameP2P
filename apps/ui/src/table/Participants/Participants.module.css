@@ -45,8 +45,8 @@
   gap: 12px;
   align-items: center;
   padding: 10px 12px;
-  background: rgb(255 255 255 / 4%);
-  border: 1px solid rgb(255 255 255 / 8%);
+  background: var(--white-04);
+  border: 1px solid var(--white-08);
 }
 
 .name {
@@ -61,6 +61,6 @@
 .empty {
   composes: label tk-10 from '../../design/typography.module.css';
   padding: 10px 12px;
-  color: rgb(255 255 255 / 30%);
-  border: 1px dashed rgb(255 255 255 / 12%);
+  color: var(--white-30);
+  border: 1px dashed var(--white-12);
 }
