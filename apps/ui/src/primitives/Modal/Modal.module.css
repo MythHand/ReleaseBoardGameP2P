@@ -57,7 +57,7 @@
   gap: 24px;
   align-items: center;
   justify-content: space-between;
-  padding: 22px 26px;
+  padding: 22px 26px 18px;
   border-block-end: 1px solid var(--white-08);
 }
 

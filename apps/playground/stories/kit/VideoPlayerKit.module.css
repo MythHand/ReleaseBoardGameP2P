@@ -1,8 +1,8 @@
+/* демо-область на всё оставшееся место экрана (под техническими заголовками) */
 .stage {
   position: relative;
-  inline-size: 520px;
-  max-inline-size: 100%;
-  block-size: 480px;
+  inline-size: 100%;
+  block-size: calc(100vh - 220px);
   background: var(--surface-1);
   border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
   border-radius: 12px;
