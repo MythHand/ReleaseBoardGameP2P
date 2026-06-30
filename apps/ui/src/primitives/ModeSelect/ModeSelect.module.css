@@ -7,7 +7,7 @@
 .title {
   composes: subtitle tk-02 from '../../design/typography.module.css';
   margin: 0;
-  color: #fff;
+  color: var(--fg);
 }
 
 /* дорожка с вариантами; колонки равной ширины */
@@ -15,8 +15,8 @@
   position: relative;
   display: flex;
   padding: 4px;
-  background: rgb(255 255 255 / 4.5%);
-  border: 1px solid rgb(255 255 255 / 8%);
+  background: var(--white-04-5);
+  border: 1px solid var(--white-08);
   border-radius: 12px;
 }
 
@@ -27,7 +27,7 @@
   inset-block: 4px;
   inset-inline-start: 4px;
   inline-size: calc((100% - 8px) / var(--n));
-  background: linear-gradient(165deg, #9ed9b6 0%, #6dbf96 100%);
+  background: var(--grad-selection);
   border-radius: 9px;
   transform: translateX(calc(var(--i) * 100%));
   transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1);
@@ -41,7 +41,7 @@
   gap: 5px;
   min-inline-size: 0;
   padding: 13px 16px;
-  color: rgb(255 255 255 / 55%);
+  color: var(--white-55);
   text-align: start;
   cursor: pointer;
   background: transparent;
@@ -60,7 +60,7 @@
 }
 
 .track:not(.readOnly) .opt:hover {
-  color: rgb(255 255 255 / 85%);
+  color: var(--white-85);
 }
 
 .disabled {
@@ -72,7 +72,7 @@
 /* активный текст — тёмный, для контраста на ярко-зелёном ползунке */
 .active,
 .active:hover {
-  color: #04140c;
+  color: var(--deep-green);
 }
 
 .label {

@@ -6,7 +6,7 @@
 
 .label {
   composes: label-sm tk-12 from '../../design/typography.module.css';
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
 }
 
 .slider {
@@ -16,7 +16,7 @@
   appearance: none;
   cursor: pointer;
   outline: none;
-  background: rgb(255 255 255 / 18%);
+  background: var(--white-18);
 }
 
 .slider::-webkit-slider-thumb {
@@ -25,7 +25,7 @@
   -webkit-appearance: none;
   appearance: none;
   cursor: pointer;
-  background: var(--thumb, #8fd9b0);
+  background: var(--thumb, var(--mint));
   border-radius: 50%;
 }
 
@@ -33,7 +33,7 @@
   inline-size: 16px;
   block-size: 16px;
   cursor: pointer;
-  background: var(--thumb, #8fd9b0);
+  background: var(--thumb, var(--mint));
   border: 0;
   border-radius: 50%;
 }

@@ -8,7 +8,7 @@
   display: flex;
   flex-direction: column;
   padding: 20px;
-  background: color-mix(in srgb, var(--surface-1) 92%, #000);
+  background: color-mix(in srgb, var(--surface-1) 92%, var(--bg));
 
   /* inline-size анимируется вместе со сдвигом — плавная смена ширины контента */
   transition: transform 320ms var(--ease-soft), inline-size 320ms var(--ease-soft);
@@ -16,15 +16,15 @@
 
 .right {
   inset-inline-end: var(--drawer-offset, 0);
-  border-inline-start: 1px solid rgb(255 255 255 / 10%);
-  box-shadow: -24px 0 48px rgb(0 0 0 / 55%);
+  border-inline-start: 1px solid var(--white-10);
+  box-shadow: -24px 0 48px var(--black-55);
   transform: translateX(calc(100% + var(--drawer-offset, 0px)));
 }
 
 .left {
   inset-inline-start: var(--drawer-offset, 0);
-  border-inline-end: 1px solid rgb(255 255 255 / 10%);
-  box-shadow: 24px 0 48px rgb(0 0 0 / 55%);
+  border-inline-end: 1px solid var(--white-10);
+  box-shadow: 24px 0 48px var(--black-55);
   transform: translateX(calc(-100% - var(--drawer-offset, 0px)));
 }
 

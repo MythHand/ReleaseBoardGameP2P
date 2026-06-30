@@ -1,26 +1,26 @@
 .toggle {
   composes: label-sm tk-12 from '../../design/typography.module.css';
   padding: 7px 14px;
-  color: rgb(255 255 255 / 60%);
+  color: var(--white-60);
   cursor: pointer;
-  background: rgb(255 255 255 / 6%);
-  border: 1px solid rgb(255 255 255 / 18%);
+  background: var(--white-06);
+  border: 1px solid var(--white-18);
   transition: all var(--t-fast) var(--ease-out);
 }
 
 .toggle:hover {
-  color: #fff;
-  border-color: rgb(255 255 255 / 40%);
+  color: var(--fg);
+  border-color: var(--white-40);
 }
 
 .on {
-  color: #04140c;
-  background: #8fd9b0;
-  border-color: #8fd9b0;
+  color: var(--deep-green);
+  background: var(--mint);
+  border-color: var(--mint);
 }
 
 .on:hover {
-  color: #04140c;
-  background: #8fd9b0;
-  border-color: #8fd9b0;
+  color: var(--deep-green);
+  background: var(--mint);
+  border-color: var(--mint);
 }

@@ -107,6 +107,13 @@
   --amber-20: rgb(255 206 70 / 20%);
   --orange-95: rgb(255 168 12 / 95%);
 
+  /* ===== Gradients ===== */
+  --grad-selection: linear-gradient(
+    165deg,
+    var(--mint-light) 0%,
+    var(--mint-dark) 100%
+  ); /* выделенный сегмент ModeSelect (мятная заливка ползунка) */
+
   /* ===== Типографика =====
      Настолка: Onest — заголовки, Fira Mono — основной текст.
      Лоадер/терминал (boot): JetBrains Mono — НЕ затираем, остаётся за модулем лоадера. */
