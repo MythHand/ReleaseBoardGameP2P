@@ -1,66 +1,44 @@
-import {
-  type ButtonHTMLAttributes,
-  type MouseEvent,
-  type ReactNode,
-  type Ref,
-  useEffect,
-  useRef,
-  useState,
-} from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
+import Typography, { type TypographyBase, type TypographyTk } from '../Typography'
 import styles from './Button.module.css'
+
+export type ButtonVariant = 'primary' | 'tech' | 'danger' | 'dangerGhost' | 'icon'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
-  variant?: 'primary' | 'tech' | 'danger' | 'dangerGhost' | 'icon'
+  variant?: ButtonVariant
   className?: string
   ref?: Ref<HTMLButtonElement>
-  // Когда задан — клик копирует это значение в буфер обмена, и кнопка на пару
-  // секунд показывает copiedChildren вместо обычной подписи. Если copiedChildren
-  // не передан — подпись не меняется (копирование без визуального отклика).
-  copyValue?: string
-  copiedChildren?: ReactNode
 }
 
-// Сколько держим состояние «скопировано» перед возвратом к обычной подписи.
-const COPIED_HOLD_MS = 1800
+// Label typography per variant. icon = a glyph / SVG sized in CSS, so it has no
+// Typography wrapper; the rest set their text through the component.
+const LABEL_TYPO: Record<ButtonVariant, { base: TypographyBase; tk: TypographyTk } | null> = {
+  primary: { base: 'button', tk: 'tk-18' },
+  tech: { base: 'label-sm', tk: 'tk-18' },
+  danger: { base: 'label-sm', tk: 'tk-18' },
+  dangerGhost: { base: 'label-sm', tk: 'tk-18' },
+  icon: null,
+}
 
 export default function Button({
   children,
   variant = 'primary',
   className = '',
-  copyValue,
-  copiedChildren,
-  onClick,
   ...rest
 }: ButtonProps) {
-  const isPrimary = variant === 'primary'
-  const [copied, setCopied] = useState(false)
-  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  useEffect(() => () => clearTimeout(timer.current), [])
-
-  const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
-    onClick?.(e)
-    if (copyValue == null) return
-    navigator.clipboard?.writeText(copyValue)
-    setCopied(true)
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => setCopied(false), COPIED_HOLD_MS)
-  }
-
-  const showCopied = copied && copiedChildren != null
-  const label = showCopied ? copiedChildren : children
-
+  const typo = LABEL_TYPO[variant]
   return (
-    <button
-      className={`${styles.btn} ${styles[variant]} ${className}`}
-      type="button"
-      onClick={handleClick}
-      {...rest}
-    >
-      {isPrimary && <span className={styles.bracket}>[</span>}
-      <span className={`${styles.label} ${showCopied ? styles.copied : ''}`}>{label}</span>
-      {isPrimary && <span className={styles.bracket}>]</span>}
+    <button className={`${styles.btn} ${styles[variant]} ${className}`} type="button" {...rest}>
+      {typo ? (
+        <Typography base={typo.base} tk={typo.tk} className={styles.label}>
+          {variant === 'primary' && <span className={styles.bracket}>[</span>}
+          {children}
+          {variant === 'primary' && <span className={styles.bracket}>]</span>}
+        </Typography>
+      ) : (
+        children
+      )}
     </button>
   )
 }

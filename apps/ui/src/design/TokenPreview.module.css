@@ -15,6 +15,18 @@
   opacity: 0.4;
 }
 
+.group {
+  margin-block-end: 28px;
+}
+
+.groupH {
+  margin-block-end: 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.5;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -25,24 +37,44 @@
 .swatch {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
+/* Checkerboard behind the color so overlay tokens' transparency reads. */
 .chip {
+  position: relative;
   block-size: 56px;
+  overflow: hidden;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 8px;
 }
 
-.label {
-  font-size: 11px;
-  text-transform: uppercase;
-  opacity: 0.8;
+.checker {
+  position: absolute;
+  inset: 0;
+  background-image: conic-gradient(
+    rgb(255 255 255 / 18%) 25%,
+    transparent 0 50%,
+    rgb(255 255 255 / 18%) 0 75%,
+    transparent 0
+  );
+  background-size: 14px 14px;
+}
+
+.fill {
+  position: absolute;
+  inset: 0;
 }
 
 .var {
   font-size: 10px;
-  opacity: 0.4;
+  opacity: 0.7;
+}
+
+.value {
+  font-size: 10px;
+  word-break: break-all;
+  opacity: 0.35;
 }
 
 .cardrow {

@@ -23,25 +23,18 @@
   outline-color: var(--brand-green);
 }
 
+/* Invalid field: a persistent, non-motion cue so the error is perceivable
+   without relying on the shake (which reduced-motion users may not see).
+   Pairs the documented aria-invalid marker with a visible border. */
+.input[aria-invalid='true'] {
+  border-color: var(--cat-attack);
+}
+
 /* натуральный регистр — для никнейма (в игре используется как написан).
    Компаунд .input.plain (0,2,0) перебивает капс тира value независимо от
    порядка правил в бандле. */
 .input.plain {
   text-transform: none;
-}
-
-.inputError {
-  border-color: var(--cat-attack);
-}
-
-.inputError:focus {
-  outline-color: var(--cat-attack);
-  border-color: var(--cat-attack);
-}
-
-.errorMsg {
-  composes: label-sm tk-10 from '../../design/typography.module.css';
-  color: var(--cat-attack);
 }
 
 /* row: input stretches, trailing element aligns by height */

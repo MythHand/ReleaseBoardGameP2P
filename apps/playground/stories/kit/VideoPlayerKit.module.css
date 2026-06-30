@@ -1,0 +1,16 @@
+.stage {
+  position: relative;
+  inline-size: 520px;
+  max-inline-size: 100%;
+  block-size: 480px;
+  background: var(--surface-1);
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border-radius: 12px;
+}
+
+/* Center the player in the stage — overrides the component's default insets
+   (two-class selector > the component's single .player). */
+.stage .player {
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+}

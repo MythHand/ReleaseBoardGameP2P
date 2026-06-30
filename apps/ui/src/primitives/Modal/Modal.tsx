@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import Typography from '../Typography'
 import styles from './Modal.module.css'
 
 const FOCUSABLE =
@@ -104,9 +105,9 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
         open
       >
         <div className={styles.head}>
-          <span id={titleId} className={styles.title}>
+          <Typography base="heading-5" tk="tk-06" id={titleId}>
             {title}
-          </span>
+          </Typography>
         </div>
         <div className={styles.body}>{children}</div>
         <button type="button" className={styles.close} onClick={onClose} aria-label="close">

@@ -61,10 +61,6 @@
   border-block-end: 1px solid rgb(255 255 255 / 8%);
 }
 
-.title {
-  composes: heading-5 tk-06 from '../../design/typography.module.css';
-}
-
 .close {
   position: absolute;
   inset-block-start: 18px;

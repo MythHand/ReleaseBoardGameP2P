@@ -2,10 +2,14 @@ import { routes } from '@generouted/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router'
+import { setRandomFavicon } from '@/assets/favicon'
 import { BASE_URL } from '~/shared/config'
 import '@release/ui/global.css'
 import './index.css'
 import '@release/translation'
+
+// Random favicon from the shared set — one per load (same as the playground).
+setRandomFavicon()
 
 // generouted's <Routes> builds the router with no basename, so when the app is
 // served under a sub-path (GitHub Pages: /ReleaseBoardGameP2P/) react-router

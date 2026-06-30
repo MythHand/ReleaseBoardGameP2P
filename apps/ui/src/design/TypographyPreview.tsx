@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import Typography, { type TypographyVariant, VARIANTS } from '../primitives/Typography'
 import styles from './TypographyPreview.module.css'
 
 // ШКАЛА ТЕКСТА — витрина живого фундамента design/typography.module.css.
@@ -400,6 +401,25 @@ const trackings: { name: string; em: string }[] = [
   { name: 'tk-22', em: '0.22em' },
 ]
 
+// The base+tk composition for a variant, read from Typography's VARIANTS so the
+// table never drifts from the component's actual definitions.
+const composesOf = (variant: TypographyVariant): string => {
+  const { base, tk } = VARIANTS[variant]
+  return tk ? `${base} · ${tk}` : base
+}
+
+// Curated <Typography> variants — each is a base + tk composition from the scale above.
+const curated: { variant: TypographyVariant; sample: string }[] = [
+  { variant: 'pageTitle', sample: 'Lobby' },
+  { variant: 'sectionTitle', sample: 'Lobby settings' },
+  { variant: 'panelTitle', sample: 'Game mode' },
+  { variant: 'body', sample: 'Game description on the start screen.' },
+  { variant: 'footnote', sample: 'Footnote under a field.' },
+  { variant: 'tag', sample: 'players' },
+  { variant: 'metaLabel', sample: 'design' },
+  { variant: 'code', sample: '4F2A-9K' },
+]
+
 // Документация по типографике: шрифты и доступные начертания.
 // Текстовые стили правил вынесены в отдельную страницу (RulesStyles).
 const fonts = [
@@ -567,6 +587,33 @@ export default function TypographyPreview() {
               <td className={styles.scaleMeta} style={{ letterSpacing: t.em }}>
                 RELEASE
               </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h3 className={styles.subH}>Curated variants (Typography)</h3>
+      <p className={styles.scaleNote}>
+        Semantic variants of the <code>{'<Typography>'}</code> component — the primary way to set
+        text (frontend and library). Each is a composition of a base and <code>tk</code> from the
+        scale above; values are not duplicated. The long tail goes through raw <code>base</code>/
+        <code>tk</code>.
+      </p>
+      <table className={styles.scaleTable}>
+        <thead>
+          <tr>
+            <th>variant</th>
+            <th>sample</th>
+            <th>composes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {curated.map((c) => (
+            <tr key={c.variant}>
+              <td className={styles.scaleName}>{c.variant}</td>
+              <td>
+                <Typography variant={c.variant}>{c.sample}</Typography>
+              </td>
+              <td className={styles.scaleMeta}>{composesOf(c.variant)}</td>
             </tr>
           ))}
         </tbody>

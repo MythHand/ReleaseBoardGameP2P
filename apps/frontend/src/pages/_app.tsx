@@ -11,17 +11,19 @@ export default function App() {
   return (
     <SessionProvider>
       <div className="min-h-screen bg-bg text-fg">
-        {pathname !== '/' && (
+        {/* Exclude '/' too: it renders briefly before redirecting to /start, and
+            the link would flash on the entry frame. */}
+        {pathname !== '/start' && pathname !== '/' && (
           <Link
-            to="/"
+            to="/start"
             className="fixed top-4 left-4 z-10 rounded-lg border border-fg/10 bg-surface-1 px-3 py-1.5 font-semibold text-brand-green text-xs tracking-base transition-opacity hover:opacity-80"
           >
             {t('app.home')}
           </Link>
         )}
-        {/* Only on the landing and start screens — elsewhere (e.g. the lobby)
-            it would overlay the page header. */}
-        {(pathname === '/' || pathname === '/start') && <LanguageSwitch />}
+        {/* Only on the start screen — elsewhere (e.g. the lobby) it would
+            overlay the page header. */}
+        {pathname === '/start' && <LanguageSwitch />}
         <Outlet />
         <AppModals />
       </div>

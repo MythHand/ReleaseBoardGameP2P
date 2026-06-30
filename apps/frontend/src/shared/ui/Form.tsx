@@ -1,5 +1,5 @@
 import type { InputProps } from '@release/ui'
-import { Input } from '@release/ui'
+import { Input, play } from '@release/ui'
 import type { FormHTMLAttributes } from 'react'
 import { createContext, useContext, useState } from 'react'
 
@@ -32,14 +32,21 @@ export default function Form({ onSubmit, requiredMessage = 'Required', ...rest }
         onSubmit={(e) => {
           e.preventDefault()
           const newErrors: Errors = {}
+          const invalid: HTMLInputElement[] = []
           for (const el of Array.from(e.currentTarget.elements)) {
             const input = el as HTMLInputElement
             if (input.name && input.required && !input.value.trim()) {
               newErrors[input.name] = requiredMessage
+              invalid.push(input)
             }
           }
-          if (Object.keys(newErrors).length > 0) {
+          if (invalid.length > 0) {
             setErrors(newErrors)
+            // Shake every offending field on every attempt — fires even when the
+            // error is unchanged (a repeat submit of the same empty field).
+            // Fall back to the control itself for fields without a [data-field]
+            // wrapper (e.g. a raw input), so they still get visible feedback.
+            for (const input of invalid) play('shake', input.closest('[data-field]') ?? input)
             return
           }
           setErrors({})

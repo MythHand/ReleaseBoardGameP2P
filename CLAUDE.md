@@ -93,14 +93,9 @@ Styling is **per-package** — the approach depends on which app the component l
 
 ---
 
-## Typography Rule
+## Code Comments Rule
 
-- **Любой текст оформляется ТОЛЬКО через шкалу текста** — `apps/ui/src/design/typography.module.css`. В компоненте подключаешь её классы через `composes`, а не пишешь `font-family` / `font-size` / `text-transform` / `letter-spacing` руками. Локально у текстового правила остаются только цвет, отступы, рамки и т.п.
-- Шкала **двухслойная**: `composes: <база> <tk> from '...'`. **База** (роль) = семейство + размер + начертание + регистр; **`tk-NN`** = вариация трекинга (`letter-spacing`, `= 0.NN em`), живёт только тут. Пример: `composes: label-sm tk-16 from '../../design/typography.module.css'`.
-- **Один элемент = одна база + один tk.** Никогда не вешай две базы на один элемент (порядок в собранном CSS решает, кто победит — будет плавать). Если у элемента геометрия + разные типографические роли по состоянию — выноси геометрию отдельным классом, а роль навешивай по варианту (см. `LangSwitcher`).
-- **Нет нужной ступени — добавляй её в шкалу**, а не подгоняй текст под близкую. Дизайн держится на нюансах размеров/трекинга — **ничего не унифицируем и шрифт не подменяем** (Fira Mono `--font-text` и JetBrains Mono `--font-mono` — разные роли, путать нельзя). Новую базу/tk вписывай и в `typography.module.css`, и в витрину `TypographyPreview`.
-- **Источник истины и живая витрина — страница плейграунда `Typography`** (`apps/ui/src/design/TypographyPreview.tsx`): все базы (с образцом/размером/tk/где используется) и таблица tk-вариаций. Сверяйся с ней перед работой над текстом; при изменениях держи её в синхроне со шкалой.
-- Вне шкалы допустимо локально: глифы/иконки (только `font-size`), `line-height`-нюанс под конкретное место (ритм), инлайн-вес-акцент (как `<b>`), контекстный сброс `text-transform` (когда элемент сидит внутри `uppercase`-родителя).
+- **Write code comments in English.** Do not add Russian comments to source files (existing Russian comments are legacy).
 
 ---
 

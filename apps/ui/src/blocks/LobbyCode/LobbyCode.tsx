@@ -1,4 +1,4 @@
-import Button from '@/primitives/Button'
+import { CopyButton } from '@/primitives/Button'
 import styles from './LobbyCode.module.css'
 
 // Текст блока приходит пропсом (компонент i18n-agnostic). Дефолт — русский.
@@ -41,9 +41,9 @@ export default function LobbyCode({
   reverse = false,
 }: LobbyCodeProps) {
   const copyBtn = (
-    <Button variant="tech" copyValue={code} copiedChildren={copy.copied}>
+    <CopyButton variant="tech" copyValue={code} copiedChildren={copy.copied}>
       {copy.copy}
-    </Button>
+    </CopyButton>
   )
   const codeEl = <span className={styles.code}>{code}</span>
   return (
