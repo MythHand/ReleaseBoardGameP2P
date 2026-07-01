@@ -1,10 +1,11 @@
 import { type CSSProperties, useState } from 'react'
 import Button from '@/primitives/Button'
 import Drawer from '@/primitives/Drawer'
+import { useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from './KitShell'
 
-// Drawer позиционируется абсолютно — нужна relative-сцена, которая его обрезает.
-// Кнопки держим НАД сценой, чтобы открытая шторка их не перекрывала.
+// Drawer is absolutely positioned — it needs a relative stage that clips it.
+// The buttons stay ABOVE the stage so an open drawer doesn't cover them.
 const wrap: CSSProperties = { inlineSize: '100%' }
 const controls: CSSProperties = { display: 'flex', gap: 12, marginBlockEnd: 12 }
 const stage: CSSProperties = {
@@ -23,20 +24,39 @@ const readout: CSSProperties = {
   lineHeight: 1.7,
 }
 
+const COPY = {
+  ru: {
+    section: 'Выезжает по кнопке от края — side / width задаются пропами',
+    collapseLeft: 'задвинуть left',
+    expandLeft: 'выдвинуть left',
+    collapseRight: 'задвинуть right',
+    expandRight: 'выдвинуть right',
+  },
+  en: {
+    section: 'Slides in from the edge on a button — side / width set via props',
+    collapseLeft: 'collapse left',
+    expandLeft: 'expand left',
+    collapseRight: 'collapse right',
+    expandRight: 'expand right',
+  },
+}
+
 export default function DrawerKit() {
+  const { lang } = useLang()
+  const t = COPY[lang]
   const [left, setLeft] = useState(false)
   const [right, setRight] = useState(false)
 
   return (
     <KitPage title="Drawer">
-      <KitSection title="Выезжает по кнопке от края — side / width задаются пропами">
+      <KitSection title={t.section}>
         <div style={wrap}>
           <div style={controls}>
             <Button variant="tech" onClick={() => setLeft((v) => !v)}>
-              {left ? 'задвинуть left' : 'выдвинуть left'}
+              {left ? t.collapseLeft : t.expandLeft}
             </Button>
             <Button variant="tech" onClick={() => setRight((v) => !v)}>
-              {right ? 'задвинуть right' : 'выдвинуть right'}
+              {right ? t.collapseRight : t.expandRight}
             </Button>
           </div>
 

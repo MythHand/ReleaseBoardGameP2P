@@ -68,7 +68,7 @@ export type {
   TypographyTk,
   TypographyVariant,
 } from './primitives/Typography'
-export { default as Typography } from './primitives/Typography'
+export { default as Typography, VARIANTS } from './primitives/Typography'
 export type { InviteCopy, InviteState, JoinRole, SlotAvailability } from './screens/Invite'
 export { default as Invite } from './screens/Invite'
 export { default as Lobby } from './screens/Lobby'

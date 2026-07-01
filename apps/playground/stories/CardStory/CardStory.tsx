@@ -3,12 +3,24 @@ import type React from 'react'
 import { type CSSProperties, useState } from 'react'
 import { CARDS, CATEGORIES } from '@/cards'
 import Card from '@/primitives/Card'
+import { useLang } from '../../Playground/lang'
 import styles from './CardStory.module.css'
 
 type CardState = 'idle' | 'playable' | 'selected' | 'disabled'
 const STATES: CardState[] = ['idle', 'playable', 'selected', 'disabled']
 
-// порядок типов для сегментации
+const COPY = {
+  ru: {
+    tilt: 'parallax-наклон',
+    hint: 'Наведи курсор на карту — подъём + наклон (чтение). Карты сегментированы по типам.',
+  },
+  en: {
+    tilt: 'parallax tilt',
+    hint: 'Hover a card — lift + tilt (reading). Cards are segmented by type.',
+  },
+}
+
+// category order for segmentation
 const ORDER: CategoryId[] = [
   'release',
   'attack',
@@ -21,6 +33,8 @@ const ORDER: CategoryId[] = [
 ]
 
 export default function CardStory() {
+  const { lang } = useLang()
+  const t = COPY[lang]
   const [state, setState] = useState<CardState>('idle')
   const [tilt, setTilt] = useState(true)
 
@@ -40,7 +54,7 @@ export default function CardStory() {
             checked={tilt}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTilt(e.target.checked)}
           />
-          parallax-наклон
+          {t.tilt}
         </label>
         <div className={styles.states}>
           {STATES.map((s) => (
@@ -56,9 +70,7 @@ export default function CardStory() {
         </div>
       </div>
 
-      <p className={styles.hint}>
-        Наведи курсор на карту — подъём + наклон (чтение). Карты сегментированы по типам.
-      </p>
+      <p className={styles.hint}>{t.hint}</p>
 
       {groups.map((g) => (
         <section key={g.cat} className={styles.group}>

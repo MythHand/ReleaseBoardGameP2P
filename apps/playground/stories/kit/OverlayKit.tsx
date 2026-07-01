@@ -1,10 +1,11 @@
 import { type CSSProperties, useState } from 'react'
 import Button from '@/primitives/Button'
 import Overlay from '@/primitives/Overlay'
+import { useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from './KitShell'
 
-// Overlay позиционируется абсолютно — нужна relative-сцена. Кнопку держим над
-// сценой, чтобы scrim её не перекрывал.
+// Overlay is absolutely positioned — it needs a relative stage. The button stays
+// above the stage so the scrim doesn't cover it.
 const wrap: CSSProperties = { inlineSize: '100%' }
 const controls: CSSProperties = { display: 'flex', gap: 12, marginBlockEnd: 12 }
 const stage: CSSProperties = {
@@ -30,20 +31,37 @@ const box: CSSProperties = {
   border: '1px solid rgb(255 255 255 / 14%)',
 }
 
+const COPY = {
+  ru: {
+    hide: 'скрыть',
+    show: 'показать',
+    filler: 'контент под оверлеем',
+    section: 'Scrim + блюр + центрирование + плавное появление',
+  },
+  en: {
+    hide: 'hide',
+    show: 'show',
+    filler: 'content under the overlay',
+    section: 'Scrim + blur + centering + smooth appearance',
+  },
+}
+
 export default function OverlayKit() {
+  const { lang } = useLang()
+  const t = COPY[lang]
   const [open, setOpen] = useState(false)
 
   return (
     <KitPage title="Overlay">
-      <KitSection title="Scrim + блюр + центрирование + плавное появление">
+      <KitSection title={t.section}>
         <div style={wrap}>
           <div style={controls}>
             <Button variant="tech" onClick={() => setOpen((v) => !v)}>
-              {open ? 'скрыть' : 'показать'}
+              {open ? t.hide : t.show}
             </Button>
           </div>
           <div style={stage}>
-            <div style={filler}>контент под оверлеем</div>
+            <div style={filler}>{t.filler}</div>
             {open && (
               <Overlay>
                 <div style={box}>overlay content</div>

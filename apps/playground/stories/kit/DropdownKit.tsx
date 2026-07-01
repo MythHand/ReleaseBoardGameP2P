@@ -1,29 +1,53 @@
 import Dropdown from '@/primitives/Dropdown'
+import { useLang } from '../../Playground/lang'
 import { KitCell, KitPage, KitSection } from './KitShell'
 
-// Реальный примитив Dropdown — выпадающее меню действий по кнопке «⋯».
+// The real Dropdown primitive — an actions menu opened by the "⋯" button.
+const COPY = {
+  ru: {
+    menu: 'Меню действий по «⋯»',
+    normalCap: 'обычный + danger',
+    makeSpectator: 'Сделать зрителем',
+    remove: 'Исключить',
+    disabledCap: 'недоступный пункт → подсказка по клику',
+    makePlayer: 'Сделать игроком',
+    noSlot: 'Нет доступного слота',
+  },
+  en: {
+    menu: 'Actions menu on "⋯"',
+    normalCap: 'normal + danger',
+    makeSpectator: 'Make spectator',
+    remove: 'Remove',
+    disabledCap: 'disabled item → hint on click',
+    makePlayer: 'Make player',
+    noSlot: 'No available slot',
+  },
+}
+
 export default function DropdownKit() {
+  const { lang } = useLang()
+  const t = COPY[lang]
   return (
     <KitPage title="Dropdown">
-      <KitSection title="Меню действий по «⋯»">
-        <KitCell caption="обычный + danger">
+      <KitSection title={t.menu}>
+        <KitCell caption={t.normalCap}>
           <Dropdown
             items={[
-              { label: 'Сделать зрителем', onClick: () => {} },
-              { label: 'Исключить', danger: true, onClick: () => {} },
+              { label: t.makeSpectator, onClick: () => {} },
+              { label: t.remove, danger: true, onClick: () => {} },
             ]}
           />
         </KitCell>
-        <KitCell caption="недоступный пункт → подсказка по клику">
+        <KitCell caption={t.disabledCap}>
           <Dropdown
             items={[
               {
-                label: 'Сделать игроком',
+                label: t.makePlayer,
                 disabled: true,
-                hint: 'Нет доступного слота',
+                hint: t.noSlot,
                 onClick: () => {},
               },
-              { label: 'Исключить', danger: true, onClick: () => {} },
+              { label: t.remove, danger: true, onClick: () => {} },
             ]}
           />
         </KitCell>

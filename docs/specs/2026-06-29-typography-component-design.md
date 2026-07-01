@@ -44,7 +44,7 @@ merged internals, so the first plan is non-conflicting.
 ## Component API
 
 ```tsx
-// Curated path (primary, public)
+// Curated path (preferred, public)
 <Typography variant="tag" className="text-cat-release opacity-85">…</Typography>
 
 // Raw escape hatch (long-tail / exhaustive lib migration)

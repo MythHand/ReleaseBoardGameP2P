@@ -1,71 +1,111 @@
 import Badge from '@/primitives/Badge'
+import { useLang } from '../../Playground/lang'
 import { KitCell, KitPage, KitSection } from './KitShell'
 
-// Реальный примитив Badge: тоны, обводка, размеры — статусы и роли с экранов.
+// The real Badge primitive: tones, outline, sizes — statuses and roles from the screens.
+const COPY = {
+  ru: {
+    roles: 'Роли',
+    spectator: 'зритель',
+    readiness: 'Статус готовности',
+    ready: 'готов',
+    waiting: 'ожидание',
+    offline: 'не в сети',
+    tableStatus: 'Статус за столом (sm)',
+    eliminated: 'выбыл',
+    noConnection: 'нет связи',
+    plate: 'Плашка (lg) — тёмный фон + рамка, напр. «вы выбыли»',
+    youAreOut: 'вы выбыли из игры',
+    whereNow: '«Где сейчас» — outlined md, все тона',
+    inGame: 'в игре',
+    onStats: 'на статистике',
+    inLobby: 'в лобби',
+  },
+  en: {
+    roles: 'Roles',
+    spectator: 'spectator',
+    readiness: 'Readiness status',
+    ready: 'ready',
+    waiting: 'waiting',
+    offline: 'offline',
+    tableStatus: 'Table status (sm)',
+    eliminated: 'eliminated',
+    noConnection: 'no connection',
+    plate: 'Plate (lg) — dark bg + border, e.g. "you are out"',
+    youAreOut: 'you are out of the game',
+    whereNow: '"Where now" — outlined md, all tones',
+    inGame: 'in game',
+    onStats: 'on stats',
+    inLobby: 'in lobby',
+  },
+}
+
 export default function BadgesKit() {
+  const { lang } = useLang()
+  const t = COPY[lang]
   return (
     <KitPage title="Badges">
-      <KitSection title="Роли">
+      <KitSection title={t.roles}>
         <KitCell caption="host (outlined sm)">
           <Badge tone="success" size="sm" outlined>
             host
           </Badge>
         </KitCell>
         <KitCell caption="spectator (muted)">
-          <Badge tone="muted">зритель</Badge>
+          <Badge tone="muted">{t.spectator}</Badge>
         </KitCell>
       </KitSection>
 
-      <KitSection title="Статус готовности">
+      <KitSection title={t.readiness}>
         <KitCell caption="ready (success)">
-          <Badge tone="success">готов</Badge>
+          <Badge tone="success">{t.ready}</Badge>
         </KitCell>
         <KitCell caption="waiting (muted)">
-          <Badge tone="muted">ожидание</Badge>
+          <Badge tone="muted">{t.waiting}</Badge>
         </KitCell>
         <KitCell caption="offline (muted)">
-          <Badge tone="muted">не в сети</Badge>
+          <Badge tone="muted">{t.offline}</Badge>
         </KitCell>
       </KitSection>
 
-      <KitSection title="Статус за столом (sm)">
+      <KitSection title={t.tableStatus}>
         <KitCell caption="eliminated (muted)">
           <Badge tone="muted" size="sm">
-            выбыл
+            {t.eliminated}
           </Badge>
         </KitCell>
         <KitCell caption="disconnected (danger)">
           <Badge tone="danger" size="sm">
-            нет связи
+            {t.noConnection}
           </Badge>
         </KitCell>
       </KitSection>
 
-      <KitSection title="Плашка (lg) — тёмный фон + рамка, напр. «вы выбыли»">
+      <KitSection title={t.plate}>
         <KitCell caption="lg">
-          <Badge size="lg">вы выбыли из игры</Badge>
+          <Badge size="lg">{t.youAreOut}</Badge>
         </KitCell>
       </KitSection>
 
-      <KitSection title="«Где сейчас» — outlined md, все тона">
+      <KitSection title={t.whereNow}>
         <KitCell caption="warning">
           <Badge tone="warning" size="md" outlined>
-            в игре
+            {t.inGame}
           </Badge>
         </KitCell>
         <KitCell caption="success">
           <Badge tone="success" size="md" outlined>
-            на статистике
+            {t.onStats}
           </Badge>
         </KitCell>
         <KitCell caption="info">
           <Badge tone="info" size="md" outlined>
-            в лобби
+            {t.inLobby}
           </Badge>
         </KitCell>
         <KitCell caption="muted">
           <Badge tone="muted" size="md" outlined>
-            не в сети
+            {t.offline}
           </Badge>
         </KitCell>
       </KitSection>
