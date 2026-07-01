@@ -1,11 +1,25 @@
 import Avatar from '@/primitives/Avatar'
+import { useLang } from '../../Playground/lang'
 import { KitCell, KitPage, KitSection } from './KitShell'
 
-// Реальный примитив Avatar — размеры из экранов + приглушённый вид.
+// The real Avatar primitive — sizes from the screens + a muted look.
+const COPY = {
+  ru: {
+    sizes: 'Размеры (size в px)',
+    muted: 'Приглушённый (не в сети)',
+  },
+  en: {
+    sizes: 'Sizes (size in px)',
+    muted: 'Muted (offline)',
+  },
+}
+
 export default function AvatarsKit() {
+  const { lang } = useLang()
+  const t = COPY[lang]
   return (
     <KitPage title="Avatars">
-      <KitSection title="Размеры (size в px)">
+      <KitSection title={t.sizes}>
         <KitCell caption="28 · participants">
           <Avatar name="dimbo" size={28} />
         </KitCell>
@@ -17,7 +31,7 @@ export default function AvatarsKit() {
         </KitCell>
       </KitSection>
 
-      <KitSection title="Приглушённый (не в сети)">
+      <KitSection title={t.muted}>
         <KitCell caption="muted">
           <Avatar name="morpheus" size={34} muted />
         </KitCell>

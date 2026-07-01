@@ -5,25 +5,26 @@ import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
 import Slider from '@/primitives/Slider'
 import Hand from '@/table/Hand'
+import { pick, useLang } from '../../Playground/lang'
 import styles from './PickOpponentCardStory.module.css'
 import { useHandInsert } from './useHandInsert'
 
-// Прототип «взятие случайной карты из руки соперника». Раздача/вскрытие/возврат —
-// свои; финальный шаг «карта встаёт в руку» — общий хук useHandInsert.
-const DEAL_CARD_W = 150 // ширина карты в раскладке
-const CARD_RATIO = 1.4 // высота/ширина карты (≈ 515/368)
+// Prototype of "take a random card from the opponent's hand". Deal/reveal/return
+// are local; the final "card settles into the hand" step is the shared useHandInsert hook.
+const DEAL_CARD_W = 150 // card width in the layout
+const CARD_RATIO = 1.4 // card height/width (≈ 515/368)
 const CARD_H = DEAL_CARD_W * CARD_RATIO
-const GAP_X = 22 // зазоры грида
+const GAP_X = 22 // grid gaps
 const GAP_Y = 26
-const COLS_MAX = 6 // макс колонок в гриде
-const REVEAL_HOLD = 820 // пауза после переворота перед разлётом, мс
+const COLS_MAX = 6 // max columns in the grid
+const REVEAL_HOLD = 820 // pause after the flip before the scatter, ms
 const INITIAL_HAND = 5
 
-// В руках (и у игрока, и у соперника) только базовая колода — зелёные обложки.
+// Hands (both player and opponent) hold only the base deck — green backs.
 const BASE = CARDS.filter((c) => c.deck === 'base')
 
-// «точка», из которой карты выезжают и куда невыбранные возвращаются —
-// верх-центр области раздачи.
+// the "origin" that cards slide out from and unpicked ones return to —
+// the top-center of the deal area.
 const ORIGIN = `translate(-50%, ${-CARD_H / 2 - 20}px) scale(0.35)`
 
 type Phase = 'idle' | 'deal' | 'resolve'
@@ -36,7 +37,7 @@ function sampleBase(n: number): CardType[] {
   return [...BASE].sort(() => Math.random() - 0.5).slice(0, n)
 }
 
-// центры карт грида относительно верх-центра области (ряды центрируются)
+// grid card centers relative to the area top-center (rows are centered)
 function gridPositions(n: number): { x: number; y: number }[] {
   if (n === 0) return []
   const cols = Math.min(n, COLS_MAX)
@@ -56,6 +57,7 @@ function makeHand(n: number) {
 }
 
 export default function PickOpponentCardStory() {
+  const { lang } = useLang()
   const [count, setCount] = useState(8)
   const [phase, setPhase] = useState<Phase>('idle')
   const [pool, setPool] = useState<PoolCard[]>([])
@@ -68,7 +70,7 @@ export default function PickOpponentCardStory() {
 
   const positions = useMemo(() => gridPositions(pool.length), [pool.length])
 
-  // финальный шаг — общий: карта встаёт в руку, потом сбрасываем раздачу
+  // the final step is shared: the card settles into the hand, then we clear the deal
   const {
     gapAt,
     overlay,
@@ -86,7 +88,7 @@ export default function PickOpponentCardStory() {
     setPool([])
   })
 
-  // вызов: раздать обложки из точки в грид
+  // call: deal the backs from the origin into the grid
   function deal() {
     setPool(sampleBase(count).map((card) => ({ uid: nextHandUid(), card })))
     setChosen(null)
@@ -95,7 +97,7 @@ export default function PickOpponentCardStory() {
     requestAnimationFrame(() => requestAnimationFrame(() => setDealt(true)))
   }
 
-  // сброс к исходному: рука как в начале, кнопка вызова снова на месте
+  // reset to initial: the hand as at start, the call button back in place
   function restart() {
     resetInsert()
     setPhase('idle')
@@ -105,14 +107,14 @@ export default function PickOpponentCardStory() {
     setHand(makeHand(INITIAL_HAND))
   }
 
-  // клик по обложке: переворот на месте, затем (после паузы) разлёт + вставка
-  function pick(i: number) {
+  // click a back: flip in place, then (after a pause) scatter + insert
+  function pickCard(i: number) {
     if (phase !== 'deal' || chosen !== null) return
     setChosen(i)
     window.setTimeout(() => resolve(i), REVEAL_HOLD)
   }
 
-  // выбранная летит в руку (общий хук) из её текущего слота; остальные — в точку
+  // the chosen one flies into the hand (shared hook) from its current slot; the rest — to the origin
   function resolve(i: number) {
     const el = slotRefs.current[i]
     if (el) {
@@ -131,10 +133,10 @@ export default function PickOpponentCardStory() {
     const pos = positions[i]
     const grid = `translate(calc(-50% + ${pos.x}px), ${pos.y - CARD_H / 2}px)`
     if (phase === 'resolve') {
-      // выбранную ведёт хук (прячем слот); остальные возвращаются в точку
+      // the chosen one is driven by the hook (hide the slot); the rest return to the origin
       return i === chosen ? { opacity: 0 } : { transform: ORIGIN, opacity: 0 }
     }
-    // выбранная выезжает вперёд и переворачивается на месте; остальные ждут
+    // the chosen one slides forward and flips in place; the rest wait
     if (chosen === i) return { transform: `${grid} scale(1.12)`, opacity: 1, zIndex: 40 }
     return {
       transform: grid,
@@ -147,10 +149,16 @@ export default function PickOpponentCardStory() {
     <div className={styles.root}>
       <div className={styles.bar}>
         <div className={styles.sliderWrap}>
-          <Slider label="карт на выбор" value={count} min={2} max={16} onChange={setCount} />
+          <Slider
+            label={pick(lang, { ru: 'карт на выбор', en: 'cards to pick' })}
+            value={count}
+            min={2}
+            max={16}
+            onChange={setCount}
+          />
         </div>
         <button type="button" className={styles.btn} onClick={restart}>
-          рестарт
+          {pick(lang, { ru: 'рестарт', en: 'restart' })}
         </button>
       </div>
 
@@ -169,7 +177,7 @@ export default function PickOpponentCardStory() {
                 card={p.card}
                 faceDown={chosen !== i}
                 width={`${DEAL_CARD_W}px`}
-                onClick={phase === 'deal' && chosen === null ? () => pick(i) : undefined}
+                onClick={phase === 'deal' && chosen === null ? () => pickCard(i) : undefined}
               />
             </div>
           ))}
@@ -179,12 +187,17 @@ export default function PickOpponentCardStory() {
       {phase === 'idle' && (
         <div className={styles.controls}>
           <button type="button" className={styles.callBtn} onClick={deal}>
-            взять случайную карту соперника
+            {pick(lang, {
+              ru: 'взять случайную карту соперника',
+              en: 'take a random opponent card',
+            })}
           </button>
         </div>
       )}
 
-      {phase === 'deal' && chosen === null && <div className={styles.hint}>выбери карту</div>}
+      {phase === 'deal' && chosen === null && (
+        <div className={styles.hint}>{pick(lang, { ru: 'выбери карту', en: 'pick a card' })}</div>
+      )}
 
       {overlay}
 

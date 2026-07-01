@@ -1,23 +1,31 @@
 import type { CSSProperties } from 'react'
+import { type Lang, useLang } from '../../Playground/lang'
 import styles from './TypographyPreview.module.css'
 
-// Текстовые стили по всему проекту (реальные значения из компонентов), сгруппированы
-// по областям. Технический CSS под каждым образцом выводится из того же объекта style,
-// что и сам образец — значения всегда совпадают. var(--font-text) = Fira Mono,
+// Project-wide text styles (real values from the components), grouped by area.
+// The technical CSS under each sample is derived from the same style object as
+// the sample itself — the values always match. var(--font-text) = Fira Mono,
 // var(--font-mono) = JetBrains Mono, var(--font-heading) = Onest.
+//
+// Language logic: the page title and the group titles are technical → English in
+// both languages. In a role, component / screen / variant names stay English
+// (Input, Badge, Stats, Modal, Primary…); only the descriptive part is bilingual.
+// Samples are bilingual too. useLang() selects the RU/EN variant.
+type Loc = Record<Lang, string>
+
 const heading: CSSProperties = { fontFamily: 'var(--font-heading)', color: '#fff' }
 const text: CSSProperties = { fontFamily: 'var(--font-text)', lineHeight: 1.5 }
 const mono: CSSProperties = { fontFamily: 'var(--font-mono)' }
 
 interface Entry {
-  role: string
-  sample: string
+  role: Loc
+  sample: Loc
   style: CSSProperties
 }
 
 const UNITLESS = new Set(['font-weight', 'line-height', 'opacity'])
 
-// CSSProperties → читаемый CSS (camelCase → kebab, числа → px кроме безразмерных).
+// CSSProperties → readable CSS (camelCase → kebab, numbers → px except unitless).
 const cssText = (style: CSSProperties): string =>
   Object.entries(style)
     .map(([k, v]) => {
@@ -27,33 +35,34 @@ const cssText = (style: CSSProperties): string =>
     })
     .join('\n')
 
+// Group titles are technical → English in both languages.
 const sections: { title: string; items: Entry[] }[] = [
   {
-    title: 'Заголовки',
+    title: 'Headings',
     items: [
       {
-        role: 'Экран (Stats / Lobby)',
-        sample: 'Статистика партии',
+        role: { ru: 'Экран (Stats / Lobby)', en: 'Screen (Stats / Lobby)' },
+        sample: { ru: 'Статистика партии', en: 'Match stats' },
         style: { ...heading, fontSize: 32, letterSpacing: '0.04em' },
       },
       {
-        role: 'Модалка',
-        sample: 'Создать игру',
+        role: { ru: 'Modal', en: 'Modal' },
+        sample: { ru: 'Создать игру', en: 'Create game' },
         style: { ...heading, fontSize: 20, textTransform: 'uppercase', letterSpacing: '0.06em' },
       },
       {
-        role: 'Блок / подсекция',
-        sample: 'Параметры лобби',
+        role: { ru: 'Блок / подсекция', en: 'Block / subsection' },
+        sample: { ru: 'Параметры лобби', en: 'Lobby settings' },
         style: { ...heading, fontSize: 16, textTransform: 'uppercase', letterSpacing: '0.04em' },
       },
     ],
   },
   {
-    title: 'Подписи и лейблы',
+    title: 'Captions and labels',
     items: [
       {
-        role: 'Лейбл поля (Input)',
-        sample: 'Ваш никнейм',
+        role: { ru: 'Лейбл поля (Input)', en: 'Field label (Input)' },
+        sample: { ru: 'Ваш никнейм', en: 'Your nickname' },
         style: {
           ...mono,
           fontSize: 11,
@@ -63,8 +72,8 @@ const sections: { title: string; items: Entry[] }[] = [
         },
       },
       {
-        role: 'Лейбл секции (Stats / Lobby)',
-        sample: 'Победы',
+        role: { ru: 'Лейбл секции (Stats / Lobby)', en: 'Section label (Stats / Lobby)' },
+        sample: { ru: 'Победы', en: 'Wins' },
         style: {
           ...mono,
           fontSize: 12,
@@ -74,8 +83,8 @@ const sections: { title: string; items: Entry[] }[] = [
         },
       },
       {
-        role: 'Тег (Start)',
-        sample: 'Открытый P2P-проект',
+        role: { ru: 'Тег (Start)', en: 'Tag (Start)' },
+        sample: { ru: 'Открытый P2P-проект', en: 'Open P2P project' },
         style: {
           ...mono,
           fontSize: 12,
@@ -85,8 +94,8 @@ const sections: { title: string; items: Entry[] }[] = [
         },
       },
       {
-        role: 'Бейдж (Badge)',
-        sample: 'хост',
+        role: { ru: 'Badge', en: 'Badge' },
+        sample: { ru: 'хост', en: 'host' },
         style: {
           ...mono,
           fontSize: 11,
@@ -100,11 +109,11 @@ const sections: { title: string; items: Entry[] }[] = [
     ],
   },
   {
-    title: 'Значения и ввод',
+    title: 'Values and input',
     items: [
       {
-        role: 'Поле ввода (Input)',
-        sample: 'DIMBO',
+        role: { ru: 'Значение поля (Input)', en: 'Field value (Input)' },
+        sample: { ru: 'DIMBO', en: 'DIMBO' },
         style: {
           ...mono,
           fontSize: 18,
@@ -114,23 +123,23 @@ const sections: { title: string; items: Entry[] }[] = [
         },
       },
       {
-        role: 'Код игры (Lobby)',
-        sample: '4F2A-9K',
+        role: { ru: 'Код игры (Lobby)', en: 'Game code (Lobby)' },
+        sample: { ru: '4F2A-9K', en: '4F2A-9K' },
         style: { ...mono, fontSize: 26, letterSpacing: '0.2em', color: '#fff' },
       },
       {
-        role: 'Крупное число (Stats)',
-        sample: '12',
+        role: { ru: 'Крупное число (Stats)', en: 'Large number (Stats)' },
+        sample: { ru: '12', en: '12' },
         style: { ...heading, fontSize: 40, lineHeight: 1 },
       },
     ],
   },
   {
-    title: 'Кнопки',
+    title: 'Buttons',
     items: [
       {
-        role: 'Primary (брекеты)',
-        sample: '[ создать игру ]',
+        role: { ru: 'Primary (брекеты)', en: 'Primary (brackets)' },
+        sample: { ru: '[ создать игру ]', en: '[ create game ]' },
         style: {
           ...mono,
           fontSize: 17,
@@ -140,8 +149,8 @@ const sections: { title: string; items: Entry[] }[] = [
         },
       },
       {
-        role: 'Tech / Danger',
-        sample: 'отмена',
+        role: { ru: 'Tech / Danger', en: 'Tech / Danger' },
+        sample: { ru: 'отмена', en: 'cancel' },
         style: {
           ...mono,
           fontSize: 11,
@@ -156,21 +165,21 @@ const sections: { title: string; items: Entry[] }[] = [
     ],
   },
   {
-    title: 'Стол / HUD',
+    title: 'Table / HUD',
     items: [
       {
-        role: 'Имя игрока (Seat)',
-        sample: 'dimbo',
+        role: { ru: 'Имя игрока (Seat)', en: 'Player name (Seat)' },
+        sample: { ru: 'dimbo', en: 'dimbo' },
         style: { ...text, fontSize: 13, letterSpacing: '0.03em' },
       },
       {
-        role: 'История хода (MoveHistory)',
-        sample: 'dimbo выложил Frontend',
+        role: { ru: 'Строка лога (MoveHistory)', en: 'Log line (MoveHistory)' },
+        sample: { ru: 'dimbo выложил Frontend', en: 'dimbo played Frontend' },
         style: { ...text, fontSize: 12, lineHeight: 1.3 },
       },
       {
-        role: 'Метка / счётчик',
-        sample: 'Раунд 2',
+        role: { ru: 'Метка / счётчик', en: 'Marker / counter' },
+        sample: { ru: 'Раунд 2', en: 'Round 2' },
         style: {
           ...mono,
           fontSize: 10,
@@ -182,27 +191,29 @@ const sections: { title: string; items: Entry[] }[] = [
     ],
   },
   {
-    title: 'Правила',
+    title: 'Rules',
     items: [
       {
-        role: 'Заголовок секции',
-        sample: 'Описание карт',
+        role: { ru: 'Заголовок секции (Rules)', en: 'Section heading (Rules)' },
+        sample: { ru: 'Описание карт', en: 'Card reference' },
         style: { ...heading, fontSize: 19, textTransform: 'uppercase', letterSpacing: '0.05em' },
       },
       {
-        role: 'Подзаголовок',
-        sample: 'Атакующие карты',
+        role: { ru: 'Подзаголовок (Rules)', en: 'Subheading (Rules)' },
+        sample: { ru: 'Атакующие карты', en: 'Attack cards' },
         style: { ...heading, fontSize: 15, textTransform: 'uppercase', letterSpacing: '0.08em' },
       },
       {
-        role: 'Тело',
-        sample:
-          'Атакующие карты разыгрываются мгновенно — на свежий релиз противника или против руки других игроков.',
+        role: { ru: 'Тело (Rules)', en: 'Body (Rules)' },
+        sample: {
+          ru: 'Атакующие карты разыгрываются мгновенно — на свежий релиз противника или против руки других игроков.',
+          en: "Attack cards are played instantly — on an opponent's fresh release or against other players' hands.",
+        },
         style: { ...text, fontSize: 14, lineHeight: 1.62, color: 'rgb(255 255 255 / 86%)' },
       },
       {
-        role: 'Имя карты',
-        sample: 'Code Review',
+        role: { ru: 'Имя карты (Rules)', en: 'Card name (Rules)' },
+        sample: { ru: 'Code Review', en: 'Code Review' },
         style: {
           ...mono,
           fontSize: 12,
@@ -212,13 +223,16 @@ const sections: { title: string; items: Entry[] }[] = [
         },
       },
       {
-        role: 'Описание карты',
-        sample: 'Разыгрывается одновременно с картой Release; делает релиз неуязвимым к атакам.',
+        role: { ru: 'Описание карты (Rules)', en: 'Card description (Rules)' },
+        sample: {
+          ru: 'Разыгрывается одновременно с картой Release; делает релиз неуязвимым к атакам.',
+          en: 'Played simultaneously with a Release card; makes the release immune to attacks.',
+        },
         style: { ...text, fontSize: 14, lineHeight: 1.62, color: 'rgb(255 255 255 / 78%)' },
       },
       {
-        role: 'Sudo-метка',
-        sample: 'sudo Git Rebase',
+        role: { ru: 'Sudo-метка', en: 'Sudo marker' },
+        sample: { ru: 'sudo Git Rebase', en: 'sudo Git Rebase' },
         style: {
           ...text,
           fontSize: 14,
@@ -228,8 +242,8 @@ const sections: { title: string; items: Entry[] }[] = [
         },
       },
       {
-        role: 'Подсветка поиска — совпадение',
-        sample: 'release',
+        role: { ru: 'Подсветка поиска — совпадение', en: 'Search highlight — match' },
+        sample: { ru: 'release', en: 'release' },
         style: {
           ...text,
           fontSize: 14,
@@ -240,8 +254,8 @@ const sections: { title: string; items: Entry[] }[] = [
         },
       },
       {
-        role: 'Подсветка поиска — активное',
-        sample: 'release',
+        role: { ru: 'Подсветка поиска — активное', en: 'Search highlight — active' },
+        sample: { ru: 'release', en: 'release' },
         style: {
           ...text,
           fontSize: 14,
@@ -256,20 +270,21 @@ const sections: { title: string; items: Entry[] }[] = [
 ]
 
 export default function TextStyles() {
+  const { lang } = useLang()
   return (
     <section className={styles.root}>
-      <h2 className={styles.h}>стили текста</h2>
+      <h2 className={styles.h}>text styles</h2>
       {sections.map((sec) => (
         <div key={sec.title}>
           <h3 className={styles.subH}>{sec.title}</h3>
           <div className={styles.list}>
             {sec.items.map((s) => (
-              <article key={s.role} className={styles.item}>
+              <article key={s.role.en} className={styles.item}>
                 <header className={styles.meta}>
-                  <span className={styles.role}>{s.role}</span>
+                  <span className={styles.role}>{s.role[lang]}</span>
                 </header>
                 <div className={styles.sampleRow}>
-                  <span style={s.style}>{s.sample}</span>
+                  <span style={s.style}>{s.sample[lang]}</span>
                 </div>
                 <pre className={styles.css}>{cssText(s.style)}</pre>
               </article>

@@ -1,10 +1,11 @@
 import { type CSSProperties, useState } from 'react'
 import Button from '@/primitives/Button'
 import EdgeGlow from '@/primitives/EdgeGlow'
+import { useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from './KitShell'
 
-// EdgeGlow позиционируется абсолютно — нужна relative-сцена. Контрол держим
-// внутри секции (как в OverlayKit), чтобы не липнуть к заголовку страницы.
+// EdgeGlow is absolutely positioned — it needs a relative stage. The control
+// stays inside the section (as in OverlayKit) so it doesn't stick to the page title.
 const wrap: CSSProperties = { inlineSize: '100%' }
 const controls: CSSProperties = { display: 'flex', gap: 12, marginBlockEnd: 12 }
 const stage: CSSProperties = {
@@ -21,17 +22,34 @@ const filler: CSSProperties = {
   fontSize: 13,
 }
 
-function Demo({ intensity }: { intensity: 'strong' | 'weak' }) {
+const COPY = {
+  ru: {
+    hide: 'скрыть',
+    show: 'показать',
+    filler: 'контент под подсветкой',
+    strong: 'Сильное — стол игрока (плавно от краёв)',
+    weak: 'Слабое — место соперника',
+  },
+  en: {
+    hide: 'hide',
+    show: 'show',
+    filler: 'content under the glow',
+    strong: "Strong — player's table (smooth from the edges)",
+    weak: "Weak — opponent's seat",
+  },
+}
+
+function Demo({ intensity, t }: { intensity: 'strong' | 'weak'; t: (typeof COPY)['ru'] }) {
   const [on, setOn] = useState(true)
   return (
     <div style={wrap}>
       <div style={controls}>
         <Button variant="tech" onClick={() => setOn((v) => !v)}>
-          {on ? 'скрыть' : 'показать'}
+          {on ? t.hide : t.show}
         </Button>
       </div>
       <div style={stage}>
-        <div style={filler}>контент под подсветкой</div>
+        <div style={filler}>{t.filler}</div>
         <EdgeGlow visible={on} intensity={intensity} />
       </div>
     </div>
@@ -39,13 +57,15 @@ function Demo({ intensity }: { intensity: 'strong' | 'weak' }) {
 }
 
 export default function EdgeGlowKit() {
+  const { lang } = useLang()
+  const t = COPY[lang]
   return (
     <KitPage title="Edge glow">
-      <KitSection title="Сильное — стол игрока (плавно от краёв)">
-        <Demo intensity="strong" />
+      <KitSection title={t.strong}>
+        <Demo intensity="strong" t={t} />
       </KitSection>
-      <KitSection title="Слабое — место соперника">
-        <Demo intensity="weak" />
+      <KitSection title={t.weak}>
+        <Demo intensity="weak" t={t} />
       </KitSection>
     </KitPage>
   )

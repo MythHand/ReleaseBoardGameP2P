@@ -8,13 +8,14 @@ import Card from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
+import { pick, useLang } from '../../Playground/lang'
 import styles from './DeckAnimationsStory.module.css'
 
-// Сцена операций над колодами. Триггеры — розыгрыш карт из руки (веер Hand):
-// Git Branch — разделение; Git Branch + Sudo — разделение + сброс становится
-// колодой; Git Merge — все колоды в одну; Git Merge + Sudo — то же + сброс.
-// Каждая разыгранная карта летит рука → центр (пресет playToCenter), там
-// отрабатывает эффект, затем карта летит в сброс (centerToDiscard, вразброс).
+// A scene of deck operations. Triggers — playing cards from the hand (the Hand fan):
+// Git Branch — split; Git Branch + Sudo — split + the discard becomes a deck;
+// Git Merge — all decks into one; Git Merge + Sudo — the same + the discard.
+// Each played card flies hand → center (the playToCenter preset), the effect runs
+// there, then the card flies to the discard (centerToDiscard, scattered).
 
 const BASE = CARDS.filter((c) => c.deck === 'base')
 const HAND_SPEC: [string, number][] = [
@@ -37,7 +38,7 @@ interface HandItem {
   card: CardData
 }
 interface DiscardEntry {
-  card: CardData // сброс хранит ОДИНОЧНЫЕ карты; комбо ложится двумя записями
+  card: CardData // the discard holds SINGLE cards; a combo lands as two entries
   rot: number
   dx: number
   dy: number
@@ -66,7 +67,7 @@ const nextUid = () => `h${++handSeq}`
 
 function makeHand(): HandItem[] {
   return HAND_SPEC.flatMap(([id, n]) =>
-    // biome-ignore lint/style/noNonNullAssertion: id-ы из каталога
+    // biome-ignore lint/style/noNonNullAssertion: ids from the catalog
     Array.from({ length: n }, () => ({ uid: nextUid(), card: cardById(id)! })),
   )
 }
@@ -78,16 +79,16 @@ function makeDiscard(): DiscardEntry[] {
 const OPERATION = 'var(--cat-operation)'
 const SUPPORT = 'var(--cat-support)'
 
-const FLIP_MS = 520 // разлёт новой колоды при разделении
-const SPLIT_HOLD = 600 // пауза после разделения перед работой со сбросом
+const FLIP_MS = 520 // the new deck's fly-out on split
+const SPLIT_HOLD = 600 // pause after the split before working with the discard
 const MERGE_MS = 520
 const GATHER_MS = 360
 const TURN_MS = 460
 const HOLD = 360
-const CENTER_HOLD = 420 // пауза карты в центре после эффекта перед уходом в сброс
+const CENTER_HOLD = 420 // pause of the card at the center after the effect before it leaves to the discard
 
-// разыгранные карты: одна — обычная карта; две (комбо с Sudo) — пара CardPair
-// (Sudo подтыкается под основную), как на странице Combo
+// played cards: one — a plain card; two (a Sudo combo) — a CardPair
+// (Sudo tucks under the main one), as on the Combo page
 function PlayedCards({ cards }: { cards: CardData[] }) {
   if (cards.length >= 2) {
     const aux = cards.find((c) => c.id === SUDO) ?? cards[0]
@@ -98,6 +99,7 @@ function PlayedCards({ cards }: { cards: CardData[] }) {
 }
 
 export default function DeckAnimationsStory() {
+  const { lang } = useLang()
   const [decks, setDecks] = useState<DrawDeck[]>([{ id: 1, count: 24 }])
   const [hand, setHand] = useState<HandItem[]>(makeHand)
   const [discard, setDiscard] = useState<DiscardState>({
@@ -108,10 +110,10 @@ export default function DeckAnimationsStory() {
   const [armed, setArmed] = useState<Armed>(null)
   const [hovered, setHovered] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
-  const [flyer, setFlyer] = useState<{ card: CardData; faceDown: boolean } | null>(null) // сброс
-  const [playFlyer, setPlayFlyer] = useState<CardData[] | null>(null) // рука → центр (пара/одна)
-  const [centerCards, setCenterCards] = useState<CardData[]>([]) // карты, лежащие в центре
-  // центр → сброс: каждая карта летит отдельной одиночкой (комбо распадается)
+  const [flyer, setFlyer] = useState<{ card: CardData; faceDown: boolean } | null>(null) // discard
+  const [playFlyer, setPlayFlyer] = useState<CardData[] | null>(null) // hand → center (pair/single)
+  const [centerCards, setCenterCards] = useState<CardData[]>([]) // cards lying at the center
+  // center → discard: each card flies as a separate single (a combo splits)
   const [discardFlyers, setDiscardFlyers] = useState<{ key: string; card: CardData }[]>([])
 
   const pileRefs = useRef<Record<number, HTMLDivElement | null>>({})
@@ -128,8 +130,8 @@ export default function DeckAnimationsStory() {
   const armColor = choosingCard ? SUPPORT : OPERATION
   const discardCardCount = discard.cards.length
 
-  // FLIP новой колоды при разделении: вылетает из колоды-источника на своё место
-  // (пресет flyFrom — анимация «из прошлого прямоугольника» в текущую позицию)
+  // FLIP of the new deck on split: it flies out from the source deck to its spot
+  // (the flyFrom preset — a "from the previous rect" animation to the current position)
   useLayoutEffect(() => {
     const f = flip.current
     if (!f) return
@@ -137,7 +139,7 @@ export default function DeckAnimationsStory() {
     play('flyFrom', pileRefs.current[f.id], { from: f.from, duration: FLIP_MS })
   })
 
-  // ===== эффекты (без управления busy — им управляет playSequence) =====
+  // ===== effects (they don't manage busy — playSequence does) =====
 
   const split = (id: number) => {
     const src = decks.find((d) => d.id === id)
@@ -152,8 +154,8 @@ export default function DeckAnimationsStory() {
     ])
   }
 
-  // общий старт работы со сбросом: скрыть счётчик → собрать в стопку → флайер
-  // лицом вверх на месте сброса. Возвращает rect позиции сброса.
+  // shared start of working with the discard: hide the counter → gather into a pile →
+  // a face-up flyer at the discard spot. Returns the discard position rect.
   const gatherDiscardToFlyer = useCallback(async (): Promise<DOMRect | undefined> => {
     if (discard.cards.length === 0) return undefined
     const top = discard.cards[discard.cards.length - 1].card
@@ -173,14 +175,14 @@ export default function DeckAnimationsStory() {
     return fromRect
   }, [discard.cards])
 
-  // сброс → к toRect лицом вверх → перевернуть рубашкой вверх (для «в колоду»)
+  // discard → to toRect face up → flip back-up (for "into the deck")
   const runDiscardFlight = useCallback(
     async (toRect: DOMRect) => {
       const fromRect = await gatherDiscardToFlyer()
       if (!fromRect) return
-      // Pile содержит подпись под картой, поэтому rect ячейки выше самой карты —
-      // целимся в верхнюю карточную область (иначе посадка уезжает вниз и при
-      // появлении реальной колоды карту телепортирует вверх на своё место)
+      // Pile has a label under the card, so the cell rect is taller than the card itself —
+      // aim at the upper card area (otherwise the landing drifts down and, when the real
+      // deck appears, the card teleports up to its spot)
       const aspect = fromRect.height / fromRect.width
       const cardTo = {
         left: toRect.left,
@@ -203,7 +205,7 @@ export default function DeckAnimationsStory() {
     [gatherDiscardToFlyer],
   )
 
-  // переворот сброса в НОВУЮ колоду добора
+  // flipping the discard into a NEW draw deck
   const flipDiscardToNewDeck = useCallback(async () => {
     if (discard.cards.length === 0) return
     const count = discard.cards.length
@@ -220,7 +222,7 @@ export default function DeckAnimationsStory() {
     setDecks((ds) => ds.map((d) => (d.id === newId ? { ...d, hidden: false } : d)))
   }, [discard.cards, runDiscardFlight])
 
-  // разделение (+ при sudo — ещё и сброс в колоду)
+  // split (+ with sudo — also the discard into a deck)
   const splitEffect = async (deckId: number) => {
     split(deckId)
     await wait(FLIP_MS + 150)
@@ -231,8 +233,8 @@ export default function DeckAnimationsStory() {
     await flipDiscardToNewDeck()
   }
 
-  // слияние всех колод в одну (+ при sudo — сброс вливается); сперва готовим
-  // сброс на месте, затем все колоды И сброс слетаются одновременно
+  // merging all decks into one (+ with sudo — the discard flows in); first prepare
+  // the discard in place, then all decks AND the discard fly together at once
   const mergeEffect = async (withDiscard: boolean) => {
     const target = decks[0]
     if (!target) return
@@ -269,7 +271,7 @@ export default function DeckAnimationsStory() {
     setFlyer(null)
   }
 
-  // ===== розыгрыш карты: рука → центр → (эффект) → сброс =====
+  // ===== playing a card: hand → center → (effect) → discard =====
 
   const flyHandToCenter = async (cards: CardData[], fromRect: Rect) => {
     setPlayFlyer(cards)
@@ -287,8 +289,8 @@ export default function DeckAnimationsStory() {
     setPlayFlyer(null)
   }
 
-  // центр → сброс: комбо распадается, каждая карта летит отдельной одиночкой со
-  // своим разбросом и ложится отдельной записью (полёт = финал, сброс из одиночек)
+  // center → discard: a combo splits, each card flies as a separate single with its
+  // own scatter and lands as its own entry (the flight = the finish, discard of singles)
   const flyCenterToDiscard = async (cards: CardData[]) => {
     const fromRect = centerRef.current?.getBoundingClientRect()
     const toRect = discardRef.current?.getBoundingClientRect()
@@ -336,7 +338,7 @@ export default function DeckAnimationsStory() {
     stop()
   }, [stop])
 
-  // розыгрыш карты из руки (Hand отдаёт индекс, DOM-слот карты и событие)
+  // playing a card from the hand (Hand gives the index, the card DOM slot and the event)
   const handlePlay = (i: number, cardEl: HTMLElement, e: React.MouseEvent) => {
     e.stopPropagation()
     if (busy) return
@@ -346,7 +348,7 @@ export default function DeckAnimationsStory() {
     const rect = cardEl.getBoundingClientRect()
     const aimFromCard = () => aim(centerOf(cardEl), { x: e.clientX, y: e.clientY })
 
-    // Sudo в прицеле → выбираем карту для усиления (Git Branch / Git Merge)
+    // Sudo armed → pick a card to enhance (Git Branch / Git Merge)
     if (armed?.kind === 'sudo') {
       const { sudo } = armed
       if (id === BRANCH) {
@@ -390,7 +392,7 @@ export default function DeckAnimationsStory() {
     }
   }
 
-  // во время прицеливания: клик мимо цели — отмена (карты не тратятся)
+  // while aiming: a click off-target — cancel (cards are not spent)
   useEffect(() => {
     if (!armed) return
     const onDown = () => cancelAim()
@@ -436,15 +438,23 @@ export default function DeckAnimationsStory() {
     <div className={styles.root}>
       <div className={styles.bar}>
         <button type="button" className={styles.btn} onClick={reset}>
-          сброс состояния
+          {pick(lang, { ru: 'сброс состояния', en: 'reset state' })}
         </button>
-        {choosingDeck && <span className={styles.hint}>выбери колоду для разделения</span>}
-        {choosingCard && <span className={styles.hint}>выбери карту для усиления</span>}
+        {choosingDeck && (
+          <span className={styles.hint}>
+            {pick(lang, { ru: 'выбери колоду для разделения', en: 'pick a deck to split' })}
+          </span>
+        )}
+        {choosingCard && (
+          <span className={styles.hint}>
+            {pick(lang, { ru: 'выбери карту для усиления', en: 'pick a card to enhance' })}
+          </span>
+        )}
       </div>
 
       <div className={styles.decks}>
         {decks.map((d) => (
-          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only выбор колоды стрелкой; sandbox story
+          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only deck selection via the arrow; sandbox story
           <div
             key={d.id}
             ref={(el) => {
@@ -457,7 +467,7 @@ export default function DeckAnimationsStory() {
             onMouseLeave={() => setHovered((h) => (h === d.id ? null : h))}
           >
             <Pile
-              label="колода"
+              label={pick(lang, { ru: 'колода', en: 'deck' })}
               deck="base"
               count={d.count}
               width="150px"
@@ -468,21 +478,27 @@ export default function DeckAnimationsStory() {
           </div>
         ))}
         <div className={styles.ai}>
-          <Pile label="события" deck="ai" count={12} width="150px" countPos="tl" />
+          <Pile
+            label={pick(lang, { ru: 'события', en: 'events' })}
+            deck="ai"
+            count={12}
+            width="150px"
+            countPos="tl"
+          />
         </div>
       </div>
 
-      {/* центр стола — разыгранные карты лежат тут на время эффекта */}
+      {/* table center — played cards sit here during the effect */}
       <div className={styles.center} ref={centerRef}>
         {centerCards.length > 0 && <PlayedCards cards={centerCards} />}
       </div>
 
-      {/* сброс — лицом вверх, вразброс */}
+      {/* discard — face up, scattered */}
       <div className={styles.discard}>
         <div className={styles.discardStack} ref={discardRef}>
           {discard.cards.map((entry, i) => (
             <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: сброс — позиционные карты, не переставляются
+              // biome-ignore lint/suspicious/noArrayIndexKey: discard cards are positional, never reordered
               key={i}
               className={styles.discardCard}
               style={{
@@ -499,29 +515,29 @@ export default function DeckAnimationsStory() {
             <span className={styles.discardCount}>{discardCardCount}</span>
           )}
         </div>
-        <div className={styles.label}>сброс</div>
+        <div className={styles.label}>{pick(lang, { ru: 'сброс', en: 'discard' })}</div>
       </div>
 
-      {/* рука игрока — веером (Hand); клик по карте разыгрывает */}
+      {/* player hand — fanned (Hand); clicking a card plays it */}
       <div className={styles.handWrap}>
         <Hand items={hand} onCardClick={handlePlay} accentAt={accentAt} />
       </div>
 
-      {/* летящий сброс (одна карта) */}
+      {/* the flying discard (single card) */}
       {flyer && (
         <div className={styles.flyer} ref={flyerRef}>
           <Card card={flyer.card} faceDown={flyer.faceDown} interactive={false} width="100%" />
         </div>
       )}
 
-      {/* рука → центр: летят одной записью (одна карта или пара CardPair) */}
+      {/* hand → center: fly as one entry (a single card or a CardPair) */}
       {playFlyer && (
         <div className={styles.playFlyer} ref={playFlyerRef}>
           <PlayedCards cards={playFlyer} />
         </div>
       )}
 
-      {/* центр → сброс: каждая карта летит отдельной одиночкой */}
+      {/* center → discard: each card flies as a separate single */}
       {discardFlyers.map((f) => (
         <div
           key={f.key}

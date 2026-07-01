@@ -9,35 +9,38 @@ import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
-import { SEAT_COPY_RU } from '@/table/Seat/Seat'
+import { SEAT_COPY_EN, SEAT_COPY_RU } from '@/table/Seat/Seat'
+import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './DrawCardStory.module.css'
 import { useHandInsert } from './useHandInsert'
 
-// Сцена «взятие карты из колоды». Одиночный добор:
-//   колода → центр (рубашкой вверх) → развилка.
-//   обычная карта → адресат: игрок (переворот + ложится в руку) / соперник
-//     (рубашкой вверх к его месту, dealToSeat);
-//   триггер (Error 503 / AI) → переворачивается в центре ДЛЯ ВСЕХ и остаётся;
-//     AI — дополнительно тянет карту из AI-колоды рядом (эффект — сторона логики).
-// Мультидобор — следующим этапом.
+type Loc = Record<Lang, string>
+
+// A "draw a card from the deck" scene. Single draw:
+//   deck → center (back-up) → branch.
+//   ordinary card → target: player (flip + settles into the hand) / opponent
+//     (back-up to their seat, dealToSeat);
+//   trigger (Error 503 / AI) → flips at the center FOR EVERYONE and stays;
+//     AI — additionally draws a card from the nearby AI deck (the effect is the logic side).
+// Multi-draw — the next stage.
 
 const BASE = CARDS.filter((c) => c.deck === 'base')
 const AI_DECK = CARDS.filter((c) => c.deck === 'ai')
-const CARD_ASPECT = 1.4 // высота/ширина карты
-const AI_HOLD = 4000 // задержка на столе при раскрытом AI-эффекте (4с)
-const FLIP_MS = 420 // длительность flipCard — даём проиграть перевороту на месте
+const CARD_ASPECT = 1.4 // card height/width
+const AI_HOLD = 4000 // table hold while the AI effect is revealed (4s)
+const FLIP_MS = 420 // flipCard duration — let the in-place flip play
 
 const ERROR_503 = 'trigger-error-503'
 const AI_TRIGGER = 'trigger-ai'
-// «случайная обычная» тянется из этого пула (3 любые обычные карты)
+// "random ordinary" is drawn from this pool (3 arbitrary ordinary cards)
 const ORDINARY_POOL = ['attack-security-bug', 'operation-git-branch', 'release-frontend']
 
 type Forced = 'error503' | 'ai' | 'ordinary'
-const FORCED_OPTIONS = [
-  { value: 'error503', label: 'Error 503' },
-  { value: 'ai', label: 'AI-триггер' },
-  { value: 'ordinary', label: 'случайная обычная' },
+const FORCED_OPTIONS: { value: Forced; label: Loc }[] = [
+  { value: 'error503', label: { ru: 'Error 503', en: 'Error 503' } },
+  { value: 'ai', label: { ru: 'AI-триггер', en: 'AI trigger' } },
+  { value: 'ordinary', label: { ru: 'случайная обычная', en: 'random ordinary' } },
 ]
 const DECK_COUNTS = [1, 2, 3, 4]
 
@@ -65,38 +68,39 @@ function resolveForced(forced: Forced): CardType | undefined {
 const resolveAiCard = (): CardType | undefined =>
   AI_DECK[Math.floor(Math.random() * AI_DECK.length)]
 
-// не-триггер карты добора (для остальных позиций мультидобора — просто в руку)
+// non-trigger draw cards (for the other multi-draw positions — just into the hand)
 const NON_TRIGGER = BASE.filter((c) => c.category !== 'trigger')
 const randomNonTrigger = (): CardType => NON_TRIGGER[Math.floor(Math.random() * NON_TRIGGER.length)]
 
-// верхняя «карточная» область ячейки Pile (под картой у Pile есть подпись —
-// поэтому rect ячейки выше самой карты; целимся в карту, а не в центр ячейки)
+// the upper "card" area of a Pile cell (a Pile has a label under the card —
+// so the cell rect is taller than the card; aim at the card, not the cell center)
 function cardAreaOf(cell: DOMRect) {
   return { left: cell.left, top: cell.top, width: cell.width, height: cell.width * CARD_ASPECT }
 }
 
 export default function DrawCardStory() {
+  const { lang } = useLang()
   const [deckCount, setDeckCount] = useState(1)
   const [forced, setForced] = useState<Forced>('ordinary')
-  const [forcedAt, setForcedAt] = useState(1) // на каком по счёту доборе вылезет форс-карта
+  const [forcedAt, setForcedAt] = useState(1) // on which draw the forced card shows up
   const [drawer, setDrawer] = useState('you')
   const [opponents, setOpponents] = useState<Opp[]>(INITIAL_OPPONENTS)
   const [hand, setHand] = useState<HandItem[]>(makeHand)
-  // seq — идентификатор полёта: разные полёты = разные key у флайера, чтобы
-  // React не переиспользовал Card (иначе смена faceDown крутит флип в полёте)
+  // seq — flight id: different flights = different flyer keys so React
+  // doesn't reuse the Card (otherwise a faceDown change spins a flip mid-flight)
   const [flyer, setFlyer] = useState<{ card: CardType; faceDown: boolean; seq: number } | null>(
     null,
   )
-  const [centerCard, setCenterCard] = useState<CardType | null>(null) // раскрытый триггер в центре
-  const [aiCard, setAiCard] = useState<CardType | null>(null) // карта из AI-колоды рядом
+  const [centerCard, setCenterCard] = useState<CardType | null>(null) // the revealed trigger at the center
+  const [aiCard, setAiCard] = useState<CardType | null>(null) // the card from the nearby AI deck
   const [discard, setDiscard] = useState<{ top: CardType | null; count: number }>({
     top: null,
     count: 0,
   })
-  // уходящие карты при разрешении AI (триггер → сброс, эффект → колода)
+  // cards leaving on AI resolution (trigger → discard, effect → deck)
   const [outs, setOuts] = useState<{ key: string; card: CardType; faceDown: boolean }[]>([])
-  // красная краевая подсветка при Error 503 (полноэкранная): self — ты вытянул
-  // (большая, ПОД рукой); other — вытянул соперник (мелкая, НАД рукой, не блокирует)
+  // red edge glow on Error 503 (full-screen): self — you drew
+  // (large, UNDER the hand); other — the opponent drew (small, OVER the hand, non-blocking)
   const [alert, setAlert] = useState<'self' | 'other' | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -104,9 +108,9 @@ export default function DrawCardStory() {
 
   const deckRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const seatRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const centerRef = useRef<HTMLDivElement>(null) // staging / Error 503 — в центре
-  const causeRef = useRef<HTMLDivElement>(null) // AI-триггер (причина) — слева, обычный размер
-  const effectRef = useRef<HTMLDivElement>(null) // AI-эффект (главная) — крупнее, в центре
+  const centerRef = useRef<HTMLDivElement>(null) // staging / Error 503 — at the center
+  const causeRef = useRef<HTMLDivElement>(null) // AI trigger (cause) — on the left, normal size
+  const effectRef = useRef<HTMLDivElement>(null) // AI effect (main) — larger, at the center
   const aiRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
   const flyerRef = useRef<HTMLDivElement>(null)
@@ -115,8 +119,8 @@ export default function DrawCardStory() {
   const barRef = useRef<HTMLDivElement>(null)
   const flightSeq = useRef(0)
 
-  // высота тех-панели — чтобы краевое свечение жило в зоне СТОЛА (под баром),
-  // а не на всём экране (иначе край стола = край экрана, игнорируя тех-элементы)
+  // the tech-bar height — so the edge glow lives in the TABLE zone (under the bar),
+  // not across the whole screen (otherwise table edge = screen edge, ignoring tech elements)
   const [barH, setBarH] = useState(0)
   useLayoutEffect(() => {
     if (barRef.current) setBarH(barRef.current.offsetHeight)
@@ -136,29 +140,29 @@ export default function DrawCardStory() {
   })
 
   const drawerOptions = [
-    { value: 'you', label: 'игрок' },
+    { value: 'you', label: pick(lang, { ru: 'игрок', en: 'player' }) },
     ...opponents.map((o) => ({ value: o.id, label: o.name })),
   ]
 
-  // игрок: остановка в центре → переворот лицом вверх → ложится в руку
+  // player: stop at the center → flip face up → settles into the hand
   const toPlayerHand = async (card: CardType) => {
     await wait(220)
     setFlyer((f) => (f ? { ...f, faceDown: false } : f))
-    await wait(560) // даём flipCard проиграть (420) + пауза
+    await wait(560) // let flipCard play (420) + a pause
     const r = flyerRef.current?.getBoundingClientRect()
     setFlyer(null)
     if (r) insert(card, { left: r.left, top: r.top, width: r.width, height: r.height }, hand.length)
   }
 
-  // соперник: уходит к его месту рубашкой вверх и тонет в скрытой руке
+  // opponent: goes to their seat back-up and sinks into the hidden hand
   const toOpponent = async (oppId: string) => {
     await wait(160)
     const el = flyerRef.current
     const seatRect = seatRefs.current[oppId]?.getBoundingClientRect()
     const fromRect = el?.getBoundingClientRect()
     if (el && seatRect && fromRect) {
-      // целимся в карточную область у места соперника с лёгким уменьшением
-      // (а не в широкий Seat — иначе карта раздувается до его ширины)
+      // aim at the card area near the opponent's seat with a slight shrink
+      // (not at the wide Seat — otherwise the card inflates to its width)
       const w = fromRect.width * 0.7
       const to = {
         left: seatRect.left + seatRect.width / 2 - w / 2,
@@ -173,17 +177,17 @@ export default function DrawCardStory() {
     setFlyer(null)
   }
 
-  // триггер (Error 503 / AI): переворачивается в центре для всех и остаётся
+  // trigger (Error 503 / AI): flips at the center for everyone and stays
   const revealForAll = async (card: CardType) => {
     await wait(220)
     setFlyer((f) => (f ? { ...f, faceDown: false } : f))
-    await wait(560) // даём flipCard проиграть + пауза
-    setCenterCard(card) // карта остаётся раскрытой в центре
+    await wait(560) // let flipCard play + a pause
+    setCenterCard(card) // the card stays revealed at the center
     setFlyer(null)
   }
 
-  // AI: тянется карта из AI-колоды в центр КАК ГЛАВНАЯ — крупнее триггера
-  // (триггер при этом стоит слева как причина). Эффект — сторона логики, потом.
+  // AI: a card is drawn from the AI deck to the center AS THE MAIN one — larger than the trigger
+  // (the trigger meanwhile stands on the left as the cause). The effect is the logic side, later.
   const drawAiEffect = async (): Promise<CardType | undefined> => {
     const ai = resolveAiCard()
     const aiCell = aiRef.current?.getBoundingClientRect()
@@ -197,7 +201,7 @@ export default function DrawCardStory() {
       el.style.left = `${from.left}px`
       el.style.top = `${from.top}px`
       el.style.width = `${from.width}px`
-      // целимся в крупный слот эффекта — карта приходит увеличенной
+      // aim at the large effect slot — the card arrives enlarged
       const anim = play('drawToCenter', el, { from, to: toRect })
       if (anim) await anim.finished
       for (const a of el.getAnimations()) a.cancel()
@@ -213,7 +217,7 @@ export default function DrawCardStory() {
     return ai
   }
 
-  // триггер уходит в сброс (как был, лицом вверх)
+  // the trigger leaves to the discard (as it was, face up)
   const leaveTrigger = async (fromRect?: DOMRect, discardRect?: DOMRect) => {
     const el = outRefs.current.trig
     if (!el || !fromRect || !discardRect) return
@@ -221,9 +225,9 @@ export default function DrawCardStory() {
     if (anim) await anim.finished
   }
 
-  // эффект сперва переворачивается рубашкой НА МЕСТЕ (консистентно с вводом карт
-  // в игру), и эта задержка разводит траектории; затем возвращается в AI-колоду
-  // с уменьшением до размера колоды (returnToDeck)
+  // the effect first flips back-up IN PLACE (consistent with cards entering
+  // play), and that delay separates the trajectories; then it returns to the AI deck
+  // shrinking to the deck size (returnToDeck)
   const leaveEffect = async (fromRect?: DOMRect, deckRect?: DOMRect) => {
     setOuts((os) => os.map((o) => (o.key === 'eff' ? { ...o, faceDown: true } : o)))
     await wait(FLIP_MS)
@@ -233,15 +237,15 @@ export default function DrawCardStory() {
     if (anim) await anim.finished
   }
 
-  // разрешение AI: пауза на столе → триггер в сброс и эффект в колоду
-  // (одновременный старт, эффект со стаггером от переворота)
+  // AI resolution: a table pause → the trigger to the discard and the effect to the deck
+  // (simultaneous start, the effect staggered by the flip)
   const resolveAi = async (trig: CardType, eff: CardType) => {
     await wait(AI_HOLD)
     const causeRect = causeRef.current?.getBoundingClientRect()
     const effectRect = effectRef.current?.getBoundingClientRect()
     const discardRect = discardRef.current?.getBoundingClientRect()
     const aiDeckRect = aiRef.current?.getBoundingClientRect()
-    // статичные карты становятся флайерами на своих местах
+    // the static cards become flyers in their places
     setOuts([
       { key: 'trig', card: trig, faceDown: false },
       { key: 'eff', card: eff, faceDown: false },
@@ -266,16 +270,16 @@ export default function DrawCardStory() {
     setDiscard((d) => ({ top: trig, count: d.count + 1 }))
   }
 
-  // один добор: конкретная карта из конкретной колоды → центр → развилка.
-  // busy/очистку центра ведёт вызывающий (draw / drawBatch). Возвращает, можно
-  // ли тянуть дальше: false — триггер ждёт своей (игровой) логики, пачка стоп.
+  // one draw: a specific card from a specific deck → center → branch.
+  // busy/clearing the center is done by the caller (draw / drawBatch). Returns whether
+  // drawing can continue: false — the trigger awaits its (game) logic, the batch stops.
   const drawOne = async (card: CardType, deckIndex: number): Promise<boolean> => {
     const isAi = card.id === AI_TRIGGER
     const deckCell = deckRefs.current[deckIndex]?.getBoundingClientRect()
-    // AI-триггер садится слева (как причина), остальное — в центр
+    // the AI trigger sits on the left (as the cause), the rest — at the center
     const stageRect = (isAi ? causeRef : centerRef).current?.getBoundingClientRect()
 
-    // 1) колода → staging (рубашкой вверх) через пресет drawToCenter
+    // 1) deck → staging (back-up) via the drawToCenter preset
     setFlyer({ card, faceDown: true, seq: ++flightSeq.current })
     await nextFrames()
     const el = flyerRef.current
@@ -286,25 +290,25 @@ export default function DrawCardStory() {
       el.style.width = `${from.width}px`
       const anim = play('drawToCenter', el, { from, to: stageRect })
       if (anim) await anim.finished
-      // фиксируем флайер на месте (identity), чтобы следующий полёт стартовал отсюда
+      // pin the flyer in place (identity) so the next flight starts here
       for (const a of el.getAnimations()) a.cancel()
       el.style.left = `${stageRect.left}px`
       el.style.top = `${stageRect.top}px`
       el.style.width = `${stageRect.width}px`
     }
 
-    // 2) развилка по типу карты
+    // 2) branch by card type
     if (card.category === 'trigger') {
       await revealForAll(card)
       if (isAi) {
         const eff = await drawAiEffect()
-        // пауза → триггер в сброс, эффект обратно в колоду
+        // pause → the trigger to the discard, the effect back to the deck
         if (eff) await resolveAi(card, eff)
-        return true // AI отыграл — можно тянуть дальше
+        return true // AI played out — can keep drawing
       }
-      // Error 503: полноэкранная красная подсветка (self — ты тянул: большая, под
-      // рукой; other — соперник: мелкая, над рукой). Остаётся раскрытым,
-      // разрешение — игровая логика (нет фикс. сценария) → пачка ждёт, дальше не тянем
+      // Error 503: full-screen red glow (self — you drew: large, under
+      // the hand; other — opponent: small, over the hand). Stays revealed,
+      // resolution is game logic (no fixed scenario) → the batch waits, we don't draw further
       setAlert(drawer === 'you' ? 'self' : 'other')
       return false
     }
@@ -313,7 +317,7 @@ export default function DrawCardStory() {
     return true
   }
 
-  // одиночный добор форс-карты из конкретной колоды (клик по колоде)
+  // a single draw of the forced card from a specific deck (click on the deck)
   const draw = async (deckIndex: number) => {
     if (busy || !nextCard) return
     setBusy(true)
@@ -324,8 +328,8 @@ export default function DrawCardStory() {
     setBusy(false)
   }
 
-  // мультидобор (кнопка): по карте из каждой колоды, по очереди. Форс-карта —
-  // на позиции «очередь», остальные позиции — случайные не-триггер карты.
+  // multi-draw (button): one card from each deck, in turn. The forced card —
+  // at the "queue" position, the other positions — random non-trigger cards.
   const drawBatch = async () => {
     if (busy) return
     setBusy(true)
@@ -337,7 +341,7 @@ export default function DrawCardStory() {
       i + 1 === forcedAt ? (forcedCard ?? randomNonTrigger()) : randomNonTrigger(),
     )
     for (let i = 0; i < seq.length; i++) {
-      // триггер без отыгранной логики останавливает пачку (дальше не тянем)
+      // a trigger without played-out logic stops the batch (we don't draw further)
       const canContinue = await drawOne(seq[i], i)
       if (!canContinue) break
     }
@@ -361,28 +365,33 @@ export default function DrawCardStory() {
     <div className={styles.root}>
       <div className={styles.bar} ref={barRef}>
         <button type="button" className={styles.btn} onClick={reset}>
-          сброс
+          {pick(lang, { ru: 'сброс', en: 'reset' })}
         </button>
         <HoverSelect
-          label="колод добора"
+          label={pick(lang, { ru: 'колод добора', en: 'draw decks' })}
           value={String(deckCount)}
           options={DECK_COUNTS.map((n) => ({ value: String(n), label: String(n) }))}
           onChange={(v) => {
             const n = Number(v)
             setDeckCount(n)
-            if (forcedAt > n) setForcedAt(n) // подрезаем позицию под число колод
+            if (forcedAt > n) setForcedAt(n) // trim the position to the deck count
           }}
         />
-        <HoverSelect label="тянет" value={drawer} options={drawerOptions} onChange={setDrawer} />
         <HoverSelect
-          label="вытянется"
+          label={pick(lang, { ru: 'тянет', en: 'draws' })}
+          value={drawer}
+          options={drawerOptions}
+          onChange={setDrawer}
+        />
+        <HoverSelect
+          label={pick(lang, { ru: 'вытянется', en: 'will draw' })}
           value={forced}
-          options={FORCED_OPTIONS}
+          options={FORCED_OPTIONS.map((o) => ({ value: o.value, label: o.label[lang] }))}
           onChange={(v) => setForced(v as Forced)}
         />
         {deckCount > 1 && (
           <HoverSelect
-            label="очередь"
+            label={pick(lang, { ru: 'очередь', en: 'queue' })}
             value={String(forcedAt)}
             options={Array.from({ length: deckCount }, (_, i) => ({
               value: String(i + 1),
@@ -393,13 +402,15 @@ export default function DrawCardStory() {
         )}
         {nextCard && (
           <div className={styles.preview}>
-            <span className={styles.previewLabel}>следующая</span>
+            <span className={styles.previewLabel}>
+              {pick(lang, { ru: 'следующая', en: 'next' })}
+            </span>
             <Card card={nextCard} interactive={false} width="46px" />
           </div>
         )}
       </div>
 
-      {/* соперники — сверху, как на столе */}
+      {/* opponents — on top, as on the table */}
       <div className={styles.opponents}>
         {opponents.map((o) => (
           <div
@@ -410,37 +421,37 @@ export default function DrawCardStory() {
           >
             <Seat
               player={{ id: o.id, name: o.name, handCount: o.handCount, release: EMPTY_RELEASE }}
-              copy={SEAT_COPY_RU}
+              copy={pick(lang, { ru: SEAT_COPY_RU, en: SEAT_COPY_EN })}
             />
           </div>
         ))}
       </div>
 
-      {/* центр стола — staging добора; Error 503 остаётся тут (для всех) */}
+      {/* table center — draw staging; Error 503 stays here (for everyone) */}
       <div className={styles.center} ref={centerRef}>
         {centerCard && centerCard.id !== AI_TRIGGER && (
           <Card card={centerCard} interactive={false} width="100%" />
         )}
       </div>
 
-      {/* AI-триггер (причина) — слева от центра, обычный размер */}
+      {/* AI trigger (cause) — left of the center, normal size */}
       <div className={styles.causeSlot} ref={causeRef} aria-hidden={centerCard?.id !== AI_TRIGGER}>
         {centerCard?.id === AI_TRIGGER && (
           <Card card={centerCard} interactive={false} width="100%" />
         )}
       </div>
 
-      {/* AI-эффект (главная) — в центре, крупнее */}
+      {/* AI effect (main) — at the center, larger */}
       <div className={styles.effectSlot} ref={effectRef} aria-hidden={!aiCard}>
         {aiCard && <Card card={aiCard} interactive={false} width="100%" />}
       </div>
 
-      {/* колоды добора (клик — тянем карту) + колода событий AI */}
+      {/* draw decks (click — draw a card) + the AI events deck */}
       <div className={styles.decks}>
         {Array.from({ length: deckCount }, (_, i) => (
-          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only добор кликом по колоде; sandbox story
+          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only draw by clicking a deck; sandbox story
           <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: колоды — позиционные ячейки сцены, без стабильного id
+            // biome-ignore lint/suspicious/noArrayIndexKey: decks are positional scene cells, no stable id
             key={`deck-${i}`}
             ref={(el) => {
               deckRefs.current[i] = el
@@ -448,48 +459,65 @@ export default function DrawCardStory() {
             className={`${styles.deck} ${styles.drawable}`}
             onMouseDown={() => draw(i)}
           >
-            <Pile label="колода" deck="base" count={40} width="150px" countPos="tl" />
+            <Pile
+              label={pick(lang, { ru: 'колода', en: 'deck' })}
+              deck="base"
+              count={40}
+              width="150px"
+              countPos="tl"
+            />
           </div>
         ))}
         <div className={styles.ai} ref={aiRef}>
-          <Pile label="события" deck="ai" count={12} width="150px" countPos="tl" />
+          <Pile
+            label={pick(lang, { ru: 'события', en: 'events' })}
+            deck="ai"
+            count={12}
+            width="150px"
+            countPos="tl"
+          />
         </div>
       </div>
 
-      {/* кнопка добора — под колодами (колоды не двигаем) */}
+      {/* the draw button — under the decks (we don't move the decks) */}
       <button type="button" className={styles.drawBtn} onClick={drawBatch} disabled={busy}>
-        добрать
+        {pick(lang, { ru: 'добрать', en: 'draw' })}
       </button>
 
-      {/* сброс — справа, как на столе */}
+      {/* discard — on the right, as on the table */}
       <div className={styles.discard} ref={discardRef}>
-        <Pile label="сброс" topCard={discard.top} count={discard.count} width="116px" />
+        <Pile
+          label={pick(lang, { ru: 'сброс', en: 'discard' })}
+          topCard={discard.top}
+          count={discard.count}
+          width="116px"
+        />
       </div>
 
-      {/* Error 503, ты вытянул — большая подсветка ПОД рукой (перед рукой в DOM).
-          Свечение живёт в зоне СТОЛА (под баром), не на всём экране. */}
+      {/* Error 503, you drew — a large glow UNDER the hand (before the hand in the DOM).
+          The glow lives in the TABLE zone (under the bar), not across the whole screen. */}
       <div className={styles.glowBounds} style={{ insetBlockStart: barH }}>
         <EdgeGlow visible={alert === 'self'} intensity="strong" />
       </div>
 
-      {/* рука игрока — снизу веером */}
+      {/* player hand — fanned at the bottom */}
       <div className={styles.handWrap} ref={handRef}>
         <Hand items={hand} gapAt={gapAt} />
       </div>
 
-      {/* Error 503, вытянул соперник — мелкая подсветка НАД рукой (не блокирует ховер) */}
+      {/* Error 503, the opponent drew — a small glow OVER the hand (doesn't block hover) */}
       <div className={styles.glowBounds} style={{ insetBlockStart: barH }}>
         <EdgeGlow visible={alert === 'other'} intensity="weak" />
       </div>
 
-      {/* летящая карта добора — key по seq: новый полёт = свежий Card (без флипа) */}
+      {/* the flying draw card — keyed by seq: a new flight = a fresh Card (no flip) */}
       {flyer && (
         <div key={flyer.seq} className={styles.flyer} ref={flyerRef}>
           <Card card={flyer.card} faceDown={flyer.faceDown} interactive={false} width="100%" />
         </div>
       )}
 
-      {/* уходящие карты при разрешении AI (триггер → сброс, эффект → колода) */}
+      {/* cards leaving on AI resolution (trigger → discard, effect → deck) */}
       {outs.map((o) => (
         <div
           key={o.key}

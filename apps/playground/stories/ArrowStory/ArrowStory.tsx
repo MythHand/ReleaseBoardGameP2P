@@ -5,27 +5,35 @@ import { useEffect, useRef, useState } from 'react'
 import { cardById } from '@/cards'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
+import { type Lang, pick, useLang } from '../../Playground/lang'
 import styles from './ArrowStory.module.css'
 
-// Демонстрация цветовой цепочки: цвет карты (по группе) → цвет стрелки → цвет
-// выделения цели. Карты четырёх цветов: красная (attack), оранжевая (operation),
-// жёлтая (support), зелёная (release). Цели обезличены — это просто зоны.
+type Loc = Record<Lang, string>
+
+// Color-chain demo: card color (by group) → arrow color → target highlight color.
+// Cards of four colors: red (attack), orange (operation), yellow (support),
+// green (release). Targets are impersonal — just zones.
 const SOURCES = ['attack-security-bug', 'operation-git-branch', 'support-sudo', 'release-frontend']
-  // biome-ignore lint/style/noNonNullAssertion: все id — из каталога
+  // biome-ignore lint/style/noNonNullAssertion: all ids are from the catalog
   .map((id) => cardById(id)!)
 
-const TARGETS = ['зона 1', 'зона 2', 'зона 3']
+const TARGETS: { id: string; label: Loc }[] = [
+  { id: 'z1', label: { ru: 'зона 1', en: 'zone 1' } },
+  { id: 'z2', label: { ru: 'зона 2', en: 'zone 2' } },
+  { id: 'z3', label: { ru: 'зона 3', en: 'zone 3' } },
+]
 
 export default function ArrowStory() {
+  const { lang } = useLang()
   const refs = useRef<Record<string, HTMLDivElement | null>>({})
-  // геометрия и слежение за курсором — общий хук стрелки
+  // geometry and cursor tracking — the shared arrow hook
   const { from, to, active, aim, stop } = useArrow()
-  const [armed, setArmed] = useState<CardData | null>(null) // какой картой целимся (для цвета)
+  const [armed, setArmed] = useState<CardData | null>(null) // which card we aim with (for color)
   const [hovered, setHovered] = useState<string | null>(null)
 
   const color = armed ? `var(--cat-${armed.category})` : 'var(--brand-green)'
 
-  // клик в пустоту — отмена прицеливания
+  // click on empty space — cancel aiming
   useEffect(() => {
     if (!active) return
     const onDown = () => {
@@ -48,8 +56,10 @@ export default function ArrowStory() {
   return (
     <div className={styles.root}>
       <p className={styles.hint}>
-        Клик по карте — стрелка её цвета идёт за курсором. Наведи на зону — она подсветится тем же
-        цветом (обводка + свечение, как у обложки). Клик ещё раз — отмена.
+        {pick(lang, {
+          ru: 'Клик по карте — стрелка её цвета идёт за курсором. Наведи на зону — она подсветится тем же цветом (обводка + свечение, как у обложки). Клик ещё раз — отмена.',
+          en: 'Click a card — an arrow in its color follows the cursor. Hover a zone — it lights up in the same color (outline + glow, like the cover). Click again — cancel.',
+        })}
       </p>
 
       <div className={styles.stage}>
@@ -70,18 +80,18 @@ export default function ArrowStory() {
         </div>
 
         <div className={styles.targets}>
-          {TARGETS.map((label) => {
-            const lit = active && hovered === label
+          {TARGETS.map((target) => {
+            const lit = active && hovered === target.id
             return (
               // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only hover target for the arrow demo; sandbox story
               <div
-                key={label}
+                key={target.id}
                 className={`${styles.target} ${lit ? styles.targeted : ''}`}
                 style={lit ? ({ '--hl': color } as CSSProperties) : undefined}
-                onMouseEnter={() => active && setHovered(label)}
-                onMouseLeave={() => setHovered((h: string | null) => (h === label ? null : h))}
+                onMouseEnter={() => active && setHovered(target.id)}
+                onMouseLeave={() => setHovered((h: string | null) => (h === target.id ? null : h))}
               >
-                {label}
+                {target.label[lang]}
               </div>
             )
           })}

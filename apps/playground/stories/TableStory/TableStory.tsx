@@ -9,37 +9,53 @@ import { RECONNECT_COPY_EN, RECONNECT_COPY_RU } from '@/table/Reconnect'
 import { SEAT_COPY_EN, SEAT_COPY_RU } from '@/table/Seat/Seat'
 import Table from '@/table/Table'
 import { TABLE_COPY_EN, TABLE_COPY_RU } from '@/table/Table/Table'
-import { pick, useLang } from '../../Playground/lang'
+import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './TableStory.module.css'
 
 type GameOverCondition = 'release' | 'lastStanding'
 type ViewState = 'oppEliminated' | 'youEliminated' | 'oppDisconnect' | 'youDisconnect'
+type Loc = Record<Lang, string>
 
 interface EndVariant {
   id: string
-  label: string
+  label: Loc
   winnerId: string
   condition: GameOverCondition
 }
 interface ViewItem {
   id: ViewState
-  label: string
+  label: Loc
 }
 
-// варианты завершения партии — каждый отдельной кнопкой, чтобы все увидеть
+// end-of-match variants — each as its own button so all are visible
 const END_VARIANTS: EndVariant[] = [
-  { id: 'win-release', label: 'победа: 3 релиза', winnerId: 'you', condition: 'release' },
-  { id: 'win-last', label: 'победа: последний', winnerId: 'you', condition: 'lastStanding' },
-  { id: 'opp-release', label: 'соперник: 3 релиза', winnerId: 'p2', condition: 'release' },
+  {
+    id: 'win-release',
+    label: { ru: 'победа: 3 релиза', en: 'win: 3 releases' },
+    winnerId: 'you',
+    condition: 'release',
+  },
+  {
+    id: 'win-last',
+    label: { ru: 'победа: последний', en: 'win: last standing' },
+    winnerId: 'you',
+    condition: 'lastStanding',
+  },
+  {
+    id: 'opp-release',
+    label: { ru: 'соперник: 3 релиза', en: 'opponent: 3 releases' },
+    winnerId: 'p2',
+    condition: 'release',
+  },
 ]
 
-// состояния стола: выбывание/дисконнект соперника и самого игрока
+// table states: elimination/disconnect of the opponent and of the player
 const VIEW_STATES: ViewItem[] = [
-  { id: 'oppEliminated', label: 'соперник выбыл' },
-  { id: 'youEliminated', label: 'ты выбыл' },
-  { id: 'oppDisconnect', label: 'дисконнект соперника' },
-  { id: 'youDisconnect', label: 'твой дисконнект' },
+  { id: 'oppEliminated', label: { ru: 'соперник выбыл', en: 'opponent out' } },
+  { id: 'youEliminated', label: { ru: 'ты выбыл', en: 'you are out' } },
+  { id: 'oppDisconnect', label: { ru: 'дисконнект соперника', en: 'opponent disconnect' } },
+  { id: 'youDisconnect', label: { ru: 'твой дисконнект', en: 'your disconnect' } },
 ]
 
 export default function TableStory() {
@@ -52,10 +68,11 @@ export default function TableStory() {
   const [kicked, setKicked] = useState<Set<string>>(() => new Set())
 
   const base = useMemo(() => makeTable(opps), [opps])
-  // исключённых хостом зрителей убираем из состава
+  // spectators kicked by the host are removed from the roster
   const state = { ...base, spectators: base.spectators.filter((s) => !kicked.has(s.id)) }
 
   const variant = END_VARIANTS.find((v) => v.id === end)
+  const none = pick(lang, { ru: '— нет —', en: '— none —' })
 
   return (
     <div className={styles.root}>
@@ -78,29 +95,31 @@ export default function TableStory() {
         </div>
 
         <HoverSelect
-          label="оппонентов"
+          label={pick(lang, { ru: 'оппонентов', en: 'opponents' })}
           value={String(opps)}
           options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
           onChange={(v) => setOpps(Number(v))}
         />
-        <span className={styles.total}>всего: {opps + 1}</span>
+        <span className={styles.total}>
+          {pick(lang, { ru: 'всего', en: 'total' })}: {opps + 1}
+        </span>
 
         <HoverSelect
-          label="состояние"
+          label={pick(lang, { ru: 'состояние', en: 'state' })}
           value={view ?? ''}
           options={[
-            { value: '', label: '— нет —' },
-            ...VIEW_STATES.map((v) => ({ value: v.id, label: v.label })),
+            { value: '', label: none },
+            ...VIEW_STATES.map((v) => ({ value: v.id, label: v.label[lang] })),
           ]}
           onChange={(v) => setView(v === '' ? null : (v as ViewState))}
         />
 
         <HoverSelect
-          label="завершение"
+          label={pick(lang, { ru: 'завершение', en: 'game end' })}
           value={end ?? ''}
           options={[
-            { value: '', label: '— нет —' },
-            ...END_VARIANTS.map((v) => ({ value: v.id, label: v.label })),
+            { value: '', label: none },
+            ...END_VARIANTS.map((v) => ({ value: v.id, label: v.label[lang] })),
           ]}
           onChange={(v) => setEnd(v === '' ? null : v)}
         />

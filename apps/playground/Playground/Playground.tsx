@@ -1,8 +1,5 @@
 import { type ReactNode, useState } from 'react'
 import { Navigate, NavLink, Route, Routes } from 'react-router'
-import TextStyles from '@/design/TextStyles'
-import TokenPreview from '@/design/TokenPreview'
-import TypographyPreview from '@/design/TypographyPreview'
 import AnimationAuditStory from '../stories/AnimationAuditStory'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
@@ -21,6 +18,9 @@ import RulesBlock from '../stories/blocks/RulesBlock'
 import SeatBlock from '../stories/blocks/SeatBlock'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
+import TextStyles from '../stories/foundations/TextStyles'
+import TokenPreview from '../stories/foundations/TokenPreview'
+import TypographyPreview from '../stories/foundations/TypographyPreview'
 import HandStory from '../stories/HandStory'
 import InviteStory from '../stories/InviteStory'
 import CardPlayStory from '../stories/interactive/CardPlayStory'
@@ -51,7 +51,7 @@ import StartStory from '../stories/StartStory'
 import StatsStory from '../stories/StatsStory'
 import TableStory from '../stories/TableStory'
 import WelcomeStory from '../stories/WelcomeStory'
-import { type Lang, LangContext } from './lang'
+import { type Lang, LangContext, pick } from './lang'
 import styles from './Playground.module.css'
 
 interface Story {
@@ -61,7 +61,9 @@ interface Story {
   render: () => ReactNode
 }
 interface Group {
-  title: string
+  // Localized group heading. Story titles themselves stay language-agnostic
+  // (they are already English), only the RU group headings get an EN variant.
+  title: { ru: string; en: string }
   items: Story[]
 }
 
@@ -70,11 +72,11 @@ interface Group {
 const groups: Group[] = [
   {
     // приветственная вкладка — первой и без заголовка группы
-    title: '',
+    title: { ru: '', en: '' },
     items: [{ id: 'welcome', title: 'Welcome', render: () => <WelcomeStory /> }],
   },
   {
-    title: 'Экраны',
+    title: { ru: 'Экраны', en: 'Screens' },
     items: [
       { id: 'loader', title: 'Loader', render: () => <LoaderStory /> },
       { id: 'start', title: 'Start screen', render: () => <StartStory /> },
@@ -85,7 +87,7 @@ const groups: Group[] = [
     ],
   },
   {
-    title: 'Основа',
+    title: { ru: 'Основа', en: 'Foundations' },
     items: [
       { id: 'colors', title: 'Colors', render: () => <TokenPreview /> },
       { id: 'typography', title: 'Typography', render: () => <TypographyPreview /> },
@@ -93,14 +95,14 @@ const groups: Group[] = [
     ],
   },
   {
-    title: 'Карты',
+    title: { ru: 'Карты', en: 'Cards' },
     items: [
       { id: 'card', title: 'Card', render: () => <CardStory /> },
       { id: 'hand', title: 'Hand', render: () => <HandStory /> },
     ],
   },
   {
-    title: 'Интерактив',
+    title: { ru: 'Интерактив', en: 'Interactive' },
     items: [
       {
         id: 'interaction-audit',
@@ -124,7 +126,7 @@ const groups: Group[] = [
   },
   {
     // Контролы — интерактивные элементы ввода/выбора (как правило, с текстом).
-    title: 'UI KIT · контролы',
+    title: { ru: 'UI KIT · контролы', en: 'UI KIT · controls' },
     items: [
       { id: 'kit-buttons', title: 'Buttons', render: () => <ButtonsKit /> },
       { id: 'kit-inputs', title: 'Inputs', render: () => <InputsKit /> },
@@ -137,7 +139,7 @@ const groups: Group[] = [
   },
   {
     // Поверхности и индикаторы — бейджи, аватары, стопки, оверлеи и т.п.
-    title: 'UI KIT · поверхности',
+    title: { ru: 'UI KIT · поверхности', en: 'UI KIT · surfaces' },
     items: [
       { id: 'kit-badges', title: 'Badges', render: () => <BadgesKit /> },
       { id: 'kit-avatars', title: 'Avatars', render: () => <AvatarsKit /> },
@@ -152,7 +154,7 @@ const groups: Group[] = [
   },
   {
     // Готовые композитные куски — собранные из примитивов блоки, как на экранах.
-    title: 'Блоки',
+    title: { ru: 'Блоки', en: 'Blocks' },
     items: [
       {
         id: 'block-game-settings',
@@ -214,20 +216,23 @@ export default function Playground() {
             </div>
           </div>
           <nav className={styles.nav}>
-            {groups.map((g) => (
-              <div key={g.title || g.items[0]?.id} className={styles.group}>
-                {g.title && <div className={styles.groupTitle}>{g.title}</div>}
-                {g.items.map((s) => (
-                  <NavLink
-                    key={s.id}
-                    to={`/${s.id}`}
-                    className={({ isActive }) => (isActive ? styles.itemActive : styles.item)}
-                  >
-                    {s.title}
-                  </NavLink>
-                ))}
-              </div>
-            ))}
+            {groups.map((g) => {
+              const groupTitle = pick(lang, g.title)
+              return (
+                <div key={g.title.ru || g.items[0]?.id} className={styles.group}>
+                  {groupTitle && <div className={styles.groupTitle}>{groupTitle}</div>}
+                  {g.items.map((s) => (
+                    <NavLink
+                      key={s.id}
+                      to={`/${s.id}`}
+                      className={({ isActive }) => (isActive ? styles.itemActive : styles.item)}
+                    >
+                      {s.title}
+                    </NavLink>
+                  ))}
+                </div>
+              )
+            })}
           </nav>
         </aside>
         <main className={styles.stage}>

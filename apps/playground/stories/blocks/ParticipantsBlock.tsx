@@ -6,7 +6,7 @@ import Participants, {
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 
-// Полный состав стола: игроки (в игре / выбыл / нет связи) и зрители.
+// Full table roster: players (in game / eliminated / no connection) and spectators.
 const { participants, spectators } = makeTable(4)
 
 export default function ParticipantsBlock() {
@@ -14,8 +14,8 @@ export default function ParticipantsBlock() {
   const copy = pick(lang, { ru: PARTICIPANTS_COPY_RU, en: PARTICIPANTS_COPY_EN })
 
   return (
-    <KitPage title="Participants" tag="блок">
-      <KitSection title="Игроки и зрители">
+    <KitPage title="Participants" tag="block">
+      <KitSection title={pick(lang, { ru: 'Игроки и зрители', en: 'Players and spectators' })}>
         <div style={{ inlineSize: 320 }}>
           <Participants players={participants} spectators={spectators} copy={copy} />
         </div>

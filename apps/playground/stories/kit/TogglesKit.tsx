@@ -1,48 +1,69 @@
 import { useState } from 'react'
-import { GAME_MODES, MODES_COPY_RU } from '@/game/modes'
+import { GAME_MODES, MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
 import ModeSelect from '@/primitives/ModeSelect'
 import Toggle from '@/primitives/Toggle'
+import { useLang } from '../../Playground/lang'
 import { KitCell, KitPage, KitSection } from './KitShell'
 import styles from './TogglesKit.module.css'
 
-// демо-режим: структура GAME_MODES[0] + русский текст из словаря
+// demo mode: GAME_MODES[0] structure + copy from the language dictionary
 const SAMPLE = GAME_MODES[0]
-const SAMPLE_COPY = MODES_COPY_RU[SAMPLE.key]
-const SAMPLE_OPTIONS = SAMPLE.options.map((o) => ({
-  value: o.value,
-  label: o.label,
-  desc: SAMPLE_COPY?.options[o.value] ?? '',
-}))
-const SAMPLE_TITLE = SAMPLE_COPY?.title ?? ''
 
-// Переключатели: сегментированный ModeSelect и бинарный Toggle (реальные примитивы).
+const COPY = {
+  ru: {
+    segmented: 'ModeSelect — сегментированный выбор с ползунком',
+    readOnly: 'ModeSelect — read-only (как у гостя)',
+    toggle: 'Toggle — бинарный (готовность)',
+    ready: 'готов',
+    notReady: 'не готов',
+  },
+  en: {
+    segmented: 'ModeSelect — segmented choice with a thumb',
+    readOnly: 'ModeSelect — read-only (as for a guest)',
+    toggle: 'Toggle — binary (readiness)',
+    ready: 'ready',
+    notReady: 'not ready',
+  },
+}
+
+// Toggles: segmented ModeSelect and binary Toggle (real primitives).
 export default function TogglesKit() {
+  const { lang } = useLang()
+  const t = COPY[lang]
+  const sampleCopy = (lang === 'ru' ? MODES_COPY_RU : MODES_COPY_EN)[SAMPLE.key]
+  const sampleTitle = sampleCopy?.title ?? ''
+  const sampleOptions = SAMPLE.options.map((o) => ({
+    value: o.value,
+    label: o.label,
+    desc: sampleCopy?.options[o.value] ?? '',
+  }))
+
   const [value, setValue] = useState(SAMPLE.options[0]?.value ?? '')
   const [ready, setReady] = useState(false)
 
   return (
     <KitPage title="Toggles">
-      <KitSection title="ModeSelect — сегментированный выбор с ползунком">
+      <KitSection title={t.segmented}>
         <div className={styles.wide}>
           <ModeSelect
-            title={SAMPLE_TITLE}
-            options={SAMPLE_OPTIONS}
+            title={sampleTitle}
+            options={sampleOptions}
             value={value}
             onChange={setValue}
           />
         </div>
       </KitSection>
 
-      <KitSection title="ModeSelect — read-only (как у гостя)">
+      <KitSection title={t.readOnly}>
         <div className={styles.wide}>
-          <ModeSelect title={SAMPLE_TITLE} options={SAMPLE_OPTIONS} value={value} readOnly />
+          <ModeSelect title={sampleTitle} options={sampleOptions} value={value} readOnly />
         </div>
       </KitSection>
 
-      <KitSection title="Toggle — бинарный (готовность)">
+      <KitSection title={t.toggle}>
         <KitCell caption={ready ? 'on' : 'off'}>
           <Toggle on={ready} onChange={setReady}>
-            {ready ? 'готов' : 'не готов'}
+            {ready ? t.ready : t.notReady}
           </Toggle>
         </KitCell>
       </KitSection>

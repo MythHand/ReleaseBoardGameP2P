@@ -4,6 +4,7 @@ import type { Card as CardType } from '@/cards/types'
 import Slider from '@/primitives/Slider'
 import Hand from '@/table/Hand'
 import { handStep } from '@/table/Hand/Hand'
+import { useLang } from '../../Playground/lang'
 import styles from './HandStory.module.css'
 
 let _u = 0
@@ -14,7 +15,22 @@ interface Item {
   card: CardType
 }
 
-// меняем длину, сохраняя существующие uid — веер плавно переукладывается
+const COPY = {
+  ru: {
+    cardsInHand: 'карт в руке',
+    faceDown: 'рубашкой вверх',
+    step: 'шаг между картами',
+    fan: 'ширина веера',
+  },
+  en: {
+    cardsInHand: 'cards in hand',
+    faceDown: 'face down',
+    step: 'step between cards',
+    fan: 'fan width',
+  },
+}
+
+// change the length, keeping existing uids — the fan re-lays out smoothly
 function resize(n: number, prev: Item[] = []): Item[] {
   const next = prev.slice(0, n)
   while (next.length < n) next.push({ uid: uid(), card: CARDS[next.length % CARDS.length] })
@@ -22,6 +38,8 @@ function resize(n: number, prev: Item[] = []): Item[] {
 }
 
 export default function HandStory() {
+  const { lang } = useLang()
+  const t = COPY[lang]
   const [items, setItems] = useState<Item[]>(() => resize(6))
   const [faceDown, setFaceDown] = useState(false)
 
@@ -33,7 +51,7 @@ export default function HandStory() {
     <div className={styles.root}>
       <div className={styles.controls}>
         <div className={styles.sliderWrap}>
-          <Slider label="карт в руке" value={items.length} min={0} max={20} onChange={setCount} />
+          <Slider label={t.cardsInHand} value={items.length} min={0} max={20} onChange={setCount} />
         </div>
         <label className={styles.check}>
           <input
@@ -41,12 +59,12 @@ export default function HandStory() {
             checked={faceDown}
             onChange={(e) => setFaceDown(e.target.checked)}
           />
-          рубашкой вверх
+          {t.faceDown}
         </label>
       </div>
 
       <p className={styles.readout}>
-        шаг между картами: <b>{step}px</b> · ширина веера: <b>{span}px</b>
+        {t.step}: <b>{step}px</b> · {t.fan}: <b>{span}px</b>
       </p>
 
       <div className={styles.stage}>
