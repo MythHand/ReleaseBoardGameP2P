@@ -1,6 +1,4 @@
-import Stub from './Stub'
-
-// Анимация начала игры — раздача карт игрокам.
+// Deal cards — intentionally left empty (no content for now).
 export default function DealCardsStory() {
-  return <Stub title="Deal cards" />
+  return null
 }

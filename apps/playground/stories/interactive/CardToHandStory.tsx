@@ -3,22 +3,24 @@ import { CARDS } from '@/cards'
 import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
 import Hand from '@/table/Hand'
+import { pick, useLang } from '../../Playground/lang'
 import styles from './CardToHandStory.module.css'
 import { useHandInsert } from './useHandInsert'
 
-// Витрина универсального шага «карта встаёт в руку» (useHandInsert).
-// Источник — кликнутая карта превью; всё остальное делает общий хук.
+// Showcase of the universal "card settles into the hand" step (useHandInsert).
+// The source is a clicked preview card; the shared hook does the rest.
 const SOURCE_CARD_W = 140
 const INITIAL_HAND = 5
 
 const BASE = CARDS.filter((c) => c.deck === 'base')
-const SOURCES = BASE.slice(5, 10) // 5 разных карт превью (отличаются от стартовой руки)
+const SOURCES = BASE.slice(5, 10) // 5 different preview cards (distinct from the starting hand)
 
 function makeHand(n: number) {
   return BASE.slice(0, n).map((card) => ({ uid: nextHandUid(), card }))
 }
 
 export default function CardToHandStory() {
+  const { lang } = useLang()
   const [hand, setHand] = useState(() => makeHand(INITIAL_HAND))
   const [used, setUsed] = useState<boolean[]>(() => SOURCES.map(() => false))
 
@@ -52,11 +54,11 @@ export default function CardToHandStory() {
     <div className={styles.root}>
       <div className={styles.bar}>
         <button type="button" className={styles.btn} onClick={restart}>
-          рестарт
+          {pick(lang, { ru: 'рестарт', en: 'restart' })}
         </button>
       </div>
 
-      {/* превью: карты закреплены на местах; израсходованная гаснет, слот держит место */}
+      {/* preview: cards are pinned in place; a used one fades, the slot holds its spot */}
       <div className={styles.source}>
         {SOURCES.map((card, i) => {
           const hidden = used[i] || flyingCard === card

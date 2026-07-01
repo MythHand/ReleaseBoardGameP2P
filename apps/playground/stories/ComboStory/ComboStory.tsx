@@ -7,7 +7,10 @@ import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/card
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
+import { type Lang, pick, useLang } from '../../Playground/lang'
 import styles from './ComboStory.module.css'
+
+type Loc = Record<Lang, string>
 
 interface HandItem {
   uid: string
@@ -15,7 +18,7 @@ interface HandItem {
 }
 
 interface DiscardEntry {
-  card: CardData // сброс хранит ОДИНОЧНЫЕ карты; комбо распадается на две записи
+  card: CardData // the discard holds SINGLE cards; a combo splits into two entries
   rot: number
   dx: number
   dy: number
@@ -31,21 +34,22 @@ const uid = () => `c${++_u}`
 const makeHand = (): HandItem[] =>
   [
     'support-sudo',
-    'attack-security-bug', // sudo-able + целится → центр → сброс
-    'operation-system-upgrade', // sudo-able, без цели → центр → сброс
+    'attack-security-bug', // sudo-able + targets → center → discard
+    'operation-system-upgrade', // sudo-able, no target → center → discard
     'support-code-review',
-    'release-frontend', // release → зона релиза
+    'release-frontend', // release → release zone
     'release-database',
     // biome-ignore lint/style/noNonNullAssertion: every id above is a known catalogue id
   ].map((id) => ({ uid: uid(), card: cardById(id)! }))
 
-const TARGETS = [
-  { id: 'tr', label: 'свежий релиз оппонента' },
-  { id: 'th', label: 'рука оппонента' },
+const TARGETS: { id: string; label: Loc }[] = [
+  { id: 'tr', label: { ru: 'свежий релиз оппонента', en: "opponent's fresh release" } },
+  { id: 'th', label: { ru: 'рука оппонента', en: "opponent's hand" } },
 ]
 const RELEASE_SLOTS = ['frontend', 'backend', 'database']
 
 export default function ComboStory() {
+  const { lang } = useLang()
   const refs = useRef<Record<string, HTMLDivElement | null>>({})
   const slotRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const centerRef = useRef<HTMLDivElement>(null)
@@ -56,7 +60,7 @@ export default function ComboStory() {
   const [phase, setPhase] = useState<'idle' | 'partner' | 'target'>('idle') // idle | partner | target
   const [source, setSource] = useState<HandItem | null>(null)
   const [partner, setPartner] = useState<HandItem | null>(null)
-  const { from, to, aim, stop } = useArrow() // геометрия стрелки + слежение за курсором
+  const { from, to, aim, stop } = useArrow() // arrow geometry + cursor tracking
   const [playing, setPlaying] = useState(false)
   const [released, setReleased] = useState<Record<string, ReleasedEntry>>({})
   const [discardPile, setDiscardPile] = useState<DiscardEntry[]>([]) // [{main, aux, rot, dx, dy}]
@@ -91,7 +95,7 @@ export default function ComboStory() {
     if (flyRef.current) flyRef.current.style.opacity = '0'
   }
 
-  // transform, помещающий карту из её места в руке в систему координат центра
+  // transform that places a card from its hand spot into the center's coordinate system
   const enterTransform = (handRect: DOMRect, boxRect: DOMRect) => {
     const dx = handRect.left + handRect.width / 2 - (boxRect.left + boxRect.width / 2)
     const dy = handRect.top + handRect.height / 2 - (boxRect.top + boxRect.height / 2)
@@ -99,8 +103,8 @@ export default function ComboStory() {
     return `translate(${dx}px, ${dy}px) scale(${s})`
   }
 
-  // оркестратор: карты слетаются со своих мест В ЦЕНТР и там совмещаются (видно всем),
-  // затем пара летит к назначению (релиз — в зону, прочее — в сброс).
+  // orchestrator: cards fly from their spots TO THE CENTER and merge there (visible to all),
+  // then the pair flies to its destination (release — to the zone, else — to the discard).
   const runPlay = async (src: HandItem, prt: HandItem, targetLabel?: string) => {
     setPlaying(true)
     cancel()
@@ -113,13 +117,13 @@ export default function ComboStory() {
 
     setHand((h) => h.filter((it) => it.uid !== src.uid && it.uid !== prt.uid))
 
-    // контейнер-пара в центре; карты — на свои места в руке (через transform)
+    // the pair container at the center; cards go to their hand spots (via transform)
     setFlyPair({ main: prt.card, aux: src.card })
     await nextFrames()
     // biome-ignore lint/style/noNonNullAssertion: flyRef is attached to the always-rendered flyer element
     const el = flyRef.current!
-    // ВАЖНО: гасим все анимации поддерева (контейнер + вложенные карты),
-    // иначе остаточный fill:forwards перетирает новые transform → хаос.
+    // IMPORTANT: cancel all subtree animations (container + nested cards),
+    // otherwise a leftover fill:forwards overwrites the new transforms → chaos.
     for (const a of el.getAnimations?.({ subtree: true }) ?? []) a.cancel()
     el.style.left = `${cRect.left}px`
     el.style.top = `${cRect.top}px`
@@ -136,7 +140,7 @@ export default function ComboStory() {
     el.style.opacity = '1'
     await nextFrames()
 
-    // СОВМЕЩЕНИЕ В ЦЕНТРЕ — карты слетаются и складываются в пару
+    // MERGING AT THE CENTER — cards fly together and fold into a pair
     const a1 = mainEl.animate(
       [{ transform: enterMain }, { transform: 'translate(0, 0) scale(1)' }],
       { duration: 620, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' },
@@ -146,21 +150,21 @@ export default function ComboStory() {
       { duration: 620, easing: 'cubic-bezier(0.2, 0.9, 0.1, 1)', fill: 'forwards' },
     )
     await Promise.all([a1.finished, a2.finished])
-    await wait(2100) // держим собранную пару в центре подольше — видно всем
+    await wait(2100) // hold the assembled pair at the center a bit longer — visible to all
 
     if (prt.card.category === 'release') {
-      // из центра — в нужный слот зоны релиза игрока
+      // from the center — into the right slot of the player's release zone
       const key = prt.card.name.toLowerCase()
       // biome-ignore lint/style/noNonNullAssertion: a release card's name maps to one of the always-rendered release slots
       const toRect = slotRefs.current[key]!.getBoundingClientRect()
       const anim = play('playToReleaseZone', el, { from: cRect, to: toRect })
       if (anim) await anim.finished
       setReleased((r) => ({ ...r, [key]: { card: prt.card, aux: src.card } }))
-      await nextFrames() // дать финальной карте отрисоваться до скрытия флайера
+      await nextFrames() // let the final card paint before hiding the flyer
       hideFlyer()
     } else {
-      // из центра — в сброс: пара распадается, каждая карта летит ОТДЕЛЬНОЙ
-      // одиночкой со своим разбросом и ложится отдельной записью (сброс — одиночки)
+      // from the center — to the discard: the pair splits, each card flies as a SEPARATE
+      // single with its own scatter and lands as its own entry (the discard holds singles)
       // biome-ignore lint/style/noNonNullAssertion: discardRef is attached to the always-rendered discard slot
       const dRect = discardRef.current!.getBoundingClientRect()
       const jMain = jitter()
@@ -228,10 +232,10 @@ export default function ComboStory() {
     cancel()
   }
 
-  const onTargetDown = (e: React.MouseEvent, t: { id: string; label: string }) => {
+  const onTargetDown = (e: React.MouseEvent, t: { id: string; label: Loc }) => {
     e.stopPropagation()
     // biome-ignore lint/style/noNonNullAssertion: phase==='target' is only set after both source and partner are assigned
-    if (phase === 'target') void runPlay(source!, partner!, t.label)
+    if (phase === 'target') void runPlay(source!, partner!, t.label[lang])
   }
 
   const reset = () => {
@@ -247,15 +251,30 @@ export default function ComboStory() {
   return (
     <div className={styles.root}>
       <p className={styles.hint}>
-        Клик по <b>Sudo</b> / <b>Code Review</b> → стрелка к партнёру. Атака даёт 2-ю стрелку цели.
-        На розыгрыше вспомогательная карта тукается под основную под углом, затем пара летит: релиз
-        — в зону релиза, прочее — в центр и в сброс.
+        {lang === 'ru' ? (
+          <>
+            Клик по <b>Sudo</b> / <b>Code Review</b> → стрелка к партнёру. Атака даёт 2-ю стрелку
+            цели. На розыгрыше вспомогательная карта тукается под основную под углом, затем пара
+            летит: релиз — в зону релиза, прочее — в центр и в сброс.
+          </>
+        ) : (
+          <>
+            Click <b>Sudo</b> / <b>Code Review</b> → an arrow to the partner. An attack adds a 2nd
+            arrow to the target. On play the helper card tucks under the main one at an angle, then
+            the pair flies: a release — into the release zone, everything else — to the center and
+            the discard.
+          </>
+        )}
       </p>
       <div className={styles.toolbar}>
         <button type="button" className={styles.reset} onClick={reset}>
-          сброс
+          {pick(lang, { ru: 'сброс', en: 'reset' })}
         </button>
-        {log && <span className={styles.log}>сыграно: {log}</span>}
+        {log && (
+          <span className={styles.log}>
+            {pick(lang, { ru: 'сыграно', en: 'played' })}: {log}
+          </span>
+        )}
       </div>
 
       <div className={styles.targets}>
@@ -269,7 +288,7 @@ export default function ComboStory() {
               style={lit ? ({ '--hl': color } as CSSProperties) : undefined}
               onMouseDown={(e) => onTargetDown(e, t)}
             >
-              {t.label}
+              {t.label[lang]}
             </div>
           )
         })}
@@ -279,7 +298,9 @@ export default function ComboStory() {
 
       <div className={styles.discard}>
         <div className={styles.discardSlot} ref={discardRef}>
-          {discardPile.length === 0 && <span className={styles.empty}>сброс</span>}
+          {discardPile.length === 0 && (
+            <span className={styles.empty}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
+          )}
           {discardPile.map((d, i) => (
             <div
               // biome-ignore lint/suspicious/noArrayIndexKey: discard pile is append-only (never reordered/removed), index is a stable key
@@ -295,7 +316,8 @@ export default function ComboStory() {
           ))}
         </div>
         <span className={styles.cap}>
-          сброс{discardPile.length > 0 ? ` // ${discardPile.length}` : ''}
+          {pick(lang, { ru: 'сброс', en: 'discard' })}
+          {discardPile.length > 0 ? ` // ${discardPile.length}` : ''}
         </span>
       </div>
 

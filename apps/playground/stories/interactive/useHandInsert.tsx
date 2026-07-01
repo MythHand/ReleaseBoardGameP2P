@@ -4,14 +4,14 @@ import Card from '@/primitives/Card'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import styles from './useHandInsert.module.css'
 
-// Универсальный шаг «карта встаёт в руку» (вынесено из Card to Hand, переиспользуется).
-// Рука раздвигается под карту (gapAt), карта адаптирует размер и опускается в
-// промежуток; высокий travel-слой держим короткий старт, дальше — слот-слой
-// (затыкается под правую половину веера), прилёт в bottom-center слота.
-// Место слота берём из единого источника геометрии веера (@/table/Hand/fan).
+// The universal "card settles into the hand" step (extracted from Card to Hand, reused).
+// The hand opens a gap for the card (gapAt), the card adapts its size and drops into
+// the gap; the high travel layer holds a short start, then the slot layer takes over
+// (tucks under the right half of the fan), landing at the slot bottom-center.
+// The slot position comes from the single source of fan geometry (@/table/Hand/fan).
 const TRAVEL_Z = 500
-const START_HIGH_MS = 140 // сколько держим высокий слой после старта
-const FLIGHT_MS = 480 // = transition в .flying
+const START_HIGH_MS = 140 // how long the high layer is held after start
+const FLIGHT_MS = 480 // = the transition in .flying
 
 export interface InsertSource {
   left: number
@@ -45,27 +45,27 @@ export function useHandInsert(
     setTucked(false)
   }
 
-  // запустить вставку карты из source-прямоугольника в руку (длиной handLength)
+  // start inserting a card from the source rect into the hand (of length handLength)
   function insert(card: CardType, source: InsertSource, handLength: number) {
     const handEl = handRef.current
     if (!handEl || flying) return
 
-    const gap = Math.round(handLength / 2) // промежуток ~по центру веера
-    // место gap-слота — из единого источника (раскладка как на handLength+1 слотов)
+    const gap = Math.round(handLength / 2) // a gap ~at the fan center
+    // the gap-slot position — from the single source (layout as for handLength+1 slots)
     const place = slotPlacement(gap, handLength + 1)
     const hr = handEl.getBoundingClientRect()
-    // целимся в bottom-center слота веера (как у .slot Hand) — пивот совпадает
+    // aim at the fan slot bottom-center (like Hand's .slot) — the pivot matches
     const targetBcX = hr.left + hr.width / 2 + place.x
     const targetBcY = hr.bottom + place.y
     const dx = targetBcX - (source.left + source.width / 2)
     const dy = targetBcY - (source.top + source.height)
     const rot = place.rotate
-    const scale = CARD_W / source.width // адаптация размера к руке
+    const scale = CARD_W / source.width // adapt size to the hand
 
     setGapAt(gap)
     setFlying({
       card,
-      z: place.z, // = индекс слота: правая половина веера остаётся над картой
+      z: place.z, // = the slot index: the right half of the fan stays over the card
       from: { left: source.left, top: source.top, width: source.width },
       to: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(${scale})`,
     })

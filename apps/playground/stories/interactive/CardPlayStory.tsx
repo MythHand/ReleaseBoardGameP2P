@@ -6,17 +6,18 @@ import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
-import { SEAT_COPY_RU } from '@/table/Seat/Seat'
+import { SEAT_COPY_EN, SEAT_COPY_RU } from '@/table/Seat/Seat'
+import { pick, useLang } from '../../Playground/lang'
 import styles from './CardPlayStory.module.css'
 
-// Витрина двух переиспользуемых пресетов розыгрыша карты:
-//   часть 1 — рука/соперник → центр стола (пресет playToCenter),
-//   часть 2 — центр → сброс (пресет centerToDiscard, с разбросом).
-// Источник части 1 вариативен: карту выкладывает игрок (снизу) или соперник
-// (сверху — представлен Seat'ом, как на столе; карта вылетает из его места).
+// Showcase of two reusable card-play presets:
+//   part 1 — hand/opponent → table center (the playToCenter preset),
+//   part 2 — center → discard (the centerToDiscard preset, with scatter).
+// The source of part 1 varies: the card is played by the player (bottom) or the
+// opponent (top — represented by a Seat, as on the table; the card flies from its spot).
 
 const BASE = CARDS.filter((c) => c.deck === 'base')
-const CARD_RATIO = 1.4 // высота/ширина карты
+const CARD_RATIO = 1.4 // card height/width
 const EMPTY_RELEASE: ReleaseSlots = { frontend: undefined, backend: undefined, database: undefined }
 
 interface HandItem {
@@ -41,6 +42,7 @@ const uid = () => `p${++seq}`
 const makeHand = (cards: CardData[]): HandItem[] => cards.map((card) => ({ uid: uid(), card }))
 
 export default function CardPlayStory() {
+  const { lang } = useLang()
   const [playerHand, setPlayerHand] = useState(() => makeHand(BASE.slice(0, 5)))
   const [oppDeck, setOppDeck] = useState(() => BASE.slice(5, 10))
   const [center, setCenter] = useState<CardData | null>(null)
@@ -54,9 +56,9 @@ export default function CardPlayStory() {
   const discardRef = useRef<HTMLDivElement>(null)
   const flyerRef = useRef<HTMLDivElement>(null)
 
-  // часть 1: карта из прямоугольника from летит в центр (пресет playToCenter)
+  // part 1: a card flies from the "from" rect to the center (the playToCenter preset)
   const flyToCenter = async (card: CardData, from: Rect) => {
-    if (busy || center) return // центр занят — сперва отправь в сброс
+    if (busy || center) return // the center is busy — send to the discard first
     setBusy(true)
     const toRect = centerRef.current?.getBoundingClientRect()
     setFlyer(card)
@@ -74,7 +76,7 @@ export default function CardPlayStory() {
     setBusy(false)
   }
 
-  // часть 2: карта из центра летит в сброс с разбросом (пресет centerToDiscard)
+  // part 2: a card flies from the center to the discard with scatter (the centerToDiscard preset)
   const flyToDiscard = async () => {
     if (busy || !center) return
     setBusy(true)
@@ -112,7 +114,7 @@ export default function CardPlayStory() {
     void flyToCenter(item.card, el.getBoundingClientRect())
   }
 
-  // соперник «разыгрывает» — карта вылетает из места Seat'а (card-размером)
+  // the opponent "plays" — a card flies from the Seat spot (card-sized)
   const playFromOpponent = (e: React.MouseEvent) => {
     e.stopPropagation()
     const el = seatRef.current
@@ -144,45 +146,48 @@ export default function CardPlayStory() {
     <div className={styles.root}>
       <div className={styles.bar}>
         <button type="button" className={styles.btn} onClick={reset}>
-          сброс состояния
+          {pick(lang, { ru: 'сброс состояния', en: 'reset state' })}
         </button>
         <span className={styles.hint}>
-          клик по карте игрока / по сопернику → в центр; клик по карте в центре → в сброс
+          {pick(lang, {
+            ru: 'клик по карте игрока / по сопернику → в центр; клик по карте в центре → в сброс',
+            en: 'click a player card / the opponent → to the center; click the card at the center → to the discard',
+          })}
         </span>
       </div>
 
-      {/* соперник — как на столе (Seat со счётчиком карт); клик = разыгрывает */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only розыгрыш сопернком; sandbox story */}
+      {/* opponent — as on the table (a Seat with a card counter); click = plays */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only opponent play; sandbox story */}
       <div className={styles.opponent} ref={seatRef} onMouseDown={playFromOpponent}>
         <Seat
           player={{
             id: 'opp',
-            name: 'соперник',
+            name: pick(lang, { ru: 'соперник', en: 'opponent' }),
             handCount: oppDeck.length,
             release: EMPTY_RELEASE,
           }}
-          copy={SEAT_COPY_RU}
+          copy={pick(lang, { ru: SEAT_COPY_RU, en: SEAT_COPY_EN })}
         />
       </div>
 
-      {/* центр стола */}
+      {/* table center */}
       <div className={styles.center} ref={centerRef}>
         {center ? (
-          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only отправка в сброс; sandbox story
+          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only send to discard; sandbox story
           <div className={styles.centerCard} onMouseDown={flyToDiscard}>
             <Card card={center} interactive={false} width="100%" />
           </div>
         ) : (
-          <span className={styles.centerSlot}>центр</span>
+          <span className={styles.centerSlot}>{pick(lang, { ru: 'центр', en: 'center' })}</span>
         )}
       </div>
 
-      {/* сброс — справа, карты ложатся вразброс */}
+      {/* discard — on the right, cards land scattered */}
       <div className={styles.discard}>
         <div className={styles.discardStack} ref={discardRef}>
           {discard.map((d, i) => (
             <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: сброс append-only, индекс стабилен
+              // biome-ignore lint/suspicious/noArrayIndexKey: discard is append-only, the index is stable
               key={i}
               className={styles.discardCard}
               style={{
@@ -193,16 +198,20 @@ export default function CardPlayStory() {
               <Card card={d.card} interactive={false} width="100%" />
             </div>
           ))}
-          {discard.length === 0 && <span className={styles.discardEmpty}>сброс</span>}
+          {discard.length === 0 && (
+            <span className={styles.discardEmpty}>
+              {pick(lang, { ru: 'сброс', en: 'discard' })}
+            </span>
+          )}
           {discard.length > 0 && <span className={styles.discardCount}>{discard.length}</span>}
         </div>
-        <div className={styles.label}>сброс</div>
+        <div className={styles.label}>{pick(lang, { ru: 'сброс', en: 'discard' })}</div>
       </div>
 
-      {/* рука игрока — снизу, лицом вверх */}
+      {/* player hand — bottom, face up */}
       <div className={styles.hand}>
         {playerHand.map((item) => (
-          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only розыгрыш; sandbox story
+          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only play; sandbox story
           <div
             key={item.uid}
             ref={(el) => {
