@@ -8,8 +8,8 @@ import GameOver, {
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 
-// Окно завершения партии (Overlay + карточка победителя). Текст — по языку,
-// условие победы — переключателем.
+// End-of-match window (Overlay + winner card). Copy follows the language;
+// the win condition is toggled.
 const wrap: CSSProperties = { inlineSize: '100%' }
 const controls: CSSProperties = { display: 'flex', gap: 12, marginBlockEnd: 12 }
 const stage: CSSProperties = {
@@ -33,19 +33,21 @@ export default function GameOverBlock() {
   const copy = pick(lang, { ru: GAME_OVER_COPY_RU, en: GAME_OVER_COPY_EN })
 
   return (
-    <KitPage title="Game over" tag="блок">
-      <KitSection title="Окно завершения партии">
+    <KitPage title="Game over" tag="block">
+      <KitSection title={pick(lang, { ru: 'Окно завершения партии', en: 'End-of-match window' })}>
         <div style={wrap}>
           <div style={controls}>
             <Button
               variant="tech"
               onClick={() => setCondition((c) => (c === 'release' ? 'lastStanding' : 'release'))}
             >
-              условие: {condition}
+              {pick(lang, { ru: 'условие', en: 'condition' })}: {condition}
             </Button>
           </div>
           <div style={stage}>
-            <div style={filler}>стол под окном</div>
+            <div style={filler}>
+              {pick(lang, { ru: 'стол под окном', en: 'table under the window' })}
+            </div>
             <GameOver
               winner={{ name: 'dimbo' }}
               condition={condition}

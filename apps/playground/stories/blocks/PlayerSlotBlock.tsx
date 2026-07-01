@@ -5,8 +5,9 @@ import Toggle from '@/primitives/Toggle'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 
-// Строка участника лобби во всех вариациях: я (тоггл), игрок (дропдаун), offline,
-// зритель, пустой слот. Дропдаун «⋯» блок рендерит сам примитивом Dropdown.
+// A lobby participant row in every variation: me (toggle), player (dropdown),
+// offline, spectator, empty slot. The "⋯" dropdown is rendered by the block
+// itself via the Dropdown primitive.
 export default function PlayerSlotBlock() {
   const { lang } = useLang()
   const [ready, setReady] = useState(true)
@@ -43,8 +44,8 @@ export default function PlayerSlotBlock() {
   })
 
   return (
-    <KitPage title="Player slot" tag="блок">
-      <KitSection title="Строка участника">
+    <KitPage title="Player slot" tag="block">
+      <KitSection title={pick(lang, { ru: 'Строка участника', en: 'Participant row' })}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, inlineSize: 380 }}>
           <PlayerSlot
             name="dimbo"

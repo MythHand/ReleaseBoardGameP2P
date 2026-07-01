@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 import styles from './KitShell.module.css'
 
-// Общий каркас страниц-витрин: метка раздела, заголовок, секции и ячейки.
-// `tag` по умолчанию «ui kit»; для блоков передаём «блок».
+// Shared showcase-page frame: section tag, title, sections and cells.
+// `tag` defaults to "ui kit"; block stories pass "block".
 export function KitPage({
   title,
   tag = 'ui kit',

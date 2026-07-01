@@ -6,16 +6,21 @@ import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 import styles from './PhysicalEditionBlock.module.css'
 
-// ссылка на заказ/предзаказ — Instagram команды (как на стартовом экране)
+// order/preorder link — the team's Instagram (as on the start screen)
 const INSTAGRAM_URL = 'https://www.instagram.com/mythhand.team/'
 
-// Блок «печатная версия»: матовая плашка с заголовком, подписью и ссылкой на
-// заказ + арт коробки, выпирающий за верхнюю грань. Текст — по языку тумблера.
+// The "physical edition" block: a matte plate with a title, caption and order
+// link + box art bleeding past the top edge. Copy follows the language toggle.
 export default function PhysicalEditionBlock() {
   const { lang } = useLang()
   return (
-    <KitPage title="Physical edition" tag="блок">
-      <KitSection title="Плашка печатного издания — во всю доступную ширину">
+    <KitPage title="Physical edition" tag="block">
+      <KitSection
+        title={pick(lang, {
+          ru: 'Плашка печатного издания — во всю доступную ширину',
+          en: 'Physical edition plate — full available width',
+        })}
+      >
         <div className={styles.panel}>
           <PhysicalEdition
             href={INSTAGRAM_URL}

@@ -3,7 +3,7 @@ import Reconnect, { RECONNECT_COPY_EN, RECONNECT_COPY_RU } from '@/table/Reconne
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 
-// Окно переподключения поверх стола (Overlay + Spinner). Текст — по языку.
+// Reconnect window over the table (Overlay + Spinner). Copy follows the language.
 const stage: CSSProperties = {
   position: 'relative',
   inlineSize: '100%',
@@ -24,10 +24,17 @@ export default function ReconnectBlock() {
   const copy = pick(lang, { ru: RECONNECT_COPY_RU, en: RECONNECT_COPY_EN })
 
   return (
-    <KitPage title="Reconnect" tag="блок">
-      <KitSection title="Окно переподключения поверх стола">
+    <KitPage title="Reconnect" tag="block">
+      <KitSection
+        title={pick(lang, {
+          ru: 'Окно переподключения поверх стола',
+          en: 'Reconnect window over the table',
+        })}
+      >
         <div style={stage}>
-          <div style={filler}>стол под окном</div>
+          <div style={filler}>
+            {pick(lang, { ru: 'стол под окном', en: 'table under the window' })}
+          </div>
           <Reconnect copy={copy} />
         </div>
       </KitSection>
