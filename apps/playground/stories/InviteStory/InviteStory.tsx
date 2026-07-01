@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { InviteCopy, InviteState, SlotAvailability } from '@/screens/Invite'
 import Invite from '@/screens/Invite'
-import { pick, useLang } from '../../Playground/lang'
+import { type Lang, pick, useLang } from '../../Playground/lang'
 import styles from './InviteStory.module.css'
 
 const COPY: Record<'ru' | 'en', InviteCopy> = {
@@ -61,25 +61,27 @@ const COPY: Record<'ru' | 'en', InviteCopy> = {
   },
 }
 
-// доступность слота — имитация ответа лобби
-const AVAILABILITY: { value: SlotAvailability; label: string }[] = [
-  { value: 'open', label: 'игрок + зритель' },
-  { value: 'spectatorOnly', label: 'только зритель' },
-  { value: 'full', label: 'мест нет' },
+type Loc = Record<Lang, string>
+
+// slot availability — a simulated lobby response
+const AVAILABILITY: { value: SlotAvailability; label: Loc }[] = [
+  { value: 'open', label: { ru: 'игрок + зритель', en: 'player + spectator' } },
+  { value: 'spectatorOnly', label: { ru: 'только зритель', en: 'spectator only' } },
+  { value: 'full', label: { ru: 'мест нет', en: 'no slots' } },
 ]
 
-// состояние экрана зависит от доступности: при full подключаться некуда, поэтому
-// фаз коннекта нет — остаются только форма и «мест нет» (красная строка)
-const STATES_DEFAULT: { value: InviteState; label: string }[] = [
-  { value: 'form', label: 'форма' },
-  { value: 'connecting', label: 'подключение' },
-  { value: 'connected', label: 'подключено' },
-  { value: 'failed', label: 'ошибка' },
-  { value: 'notFound', label: 'не найдена' },
+// the screen state depends on availability: when full there is nowhere to connect,
+// so there are no connect phases — only the form and the "no slots" (red) line
+const STATES_DEFAULT: { value: InviteState; label: Loc }[] = [
+  { value: 'form', label: { ru: 'форма', en: 'form' } },
+  { value: 'connecting', label: { ru: 'подключение', en: 'connecting' } },
+  { value: 'connected', label: { ru: 'подключено', en: 'connected' } },
+  { value: 'failed', label: { ru: 'ошибка', en: 'failed' } },
+  { value: 'notFound', label: { ru: 'не найдена', en: 'not found' } },
 ]
-const STATES_FULL: { value: InviteState; label: string }[] = [
-  { value: 'form', label: 'форма' },
-  { value: 'full', label: 'мест нет' },
+const STATES_FULL: { value: InviteState; label: Loc }[] = [
+  { value: 'form', label: { ru: 'форма', en: 'form' } },
+  { value: 'full', label: { ru: 'мест нет', en: 'no slots' } },
 ]
 
 export default function InviteStory() {
@@ -88,7 +90,7 @@ export default function InviteStory() {
   const [state, setState] = useState<InviteState>('form')
   const stateOptions = availability === 'full' ? STATES_FULL : STATES_DEFAULT
 
-  // правый селектор зависит от левого — при смене сбрасываем недоступное состояние
+  // the right selector depends on the left one — on change, reset an unavailable state
   const changeAvailability = (a: SlotAvailability) => {
     setAvailability(a)
     if (a === 'full' && state !== 'form' && state !== 'full') setState('form')
@@ -98,7 +100,9 @@ export default function InviteStory() {
   return (
     <div className={styles.root}>
       <div className={styles.controls}>
-        <span className={styles.controlsLabel}>доступность слота</span>
+        <span className={styles.controlsLabel}>
+          {pick(lang, { ru: 'доступность слота', en: 'slot availability' })}
+        </span>
         <div className={styles.switch}>
           {AVAILABILITY.map((a) => (
             <button
@@ -107,11 +111,11 @@ export default function InviteStory() {
               className={availability === a.value ? styles.on : ''}
               onClick={() => changeAvailability(a.value)}
             >
-              {a.label}
+              {a.label[lang]}
             </button>
           ))}
         </div>
-        <span className={styles.controlsLabel}>состояние</span>
+        <span className={styles.controlsLabel}>{pick(lang, { ru: 'состояние', en: 'state' })}</span>
         <div className={styles.switch}>
           {stateOptions.map((s) => (
             <button
@@ -120,7 +124,7 @@ export default function InviteStory() {
               className={state === s.value ? styles.on : ''}
               onClick={() => setState(s.value)}
             >
-              {s.label}
+              {s.label[lang]}
             </button>
           ))}
         </div>
@@ -131,7 +135,7 @@ export default function InviteStory() {
           availability={availability}
           state={state}
           copy={pick(lang, COPY)}
-          // клик по «подключиться» в песочнице запускает фазу подключения
+          // clicking "connect" in the sandbox starts the connecting phase
           onJoin={() => setState('connecting')}
           onCancel={() => setState('form')}
           lang={lang}
