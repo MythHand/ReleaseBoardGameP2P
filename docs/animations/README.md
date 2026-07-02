@@ -10,11 +10,11 @@ Read in this order:
 1. **This file** — the mental model + the global invariants every recipe relies on.
 2. **[`recipes.md`](./recipes.md)** — by game situation ("a card was played", "a card was
    drawn"…): the ordered sequence + params + gotchas to reproduce it. **Start here for a task.**
-3. **[`reference.md`](./reference.md)** — flat catalog of presets, helpers and toolkit
-   modules (signatures, params, defaults). Look up a name here.
-4. **[`extending.md`](./extending.md)** — add a new preset/module when nothing fits.
-5. **[`glossary.md`](./glossary.md)** — the reference catalog of every animation name and tuning
-   number (presets, helpers, parameters, per-scene constants) in one place.
+3. **[`reference.md`](./reference.md)** — the callable API: presets, helpers and toolkit modules
+   (signatures, params, defaults). Look up *how to call* something.
+4. **[`glossary.md`](./glossary.md)** — the properties & values you pass and tune: `play(...)`
+   parameters, easing tokens, geometry/timing constants, holds. Look up *what a word or number means*.
+5. **[`extending.md`](./extending.md)** — add a new preset/module when nothing fits.
 
 The live status map of what exists is the playground **`Interaction audit`** page
 (`apps/playground/stories/AnimationAuditStory`). Keep it and these docs in sync on changes.
@@ -99,7 +99,7 @@ teleports on screen.
   so the cell rect is taller than the card. Target the upper card box:
   `{ left, top, width, height: width * CARD_RATIO }` (`CARD_RATIO = 1.4`, the card's height/width).
   Otherwise the landing drifts down and the card teleports when the real pile appears. Use the
-  shared helpers `cardAreaOf` / `cardBoxIn` from `@/primitives/Card` (see the glossary §5).
+  shared helpers `cardAreaOf` / `cardBoxIn` (reference); `CARD_RATIO` is in the glossary.
 - **I7 — Precompute variance and pass it in.** For scatter/rotation (`jitter()`), compute it
   **once** and pass `rotate/dx/dy` into the preset, so the card lands in its final pose with
   no post-animation jump. Store the same values with the resulting entry.
