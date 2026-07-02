@@ -79,12 +79,12 @@ function makeDiscard(): DiscardEntry[] {
 const OPERATION = 'var(--cat-operation)'
 const SUPPORT = 'var(--cat-support)'
 
-const FLIP_MS = 520 // the new deck's fly-out on split
+const SPLIT_MS = 520 // the new deck's fly-out on split
 const SPLIT_HOLD = 600 // pause after the split before working with the discard
 const MERGE_MS = 520
 const GATHER_MS = 360
 const TURN_MS = 460
-const HOLD = 360
+const STEP_HOLD = 360 // standard short beat between deck steps
 const CENTER_HOLD = 420 // pause of the card at the center after the effect before it leaves to the discard
 
 // played cards: one — a plain card; two (a Sudo combo) — a CardPair
@@ -136,7 +136,7 @@ export default function DeckAnimationsStory() {
     const f = flip.current
     if (!f) return
     flip.current = null
-    play('flyFrom', pileRefs.current[f.id], { from: f.from, duration: FLIP_MS })
+    play('flyFrom', pileRefs.current[f.id], { from: f.from, duration: SPLIT_MS })
   })
 
   // ===== effects (they don't manage busy — playSequence does) =====
@@ -161,7 +161,7 @@ export default function DeckAnimationsStory() {
     const top = discard.cards[discard.cards.length - 1].card
     setDiscard((d) => ({ ...d, showCount: false, gathered: true }))
     await wait(GATHER_MS)
-    await wait(HOLD)
+    await wait(STEP_HOLD)
     const fromRect = discardRef.current?.getBoundingClientRect()
     setFlyer({ card: top, faceDown: false })
     setDiscard((d) => ({ ...d, cards: [] }))
@@ -196,10 +196,10 @@ export default function DeckAnimationsStory() {
         duration: 560,
       })
       if (anim) await anim.finished
-      await wait(HOLD)
+      await wait(STEP_HOLD)
       setFlyer((f) => (f ? { ...f, faceDown: true } : f))
       await wait(TURN_MS)
-      await wait(HOLD)
+      await wait(STEP_HOLD)
       setFlyer(null)
     },
     [gatherDiscardToFlyer],
@@ -225,7 +225,7 @@ export default function DeckAnimationsStory() {
   // split (+ with sudo — also the discard into a deck)
   const splitEffect = async (deckId: number) => {
     split(deckId)
-    await wait(FLIP_MS + 150)
+    await wait(SPLIT_MS + 150)
   }
   const enhancedBranchEffect = async (deckId: number) => {
     split(deckId)
@@ -244,7 +244,7 @@ export default function DeckAnimationsStory() {
       discardFrom = await gatherDiscardToFlyer()
       setFlyer((f) => (f ? { ...f, faceDown: true } : f))
       await wait(TURN_MS)
-      await wait(HOLD)
+      await wait(STEP_HOLD)
     }
     const tRect = pileRefs.current[target.id]?.getBoundingClientRect()
     const flights: Promise<unknown>[] = []
