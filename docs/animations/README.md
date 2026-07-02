@@ -50,6 +50,14 @@ machinery and orchestration you **reproduce** from the recipe. Do **not** assume
 primitive/hook — that gap is not yet designed. This section states what is true today, not a
 finished architecture; update it when the boundary moves.
 
+> **Открытый вопрос (требует согласования в команде — не решать в одиночку).**
+> Как готовить переиспользуемую машинерию анимаций — ещё не согласовано. Кандидаты: перенести
+> `useHandInsert` в `@/ui`; спроектировать общий `useFlight` / `<Flyer>` (обязательно с учётом
+> **мульти-флаера** — Combo-пара, AI `outs`, параллельный merge) и перевести стори на его
+> потребление с проверкой на экране. **До согласования новые интерактив-экраны воспроизводят
+> текущий паттерн** (как существующие) — это допустимо и разработку НЕ блокирует; при выносе их
+> потом мигрируем. Архитектуру полёта не финализировать без общего решения (иначе — заплатка).
+
 ---
 
 ## No reinterpretation — reproduce exactly (hard rule)
