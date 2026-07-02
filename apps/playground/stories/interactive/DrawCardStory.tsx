@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { nextFrames, play, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
-import Card from '@/primitives/Card'
+import Card, { cardAreaOf, cardBoxIn } from '@/primitives/Card'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
@@ -27,7 +27,6 @@ type Loc = Record<Lang, string>
 
 const BASE = CARDS.filter((c) => c.deck === 'base')
 const AI_DECK = CARDS.filter((c) => c.deck === 'ai')
-const CARD_ASPECT = 1.4 // card height/width
 const AI_HOLD = 4000 // table hold while the AI effect is revealed (4s)
 const FLIP_MS = 420 // flipCard duration — let the in-place flip play
 
@@ -71,12 +70,6 @@ const resolveAiCard = (): CardType | undefined =>
 // non-trigger draw cards (for the other multi-draw positions — just into the hand)
 const NON_TRIGGER = BASE.filter((c) => c.category !== 'trigger')
 const randomNonTrigger = (): CardType => NON_TRIGGER[Math.floor(Math.random() * NON_TRIGGER.length)]
-
-// the upper "card" area of a Pile cell (a Pile has a label under the card —
-// so the cell rect is taller than the card; aim at the card, not the cell center)
-function cardAreaOf(cell: DOMRect) {
-  return { left: cell.left, top: cell.top, width: cell.width, height: cell.width * CARD_ASPECT }
-}
 
 export default function DrawCardStory() {
   const { lang } = useLang()
@@ -163,13 +156,7 @@ export default function DrawCardStory() {
     if (el && seatRect && fromRect) {
       // aim at the card area near the opponent's seat with a slight shrink
       // (not at the wide Seat — otherwise the card inflates to its width)
-      const w = fromRect.width * 0.7
-      const to = {
-        left: seatRect.left + seatRect.width / 2 - w / 2,
-        top: seatRect.top + seatRect.height / 2 - (w * CARD_ASPECT) / 2,
-        width: w,
-        height: w * CARD_ASPECT,
-      }
+      const to = cardBoxIn(seatRect, fromRect.width * 0.7)
       const anim = play('dealToSeat', el, { from: fromRect, to })
       if (anim) await anim.finished
     }

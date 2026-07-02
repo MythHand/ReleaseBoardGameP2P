@@ -2,7 +2,7 @@ import { type CSSProperties, useMemo, useRef, useState } from 'react'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
-import Card from '@/primitives/Card'
+import Card, { CARD_RATIO } from '@/primitives/Card'
 import Slider from '@/primitives/Slider'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
@@ -12,7 +12,6 @@ import { useHandInsert } from './useHandInsert'
 // Prototype of "take a random card from the opponent's hand". Deal/reveal/return
 // are local; the final "card settles into the hand" step is the shared useHandInsert hook.
 const DEAL_CARD_W = 150 // card width in the layout
-const CARD_RATIO = 1.4 // card height/width (≈ 515/368)
 const CARD_H = DEAL_CARD_W * CARD_RATIO
 const GAP_X = 22 // grid gaps
 const GAP_Y = 26
