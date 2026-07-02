@@ -243,6 +243,67 @@ the cursor; hovering a target zone lights it in the same color; clicking empty s
 
 ---
 
+## Card to hand — settle a card into the fan (`useHandInsert`)
+
+**When to call**
+The base "a card settles into the hand" step, reused wherever a card ends up in the player's hand
+(draw, take-opponent). Standalone trigger (showcase): click a source card → `click(i)`. Guard:
+`if (flyingCard || used[i]) return`. Then `insert(card, sourceRect, hand.length)`.
+
+**Visual result**
+The hand fan opens a gap; the card flies from its source spot into that gap, scaling to the hand-card
+size and rotating to the slot's angle; it rides above the fan briefly, then tucks under the fan's right
+half and lands at the slot's bottom-center.
+
+**Elements / refs**
+- `handRef` — the `Hand` fan container (the hook measures it and reads `@/table/Hand/fan` geometry).
+- `sourceRefs[i]` — source card spots (the flight origin).
+- `useHandInsert(handRef, onInserted)` → `{ gapAt, overlay, insert, reset, flyingCard }`.
+- State: `hand`; the hook owns `gapAt`, `flying`, `started`, `tucked`.
+
+**Sequence** (`insert(card, source, handLength)`, inside the hook)
+1. Guard `if (flying) return`. `gap = round(handLength / 2)` (≈ fan center); `place = slotPlacement(gap, handLength + 1)`
+   — the target slot in a fan of `handLength + 1` slots (the single source of fan geometry).
+2. Measure the hand rect `hr` — **[I1]**. Target the slot **bottom-center**:
+   `targetBcX = hr.left + hr.width/2 + place.x`, `targetBcY = hr.bottom + place.y`. Compute `dx/dy` from the
+   source's bottom-center, `rot = place.rotate`, `scale = CARD_W / source.width`.
+3. `setGapAt(gap)` (the fan opens the gap); `setFlying({ card, z: place.z, from: source, to: \`translate(dx,dy) rotate(rot) scale(scale)\` })`;
+   `setStarted(false)`, `setTucked(false)`.
+4. **Double-rAF** — **[I2]** → `setStarted(true)` (the overlay transitions to `to`); start a `START_HIGH_MS` timer → `setTucked(true)`.
+5. The overlay div: `zIndex = tucked ? place.z : TRAVEL_Z`; `transform = started ? to : 'none'`; the move is a CSS
+   transition on `.flying` (`FLIGHT_MS`).
+6. `onTransitionEnd` (`settle`): if the finished property is `transform` and `gapAt != null` →
+   `onInserted(card, gapAt)` (the consumer splices the card into `hand` at `gap`) → `reset()` (clear gap/flying/started/tucked).
+
+**Params & timings**
+| Aspect | Value |
+|---|---|
+| flight | CSS transition on `.flying`, `FLIGHT_MS = 480` |
+| high-layer hold | `START_HIGH_MS = 140` (then z drops from `TRAVEL_Z = 500` to the slot's z) |
+| target size | `scale = CARD_W / source.width` (`CARD_W = 150`, the fan's card width) |
+| slot | `slotPlacement(gap, handLength + 1)` from `@/table/Hand/fan` — `x`, `y`, `rotate`, `z` |
+
+**Invariants**
+- **I1** measure the hand rect (and the source rect) before starting. **I2** double-rAF before flipping `started`
+  on, so the overlay paints at the source before transitioning (else it jumps).
+- Local: this is **CSS-transition based, not a `play()` preset**. The gap (`gapAt`) and the flight are one
+  coordinated move — the fan must render `handLength + 1` slots so the landing slot exists. The high→tuck
+  z-swap (`TRAVEL_Z` → `place.z`) makes the card ride over the fan, then slip under its right half. Landing is
+  detected by the `transitionend` of `transform`.
+
+**End state & cleanup**
+- `onInserted` splices the card into `hand` at `gap`; the hook `reset()`s (`gapAt = null`, flying cleared). The
+  fan is whole again with the new card.
+
+**Building blocks**
+[`useHandInsert`](./reference.md#hand-insert) (**playground-local** — see the README "Current state" note) ·
+`@/table/Hand/fan` (`slotPlacement`, `CARD_W`) · `Hand` (renders the `gapAt`).
+
+**Live reference**
+`Card to Hand` — `apps/playground/stories/interactive/CardToHandStory.tsx`.
+
+---
+
 ## Drawing a card (single) — deck → center (back-up) → player / opponent / trigger
 
 **When to call**
