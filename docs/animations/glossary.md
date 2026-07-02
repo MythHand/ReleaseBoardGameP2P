@@ -30,10 +30,12 @@ The words that flow into a preset as `params`.
 | `dx` / `dy` | number (px) | extra final offset (land in the exact pose, no post-jump) |
 | `fade` | boolean | dissolve opacity during the flight (baked into `absorbToDeck` / `dealToSeat`) |
 | `duration` | number (ms) | override the preset's default time (variable-time presets) |
-| `faceDown` | boolean | `flipCard` direction |
-| `seq` | number | per-flight key so React does not reuse the flyer `Card` (see **I5**) |
+| `faceDown` | boolean | `flipCard` direction (the `Card` auto-plays `flipCard` when this prop changes) |
 
 > Two rect shapes: travel presets use `{ left, top, width, height }`; `Point` (arrows) uses `{ x, y }`.
+>
+> `seq` (seen in recipes) is **not** a `play()` argument — it is the flyer's React `key`, bumped per
+> flight so React mounts a fresh `Card` instead of reusing one (**I5**).
 
 ---
 
@@ -66,6 +68,9 @@ playground.
 | `FLIGHT_MS` | `480` | `useHandInsert` | hand-insert flight — **must equal the `.flying` CSS transition** |
 | `FLIP_MS` | `420` | `DrawCardStory` | mirror of the `flipCard` preset — JS waits the in-place flip |
 | `SPLIT_MS` | `520` | `DeckAnimationsStory` | the `flyFrom` split fly-out duration |
+| `MERGE_MS` | `520` | `DeckAnimationsStory` | each deck's `absorbToDeck` flight on merge |
+| `GATHER_MS` | `360` | `DeckAnimationsStory` | gather the scattered discard before it flies |
+| `TURN_MS` | `460` | `DeckAnimationsStory` | flip a card back-up in place (discard→deck / merge prep) |
 | `AI_HOLD` | `4000` | `DrawCardStory` | table hold while the AI effect is read |
 | `REVEAL_HOLD` | `820` | `PickOpponentCardStory` | pause after flip, before scatter |
 | `SPLIT_HOLD` | `600` | `DeckAnimationsStory` | pause after split, before touching discard |

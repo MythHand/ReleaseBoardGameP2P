@@ -21,6 +21,37 @@ The live status map of what exists is the playground **`Interaction audit`** pag
 
 ---
 
+## Current state — library vs. playground (read before you wire anything)
+
+Not everything these docs describe is a shared library module. As of now:
+
+**In `@release/ui` — import and use directly:**
+- The animation vocabulary: `play`, the presets (`PRESETS`), and `move` / `jitter` / `wait` /
+  `nextFrames` (`apps/ui/src/animations/`); the card geometry helpers `cardAreaOf` / `cardBoxIn`
+  (`@/primitives/Card`).
+- Primitives that **animate themselves** — used declaratively, the animation is built in:
+  `Card` (plays `flipCard` on a `faceDown` change), `EdgeGlow` (CSS opacity fade), `Input` (shake),
+  `Arrow` (via `useArrow`).
+
+**NOT in the library — lives only in the playground stories (`apps/playground/stories/...`):**
+- The **travel / flight machinery** — the `flyer` element plus the measure → `nextFrames` →
+  position → `play` → cancel/pin dance. There is **no shared `Flyer` / flight primitive**; each
+  story hand-rolls it.
+- The **`useHandInsert`** hook (it works, but sits in the playground, not `@/ui`).
+- The per-scenario **orchestration**: `playSequence`, `drawOne`, `resolveAi`, `flyToCenter`,
+  `runPlay`, the bespoke combo merge.
+
+**What this means for these docs:** the recipes describe the **playground implementation** (the
+visual source of truth). The atoms and self-animating primitives you can **import**; the flight
+machinery and orchestration you **reproduce** from the recipe. Do **not** assume
+`import { useHandInsert } from '@release/ui'` — it isn't there.
+
+**Honest status:** early scaffolding. The flight-glue has **not** been consolidated into a shared
+primitive/hook — that gap is not yet designed. This section states what is true today, not a
+finished architecture; update it when the boundary moves.
+
+---
+
 ## No reinterpretation — reproduce exactly (hard rule)
 
 The playground animations are already debugged and verified on screen. When you use or document
