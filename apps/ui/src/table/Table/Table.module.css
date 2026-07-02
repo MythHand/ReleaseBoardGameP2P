@@ -38,10 +38,19 @@
   transform: translateY(-50%);
 }
 
+/* служебный док хода — нижний-левый угол, под колодами, слева от руки */
+.turnDock {
+  position: absolute;
+  inset-block-end: 20px;
+  inset-inline-start: 26px;
+}
+
 .you {
   position: absolute;
   inset-block-end: 16px;
-  inset-inline: 0 56px;
+
+  /* слева — учитываем половину ширины дока (26 + 300/2 + зазор), справа — правый рейл */
+  inset-inline: 196px 56px;
   display: flex;
   flex-direction: column;
   gap: 4px;

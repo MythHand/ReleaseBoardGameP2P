@@ -1,0 +1,277 @@
+/* Turn dock — custom game-HUD vibe. One accent var (--ac) per state; tokens for
+   colour, layout/effects hand-built (no primitives) for a bolder direction. */
+.dock {
+  --ac: var(--brand-green);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  inline-size: 300px;
+  block-size: 150px;
+  padding: 16px 20px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  background:
+    radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--ac) 6%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-1) 94%, #000), #060806);
+  border: 1px solid color-mix(in srgb, var(--ac) 16%, transparent);
+  border-radius: 14px;
+  box-shadow:
+    0 18px 48px rgb(0 0 0 / 50%),
+    inset 0 1px 0 color-mix(in srgb, var(--ac) 7%, transparent);
+}
+
+/* opponent turn — neutral, no colour cast */
+.dock[data-state='waiting'] {
+  --ac: var(--fg);
+}
+
+/* reaction window — caution amber (e.g. attack a release) */
+.dock[data-state='reaction'] {
+  --ac: var(--gold);
+}
+
+/* danger reaction — red (e.g. Error 503) */
+.dock[data-state='reaction'][data-danger] {
+  --ac: var(--coral);
+}
+
+/* faint techno grid, fading out toward the bottom */
+.grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(0deg, color-mix(in srgb, var(--fg) 4%, transparent) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--fg) 4%, transparent) 0 1px, transparent 1px 22px);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 85%);
+}
+
+/* soft bloom behind the ring */
+.glow {
+  position: absolute;
+  inset-block-start: -28px;
+  inset-inline-start: 16px;
+  inline-size: 120px;
+  block-size: 120px;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--ac) 16%, transparent), transparent 65%);
+  filter: blur(9px);
+}
+
+/* ===== top row: status ===== */
+.top {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.dot {
+  inline-size: 8px;
+  block-size: 8px;
+  background: var(--ac);
+  border-radius: 50%;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--ac) 70%, transparent);
+  animation: blink 1.6s var(--ease-out, ease) infinite;
+}
+
+.phase {
+  font-size: 13px;
+  color: var(--white-75);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+}
+
+.chip {
+  padding: 4px 9px;
+  margin-inline-start: auto;
+  font-size: 11px;
+  color: color-mix(in srgb, var(--ac) 75%, var(--fg));
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  border: 1px solid color-mix(in srgb, var(--ac) 26%, transparent);
+  border-radius: 6px;
+}
+
+/* ===== body: ring timer + action ===== */
+.body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  gap: 20px;
+  align-items: center;
+}
+
+.ring {
+  position: relative;
+  flex: none;
+  inline-size: 72px;
+  block-size: 72px;
+}
+
+.ringSvg {
+  inline-size: 100%;
+  block-size: 100%;
+  transform: rotate(-90deg);
+}
+
+.ringTrack {
+  fill: none;
+  stroke: var(--white-08);
+  stroke-width: 8;
+}
+
+.ringProg {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--ac) 40%, transparent));
+  fill: none;
+  stroke: color-mix(in srgb, var(--ac) 85%, transparent);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 400ms var(--ease-out, ease);
+}
+
+/* full-width overlay centring the value on the ring's true centre */
+.num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  opacity: 0.7;
+}
+
+/* ===== action zone (right) — swaps per state, fixed slot ===== */
+.action {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  justify-content: center;
+  min-inline-size: 0;
+}
+
+/* energized action key (DRAW / PUSH / PASS) */
+.key {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  block-size: 52px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  color: color-mix(in srgb, var(--ac) 80%, var(--fg));
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ac) 9%, transparent), color-mix(in srgb, var(--ac) 4%, transparent));
+  border: 1px solid color-mix(in srgb, var(--ac) 30%, transparent);
+  border-radius: 12px;
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--ac) 14%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--ac) 7%, transparent);
+  transition:
+    box-shadow 200ms var(--ease-out, ease),
+    transform 120ms var(--ease-out, ease);
+}
+
+.key:hover {
+  box-shadow:
+    0 0 20px color-mix(in srgb, var(--ac) 24%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--ac) 12%, transparent);
+}
+
+.key:active {
+  transform: translateY(1px);
+}
+
+.bracket {
+  color: color-mix(in srgb, var(--ac) 45%, transparent);
+}
+
+.keyLabel {
+  color: var(--fg);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--ac) 35%, transparent);
+}
+
+/* light sweep across the key */
+.glint {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -60%;
+  inline-size: 40%;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--ac) 12%, transparent), transparent);
+  transform: skewX(-18deg);
+  animation: glint 3.6s var(--ease-out, ease) infinite;
+}
+
+/* small dim line — locked PUSH hint / "can defend" */
+.locked {
+  font-size: 11px;
+  color: var(--white-45);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* opponent turn — spectating the active player */
+.spectate {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: 40px;
+  block-size: 40px;
+  font-size: 17px;
+  color: var(--white-75);
+  background: var(--white-08);
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-radius: 50%;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 17px;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes glint {
+  0% {
+    inset-inline-start: -60%;
+  }
+
+  55%,
+  100% {
+    inset-inline-start: 130%;
+  }
+}

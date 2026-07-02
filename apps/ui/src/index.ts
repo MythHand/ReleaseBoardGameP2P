@@ -96,3 +96,9 @@ export { SEAT_COPY_EN, SEAT_COPY_RU } from './table/Seat/Seat'
 export { default as Table } from './table/Table'
 export type { TableCopy } from './table/Table/Table'
 export { TABLE_COPY_EN, TABLE_COPY_RU } from './table/Table/Table'
+export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'
+export {
+  default as TurnDock,
+  TURN_DOCK_COPY_EN,
+  TURN_DOCK_COPY_RU,
+} from './table/TurnDock/TurnDock'

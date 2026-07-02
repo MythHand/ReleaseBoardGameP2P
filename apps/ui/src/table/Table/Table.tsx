@@ -37,6 +37,11 @@ import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import { SEAT_COPY_RU, type SeatCopy } from '@/table/Seat/Seat'
+import TurnDock, {
+  TURN_DOCK_COPY_EN,
+  TURN_DOCK_COPY_RU,
+  type TurnDockState,
+} from '@/table/TurnDock/TurnDock'
 import styles from './Table.module.css'
 
 interface Opponent {
@@ -107,6 +112,10 @@ interface TableProps {
   onSpectatorLimitChange?: (n: number) => void
   // исключение зрителя из панели «участники» (только для хоста)
   onKickSpectator?: (id: string) => void
+  // состояние служебного дока хода (в игре — от логики; в песочнице — из истории)
+  turnDockState?: TurnDockState
+  // danger-тон реакции (напр. Error 503) — красная реакция вместо янтарной
+  turnDockDanger?: boolean
 }
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
@@ -208,12 +217,18 @@ export default function Table({
   spectatorLimit,
   onSpectatorLimitChange,
   onKickSpectator,
+  turnDockState = 'push',
+  turnDockDanger = false,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
 
   const isHost = role === 'host'
   const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
+  const turnCopy = lang === 'en' ? TURN_DOCK_COPY_EN : TURN_DOCK_COPY_RU
+  // служебный док хода — состояние приходит пропсами (в игре — от логики хода,
+  // в песочнице — из селектора истории); имя активного игрока берём со стола
+  const dockPlayer = opponents[0]?.name
   // секция управления хоста в настройках (сейчас — лимит зрителей)
   const hostControls = isHost && onSpectatorLimitChange && spectatorLimit != null
   const hasUpperSettings = Boolean(lang && onLangChange) || Boolean(code)
@@ -295,6 +310,18 @@ export default function Table({
             </div>
           </>
         )}
+      </div>
+
+      {/* служебный док хода — низ слева, под колодами, слева от руки */}
+      <div className={styles.turnDock}>
+        <TurnDock
+          state={turnDockState}
+          danger={turnDockDanger}
+          seconds={16}
+          progress={0.55}
+          activePlayer={dockPlayer}
+          copy={turnCopy}
+        />
       </div>
 
       {/* вертикальный рейл у правого края — переключает панели drawer */}
