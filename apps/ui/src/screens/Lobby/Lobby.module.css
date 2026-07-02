@@ -87,6 +87,12 @@
   text-transform: none; /* сброс капса родителя .h (заголовок uppercase) */
 }
 
+/* правила игры — вторичное действие в строке заголовка, прижато к правому краю */
+.rulesBtn {
+  align-self: center;
+  margin-inline-start: auto;
+}
+
 /* режимы — скроллятся независимо, если не помещаются */
 .modes {
   display: flex;
