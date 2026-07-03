@@ -1,4 +1,5 @@
-import { type CSSProperties, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import { CARD_CONTENT, CARDS, CATEGORIES } from '@/cards'
 import CardParallax, { PARALLAX_CARDS } from '@/cards/CardParallax'
 import type { CardContent } from '@/cards/content'
@@ -29,8 +30,11 @@ const PREVIEWS: { id: string; w: number; lod: boolean; label: { ru: string; en: 
 
 export default function CardParallaxStory() {
   const { lang } = useLang()
-  const [selectedId, setSelectedId] = useState(CARDS[0].id)
-  const selected = CARDS.find((c) => c.id === selectedId) ?? CARDS[0]
+  // selected card lives in the URL (/card-parallax/:cardId) so each card is a
+  // full, shareable address; no cardId falls back to the first card
+  const { cardId } = useParams<{ cardId?: string }>()
+  const navigate = useNavigate()
+  const selected = CARDS.find((c) => c.id === cardId) ?? CARDS[0]
   const accent = CATEGORIES[selected.category].accent
   const content: CardContent | undefined = CARD_CONTENT[selected.id]?.[lang]
 
@@ -88,9 +92,9 @@ export default function CardParallaxStory() {
             <button
               type="button"
               key={card.id}
-              className={card.id === selectedId ? styles.railOn : styles.railItem}
+              className={card.id === selected.id ? styles.railOn : styles.railItem}
               style={{ '--accent': CATEGORIES[card.category].accent } as CSSProperties}
-              onClick={() => setSelectedId(card.id)}
+              onClick={() => navigate(`/card-parallax/${card.id}`)}
             >
               <span className={styles.railDot} />
               <span className={styles.railName}>{card.name}</span>
@@ -139,7 +143,7 @@ export default function CardParallaxStory() {
                 <dd>
                   {content.paragraphs.map((para) => (
                     <span key={para.text} style={{ display: 'block' }}>
-                      {para.highlight ? 'sudo · ' : ''}
+                      {para.highlight ? `${para.highlight} · ` : ''}
                       {para.text}
                     </span>
                   ))}

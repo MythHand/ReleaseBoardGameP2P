@@ -152,6 +152,7 @@
   --card-radius: 14px;
   --card-parallax-navy: #102131; /* заливка панели composed-лица (CardParallax) */
   --card-sudo-yellow: #facc15; /* подложка sudo-абзаца в описании (CardParallax) */
+  --card-defense-green: #10b981; /* подложка «работает против» у Defense (CardParallax) */
 
   /* ===== Слои (z-index) ===== */
   --z-table: 0;

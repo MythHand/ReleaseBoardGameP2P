@@ -261,6 +261,8 @@ export default function Playground() {
             ))}
             {/* словарь анимаций — суб-роут на конкретный пресет */}
             <Route path="/animations/:preset" element={<AnimationsStory />} />
+            {/* параллакс-карты — суб-роут на конкретную карту */}
+            <Route path="/card-parallax/:cardId" element={<CardParallaxStory />} />
             {/* Unknown path → first story */}
             <Route path="*" element={<Navigate to={`/${firstId}`} replace />} />
           </Routes>

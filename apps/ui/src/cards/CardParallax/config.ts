@@ -1,7 +1,10 @@
+import bgDefense from '@/assets/cards/parallax/background/defense.png'
 import bgOperation from '@/assets/cards/parallax/background/git-operation.png'
 import bgProtection from '@/assets/cards/parallax/background/protection.png'
 import bgRelease from '@/assets/cards/parallax/background/release.png'
 import gridUrl from '@/assets/cards/parallax/base/grid.svg'
+import defenseIcon from '@/assets/cards/parallax/category/defense.svg'
+import fastIcon from '@/assets/cards/parallax/category/fast.svg'
 import operationIcon from '@/assets/cards/parallax/category/git-operation.svg'
 import protectionIcon from '@/assets/cards/parallax/category/protection.svg'
 import releaseIcon from '@/assets/cards/parallax/category/release.svg'
@@ -10,7 +13,9 @@ import databaseArt from '@/assets/cards/parallax/illustration/database.png'
 import debuggerArt from '@/assets/cards/parallax/illustration/debugger.png'
 import frontendArt from '@/assets/cards/parallax/illustration/frontend.png'
 import monitoringArt from '@/assets/cards/parallax/illustration/monitoring.png'
+import notABugArt from '@/assets/cards/parallax/illustration/not-a-bug.png'
 import systemUpgradeArt from '@/assets/cards/parallax/illustration/system-upgrade.png'
+import worksOnMyMachineArt from '@/assets/cards/parallax/illustration/works-on-my-machine.png'
 
 // Design reference frame — the card footprint. Every size / position below is in
 // these design px; the component maps them to cqw so the whole face scales as a
@@ -80,6 +85,17 @@ export interface CategoryLayer {
   depth: number
 }
 
+// Lightning "fast play" mark in the top-right corner (colour baked into the SVG).
+export interface FastLayer {
+  icon: string
+  w: number
+  h: number
+  // top-right position, in design px
+  top: number
+  right: number
+  depth: number
+}
+
 export interface ParallaxCardConfig {
   background: ImageLayer
   grid: ImageLayer
@@ -89,6 +105,8 @@ export interface ParallaxCardConfig {
   // own opacity (release panels sit at 0.9, protection at 0.58).
   panel: { depth: number; opacity: number }
   category: CategoryLayer
+  // optional lightning mark (all Defense cards are played fast)
+  fast?: FastLayer
   title: TextLayer
   description: TextLayer
 }
@@ -100,6 +118,8 @@ interface CardTheme {
   background: { src: string; w: number; h: number }
   panelOpacity: number
   category: { icon: string; w: number; h: number; label: string; accent: string }
+  // whether cards of this category show the lightning "fast play" mark
+  fast?: boolean
 }
 
 const RELEASE_THEME: CardTheme = {
@@ -132,18 +152,28 @@ const OPERATION_THEME: CardTheme = {
   },
 }
 
+const DEFENSE_THEME: CardTheme = {
+  background: { src: bgDefense, w: 417, h: 621 },
+  panelOpacity: 0.71,
+  category: { icon: defenseIcon, w: 16, h: 16, label: 'Defense', accent: 'var(--cat-defense)' },
+  fast: true,
+}
+
 // shared vertical position of the illustration (design px); the per-card yNudge
 // lowers it to balance each art
 const ILLO_Y = -12
 
 // The accepted BASE: the depth model and text positions here are the locked
 // reference every composed card is tuned against. Per card, only the theme
-// (category) and the illustration (with its native size + optional yNudge) vary.
+// (category), the illustration (native size + optional yNudge) and — where a
+// category has one — the subtype appended to the tag (e.g. "Defense / Unicorn").
 function makeCard(
   theme: CardTheme,
   illustration: { src: string; w: number; h: number },
-  yNudge = 0,
+  opts: { yNudge?: number; subtype?: string } = {},
 ): ParallaxCardConfig {
+  const { yNudge = 0, subtype } = opts
+  const label = subtype ? `${theme.category.label} / ${subtype}` : theme.category.label
   return {
     // Depth reads as recession INTO the card, not layers bulging out: deep
     // layers (background) parallax the MOST — the far floor behind the glass —
@@ -154,7 +184,10 @@ function makeCard(
     grid: { src: gridUrl, w: 443, h: 726, depth: 0.28 },
     illustration: { ...illustration, depth: 0.6, y: ILLO_Y + yNudge },
     // category tag — same surface depth as the text; position mirrors the PNG
-    category: { ...theme.category, top: 20, left: 20, depth: 0.05 },
+    category: { ...theme.category, label, top: 20, left: 20, depth: 0.05 },
+    fast: theme.fast
+      ? { icon: fastIcon, w: 12, h: 15, top: 21, right: 22, depth: 0.05 }
+      : undefined,
     title: { top: 52, padX: 22, depth: -0.14 },
     description: { bottom: 34, padX: 22, depth: -0.14 },
   }
@@ -163,11 +196,39 @@ function makeCard(
 // Illustration native sizes differ on purpose — that difference balances the
 // visual weight of each card's art, so it is never normalised.
 export const FRONTEND = makeCard(RELEASE_THEME, { src: frontendArt, w: 259, h: 259 })
-export const BACKEND = makeCard(RELEASE_THEME, { src: backendArt, w: 282, h: 282 }, 10)
-export const DATABASE = makeCard(RELEASE_THEME, { src: databaseArt, w: 317, h: 317 }, 20)
-export const MONITORING = makeCard(PROTECTION_THEME, { src: monitoringArt, w: 284, h: 284 }, -7)
-export const DEBUGGER = makeCard(PROTECTION_THEME, { src: debuggerArt, w: 324, h: 324 }, 3)
+export const BACKEND = makeCard(RELEASE_THEME, { src: backendArt, w: 282, h: 282 }, { yNudge: 10 })
+export const DATABASE = makeCard(
+  RELEASE_THEME,
+  { src: databaseArt, w: 317, h: 317 },
+  { yNudge: 20 },
+)
+export const MONITORING = makeCard(
+  PROTECTION_THEME,
+  { src: monitoringArt, w: 284, h: 284 },
+  {
+    yNudge: -7,
+  },
+)
+export const DEBUGGER = makeCard(
+  PROTECTION_THEME,
+  { src: debuggerArt, w: 324, h: 324 },
+  {
+    yNudge: 3,
+  },
+)
 export const SYSTEM_UPGRADE = makeCard(OPERATION_THEME, { src: systemUpgradeArt, w: 266, h: 266 })
+export const NOT_A_BUG = makeCard(
+  DEFENSE_THEME,
+  { src: notABugArt, w: 196, h: 196 },
+  {
+    subtype: 'Unicorn',
+  },
+)
+export const WORKS_ON_MY_MACHINE = makeCard(
+  DEFENSE_THEME,
+  { src: worksOnMyMachineArt, w: 309, h: 309 },
+  { subtype: 'Unicorn' },
+)
 
 // Registry: card id → composed config. Ids absent here render as the PNG face.
 export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {
@@ -177,4 +238,6 @@ export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {
   'protection-monitoring': MONITORING,
   'protection-debugger': DEBUGGER,
   'operation-system-upgrade': SYSTEM_UPGRADE,
+  'defense-not-a-bug': NOT_A_BUG,
+  'defense-works-on-my-machine': WORKS_ON_MY_MACHINE,
 }

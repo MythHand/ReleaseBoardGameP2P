@@ -33,6 +33,7 @@
 .panel,
 .noise,
 .category,
+.fast,
 .title,
 .desc {
   position: absolute;
@@ -107,18 +108,35 @@
   line-height: 1.25;
 }
 
-/* sudo effect — text on a translucent yellow callout */
-.sudo {
+/* callouts — a paragraph on a translucent coloured background */
+.calloutSudo,
+.calloutDefense {
   padding: 2cqw;
   margin: 0;
   line-height: 1.25;
-  background: color-mix(in srgb, var(--card-sudo-yellow) 40%, transparent);
   border-radius: 2.5cqw;
+}
+
+/* Git Operation sudo effect — yellow, only the prefix bold */
+.calloutSudo {
+  background: color-mix(in srgb, var(--card-sudo-yellow) 40%, transparent);
+}
+
+/* Defense "works against …" — green, whole line bold */
+.calloutDefense {
+  font-weight: 700;
+  background: color-mix(in srgb, var(--card-defense-green) 40%, transparent);
 }
 
 /* referenced card names / sudo prefix — inline weight accent */
 .desc b {
   font-weight: 700;
+}
+
+/* lightning "fast play" mark, top-right */
+.fast {
+  pointer-events: none;
+  transform: translate(var(--dx, 0), var(--dy, 0));
 }
 
 /* category tag — icon + label, both in the category colour (icon colour is

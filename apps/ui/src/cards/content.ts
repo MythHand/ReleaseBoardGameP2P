@@ -15,8 +15,9 @@ export interface CardParagraph {
   text: string
   // substrings of `text` to bold — names of other cards, or a sudo prefix
   bold?: string[]
-  // sudo effect — rendered on a translucent yellow callout background
-  highlight?: boolean
+  // callout background: 'sudo' = yellow (Git Operation sudo effect),
+  // 'defense' = green (Defense "works against …", whole line bold)
+  highlight?: 'sudo' | 'defense'
 }
 
 // Text shown on a composed card face. Minimal on purpose — fields are added as
@@ -49,6 +50,23 @@ const releaseContent = (name: string): LocalizedCardContent => ({
   ru: { title: name, typeLine: 'Release', paragraphs: [{ text: RELEASE_EFFECT.ru }] },
   en: { title: name, typeLine: 'Release', paragraphs: [{ text: RELEASE_EFFECT.en }] },
 })
+
+// Unicorn Defense cards share the "cancel an attack" line and the green
+// "works against a sudo attack" callout — only extra paragraphs differ.
+const DEFENSE_CANCEL: Record<'ru' | 'en', CardParagraph> = {
+  ru: {
+    text: 'Отмените атаку Bug / Out of Memory / Legacy Code / Security Bug. Сбросьте обе карты.',
+    bold: ['Bug', 'Out of Memory', 'Legacy Code', 'Security Bug'],
+  },
+  en: {
+    text: 'Cancel a Bug / Out of Memory / Legacy Code / Security Bug attack. Discard both cards.',
+    bold: ['Bug', 'Out of Memory', 'Legacy Code', 'Security Bug'],
+  },
+}
+const DEFENSE_ANTI_SUDO: Record<'ru' | 'en', CardParagraph> = {
+  ru: { text: 'Работает против sudo-атаки.', highlight: 'defense' },
+  en: { text: 'Works against a sudo attack.', highlight: 'defense' },
+}
 
 export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
   'release-frontend': releaseContent('Frontend'),
@@ -107,7 +125,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
         {
           text: 'sudo System Upgrade: Выберите одну из сброшенных карт и возьмите её себе в руку.',
           bold: ['sudo System Upgrade:'],
-          highlight: true,
+          highlight: 'sudo',
         },
       ],
     },
@@ -119,8 +137,44 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
         {
           text: 'sudo System Upgrade: Choose one of the discarded cards and take it into your hand.',
           bold: ['sudo System Upgrade:'],
-          highlight: true,
+          highlight: 'sudo',
         },
+      ],
+    },
+  },
+  'defense-not-a-bug': {
+    ru: {
+      title: 'Not a Bug',
+      typeLine: 'Defense / Unicorn',
+      paragraphs: [DEFENSE_CANCEL.ru, DEFENSE_ANTI_SUDO.ru],
+    },
+    en: {
+      title: 'Not a Bug',
+      typeLine: 'Defense / Unicorn',
+      paragraphs: [DEFENSE_CANCEL.en, DEFENSE_ANTI_SUDO.en],
+    },
+  },
+  'defense-works-on-my-machine': {
+    ru: {
+      // hand-tuned wrap: nbsp glues "Works on" and "my Machine", so the only
+      // break point is the middle space → "Works on" / "my Machine"
+      title: 'Works on my Machine',
+      typeLine: 'Defense / Unicorn',
+      paragraphs: [
+        DEFENSE_CANCEL.ru,
+        DEFENSE_ANTI_SUDO.ru,
+        { text: 'Эффект атакующей карты оборачивается против самого атакующего.' },
+      ],
+    },
+    en: {
+      // hand-tuned wrap: nbsp glues "Works on" and "my Machine", so the only
+      // break point is the middle space → "Works on" / "my Machine"
+      title: 'Works on my Machine',
+      typeLine: 'Defense / Unicorn',
+      paragraphs: [
+        DEFENSE_CANCEL.en,
+        DEFENSE_ANTI_SUDO.en,
+        { text: 'The attacking card’s effect is turned back against the attacker.' },
       ],
     },
   },

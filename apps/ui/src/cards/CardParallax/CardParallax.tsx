@@ -15,11 +15,11 @@ import {
 // stacked at their native size and centered; parallax runs only while the card
 // is hovered (interactive), everything else is a static, calm state.
 
-// One paragraph of the description. `highlight` renders a sudo callout.
+// One paragraph of the description. `highlight` renders a coloured callout.
 export interface CardParallaxParagraph {
   text: string
   bold?: string[]
-  highlight?: boolean
+  highlight?: 'sudo' | 'defense'
 }
 
 export interface CardParallaxContent {
@@ -55,6 +55,13 @@ function renderBold(text: string, bold?: string[]): ReactNode {
       noOrphans(part)
     ),
   )
+}
+
+// CSS class for a paragraph — a coloured callout when highlighted, else plain.
+function paragraphClass(highlight?: 'sudo' | 'defense'): string {
+  if (highlight === 'sudo') return styles.calloutSudo
+  if (highlight === 'defense') return styles.calloutDefense
+  return styles.para
 }
 
 interface CardParallaxProps {
@@ -202,6 +209,20 @@ export default function CardParallax({
               </span>
             </div>
           )}
+          {!lod && config.fast && (
+            <img
+              className={styles.fast}
+              src={config.fast.icon}
+              alt=""
+              style={{
+                top: cqw(config.fast.top),
+                right: cqw(config.fast.right),
+                width: cqw(config.fast.w),
+                height: cqw(config.fast.h),
+                ...shift(config.fast.depth),
+              }}
+            />
+          )}
           <div className={styles.title} style={textStyle(config.title, titleSize)}>
             {content.title}
           </div>
@@ -211,7 +232,7 @@ export default function CardParallax({
               style={textStyle(config.description, CARD_FONT.description)}
             >
               {content.description.map((para) => (
-                <p key={para.text} className={para.highlight ? styles.sudo : styles.para}>
+                <p key={para.text} className={paragraphClass(para.highlight)}>
                   {renderBold(para.text, para.bold)}
                 </p>
               ))}
