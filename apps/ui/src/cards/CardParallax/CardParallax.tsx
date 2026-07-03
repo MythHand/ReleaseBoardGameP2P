@@ -5,6 +5,7 @@ import {
   CARD_FONT,
   FRONTEND,
   type ImageLayer,
+  LOD,
   type ParallaxCardConfig,
   type TextLayer,
 } from './config'
@@ -27,6 +28,9 @@ interface CardParallaxProps {
   width?: string
   // false → no pointer parallax, the calm static state (previews, table, piles)
   interactive?: boolean
+  // simplified variant for the release zone: no category / description, larger
+  // and lower illustration
+  lod?: boolean
 }
 
 // how far (in cqw) a depth-1 layer shifts at full pointer deflection
@@ -39,6 +43,7 @@ export default function CardParallax({
   config = FRONTEND,
   width = `${BASE_W}px`,
   interactive = true,
+  lod = false,
 }: CardParallaxProps) {
   const [p, setP] = useState({ x: 0, y: 0 })
   const [hover, setHover] = useState(false)
@@ -97,6 +102,18 @@ export default function CardParallax({
   const blurScale = m ? Number(m[1]) / BASE_W : 1
   const rootStyle = { width, '--blur': `${(PANEL_BLUR * blurScale).toFixed(2)}px` } as CSSProperties
 
+  // LOD enlarges the illustration and drops it lower; everything else is shared
+  const illustration: ImageLayer = lod
+    ? {
+        ...config.illustration,
+        w: config.illustration.w * LOD.illustrationScale,
+        h: config.illustration.h * LOD.illustrationScale,
+        y: LOD.illustrationY,
+      }
+    : config.illustration
+  // LOD also enlarges the title
+  const titleSize = lod ? CARD_FONT.title * LOD.titleScale : CARD_FONT.title
+
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: mouse handlers drive the decorative hover parallax only; no actionable behaviour
     <div
@@ -119,35 +136,42 @@ export default function CardParallax({
           <img className={styles.img} src={config.grid.src} alt="" style={imgStyle(config.grid)} />
           <img
             className={styles.img}
-            src={config.illustration.src}
+            src={illustration.src}
             alt=""
-            style={imgStyle(config.illustration)}
+            style={imgStyle(illustration)}
           />
-          <div
-            className={styles.category}
-            style={{
-              top: cqw(config.category.top),
-              left: cqw(config.category.left),
-              color: config.category.accent,
-              ...shift(config.category.depth),
-            }}
-          >
-            <img
-              className={styles.catIcon}
-              src={config.category.icon}
-              alt=""
-              style={{ width: cqw(config.category.w), height: cqw(config.category.h) }}
-            />
-            <span className={styles.catLabel} style={{ fontSize: cqw(CARD_FONT.category) }}>
-              {config.category.label}
-            </span>
-          </div>
-          <div className={styles.title} style={textStyle(config.title, CARD_FONT.title)}>
+          {!lod && (
+            <div
+              className={styles.category}
+              style={{
+                top: cqw(config.category.top),
+                left: cqw(config.category.left),
+                color: config.category.accent,
+                ...shift(config.category.depth),
+              }}
+            >
+              <img
+                className={styles.catIcon}
+                src={config.category.icon}
+                alt=""
+                style={{ width: cqw(config.category.w), height: cqw(config.category.h) }}
+              />
+              <span className={styles.catLabel} style={{ fontSize: cqw(CARD_FONT.category) }}>
+                {config.category.label}
+              </span>
+            </div>
+          )}
+          <div className={styles.title} style={textStyle(config.title, titleSize)}>
             {content.title}
           </div>
-          <div className={styles.desc} style={textStyle(config.description, CARD_FONT.description)}>
-            {content.description}
-          </div>
+          {!lod && (
+            <div
+              className={styles.desc}
+              style={textStyle(config.description, CARD_FONT.description)}
+            >
+              {content.description}
+            </div>
+          )}
         </div>
       </div>
     </div>

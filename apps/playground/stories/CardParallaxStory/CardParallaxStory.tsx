@@ -17,11 +17,17 @@ const PARALLAX_IDS = new Set(['release-frontend'])
 // authoring surface — native PNG proportion 368×515
 const AUTHORING_W = 368
 
-// the real widths the card is shown at elsewhere in the product
-const PREVIEWS: { id: string; w: number; label: { ru: string; en: string } }[] = [
-  { id: 'hand', w: 150, label: { ru: 'рука', en: 'hand' } },
-  { id: 'release', w: 100, label: { ru: 'зона релиза', en: 'release zone' } },
-  { id: 'release-compact', w: 72 / 1.4, label: { ru: 'релиз · компакт', en: 'release · compact' } },
+// the real widths the card is shown at elsewhere in the product; the release
+// zone shows the simplified LOD variant
+const PREVIEWS: { id: string; w: number; lod: boolean; label: { ru: string; en: string } }[] = [
+  { id: 'hand', w: 150, lod: false, label: { ru: 'рука', en: 'hand' } },
+  { id: 'release', w: 100, lod: true, label: { ru: 'зона релиза', en: 'release zone' } },
+  {
+    id: 'release-compact',
+    w: 72 / 1.4,
+    lod: true,
+    label: { ru: 'релиз · компакт', en: 'release · compact' },
+  },
 ]
 
 export default function CardParallaxStory() {
@@ -32,12 +38,13 @@ export default function CardParallaxStory() {
   const content: CardContent | undefined = CARD_CONTENT[selected.id]?.[lang]
 
   // render the composed face for parallax cards, the PNG face otherwise
-  const renderFace = (w: number, interactive: boolean) =>
+  const renderFace = (w: number, interactive: boolean, lod = false) =>
     PARALLAX_IDS.has(selected.id) ? (
       <CardParallax
         content={{ title: content?.title ?? selected.name, description: content?.effect ?? '' }}
         width={`${w}px`}
         interactive={interactive}
+        lod={lod}
       />
     ) : (
       <Card card={selected} width={`${w}px`} interactive={interactive} />
@@ -101,7 +108,7 @@ export default function CardParallaxStory() {
             </div>
             <div className={styles.authoringCell}>
               <div className={styles.label}>LOD · {AUTHORING_W}×515</div>
-              {renderFace(AUTHORING_W, false)}
+              {renderFace(AUTHORING_W, false, true)}
             </div>
           </section>
 
@@ -110,7 +117,7 @@ export default function CardParallaxStory() {
             <div className={styles.previews}>
               {PREVIEWS.map((p) => (
                 <div key={p.id} className={styles.previewCell}>
-                  {renderFace(p.w, false)}
+                  {renderFace(p.w, false, p.lod)}
                   <div className={styles.previewCap}>
                     {pick(lang, p.label)} · {Math.round(p.w)}px
                   </div>

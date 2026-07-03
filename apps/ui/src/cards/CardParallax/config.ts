@@ -33,6 +33,15 @@ export const CARD_FONT = {
   category: 13,
 }
 
+// LOD (simplified) variant, used when a card sits in the release zone. Derived
+// from the full card: no category tag, no description, and the illustration is
+// enlarged and dropped a little lower. Shared across every card.
+export const LOD = {
+  illustrationScale: 1.4,
+  illustrationY: 24, // design px — lower than the full card's illustration
+  titleScale: 1.2,
+}
+
 export interface TextLayer {
   // vertical anchor in design px — set exactly ONE:
   //   top    → distance from the top edge (e.g. the title)
