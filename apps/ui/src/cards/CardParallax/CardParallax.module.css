@@ -1,0 +1,116 @@
+/* outer frame — owns perspective + the cqw container for unified scale */
+.root {
+  position: relative;
+  aspect-ratio: var(--card-aspect);
+  container-type: inline-size;
+  user-select: none;
+  perspective: 1100px;
+}
+
+/* hover tilt/lift wrapper — ported 1:1 from the PNG Card (rotateX/Y + lift + scale) */
+.tilt {
+  inline-size: 100%;
+  block-size: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--t-base) var(--ease-out);
+  will-change: transform;
+}
+
+/* clipping face — layers stack and are clipped to the card here */
+.face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--surface-0);
+  border-radius: 6cqw;
+  box-shadow: 0 6px 16px var(--black-50);
+  isolation: isolate;
+  backface-visibility: hidden;
+}
+
+/* every layer eases back to its calm position when the pointer leaves */
+.img,
+.panel,
+.noise,
+.category,
+.title,
+.desc {
+  position: absolute;
+  transition: transform 0.16s ease-out;
+  will-change: transform;
+}
+
+/* centered images — native size (in cqw), never distorted; overflow is clipped */
+.img {
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  pointer-events: none;
+  user-select: none;
+  transform: translate(calc(-50% + var(--dx, 0cqw)), calc(-50% + var(--dy, 0cqw)));
+}
+
+/* radial-navy glass panel over the background: lighter core lets the light glow
+   through, darker rim vignettes the edges; own 90% opacity + a soft layer blur.
+   Sized larger than the frame so a parallax shift never exposes an edge. */
+.panel,
+.noise {
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 128cqw;
+  block-size: 168cqw;
+  pointer-events: none;
+  transform: translate(calc(-50% + var(--dx, 0cqw)), calc(-50% + var(--dy, 0cqw)));
+}
+
+.panel {
+  background: radial-gradient(
+    circle at 50% 42%,
+    color-mix(in srgb, var(--card-parallax-navy) 50%, transparent) 0%,
+    color-mix(in srgb, var(--card-parallax-navy) 95%, transparent) 100%
+  );
+  opacity: 0.9;
+  filter: blur(var(--blur, 14px));
+}
+
+/* film grain — desaturated fractal noise, matching the duo black/white grain */
+.noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  opacity: 0.35;
+}
+
+/* card-face type — family / weight / tracking come from the typography scale
+   (title = card-title + tk-01, description = body); size is set inline in cqw. */
+.title {
+  composes: card-title tk-01 from '../../design/typography.module.css';
+  line-height: 1;
+  color: var(--fg);
+  text-align: center;
+  transform: translate(var(--dx, 0), var(--dy, 0));
+}
+
+.desc {
+  composes: body from '../../design/typography.module.css';
+  line-height: 1.4;
+  color: var(--white-85);
+  text-align: center;
+  transform: translate(var(--dx, 0), var(--dy, 0));
+}
+
+/* category tag — icon + label, both in the category colour (icon colour is
+   baked into the SVG; label inherits the colour set inline) */
+.category {
+  display: flex;
+  gap: 1.8cqw;
+  align-items: center;
+  transform: translate(var(--dx, 0), var(--dy, 0));
+}
+
+.catIcon {
+  display: block;
+}
+
+.catLabel {
+  composes: body-sm from '../../design/typography.module.css';
+  line-height: 1;
+}

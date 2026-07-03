@@ -108,6 +108,17 @@ const scale: ScaleRow[] = [
     sample: { ru: 'Атакующие карты', en: 'Attack cards' },
     where: { ru: 'Подзаголовок правил (Rules)', en: 'Rules subheading (Rules)' },
   },
+  {
+    cls: 'card-title',
+    font: 'Onest',
+    size: 34,
+    weight: 800,
+    sample: { ru: 'Frontend', en: 'Frontend' },
+    where: {
+      ru: 'Заголовок composed-карты (CardParallax)',
+      en: 'Composed card title (CardParallax)',
+    },
+  },
   // ===== Body — Fira Mono (var(--font-text)) =====
   {
     cls: 'body-lg',
@@ -472,6 +483,7 @@ const weights: { name: string; cls: string; items: { w: number; label: string }[
       { w: 500, label: 'Medium' },
       { w: 600, label: 'Semibold' },
       { w: 700, label: 'Bold' },
+      { w: 800, label: 'ExtraBold' },
     ],
   },
   {

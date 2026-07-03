@@ -13,6 +13,7 @@ export type TypographyBase =
   | 'heading-7'
   | 'heading-8'
   | 'heading-9'
+  | 'card-title'
   | 'subtitle'
   | 'body-lg'
   | 'body'

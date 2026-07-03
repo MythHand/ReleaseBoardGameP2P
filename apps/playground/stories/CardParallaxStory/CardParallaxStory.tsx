@@ -1,14 +1,18 @@
 import { type CSSProperties, useState } from 'react'
 import { CARD_CONTENT, CARDS, CATEGORIES } from '@/cards'
+import CardParallax from '@/cards/CardParallax'
 import type { CardContent } from '@/cards/content'
 import Card from '@/primitives/Card'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './CardParallaxStory.module.css'
 
-// Foundation page for the composed (parallax) card face. The stage renders the
-// existing PNG face as a stand-in until the composed face lands behind CardFace;
-// the rig (name rail + authoring size + real-usage previews + content panel) is
-// what we validate here first, so building the face later is drop-in.
+// cards that have a code-composed (parallax) face built; others stay PNG
+const PARALLAX_IDS = new Set(['release-frontend'])
+
+// Page for developing the composed (parallax) card face. Cards with a built
+// composed face (PARALLAX_IDS) render <CardParallax>; the rest stay PNG <Card>.
+// The rig — name rail, authoring size beside its LOD, usage-size previews and
+// the content panel — is where we tune one card at a time (Frontend first).
 
 // authoring surface — native PNG proportion 368×515
 const AUTHORING_W = 368
@@ -26,6 +30,18 @@ export default function CardParallaxStory() {
   const selected = CARDS.find((c) => c.id === selectedId) ?? CARDS[0]
   const accent = CATEGORIES[selected.category].accent
   const content: CardContent | undefined = CARD_CONTENT[selected.id]?.[lang]
+
+  // render the composed face for parallax cards, the PNG face otherwise
+  const renderFace = (w: number, interactive: boolean) =>
+    PARALLAX_IDS.has(selected.id) ? (
+      <CardParallax
+        content={{ title: content?.title ?? selected.name, description: content?.effect ?? '' }}
+        width={`${w}px`}
+        interactive={interactive}
+      />
+    ) : (
+      <Card card={selected} width={`${w}px`} interactive={interactive} />
+    )
 
   const t = pick(lang, {
     ru: {
@@ -81,11 +97,11 @@ export default function CardParallaxStory() {
               <div className={styles.label}>
                 {t.authoring} · {AUTHORING_W}×515
               </div>
-              <Card card={selected} width={`${AUTHORING_W}px`} />
+              {renderFace(AUTHORING_W, true)}
             </div>
             <div className={styles.authoringCell}>
               <div className={styles.label}>LOD · {AUTHORING_W}×515</div>
-              <Card card={selected} width={`${AUTHORING_W}px`} interactive={false} />
+              {renderFace(AUTHORING_W, false)}
             </div>
           </section>
 
@@ -94,7 +110,7 @@ export default function CardParallaxStory() {
             <div className={styles.previews}>
               {PREVIEWS.map((p) => (
                 <div key={p.id} className={styles.previewCell}>
-                  <Card card={selected} width={`${p.w}px`} interactive={false} />
+                  {renderFace(p.w, false)}
                   <div className={styles.previewCap}>
                     {pick(lang, p.label)} · {Math.round(p.w)}px
                   </div>

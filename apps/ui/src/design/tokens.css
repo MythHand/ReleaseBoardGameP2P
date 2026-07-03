@@ -150,6 +150,7 @@
   --card-w: 200px;
   --card-aspect: 368 / 515; /* оригинальная пропорция арта */
   --card-radius: 14px;
+  --card-parallax-navy: #102131; /* заливка панели composed-лица (CardParallax) */
 
   /* ===== Слои (z-index) ===== */
   --z-table: 0;
