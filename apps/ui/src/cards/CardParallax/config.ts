@@ -1,9 +1,16 @@
+import bgOperation from '@/assets/cards/parallax/background/git-operation.png'
+import bgProtection from '@/assets/cards/parallax/background/protection.png'
 import bgRelease from '@/assets/cards/parallax/background/release.png'
 import gridUrl from '@/assets/cards/parallax/base/grid.svg'
+import operationIcon from '@/assets/cards/parallax/category/git-operation.svg'
+import protectionIcon from '@/assets/cards/parallax/category/protection.svg'
 import releaseIcon from '@/assets/cards/parallax/category/release.svg'
 import backendArt from '@/assets/cards/parallax/illustration/backend.png'
 import databaseArt from '@/assets/cards/parallax/illustration/database.png'
+import debuggerArt from '@/assets/cards/parallax/illustration/debugger.png'
 import frontendArt from '@/assets/cards/parallax/illustration/frontend.png'
+import monitoringArt from '@/assets/cards/parallax/illustration/monitoring.png'
+import systemUpgradeArt from '@/assets/cards/parallax/illustration/system-upgrade.png'
 
 // Design reference frame — the card footprint. Every size / position below is in
 // these design px; the component maps them to cqw so the whole face scales as a
@@ -77,23 +84,63 @@ export interface ParallaxCardConfig {
   background: ImageLayer
   grid: ImageLayer
   illustration: ImageLayer
-  // radial-navy panel (gradient + blur + noise) — styling lives in the module,
-  // only its parallax depth is tuned per card here
-  panel: { depth: number }
+  // radial-navy panel (gradient + blur + noise) muting the background image.
+  // Styling lives in the module; per card we tune its parallax depth and its
+  // own opacity (release panels sit at 0.9, protection at 0.58).
+  panel: { depth: number; opacity: number }
   category: CategoryLayer
   title: TextLayer
   description: TextLayer
 }
 
-// Every Release card shares the same layers, category tag, depths and text
-// positions — only the illustration (and its native size) differs. This factory
-// is the accepted BASE: the depth model and positions here are the locked
-// reference the whole category is tuned against.
-// shared vertical position of the release illustration (design px); the
-// per-card yNudge lowers it to balance each art
-const RELEASE_ILLO_Y = -12
+// A category theme = the parts that differ between categories: the background
+// image, how strongly its panel mutes that background, and the category tag.
+// Everything else (grid, depths, text positions) is shared across all cards.
+interface CardTheme {
+  background: { src: string; w: number; h: number }
+  panelOpacity: number
+  category: { icon: string; w: number; h: number; label: string; accent: string }
+}
 
-function makeReleaseCard(
+const RELEASE_THEME: CardTheme = {
+  background: { src: bgRelease, w: 421, h: 627 },
+  panelOpacity: 0.9,
+  category: { icon: releaseIcon, w: 20, h: 14, label: 'Release', accent: 'var(--cat-release)' },
+}
+
+const PROTECTION_THEME: CardTheme = {
+  background: { src: bgProtection, w: 419, h: 624 },
+  panelOpacity: 0.58,
+  category: {
+    icon: protectionIcon,
+    w: 16,
+    h: 16,
+    label: 'Protection',
+    accent: 'var(--cat-protection)',
+  },
+}
+
+const OPERATION_THEME: CardTheme = {
+  background: { src: bgOperation, w: 416, h: 620 },
+  panelOpacity: 0.6,
+  category: {
+    icon: operationIcon,
+    w: 16,
+    h: 16,
+    label: 'Git Operation',
+    accent: 'var(--cat-operation)',
+  },
+}
+
+// shared vertical position of the illustration (design px); the per-card yNudge
+// lowers it to balance each art
+const ILLO_Y = -12
+
+// The accepted BASE: the depth model and text positions here are the locked
+// reference every composed card is tuned against. Per card, only the theme
+// (category) and the illustration (with its native size + optional yNudge) vary.
+function makeCard(
+  theme: CardTheme,
   illustration: { src: string; w: number; h: number },
   yNudge = 0,
 ): ParallaxCardConfig {
@@ -102,35 +149,32 @@ function makeReleaseCard(
     // layers (background) parallax the MOST — the far floor behind the glass —
     // while surface layers (text) barely move, as if pinned to the card face.
     // Sign = direction (content inverted vs grid); magnitude = how deep it sits.
-    background: { src: bgRelease, w: 421, h: 627, depth: 0.9 },
-    panel: { depth: -0.7 },
+    background: { ...theme.background, depth: 0.9 },
+    panel: { depth: -0.7, opacity: theme.panelOpacity },
     grid: { src: gridUrl, w: 443, h: 726, depth: 0.28 },
-    illustration: { ...illustration, depth: 0.6, y: RELEASE_ILLO_Y + yNudge },
+    illustration: { ...illustration, depth: 0.6, y: ILLO_Y + yNudge },
     // category tag — same surface depth as the text; position mirrors the PNG
-    category: {
-      icon: releaseIcon,
-      w: 20,
-      h: 14,
-      label: 'Release',
-      accent: 'var(--cat-release)',
-      top: 20,
-      left: 20,
-      depth: 0.05,
-    },
-    title: { top: 52, padX: 24, depth: -0.14 },
-    description: { bottom: 34, padX: 34, depth: -0.14 },
+    category: { ...theme.category, top: 20, left: 20, depth: 0.05 },
+    title: { top: 52, padX: 22, depth: -0.14 },
+    description: { bottom: 34, padX: 22, depth: -0.14 },
   }
 }
 
 // Illustration native sizes differ on purpose — that difference balances the
 // visual weight of each card's art, so it is never normalised.
-export const FRONTEND = makeReleaseCard({ src: frontendArt, w: 259, h: 259 })
-export const BACKEND = makeReleaseCard({ src: backendArt, w: 282, h: 282 }, 10)
-export const DATABASE = makeReleaseCard({ src: databaseArt, w: 317, h: 317 }, 20)
+export const FRONTEND = makeCard(RELEASE_THEME, { src: frontendArt, w: 259, h: 259 })
+export const BACKEND = makeCard(RELEASE_THEME, { src: backendArt, w: 282, h: 282 }, 10)
+export const DATABASE = makeCard(RELEASE_THEME, { src: databaseArt, w: 317, h: 317 }, 20)
+export const MONITORING = makeCard(PROTECTION_THEME, { src: monitoringArt, w: 284, h: 284 }, -7)
+export const DEBUGGER = makeCard(PROTECTION_THEME, { src: debuggerArt, w: 324, h: 324 }, 3)
+export const SYSTEM_UPGRADE = makeCard(OPERATION_THEME, { src: systemUpgradeArt, w: 266, h: 266 })
 
 // Registry: card id → composed config. Ids absent here render as the PNG face.
 export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {
   'release-frontend': FRONTEND,
   'release-backend': BACKEND,
   'release-database': DATABASE,
+  'protection-monitoring': MONITORING,
+  'protection-debugger': DEBUGGER,
+  'operation-system-upgrade': SYSTEM_UPGRADE,
 }

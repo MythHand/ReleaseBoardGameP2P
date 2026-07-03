@@ -40,7 +40,10 @@ export default function CardParallaxStory() {
     parallaxConfig ? (
       <CardParallax
         config={parallaxConfig}
-        content={{ title: content?.title ?? selected.name, description: content?.effect ?? '' }}
+        content={{
+          title: content?.title ?? selected.name,
+          description: content?.paragraphs ?? [],
+        }}
         width={w}
         interactive={interactive}
         lod={lod}
@@ -133,7 +136,14 @@ export default function CardParallaxStory() {
                 <dt>{t.typeLine}</dt>
                 <dd>{content.typeLine}</dd>
                 <dt>{t.effect}</dt>
-                <dd>{content.effect}</dd>
+                <dd>
+                  {content.paragraphs.map((para) => (
+                    <span key={para.text} style={{ display: 'block' }}>
+                      {para.highlight ? 'sudo · ' : ''}
+                      {para.text}
+                    </span>
+                  ))}
+                </dd>
                 {content.flavor && (
                   <>
                     <dt>{t.flavor}</dt>

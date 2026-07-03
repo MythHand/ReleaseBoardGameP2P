@@ -63,12 +63,12 @@
 }
 
 .panel {
+  /* opacity is per-card (release 0.9, protection 0.58) — set inline from config */
   background: radial-gradient(
     circle at 50% 42%,
     color-mix(in srgb, var(--card-parallax-navy) 50%, transparent) 0%,
     color-mix(in srgb, var(--card-parallax-navy) 95%, transparent) 100%
   );
-  opacity: 0.9;
   filter: blur(var(--blur, 14px));
 }
 
@@ -89,12 +89,36 @@
   transform: translate(var(--dx, 0), var(--dy, 0));
 }
 
+/* description — a column of paragraphs, still anchored to the bottom edge */
 .desc {
   composes: body from '../../design/typography.module.css';
-  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqw;
   color: var(--white-85);
   text-align: center;
   transform: translate(var(--dx, 0), var(--dy, 0));
+}
+
+/* line-height lives on the paragraphs, not .desc — the composed `body` base
+   sets its own line-height that would otherwise win over .desc */
+.para {
+  margin: 0;
+  line-height: 1.25;
+}
+
+/* sudo effect — text on a translucent yellow callout */
+.sudo {
+  padding: 2cqw;
+  margin: 0;
+  line-height: 1.25;
+  background: color-mix(in srgb, var(--card-sudo-yellow) 40%, transparent);
+  border-radius: 2.5cqw;
+}
+
+/* referenced card names / sudo prefix — inline weight accent */
+.desc b {
+  font-weight: 700;
 }
 
 /* category tag — icon + label, both in the category colour (icon colour is
