@@ -36,13 +36,17 @@ import ButtonsKit from '../stories/kit/ButtonsKit'
 import DrawerKit from '../stories/kit/DrawerKit'
 import DropdownKit from '../stories/kit/DropdownKit'
 import EdgeGlowKit from '../stories/kit/EdgeGlowKit'
+import HudBackgroundKit from '../stories/kit/HudBackgroundKit'
+import HudSurfaceKit from '../stories/kit/HudSurfaceKit'
 import InputsKit from '../stories/kit/InputsKit'
 import ModalsKit from '../stories/kit/ModalsKit'
 import ModeSelectKit from '../stories/kit/ModeSelectKit'
 import OverlayKit from '../stories/kit/OverlayKit'
 import PilesKit from '../stories/kit/PilesKit'
+import RingTimerKit from '../stories/kit/RingTimerKit'
 import SlidersKit from '../stories/kit/SlidersKit'
 import SpinnerKit from '../stories/kit/SpinnerKit'
+import StatusDotKit from '../stories/kit/StatusDotKit'
 import TabRailKit from '../stories/kit/TabRailKit'
 import TogglesKit from '../stories/kit/TogglesKit'
 import VideoPlayerKit from '../stories/kit/VideoPlayerKit'
@@ -151,6 +155,16 @@ const groups: Group[] = [
       { id: 'kit-edge-glow', title: 'Edge glow', render: () => <EdgeGlowKit /> },
       { id: 'kit-spinner', title: 'Spinner', render: () => <SpinnerKit /> },
       { id: 'kit-video-player', title: 'Video player', render: () => <VideoPlayerKit /> },
+    ],
+  },
+  {
+    // HUD-примитивы — служебный игровой интерфейс (таймеры, индикаторы, панели).
+    title: { ru: 'UI KIT · HUD', en: 'UI KIT · HUD' },
+    items: [
+      { id: 'kit-ring-timer', title: 'Ring timer', render: () => <RingTimerKit /> },
+      { id: 'kit-status-dot', title: 'Status dot', render: () => <StatusDotKit /> },
+      { id: 'kit-hud-surface', title: 'HUD surface', render: () => <HudSurfaceKit /> },
+      { id: 'kit-hud-background', title: 'HUD background', render: () => <HudBackgroundKit /> },
     ],
   },
   {

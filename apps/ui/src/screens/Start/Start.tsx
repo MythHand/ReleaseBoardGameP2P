@@ -14,6 +14,7 @@ import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
 import { randomNickname, sanitizeNickname } from '@/game/nicknames'
 import DiceIcon from '@/icons/DiceIcon'
 import Button from '@/primitives/Button'
+import HudBackground from '@/primitives/HudBackground'
 import Input from '@/primitives/Input'
 import Modal from '@/primitives/Modal'
 import styles from './Start.module.css'
@@ -130,6 +131,8 @@ export default function Start({
       <div className={styles.bg} />
       <div className={styles.blur} />
       <div className={styles.scrim} />
+      {/* HUD-сетка: над градиентом/картинкой, под контентом */}
+      <HudBackground tone="grid" className={styles.bgLayer} />
 
       {lang && onLangChange && (
         <>

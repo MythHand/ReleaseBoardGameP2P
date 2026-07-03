@@ -216,6 +216,22 @@ const scale: ScaleRow[] = [
     where: { ru: 'Код игры (Lobby)', en: 'Game code (Lobby)' },
   },
   {
+    cls: 'numeric-lg',
+    font: 'JetBrains Mono',
+    size: 26,
+    weight: 300,
+    sample: { ru: '18', en: '18' },
+    where: { ru: 'Счётчик таймера (RingTimer / HUD)', en: 'Timer readout (RingTimer / HUD)' },
+  },
+  {
+    cls: 'value-lg',
+    font: 'JetBrains Mono',
+    size: 20,
+    upper: true,
+    sample: { ru: 'push', en: 'push' },
+    where: { ru: 'Крупная HUD-клавиша (Button hud)', en: 'Large HUD key (Button hud)' },
+  },
+  {
     cls: 'value',
     font: 'JetBrains Mono',
     size: 18,
@@ -240,6 +256,13 @@ const scale: ScaleRow[] = [
       ru: 'Числа таблицы (Stats), значение слайдера',
       en: 'Table numbers (Stats), slider value',
     },
+  },
+  {
+    cls: 'mono-xl',
+    font: 'JetBrains Mono',
+    size: 17,
+    sample: { ru: 'neo', en: 'neo' },
+    where: { ru: 'Имя игрока в HUD (spectate)', en: 'Player name in HUD (spectate)' },
   },
   {
     cls: 'mono-lg',

@@ -1,0 +1,53 @@
+/* Lighter than HudSurface: translucent fill, faint grid + border, no drop shadow
+   — a quiet background. Semantic tone drives the faint tint/border via --a. */
+.bg {
+  --a: var(--gray); /* neutral — grey, not white */
+
+  position: relative;
+  padding: 16px 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--a) 4%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-1) 45%, transparent), color-mix(in srgb, var(--surface-0) 25%, transparent));
+  border: 1px solid color-mix(in srgb, var(--a) 9%, transparent);
+  border-radius: 14px;
+}
+
+.bg[data-tone='positive'] {
+  --a: var(--brand-green);
+}
+
+/* grid — fully transparent, only the techno grid remains (no fill, no border) */
+.bg[data-tone='grid'] {
+  background: none;
+  border: 0;
+}
+
+/* faint techno grid — masked down further than the surface's */
+.grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 22px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 22px);
+  mask-image: linear-gradient(180deg, color-mix(in srgb, var(--fg) 55%, transparent) 0%, transparent 80%);
+}
+
+/* draft accent bloom, top-left (opt-in — mainly positive) */
+.glow {
+  position: absolute;
+  inset-block-start: -28px;
+  inset-inline-start: 16px;
+  inline-size: 120px;
+  block-size: 120px;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--a) 12%, transparent), transparent 65%);
+  filter: blur(9px);
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  block-size: 100%;
+}

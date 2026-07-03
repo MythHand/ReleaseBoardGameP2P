@@ -7,6 +7,7 @@ import { type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
 import GearIcon from '@/icons/GearIcon'
 import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
+import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
 import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
@@ -264,6 +265,8 @@ export default function Table({
 
   return (
     <div className={styles.table}>
+      <HudBackground tone="neutral" className={styles.bgLayer} />
+
       <div className={styles.opponents}>
         {opponents.map((p, i) => {
           const eliminated = view === 'oppEliminated' && i === 0

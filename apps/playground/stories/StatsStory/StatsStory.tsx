@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { makeStats } from '@/mocks/stats'
 import Stats from '@/screens/Stats'
 import type { StatsCopy } from '@/screens/Stats/Stats'
@@ -57,10 +58,31 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
 
 export default function StatsStory() {
   const { lang, setLang } = useLang()
+  const [bg, setBg] = useState<'neutral' | 'positive'>('neutral')
   const data = makeStats()
   return (
     <div className={styles.root}>
-      <Stats {...data} copy={pick(lang, COPY)} lang={lang} onLangChange={setLang} />
+      <div className={styles.controls}>
+        <div className={styles.switch}>
+          <button
+            type="button"
+            className={bg === 'neutral' ? styles.on : ''}
+            onClick={() => setBg('neutral')}
+          >
+            neutral
+          </button>
+          <button
+            type="button"
+            className={bg === 'positive' ? styles.on : ''}
+            onClick={() => setBg('positive')}
+          >
+            positive
+          </button>
+        </div>
+      </div>
+      <div className={styles.stage}>
+        <Stats {...data} copy={pick(lang, COPY)} lang={lang} onLangChange={setLang} bgTone={bg} />
+      </div>
     </div>
   )
 }

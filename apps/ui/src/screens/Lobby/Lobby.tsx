@@ -8,6 +8,7 @@ import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, MODES_COPY_EN, MODES_COPY_RU, type Setup } from '@/game/modes'
 import Badge from '@/primitives/Badge'
 import Button from '@/primitives/Button'
+import HudBackground, { type HudBackgroundTone } from '@/primitives/HudBackground'
 import Modal from '@/primitives/Modal'
 import Slider from '@/primitives/Slider'
 import Toggle from '@/primitives/Toggle'
@@ -31,6 +32,8 @@ interface LobbyProps {
   role?: 'host' | 'guest'
   initialSetup?: Setup
   initialLang?: SwitchLang
+  // HUD-фон экрана (переключается снаружи — напр. из техстроки песочницы)
+  bgTone?: HudBackgroundTone
 }
 
 // Весь видимый текст лобби приходит из набора по языку — экран сам переключает
@@ -170,6 +173,7 @@ export default function Lobby({
   role = 'host',
   initialSetup = DEFAULT_SETUP,
   initialLang = 'ru',
+  bgTone = 'neutral',
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
@@ -236,6 +240,7 @@ export default function Lobby({
 
   return (
     <div className={styles.lobby}>
+      <HudBackground tone={bgTone} className={styles.bgLayer} />
       <header className={styles.head}>
         <div>
           <div className={styles.titleRow}>
