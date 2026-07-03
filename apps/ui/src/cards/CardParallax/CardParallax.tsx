@@ -111,7 +111,7 @@ export default function CardParallax({
         ...config.illustration,
         w: config.illustration.w * LOD.illustrationScale,
         h: config.illustration.h * LOD.illustrationScale,
-        y: LOD.illustrationY,
+        y: (config.illustration.y ?? 0) + LOD.illustrationYDrop,
       }
     : config.illustration
   // LOD also enlarges the title

@@ -1,6 +1,8 @@
 import bgRelease from '@/assets/cards/parallax/background/release.png'
 import gridUrl from '@/assets/cards/parallax/base/grid.svg'
 import releaseIcon from '@/assets/cards/parallax/category/release.svg'
+import backendArt from '@/assets/cards/parallax/illustration/backend.png'
+import databaseArt from '@/assets/cards/parallax/illustration/database.png'
 import frontendArt from '@/assets/cards/parallax/illustration/frontend.png'
 
 // Design reference frame — the card footprint. Every size / position below is in
@@ -38,7 +40,9 @@ export const CARD_FONT = {
 // enlarged and dropped a little lower. Shared across every card.
 export const LOD = {
   illustrationScale: 1.4,
-  illustrationY: 24, // design px — lower than the full card's illustration
+  // design px lower than the full card's illustration — a delta, so each card's
+  // own vertical position (incl. per-card nudges) carries into the LOD too
+  illustrationYDrop: 36,
   titleScale: 1.2,
 }
 
@@ -81,29 +85,52 @@ export interface ParallaxCardConfig {
   description: TextLayer
 }
 
-// Frontend — the first composed card and the accepted BASE that every other
-// composed card is tuned against: these depths, positions and font sizes are
-// the locked reference, not a throwaway first pass.
-export const FRONTEND: ParallaxCardConfig = {
-  // Depth reads as recession INTO the card, not layers bulging out: deep layers
-  // (background) parallax the MOST — the far floor behind the glass — while
-  // surface layers (text) barely move, as if pinned to the card face. Sign =
-  // direction (content inverted vs grid); magnitude = how deep it sits.
-  background: { src: bgRelease, w: 421, h: 627, depth: 0.9 },
-  panel: { depth: -0.7 },
-  grid: { src: gridUrl, w: 443, h: 726, depth: 0.28 },
-  illustration: { src: frontendArt, w: 259, h: 259, depth: 0.6, y: -12 },
-  // category tag — same surface depth as the text; position mirrors the PNG
-  category: {
-    icon: releaseIcon,
-    w: 20,
-    h: 14,
-    label: 'Release',
-    accent: 'var(--cat-release)',
-    top: 20,
-    left: 20,
-    depth: 0.05,
-  },
-  title: { top: 52, padX: 24, depth: -0.14 },
-  description: { bottom: 34, padX: 34, depth: -0.14 },
+// Every Release card shares the same layers, category tag, depths and text
+// positions — only the illustration (and its native size) differs. This factory
+// is the accepted BASE: the depth model and positions here are the locked
+// reference the whole category is tuned against.
+// shared vertical position of the release illustration (design px); the
+// per-card yNudge lowers it to balance each art
+const RELEASE_ILLO_Y = -12
+
+function makeReleaseCard(
+  illustration: { src: string; w: number; h: number },
+  yNudge = 0,
+): ParallaxCardConfig {
+  return {
+    // Depth reads as recession INTO the card, not layers bulging out: deep
+    // layers (background) parallax the MOST — the far floor behind the glass —
+    // while surface layers (text) barely move, as if pinned to the card face.
+    // Sign = direction (content inverted vs grid); magnitude = how deep it sits.
+    background: { src: bgRelease, w: 421, h: 627, depth: 0.9 },
+    panel: { depth: -0.7 },
+    grid: { src: gridUrl, w: 443, h: 726, depth: 0.28 },
+    illustration: { ...illustration, depth: 0.6, y: RELEASE_ILLO_Y + yNudge },
+    // category tag — same surface depth as the text; position mirrors the PNG
+    category: {
+      icon: releaseIcon,
+      w: 20,
+      h: 14,
+      label: 'Release',
+      accent: 'var(--cat-release)',
+      top: 20,
+      left: 20,
+      depth: 0.05,
+    },
+    title: { top: 52, padX: 24, depth: -0.14 },
+    description: { bottom: 34, padX: 34, depth: -0.14 },
+  }
+}
+
+// Illustration native sizes differ on purpose — that difference balances the
+// visual weight of each card's art, so it is never normalised.
+export const FRONTEND = makeReleaseCard({ src: frontendArt, w: 259, h: 259 })
+export const BACKEND = makeReleaseCard({ src: backendArt, w: 282, h: 282 }, 10)
+export const DATABASE = makeReleaseCard({ src: databaseArt, w: 317, h: 317 }, 20)
+
+// Registry: card id → composed config. Ids absent here render as the PNG face.
+export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {
+  'release-frontend': FRONTEND,
+  'release-backend': BACKEND,
+  'release-database': DATABASE,
 }

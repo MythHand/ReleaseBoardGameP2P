@@ -31,19 +31,20 @@ export interface LocalizedCardContent {
 
 // Keyed by Card.id (see catalogue.ts). Authored incrementally — start with the
 // one representative card that validates the composed face, then fill the rest.
+// Every Release card shares this effect text — only the title (card name) differs.
+const RELEASE_EFFECT = {
+  ru: 'Выложите эту карту в свою зону релиза. Для этого сбросьте 1 карту из руки в сброс.',
+  en: 'Place this card into your release zone. To do so, discard 1 card from your hand.',
+}
+const releaseContent = (name: string): LocalizedCardContent => ({
+  ru: { title: name, typeLine: 'Release', effect: RELEASE_EFFECT.ru },
+  en: { title: name, typeLine: 'Release', effect: RELEASE_EFFECT.en },
+})
+
 export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
-  'release-frontend': {
-    ru: {
-      title: 'Frontend',
-      typeLine: 'Release',
-      effect: 'Выложите эту карту в свою зону релиза. Для этого сбросьте 1 карту из руки в сброс.',
-    },
-    en: {
-      title: 'Frontend',
-      typeLine: 'Release',
-      effect: 'Place this card into your release zone. To do so, discard 1 card from your hand.',
-    },
-  },
+  'release-frontend': releaseContent('Frontend'),
+  'release-backend': releaseContent('Backend'),
+  'release-database': releaseContent('Database'),
 }
 
 // Convenience lookup — undefined until a card has authored content.

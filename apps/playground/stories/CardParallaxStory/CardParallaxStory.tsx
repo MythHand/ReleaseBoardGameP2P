@@ -1,13 +1,10 @@
 import { type CSSProperties, useState } from 'react'
 import { CARD_CONTENT, CARDS, CATEGORIES } from '@/cards'
-import CardParallax from '@/cards/CardParallax'
+import CardParallax, { PARALLAX_CARDS } from '@/cards/CardParallax'
 import type { CardContent } from '@/cards/content'
 import Card from '@/primitives/Card'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './CardParallaxStory.module.css'
-
-// cards that have a code-composed (parallax) face built; others stay PNG
-const PARALLAX_IDS = new Set(['release-frontend'])
 
 // Page for developing the composed (parallax) card face. Cards with a built
 // composed face (PARALLAX_IDS) render <CardParallax>; the rest stay PNG <Card>.
@@ -37,10 +34,12 @@ export default function CardParallaxStory() {
   const accent = CATEGORIES[selected.category].accent
   const content: CardContent | undefined = CARD_CONTENT[selected.id]?.[lang]
 
-  // render the composed face for parallax cards, the PNG face otherwise
+  // render the composed face for cards that have one, the PNG face otherwise
+  const parallaxConfig = PARALLAX_CARDS[selected.id]
   const renderFace = (w: number, interactive: boolean, lod = false) =>
-    PARALLAX_IDS.has(selected.id) ? (
+    parallaxConfig ? (
       <CardParallax
+        config={parallaxConfig}
         content={{ title: content?.title ?? selected.name, description: content?.effect ?? '' }}
         width={w}
         interactive={interactive}
