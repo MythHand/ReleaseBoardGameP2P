@@ -17,6 +17,7 @@ import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
 import RulesBlock from '../stories/blocks/RulesBlock'
 import SeatBlock from '../stories/blocks/SeatBlock'
 import TurnDockBlock from '../stories/blocks/TurnDockBlock'
+import CardParallaxStory from '../stories/CardParallaxStory'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import TextStyles from '../stories/foundations/TextStyles'
@@ -103,6 +104,7 @@ const groups: Group[] = [
     title: { ru: 'Карты', en: 'Cards' },
     items: [
       { id: 'card', title: 'Card', render: () => <CardStory /> },
+      { id: 'card-parallax', title: 'Card parallax', render: () => <CardParallaxStory /> },
       { id: 'hand', title: 'Hand', render: () => <HandStory /> },
     ],
   },
