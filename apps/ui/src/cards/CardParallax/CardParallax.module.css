@@ -106,31 +106,51 @@
 .para {
   margin: 0;
   line-height: 1.25;
+  text-wrap: balance; /* even out line lengths → no single word on the last line */
 }
 
-/* callouts — a paragraph on a translucent coloured background */
+/* callouts — a paragraph on a translucent coloured background; whole line bold */
 .calloutSudo,
 .calloutDefense {
   padding: 2cqw;
   margin: 0;
+  font-weight: 700;
   line-height: 1.25;
+  text-wrap: balance;
   border-radius: 2.5cqw;
 }
 
-/* Git Operation sudo effect — yellow, only the prefix bold */
+/* sudo effect — yellow */
 .calloutSudo {
   background: color-mix(in srgb, var(--card-sudo-yellow) 40%, transparent);
 }
 
-/* Defense "works against …" — green, whole line bold */
+/* Defense "works against …" — green */
 .calloutDefense {
-  font-weight: 700;
   background: color-mix(in srgb, var(--card-defense-green) 40%, transparent);
 }
 
 /* referenced card names / sudo prefix — inline weight accent */
 .desc b {
   font-weight: 700;
+}
+
+/* "ИЛИ" divider — text centred between two thin rules; rules stop 4px short of
+   the description edges on each side */
+.divider {
+  display: flex;
+  gap: 3cqw;
+  align-items: center;
+  padding-inline: 1.087cqw; /* ≈ 4px at the 368-wide authoring size */
+  line-height: 1;
+}
+
+.divider::before,
+.divider::after {
+  flex: 1;
+  block-size: 0.245cqw; /* ≈ 0.9px at the 368-wide authoring size */
+  content: "";
+  background: var(--white-40);
 }
 
 /* lightning "fast play" mark, top-right */

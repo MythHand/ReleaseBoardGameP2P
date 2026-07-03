@@ -15,11 +15,13 @@ import {
 // stacked at their native size and centered; parallax runs only while the card
 // is hovered (interactive), everything else is a static, calm state.
 
-// One paragraph of the description. `highlight` renders a coloured callout.
+// One paragraph of the description. `highlight` renders a coloured callout;
+// `divider` renders `text` centred between two thin rules (e.g. "ИЛИ").
 export interface CardParallaxParagraph {
   text: string
   bold?: string[]
   highlight?: 'sudo' | 'defense'
+  divider?: boolean
 }
 
 export interface CardParallaxContent {
@@ -231,11 +233,17 @@ export default function CardParallax({
               className={styles.desc}
               style={textStyle(config.description, CARD_FONT.description)}
             >
-              {content.description.map((para) => (
-                <p key={para.text} className={paragraphClass(para.highlight)}>
-                  {renderBold(para.text, para.bold)}
-                </p>
-              ))}
+              {content.description.map((para) =>
+                para.divider ? (
+                  <div key={para.text} className={styles.divider}>
+                    <span>{para.text}</span>
+                  </div>
+                ) : (
+                  <p key={para.text} className={paragraphClass(para.highlight)}>
+                    {renderBold(para.text, para.bold)}
+                  </p>
+                ),
+              )}
             </div>
           )}
         </div>

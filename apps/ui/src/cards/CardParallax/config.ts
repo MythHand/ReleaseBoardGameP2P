@@ -1,19 +1,38 @@
+import bgAttack from '@/assets/cards/parallax/background/attack.png'
 import bgDefense from '@/assets/cards/parallax/background/defense.png'
 import bgOperation from '@/assets/cards/parallax/background/git-operation.png'
 import bgProtection from '@/assets/cards/parallax/background/protection.png'
 import bgRelease from '@/assets/cards/parallax/background/release.png'
+import bgSupport from '@/assets/cards/parallax/background/support.png'
 import gridUrl from '@/assets/cards/parallax/base/grid.svg'
+import attackIcon from '@/assets/cards/parallax/category/attack.svg'
 import defenseIcon from '@/assets/cards/parallax/category/defense.svg'
 import fastIcon from '@/assets/cards/parallax/category/fast.svg'
 import operationIcon from '@/assets/cards/parallax/category/git-operation.svg'
 import protectionIcon from '@/assets/cards/parallax/category/protection.svg'
 import releaseIcon from '@/assets/cards/parallax/category/release.svg'
+import supportIcon from '@/assets/cards/parallax/category/support.svg'
 import backendArt from '@/assets/cards/parallax/illustration/backend.png'
+import bugArt from '@/assets/cards/parallax/illustration/bug.png'
+import codeReviewArt from '@/assets/cards/parallax/illustration/code-review.png'
 import databaseArt from '@/assets/cards/parallax/illustration/database.png'
+import ddosArt from '@/assets/cards/parallax/illustration/ddos.png'
 import debuggerArt from '@/assets/cards/parallax/illustration/debugger.png'
 import frontendArt from '@/assets/cards/parallax/illustration/frontend.png'
+import gitBranchArt from '@/assets/cards/parallax/illustration/git-branch.png'
+import gitCherryPickArt from '@/assets/cards/parallax/illustration/git-cherry-pick.png'
+import gitMergeArt from '@/assets/cards/parallax/illustration/git-merge.png'
+import gitRebaseArt from '@/assets/cards/parallax/illustration/git-rebase.png'
+import hotfixArt from '@/assets/cards/parallax/illustration/hotfix.png'
+import legacyCodeArt from '@/assets/cards/parallax/illustration/legacy-code.png'
 import monitoringArt from '@/assets/cards/parallax/illustration/monitoring.png'
 import notABugArt from '@/assets/cards/parallax/illustration/not-a-bug.png'
+import outOfMemoryArt from '@/assets/cards/parallax/illustration/out-of-memory.png'
+import prApprovedArt from '@/assets/cards/parallax/illustration/pr-approved.png'
+import rollbackArt from '@/assets/cards/parallax/illustration/rollback.png'
+import rubberDuckyArt from '@/assets/cards/parallax/illustration/rubber-ducky.png'
+import securityBugArt from '@/assets/cards/parallax/illustration/security-bug.png'
+import sudoArt from '@/assets/cards/parallax/illustration/sudo.png'
 import systemUpgradeArt from '@/assets/cards/parallax/illustration/system-upgrade.png'
 import worksOnMyMachineArt from '@/assets/cards/parallax/illustration/works-on-my-machine.png'
 
@@ -159,6 +178,20 @@ const DEFENSE_THEME: CardTheme = {
   fast: true,
 }
 
+// Attack cards show the lightning by default; DDoS opts out via { fast: false }.
+const ATTACK_THEME: CardTheme = {
+  background: { src: bgAttack, w: 417, h: 621 },
+  panelOpacity: 0.6,
+  category: { icon: attackIcon, w: 15, h: 15, label: 'Attack', accent: 'var(--cat-attack)' },
+  fast: true,
+}
+
+const SUPPORT_THEME: CardTheme = {
+  background: { src: bgSupport, w: 418, h: 622 },
+  panelOpacity: 0.6,
+  category: { icon: supportIcon, w: 15, h: 15, label: 'Support', accent: 'var(--cat-support)' },
+}
+
 // shared vertical position of the illustration (design px); the per-card yNudge
 // lowers it to balance each art
 const ILLO_Y = -12
@@ -170,10 +203,12 @@ const ILLO_Y = -12
 function makeCard(
   theme: CardTheme,
   illustration: { src: string; w: number; h: number },
-  opts: { yNudge?: number; subtype?: string } = {},
+  opts: { yNudge?: number; subtype?: string; fast?: boolean } = {},
 ): ParallaxCardConfig {
-  const { yNudge = 0, subtype } = opts
+  const { yNudge = 0, subtype, fast } = opts
   const label = subtype ? `${theme.category.label} / ${subtype}` : theme.category.label
+  // theme decides the default; a card can opt out (e.g. DDoS has no lightning)
+  const showFast = fast ?? theme.fast
   return {
     // Depth reads as recession INTO the card, not layers bulging out: deep
     // layers (background) parallax the MOST — the far floor behind the glass —
@@ -185,11 +220,9 @@ function makeCard(
     illustration: { ...illustration, depth: 0.6, y: ILLO_Y + yNudge },
     // category tag — same surface depth as the text; position mirrors the PNG
     category: { ...theme.category, label, top: 20, left: 20, depth: 0.05 },
-    fast: theme.fast
-      ? { icon: fastIcon, w: 12, h: 15, top: 21, right: 22, depth: 0.05 }
-      : undefined,
-    title: { top: 52, padX: 22, depth: -0.14 },
-    description: { bottom: 34, padX: 22, depth: -0.14 },
+    fast: showFast ? { icon: fastIcon, w: 12, h: 15, top: 21, right: 22, depth: 0.05 } : undefined,
+    title: { top: 52, padX: 21, depth: -0.14 },
+    description: { bottom: 34, padX: 20, depth: -0.14 },
   }
 }
 
@@ -217,6 +250,60 @@ export const DEBUGGER = makeCard(
   },
 )
 export const SYSTEM_UPGRADE = makeCard(OPERATION_THEME, { src: systemUpgradeArt, w: 266, h: 266 })
+export const GIT_BRANCH = makeCard(
+  OPERATION_THEME,
+  { src: gitBranchArt, w: 309, h: 309 },
+  {
+    yNudge: -7,
+  },
+)
+export const GIT_MERGE = makeCard(OPERATION_THEME, { src: gitMergeArt, w: 246, h: 246 })
+export const GIT_REBASE = makeCard(OPERATION_THEME, { src: gitRebaseArt, w: 267, h: 267 })
+export const GIT_CHERRY_PICK = makeCard(
+  OPERATION_THEME,
+  { src: gitCherryPickArt, w: 280, h: 280 },
+  {
+    yNudge: -4,
+  },
+)
+export const SECURITY_BUG = makeCard(
+  ATTACK_THEME,
+  { src: securityBugArt, w: 172, h: 172 },
+  {
+    yNudge: -35,
+  },
+)
+export const DDOS = makeCard(
+  ATTACK_THEME,
+  { src: ddosArt, w: 238, h: 238 },
+  {
+    fast: false,
+    yNudge: -8,
+  },
+)
+export const BUG = makeCard(ATTACK_THEME, { src: bugArt, w: 221, h: 221 }, { yNudge: -13 })
+export const LEGACY_CODE = makeCard(
+  ATTACK_THEME,
+  { src: legacyCodeArt, w: 228, h: 228 },
+  {
+    yNudge: -20,
+  },
+)
+export const OUT_OF_MEMORY = makeCard(
+  ATTACK_THEME,
+  { src: outOfMemoryArt, w: 221, h: 221 },
+  {
+    yNudge: -11,
+  },
+)
+export const SUDO = makeCard(SUPPORT_THEME, { src: sudoArt, w: 277, h: 277 }, { yNudge: 16 })
+export const CODE_REVIEW = makeCard(
+  SUPPORT_THEME,
+  { src: codeReviewArt, w: 301, h: 301 },
+  {
+    yNudge: 1,
+  },
+)
 export const NOT_A_BUG = makeCard(
   DEFENSE_THEME,
   { src: notABugArt, w: 196, h: 196 },
@@ -229,6 +316,38 @@ export const WORKS_ON_MY_MACHINE = makeCard(
   { src: worksOnMyMachineArt, w: 309, h: 309 },
   { subtype: 'Unicorn' },
 )
+export const ROLLBACK = makeCard(
+  DEFENSE_THEME,
+  { src: rollbackArt, w: 214, h: 214 },
+  {
+    subtype: 'Cancel',
+    yNudge: -24,
+  },
+)
+export const HOTFIX = makeCard(
+  DEFENSE_THEME,
+  { src: hotfixArt, w: 258, h: 258 },
+  {
+    subtype: 'Cancel',
+    yNudge: 7,
+  },
+)
+export const PR_APPROVED = makeCard(
+  DEFENSE_THEME,
+  { src: prApprovedArt, w: 274, h: 274 },
+  {
+    subtype: 'Cancel',
+    yNudge: 12,
+  },
+)
+export const RUBBER_DUCKY = makeCard(
+  DEFENSE_THEME,
+  { src: rubberDuckyArt, w: 312, h: 312 },
+  {
+    subtype: 'Cancel',
+    yNudge: 6,
+  },
+)
 
 // Registry: card id → composed config. Ids absent here render as the PNG face.
 export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {
@@ -238,6 +357,21 @@ export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {
   'protection-monitoring': MONITORING,
   'protection-debugger': DEBUGGER,
   'operation-system-upgrade': SYSTEM_UPGRADE,
+  'operation-git-branch': GIT_BRANCH,
+  'operation-git-merge': GIT_MERGE,
+  'operation-git-rebase': GIT_REBASE,
+  'operation-git-cherry-pick': GIT_CHERRY_PICK,
   'defense-not-a-bug': NOT_A_BUG,
   'defense-works-on-my-machine': WORKS_ON_MY_MACHINE,
+  'defense-rollback': ROLLBACK,
+  'defense-hotfix': HOTFIX,
+  'defense-pr-approved': PR_APPROVED,
+  'defense-rubber-ducky': RUBBER_DUCKY,
+  'attack-security-bug': SECURITY_BUG,
+  'attack-ddos': DDOS,
+  'attack-bug': BUG,
+  'attack-legacy-code': LEGACY_CODE,
+  'attack-out-of-memory': OUT_OF_MEMORY,
+  'support-sudo': SUDO,
+  'support-code-review': CODE_REVIEW,
 }

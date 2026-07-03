@@ -18,6 +18,8 @@ export interface CardParagraph {
   // callout background: 'sudo' = yellow (Git Operation sudo effect),
   // 'defense' = green (Defense "works against …", whole line bold)
   highlight?: 'sudo' | 'defense'
+  // render `text` (e.g. "ИЛИ") as a centred divider — a thin rule to each side
+  divider?: boolean
 }
 
 // Text shown on a composed card face. Minimal on purpose — fields are added as
@@ -53,7 +55,7 @@ const releaseContent = (name: string): LocalizedCardContent => ({
 
 // Unicorn Defense cards share the "cancel an attack" line and the green
 // "works against a sudo attack" callout — only extra paragraphs differ.
-const DEFENSE_CANCEL: Record<'ru' | 'en', CardParagraph> = {
+const DEFENSE_UNICORN_CANCEL: Record<'ru' | 'en', CardParagraph> = {
   ru: {
     text: 'Отмените атаку Bug / Out of Memory / Legacy Code / Security Bug. Сбросьте обе карты.',
     bold: ['Bug', 'Out of Memory', 'Legacy Code', 'Security Bug'],
@@ -66,6 +68,75 @@ const DEFENSE_CANCEL: Record<'ru' | 'en', CardParagraph> = {
 const DEFENSE_ANTI_SUDO: Record<'ru' | 'en', CardParagraph> = {
   ru: { text: 'Работает против sudo-атаки.', highlight: 'defense' },
   en: { text: 'Works against a sudo attack.', highlight: 'defense' },
+}
+
+// Cancel Defense cards (Hotfix, PR Approved, Rubber Ducky) share this single line.
+const DEFENSE_CANCEL_DISCARD: Record<'ru' | 'en', CardParagraph> = {
+  ru: {
+    text: 'Отменяют атаку картами Bug, Out of Memory, Legacy Code или Security Bug. Обе карты сбрасываются.',
+    bold: ['Bug', 'Out of Memory', 'Legacy Code', 'Security Bug'],
+  },
+  en: {
+    text: 'Cancel an attack by Bug, Out of Memory, Legacy Code or Security Bug. Both cards are discarded.',
+    bold: ['Bug', 'Out of Memory', 'Legacy Code', 'Security Bug'],
+  },
+}
+const cancelDiscardContent = (name: string): LocalizedCardContent => ({
+  ru: { title: name, typeLine: 'Defense / Cancel', paragraphs: [DEFENSE_CANCEL_DISCARD.ru] },
+  en: { title: name, typeLine: 'Defense / Cancel', paragraphs: [DEFENSE_CANCEL_DISCARD.en] },
+})
+
+// Git Operation cards: a plain first line + a yellow sudo callout whose prefix
+// "sudo <Name>:" is bold. `line`/`sudo` are the per-locale texts.
+interface GitOpText {
+  line: string
+  sudo: string
+}
+const gitOpContent = (name: string, ru: GitOpText, en: GitOpText): LocalizedCardContent => {
+  const face = (t: GitOpText): CardContent => ({
+    title: name,
+    typeLine: 'Git Operation',
+    paragraphs: [
+      { text: t.line },
+      { text: `sudo ${name}: ${t.sudo}`, bold: [`sudo ${name}:`], highlight: 'sudo' },
+    ],
+  })
+  return { ru: face(ru), en: face(en) }
+}
+
+// Attack cards defended only by Unicorn (Bug, Legacy Code, Out of Memory) share
+// this body; only the title + sudo prefix ("sudo <Name>:") differ.
+const ATTACK_UNICORN_BASE: Record<'ru' | 'en', CardParagraph[]> = {
+  ru: [
+    {
+      text: 'Сразу после релиза противника: Сбросьте его Release вместе с этой картой.',
+      bold: ['Release'],
+    },
+    { text: 'ИЛИ', divider: true },
+    { text: 'Возьмите случайную карту из руки любого игрока.' },
+  ],
+  en: [
+    {
+      text: "Right after an opponent's release: discard their Release along with this card.",
+      bold: ['Release'],
+    },
+    { text: 'OR', divider: true },
+    { text: "Take a random card from any player's hand." },
+  ],
+}
+const attackUnicornContent = (name: string): LocalizedCardContent => {
+  const face = (base: CardParagraph[], sudo: string): CardContent => ({
+    title: name,
+    typeLine: 'Attack',
+    paragraphs: [
+      ...base,
+      { text: `sudo ${name}: ${sudo}`, bold: [`sudo ${name}:`, 'Unicorn'], highlight: 'sudo' },
+    ],
+  })
+  return {
+    ru: face(ATTACK_UNICORN_BASE.ru, 'Защита возможна только картами Unicorn.'),
+    en: face(ATTACK_UNICORN_BASE.en, 'Can only be defended with Unicorn cards.'),
+  }
 }
 
 export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
@@ -142,16 +213,60 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
       ],
     },
   },
+  'operation-git-branch': gitOpContent(
+    'Git Branch',
+    {
+      line: 'Разделите одну из колод добора на две колоды.',
+      sudo: 'Переверните сброс и используйте его как новую колоду добора (не перемешивайте карты).',
+    },
+    {
+      line: 'Split one of the draw decks into two decks.',
+      sudo: 'Flip the discard pile and use it as a new draw deck (do not shuffle the cards).',
+    },
+  ),
+  'operation-git-merge': gitOpContent(
+    'Git Merge',
+    {
+      line: 'Объедините все колоды добора в одну и перетасуйте их.',
+      sudo: 'Добавьте сброс к новой колоде и перетасуйте.',
+    },
+    {
+      line: 'Merge all draw decks into one and shuffle them.',
+      sudo: 'Add the discard pile to the new deck and shuffle.',
+    },
+  ),
+  'operation-git-rebase': gitOpContent(
+    'Git Rebase',
+    {
+      line: 'Посмотрите три верхние карты из одной колоды добора и измените их порядок по своему усмотрению.',
+      sudo: 'Примените эффект ко всем колодам добора в игре.',
+    },
+    {
+      line: 'Look at the top three cards of one draw deck and reorder them as you wish.',
+      sudo: 'Apply the effect to every draw deck in the game.',
+    },
+  ),
+  'operation-git-cherry-pick': gitOpContent(
+    'Git Cherry-pick',
+    {
+      line: 'Выберите одну карту из всего сброса и заберите её в свою руку.',
+      sudo: 'Выберите две карты из сброса — одну возьмите в руку, вторую положите наверх колоды добора.',
+    },
+    {
+      line: 'Choose one card from the entire discard pile and take it into your hand.',
+      sudo: 'Choose two cards from the discard pile — take one into your hand, put the other on top of the draw deck.',
+    },
+  ),
   'defense-not-a-bug': {
     ru: {
       title: 'Not a Bug',
       typeLine: 'Defense / Unicorn',
-      paragraphs: [DEFENSE_CANCEL.ru, DEFENSE_ANTI_SUDO.ru],
+      paragraphs: [DEFENSE_UNICORN_CANCEL.ru, DEFENSE_ANTI_SUDO.ru],
     },
     en: {
       title: 'Not a Bug',
       typeLine: 'Defense / Unicorn',
-      paragraphs: [DEFENSE_CANCEL.en, DEFENSE_ANTI_SUDO.en],
+      paragraphs: [DEFENSE_UNICORN_CANCEL.en, DEFENSE_ANTI_SUDO.en],
     },
   },
   'defense-works-on-my-machine': {
@@ -161,7 +276,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
       title: 'Works on my Machine',
       typeLine: 'Defense / Unicorn',
       paragraphs: [
-        DEFENSE_CANCEL.ru,
+        DEFENSE_UNICORN_CANCEL.ru,
         DEFENSE_ANTI_SUDO.ru,
         { text: 'Эффект атакующей карты оборачивается против самого атакующего.' },
       ],
@@ -172,9 +287,163 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
       title: 'Works on my Machine',
       typeLine: 'Defense / Unicorn',
       paragraphs: [
-        DEFENSE_CANCEL.en,
+        DEFENSE_UNICORN_CANCEL.en,
         DEFENSE_ANTI_SUDO.en,
         { text: 'The attacking card’s effect is turned back against the attacker.' },
+      ],
+    },
+  },
+  'defense-rollback': {
+    ru: {
+      title: 'Rollback',
+      typeLine: 'Defense / Cancel',
+      paragraphs: [
+        {
+          text: 'Отменяют атаку картами Bug, Out of Memory, Legacy Code или Security Bug. Эта карта сбрасывается. Карта атаки возвращается в руку атакующего — он не сможет сыграть её снова до своего следующего хода.',
+          bold: ['Bug', 'Out of Memory', 'Legacy Code', 'Security Bug'],
+        },
+        {
+          text: 'sudo Rollback: Заберите атакующую карту в свою руку.',
+          bold: ['sudo Rollback:'],
+          highlight: 'sudo',
+        },
+      ],
+    },
+    en: {
+      title: 'Rollback',
+      typeLine: 'Defense / Cancel',
+      paragraphs: [
+        {
+          text: "Cancel an attack by Bug, Out of Memory, Legacy Code or Security Bug. This card is discarded. The attack card returns to the attacker's hand — they can't play it again until their next turn.",
+          bold: ['Bug', 'Out of Memory', 'Legacy Code', 'Security Bug'],
+        },
+        {
+          text: 'sudo Rollback: Take the attacking card into your hand.',
+          bold: ['sudo Rollback:'],
+          highlight: 'sudo',
+        },
+      ],
+    },
+  },
+  'defense-hotfix': cancelDiscardContent('Hotfix'),
+  'defense-pr-approved': cancelDiscardContent('PR Approved'),
+  'defense-rubber-ducky': cancelDiscardContent('Rubber Ducky'),
+  'attack-security-bug': {
+    ru: {
+      title: 'Security Bug',
+      typeLine: 'Attack',
+      paragraphs: [
+        {
+          text: 'Сразу после релиза противника: Переместите Release в вашу зону релиза.',
+          bold: ['Release'],
+        },
+        { text: 'ИЛИ', divider: true },
+        {
+          text: 'Запросите определенную карту из руки любого игрока — заберите если карта есть (иначе ничего).',
+        },
+        {
+          text: 'sudo Security Bug: Защита возможна только картами Unicorn.',
+          bold: ['sudo Security Bug:', 'Unicorn'],
+          highlight: 'sudo',
+        },
+      ],
+    },
+    en: {
+      title: 'Security Bug',
+      typeLine: 'Attack',
+      paragraphs: [
+        {
+          text: "Right after an opponent's release: move a Release into your release zone.",
+          bold: ['Release'],
+        },
+        { text: 'OR', divider: true },
+        {
+          text: 'Name a specific card from any player’s hand — take it if they have it (otherwise nothing).',
+        },
+        {
+          text: 'sudo Security Bug: Can only be defended with Unicorn cards.',
+          bold: ['sudo Security Bug:', 'Unicorn'],
+          highlight: 'sudo',
+        },
+      ],
+    },
+  },
+  'attack-ddos': {
+    ru: {
+      title: 'DDoS',
+      typeLine: 'Attack',
+      paragraphs: [
+        {
+          text: 'Уничтожьте Monitoring / AI Monitoring противника, сбросьте обе карты (AI Monitoring возвращается в AI-колоду).',
+          bold: ['Monitoring', 'AI Monitoring'],
+        },
+        { text: 'ИЛИ', divider: true },
+        {
+          text: 'На Release игрока: верните владельцу в руку (заморожена на один ход); На AI Release: возвращается в AI-колоду.',
+          bold: ['Release', 'AI Release'],
+        },
+      ],
+    },
+    en: {
+      title: 'DDoS',
+      typeLine: 'Attack',
+      paragraphs: [
+        {
+          text: "Destroy an opponent's Monitoring / AI Monitoring, discard both cards (AI Monitoring returns to the AI deck).",
+          bold: ['Monitoring', 'AI Monitoring'],
+        },
+        { text: 'OR', divider: true },
+        {
+          text: "On a player's Release: return it to the owner's hand (frozen for one turn); on an AI Release: it returns to the AI deck.",
+          bold: ['Release', 'AI Release'],
+        },
+      ],
+    },
+  },
+  'attack-bug': attackUnicornContent('Bug'),
+  'attack-legacy-code': attackUnicornContent('Legacy Code'),
+  'attack-out-of-memory': attackUnicornContent('Out of Memory'),
+  'support-sudo': {
+    ru: {
+      title: 'Sudo',
+      typeLine: 'Support',
+      paragraphs: [
+        {
+          text: 'Разыграйте с картой, имеющей sudo эффект. Активирует это усиление.',
+          highlight: 'sudo',
+        },
+      ],
+    },
+    en: {
+      title: 'Sudo',
+      typeLine: 'Support',
+      paragraphs: [
+        {
+          text: 'Play together with a card that has a sudo effect. Activates that boost.',
+          highlight: 'sudo',
+        },
+      ],
+    },
+  },
+  'support-code-review': {
+    ru: {
+      title: 'Code Review',
+      typeLine: 'Support',
+      paragraphs: [
+        {
+          text: 'Разыграйте одновременно с картой Release. Делает Release неуязвимой к атакам Bug, Out of Memory, Legacy Code или Security Bug (даже с sudo-усилением).',
+          bold: ['Release', 'Bug', 'Out of Memory', 'Legacy Code', 'Security Bug'],
+        },
+      ],
+    },
+    en: {
+      title: 'Code Review',
+      typeLine: 'Support',
+      paragraphs: [
+        {
+          text: 'Play together with a Release card. Makes the Release immune to Bug, Out of Memory, Legacy Code or Security Bug attacks (even with a sudo boost).',
+          bold: ['Release', 'Bug', 'Out of Memory', 'Legacy Code', 'Security Bug'],
+        },
       ],
     },
   },
