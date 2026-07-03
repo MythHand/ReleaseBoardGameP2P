@@ -12,8 +12,6 @@ export default function HudBackgroundKit() {
       neutral: 'нейтральное',
       positive: 'позитивное',
       grid: 'сетка (прозрачное)',
-      glowT: 'Glow (черновик) — под позитивное',
-      glowCap: 'позитивное + glow',
       label: 'фон',
     },
     en: {
@@ -21,8 +19,6 @@ export default function HudBackgroundKit() {
       neutral: 'neutral',
       positive: 'positive',
       grid: 'grid (transparent)',
-      glowT: 'Glow (draft) — for positive',
-      glowCap: 'positive + glow',
       label: 'background',
     },
   })
@@ -48,14 +44,6 @@ export default function HudBackgroundKit() {
         </KitCell>
         <KitCell caption={w.grid}>
           <HudBackground tone="grid" className={styles.demo}>
-            {label}
-          </HudBackground>
-        </KitCell>
-      </KitSection>
-
-      <KitSection title={w.glowT}>
-        <KitCell caption={w.glowCap}>
-          <HudBackground tone="positive" glow className={styles.demo}>
             {label}
           </HudBackground>
         </KitCell>

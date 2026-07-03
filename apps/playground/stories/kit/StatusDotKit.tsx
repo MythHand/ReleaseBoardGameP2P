@@ -21,17 +21,17 @@ export default function StatusDotKit() {
         <KitCell caption="danger">
           <StatusDot accent="var(--danger-accent)" />
         </KitCell>
-        <KitCell caption="idle">
-          <StatusDot accent="var(--idle-accent)" />
+        <KitCell caption="idle (static)">
+          <StatusDot accent="var(--idle-accent)" pulse={false} />
         </KitCell>
       </KitSection>
 
       <KitSection title={w.pulse}>
-        <KitCell caption="pulse">
-          <StatusDot />
+        <KitCell caption="pulse (default)">
+          <StatusDot size={16} />
         </KitCell>
-        <KitCell caption="static">
-          <StatusDot pulse={false} />
+        <KitCell caption="static — pulse={false}">
+          <StatusDot pulse={false} size={16} />
         </KitCell>
       </KitSection>
 

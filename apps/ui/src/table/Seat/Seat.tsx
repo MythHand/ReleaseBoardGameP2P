@@ -1,4 +1,5 @@
 import Badge from '@/primitives/Badge'
+import StatusDot from '@/primitives/StatusDot'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import styles from './Seat.module.css'
@@ -52,7 +53,13 @@ export default function Seat({
       } ${disconnected ? styles.disconnected : ''}`}
     >
       <div className={styles.head}>
-        <span className={styles.dot} aria-hidden="true" />
+        {disconnected ? (
+          <StatusDot accent="var(--coral)" size={7} />
+        ) : active ? (
+          <StatusDot accent="var(--brand-green)" size={7} />
+        ) : (
+          <StatusDot accent="var(--white-25)" pulse={false} size={7} />
+        )}
         <span className={styles.name}>{player.name}</span>
         {eliminated ? (
           <Badge tone="muted" size="sm" className={styles.status}>
@@ -68,7 +75,7 @@ export default function Seat({
           </span>
         )}
       </div>
-      <ReleaseZone release={player.release} size="72px" />
+      <ReleaseZone release={player.release} size="72px" variant="compact" />
     </div>
   )
 }

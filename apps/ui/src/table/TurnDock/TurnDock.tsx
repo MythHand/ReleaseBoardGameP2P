@@ -36,7 +36,7 @@ export interface TurnDockCopy {
 
 export const TURN_DOCK_COPY_RU: TurnDockCopy = {
   yourTurn: 'ваш ход',
-  turnOf: 'ходит',
+  turnOf: 'ход соперника',
   reaction: 'реакция',
   reactionDanger: 'error 503',
   draw: 'добор',
@@ -49,7 +49,7 @@ export const TURN_DOCK_COPY_RU: TurnDockCopy = {
 
 export const TURN_DOCK_COPY_EN: TurnDockCopy = {
   yourTurn: 'your turn',
-  turnOf: 'turn',
+  turnOf: 'opponent turn',
   reaction: 'reaction',
   reactionDanger: 'error 503',
   draw: 'draw',
@@ -113,7 +113,7 @@ export default function TurnDock({
     <HudSurface accent={accent} className={styles.dock}>
       <div className={styles.inner}>
         <div className={styles.top}>
-          <StatusDot accent={accent} />
+          <StatusDot accent={accent} pulse={state !== 'waiting'} />
           <Typography as="span" base="label-md" tk="tk-22" className={styles.phase}>
             {phase}
           </Typography>
