@@ -33,7 +33,7 @@
 .panel,
 .noise,
 .category,
-.fast,
+.fastBox,
 .title,
 .desc {
   position: absolute;
@@ -153,17 +153,29 @@
   background: var(--white-40);
 }
 
-/* lightning "fast play" mark, top-right */
-.fast {
+/* lightning "fast play" mark, top-right — framed in the unified icon box so it
+   sits on the same vertical line as the category tag */
+.fastBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
   transform: translate(var(--dx, 0), var(--dy, 0));
+}
+
+/* unified icon slot — fixed height (set inline in cqw), width hugs the icon;
+   centres the native icon vertically without distorting it */
+.iconBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* category tag — icon + label, both in the category colour (icon colour is
    baked into the SVG; label inherits the colour set inline) */
 .category {
   display: flex;
-  gap: 1.8cqw;
+  gap: 1.93cqw; /* ≈ 6.6px icon↔label + 0.5px breathing room, at the 368 frame */
   align-items: center;
   transform: translate(var(--dx, 0), var(--dy, 0));
 }

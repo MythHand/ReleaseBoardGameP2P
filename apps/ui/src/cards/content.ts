@@ -158,7 +158,7 @@ const AI_ON_DESTROY: Record<'ru' | 'en', string> = {
 const aiReleaseContent = (target: string): LocalizedCardContent => ({
   ru: {
     title: `Release ${target}`,
-    typeLine: 'AI / Event',
+    typeLine: 'Event',
     paragraphs: [
       {
         text: `Если у вас ещё нет карты ${target} в зоне релиза, поместите эту карту в вашу зону релиза.`,
@@ -169,7 +169,7 @@ const aiReleaseContent = (target: string): LocalizedCardContent => ({
   },
   en: {
     title: `Release ${target}`,
-    typeLine: 'AI / Event',
+    typeLine: 'Event',
     paragraphs: [
       {
         text: `If you don't already have a ${target} card in your release zone, place this card into your release zone.`,
@@ -185,7 +185,7 @@ const aiReleaseContent = (target: string): LocalizedCardContent => ({
 const aiCrushContent = (target: string): LocalizedCardContent => ({
   ru: {
     title: `Crush ${target}`,
-    typeLine: 'AI / Event',
+    typeLine: 'Event',
     paragraphs: [
       { text: `Уничтожьте карту ${target} в зоне релиза, отправив карту в сброс.`, bold: [target] },
       { text: AI_RETURN.ru },
@@ -193,7 +193,7 @@ const aiCrushContent = (target: string): LocalizedCardContent => ({
   },
   en: {
     title: `Crush ${target}`,
-    typeLine: 'AI / Event',
+    typeLine: 'Event',
     paragraphs: [
       {
         text: `Destroy a ${target} card in the release zone, sending it to the discard pile.`,
@@ -493,7 +493,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
   'ai-good-vibe-coding': {
     ru: {
       title: 'Good Vibe-Coding',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         { text: 'Вы оптимизировали себя с помощью AI. Возьмите 2 карты из колоды добора.' },
         { text: 'Карта сразу возвращается в AI колоду.' },
@@ -501,7 +501,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
     },
     en: {
       title: 'Good Vibe-Coding',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         { text: 'You optimized yourself with AI. Draw 2 cards from the draw deck.' },
         { text: 'The card returns to the AI deck immediately.' },
@@ -511,7 +511,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
   'ai-bad-vibe-coding': {
     ru: {
       title: 'Bad Vibe-Coding',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         { text: 'Вы неудачно оптимизировали себя с помощью AI. Сбросьте 1 карту с руки в сброс.' },
         { text: 'Карта сразу возвращается в AI колоду.' },
@@ -519,7 +519,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
     },
     en: {
       title: 'Bad Vibe-Coding',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         { text: 'Your AI optimization backfired. Discard 1 card from your hand.' },
         { text: 'The card returns to the AI deck immediately.' },
@@ -535,7 +535,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
   'ai-monitoring': {
     ru: {
       title: 'AI Monitoring',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         {
           text: 'Выложите эту карту в свою зону релиза (не более одной). Карта защищает от Error 503 и Crush. При доборе угроза сбрасывается, а AI Monitoring остаётся в зоне релиза.',
@@ -546,7 +546,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
     },
     en: {
       title: 'AI Monitoring',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         {
           text: 'Place this card into your release zone (no more than one). It protects against Error 503 and Crush. On a draw the threat is discarded and AI Monitoring stays in the release zone.',
@@ -559,7 +559,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
   'ai-hallucination': {
     ru: {
       title: 'Hallucination',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         { text: 'Вы слишком увлеклись искусственным интеллектом и завершаете свой ход.' },
         { text: AI_RETURN.ru },
@@ -567,7 +567,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
     },
     en: {
       title: 'Hallucination',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         { text: 'You got too carried away with artificial intelligence and end your turn.' },
         { text: AI_RETURN.en },
@@ -577,7 +577,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
   'ai-inside': {
     ru: {
       title: 'Inside',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         { text: 'Возьмите одну карту Release из сброса в свою руку.', bold: ['Release'] },
         { text: AI_RETURN.ru },
@@ -585,7 +585,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
     },
     en: {
       title: 'Inside',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         { text: 'Take one Release card from the discard pile into your hand.', bold: ['Release'] },
         { text: AI_RETURN.en },
@@ -595,7 +595,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
   'ai-error-503': {
     ru: {
       title: 'Error 503',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         {
           text: 'Уничтожьте свой Release из зоны релиза (обе в сброс). Иначе вы выбываете из игры (рука в сброс).',
@@ -606,7 +606,7 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
     },
     en: {
       title: 'Error 503',
-      typeLine: 'AI / Event',
+      typeLine: 'Event',
       paragraphs: [
         {
           text: "Destroy your Release from the release zone (both to the discard pile). Otherwise you're out of the game (your hand goes to the discard pile).",

@@ -3,6 +3,7 @@ import styles from './CardParallax.module.css'
 import {
   BASE_W,
   CARD_FONT,
+  CAT_ICON_BOX,
   FRONTEND,
   type ImageLayer,
   LOD,
@@ -208,30 +209,36 @@ export default function CardParallax({
                 ...shift(config.category.depth),
               }}
             >
-              <img
-                className={styles.catIcon}
-                src={config.category.icon}
-                alt=""
-                style={{ width: cqw(config.category.w), height: cqw(config.category.h) }}
-              />
+              <span className={styles.iconBox} style={{ height: cqw(CAT_ICON_BOX) }}>
+                <img
+                  className={styles.catIcon}
+                  src={config.category.icon}
+                  alt=""
+                  style={{ width: cqw(config.category.w), height: cqw(config.category.h) }}
+                />
+              </span>
               <span className={styles.catLabel} style={{ fontSize: cqw(CARD_FONT.category) }}>
                 {config.category.label}
               </span>
             </div>
           )}
           {!lod && config.fast && (
-            <img
-              className={styles.fast}
-              src={config.fast.icon}
-              alt=""
+            <span
+              className={styles.fastBox}
               style={{
                 top: cqw(config.fast.top),
                 right: cqw(config.fast.right),
-                width: cqw(config.fast.w),
-                height: cqw(config.fast.h),
+                height: cqw(CAT_ICON_BOX),
                 ...shift(config.fast.depth),
               }}
-            />
+            >
+              <img
+                className={styles.catIcon}
+                src={config.fast.icon}
+                alt=""
+                style={{ width: cqw(config.fast.w), height: cqw(config.fast.h) }}
+              />
+            </span>
           )}
           <div className={styles.title} style={textStyle(config.title, titleSize)}>
             {content.title}

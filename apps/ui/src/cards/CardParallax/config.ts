@@ -85,6 +85,11 @@ export const CARD_FONT = {
   category: 13,
 }
 
+// Unified icon slot — every category / fast icon sits, centred and UNDISTORTED,
+// inside a box this tall (design px); the box width hugs the icon (never wider).
+// Normalises the vertical line across cards despite differing native icon sizes.
+export const CAT_ICON_BOX = 16
+
 // LOD (simplified) variant, used when a card sits in the release zone. Derived
 // from the full card: no category tag, no description, and the illustration is
 // enlarged and dropped a little lower. Shared across every card.
@@ -222,7 +227,7 @@ const SUPPORT_THEME: CardTheme = {
 const AI_EVENT_THEME: CardTheme = {
   background: { src: bgAiEvent, w: 425, h: 633 },
   panelOpacity: 0.56,
-  category: { icon: eventsIcon, w: 20, h: 16, label: 'AI', accent: 'var(--cat-ai)' },
+  category: { icon: eventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
 }
 
 // Trigger cards (Error 503 / AI) — no category tag, a stronger (thinner) panel,
@@ -243,7 +248,7 @@ const TRIGGER_AI_THEME: CardTheme = {
 const AI_ERROR_503_THEME: CardTheme = {
   background: { src: bgError503, w: 415, h: 618 },
   panelOpacity: 0.32,
-  category: { icon: eventsIcon, w: 20, h: 16, label: 'AI', accent: 'var(--cat-ai)' },
+  category: { icon: eventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
   decor: decorError,
 }
 
@@ -291,7 +296,7 @@ function makeCard(
     illustration: { ...illustration, depth: 0.6, y: ILLO_Y + yNudge },
     decor: theme.decor ? { ...DECOR, src: theme.decor } : undefined,
     category,
-    fast: showFast ? { icon: fastIcon, w: 12, h: 15, top: 21, right: 22, depth: 0.05 } : undefined,
+    fast: showFast ? { icon: fastIcon, w: 12, h: 15, top: 20, right: 22, depth: 0.05 } : undefined,
     title: { top: 52, padX: 21, depth: -0.14 },
     description: { bottom: 34, padX: 20, depth: -0.14 },
   }
@@ -423,62 +428,58 @@ export const RUBBER_DUCKY = makeCard(
 export const GOOD_VIBE_CODING = makeCard(
   AI_EVENT_THEME,
   { src: goodVibeCodingArt, w: 282, h: 282 },
-  { subtype: 'Event', yNudge: 14 },
+  { yNudge: 14 },
 )
 export const BAD_VIBE_CODING = makeCard(
   AI_EVENT_THEME,
   { src: badVibeCodingArt, w: 258, h: 258 },
-  { subtype: 'Event', yNudge: 13 },
+  { yNudge: 13 },
 )
 export const CRUSH_DATABASE = makeCard(
   AI_EVENT_THEME,
   { src: crushDatabaseArt, w: 304, h: 304 },
-  { subtype: 'Event', yNudge: 11 },
+  { yNudge: 11 },
 )
 export const CRUSH_FRONTEND = makeCard(
   AI_EVENT_THEME,
   { src: crushFrontendArt, w: 246, h: 246 },
-  { subtype: 'Event', yNudge: 11 },
+  { yNudge: 11 },
 )
 export const CRUSH_BACKEND = makeCard(
   AI_EVENT_THEME,
   { src: crushBackendArt, w: 275, h: 275 },
-  { subtype: 'Event', yNudge: 11 },
+  { yNudge: 11 },
 )
 export const AI_RELEASE_DATABASE = makeCard(
   AI_EVENT_THEME,
   { src: aiReleaseDatabaseArt, w: 304, h: 304 },
-  { subtype: 'Event', yNudge: 6 },
+  { yNudge: 6 },
 )
-export const AI_RELEASE_FRONTEND = makeCard(
-  AI_EVENT_THEME,
-  { src: aiReleaseFrontendArt, w: 246, h: 246 },
-  { subtype: 'Event' },
-)
+export const AI_RELEASE_FRONTEND = makeCard(AI_EVENT_THEME, {
+  src: aiReleaseFrontendArt,
+  w: 246,
+  h: 246,
+})
 export const AI_RELEASE_BACKEND = makeCard(
   AI_EVENT_THEME,
   { src: aiReleaseBackendArt, w: 275, h: 275 },
-  { subtype: 'Event', yNudge: 3 },
+  { yNudge: 3 },
 )
 export const AI_MONITORING = makeCard(
   AI_EVENT_THEME,
   { src: aiMonitoringArt, w: 267, h: 267 },
-  { subtype: 'Event', yNudge: -5 },
+  { yNudge: -5 },
 )
 export const HALLUCINATION = makeCard(
   AI_EVENT_THEME,
   { src: hallucinationArt, w: 276, h: 276 },
-  { subtype: 'Event', yNudge: 14 },
+  { yNudge: 14 },
 )
-export const AI_INSIDE = makeCard(
-  AI_EVENT_THEME,
-  { src: insideArt, w: 271, h: 271 },
-  { subtype: 'Event', yNudge: 7 },
-)
+export const AI_INSIDE = makeCard(AI_EVENT_THEME, { src: insideArt, w: 271, h: 271 }, { yNudge: 7 })
 export const AI_ERROR_503 = makeCard(
   AI_ERROR_503_THEME,
   { src: error503Art, w: 338, h: 338 },
-  { subtype: 'Event', yNudge: 3 },
+  { yNudge: 3 },
 )
 export const TRIGGER_ERROR_503 = makeCard(
   TRIGGER_ERROR_503_THEME,
