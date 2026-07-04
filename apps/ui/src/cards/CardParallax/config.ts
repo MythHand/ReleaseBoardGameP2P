@@ -1,5 +1,8 @@
+import bgTriggerAi from '@/assets/cards/parallax/background/ai.png'
+import bgAiEvent from '@/assets/cards/parallax/background/ai-event.png'
 import bgAttack from '@/assets/cards/parallax/background/attack.png'
 import bgDefense from '@/assets/cards/parallax/background/defense.png'
+import bgError503 from '@/assets/cards/parallax/background/error-503.png'
 import bgOperation from '@/assets/cards/parallax/background/git-operation.png'
 import bgProtection from '@/assets/cards/parallax/background/protection.png'
 import bgRelease from '@/assets/cards/parallax/background/release.png'
@@ -7,23 +10,39 @@ import bgSupport from '@/assets/cards/parallax/background/support.png'
 import gridUrl from '@/assets/cards/parallax/base/grid.svg'
 import attackIcon from '@/assets/cards/parallax/category/attack.svg'
 import defenseIcon from '@/assets/cards/parallax/category/defense.svg'
+import eventsIcon from '@/assets/cards/parallax/category/events.svg'
 import fastIcon from '@/assets/cards/parallax/category/fast.svg'
 import operationIcon from '@/assets/cards/parallax/category/git-operation.svg'
 import protectionIcon from '@/assets/cards/parallax/category/protection.svg'
 import releaseIcon from '@/assets/cards/parallax/category/release.svg'
 import supportIcon from '@/assets/cards/parallax/category/support.svg'
+import decorAi from '@/assets/cards/parallax/decorate/ai.svg'
+import decorError from '@/assets/cards/parallax/decorate/error.svg'
+import aiArt from '@/assets/cards/parallax/illustration/ai.png'
+import aiMonitoringArt from '@/assets/cards/parallax/illustration/ai-monitoring.png'
+import aiReleaseBackendArt from '@/assets/cards/parallax/illustration/ai-release-backend.png'
+import aiReleaseDatabaseArt from '@/assets/cards/parallax/illustration/ai-release-database.png'
+import aiReleaseFrontendArt from '@/assets/cards/parallax/illustration/ai-release-frontend.png'
 import backendArt from '@/assets/cards/parallax/illustration/backend.png'
+import badVibeCodingArt from '@/assets/cards/parallax/illustration/bad-vibe-coding.png'
 import bugArt from '@/assets/cards/parallax/illustration/bug.png'
 import codeReviewArt from '@/assets/cards/parallax/illustration/code-review.png'
+import crushBackendArt from '@/assets/cards/parallax/illustration/crush-backend.png'
+import crushDatabaseArt from '@/assets/cards/parallax/illustration/crush-database.png'
+import crushFrontendArt from '@/assets/cards/parallax/illustration/crush-frontend.png'
 import databaseArt from '@/assets/cards/parallax/illustration/database.png'
 import ddosArt from '@/assets/cards/parallax/illustration/ddos.png'
 import debuggerArt from '@/assets/cards/parallax/illustration/debugger.png'
+import error503Art from '@/assets/cards/parallax/illustration/error-503.png'
 import frontendArt from '@/assets/cards/parallax/illustration/frontend.png'
 import gitBranchArt from '@/assets/cards/parallax/illustration/git-branch.png'
 import gitCherryPickArt from '@/assets/cards/parallax/illustration/git-cherry-pick.png'
 import gitMergeArt from '@/assets/cards/parallax/illustration/git-merge.png'
 import gitRebaseArt from '@/assets/cards/parallax/illustration/git-rebase.png'
+import goodVibeCodingArt from '@/assets/cards/parallax/illustration/good-vibe-coding.png'
+import hallucinationArt from '@/assets/cards/parallax/illustration/hallucination.png'
 import hotfixArt from '@/assets/cards/parallax/illustration/hotfix.png'
+import insideArt from '@/assets/cards/parallax/illustration/inside.png'
 import legacyCodeArt from '@/assets/cards/parallax/illustration/legacy-code.png'
 import monitoringArt from '@/assets/cards/parallax/illustration/monitoring.png'
 import notABugArt from '@/assets/cards/parallax/illustration/not-a-bug.png'
@@ -119,11 +138,15 @@ export interface ParallaxCardConfig {
   background: ImageLayer
   grid: ImageLayer
   illustration: ImageLayer
+  // optional diagonal decorative band (Trigger cards) — an authored SVG placed
+  // 1:1 and centred; colour/gradient/rotation are baked into the asset
+  decor?: ImageLayer
   // radial-navy panel (gradient + blur + noise) muting the background image.
   // Styling lives in the module; per card we tune its parallax depth and its
   // own opacity (release panels sit at 0.9, protection at 0.58).
   panel: { depth: number; opacity: number }
-  category: CategoryLayer
+  // optional — Trigger cards have no category tag (no top explanatory line)
+  category?: CategoryLayer
   // optional lightning mark (all Defense cards are played fast)
   fast?: FastLayer
   title: TextLayer
@@ -136,9 +159,12 @@ export interface ParallaxCardConfig {
 interface CardTheme {
   background: { src: string; w: number; h: number }
   panelOpacity: number
-  category: { icon: string; w: number; h: number; label: string; accent: string }
+  // omitted for Trigger cards, which carry no category tag
+  category?: { icon: string; w: number; h: number; label: string; accent: string }
   // whether cards of this category show the lightning "fast play" mark
   fast?: boolean
+  // Trigger diagonal band SVG (only Trigger-style cards have one)
+  decor?: string
 }
 
 const RELEASE_THEME: CardTheme = {
@@ -192,9 +218,45 @@ const SUPPORT_THEME: CardTheme = {
   category: { icon: supportIcon, w: 15, h: 15, label: 'Support', accent: 'var(--cat-support)' },
 }
 
+// AI deck (purple). Cards carry a subtype in the tag (e.g. "AI / Event").
+const AI_EVENT_THEME: CardTheme = {
+  background: { src: bgAiEvent, w: 425, h: 633 },
+  panelOpacity: 0.56,
+  category: { icon: eventsIcon, w: 20, h: 16, label: 'AI', accent: 'var(--cat-ai)' },
+}
+
+// Trigger cards (Error 503 / AI) — no category tag, a stronger (thinner) panel,
+// and each card brings its own background.
+const TRIGGER_ERROR_503_THEME: CardTheme = {
+  background: { src: bgError503, w: 415, h: 618 },
+  panelOpacity: 0.32,
+  decor: decorError,
+}
+const TRIGGER_AI_THEME: CardTheme = {
+  background: { src: bgTriggerAi, w: 415, h: 618 },
+  panelOpacity: 0.32,
+  decor: decorAi,
+}
+
+// The AI-deck Error 503 borrows the Trigger Error 503 look (background + panel +
+// diagonal band), but keeps its "AI / Event" tag and "returns to the AI deck" line.
+const AI_ERROR_503_THEME: CardTheme = {
+  background: { src: bgError503, w: 415, h: 618 },
+  panelOpacity: 0.32,
+  category: { icon: eventsIcon, w: 20, h: 16, label: 'AI', accent: 'var(--cat-ai)' },
+  decor: decorError,
+}
+
 // shared vertical position of the illustration (design px); the per-card yNudge
 // lowers it to balance each art
 const ILLO_Y = -12
+
+// Shared geometry of the Trigger diagonal band — identical on every trigger card
+// (only the colour differs). Native SVG is 1389×1638 authored at 2× the other
+// layers, so we use half of it; ratio kept so the -30° angle stays undistorted.
+// The decor SVG is authored square with the band centred (its own margins give
+// the parallax headroom), so we just drop it 1:1 at native size, centred.
+const DECOR = { w: 1014, h: 1016, depth: 0.44 }
 
 // The accepted BASE: the depth model and text positions here are the locked
 // reference every composed card is tuned against. Per card, only the theme
@@ -206,7 +268,16 @@ function makeCard(
   opts: { yNudge?: number; subtype?: string; fast?: boolean } = {},
 ): ParallaxCardConfig {
   const { yNudge = 0, subtype, fast } = opts
-  const label = subtype ? `${theme.category.label} / ${subtype}` : theme.category.label
+  // category tag — Trigger cards have none; others may append a subtype to the label
+  const category = theme.category
+    ? {
+        ...theme.category,
+        label: subtype ? `${theme.category.label} / ${subtype}` : theme.category.label,
+        top: 20,
+        left: 20,
+        depth: 0.05,
+      }
+    : undefined
   // theme decides the default; a card can opt out (e.g. DDoS has no lightning)
   const showFast = fast ?? theme.fast
   return {
@@ -218,8 +289,8 @@ function makeCard(
     panel: { depth: -0.7, opacity: theme.panelOpacity },
     grid: { src: gridUrl, w: 443, h: 726, depth: 0.28 },
     illustration: { ...illustration, depth: 0.6, y: ILLO_Y + yNudge },
-    // category tag — same surface depth as the text; position mirrors the PNG
-    category: { ...theme.category, label, top: 20, left: 20, depth: 0.05 },
+    decor: theme.decor ? { ...DECOR, src: theme.decor } : undefined,
+    category,
     fast: showFast ? { icon: fastIcon, w: 12, h: 15, top: 21, right: 22, depth: 0.05 } : undefined,
     title: { top: 52, padX: 21, depth: -0.14 },
     description: { bottom: 34, padX: 20, depth: -0.14 },
@@ -349,6 +420,73 @@ export const RUBBER_DUCKY = makeCard(
   },
 )
 
+export const GOOD_VIBE_CODING = makeCard(
+  AI_EVENT_THEME,
+  { src: goodVibeCodingArt, w: 282, h: 282 },
+  { subtype: 'Event', yNudge: 14 },
+)
+export const BAD_VIBE_CODING = makeCard(
+  AI_EVENT_THEME,
+  { src: badVibeCodingArt, w: 258, h: 258 },
+  { subtype: 'Event', yNudge: 13 },
+)
+export const CRUSH_DATABASE = makeCard(
+  AI_EVENT_THEME,
+  { src: crushDatabaseArt, w: 304, h: 304 },
+  { subtype: 'Event', yNudge: 11 },
+)
+export const CRUSH_FRONTEND = makeCard(
+  AI_EVENT_THEME,
+  { src: crushFrontendArt, w: 246, h: 246 },
+  { subtype: 'Event', yNudge: 11 },
+)
+export const CRUSH_BACKEND = makeCard(
+  AI_EVENT_THEME,
+  { src: crushBackendArt, w: 275, h: 275 },
+  { subtype: 'Event', yNudge: 11 },
+)
+export const AI_RELEASE_DATABASE = makeCard(
+  AI_EVENT_THEME,
+  { src: aiReleaseDatabaseArt, w: 304, h: 304 },
+  { subtype: 'Event', yNudge: 6 },
+)
+export const AI_RELEASE_FRONTEND = makeCard(
+  AI_EVENT_THEME,
+  { src: aiReleaseFrontendArt, w: 246, h: 246 },
+  { subtype: 'Event' },
+)
+export const AI_RELEASE_BACKEND = makeCard(
+  AI_EVENT_THEME,
+  { src: aiReleaseBackendArt, w: 275, h: 275 },
+  { subtype: 'Event', yNudge: 3 },
+)
+export const AI_MONITORING = makeCard(
+  AI_EVENT_THEME,
+  { src: aiMonitoringArt, w: 267, h: 267 },
+  { subtype: 'Event', yNudge: -5 },
+)
+export const HALLUCINATION = makeCard(
+  AI_EVENT_THEME,
+  { src: hallucinationArt, w: 276, h: 276 },
+  { subtype: 'Event', yNudge: 14 },
+)
+export const AI_INSIDE = makeCard(
+  AI_EVENT_THEME,
+  { src: insideArt, w: 271, h: 271 },
+  { subtype: 'Event', yNudge: 7 },
+)
+export const AI_ERROR_503 = makeCard(
+  AI_ERROR_503_THEME,
+  { src: error503Art, w: 338, h: 338 },
+  { subtype: 'Event', yNudge: 3 },
+)
+export const TRIGGER_ERROR_503 = makeCard(
+  TRIGGER_ERROR_503_THEME,
+  { src: error503Art, w: 338, h: 338 },
+  { yNudge: 19 },
+)
+export const TRIGGER_AI = makeCard(TRIGGER_AI_THEME, { src: aiArt, w: 292, h: 292 }, { yNudge: 19 })
+
 // Registry: card id → composed config. Ids absent here render as the PNG face.
 export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {
   'release-frontend': FRONTEND,
@@ -374,4 +512,18 @@ export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {
   'attack-out-of-memory': OUT_OF_MEMORY,
   'support-sudo': SUDO,
   'support-code-review': CODE_REVIEW,
+  'ai-good-vibe-coding': GOOD_VIBE_CODING,
+  'ai-bad-vibe-coding': BAD_VIBE_CODING,
+  'ai-crush-database': CRUSH_DATABASE,
+  'ai-crush-frontend': CRUSH_FRONTEND,
+  'ai-crush-backend': CRUSH_BACKEND,
+  'ai-release-database': AI_RELEASE_DATABASE,
+  'ai-release-frontend': AI_RELEASE_FRONTEND,
+  'ai-release-backend': AI_RELEASE_BACKEND,
+  'ai-monitoring': AI_MONITORING,
+  'ai-hallucination': HALLUCINATION,
+  'ai-inside': AI_INSIDE,
+  'ai-error-503': AI_ERROR_503,
+  'trigger-error-503': TRIGGER_ERROR_503,
+  'trigger-ai': TRIGGER_AI,
 }

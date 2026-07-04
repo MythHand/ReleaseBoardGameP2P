@@ -139,6 +139,71 @@ const attackUnicornContent = (name: string): LocalizedCardContent => {
   }
 }
 
+// Every AI-deck (purple) card ends with this "returns to the AI deck" line as a
+// separate, final paragraph — the composed face renders it on its own line.
+const AI_RETURN: Record<'ru' | 'en', string> = {
+  ru: 'Карта сразу возвращается в AI колоду.',
+  en: 'The card returns to the AI deck immediately.',
+}
+
+// AI cards that sit in the release zone (AI Release, AI Monitoring) end with
+// this "returns to the AI deck when destroyed" line as their final paragraph.
+const AI_ON_DESTROY: Record<'ru' | 'en', string> = {
+  ru: 'При уничтожении возвращается в AI колоду.',
+  en: 'When destroyed, it returns to the AI deck.',
+}
+
+// AI Release <Target> — a purple-deck clone of a base Release card. Only the
+// target (Frontend / Backend / Database) differs.
+const aiReleaseContent = (target: string): LocalizedCardContent => ({
+  ru: {
+    title: `Release ${target}`,
+    typeLine: 'AI / Event',
+    paragraphs: [
+      {
+        text: `Если у вас ещё нет карты ${target} в зоне релиза, поместите эту карту в вашу зону релиза.`,
+        bold: [target],
+      },
+      { text: AI_ON_DESTROY.ru },
+    ],
+  },
+  en: {
+    title: `Release ${target}`,
+    typeLine: 'AI / Event',
+    paragraphs: [
+      {
+        text: `If you don't already have a ${target} card in your release zone, place this card into your release zone.`,
+        bold: [target],
+      },
+      { text: AI_ON_DESTROY.en },
+    ],
+  },
+})
+
+// Crush <Target> — destroys the matching Release card in the release zone. Only
+// the target (Frontend / Backend / Database) differs.
+const aiCrushContent = (target: string): LocalizedCardContent => ({
+  ru: {
+    title: `Crush ${target}`,
+    typeLine: 'AI / Event',
+    paragraphs: [
+      { text: `Уничтожьте карту ${target} в зоне релиза, отправив карту в сброс.`, bold: [target] },
+      { text: AI_RETURN.ru },
+    ],
+  },
+  en: {
+    title: `Crush ${target}`,
+    typeLine: 'AI / Event',
+    paragraphs: [
+      {
+        text: `Destroy a ${target} card in the release zone, sending it to the discard pile.`,
+        bold: [target],
+      },
+      { text: AI_RETURN.en },
+    ],
+  },
+})
+
 export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
   'release-frontend': releaseContent('Frontend'),
   'release-backend': releaseContent('Backend'),
@@ -422,6 +487,172 @@ export const CARD_CONTENT: Record<string, LocalizedCardContent> = {
           text: 'Play together with a card that has a sudo effect. Activates that boost.',
           highlight: 'sudo',
         },
+      ],
+    },
+  },
+  'ai-good-vibe-coding': {
+    ru: {
+      title: 'Good Vibe-Coding',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        { text: 'Вы оптимизировали себя с помощью AI. Возьмите 2 карты из колоды добора.' },
+        { text: 'Карта сразу возвращается в AI колоду.' },
+      ],
+    },
+    en: {
+      title: 'Good Vibe-Coding',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        { text: 'You optimized yourself with AI. Draw 2 cards from the draw deck.' },
+        { text: 'The card returns to the AI deck immediately.' },
+      ],
+    },
+  },
+  'ai-bad-vibe-coding': {
+    ru: {
+      title: 'Bad Vibe-Coding',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        { text: 'Вы неудачно оптимизировали себя с помощью AI. Сбросьте 1 карту с руки в сброс.' },
+        { text: 'Карта сразу возвращается в AI колоду.' },
+      ],
+    },
+    en: {
+      title: 'Bad Vibe-Coding',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        { text: 'Your AI optimization backfired. Discard 1 card from your hand.' },
+        { text: 'The card returns to the AI deck immediately.' },
+      ],
+    },
+  },
+  'ai-crush-database': aiCrushContent('Database'),
+  'ai-crush-frontend': aiCrushContent('Frontend'),
+  'ai-crush-backend': aiCrushContent('Backend'),
+  'ai-release-database': aiReleaseContent('Database'),
+  'ai-release-frontend': aiReleaseContent('Frontend'),
+  'ai-release-backend': aiReleaseContent('Backend'),
+  'ai-monitoring': {
+    ru: {
+      title: 'AI Monitoring',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        {
+          text: 'Выложите эту карту в свою зону релиза (не более одной). Карта защищает от Error 503 и Crush. При доборе угроза сбрасывается, а AI Monitoring остаётся в зоне релиза.',
+          bold: ['Error 503', 'Crush', 'AI Monitoring'],
+        },
+        { text: AI_ON_DESTROY.ru },
+      ],
+    },
+    en: {
+      title: 'AI Monitoring',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        {
+          text: 'Place this card into your release zone (no more than one). It protects against Error 503 and Crush. On a draw the threat is discarded and AI Monitoring stays in the release zone.',
+          bold: ['Error 503', 'Crush', 'AI Monitoring'],
+        },
+        { text: AI_ON_DESTROY.en },
+      ],
+    },
+  },
+  'ai-hallucination': {
+    ru: {
+      title: 'Hallucination',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        { text: 'Вы слишком увлеклись искусственным интеллектом и завершаете свой ход.' },
+        { text: AI_RETURN.ru },
+      ],
+    },
+    en: {
+      title: 'Hallucination',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        { text: 'You got too carried away with artificial intelligence and end your turn.' },
+        { text: AI_RETURN.en },
+      ],
+    },
+  },
+  'ai-inside': {
+    ru: {
+      title: 'Inside',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        { text: 'Возьмите одну карту Release из сброса в свою руку.', bold: ['Release'] },
+        { text: AI_RETURN.ru },
+      ],
+    },
+    en: {
+      title: 'Inside',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        { text: 'Take one Release card from the discard pile into your hand.', bold: ['Release'] },
+        { text: AI_RETURN.en },
+      ],
+    },
+  },
+  'ai-error-503': {
+    ru: {
+      title: 'Error 503',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        {
+          text: 'Уничтожьте свой Release из зоны релиза (обе в сброс). Иначе вы выбываете из игры (рука в сброс).',
+          bold: ['Release'],
+        },
+        { text: AI_RETURN.ru },
+      ],
+    },
+    en: {
+      title: 'Error 503',
+      typeLine: 'AI / Event',
+      paragraphs: [
+        {
+          text: "Destroy your Release from the release zone (both to the discard pile). Otherwise you're out of the game (your hand goes to the discard pile).",
+          bold: ['Release'],
+        },
+        { text: AI_RETURN.en },
+      ],
+    },
+  },
+  'trigger-error-503': {
+    ru: {
+      title: 'Error 503',
+      typeLine: 'Trigger',
+      paragraphs: [
+        {
+          text: 'Уничтожьте свой Release из зоны релиза (обе в сброс). Иначе вы выбываете из игры (рука в сброс).',
+          bold: ['Release'],
+        },
+      ],
+    },
+    en: {
+      title: 'Error 503',
+      typeLine: 'Trigger',
+      paragraphs: [
+        {
+          text: "Destroy your Release from the release zone (both to the discard pile). Otherwise you're out of the game (your hand goes to the discard pile).",
+          bold: ['Release'],
+        },
+      ],
+    },
+  },
+  'trigger-ai': {
+    ru: {
+      title: 'AI',
+      typeLine: 'Trigger',
+      paragraphs: [
+        { text: 'Вы используете AI' },
+        { text: 'Возьмите случайную карту из колоды AI карт и выполните указания на ней.' },
+      ],
+    },
+    en: {
+      title: 'AI',
+      typeLine: 'Trigger',
+      paragraphs: [
+        { text: 'You use AI' },
+        { text: 'Draw a random card from the AI deck and follow its instructions.' },
       ],
     },
   },
