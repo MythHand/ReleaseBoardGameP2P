@@ -81,8 +81,6 @@ interface CardParallaxProps {
 
 // how far (in cqw) a depth-1 layer shifts at full pointer deflection
 const SHIFT = 7
-// Figma layer-blur on the panel, authored against the 368-wide frame
-const PANEL_BLUR = 14
 
 export default function CardParallax({
   content,
@@ -142,13 +140,7 @@ export default function CardParallax({
     ...shift(l.depth),
   })
 
-  // blur is a px filter (no cqw), so scale it with the display width to keep
-  // the look consistent across authoring and small previews
-  const blurScale = width / BASE_W
-  const rootStyle = {
-    width: `${width}px`,
-    '--blur': `${(PANEL_BLUR * blurScale).toFixed(2)}px`,
-  } as CSSProperties
+  const rootStyle = { width: `${width}px` } as CSSProperties
 
   // LOD enlarges the illustration and drops it lower; everything else is shared
   const illustration: ImageLayer = lod
@@ -183,7 +175,6 @@ export default function CardParallax({
             className={styles.panel}
             style={{ ...shift(config.panel.depth), opacity: config.panel.opacity }}
           />
-          <div className={styles.noise} style={shift(config.panel.depth)} />
           {config.decor && (
             <img
               className={styles.img}

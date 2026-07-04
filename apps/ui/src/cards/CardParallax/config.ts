@@ -256,6 +256,10 @@ const AI_ERROR_503_THEME: CardTheme = {
 // lowers it to balance each art
 const ILLO_Y = -12
 
+// background parallax depth — the panel (dim + grain) rides the SAME plane, so
+// the darkening stays registered to the photo background and covers only it
+const BG_DEPTH = 0.9
+
 // Shared geometry of the Trigger diagonal band — identical on every trigger card
 // (only the colour differs). Native SVG is 1389×1638 authored at 2× the other
 // layers, so we use half of it; ratio kept so the -30° angle stays undistorted.
@@ -290,8 +294,10 @@ function makeCard(
     // layers (background) parallax the MOST — the far floor behind the glass —
     // while surface layers (text) barely move, as if pinned to the card face.
     // Sign = direction (content inverted vs grid); magnitude = how deep it sits.
-    background: { ...theme.background, depth: 0.9 },
-    panel: { depth: -0.7, opacity: theme.panelOpacity },
+    background: { ...theme.background, depth: BG_DEPTH },
+    // panel = the dim+grain over the photo; same depth as the background so it
+    // tracks it exactly (covers only the photo, never drifts onto other layers)
+    panel: { depth: BG_DEPTH, opacity: theme.panelOpacity },
     grid: { src: gridUrl, w: 443, h: 726, depth: 0.28 },
     illustration: { ...illustration, depth: 0.6, y: ILLO_Y + yNudge },
     decor: theme.decor ? { ...DECOR, src: theme.decor } : undefined,
