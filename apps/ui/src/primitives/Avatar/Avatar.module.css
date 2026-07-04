@@ -1,10 +1,15 @@
 .avatar {
+  position: relative;
   display: flex;
   flex: none;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   font-family: var(--font-mono);
   background: var(--white-08);
+
+  /* barely-there rounding — a % so it scales with size (≈1.6px at 32, ≈6px at 128) */
+  border-radius: 5%;
 }
 
 /* приглушённый — игрок не в сети */

@@ -1,0 +1,40 @@
+/* the layer stack fills the Avatar frame (which owns the clip + rounding) */
+.art {
+  position: absolute;
+  inset: 0;
+}
+
+/* muted (offline) — desaturate + dim the whole stack */
+.muted {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+
+/* background image — covers the square */
+.bg {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+/* dim — the same radial-navy the card panel uses; opacity is set inline per card */
+.dim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 42%,
+    color-mix(in srgb, var(--card-parallax-navy) 50%, transparent) 0%,
+    color-mix(in srgb, var(--card-parallax-navy) 95%, transparent) 100%
+  );
+}
+
+/* illustration — fills the whole square (art is square, same as the frame) */
+.illo {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}

@@ -1,6 +1,11 @@
 // Data + logic
 
 export { PRESETS, play, presetNames } from './animations'
+export {
+  default as PresetAvatar,
+  PRESET_AVATARS,
+  type PresetAvatarItem,
+} from './avatars/PresetAvatar'
 export { default as GameSettings } from './blocks/GameSettings'
 export type { SwitchLang } from './blocks/LangSwitcher'
 export { default as LangSwitcher } from './blocks/LangSwitcher'
