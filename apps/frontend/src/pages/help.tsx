@@ -1,12 +1,13 @@
 import { useTranslation } from '@release/translation'
 import { Link } from 'react-router'
+import styles from './help.module.css'
 
 export default function HelpPage() {
   const { t } = useTranslation()
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-16">
-      <h1 className="font-bold text-3xl tracking-base">{t('help.title')}</h1>
-      <Link to="/start" className="text-brand-green underline">
+    <main className={styles.page}>
+      <h1 className={styles.title}>{t('help.title')}</h1>
+      <Link to="/start" className={styles.back}>
         {t('help.back')}
       </Link>
     </main>
