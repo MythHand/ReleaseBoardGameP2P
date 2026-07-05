@@ -23,6 +23,7 @@ import styles from './Start.module.css'
 const GITHUB_URL = 'https://github.com/MythHand'
 const DESIGN_URL = 'https://github.com/dimbo-design'
 const DEV_URL = 'https://github.com/ditayler'
+const CLAUDE_URL = 'https://github.com/anthropics/claude-code'
 // печатная версия — заказ/предзаказ ведём через Instagram команды
 const INSTAGRAM_URL = 'https://www.instagram.com/mythhand.team/'
 // game review — the embed shown in the start-screen video player
@@ -31,6 +32,7 @@ const VIDEO_URL = 'https://www.youtube.com/embed/bxGtRnoYW4g?autoplay=1'
 // авторы — собственные имена, одинаковы для всех языков
 const DESIGN_NAME = 'Togulev Dmitry'
 const DEV_NAME = 'Andrey Konnov'
+const CLAUDE_NAME = 'Claude'
 
 export interface StartCopy {
   logoAlt: string
@@ -187,9 +189,34 @@ export default function Start({
         </span>
         <span className={styles.credit}>
           <span className={styles.creditLabel}>{copy.authorDev}</span>
-          <a className={styles.creditLink} href={DEV_URL} target="_blank" rel="noopener noreferrer">
-            {DEV_NAME}
-          </a>
+          <span>
+            <a
+              className={styles.creditLink}
+              href={CLAUDE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {CLAUDE_NAME}
+            </a>
+            {', '}
+            <a
+              className={styles.creditLink}
+              href={DEV_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {DEV_NAME}
+            </a>
+            {', '}
+            <a
+              className={styles.creditLink}
+              href={DESIGN_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {DESIGN_NAME}
+            </a>
+          </span>
         </span>
       </div>
 
