@@ -4,6 +4,7 @@ import { useGoToLobby } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
 import AppLogo from '~/shared/ui/AppLogo'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
+import styles from './start.module.css'
 
 const REPO_URL = 'https://github.com/dimbo-design/ReleaseBoardGameP2P'
 const VIDEO_URL = 'https://www.youtube.com/embed/bxGtRnoYW4g?autoplay=1'
@@ -16,25 +17,25 @@ export default function StartPage() {
   const hasSession = session.status === 'in-lobby' && !!session.state
 
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-bg">
-      <div className="absolute inset-0 bg-[url(@/assets/home/photo.jpg)] bg-center bg-cover" />
-      <div className="absolute inset-0 start-blur-mask" />
-      <div className="absolute inset-0 start-scrim" />
+    <div className={styles.root}>
+      <div className={styles.bg} />
+      <div className={styles.blur} />
+      <div className={styles.scrim} />
 
-      <div className="relative z-2 flex h-full items-center ps-19">
-        <div className="flex w-115 flex-col items-start">
-          <AppLogo className="mb-3 -ml-2.75 h-auto w-120" />
+      <div className={styles.content}>
+        <div className={styles.col}>
+          <AppLogo className={styles.logo} />
 
-          <div className="mb-9.5 flex flex-col gap-1.5 text-cat-release opacity-85">
+          <div className={styles.tags}>
             <Typography variant="tag">{t('start.tagOpenP2P')}</Typography>
             <Typography variant="tag">{t('start.tagBoardCard')}</Typography>
           </div>
 
-          <Typography variant="body" className="mb-18">
+          <Typography variant="body" className={styles.desc}>
             {t('start.description')}
           </Typography>
 
-          <Menu>
+          <Menu className={styles.menu}>
             {/* Always rendered so toggling it never reflows the column — without
                 a reserved slot, mounting/unmounting would change the
                 vertically-centred column's height and shift everything. Hidden
@@ -43,7 +44,7 @@ export default function StartPage() {
               <MenuButton
                 aria-hidden={!hasSession}
                 disabled={!hasSession}
-                className={hasSession ? undefined : 'pointer-events-none invisible'}
+                className={hasSession ? undefined : styles.hiddenSlot}
                 onClick={() => session.roomCode && goToLobby(session.roomCode)}
               >
                 {t('start.continueSession')}

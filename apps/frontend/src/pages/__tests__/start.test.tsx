@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
 import StartPage from '../start'
+import styles from '../start.module.css'
 
 vi.mock('@release/translation', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'ru' } }),
@@ -47,7 +48,7 @@ it('shows an interactive continue session button when session is active', () => 
     </MemoryRouter>,
   )
   const btn = screen.getByText('start.continueSession').closest('button')
-  expect(btn?.className ?? '').not.toContain('invisible')
+  expect(btn?.className ?? '').not.toContain(styles.hiddenSlot)
   expect(btn?.disabled).toBe(false)
 })
 
@@ -61,7 +62,7 @@ it('keeps the continue session slot reserved but hidden when no session', () => 
     </MemoryRouter>,
   )
   const btn = screen.getByText('start.continueSession').closest('button')
-  expect(btn?.className ?? '').toContain('invisible')
+  expect(btn?.className ?? '').toContain(styles.hiddenSlot)
   expect(btn?.disabled).toBe(true)
   expect(btn?.getAttribute('aria-hidden')).toBe('true')
 })
