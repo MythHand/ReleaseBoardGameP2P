@@ -1,6 +1,6 @@
 # apps/playground — `@release/playground`
 
-Vite sandbox that renders `@release/ui` components in isolation (CSS Modules, no Tailwind). **Additive** to the root [CLAUDE.md](../../CLAUDE.md).
+Vite sandbox that renders `@release/ui` components in isolation (CSS Modules only). **Additive** to the root [CLAUDE.md](../../CLAUDE.md).
 
 ## Typography Rule
 
