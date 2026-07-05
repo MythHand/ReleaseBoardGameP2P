@@ -1,22 +1,24 @@
 import { useEffect, useState } from 'react'
 import styles from './TokenPreview.module.css'
 
-// The same component is used by both the real app and the sandbox —
-// demonstrating the "shared components, two entry points" principle.
+// Colour tokens read from the live stylesheet — declared value plus the resolved
+// rgb/hex — so the showcase always matches tokens.css and never drifts. The page
+// separates two axes: discrete hues (grouped by role) and alpha ramps (one base
+// colour at many opacities, shown as a scale instead of dozens of near-identical
+// chips). Values are display-only; the system is unchanged.
 
-interface ColorToken {
+interface Token {
   name: string
-  value: string
+  raw: string // declared value (rgb / hex / var(...) / gradient)
+  rgb: string // resolved rgb(...), empty for gradients
+  hex: string // derived from the resolved rgb (8-digit when it carries alpha)
+  aliasTarget?: string // the --token a var() alias points at
+  isGradient: boolean
 }
 
-// Color values: hex, rgb/hsl/hwb, oklch/oklab/lab/lch, color-mix, gradients, and
-// var() aliases (semantic tokens that point at another colour token).
 const COLOR_RE =
   /^(#|rgb|hsl|hwb|okl|lab|lch|color-mix|var\(|(repeating-)?(linear|radial|conic)-gradient)/i
 
-// Collect every color custom property from :root — including tokens pulled in
-// via @import (CSSImportRule). The source is the live styles, so the showcase
-// never drifts from tokens.css: we show exactly what's declared.
 function collectVars(sheet: CSSStyleSheet, into: Map<string, string>): void {
   let rules: CSSRuleList
   try {
@@ -39,71 +41,274 @@ function collectVars(sheet: CSSStyleSheet, into: Map<string, string>): void {
   }
 }
 
-function readColorTokens(): ColorToken[] {
-  const map = new Map<string, string>()
-  for (const sheet of Array.from(document.styleSheets)) collectVars(sheet, map)
-  return Array.from(map, ([name, value]) => ({ name, value }))
+// resolved "rgb(r, g, b[ / a])" → hex; 8-digit when an alpha < 1 is present
+function toHex(rgb: string): string {
+  const m = rgb.match(/rgba?\(([^)]+)\)/i)
+  if (!m) return ''
+  const n = m[1]
+    .split(/[\s,/]+/)
+    .filter(Boolean)
+    .map(Number)
+  const h = (x: number) => Math.round(x).toString(16).padStart(2, '0')
+  let hex = `#${h(n[0])}${h(n[1])}${h(n[2])}`
+  if (n[3] != null && n[3] < 1) hex += h(n[3] * 255)
+  return hex.toUpperCase()
 }
 
-// Groups in display order. Bucketed by token-name prefix.
-const GROUP_ORDER = [
-  'Base & surfaces',
-  'Brand & categories',
-  'State accents',
-  'Named hues',
-  'White overlays',
-  'Black overlays',
-  'Tinted overlays',
-  'Gradients',
-] as const
+function readTokens(): Token[] {
+  const map = new Map<string, string>()
+  for (const sheet of Array.from(document.styleSheets)) collectVars(sheet, map)
 
-function groupOf(name: string): (typeof GROUP_ORDER)[number] {
-  if (name === '--bg' || name === '--fg' || name === '--grid-line' || name.startsWith('--surface'))
-    return 'Base & surfaces'
-  if (name.endsWith('-accent')) return 'State accents'
-  if (name === '--brand-green' || name.startsWith('--cat-')) return 'Brand & categories'
-  if (name.startsWith('--grad')) return 'Gradients'
-  if (name.startsWith('--white-')) return 'White overlays'
-  if (name.startsWith('--black-')) return 'Black overlays'
-  // alpha variants of the hues carry a trailing -NN (--mint-40, --coral-12, --yellow-28…)
-  if (/-\d/.test(name)) return 'Tinted overlays'
-  return 'Named hues'
+  // resolve each token's actual colour via a throwaway probe (also flattens
+  // var() aliases to their target colour)
+  const probe = document.createElement('span')
+  probe.style.display = 'none'
+  document.body.appendChild(probe)
+
+  const out: Token[] = []
+  for (const [name, raw] of map) {
+    const isGradient = /gradient/i.test(raw)
+    let rgb = ''
+    if (!isGradient) {
+      probe.style.color = 'transparent'
+      probe.style.color = `var(${name})`
+      rgb = getComputedStyle(probe).color
+    }
+    const alias = raw.startsWith('var(') ? raw.match(/--[\w-]+/) : null
+    out.push({
+      name,
+      raw,
+      rgb,
+      hex: rgb ? toHex(rgb) : '',
+      aliasTarget: alias ? alias[0] : undefined,
+      isGradient,
+    })
+  }
+  probe.remove()
+  return out
+}
+
+// ---- role grouping (discrete hues) ------------------------------------------
+
+const NAMED_HUES = [
+  '--mint',
+  '--mint-light',
+  '--mint-dark',
+  '--deep-green',
+  '--coral',
+  '--gold',
+  '--periwinkle',
+  '--gray',
+  '--charcoal',
+]
+
+const DISCRETE_SECTIONS: { title: string; pick: (n: string) => boolean }[] = [
+  {
+    title: 'Core & surfaces',
+    pick: (n) => n === '--bg' || n === '--fg' || n === '--grid-line' || n.startsWith('--surface'),
+  },
+  { title: 'Brand & categories', pick: (n) => n === '--brand-green' || n.startsWith('--cat-') },
+  { title: 'Named hues', pick: (n) => NAMED_HUES.includes(n) },
+  { title: 'State accents', pick: (n) => n.endsWith('-accent') },
+  { title: 'Highlight fills', pick: (n) => /^--(yellow|amber|orange)-/.test(n) },
+]
+
+// ---- alpha ramps (one base colour at many opacities) ------------------------
+
+const RAMP_DEFS: { base: string; title: string; sub: string }[] = [
+  { base: '--white', title: 'White', sub: '--fg at an alpha' },
+  { base: '--black', title: 'Black', sub: '--bg at an alpha' },
+  { base: '--mint', title: 'Mint', sub: 'tint' },
+  { base: '--coral', title: 'Coral', sub: 'tint' },
+  { base: '--brand-green', title: 'Brand green', sub: 'tint' },
+]
+
+// a token belongs to a ramp when it is "<base>-<number>" (excludes --mint-light etc.)
+function rampBase(name: string): string | null {
+  const m = name.match(/^(--(?:white|black|mint|coral|brand-green))-\d/)
+  return m ? m[1] : null
+}
+
+// numeric step (the alpha %); "--white-04-5" → 4.5
+function stepPct(name: string, base: string): number {
+  return Number(name.slice(base.length + 1).replace(/-(\d)$/, '.$1'))
+}
+
+// ---- copy affordance --------------------------------------------------------
+
+function Copy({
+  text,
+  display,
+  primary,
+  wrap,
+}: {
+  text: string
+  display: string
+  primary?: boolean
+  wrap?: boolean
+}) {
+  const [done, setDone] = useState(false)
+  return (
+    <button
+      type="button"
+      className={`${styles.copy} ${primary ? styles.copyPrimary : ''} ${wrap ? styles.copyWrap : ''}`}
+      title={`copy ${text}`}
+      onClick={() => {
+        void navigator.clipboard?.writeText(text)
+        setDone(true)
+        setTimeout(() => setDone(false), 1000)
+      }}
+    >
+      <code>{display}</code>
+      {done && <span className={styles.copied}>copied</span>}
+    </button>
+  )
+}
+
+// name (primary) + the resolved rgb/hex (or the gradient value); aliases also
+// expose the token they point at. Every field copies independently.
+function Fields({ t }: { t: Token }) {
+  return (
+    <div className={styles.fields}>
+      <Copy primary text={`var(${t.name})`} display={t.name} />
+      {t.aliasTarget && (
+        <span className={styles.aliasRow}>
+          <span className={styles.arrow}>→</span>
+          <Copy text={`var(${t.aliasTarget})`} display={t.aliasTarget} />
+        </span>
+      )}
+      {t.isGradient ? (
+        <Copy wrap text={t.raw} display={t.raw} />
+      ) : (
+        <>
+          <Copy text={t.rgb} display={t.rgb} />
+          <Copy text={t.hex} display={t.hex} />
+        </>
+      )}
+    </div>
+  )
+}
+
+// One base colour across its defined opacity steps. Hovering a step selects it;
+// the first step is selected by default so the readout is always populated.
+function Ramp({
+  def,
+  steps,
+  bg,
+}: {
+  def: { base: string; title: string; sub: string }
+  steps: Token[]
+  bg: string
+}) {
+  const [active, setActive] = useState(steps[0].name)
+  const sel = steps.find((s) => s.name === active) ?? steps[0]
+  return (
+    <div className={styles.ramp}>
+      <div className={styles.rampH}>
+        {def.title} <span className={styles.rampSub}>{def.sub}</span>
+        <span className={styles.rampCount}>{`${steps.length} steps`}</span>
+      </div>
+      <div className={styles.strip}>
+        {steps.map((t) => (
+          <button
+            key={t.name}
+            type="button"
+            className={`${styles.seg} ${active === t.name ? styles.segOn : ''}`}
+            data-bg={bg}
+            title={`${t.name} · ${stepPct(t.name, def.base)}%`}
+            onMouseEnter={() => setActive(t.name)}
+            onFocus={() => setActive(t.name)}
+          >
+            <span className={styles.segFill} style={{ background: `var(${t.name})` }} />
+          </button>
+        ))}
+      </div>
+      <div className={styles.readout}>
+        <span className={styles.readoutPct}>{stepPct(sel.name, def.base)}%</span>
+        <Fields t={sel} />
+      </div>
+    </div>
+  )
 }
 
 export default function TokenPreview() {
-  // Styles are attached globally before mount, but we read in an effect just in
-  // case (StrictMode / timing); the result is stable.
-  const [tokens, setTokens] = useState<ColorToken[]>([])
-  useEffect(() => setTokens(readColorTokens()), [])
+  const [tokens, setTokens] = useState<Token[]>([])
+  const [checker, setChecker] = useState(false)
+  useEffect(() => setTokens(readTokens()), [])
 
-  const groups = GROUP_ORDER.map((title) => ({
-    title,
-    items: tokens.filter((t) => groupOf(t.name) === title),
-  })).filter((g) => g.items.length > 0)
+  const bg = checker ? 'checker' : 'surface'
+
+  const discrete = DISCRETE_SECTIONS.map((s) => ({
+    title: s.title,
+    items: tokens.filter((t) => !t.isGradient && rampBase(t.name) === null && s.pick(t.name)),
+  })).filter((s) => s.items.length > 0)
+
+  const ramps = RAMP_DEFS.map((def) => ({
+    ...def,
+    steps: tokens
+      .filter((t) => rampBase(t.name) === def.base)
+      .sort((a, b) => stepPct(a.name, def.base) - stepPct(b.name, def.base)),
+  })).filter((r) => r.steps.length > 0)
+
+  const gradients = tokens.filter((t) => t.isGradient)
 
   return (
     <section className={styles.root}>
-      <h2 className={styles.h}>
-        colors <span className={styles.note}>{`// ${tokens.length}`}</span>
-      </h2>
+      <div className={styles.bar}>
+        <h2 className={styles.h}>
+          colors <span className={styles.note}>{`// ${tokens.length}`}</span>
+        </h2>
+        <div className={styles.barRight}>
+          <span className={styles.hint}>
+            click any value to copy · click a ramp step for its token
+          </span>
+          <button type="button" className={styles.toggle} onClick={() => setChecker((c) => !c)}>
+            bg: {checker ? 'checker' : 'surface'}
+          </button>
+        </div>
+      </div>
 
-      {groups.map((g) => (
-        <div key={g.title} className={styles.group}>
-          <div className={styles.groupH}>{g.title}</div>
-          <div className={styles.grid}>
+      {/* discrete hues — grouped by role */}
+      {discrete.map((g) => (
+        <div key={g.title} className={styles.section}>
+          <div className={styles.sectionH}>{g.title}</div>
+          <div className={styles.swatchGrid}>
             {g.items.map((t) => (
               <div key={t.name} className={styles.swatch}>
-                <div className={styles.chip}>
-                  <div className={styles.checker} />
+                <div className={styles.chip} data-bg={bg}>
                   <div className={styles.fill} style={{ background: `var(${t.name})` }} />
                 </div>
-                <code className={styles.var}>{t.name}</code>
-                <code className={styles.value}>{t.value}</code>
+                <Fields t={t} />
               </div>
             ))}
           </div>
         </div>
       ))}
+
+      {/* alpha ramps — one base colour across its defined opacity steps */}
+      {ramps.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionH}>Alpha ramps</div>
+          {ramps.map((r) => (
+            <Ramp key={r.base} def={r} steps={r.steps} bg={bg} />
+          ))}
+        </div>
+      )}
+
+      {/* gradients — composite tokens, full width */}
+      {gradients.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionH}>Gradients</div>
+          <div className={styles.gradList}>
+            {gradients.map((t) => (
+              <div key={t.name} className={styles.gradRow}>
+                <div className={styles.gradBar} style={{ background: `var(${t.name})` }} />
+                <Fields t={t} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

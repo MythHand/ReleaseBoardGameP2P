@@ -1,10 +1,25 @@
 .root {
-  padding: 28px;
+  padding: 24px 28px 64px;
   letter-spacing: var(--tracking);
 }
 
+/* sticky top bar — title, hint, background toggle */
+.bar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-block: 12px;
+  margin-block-end: 12px;
+  background: var(--surface-0);
+  border-block-end: 1px solid var(--white-08);
+}
+
 .h {
-  margin: 0 0 20px;
+  margin: 0;
   font-size: 14px;
   font-weight: 500;
   text-transform: uppercase;
@@ -15,43 +30,72 @@
   opacity: 0.4;
 }
 
-.group {
-  margin-block-end: 28px;
+.barRight {
+  display: flex;
+  gap: 14px;
+  align-items: center;
 }
 
-.groupH {
-  margin-block-end: 12px;
+.hint {
+  font-size: 11px;
+  opacity: 0.4;
+}
+
+.toggle {
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg);
+  cursor: pointer;
+  background: var(--white-05);
+  border: 1px solid var(--white-14);
+  border-radius: 6px;
+}
+
+.toggle:hover {
+  background: var(--white-08);
+}
+
+.section {
+  margin-block-start: 52px;
+}
+
+.sectionH {
+  margin-block-end: 14px;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   opacity: 0.5;
 }
 
-.grid {
+/* ---- discrete hues ---- */
+.swatchGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 14px;
-  max-inline-size: 920px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 16px;
 }
 
 .swatch {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 8px;
 }
 
-/* Checkerboard behind the color so overlay tokens' transparency reads. */
 .chip {
   position: relative;
-  block-size: 56px;
+  block-size: 60px;
   overflow: hidden;
   border: 1px solid var(--white-12);
   border-radius: 8px;
 }
 
-.checker {
-  position: absolute;
-  inset: 0;
+.chip[data-bg='surface'],
+.seg[data-bg='surface'] {
+  background: var(--surface-1);
+}
+
+.chip[data-bg='checker'],
+.seg[data-bg='checker'] {
   background-image: conic-gradient(
     var(--white-18) 25%,
     transparent 0 50%,
@@ -66,13 +110,167 @@
   inset: 0;
 }
 
-.var {
-  font-size: 10px;
-  opacity: 0.7;
+/* ---- copyable fields ---- */
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: flex-start;
 }
 
-.value {
+.copy {
+  position: relative;
+  max-inline-size: 100%;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-55);
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+/* long composite values (gradients) wrap instead of truncating */
+.copyWrap {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.copy:hover {
+  color: var(--fg);
+  background: var(--white-06);
+  border-color: var(--white-12);
+}
+
+.copyPrimary {
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.copied {
+  margin-inline-start: 8px;
+  color: var(--brand-green);
+}
+
+.aliasRow {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.arrow {
+  font-size: 11px;
+  opacity: 0.4;
+}
+
+/* ---- alpha ramps ---- */
+.ramp {
+  margin-block: 26px;
+}
+
+.rampH {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-block-end: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rampSub {
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.4;
+}
+
+.rampCount {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
   font-size: 10px;
-  word-break: break-all;
-  opacity: 0.35;
+  opacity: 0.3;
+}
+
+.strip {
+  display: flex;
+  block-size: 46px;
+  overflow: hidden;
+  border: 1px solid var(--white-12);
+  border-radius: 8px;
+}
+
+.seg {
+  position: relative;
+  flex: 1 1 0;
+  min-inline-size: 6px;
+  padding: 0;
+  cursor: pointer;
+  border: none;
+}
+
+.segFill {
+  position: absolute;
+  inset: 0;
+}
+
+.seg:hover {
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--white-45);
+}
+
+.segOn {
+  z-index: 2;
+  box-shadow: inset 0 0 0 2px var(--fg);
+}
+
+.readout {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 7px 10px;
+  margin-block-start: 3px;
+  background: var(--white-03);
+  border: 1px solid var(--white-08);
+  border-radius: 8px;
+}
+
+.readoutPct {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.readout .fields {
+  flex-flow: row wrap;
+  gap: 2px 10px;
+  align-items: center;
+}
+
+/* ---- gradients ---- */
+.gradList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gradRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gradBar {
+  block-size: 52px;
+  border: 1px solid var(--white-12);
+  border-radius: 8px;
+}
+
+.gradRow .fields {
+  gap: 4px;
 }
