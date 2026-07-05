@@ -65,11 +65,7 @@
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")
       repeat,
-    radial-gradient(
-      circle at 50% 42%,
-      color-mix(in srgb, var(--card-parallax-navy) 50%, transparent) 0%,
-      color-mix(in srgb, var(--card-parallax-navy) 95%, transparent) 100%
-    );
+    var(--grad-card-navy);
 
   /* noise tile sized in cqw so the grain scales WITH the card (≈140px at the
      368 frame); the gradient stays auto. Fixes coarse grain on small cards. */
