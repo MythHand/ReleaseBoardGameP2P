@@ -18,11 +18,12 @@
     "react-router": "^8.0.1"
   },
   "devDependencies": {
+    "@release/lint": "workspace:*",
     "@types/node": "^26.0.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "vite": "^8.0.16",
-    "@release/lint": "workspace:*"
+    "vite-plugin-svgr": "^5.2.0"
   }
 }

@@ -1,3 +1,4 @@
+import type { FunctionComponent, SVGProps } from 'react'
 import bgTriggerAi from '@/assets/cards/parallax/background/ai.png'
 import bgAiEvent from '@/assets/cards/parallax/background/ai-event.png'
 import bgAttack from '@/assets/cards/parallax/background/attack.png'
@@ -8,14 +9,14 @@ import bgProtection from '@/assets/cards/parallax/background/protection.png'
 import bgRelease from '@/assets/cards/parallax/background/release.png'
 import bgSupport from '@/assets/cards/parallax/background/support.png'
 import gridUrl from '@/assets/cards/parallax/base/grid.svg'
-import attackIcon from '@/assets/cards/parallax/category/attack.svg'
-import defenseIcon from '@/assets/cards/parallax/category/defense.svg'
-import eventsIcon from '@/assets/cards/parallax/category/events.svg'
+import AttackIcon from '@/assets/cards/parallax/category/attack.svg?react'
+import DefenseIcon from '@/assets/cards/parallax/category/defense.svg?react'
+import EventsIcon from '@/assets/cards/parallax/category/events.svg?react'
 import fastIcon from '@/assets/cards/parallax/category/fast.svg'
-import operationIcon from '@/assets/cards/parallax/category/git-operation.svg'
-import protectionIcon from '@/assets/cards/parallax/category/protection.svg'
-import releaseIcon from '@/assets/cards/parallax/category/release.svg'
-import supportIcon from '@/assets/cards/parallax/category/support.svg'
+import OperationIcon from '@/assets/cards/parallax/category/git-operation.svg?react'
+import ProtectionIcon from '@/assets/cards/parallax/category/protection.svg?react'
+import ReleaseIcon from '@/assets/cards/parallax/category/release.svg?react'
+import SupportIcon from '@/assets/cards/parallax/category/support.svg?react'
 import decorAi from '@/assets/cards/parallax/decorate/ai.svg'
 import decorError from '@/assets/cards/parallax/decorate/error.svg'
 import aiArt from '@/assets/cards/parallax/illustration/ai.png'
@@ -112,10 +113,14 @@ export interface TextLayer {
   depth: number
 }
 
-// Top-left category tag: an icon (its category colour is baked into the SVG)
-// plus the category name in that same colour.
+// A category glyph imported as a React component (vite-plugin-svgr `?react`),
+// tinted via currentColor from the accent instead of a baked-in fill.
+export type SvgIcon = FunctionComponent<SVGProps<SVGSVGElement>>
+
+// Top-left category tag: an icon (tinted with the category colour via
+// currentColor) plus the category name in that same colour.
 export interface CategoryLayer {
-  icon: string
+  icon: SvgIcon
   // native icon px (kept as-is)
   w: number
   h: number
@@ -165,7 +170,7 @@ interface CardTheme {
   background: { src: string; w: number; h: number }
   panelOpacity: number
   // omitted for Trigger cards, which carry no category tag
-  category?: { icon: string; w: number; h: number; label: string; accent: string }
+  category?: { icon: SvgIcon; w: number; h: number; label: string; accent: string }
   // whether cards of this category show the lightning "fast play" mark
   fast?: boolean
   // Trigger diagonal band SVG (only Trigger-style cards have one)
@@ -175,14 +180,14 @@ interface CardTheme {
 const RELEASE_THEME: CardTheme = {
   background: { src: bgRelease, w: 421, h: 627 },
   panelOpacity: 0.9,
-  category: { icon: releaseIcon, w: 20, h: 14, label: 'Release', accent: 'var(--cat-release)' },
+  category: { icon: ReleaseIcon, w: 20, h: 14, label: 'Release', accent: 'var(--cat-release)' },
 }
 
 const PROTECTION_THEME: CardTheme = {
   background: { src: bgProtection, w: 419, h: 624 },
   panelOpacity: 0.58,
   category: {
-    icon: protectionIcon,
+    icon: ProtectionIcon,
     w: 16,
     h: 16,
     label: 'Protection',
@@ -194,7 +199,7 @@ const OPERATION_THEME: CardTheme = {
   background: { src: bgOperation, w: 416, h: 620 },
   panelOpacity: 0.6,
   category: {
-    icon: operationIcon,
+    icon: OperationIcon,
     w: 16,
     h: 16,
     label: 'Git Operation',
@@ -205,7 +210,7 @@ const OPERATION_THEME: CardTheme = {
 const DEFENSE_THEME: CardTheme = {
   background: { src: bgDefense, w: 417, h: 621 },
   panelOpacity: 0.71,
-  category: { icon: defenseIcon, w: 16, h: 16, label: 'Defense', accent: 'var(--cat-defense)' },
+  category: { icon: DefenseIcon, w: 16, h: 16, label: 'Defense', accent: 'var(--cat-defense)' },
   fast: true,
 }
 
@@ -213,21 +218,21 @@ const DEFENSE_THEME: CardTheme = {
 const ATTACK_THEME: CardTheme = {
   background: { src: bgAttack, w: 417, h: 621 },
   panelOpacity: 0.6,
-  category: { icon: attackIcon, w: 15, h: 15, label: 'Attack', accent: 'var(--cat-attack)' },
+  category: { icon: AttackIcon, w: 15, h: 15, label: 'Attack', accent: 'var(--cat-attack)' },
   fast: true,
 }
 
 const SUPPORT_THEME: CardTheme = {
   background: { src: bgSupport, w: 418, h: 622 },
   panelOpacity: 0.6,
-  category: { icon: supportIcon, w: 15, h: 15, label: 'Support', accent: 'var(--cat-support)' },
+  category: { icon: SupportIcon, w: 15, h: 15, label: 'Support', accent: 'var(--cat-support)' },
 }
 
 // AI deck (purple). Cards carry a subtype in the tag (e.g. "AI / Event").
 const AI_EVENT_THEME: CardTheme = {
   background: { src: bgAiEvent, w: 425, h: 633 },
   panelOpacity: 0.56,
-  category: { icon: eventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
+  category: { icon: EventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
 }
 
 // Trigger cards (Error 503 / AI) — no category tag, a stronger (thinner) panel,
@@ -248,7 +253,7 @@ const TRIGGER_AI_THEME: CardTheme = {
 const AI_ERROR_503_THEME: CardTheme = {
   background: { src: bgError503, w: 415, h: 618 },
   panelOpacity: 0.32,
-  category: { icon: eventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
+  category: { icon: EventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
   decor: decorError,
 }
 

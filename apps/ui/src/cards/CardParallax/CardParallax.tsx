@@ -153,6 +153,9 @@ export default function CardParallax({
     : config.illustration
   // LOD also enlarges the title
   const titleSize = lod ? CARD_FONT.title * LOD.titleScale : CARD_FONT.title
+  // category glyph — an svgr component tinted via currentColor (it inherits the
+  // accent set on the .category container); capitalised for use as a JSX element
+  const CategoryIcon = config.category?.icon
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: mouse handlers drive the decorative hover parallax only; no actionable behaviour
@@ -190,7 +193,7 @@ export default function CardParallax({
             alt=""
             style={imgStyle(illustration)}
           />
-          {!lod && config.category && (
+          {!lod && config.category && CategoryIcon && (
             <div
               className={styles.category}
               style={{
@@ -201,10 +204,8 @@ export default function CardParallax({
               }}
             >
               <span className={styles.iconBox} style={{ height: cqw(CAT_ICON_BOX) }}>
-                <img
+                <CategoryIcon
                   className={styles.catIcon}
-                  src={config.category.icon}
-                  alt=""
                   style={{ width: cqw(config.category.w), height: cqw(config.category.h) }}
                 />
               </span>
