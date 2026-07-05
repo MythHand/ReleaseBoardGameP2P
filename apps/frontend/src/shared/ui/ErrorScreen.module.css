@@ -1,0 +1,51 @@
+/* apps/frontend/src/shared/ui/ErrorScreen.module.css */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 100vh;
+  padding: 24px;
+  color: var(--fg);
+  text-align: center;
+  background: var(--bg);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: var(--tracking);
+}
+
+.desc {
+  max-inline-size: 384px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--white-60);
+}
+
+.detail {
+  max-inline-size: 448px;
+  padding: 12px;
+  margin: 0;
+  overflow: auto;
+  font-size: 12px;
+  color: var(--white-70);
+  text-align: start;
+  background: var(--surface-1);
+  border: 1px solid var(--white-10);
+  border-radius: 6px;
+}
+
+.actions {
+  display: inline-flex;
+  gap: 8px;
+}
