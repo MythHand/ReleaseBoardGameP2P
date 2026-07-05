@@ -252,10 +252,7 @@ export default function LobbyView() {
 
             <ul className={styles.list}>
               {spectators.map((s) => (
-                <li
-                  key={s.id}
-                  className={`${styles.slot} ${s.id === state.selfId ? styles.slotMe : ''}`}
-                >
+                <li key={s.id} className={styles.slot}>
                   <Avatar name={s.name} size={34} />
                   <span className={styles.name}>
                     {s.name}
