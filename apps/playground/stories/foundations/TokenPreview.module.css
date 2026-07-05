@@ -45,7 +45,7 @@
   position: relative;
   block-size: 56px;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 12%);
+  border: 1px solid var(--white-12);
   border-radius: 8px;
 }
 
@@ -53,9 +53,9 @@
   position: absolute;
   inset: 0;
   background-image: conic-gradient(
-    rgb(255 255 255 / 18%) 25%,
+    var(--white-18) 25%,
     transparent 0 50%,
-    rgb(255 255 255 / 18%) 0 75%,
+    var(--white-18) 0 75%,
     transparent 0
   );
   background-size: 14px 14px;

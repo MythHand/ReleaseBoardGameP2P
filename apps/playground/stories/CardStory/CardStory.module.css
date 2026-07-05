@@ -32,13 +32,13 @@
   letter-spacing: var(--tracking);
   cursor: pointer;
   background: transparent;
-  border: 1px solid rgb(255 255 255 / 15%);
+  border: 1px solid var(--white-15);
   border-radius: 6px;
 }
 
 .on {
   color: var(--brand-green);
-  background: rgb(41 224 122 / 10%);
+  background: var(--brand-green-10);
   border-color: var(--brand-green);
 }
 

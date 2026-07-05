@@ -17,7 +17,7 @@
   font-family: var(--font-text);
   font-size: 13px;
   line-height: 1.5;
-  color: rgb(255 255 255 / 55%);
+  color: var(--white-55);
 }
 
 .group {
@@ -32,7 +32,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: var(--tracking);
-  border-block-end: 1px solid rgb(255 255 255 / 10%);
+  border-block-end: 1px solid var(--white-10);
   opacity: 0.7;
 }
 
@@ -44,14 +44,14 @@
   gap: 28px;
   align-items: center;
   padding: 16px 0;
-  border-block-end: 1px solid rgb(255 255 255 / 6%);
+  border-block-end: 1px solid var(--white-06);
 }
 
 .where {
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.4;
-  color: rgb(255 255 255 / 55%);
+  color: var(--white-55);
 }
 
 .sampleCell {
@@ -67,16 +67,16 @@
   padding: 2px 6px;
   font-family: var(--font-mono);
   font-size: 9px;
-  color: rgb(255 255 255 / 55%);
+  color: var(--white-55);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  background: rgb(255 255 255 / 8%);
+  background: var(--white-08);
   border-radius: 3px;
 }
 
 .anatomy {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: rgb(255 255 255 / 42%);
+  color: var(--white-42);
   text-align: end;
 }
