@@ -1,6 +1,6 @@
 # apps/ui — `@release/ui`
 
-Shared component library — TypeScript + React + CSS Modules + design tokens; no i18n (all copy arrives via props). **Additive** to the root [CLAUDE.md](../../CLAUDE.md); cross-cutting monorepo rules live there and are not repeated here. This file owns the rules for things `@release/ui` is the source of truth for.
+Shared component library — TypeScript + React + CSS Modules + design tokens; no Tailwind dependency (stays portable for any consumer), no i18n (all copy arrives via props). **Additive** to the root [CLAUDE.md](../../CLAUDE.md); cross-cutting monorepo rules live there and are not repeated here. This file owns the rules for things `@release/ui` is the source of truth for.
 
 ## Typography Rule
 
