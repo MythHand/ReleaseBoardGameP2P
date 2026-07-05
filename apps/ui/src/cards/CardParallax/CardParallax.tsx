@@ -25,7 +25,8 @@ export interface CardParallaxContent {
 interface CardParallaxProps {
   content: CardParallaxContent
   config?: ParallaxCardConfig
-  width?: string
+  // display width in px — the component formats the unit and scales everything in cqw
+  width?: number
   // false → no pointer parallax, the calm static state (previews, table, piles)
   interactive?: boolean
   // simplified variant for the release zone: no category / description, larger
@@ -41,7 +42,7 @@ const PANEL_BLUR = 14
 export default function CardParallax({
   content,
   config = FRONTEND,
-  width = `${BASE_W}px`,
+  width = BASE_W,
   interactive = true,
   lod = false,
 }: CardParallaxProps) {
@@ -98,9 +99,11 @@ export default function CardParallax({
 
   // blur is a px filter (no cqw), so scale it with the display width to keep
   // the look consistent across authoring and small previews
-  const m = /^([\d.]+)px$/.exec(width)
-  const blurScale = m ? Number(m[1]) / BASE_W : 1
-  const rootStyle = { width, '--blur': `${(PANEL_BLUR * blurScale).toFixed(2)}px` } as CSSProperties
+  const blurScale = width / BASE_W
+  const rootStyle = {
+    width: `${width}px`,
+    '--blur': `${(PANEL_BLUR * blurScale).toFixed(2)}px`,
+  } as CSSProperties
 
   // LOD enlarges the illustration and drops it lower; everything else is shared
   const illustration: ImageLayer = lod

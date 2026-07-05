@@ -220,7 +220,7 @@ export default function CardPlayStory() {
             className={styles.card}
             onMouseDown={(e) => playFromPlayer(e, item)}
           >
-            <Card card={item.card} interactive={false} width="108px" />
+            <Card card={item.card} interactive={false} width={108} />
           </div>
         ))}
       </div>

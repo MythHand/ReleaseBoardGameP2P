@@ -16,7 +16,8 @@ interface CardProps {
   state?: 'idle' | 'playable' | 'selected' | 'disabled'
   tilt?: boolean
   interactive?: boolean
-  width?: string
+  // number → px (formatted here); string passes through (e.g. '100%' to fill the parent)
+  width?: number | string
   onClick?: () => void
   // переопределить цвет свечения (по умолчанию — акцент категории карты)
   accent?: string
@@ -97,7 +98,7 @@ export default function Card({
       style={
         {
           '--accent': accent,
-          width: width ?? 'var(--card-w)',
+          width: typeof width === 'number' ? `${width}px` : (width ?? 'var(--card-w)'),
           zIndex: lifted ? 'var(--z-card-lifted)' : 'auto',
         } as CSSProperties
       }

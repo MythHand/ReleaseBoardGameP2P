@@ -287,17 +287,12 @@ export default function Table({
       </div>
 
       <div className={styles.decks}>
-        <Pile label={copy.deck} deck="base" count={decks.main} width="150px" countPos="tl" />
-        <Pile label={copy.events} deck="ai" count={decks.events} width="150px" countPos="tl" />
+        <Pile label={copy.deck} deck="base" count={decks.main} width={150} countPos="tl" />
+        <Pile label={copy.events} deck="ai" count={decks.events} width={150} countPos="tl" />
       </div>
 
       <div className={styles.discard}>
-        <Pile
-          label={copy.discard}
-          topCard={decks.discard}
-          count={decks.discardCount}
-          width="116px"
-        />
+        <Pile label={copy.discard} topCard={decks.discard} count={decks.discardCount} width={116} />
       </div>
 
       <div className={styles.you}>

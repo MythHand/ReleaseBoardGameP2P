@@ -364,7 +364,7 @@ export default function ComboStory() {
                 style={valid || isPartner ? ({ '--hl': color } as CSSProperties) : undefined}
                 onMouseDown={(e) => onCardDown(e, item)}
               >
-                <Card card={item.card} interactive={false} width="118px" />
+                <Card card={item.card} interactive={false} width={118} />
               </div>
             )
           })}

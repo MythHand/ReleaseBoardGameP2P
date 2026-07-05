@@ -74,7 +74,7 @@ export default function ArrowStory() {
               className={styles.src}
               onMouseDown={(e) => arm(e, card)}
             >
-              <Card card={card} interactive={false} width="130px" />
+              <Card card={card} interactive={false} width={130} />
             </div>
           ))}
         </div>

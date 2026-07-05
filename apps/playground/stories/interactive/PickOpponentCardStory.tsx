@@ -176,7 +176,7 @@ export default function PickOpponentCardStory() {
               <Card
                 card={p.card}
                 faceDown={chosen !== i}
-                width={`${DEAL_CARD_W}px`}
+                width={DEAL_CARD_W}
                 onClick={phase === 'deal' && chosen === null ? () => pickCard(i) : undefined}
               />
             </div>

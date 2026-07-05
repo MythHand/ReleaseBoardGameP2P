@@ -405,7 +405,7 @@ export default function DrawCardStory() {
             <span className={styles.previewLabel}>
               {pick(lang, { ru: 'следующая', en: 'next' })}
             </span>
-            <Card card={nextCard} interactive={false} width="46px" />
+            <Card card={nextCard} interactive={false} width={46} />
           </div>
         )}
       </div>
@@ -463,7 +463,7 @@ export default function DrawCardStory() {
               label={pick(lang, { ru: 'колода', en: 'deck' })}
               deck="base"
               count={40}
-              width="150px"
+              width={150}
               countPos="tl"
             />
           </div>
@@ -473,7 +473,7 @@ export default function DrawCardStory() {
             label={pick(lang, { ru: 'события', en: 'events' })}
             deck="ai"
             count={12}
-            width="150px"
+            width={150}
             countPos="tl"
           />
         </div>
@@ -490,7 +490,7 @@ export default function DrawCardStory() {
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
           topCard={discard.top}
           count={discard.count}
-          width="116px"
+          width={116}
         />
       </div>
 

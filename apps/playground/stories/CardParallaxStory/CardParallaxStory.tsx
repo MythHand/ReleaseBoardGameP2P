@@ -42,12 +42,12 @@ export default function CardParallaxStory() {
     PARALLAX_IDS.has(selected.id) ? (
       <CardParallax
         content={{ title: content?.title ?? selected.name, description: content?.effect ?? '' }}
-        width={`${w}px`}
+        width={w}
         interactive={interactive}
         lod={lod}
       />
     ) : (
-      <Card card={selected} width={`${w}px`} interactive={interactive} />
+      <Card card={selected} width={w} interactive={interactive} />
     )
 
   const t = pick(lang, {

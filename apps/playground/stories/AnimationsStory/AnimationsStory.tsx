@@ -232,17 +232,17 @@ function SceneVisual({ visual }: { visual: Visual }) {
   if (visual === 'deck') {
     return (
       <div className={styles.deck}>
-        <Card card={DEMO} faceDown interactive={false} width="96px" />
-        <Card card={DEMO} faceDown interactive={false} width="96px" />
-        <Card card={DEMO} faceDown interactive={false} width="96px" />
+        <Card card={DEMO} faceDown interactive={false} width={96} />
+        <Card card={DEMO} faceDown interactive={false} width={96} />
+        <Card card={DEMO} faceDown interactive={false} width={96} />
       </div>
     )
   }
   if (visual === 'discard') {
     return (
       <div className={styles.discard}>
-        <Card card={CARDS[3]} interactive={false} width="96px" />
-        <Card card={CARDS[5]} interactive={false} width="96px" />
+        <Card card={CARDS[3]} interactive={false} width={96} />
+        <Card card={CARDS[5]} interactive={false} width={96} />
       </div>
     )
   }
@@ -429,7 +429,7 @@ export default function AnimationsStory() {
           {spec && (
             <div className={`${styles.cardSlot} ${cardSlot}`}>
               <div ref={cardRef} className={styles.card}>
-                <Card card={DEMO} faceDown={faceDown} interactive={false} width="150px" />
+                <Card card={DEMO} faceDown={faceDown} interactive={false} width={150} />
               </div>
             </div>
           )}
