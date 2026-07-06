@@ -4,24 +4,3 @@
   color: var(--fg);
   background: var(--bg);
 }
-
-.homeLink {
-  position: fixed;
-  inset-block-start: 16px;
-  inset-inline-start: 16px;
-  z-index: 10;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--brand-green);
-  letter-spacing: var(--tracking);
-  text-decoration: none;
-  background: var(--surface-1);
-  border: 1px solid var(--white-10);
-  border-radius: 8px;
-  transition: opacity var(--t-fast) var(--ease-out);
-}
-
-.homeLink:hover {
-  opacity: 0.8;
-}

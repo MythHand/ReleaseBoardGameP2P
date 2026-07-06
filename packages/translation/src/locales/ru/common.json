@@ -1,8 +1,7 @@
 {
   "app": {
     "foundationTag": "visual layer — foundation",
-    "phasesHint": "Экраны (boot → lobby → game → game over) появятся по фазам.",
-    "home": "← ГЛАВНАЯ"
+    "phasesHint": "Экраны (boot → lobby → game → game over) появятся по фазам."
   },
   "start": {
     "logoAlt": "Release любой ценой",

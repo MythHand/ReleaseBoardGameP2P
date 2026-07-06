@@ -1,5 +1,4 @@
-import { useTranslation } from '@release/translation'
-import { Link, Outlet, useLocation, useRouteError } from 'react-router'
+import { Outlet, useLocation, useRouteError } from 'react-router'
 import AppModals from '~/app/AppModals'
 import styles from '~/app/app.module.css'
 import { SessionProvider } from '~/app/providers/SessionProvider'
@@ -7,18 +6,10 @@ import ErrorScreen from '~/shared/ui/ErrorScreen'
 import LanguageSwitch from '~/shared/ui/LanguageSwitch'
 
 export default function App() {
-  const { t } = useTranslation()
   const { pathname } = useLocation()
   return (
     <SessionProvider>
       <div className={styles.root}>
-        {/* Exclude '/' too: it renders briefly before redirecting to /start, and
-            the link would flash on the entry frame. */}
-        {pathname !== '/start' && pathname !== '/' && (
-          <Link to="/start" className={styles.homeLink}>
-            {t('app.home')}
-          </Link>
-        )}
         {/* Only on the start screen — elsewhere (e.g. the lobby) it would
             overlay the page header. */}
         {pathname === '/start' && <LanguageSwitch />}
