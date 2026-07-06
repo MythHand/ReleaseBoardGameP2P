@@ -21,6 +21,8 @@ interface CardProps {
   onClick?: () => void
   // переопределить цвет свечения (по умолчанию — акцент категории карты)
   accent?: string
+  // force the flat PNG face instead of the composed one (OG-card showcase)
+  png?: boolean
 }
 
 /**
@@ -35,13 +37,14 @@ export default function Card({
   width,
   onClick,
   accent: accentProp,
+  png,
 }: CardProps) {
   const ref = useRef<HTMLDivElement>(null)
   const flipRef = useRef<HTMLDivElement>(null)
   const initialDown = useRef(faceDown)
   const prevDown = useRef(faceDown)
   const [hover, setHover] = useState(false)
-  const [rot, setRot] = useState({ rx: 0, ry: 0 })
+  const [p, setP] = useState({ x: 0, y: 0 })
 
   // Флип лицо↔рубашка — через словарь анимаций (play('flipCard')).
   // Начальное положение задано инлайн-стилем (без мигания); все последующие
@@ -62,7 +65,7 @@ export default function Card({
 
   // сбрасываем наклон, когда параллакс выключается (карта ушла из наведения)
   useEffect(() => {
-    if (!tiltOn) setRot({ rx: 0, ry: 0 })
+    if (!tiltOn) setP({ x: 0, y: 0 })
   }, [tiltOn])
 
   function handleMove(e: React.MouseEvent<HTMLDivElement>) {
@@ -72,7 +75,7 @@ export default function Card({
     const r = el.getBoundingClientRect()
     const px = (e.clientX - r.left) / r.width - 0.5
     const py = (e.clientY - r.top) / r.height - 0.5
-    setRot({ rx: -py * TILT_MAX * 2, ry: px * TILT_MAX * 2 })
+    setP({ x: px, y: py })
   }
 
   function handleEnter() {
@@ -81,13 +84,13 @@ export default function Card({
 
   function handleLeave() {
     setHover(false)
-    setRot({ rx: 0, ry: 0 })
+    setP({ x: 0, y: 0 })
   }
 
   const lifted = hover
   const transform =
     `translateY(${lifted ? -10 : 0}px) scale(${lifted ? 1.04 : 1}) ` +
-    `rotateX(${rot.rx}deg) rotateY(${rot.ry}deg)`
+    `rotateX(${-p.y * TILT_MAX * 2}deg) rotateY(${p.x * TILT_MAX * 2}deg)`
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: mouse handlers drive decorative hover-lift/parallax only; actionable cards (onClick) get role=button + onKeyDown + tabIndex below
@@ -123,7 +126,7 @@ export default function Card({
           style={{ transform: `rotateY(${initialDown.current ? 180 : 0}deg)` }}
         >
           <div className={styles.face}>
-            <CardFace card={card} />
+            <CardFace card={card} p={p} png={png} />
           </div>
           <div className={`${styles.face} ${styles.back}`}>
             <CardBack deck={card?.deck} />
