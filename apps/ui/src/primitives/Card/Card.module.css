@@ -28,8 +28,10 @@
   position: absolute;
   inset: 0;
   overflow: hidden;
+  background: var(--surface-0); /* base behind the composed layers (harmless for PNG) */
   border-radius: 6cqw; /* масштабируется с шириной карты, не фиксировано */
   box-shadow: 0 6px 16px var(--black-50);
+  isolation: isolate; /* keeps the composed panel's blend-mode inside the face */
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }

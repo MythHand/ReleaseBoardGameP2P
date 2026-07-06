@@ -1,0 +1,82 @@
+.root {
+  padding: 28px;
+}
+
+.h {
+  margin: 0 0 14px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+}
+
+.intro {
+  max-inline-size: 78ch;
+  margin: 0 0 28px;
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--white-55);
+}
+
+.group {
+  margin-block-start: 34px;
+}
+
+.groupH {
+  padding-block-end: 8px;
+  margin: 0 0 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking);
+  border-block-end: 1px solid var(--white-10);
+  opacity: 0.7;
+}
+
+/* one style per row — aligned columns: where · sample · anatomy, so the reader
+   scans down and compares. Function-first: a registry, not a gallery. */
+.row {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 230px;
+  gap: 28px;
+  align-items: center;
+  padding: 16px 0;
+  border-block-end: 1px solid var(--white-06);
+}
+
+.where {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--white-55);
+}
+
+.sampleCell {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+/* the contextual on-top styling (colour / highlight) marked as a small tag */
+.layer {
+  flex: none;
+  padding: 2px 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--white-55);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  background: var(--white-08);
+  border-radius: 3px;
+}
+
+.anatomy {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-42);
+  text-align: end;
+}

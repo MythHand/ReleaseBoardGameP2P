@@ -8,7 +8,7 @@
 .sidebar {
   overflow-y: auto; /* собственный скролл навигации, не двигает контент */
   background: var(--surface-1);
-  border-inline-end: 1px solid rgb(255 255 255 / 8%);
+  border-inline-end: 1px solid var(--white-08);
 }
 
 /* шапка (название + язык) прилипает к верху при скролле навигации */
@@ -18,7 +18,7 @@
   z-index: 1;
   padding: 18px 18px 14px;
   background: var(--surface-1);
-  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  border-block-end: 1px solid var(--white-08);
 }
 
 /* переключатель языка предпросмотра — под названием */
@@ -31,8 +31,8 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   padding: 3px;
-  background: rgb(0 0 0 / 28%);
-  border: 1px solid rgb(255 255 255 / 10%);
+  background: var(--black-28);
+  border: 1px solid var(--white-10);
   border-radius: 999px;
 }
 
@@ -41,8 +41,8 @@
   inset-block: 3px;
   inset-inline-start: 3px;
   inline-size: calc(50% - 3px);
-  background: rgb(41 224 122 / 16%);
-  border: 1px solid rgb(41 224 122 / 35%);
+  background: var(--brand-green-16);
+  border: 1px solid var(--brand-green-35);
   border-radius: 999px;
   transition: transform var(--t-base) var(--ease-soft);
 }
@@ -123,11 +123,11 @@
 }
 
 .item:hover {
-  background: rgb(255 255 255 / 4%);
+  background: var(--white-04);
 }
 
 .itemActive {
-  background: rgb(41 224 122 / 8%);
+  background: var(--brand-green-08);
   border-inline-start-color: var(--brand-green);
 }
 

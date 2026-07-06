@@ -1,7 +1,7 @@
 {
   "extends": "@release/lint/tsconfig",
   "compilerOptions": {
-    "types": ["vite/client"],
+    "types": ["vite/client", "vite-plugin-svgr/client"],
     "paths": { "@release/ui": ["../ui/src/index.ts"], "@/*": ["../ui/src/*"] }
   },
   "include": ["."],

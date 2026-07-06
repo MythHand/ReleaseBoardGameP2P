@@ -1,3 +1,4 @@
+import type { FunctionComponent, SVGProps } from 'react'
 import bgTriggerAi from '@/assets/cards/parallax/background/ai.png'
 import bgAiEvent from '@/assets/cards/parallax/background/ai-event.png'
 import bgAttack from '@/assets/cards/parallax/background/attack.png'
@@ -8,14 +9,14 @@ import bgProtection from '@/assets/cards/parallax/background/protection.png'
 import bgRelease from '@/assets/cards/parallax/background/release.png'
 import bgSupport from '@/assets/cards/parallax/background/support.png'
 import gridUrl from '@/assets/cards/parallax/base/grid.svg'
-import attackIcon from '@/assets/cards/parallax/category/attack.svg'
-import defenseIcon from '@/assets/cards/parallax/category/defense.svg'
-import eventsIcon from '@/assets/cards/parallax/category/events.svg'
+import AttackIcon from '@/assets/cards/parallax/category/attack.svg?react'
+import DefenseIcon from '@/assets/cards/parallax/category/defense.svg?react'
+import EventsIcon from '@/assets/cards/parallax/category/events.svg?react'
 import fastIcon from '@/assets/cards/parallax/category/fast.svg'
-import operationIcon from '@/assets/cards/parallax/category/git-operation.svg'
-import protectionIcon from '@/assets/cards/parallax/category/protection.svg'
-import releaseIcon from '@/assets/cards/parallax/category/release.svg'
-import supportIcon from '@/assets/cards/parallax/category/support.svg'
+import OperationIcon from '@/assets/cards/parallax/category/git-operation.svg?react'
+import ProtectionIcon from '@/assets/cards/parallax/category/protection.svg?react'
+import ReleaseIcon from '@/assets/cards/parallax/category/release.svg?react'
+import SupportIcon from '@/assets/cards/parallax/category/support.svg?react'
 import decorAi from '@/assets/cards/parallax/decorate/ai.svg'
 import decorError from '@/assets/cards/parallax/decorate/error.svg'
 import aiArt from '@/assets/cards/parallax/illustration/ai.png'
@@ -112,10 +113,14 @@ export interface TextLayer {
   depth: number
 }
 
-// Top-left category tag: an icon (its category colour is baked into the SVG)
-// plus the category name in that same colour.
+// A category glyph imported as a React component (vite-plugin-svgr `?react`),
+// tinted via currentColor from the accent instead of a baked-in fill.
+export type SvgIcon = FunctionComponent<SVGProps<SVGSVGElement>>
+
+// Top-left category tag: an icon (tinted with the category colour via
+// currentColor) plus the category name in that same colour.
 export interface CategoryLayer {
-  icon: string
+  icon: SvgIcon
   // native icon px (kept as-is)
   w: number
   h: number
@@ -165,7 +170,7 @@ interface CardTheme {
   background: { src: string; w: number; h: number }
   panelOpacity: number
   // omitted for Trigger cards, which carry no category tag
-  category?: { icon: string; w: number; h: number; label: string; accent: string }
+  category?: { icon: SvgIcon; w: number; h: number; label: string; accent: string }
   // whether cards of this category show the lightning "fast play" mark
   fast?: boolean
   // Trigger diagonal band SVG (only Trigger-style cards have one)
@@ -175,14 +180,14 @@ interface CardTheme {
 const RELEASE_THEME: CardTheme = {
   background: { src: bgRelease, w: 421, h: 627 },
   panelOpacity: 0.9,
-  category: { icon: releaseIcon, w: 20, h: 14, label: 'Release', accent: 'var(--cat-release)' },
+  category: { icon: ReleaseIcon, w: 20, h: 14, label: 'Release', accent: 'var(--cat-release)' },
 }
 
 const PROTECTION_THEME: CardTheme = {
   background: { src: bgProtection, w: 419, h: 624 },
   panelOpacity: 0.58,
   category: {
-    icon: protectionIcon,
+    icon: ProtectionIcon,
     w: 16,
     h: 16,
     label: 'Protection',
@@ -194,7 +199,7 @@ const OPERATION_THEME: CardTheme = {
   background: { src: bgOperation, w: 416, h: 620 },
   panelOpacity: 0.6,
   category: {
-    icon: operationIcon,
+    icon: OperationIcon,
     w: 16,
     h: 16,
     label: 'Git Operation',
@@ -205,7 +210,7 @@ const OPERATION_THEME: CardTheme = {
 const DEFENSE_THEME: CardTheme = {
   background: { src: bgDefense, w: 417, h: 621 },
   panelOpacity: 0.71,
-  category: { icon: defenseIcon, w: 16, h: 16, label: 'Defense', accent: 'var(--cat-defense)' },
+  category: { icon: DefenseIcon, w: 16, h: 16, label: 'Defense', accent: 'var(--cat-defense)' },
   fast: true,
 }
 
@@ -213,21 +218,21 @@ const DEFENSE_THEME: CardTheme = {
 const ATTACK_THEME: CardTheme = {
   background: { src: bgAttack, w: 417, h: 621 },
   panelOpacity: 0.6,
-  category: { icon: attackIcon, w: 15, h: 15, label: 'Attack', accent: 'var(--cat-attack)' },
+  category: { icon: AttackIcon, w: 15, h: 15, label: 'Attack', accent: 'var(--cat-attack)' },
   fast: true,
 }
 
 const SUPPORT_THEME: CardTheme = {
   background: { src: bgSupport, w: 418, h: 622 },
   panelOpacity: 0.6,
-  category: { icon: supportIcon, w: 15, h: 15, label: 'Support', accent: 'var(--cat-support)' },
+  category: { icon: SupportIcon, w: 15, h: 15, label: 'Support', accent: 'var(--cat-support)' },
 }
 
 // AI deck (purple). Cards carry a subtype in the tag (e.g. "AI / Event").
 const AI_EVENT_THEME: CardTheme = {
   background: { src: bgAiEvent, w: 425, h: 633 },
   panelOpacity: 0.56,
-  category: { icon: eventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
+  category: { icon: EventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
 }
 
 // Trigger cards (Error 503 / AI) — no category tag, a stronger (thinner) panel,
@@ -248,13 +253,17 @@ const TRIGGER_AI_THEME: CardTheme = {
 const AI_ERROR_503_THEME: CardTheme = {
   background: { src: bgError503, w: 415, h: 618 },
   panelOpacity: 0.32,
-  category: { icon: eventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
+  category: { icon: EventsIcon, w: 20, h: 16, label: 'Event', accent: 'var(--cat-ai)' },
   decor: decorError,
 }
 
 // shared vertical position of the illustration (design px); the per-card yNudge
 // lowers it to balance each art
-const ILLO_Y = -12
+const ILLO_Y = -4
+
+// background parallax depth — the panel (dim + grain) rides the SAME plane, so
+// the darkening stays registered to the photo background and covers only it
+const BG_DEPTH = 0.9
 
 // Shared geometry of the Trigger diagonal band — identical on every trigger card
 // (only the colour differs). Native SVG is 1389×1638 authored at 2× the other
@@ -270,9 +279,9 @@ const DECOR = { w: 1014, h: 1016, depth: 0.44 }
 function makeCard(
   theme: CardTheme,
   illustration: { src: string; w: number; h: number },
-  opts: { yNudge?: number; subtype?: string; fast?: boolean } = {},
+  opts: { yNudge?: number; titleNudge?: number; subtype?: string; fast?: boolean } = {},
 ): ParallaxCardConfig {
-  const { yNudge = 0, subtype, fast } = opts
+  const { yNudge = 0, titleNudge = 0, subtype, fast } = opts
   // category tag — Trigger cards have none; others may append a subtype to the label
   const category = theme.category
     ? {
@@ -290,14 +299,16 @@ function makeCard(
     // layers (background) parallax the MOST — the far floor behind the glass —
     // while surface layers (text) barely move, as if pinned to the card face.
     // Sign = direction (content inverted vs grid); magnitude = how deep it sits.
-    background: { ...theme.background, depth: 0.9 },
-    panel: { depth: -0.7, opacity: theme.panelOpacity },
+    background: { ...theme.background, depth: BG_DEPTH },
+    // panel = the dim+grain over the photo; same depth as the background so it
+    // tracks it exactly (covers only the photo, never drifts onto other layers)
+    panel: { depth: BG_DEPTH, opacity: theme.panelOpacity },
     grid: { src: gridUrl, w: 443, h: 726, depth: 0.28 },
     illustration: { ...illustration, depth: 0.6, y: ILLO_Y + yNudge },
     decor: theme.decor ? { ...DECOR, src: theme.decor } : undefined,
     category,
     fast: showFast ? { icon: fastIcon, w: 12, h: 15, top: 20, right: 22, depth: 0.05 } : undefined,
-    title: { top: 52, padX: 21, depth: -0.14 },
+    title: { top: 68 + titleNudge, padX: 21, depth: -0.14 },
     description: { bottom: 34, padX: 20, depth: -0.14 },
   }
 }
@@ -390,7 +401,7 @@ export const NOT_A_BUG = makeCard(
 export const WORKS_ON_MY_MACHINE = makeCard(
   DEFENSE_THEME,
   { src: worksOnMyMachineArt, w: 309, h: 309 },
-  { subtype: 'Unicorn' },
+  { subtype: 'Unicorn', titleNudge: -6 },
 )
 export const ROLLBACK = makeCard(
   DEFENSE_THEME,
@@ -484,9 +495,13 @@ export const AI_ERROR_503 = makeCard(
 export const TRIGGER_ERROR_503 = makeCard(
   TRIGGER_ERROR_503_THEME,
   { src: error503Art, w: 338, h: 338 },
-  { yNudge: 19 },
+  { yNudge: 13, titleNudge: -12 },
 )
-export const TRIGGER_AI = makeCard(TRIGGER_AI_THEME, { src: aiArt, w: 292, h: 292 }, { yNudge: 19 })
+export const TRIGGER_AI = makeCard(
+  TRIGGER_AI_THEME,
+  { src: aiArt, w: 292, h: 292 },
+  { yNudge: 13, titleNudge: -12 },
+)
 
 // Registry: card id → composed config. Ids absent here render as the PNG face.
 export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {

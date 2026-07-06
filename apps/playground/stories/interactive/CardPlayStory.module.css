@@ -15,7 +15,7 @@
   align-items: center;
   padding: 16px 24px;
   background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  border-block-end: 1px solid var(--white-08);
 }
 
 .btn {
@@ -25,7 +25,7 @@
   letter-spacing: var(--tracking);
   cursor: pointer;
   background: transparent;
-  border: 1px solid rgb(255 255 255 / 15%);
+  border: 1px solid var(--white-15);
   border-radius: 6px;
 }
 
@@ -37,7 +37,7 @@
 .hint {
   font-family: var(--font-mono);
   font-size: 12px;
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
   letter-spacing: 0.1em;
 }
 
@@ -73,10 +73,10 @@
   block-size: 100%;
   font-family: var(--font-mono);
   font-size: 12px;
-  color: rgb(255 255 255 / 28%);
+  color: var(--white-28);
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  border: 1px dashed rgb(255 255 255 / 14%);
+  border: 1px dashed var(--white-14);
   border-radius: 8px;
 }
 
@@ -113,10 +113,10 @@
   block-size: 100%;
   font-family: var(--font-mono);
   font-size: 12px;
-  color: rgb(255 255 255 / 28%);
+  color: var(--white-28);
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  border: 1px dashed rgb(255 255 255 / 14%);
+  border: 1px dashed var(--white-14);
   border-radius: 8px;
 }
 
@@ -129,8 +129,8 @@
   font-family: var(--font-mono);
   font-size: 15px;
   letter-spacing: 0.02em;
-  background: rgb(0 0 0 / 78%);
-  border: 1px solid rgb(255 255 255 / 20%);
+  background: var(--black-78);
+  border: 1px solid var(--white-20);
   border-radius: 6px;
 }
 

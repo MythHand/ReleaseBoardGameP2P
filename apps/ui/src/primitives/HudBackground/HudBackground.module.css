@@ -2,12 +2,13 @@
    — a quiet background. Semantic tone drives the faint tint/border via --a. */
 .bg {
   --a: var(--gray); /* neutral — grey, not white */
+  --glow: 4%; /* top radial-glow strength — per tone (positive is brighter) */
 
   position: relative;
   padding: 16px 20px;
   overflow: hidden;
   background:
-    radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--a) 4%, transparent), transparent 60%),
+    radial-gradient(120% 90% at 50% -10%, color-mix(in srgb, var(--a) var(--glow), transparent), transparent 60%),
     linear-gradient(180deg, color-mix(in srgb, var(--surface-1) 45%, transparent), color-mix(in srgb, var(--surface-0) 25%, transparent));
   border: 1px solid color-mix(in srgb, var(--a) 9%, transparent);
   border-radius: 14px;
@@ -15,6 +16,7 @@
 
 .bg[data-tone='positive'] {
   --a: var(--brand-green);
+  --glow: 12%; /* 3× the neutral glow — brighter green wash */
 }
 
 /* grid — fully transparent, only the techno grid remains (no fill, no border) */
@@ -25,6 +27,9 @@
 
 /* faint techno grid — masked down further than the surface's */
 .grid {
+  /* local boost: 1.6× the shared --grid-line (4% → 6.4%), only for this bg */
+  --grid-line: color-mix(in srgb, var(--fg) 6.4%, transparent);
+
   position: absolute;
   inset: 0;
   pointer-events: none;

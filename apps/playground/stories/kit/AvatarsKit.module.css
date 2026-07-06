@@ -10,7 +10,7 @@
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  border-block-end: 1px solid var(--white-08);
   opacity: 0.5;
 }
 
@@ -43,18 +43,18 @@
 }
 
 .item:hover {
-  background: rgb(255 255 255 / 5%);
+  background: var(--white-05);
 }
 
 .itemOn {
-  background: rgb(255 255 255 / 8%);
-  border-color: rgb(255 255 255 / 22%);
+  background: var(--white-08);
+  border-color: var(--white-22);
 }
 
 .cap {
   font-family: var(--font-mono);
   font-size: 10px;
-  color: rgb(255 255 255 / 60%);
+  color: var(--white-60);
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -69,7 +69,7 @@
   flex-direction: column;
   gap: 28px;
   padding: 24px;
-  background: rgb(255 255 255 / 3%);
+  background: var(--white-03);
   border-radius: 18px;
 }
 
@@ -82,7 +82,7 @@
 .previewCap {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -103,7 +103,7 @@
 .sub {
   font-family: var(--font-mono);
   font-size: 9px;
-  color: rgb(255 255 255 / 40%);
+  color: var(--white-40);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }

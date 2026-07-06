@@ -1,16 +1,12 @@
 import type { CSSProperties } from 'react'
 import { type Lang, useLang } from '../../Playground/lang'
-import styles from './TypographyPreview.module.css'
+import styles from './TextStyles.module.css'
 
-// Project-wide text styles (real values from the components), grouped by area.
-// The technical CSS under each sample is derived from the same style object as
-// the sample itself — the values always match. var(--font-text) = Fira Mono,
-// var(--font-mono) = JetBrains Mono, var(--font-heading) = Onest.
-//
-// Language logic: the page title and the group titles are technical → English in
-// both languages. In a role, component / screen / variant names stay English
-// (Input, Badge, Stats, Modal, Primary…); only the descriptive part is bilingual.
-// Samples are bilingual too. useLang() selects the RU/EN variant.
+// Applied text styles — the project's typography BY WHERE IT IS USED, not as code
+// to paste. Each row: where/why it's used · the live sample · a readable anatomy
+// of the type (family · size · weight · case · tracking). A small tag marks the
+// contextual styling layered ON TOP of the type (colour / highlight, e.g. Rules);
+// a component's own chrome (Badge border, Button box) is not shown here.
 type Loc = Record<Lang, string>
 
 const heading: CSSProperties = { fontFamily: 'var(--font-heading)', color: '#fff' }
@@ -21,19 +17,29 @@ interface Entry {
   role: Loc
   sample: Loc
   style: CSSProperties
+  // label for a contextual style layered on top of the type (accent / highlight)
+  layer?: string
 }
 
-const UNITLESS = new Set(['font-weight', 'line-height', 'opacity'])
+// family var → readable name
+const FAMILY: Record<string, string> = {
+  'var(--font-heading)': 'Onest',
+  'var(--font-text)': 'Fira Mono',
+  'var(--font-mono)': 'JetBrains Mono',
+}
 
-// CSSProperties → readable CSS (camelCase → kebab, numbers → px except unitless).
-const cssText = (style: CSSProperties): string =>
-  Object.entries(style)
-    .map(([k, v]) => {
-      const prop = k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)
-      const val = typeof v === 'number' && !UNITLESS.has(prop) ? `${v}px` : v
-      return `${prop}: ${val};`
-    })
-    .join('\n')
+// Readable anatomy of the TYPE only (family · size · weight · case · tracking).
+// Colour / highlight are the contextual layer and are shown as a tag, not here.
+function anatomy(style: CSSProperties): string {
+  const parts: string[] = []
+  const fam = style.fontFamily as string | undefined
+  if (fam) parts.push(FAMILY[fam] ?? fam)
+  if (style.fontSize != null) parts.push(String(style.fontSize))
+  if (style.fontWeight != null && style.fontWeight !== 400) parts.push(String(style.fontWeight))
+  if (style.textTransform === 'uppercase') parts.push('uppercase')
+  if (style.letterSpacing) parts.push(String(style.letterSpacing))
+  return parts.join(' · ')
+}
 
 // Group titles are technical → English in both languages.
 const sections: { title: string; items: Entry[] }[] = [
@@ -41,14 +47,14 @@ const sections: { title: string; items: Entry[] }[] = [
     title: 'Headings',
     items: [
       {
-        role: { ru: 'Экран (Stats / Lobby)', en: 'Screen (Stats / Lobby)' },
+        role: { ru: 'Заголовок экрана (Stats)', en: 'Screen title (Stats)' },
         sample: { ru: 'Статистика партии', en: 'Match stats' },
         style: { ...heading, fontSize: 32, letterSpacing: '0.04em' },
       },
       {
-        role: { ru: 'Modal', en: 'Modal' },
-        sample: { ru: 'Создать игру', en: 'Create game' },
-        style: { ...heading, fontSize: 20, textTransform: 'uppercase', letterSpacing: '0.06em' },
+        role: { ru: 'Заголовок экрана (Lobby)', en: 'Screen title (Lobby)' },
+        sample: { ru: 'Лобби', en: 'Lobby' },
+        style: { ...heading, fontSize: 30, letterSpacing: '0.04em' },
       },
       {
         role: { ru: 'Блок / подсекция', en: 'Block / subsection' },
@@ -60,17 +66,6 @@ const sections: { title: string; items: Entry[] }[] = [
   {
     title: 'Captions and labels',
     items: [
-      {
-        role: { ru: 'Лейбл поля (Input)', en: 'Field label (Input)' },
-        sample: { ru: 'Ваш никнейм', en: 'Your nickname' },
-        style: {
-          ...mono,
-          fontSize: 11,
-          textTransform: 'uppercase',
-          letterSpacing: '0.16em',
-          color: 'rgb(255 255 255 / 70%)',
-        },
-      },
       {
         role: { ru: 'Лейбл секции (Stats / Lobby)', en: 'Section label (Stats / Lobby)' },
         sample: { ru: 'Победы', en: 'Wins' },
@@ -92,101 +87,17 @@ const sections: { title: string; items: Entry[] }[] = [
           letterSpacing: '0.16em',
           color: 'var(--cat-release)',
         },
-      },
-      {
-        role: { ru: 'Badge', en: 'Badge' },
-        sample: { ru: 'хост', en: 'host' },
-        style: {
-          ...mono,
-          fontSize: 11,
-          textTransform: 'uppercase',
-          letterSpacing: '0.1em',
-          padding: '2px 8px',
-          border: '1px solid rgb(255 255 255 / 18%)',
-          borderRadius: 4,
-        },
+        layer: 'accent',
       },
     ],
   },
   {
-    title: 'Values and input',
+    title: 'Values',
     items: [
-      {
-        role: { ru: 'Значение поля (Input)', en: 'Field value (Input)' },
-        sample: { ru: 'DIMBO', en: 'DIMBO' },
-        style: {
-          ...mono,
-          fontSize: 18,
-          textTransform: 'uppercase',
-          letterSpacing: '0.14em',
-          color: '#fff',
-        },
-      },
-      {
-        role: { ru: 'Код игры (Lobby)', en: 'Game code (Lobby)' },
-        sample: { ru: '4F2A-9K', en: '4F2A-9K' },
-        style: { ...mono, fontSize: 26, letterSpacing: '0.2em', color: '#fff' },
-      },
       {
         role: { ru: 'Крупное число (Stats)', en: 'Large number (Stats)' },
         sample: { ru: '12', en: '12' },
-        style: { ...heading, fontSize: 40, lineHeight: 1 },
-      },
-    ],
-  },
-  {
-    title: 'Buttons',
-    items: [
-      {
-        role: { ru: 'Primary (брекеты)', en: 'Primary (brackets)' },
-        sample: { ru: '[ создать игру ]', en: '[ create game ]' },
-        style: {
-          ...mono,
-          fontSize: 17,
-          textTransform: 'uppercase',
-          letterSpacing: '0.18em',
-          color: '#fff',
-        },
-      },
-      {
-        role: { ru: 'Tech / Danger', en: 'Tech / Danger' },
-        sample: { ru: 'отмена', en: 'cancel' },
-        style: {
-          ...mono,
-          fontSize: 11,
-          textTransform: 'uppercase',
-          letterSpacing: '0.18em',
-          color: 'rgb(255 255 255 / 60%)',
-          padding: '6px 10px',
-          border: '1px solid rgb(255 255 255 / 18%)',
-          borderRadius: 4,
-        },
-      },
-    ],
-  },
-  {
-    title: 'Table / HUD',
-    items: [
-      {
-        role: { ru: 'Имя игрока (Seat)', en: 'Player name (Seat)' },
-        sample: { ru: 'dimbo', en: 'dimbo' },
-        style: { ...text, fontSize: 13, letterSpacing: '0.03em' },
-      },
-      {
-        role: { ru: 'Строка лога (MoveHistory)', en: 'Log line (MoveHistory)' },
-        sample: { ru: 'dimbo выложил Frontend', en: 'dimbo played Frontend' },
-        style: { ...text, fontSize: 12, lineHeight: 1.3 },
-      },
-      {
-        role: { ru: 'Метка / счётчик', en: 'Marker / counter' },
-        sample: { ru: 'Раунд 2', en: 'Round 2' },
-        style: {
-          ...mono,
-          fontSize: 10,
-          textTransform: 'uppercase',
-          letterSpacing: '0.08em',
-          color: 'rgb(255 255 255 / 50%)',
-        },
+        style: { ...mono, fontSize: 52, fontWeight: 300 },
       },
     ],
   },
@@ -221,6 +132,7 @@ const sections: { title: string; items: Entry[] }[] = [
           letterSpacing: '0.04em',
           color: 'var(--cat-release)',
         },
+        layer: 'accent',
       },
       {
         role: { ru: 'Описание карты (Rules)', en: 'Card description (Rules)' },
@@ -240,6 +152,7 @@ const sections: { title: string; items: Entry[] }[] = [
           color: 'rgb(255 255 255 / 90%)',
           background: 'rgb(255 206 70 / 20%)',
         },
+        layer: 'sudo',
       },
       {
         role: { ru: 'Подсветка поиска — совпадение', en: 'Search highlight — match' },
@@ -249,9 +162,10 @@ const sections: { title: string; items: Entry[] }[] = [
           fontSize: 14,
           padding: '1px 4px',
           borderRadius: 2,
-          color: '#fff',
-          background: 'rgb(255 230 120 / 28%)',
+          color: 'var(--fg)',
+          background: 'var(--yellow-28)',
         },
+        layer: 'match',
       },
       {
         role: { ru: 'Подсветка поиска — активное', en: 'Search highlight — active' },
@@ -261,35 +175,40 @@ const sections: { title: string; items: Entry[] }[] = [
           fontSize: 14,
           padding: '1px 4px',
           borderRadius: 2,
-          color: '#1c1c1c',
-          background: 'rgb(255 168 12 / 95%)',
+          color: 'var(--charcoal)',
+          background: 'var(--orange-95)',
         },
+        layer: 'active',
       },
     ],
   },
 ]
+
+const INTRO: Loc = {
+  ru: 'Текстовые стили проекта по месту применения. Слева — где и зачем, в центре — живой стиль, справа — его анатомия (семейство · размер · начертание · кейс · трекинг). Плашка отмечает стилизацию, навешенную поверх типа (цвет / подсветка).',
+  en: 'The project’s text styles by where they are used. Left — where and why, centre — the live style, right — its anatomy (family · size · weight · case · tracking). A tag marks styling layered on top of the type (colour / highlight).',
+}
 
 export default function TextStyles() {
   const { lang } = useLang()
   return (
     <section className={styles.root}>
       <h2 className={styles.h}>text styles</h2>
+      <p className={styles.intro}>{INTRO[lang]}</p>
+
       {sections.map((sec) => (
-        <div key={sec.title}>
-          <h3 className={styles.subH}>{sec.title}</h3>
-          <div className={styles.list}>
-            {sec.items.map((s) => (
-              <article key={s.role.en} className={styles.item}>
-                <header className={styles.meta}>
-                  <span className={styles.role}>{s.role[lang]}</span>
-                </header>
-                <div className={styles.sampleRow}>
-                  <span style={s.style}>{s.sample[lang]}</span>
-                </div>
-                <pre className={styles.css}>{cssText(s.style)}</pre>
-              </article>
-            ))}
-          </div>
+        <div key={sec.title} className={styles.group}>
+          <h3 className={styles.groupH}>{sec.title}</h3>
+          {sec.items.map((s) => (
+            <div key={s.role.en} className={styles.row}>
+              <span className={styles.where}>{s.role[lang]}</span>
+              <span className={styles.sampleCell}>
+                <span style={s.style}>{s.sample[lang]}</span>
+                {s.layer && <span className={styles.layer}>{s.layer}</span>}
+              </span>
+              <span className={styles.anatomy}>{anatomy(s.style)}</span>
+            </div>
+          ))}
         </div>
       ))}
     </section>

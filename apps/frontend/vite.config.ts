@@ -3,6 +3,7 @@ import generouted from '@generouted/react-router/plugin'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import svgr from 'vite-plugin-svgr'
 
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 const appSrc = fileURLToPath(new URL('./src', import.meta.url))
@@ -14,6 +15,10 @@ export default defineConfig({
   base: process.env.VITE_BASE_URL ?? '/',
   plugins: [
     react(),
+    // `*.svg?react` imports resolve to React components (plain `*.svg` stay
+    // asset URLs). @release/ui is consumed from source and its CardParallax
+    // config pulls in svgr-imported category icons.
+    svgr(),
     tailwindcss(),
     generouted({
       format: false,
