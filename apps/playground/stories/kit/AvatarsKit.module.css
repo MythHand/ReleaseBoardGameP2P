@@ -1,0 +1,109 @@
+.presets {
+  margin-block-start: 40px;
+}
+
+/* section header — matches the KitShell section heading */
+.h {
+  padding-block-end: 8px;
+  margin: 0 0 20px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  opacity: 0.5;
+}
+
+/* 60 / 40 split — gallery left, live preview right */
+.split {
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+}
+
+.gallery {
+  display: grid;
+  flex: 3;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 16px;
+  min-inline-size: 0;
+}
+
+.item,
+.itemOn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 16px;
+}
+
+.item:hover {
+  background: rgb(255 255 255 / 5%);
+}
+
+.itemOn {
+  background: rgb(255 255 255 / 8%);
+  border-color: rgb(255 255 255 / 22%);
+}
+
+.cap {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgb(255 255 255 / 60%);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* preview panel — sticky so it stays put while the gallery scrolls */
+.preview {
+  position: sticky;
+  inset-block-start: 24px;
+  display: flex;
+  flex: 2;
+  flex-direction: column;
+  gap: 28px;
+  padding: 24px;
+  background: rgb(255 255 255 / 3%);
+  border-radius: 18px;
+}
+
+.previewRow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.previewCap {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgb(255 255 255 / 45%);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.variants {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+}
+
+.variant {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgb(255 255 255 / 40%);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}

@@ -1,13 +1,11 @@
-import { type CSSProperties, useState } from 'react'
+import { type CSSProperties, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import { CARD_CONTENT, CARDS, CATEGORIES } from '@/cards'
-import CardParallax from '@/cards/CardParallax'
+import CardParallax, { PARALLAX_CARDS } from '@/cards/CardParallax'
 import type { CardContent } from '@/cards/content'
 import Card from '@/primitives/Card'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './CardParallaxStory.module.css'
-
-// cards that have a code-composed (parallax) face built; others stay PNG
-const PARALLAX_IDS = new Set(['release-frontend'])
 
 // Page for developing the composed (parallax) card face. Cards with a built
 // composed face (PARALLAX_IDS) render <CardParallax>; the rest stay PNG <Card>.
@@ -32,16 +30,42 @@ const PREVIEWS: { id: string; w: number; lod: boolean; label: { ru: string; en: 
 
 export default function CardParallaxStory() {
   const { lang } = useLang()
-  const [selectedId, setSelectedId] = useState(CARDS[0].id)
-  const selected = CARDS.find((c) => c.id === selectedId) ?? CARDS[0]
+  // selected card lives in the URL (/card-parallax/:cardId) so each card is a
+  // full, shareable address; no cardId falls back to the first card
+  const { cardId } = useParams<{ cardId?: string }>()
+  const navigate = useNavigate()
+  const selected = CARDS.find((c) => c.id === cardId) ?? CARDS[0]
   const accent = CATEGORIES[selected.category].accent
   const content: CardContent | undefined = CARD_CONTENT[selected.id]?.[lang]
 
-  // render the composed face for parallax cards, the PNG face otherwise
+  // ↑/↓ step through the cards (internal "pages"), mirroring the vertical rail
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+      e.preventDefault()
+      const idx = CARDS.findIndex((c) => c.id === selected.id)
+      const next =
+        e.key === 'ArrowDown' ? Math.min(idx + 1, CARDS.length - 1) : Math.max(idx - 1, 0)
+      if (next === idx) return
+      // drop focus off the clicked rail item — otherwise the first arrow press
+      // makes it :focus-visible and its green outline sticks on the old entry
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+      void navigate(`/card-parallax/${CARDS[next].id}`)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected.id, navigate])
+
+  // render the composed face for cards that have one, the PNG face otherwise
+  const parallaxConfig = PARALLAX_CARDS[selected.id]
   const renderFace = (w: number, interactive: boolean, lod = false) =>
-    PARALLAX_IDS.has(selected.id) ? (
+    parallaxConfig ? (
       <CardParallax
-        content={{ title: content?.title ?? selected.name, description: content?.effect ?? '' }}
+        config={parallaxConfig}
+        content={{
+          title: content?.title ?? selected.name,
+          description: content?.paragraphs ?? [],
+        }}
         width={w}
         interactive={interactive}
         lod={lod}
@@ -53,8 +77,10 @@ export default function CardParallaxStory() {
   const t = pick(lang, {
     ru: {
       hint: 'Наведи на авторскую карту — параллакс-наклон для настройки глубины. LOD справа и превью ниже — статичные, в реальных размерах.',
+      navHint: '↑↓ — карты',
       authoring: 'авторский размер',
       usedAt: 'размеры использования',
+      contentTitle: 'контент',
       noContent: 'composed-содержимого пока нет — заполняется по мере работы над картой',
       title: 'заголовок',
       typeLine: 'тип',
@@ -63,8 +89,10 @@ export default function CardParallaxStory() {
     },
     en: {
       hint: 'Hover the authoring card — parallax tilt for tuning depth. The LOD on the right and previews below are static, at real sizes.',
+      navHint: '↑↓ — cards',
       authoring: 'authoring size',
       usedAt: 'used at',
+      contentTitle: 'content',
       noContent: 'no composed content yet — authored as card work proceeds',
       title: 'title',
       typeLine: 'type',
@@ -77,7 +105,10 @@ export default function CardParallaxStory() {
     <div className={styles.root}>
       <div className={styles.controls}>
         <span className={styles.hint}>{t.hint}</span>
-        <span className={styles.count}>{CARDS.length}</span>
+        <span className={styles.meta}>
+          <span className={styles.navHint}>{t.navHint}</span>
+          <span className={styles.count}>{CARDS.length}</span>
+        </span>
       </div>
 
       <div className={styles.main}>
@@ -86,9 +117,9 @@ export default function CardParallaxStory() {
             <button
               type="button"
               key={card.id}
-              className={card.id === selectedId ? styles.railOn : styles.railItem}
+              className={card.id === selected.id ? styles.railOn : styles.railItem}
               style={{ '--accent': CATEGORIES[card.category].accent } as CSSProperties}
-              onClick={() => setSelectedId(card.id)}
+              onClick={() => navigate(`/card-parallax/${card.id}`)}
             >
               <span className={styles.railDot} />
               <span className={styles.railName}>{card.name}</span>
@@ -112,40 +143,50 @@ export default function CardParallaxStory() {
             </div>
           </section>
 
-          <section className={styles.block}>
-            <div className={styles.label}>{t.usedAt}</div>
-            <div className={styles.previews}>
-              {PREVIEWS.map((p) => (
-                <div key={p.id} className={styles.previewCell}>
-                  {renderFace(p.w, false, p.lod)}
-                  <div className={styles.previewCap}>
-                    {pick(lang, p.label)} · {Math.round(p.w)}px
+          <div className={styles.usageRow}>
+            <section className={styles.block}>
+              <div className={styles.label}>{t.usedAt}</div>
+              <div className={styles.previews}>
+                {PREVIEWS.map((p) => (
+                  <div key={p.id} className={styles.previewCell}>
+                    {renderFace(p.w, false, p.lod)}
+                    <div className={styles.previewCap}>
+                      {pick(lang, p.label)} · {Math.round(p.w)}px
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
 
-          <section className={styles.block}>
-            {content ? (
-              <dl className={styles.content}>
-                <dt>{t.title}</dt>
-                <dd>{content.title}</dd>
-                <dt>{t.typeLine}</dt>
-                <dd>{content.typeLine}</dd>
-                <dt>{t.effect}</dt>
-                <dd>{content.effect}</dd>
-                {content.flavor && (
-                  <>
-                    <dt>{t.flavor}</dt>
-                    <dd>{content.flavor}</dd>
-                  </>
-                )}
-              </dl>
-            ) : (
-              <p className={styles.noContent}>{t.noContent}</p>
-            )}
-          </section>
+            <section className={styles.block}>
+              <div className={styles.label}>{t.contentTitle}</div>
+              {content ? (
+                <dl className={styles.content}>
+                  <dt>{t.title}</dt>
+                  <dd>{content.title}</dd>
+                  <dt>{t.typeLine}</dt>
+                  <dd>{content.typeLine}</dd>
+                  <dt>{t.effect}</dt>
+                  <dd>
+                    {content.paragraphs.map((para) => (
+                      <span key={para.text} style={{ display: 'block' }}>
+                        {para.highlight ? `${para.highlight} · ` : ''}
+                        {para.text}
+                      </span>
+                    ))}
+                  </dd>
+                  {content.flavor && (
+                    <>
+                      <dt>{t.flavor}</dt>
+                      <dd>{content.flavor}</dd>
+                    </>
+                  )}
+                </dl>
+              ) : (
+                <p className={styles.noContent}>{t.noContent}</p>
+              )}
+            </section>
+          </div>
         </div>
       </div>
     </div>

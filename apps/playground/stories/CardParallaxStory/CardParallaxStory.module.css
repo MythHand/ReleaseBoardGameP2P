@@ -23,8 +23,21 @@
   opacity: 0.5;
 }
 
-.count {
+/* right cluster of the technical bar — nav hint + card count */
+.meta {
+  display: flex;
   flex: 0 0 auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.navHint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.count {
   font-family: var(--font-mono);
   font-size: 12px;
   opacity: 0.35;
@@ -111,6 +124,13 @@
 .authoring {
   display: flex;
   gap: 32px;
+  align-items: flex-start;
+}
+
+/* usage previews + content side by side — content sits to the right */
+.usageRow {
+  display: flex;
+  gap: 40px;
   align-items: flex-start;
 }
 

@@ -33,6 +33,7 @@
 .panel,
 .noise,
 .category,
+.fastBox,
 .title,
 .desc {
   position: absolute;
@@ -63,12 +64,12 @@
 }
 
 .panel {
+  /* opacity is per-card (release 0.9, protection 0.58) — set inline from config */
   background: radial-gradient(
     circle at 50% 42%,
     color-mix(in srgb, var(--card-parallax-navy) 50%, transparent) 0%,
     color-mix(in srgb, var(--card-parallax-navy) 95%, transparent) 100%
   );
-  opacity: 0.9;
   filter: blur(var(--blur, 14px));
 }
 
@@ -89,19 +90,92 @@
   transform: translate(var(--dx, 0), var(--dy, 0));
 }
 
+/* description — a column of paragraphs, still anchored to the bottom edge */
 .desc {
   composes: body from '../../design/typography.module.css';
-  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqw;
   color: var(--white-85);
   text-align: center;
   transform: translate(var(--dx, 0), var(--dy, 0));
+}
+
+/* line-height lives on the paragraphs, not .desc — the composed `body` base
+   sets its own line-height that would otherwise win over .desc */
+.para {
+  margin: 0;
+  line-height: 1.25;
+  text-wrap: balance; /* even out line lengths → no single word on the last line */
+}
+
+/* callouts — a paragraph on a translucent coloured background; whole line bold */
+.calloutSudo,
+.calloutDefense {
+  padding: 2cqw;
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.25;
+  text-wrap: balance;
+  border-radius: 2.5cqw;
+}
+
+/* sudo effect — yellow */
+.calloutSudo {
+  background: color-mix(in srgb, var(--card-sudo-yellow) 40%, transparent);
+}
+
+/* Defense "works against …" — green */
+.calloutDefense {
+  background: color-mix(in srgb, var(--card-defense-green) 40%, transparent);
+}
+
+/* referenced card names / sudo prefix — inline weight accent */
+.desc b {
+  font-weight: 700;
+}
+
+/* "ИЛИ" divider — text centred between two thin rules; rules stop 4px short of
+   the description edges on each side */
+.divider {
+  display: flex;
+  gap: 3cqw;
+  align-items: center;
+  padding-inline: 1.087cqw; /* ≈ 4px at the 368-wide authoring size */
+  line-height: 1;
+}
+
+.divider::before,
+.divider::after {
+  flex: 1;
+  block-size: 0.245cqw; /* ≈ 0.9px at the 368-wide authoring size */
+  content: "";
+  background: var(--white-40);
+}
+
+/* lightning "fast play" mark, top-right — framed in the unified icon box so it
+   sits on the same vertical line as the category tag */
+.fastBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transform: translate(var(--dx, 0), var(--dy, 0));
+}
+
+/* unified icon slot — fixed height (set inline in cqw), width hugs the icon;
+   centres the native icon vertically without distorting it */
+.iconBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* category tag — icon + label, both in the category colour (icon colour is
    baked into the SVG; label inherits the colour set inline) */
 .category {
   display: flex;
-  gap: 1.8cqw;
+  gap: 1.93cqw; /* ≈ 6.6px icon↔label + 0.5px breathing room, at the 368 frame */
   align-items: center;
   transform: translate(var(--dx, 0), var(--dy, 0));
 }
