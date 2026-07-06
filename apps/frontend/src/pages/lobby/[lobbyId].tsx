@@ -1,5 +1,5 @@
 import { useTranslation } from '@release/translation'
-import { Button } from '@release/ui'
+import { Button, Typography } from '@release/ui'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
@@ -35,15 +35,15 @@ export default function LobbyPage() {
     return (
       <Shell>
         <div className={card}>
-          <p className={styles.statusText}>
+          <Typography variant="body" className={styles.statusText}>
             {session.status === 'kicked' ? t('lobby.kickedMessage') : t('lobby.disbandedMessage')}
-          </p>
+          </Typography>
           <Link
             to="/start"
             className={`${ghostBtn} ${styles.backLink}`}
             onClick={() => session.leaveSession()}
           >
-            {t('lobby.back')}
+            <Typography base="body">{t('lobby.back')}</Typography>
           </Link>
         </div>
       </Shell>
@@ -56,8 +56,12 @@ export default function LobbyPage() {
         <Shell>
           <div className={`${card} ${styles.cardStack}`}>
             <div>
-              <p className={label}>{t('lobby.activeSession')}</p>
-              <p className={styles.code}>{session.roomCode}</p>
+              <Typography base="label-sm" tk="tk-16" as="p" className={label}>
+                {t('lobby.activeSession')}
+              </Typography>
+              <Typography variant="code" as="p" className={styles.code}>
+                {session.roomCode}
+              </Typography>
             </div>
             <div className={styles.row}>
               <Button onClick={() => setContinued(true)}>{t('lobby.continue')}</Button>
@@ -77,10 +81,14 @@ export default function LobbyPage() {
       {/* A failed join surfaces its error inside JoinLobbyForm itself (shared
           with the start-screen modal), so it isn't repeated here. */}
       {session.status === 'connecting' && (
-        <p className={styles.connecting}>{t('lobby.connecting')}</p>
+        <Typography base="body" as="p" className={styles.connecting}>
+          {t('lobby.connecting')}
+        </Typography>
       )}
       <div className={`${card} ${styles.cardStack}`}>
-        <h2 className={styles.joinTitle}>{t('lobby.joinTitle')}</h2>
+        <Typography variant="panelTitle" as="h2" className={styles.joinTitle}>
+          {t('lobby.joinTitle')}
+        </Typography>
         <JoinLobbyForm />
       </div>
       {/* No live session here (idle/connecting/error) — Back just resets any
@@ -90,7 +98,7 @@ export default function LobbyPage() {
         className={`${ghostBtn} ${styles.backStart}`}
         onClick={() => session.leaveSession()}
       >
-        {t('lobby.back')}
+        <Typography base="body">{t('lobby.back')}</Typography>
       </Link>
     </Shell>
   )

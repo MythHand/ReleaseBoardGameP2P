@@ -4,7 +4,7 @@ Shared component library — TypeScript + React + CSS Modules + design tokens; n
 
 ## Typography Rule
 
-- **All text is set through the `<Typography>` component from `@release/ui`** — the single typography path for both the frontend (`@release/web`) and the library. Do not write `font-family` / `font-size` / `text-transform` / `letter-spacing` by hand, and do not use raw font/size/tracking declarations outside `composes` from the shared typography scale. Color / spacing / layout stay local (via `className`).
+- **All text is set through the `<Typography>` component from `@release/ui`** — the single typography path for both the frontend (`@release/web`) and the library. Do not write `font-family` / `font-size` / `text-transform` / `letter-spacing` by hand, and do not add new `composes` from the scale (legacy — see below). Color / spacing / layout stay local (via `className`).
 - Two ways to pick a style:
   - **Semantic variant** (preferred): `<Typography variant="tag">…</Typography>`.
   - **Raw `base` + `tk`** (long tail, when no variant fits): `<Typography base="mono-strong" tk="tk-02">…</Typography>`. Exactly one of `variant` / `base` is required; `tk` is valid only alongside `base`.

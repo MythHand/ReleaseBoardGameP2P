@@ -1,7 +1,9 @@
 /* apps/frontend/src/pages/lobby/_LobbyView.module.css */
 
 /* Ported from apps/ui/src/screens/Lobby/Lobby.module.css and the PlayerSlot /
-   LobbyCode block modules; the kebab menu is frontend-only markup. */
+   LobbyCode block modules; the kebab menu is frontend-only markup.
+   Typography comes from <Typography> in the JSX — only color / spacing /
+   layout live here. */
 .lobby {
   position: relative;
   display: flex;
@@ -42,13 +44,10 @@
 }
 
 .title {
-  composes: heading-3 tk-04 from '@/design/typography.module.css';
   margin: 0;
 }
 
 .sub {
-  composes: label tk-14 from '@/design/typography.module.css';
-
   /* aligned under the word "Lobby": logo 96 + gap 18 + divider 1 + gap 18 */
   margin: 6px 0 0 133px;
   color: var(--white-45);
@@ -63,7 +62,6 @@
 }
 
 .codeLabel {
-  composes: label-sm tk-16 from '@/design/typography.module.css';
   color: var(--white-45);
 }
 
@@ -74,23 +72,7 @@
 }
 
 .codeValue {
-  composes: code tk-20 from '@/design/typography.module.css';
   color: var(--mint);
-}
-
-.copyBtn {
-  composes: label-sm tk-12 from '@/design/typography.module.css';
-  padding: 7px 12px;
-  color: var(--white-70);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-18);
-  transition: color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
-}
-
-.copyBtn:hover {
-  color: var(--fg);
-  border-color: var(--white-55);
 }
 
 /* ===== content: modes left, players right ===== */
@@ -104,7 +86,6 @@
 }
 
 .h {
-  composes: heading-8 tk-04 from '@/design/typography.module.css';
   display: flex;
   gap: 12px;
   align-items: baseline;
@@ -112,14 +93,12 @@
 }
 
 .count {
-  composes: mono-md tk-10 from '@/design/typography.module.css';
   color: var(--white-45);
 }
 
 .lockTag {
-  composes: mono-xs tk-10 from '@/design/typography.module.css';
   color: var(--white-40);
-  text-transform: none;
+  text-transform: none; /* reset the uppercase inherited from the heading */
 }
 
 .modes {
@@ -185,12 +164,7 @@
   border-color: var(--mint-50);
 }
 
-.name {
-  composes: body-lg from '@/design/typography.module.css';
-}
-
 .you {
-  composes: body-sm from '@/design/typography.module.css';
   color: var(--white-40);
 }
 
@@ -203,7 +177,6 @@
 }
 
 .slotEmpty {
-  composes: label tk-12 from '@/design/typography.module.css';
   color: var(--white-30);
   border-style: dashed;
 }
@@ -220,7 +193,7 @@
   justify-content: center;
   inline-size: 28px;
   block-size: 28px;
-  font-size: 18px;
+  font-size: 18px; /* glyph size — allowed outside the scale */
   line-height: 1;
   color: var(--white-50);
   cursor: pointer;
@@ -245,7 +218,6 @@
 }
 
 .kebabItem {
-  composes: body-sm from '@/design/typography.module.css';
   display: block;
   inline-size: 100%;
   padding: 11px 18px;
@@ -285,7 +257,6 @@
 
 /* ===== disband confirmation modal ===== */
 .confirmText {
-  composes: body-lg from '@/design/typography.module.css';
   margin: 0;
   color: var(--white-75);
 }

@@ -1,5 +1,5 @@
 import { useTranslation } from '@release/translation'
-import { Button, randomNickname, sanitizeNickname } from '@release/ui'
+import { Button, randomNickname, sanitizeNickname, Typography } from '@release/ui'
 import { useState } from 'react'
 import { useParams } from 'react-router'
 import DiceIcon from '@/icons/DiceIcon'
@@ -70,7 +70,11 @@ export default function JoinLobbyForm() {
       <Button type="submit" disabled={connecting}>
         {t('start.joinCta')}
       </Button>
-      {session.error && <p className={styles.error}>{session.error}</p>}
+      {session.error && (
+        <Typography base="body" as="p" className={styles.error}>
+          {session.error}
+        </Typography>
+      )}
     </Form>
   )
 }

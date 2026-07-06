@@ -1,4 +1,6 @@
-/* Shared styling for the lobby status flow (/lobby/:lobbyId). */
+/* Shared styling for the lobby status flow (/lobby/:lobbyId).
+   Typography comes from <Typography> in the JSX — only color / spacing /
+   layout live here. */
 .shell {
   display: flex;
   flex-direction: column;
@@ -12,16 +14,12 @@
 
 .label {
   margin: 0;
-  font-weight: 600;
   color: var(--white-70);
-  letter-spacing: var(--tracking);
 }
 
 .ghostBtn {
   padding: 8px 16px;
-  font-weight: 600;
   color: var(--white-78);
-  letter-spacing: var(--tracking);
   text-decoration: none;
   cursor: pointer;
   border: 1px solid var(--white-14);
@@ -67,9 +65,7 @@
 }
 
 .code {
-  composes: code tk-10 from '@/design/typography.module.css';
   margin: 0;
-  font-weight: 700;
   color: var(--brand-green);
 }
 
@@ -81,13 +77,9 @@
 
 .connecting {
   margin: 0;
-  font-size: 14px;
   color: var(--white-60);
 }
 
 .joinTitle {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: var(--tracking);
 }

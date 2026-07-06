@@ -3,12 +3,14 @@ import {
   Avatar,
   Badge,
   Button,
+  CopyButton,
   GameSettings,
   MODES_COPY_EN,
   MODES_COPY_RU,
   Modal,
   Slider,
   Toggle,
+  Typography,
 } from '@release/ui'
 import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
@@ -31,7 +33,6 @@ export default function LobbyView() {
   const startGame = useStartGame()
   const navigate = useNavigate()
 
-  const [copied, setCopied] = useState(false)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [disbandOpen, setDisbandOpen] = useState(false)
 
@@ -58,12 +59,6 @@ export default function LobbyView() {
   const shareUrl = session.roomCode
     ? `${window.location.origin}${BASE_URL}lobby/${session.roomCode}`
     : ''
-
-  const copyLink = () => {
-    navigator.clipboard?.writeText(shareUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
 
   const setMode = (key: string, value: string) => session.setSetup({ ...state.setup, [key]: value })
 
@@ -131,7 +126,7 @@ export default function LobbyView() {
                 setMenuFor(null)
               }}
             >
-              {it.label}
+              <Typography base="body-sm">{it.label}</Typography>
             </button>
           ))}
         </div>
@@ -146,22 +141,30 @@ export default function LobbyView() {
           <div className={styles.titleRow}>
             <AppLogo className={styles.headLogo} blink={false} />
             <span className={styles.headDivider} />
-            <h1 className={styles.title}>{t('lobby.title')}</h1>
+            <Typography variant="pageTitle" className={styles.title}>
+              {t('lobby.title')}
+            </Typography>
             {isHost && (
               <Button variant="dangerGhost" onClick={() => setDisbandOpen(true)}>
                 {t('lobby.disband')}
               </Button>
             )}
           </div>
-          <p className={styles.sub}>{t('lobby.subtitle')}</p>
+          <Typography base="label" tk="tk-14" as="p" className={styles.sub}>
+            {t('lobby.subtitle')}
+          </Typography>
         </div>
         <div className={styles.codeBox}>
-          <span className={styles.codeLabel}>{t('lobby.code')}</span>
+          <Typography base="label-sm" tk="tk-16" className={styles.codeLabel}>
+            {t('lobby.code')}
+          </Typography>
           <div className={styles.codeRow}>
-            <span className={styles.codeValue}>{session.roomCode}</span>
-            <button className={styles.copyBtn} type="button" onClick={copyLink}>
-              {copied ? t('lobby.copied') : t('lobby.copy')}
-            </button>
+            <Typography variant="code" className={styles.codeValue}>
+              {session.roomCode}
+            </Typography>
+            <CopyButton variant="tech" copyValue={shareUrl} copiedChildren={t('lobby.copied')}>
+              {t('lobby.copy')}
+            </CopyButton>
           </div>
         </div>
       </header>
@@ -169,10 +172,14 @@ export default function LobbyView() {
       <div className={styles.grid}>
         {/* Left — match modes */}
         <section className={styles.modes}>
-          <h2 className={styles.h}>
+          <Typography variant="sectionTitle" className={styles.h}>
             {t('lobby.modes')}
-            {!isHost && <span className={styles.lockTag}>{t('lobby.modesLockedHint')}</span>}
-          </h2>
+            {!isHost && (
+              <Typography base="mono-xs" tk="tk-10" className={styles.lockTag}>
+                {t('lobby.modesLockedHint')}
+              </Typography>
+            )}
+          </Typography>
           <div className={styles.modeList}>
             <GameSettings
               setup={state.setup}
@@ -186,12 +193,12 @@ export default function LobbyView() {
         {/* Right — players, spectators, lobby controls */}
         <section className={styles.players}>
           <div className={styles.scrollArea}>
-            <h2 className={styles.h}>
+            <Typography variant="sectionTitle" className={styles.h}>
               {t('lobby.players')}
-              <span className={styles.count}>
+              <Typography base="mono-md" tk="tk-10" className={styles.count}>
                 {players.length} / {capacity}
-              </span>
-            </h2>
+              </Typography>
+            </Typography>
 
             {isHost && (
               <Slider
@@ -212,12 +219,15 @@ export default function LobbyView() {
                     className={`${styles.slot} ${p.id === state.selfId ? styles.slotMe : ''}`}
                   >
                     <Avatar name={p.name} size={34} />
-                    <span className={styles.name}>
+                    <Typography base="body-lg">
                       {p.name}
                       {p.id === state.selfId && (
-                        <span className={styles.you}> ({t('lobby.you')})</span>
+                        <Typography base="body-sm" className={styles.you}>
+                          {' '}
+                          ({t('lobby.you')})
+                        </Typography>
                       )}
-                    </span>
+                    </Typography>
                     {p.role === 'host' && (
                       <Badge tone="success" size="sm" outlined>
                         {t('lobby.roleHost')}
@@ -239,27 +249,34 @@ export default function LobbyView() {
                   </li>
                 ) : (
                   <li key={key} className={styles.slotEmpty}>
-                    {t('lobby.freeSlot')}
+                    <Typography base="label" tk="tk-12">
+                      {t('lobby.freeSlot')}
+                    </Typography>
                   </li>
                 ),
               )}
             </ul>
 
-            <h2 className={`${styles.h} ${styles.hSpectators}`}>
+            <Typography variant="sectionTitle" className={`${styles.h} ${styles.hSpectators}`}>
               {t('lobby.spectators')}
-              <span className={styles.count}>{spectators.length}</span>
-            </h2>
+              <Typography base="mono-md" tk="tk-10" className={styles.count}>
+                {spectators.length}
+              </Typography>
+            </Typography>
 
             <ul className={styles.list}>
               {spectators.map((s) => (
                 <li key={s.id} className={styles.slot}>
                   <Avatar name={s.name} size={34} />
-                  <span className={styles.name}>
+                  <Typography base="body-lg">
                     {s.name}
                     {s.id === state.selfId && (
-                      <span className={styles.you}> ({t('lobby.you')})</span>
+                      <Typography base="body-sm" className={styles.you}>
+                        {' '}
+                        ({t('lobby.you')})
+                      </Typography>
                     )}
-                  </span>
+                  </Typography>
                   <div className={styles.rowEnd}>
                     <Badge tone="muted">{t('lobby.roleGuest')}</Badge>
                     {isHost &&
@@ -270,7 +287,11 @@ export default function LobbyView() {
                 </li>
               ))}
               {spectators.length === 0 && (
-                <li className={styles.slotEmpty}>{t('lobby.noSpectators')}</li>
+                <li className={styles.slotEmpty}>
+                  <Typography base="label" tk="tk-12">
+                    {t('lobby.noSpectators')}
+                  </Typography>
+                </li>
               )}
             </ul>
           </div>
@@ -292,7 +313,9 @@ export default function LobbyView() {
         onClose={() => setDisbandOpen(false)}
         title={t('lobby.disbandTitle')}
       >
-        <p className={styles.confirmText}>{t('lobby.disbandConfirm')}</p>
+        <Typography variant="body" className={styles.confirmText}>
+          {t('lobby.disbandConfirm')}
+        </Typography>
         <div className={styles.confirmActions}>
           <Button variant="tech" onClick={() => setDisbandOpen(false)}>
             {t('start.close')}

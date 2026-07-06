@@ -1,5 +1,5 @@
 import { useTranslation } from '@release/translation'
-import { Button } from '@release/ui'
+import { Button, Typography } from '@release/ui'
 import { BASE_URL, IS_DEV } from '~/shared/config'
 import styles from './ErrorScreen.module.css'
 
@@ -20,10 +20,18 @@ export default function ErrorScreen({ error }: { error?: unknown }) {
   return (
     <div className={styles.root}>
       <div className={styles.text}>
-        <h1 className={styles.title}>{t('error.title')}</h1>
-        <p className={styles.desc}>{t('error.description')}</p>
+        <Typography variant="panelTitle" as="h1" className={styles.title}>
+          {t('error.title')}
+        </Typography>
+        <Typography base="body" as="p" className={styles.desc}>
+          {t('error.description')}
+        </Typography>
       </div>
-      {detail && <pre className={styles.detail}>{detail}</pre>}
+      {detail && (
+        <Typography base="mono-sm" as="pre" className={styles.detail}>
+          {detail}
+        </Typography>
+      )}
       <div className={styles.actions}>
         <Button onClick={() => window.location.reload()}>{t('error.reload')}</Button>
         <Button variant="tech" onClick={() => window.location.assign(BASE_URL)}>

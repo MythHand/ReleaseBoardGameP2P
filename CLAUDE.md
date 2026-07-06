@@ -88,9 +88,10 @@ Styling is uniform across all packages: **CSS Modules + design tokens.**
   [`apps/ui/src/design/tokens.css`](./apps/ui/src/design/tokens.css) via
   `var(--*)` — never hardcode a color (`#hex`, `rgb()`, named). Missing a
   color → add a token there first.
-- Typography composes from the shared scale:
-  `composes: <base> <tk-NN> from '@/design/typography.module.css'`
-  (see [`apps/ui/src/design/typography.module.css`](./apps/ui/src/design/typography.module.css)).
+- All text is set through the `<Typography>` component from `@release/ui`
+  (semantic `variant`, or raw `base` + `tk` for the long tail) — no
+  hand-written font declarations and no `composes` from the scale in module
+  CSS. Full rule: [apps/ui/CLAUDE.md](./apps/ui/CLAUDE.md#typography-rule).
 - Spacing/sizing are plain px values; use logical properties
   (`padding-inline`, `margin-block-start`) — stylelint enforces this.
 - **No Tailwind anywhere** — removed in

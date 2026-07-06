@@ -9,6 +9,7 @@ import {
   randomNickname,
   type Setup,
   sanitizeNickname,
+  Typography,
 } from '@release/ui'
 import { useState } from 'react'
 import DiceIcon from '@/icons/DiceIcon'
@@ -71,7 +72,9 @@ export default function CreateLobbyForm() {
           })}
         </div>
         <div className={styles.createTech}>
-          <h4 className={styles.techTitle}>{t('start.lobbyParams')}</h4>
+          <Typography variant="panelTitle" as="h4" className={styles.techTitle}>
+            {t('start.lobbyParams')}
+          </Typography>
           <FormField
             name="name"
             label={t('start.nicknameLabel')}
@@ -94,8 +97,14 @@ export default function CreateLobbyForm() {
           <Button type="submit" disabled={connecting}>
             {t('start.createCta')}
           </Button>
-          {session.error && <p className={styles.error}>{session.error}</p>}
-          <p className={styles.note}>{t('start.lobbyNote')}</p>
+          {session.error && (
+            <Typography base="body" as="p" className={styles.error}>
+              {session.error}
+            </Typography>
+          )}
+          <Typography variant="footnote" className={styles.note}>
+            {t('start.lobbyNote')}
+          </Typography>
         </div>
       </div>
     </Form>
