@@ -7,7 +7,14 @@ import {
   useRef,
   useState,
 } from 'react'
-import { CARDS } from '@/cards'
+import { createPortal } from 'react-dom'
+import type { SwitchLang } from '@/blocks/LangSwitcher'
+import { CARD_CONTENT, CARDS } from '@/cards'
+import CardParallax, {
+  type CardParallaxContent,
+  PARALLAX_CARDS,
+  type ParallaxCardConfig,
+} from '@/cards/CardParallax'
 import styles from './Rules.module.css'
 
 // Правила = скелет (структура, язык-независимая) + copy (тексты по id, на язык).
@@ -645,6 +652,8 @@ function buildSections(skel: SectionSkel[], copy: RulesCopy): RulesSection[] {
 
 export interface RulesProps {
   copy?: RulesCopy
+  // language for the composed card faces shown in the card reference
+  lang?: SwitchLang
 }
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -729,15 +738,61 @@ const rich = (text: string): ReactNode =>
     ),
   )
 
-// Арт карты по имени — из каталога CARDS (единый источник; первое совпадение).
-const ART_BY_NAME = new Map<string, string>()
-for (const c of CARDS) if (!ART_BY_NAME.has(c.name)) ART_BY_NAME.set(c.name, c.art)
+// Карта по имени — из каталога CARDS (единый источник; первое совпадение).
+type CatalogCard = (typeof CARDS)[number]
+const CARD_BY_NAME = new Map<string, CatalogCard>()
+for (const c of CARDS) if (!CARD_BY_NAME.has(c.name)) CARD_BY_NAME.set(c.name, c)
 
-// Превью для имён записи: имена без карты в каталоге (режимы) отсеиваются.
-const artsFor = (names: string[]) =>
-  names
-    .map((name) => ({ name, src: ART_BY_NAME.get(name) }))
-    .filter((a): a is { name: string; src: string } => Boolean(a.src))
+// Карты для имён записи: имена без карты в каталоге (режимы) отсеиваются.
+const cardsFor = (names: string[]) =>
+  names.map((name) => CARD_BY_NAME.get(name)).filter((c): c is CatalogCard => Boolean(c))
+
+// display width of a card face in the reference (px); a hover lifts a ×2 copy
+// into a top-layer portal (below) so it escapes the modal's overflow clipping.
+const REF_CARD_W = 98
+
+interface ZoomCard {
+  id: string
+  rect: DOMRect
+  config: ParallaxCardConfig
+  content: CardParallaxContent
+}
+
+// Hover-zoom overlay — an enlarged, parallax card portaled to <body> and fixed at
+// the reference slot, so no ancestor's overflow (the Rules modal scrolls) can clip
+// it. Grows ×2 from the slot centre on mount, shrinks back before unmounting.
+function CardZoomOverlay({ card, onClose }: { card: ZoomCard; onClose: () => void }) {
+  const [grown, setGrown] = useState(false)
+  const closing = useRef(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setGrown(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+  const { rect } = card
+  return createPortal(
+    // biome-ignore lint/a11y/noStaticElementInteractions: decorative hover-zoom overlay; mouse only
+    <div
+      className={styles.zoomOverlay}
+      style={{
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        transform: `scale(${grown ? 2 : 1})`,
+      }}
+      onMouseLeave={() => {
+        closing.current = true
+        setGrown(false)
+      }}
+      onTransitionEnd={(e) => {
+        if (closing.current && e.propertyName === 'transform') onClose()
+      }}
+    >
+      <CardParallax config={card.config} content={card.content} width={rect.width} interactive />
+    </div>,
+    document.body,
+  )
+}
 
 // Усиленный (sudo) эффект в описании карты: выносим на новую строку, жёлтым
 // подсвечиваем только метку «sudo + имя карты» (mark), текст эффекта (rest) —
@@ -752,8 +807,10 @@ const splitSudo = (desc: string) => {
 // Поиск повторяет браузерный «найти на странице»: текст не фильтруется, все
 // совпадения подсвечиваются и нумеруются (data-mi в DOM-порядке), активное
 // выделяется ярче; стрелки / Enter переключают активное и скроллят к нему.
-export default function Rules({ copy = RULES_COPY_RU }: RulesProps = {}) {
+export default function Rules({ copy = RULES_COPY_RU, lang = 'ru' }: RulesProps = {}) {
   const sections = useMemo(() => buildSections(RULES, copy), [copy])
+  // hovered card lifted into the top-layer zoom overlay (null = none)
+  const [zoom, setZoom] = useState<ZoomCard | null>(null)
   const meta = copy.meta
   const searchPlaceholder = copy.searchPlaceholder
   const notFoundText = copy.notFound
@@ -845,15 +902,52 @@ export default function Rules({ copy = RULES_COPY_RU }: RulesProps = {}) {
 
   const renderCards = (cards?: RuleCard[]) =>
     cards?.map((c) => {
-      const arts = artsFor(c.names)
+      const faces = cardsFor(c.names)
       const sudo = c.desc ? splitSudo(c.desc) : null
       return (
         <div key={c.names.join('/')} className={styles.card}>
-          {arts.length > 0 && (
+          {faces.length > 0 && (
             <div className={styles.cardArt}>
-              {arts.map((a) => (
-                <img key={a.src} className={styles.cardThumb} src={a.src} alt={a.name} />
-              ))}
+              {faces.map((card) => {
+                const config = PARALLAX_CARDS[card.id]
+                const cc = CARD_CONTENT[card.id]?.[lang]
+                if (!config || !cc) {
+                  return (
+                    <img
+                      key={card.id}
+                      className={styles.cardThumb}
+                      src={card.art}
+                      alt={card.name}
+                    />
+                  )
+                }
+                const content: CardParallaxContent = {
+                  title: cc.title,
+                  description: cc.paragraphs,
+                }
+                return (
+                  // biome-ignore lint/a11y/noStaticElementInteractions: hover spawns the decorative zoom overlay; mouse only
+                  <div
+                    key={card.id}
+                    className={styles.cardZoom}
+                    onMouseEnter={(e) =>
+                      setZoom({
+                        id: card.id,
+                        rect: e.currentTarget.getBoundingClientRect(),
+                        config,
+                        content,
+                      })
+                    }
+                  >
+                    <CardParallax
+                      config={config}
+                      content={content}
+                      width={REF_CARD_W}
+                      interactive={false}
+                    />
+                  </div>
+                )
+              })}
             </div>
           )}
           <div className={styles.cardText}>
@@ -978,6 +1072,7 @@ export default function Rules({ copy = RULES_COPY_RU }: RulesProps = {}) {
       ))}
 
       {query && shown.length === 0 && <p className={styles.empty}>{notFoundText}</p>}
+      {zoom && <CardZoomOverlay key={zoom.id} card={zoom} onClose={() => setZoom(null)} />}
     </div>
   )
 }

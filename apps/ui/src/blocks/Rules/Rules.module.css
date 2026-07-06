@@ -247,6 +247,24 @@
   border-radius: 4px;
 }
 
+/* composed card face in the reference — on hover it zooms ×2 from its own centre,
+   above its neighbours, without shifting layout; the parallax tilt keeps working
+   in the zoomed state */
+.cardZoom {
+  align-self: flex-start;
+  inline-size: 98px;
+}
+
+/* hover-zoom overlay — portaled to <body>, fixed at the slot; escapes the modal's
+   overflow. Grows ×2 from the slot centre; the in-flow card stays as a placeholder. */
+.zoomOverlay {
+  position: fixed;
+  z-index: calc(var(--z-modal) + 1);
+  transform-origin: center;
+  transition: transform var(--t-slow) var(--ease-out);
+  will-change: transform;
+}
+
 .cardText {
   flex: 1;
   min-inline-size: 0;
