@@ -1,9 +1,22 @@
 .stats {
+  position: relative;
   inline-size: 100%;
-  min-block-size: 100vh;
+  min-block-size: 100%;
   padding: 56px clamp(40px, 8vw, 120px);
   color: var(--fg);
   background: var(--bg);
+  isolation: isolate; /* own stacking context so the bg layer sits behind content */
+}
+
+/* HUD-фон экрана — слой над базовым фоном, под контентом (z-index: -1 в контексте
+   .stats). Селектор специфичнее .bg из HudBackground, иначе его position:relative
+   победит по порядку и слой схлопнется в поток. */
+.stats .bgLayer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 0;
+  border-radius: 0;
 }
 
 /* ===== шапка ===== заголовок слева, свитчер языка по правой линии контента */

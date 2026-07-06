@@ -1,0 +1,83 @@
+/* Turn dock — layout only. The surface, ring, dot, action key, badge and avatar
+   all come from primitives; this module sizes the block and fixes the slots so
+   every state shares one layout (key, caption and badge never move). */
+
+/* fixed footprint on the HudSurface. Trim the bottom breathing room (half of the
+   surface's default) so the action group can sit lower toward the edge. */
+.dock {
+  inline-size: 300px;
+  block-size: 150px;
+  padding-block-end: 8px;
+}
+
+.inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: space-between;
+  block-size: 100%;
+}
+
+/* ===== top row: status + "drawn" badge on one line ===== */
+.top {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-block-size: 24px; /* reserved so the badge never changes the row height */
+}
+
+.phase {
+  color: var(--white-75);
+}
+
+/* "drawn" badge — right end of the status row, same horizontal line as the phase */
+.chip {
+  margin-inline-start: auto;
+}
+
+/* ===== body: ring timer + action ===== */
+.body {
+  display: flex;
+  flex: 1;
+  gap: 20px;
+  align-items: center;
+}
+
+/* action column — key slot on top, caption slot below it. Both slots reserve a
+   fixed height, so the group stays the same size and the key never moves; the
+   body centres the whole group vertically (aligned with the ring). */
+.action {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-self: flex-end; /* sit the key + caption group low, near the bottom edge */
+  min-inline-size: 0;
+}
+
+/* the key / spectate slot — constant height so all states share it */
+.actionMain {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  min-block-size: 54px;
+}
+
+/* under-key caption — directly below the key, FIXED-height slot (empty and
+   filled render identically), so the key never moves between states */
+.caption {
+  block-size: 14px;
+  margin-block-start: 10px;
+  overflow: hidden;
+  line-height: 14px;
+  color: var(--white-45);
+  text-align: center;
+}
+
+/* opponent turn — active player name sits in the key's slot; wraps to a second
+   line rather than truncating */
+.name {
+  color: var(--fg);
+  text-align: center;
+  overflow-wrap: anywhere;
+}

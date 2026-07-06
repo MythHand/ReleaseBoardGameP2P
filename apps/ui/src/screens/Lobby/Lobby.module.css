@@ -3,15 +3,28 @@
   display: flex;
   flex-direction: column;
   inline-size: 100%;
-  block-size: 100vh;
+  block-size: 100%;
   padding: 48px clamp(40px, 7vw, 96px);
   overflow: hidden;
   color: var(--fg);
   background: var(--bg);
 }
 
+/* HUD-фон экрана — полноэкранный слой над базовым фоном, под контентом.
+   Селектор специфичнее .bg из HudBackground (иначе его position:relative
+   победит по порядку и слой схлопнется в поток). */
+.lobby .bgLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 0;
+  border-radius: 0;
+}
+
 /* ===== шапка ===== */
 .head {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 32px;
   align-items: flex-start;
@@ -60,6 +73,8 @@
 
 /* ===== контент: слева режимы, справа игроки ===== */
 .grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
@@ -85,6 +100,12 @@
   composes: mono-xs tk-10 from '../../design/typography.module.css';
   color: var(--white-40);
   text-transform: none; /* сброс капса родителя .h (заголовок uppercase) */
+}
+
+/* правила игры — вторичное действие в строке заголовка, прижато к правому краю */
+.rulesBtn {
+  align-self: center;
+  margin-inline-start: auto;
 }
 
 /* режимы — скроллятся независимо, если не помещаются */

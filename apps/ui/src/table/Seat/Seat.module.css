@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  inline-size: 264px;
+  inline-size: fit-content; /* обжимаемся по ширине релиз-зоны внутри */
   padding: 14px 16px;
   background: var(--surface-1);
   border: 1px solid var(--white-08);
@@ -21,19 +21,6 @@
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.dot {
-  flex: 0 0 auto;
-  inline-size: 7px;
-  block-size: 7px;
-  background: var(--white-25);
-  border-radius: 50%;
-}
-
-.active .dot {
-  background: var(--brand-green);
-  box-shadow: 0 0 8px var(--brand-green);
 }
 
 .name {
@@ -70,7 +57,3 @@
   border-color: var(--coral-45);
 }
 
-.disconnected .dot {
-  background: var(--coral);
-  box-shadow: 0 0 8px var(--coral-60);
-}

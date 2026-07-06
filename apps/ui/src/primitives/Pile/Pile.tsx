@@ -10,7 +10,8 @@ interface PileProps {
   count?: number
   deck?: 'base' | 'ai'
   topCard?: CardType | null
-  width?: string
+  // number → px (formatted here); string passes through (e.g. '100%')
+  width?: number | string
   /** 'br' — бейдж в правом нижнем (сброс) | 'tl' — текст в левом верхнем (колоды) */
   countPos?: 'br' | 'tl'
   /** выделение обложки: обводка + свечение в цвете accent (как у Card) */
@@ -27,7 +28,7 @@ export default function Pile({
   count = 0,
   deck = 'base',
   topCard = null,
-  width = '88px',
+  width = 88,
   countPos = 'br',
   selected = false,
   accent = 'var(--brand-green)',
@@ -37,7 +38,10 @@ export default function Pile({
   // полупрозрачным логотипом (никакой «глубины», обложек и свечения).
   const emptyDiscard = !topCard && countPos === 'br'
   return (
-    <div className={styles.pile} style={{ width }}>
+    <div
+      className={styles.pile}
+      style={{ width: typeof width === 'number' ? `${width}px` : width }}
+    >
       <div
         className={styles.stack}
         data-selected={selected}

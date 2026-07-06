@@ -1,0 +1,37 @@
+.ring {
+  position: relative;
+  flex: none;
+  inline-size: var(--ring-size, 72px);
+  block-size: var(--ring-size, 72px);
+}
+
+.svg {
+  inline-size: 100%;
+  block-size: 100%;
+  transform: rotate(-90deg);
+}
+
+.track {
+  fill: none;
+  stroke: var(--white-08);
+}
+
+.prog {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--ring-accent) 40%, transparent));
+  fill: none;
+  stroke: color-mix(in srgb, var(--ring-accent) 85%, transparent);
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--t-slow) var(--ease-out);
+}
+
+/* centered readout — overlays the ring, centred on its true centre */
+.value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  opacity: 0.7;
+}

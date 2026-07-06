@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 import styles from './Badge.module.css'
 
-export type BadgeTone = 'success' | 'muted' | 'danger' | 'warning' | 'info'
+export type BadgeTone = 'success' | 'muted' | 'danger' | 'warning' | 'info' | 'hud'
 
 interface BadgeProps {
   children: ReactNode
-  // цвет: success — зелёный, muted — серый, danger — красный, warning — янтарь, info — синий
+  // цвет: success — зелёный, muted — серый, danger — красный, warning — янтарь,
+  // info — синий, hud — акцент HUD (--badge-accent, по умолчанию активный ход)
   tone?: BadgeTone
   // обведённый бейдж (как роль host)
   outlined?: boolean

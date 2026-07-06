@@ -94,7 +94,7 @@ export default function Hand({
               faceDown={faceDown}
               interactive={false}
               tilt={hovered === i}
-              width={`${CARD_W}px`}
+              width={CARD_W}
               state={accentAt?.(i) ? 'selected' : 'idle'}
               accent={accentAt?.(i)}
             />

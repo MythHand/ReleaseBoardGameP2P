@@ -127,6 +127,13 @@
   text-transform: uppercase;
 }
 
+/* 34 Onest ExtraBold — заголовок composed-карты (CardParallax) */
+.card-title {
+  font-family: var(--font-heading);
+  font-size: 34px;
+  font-weight: 800;
+}
+
 /* ===== Базы — Fira (тело) ===== */
 .body-lg {
   font-family: var(--font-text);
@@ -199,6 +206,20 @@
   font-size: 26px;
 }
 
+/* 26 mono тонкий — крупный счётчик таймера (RingTimer / HUD) */
+.numeric-lg {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 300;
+}
+
+/* 20 mono КАПС — крупная HUD-клавиша (Button variant hud) */
+.value-lg {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  text-transform: uppercase;
+}
+
 .value {
   font-family: var(--font-mono);
   font-size: 18px;
@@ -214,6 +235,12 @@
 .numeric {
   font-family: var(--font-mono);
   font-size: 16px;
+}
+
+/* 17 mono — имя игрока в HUD (spectate) */
+.mono-xl {
+  font-family: var(--font-mono);
+  font-size: 17px;
 }
 
 .mono-lg {

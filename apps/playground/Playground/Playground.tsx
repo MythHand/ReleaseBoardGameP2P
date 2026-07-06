@@ -16,6 +16,8 @@ import ReconnectBlock from '../stories/blocks/ReconnectBlock'
 import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
 import RulesBlock from '../stories/blocks/RulesBlock'
 import SeatBlock from '../stories/blocks/SeatBlock'
+import TurnDockBlock from '../stories/blocks/TurnDockBlock'
+import CardParallaxStory from '../stories/CardParallaxStory'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import TextStyles from '../stories/foundations/TextStyles'
@@ -35,13 +37,17 @@ import ButtonsKit from '../stories/kit/ButtonsKit'
 import DrawerKit from '../stories/kit/DrawerKit'
 import DropdownKit from '../stories/kit/DropdownKit'
 import EdgeGlowKit from '../stories/kit/EdgeGlowKit'
+import HudBackgroundKit from '../stories/kit/HudBackgroundKit'
+import HudSurfaceKit from '../stories/kit/HudSurfaceKit'
 import InputsKit from '../stories/kit/InputsKit'
 import ModalsKit from '../stories/kit/ModalsKit'
 import ModeSelectKit from '../stories/kit/ModeSelectKit'
 import OverlayKit from '../stories/kit/OverlayKit'
 import PilesKit from '../stories/kit/PilesKit'
+import RingTimerKit from '../stories/kit/RingTimerKit'
 import SlidersKit from '../stories/kit/SlidersKit'
 import SpinnerKit from '../stories/kit/SpinnerKit'
+import StatusDotKit from '../stories/kit/StatusDotKit'
 import TabRailKit from '../stories/kit/TabRailKit'
 import TogglesKit from '../stories/kit/TogglesKit'
 import VideoPlayerKit from '../stories/kit/VideoPlayerKit'
@@ -98,6 +104,7 @@ const groups: Group[] = [
     title: { ru: 'Карты', en: 'Cards' },
     items: [
       { id: 'card', title: 'Card', render: () => <CardStory /> },
+      { id: 'card-parallax', title: 'Card parallax', render: () => <CardParallaxStory /> },
       { id: 'hand', title: 'Hand', render: () => <HandStory /> },
     ],
   },
@@ -153,6 +160,16 @@ const groups: Group[] = [
     ],
   },
   {
+    // HUD-примитивы — служебный игровой интерфейс (таймеры, индикаторы, панели).
+    title: { ru: 'UI KIT · HUD', en: 'UI KIT · HUD' },
+    items: [
+      { id: 'kit-ring-timer', title: 'Ring timer', render: () => <RingTimerKit /> },
+      { id: 'kit-status-dot', title: 'Status dot', render: () => <StatusDotKit /> },
+      { id: 'kit-hud-surface', title: 'HUD surface', render: () => <HudSurfaceKit /> },
+      { id: 'kit-hud-background', title: 'HUD background', render: () => <HudBackgroundKit /> },
+    ],
+  },
+  {
     // Готовые композитные куски — собранные из примитивов блоки, как на экранах.
     title: { ru: 'Блоки', en: 'Blocks' },
     items: [
@@ -170,6 +187,7 @@ const groups: Group[] = [
       },
       { id: 'block-seat', title: 'Seat', render: () => <SeatBlock /> },
       { id: 'block-release-zone', title: 'Release zone', render: () => <ReleaseZoneBlock /> },
+      { id: 'block-turn-dock', title: 'Turn dock', render: () => <TurnDockBlock /> },
       { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },
       { id: 'block-player-slot', title: 'Player slot', render: () => <PlayerSlotBlock /> },
       { id: 'block-lobby-code', title: 'Lobby code', render: () => <LobbyCodeBlock /> },

@@ -6,6 +6,18 @@
     linear-gradient(0deg, var(--surface-0), var(--surface-0)),
     repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
     repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 28px);
+  isolation: isolate; /* own stacking context so the bg layer sits behind content */
+}
+
+/* HUD-фон (нейтральный) — слой над базовым фоном, под контентом (z-index: -1).
+   Селектор специфичнее .bg из HudBackground, иначе его position:relative победит
+   по порядку и слой схлопнется в поток. */
+.table .bgLayer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 0;
+  border-radius: 0;
 }
 
 /* ===== независимые блоки ===== */
@@ -38,10 +50,19 @@
   transform: translateY(-50%);
 }
 
+/* служебный док хода — нижний-левый угол, под колодами, слева от руки */
+.turnDock {
+  position: absolute;
+  inset-block-end: 20px;
+  inset-inline-start: 26px;
+}
+
 .you {
   position: absolute;
   inset-block-end: 16px;
-  inset-inline: 0 56px;
+
+  /* слева — учитываем половину ширины дока (26 + 300/2 + зазор), справа — правый рейл */
+  inset-inline: 196px 56px;
   display: flex;
   flex-direction: column;
   gap: 4px;

@@ -9,9 +9,10 @@ interface ColorToken {
   value: string
 }
 
-// Color values: hex, rgb/hsl/hwb, oklch/oklab/lab/lch, color-mix, and gradients.
+// Color values: hex, rgb/hsl/hwb, oklch/oklab/lab/lch, color-mix, gradients, and
+// var() aliases (semantic tokens that point at another colour token).
 const COLOR_RE =
-  /^(#|rgb|hsl|hwb|okl|lab|lch|color-mix|(repeating-)?(linear|radial|conic)-gradient)/i
+  /^(#|rgb|hsl|hwb|okl|lab|lch|color-mix|var\(|(repeating-)?(linear|radial|conic)-gradient)/i
 
 // Collect every color custom property from :root — including tokens pulled in
 // via @import (CSSImportRule). The source is the live styles, so the showcase
@@ -48,6 +49,7 @@ function readColorTokens(): ColorToken[] {
 const GROUP_ORDER = [
   'Base & surfaces',
   'Brand & categories',
+  'State accents',
   'Named hues',
   'White overlays',
   'Black overlays',
@@ -58,6 +60,7 @@ const GROUP_ORDER = [
 function groupOf(name: string): (typeof GROUP_ORDER)[number] {
   if (name === '--bg' || name === '--fg' || name === '--grid-line' || name.startsWith('--surface'))
     return 'Base & surfaces'
+  if (name.endsWith('-accent')) return 'State accents'
   if (name === '--brand-green' || name.startsWith('--cat-')) return 'Brand & categories'
   if (name.startsWith('--grad')) return 'Gradients'
   if (name.startsWith('--white-')) return 'White overlays'

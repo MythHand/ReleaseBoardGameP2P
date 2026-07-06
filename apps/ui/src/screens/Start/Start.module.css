@@ -53,6 +53,15 @@
   background: var(--grad-scrim);
 }
 
+/* HUD-сетка поверх градиента, под контентом (в потоке после .scrim, z-auto —
+   контент выше по z-index). Специфичнее .bg из HudBackground, чтобы его
+   position:relative не победил. */
+.root .bgLayer {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+}
+
 .content {
   position: relative;
   z-index: 2;

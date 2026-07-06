@@ -59,7 +59,7 @@
   cursor: default;
 }
 
-.track:not(.readOnly) .opt:hover {
+.track:not(.readOnly) .opt:not(.active):hover {
   color: var(--white-85);
 }
 

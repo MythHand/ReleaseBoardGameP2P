@@ -4,6 +4,7 @@ import Avatar from '@/primitives/Avatar'
 import Badge, { type BadgeTone } from '@/primitives/Badge'
 import Button from '@/primitives/Button'
 import Card from '@/primitives/Card'
+import HudBackground, { type HudBackgroundTone } from '@/primitives/HudBackground'
 import styles from './Stats.module.css'
 
 type Location = 'game' | 'stats' | 'lobby' | 'offline'
@@ -53,6 +54,8 @@ interface StatsProps {
   // Каталоги экран не держит (i18n-agnostic) — copy свапает консьюмер.
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
+  // HUD-фон экрана (переключается снаружи — напр. из техстроки песочницы)
+  bgTone?: HudBackgroundTone
 }
 
 interface Achievement {
@@ -84,7 +87,14 @@ const ACHIEVEMENTS: Achievement[] = [
   },
 ]
 
-export default function Stats({ winnerId, copy, players = [], lang, onLangChange }: StatsProps) {
+export default function Stats({
+  winnerId,
+  copy,
+  players = [],
+  lang,
+  onLangChange,
+  bgTone = 'neutral',
+}: StatsProps) {
   const winner = players.find((p) => p.id === winnerId)
   const leader = (key: MetricKey): StatPlayer | undefined => {
     if (players.length === 0) return undefined
@@ -96,6 +106,7 @@ export default function Stats({ winnerId, copy, players = [], lang, onLangChange
 
   return (
     <div className={styles.stats}>
+      <HudBackground tone={bgTone} className={styles.bgLayer} />
       <header className={styles.head}>
         <div>
           <h1 className={styles.title}>{copy.title}</h1>
