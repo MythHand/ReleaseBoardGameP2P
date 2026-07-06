@@ -69,6 +69,8 @@
 
 .desc {
   margin-block-end: 96px;
+  line-height: 1.65;
+  opacity: 0.85;
 }
 
 .menu {
