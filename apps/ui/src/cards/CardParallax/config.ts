@@ -259,7 +259,7 @@ const AI_ERROR_503_THEME: CardTheme = {
 
 // shared vertical position of the illustration (design px); the per-card yNudge
 // lowers it to balance each art
-const ILLO_Y = -12
+const ILLO_Y = -4
 
 // background parallax depth — the panel (dim + grain) rides the SAME plane, so
 // the darkening stays registered to the photo background and covers only it
@@ -279,9 +279,9 @@ const DECOR = { w: 1014, h: 1016, depth: 0.44 }
 function makeCard(
   theme: CardTheme,
   illustration: { src: string; w: number; h: number },
-  opts: { yNudge?: number; subtype?: string; fast?: boolean } = {},
+  opts: { yNudge?: number; titleNudge?: number; subtype?: string; fast?: boolean } = {},
 ): ParallaxCardConfig {
-  const { yNudge = 0, subtype, fast } = opts
+  const { yNudge = 0, titleNudge = 0, subtype, fast } = opts
   // category tag — Trigger cards have none; others may append a subtype to the label
   const category = theme.category
     ? {
@@ -308,7 +308,7 @@ function makeCard(
     decor: theme.decor ? { ...DECOR, src: theme.decor } : undefined,
     category,
     fast: showFast ? { icon: fastIcon, w: 12, h: 15, top: 20, right: 22, depth: 0.05 } : undefined,
-    title: { top: 52, padX: 21, depth: -0.14 },
+    title: { top: 68 + titleNudge, padX: 21, depth: -0.14 },
     description: { bottom: 34, padX: 20, depth: -0.14 },
   }
 }
@@ -401,7 +401,7 @@ export const NOT_A_BUG = makeCard(
 export const WORKS_ON_MY_MACHINE = makeCard(
   DEFENSE_THEME,
   { src: worksOnMyMachineArt, w: 309, h: 309 },
-  { subtype: 'Unicorn' },
+  { subtype: 'Unicorn', titleNudge: -6 },
 )
 export const ROLLBACK = makeCard(
   DEFENSE_THEME,
@@ -495,9 +495,13 @@ export const AI_ERROR_503 = makeCard(
 export const TRIGGER_ERROR_503 = makeCard(
   TRIGGER_ERROR_503_THEME,
   { src: error503Art, w: 338, h: 338 },
-  { yNudge: 19 },
+  { yNudge: 13, titleNudge: -12 },
 )
-export const TRIGGER_AI = makeCard(TRIGGER_AI_THEME, { src: aiArt, w: 292, h: 292 }, { yNudge: 19 })
+export const TRIGGER_AI = makeCard(
+  TRIGGER_AI_THEME,
+  { src: aiArt, w: 292, h: 292 },
+  { yNudge: 13, titleNudge: -12 },
+)
 
 // Registry: card id → composed config. Ids absent here render as the PNG face.
 export const PARALLAX_CARDS: Record<string, ParallaxCardConfig> = {
