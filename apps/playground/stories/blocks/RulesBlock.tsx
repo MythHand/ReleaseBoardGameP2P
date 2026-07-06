@@ -17,7 +17,7 @@ export default function RulesBlock() {
         })}
       >
         <div className={styles.panel}>
-          <Rules copy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })} />
+          <Rules copy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })} lang={lang} />
         </div>
       </KitSection>
     </KitPage>

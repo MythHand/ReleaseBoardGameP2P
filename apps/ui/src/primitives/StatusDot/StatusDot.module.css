@@ -1,0 +1,24 @@
+.dot {
+  display: inline-block;
+  flex: none;
+  inline-size: var(--dot-size, 8px);
+  block-size: var(--dot-size, 8px);
+  background: var(--dot);
+  border-radius: 50%;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--dot) 70%, transparent);
+}
+
+.pulse {
+  animation: dot-pulse var(--t-ambient) var(--ease-out) infinite;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}

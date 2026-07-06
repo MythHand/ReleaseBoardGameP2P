@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import Typography, { type TypographyBase, type TypographyTk } from '../Typography'
 import styles from './Button.module.css'
 
-export type ButtonVariant = 'primary' | 'tech' | 'danger' | 'dangerGhost' | 'icon'
+export type ButtonVariant = 'primary' | 'tech' | 'danger' | 'dangerGhost' | 'icon' | 'hud'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
@@ -19,6 +19,7 @@ const LABEL_TYPO: Record<ButtonVariant, { base: TypographyBase; tk: TypographyTk
   danger: { base: 'label-sm', tk: 'tk-18' },
   dangerGhost: { base: 'label-sm', tk: 'tk-18' },
   icon: null,
+  hud: { base: 'value-lg', tk: 'tk-16' },
 }
 
 export default function Button({
@@ -30,6 +31,7 @@ export default function Button({
   const typo = LABEL_TYPO[variant]
   return (
     <button className={`${styles.btn} ${styles[variant]} ${className}`} type="button" {...rest}>
+      {variant === 'hud' && <span className={styles.glint} aria-hidden="true" />}
       {typo ? (
         <Typography base={typo.base} tk={typo.tk} className={styles.label}>
           {variant === 'primary' && <span className={styles.bracket}>[</span>}

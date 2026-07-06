@@ -22,7 +22,7 @@
 .item {
   padding: 18px 20px;
   background: var(--surface-1);
-  border: 1px solid rgb(255 255 255 / 8%);
+  border: 1px solid var(--white-08);
   border-radius: 10px;
 }
 
@@ -40,7 +40,7 @@
   color: var(--brand-green);
   text-transform: uppercase;
   letter-spacing: var(--tracking);
-  background: rgb(41 224 122 / 12%);
+  background: var(--brand-green-12);
   border-radius: 4px;
 }
 
@@ -130,9 +130,9 @@
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.5;
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
   white-space: pre-wrap;
-  background: rgb(0 0 0 / 25%);
+  background: var(--black-25);
   border-radius: 6px;
 }
 
@@ -156,17 +156,17 @@
   padding: 8px 14px;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: rgb(255 255 255 / 50%);
+  color: var(--white-50);
   text-align: start;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  border-block-end: 1px solid rgb(255 255 255 / 14%);
+  border-block-end: 1px solid var(--white-14);
 }
 
 .scaleTable td {
   padding: 14px;
   vertical-align: middle;
-  border-block-end: 1px solid rgb(255 255 255 / 7%);
+  border-block-end: 1px solid var(--white-07);
 }
 
 .scaleName {
@@ -179,7 +179,7 @@
 .scaleMeta {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: rgb(255 255 255 / 60%);
+  color: var(--white-60);
   white-space: nowrap;
 }
 
@@ -187,5 +187,5 @@
   font-family: var(--font-text);
   font-size: 11.5px;
   line-height: 1.45;
-  color: rgb(255 255 255 / 50%);
+  color: var(--white-50);
 }

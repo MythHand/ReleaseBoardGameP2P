@@ -30,6 +30,17 @@
   color: var(--periwinkle);
 }
 
+/* HUD-бейдж — самостоятельный стиль-пилюля: лёгкая заливка акцентом, рамка и
+   подкрашенный лейбл. Цвет несёт --badge-accent (по умолчанию активный ход).
+   Отдельный вид — не нужно комбинировать с .outlined. */
+.hud {
+  padding: 4px 9px;
+  color: color-mix(in srgb, var(--badge-accent, var(--turn-accent)) 78%, var(--fg));
+  background: color-mix(in srgb, var(--badge-accent, var(--turn-accent)) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--badge-accent, var(--turn-accent)) 32%, transparent);
+  border-radius: 6px;
+}
+
 /* крупная «плашка» — тёмный фон + нейтральная рамка (напр. «вы выбыли» на столе).
    Своя заливка/рамка/цвет перекрывают тон, поэтому стоит после тонов. */
 .lg {

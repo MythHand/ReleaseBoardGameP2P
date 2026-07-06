@@ -73,7 +73,7 @@ export default function CardToHandStory() {
             >
               <Card
                 card={card}
-                width={`${SOURCE_CARD_W}px`}
+                width={SOURCE_CARD_W}
                 onClick={flyingCard || used[i] ? undefined : () => click(i)}
               />
             </div>

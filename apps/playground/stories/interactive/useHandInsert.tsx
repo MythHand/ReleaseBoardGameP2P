@@ -97,7 +97,7 @@ export function useHandInsert(
       }}
       onTransitionEnd={settle}
     >
-      <Card card={flying.card} width={`${flying.from.width}px`} interactive={false} />
+      <Card card={flying.card} width={flying.from.width} interactive={false} />
     </div>
   ) : null
 

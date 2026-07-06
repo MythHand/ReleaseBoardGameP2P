@@ -1,0 +1,9 @@
+/* fixed demo footprint so the surface has something to fill */
+.demo {
+  inline-size: 220px;
+  block-size: 120px;
+}
+
+.demoLabel {
+  color: var(--white-75);
+}

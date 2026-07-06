@@ -22,3 +22,8 @@
   border-radius: 6cqw;
   opacity: 0.4;
 }
+
+/* compact — подпись пустого слота вертикальная (текст на 90°) */
+.compact .empty {
+  writing-mode: vertical-rl;
+}

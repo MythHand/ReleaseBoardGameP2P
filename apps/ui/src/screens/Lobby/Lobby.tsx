@@ -3,10 +3,12 @@ import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import LobbyCode, { LOBBY_CODE_COPY_EN, LOBBY_CODE_COPY_RU } from '@/blocks/LobbyCode'
 import PlayerSlot, { EmptySlot } from '@/blocks/PlayerSlot'
+import Rules, { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, MODES_COPY_EN, MODES_COPY_RU, type Setup } from '@/game/modes'
 import Badge from '@/primitives/Badge'
 import Button from '@/primitives/Button'
+import HudBackground, { type HudBackgroundTone } from '@/primitives/HudBackground'
 import Modal from '@/primitives/Modal'
 import Slider from '@/primitives/Slider'
 import Toggle from '@/primitives/Toggle'
@@ -30,6 +32,8 @@ interface LobbyProps {
   role?: 'host' | 'guest'
   initialSetup?: Setup
   initialLang?: SwitchLang
+  // HUD-фон экрана (переключается снаружи — напр. из техстроки песочницы)
+  bgTone?: HudBackgroundTone
 }
 
 // Весь видимый текст лобби приходит из набора по языку — экран сам переключает
@@ -39,6 +43,8 @@ export interface LobbyCopy {
   subtitle: string
   language: string
   disband: string
+  rules: string
+  rulesTitle: string
   modes: string
   modesLockedHint: string
   players: string
@@ -72,6 +78,8 @@ export const LOBBY_COPY_RU: LobbyCopy = {
   subtitle: 'Ожидание игроков…',
   language: 'язык',
   disband: 'расформировать',
+  rules: 'правила',
+  rulesTitle: 'Правила',
   modes: 'Режимы партии',
   modesLockedHint: 'настраивает host',
   players: 'Игроки',
@@ -106,6 +114,8 @@ export const LOBBY_COPY_EN: LobbyCopy = {
   subtitle: 'Waiting for players…',
   language: 'language',
   disband: 'disband',
+  rules: 'rules',
+  rulesTitle: 'Rules',
   modes: 'Match modes',
   modesLockedHint: 'set by host',
   players: 'Players',
@@ -163,6 +173,7 @@ export default function Lobby({
   role = 'host',
   initialSetup = DEFAULT_SETUP,
   initialLang = 'ru',
+  bgTone = 'neutral',
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
@@ -173,12 +184,14 @@ export default function Lobby({
   const [spectators, setSpectators] = useState<Spectator[]>(MOCK_SPECTATORS)
   const [specCapacity, setSpecCapacity] = useState(8)
   const [disbandOpen, setDisbandOpen] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
   const [lang, setLang] = useState<SwitchLang>(initialLang)
 
   // наборы текста по языку — экран держит оба и выбирает встроенным свитчером
   const copy = lang === 'en' ? LOBBY_COPY_EN : LOBBY_COPY_RU
   const modesCopy = lang === 'en' ? MODES_COPY_EN : MODES_COPY_RU
   const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
+  const rulesCopy = lang === 'en' ? RULES_COPY_EN : RULES_COPY_RU
 
   const specColor = specColorFor(specCapacity)
 
@@ -227,6 +240,7 @@ export default function Lobby({
 
   return (
     <div className={styles.lobby}>
+      <HudBackground tone={bgTone} className={styles.bgLayer} />
       <header className={styles.head}>
         <div>
           <div className={styles.titleRow}>
@@ -253,6 +267,9 @@ export default function Lobby({
           <h2 className={styles.h}>
             {copy.modes}
             {!isHost && <span className={styles.lockTag}>{copy.modesLockedHint}</span>}
+            <Button variant="tech" className={styles.rulesBtn} onClick={() => setRulesOpen(true)}>
+              {copy.rules}
+            </Button>
           </h2>
           <div className={styles.modeList}>
             <GameSettings setup={setup} onChange={setMode} readOnly={!isHost} copy={modesCopy} />
@@ -375,6 +392,10 @@ export default function Lobby({
           </div>
         </section>
       </div>
+
+      <Modal open={rulesOpen} onClose={() => setRulesOpen(false)} title={copy.rulesTitle} wide>
+        <Rules copy={rulesCopy} />
+      </Modal>
 
       <Modal open={disbandOpen} onClose={() => setDisbandOpen(false)} title={copy.disbandTitle}>
         <p className={styles.confirmText}>{copy.disbandText}</p>

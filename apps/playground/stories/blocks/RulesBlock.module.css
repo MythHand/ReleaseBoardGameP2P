@@ -3,6 +3,6 @@
   inline-size: min(1040px, 95vw);
   padding: 24px 26px;
   background: color-mix(in srgb, var(--surface-1) 94%, #000);
-  border: 1px solid rgb(255 255 255 / 14%);
-  box-shadow: 0 30px 80px rgb(0 0 0 / 60%);
+  border: 1px solid var(--white-14);
+  box-shadow: 0 30px 80px var(--black-60);
 }

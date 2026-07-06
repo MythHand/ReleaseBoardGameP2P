@@ -1,0 +1,201 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
+  overflow: hidden;
+}
+
+/* separated technical bar — page-level hint + card count, never over the stage */
+.controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-block-end: 1px solid var(--white-08);
+}
+
+.hint {
+  max-inline-size: 70ch;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.5;
+}
+
+/* right cluster of the technical bar — nav hint + card count */
+.meta {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.navHint {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0.35;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  min-block-size: 0;
+}
+
+/* left rail — technical card selector by name (scrolls; ~104 entries) */
+.rail {
+  display: flex;
+  flex: 0 0 272px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 10px;
+  overflow-y: auto;
+  border-inline-end: 1px solid var(--white-08);
+}
+
+.railItem,
+.railOn {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--white-60);
+  text-align: start;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+}
+
+.railItem:hover {
+  color: #fff;
+  background: var(--white-06);
+}
+
+.railOn {
+  color: #fff;
+  background: var(--white-12);
+}
+
+.railDot {
+  flex: 0 0 auto;
+  inline-size: 7px;
+  block-size: 7px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.railName {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* technical "not ready" marker — right-aligned, muted */
+.railTag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--white-30);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.stage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 40px;
+  min-block-size: 0;
+  padding: 32px;
+  overflow-y: auto;
+}
+
+.authoring {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+/* usage previews + content side by side — content sits to the right */
+.usageRow {
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+}
+
+.authoringCell,
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+}
+
+.previews {
+  display: flex;
+  gap: 32px;
+  align-items: flex-end;
+}
+
+.previewCell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.previewCap {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.45;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 18px;
+  max-inline-size: 620px;
+  margin: 0;
+}
+
+.content dt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-45);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.content dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.noContent {
+  max-inline-size: 60ch;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.5;
+}

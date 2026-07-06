@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-svgr/client" />
 
 // Typing for the app's custom environment variables. Vite only exposes
 // `VITE_`-prefixed vars to client code; built-ins (BASE_URL, DEV, …) come from

@@ -58,12 +58,24 @@ const VIEW_STATES: ViewItem[] = [
   { id: 'youDisconnect', label: { ru: 'твой дисконнект', en: 'your disconnect' } },
 ]
 
+// служебный док: демо-состояния (reaction503 = красная danger-реакция →
+// в Table это state='reaction' + turnDockDanger)
+type DockDemo = 'draw' | 'push' | 'waiting' | 'reaction' | 'reaction503'
+const DOCK_STATES: { id: DockDemo; label: Loc }[] = [
+  { id: 'draw', label: { ru: 'ход · добор', en: 'turn · draw' } },
+  { id: 'push', label: { ru: 'ход · PUSH', en: 'turn · PUSH' } },
+  { id: 'waiting', label: { ru: 'ход оппонента', en: 'opponent turn' } },
+  { id: 'reaction', label: { ru: 'реакция', en: 'reaction' } },
+  { id: 'reaction503', label: { ru: 'error 503', en: 'error 503' } },
+]
+
 export default function TableStory() {
   const { lang, setLang } = useLang()
   const [opps, setOpps] = useState(3)
   const [end, setEnd] = useState<string | null>(null)
   const [view, setView] = useState<ViewState | null>(null)
   const [role, setRole] = useState<'host' | 'guest'>('host')
+  const [dock, setDock] = useState<DockDemo>('push')
   const [specLimit, setSpecLimit] = useState(8)
   const [kicked, setKicked] = useState<Set<string>>(() => new Set())
 
@@ -123,6 +135,13 @@ export default function TableStory() {
           ]}
           onChange={(v) => setEnd(v === '' ? null : v)}
         />
+
+        <HoverSelect
+          label={pick(lang, { ru: 'состояние дока', en: 'dock state' })}
+          value={dock}
+          options={DOCK_STATES.map((d) => ({ value: d.id, label: d.label[lang] }))}
+          onChange={(v) => setDock(v as DockDemo)}
+        />
       </div>
       <div className={styles.stage}>
         <Table
@@ -145,6 +164,8 @@ export default function TableStory() {
           spectatorLimit={specLimit}
           onSpectatorLimitChange={setSpecLimit}
           onKickSpectator={(id) => setKicked((k) => new Set(k).add(id))}
+          turnDockState={dock === 'reaction503' ? 'reaction' : dock}
+          turnDockDanger={dock === 'reaction503'}
         />
       </div>
     </div>

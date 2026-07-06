@@ -15,7 +15,7 @@
   align-items: center;
   padding: 16px 24px;
   background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  border-block-end: 1px solid rgb(255 255 255 / 8%);
+  border-block-end: 1px solid var(--white-08);
 }
 
 .sliderWrap {
@@ -30,7 +30,7 @@
   letter-spacing: var(--tracking);
   cursor: pointer;
   background: transparent;
-  border: 1px solid rgb(255 255 255 / 15%);
+  border: 1px solid var(--white-15);
   border-radius: 6px;
 }
 
@@ -75,7 +75,7 @@
   letter-spacing: 0.14em;
   cursor: pointer;
   background: transparent;
-  border: 1px solid rgb(255 255 255 / 20%);
+  border: 1px solid var(--white-20);
   border-radius: 8px;
   transition: color var(--t-base) var(--ease-out),
     border-color var(--t-base) var(--ease-out);
@@ -92,7 +92,7 @@
   inset-inline: 0;
   font-family: var(--font-mono);
   font-size: 12px;
-  color: rgb(255 255 255 / 45%);
+  color: var(--white-45);
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.18em;

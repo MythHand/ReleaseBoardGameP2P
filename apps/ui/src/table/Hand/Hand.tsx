@@ -19,6 +19,32 @@ export interface HandItem {
   card: CardType
 }
 
+// Per-slot render context — everything Hand computed for that slot's face, so a
+// custom renderer can reproduce (or replace) the default face.
+export interface HandFaceContext {
+  faceDown: boolean
+  tilt: boolean
+  width: number
+  state: 'idle' | 'selected'
+  accent?: string
+}
+
+// Default face — the flat-PNG Card. A consumer can override via `renderFace`
+// (e.g. the playground swapping in the composed CardParallax face).
+function defaultFace(item: HandItem, ctx: HandFaceContext): React.ReactNode {
+  return (
+    <Card
+      card={item.card}
+      faceDown={ctx.faceDown}
+      interactive={false}
+      tilt={ctx.tilt}
+      width={ctx.width}
+      state={ctx.state}
+      accent={ctx.accent}
+    />
+  )
+}
+
 interface HandProps {
   items: HandItem[]
   faceDown?: boolean
@@ -29,6 +55,8 @@ interface HandProps {
   onCardClick?: (index: number, el: HTMLElement, e: React.MouseEvent) => void
   // подсветка карты по индексу: вернуть цвет свечения (цель стрелки) или undefined
   accentAt?: (index: number) => string | undefined
+  // переопределение отрисовки лицевой стороны слота (по умолчанию — PNG Card)
+  renderFace?: (item: HandItem, ctx: HandFaceContext) => React.ReactNode
 }
 
 /**
@@ -42,6 +70,7 @@ export default function Hand({
   gapAt = null,
   onCardClick,
   accentAt,
+  renderFace = defaultFace,
 }: HandProps) {
   const [hovered, setHovered] = useState<number | null>(null)
   const n = items.length
@@ -89,15 +118,13 @@ export default function Hand({
             onMouseLeave={() => setHovered((h) => (h === i ? null : h))}
             onMouseDown={onCardClick ? (e) => onCardClick(i, e.currentTarget, e) : undefined}
           >
-            <Card
-              card={item.card}
-              faceDown={faceDown}
-              interactive={false}
-              tilt={hovered === i}
-              width={`${CARD_W}px`}
-              state={accentAt?.(i) ? 'selected' : 'idle'}
-              accent={accentAt?.(i)}
-            />
+            {renderFace(item, {
+              faceDown,
+              tilt: hovered === i,
+              width: CARD_W,
+              state: accentAt?.(i) ? 'selected' : 'idle',
+              accent: accentAt?.(i),
+            })}
           </div>
         )
       })}

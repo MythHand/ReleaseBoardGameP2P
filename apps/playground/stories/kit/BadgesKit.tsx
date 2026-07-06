@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import Badge from '@/primitives/Badge'
 import { useLang } from '../../Playground/lang'
 import { KitCell, KitPage, KitSection } from './KitShell'
@@ -20,6 +21,8 @@ const COPY = {
     inGame: 'в игре',
     onStats: 'на статистике',
     inLobby: 'в лобби',
+    hud: 'HUD — самостоятельный стиль (заливка+рамка), цвет из --badge-accent',
+    drawn: 'добор ✓',
   },
   en: {
     roles: 'Roles',
@@ -37,6 +40,8 @@ const COPY = {
     inGame: 'in game',
     onStats: 'on stats',
     inLobby: 'in lobby',
+    hud: 'HUD — self-contained style (fill+border), colour from --badge-accent',
+    drawn: 'draw ✓',
   },
 }
 
@@ -107,6 +112,22 @@ export default function BadgesKit() {
           <Badge tone="muted" size="md" outlined>
             {t.offline}
           </Badge>
+        </KitCell>
+      </KitSection>
+
+      <KitSection title={t.hud}>
+        <KitCell caption="default (turn)">
+          <Badge tone="hud">{t.drawn}</Badge>
+        </KitCell>
+        <KitCell caption="reaction">
+          <span style={{ '--badge-accent': 'var(--reaction-accent)' } as CSSProperties}>
+            <Badge tone="hud">{t.drawn}</Badge>
+          </span>
+        </KitCell>
+        <KitCell caption="danger">
+          <span style={{ '--badge-accent': 'var(--danger-accent)' } as CSSProperties}>
+            <Badge tone="hud">{t.drawn}</Badge>
+          </span>
         </KitCell>
       </KitSection>
     </KitPage>

@@ -1,6 +1,11 @@
 // Data + logic
 
 export { PRESETS, play, presetNames } from './animations'
+export {
+  default as PresetAvatar,
+  PRESET_AVATARS,
+  type PresetAvatarItem,
+} from './avatars/PresetAvatar'
 export { default as GameSettings } from './blocks/GameSettings'
 export type { SwitchLang } from './blocks/LangSwitcher'
 export { default as LangSwitcher } from './blocks/LangSwitcher'
@@ -50,6 +55,9 @@ export { default as Drawer } from './primitives/Drawer'
 export type { DropdownItem } from './primitives/Dropdown'
 export { default as Dropdown } from './primitives/Dropdown'
 export { default as EdgeGlow } from './primitives/EdgeGlow'
+export type { HudBackgroundTone } from './primitives/HudBackground'
+export { default as HudBackground } from './primitives/HudBackground'
+export { default as HudSurface } from './primitives/HudSurface'
 export type { InputHandle, InputProps } from './primitives/Input'
 export { default as Input } from './primitives/Input'
 export { default as Modal } from './primitives/Modal'
@@ -57,8 +65,10 @@ export type { ModeOption } from './primitives/ModeSelect'
 export { default as ModeSelect } from './primitives/ModeSelect'
 export { default as Overlay } from './primitives/Overlay'
 export { default as Pile } from './primitives/Pile'
+export { default as RingTimer } from './primitives/RingTimer'
 export { default as Slider } from './primitives/Slider'
 export { default as Spinner } from './primitives/Spinner'
+export { default as StatusDot } from './primitives/StatusDot'
 export type { TabRailItem } from './primitives/TabRail'
 export { default as TabRail } from './primitives/TabRail'
 export { default as Toggle } from './primitives/Toggle'
@@ -96,3 +106,9 @@ export { SEAT_COPY_EN, SEAT_COPY_RU } from './table/Seat/Seat'
 export { default as Table } from './table/Table'
 export type { TableCopy } from './table/Table/Table'
 export { TABLE_COPY_EN, TABLE_COPY_RU } from './table/Table/Table'
+export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'
+export {
+  default as TurnDock,
+  TURN_DOCK_COPY_EN,
+  TURN_DOCK_COPY_RU,
+} from './table/TurnDock/TurnDock'

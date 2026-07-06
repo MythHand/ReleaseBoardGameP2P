@@ -1,0 +1,9 @@
+/* large preview — roughly half the available screen so the subtle fill reads */
+.demo {
+  inline-size: min(48vw, 760px);
+  block-size: 44vh;
+}
+
+.demoLabel {
+  color: var(--white-75);
+}

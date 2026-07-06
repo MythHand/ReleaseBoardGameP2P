@@ -9,6 +9,7 @@ import ReleaseLogo from '@/brand/ReleaseLogo'
 import { randomNickname, sanitizeNickname } from '@/game/nicknames'
 import DiceIcon from '@/icons/DiceIcon'
 import Button from '@/primitives/Button'
+import HudBackground from '@/primitives/HudBackground'
 import Input from '@/primitives/Input'
 import Spinner from '@/primitives/Spinner'
 import styles from './Invite.module.css'
@@ -141,6 +142,8 @@ export default function Invite({
       <div className={styles.bg} />
       <div className={styles.blur} />
       <div className={styles.scrim} />
+      {/* HUD-сетка: над градиентом/картинкой, под контентом */}
+      <HudBackground tone="grid" className={styles.bgLayer} />
 
       {lang && onLangChange && (
         <>

@@ -470,7 +470,7 @@ export default function DeckAnimationsStory() {
               label={pick(lang, { ru: 'колода', en: 'deck' })}
               deck="base"
               count={d.count}
-              width="150px"
+              width={150}
               countPos="tl"
               selected={choosingDeck && hovered === d.id}
               accent={OPERATION}
@@ -482,7 +482,7 @@ export default function DeckAnimationsStory() {
             label={pick(lang, { ru: 'события', en: 'events' })}
             deck="ai"
             count={12}
-            width="150px"
+            width={150}
             countPos="tl"
           />
         </div>

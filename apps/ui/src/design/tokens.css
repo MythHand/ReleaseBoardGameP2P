@@ -37,8 +37,15 @@
   --gray: #8a8a8a; /* mid grey — arrow desaturation mix */
   --charcoal: #1c1c1c; /* near-black — dark text on light surfaces (Rules) */
 
+  /* ===== Turn / HUD state accents (semantic — one meaning per phase) ===== */
+  --turn-accent: var(--brand-green); /* активный ход игрока */
+  --idle-accent: var(--white-45); /* ход оппонента / нейтраль — приглушённый белый */
+  --reaction-accent: var(--gold); /* окно реакции — атака на релиз */
+  --danger-accent: var(--coral); /* danger-реакция (напр. Error 503) */
+
   /* ===== White overlays — --fg at an alpha (borders, text, faint surfaces) ===== */
   --white-02: rgb(255 255 255 / 2%);
+  --white-03: rgb(255 255 255 / 3%);
   --white-04: rgb(255 255 255 / 4%);
   --white-04-5: rgb(255 255 255 / 4.5%);
   --white-05: rgb(255 255 255 / 5%);
@@ -48,11 +55,13 @@
   --white-10: rgb(255 255 255 / 10%);
   --white-12: rgb(255 255 255 / 12%);
   --white-14: rgb(255 255 255 / 14%);
+  --white-15: rgb(255 255 255 / 15%);
   --white-16: rgb(255 255 255 / 16%);
   --white-18: rgb(255 255 255 / 18%);
   --white-20: rgb(255 255 255 / 20%);
   --white-22: rgb(255 255 255 / 22%);
   --white-25: rgb(255 255 255 / 25%);
+  --white-28: rgb(255 255 255 / 28%);
   --white-30: rgb(255 255 255 / 30%);
   --white-32: rgb(255 255 255 / 32%);
   --white-35: rgb(255 255 255 / 35%);
@@ -67,6 +76,7 @@
   --white-72: rgb(255 255 255 / 72%);
   --white-75: rgb(255 255 255 / 75%);
   --white-78: rgb(255 255 255 / 78%);
+  --white-80: rgb(255 255 255 / 80%);
   --white-82: rgb(255 255 255 / 82%);
   --white-85: rgb(255 255 255 / 85%);
   --white-86: rgb(255 255 255 / 86%);
@@ -75,6 +85,7 @@
   /* ===== Black overlays — --bg at an alpha (scrims, shadows) ===== */
   --black-20: rgb(0 0 0 / 20%);
   --black-25: rgb(0 0 0 / 25%);
+  --black-28: rgb(0 0 0 / 28%);
   --black-32: rgb(0 0 0 / 32%);
   --black-35: rgb(0 0 0 / 35%);
   --black-42: rgb(0 0 0 / 42%);
@@ -100,7 +111,10 @@
   --coral-45: rgb(255 107 129 / 45%);
   --coral-60: rgb(255 107 129 / 60%);
   --brand-green-08: rgb(41 224 122 / 8%);
+  --brand-green-10: rgb(41 224 122 / 10%);
   --brand-green-12: rgb(41 224 122 / 12%);
+  --brand-green-16: rgb(41 224 122 / 16%);
+  --brand-green-35: rgb(41 224 122 / 35%);
 
   /* ===== Yellow / amber / orange — Rules highlight fills ===== */
   --yellow-28: rgb(255 230 120 / 28%);
@@ -131,6 +145,11 @@
     var(--cat-defense),
     var(--cat-protection)
   ); /* «защитные» категории — синий→фиолетовый (текст-градиент в Stats) */
+  --grad-card-navy: radial-gradient(
+    circle at 50% 42%,
+    color-mix(in srgb, var(--card-parallax-navy) 50%, transparent) 0%,
+    color-mix(in srgb, var(--card-parallax-navy) 95%, transparent) 100%
+  ); /* CardParallax panel: radial-navy, light core → vignetted rim; reused by PresetAvatar dim */
 
   /* ===== Типографика =====
      Настолка: Onest — заголовки, Fira Mono — основной текст.
@@ -144,6 +163,9 @@
   --card-w: 200px;
   --card-aspect: 368 / 515; /* оригинальная пропорция арта */
   --card-radius: 14px;
+  --card-parallax-navy: #102131; /* заливка панели composed-лица (CardParallax) */
+  --card-sudo-yellow: #facc15; /* подложка sudo-абзаца в описании (CardParallax) */
+  --card-defense-green: #10b981; /* подложка «работает против» у Defense (CardParallax) */
 
   /* ===== Слои (z-index) ===== */
   --z-table: 0;
@@ -159,4 +181,8 @@
   --t-slow: 420ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-soft: cubic-bezier(0.4, 0, 0.2, 1); /* спокойный ease-in-out */
+
+  /* ambient loops (не переходы, а бесконечные циклы — пульс/бегущий блик HUD) */
+  --t-ambient: 1.6s;
+  --t-ambient-slow: 3.6s;
 }

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import DiceIcon from '@/icons/DiceIcon'
 import Button, { CopyButton } from '@/primitives/Button'
 import { useLang } from '../../Playground/lang'
@@ -16,6 +17,8 @@ const COPY = {
     dangerGhost: 'dangerGhost — серая → заливка (хедер)',
     disband: 'расформировать',
     icon: 'Icon — квадрат под высоту поля ввода',
+    hud: 'HUD — энергичная клавиша (акцент --btn-accent)',
+    push: 'PUSH',
     randomNick: 'случайный ник',
     copy: 'Copy — клик копирует, подпись на миг меняется',
     copied: 'скопировано',
@@ -32,6 +35,8 @@ const COPY = {
     dangerGhost: 'dangerGhost — gray → fill (header)',
     disband: 'disband',
     icon: 'Icon — square matching input height',
+    hud: 'HUD — energized key (accent --btn-accent)',
+    push: 'PUSH',
     randomNick: 'random nickname',
     copy: 'Copy — click copies, label flips briefly',
     copied: 'copied',
@@ -77,6 +82,30 @@ export default function ButtonsKit() {
         <KitCell caption="dice">
           <Button variant="icon" aria-label={t.randomNick}>
             <DiceIcon />
+          </Button>
+        </KitCell>
+      </KitSection>
+
+      <KitSection title={t.hud}>
+        <KitCell caption="turn">
+          <Button variant="hud">{t.push}</Button>
+        </KitCell>
+        <KitCell caption="reaction">
+          <Button
+            variant="hud"
+            style={{ '--btn-accent': 'var(--reaction-accent)' } as CSSProperties}
+          >
+            {t.push}
+          </Button>
+        </KitCell>
+        <KitCell caption="danger">
+          <Button variant="hud" style={{ '--btn-accent': 'var(--danger-accent)' } as CSSProperties}>
+            {t.push}
+          </Button>
+        </KitCell>
+        <KitCell caption="disabled">
+          <Button variant="hud" disabled>
+            {t.push}
           </Button>
         </KitCell>
       </KitSection>

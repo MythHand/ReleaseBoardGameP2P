@@ -22,3 +22,18 @@ Shared component library — TypeScript + React + CSS Modules + design tokens; n
 
 - **Prefer composition over polymorphism for primitives.** A primitive (`Button`, `Input`, …) renders one element and owns one responsibility. When you need extra behaviour on top — e.g. copy-to-clipboard with a transient "copied" label — add a sibling component that wraps the primitive and reuses its styles (`CopyButton` renders a `Button` and owns only the copy concern) rather than growing the behaviour onto the primitive itself.
 - **Wrappers add behaviour; primitives stay unaware of them.** A wrapper like `CopyButton` or `MenuButton` composes `Button` and layers its own concern (clipboard, menu focus/roving) on top; the primitive carries no copy / menu knowledge.
+
+## Card Components
+
+The card face is code-composed (layered graphics + text), not a flat image, and shows up in two shapes. They are **not copies of each other** — they share one base and split by responsibility:
+
+| Piece | Path | Owns | Used by |
+|---|---|---|---|
+| `ComposedFace` | `cards/CardParallax/ComposedFace.tsx` | The layers of a card face (background / panel / grid / illustration / category / title / desc). Pure render, no state — driven by an external deflection `p`. | Both cards below. |
+| `useCardTilt` | `cards/useCardTilt.ts` | The tilt engine: pointer → deflection `p`, hover, and the whole-card `transform` (lift + scale + rotate). **The single source of the tilt math.** | Both cards below. |
+| `Card` | `primitives/Card/Card.tsx` | The **full game card** — the interactive primitive: flip (face↔back), states (`playable`/`selected`/`disabled`), glow, click/keyboard. Renders its face via `CardFace`. | Table, hand, piles, Stats. |
+| `CardParallax` | `cards/CardParallax/CardParallax.tsx` | The **display-only card** — just face + tilt, no flip/states/click. | Previews and the Rules hover-zoom overlay. |
+
+- Mental model: **`Card` = «карта, с которой играют»** (interactive), **`CardParallax` = «карта, которую показывают»** (showcase). Both render the same `ComposedFace` with the same `useCardTilt` engine — hence one face, one tilt engine, no duplication.
+- `CardFace` (`primitives/Card/CardFace.tsx`) is the swap point inside `Card`: composed face by default, flat PNG art as fallback or when `png` is forced (the playground **OG Card (PNG)** page — the one place PNG survives).
+- Composed faces are localized (`CARD_CONTENT[id][lang]`); the language comes from `CardLangProvider` (`cards/cardLang.tsx`). A consumer wraps its card-bearing subtree in it; without a provider a face falls back to `ru`.

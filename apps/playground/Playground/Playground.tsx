@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import { Navigate, NavLink, Route, Routes } from 'react-router'
+import { CardLangProvider } from '@/cards/cardLang'
 import AnimationAuditStory from '../stories/AnimationAuditStory'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
@@ -16,6 +17,8 @@ import ReconnectBlock from '../stories/blocks/ReconnectBlock'
 import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
 import RulesBlock from '../stories/blocks/RulesBlock'
 import SeatBlock from '../stories/blocks/SeatBlock'
+import TurnDockBlock from '../stories/blocks/TurnDockBlock'
+import CardParallaxStory from '../stories/CardParallaxStory'
 import CardStory from '../stories/CardStory'
 import ComboStory from '../stories/ComboStory'
 import TextStyles from '../stories/foundations/TextStyles'
@@ -35,13 +38,17 @@ import ButtonsKit from '../stories/kit/ButtonsKit'
 import DrawerKit from '../stories/kit/DrawerKit'
 import DropdownKit from '../stories/kit/DropdownKit'
 import EdgeGlowKit from '../stories/kit/EdgeGlowKit'
+import HudBackgroundKit from '../stories/kit/HudBackgroundKit'
+import HudSurfaceKit from '../stories/kit/HudSurfaceKit'
 import InputsKit from '../stories/kit/InputsKit'
 import ModalsKit from '../stories/kit/ModalsKit'
 import ModeSelectKit from '../stories/kit/ModeSelectKit'
 import OverlayKit from '../stories/kit/OverlayKit'
 import PilesKit from '../stories/kit/PilesKit'
+import RingTimerKit from '../stories/kit/RingTimerKit'
 import SlidersKit from '../stories/kit/SlidersKit'
 import SpinnerKit from '../stories/kit/SpinnerKit'
+import StatusDotKit from '../stories/kit/StatusDotKit'
 import TabRailKit from '../stories/kit/TabRailKit'
 import TogglesKit from '../stories/kit/TogglesKit'
 import VideoPlayerKit from '../stories/kit/VideoPlayerKit'
@@ -97,7 +104,8 @@ const groups: Group[] = [
   {
     title: { ru: 'Карты', en: 'Cards' },
     items: [
-      { id: 'card', title: 'Card', render: () => <CardStory /> },
+      { id: 'card', title: 'OG Card (PNG)', render: () => <CardStory /> },
+      { id: 'card-parallax', title: 'Card', render: () => <CardParallaxStory /> },
       { id: 'hand', title: 'Hand', render: () => <HandStory /> },
     ],
   },
@@ -153,6 +161,16 @@ const groups: Group[] = [
     ],
   },
   {
+    // HUD-примитивы — служебный игровой интерфейс (таймеры, индикаторы, панели).
+    title: { ru: 'UI KIT · HUD', en: 'UI KIT · HUD' },
+    items: [
+      { id: 'kit-ring-timer', title: 'Ring timer', render: () => <RingTimerKit /> },
+      { id: 'kit-status-dot', title: 'Status dot', render: () => <StatusDotKit /> },
+      { id: 'kit-hud-surface', title: 'HUD surface', render: () => <HudSurfaceKit /> },
+      { id: 'kit-hud-background', title: 'HUD background', render: () => <HudBackgroundKit /> },
+    ],
+  },
+  {
     // Готовые композитные куски — собранные из примитивов блоки, как на экранах.
     title: { ru: 'Блоки', en: 'Blocks' },
     items: [
@@ -170,6 +188,7 @@ const groups: Group[] = [
       },
       { id: 'block-seat', title: 'Seat', render: () => <SeatBlock /> },
       { id: 'block-release-zone', title: 'Release zone', render: () => <ReleaseZoneBlock /> },
+      { id: 'block-turn-dock', title: 'Turn dock', render: () => <TurnDockBlock /> },
       { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },
       { id: 'block-player-slot', title: 'Player slot', render: () => <PlayerSlotBlock /> },
       { id: 'block-lobby-code', title: 'Lobby code', render: () => <LobbyCodeBlock /> },
@@ -191,63 +210,68 @@ export default function Playground() {
 
   return (
     <LangContext.Provider value={{ lang, setLang }}>
-      <div className={styles.wrap}>
-        <aside className={styles.sidebar}>
-          <div className={styles.head}>
-            <div className={styles.title}>Playground</div>
-            <div className={styles.langRow}>
-              <div className={styles.langSwitch}>
-                <span
-                  className={styles.langThumb}
-                  style={{ transform: lang === 'en' ? 'translateX(100%)' : 'translateX(0)' }}
-                  aria-hidden="true"
-                />
-                {LANGS.map((l) => (
-                  <button
-                    key={l}
-                    type="button"
-                    className={lang === l ? styles.langOn : styles.langOff}
-                    onClick={() => setLang(l)}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <nav className={styles.nav}>
-            {groups.map((g) => {
-              const groupTitle = pick(lang, g.title)
-              return (
-                <div key={g.title.ru || g.items[0]?.id} className={styles.group}>
-                  {groupTitle && <div className={styles.groupTitle}>{groupTitle}</div>}
-                  {g.items.map((s) => (
-                    <NavLink
-                      key={s.id}
-                      to={`/${s.id}`}
-                      className={({ isActive }) => (isActive ? styles.itemActive : styles.item)}
+      {/* composed card faces (CardFace → useCardLang) follow the preview language */}
+      <CardLangProvider value={lang}>
+        <div className={styles.wrap}>
+          <aside className={styles.sidebar}>
+            <div className={styles.head}>
+              <div className={styles.title}>Playground</div>
+              <div className={styles.langRow}>
+                <div className={styles.langSwitch}>
+                  <span
+                    className={styles.langThumb}
+                    style={{ transform: lang === 'en' ? 'translateX(100%)' : 'translateX(0)' }}
+                    aria-hidden="true"
+                  />
+                  {LANGS.map((l) => (
+                    <button
+                      key={l}
+                      type="button"
+                      className={lang === l ? styles.langOn : styles.langOff}
+                      onClick={() => setLang(l)}
                     >
-                      {s.title}
-                    </NavLink>
+                      {l}
+                    </button>
                   ))}
                 </div>
-              )
-            })}
-          </nav>
-        </aside>
-        <main className={styles.stage}>
-          <Routes>
-            <Route index element={<Navigate to={`/${firstId}`} replace />} />
-            {allStories.map((s) => (
-              <Route key={s.id} path={`/${s.id}`} element={s.render()} />
-            ))}
-            {/* словарь анимаций — суб-роут на конкретный пресет */}
-            <Route path="/animations/:preset" element={<AnimationsStory />} />
-            {/* Unknown path → first story */}
-            <Route path="*" element={<Navigate to={`/${firstId}`} replace />} />
-          </Routes>
-        </main>
-      </div>
+              </div>
+            </div>
+            <nav className={styles.nav}>
+              {groups.map((g) => {
+                const groupTitle = pick(lang, g.title)
+                return (
+                  <div key={g.title.ru || g.items[0]?.id} className={styles.group}>
+                    {groupTitle && <div className={styles.groupTitle}>{groupTitle}</div>}
+                    {g.items.map((s) => (
+                      <NavLink
+                        key={s.id}
+                        to={`/${s.id}`}
+                        className={({ isActive }) => (isActive ? styles.itemActive : styles.item)}
+                      >
+                        {s.title}
+                      </NavLink>
+                    ))}
+                  </div>
+                )
+              })}
+            </nav>
+          </aside>
+          <main className={styles.stage}>
+            <Routes>
+              <Route index element={<Navigate to={`/${firstId}`} replace />} />
+              {allStories.map((s) => (
+                <Route key={s.id} path={`/${s.id}`} element={s.render()} />
+              ))}
+              {/* словарь анимаций — суб-роут на конкретный пресет */}
+              <Route path="/animations/:preset" element={<AnimationsStory />} />
+              {/* параллакс-карты — суб-роут на конкретную карту */}
+              <Route path="/card-parallax/:cardId" element={<CardParallaxStory />} />
+              {/* Unknown path → first story */}
+              <Route path="*" element={<Navigate to={`/${firstId}`} replace />} />
+            </Routes>
+          </main>
+        </div>
+      </CardLangProvider>
     </LangContext.Provider>
   )
 }

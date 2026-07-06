@@ -1,14 +1,12 @@
 import type { CSSProperties } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { play } from '@/animations'
 import { CATEGORIES } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
+import { useCardTilt } from '@/cards/useCardTilt'
 import styles from './Card.module.css'
 import CardBack from './CardBack'
 import CardFace from './CardFace'
-
-// Скромный наклон, чтобы не «кринж» в вебе. Тюнингуется.
-const TILT_MAX = 7
 
 interface CardProps {
   card: CardType
@@ -16,10 +14,13 @@ interface CardProps {
   state?: 'idle' | 'playable' | 'selected' | 'disabled'
   tilt?: boolean
   interactive?: boolean
-  width?: string
+  // number → px (formatted here); string passes through (e.g. '100%' to fill the parent)
+  width?: number | string
   onClick?: () => void
   // переопределить цвет свечения (по умолчанию — акцент категории карты)
   accent?: string
+  // force the flat PNG face instead of the composed one (OG-card showcase)
+  png?: boolean
 }
 
 /**
@@ -34,13 +35,11 @@ export default function Card({
   width,
   onClick,
   accent: accentProp,
+  png,
 }: CardProps) {
-  const ref = useRef<HTMLDivElement>(null)
   const flipRef = useRef<HTMLDivElement>(null)
   const initialDown = useRef(faceDown)
   const prevDown = useRef(faceDown)
-  const [hover, setHover] = useState(false)
-  const [rot, setRot] = useState({ rx: 0, ry: 0 })
 
   // Флип лицо↔рубашка — через словарь анимаций (play('flipCard')).
   // Начальное положение задано инлайн-стилем (без мигания); все последующие
@@ -59,51 +58,28 @@ export default function Card({
   const tiltOn = (tilt ?? interactive) && !disabled
   const accent = accentProp ?? CATEGORIES[card?.category]?.accent ?? 'var(--brand-green)'
 
-  // сбрасываем наклон, когда параллакс выключается (карта ушла из наведения)
-  useEffect(() => {
-    if (!tiltOn) setRot({ rx: 0, ry: 0 })
-  }, [tiltOn])
-
-  function handleMove(e: React.MouseEvent<HTMLDivElement>) {
-    if (!tiltOn) return
-    const el = ref.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    const px = (e.clientX - r.left) / r.width - 0.5
-    const py = (e.clientY - r.top) / r.height - 0.5
-    setRot({ rx: -py * TILT_MAX * 2, ry: px * TILT_MAX * 2 })
-  }
-
-  function handleEnter() {
-    if (canInteract) setHover(true)
-  }
-
-  function handleLeave() {
-    setHover(false)
-    setRot({ rx: 0, ry: 0 })
-  }
-
+  // shared tilt engine — Card separates parallax (tiltOn) from hover-lift (canInteract)
+  const { p, hover, transform, onMouseEnter, onMouseMove, onMouseLeave } = useCardTilt({
+    tilt: tiltOn,
+    lift: canInteract,
+  })
   const lifted = hover
-  const transform =
-    `translateY(${lifted ? -10 : 0}px) scale(${lifted ? 1.04 : 1}) ` +
-    `rotateX(${rot.rx}deg) rotateY(${rot.ry}deg)`
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: mouse handlers drive decorative hover-lift/parallax only; actionable cards (onClick) get role=button + onKeyDown + tabIndex below
     <div
-      ref={ref}
       className={styles.root}
       data-state={state}
       style={
         {
           '--accent': accent,
-          width: width ?? 'var(--card-w)',
+          width: typeof width === 'number' ? `${width}px` : (width ?? 'var(--card-w)'),
           zIndex: lifted ? 'var(--z-card-lifted)' : 'auto',
         } as CSSProperties
       }
-      onMouseEnter={handleEnter}
-      onMouseMove={handleMove}
-      onMouseLeave={handleLeave}
+      onMouseEnter={onMouseEnter}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
       onClick={disabled ? undefined : onClick}
       onKeyDown={
         !disabled && onClick
@@ -122,7 +98,7 @@ export default function Card({
           style={{ transform: `rotateY(${initialDown.current ? 180 : 0}deg)` }}
         >
           <div className={styles.face}>
-            <CardFace card={card} />
+            <CardFace card={card} p={p} png={png} />
           </div>
           <div className={`${styles.face} ${styles.back}`}>
             <CardBack deck={card?.deck} />

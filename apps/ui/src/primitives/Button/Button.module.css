@@ -112,3 +112,64 @@
 .icon svg {
   display: block;
 }
+
+/* HUD-клавиша — «энергичная» кнопка с акцентным свечением. Акцент задаётся
+   переменной --btn-accent (по умолчанию активный ход); тёмный текст остаётся
+   белым, акцент несут рамка/заливка/свечение. */
+.hud {
+  --a: var(--btn-accent, var(--turn-accent));
+
+  position: relative;
+  justify-content: center;
+  padding: 14px 20px;
+  overflow: hidden;
+  color: var(--fg);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--a) 35%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--a) 9%, transparent), color-mix(in srgb, var(--a) 4%, transparent));
+  border: 1px solid color-mix(in srgb, var(--a) 30%, transparent);
+  border-radius: 12px;
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--a) 14%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--a) 7%, transparent);
+  transition:
+    box-shadow var(--t-base) var(--ease-out),
+    transform var(--t-fast) var(--ease-out);
+}
+
+.hud:hover {
+  box-shadow:
+    0 0 20px color-mix(in srgb, var(--a) 24%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--a) 12%, transparent);
+}
+
+.hud:active {
+  transform: translateY(1px);
+}
+
+/* label above the glint sweep */
+.hud .label {
+  position: relative;
+  z-index: 1;
+}
+
+/* running light sweep across the HUD key */
+.glint {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -60%;
+  inline-size: 40%;
+  background: linear-gradient(100deg, transparent, color-mix(in srgb, var(--a) 14%, transparent), transparent);
+  transform: skewX(-18deg);
+  animation: glint var(--t-ambient-slow) var(--ease-out) infinite;
+}
+
+@keyframes glint {
+  0% {
+    inset-inline-start: -60%;
+  }
+
+  55%,
+  100% {
+    inset-inline-start: 130%;
+  }
+}
