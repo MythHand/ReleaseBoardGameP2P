@@ -11,12 +11,12 @@ const STATES: CardState[] = ['idle', 'playable', 'selected', 'disabled']
 
 const COPY = {
   ru: {
-    tilt: 'parallax-наклон',
-    hint: 'Наведи курсор на карту — подъём + наклон (чтение). Карты сегментированы по типам.',
+    tilt: 'наклон',
+    hint: 'OG-лица: плоский PNG-арт (без сборных слоёв). Наведи — подъём + наклон. Карты сегментированы по типам.',
   },
   en: {
-    tilt: 'parallax tilt',
-    hint: 'Hover a card — lift + tilt (reading). Cards are segmented by type.',
+    tilt: 'tilt',
+    hint: 'OG faces: flat PNG art (no composed layers). Hover — lift + tilt. Cards are segmented by type.',
   },
 }
 
@@ -82,7 +82,7 @@ export default function CardStory() {
           <div className={styles.grid}>
             {g.cards.map((card) => (
               <div key={card.id} className={styles.cell}>
-                <Card card={card} state={state} tilt={tilt} />
+                <Card card={card} state={state} tilt={tilt} png />
                 <div className={styles.cap}>
                   {card.name} · {card.category}
                 </div>

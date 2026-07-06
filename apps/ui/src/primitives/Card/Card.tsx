@@ -1,14 +1,12 @@
 import type { CSSProperties } from 'react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { play } from '@/animations'
 import { CATEGORIES } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
+import { useCardTilt } from '@/cards/useCardTilt'
 import styles from './Card.module.css'
 import CardBack from './CardBack'
 import CardFace from './CardFace'
-
-// Скромный наклон, чтобы не «кринж» в вебе. Тюнингуется.
-const TILT_MAX = 7
 
 interface CardProps {
   card: CardType
@@ -39,12 +37,9 @@ export default function Card({
   accent: accentProp,
   png,
 }: CardProps) {
-  const ref = useRef<HTMLDivElement>(null)
   const flipRef = useRef<HTMLDivElement>(null)
   const initialDown = useRef(faceDown)
   const prevDown = useRef(faceDown)
-  const [hover, setHover] = useState(false)
-  const [p, setP] = useState({ x: 0, y: 0 })
 
   // Флип лицо↔рубашка — через словарь анимаций (play('flipCard')).
   // Начальное положение задано инлайн-стилем (без мигания); все последующие
@@ -63,39 +58,16 @@ export default function Card({
   const tiltOn = (tilt ?? interactive) && !disabled
   const accent = accentProp ?? CATEGORIES[card?.category]?.accent ?? 'var(--brand-green)'
 
-  // сбрасываем наклон, когда параллакс выключается (карта ушла из наведения)
-  useEffect(() => {
-    if (!tiltOn) setP({ x: 0, y: 0 })
-  }, [tiltOn])
-
-  function handleMove(e: React.MouseEvent<HTMLDivElement>) {
-    if (!tiltOn) return
-    const el = ref.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    const px = (e.clientX - r.left) / r.width - 0.5
-    const py = (e.clientY - r.top) / r.height - 0.5
-    setP({ x: px, y: py })
-  }
-
-  function handleEnter() {
-    if (canInteract) setHover(true)
-  }
-
-  function handleLeave() {
-    setHover(false)
-    setP({ x: 0, y: 0 })
-  }
-
+  // shared tilt engine — Card separates parallax (tiltOn) from hover-lift (canInteract)
+  const { p, hover, transform, onMouseEnter, onMouseMove, onMouseLeave } = useCardTilt({
+    tilt: tiltOn,
+    lift: canInteract,
+  })
   const lifted = hover
-  const transform =
-    `translateY(${lifted ? -10 : 0}px) scale(${lifted ? 1.04 : 1}) ` +
-    `rotateX(${-p.y * TILT_MAX * 2}deg) rotateY(${p.x * TILT_MAX * 2}deg)`
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: mouse handlers drive decorative hover-lift/parallax only; actionable cards (onClick) get role=button + onKeyDown + tabIndex below
     <div
-      ref={ref}
       className={styles.root}
       data-state={state}
       style={
@@ -105,9 +77,9 @@ export default function Card({
           zIndex: lifted ? 'var(--z-card-lifted)' : 'auto',
         } as CSSProperties
       }
-      onMouseEnter={handleEnter}
-      onMouseMove={handleMove}
-      onMouseLeave={handleLeave}
+      onMouseEnter={onMouseEnter}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
       onClick={disabled ? undefined : onClick}
       onKeyDown={
         !disabled && onClick

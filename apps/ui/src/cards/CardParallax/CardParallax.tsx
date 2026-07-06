@@ -1,12 +1,14 @@
-import { type CSSProperties, type MouseEvent, useState } from 'react'
+import type { CSSProperties } from 'react'
+import { useCardTilt } from '../useCardTilt'
 import styles from './CardParallax.module.css'
 import ComposedFace, { type CardParallaxContent } from './ComposedFace'
 import { BASE_W, FRONTEND, type ParallaxCardConfig } from './config'
 
-// CardParallax — the standalone, self-tilting composed card: it owns the pointer
-// tilt engine and renders the shared ComposedFace (the layers). The SAME face also
-// renders under Card/CardFace, driven by Card's tilt — so there is one face and no
-// duplicated engine. Kept standalone for previews and the Rules hover-zoom overlay.
+// CardParallax — the display-only composed card: no flip / states / click, just the
+// face + tilt. It drives the shared ComposedFace (the layers) with the shared
+// useCardTilt engine. The interactive primitive Card renders the SAME face with the
+// SAME engine — one face, one tilt engine, no copies. Used for previews and the
+// Rules hover-zoom overlay; Card is the full game-table card.
 
 // re-exported so existing consumers keep importing the content type from here
 export type { CardParallaxContent, CardParallaxParagraph } from './ComposedFace'
@@ -30,29 +32,11 @@ export default function CardParallax({
   interactive = true,
   lod = false,
 }: CardParallaxProps) {
-  const [p, setP] = useState({ x: 0, y: 0 })
-  const [hover, setHover] = useState(false)
-
-  function handleMove(e: MouseEvent<HTMLDivElement>) {
-    if (!interactive) return
-    const r = e.currentTarget.getBoundingClientRect()
-    setP({
-      x: (e.clientX - r.left) / r.width - 0.5,
-      y: (e.clientY - r.top) / r.height - 0.5,
-    })
-  }
-  function enter() {
-    if (interactive) setHover(true)
-  }
-  function reset() {
-    setHover(false)
-    setP({ x: 0, y: 0 })
-  }
-
-  // whole-card hover tilt/lift — ported 1:1 from the PNG Card (TILT_MAX 7 → ±7°)
-  const tilt =
-    `translateY(${hover ? -10 : 0}px) scale(${hover ? 1.04 : 1}) ` +
-    `rotateX(${(-p.y * 14).toFixed(2)}deg) rotateY(${(p.x * 14).toFixed(2)}deg)`
+  // shared tilt engine — previews tie both parallax and hover-lift to `interactive`
+  const { p, transform, onMouseEnter, onMouseMove, onMouseLeave } = useCardTilt({
+    tilt: interactive,
+    lift: interactive,
+  })
 
   const rootStyle = { width: `${width}px` } as CSSProperties
 
@@ -61,11 +45,11 @@ export default function CardParallax({
     <div
       className={styles.root}
       style={rootStyle}
-      onMouseEnter={enter}
-      onMouseMove={handleMove}
-      onMouseLeave={reset}
+      onMouseEnter={onMouseEnter}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
     >
-      <div className={styles.tilt} style={{ transform: tilt }}>
+      <div className={styles.tilt} style={{ transform }}>
         <div className={styles.face}>
           <ComposedFace config={config} content={content} p={p} lod={lod} />
         </div>
