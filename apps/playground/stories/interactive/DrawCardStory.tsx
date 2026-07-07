@@ -9,7 +9,8 @@ import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
-import { SEAT_COPY_EN, SEAT_COPY_RU } from '@/table/Seat/Seat'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './DrawCardStory.module.css'
@@ -408,7 +409,7 @@ export default function DrawCardStory() {
           >
             <Seat
               player={{ id: o.id, name: o.name, handCount: o.handCount, release: EMPTY_RELEASE }}
-              copy={pick(lang, { ru: SEAT_COPY_RU, en: SEAT_COPY_EN })}
+              copy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
             />
           </div>
         ))}

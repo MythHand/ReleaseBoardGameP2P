@@ -1,5 +1,7 @@
 import { makeTable } from '@/mocks/table'
-import Seat, { SEAT_COPY_EN, SEAT_COPY_RU } from '@/table/Seat/Seat'
+import Seat from '@/table/Seat/Seat'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { pick, useLang } from '../../Playground/lang'
 import { KitCell, KitPage, KitSection } from '../kit/KitShell'
 
@@ -8,7 +10,7 @@ const player = makeTable(3).opponents[0]
 
 export default function SeatBlock() {
   const { lang } = useLang()
-  const copy = pick(lang, { ru: SEAT_COPY_RU, en: SEAT_COPY_EN })
+  const copy = pick(lang, { ru: ruCommon.seat, en: enCommon.seat })
   const w = pick(lang, {
     ru: {
       states: 'Состояния места',

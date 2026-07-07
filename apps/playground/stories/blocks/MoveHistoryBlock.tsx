@@ -1,8 +1,7 @@
 import { makeTable } from '@/mocks/table'
-import MoveHistory, {
-  MOVE_HISTORY_COPY_EN,
-  MOVE_HISTORY_COPY_RU,
-} from '@/table/MoveHistory/MoveHistory'
+import MoveHistory from '@/table/MoveHistory/MoveHistory'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 
@@ -11,7 +10,7 @@ const { history } = makeTable(3)
 
 export default function MoveHistoryBlock() {
   const { lang } = useLang()
-  const copy = pick(lang, { ru: MOVE_HISTORY_COPY_RU, en: MOVE_HISTORY_COPY_EN })
+  const copy = pick(lang, { ru: ruCommon.moveHistory, en: enCommon.moveHistory })
 
   return (
     <KitPage title="Move history" tag="block">

@@ -13,36 +13,23 @@ import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
 import GameModes from '@/table/GameModes'
 import GameOver from '@/table/GameOver'
-import {
-  GAME_OVER_COPY_RU,
-  type GameOverCondition,
-  type GameOverCopy,
-} from '@/table/GameOver/GameOver'
+import { type GameOverCondition, type GameOverCopy } from '@/table/GameOver/GameOver'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import MoveHistory from '@/table/MoveHistory'
-import {
-  type HistoryEntry,
-  MOVE_HISTORY_COPY_RU,
-  type MoveHistoryCopy,
-} from '@/table/MoveHistory/MoveHistory'
+import { type HistoryEntry, type MoveHistoryCopy } from '@/table/MoveHistory/MoveHistory'
 import Participants from '@/table/Participants'
 import {
-  PARTICIPANTS_COPY_RU,
   type Participant,
   type ParticipantsCopy,
   type Spectator,
 } from '@/table/Participants/Participants'
-import Reconnect, { RECONNECT_COPY_RU, type ReconnectCopy } from '@/table/Reconnect'
+import Reconnect, { type ReconnectCopy } from '@/table/Reconnect'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
-import { SEAT_COPY_RU, type SeatCopy } from '@/table/Seat/Seat'
-import TurnDock, {
-  TURN_DOCK_COPY_EN,
-  TURN_DOCK_COPY_RU,
-  type TurnDockState,
-} from '@/table/TurnDock/TurnDock'
+import type { SeatCopy } from '@/table/Seat/Seat'
+import TurnDock, { type TurnDockCopy, type TurnDockState } from '@/table/TurnDock/TurnDock'
 import styles from './Table.module.css'
 
 interface Opponent {
@@ -90,15 +77,15 @@ interface TableProps {
   // текст правил по языку (панель «правила»)
   rulesCopy?: RulesCopy
   // текст мест оппонентов по языку (статус / счётчик карт)
-  seatCopy?: SeatCopy
+  seatCopy: SeatCopy
   // текст панели «участники» по языку
-  participantsCopy?: ParticipantsCopy
+  participantsCopy: ParticipantsCopy
   // текст ленты ходов по языку
-  historyCopy?: MoveHistoryCopy
+  historyCopy: MoveHistoryCopy
   // текст окна переподключения по языку
-  reconnectCopy?: ReconnectCopy
+  reconnectCopy: ReconnectCopy
   // текст окна завершения партии по языку
-  gameOverCopy?: GameOverCopy
+  gameOverCopy: GameOverCopy
   // собственный «хром»-текст стола по языку
   copy?: TableCopy
   // текущий язык и его смена — для свитчера языка в служебной вкладке
@@ -117,6 +104,8 @@ interface TableProps {
   turnDockState?: TurnDockState
   // danger-тон реакции (напр. Error 503) — красная реакция вместо янтарной
   turnDockDanger?: boolean
+  // localized TurnDock strings — from the central catalog, supplied by the consumer
+  turnDockCopy: TurnDockCopy
 }
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
@@ -205,11 +194,11 @@ export default function Table({
   view = null,
   modesCopy = MODES_COPY_RU,
   rulesCopy = RULES_COPY_RU,
-  seatCopy = SEAT_COPY_RU,
-  participantsCopy = PARTICIPANTS_COPY_RU,
-  historyCopy = MOVE_HISTORY_COPY_RU,
-  reconnectCopy = RECONNECT_COPY_RU,
-  gameOverCopy = GAME_OVER_COPY_RU,
+  seatCopy,
+  participantsCopy,
+  historyCopy,
+  reconnectCopy,
+  gameOverCopy,
   copy = TABLE_COPY_RU,
   lang,
   onLangChange,
@@ -220,13 +209,14 @@ export default function Table({
   onKickSpectator,
   turnDockState = 'push',
   turnDockDanger = false,
+  turnDockCopy,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
 
   const isHost = role === 'host'
   const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
-  const turnCopy = lang === 'en' ? TURN_DOCK_COPY_EN : TURN_DOCK_COPY_RU
+  const turnCopy = turnDockCopy
   // служебный док хода — состояние приходит пропсами (в игре — от логики хода,
   // в песочнице — из селектора истории); имя активного игрока берём со стола
   const dockPlayer = opponents[0]?.name

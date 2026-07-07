@@ -2,13 +2,10 @@ import { useMemo, useState } from 'react'
 import { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
 import { MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
 import { makeTable } from '@/mocks/table'
-import { GAME_OVER_COPY_EN, GAME_OVER_COPY_RU } from '@/table/GameOver/GameOver'
-import { MOVE_HISTORY_COPY_EN, MOVE_HISTORY_COPY_RU } from '@/table/MoveHistory/MoveHistory'
-import { PARTICIPANTS_COPY_EN, PARTICIPANTS_COPY_RU } from '@/table/Participants/Participants'
-import { RECONNECT_COPY_EN, RECONNECT_COPY_RU } from '@/table/Reconnect'
-import { SEAT_COPY_EN, SEAT_COPY_RU } from '@/table/Seat/Seat'
 import Table from '@/table/Table'
 import { TABLE_COPY_EN, TABLE_COPY_RU } from '@/table/Table/Table'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './TableStory.module.css'
@@ -151,11 +148,12 @@ export default function TableStory() {
           onOverContinue={() => setEnd(null)}
           modesCopy={pick(lang, { ru: MODES_COPY_RU, en: MODES_COPY_EN })}
           rulesCopy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })}
-          seatCopy={pick(lang, { ru: SEAT_COPY_RU, en: SEAT_COPY_EN })}
-          participantsCopy={pick(lang, { ru: PARTICIPANTS_COPY_RU, en: PARTICIPANTS_COPY_EN })}
-          historyCopy={pick(lang, { ru: MOVE_HISTORY_COPY_RU, en: MOVE_HISTORY_COPY_EN })}
-          reconnectCopy={pick(lang, { ru: RECONNECT_COPY_RU, en: RECONNECT_COPY_EN })}
-          gameOverCopy={pick(lang, { ru: GAME_OVER_COPY_RU, en: GAME_OVER_COPY_EN })}
+          seatCopy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
+          turnDockCopy={pick(lang, { ru: ruCommon.turnDock, en: enCommon.turnDock })}
+          participantsCopy={pick(lang, { ru: ruCommon.participants, en: enCommon.participants })}
+          historyCopy={pick(lang, { ru: ruCommon.moveHistory, en: enCommon.moveHistory })}
+          reconnectCopy={pick(lang, { ru: ruCommon.reconnect, en: enCommon.reconnect })}
+          gameOverCopy={pick(lang, { ru: ruCommon.gameOver, en: enCommon.gameOver })}
           copy={pick(lang, { ru: TABLE_COPY_RU, en: TABLE_COPY_EN })}
           lang={lang}
           onLangChange={setLang}

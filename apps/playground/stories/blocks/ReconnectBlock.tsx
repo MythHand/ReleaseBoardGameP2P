@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react'
-import Reconnect, { RECONNECT_COPY_EN, RECONNECT_COPY_RU } from '@/table/Reconnect'
+import Reconnect from '@/table/Reconnect'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 
@@ -21,7 +23,7 @@ const filler: CSSProperties = {
 
 export default function ReconnectBlock() {
   const { lang } = useLang()
-  const copy = pick(lang, { ru: RECONNECT_COPY_RU, en: RECONNECT_COPY_EN })
+  const copy = pick(lang, { ru: ruCommon.reconnect, en: enCommon.reconnect })
 
   return (
     <KitPage title="Reconnect" tag="block">

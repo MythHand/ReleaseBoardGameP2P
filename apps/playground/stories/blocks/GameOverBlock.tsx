@@ -1,10 +1,8 @@
 import { type CSSProperties, useState } from 'react'
 import Button from '@/primitives/Button'
-import GameOver, {
-  GAME_OVER_COPY_EN,
-  GAME_OVER_COPY_RU,
-  type GameOverCondition,
-} from '@/table/GameOver/GameOver'
+import GameOver, { type GameOverCondition } from '@/table/GameOver/GameOver'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 
@@ -30,7 +28,7 @@ const filler: CSSProperties = {
 export default function GameOverBlock() {
   const { lang } = useLang()
   const [condition, setCondition] = useState<GameOverCondition>('release')
-  const copy = pick(lang, { ru: GAME_OVER_COPY_RU, en: GAME_OVER_COPY_EN })
+  const copy = pick(lang, { ru: ruCommon.gameOver, en: enCommon.gameOver })
 
   return (
     <KitPage title="Game over" tag="block">

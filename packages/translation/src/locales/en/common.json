@@ -173,5 +173,45 @@
     "disbandConfirm": "The lobby will be closed and all connected players will be disconnected. This cannot be undone.",
     "disband": "disband",
     "disbandedMessage": "The lobby has been disbanded."
+  },
+  "turnDock": {
+    "yourTurn": "your turn",
+    "turnOf": "opponent turn",
+    "reaction": "reaction",
+    "reactionDanger": "error 503",
+    "draw": "draw",
+    "push": "PUSH",
+    "pass": "pass",
+    "drawn": "draw ✓",
+    "locked": "PUSH after draw",
+    "canDefend": "you can defend"
+  },
+  "seat": {
+    "eliminated": "eliminated",
+    "disconnected": "offline",
+    "cards": "cards"
+  },
+  "gameOver": {
+    "winner": "winner",
+    "conditions": { "release": "3 releases shipped", "lastStanding": "last one standing" },
+    "continue": "to stats"
+  },
+  "participants": {
+    "players": "players",
+    "spectators": "spectators",
+    "inGame": "in game",
+    "eliminated": "eliminated",
+    "connectionLost": "connection lost",
+    "spectator": "spectator",
+    "noSpectators": "no spectators yet",
+    "actions": "actions",
+    "kick": "kick"
+  },
+  "moveHistory": {
+    "draw": "draw",
+    "eliminated": "is out"
+  },
+  "reconnect": {
+    "label": "reconnecting…"
   }
 }

@@ -1,5 +1,7 @@
 import Typography from '@/primitives/Typography'
-import TurnDock, { TURN_DOCK_COPY_EN, TURN_DOCK_COPY_RU } from '@/table/TurnDock/TurnDock'
+import TurnDock from '@/table/TurnDock/TurnDock'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { pick, useLang } from '../../Playground/lang'
 import { KitCell, KitPage, KitSection } from '../kit/KitShell'
 
@@ -8,7 +10,8 @@ import { KitCell, KitPage, KitSection } from '../kit/KitShell'
 // caption, plus notes on the intended timer behaviour (research — not yet wired).
 export default function TurnDockBlock() {
   const { lang } = useLang()
-  const copy = lang === 'en' ? TURN_DOCK_COPY_EN : TURN_DOCK_COPY_RU
+  // TurnDock strings come from the central catalog (single source of truth)
+  const copy = (lang === 'en' ? enCommon : ruCommon).turnDock
   const w = pick(lang, {
     ru: {
       states: 'Состояния',

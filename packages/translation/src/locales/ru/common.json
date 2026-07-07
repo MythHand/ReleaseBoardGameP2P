@@ -173,5 +173,45 @@
     "disbandConfirm": "Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить.",
     "disband": "расформировать",
     "disbandedMessage": "Лобби было расформировано."
+  },
+  "turnDock": {
+    "yourTurn": "ваш ход",
+    "turnOf": "ход соперника",
+    "reaction": "реакция",
+    "reactionDanger": "error 503",
+    "draw": "добор",
+    "push": "PUSH",
+    "pass": "пас",
+    "drawn": "добор ✓",
+    "locked": "PUSH после добора",
+    "canDefend": "можно отбить"
+  },
+  "seat": {
+    "eliminated": "выбыл",
+    "disconnected": "нет связи",
+    "cards": "карт"
+  },
+  "gameOver": {
+    "winner": "победитель",
+    "conditions": { "release": "Собраны 3 релиза", "lastStanding": "Остался последним" },
+    "continue": "к статистике"
+  },
+  "participants": {
+    "players": "игроки",
+    "spectators": "зрители",
+    "inGame": "в игре",
+    "eliminated": "выбыл",
+    "connectionLost": "потеряно соединение",
+    "spectator": "зритель",
+    "noSpectators": "пока без зрителей",
+    "actions": "действия",
+    "kick": "исключить"
+  },
+  "moveHistory": {
+    "draw": "добор",
+    "eliminated": "выбыл из игры"
+  },
+  "reconnect": {
+    "label": "переподключение…"
   }
 }

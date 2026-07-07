@@ -94,16 +94,6 @@ export interface MoveHistoryCopy {
   eliminated: string
 }
 
-export const MOVE_HISTORY_COPY_RU: MoveHistoryCopy = {
-  draw: 'добор',
-  eliminated: 'выбыл из игры',
-}
-
-export const MOVE_HISTORY_COPY_EN: MoveHistoryCopy = {
-  draw: 'draw',
-  eliminated: 'is out',
-}
-
 interface RowProps {
   e: HistoryEntry
   copy: MoveHistoryCopy
@@ -185,15 +175,12 @@ function Row({ e, copy, nested = false }: RowProps) {
 
 interface MoveHistoryProps {
   entries?: HistoryEntry[]
-  copy?: MoveHistoryCopy
+  copy: MoveHistoryCopy
 }
 
 // История: слева — карта/действие (+ связка/цель/возврат), справа — кто;
 // реакции и последствия вложены иерархией; слева фон-градиент из цвета типа.
-export default function MoveHistory({
-  entries = [],
-  copy = MOVE_HISTORY_COPY_RU,
-}: MoveHistoryProps) {
+export default function MoveHistory({ entries = [], copy }: MoveHistoryProps) {
   return (
     <div className={styles.box}>
       <div className={styles.list}>
