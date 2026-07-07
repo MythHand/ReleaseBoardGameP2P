@@ -1,5 +1,9 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useId, useState } from 'react'
 import styles from './Dropdown.module.css'
+
+// Page-wide "only one open at a time": an opening dropdown broadcasts its id on
+// window; every other open dropdown hears it and closes itself. No provider needed.
+const EXCLUSIVE_EVENT = 'ui-dropdown-open'
 
 export interface DropdownItem {
   label: string
@@ -21,6 +25,7 @@ interface DropdownProps {
 // Выпадающее меню действий по кнопке «⋯»: открытие/закрытие, закрытие по клику
 // снаружи, пункты с вариантами danger / disabled (+подсказка по клику).
 export default function Dropdown({ items, ariaLabel = 'действия', trigger = '⋯' }: DropdownProps) {
+  const id = useId()
   const [open, setOpen] = useState(false)
   const [hint, setHint] = useState('')
 
@@ -35,6 +40,18 @@ export default function Dropdown({ items, ariaLabel = 'действия', trigge
     return () => window.removeEventListener('click', onDoc)
   }, [open])
 
+  // only one dropdown open page-wide — close when another one announces it opened
+  useEffect(() => {
+    const onOther = (e: Event) => {
+      if ((e as CustomEvent<string>).detail !== id) {
+        setOpen(false)
+        setHint('')
+      }
+    }
+    window.addEventListener(EXCLUSIVE_EVENT, onOther)
+    return () => window.removeEventListener(EXCLUSIVE_EVENT, onOther)
+  }, [id])
+
   return (
     <div className={styles.wrap}>
       <button
@@ -44,7 +61,13 @@ export default function Dropdown({ items, ariaLabel = 'действия', trigge
         onClick={(e) => {
           e.stopPropagation()
           setHint('')
-          setOpen((v) => !v)
+          if (open) {
+            setOpen(false)
+          } else {
+            // opening — tell any other open dropdown to close, then open this one
+            window.dispatchEvent(new CustomEvent(EXCLUSIVE_EVENT, { detail: id }))
+            setOpen(true)
+          }
         }}
       >
         {trigger}
