@@ -39,22 +39,38 @@
   border-color: var(--brand-green);
 }
 
-/* область раздачи; карты внутри позиционируются абсолютно от её верх-центра.
-   z выше руки — спред всегда над ней, не уходит под руку */
-.deal {
+/* веер соперника — та же рука (Hand), рубашкой вверх, у верхнего края;
+   въезжает сверху и уходит обратно за верх по data-in */
+.topHand {
   position: absolute;
-  inset-block: 104px 248px;
+  inset-block-start: 96px;
   inset-inline: 0;
-  z-index: 50;
+  z-index: 40;
+  transition: transform 520ms var(--ease-soft);
+  will-change: transform;
 }
 
-.slot {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 50%;
-  inline-size: max-content;
-  transition: transform 480ms var(--ease-soft), opacity 480ms var(--ease-soft);
-  will-change: transform, opacity;
+.topHand[data-in="false"] {
+  transform: translateY(-160%);
+}
+
+.topHand[data-in="true"] {
+  transform: translateY(0);
+}
+
+/* разворот руки оппонента на 180° — арка вниз, как веер напротив (лифт тянет
+   карту вниз, к игроку). Слайд держит внешний .topHand, разворот — здесь */
+.topHandInner {
+  transform: rotate(180deg);
+}
+
+/* выбранная карта: летит из слота в центр экрана и там переворачивается */
+.reveal {
+  position: fixed;
+  z-index: 55;
+  transform-origin: center center;
+  transition: transform 460ms var(--ease-soft);
+  will-change: transform;
 }
 
 /* кнопка вызова — по центру, в стиле плейграунда */
@@ -88,7 +104,7 @@
 
 .hint {
   position: absolute;
-  inset-block-start: 76px;
+  inset-block-start: 50%;
   inset-inline: 0;
   font-family: var(--font-mono);
   font-size: 12px;
@@ -99,7 +115,7 @@
 }
 
 /* без z-index — карты руки в общем контексте, чтобы летящая карта затыкалась
-   между половинками веера (спред над рукой держит z-index у .deal) */
+   между половинками веера */
 .handWrap {
   position: absolute;
   inset-block-end: 24px;
