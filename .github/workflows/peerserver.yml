@@ -8,6 +8,8 @@ on:
       - "apps/peerserver/**"
       - ".github/workflows/peerserver.yml"
       - "pnpm-lock.yaml"
+      - ".dockerignore"
+      - "package.json"
   workflow_dispatch:
 
 concurrency:

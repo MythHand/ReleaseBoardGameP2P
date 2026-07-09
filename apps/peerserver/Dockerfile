@@ -8,6 +8,7 @@ COPY . .
 # --ignore-scripts: the root `prepare` hook (simple-git-hooks) needs .git,
 # which is excluded from the context; no dependency here needs a postinstall.
 RUN pnpm install --frozen-lockfile --filter @release/peerserver... --ignore-scripts
+# .dockerignore excludes **/dist from the build context; this dist is produced here, inside the stage.
 RUN pnpm --filter @release/peerserver build
 # Standalone production bundle: no workspace symlinks, prod deps only.
 RUN pnpm --filter @release/peerserver deploy --prod /out

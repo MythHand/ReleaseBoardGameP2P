@@ -15,6 +15,8 @@ peer-to-peer and never touches this server.
 `GET /health` returns `200 {"status":"ok"}` — used by the Docker
 `HEALTHCHECK` and host monitoring.
 
+**Note:** the shipped frontend always sends the PeerJS default key (`peerjs`) — there is no `VITE_PEER_KEY` wiring in the client. Changing `PEER_KEY` on the server will make every client connection fail with `INVALID-KEY` until such wiring is added.
+
 ## Run locally
 
 ```bash

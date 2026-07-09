@@ -3,21 +3,23 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createServer } from './server.js'
 
 describe('createServer', () => {
-  let server: http.Server
+  let server: http.Server | undefined
 
   afterEach(
     () =>
       new Promise<void>((resolve, reject) => {
+        if (!server) return resolve()
         server.close((err) => (err ? reject(err) : resolve()))
       }),
   )
 
   async function listen(): Promise<number> {
     server = createServer({ port: 0, peerPath: '/', peerKey: 'peerjs' })
+    const localServer = server
     await new Promise<void>((resolve) => {
-      server.listen(0, resolve)
+      localServer.listen(0, resolve)
     })
-    const address = server.address()
+    const address = localServer.address()
     if (address === null || typeof address === 'string') throw new Error('no port assigned')
     return address.port
   }
