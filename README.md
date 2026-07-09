@@ -63,3 +63,18 @@ Architecture, per-app conventions, and the styling / i18n / signaling rules live
 [`CLAUDE.md`](./CLAUDE.md) — read it before making changes. In short: `@release/ui` stays
 CSS-Modules + i18n-agnostic (copy via props); the frontend is Tailwind-first; the backend
 holds no game rules.
+
+## License
+
+Licensed under the **GNU Affero General Public License v3.0 or later** (AGPL-3.0-or-later) —
+see [`LICENSE`](./LICENSE).
+
+Copyright (C) 2026 Dmitry Togulev ([@dimbo-design](https://github.com/dimbo-design)).
+
+Building other projects on top of this is welcome — keep the attribution and, per the AGPL,
+keep your version's source open (this closes the "fork, change a couple of lines, ship it
+closed/hosted for profit" loophole).
+
+> **TODO (before the final release):** add per-file SPDX headers
+> (`// SPDX-License-Identifier: AGPL-3.0-or-later`) across the source. Not required for the
+> license to apply, but recommended for AGPL — do a dedicated pass before release.
