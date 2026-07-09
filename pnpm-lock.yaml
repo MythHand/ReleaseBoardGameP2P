@@ -82,6 +82,28 @@ importers:
         specifier: ^5.2.0
         version: 5.2.0(rollup@4.62.2)(typescript@6.0.3)(vite@6.4.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  apps/peerserver:
+    dependencies:
+      express:
+        specifier: ^4.22.2
+        version: 4.22.2
+      peer:
+        specifier: ^1.0.2
+        version: 1.0.2
+    devDependencies:
+      '@release/lint':
+        specifier: workspace:*
+        version: link:../../packages/lint
+      '@types/express':
+        specifier: ^4.17.23
+        version: 4.17.25
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
+
   apps/playground:
     dependencies:
       '@release/ui':
@@ -4029,7 +4051,6 @@ snapshots:
       '@esbuild/win32-arm64': 0.28.1
       '@esbuild/win32-ia32': 0.28.1
       '@esbuild/win32-x64': 0.28.1
-    optional: true
 
   escalade@3.2.0: {}
 
@@ -5043,7 +5064,6 @@ snapshots:
       esbuild: 0.28.1
     optionalDependencies:
       fsevents: 2.3.3
-    optional: true
 
   type-is@1.6.18:
     dependencies:
