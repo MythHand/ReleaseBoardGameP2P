@@ -8,23 +8,7 @@
     "property-no-vendor-prefix": null,
     "property-no-unknown": [true, { "ignoreProperties": ["font-smooth", "composes"] }],
     "csstools/use-logical": "always",
-    "at-rule-no-unknown": [
-      true,
-      {
-        "ignoreAtRules": [
-          "theme",
-          "tailwind",
-          "apply",
-          "utility",
-          "variant",
-          "custom-variant",
-          "source",
-          "plugin",
-          "config",
-          "reference"
-        ]
-      }
-    ],
+    "at-rule-no-unknown": true,
     "import-notation": null
   }
 }

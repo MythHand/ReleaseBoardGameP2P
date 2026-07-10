@@ -1,0 +1,6 @@
+/* apps/frontend/src/app/app.module.css */
+.root {
+  min-block-size: 100vh;
+  color: var(--fg);
+  background: var(--bg);
+}

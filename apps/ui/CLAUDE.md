@@ -1,10 +1,10 @@
 # apps/ui — `@release/ui`
 
-Shared component library — TypeScript + React + CSS Modules + design tokens; no Tailwind, no i18n (all copy arrives via props). **Additive** to the root [CLAUDE.md](../../CLAUDE.md); cross-cutting monorepo rules live there and are not repeated here. This file owns the rules for things `@release/ui` is the source of truth for.
+Shared component library — TypeScript + React + CSS Modules + design tokens; no Tailwind dependency (stays portable for any consumer), no i18n (all copy arrives via props). **Additive** to the root [CLAUDE.md](../../CLAUDE.md); cross-cutting monorepo rules live there and are not repeated here. This file owns the rules for things `@release/ui` is the source of truth for.
 
 ## Typography Rule
 
-- **All text is set through the `<Typography>` component from `@release/ui`** — the single typography path for both the frontend (`@release/web`) and the library. Do not write `font-family` / `font-size` / `text-transform` / `letter-spacing` by hand, and do not use Tailwind text utilities. Color / spacing / layout stay local (via `className`).
+- **All text is set through the `<Typography>` component from `@release/ui`** — the single typography path for both the frontend (`@release/web`) and the library. Do not write `font-family` / `font-size` / `text-transform` / `letter-spacing` by hand, and do not add new `composes` from the scale (legacy — see below). Color / spacing / layout stay local (via `className`).
 - Two ways to pick a style:
   - **Semantic variant** (preferred): `<Typography variant="tag">…</Typography>`.
   - **Raw `base` + `tk`** (long tail, when no variant fits): `<Typography base="mono-strong" tk="tk-02">…</Typography>`. Exactly one of `variant` / `base` is required; `tk` is valid only alongside `base`.
@@ -16,7 +16,7 @@ Shared component library — TypeScript + React + CSS Modules + design tokens; n
 ## Color Rule
 
 - **Colors are design tokens only.** In CSS Modules never hardcode a color literal — no `#hex`, `rgb()/hsl()`, or named colors. Reference the `var(--token)` custom properties from [`src/design/tokens.css`](src/design/tokens.css) (`var(--fg)`, `var(--bg)`, `var(--surface-1)`, `var(--brand-green)`, `var(--cat-attack)`…). Opacity variants compose on a token (`color-mix(in srgb, var(--fg) 18%, transparent)`), not a raw `rgb(255 255 255 / 18%)`.
-- **Source of values — [`src/design/tokens.css`](src/design/tokens.css).** Missing a color → add a token there, don't inline a raw value. Tokens are the single surface the frontend bridges into Tailwind via `@theme`, so a literal here can't be themed downstream.
+- **Source of values — [`src/design/tokens.css`](src/design/tokens.css).** Missing a color → add a token there, don't inline a raw value. Tokens are the single surface consumed across all packages via `var(--*)`, so a literal here breaks theming downstream.
 
 ## Component Composition Rule
 

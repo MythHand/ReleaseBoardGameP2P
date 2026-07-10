@@ -1,0 +1,15 @@
+/* apps/frontend/src/features/join-lobby/JoinLobbyForm.module.css */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.error {
+  padding: 12px 16px;
+  margin: 0;
+  color: var(--coral);
+  background: var(--coral-12);
+  border: 1px solid var(--coral-45);
+  border-radius: 8px;
+}

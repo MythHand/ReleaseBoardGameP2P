@@ -1,6 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
 import generouted from '@generouted/react-router/plugin'
-import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import svgr from 'vite-plugin-svgr'
@@ -19,7 +18,6 @@ export default defineConfig({
     // asset URLs). @release/ui is consumed from source and its CardParallax
     // config pulls in svgr-imported category icons.
     svgr(),
-    tailwindcss(),
     generouted({
       format: false,
       // Generated router lives in the app layer (FSD composition root).

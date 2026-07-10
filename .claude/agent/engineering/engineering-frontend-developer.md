@@ -153,7 +153,7 @@ export const DataTable = memo<DataTableProps>(({ data, columns, onRowClick }) =>
 ## 🎨 UI Implementation
 **Framework**: [React/Vue/Angular with version and reasoning]
 **State Management**: [Redux/Zustand/Context API implementation]
-**Styling**: [Tailwind/CSS Modules/Styled Components approach]
+**Styling**: [CSS Modules/Styled Components approach]
 **Component Library**: [Reusable component structure]
 
 ## ⚡ Performance Optimization

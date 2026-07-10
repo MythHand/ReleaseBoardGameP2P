@@ -1,11 +1,11 @@
 import { useTranslation } from '@release/translation'
-import { Button } from '@release/ui'
+import { Button, Typography } from '@release/ui'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import JoinLobbyForm from '~/features/join-lobby/JoinLobbyForm'
 import LobbyView from './_LobbyView'
-import { card, ghostBtn, label, Shell } from './_ui'
+import { card, ghostBtn, label, Shell, styles } from './_ui'
 
 // /lobby/:lobbyId — the session-status flow for one lobby. A live session shows
 // the lobby (or a Continue/Leave interstitial when arriving on top of a running
@@ -35,15 +35,15 @@ export default function LobbyPage() {
     return (
       <Shell>
         <div className={card}>
-          <p className="text-fg/80">
+          <Typography variant="body" className={styles.statusText}>
             {session.status === 'kicked' ? t('lobby.kickedMessage') : t('lobby.disbandedMessage')}
-          </p>
+          </Typography>
           <Link
             to="/start"
-            className={`${ghostBtn} mt-4 inline-block`}
+            className={`${ghostBtn} ${styles.backLink}`}
             onClick={() => session.leaveSession()}
           >
-            {t('lobby.back')}
+            <Typography base="body">{t('lobby.back')}</Typography>
           </Link>
         </div>
       </Shell>
@@ -54,14 +54,16 @@ export default function LobbyPage() {
     if (!continued) {
       return (
         <Shell>
-          <div className={`${card} flex flex-col gap-4`}>
+          <div className={`${card} ${styles.cardStack}`}>
             <div>
-              <p className={label}>{t('lobby.activeSession')}</p>
-              <p className="font-bold text-2xl text-brand-green tracking-widest">
+              <Typography base="label-sm" tk="tk-16" as="p" className={label}>
+                {t('lobby.activeSession')}
+              </Typography>
+              <Typography variant="code" as="p" className={styles.code}>
                 {session.roomCode}
-              </p>
+              </Typography>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className={styles.row}>
               <Button onClick={() => setContinued(true)}>{t('lobby.continue')}</Button>
               <Button variant="danger" onClick={() => session.leaveSession()}>
                 {t('lobby.leave')}
@@ -79,16 +81,24 @@ export default function LobbyPage() {
       {/* A failed join surfaces its error inside JoinLobbyForm itself (shared
           with the start-screen modal), so it isn't repeated here. */}
       {session.status === 'connecting' && (
-        <p className="text-fg/60 text-sm">{t('lobby.connecting')}</p>
+        <Typography base="body" as="p" className={styles.connecting}>
+          {t('lobby.connecting')}
+        </Typography>
       )}
-      <div className={`${card} flex flex-col gap-4`}>
-        <h2 className="font-bold text-lg tracking-base">{t('lobby.joinTitle')}</h2>
+      <div className={`${card} ${styles.cardStack}`}>
+        <Typography variant="panelTitle" as="h2" className={styles.joinTitle}>
+          {t('lobby.joinTitle')}
+        </Typography>
         <JoinLobbyForm />
       </div>
       {/* No live session here (idle/connecting/error) — Back just resets any
           dangling transport/error and returns to the chooser. */}
-      <Link to="/start" className={`${ghostBtn} self-start`} onClick={() => session.leaveSession()}>
-        {t('lobby.back')}
+      <Link
+        to="/start"
+        className={`${ghostBtn} ${styles.backStart}`}
+        onClick={() => session.leaveSession()}
+      >
+        <Typography base="body">{t('lobby.back')}</Typography>
       </Link>
     </Shell>
   )

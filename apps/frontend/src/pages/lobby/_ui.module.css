@@ -1,0 +1,85 @@
+/* Shared styling for the lobby status flow (/lobby/:lobbyId).
+   Typography comes from <Typography> in the JSX — only color / spacing /
+   layout live here. */
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  justify-content: center;
+  max-inline-size: 576px;
+  min-block-size: 100vh;
+  padding: 80px 24px;
+  margin-inline: auto;
+}
+
+.label {
+  margin: 0;
+  color: var(--white-70);
+}
+
+.ghostBtn {
+  padding: 8px 16px;
+  color: var(--white-78);
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid var(--white-14);
+  border-radius: 8px;
+  transition: background var(--t-fast) var(--ease-out);
+}
+
+.ghostBtn:hover {
+  background: var(--white-06);
+}
+
+.ghostBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.card {
+  padding: 24px;
+  background: var(--surface-1);
+  border: 1px solid var(--white-10);
+  border-radius: 16px;
+}
+
+/* card contents stacked (interstitial / join card) */
+.cardStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.statusText {
+  margin: 0;
+  color: var(--white-78);
+}
+
+.backLink {
+  display: inline-block;
+  margin-block-start: 16px;
+}
+
+.backStart {
+  align-self: flex-start;
+}
+
+.code {
+  margin: 0;
+  color: var(--brand-green);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.connecting {
+  margin: 0;
+  color: var(--white-60);
+}
+
+.joinTitle {
+  margin: 0;
+}

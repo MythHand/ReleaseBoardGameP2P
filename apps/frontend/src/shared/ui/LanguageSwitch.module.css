@@ -1,0 +1,20 @@
+/* apps/frontend/src/shared/ui/LanguageSwitch.module.css */
+.corner {
+  position: fixed;
+  inset-block-start: 72px;
+  inset-inline-end: 76px;
+  z-index: 10;
+}
+
+/* soft corner darkening under the switcher — the start photo is light and
+   busy on the right; ported from the ui Start screen */
+.shade {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  z-index: 9;
+  inline-size: 340px;
+  block-size: 200px;
+  pointer-events: none;
+  background: var(--grad-corner-shade);
+}

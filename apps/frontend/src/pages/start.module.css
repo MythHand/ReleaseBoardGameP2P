@@ -1,0 +1,86 @@
+/* apps/frontend/src/pages/start.module.css */
+
+/* Ported from apps/ui/src/screens/Start/Start.module.css. */
+.root {
+  position: relative;
+  inline-size: 100%;
+  block-size: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("@/assets/home/photo.jpg");
+  background-position: center right;
+  background-size: cover;
+}
+
+/* blur stronger on the left, fading to the right edge (via mask) */
+.blur {
+  position: absolute;
+  inset: 0;
+  -webkit-backdrop-filter: blur(11px);
+  backdrop-filter: blur(11px);
+  -webkit-mask-image: linear-gradient(90deg, var(--bg) 0%, var(--black-70) 38%, transparent 66%);
+  mask-image: linear-gradient(90deg, var(--bg) 0%, var(--black-70) 38%, transparent 66%);
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--grad-scrim);
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  block-size: 100%;
+  padding-block-start: 72px;
+  padding-inline-start: 76px;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  inline-size: 460px;
+}
+
+.logo {
+  inline-size: 480px;
+  block-size: auto;
+
+  /* compensate the glyph glow/inset in the SVG — "R" on the left line */
+  margin: 0 0 12px -11px;
+}
+
+.tags {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block-end: 38px;
+  color: var(--cat-release);
+  opacity: 0.85;
+}
+
+.desc {
+  margin-block-end: 96px;
+  line-height: 1.65;
+  opacity: 0.85;
+}
+
+.menu {
+  align-self: flex-start;
+  inline-size: 300px;
+  margin-inline-start: -11px;
+}
+
+/* reserved continue-session slot, hidden without a session */
+.hiddenSlot {
+  visibility: hidden;
+  pointer-events: none;
+}

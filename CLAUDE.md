@@ -7,7 +7,7 @@ Rules and card mechanics: [`docs/rules-board-game.md`](./docs/rules-board-game.m
 
 **Design specs live in [`docs/specs/`](./docs/specs/)** (`YYYY-MM-DD-<topic>-design.md`).
 
-The app is in early scaffolding. Game logic (full game screens) is out of scope for this phase and lives in later specs. What exists today: the monorepo skeleton, the UI component library, and the Tailwind-themed frontend shell.
+The app is in early scaffolding. Game logic (full game screens) is out of scope for this phase and lives in later specs. What exists today: the monorepo skeleton, the UI component library, and the frontend shell.
 
 ---
 
@@ -17,7 +17,7 @@ The app is in early scaffolding. Game logic (full game screens) is out of scope 
 |---|---|---|
 | `apps/ui` | `@release/ui` | Shared component library — TypeScript + CSS Modules + design tokens; i18n-agnostic |
 | `apps/playground` | `@release/playground` | Vite sandbox for developing and previewing UI components in isolation |
-| `apps/frontend` | `@release/web` | Main web app — Vite + React + Tailwind v4 + react-i18next |
+| `apps/frontend` | `@release/web` | Main web app — Vite + React + CSS Modules + react-i18next |
 | `packages/translation` | `@release/translation` | i18next setup + locale catalogs (`en`/`ru`) + typed-key augmentation; consumed by `@release/web` |
 
 Package manager: **pnpm** (workspace defined in `pnpm-workspace.yaml` as `apps/*` and `packages/*`).
@@ -36,12 +36,11 @@ Package manager: **pnpm** (workspace defined in `pnpm-workspace.yaml` as `apps/*
 ### `@release/playground`
 - Vite + React 18
 - Consumes `@release/ui` from source via Vite alias (see UI Consumption below)
-- No Tailwind — purely for component rendering
+- CSS Modules only — purely for component rendering
 
 ### `@release/web` (frontend)
 - Vite + React 18 + TypeScript
-- **Tailwind v4** via `@tailwindcss/vite` plugin
-- Tailwind tokens bridged from UI design tokens via `@theme` in `src/index.css`
+- CSS Modules for component styles, design tokens via `@release/ui/tokens.css`
 - react-i18next — translation catalogs under `src/locales/en/` and `src/locales/ru/`
 - Consumes `@release/ui` from source via Vite alias
 
@@ -82,14 +81,24 @@ The `lint` script runs `biome check .` (root-level) followed by `pnpm -r styleli
 
 ## Styling Rule
 
-Styling is **per-package** — the approach depends on which app the component lives in:
+Styling is uniform across all packages: **CSS Modules + design tokens.**
 
-- **`@release/ui` (shared library): CSS Modules only.** Its CSS Modules stay as authored — do not rewrite them into Tailwind. The library must have **no Tailwind dependency** so it stays portable for any consumer.
-- **`@release/web` (frontend app): Tailwind first.** Style frontend components with Tailwind utility classes in JSX. Do **not** add new `*.module.css` files to the frontend; use Tailwind utilities (and `@apply`/`@utility`/`@layer` in `index.css` for anything that can't be expressed inline). The shell may keep a small `App.module.css` for page layout, but new components are Tailwind.
-- **`@release/playground` (sandbox): CSS Modules.** It renders `@release/ui` in isolation and has no Tailwind.
-- Tailwind v4 (frontend only) is themed off the UI design tokens via the `@theme` bridge in `apps/frontend/src/index.css`, so utilities like `bg-surface-1`, `text-brand-green`, `text-cat-release` resolve to the same CSS variables defined in `apps/ui/src/design/tokens.css`. Add new token-backed utilities by extending that `@theme` block.
-- Stylelint (`.stylelintrc.json`) allows Tailwind v4 at-rules (`@theme`, `@apply`, `@utility`, `@variant`, `@custom-variant`, etc.).
-- 📌 Послание от дизайнера проекта про потребление `@release/ui` вместо ручного Tailwind на фронте — [`NO_TAILWIND.md`](./NO_TAILWIND.md). Прочитай перед работой над фронтом.
+- Every styled component/page has a co-located `*.module.css`. Colors, fonts,
+  gradients, timings come from the design tokens in
+  [`apps/ui/src/design/tokens.css`](./apps/ui/src/design/tokens.css) via
+  `var(--*)` — never hardcode a color (`#hex`, `rgb()`, named). Missing a
+  color → add a token there first.
+- All text is set through the `<Typography>` component from `@release/ui`
+  (semantic `variant`, or raw `base` + `tk` for the long tail) — no
+  hand-written font declarations and no `composes` from the scale in module
+  CSS. Full rule: [apps/ui/CLAUDE.md](./apps/ui/CLAUDE.md#typography-rule).
+- Spacing/sizing are plain px values; use logical properties
+  (`padding-inline`, `margin-block-start`) — stylelint enforces this.
+- **No Tailwind anywhere** — removed in
+  [#47](https://github.com/MythHand/ReleaseBoardGameP2P/issues/47); stylelint
+  rejects its at-rules. For the screens the ui-kit also ships
+  (`screens/Start`, `screens/Lobby`), the ui-kit styles are the visual source
+  of truth — check the playground before restyling the frontend.
 
 ---
 

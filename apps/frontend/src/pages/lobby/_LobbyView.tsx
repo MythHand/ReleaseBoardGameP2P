@@ -3,12 +3,14 @@ import {
   Avatar,
   Badge,
   Button,
+  CopyButton,
   GameSettings,
   MODES_COPY_EN,
   MODES_COPY_RU,
   Modal,
   Slider,
   Toggle,
+  Typography,
 } from '@release/ui'
 import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
@@ -17,6 +19,7 @@ import { useStartGame } from '~/features/start-game/useStartGame'
 import type { PeerInfo } from '~/network/types'
 import { BASE_URL } from '~/shared/config'
 import AppLogo from '~/shared/ui/AppLogo'
+import styles from './_LobbyView.module.css'
 
 interface MenuItemDef {
   label: string
@@ -30,7 +33,6 @@ export default function LobbyView() {
   const startGame = useStartGame()
   const navigate = useNavigate()
 
-  const [copied, setCopied] = useState(false)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [disbandOpen, setDisbandOpen] = useState(false)
 
@@ -57,12 +59,6 @@ export default function LobbyView() {
   const shareUrl = session.roomCode
     ? `${window.location.origin}${BASE_URL}lobby/${session.roomCode}`
     : ''
-
-  const copyLink = () => {
-    navigator.clipboard?.writeText(shareUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
 
   const setMode = (key: string, value: string) => session.setSetup({ ...state.setup, [key]: value })
 
@@ -105,10 +101,10 @@ export default function LobbyView() {
   }
 
   const renderMenu = (id: string, items: MenuItemDef[]) => (
-    <div className="relative flex">
+    <div className={styles.kebabWrap}>
       <button
         type="button"
-        className="flex h-7 w-7 cursor-pointer items-center justify-center border-0 bg-transparent text-[18px] text-white/50 leading-none transition-colors hover:text-white"
+        className={styles.kebabBtn}
         aria-label={t('lobby.kick')}
         onClick={(e) => {
           e.stopPropagation()
@@ -118,23 +114,19 @@ export default function LobbyView() {
         ⋯
       </button>
       {menuFor === id && (
-        <div className="absolute end-0 top-[calc(100%+6px)] z-[5] w-max border border-white/14 bg-[color-mix(in_srgb,var(--surface-1)_96%,#000)] shadow-[0_16px_40px_rgb(0_0_0/50%)]">
+        <div className={styles.kebabMenu}>
           {items.map((it) => (
             <button
               key={it.label}
               type="button"
-              className={`block w-full cursor-pointer whitespace-nowrap border-0 bg-transparent px-[18px] py-[11px] text-start font-[var(--font-text)] text-sm transition-colors ${
-                it.danger
-                  ? 'text-[#ff6b81] hover:bg-[#ff6b81]/12'
-                  : 'text-white/85 hover:bg-white/8 hover:text-white'
-              }`}
+              className={`${styles.kebabItem} ${it.danger ? styles.kebabDanger : ''}`}
               onClick={(e) => {
                 e.stopPropagation()
                 it.onClick()
                 setMenuFor(null)
               }}
             >
-              {it.label}
+              <Typography base="body-sm">{it.label}</Typography>
             </button>
           ))}
         </div>
@@ -143,56 +135,52 @@ export default function LobbyView() {
   )
 
   return (
-    <div className="relative flex h-screen w-full flex-col overflow-hidden bg-black px-[clamp(40px,7vw,96px)] py-12 text-white">
-      <header className="flex items-start justify-between gap-8 border-white/8 border-b pb-7">
+    <div className={styles.lobby}>
+      <header className={styles.head}>
         <div>
-          <div className="flex items-center gap-[18px]">
-            <AppLogo className="w-24 flex-none" blink={false} />
-            <span className="h-[30px] w-px bg-white/20" />
-            <h1 className="m-0 font-[var(--font-heading)] text-[30px] tracking-[0.04em]">
+          <div className={styles.titleRow}>
+            <AppLogo className={styles.headLogo} blink={false} />
+            <span className={styles.headDivider} />
+            <Typography variant="pageTitle" className={styles.title}>
               {t('lobby.title')}
-            </h1>
+            </Typography>
             {isHost && (
-              <Button variant="danger" onClick={() => setDisbandOpen(true)}>
+              <Button variant="dangerGhost" onClick={() => setDisbandOpen(true)}>
                 {t('lobby.disband')}
               </Button>
             )}
           </div>
-          <p className="mt-1.5 mb-0 ml-[133px] font-[var(--font-mono)] text-white/45 text-xs uppercase tracking-[0.14em]">
+          <Typography base="label" tk="tk-14" as="p" className={styles.sub}>
             {t('lobby.subtitle')}
-          </p>
+          </Typography>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <span className="font-[var(--font-mono)] text-[11px] text-white/45 uppercase tracking-[0.16em]">
+        <div className={styles.codeBox}>
+          <Typography base="label-sm" tk="tk-16" className={styles.codeLabel}>
             {t('lobby.code')}
-          </span>
-          <div className="flex items-center gap-[14px]">
-            <span className="font-[var(--font-mono)] text-[#8fd9b0] text-[26px] tracking-[0.2em]">
+          </Typography>
+          <div className={styles.codeRow}>
+            <Typography variant="code" className={styles.codeValue}>
               {session.roomCode}
-            </span>
-            <button
-              className="cursor-pointer border border-white/18 bg-transparent px-3 py-[7px] font-[var(--font-mono)] text-[11px] text-white/70 uppercase tracking-[0.12em] transition-colors hover:border-white/55 hover:text-white"
-              type="button"
-              onClick={copyLink}
-            >
-              {copied ? t('lobby.copied') : t('lobby.copy')}
-            </button>
+            </Typography>
+            <CopyButton variant="tech" copyValue={shareUrl} copiedChildren={t('lobby.copied')}>
+              {t('lobby.copy')}
+            </CopyButton>
           </div>
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] gap-12 py-8">
+      <div className={styles.grid}>
         {/* Left — match modes */}
-        <section className="flex min-h-0 flex-col">
-          <h2 className="m-0 mb-5 flex items-baseline gap-3 font-[var(--font-heading)] text-base uppercase tracking-[0.04em]">
+        <section className={styles.modes}>
+          <Typography variant="sectionTitle" className={styles.h}>
             {t('lobby.modes')}
             {!isHost && (
-              <span className="font-[var(--font-mono)] text-[11px] text-white/40 normal-case tracking-[0.1em]">
+              <Typography base="mono-xs" tk="tk-10" className={styles.lockTag}>
                 {t('lobby.modesLockedHint')}
-              </span>
+              </Typography>
             )}
-          </h2>
-          <div className="flex flex-col gap-[22px] overflow-y-auto pe-2">
+          </Typography>
+          <div className={styles.modeList}>
             <GameSettings
               setup={state.setup}
               onChange={setMode}
@@ -203,18 +191,18 @@ export default function LobbyView() {
         </section>
 
         {/* Right — players, spectators, lobby controls */}
-        <section className="flex min-h-0 flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto pe-2">
-            <h2 className="m-0 mb-5 flex items-baseline gap-3 font-[var(--font-heading)] text-base uppercase tracking-[0.04em]">
+        <section className={styles.players}>
+          <div className={styles.scrollArea}>
+            <Typography variant="sectionTitle" className={styles.h}>
               {t('lobby.players')}
-              <span className="font-[var(--font-mono)] text-[13px] text-white/45 tracking-[0.1em]">
+              <Typography base="mono-md" tk="tk-10" className={styles.count}>
                 {players.length} / {capacity}
-              </span>
-            </h2>
+              </Typography>
+            </Typography>
 
             {isHost && (
               <Slider
-                className="mb-[18px]"
+                className={styles.capRow}
                 label={t('lobby.capacity')}
                 value={capacity}
                 min={minCapacity}
@@ -223,29 +211,30 @@ export default function LobbyView() {
               />
             )}
 
-            <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+            <ul className={styles.list}>
               {slots.map(({ key, peer: p }) =>
                 p ? (
                   <li
                     key={key}
-                    className={`flex items-center gap-[14px] border bg-white/4 px-4 py-[14px] ${
-                      p.id === state.selfId ? 'border-[#8fd9b0]/50' : 'border-white/10'
-                    }`}
+                    className={`${styles.slot} ${p.id === state.selfId ? styles.slotMe : ''}`}
                   >
                     <Avatar name={p.name} size={34} />
-                    <span className="font-[var(--font-text)] text-[15px]">
+                    <Typography base="body-lg">
                       {p.name}
                       {p.id === state.selfId && (
-                        <span className="text-[13px] text-white/40"> ({t('lobby.you')})</span>
+                        <Typography base="body-sm" className={styles.you}>
+                          {' '}
+                          ({t('lobby.you')})
+                        </Typography>
                       )}
-                    </span>
+                    </Typography>
                     {p.role === 'host' && (
                       <Badge tone="success" size="sm" outlined>
                         {t('lobby.roleHost')}
                       </Badge>
                     )}
 
-                    <div className="relative ms-auto flex items-center gap-2.5">
+                    <div className={styles.rowEnd}>
                       {renderStatus(p)}
                       {isHost &&
                         p.id !== state.selfId &&
@@ -259,37 +248,36 @@ export default function LobbyView() {
                     </div>
                   </li>
                 ) : (
-                  <li
-                    key={key}
-                    className="flex items-center gap-[14px] border border-white/10 border-dashed px-4 py-[14px] font-[var(--font-mono)] text-white/30 text-xs uppercase tracking-[0.12em]"
-                  >
-                    {t('lobby.freeSlot')}
+                  <li key={key} className={styles.slotEmpty}>
+                    <Typography base="label" tk="tk-12">
+                      {t('lobby.freeSlot')}
+                    </Typography>
                   </li>
                 ),
               )}
             </ul>
 
-            <h2 className="m-0 mt-[30px] mb-5 flex items-baseline gap-3 font-[var(--font-heading)] text-base uppercase tracking-[0.04em]">
+            <Typography variant="sectionTitle" className={`${styles.h} ${styles.hSpectators}`}>
               {t('lobby.spectators')}
-              <span className="font-[var(--font-mono)] text-[13px] text-white/45 tracking-[0.1em]">
+              <Typography base="mono-md" tk="tk-10" className={styles.count}>
                 {spectators.length}
-              </span>
-            </h2>
+              </Typography>
+            </Typography>
 
-            <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+            <ul className={styles.list}>
               {spectators.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center gap-[14px] border border-white/10 bg-white/4 px-4 py-[14px]"
-                >
+                <li key={s.id} className={styles.slot}>
                   <Avatar name={s.name} size={34} />
-                  <span className="font-[var(--font-text)] text-[15px]">
+                  <Typography base="body-lg">
                     {s.name}
                     {s.id === state.selfId && (
-                      <span className="text-[13px] text-white/40"> ({t('lobby.you')})</span>
+                      <Typography base="body-sm" className={styles.you}>
+                        {' '}
+                        ({t('lobby.you')})
+                      </Typography>
                     )}
-                  </span>
-                  <div className="relative ms-auto flex items-center gap-2.5">
+                  </Typography>
+                  <div className={styles.rowEnd}>
                     <Badge tone="muted">{t('lobby.roleGuest')}</Badge>
                     {isHost &&
                       renderMenu(s.id, [
@@ -299,14 +287,16 @@ export default function LobbyView() {
                 </li>
               ))}
               {spectators.length === 0 && (
-                <li className="flex items-center gap-[14px] border border-white/10 border-dashed px-4 py-[14px] font-[var(--font-mono)] text-white/30 text-xs uppercase tracking-[0.12em]">
-                  {t('lobby.noSpectators')}
+                <li className={styles.slotEmpty}>
+                  <Typography base="label" tk="tk-12">
+                    {t('lobby.noSpectators')}
+                  </Typography>
                 </li>
               )}
             </ul>
           </div>
 
-          <div className="mt-[22px] flex items-center justify-center gap-4 border-white/8 border-t pt-[22px]">
+          <div className={styles.actions}>
             {isHost ? (
               <Button disabled={!session.canStart} onClick={startGame}>
                 {t('lobby.start')}
@@ -323,10 +313,10 @@ export default function LobbyView() {
         onClose={() => setDisbandOpen(false)}
         title={t('lobby.disbandTitle')}
       >
-        <p className="m-0 font-[var(--font-text)] text-[15px] text-white/75 leading-[1.6]">
+        <Typography variant="body" className={styles.confirmText}>
           {t('lobby.disbandConfirm')}
-        </p>
-        <div className="mt-auto flex justify-end gap-[18px]">
+        </Typography>
+        <div className={styles.confirmActions}>
           <Button variant="tech" onClick={() => setDisbandOpen(false)}>
             {t('start.close')}
           </Button>
