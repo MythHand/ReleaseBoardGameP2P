@@ -78,7 +78,12 @@ export default function PickSpecificCardStory() {
   const later = (fn: () => void, ms: number) => timers.current.push(window.setTimeout(fn, ms))
 
   // final step is shared: the card settles into the hand, then back to the start
-  const { gapAt, overlay, insert, reset: resetInsert } = useHandInsert(handRef, (card, gap) => {
+  const {
+    gapAt,
+    overlay,
+    insert,
+    reset: resetInsert,
+  } = useHandInsert(handRef, (card, gap) => {
     setHand((h) => {
       const copy = [...h]
       copy.splice(gap, 0, { uid: nextHandUid(), card })
@@ -170,7 +175,11 @@ export default function PickSpecificCardStory() {
     const el = revealRef.current
     if (el && reveal) {
       const r = el.getBoundingClientRect()
-      insert(reveal.card, { left: r.left, top: r.top, width: r.width, height: r.height }, hand.length)
+      insert(
+        reveal.card,
+        { left: r.left, top: r.top, width: r.width, height: r.height },
+        hand.length,
+      )
     }
     setReveal(null)
   }
@@ -195,7 +204,10 @@ export default function PickSpecificCardStory() {
 
       {/* opponent fan (across the table) — face-down, rotated 180° */}
       {phase !== 'idle' && (
-        <div className={`${styles.topHand} ${phase === 'miss' ? styles.shake : ''}`} data-in={handIn}>
+        <div
+          className={`${styles.topHand} ${phase === 'miss' ? styles.shake : ''}`}
+          data-in={handIn}
+        >
           <div className={styles.topHandInner} ref={fanRef}>
             <Hand
               items={oppHand}
@@ -217,7 +229,9 @@ export default function PickSpecificCardStory() {
       )}
 
       {phase === 'miss' && (
-        <div className={styles.miss}>{pick(lang, { ru: 'нет такой карты', en: 'not in hand' })}</div>
+        <div className={styles.miss}>
+          {pick(lang, { ru: 'нет такой карты', en: 'not in hand' })}
+        </div>
       )}
 
       {/* idle: the start button in the centre */}
@@ -234,7 +248,10 @@ export default function PickSpecificCardStory() {
         <div className={styles.grid}>
           {phase === 'choose' && (
             <div className={styles.hint}>
-              {pick(lang, { ru: 'выбери карту, которую хочешь забрать', en: 'choose the card to take' })}
+              {pick(lang, {
+                ru: 'выбери карту, которую хочешь забрать',
+                en: 'choose the card to take',
+              })}
             </div>
           )}
           {BASE_TYPES.map((c, i) => (
@@ -265,7 +282,12 @@ export default function PickSpecificCardStory() {
           }
           onTransitionEnd={onRevealEnd}
         >
-          <Card card={reveal.card} faceDown={!flipped} width={reveal.from.width} interactive={false} />
+          <Card
+            card={reveal.card}
+            faceDown={!flipped}
+            width={reveal.from.width}
+            interactive={false}
+          />
         </div>
       )}
 

@@ -194,7 +194,9 @@ export default function OpponentTakesCardStory() {
       )}
 
       {phase === 'miss' && (
-        <div className={styles.miss}>{pick(lang, { ru: 'у тебя нет такой карты', en: "you don't have that card" })}</div>
+        <div className={styles.miss}>
+          {pick(lang, { ru: 'у тебя нет такой карты', en: "you don't have that card" })}
+        </div>
       )}
 
       {/* idle: the start button in the centre */}

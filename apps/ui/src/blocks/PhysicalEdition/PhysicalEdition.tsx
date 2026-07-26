@@ -23,11 +23,7 @@ interface PhysicalEditionProps {
 
 // Блок «печатная версия»: матовая плашка — слева заголовок + подпись со ссылкой
 // на заказ, справа квадрат под арт коробки (выпирает за верхнюю грань).
-export default function PhysicalEdition({
-  href,
-  copy,
-  className = '',
-}: PhysicalEditionProps) {
+export default function PhysicalEdition({ href, copy, className = '' }: PhysicalEditionProps) {
   return (
     <div className={`${styles.box}${className ? ` ${className}` : ''}`}>
       <div className={styles.text}>

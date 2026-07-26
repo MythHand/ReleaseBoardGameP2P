@@ -58,7 +58,12 @@ export default function PickOpponentCardStory() {
   const holdTimer = useRef<number | null>(null)
 
   // final step is shared: the card settles into the hand, then reset the round
-  const { gapAt, overlay, insert, reset: resetInsert } = useHandInsert(handRef, (card, gap) => {
+  const {
+    gapAt,
+    overlay,
+    insert,
+    reset: resetInsert,
+  } = useHandInsert(handRef, (card, gap) => {
     setHand((h) => {
       const copy = [...h]
       copy.splice(gap, 0, { uid: nextHandUid(), card })
@@ -128,7 +133,11 @@ export default function PickOpponentCardStory() {
     const el = revealRef.current
     if (el && reveal) {
       const r = el.getBoundingClientRect()
-      insert(reveal.card, { left: r.left, top: r.top, width: r.width, height: r.height }, hand.length)
+      insert(
+        reveal.card,
+        { left: r.left, top: r.top, width: r.width, height: r.height },
+        hand.length,
+      )
     }
     setReveal(null)
   }
@@ -204,7 +213,12 @@ export default function PickOpponentCardStory() {
           }
           onTransitionEnd={onRevealEnd}
         >
-          <Card card={reveal.card} faceDown={!flipped} width={reveal.from.width} interactive={false} />
+          <Card
+            card={reveal.card}
+            faceDown={!flipped}
+            width={reveal.from.width}
+            interactive={false}
+          />
         </div>
       )}
 
