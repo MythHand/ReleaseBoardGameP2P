@@ -1,7 +1,7 @@
-import type { CSSProperties } from 'react'
-import Reconnect from '@/table/Reconnect'
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
+import type { CSSProperties } from 'react'
+import Reconnect from '@/table/Reconnect'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 

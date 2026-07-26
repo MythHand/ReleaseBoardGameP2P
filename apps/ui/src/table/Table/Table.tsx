@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
-import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
+import Rules, { type RulesCopy } from '@/blocks/Rules'
 import type { Card } from '@/cards/types'
-import { type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
+import type { GameModesCopy, Setup } from '@/game/modes'
 import GearIcon from '@/icons/GearIcon'
 import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
@@ -13,17 +13,13 @@ import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
 import GameModes from '@/table/GameModes'
 import GameOver from '@/table/GameOver'
-import { type GameOverCondition, type GameOverCopy } from '@/table/GameOver/GameOver'
+import type { GameOverCondition, GameOverCopy } from '@/table/GameOver/GameOver'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import MoveHistory from '@/table/MoveHistory'
-import { type HistoryEntry, type MoveHistoryCopy } from '@/table/MoveHistory/MoveHistory'
+import type { HistoryEntry, MoveHistoryCopy } from '@/table/MoveHistory/MoveHistory'
 import Participants from '@/table/Participants'
-import {
-  type Participant,
-  type ParticipantsCopy,
-  type Spectator,
-} from '@/table/Participants/Participants'
+import type { Participant, ParticipantsCopy, Spectator } from '@/table/Participants/Participants'
 import Reconnect, { type ReconnectCopy } from '@/table/Reconnect'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
@@ -73,9 +69,9 @@ interface TableProps {
   onOverContinue?: () => void
   view?: View | null
   // текст режимов по языку (read-only панель «игровой режим»)
-  modesCopy?: GameModesCopy
+  modesCopy: GameModesCopy
   // текст правил по языку (панель «правила»)
-  rulesCopy?: RulesCopy
+  rulesCopy: RulesCopy
   // текст мест оппонентов по языку (статус / счётчик карт)
   seatCopy: SeatCopy
   // текст панели «участники» по языку
@@ -162,8 +158,8 @@ export default function Table({
   over = null,
   onOverContinue,
   view = null,
-  modesCopy = MODES_COPY_RU,
-  rulesCopy = RULES_COPY_RU,
+  modesCopy,
+  rulesCopy,
   seatCopy,
   participantsCopy,
   historyCopy,

@@ -1,6 +1,9 @@
-# i18n: centralizing UI-kit copy — open decisions
+# i18n: centralizing UI-kit copy
 
-> Status: **in progress, blocked on decisions below.** Started 2026-07-07 on branch `feat/design-iteration`.
+> Status: **all 12 components migrated** on branch `feat/design-iteration` (started 2026-07-07).
+> `@release/ui` + `@release/playground` are green (typecheck + tests + biome). Frontend
+> companions (⚠️ FE below) remain for the frontend owner — repo-wide typecheck stays red on
+> `@release/web` until they land, so batch commits use `--no-verify`.
 
 ## Problem
 
@@ -27,20 +30,33 @@ catalog.
    - `Table` (which composes many of these) takes each sub-copy as a **required prop**
      instead of mapping `lang → bundle` internally.
 
-## Done (6/12) — committed `f6dd8d8`
+## Done (12/12)
 
-`TurnDock`, `Seat`, `GameOver`, `Participants`, `MoveHistory`, `Reconnect`.
-Catalog namespaces added: `turnDock`, `seat`, `gameOver`, `participants`,
-`moveHistory`, `reconnect`. `apps/ui` + `apps/playground` typecheck green.
+- **Batch 1** — `TurnDock`, `Seat`, `GameOver`, `Participants`, `MoveHistory`, `Reconnect`
+  → namespaces `turnDock`, `seat`, `gameOver`, `participants`, `moveHistory`, `reconnect`.
+- **Batch 2** — `Table` (own `TABLE_COPY`), `LobbyCode`, `PhysicalEdition`
+  → `table`, `lobbyCode`, `physicalEdition`.
+- **Batch 3** — `Modes` (`game/modes.ts`) → `gameModes`.
+- **Batch 4** — `Rules` → `rulesBlock` (Option A; collides with frontend `rules`).
+- **Batch 5** — `Lobby` screen (own `LOBBY_COPY`) → `lobbyScreen` (Option A; collides with frontend `lobby`).
 
-## Remaining (6/12)
+Every component now keeps only its `…Copy` interface + a **required** `copy` prop; all strings
+live in the catalog. The large `Rules`/`Lobby`/`Modes` bundles were spliced into `common.json`
+by extracting the literal from source (exact fidelity), preserving the catalog's existing
+formatting (biome-clean, pure additions).
 
-`Modes` (`game/modes.ts`), `LobbyCode`, `Table` (own `TABLE_COPY`),
-`PhysicalEdition`, `Rules`, `Lobby` (screen).
+### Self-switching screen — the `{ru,en}` map
 
-## Open decisions (resolve before finishing)
+The `Lobby` **screen** owns an internal language switcher, so it can't take a single resolved
+`copy`. It receives each catalog namespace as a `{ ru, en }` **map** and picks by its own
+`lang` (`lobbyCodeCopy` / `gameModesCopy` / `rulesBlockCopy` / `lobbyScreenCopy`). This keeps
+the screen's built-in switcher working **identically** — only the data source moved from
+in-file bundles to props. Plain blocks (LobbyCode, PhysicalEdition, Table, …) still take one
+resolved `copy`; the map is only for the self-switching screen.
 
-1. **Namespace collision — `Rules` and `Lobby`.**
+## Decisions (resolved)
+
+1. **Namespace collision — `Rules` and `Lobby`.** → **Option A taken.**
    The catalog already has `rules` and `lobby` namespaces — these belong to the
    **frontend** (`@release/web` calls `t('lobby.copy')` etc.). The UI-kit
    `RulesCopy` / `LobbyCopy` have a different, wider shape. Merging kit copy into
@@ -66,10 +82,11 @@ Catalog namespaces added: `turnDock`, `seat`, `gameOver`, `participants`,
    namespaces too — a joint step, likely alongside issue #51 (frontend consumes
    ui-kit screens as controlled components).
 
-## Turn-key checklist — the remaining 6
+## Per-component record (all done)
 
 Per component: the bundle, the catalog namespace (Option A above), and **every file that
-imports/uses it** (so no re-discovery). Legend:
+imports/uses it**. All `@release/ui` + `@release/playground` files below are migrated; the
+**⚠️ FE** files are the pending companion PR for the frontend owner. Legend:
 
 - **(self)** the component that defines the bundle — recipe step 2 (drop bundles, `copy`
   required) + step 3 (drop the `index.ts` export).

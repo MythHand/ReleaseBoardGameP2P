@@ -1,10 +1,8 @@
-import { useMemo, useState } from 'react'
-import { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
-import { MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
-import { makeTable } from '@/mocks/table'
-import Table from '@/table/Table'
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
+import { useMemo, useState } from 'react'
+import { makeTable } from '@/mocks/table'
+import Table from '@/table/Table'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './TableStory.module.css'
@@ -145,8 +143,8 @@ export default function TableStory() {
           view={view}
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
           onOverContinue={() => setEnd(null)}
-          modesCopy={pick(lang, { ru: MODES_COPY_RU, en: MODES_COPY_EN })}
-          rulesCopy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })}
+          modesCopy={pick(lang, { ru: ruCommon.gameModes, en: enCommon.gameModes })}
+          rulesCopy={pick(lang, { ru: ruCommon.rulesBlock, en: enCommon.rulesBlock })}
           seatCopy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
           turnDockCopy={pick(lang, { ru: ruCommon.turnDock, en: enCommon.turnDock })}
           participantsCopy={pick(lang, { ru: ruCommon.participants, en: enCommon.participants })}

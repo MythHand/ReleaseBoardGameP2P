@@ -1,6 +1,6 @@
-import LobbyCode from '@/blocks/LobbyCode'
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
+import LobbyCode from '@/blocks/LobbyCode'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 

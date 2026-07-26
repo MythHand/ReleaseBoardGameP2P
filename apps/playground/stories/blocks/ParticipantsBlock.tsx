@@ -1,7 +1,7 @@
-import { makeTable } from '@/mocks/table'
-import Participants from '@/table/Participants/Participants'
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
+import { makeTable } from '@/mocks/table'
+import Participants from '@/table/Participants/Participants'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 

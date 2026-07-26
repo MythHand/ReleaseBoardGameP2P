@@ -1,15 +1,16 @@
 import GameSettings from '@/blocks/GameSettings'
-import { type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
+import type { GameModesCopy, Setup } from '@/game/modes'
 import styles from './GameModes.module.css'
 
 interface GameModesProps {
   setup?: Setup
-  copy?: GameModesCopy
+  // текст режимов (из каталога `gameModes`, по языку) — передаёт консьюмер
+  copy: GameModesCopy
 }
 
 // Игровой режим на столе — те же группы, что выбирались в лобби, но read-only:
 // смотреть можно всем, менять во время партии нельзя (как у гостя в лобби).
-export default function GameModes({ setup = {}, copy = MODES_COPY_RU }: GameModesProps) {
+export default function GameModes({ setup = {}, copy }: GameModesProps) {
   return (
     <div className={styles.box}>
       <div className={styles.list}>

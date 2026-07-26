@@ -1,6 +1,8 @@
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { useState } from 'react'
 import GameSettings from '@/blocks/GameSettings'
-import { DEFAULT_SETUP, MODES_COPY_EN, MODES_COPY_RU, type Setup } from '@/game/modes'
+import { DEFAULT_SETUP, type Setup } from '@/game/modes'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 
@@ -18,7 +20,7 @@ export default function GameSettingsBlock() {
           <GameSettings
             setup={setup}
             onChange={setMode}
-            copy={pick(lang, { ru: MODES_COPY_RU, en: MODES_COPY_EN })}
+            copy={pick(lang, { ru: ruCommon.gameModes, en: enCommon.gameModes })}
           />
         </div>
       </KitSection>

@@ -3,9 +3,9 @@ import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
 import PlayerSlot, { EmptySlot } from '@/blocks/PlayerSlot'
-import Rules, { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
+import Rules, { type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
-import { DEFAULT_SETUP, MODES_COPY_EN, MODES_COPY_RU, type Setup } from '@/game/modes'
+import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
 import Badge from '@/primitives/Badge'
 import Button from '@/primitives/Button'
 import HudBackground, { type HudBackgroundTone } from '@/primitives/HudBackground'
@@ -36,6 +36,12 @@ interface LobbyProps {
   bgTone?: HudBackgroundTone
   // экран сам переключает язык, поэтому копи из каталога приходит обоими языками
   lobbyCodeCopy: { ru: LobbyCodeCopy; en: LobbyCodeCopy }
+  // текст режимов партии обоими языками — экран выбирает по внутреннему lang
+  gameModesCopy: { ru: GameModesCopy; en: GameModesCopy }
+  // текст правил обоими языками — экран выбирает по внутреннему lang
+  rulesBlockCopy: { ru: RulesCopy; en: RulesCopy }
+  // собственный текст экрана лобби обоими языками — выбирается по внутреннему lang
+  lobbyScreenCopy: { ru: LobbyCopy; en: LobbyCopy }
 }
 
 // Весь видимый текст лобби приходит из набора по языку — экран сам переключает
@@ -75,78 +81,6 @@ export interface LobbyCopy {
   cancel: string
 }
 
-export const LOBBY_COPY_RU: LobbyCopy = {
-  title: 'Лобби',
-  subtitle: 'Ожидание игроков…',
-  language: 'язык',
-  disband: 'расформировать',
-  rules: 'правила',
-  rulesTitle: 'Правила',
-  modes: 'Режимы партии',
-  modesLockedHint: 'настраивает host',
-  players: 'Игроки',
-  capacity: 'Вместимость',
-  spectators: 'Зрители',
-  specLimit: 'Лимит',
-  freeSlot: 'свободный слот',
-  noSpectators: 'пока без зрителей',
-  roleHost: 'host',
-  roleGuest: 'зритель',
-  you: 'вы',
-  ready: 'готов',
-  notReady: 'не готов',
-  waiting: 'ожидание',
-  offline: 'не в сети',
-  makeSpectator: 'Сделать зрителем',
-  makePlayer: 'Сделать игроком',
-  kick: 'Исключить',
-  noSlot: 'Нет доступного слота',
-  unavailable: 'Недоступно',
-  actions: 'действия',
-  start: 'начать игру',
-  leave: 'покинуть',
-  disbandTitle: 'Расформировать лобби?',
-  disbandText:
-    'Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить.',
-  cancel: 'отмена',
-}
-
-export const LOBBY_COPY_EN: LobbyCopy = {
-  title: 'Lobby',
-  subtitle: 'Waiting for players…',
-  language: 'language',
-  disband: 'disband',
-  rules: 'rules',
-  rulesTitle: 'Rules',
-  modes: 'Match modes',
-  modesLockedHint: 'set by host',
-  players: 'Players',
-  capacity: 'Capacity',
-  spectators: 'Spectators',
-  specLimit: 'Limit',
-  freeSlot: 'free slot',
-  noSpectators: 'no spectators yet',
-  roleHost: 'host',
-  roleGuest: 'spectator',
-  you: 'you',
-  ready: 'ready',
-  notReady: 'not ready',
-  waiting: 'waiting',
-  offline: 'offline',
-  makeSpectator: 'Make spectator',
-  makePlayer: 'Make player',
-  kick: 'Kick',
-  noSlot: 'No free slot',
-  unavailable: 'Unavailable',
-  actions: 'actions',
-  start: 'start game',
-  leave: 'leave',
-  disbandTitle: 'Disband lobby?',
-  disbandText:
-    'The lobby will be closed and all connected players disconnected. This cannot be undone.',
-  cancel: 'cancel',
-}
-
 // ⚠️ Каркас (WIP). Данные — моки. Сетевой/presence-слой придёт от логики;
 // здесь только верстка и интерактив, что уже готов.
 const MOCK_PLAYERS: Player[] = [
@@ -177,6 +111,9 @@ export default function Lobby({
   initialLang = 'ru',
   bgTone = 'neutral',
   lobbyCodeCopy,
+  gameModesCopy,
+  rulesBlockCopy,
+  lobbyScreenCopy,
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
@@ -191,10 +128,10 @@ export default function Lobby({
   const [lang, setLang] = useState<SwitchLang>(initialLang)
 
   // наборы текста по языку — экран держит оба и выбирает встроенным свитчером
-  const copy = lang === 'en' ? LOBBY_COPY_EN : LOBBY_COPY_RU
-  const modesCopy = lang === 'en' ? MODES_COPY_EN : MODES_COPY_RU
+  const copy = lobbyScreenCopy[lang]
+  const modesCopy = gameModesCopy[lang]
   const codeCopy = lobbyCodeCopy[lang]
-  const rulesCopy = lang === 'en' ? RULES_COPY_EN : RULES_COPY_RU
+  const rulesCopy = rulesBlockCopy[lang]
 
   const specColor = specColorFor(specCapacity)
 

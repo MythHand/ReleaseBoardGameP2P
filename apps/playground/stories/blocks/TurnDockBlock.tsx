@@ -1,7 +1,7 @@
-import Typography from '@/primitives/Typography'
-import TurnDock from '@/table/TurnDock/TurnDock'
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
+import Typography from '@/primitives/Typography'
+import TurnDock from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import { KitCell, KitPage, KitSection } from '../kit/KitShell'
 

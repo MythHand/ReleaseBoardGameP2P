@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import Lobby from '@/screens/Lobby'
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
+import { useState } from 'react'
+import Lobby from '@/screens/Lobby'
 import { useLang } from '../../Playground/lang'
 import styles from './LobbyStory.module.css'
 
@@ -55,6 +55,9 @@ export default function LobbyStory() {
           initialLang={lang}
           bgTone={bg}
           lobbyCodeCopy={{ ru: ruCommon.lobbyCode, en: enCommon.lobbyCode }}
+          gameModesCopy={{ ru: ruCommon.gameModes, en: enCommon.gameModes }}
+          rulesBlockCopy={{ ru: ruCommon.rulesBlock, en: enCommon.rulesBlock }}
+          lobbyScreenCopy={{ ru: ruCommon.lobbyScreen, en: enCommon.lobbyScreen }}
         />
       </div>
     </div>

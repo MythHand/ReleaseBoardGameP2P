@@ -1,8 +1,8 @@
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { type CSSProperties, useState } from 'react'
 import Button from '@/primitives/Button'
 import GameOver, { type GameOverCondition } from '@/table/GameOver/GameOver'
-import enCommon from '@release/translation/locales/en/common.json'
-import ruCommon from '@release/translation/locales/ru/common.json'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 

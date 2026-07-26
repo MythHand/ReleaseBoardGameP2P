@@ -1,6 +1,6 @@
-import PhysicalEdition from '@/blocks/PhysicalEdition'
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
+import PhysicalEdition from '@/blocks/PhysicalEdition'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 import styles from './PhysicalEditionBlock.module.css'
