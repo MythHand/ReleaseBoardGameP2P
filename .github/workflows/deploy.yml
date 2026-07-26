@@ -40,6 +40,18 @@ jobs:
         run: pnpm --filter @release/web build
         env:
           VITE_BASE_URL: /ReleaseBoardGameP2P/
+          # Self-hosted signaling server (apps/peerserver). Unset repo variables
+          # yield empty strings, and the client falls back to the PeerJS public
+          # cloud — so this is a no-op until the variables are configured.
+          VITE_PEER_HOST: ${{ vars.VITE_PEER_HOST }}
+          VITE_PEER_PORT: ${{ vars.VITE_PEER_PORT }}
+          VITE_PEER_PATH: ${{ vars.VITE_PEER_PATH }}
+          # TURN relay (coturn, deployed alongside the signaling server).
+          # Players behind symmetric NAT, a VPN, or blocked UDP cannot connect
+          # without it. Unset variables leave PeerJS on its bundled defaults.
+          VITE_TURN_URL: ${{ vars.VITE_TURN_URL }}
+          VITE_TURN_USERNAME: ${{ vars.VITE_TURN_USERNAME }}
+          VITE_TURN_CREDENTIAL: ${{ vars.VITE_TURN_CREDENTIAL }}
 
       # SPA fallback: @generouted/react-router uses the history API, so deep
       # links / hard refreshes (e.g. /lobby/<code>) would hit GitHub's generic

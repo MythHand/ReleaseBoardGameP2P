@@ -35,6 +35,15 @@ export const PEER_PORT = import.meta.env.VITE_PEER_PORT
 // Only consulted when PEER_HOST is set.
 export const PEER_PATH = import.meta.env.VITE_PEER_PATH ?? '/'
 
+// Whether to reach the broker over TLS (wss://). Leave unset in production:
+// PeerJS then follows the page's protocol, which is right when page and broker
+// share it. Set it to "true" to point an http:// dev server at an https://
+// broker — that auto-detection would otherwise pick ws:// and the socket would
+// never open. Only consulted when PEER_HOST is set.
+export const PEER_SECURE = import.meta.env.VITE_PEER_SECURE
+  ? import.meta.env.VITE_PEER_SECURE === 'true'
+  : undefined
+
 // ─── ICE / TURN relay ───────────────────────────────────────────────────────
 
 // TURN relay URL (e.g. `turn:turn.example.com:3478` or `turns:…:443`). Set this

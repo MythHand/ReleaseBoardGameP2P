@@ -3,6 +3,7 @@ import {
   PEER_HOST,
   PEER_PATH,
   PEER_PORT,
+  PEER_SECURE,
   STUN_URL,
   TURN_CREDENTIAL,
   TURN_URL,
@@ -54,6 +55,9 @@ function peerOptions() {
     host: PEER_HOST,
     port: PEER_PORT,
     path: PEER_PATH,
+    // Omitted unless explicitly configured, so PeerJS keeps deriving it from
+    // the page protocol (see PEER_SECURE).
+    ...(PEER_SECURE !== undefined && { secure: PEER_SECURE }),
     ...(config && { config }),
   }
 }

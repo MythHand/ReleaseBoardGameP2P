@@ -18,6 +18,7 @@ The app is in early scaffolding. Game logic (full game screens) is out of scope 
 | `apps/ui` | `@release/ui` | Shared component library — TypeScript + CSS Modules + design tokens; i18n-agnostic |
 | `apps/playground` | `@release/playground` | Vite sandbox for developing and previewing UI components in isolation |
 | `apps/frontend` | `@release/web` | Main web app — Vite + React + CSS Modules + react-i18next |
+| `apps/peerserver` | `@release/peerserver` | Self-hosted PeerJS signaling server (Express + `ExpressPeerServer`), shipped as a Docker image to GHCR |
 | `packages/translation` | `@release/translation` | i18next setup + locale catalogs (`en`/`ru`) + typed-key augmentation; consumed by `@release/web` |
 
 Package manager: **pnpm** (workspace defined in `pnpm-workspace.yaml` as `apps/*` and `packages/*`).
@@ -43,6 +44,12 @@ Package manager: **pnpm** (workspace defined in `pnpm-workspace.yaml` as `apps/*
 - CSS Modules for component styles, design tokens via `@release/ui/tokens.css`
 - react-i18next — translation catalogs under `src/locales/en/` and `src/locales/ru/`
 - Consumes `@release/ui` from source via Vite alias
+
+### `@release/peerserver`
+- TypeScript (NodeNext ESM), Express 4, `peer` (PeerServer)
+- Env config: `PORT` / `PEER_PATH` / `PEER_KEY`; `/health` endpoint
+- Docker image via `apps/peerserver/Dockerfile`; published to GHCR by `.github/workflows/peerserver.yml` on `peerserver-v*` tags
+- Dev: `pnpm dev:p2p` runs it alongside the frontend
 
 ---
 

@@ -44,6 +44,19 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/peerserver/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noProcessEnv": "off"
+          },
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
     }
   ]
 }
