@@ -66,6 +66,52 @@ Catalog namespaces added: `turnDock`, `seat`, `gameOver`, `participants`,
    namespaces too — a joint step, likely alongside issue #51 (frontend consumes
    ui-kit screens as controlled components).
 
+## Turn-key checklist — the remaining 6
+
+Per component: the bundle, the catalog namespace (Option A above), and **every file that
+imports/uses it** (so no re-discovery). Legend:
+
+- **(self)** the component that defines the bundle — recipe step 2 (drop bundles, `copy`
+  required) + step 3 (drop the `index.ts` export).
+- **(agg)** a `@release/ui` **aggregator** that today builds this copy from `lang` and
+  passes it down (`Table` and the screens `Lobby`/`Start`/`Invite`). It must stop the
+  `lang → bundle` map and take the copy **as a prop** — which **cascades** to its own
+  consumers. Do the leaf blocks first, aggregators last.
+- **(story)** playground story — feed from the catalog (`pick(lang, { ru: ruCommon.<ns>, en: enCommon.<ns> })`).
+- **⚠️ FE** frontend consumer — **@ditayler's zone, do NOT edit here**; list is for the companion PR.
+
+Suggested order (leaf → aggregator; the two colliders need Option A confirmed first):
+
+**1. `Table` own — `TABLE_COPY` → `table`**  ·  no FE, no collision (simplest)
+- (self) `apps/ui/src/table/Table/Table.tsx` + `apps/ui/src/index.ts`
+- (story) `apps/playground/stories/TableStory/TableStory.tsx`
+
+**2. `LobbyCode` — `LOBBY_CODE_COPY` → `lobbyCode`**  ·  no FE, no collision
+- (self) `apps/ui/src/blocks/LobbyCode/LobbyCode.tsx` (+ `blocks/LobbyCode/index.ts`) + `apps/ui/src/index.ts`
+- (agg) `table/Table/Table.tsx`, `screens/Lobby/Lobby.tsx` — both build `codeCopy` from `lang`
+- (story) `apps/playground/stories/blocks/LobbyCodeBlock.tsx`
+
+**3. `PhysicalEdition` — `PHYSICAL_EDITION_COPY` → `physicalEdition`**  ·  no FE, no collision
+- (self) `apps/ui/src/blocks/PhysicalEdition/PhysicalEdition.tsx` (+ its `index.ts`) + `apps/ui/src/index.ts`
+- (agg) `screens/Start/Start.tsx`, `screens/Invite/Invite.tsx`
+- (story) `apps/playground/stories/blocks/PhysicalEditionBlock.tsx`
+
+**4. `Modes` — `MODES_COPY` (`game/modes.ts`) → `gameModes`**  ·  ⚠️ FE
+- (self) `apps/ui/src/game/modes.ts` + `apps/ui/src/index.ts`
+- (agg) `table/GameModes/GameModes.tsx`, `table/Table/Table.tsx`, `screens/Lobby/Lobby.tsx`
+- (story) `TableStory`, `StartStory`, `blocks/GameSettingsBlock`, `kit/TogglesKit`
+- ⚠️ FE: `apps/frontend/src/features/create-lobby/CreateLobbyForm.tsx`, `apps/frontend/src/pages/lobby/_LobbyView.tsx` (import `MODES_COPY_*` directly)
+
+**5. `Rules` — `RULES_COPY` → `rulesBlock`**  ·  ⚠️ collides with catalog `rules` → use `rulesBlock` (Option A)  ·  ⚠️ FE
+- (self) `apps/ui/src/blocks/Rules/Rules.tsx` (+ its `index.ts`) + `apps/ui/src/index.ts`
+- (agg) `table/Table/Table.tsx`, `screens/Start/Start.tsx`, `screens/Lobby/Lobby.tsx`
+- (story) `TableStory`, `StartStory`, `blocks/RulesBlock`
+- ⚠️ FE: `apps/frontend/src/features/rules/Rules.tsx`
+
+**6. `Lobby` screen — `LOBBY_COPY` → `lobbyScreen`**  ·  ⚠️ collides with catalog `lobby` → use `lobbyScreen` (Option A)  ·  do LAST
+- (self/agg) `apps/ui/src/screens/Lobby/Lobby.tsx` — the biggest aggregator: builds `LOBBY_COPY` **and** `modesCopy`/`rulesCopy`/`codeCopy`, so finish #2/#4/#5 before this.
+- (story) `apps/playground/stories/LobbyStory/LobbyStory.tsx` — renders `<Lobby>`; today passes only `lang`, must supply the copy from the catalog after migration.
+
 ## Boundary
 
 This work lives in **`@release/ui` + `@release/playground` + `packages/translation`**
