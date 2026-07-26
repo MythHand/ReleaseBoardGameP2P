@@ -3,8 +3,7 @@ import {
   Button,
   DEFAULT_SETUP,
   GAME_MODES,
-  MODES_COPY_EN,
-  MODES_COPY_RU,
+  type GameModesCopy,
   ModeSelect,
   randomNickname,
   type Setup,
@@ -25,8 +24,9 @@ import { useCreateLobby } from './useCreateLobby'
 const DEFAULT_CAPACITY = 6
 
 export default function CreateLobbyForm() {
-  const { t, i18n } = useTranslation()
-  const modesCopy = i18n.language.startsWith('en') ? MODES_COPY_EN : MODES_COPY_RU
+  const { t } = useTranslation()
+  // mode copy comes from the central catalog (namespace `gameModes`) via i18next
+  const modesCopy: GameModesCopy = t('gameModes', { returnObjects: true })
   const goToLobby = useGoToLobby()
   const createLobby = useCreateLobby()
   const session = useSession()

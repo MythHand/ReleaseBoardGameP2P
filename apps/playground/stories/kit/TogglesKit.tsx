@@ -1,5 +1,7 @@
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { useState } from 'react'
-import { GAME_MODES, MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
+import { GAME_MODES, type GameModesCopy } from '@/game/modes'
 import ModeSelect from '@/primitives/ModeSelect'
 import Toggle from '@/primitives/Toggle'
 import { useLang } from '../../Playground/lang'
@@ -30,7 +32,8 @@ const COPY = {
 export default function TogglesKit() {
   const { lang } = useLang()
   const t = COPY[lang]
-  const sampleCopy = (lang === 'ru' ? MODES_COPY_RU : MODES_COPY_EN)[SAMPLE.key]
+  const modes: GameModesCopy = lang === 'ru' ? ruCommon.gameModes : enCommon.gameModes
+  const sampleCopy = modes[SAMPLE.key]
   const sampleTitle = sampleCopy?.title ?? ''
   const sampleOptions = SAMPLE.options.map((o) => ({
     value: o.value,

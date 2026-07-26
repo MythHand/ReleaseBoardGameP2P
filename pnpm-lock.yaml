@@ -84,6 +84,9 @@ importers:
 
   apps/playground:
     dependencies:
+      '@release/translation':
+        specifier: workspace:*
+        version: link:../../packages/translation
       '@release/ui':
         specifier: workspace:*
         version: link:../ui

@@ -1,7 +1,6 @@
-import PhysicalEdition, {
-  PHYSICAL_EDITION_COPY_EN,
-  PHYSICAL_EDITION_COPY_RU,
-} from '@/blocks/PhysicalEdition'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
+import PhysicalEdition from '@/blocks/PhysicalEdition'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 import styles from './PhysicalEditionBlock.module.css'
@@ -24,7 +23,7 @@ export default function PhysicalEditionBlock() {
         <div className={styles.panel}>
           <PhysicalEdition
             href={INSTAGRAM_URL}
-            copy={pick(lang, { ru: PHYSICAL_EDITION_COPY_RU, en: PHYSICAL_EDITION_COPY_EN })}
+            copy={pick(lang, { ru: ruCommon.physicalEdition, en: enCommon.physicalEdition })}
             className={styles.placed}
           />
         </div>

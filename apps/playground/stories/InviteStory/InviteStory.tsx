@@ -1,3 +1,5 @@
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { useState } from 'react'
 import type { InviteCopy, InviteState, SlotAvailability } from '@/screens/Invite'
 import Invite from '@/screens/Invite'
@@ -135,6 +137,10 @@ export default function InviteStory() {
           availability={availability}
           state={state}
           copy={pick(lang, COPY)}
+          physicalEditionCopy={pick(lang, {
+            ru: ruCommon.physicalEdition,
+            en: enCommon.physicalEdition,
+          })}
           // clicking "connect" in the sandbox starts the connecting phase
           onJoin={() => setState('connecting')}
           onCancel={() => setState('form')}

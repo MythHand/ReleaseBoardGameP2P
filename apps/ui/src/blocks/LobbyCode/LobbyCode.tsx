@@ -8,21 +8,9 @@ export interface LobbyCodeCopy {
   copied: string
 }
 
-export const LOBBY_CODE_COPY_RU: LobbyCodeCopy = {
-  label: 'код игры',
-  copy: 'копировать',
-  copied: 'скопировано',
-}
-
-export const LOBBY_CODE_COPY_EN: LobbyCodeCopy = {
-  label: 'game code',
-  copy: 'copy',
-  copied: 'copied',
-}
-
 interface LobbyCodeProps {
   code: string
-  copy?: LobbyCodeCopy
+  copy: LobbyCodeCopy
   // своя подпись «код игры» (true по умолч.); выключаем, когда заголовок внешний
   showLabel?: boolean
   // выравнивание: end (по умолч., как в шапке лобби) / start
@@ -35,7 +23,7 @@ interface LobbyCodeProps {
 // Копирование через режим Button (copyValue → буфер + «скопировано»).
 export default function LobbyCode({
   code,
-  copy = LOBBY_CODE_COPY_RU,
+  copy,
   showLabel = true,
   align = 'end',
   reverse = false,

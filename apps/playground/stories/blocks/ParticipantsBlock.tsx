@@ -1,8 +1,7 @@
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { makeTable } from '@/mocks/table'
-import Participants, {
-  PARTICIPANTS_COPY_EN,
-  PARTICIPANTS_COPY_RU,
-} from '@/table/Participants/Participants'
+import Participants from '@/table/Participants/Participants'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 
@@ -11,7 +10,7 @@ const { participants, spectators } = makeTable(4)
 
 export default function ParticipantsBlock() {
   const { lang } = useLang()
-  const copy = pick(lang, { ru: PARTICIPANTS_COPY_RU, en: PARTICIPANTS_COPY_EN })
+  const copy = pick(lang, { ru: ruCommon.participants, en: enCommon.participants })
 
   return (
     <KitPage title="Participants" tag="block">

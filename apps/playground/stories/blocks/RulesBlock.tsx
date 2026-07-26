@@ -1,4 +1,6 @@
-import Rules, { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
+import Rules from '@/blocks/Rules'
 import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 import styles from './RulesBlock.module.css'
@@ -17,7 +19,10 @@ export default function RulesBlock() {
         })}
       >
         <div className={styles.panel}>
-          <Rules copy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })} lang={lang} />
+          <Rules
+            copy={pick(lang, { ru: ruCommon.rulesBlock, en: enCommon.rulesBlock })}
+            lang={lang}
+          />
         </div>
       </KitSection>
     </KitPage>

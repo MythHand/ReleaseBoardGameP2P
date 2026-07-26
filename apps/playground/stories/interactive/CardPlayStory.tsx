@@ -1,3 +1,5 @@
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useRef, useState } from 'react'
@@ -6,7 +8,6 @@ import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
-import { SEAT_COPY_EN, SEAT_COPY_RU } from '@/table/Seat/Seat'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './CardPlayStory.module.css'
 
@@ -166,7 +167,7 @@ export default function CardPlayStory() {
             handCount: oppDeck.length,
             release: EMPTY_RELEASE,
           }}
-          copy={pick(lang, { ru: SEAT_COPY_RU, en: SEAT_COPY_EN })}
+          copy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
         />
       </div>
 

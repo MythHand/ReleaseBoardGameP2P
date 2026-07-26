@@ -4,30 +4,18 @@ import styles from './GameOver.module.css'
 
 export type GameOverCondition = 'release' | 'lastStanding'
 
-// Текст окна — пропсом (i18n-agnostic). Дефолт — русский.
+// Text — via prop (i18n-agnostic); strings come from the central catalog.
 export interface GameOverCopy {
   winner: string
   conditions: Record<GameOverCondition, string>
   continue: string
 }
 
-export const GAME_OVER_COPY_RU: GameOverCopy = {
-  winner: 'победитель',
-  conditions: { release: 'Собраны 3 релиза', lastStanding: 'Остался последним' },
-  continue: 'к статистике',
-}
-
-export const GAME_OVER_COPY_EN: GameOverCopy = {
-  winner: 'winner',
-  conditions: { release: '3 releases shipped', lastStanding: 'last one standing' },
-  continue: 'to stats',
-}
-
 interface GameOverProps {
   winner?: { name: string } | null
   condition?: GameOverCondition
   onContinue?: () => void
-  copy?: GameOverCopy
+  copy: GameOverCopy
 }
 
 // Окно завершения партии поверх стола: победитель + условие победы + CTA.
@@ -35,7 +23,7 @@ export default function GameOver({
   winner,
   condition = 'release',
   onContinue,
-  copy = GAME_OVER_COPY_RU,
+  copy,
 }: GameOverProps) {
   return (
     <Overlay className={styles.over}>

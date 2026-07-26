@@ -34,39 +34,15 @@ export interface TurnDockCopy {
   canDefend: string
 }
 
-export const TURN_DOCK_COPY_RU: TurnDockCopy = {
-  yourTurn: 'ваш ход',
-  turnOf: 'ход соперника',
-  reaction: 'реакция',
-  reactionDanger: 'error 503',
-  draw: 'добор',
-  push: 'PUSH',
-  pass: 'пас',
-  drawn: 'добор ✓',
-  locked: 'PUSH после добора',
-  canDefend: 'можно отбить',
-}
-
-export const TURN_DOCK_COPY_EN: TurnDockCopy = {
-  yourTurn: 'your turn',
-  turnOf: 'opponent turn',
-  reaction: 'reaction',
-  reactionDanger: 'error 503',
-  draw: 'draw',
-  push: 'PUSH',
-  pass: 'pass',
-  drawn: 'draw ✓',
-  locked: 'PUSH after draw',
-  canDefend: 'you can defend',
-}
-
 interface TurnDockProps {
   state: TurnDockState
   // seconds left on the clock — the ticking number reads as the timer
   seconds: number
   // 0..1 of the time still left — drives the ring sweep
   progress: number
-  copy?: TurnDockCopy
+  // localized strings — sourced from the central catalog by the consumer and
+  // passed in (the library stays i18n-agnostic)
+  copy: TurnDockCopy
   // active player's name — shown in 'waiting' / 'reaction'
   activePlayer?: string
   // reaction only: red danger tone (e.g. Error 503) vs the default amber
@@ -94,7 +70,7 @@ export default function TurnDock({
   state,
   seconds,
   progress,
-  copy = TURN_DOCK_COPY_RU,
+  copy,
   activePlayer,
   danger = false,
   onDraw,

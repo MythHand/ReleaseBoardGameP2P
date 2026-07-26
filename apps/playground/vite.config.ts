@@ -4,6 +4,9 @@ import { defineConfig } from 'vite'
 import svgr from 'vite-plugin-svgr'
 
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
+// central translation catalog consumed as raw data (JSON), so a story can feed a
+// component its localized copy from the single source of truth
+const translationSrc = fileURLToPath(new URL('../../packages/translation/src', import.meta.url))
 
 export default defineConfig({
   // Served under /playground/ in dev; in prod it is co-located under the
@@ -16,6 +19,7 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: '@release/ui', replacement: `${uiSrc}/index.ts` },
+      { find: '@release/translation', replacement: translationSrc },
       { find: '@', replacement: uiSrc },
     ],
   },

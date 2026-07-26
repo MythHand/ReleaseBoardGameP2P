@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
-import LobbyCode, { LOBBY_CODE_COPY_EN, LOBBY_CODE_COPY_RU } from '@/blocks/LobbyCode'
-import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
+import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
+import Rules, { type RulesCopy } from '@/blocks/Rules'
 import type { Card } from '@/cards/types'
-import { type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
+import type { GameModesCopy, Setup } from '@/game/modes'
 import GearIcon from '@/icons/GearIcon'
 import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
@@ -13,36 +13,19 @@ import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
 import GameModes from '@/table/GameModes'
 import GameOver from '@/table/GameOver'
-import {
-  GAME_OVER_COPY_RU,
-  type GameOverCondition,
-  type GameOverCopy,
-} from '@/table/GameOver/GameOver'
+import type { GameOverCondition, GameOverCopy } from '@/table/GameOver/GameOver'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import MoveHistory from '@/table/MoveHistory'
-import {
-  type HistoryEntry,
-  MOVE_HISTORY_COPY_RU,
-  type MoveHistoryCopy,
-} from '@/table/MoveHistory/MoveHistory'
+import type { HistoryEntry, MoveHistoryCopy } from '@/table/MoveHistory/MoveHistory'
 import Participants from '@/table/Participants'
-import {
-  PARTICIPANTS_COPY_RU,
-  type Participant,
-  type ParticipantsCopy,
-  type Spectator,
-} from '@/table/Participants/Participants'
-import Reconnect, { RECONNECT_COPY_RU, type ReconnectCopy } from '@/table/Reconnect'
+import type { Participant, ParticipantsCopy, Spectator } from '@/table/Participants/Participants'
+import Reconnect, { type ReconnectCopy } from '@/table/Reconnect'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
-import { SEAT_COPY_RU, type SeatCopy } from '@/table/Seat/Seat'
-import TurnDock, {
-  TURN_DOCK_COPY_EN,
-  TURN_DOCK_COPY_RU,
-  type TurnDockState,
-} from '@/table/TurnDock/TurnDock'
+import type { SeatCopy } from '@/table/Seat/Seat'
+import TurnDock, { type TurnDockCopy, type TurnDockState } from '@/table/TurnDock/TurnDock'
 import styles from './Table.module.css'
 
 interface Opponent {
@@ -86,21 +69,23 @@ interface TableProps {
   onOverContinue?: () => void
   view?: View | null
   // текст режимов по языку (read-only панель «игровой режим»)
-  modesCopy?: GameModesCopy
+  modesCopy: GameModesCopy
   // текст правил по языку (панель «правила»)
-  rulesCopy?: RulesCopy
+  rulesCopy: RulesCopy
   // текст мест оппонентов по языку (статус / счётчик карт)
-  seatCopy?: SeatCopy
+  seatCopy: SeatCopy
   // текст панели «участники» по языку
-  participantsCopy?: ParticipantsCopy
+  participantsCopy: ParticipantsCopy
   // текст ленты ходов по языку
-  historyCopy?: MoveHistoryCopy
+  historyCopy: MoveHistoryCopy
   // текст окна переподключения по языку
-  reconnectCopy?: ReconnectCopy
+  reconnectCopy: ReconnectCopy
   // текст окна завершения партии по языку
-  gameOverCopy?: GameOverCopy
+  gameOverCopy: GameOverCopy
   // собственный «хром»-текст стола по языку
-  copy?: TableCopy
+  copy: TableCopy
+  // текст блока кода игры (передаётся дальше в LobbyCode)
+  lobbyCodeCopy: LobbyCodeCopy
   // текущий язык и его смена — для свитчера языка в служебной вкладке
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
@@ -117,6 +102,8 @@ interface TableProps {
   turnDockState?: TurnDockState
   // danger-тон реакции (напр. Error 503) — красная реакция вместо янтарной
   turnDockDanger?: boolean
+  // localized TurnDock strings — from the central catalog, supplied by the consumer
+  turnDockCopy: TurnDockCopy
   // turn clock — seconds left and 0..1 progress driving the TurnDock ring;
   // passed through so game/sandbox turn state controls the countdown (the
   // defaults are static placeholders until the rules engine wires it up)
@@ -163,38 +150,6 @@ export interface TableCopy {
   tabModes: string
 }
 
-export const TABLE_COPY_RU: TableCopy = {
-  youEliminated: 'вы выбыли из игры',
-  deck: 'колода',
-  events: 'события',
-  discard: 'сброс',
-  settings: 'настройки',
-  langTitle: 'язык',
-  codeTitle: 'код игры',
-  hostTitle: 'управление',
-  specLimit: 'лимит зрителей',
-  tabHistory: 'история',
-  tabParticipants: 'участники',
-  tabRules: 'правила',
-  tabModes: 'игровой режим',
-}
-
-export const TABLE_COPY_EN: TableCopy = {
-  youEliminated: 'you are out',
-  deck: 'deck',
-  events: 'events',
-  discard: 'discard',
-  settings: 'settings',
-  langTitle: 'language',
-  codeTitle: 'game code',
-  hostTitle: 'controls',
-  specLimit: 'spectator limit',
-  tabHistory: 'history',
-  tabParticipants: 'participants',
-  tabRules: 'rules',
-  tabModes: 'game mode',
-}
-
 const EMPTY_RELEASE: ReleaseSlots = {
   frontend: undefined,
   backend: undefined,
@@ -208,14 +163,15 @@ export default function Table({
   over = null,
   onOverContinue,
   view = null,
-  modesCopy = MODES_COPY_RU,
-  rulesCopy = RULES_COPY_RU,
-  seatCopy = SEAT_COPY_RU,
-  participantsCopy = PARTICIPANTS_COPY_RU,
-  historyCopy = MOVE_HISTORY_COPY_RU,
-  reconnectCopy = RECONNECT_COPY_RU,
-  gameOverCopy = GAME_OVER_COPY_RU,
-  copy = TABLE_COPY_RU,
+  modesCopy,
+  rulesCopy,
+  seatCopy,
+  participantsCopy,
+  historyCopy,
+  reconnectCopy,
+  gameOverCopy,
+  copy,
+  lobbyCodeCopy,
   lang,
   onLangChange,
   code,
@@ -225,6 +181,7 @@ export default function Table({
   onKickSpectator,
   turnDockState = 'push',
   turnDockDanger = false,
+  turnDockCopy,
   turnDockSeconds = 16,
   turnDockProgress = 0.55,
 }: TableProps) {
@@ -232,8 +189,8 @@ export default function Table({
   const [panel, setPanel] = useState<Panel | null>(null)
 
   const isHost = role === 'host'
-  const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
-  const turnCopy = lang === 'en' ? TURN_DOCK_COPY_EN : TURN_DOCK_COPY_RU
+  const codeCopy = lobbyCodeCopy
+  const turnCopy = turnDockCopy
   // служебный док хода — состояние приходит пропсами (в игре — от логики хода,
   // в песочнице — из селектора истории); имя активного игрока берём со стола
   const dockPlayer = opponents[0]?.name

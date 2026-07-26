@@ -58,62 +58,10 @@ export const DEFAULT_SETUP: Setup = Object.fromEntries(
 )
 
 // Переводимый текст: заголовок режима + описание каждой опции (по её value).
+// Значения — в центральном каталоге (`common.json` → `gameModes`); консьюмер
+// передаёт их пропсом, библиотека остаётся i18n-agnostic.
 export interface GameModeCopy {
   title: string
   options: Record<string, string>
 }
 export type GameModesCopy = Record<string, GameModeCopy>
-
-export const MODES_COPY_RU: GameModesCopy = {
-  handLimit: {
-    title: 'Лимит карт в руке (в конце хода)',
-    options: { base: 'Без ограничений', '8bit': 'Не более 8 карт', memory: 'Не более 5 карт' },
-  },
-  releases: {
-    title: 'Количество релизов за ход',
-    options: { base: 'Не более 1', fast: 'Без ограничений' },
-  },
-  releaseCond: {
-    title: 'Условие релиза',
-    options: { base: 'Сброс 1 карты за релиз', easy: 'Без сброса карт за релиз' },
-  },
-  ai: {
-    title: 'Кол-во AI в игре',
-    options: {
-      base: 'Без изменений',
-      less: 'Убрать: 6 AI карт, 1 Error 503, 1 Debugger',
-      no: 'Убрать: все AI карты, 1 Error 503, 2 Debugger',
-    },
-  },
-  gitBranch: {
-    title: 'Последствия Git Branch',
-    options: { base: 'Добор из всех колод', strategic: 'Добор только из одной колоды' },
-  },
-}
-
-export const MODES_COPY_EN: GameModesCopy = {
-  handLimit: {
-    title: 'Hand size limit (end of turn)',
-    options: { base: 'No limit', '8bit': 'Max 8 cards', memory: 'Max 5 cards' },
-  },
-  releases: {
-    title: 'Releases per turn',
-    options: { base: 'Max 1', fast: 'No limit' },
-  },
-  releaseCond: {
-    title: 'Release condition',
-    options: { base: 'Discard 1 card per release', easy: 'No discard per release' },
-  },
-  ai: {
-    title: 'AI count in game',
-    options: {
-      base: 'No change',
-      less: 'Remove: 6 AI cards, 1 Error 503, 1 Debugger',
-      no: 'Remove: all AI cards, 1 Error 503, 2 Debugger',
-    },
-  },
-  gitBranch: {
-    title: 'Git Branch consequences',
-    options: { base: 'Draw from all decks', strategic: 'Draw from one deck only' },
-  },
-}

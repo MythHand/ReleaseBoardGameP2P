@@ -31,7 +31,9 @@ import CardToHandStory from '../stories/interactive/CardToHandStory'
 import DealCardsStory from '../stories/interactive/DealCardsStory'
 import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
+import OpponentTakesCardStory from '../stories/interactive/OpponentTakesCardStory'
 import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
+import PickSpecificCardStory from '../stories/interactive/PickSpecificCardStory'
 import AvatarsKit from '../stories/kit/AvatarsKit'
 import BadgesKit from '../stories/kit/BadgesKit'
 import ButtonsKit from '../stories/kit/ButtonsKit'
@@ -124,6 +126,16 @@ const groups: Group[] = [
         id: 'pick-opponent-card',
         title: 'Random opponent card',
         render: () => <PickOpponentCardStory />,
+      },
+      {
+        id: 'pick-specific-card',
+        title: 'Specific opponent card',
+        render: () => <PickSpecificCardStory />,
+      },
+      {
+        id: 'opponent-takes-card',
+        title: 'Opponent takes your card',
+        render: () => <OpponentTakesCardStory />,
       },
       { id: 'card-to-hand', title: 'Card to Hand', render: () => <CardToHandStory /> },
       { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },

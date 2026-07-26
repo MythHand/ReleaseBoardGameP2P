@@ -29,34 +29,10 @@ export interface ParticipantsCopy {
   kick: string
 }
 
-export const PARTICIPANTS_COPY_RU: ParticipantsCopy = {
-  players: 'игроки',
-  spectators: 'зрители',
-  inGame: 'в игре',
-  eliminated: 'выбыл',
-  connectionLost: 'потеряно соединение',
-  spectator: 'зритель',
-  noSpectators: 'пока без зрителей',
-  actions: 'действия',
-  kick: 'исключить',
-}
-
-export const PARTICIPANTS_COPY_EN: ParticipantsCopy = {
-  players: 'players',
-  spectators: 'spectators',
-  inGame: 'in game',
-  eliminated: 'eliminated',
-  connectionLost: 'connection lost',
-  spectator: 'spectator',
-  noSpectators: 'no spectators yet',
-  actions: 'actions',
-  kick: 'kick',
-}
-
 interface ParticipantsProps {
   players?: Participant[]
   spectators?: Spectator[]
-  copy?: ParticipantsCopy
+  copy: ParticipantsCopy
   // хост видит у зрителей дропдаун «⋯» с исключением
   isHost?: boolean
   onKickSpectator?: (id: string) => void
@@ -66,7 +42,7 @@ interface ParticipantsProps {
 export default function Participants({
   players = [],
   spectators = [],
-  copy = PARTICIPANTS_COPY_RU,
+  copy,
   isHost = false,
   onKickSpectator,
 }: ParticipantsProps) {

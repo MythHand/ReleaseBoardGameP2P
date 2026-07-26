@@ -1,10 +1,11 @@
 import { useTranslation } from '@release/translation'
-import { RULES_COPY_EN, RULES_COPY_RU, Rules as RulesView } from '@release/ui'
+import { Rules as RulesView } from '@release/ui'
 
-// Правила берутся из готового @release/ui Rules; текст выбирается по текущему
-// языку i18next (тот же компонент, что в playground и панель «правила» на столе).
+// Правила берутся из готового @release/ui Rules; текст — из центрального каталога
+// (namespace `rulesBlock`) через i18next (тот же компонент, что в playground и
+// панель «правила» на столе).
 export default function Rules() {
-  const { i18n } = useTranslation()
-  const copy = i18n.language.startsWith('en') ? RULES_COPY_EN : RULES_COPY_RU
+  const { t } = useTranslation()
+  const copy = t('rulesBlock', { returnObjects: true })
   return <RulesView copy={copy} />
 }

@@ -1,10 +1,7 @@
 import { useRef, useState } from 'react'
 import { play } from '@/animations'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
-import PhysicalEdition, {
-  PHYSICAL_EDITION_COPY_EN,
-  PHYSICAL_EDITION_COPY_RU,
-} from '@/blocks/PhysicalEdition'
+import PhysicalEdition, { type PhysicalEditionCopy } from '@/blocks/PhysicalEdition'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { randomNickname, sanitizeNickname } from '@/game/nicknames'
 import DiceIcon from '@/icons/DiceIcon'
@@ -74,6 +71,8 @@ interface InviteProps {
   // состояние экрана; ведёт его консьюмер (сетевой слой). По умолчанию — форма
   state?: InviteState
   copy: InviteCopy
+  // текст блока печатной версии (из центрального каталога, от консьюмера)
+  physicalEditionCopy: PhysicalEditionCopy
   // подключение к игре — реализует консьюмер (сетевой слой). Повтор после
   // ошибки — тот же колбэк (та же форма), отдельного onRetry не нужно
   onJoin?: (nickname: string, code: string, role: JoinRole) => void
@@ -91,6 +90,7 @@ export default function Invite({
   availability,
   state = 'form',
   copy,
+  physicalEditionCopy,
   onJoin,
   onCancel,
   onHome,
@@ -278,7 +278,7 @@ export default function Invite({
           (logoVariant). Здесь задаём только позицию/ширину через styles.physical */}
       <PhysicalEdition
         href={INSTAGRAM_URL}
-        copy={copy.logoVariant === 'en' ? PHYSICAL_EDITION_COPY_EN : PHYSICAL_EDITION_COPY_RU}
+        copy={physicalEditionCopy}
         className={styles.physical}
       />
     </div>

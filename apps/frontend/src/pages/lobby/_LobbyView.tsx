@@ -5,8 +5,6 @@ import {
   Button,
   CopyButton,
   GameSettings,
-  MODES_COPY_EN,
-  MODES_COPY_RU,
   Modal,
   Slider,
   Toggle,
@@ -28,7 +26,7 @@ interface MenuItemDef {
 }
 
 export default function LobbyView() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const session = useSession()
   const startGame = useStartGame()
   const navigate = useNavigate()
@@ -47,8 +45,8 @@ export default function LobbyView() {
   const state = session.state
   if (!state) return null
 
-  const isEn = i18n.language.startsWith('en')
-  const modesCopy = isEn ? MODES_COPY_EN : MODES_COPY_RU
+  // mode copy comes from the central catalog (namespace `gameModes`) via i18next
+  const modesCopy = t('gameModes', { returnObjects: true })
 
   const isHost = session.isHost
   const players = Object.values(state.peers).filter((p) => p.role === 'host' || p.role === 'player')

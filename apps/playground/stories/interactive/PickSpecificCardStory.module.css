@@ -1,0 +1,223 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* техническая верхняя линия управления */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid var(--white-08);
+}
+
+.toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+}
+
+.btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* idle: кнопка старта по центру */
+.controls {
+  position: absolute;
+  inset-block-start: 46%;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.callBtn {
+  padding: 14px 28px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-20);
+  border-radius: 8px;
+  transition: color var(--t-base) var(--ease-out),
+    border-color var(--t-base) var(--ease-out);
+}
+
+.callBtn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* шаг 1: каталог базовых карт лицом вверх — сетка (НЕ веер), средняя полоса
+   между веером оппонента (сверху) и рукой игрока (снизу) */
+.grid {
+  position: absolute;
+  inset-block: 300px 268px;
+  inset-inline: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 18px;
+  place-content: center;
+  padding: 0 32px;
+  overflow: visible;
+}
+
+.hint {
+  position: absolute;
+  inset-block-start: -30px;
+  inset-inline: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--white-45);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+}
+
+/* карта каталога: вылетает при появлении (стаггер через inline animation-delay),
+   по ховеру увеличивается, чтобы прочитать эффект */
+.cell {
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
+  animation: cell-in 360ms var(--ease-out) backwards;
+}
+
+.cell:hover {
+  z-index: 20;
+  transform: scale(1.9);
+}
+
+/* выбранная — держится увеличенной, пока остальные уходят */
+.chosen {
+  z-index: 15;
+  transform: scale(1.7);
+}
+
+/* остальные — уезжают из сетки */
+.leaving {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(24px) scale(0.86);
+}
+
+@keyframes cell-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* веер соперника — та же рука (Hand), рубашкой вверх, у верхнего края;
+   разворот на 180° = веер напротив; слайд держит внешний .topHand */
+.topHand {
+  position: absolute;
+  inset-block-start: 76px;
+  inset-inline: 0;
+  z-index: 40;
+  transition: transform 520ms var(--ease-soft);
+  will-change: transform;
+}
+
+.topHand[data-in="false"] {
+  transform: translateY(-160%);
+}
+
+.topHand[data-in="true"] {
+  transform: translateY(0);
+}
+
+.topHandInner {
+  transform: rotate(180deg);
+}
+
+/* крайний кейс: карты нет — веер вздрагивает на месте (translateY 0 сохраняем) */
+.shake {
+  animation: shake 460ms var(--ease-soft);
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+  }
+
+  20% {
+    transform: translateY(0) translateX(-9px);
+  }
+
+  40% {
+    transform: translateY(0) translateX(9px);
+  }
+
+  60% {
+    transform: translateY(0) translateX(-6px);
+  }
+
+  80% {
+    transform: translateY(0) translateX(6px);
+  }
+}
+
+.miss {
+  position: absolute;
+  inset-block-start: 46%;
+  inset-inline: 0;
+  z-index: 45;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--coral);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+/* выбранная карта: летит из слота в центр и там переворачивается */
+.reveal {
+  position: fixed;
+  z-index: 55;
+  transform-origin: center center;
+  transition: transform 460ms var(--ease-soft);
+  will-change: transform;
+}
+
+/* без z-index — карты руки в общем контексте, чтобы летящая карта затыкалась
+   между половинками веера */
+.handWrap {
+  position: absolute;
+  inset-block-end: 24px;
+  inset-inline: 0;
+}

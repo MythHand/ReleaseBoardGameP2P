@@ -13,37 +13,17 @@ export interface PhysicalEditionCopy {
   imageAlt: string
 }
 
-export const PHYSICAL_EDITION_COPY_RU: PhysicalEditionCopy = {
-  title: 'Печатная версия',
-  lead: 'У «Release любой ценой» есть печатное издание — можете поддержать проект и сыграть вживую.',
-  order: 'Заказать копию или оформить предзаказ —',
-  linkLabel: 'в Instagram',
-  imageAlt: 'Коробка печатной версии игры',
-}
-
-export const PHYSICAL_EDITION_COPY_EN: PhysicalEditionCopy = {
-  title: 'Printed edition',
-  lead: '“Release at any cost” has a printed edition — you can support the project and play it for real.',
-  order: 'Order a copy or place a pre-order —',
-  linkLabel: 'on Instagram',
-  imageAlt: 'Printed edition box',
-}
-
 interface PhysicalEditionProps {
   // ссылка на заказ/предзаказ (напр. Instagram команды)
   href: string
-  copy?: PhysicalEditionCopy
+  copy: PhysicalEditionCopy
   // позиционирование/ширину задаёт место использования (мерджится в корень)
   className?: string
 }
 
 // Блок «печатная версия»: матовая плашка — слева заголовок + подпись со ссылкой
 // на заказ, справа квадрат под арт коробки (выпирает за верхнюю грань).
-export default function PhysicalEdition({
-  href,
-  copy = PHYSICAL_EDITION_COPY_RU,
-  className = '',
-}: PhysicalEditionProps) {
+export default function PhysicalEdition({ href, copy, className = '' }: PhysicalEditionProps) {
   return (
     <div className={`${styles.box}${className ? ` ${className}` : ''}`}>
       <div className={styles.text}>
