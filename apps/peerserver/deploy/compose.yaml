@@ -49,8 +49,6 @@ services:
       - --lt-cred-mech
       - --fingerprint
       - --no-cli
-      - --no-tlsv1
-      - --no-tlsv1_1
       - --log-file=stdout
       # Must match the UDP range opened in the host firewall.
       - --min-port=49160
