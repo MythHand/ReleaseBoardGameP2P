@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
-import LobbyCode, { LOBBY_CODE_COPY_EN, LOBBY_CODE_COPY_RU } from '@/blocks/LobbyCode'
+import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
 import PlayerSlot, { EmptySlot } from '@/blocks/PlayerSlot'
 import Rules, { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
@@ -34,6 +34,8 @@ interface LobbyProps {
   initialLang?: SwitchLang
   // HUD-фон экрана (переключается снаружи — напр. из техстроки песочницы)
   bgTone?: HudBackgroundTone
+  // экран сам переключает язык, поэтому копи из каталога приходит обоими языками
+  lobbyCodeCopy: { ru: LobbyCodeCopy; en: LobbyCodeCopy }
 }
 
 // Весь видимый текст лобби приходит из набора по языку — экран сам переключает
@@ -174,6 +176,7 @@ export default function Lobby({
   initialSetup = DEFAULT_SETUP,
   initialLang = 'ru',
   bgTone = 'neutral',
+  lobbyCodeCopy,
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
@@ -190,7 +193,7 @@ export default function Lobby({
   // наборы текста по языку — экран держит оба и выбирает встроенным свитчером
   const copy = lang === 'en' ? LOBBY_COPY_EN : LOBBY_COPY_RU
   const modesCopy = lang === 'en' ? MODES_COPY_EN : MODES_COPY_RU
-  const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
+  const codeCopy = lobbyCodeCopy[lang]
   const rulesCopy = lang === 'en' ? RULES_COPY_EN : RULES_COPY_RU
 
   const specColor = specColorFor(specCapacity)

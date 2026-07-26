@@ -2,6 +2,8 @@ import { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
 import { MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
 import Start from '@/screens/Start'
 import type { StartCopy } from '@/screens/Start/Start'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './StartStory.module.css'
 
@@ -74,6 +76,7 @@ export default function StartStory() {
     <div className={styles.root}>
       <Start
         copy={pick(lang, COPY)}
+        physicalEditionCopy={pick(lang, { ru: ruCommon.physicalEdition, en: enCommon.physicalEdition })}
         rulesCopy={pick(lang, { ru: RULES_COPY_RU, en: RULES_COPY_EN })}
         onPlayground={() => {}}
         lang={lang}

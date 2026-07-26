@@ -213,5 +213,32 @@
   },
   "reconnect": {
     "label": "reconnecting…"
+  },
+  "table": {
+    "youEliminated": "you are out",
+    "deck": "deck",
+    "events": "events",
+    "discard": "discard",
+    "settings": "settings",
+    "langTitle": "language",
+    "codeTitle": "game code",
+    "hostTitle": "controls",
+    "specLimit": "spectator limit",
+    "tabHistory": "history",
+    "tabParticipants": "participants",
+    "tabRules": "rules",
+    "tabModes": "game mode"
+  },
+  "lobbyCode": {
+    "label": "game code",
+    "copy": "copy",
+    "copied": "copied"
+  },
+  "physicalEdition": {
+    "title": "Printed edition",
+    "lead": "“Release at any cost” has a printed edition — you can support the project and play it for real.",
+    "order": "Order a copy or place a pre-order —",
+    "linkLabel": "on Instagram",
+    "imageAlt": "Printed edition box"
   }
 }

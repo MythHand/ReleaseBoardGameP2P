@@ -10,14 +10,10 @@ export { default as GameSettings } from './blocks/GameSettings'
 export type { SwitchLang } from './blocks/LangSwitcher'
 export { default as LangSwitcher } from './blocks/LangSwitcher'
 export type { LobbyCodeCopy } from './blocks/LobbyCode'
-export { default as LobbyCode, LOBBY_CODE_COPY_EN, LOBBY_CODE_COPY_RU } from './blocks/LobbyCode'
+export { default as LobbyCode } from './blocks/LobbyCode'
 export { default as Menu, MenuButton, MenuGroup } from './blocks/Menu'
 export type { PhysicalEditionCopy } from './blocks/PhysicalEdition'
-export {
-  default as PhysicalEdition,
-  PHYSICAL_EDITION_COPY_EN,
-  PHYSICAL_EDITION_COPY_RU,
-} from './blocks/PhysicalEdition'
+export { default as PhysicalEdition } from './blocks/PhysicalEdition'
 export { default as PlayerSlot, EmptySlot } from './blocks/PlayerSlot'
 export type { RulesCopy, RulesProps, RulesSection } from './blocks/Rules'
 export { default as Rules, RULES_COPY_EN, RULES_COPY_RU } from './blocks/Rules'
@@ -101,6 +97,5 @@ export { default as Seat } from './table/Seat'
 export type { SeatCopy } from './table/Seat/Seat'
 export { default as Table } from './table/Table'
 export type { TableCopy } from './table/Table/Table'
-export { TABLE_COPY_EN, TABLE_COPY_RU } from './table/Table/Table'
 export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'
 export { default as TurnDock } from './table/TurnDock/TurnDock'

@@ -3,10 +3,7 @@ import { play } from '@/animations'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import Menu, { MenuButton, MenuGroup } from '@/blocks/Menu'
-import PhysicalEdition, {
-  PHYSICAL_EDITION_COPY_EN,
-  PHYSICAL_EDITION_COPY_RU,
-} from '@/blocks/PhysicalEdition'
+import PhysicalEdition, { type PhysicalEditionCopy } from '@/blocks/PhysicalEdition'
 import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import VideoPlayer from '@/blocks/VideoPlayer'
 import ReleaseLogo from '@/brand/ReleaseLogo'
@@ -68,6 +65,8 @@ export interface StartCopy {
 
 interface StartProps {
   copy: StartCopy
+  // текст блока печатной версии (из центрального каталога, от консьюмера)
+  physicalEditionCopy: PhysicalEditionCopy
   // текст правил по языку (модалка «Правила»)
   rulesCopy?: RulesCopy
   // точки подключения сетевой логики (создание/вход) — реализует консьюмер
@@ -83,6 +82,7 @@ interface StartProps {
 
 export default function Start({
   copy,
+  physicalEditionCopy,
   onCreate,
   onJoin,
   onPlayground,
@@ -225,7 +225,7 @@ export default function Start({
           у логотипа (logoVariant). Здесь только позиция/ширина через styles.physical */}
       <PhysicalEdition
         href={INSTAGRAM_URL}
-        copy={copy.logoVariant === 'en' ? PHYSICAL_EDITION_COPY_EN : PHYSICAL_EDITION_COPY_RU}
+        copy={physicalEditionCopy}
         className={styles.physical}
       />
 

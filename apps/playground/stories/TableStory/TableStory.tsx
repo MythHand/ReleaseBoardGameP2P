@@ -3,7 +3,6 @@ import { RULES_COPY_EN, RULES_COPY_RU } from '@/blocks/Rules'
 import { MODES_COPY_EN, MODES_COPY_RU } from '@/game/modes'
 import { makeTable } from '@/mocks/table'
 import Table from '@/table/Table'
-import { TABLE_COPY_EN, TABLE_COPY_RU } from '@/table/Table/Table'
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { type Lang, pick, useLang } from '../../Playground/lang'
@@ -154,7 +153,8 @@ export default function TableStory() {
           historyCopy={pick(lang, { ru: ruCommon.moveHistory, en: enCommon.moveHistory })}
           reconnectCopy={pick(lang, { ru: ruCommon.reconnect, en: enCommon.reconnect })}
           gameOverCopy={pick(lang, { ru: ruCommon.gameOver, en: enCommon.gameOver })}
-          copy={pick(lang, { ru: TABLE_COPY_RU, en: TABLE_COPY_EN })}
+          copy={pick(lang, { ru: ruCommon.table, en: enCommon.table })}
+          lobbyCodeCopy={pick(lang, { ru: ruCommon.lobbyCode, en: enCommon.lobbyCode })}
           lang={lang}
           onLangChange={setLang}
           code="4F2A-9K"

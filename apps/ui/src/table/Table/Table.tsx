@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
-import LobbyCode, { LOBBY_CODE_COPY_EN, LOBBY_CODE_COPY_RU } from '@/blocks/LobbyCode'
+import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
 import Rules, { RULES_COPY_RU, type RulesCopy } from '@/blocks/Rules'
 import type { Card } from '@/cards/types'
 import { type GameModesCopy, MODES_COPY_RU, type Setup } from '@/game/modes'
@@ -87,7 +87,9 @@ interface TableProps {
   // текст окна завершения партии по языку
   gameOverCopy: GameOverCopy
   // собственный «хром»-текст стола по языку
-  copy?: TableCopy
+  copy: TableCopy
+  // текст блока кода игры (передаётся дальше в LobbyCode)
+  lobbyCodeCopy: LobbyCodeCopy
   // текущий язык и его смена — для свитчера языка в служебной вкладке
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
@@ -147,38 +149,6 @@ export interface TableCopy {
   tabModes: string
 }
 
-export const TABLE_COPY_RU: TableCopy = {
-  youEliminated: 'вы выбыли из игры',
-  deck: 'колода',
-  events: 'события',
-  discard: 'сброс',
-  settings: 'настройки',
-  langTitle: 'язык',
-  codeTitle: 'код игры',
-  hostTitle: 'управление',
-  specLimit: 'лимит зрителей',
-  tabHistory: 'история',
-  tabParticipants: 'участники',
-  tabRules: 'правила',
-  tabModes: 'игровой режим',
-}
-
-export const TABLE_COPY_EN: TableCopy = {
-  youEliminated: 'you are out',
-  deck: 'deck',
-  events: 'events',
-  discard: 'discard',
-  settings: 'settings',
-  langTitle: 'language',
-  codeTitle: 'game code',
-  hostTitle: 'controls',
-  specLimit: 'spectator limit',
-  tabHistory: 'history',
-  tabParticipants: 'participants',
-  tabRules: 'rules',
-  tabModes: 'game mode',
-}
-
 const EMPTY_RELEASE: ReleaseSlots = {
   frontend: undefined,
   backend: undefined,
@@ -199,7 +169,8 @@ export default function Table({
   historyCopy,
   reconnectCopy,
   gameOverCopy,
-  copy = TABLE_COPY_RU,
+  copy,
+  lobbyCodeCopy,
   lang,
   onLangChange,
   code,
@@ -215,7 +186,7 @@ export default function Table({
   const [panel, setPanel] = useState<Panel | null>(null)
 
   const isHost = role === 'host'
-  const codeCopy = lang === 'en' ? LOBBY_CODE_COPY_EN : LOBBY_CODE_COPY_RU
+  const codeCopy = lobbyCodeCopy
   const turnCopy = turnDockCopy
   // служебный док хода — состояние приходит пропсами (в игре — от логики хода,
   // в песочнице — из селектора истории); имя активного игрока берём со стола

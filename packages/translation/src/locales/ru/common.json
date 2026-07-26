@@ -213,5 +213,32 @@
   },
   "reconnect": {
     "label": "переподключение…"
+  },
+  "table": {
+    "youEliminated": "вы выбыли из игры",
+    "deck": "колода",
+    "events": "события",
+    "discard": "сброс",
+    "settings": "настройки",
+    "langTitle": "язык",
+    "codeTitle": "код игры",
+    "hostTitle": "управление",
+    "specLimit": "лимит зрителей",
+    "tabHistory": "история",
+    "tabParticipants": "участники",
+    "tabRules": "правила",
+    "tabModes": "игровой режим"
+  },
+  "lobbyCode": {
+    "label": "код игры",
+    "copy": "копировать",
+    "copied": "скопировано"
+  },
+  "physicalEdition": {
+    "title": "Печатная версия",
+    "lead": "У «Release любой ценой» есть печатное издание — можете поддержать проект и сыграть вживую.",
+    "order": "Заказать копию или оформить предзаказ —",
+    "linkLabel": "в Instagram",
+    "imageAlt": "Коробка печатной версии игры"
   }
 }

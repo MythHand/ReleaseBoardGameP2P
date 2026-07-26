@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import Lobby from '@/screens/Lobby'
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { useLang } from '../../Playground/lang'
 import styles from './LobbyStory.module.css'
 
@@ -47,7 +49,13 @@ export default function LobbyStory() {
           встроенный в лобби свитчер. key переинициализирует экран при смене
           языка плейграунда из шапки */}
       <div className={styles.stage}>
-        <Lobby key={lang} role={role} initialLang={lang} bgTone={bg} />
+        <Lobby
+          key={lang}
+          role={role}
+          initialLang={lang}
+          bgTone={bg}
+          lobbyCodeCopy={{ ru: ruCommon.lobbyCode, en: enCommon.lobbyCode }}
+        />
       </div>
     </div>
   )
