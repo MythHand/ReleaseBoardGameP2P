@@ -16,6 +16,13 @@ Caddy's certificate volume, which regenerates itself on a new host.
   exactly this name, so it must resolve *before* the first `docker compose up`.
 - Ports 80 and 443 reachable. Port 80 is required for the ACME HTTP challenge,
   not just redirects — a firewall that blocks it means no certificate.
+- Ports for TURN: `3478/tcp`, `3478/udp`, and the UDP range `49160-49200`.
+  Relayed traffic flows over that range, and TURN fails with no visible error
+  when it is closed.
+
+  ```bash
+  ufw allow 80,443/tcp && ufw allow 3478 && ufw allow 49160:49200/udp
+  ```
 - Nothing else bound to 80/443 on the host. A Caddy or nginx installed with
   `apt` will hold those ports: `systemctl disable --now caddy`.
 
@@ -107,7 +114,40 @@ finishes, published clients still point at the old name.
 | `denied` / `manifest unknown` on pull | Package is private and the host has no `read:packages` credentials |
 | WebSocket probe returns 404 | Probe went over HTTP/2 — re-run it with `--http1.1` |
 
-## Not covered here
+## TURN
 
-TURN relaying, which peers behind symmetric NAT need in addition to signaling;
-see the TURN section of the [app README](../README.md).
+Signaling only introduces peers to each other; it cannot carry their traffic.
+When no direct path exists — symmetric NAT, a VPN, a firewall that blocks UDP —
+the connection needs a relay, and without one the lobby hangs on "connecting"
+with no error on either side. PeerJS ships default TURN servers, but they are
+rate-limited and in practice return no relay candidates at all, so a working
+deployment has to provide its own. The `coturn` service in
+[compose.yaml](./compose.yaml) is that relay.
+
+Point the frontend at it through the same repository variables mechanism as the
+signaling server — `VITE_TURN_URL` (`turn:<domain>:3478`), `VITE_TURN_USERNAME`,
+`VITE_TURN_CREDENTIAL` — then re-run
+[deploy.yml](../../../.github/workflows/deploy.yml). Setting a custom TURN
+replaces PeerJS's entire ICE configuration, so `VITE_STUN_URL` is used too and
+defaults to Google's public STUN.
+
+These credentials end up in the published JS bundle and are therefore public.
+The compose service caps abuse with `--user-quota`/`--total-quota` and refuses
+to relay to private address ranges. Rotating them means editing `.env`,
+restarting, updating the variables, and rebuilding the frontend.
+
+To verify the relay is reachable, check that a browser gathers a candidate of
+type `relay` against it — a `srflx`-only result means TURN is not working:
+
+```js
+const pc = new RTCPeerConnection({
+  iceServers: [{ urls: 'turn:<domain>:3478', username: '<user>', credential: '<password>' }],
+})
+pc.createDataChannel('probe')
+pc.onicecandidate = (e) => e.candidate && console.log(e.candidate.type, e.candidate.candidate)
+pc.setLocalDescription(await pc.createOffer())
+```
+
+`turns:` on port 5349 (TURN over TLS) additionally gets through networks that
+block UDP entirely. It needs a certificate for the domain, so add it once the
+plain `turn:` path is confirmed working.

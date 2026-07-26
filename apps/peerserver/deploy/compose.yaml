@@ -32,6 +32,43 @@ services:
     depends_on:
       - peerserver
 
+  # Relays WebRTC traffic for peers that cannot connect directly — behind
+  # symmetric NAT, a VPN, or a firewall that blocks UDP. Without it those
+  # players simply never connect, because signaling alone is not enough.
+  coturn:
+    image: coturn/coturn:4.7-alpine
+    restart: unless-stopped
+    # Host networking: TURN hands out its own address in candidates and needs a
+    # wide UDP relay range, both of which Docker's NAT breaks. `ports:` is
+    # ignored in this mode — the host firewall is what governs access.
+    network_mode: host
+    command:
+      - --listening-port=3478
+      - --realm=${TURN_DOMAIN:?set TURN_DOMAIN in .env}
+      - --user=${TURN_USER:?set TURN_USER in .env}:${TURN_PASSWORD:?set TURN_PASSWORD in .env}
+      - --lt-cred-mech
+      - --fingerprint
+      - --no-cli
+      - --no-tlsv1
+      - --no-tlsv1_1
+      - --log-file=stdout
+      # Must match the UDP range opened in the host firewall.
+      - --min-port=49160
+      - --max-port=49200
+      # The credentials ship inside the public JS bundle, so anyone can find
+      # them. Quotas cap what an abuser can extract; the deny rules stop the
+      # relay being used to reach this host's own services or private networks
+      # (with host networking it would otherwise see localhost).
+      - --user-quota=12
+      - --total-quota=1200
+      - --no-multicast-peers
+      - --denied-peer-ip=0.0.0.0-0.255.255.255
+      - --denied-peer-ip=10.0.0.0-10.255.255.255
+      - --denied-peer-ip=127.0.0.0-127.255.255.255
+      - --denied-peer-ip=169.254.0.0-169.254.255.255
+      - --denied-peer-ip=172.16.0.0-172.31.255.255
+      - --denied-peer-ip=192.168.0.0-192.168.255.255
+
 volumes:
   caddy_data:
   caddy_config:
