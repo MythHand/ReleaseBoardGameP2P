@@ -1,4 +1,5 @@
-import type { CSSProperties, ReactNode } from 'react'
+import { type CSSProperties, type ReactNode, useMemo } from 'react'
+import type { CardParagraph } from '../content'
 import styles from './CardParallax.module.css'
 import {
   BASE_W,
@@ -13,20 +14,15 @@ import {
 // how far (in cqw) a depth-1 layer shifts at full pointer deflection
 const SHIFT = 7
 
-// One paragraph of the description. `highlight` renders a coloured callout;
-// `divider` renders `text` centred between two thin rules (e.g. "ИЛИ").
-export interface CardParallaxParagraph {
-  text: string
-  bold?: string[]
-  highlight?: 'sudo' | 'defense'
-  divider?: boolean
-}
+// One paragraph of the description — CardParagraph is the authored paragraph
+// shape from content.ts (the same data fed in here), so the two never drift.
+export type CardParallaxParagraph = CardParagraph
 
 export interface CardParallaxContent {
   // language-agnostic name (proper noun) — the consumer passes it in
   title: string
   // localized description — picked by the consumer, so this stays i18n-agnostic
-  description: CardParallaxParagraph[]
+  description: CardParagraph[]
 }
 
 // Glue short prepositions / conjunctions (1–2 letters) to the next word with a
@@ -117,6 +113,25 @@ export default function ComposedFace({
     : config.illustration
   // LOD also enlarges the title
   const titleSize = lod ? CARD_FONT.title * LOD.titleScale : CARD_FONT.title
+
+  // description is static per card — memoize so pointer moves (which re-render
+  // the face every frame via `p` while hovered) don't rebuild the bold /
+  // no-orphan pass
+  const description = useMemo(
+    () =>
+      content.description.map((para) =>
+        para.divider ? (
+          <div key={para.text} className={styles.divider}>
+            <span>{para.text}</span>
+          </div>
+        ) : (
+          <p key={para.text} className={paragraphClass(para.highlight)}>
+            {renderBold(para.text, para.bold)}
+          </p>
+        ),
+      ),
+    [content.description],
+  )
   // category glyph — an svgr component tinted via currentColor (it inherits the
   // accent set on the .category container); capitalised for use as a JSX element
   const CategoryIcon = config.category?.icon
@@ -185,17 +200,7 @@ export default function ComposedFace({
       </div>
       {!lod && (
         <div className={styles.desc} style={textStyle(config.description, CARD_FONT.description)}>
-          {content.description.map((para) =>
-            para.divider ? (
-              <div key={para.text} className={styles.divider}>
-                <span>{para.text}</span>
-              </div>
-            ) : (
-              <p key={para.text} className={paragraphClass(para.highlight)}>
-                {renderBold(para.text, para.bold)}
-              </p>
-            ),
-          )}
+          {description}
         </div>
       )}
     </>

@@ -104,6 +104,11 @@ interface TableProps {
   turnDockDanger?: boolean
   // localized TurnDock strings — from the central catalog, supplied by the consumer
   turnDockCopy: TurnDockCopy
+  // turn clock — seconds left and 0..1 progress driving the TurnDock ring;
+  // passed through so game/sandbox turn state controls the countdown (the
+  // defaults are static placeholders until the rules engine wires it up)
+  turnDockSeconds?: number
+  turnDockProgress?: number
 }
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
@@ -177,6 +182,8 @@ export default function Table({
   turnDockState = 'push',
   turnDockDanger = false,
   turnDockCopy,
+  turnDockSeconds = 16,
+  turnDockProgress = 0.55,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
@@ -272,8 +279,8 @@ export default function Table({
         <TurnDock
           state={turnDockState}
           danger={turnDockDanger}
-          seconds={16}
-          progress={0.55}
+          seconds={turnDockSeconds}
+          progress={turnDockProgress}
           activePlayer={dockPlayer}
           copy={turnCopy}
         />

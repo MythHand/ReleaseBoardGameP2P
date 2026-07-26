@@ -1,8 +1,7 @@
 {
   "app": {
     "foundationTag": "visual layer — foundation",
-    "phasesHint": "Screens (boot → lobby → game → game over) arrive in phases.",
-    "home": "← HOME"
+    "phasesHint": "Screens (boot → lobby → game → game over) arrive in phases."
   },
   "start": {
     "logoAlt": "Release at any cost",

@@ -1,6 +1,7 @@
 import { useTranslation } from '@release/translation'
-import { Button } from '@release/ui'
+import { Button, Typography } from '@release/ui'
 import { BASE_URL, IS_DEV } from '~/shared/config'
+import styles from './ErrorScreen.module.css'
 
 function messageOf(error: unknown): string | null {
   if (error instanceof Error) return error.message
@@ -17,17 +18,21 @@ export default function ErrorScreen({ error }: { error?: unknown }) {
   const detail = IS_DEV ? messageOf(error) : null
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-bg p-6 text-center text-fg">
-      <div className="flex flex-col gap-2">
-        <h1 className="font-semibold text-xl tracking-base">{t('error.title')}</h1>
-        <p className="max-w-sm text-fg/60 text-sm">{t('error.description')}</p>
+    <div className={styles.root}>
+      <div className={styles.text}>
+        <Typography variant="panelTitle" as="h1" className={styles.title}>
+          {t('error.title')}
+        </Typography>
+        <Typography base="body" as="p" className={styles.desc}>
+          {t('error.description')}
+        </Typography>
       </div>
       {detail && (
-        <pre className="max-w-md overflow-auto rounded-md border border-fg/10 bg-surface-1 p-3 text-left text-fg/70 text-xs">
+        <Typography base="mono-sm" as="pre" className={styles.detail}>
           {detail}
-        </pre>
+        </Typography>
       )}
-      <div className="inline-flex gap-2">
+      <div className={styles.actions}>
         <Button onClick={() => window.location.reload()}>{t('error.reload')}</Button>
         <Button variant="tech" onClick={() => window.location.assign(BASE_URL)}>
           {t('error.backToStart')}

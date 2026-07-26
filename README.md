@@ -5,7 +5,7 @@ card game about the real grind of software development (bugs, surprise events, r
 attacks; release first to win).
 
 The project is in early scaffolding: the monorepo skeleton, the shared UI component
-library, and the Tailwind-themed frontend shell exist today. Full game screens and the
+library, and the frontend shell exist today. Full game screens and the
 P2P networking layer (WebRTC via PeerJS) come in later phases.
 
 Game rules and card mechanics: [`docs/rules-board-game.md`](./docs/rules-board-game.md).
@@ -18,7 +18,7 @@ A pnpm workspace under `apps/*`:
 |------|---------|------|
 | `apps/ui` | `@release/ui` | Shared component library — TypeScript + CSS Modules + design tokens; i18n-agnostic |
 | `apps/playground` | `@release/playground` | Vite sandbox for developing UI components in isolation (route per story) |
-| `apps/frontend` | `@release/web` | Main web app — Vite + React + Tailwind v4 + react-i18next |
+| `apps/frontend` | `@release/web` | Main web app — Vite + React + CSS Modules + react-i18next |
 
 The frontend and playground consume `@release/ui` **from source** via a Vite/tsconfig alias —
 no build step for the library.
@@ -52,7 +52,7 @@ pnpm format     # Biome format --write
 ## Stack
 
 - **pnpm workspaces**, **TypeScript 5**, **Vite 6**, **React 19**
-- **Tailwind v4** (frontend only), themed off the UI design tokens via `@theme`
+- **CSS Modules** for component styles, design tokens via `@release/ui/tokens.css`
 - **react-i18next** (frontend) — English + Russian
 - **PeerJS** — WebRTC signaling; game state lives on the peers
 - **Biome** lints/formats JS/TS; **Stylelint** lints CSS; **Vitest** for tests
@@ -61,7 +61,7 @@ pnpm format     # Biome format --write
 
 Architecture, per-app conventions, and the styling / i18n / signaling rules live in
 [`CLAUDE.md`](./CLAUDE.md) — read it before making changes. In short: `@release/ui` stays
-CSS-Modules + i18n-agnostic (copy via props); the frontend is Tailwind-first; the backend
+CSS-Modules + i18n-agnostic (copy via props); the frontend uses CSS Modules + design tokens; the backend
 holds no game rules.
 
 ## License

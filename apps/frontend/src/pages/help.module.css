@@ -1,0 +1,18 @@
+/* apps/frontend/src/pages/help.module.css */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-inline-size: 672px;
+  padding: 64px 24px;
+  margin-inline: auto;
+}
+
+.title {
+  margin: 0;
+}
+
+.back {
+  color: var(--brand-green);
+  text-decoration: underline;
+}

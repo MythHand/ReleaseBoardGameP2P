@@ -38,10 +38,10 @@
   --charcoal: #1c1c1c; /* near-black — dark text on light surfaces (Rules) */
 
   /* ===== Turn / HUD state accents (semantic — one meaning per phase) ===== */
-  --turn-accent: var(--brand-green); /* активный ход игрока */
-  --idle-accent: var(--white-45); /* ход оппонента / нейтраль — приглушённый белый */
-  --reaction-accent: var(--gold); /* окно реакции — атака на релиз */
-  --danger-accent: var(--coral); /* danger-реакция (напр. Error 503) */
+  --turn-accent: var(--brand-green); /* the player's active turn */
+  --idle-accent: var(--white-45); /* opponent turn / neutral — muted white */
+  --reaction-accent: var(--gold); /* reaction window — attack on a release */
+  --danger-accent: var(--coral); /* danger reaction (e.g. Error 503) */
 
   /* ===== White overlays — --fg at an alpha (borders, text, faint surfaces) ===== */
   --white-02: rgb(255 255 255 / 2%);
@@ -163,9 +163,9 @@
   --card-w: 200px;
   --card-aspect: 368 / 515; /* оригинальная пропорция арта */
   --card-radius: 14px;
-  --card-parallax-navy: #102131; /* заливка панели composed-лица (CardParallax) */
-  --card-sudo-yellow: #facc15; /* подложка sudo-абзаца в описании (CardParallax) */
-  --card-defense-green: #10b981; /* подложка «работает против» у Defense (CardParallax) */
+  --card-parallax-navy: #102131; /* composed-face panel fill (CardParallax) */
+  --card-sudo-yellow: #facc15; /* sudo-paragraph background in the description (CardParallax) */
+  --card-defense-green: #10b981; /* "works against" background on Defense (CardParallax) */
 
   /* ===== Слои (z-index) ===== */
   --z-table: 0;
@@ -182,7 +182,7 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-soft: cubic-bezier(0.4, 0, 0.2, 1); /* спокойный ease-in-out */
 
-  /* ambient loops (не переходы, а бесконечные циклы — пульс/бегущий блик HUD) */
+  /* ambient loops (not transitions but infinite cycles — HUD pulse / travelling glint) */
   --t-ambient: 1.6s;
   --t-ambient-slow: 3.6s;
 }

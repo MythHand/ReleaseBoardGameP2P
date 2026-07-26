@@ -44,6 +44,6 @@
 }
 
 .switch .on {
-  color: #fff;
+  color: var(--fg);
   background: var(--white-16);
 }

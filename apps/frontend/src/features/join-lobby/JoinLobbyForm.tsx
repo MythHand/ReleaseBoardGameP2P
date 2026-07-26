@@ -1,11 +1,12 @@
 import { useTranslation } from '@release/translation'
-import { Button, randomNickname, sanitizeNickname } from '@release/ui'
+import { Button, randomNickname, sanitizeNickname, Typography } from '@release/ui'
 import { useState } from 'react'
 import { useParams } from 'react-router'
 import DiceIcon from '@/icons/DiceIcon'
 import { useGoToLobby } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
 import Form, { FormField } from '~/shared/ui/Form'
+import styles from './JoinLobbyForm.module.css'
 import { useJoinLobby } from './useJoinLobby'
 
 export default function JoinLobbyForm() {
@@ -38,7 +39,7 @@ export default function JoinLobbyForm() {
         }
       }}
       requiredMessage={t('start.required')}
-      className="flex flex-col gap-5"
+      className={styles.form}
     >
       <FormField
         name="name"
@@ -70,9 +71,9 @@ export default function JoinLobbyForm() {
         {t('start.joinCta')}
       </Button>
       {session.error && (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-400 text-sm">
+        <Typography base="body" as="p" className={styles.error}>
           {session.error}
-        </p>
+        </Typography>
       )}
     </Form>
   )

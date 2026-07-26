@@ -24,7 +24,6 @@
   },
   "devDependencies": {
     "@release/lint": "workspace:*",
-    "@tailwindcss/vite": "^4.3.1",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -32,7 +31,6 @@
     "concurrently": "^9.1.0",
     "jsdom": "^29.1.1",
     "peer": "^1.0.2",
-    "tailwindcss": "^4.3.1",
     "vite": "^6.4.3",
     "vite-plugin-svgr": "^5.2.0"
   }

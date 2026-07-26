@@ -9,12 +9,14 @@ import {
   randomNickname,
   type Setup,
   sanitizeNickname,
+  Typography,
 } from '@release/ui'
 import { useState } from 'react'
 import DiceIcon from '@/icons/DiceIcon'
 import { useGoToLobby } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
 import Form, { FormField } from '~/shared/ui/Form'
+import styles from './CreateLobbyForm.module.css'
 import { useCreateLobby } from './useCreateLobby'
 
 // Default lobby capacity: the maximum the host can later narrow with the
@@ -50,8 +52,8 @@ export default function CreateLobbyForm() {
       }}
       requiredMessage={t('start.required')}
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] items-stretch">
-        <div className="flex flex-col gap-6.5 pe-9">
+      <div className={styles.createGrid}>
+        <div className={styles.createMods}>
           {GAME_MODES.map((m) => {
             const mc = modesCopy[m.key]
             return (
@@ -69,10 +71,10 @@ export default function CreateLobbyForm() {
             )
           })}
         </div>
-        <div className="flex flex-col gap-5 border-white/8 border-s ps-9">
-          <h4 className="m-0 font-heading text-base text-white tracking-[0.02em]">
+        <div className={styles.createTech}>
+          <Typography variant="panelTitle" as="h4" className={styles.techTitle}>
             {t('start.lobbyParams')}
-          </h4>
+          </Typography>
           <FormField
             name="name"
             label={t('start.nicknameLabel')}
@@ -96,13 +98,13 @@ export default function CreateLobbyForm() {
             {t('start.createCta')}
           </Button>
           {session.error && (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-400 text-sm">
+            <Typography base="body" as="p" className={styles.error}>
               {session.error}
-            </p>
+            </Typography>
           )}
-          <p className="mt-auto mb-0 text-[13px] text-white/50 leading-[1.55]">
+          <Typography variant="footnote" className={styles.note}>
             {t('start.lobbyNote')}
-          </p>
+          </Typography>
         </div>
       </div>
     </Form>

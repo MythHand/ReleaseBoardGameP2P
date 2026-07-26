@@ -34,6 +34,16 @@ export default function Seat({
   disconnected = false,
   copy,
 }: SeatProps) {
+  // status dot — colour by state; idle seats hold a static dot, offline and the
+  // active turn pulse to read as live
+  const status = disconnected ? 'offline' : active ? 'active' : 'idle'
+  const statusAccent =
+    status === 'offline'
+      ? 'var(--coral)'
+      : status === 'active'
+        ? 'var(--brand-green)'
+        : 'var(--white-25)'
+  const statusPulse = status !== 'idle'
   return (
     <div
       className={`${styles.seat} ${active ? styles.active : ''} ${
@@ -41,13 +51,7 @@ export default function Seat({
       } ${disconnected ? styles.disconnected : ''}`}
     >
       <div className={styles.head}>
-        {disconnected ? (
-          <StatusDot accent="var(--coral)" size={7} />
-        ) : active ? (
-          <StatusDot accent="var(--brand-green)" size={7} />
-        ) : (
-          <StatusDot accent="var(--white-25)" pulse={false} size={7} />
-        )}
+        <StatusDot accent={statusAccent} pulse={statusPulse} size={7} />
         <span className={styles.name}>{player.name}</span>
         {eliminated ? (
           <Badge tone="muted" size="sm" className={styles.status}>
