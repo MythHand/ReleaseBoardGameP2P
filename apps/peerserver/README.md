@@ -40,19 +40,14 @@ Build locally (context must be the repo root):
 docker build -f apps/peerserver/Dockerfile -t peerserver .
 ```
 
-## TLS
+## Deployment
 
 The container speaks plain HTTP/WS. The GitHub Pages frontend is HTTPS, so
-browsers require `wss://` — terminate TLS at a reverse proxy on the host.
-Caddy example (automatic certificates):
+browsers require `wss://` — TLS terminates at Caddy in front of it. The
+production stack (server + Caddy) and the runbook for standing it up, updating
+it, and moving it to another host live in [deploy/](./deploy/README.md).
 
-```
-peer.example.com {
-    reverse_proxy localhost:9000
-}
-```
-
-Then set the repo variables consumed by
+Once it is running, set the repo variables consumed by
 [deploy.yml](../../.github/workflows/deploy.yml):
 `VITE_PEER_HOST=peer.example.com`, `VITE_PEER_PORT=443`, `VITE_PEER_PATH=/`.
 

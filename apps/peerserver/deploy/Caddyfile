@@ -1,0 +1,6 @@
+# The domain comes from PEER_DOMAIN in .env; compose passes it into the
+# container and Caddy substitutes it here at startup. Caddy obtains and renews
+# the certificate itself and proxies WebSocket upgrades without extra config.
+{$PEER_DOMAIN} {
+	reverse_proxy peerserver:9000
+}

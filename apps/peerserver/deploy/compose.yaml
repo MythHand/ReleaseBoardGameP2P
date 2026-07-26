@@ -1,0 +1,37 @@
+# Production stack for the signaling server: the app container plus Caddy for
+# TLS. Everything the host needs is in this directory — copy it over, fill in
+# .env, and `docker compose up -d`. Docker is the only host-level dependency,
+# which is what makes moving to another VPS cheap.
+
+services:
+  peerserver:
+    image: ${PEERSERVER_IMAGE:?set PEERSERVER_IMAGE in .env}
+    restart: unless-stopped
+    # Deliberately no published ports. Only Caddy reaches this service, over
+    # the compose network, so nothing on the host binds :9000 and there is no
+    # way to reach the server bypassing TLS.
+    expose:
+      - "9000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80" # ACME HTTP challenge + the HTTP->HTTPS redirect
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      PEER_DOMAIN: ${PEER_DOMAIN:?set PEER_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Issued certificates live here. Persisting the volume across restarts
+      # keeps Caddy from re-requesting them and hitting Let's Encrypt rate
+      # limits.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - peerserver
+
+volumes:
+  caddy_data:
+  caddy_config:
