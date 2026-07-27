@@ -9,6 +9,7 @@ interface FakeTransport {
   close: ReturnType<typeof vi.fn>
   onError?: (err: { type?: string; message: string }) => void
   onConnection?: (peerId: string) => void
+  onDisconnect?: (peerId: string) => void
 }
 
 // vi.mock is hoisted above the imports, so the array it closes over has to be
@@ -20,6 +21,7 @@ vi.mock('./transport/peer', () => ({
     (args: {
       onError?: (err: { type?: string; message: string }) => void
       onConnection?: (peerId: string) => void
+      onDisconnect?: (peerId: string) => void
     }) => {
       const fake = {
         id: `peer${transports.length}`,
@@ -31,6 +33,7 @@ vi.mock('./transport/peer', () => ({
         connectedIds: () => [],
         onError: args.onError,
         onConnection: args.onConnection,
+        onDisconnect: args.onDisconnect,
       }
       transports.push(fake)
       return fake
@@ -119,4 +122,47 @@ it('closes the previous transport when joining again after a failure', async () 
   expect(transports).toHaveLength(2)
   expect(transports[0].close).toHaveBeenCalledOnce()
   expect(transports[1].close).not.toHaveBeenCalled()
+})
+
+it('preserves a not-found errorKind when the never-opened channel then disconnects', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  act(() => {
+    transports[0].onError?.({
+      type: 'peer-unavailable',
+      message: 'Could not connect to peer f96nmt',
+    })
+  })
+  // The channel never opened (no onConnection fired), so hostConnectedRef is
+  // still false when PeerJS follows up with a disconnect for the same peer —
+  // this must not clobber the more specific 'not-found' already recorded.
+  act(() => {
+    transports[0].onDisconnect?.(parseRoomCode('F96-NMT'))
+  })
+  expect(result.current.status).toBe('error')
+  expect(result.current.errorKind).toBe('not-found')
+})
+
+it('reports connection for a host disconnect after a successful connection, even over a stale kind', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+  // Contrive a stale, unrelated errorKind before the channel opens, so the
+  // post-connect disconnect path is proven to overwrite unconditionally
+  // rather than accidentally inheriting the same "preserve if set" rule.
+  act(() => {
+    transports[0].onError?.({ type: 'peer-unavailable', message: 'stale' })
+  })
+  act(() => {
+    transports[0].onConnection?.(hostId)
+  })
+  act(() => {
+    transports[0].onDisconnect?.(hostId)
+  })
+  expect(result.current.status).toBe('error')
+  expect(result.current.errorKind).toBe('connection')
 })

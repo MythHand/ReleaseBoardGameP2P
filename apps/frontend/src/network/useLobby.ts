@@ -146,12 +146,20 @@ export function useLobby(): UseLobby {
         // The guest can't proceed without the host. Only call it "host left" if
         // we were actually connected; a channel that never opened means the
         // connection failed (ICE/negotiation) — keep that more specific error.
+        // errorKind must stay in lockstep with error: a genuine post-connect
+        // host departure is a fresh, definite connection failure (both
+        // overwrite unconditionally), but a channel that never opened may
+        // already carry a more specific kind from onError (e.g. 'not-found'
+        // from peer-unavailable) — preserve it the same way the message is
+        // preserved, or the two would disagree and 'not-found' would become
+        // unreachable.
         if (hostConnectedRef.current) {
           setError('disconnected: host left the lobby')
+          setErrorKind('connection')
         } else {
           setError((prev) => prev ?? 'could not connect to the lobby')
+          setErrorKind((prev) => prev ?? 'connection')
         }
-        setErrorKind('connection')
         setStatus('error')
       } else {
         commit(applyPeerLeft(current, peerId))
