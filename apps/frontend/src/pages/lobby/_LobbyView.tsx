@@ -1,46 +1,38 @@
 import { useTranslation } from '@release/translation'
 import {
-  Avatar,
   Badge,
   Button,
   CopyButton,
+  EmptySlot,
   GameSettings,
+  HudBackground,
+  LangSwitcher,
   Modal,
+  PlayerSlot,
   Slider,
   Toggle,
   Typography,
 } from '@release/ui'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { useStartGame } from '~/features/start-game/useStartGame'
 import type { PeerInfo } from '~/network/types'
 import { BASE_URL } from '~/shared/config'
 import AppLogo from '~/shared/ui/AppLogo'
+import { useModalRoute } from '~/shared/ui/ModalRouter'
 import styles from './_LobbyView.module.css'
 
-interface MenuItemDef {
-  label: string
-  danger?: boolean
-  onClick: () => void
-}
-
 export default function LobbyView() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const session = useSession()
   const startGame = useStartGame()
   const navigate = useNavigate()
+  // Rules reuse the app-wide `?modal=` router rather than a second local modal,
+  // so the lobby and the start screen open the very same rules content.
+  const openModal = useModalRoute()
 
-  const [menuFor, setMenuFor] = useState<string | null>(null)
   const [disbandOpen, setDisbandOpen] = useState(false)
-
-  // Close the kebab menu on any outside click.
-  useEffect(() => {
-    if (menuFor == null) return
-    const onDoc = () => setMenuFor(null)
-    window.addEventListener('click', onDoc)
-    return () => window.removeEventListener('click', onDoc)
-  }, [menuFor])
 
   const state = session.state
   if (!state) return null
@@ -54,6 +46,8 @@ export default function LobbyView() {
   const capacity = state.maxPlayers
   const minCapacity = Math.max(2, players.length)
 
+  // The invite link — what a host actually sends someone. Opening it lands on
+  // the invite screen with the code already filled in.
   const shareUrl = session.roomCode
     ? `${window.location.origin}${BASE_URL}lobby/${session.roomCode}`
     : ''
@@ -70,8 +64,6 @@ export default function LobbyView() {
     navigate('/start')
   }
 
-  const openMenu = (id: string) => setMenuFor((cur) => (cur === id ? null : id))
-
   // Fill the player column with empty slots up to the capacity. Each slot
   // carries a stable key — empty slots are keyed by their fixed position rather
   // than the raw render index, so React identity stays put as players come/go.
@@ -87,83 +79,72 @@ export default function LobbyView() {
     if (p.id === state.selfId) {
       return (
         <Toggle on={p.ready} onChange={() => session.ready()}>
-          {p.ready ? t('lobby.ready') : t('lobby.notReady')}
+          {p.ready ? t('lobbyScreen.ready') : t('lobbyScreen.notReady')}
         </Toggle>
       )
     }
     return (
       <Badge tone={p.ready ? 'success' : 'muted'}>
-        {p.ready ? t('lobby.ready') : t('lobby.waiting')}
+        {p.ready ? t('lobbyScreen.ready') : t('lobbyScreen.waiting')}
       </Badge>
     )
   }
 
-  const renderMenu = (id: string, items: MenuItemDef[]) => (
-    <div className={styles.kebabWrap}>
-      <button
-        type="button"
-        className={styles.kebabBtn}
-        aria-label={t('lobby.kick')}
-        onClick={(e) => {
-          e.stopPropagation()
-          openMenu(id)
-        }}
-      >
-        ⋯
-      </button>
-      {menuFor === id && (
-        <div className={styles.kebabMenu}>
-          {items.map((it) => (
-            <button
-              key={it.label}
-              type="button"
-              className={`${styles.kebabItem} ${it.danger ? styles.kebabDanger : ''}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                it.onClick()
-                setMenuFor(null)
-              }}
-            >
-              <Typography base="body-sm">{it.label}</Typography>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+  // Kick is the only moderation action the protocol backs today — role changes
+  // (make spectator/player) have no wire message, so the menu carries just this.
+  const kickItems = (id: string) => [
+    { label: t('lobbyScreen.kick'), danger: true, onClick: () => session.kick(id) },
+  ]
 
   return (
     <div className={styles.lobby}>
+      {/* Green once the game can actually start — the tone and the Start button
+          are driven by the same canStart rule, so they never disagree. */}
+      <HudBackground tone={session.canStart ? 'positive' : 'neutral'} className={styles.bgLayer} />
+
       <header className={styles.head}>
         <div>
           <div className={styles.titleRow}>
             <AppLogo className={styles.headLogo} blink={false} />
             <span className={styles.headDivider} />
             <Typography variant="pageTitle" className={styles.title}>
-              {t('lobby.title')}
+              {t('lobbyScreen.title')}
             </Typography>
             {isHost && (
               <Button variant="dangerGhost" onClick={() => setDisbandOpen(true)}>
-                {t('lobby.disband')}
+                {t('lobbyScreen.disband')}
               </Button>
             )}
           </div>
           <Typography base="label" tk="tk-14" as="p" className={styles.sub}>
-            {t('lobby.subtitle')}
+            {t('lobbyScreen.subtitle')}
           </Typography>
         </div>
-        <div className={styles.codeBox}>
-          <Typography base="label-sm" tk="tk-16" className={styles.codeLabel}>
-            {t('lobby.code')}
-          </Typography>
-          <div className={styles.codeRow}>
-            <Typography variant="code" className={styles.codeValue}>
-              {session.roomCode}
+        <div className={styles.headRight}>
+          <div className={styles.codeBox}>
+            <Typography base="label-sm" tk="tk-16" as="span" className={styles.codeLabel}>
+              {t('lobbyCode.label')}
             </Typography>
-            <CopyButton variant="tech" copyValue={shareUrl} copiedChildren={t('lobby.copied')}>
-              {t('lobby.copy')}
-            </CopyButton>
+            <div className={styles.codeRow}>
+              {/* Copies the invite link, not the bare code — that link is what
+                  opens the invite screen with the code already filled in. */}
+              <CopyButton
+                variant="tech"
+                copyValue={shareUrl}
+                copiedChildren={t('lobbyCode.copied')}
+              >
+                {t('lobbyCode.copy')}
+              </CopyButton>
+              <Typography variant="code" className={styles.codeValue}>
+                {session.roomCode}
+              </Typography>
+            </div>
           </div>
+          <LangSwitcher
+            value={i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'}
+            onChange={(lang) => i18n.changeLanguage(lang)}
+            label={t('lobbyScreen.language')}
+          />
         </div>
       </header>
 
@@ -171,12 +152,15 @@ export default function LobbyView() {
         {/* Left — match modes */}
         <section className={styles.modes}>
           <Typography variant="sectionTitle" className={styles.h}>
-            {t('lobby.modes')}
+            {t('lobbyScreen.modes')}
             {!isHost && (
-              <Typography base="mono-xs" tk="tk-10" className={styles.lockTag}>
-                {t('lobby.modesLockedHint')}
+              <Typography base="mono-xs" tk="tk-10" as="span" className={styles.lockTag}>
+                {t('lobbyScreen.modesLockedHint')}
               </Typography>
             )}
+            <Button variant="tech" className={styles.rulesBtn} value="rules" onClick={openModal}>
+              {t('lobbyScreen.rules')}
+            </Button>
           </Typography>
           <div className={styles.modeList}>
             <GameSettings
@@ -192,8 +176,8 @@ export default function LobbyView() {
         <section className={styles.players}>
           <div className={styles.scrollArea}>
             <Typography variant="sectionTitle" className={styles.h}>
-              {t('lobby.players')}
-              <Typography base="mono-md" tk="tk-10" className={styles.count}>
+              {t('lobbyScreen.players')}
+              <Typography base="mono-md" tk="tk-10" as="span" className={styles.count}>
                 {players.length} / {capacity}
               </Typography>
             </Typography>
@@ -201,7 +185,7 @@ export default function LobbyView() {
             {isHost && (
               <Slider
                 className={styles.capRow}
-                label={t('lobby.capacity')}
+                label={t('lobbyScreen.capacity')}
                 value={capacity}
                 min={minCapacity}
                 max={6}
@@ -209,98 +193,61 @@ export default function LobbyView() {
               />
             )}
 
-            <ul className={styles.list}>
+            <div className={styles.list}>
               {slots.map(({ key, peer: p }) =>
                 p ? (
-                  <li
+                  <PlayerSlot
                     key={key}
-                    className={`${styles.slot} ${p.id === state.selfId ? styles.slotMe : ''}`}
-                  >
-                    <Avatar name={p.name} size={34} />
-                    <Typography base="body-lg">
-                      {p.name}
-                      {p.id === state.selfId && (
-                        <Typography base="body-sm" className={styles.you}>
-                          {' '}
-                          ({t('lobby.you')})
-                        </Typography>
-                      )}
-                    </Typography>
-                    {p.role === 'host' && (
-                      <Badge tone="success" size="sm" outlined>
-                        {t('lobby.roleHost')}
-                      </Badge>
-                    )}
-
-                    <div className={styles.rowEnd}>
-                      {renderStatus(p)}
-                      {isHost &&
-                        p.id !== state.selfId &&
-                        renderMenu(p.id, [
-                          {
-                            label: t('lobby.kick'),
-                            danger: true,
-                            onClick: () => session.kick(p.id),
-                          },
-                        ])}
-                    </div>
-                  </li>
+                    name={p.name}
+                    me={p.id === state.selfId}
+                    youLabel={t('lobbyScreen.you')}
+                    badge={
+                      p.role === 'host' ? (
+                        <Badge tone="success" size="sm" outlined>
+                          {t('lobbyScreen.roleHost')}
+                        </Badge>
+                      ) : undefined
+                    }
+                    status={renderStatus(p)}
+                    dropdownLabel={t('lobbyScreen.actions')}
+                    dropdown={isHost && p.id !== state.selfId ? kickItems(p.id) : undefined}
+                  />
                 ) : (
-                  <li key={key} className={styles.slotEmpty}>
-                    <Typography base="label" tk="tk-12">
-                      {t('lobby.freeSlot')}
-                    </Typography>
-                  </li>
+                  <EmptySlot key={key}>{t('lobbyScreen.freeSlot')}</EmptySlot>
                 ),
               )}
-            </ul>
+            </div>
 
             <Typography variant="sectionTitle" className={`${styles.h} ${styles.hSpectators}`}>
-              {t('lobby.spectators')}
-              <Typography base="mono-md" tk="tk-10" className={styles.count}>
+              {t('lobbyScreen.spectators')}
+              <Typography base="mono-md" tk="tk-10" as="span" className={styles.count}>
                 {spectators.length}
               </Typography>
             </Typography>
 
-            <ul className={styles.list}>
+            <div className={styles.list}>
               {spectators.map((s) => (
-                <li key={s.id} className={styles.slot}>
-                  <Avatar name={s.name} size={34} />
-                  <Typography base="body-lg">
-                    {s.name}
-                    {s.id === state.selfId && (
-                      <Typography base="body-sm" className={styles.you}>
-                        {' '}
-                        ({t('lobby.you')})
-                      </Typography>
-                    )}
-                  </Typography>
-                  <div className={styles.rowEnd}>
-                    <Badge tone="muted">{t('lobby.roleGuest')}</Badge>
-                    {isHost &&
-                      renderMenu(s.id, [
-                        { label: t('lobby.kick'), danger: true, onClick: () => session.kick(s.id) },
-                      ])}
-                  </div>
-                </li>
+                <PlayerSlot
+                  key={s.id}
+                  name={s.name}
+                  me={s.id === state.selfId}
+                  youLabel={t('lobbyScreen.you')}
+                  status={<Badge tone="muted">{t('lobbyScreen.roleGuest')}</Badge>}
+                  dropdownLabel={t('lobbyScreen.actions')}
+                  dropdown={isHost ? kickItems(s.id) : undefined}
+                />
               ))}
-              {spectators.length === 0 && (
-                <li className={styles.slotEmpty}>
-                  <Typography base="label" tk="tk-12">
-                    {t('lobby.noSpectators')}
-                  </Typography>
-                </li>
-              )}
-            </ul>
+              {spectators.length === 0 && <EmptySlot>{t('lobbyScreen.noSpectators')}</EmptySlot>}
+            </div>
           </div>
 
           <div className={styles.actions}>
             {isHost ? (
               <Button disabled={!session.canStart} onClick={startGame}>
-                {t('lobby.start')}
+                {t('lobbyScreen.start')}
               </Button>
             ) : (
-              <Button onClick={leave}>{t('lobby.leave')}</Button>
+              <Button onClick={leave}>{t('lobbyScreen.leave')}</Button>
             )}
           </div>
         </section>
@@ -309,17 +256,17 @@ export default function LobbyView() {
       <Modal
         open={disbandOpen}
         onClose={() => setDisbandOpen(false)}
-        title={t('lobby.disbandTitle')}
+        title={t('lobbyScreen.disbandTitle')}
       >
         <Typography variant="body" className={styles.confirmText}>
-          {t('lobby.disbandConfirm')}
+          {t('lobbyScreen.disbandText')}
         </Typography>
         <div className={styles.confirmActions}>
           <Button variant="tech" onClick={() => setDisbandOpen(false)}>
-            {t('start.close')}
+            {t('lobbyScreen.cancel')}
           </Button>
           <Button variant="danger" onClick={onDisbandConfirm}>
-            {t('lobby.disband')}
+            {t('lobbyScreen.disband')}
           </Button>
         </div>
       </Modal>
