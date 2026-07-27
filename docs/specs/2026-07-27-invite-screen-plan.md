@@ -708,10 +708,28 @@ Check `apps/frontend/src/network/index.ts` re-exports `ErrorKind` from `./useLob
 Run: `pnpm --filter @release/web test useLobby`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Keep the tree compiling**
+
+`errorKind` is required on `UseLobby`, so every fixture that builds the whole object stops
+type-checking the moment the interface changes. One does: `base()` in
+`apps/frontend/src/pages/lobby/__tests__/lobby.test.tsx`. Add the field beside `error: null,`:
+
+```ts
+    error: null,
+    errorKind: null,
+```
+
+That single line belongs to this task, not to Task 7 — the repo's pre-commit hook runs
+`pnpm typecheck` across the workspace, so the commit is blocked until the fixture compiles.
+Task 7 still owns the rest of that file's changes.
+
+Run: `pnpm --filter @release/web typecheck`
+Expected: clean.
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add apps/frontend/src/network apps/frontend/src/entities/lobby/index.ts
+git add apps/frontend/src/network apps/frontend/src/entities/lobby/index.ts apps/frontend/src/pages/lobby/__tests__/lobby.test.tsx
 git commit -m "feat(web): classify session errors as not-found or connection"
 ```
 
@@ -1399,7 +1417,7 @@ Replace the whole final `return (…)` block — the `Shell`, the connecting lin
 
 - [ ] **Step 2: Update the fixture and the four pre-session tests**
 
-In `apps/frontend/src/pages/lobby/__tests__/lobby.test.tsx`, add `errorKind: null,` to `base()` next to `error: null,`, and extend the translation mock so `_InviteScreen` can read the language:
+In `apps/frontend/src/pages/lobby/__tests__/lobby.test.tsx` — `base()` already gained `errorKind: null` in Task 3 (the type change could not compile without it), so it needs no further edit. Extend the translation mock so `_InviteScreen` can read the language:
 
 ```tsx
 vi.mock('@release/translation', () => ({
