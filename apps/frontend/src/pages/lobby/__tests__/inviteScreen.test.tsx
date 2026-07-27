@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
 import InviteScreen from '../_InviteScreen'
@@ -14,6 +14,14 @@ vi.mock('@release/translation', () => ({
 let sessionValue: UseLobby
 vi.mock('~/app/providers/SessionProvider', () => ({
   useSession: () => sessionValue,
+}))
+
+// useGoToLobby (Task 1's navigation helper) and the screen's own "home" button
+// both call useNavigate from the generouted router — mocked here so the
+// rejected-submit test can assert navigation never fired.
+const navigateMock = vi.fn()
+vi.mock('~/app/router', () => ({
+  useNavigate: () => navigateMock,
 }))
 
 function base(): UseLobby {
@@ -53,6 +61,21 @@ const renderScreen = () =>
     </MemoryRouter>,
   )
 
+// Renders at /lobby/:lobbyId so the code field pre-fills from the route param —
+// the same idiom lobby.test.tsx uses for its "pre-fills the code" case.
+const renderAtLobby = (code: string) =>
+  render(
+    <MemoryRouter initialEntries={[`/lobby/${code}`]}>
+      <Routes>
+        <Route path="/lobby/:lobbyId" element={<InviteScreen />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+
+beforeEach(() => {
+  navigateMock.mockClear()
+})
+
 it('shows the form when there is no session', () => {
   sessionValue = base()
   renderScreen()
@@ -78,6 +101,20 @@ it('shows the connected state until the roster arrives', () => {
   sessionValue = joined({ me: { id: 'me', name: 'Me', role: 'guest', ready: false } })
   renderScreen()
   expect(screen.getByText('invite.connected')).toBeTruthy()
+})
+
+// Pins the roster-presence half of the condition: `rosterPending` must flip
+// off once the host itself shows up in `peers`, or the green banner (and a
+// host's own view of the screen) would never clear. Without this, swapping
+// the guard for a plain `status === 'in-lobby'` still passes every other test.
+it('leaves the connected state once the host roster arrives', () => {
+  sessionValue = joined({
+    h: { id: 'h', name: 'Host', role: 'host', ready: true },
+    me: { id: 'me', name: 'Me', role: 'guest', ready: false },
+  })
+  renderScreen()
+  expect(screen.queryByText('invite.connected')).toBeNull()
+  expect(screen.getByText('invite.joinCta')).toBeTruthy()
 })
 
 it('shows the not-found status for an unknown code', () => {
@@ -117,9 +154,43 @@ it('cancelling a connection tears the session down', () => {
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 
+// Code is pre-filled via the route so the nickname is the ONLY missing
+// required field — pins the Form required-path specifically, rather than
+// passing for any of several reasons (both fields empty, click not wired, etc).
 it('does not join when the nickname is empty', () => {
   sessionValue = base()
-  renderScreen()
+  renderAtLobby('F96-NMT')
   fireEvent.click(screen.getByText('invite.joinCta'))
   expect(sessionValue.joinRoom).not.toHaveBeenCalled()
+})
+
+// Pins the submit path end to end: joinRoom's argument order (code first,
+// nickname second — both are `string`, so a swap type-checks fine and would
+// only ever show up here).
+it('submits with the code first and the nickname second', () => {
+  sessionValue = { ...base(), joinRoom: vi.fn().mockResolvedValue('F96-NMT') }
+  renderAtLobby('F96-NMT')
+  fireEvent.change(screen.getByLabelText('invite.nicknameLabel'), { target: { value: 'Ann' } })
+  fireEvent.click(screen.getByText('invite.joinCta'))
+  expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann')
+})
+
+// Pins the silent catch: a rejected joinRoom must leave the form up and must
+// never call goToLobby's navigate — without this, an unconditional
+// goToLobby(formatted) after the await would go unnoticed.
+it('stays on the form and does not navigate when the join rejects', async () => {
+  sessionValue = {
+    ...base(),
+    joinRoom: vi.fn().mockRejectedValue(new Error('peer-unavailable: x')),
+  }
+  renderAtLobby('F96-NMT')
+  fireEvent.change(screen.getByLabelText('invite.nicknameLabel'), { target: { value: 'Ann' } })
+  fireEvent.click(screen.getByText('invite.joinCta'))
+
+  await waitFor(() => expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann'))
+  // let the rejected promise's catch run before asserting on its aftermath
+  await new Promise((resolve) => setTimeout(resolve, 0))
+
+  expect(navigateMock).not.toHaveBeenCalled()
+  expect(screen.getByText('invite.joinCta')).toBeTruthy()
 })
