@@ -1,15 +1,122 @@
-/* ниже game-over (100), выше полосы (60) */
+/* Overlay z: below game-over (100), above the bars (60). The scrim + centring
+   come from Overlay; this file styles the terminal window inside it. */
 .over {
   --overlay-z: 90;
 }
 
-.box {
-  composes: notice tk-10 from '../../design/typography.module.css';
+.window {
+  --ph: var(--gold); /* trying — amber; flips to coral on failure */
+
   display: flex;
-  gap: 14px;
-  align-items: center;
-  padding: 20px 28px;
+  flex-direction: column;
+  inline-size: 540px;
+  max-inline-size: 100%;
+  block-size: 400px;
   color: var(--fg);
   background: color-mix(in srgb, var(--surface-1) 94%, var(--bg));
-  border: 1px solid var(--white-14);
+  border: 1px solid color-mix(in srgb, var(--ph) 30%, var(--white-14));
+  border-radius: 12px;
+  box-shadow: 0 0 24px color-mix(in srgb, var(--ph) 12%, transparent);
+}
+
+.window[data-tone='failed'] {
+  --ph: var(--coral);
+}
+
+.head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 14px 18px;
+  border-block-end: 1px solid var(--white-08);
+}
+
+.dot {
+  inline-size: 8px;
+  block-size: 8px;
+  background: var(--ph);
+  border-radius: 50%;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ph) 60%, transparent);
+}
+
+.headLabel {
+  color: var(--white-45);
+}
+
+.headAddr {
+  margin-inline-start: auto;
+  color: var(--ph);
+}
+
+/* log body: fixed height, lines stream in from the bottom and older ones clip
+   above (justify-end + overflow hidden) — the terminal-from-below feel */
+.log {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: flex-end;
+  min-block-size: 0;
+  padding: 14px 18px;
+  overflow: hidden;
+}
+
+.line {
+  color: color-mix(in srgb, var(--fg) 66%, transparent);
+  white-space: pre-wrap;
+}
+
+.lineErr {
+  color: var(--coral);
+  white-space: pre-wrap;
+}
+
+.cursorLine {
+  display: flex;
+  align-items: center;
+  block-size: 1.4em;
+}
+
+.cursor {
+  display: inline-block;
+  inline-size: 0.5em;
+  block-size: 1em;
+  background: var(--ph);
+  animation: blink 1s steps(2) infinite;
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor {
+    animation: none;
+  }
+}
+
+.foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px;
+  border-block-start: 1px solid var(--white-08);
+}
+
+.actions {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.confirmQ {
+  color: var(--coral);
 }

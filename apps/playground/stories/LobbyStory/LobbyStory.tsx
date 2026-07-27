@@ -8,7 +8,7 @@ import styles from './LobbyStory.module.css'
 export default function LobbyStory() {
   const { lang } = useLang()
   const [role, setRole] = useState<'host' | 'guest'>('host')
-  const [bg, setBg] = useState<'neutral' | 'positive'>('neutral')
+  const [bg, setBg] = useState<'neutral' | 'positive' | 'problem'>('neutral')
   return (
     <div className={styles.root}>
       <div className={styles.controls}>
@@ -42,6 +42,13 @@ export default function LobbyStory() {
             onClick={() => setBg('positive')}
           >
             positive
+          </button>
+          <button
+            type="button"
+            className={bg === 'problem' ? styles.on : ''}
+            onClick={() => setBg('problem')}
+          >
+            problem
           </button>
         </div>
       </div>

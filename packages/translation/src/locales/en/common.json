@@ -227,7 +227,12 @@
     "eliminated": "is out"
   },
   "reconnect": {
-    "label": "reconnecting…"
+    "label": "reconnecting…",
+    "retry": "reconnect",
+    "leave": "leave",
+    "confirmLeave": "confirm",
+    "cancel": "cancel",
+    "abortPrompt": "> abort session?"
   },
   "table": {
     "youEliminated": "you are out",

@@ -38,6 +38,23 @@
   border-radius: 50%;
 }
 
+/* Keyboard focus: suppress the element's own outline (the global :focus-visible
+   ring would otherwise trace the thin track) and ring the thumb instead. */
+.slider:focus-visible {
+  outline: none;
+}
+
+/* Green ring standing off the thumb: a dark gap separates it from the mint
+   thumb so it reads as a distinct ring, not a bigger thumb (box-shadow is the
+   only way to ring a slider-thumb pseudo-element). */
+.slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand-green);
+}
+
+.slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand-green);
+}
+
 .value {
   composes: numeric from '../../design/typography.module.css';
   min-inline-size: 18px;

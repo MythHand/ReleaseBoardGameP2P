@@ -1,3 +1,19 @@
+/* Registered so a tone change interpolates the accent colour and glow instead
+   of snapping: the gradient + border read var(--a)/var(--glow), and registered
+   custom props re-resolve their dependents each frame. This is what lets a tone
+   switch fade the fill in from neutral and cross-fade green↔amber. */
+@property --a {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+@property --glow {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 4%;
+}
+
 /* Lighter than HudSurface: translucent fill, faint grid + border, no drop shadow
    — a quiet background. Semantic tone drives the faint tint/border via --a. */
 .bg {
@@ -12,11 +28,27 @@
     linear-gradient(180deg, color-mix(in srgb, var(--surface-1) 45%, transparent), color-mix(in srgb, var(--surface-0) 25%, transparent));
   border: 1px solid color-mix(in srgb, var(--a) 9%, transparent);
   border-radius: 14px;
+  transition:
+    --a var(--t-base) var(--ease-soft),
+    --glow var(--t-base) var(--ease-soft);
+}
+
+/* Respect reduced-motion: keep the tone change, drop the animation. */
+@media (prefers-reduced-motion: reduce) {
+  .bg {
+    transition: none;
+  }
 }
 
 .bg[data-tone='positive'] {
   --a: var(--brand-green);
   --glow: 12%; /* 3× the neutral glow — brighter green wash */
+}
+
+/* problem — amber caution wash (e.g. a player is offline in the lobby) */
+.bg[data-tone='problem'] {
+  --a: var(--gold);
+  --glow: 12%;
 }
 
 /* grid — fully transparent, only the techno grid remains (no fill, no border) */

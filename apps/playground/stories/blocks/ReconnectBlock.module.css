@@ -1,0 +1,13 @@
+/* tall mock stage so the reconnect window has room to read at full size */
+.stage {
+  position: relative;
+  inline-size: 100%;
+  min-block-size: 640px;
+  overflow: hidden;
+  border: 1px solid var(--white-12);
+}
+
+.filler {
+  padding: 20px;
+  color: var(--white-30);
+}

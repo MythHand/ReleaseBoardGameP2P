@@ -36,6 +36,17 @@
   opacity: 0.45;
 }
 
+/* Keyboard focus: the label itself lights up in the frame green (no box fill,
+   no outline ring). Brackets go full-opacity so [ TEXT ] reads as one green. */
+.primary:focus-visible {
+  color: var(--brand-green);
+  outline: none;
+}
+
+.primary:focus-visible .bracket {
+  opacity: 1;
+}
+
 /* техническая — бордер-бокс */
 .tech {
   padding: 6px 10px;
