@@ -211,7 +211,12 @@
     "eliminated": "выбыл из игры"
   },
   "reconnect": {
-    "label": "переподключение…"
+    "label": "переподключение…",
+    "retry": "переподключиться",
+    "leave": "выйти",
+    "confirmLeave": "подтвердить",
+    "cancel": "отмена",
+    "abortPrompt": "> прервать сессию?"
   },
   "table": {
     "youEliminated": "вы выбыли из игры",
