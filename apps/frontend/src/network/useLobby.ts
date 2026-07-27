@@ -268,6 +268,11 @@ export function useLobby(): UseLobby {
 
   const joinRoom = useCallback(
     async (code: string, name: string) => {
+      // A retry (the invite screen reuses the same submit path) would otherwise
+      // leave the previous peer open — createTransport is assigned over the ref
+      // below, so nothing else would ever close it.
+      transportRef.current?.close()
+      transportRef.current = null
       setStatus('connecting')
       setError(null)
       setErrorKind(null)

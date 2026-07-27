@@ -17,8 +17,7 @@ const { transports } = vi.hoisted(() => ({ transports: [] as FakeTransport[] }))
 
 vi.mock('./transport/peer', () => ({
   createTransport: vi.fn(
-    // biome-ignore lint/suspicious/useAwait: async keeps this a Promise<Transport>, matching the real signature
-    async (args: {
+    (args: {
       onError?: (err: { type?: string; message: string }) => void
       onConnection?: (peerId: string) => void
     }) => {
@@ -102,4 +101,22 @@ it('clears errorKind alongside the error', async () => {
   })
   expect(result.current.error).toBeNull()
   expect(result.current.errorKind).toBeNull()
+})
+
+it('closes the previous transport when joining again after a failure', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  act(() => {
+    transports[0].onError?.({ type: 'peer-unavailable', message: 'nope' })
+  })
+
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+
+  expect(transports).toHaveLength(2)
+  expect(transports[0].close).toHaveBeenCalledOnce()
+  expect(transports[1].close).not.toHaveBeenCalled()
 })
