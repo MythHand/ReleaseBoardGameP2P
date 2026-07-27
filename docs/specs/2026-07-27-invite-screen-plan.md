@@ -151,7 +151,7 @@ Expected: FAIL — `Failed to resolve import "./ScreenShell"`.
 
 - [ ] **Step 3: Write the stylesheet**
 
-Create `apps/ui/src/screens/ScreenShell/ScreenShell.module.css`. Every rule here is lifted verbatim from `Start.module.css` / `Invite.module.css` except the four marked below:
+Create `apps/ui/src/screens/ScreenShell/ScreenShell.module.css`. Every rule here is lifted verbatim from `Start.module.css` / `Invite.module.css` except the three marked `CHANGED:` below. (`.root`, `.content`'s `overflow-y` and `.desc`'s `composes: body` come from the *invite* screen's values, which is why only three rules are marked — they are verbatim from one source, not new.)
 
 ```css
 /* Общая оболочка экранов Start/Invite: слоёный фон (фото + блюр + затемнение),
