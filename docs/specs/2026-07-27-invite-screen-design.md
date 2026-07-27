@@ -30,9 +30,16 @@ third copy of the shared background chrome. It has already drifted: `start.tsx`
 renders `.bg`, `.blur` and `.scrim` but **no `HudBackground`**, so the frontend's
 `/start` is missing the HUD grid the playground shows.
 
+> **Superseded in part.** Decision 1 below was reversed during implementation: `apps/ui/src/screens/`
+> is a design *mockup*, not a dependency, so the frontend implements the screen itself and shares a
+> `ScreenShell` of its own between `/start` and `/lobby/:lobbyId`. See
+> [`2026-07-27-invite-screen-plan.md`](./2026-07-27-invite-screen-plan.md). Everything else here —
+> the state machine, the error classification, the layout measurements, the copy decisions — still
+> governs, and `ScreenShell` carries the same values this document specifies.
+
 ## Decisions
 
-1. **Consume `@release/ui`, don't re-port.** The page becomes a thin adapter. This is
+1. ~~**Consume `@release/ui`, don't re-port.**~~ *(Superseded — see the note above.)* The page becomes a thin adapter. This is
    the CLAUDE.md rule for `apps/frontend` ("All visuals come from `@release/ui`") and
    the only option under which "the same layout" survives future edits.
 
