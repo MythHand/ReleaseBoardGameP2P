@@ -20,6 +20,14 @@
   align-items: center;
 }
 
+/* two-copy mode: the «link» + «code» buttons sit together, tighter than the
+   gap between the button group and the code itself */
+.actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .code {
   composes: code tk-20 from '../../design/typography.module.css';
   color: var(--mint);

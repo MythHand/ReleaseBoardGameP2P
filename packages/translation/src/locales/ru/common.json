@@ -252,6 +252,8 @@
   "lobbyCode": {
     "label": "код игры",
     "copy": "копировать",
+    "copyLink": "ссылка",
+    "copyCode": "код",
     "copied": "скопировано"
   },
   "physicalEdition": {
