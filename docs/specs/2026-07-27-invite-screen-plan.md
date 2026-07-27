@@ -687,7 +687,26 @@ Set it everywhere `error` is set:
   }, [])
 ```
 
-In `onDisconnect`'s guest branch, both paths are connection failures — add `setErrorKind('connection')` beside the existing `setStatus('error')`.
+In `onDisconnect`'s guest branch, `errorKind` must follow the **same preservation rule as the
+message it describes** — otherwise the two disagree and `'not-found'` becomes unreachable:
+
+```ts
+        if (hostConnectedRef.current) {
+          setError('disconnected: host left the lobby')
+          setErrorKind('connection')
+        } else {
+          setError((prev) => prev ?? 'could not connect to the lobby')
+          setErrorKind((prev) => prev ?? 'connection')
+        }
+```
+
+A host that genuinely left after connecting is a fresh, definite connection failure, so both
+overwrite unconditionally. A channel that never opened may already carry a more specific kind
+from `onError` (`'not-found'`, from `peer-unavailable`) — preserve it exactly as the message is
+preserved. Setting the kind unconditionally here is a real defect: for a bad code the sequence is
+`peer-unavailable` → `onError` sets `'not-found'`, then the connection closes → `onDisconnect`
+clobbers it back to `'connection'`, and the user sees "couldn't connect" instead of "game not
+found". Unit tests that set `errorKind` directly on a mocked session cannot catch it.
 
 Clear it in `leaveSession` and `clearError` beside `setError(null)`, and reset it at the top of `createRoom` and `joinRoom` beside their `setError(null)`.
 
