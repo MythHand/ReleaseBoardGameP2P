@@ -173,6 +173,12 @@
   align-items: stretch;
 }
 
+/* Focus-nav wrapper that must not become a layout box: children keep the
+   modal body's own flex gap (join modal has no grid of its own). */
+.navGroup {
+  display: contents;
+}
+
 .createMods {
   display: flex;
   flex-direction: column;

@@ -7,6 +7,7 @@ import PhysicalEdition, { type PhysicalEditionCopy } from '@/blocks/PhysicalEdit
 import Rules, { type RulesCopy } from '@/blocks/Rules'
 import VideoPlayer from '@/blocks/VideoPlayer'
 import ReleaseLogo from '@/brand/ReleaseLogo'
+import { useSpatialNav } from '@/focus/useSpatialNav'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
 import { randomNickname, sanitizeNickname } from '@/game/nicknames'
 import DiceIcon from '@/icons/DiceIcon'
@@ -98,6 +99,8 @@ export default function Start({
   const [joinCode, setJoinCode] = useState('')
   const close = () => setModal(null)
   const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
+  // Arrow-key focus navigation across the create modal's grid (on top of Tab).
+  const spatialNav = useSpatialNav()
 
   // тряска незаполненных полей при попытке войти (play('shake') — тот же модуль,
   // что в экране приглашения): встряхиваем первое пустое поле
@@ -236,7 +239,9 @@ export default function Start({
       />
 
       <Modal open={modal === 'create'} onClose={close} title={copy.createTitle} wide>
-        <div className={styles.createGrid}>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: arrow-key focus
+            nav layered over Tab; the handler only moves focus, never activates */}
+        <div className={styles.createGrid} onKeyDown={spatialNav}>
           <div className={styles.createMods}>
             <GameSettings setup={setup} onChange={setMode} copy={copy.modes} />
           </div>
@@ -274,37 +279,41 @@ export default function Start({
       </Modal>
 
       <Modal open={modal === 'join'} onClose={close} title={copy.joinTitle}>
-        <div ref={joinNameRef}>
-          <Input
-            label={copy.nicknameLabel}
-            value={joinName}
-            onChange={(e) => setJoinName(sanitizeNickname(e.target.value))}
-            placeholder={copy.nicknamePlaceholder}
-            maxLength={20}
-            plain
-            trailing={
-              <Button
-                variant="icon"
-                onClick={() => setJoinName(randomNickname())}
-                aria-label={copy.randomNick}
-                title={copy.randomNick}
-              >
-                <DiceIcon />
-              </Button>
-            }
-          />
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: arrow-key focus
+            nav (display:contents wrapper); the handler only moves focus */}
+        <div className={styles.navGroup} onKeyDown={spatialNav}>
+          <div ref={joinNameRef}>
+            <Input
+              label={copy.nicknameLabel}
+              value={joinName}
+              onChange={(e) => setJoinName(sanitizeNickname(e.target.value))}
+              placeholder={copy.nicknamePlaceholder}
+              maxLength={20}
+              plain
+              trailing={
+                <Button
+                  variant="icon"
+                  onClick={() => setJoinName(randomNickname())}
+                  aria-label={copy.randomNick}
+                  title={copy.randomNick}
+                >
+                  <DiceIcon />
+                </Button>
+              }
+            />
+          </div>
+          <div ref={joinCodeRef}>
+            <Input
+              label={copy.gameCodeLabel}
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              placeholder={copy.gameCodePlaceholder}
+            />
+          </div>
+          <Button className={joinValid ? '' : styles.ctaIdle} onClick={submitJoin}>
+            {copy.joinCta}
+          </Button>
         </div>
-        <div ref={joinCodeRef}>
-          <Input
-            label={copy.gameCodeLabel}
-            value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value)}
-            placeholder={copy.gameCodePlaceholder}
-          />
-        </div>
-        <Button className={joinValid ? '' : styles.ctaIdle} onClick={submitJoin}>
-          {copy.joinCta}
-        </Button>
       </Modal>
 
       <Modal open={modal === 'rules'} onClose={close} title={copy.rulesTitle} wide>
