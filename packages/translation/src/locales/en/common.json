@@ -32,6 +32,24 @@
     "required": "Required",
     "continueSession": "continue game"
   },
+  "invite": {
+    "formTitle": "Game invite",
+    "codeLabel": "game code",
+    "nicknameLabel": "your nickname",
+    "nicknamePlaceholder": "E.G. Dimbo",
+    "randomNick": "random name",
+    "roleTitle": "join as",
+    "rolePlayer": "player",
+    "roleSpectator": "spectator",
+    "joinCta": "connect",
+    "connecting": "connecting",
+    "connected": "connected",
+    "cancel": "cancel",
+    "retry": "retry",
+    "connectError": "couldn't connect",
+    "notFoundStatus": "game not found",
+    "homePage": "home page"
+  },
   "stats": {
     "title": "Match results",
     "subtitle": "Match over",
