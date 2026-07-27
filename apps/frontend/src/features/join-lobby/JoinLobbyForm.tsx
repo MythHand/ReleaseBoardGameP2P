@@ -47,6 +47,9 @@ export default function JoinLobbyForm() {
         placeholder={t('start.nicknamePlaceholder')}
         maxLength={20}
         required
+        // natural case — a nickname is used in game exactly as typed, unlike
+        // the code field, which the value tier uppercases
+        plain
         value={name}
         onChange={(e) => setName(sanitizeNickname(e.target.value))}
         trailing={

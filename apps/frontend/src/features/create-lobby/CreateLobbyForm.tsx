@@ -81,6 +81,8 @@ export default function CreateLobbyForm() {
             placeholder={t('start.nicknamePlaceholder')}
             maxLength={20}
             required
+            // natural case — a nickname is used in game exactly as typed
+            plain
             value={name}
             onChange={(e) => setName(sanitizeNickname(e.target.value))}
             trailing={

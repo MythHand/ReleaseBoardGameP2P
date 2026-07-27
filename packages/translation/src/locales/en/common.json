@@ -18,7 +18,7 @@
     "createTitle": "Create game",
     "lobbyParams": "Lobby settings",
     "nicknameLabel": "Your nickname",
-    "nicknamePlaceholder": "e.g. dimbo",
+    "nicknamePlaceholder": "E.G. Dimbo",
     "createCta": "create lobby",
     "lobbyNote": "Player limit and match modes are configured in the lobby — no need to recreate anything.",
     "joinTitle": "Join",
