@@ -25,6 +25,7 @@ function base(): UseLobby {
     isHost: false,
     canStart: false,
     error: null,
+    errorKind: null,
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
     ready: vi.fn(),

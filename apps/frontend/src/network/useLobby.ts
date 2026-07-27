@@ -50,6 +50,16 @@ const DISBAND_FLUSH_MS = 200
 
 export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'disbanded' | 'error'
 
+// Semantic classification of a session failure, so the UI can show localized
+// copy instead of the raw English PeerJS string. 'not-found' is specifically
+// "no host answers to this code" (PeerJS `peer-unavailable`); everything else
+// is a connection problem.
+export type ErrorKind = 'not-found' | 'connection' | null
+
+function classify(type?: string): Exclude<ErrorKind, null> {
+  return type === 'peer-unavailable' ? 'not-found' : 'connection'
+}
+
 export interface UseLobby {
   state: LobbyState | null
   status: LobbyStatus
@@ -57,6 +67,7 @@ export interface UseLobby {
   isHost: boolean
   canStart: boolean
   error: string | null
+  errorKind: ErrorKind
   createRoom(name: string, maxPlayers: number, setup?: Setup): Promise<string>
   joinRoom(code: string, name: string): Promise<string>
   ready(): void
@@ -75,6 +86,7 @@ export function useLobby(): UseLobby {
   const [isHost, setIsHost] = useState(false)
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errorKind, setErrorKind] = useState<ErrorKind>(null)
   const transportRef = useRef<Transport | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
@@ -90,6 +102,7 @@ export function useLobby(): UseLobby {
     // whole session, but signaling/peer errors (peer-unavailable, network,
     // disconnected) mean the session can't proceed — surface them.
     setError(err.type ? `${err.type}: ${err.message}` : err.message)
+    setErrorKind(classify(err.type))
     if (err.type !== 'connection') setStatus('error')
   }, [])
 
@@ -100,6 +113,7 @@ export function useLobby(): UseLobby {
     const e = err as { type?: string; message?: string }
     const message = e?.message ?? String(err)
     setError(e?.type ? `${e.type}: ${message}` : message)
+    setErrorKind(classify(e?.type))
     setStatus('error')
   }, [])
 
@@ -137,6 +151,7 @@ export function useLobby(): UseLobby {
         } else {
           setError((prev) => prev ?? 'could not connect to the lobby')
         }
+        setErrorKind('connection')
         setStatus('error')
       } else {
         commit(applyPeerLeft(current, peerId))
@@ -213,6 +228,7 @@ export function useLobby(): UseLobby {
     async (name: string, maxPlayers: number, setup?: Setup) => {
       setStatus('connecting')
       setError(null)
+      setErrorKind(null)
       try {
         // The host's peer id IS the room code, so the displayed code is exactly
         // what a joiner connects to — formatRoomCode/parseRoomCode round-trip it.
@@ -254,6 +270,7 @@ export function useLobby(): UseLobby {
     async (code: string, name: string) => {
       setStatus('connecting')
       setError(null)
+      setErrorKind(null)
       hostConnectedRef.current = false
       const hostId = parseRoomCode(code)
       try {
@@ -368,6 +385,7 @@ export function useLobby(): UseLobby {
     setStatus('idle')
     setRoomCode(null)
     setError(null)
+    setErrorKind(null)
     setIsHost(false)
     if (!t) return
     if (flushMs) setTimeout(() => t.close(), flushMs)
@@ -402,6 +420,7 @@ export function useLobby(): UseLobby {
   // this on mount can't kill an in-lobby session.
   const clearError = useCallback(() => {
     setError(null)
+    setErrorKind(null)
     setStatus((s) => (s === 'error' ? 'idle' : s))
   }, [])
 
@@ -417,6 +436,7 @@ export function useLobby(): UseLobby {
       isHost,
       canStart: state ? canStartFn(state) : false,
       error,
+      errorKind,
       createRoom,
       joinRoom,
       ready,
@@ -434,6 +454,7 @@ export function useLobby(): UseLobby {
       roomCode,
       isHost,
       error,
+      errorKind,
       createRoom,
       joinRoom,
       ready,
