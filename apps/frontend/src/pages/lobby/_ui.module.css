@@ -60,10 +60,6 @@
   margin-block-start: 16px;
 }
 
-.backStart {
-  align-self: flex-start;
-}
-
 .code {
   margin: 0;
   color: var(--brand-green);
@@ -73,13 +69,4 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-}
-
-.connecting {
-  margin: 0;
-  color: var(--white-60);
-}
-
-.joinTitle {
-  margin: 0;
 }

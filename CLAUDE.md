@@ -7,7 +7,7 @@ Rules and card mechanics: [`docs/rules-board-game.md`](./docs/rules-board-game.m
 
 **Design specs live in [`docs/specs/`](./docs/specs/)** (`YYYY-MM-DD-<topic>-design.md`).
 
-The app is in early scaffolding. Game logic (full game screens) is out of scope for this phase and lives in later specs. What exists today: the monorepo skeleton, the UI component library, and the frontend shell.
+What exists today: the monorepo skeleton, the UI component library, the frontend shell, and the P2P networking layer (`apps/frontend/src/network/` plus the self-hosted signaling server). Game logic — the in-game board screens — is out of scope for this phase and lives in later specs.
 
 ---
 
@@ -17,32 +17,36 @@ The app is in early scaffolding. Game logic (full game screens) is out of scope 
 |---|---|---|
 | `apps/ui` | `@release/ui` | Shared component library — TypeScript + CSS Modules + design tokens; i18n-agnostic |
 | `apps/playground` | `@release/playground` | Vite sandbox for developing and previewing UI components in isolation |
-| `apps/frontend` | `@release/web` | Main web app — Vite + React + CSS Modules + react-i18next |
+| `apps/frontend` | `@release/web` | Main web app — Vite + React + CSS Modules |
 | `apps/peerserver` | `@release/peerserver` | Self-hosted PeerJS signaling server (Express + `ExpressPeerServer`), shipped as a Docker image to GHCR |
 | `packages/translation` | `@release/translation` | i18next setup + locale catalogs (`en`/`ru`) + typed-key augmentation; consumed by `@release/web` |
+| `packages/lint` | `@release/lint` | Shared Biome / Stylelint / TypeScript configs, and the `release-lint` / `release-tsc` wrappers |
 
 Package manager: **pnpm** (workspace defined in `pnpm-workspace.yaml` as `apps/*` and `packages/*`).
+
+`apps/frontend`, `apps/playground` and `apps/ui` each carry their own `CLAUDE.md` with rules
+additive to this one — read the relevant one before editing inside that app.
 
 ---
 
 ## Stack Per App
 
 ### `@release/ui`
-- TypeScript, React 18 (peer dep)
+- TypeScript, React 19 (peer dep)
 - CSS Modules for component styles
 - Design tokens as CSS custom properties (`src/design/tokens.css`, `src/design/global.css`)
 - Exports: `@release/ui` → `src/index.ts`, `@release/ui/tokens.css`, `@release/ui/global.css`
 - No i18n dependency — all copy is received via props
 
 ### `@release/playground`
-- Vite + React 18
+- Vite + React 19
 - Consumes `@release/ui` from source via Vite alias (see UI Consumption below)
 - CSS Modules only — purely for component rendering
 
 ### `@release/web` (frontend)
-- Vite + React 18 + TypeScript
+- Vite + React 19 + TypeScript
 - CSS Modules for component styles, design tokens via `@release/ui/tokens.css`
-- react-i18next — translation catalogs under `src/locales/en/` and `src/locales/ru/`
+- i18n through `@release/translation` — never `react-i18next` directly (see the i18n Rule)
 - Consumes `@release/ui` from source via Vite alias
 
 ### `@release/peerserver`
@@ -69,11 +73,18 @@ pnpm dev:playground
 # proxies to the running playground app). Needed only when using that link.
 pnpm dev:all
 
+# Run the frontend against the local signaling server instead of the public
+# PeerJS broker. Without it, `pnpm dev` uses the public broker.
+pnpm dev:p2p
+
 # Build all packages (pnpm -r build)
 pnpm build
 
 # Lint: Biome check (root) + Stylelint across all packages
 pnpm lint
+
+# Format with Biome (writes)
+pnpm format
 
 # Type-check all packages
 pnpm typecheck
@@ -82,7 +93,7 @@ pnpm typecheck
 pnpm test
 ```
 
-The `lint` script runs `biome check .` (root-level) followed by `pnpm -r stylelint` (per-package Stylelint). Biome handles JS/TS formatting and linting. Stylelint handles CSS files.
+The `lint` script runs `release-lint check --error-on-warnings .` (the shared Biome config from `@release/lint`) followed by `pnpm -r stylelint` (per-package Stylelint). Biome handles JS/TS formatting and linting. Stylelint handles CSS files.
 
 ---
 
@@ -103,9 +114,16 @@ Styling is uniform across all packages: **CSS Modules + design tokens.**
   (`padding-inline`, `margin-block-start`) — stylelint enforces this.
 - **No Tailwind anywhere** — removed in
   [#47](https://github.com/MythHand/ReleaseBoardGameP2P/issues/47); stylelint
-  rejects its at-rules. For the screens the ui-kit also ships
-  (`screens/Start`, `screens/Lobby`), the ui-kit styles are the visual source
-  of truth — check the playground before restyling the frontend.
+  rejects its at-rules.
+- **`apps/ui/src/screens/` is the visual source of truth.** It ships `Start`,
+  `Lobby`, `Invite` and `Stats` — open the matching playground story and match
+  its values before restyling the frontend.
+  - `Start`, `Lobby` and `Invite` are **read as reference and re-implemented**
+    in `apps/frontend`; do not import them. Their module CSS uses `composes`
+    from the typography scale, which the frontend must not copy — convert each
+    to `<Typography base=… tk=…>` instead.
+  - `Stats` is the exception: `pages/board/[gameId]/stats.tsx` renders it
+    straight from `@release/ui`.
 
 ---
 
@@ -117,8 +135,12 @@ Styling is uniform across all packages: **CSS Modules + design tokens.**
 
 ## i18n Rule
 
-- **`@release/web`** uses react-i18next with `i18next-browser-languagedetector`.
-- Translation catalogs live under `apps/frontend/src/locales/en/` and `apps/frontend/src/locales/ru/`.
+- **`@release/translation` is the single i18n surface.** It owns the i18next init,
+  `i18next-browser-languagedetector`, and the typed-key augmentation, and re-exports the
+  react-i18next binding. `@release/web` gets `useTranslation()` from it and **never depends on
+  `react-i18next` directly**.
+- Translation catalogs live under `packages/translation/src/locales/en/common.json` and
+  `…/ru/common.json`. A key must exist in **both** — a key missing from one silently falls back.
 - **No string literals in `.tsx` files** — all user-visible text must go through `t()` or translation keys.
 - **`@release/ui`** is i18n-agnostic — it does not import or use i18next. All display copy is passed in as props by the consuming app.
 
@@ -126,14 +148,14 @@ Styling is uniform across all packages: **CSS Modules + design tokens.**
 
 ## Animations Rule
 
-- Анимации собираются **из модулей**, а не пишутся полётами вручную. Словарь и хелперы — в `apps/ui/src/animations/`: пресеты через `play('name', el, params)` плюс `move`, `jitter`, `wait`, `nextFrames`. Нужен новый кусочек — оформляй его модулем, потом используй.
+- Анимации собираются **из модулей**, а не пишутся полётами вручную. Словарь и хелперы — в `apps/ui/src/animations/`: пресеты через `play('name', el, params)` плюс `jitter`, `wait`, `nextFrames`. Нужен новый кусочек — оформляй его модулем, потом используй.
 - **Источник состояния работы с анимациями — страница плейграунда `Interaction audit`** (`apps/playground/stories/AnimationAuditStory`): какие модули готовы (со статусами), какие сценарии из них собраны, и что требует доработок. Перед работой над анимациями сверяй актуальные статусы там; при изменениях вписывай их обратно в эту страницу.
 
 ---
 
 ## Architecture Rule
 
-- Networking is **peer-to-peer over WebRTC**, signaled by **PeerJS** (hosted or self-hosted `peerjs-server`). There is no game backend.
+- Networking is **peer-to-peer over WebRTC**, signaled by **PeerJS** — either the public broker (the default) or `apps/peerserver`. There is no game backend.
 - Topology is a **star through the host peer**: non-host peers hold one DataChannel to the host, who relays messages to the others.
 - **Game state lives on the peers** (browsers). No game rules are evaluated or enforced by any server.
 - All P2P code lives in `apps/frontend/src/network/`.

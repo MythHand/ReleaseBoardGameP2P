@@ -9,8 +9,15 @@ import { useNavigate } from '~/app/router'
 export function useGoToLobby() {
   const navigate = useNavigate()
   return useCallback(
-    (code: string) =>
-      navigate('/lobby/:lobbyId', { params: { lobbyId: code }, state: { resumed: true } }),
+    // `nickname` travels with the navigation so the invite screen can pre-fill
+    // it. A join begun in the start-screen modal only fails once we're already
+    // on /lobby/:lobbyId, and without this the user would land on the error
+    // state facing an empty field, retyping the name they just entered.
+    (code: string, nickname?: string) =>
+      navigate('/lobby/:lobbyId', {
+        params: { lobbyId: code },
+        state: { resumed: true, ...(nickname ? { nickname } : {}) },
+      }),
     [navigate],
   )
 }

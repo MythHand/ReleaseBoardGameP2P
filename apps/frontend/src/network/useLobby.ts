@@ -50,6 +50,16 @@ const DISBAND_FLUSH_MS = 200
 
 export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'disbanded' | 'error'
 
+// Semantic classification of a session failure, so the UI can show localized
+// copy instead of the raw English PeerJS string. 'not-found' is specifically
+// "no host answers to this code" (PeerJS `peer-unavailable`); everything else
+// is a connection problem.
+export type ErrorKind = 'not-found' | 'connection' | null
+
+function classify(type?: string): Exclude<ErrorKind, null> {
+  return type === 'peer-unavailable' ? 'not-found' : 'connection'
+}
+
 export interface UseLobby {
   state: LobbyState | null
   status: LobbyStatus
@@ -57,6 +67,7 @@ export interface UseLobby {
   isHost: boolean
   canStart: boolean
   error: string | null
+  errorKind: ErrorKind
   createRoom(name: string, maxPlayers: number, setup?: Setup): Promise<string>
   joinRoom(code: string, name: string): Promise<string>
   ready(): void
@@ -75,6 +86,7 @@ export function useLobby(): UseLobby {
   const [isHost, setIsHost] = useState(false)
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errorKind, setErrorKind] = useState<ErrorKind>(null)
   const transportRef = useRef<Transport | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
@@ -84,13 +96,23 @@ export function useLobby(): UseLobby {
   // different, accurate errors.
   const hostConnectedRef = useRef(false)
   const leaveSessionRef = useRef<() => void>(() => {})
+  // Bumped on every teardown (leaveSession). joinRoom captures it before its
+  // createTransport await so a teardown that lands mid-await (e.g. Cancel / Home
+  // on the invite screen, whose leaveSession runs while transportRef is still
+  // null) is detected below — otherwise the resolved transport would be assigned
+  // over the ref and resurrect the very session the user just cancelled.
+  const sessionEpochRef = useRef(0)
 
   const onError = useCallback((err: { type?: string; message: string }) => {
-    // A connection-level error after the lobby is up shouldn't tear down the
-    // whole session, but signaling/peer errors (peer-unavailable, network,
-    // disconnected) mean the session can't proceed — surface them.
+    // Signaling/peer errors (peer-unavailable, network, disconnected) always
+    // mean the session can't proceed — surface them. A per-connection error is
+    // softer: once a lobby is live it shouldn't tear the whole session down, but
+    // during a join (status still 'connecting') it IS the join failing, so
+    // surface it too — otherwise the invite screen spins on 'connecting' forever
+    // with no error shown and no recovery.
     setError(err.type ? `${err.type}: ${err.message}` : err.message)
-    if (err.type !== 'connection') setStatus('error')
+    setErrorKind(classify(err.type))
+    setStatus((s) => (err.type !== 'connection' || s === 'connecting' ? 'error' : s))
   }, [])
 
   // A rejected createTransport (setup failed before the peer opened) bypasses
@@ -100,6 +122,7 @@ export function useLobby(): UseLobby {
     const e = err as { type?: string; message?: string }
     const message = e?.message ?? String(err)
     setError(e?.type ? `${e.type}: ${message}` : message)
+    setErrorKind(classify(e?.type))
     setStatus('error')
   }, [])
 
@@ -132,10 +155,19 @@ export function useLobby(): UseLobby {
         // The guest can't proceed without the host. Only call it "host left" if
         // we were actually connected; a channel that never opened means the
         // connection failed (ICE/negotiation) — keep that more specific error.
+        // errorKind must stay in lockstep with error: a genuine post-connect
+        // host departure is a fresh, definite connection failure (both
+        // overwrite unconditionally), but a channel that never opened may
+        // already carry a more specific kind from onError (e.g. 'not-found'
+        // from peer-unavailable) — preserve it the same way the message is
+        // preserved, or the two would disagree and 'not-found' would become
+        // unreachable.
         if (hostConnectedRef.current) {
           setError('disconnected: host left the lobby')
+          setErrorKind('connection')
         } else {
           setError((prev) => prev ?? 'could not connect to the lobby')
+          setErrorKind((prev) => prev ?? 'connection')
         }
         setStatus('error')
       } else {
@@ -211,8 +243,14 @@ export function useLobby(): UseLobby {
 
   const createRoom = useCallback(
     async (name: string, maxPlayers: number, setup?: Setup) => {
+      // Mirror joinRoom: a stale transport (e.g. returning to /start from a live
+      // guest session, which never calls leaveSession) is assigned over the ref
+      // below, so close it first or the previous peer leaks.
+      transportRef.current?.close()
+      transportRef.current = null
       setStatus('connecting')
       setError(null)
+      setErrorKind(null)
       try {
         // The host's peer id IS the room code, so the displayed code is exactly
         // what a joiner connects to — formatRoomCode/parseRoomCode round-trip it.
@@ -252,10 +290,19 @@ export function useLobby(): UseLobby {
 
   const joinRoom = useCallback(
     async (code: string, name: string) => {
+      // A retry (the invite screen reuses the same submit path) would otherwise
+      // leave the previous peer open — createTransport is assigned over the ref
+      // below, so nothing else would ever close it.
+      transportRef.current?.close()
+      transportRef.current = null
       setStatus('connecting')
       setError(null)
+      setErrorKind(null)
       hostConnectedRef.current = false
       const hostId = parseRoomCode(code)
+      // Snapshot the session generation so a Cancel/Home (leaveSession) during
+      // the createTransport round-trip is detectable below.
+      const epoch = sessionEpochRef.current
       try {
         const t = await createTransport({
           onMessage,
@@ -274,6 +321,14 @@ export function useLobby(): UseLobby {
             }
           },
         })
+        // Torn down mid-await (Cancel/Home bumped the epoch and reset to idle):
+        // discard the freshly-opened peer instead of committing it, or the
+        // cancelled attempt resurrects — leaking a live peer and re-arming the
+        // /start "continue game" button for a session the user just left.
+        if (sessionEpochRef.current !== epoch) {
+          t.close()
+          throw new Error('join cancelled')
+        }
         transportRef.current = t
         isHostRef.current = false
         setIsHost(false)
@@ -293,6 +348,10 @@ export function useLobby(): UseLobby {
         // as a connection error on that same route.
         return formatRoomCode(hostId)
       } catch (err) {
+        // A cancellation (epoch bumped) already reset the session to idle — don't
+        // overwrite that with an error state; just propagate so the caller skips
+        // the post-await navigate.
+        if (sessionEpochRef.current !== epoch) throw err
         // Peer setup failed before opening (bad code, signaling unreachable);
         // surface it instead of leaving the form stuck on 'connecting', and
         // re-throw so the caller skips the post-await navigate.
@@ -360,6 +419,10 @@ export function useLobby(): UseLobby {
   // over the DataChannels before peer.destroy() — see disband().
   const leaveSession = useCallback((flushMs?: number) => {
     const t = transportRef.current
+    // Invalidate any join awaiting createTransport: if this teardown lands
+    // mid-await, joinRoom sees the bumped epoch and discards the peer it opens
+    // instead of resurrecting the torn-down session.
+    sessionEpochRef.current += 1
     transportRef.current = null
     stateRef.current = null
     isHostRef.current = false
@@ -368,6 +431,7 @@ export function useLobby(): UseLobby {
     setStatus('idle')
     setRoomCode(null)
     setError(null)
+    setErrorKind(null)
     setIsHost(false)
     if (!t) return
     if (flushMs) setTimeout(() => t.close(), flushMs)
@@ -402,6 +466,7 @@ export function useLobby(): UseLobby {
   // this on mount can't kill an in-lobby session.
   const clearError = useCallback(() => {
     setError(null)
+    setErrorKind(null)
     setStatus((s) => (s === 'error' ? 'idle' : s))
   }, [])
 
@@ -417,6 +482,7 @@ export function useLobby(): UseLobby {
       isHost,
       canStart: state ? canStartFn(state) : false,
       error,
+      errorKind,
       createRoom,
       joinRoom,
       ready,
@@ -434,6 +500,7 @@ export function useLobby(): UseLobby {
       roomCode,
       isHost,
       error,
+      errorKind,
       createRoom,
       joinRoom,
       ready,

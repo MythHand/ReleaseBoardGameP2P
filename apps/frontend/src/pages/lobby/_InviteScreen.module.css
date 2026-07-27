@@ -1,0 +1,122 @@
+/* the invite form — the column body under the description. No top margin:
+   ScreenShell's description owns the gap, so it can't be doubled. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  inline-size: 360px;
+}
+
+/* fixed-height field container, sized with room for the role control: the form
+   breathes inside it while the action slot and home button below stay put */
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-block-size: 295px;
+}
+
+.formTitle {
+  margin: 0 0 4px;
+  color: var(--fg);
+}
+
+/* role choice — styled like the input fields: label above, segments below */
+.role {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roleLabel {
+  opacity: 0.55;
+}
+
+.roleOptions {
+  display: flex;
+  inline-size: 320px;
+  background: var(--white-05);
+  border: 1px solid var(--white-18);
+}
+
+.roleOpt {
+  flex: 1;
+  padding: 12px 14px;
+  color: var(--white-55);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.roleOptOn {
+  color: var(--fg);
+  background: var(--white-12);
+}
+
+.roleOpt + .roleOpt {
+  border-inline-start: 1px solid var(--white-18);
+}
+
+.roleOpt:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.roleOpt:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+/* action slot — the width of the code input (320), fixed height for the tallest
+   state (status line + button). The action is pinned to the bottom so the button
+   doesn't jump between states; the message is added above it. */
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: flex-end;
+  inline-size: 320px;
+  block-size: 70px;
+  margin-block-start: 4px;
+}
+
+/* status line above the action (failed / not found) — the field-error language */
+.actionError {
+  color: var(--cat-attack);
+  text-align: center;
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* connecting: spinner + status + cancel as one centred group */
+.connecting {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.connectingStatus {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-block: 10px; /* same box as the button, so the text sits on its line */
+  color: var(--white-70);
+}
+
+/* success — green, until the lobby takes over */
+.connected {
+  padding-block: 10px;
+  color: var(--brand-green);
+}
+
+/* leaving for the start screen — set off by a clear gap, on the same centre
+   line as the connect button */
+.home {
+  display: flex;
+  justify-content: center;
+  inline-size: 320px;
+  margin-block-start: 64px;
+}
