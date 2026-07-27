@@ -1,9 +1,9 @@
 import { useTranslation } from '@release/translation'
-import { Menu, MenuButton, MenuGroup, Typography, VideoPlayer } from '@release/ui'
+import { Menu, MenuButton, MenuGroup, VideoPlayer } from '@release/ui'
 import { useGoToLobby } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
-import AppLogo from '~/shared/ui/AppLogo'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
+import ScreenShell from '~/shared/ui/ScreenShell'
 import styles from './start.module.css'
 
 const REPO_URL = 'https://github.com/dimbo-design/ReleaseBoardGameP2P'
@@ -17,75 +17,62 @@ export default function StartPage() {
   const hasSession = session.status === 'in-lobby' && !!session.state
 
   return (
-    <div className={styles.root}>
-      <div className={styles.bg} />
-      <div className={styles.blur} />
-      <div className={styles.scrim} />
-
-      <div className={styles.content}>
-        <div className={styles.col}>
-          <AppLogo className={styles.logo} />
-
-          <div className={styles.tags}>
-            <Typography variant="tag">{t('start.tagOpenP2P')}</Typography>
-            <Typography variant="tag">{t('start.tagBoardCard')}</Typography>
-          </div>
-
-          <Typography variant="body" className={styles.desc}>
-            {t('start.description')}
-          </Typography>
-
-          <Menu className={styles.menu}>
-            {/* Always rendered so toggling it never reflows the column — without
-                a reserved slot, mounting/unmounting would change the
-                vertically-centred column's height and shift everything. Hidden
-                and inert when there is no session to resume. */}
-            <MenuGroup>
-              <MenuButton
-                aria-hidden={!hasSession}
-                disabled={!hasSession}
-                className={hasSession ? undefined : styles.hiddenSlot}
-                onClick={() => session.roomCode && goToLobby(session.roomCode)}
-              >
-                {t('start.continueSession')}
-              </MenuButton>
-              <MenuButton autoFocus value="create" onClick={handleMenuClick}>
-                {t('start.createGame')}
-              </MenuButton>
-              <MenuButton value="join" onClick={handleMenuClick}>
-                {t('start.joinGame')}
-              </MenuButton>
-            </MenuGroup>
-            <MenuGroup>
-              <MenuButton value="rules" onClick={handleMenuClick}>
-                {t('start.rules')}
-              </MenuButton>
-            </MenuGroup>
-            <MenuGroup>
-              <MenuButton onClick={() => window.open(REPO_URL, '_blank', 'noopener')}>
-                {t('start.github')}
-              </MenuButton>
-              <MenuButton
-                onClick={() => {
-                  window.location.href = `${import.meta.env.BASE_URL}playground/`
-                }}
-              >
-                {t('start.playground')}
-              </MenuButton>
-            </MenuGroup>
-          </Menu>
-        </div>
-      </div>
-
-      {/* Video player — expands in place to an inline iframe */}
-      <VideoPlayer
-        src={VIDEO_URL}
-        copy={{
-          videoReview: t('start.videoReview'),
-          close: t('start.close'),
-          title: t('start.logoAlt'),
-        }}
-      />
-    </div>
+    <ScreenShell
+      tags={[t('start.tagOpenP2P'), t('start.tagBoardCard')]}
+      description={t('start.description')}
+      corners={
+        <>
+          {/* Video player — expands in place to an inline iframe */}
+          <VideoPlayer
+            src={VIDEO_URL}
+            copy={{
+              videoReview: t('start.videoReview'),
+              close: t('start.close'),
+              title: t('start.logoAlt'),
+            }}
+          />
+        </>
+      }
+    >
+      <Menu className={styles.menu}>
+        {/* Always rendered so toggling it never reflows the column — without
+              a reserved slot, mounting/unmounting would change the column's
+              height and shift everything. Hidden and inert when there is no
+              session to resume. */}
+        <MenuGroup>
+          <MenuButton
+            aria-hidden={!hasSession}
+            disabled={!hasSession}
+            className={hasSession ? undefined : styles.hiddenSlot}
+            onClick={() => session.roomCode && goToLobby(session.roomCode)}
+          >
+            {t('start.continueSession')}
+          </MenuButton>
+          <MenuButton autoFocus value="create" onClick={handleMenuClick}>
+            {t('start.createGame')}
+          </MenuButton>
+          <MenuButton value="join" onClick={handleMenuClick}>
+            {t('start.joinGame')}
+          </MenuButton>
+        </MenuGroup>
+        <MenuGroup>
+          <MenuButton value="rules" onClick={handleMenuClick}>
+            {t('start.rules')}
+          </MenuButton>
+        </MenuGroup>
+        <MenuGroup>
+          <MenuButton onClick={() => window.open(REPO_URL, '_blank', 'noopener')}>
+            {t('start.github')}
+          </MenuButton>
+          <MenuButton
+            onClick={() => {
+              window.location.href = `${import.meta.env.BASE_URL}playground/`
+            }}
+          >
+            {t('start.playground')}
+          </MenuButton>
+        </MenuGroup>
+      </Menu>
+    </ScreenShell>
   )
 }

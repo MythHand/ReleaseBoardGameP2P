@@ -32,7 +32,7 @@ export default function JoinLobbyForm() {
             // A setup failure (bad code, signaling unreachable) rejects here and
             // is surfaced via session.error below, so only navigate on success.
             const formatted = await joinLobby(code, nickname)
-            goToLobby(formatted)
+            goToLobby(formatted, nickname)
           } catch {
             // Error already surfaced through session.error; stay on the form.
           }
@@ -47,6 +47,9 @@ export default function JoinLobbyForm() {
         placeholder={t('start.nicknamePlaceholder')}
         maxLength={20}
         required
+        // natural case — a nickname is used in game exactly as typed, unlike
+        // the code field, which the value tier uppercases
+        plain
         value={name}
         onChange={(e) => setName(sanitizeNickname(e.target.value))}
         trailing={

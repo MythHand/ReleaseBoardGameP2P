@@ -6,9 +6,26 @@ import type { UseLobby } from '~/entities/lobby'
 import LobbyView from '../_LobbyView'
 import LobbyPage from '../[lobbyId]'
 
+// LobbyCode and GameSettings take whole copy objects via returnObjects, so the
+// mock has to hand back a shape for those keys rather than echoing the key —
+// otherwise their labels render blank and assertions on them are meaningless.
+const OBJECT_COPY: Record<string, unknown> = {
+  lobbyCode: { label: 'lobbyCode.label', copy: 'lobbyCode.copy', copied: 'lobbyCode.copied' },
+}
+
 vi.mock('@release/translation', () => ({
-  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'ru' } }),
+  useTranslation: () => ({
+    t: (k: string, opts?: { returnObjects?: boolean }) =>
+      opts?.returnObjects && OBJECT_COPY[k] ? OBJECT_COPY[k] : k,
+    i18n: { language: 'ru', resolvedLanguage: 'ru', changeLanguage: vi.fn() },
+  }),
 }))
+
+const writeText = vi.fn().mockResolvedValue(undefined)
+Object.defineProperty(navigator, 'clipboard', {
+  value: { writeText },
+  configurable: true,
+})
 
 // All the lobby pieces read the session through useSession, so a single mock
 // here drives create/join/roster/start behavior.
@@ -25,6 +42,7 @@ function base(): UseLobby {
     isHost: false,
     canStart: false,
     error: null,
+    errorKind: null,
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
     ready: vi.fn(),
@@ -42,11 +60,11 @@ function renderInRouter(ui: ReactNode) {
   return render(<MemoryRouter>{ui}</MemoryRouter>)
 }
 
-it('shows the join form when there is no session', () => {
+it('shows the invite screen when there is no session', () => {
   sessionValue = base()
   renderInRouter(<LobbyPage />)
-  expect(screen.getByText('lobby.joinTitle')).toBeTruthy()
-  expect(screen.getByText('start.joinCta')).toBeTruthy()
+  expect(screen.getByText('invite.formTitle')).toBeTruthy()
+  expect(screen.getByText('invite.joinCta')).toBeTruthy()
 })
 
 it('pre-fills the code from a shared /lobby/:lobbyId link', () => {
@@ -62,15 +80,15 @@ it('pre-fills the code from a shared /lobby/:lobbyId link', () => {
 })
 
 it('clears a stale error on mount', () => {
-  sessionValue = { ...base(), status: 'error', error: 'peer-unavailable' }
+  sessionValue = { ...base(), status: 'error', error: 'peer-unavailable', errorKind: 'not-found' }
   renderInRouter(<LobbyPage />)
   expect(sessionValue.clearError).toHaveBeenCalledOnce()
 })
 
-it('pre-session Back resets the (failed) session', () => {
-  sessionValue = { ...base(), status: 'error', error: 'peer-unavailable' }
+it('the invite screen home button resets the (failed) session', () => {
+  sessionValue = { ...base(), status: 'error', error: 'peer-unavailable', errorKind: 'not-found' }
   renderInRouter(<LobbyPage />)
-  fireEvent.click(screen.getByText('lobby.back'))
+  fireEvent.click(screen.getByText('invite.homePage'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 
@@ -114,7 +132,7 @@ it('offers Continue/Leave when arriving with an active session', () => {
   expect(screen.getByText('lobby.leave')).toBeTruthy()
   // Neither the join form nor the live session view is shown yet.
   expect(screen.queryByText('lobby.joinTitle')).toBeNull()
-  expect(screen.queryByText('lobby.players')).toBeNull()
+  expect(screen.queryByText('lobbyScreen.players')).toBeNull()
 })
 
 it('Leave from the interstitial tears the session down', () => {
@@ -131,7 +149,7 @@ it('Continue reveals the live session view (room code, roster, copy)', () => {
   expect(screen.getByText('ABC-23D')).toBeTruthy()
   expect(screen.getByText('Host')).toBeTruthy()
   expect(screen.getByText('Pat')).toBeTruthy()
-  expect(screen.getByText('lobby.copy')).toBeTruthy()
+  expect(screen.getByText('lobbyCode.copy')).toBeTruthy()
 })
 
 it('LobbyView guest Leave tears the session down', () => {
@@ -139,7 +157,7 @@ it('LobbyView guest Leave tears the session down', () => {
   // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
   sessionValue = { ...s, isHost: false, state: { ...s.state!, selfId: 'p1' } }
   renderInRouter(<LobbyView />)
-  fireEvent.click(screen.getByText('lobby.leave'))
+  fireEvent.click(screen.getByText('lobbyScreen.leave'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 
@@ -147,8 +165,8 @@ it('LobbyView host disband confirm tears the session down', () => {
   sessionValue = inSession()
   renderInRouter(<LobbyView />)
   // Header disband opens the confirm modal; the modal's own disband confirms.
-  fireEvent.click(screen.getByText('lobby.disband'))
-  const disbandButtons = screen.getAllByText('lobby.disband')
+  fireEvent.click(screen.getByText('lobbyScreen.disband'))
+  const disbandButtons = screen.getAllByText('lobbyScreen.disband')
   fireEvent.click(disbandButtons[disbandButtons.length - 1])
   expect(sessionValue.disband).toHaveBeenCalledOnce()
 })
@@ -156,7 +174,7 @@ it('LobbyView host disband confirm tears the session down', () => {
 it('LobbyView renders game modes section', () => {
   sessionValue = inSession()
   renderInRouter(<LobbyView />)
-  expect(screen.getByText('lobby.modes')).toBeTruthy()
+  expect(screen.getByText('lobbyScreen.modes')).toBeTruthy()
 })
 
 it('LobbyView renders spectator section when guests present', () => {
@@ -181,19 +199,52 @@ it('LobbyView renders spectator section when guests present', () => {
   }
   renderInRouter(<LobbyView />)
   expect(screen.getByText('Gus')).toBeTruthy()
-  expect(screen.getByText('lobby.roleGuest')).toBeTruthy()
+  expect(screen.getByText('lobbyScreen.roleGuest')).toBeTruthy()
+})
+
+// The HUD tone is the lobby's "ready to go" signal. It rides on the same
+// canStart the Start button uses, so the green background and an enabled Start
+// can never disagree — a mismatch there is exactly what a host would query.
+// The copy button hands over the invite LINK, not the bare code — that link is
+// what opens the invite screen with the code pre-filled. @release/ui's LobbyCode
+// block copies the code, which is why this markup is rendered locally.
+it('LobbyView copies the invite link rather than the code', () => {
+  sessionValue = inSession()
+  const { container } = renderInRouter(<LobbyView />)
+  const copyBtn = [...container.querySelectorAll('button')].find(
+    (b) => b.textContent === 'lobbyCode.copy',
+  )
+  expect(copyBtn).toBeTruthy()
+  expect(screen.getByText('ABC-23D')).toBeTruthy()
+  fireEvent.click(copyBtn as HTMLButtonElement)
+  expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/lobby/ABC-23D'))
+  expect(writeText).not.toHaveBeenCalledWith('ABC-23D')
+})
+
+it('LobbyView shows the neutral HUD tone while the game cannot start', () => {
+  sessionValue = { ...inSession(), canStart: false }
+  const { container } = renderInRouter(<LobbyView />)
+  expect(container.querySelector('[data-tone="neutral"]')).toBeTruthy()
+  expect(container.querySelector('[data-tone="positive"]')).toBeNull()
+})
+
+it('LobbyView turns the HUD tone positive once the game can start', () => {
+  sessionValue = { ...inSession(), canStart: true }
+  const { container } = renderInRouter(<LobbyView />)
+  expect(container.querySelector('[data-tone="positive"]')).toBeTruthy()
+  expect(container.querySelector('[data-tone="neutral"]')).toBeNull()
 })
 
 it('LobbyView host sees disband button', () => {
   sessionValue = inSession()
   renderInRouter(<LobbyView />)
-  expect(screen.getByText('lobby.disband')).toBeTruthy()
+  expect(screen.getByText('lobbyScreen.disband')).toBeTruthy()
 })
 
 it('LobbyView guest does not see disband button', () => {
   sessionValue = { ...inSession(), isHost: false }
   renderInRouter(<LobbyView />)
-  expect(screen.queryByText('lobby.disband')).toBeNull()
+  expect(screen.queryByText('lobbyScreen.disband')).toBeNull()
 })
 
 it('shows the disbanded message instead of the form', () => {

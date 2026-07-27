@@ -1,23 +1,37 @@
 /* apps/frontend/src/pages/lobby/_LobbyView.module.css */
 
-/* Ported from apps/ui/src/screens/Lobby/Lobby.module.css and the PlayerSlot /
-   LobbyCode block modules; the kebab menu is frontend-only markup.
-   Typography comes from <Typography> in the JSX — only color / spacing /
-   layout live here. */
+/* Ported from the design mockup apps/ui/src/screens/Lobby/Lobby.module.css.
+   Typography comes from <Typography> in the JSX rather than composes (see
+   apps/frontend/CLAUDE.md) — only color / spacing / layout live here. The
+   player rows and the code block are @release/ui blocks now, so their styling
+   is no longer duplicated in this file. */
 .lobby {
   position: relative;
   display: flex;
   flex-direction: column;
   inline-size: 100%;
-  block-size: 100vh;
+  block-size: 100dvh;
   padding: 48px clamp(40px, 7vw, 96px);
   overflow: hidden;
   color: var(--fg);
   background: var(--bg);
 }
 
+/* Full-screen HUD layer above the base background, below the content. The
+   selector is more specific than HudBackground's own .bg — otherwise its
+   position: relative wins by order and the layer collapses into the flow. */
+.lobby .bgLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 0;
+  border-radius: 0;
+}
+
 /* ===== header ===== */
 .head {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 32px;
   align-items: flex-start;
@@ -32,9 +46,10 @@
   align-items: center;
 }
 
+/* game logo in the header — sized to the heading, no blinking cursor */
 .headLogo {
   flex: none;
-  inline-size: 96px;
+  inline-size: 96px; /* viewBox 301×105 → about 33px tall */
 }
 
 .headDivider {
@@ -47,13 +62,22 @@
   margin: 0;
 }
 
+/* aligned under the word "Lobby": logo 96 + gap 18 + rule 1 + gap 18 */
 .sub {
-  /* aligned under the word "Lobby": logo 96 + gap 18 + divider 1 + gap 18 */
   margin: 6px 0 0 133px;
   color: var(--white-45);
 }
 
-/* right side of the header: game code (LobbyCode-style column) */
+/* right side of the header: game code + language switch on one line */
+.headRight {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+/* Game code block. Mirrors @release/ui's LobbyCode, but rendered here because
+   that block copies the bare code — what's actually worth sharing is the invite
+   link, which is the whole point of the invite screen. */
 .codeBox {
   display: flex;
   flex-direction: column;
@@ -75,8 +99,10 @@
   color: var(--mint);
 }
 
-/* ===== content: modes left, players right ===== */
+/* ===== content: modes on the left, players on the right ===== */
 .grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
@@ -98,9 +124,16 @@
 
 .lockTag {
   color: var(--white-40);
-  text-transform: none; /* reset the uppercase inherited from the heading */
+  text-transform: none; /* reset the uppercase heading it sits inside */
 }
 
+/* rules — a secondary action in the heading row, pushed to the right edge */
+.rulesBtn {
+  align-self: center;
+  margin-inline-start: auto;
+}
+
+/* modes scroll independently when they don't fit */
 .modes {
   display: flex;
   flex-direction: column;
@@ -122,6 +155,7 @@
   min-block-size: 0;
 }
 
+/* players + spectators scroll together; the actions stay pinned below */
 .scrollArea {
   flex: 1;
   min-block-size: 0;
@@ -133,10 +167,12 @@
   margin-block-start: 30px;
 }
 
+/* spacing under the capacity slider (the Slider supplies its own layout) */
 .capRow {
   margin-block-end: 18px;
 }
 
+/* player / spectator lists */
 .list {
   display: flex;
   flex-direction: column;
@@ -146,105 +182,7 @@
   list-style: none;
 }
 
-/* player / spectator rows — ported from PlayerSlot */
-.slot,
-.slotEmpty {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  padding: 14px 16px;
-  border: 1px solid var(--white-10);
-}
-
-.slot {
-  background: var(--white-04);
-}
-
-.slotMe {
-  border-color: var(--mint-50);
-}
-
-.you {
-  color: var(--white-40);
-}
-
-.rowEnd {
-  position: relative;
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-inline-start: auto;
-}
-
-.slotEmpty {
-  color: var(--white-30);
-  border-style: dashed;
-}
-
-/* ===== kebab menu (frontend-only) ===== */
-.kebabWrap {
-  position: relative;
-  display: flex;
-}
-
-.kebabBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 28px;
-  block-size: 28px;
-  font-size: 18px; /* glyph size — allowed outside the scale */
-  line-height: 1;
-  color: var(--white-50);
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  transition: color var(--t-fast) var(--ease-out);
-}
-
-.kebabBtn:hover {
-  color: var(--fg);
-}
-
-.kebabMenu {
-  position: absolute;
-  inset-block-start: calc(100% + 6px);
-  inset-inline-end: 0;
-  z-index: 5;
-  inline-size: max-content;
-  background: color-mix(in srgb, var(--surface-1) 96%, var(--bg));
-  border: 1px solid var(--white-14);
-  box-shadow: 0 16px 40px var(--black-50);
-}
-
-.kebabItem {
-  display: block;
-  inline-size: 100%;
-  padding: 11px 18px;
-  color: var(--white-85);
-  text-align: start;
-  white-space: nowrap;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  transition: color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
-}
-
-.kebabItem:hover {
-  color: var(--fg);
-  background: var(--white-08);
-}
-
-.kebabDanger {
-  color: var(--coral);
-}
-
-.kebabDanger:hover {
-  color: var(--coral);
-  background: var(--coral-12);
-}
-
-/* ===== lobby actions ===== */
+/* lobby actions — always visible at the foot of the players column */
 .actions {
   display: flex;
   gap: 16px;
