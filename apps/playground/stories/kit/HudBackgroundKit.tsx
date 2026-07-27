@@ -11,6 +11,7 @@ export default function HudBackgroundKit() {
       states: 'Состояния',
       neutral: 'нейтральное',
       positive: 'позитивное',
+      problem: 'проблема (не в сети)',
       grid: 'сетка (прозрачное)',
       label: 'фон',
     },
@@ -18,6 +19,7 @@ export default function HudBackgroundKit() {
       states: 'States',
       neutral: 'neutral',
       positive: 'positive',
+      problem: 'problem (offline)',
       grid: 'grid (transparent)',
       label: 'background',
     },
@@ -39,6 +41,11 @@ export default function HudBackgroundKit() {
         </KitCell>
         <KitCell caption={w.positive}>
           <HudBackground tone="positive" className={styles.demo}>
+            {label}
+          </HudBackground>
+        </KitCell>
+        <KitCell caption={w.problem}>
+          <HudBackground tone="problem" className={styles.demo}>
             {label}
           </HudBackground>
         </KitCell>
