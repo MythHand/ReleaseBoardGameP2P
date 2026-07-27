@@ -63,9 +63,12 @@ const renderScreen = () =>
 
 // Renders at /lobby/:lobbyId so the code field pre-fills from the route param —
 // the same idiom lobby.test.tsx uses for its "pre-fills the code" case.
-const renderAtLobby = (code: string) =>
+// `nickname` mirrors what useGoToLobby hands over from the start-screen modal.
+const renderAtLobby = (code: string, nickname?: string) =>
   render(
-    <MemoryRouter initialEntries={[`/lobby/${code}`]}>
+    <MemoryRouter
+      initialEntries={[{ pathname: `/lobby/${code}`, state: nickname ? { nickname } : undefined }]}
+    >
       <Routes>
         <Route path="/lobby/:lobbyId" element={<InviteScreen />} />
       </Routes>
@@ -193,4 +196,30 @@ it('stays on the form and does not navigate when the join rejects', async () => 
 
   expect(navigateMock).not.toHaveBeenCalled()
   expect(screen.getByText('invite.joinCta')).toBeTruthy()
+})
+
+it('pre-fills the nickname handed over from the start-screen join modal', () => {
+  sessionValue = base()
+  renderAtLobby('F96-NMT', 'Ann')
+  expect(screen.getByDisplayValue('Ann')).toBeTruthy()
+  expect(screen.getByDisplayValue('F96-NMT')).toBeTruthy()
+})
+
+it('keeps the handed-over nickname when the join fails on arrival', () => {
+  sessionValue = {
+    ...base(),
+    status: 'error',
+    error: 'peer-unavailable: x',
+    errorKind: 'not-found',
+  }
+  renderAtLobby('F96-NMT', 'Ann')
+  // The user must be able to hit retry without retyping what they entered.
+  expect(screen.getByText('invite.notFoundStatus')).toBeTruthy()
+  expect(screen.getByDisplayValue('Ann')).toBeTruthy()
+})
+
+it('leaves the nickname empty when arriving straight from an invite link', () => {
+  sessionValue = base()
+  renderAtLobby('F96-NMT')
+  expect(screen.queryByDisplayValue('Ann')).toBeNull()
 })

@@ -1,8 +1,8 @@
+import { useTranslation } from '@release/translation'
 import {
   HudBackground,
   LangSwitcher,
   PhysicalEdition,
-  type PhysicalEditionCopy,
   type SwitchLang,
   Typography,
 } from '@release/ui'
@@ -16,11 +16,13 @@ const INSTAGRAM_URL = 'https://www.instagram.com/mythhand.team/'
 interface ScreenShellProps {
   tags: string[]
   description: string
+  // Column rhythm. 'hero' is the design's reference scale (the playground's
+  // start screen). 'compact' is for screens whose body is too tall to sit under
+  // a 480px logo — the invite form would otherwise push its CTA below the fold.
+  density?: 'hero' | 'compact'
   // language + setter: when both are given, the corner switch is drawn
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
-  // printed-edition plate in the bottom-right; omitted when no copy is given
-  physicalEditionCopy?: PhysicalEditionCopy
   // other absolutely-positioned blocks of the screen (video player, credits)
   corners?: ReactNode
   // the column body under the description — its own top gap is its own, since
@@ -29,18 +31,23 @@ interface ScreenShellProps {
 }
 
 // The screen frame shared by /start and /lobby/:lobbyId: layered background,
-// language corner, and the left column down to the description.
+// language corner, the left column down to the description, and the
+// printed-edition plate. The plate is part of the frame rather than a prop —
+// both screens show it with the same copy from the same catalog key, so passing
+// it in only gave the two a way to drift apart.
 export default function ScreenShell({
   tags,
   description,
+  density = 'hero',
   lang,
   onLangChange,
-  physicalEditionCopy,
   corners,
   children,
 }: ScreenShellProps) {
+  const { t } = useTranslation()
+  const compact = density === 'compact'
   return (
-    <div className={styles.root}>
+    <div className={`${styles.root} ${compact ? styles.compact : ''}`}>
       <div className={styles.bg} />
       <div className={styles.blur} />
       <div className={styles.scrim} />
@@ -65,7 +72,7 @@ export default function ScreenShell({
               </Typography>
             ))}
           </div>
-          <Typography base="body" as="p" className={styles.desc}>
+          <Typography base={compact ? 'body' : 'body-lg'} as="p" className={styles.desc}>
             {description}
           </Typography>
           {children}
@@ -74,13 +81,11 @@ export default function ScreenShell({
 
       {corners}
 
-      {physicalEditionCopy && (
-        <PhysicalEdition
-          href={INSTAGRAM_URL}
-          copy={physicalEditionCopy}
-          className={styles.physical}
-        />
-      )}
+      <PhysicalEdition
+        href={INSTAGRAM_URL}
+        copy={t('physicalEdition', { returnObjects: true })}
+        className={styles.physical}
+      />
     </div>
   )
 }

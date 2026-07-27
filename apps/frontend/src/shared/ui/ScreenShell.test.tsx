@@ -2,10 +2,6 @@ import { render } from '@testing-library/react'
 import { vi } from 'vitest'
 import ScreenShell from './ScreenShell'
 
-vi.mock('@release/translation', () => ({
-  useTranslation: () => ({ t: (k: string) => k, i18n: { resolvedLanguage: 'en' } }),
-}))
-
 const PHYSICAL = {
   title: 'Printed edition',
   lead: 'lead',
@@ -13,6 +9,16 @@ const PHYSICAL = {
   linkLabel: 'on Instagram',
   imageAlt: 'box',
 }
+
+// ScreenShell reads the printed-edition copy from the catalog itself, so the
+// mock has to honour returnObjects rather than echoing the key back.
+vi.mock('@release/translation', () => ({
+  useTranslation: () => ({
+    t: (k: string, opts?: { returnObjects?: boolean }) =>
+      opts?.returnObjects && k === 'physicalEdition' ? PHYSICAL : k,
+    i18n: { resolvedLanguage: 'en' },
+  }),
+}))
 
 it('renders the column body passed as children', () => {
   const { getByText } = render(
@@ -40,12 +46,10 @@ it('draws the language corner only when both lang and onLangChange are given', (
   expect(queryByText('ru')).toBeTruthy()
 })
 
-it('draws the printed-edition block only when its copy is given', () => {
-  const { queryByText, rerender } = render(<ScreenShell tags={[]} description="d" />)
-  expect(queryByText('Printed edition')).toBeNull()
-
-  rerender(<ScreenShell tags={[]} description="d" physicalEditionCopy={PHYSICAL} />)
-  expect(queryByText('Printed edition')).toBeTruthy()
+it('always draws the printed-edition block, with copy from the catalog', () => {
+  const { getByText } = render(<ScreenShell tags={[]} description="d" />)
+  expect(getByText('Printed edition')).toBeTruthy()
+  expect(getByText('on Instagram')).toBeTruthy()
 })
 
 it('renders extra corner blocks', () => {

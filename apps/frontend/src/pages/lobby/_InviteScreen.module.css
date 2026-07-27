@@ -1,16 +1,10 @@
-/* Screen frame. ScreenShell is block-size: 100%, so it needs a parent with a
-   definite height — app.module.css only sets min-block-size. */
-.screen {
-  block-size: 100vh;
-}
-
-/* the invite form — the column body under the description */
+/* the invite form — the column body under the description. No top margin:
+   ScreenShell's description owns the gap, so it can't be doubled. */
 .form {
   display: flex;
   flex-direction: column;
   gap: 16px;
   inline-size: 360px;
-  margin-block-start: 44px;
 }
 
 /* fixed-height field container, sized with room for the role control: the form

@@ -43,12 +43,13 @@ export default defineConfig({
   },
   server: {
     // The /playground/ link opens the playground app (a separate Vite app on
-    // :5174). Proxy keeps it same-origin in dev so href="/playground/" works;
+    // :5180 — it pins that with strictPort, so this target must track it).
+    // Proxy keeps it same-origin in dev so href="/playground/" works;
     // ws:true forwards the playground's HMR socket. In prod, co-locate the
     // playground build under /playground/ behind the same host.
     proxy: {
       '/playground': {
-        target: 'http://localhost:5174',
+        target: 'http://localhost:5180',
         changeOrigin: true,
         ws: true,
       },

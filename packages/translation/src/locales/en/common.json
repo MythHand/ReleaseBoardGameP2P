@@ -147,7 +147,6 @@
   },
   "lobby": {
     "createTitle": "Create game",
-    "joinTitle": "Join game",
     "namePlaceholder": "Your name",
     "maxPlayers": "Max players",
     "create": "Create",
@@ -165,7 +164,6 @@
     "roleHost": "Host",
     "rolePlayer": "Player",
     "roleGuest": "Spectator",
-    "connecting": "Connecting…",
     "you": "you",
     "code": "Game code",
     "codePlaceholder": "e.g. ABC-23D",

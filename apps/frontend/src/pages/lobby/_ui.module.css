@@ -70,8 +70,3 @@
   flex-wrap: wrap;
   gap: 12px;
 }
-
-.connecting {
-  margin: 0;
-  color: var(--white-60);
-}

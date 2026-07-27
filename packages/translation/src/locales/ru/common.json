@@ -147,7 +147,6 @@
   },
   "lobby": {
     "createTitle": "Создать игру",
-    "joinTitle": "Присоединиться",
     "namePlaceholder": "Ваше имя",
     "maxPlayers": "Макс. игроков",
     "create": "Создать",
@@ -165,7 +164,6 @@
     "roleHost": "Хост",
     "rolePlayer": "Игрок",
     "roleGuest": "Зритель",
-    "connecting": "Подключение…",
     "you": "вы",
     "code": "Код игры",
     "codePlaceholder": "напр. ABC-23D",

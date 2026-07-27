@@ -96,14 +96,23 @@ export function useLobby(): UseLobby {
   // different, accurate errors.
   const hostConnectedRef = useRef(false)
   const leaveSessionRef = useRef<() => void>(() => {})
+  // Bumped on every teardown (leaveSession). joinRoom captures it before its
+  // createTransport await so a teardown that lands mid-await (e.g. Cancel / Home
+  // on the invite screen, whose leaveSession runs while transportRef is still
+  // null) is detected below — otherwise the resolved transport would be assigned
+  // over the ref and resurrect the very session the user just cancelled.
+  const sessionEpochRef = useRef(0)
 
   const onError = useCallback((err: { type?: string; message: string }) => {
-    // A connection-level error after the lobby is up shouldn't tear down the
-    // whole session, but signaling/peer errors (peer-unavailable, network,
-    // disconnected) mean the session can't proceed — surface them.
+    // Signaling/peer errors (peer-unavailable, network, disconnected) always
+    // mean the session can't proceed — surface them. A per-connection error is
+    // softer: once a lobby is live it shouldn't tear the whole session down, but
+    // during a join (status still 'connecting') it IS the join failing, so
+    // surface it too — otherwise the invite screen spins on 'connecting' forever
+    // with no error shown and no recovery.
     setError(err.type ? `${err.type}: ${err.message}` : err.message)
     setErrorKind(classify(err.type))
-    if (err.type !== 'connection') setStatus('error')
+    setStatus((s) => (err.type !== 'connection' || s === 'connecting' ? 'error' : s))
   }, [])
 
   // A rejected createTransport (setup failed before the peer opened) bypasses
@@ -234,6 +243,11 @@ export function useLobby(): UseLobby {
 
   const createRoom = useCallback(
     async (name: string, maxPlayers: number, setup?: Setup) => {
+      // Mirror joinRoom: a stale transport (e.g. returning to /start from a live
+      // guest session, which never calls leaveSession) is assigned over the ref
+      // below, so close it first or the previous peer leaks.
+      transportRef.current?.close()
+      transportRef.current = null
       setStatus('connecting')
       setError(null)
       setErrorKind(null)
@@ -286,6 +300,9 @@ export function useLobby(): UseLobby {
       setErrorKind(null)
       hostConnectedRef.current = false
       const hostId = parseRoomCode(code)
+      // Snapshot the session generation so a Cancel/Home (leaveSession) during
+      // the createTransport round-trip is detectable below.
+      const epoch = sessionEpochRef.current
       try {
         const t = await createTransport({
           onMessage,
@@ -304,6 +321,14 @@ export function useLobby(): UseLobby {
             }
           },
         })
+        // Torn down mid-await (Cancel/Home bumped the epoch and reset to idle):
+        // discard the freshly-opened peer instead of committing it, or the
+        // cancelled attempt resurrects — leaking a live peer and re-arming the
+        // /start "continue game" button for a session the user just left.
+        if (sessionEpochRef.current !== epoch) {
+          t.close()
+          throw new Error('join cancelled')
+        }
         transportRef.current = t
         isHostRef.current = false
         setIsHost(false)
@@ -323,6 +348,10 @@ export function useLobby(): UseLobby {
         // as a connection error on that same route.
         return formatRoomCode(hostId)
       } catch (err) {
+        // A cancellation (epoch bumped) already reset the session to idle — don't
+        // overwrite that with an error state; just propagate so the caller skips
+        // the post-await navigate.
+        if (sessionEpochRef.current !== epoch) throw err
         // Peer setup failed before opening (bad code, signaling unreachable);
         // surface it instead of leaving the form stuck on 'connecting', and
         // re-throw so the caller skips the post-await navigate.
@@ -390,6 +419,10 @@ export function useLobby(): UseLobby {
   // over the DataChannels before peer.destroy() — see disband().
   const leaveSession = useCallback((flushMs?: number) => {
     const t = transportRef.current
+    // Invalidate any join awaiting createTransport: if this teardown lands
+    // mid-await, joinRoom sees the bumped epoch and discards the peer it opens
+    // instead of resurrecting the torn-down session.
+    sessionEpochRef.current += 1
     transportRef.current = null
     stateRef.current = null
     isHostRef.current = false

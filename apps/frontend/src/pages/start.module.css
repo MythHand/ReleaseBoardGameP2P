@@ -1,18 +1,11 @@
 /* apps/frontend/src/pages/start.module.css */
 
-/* Screen frame. ScreenShell is block-size: 100%, so it needs a parent with a
-   definite height — app.module.css only sets min-block-size. */
-.screen {
-  block-size: 100vh;
-}
-
-/* Menu sits on the logo's optical left edge. The top gap to the description
-   belongs to the column body — ScreenShell's description carries no margin. */
+/* Menu sits on the logo's optical left edge — the hero logo's -11px inset. The
+   gap above belongs to ScreenShell's description, so there's no top margin. */
 .menu {
   align-self: flex-start;
   inline-size: 300px;
-  margin-block-start: 44px;
-  margin-inline-start: -7px;
+  margin-inline-start: -11px;
 }
 
 /* reserved continue-session slot, hidden without a session */

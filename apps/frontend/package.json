@@ -26,8 +26,14 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.5.4",
     "jsdom": "^29.1.1",
+    "postcss": "^8.5.23",
     "vite": "^6.4.3",
     "vite-plugin-svgr": "^5.2.0"
-  }
+  },
+  "browserslist": [
+    "defaults",
+    "safari >= 15"
+  ]
 }

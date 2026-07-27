@@ -3,11 +3,16 @@
    (logo, tags, description). The column body is children: the menu on /start,
    the invite form on /lobby/:lobbyId.
    Ported from the design mockup apps/ui/src/screens/Invite/Invite.module.css.
-   block-size: 100% — the height comes from the consuming page's wrapper. */
+
+   The frame owns its own height. The mockup sizes itself from a container
+   (the playground stage supplies one); no such container exists here, and
+   app.module.css only sets min-block-size, against which a percentage height
+   would not resolve. Owning it outright means neither page needs a wrapper.
+   dvh rather than vh so mobile browser chrome doesn't clip the bottom. */
 .root {
   position: relative;
   inline-size: 100%;
-  block-size: 100%;
+  block-size: 100dvh;
   overflow: hidden;
   background: var(--bg);
 }
@@ -20,13 +25,13 @@
   background-size: cover;
 }
 
-/* blur stronger on the left, fading out to the right edge (via mask) */
+/* blur stronger on the left, fading out to the right edge (via mask).
+   Written unprefixed — autoprefixer adds the -webkit- forms from the
+   browserslist target (see postcss.config.js). */
 .blur {
   position: absolute;
   inset: 0;
-  -webkit-backdrop-filter: blur(11px);
   backdrop-filter: blur(11px);
-  -webkit-mask-image: linear-gradient(90deg, var(--bg) 0%, var(--black-70) 38%, transparent 66%);
   mask-image: linear-gradient(90deg, var(--bg) 0%, var(--black-70) 38%, transparent 66%);
 }
 
@@ -67,13 +72,17 @@
   z-index: 3;
 }
 
+/* ===== hero density (default) — matches the playground's start screen =====
+   The column owns the whole rhythm down to the body gap, so a consuming page
+   never sets its own top margin and the two densities can't drift. */
+
 .content {
   position: relative;
   z-index: 2;
   display: flex;
   align-items: flex-start;
   block-size: 100%;
-  padding-block: 64px;
+  padding-block: 72px 64px;
   padding-inline-start: 76px;
   overflow-y: auto;
 }
@@ -86,27 +95,51 @@
 }
 
 .logo {
-  inline-size: 263px;
+  inline-size: 480px;
   block-size: auto;
 
   /* compensates the glyph glow/inset in the SVG — puts "R" on the left line */
-  margin: 0 0 12px -7px;
+  margin: 0 0 12px -11px;
 }
 
 .tags {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-block-end: 22px;
+  margin-block-end: 38px;
   color: var(--cat-release);
   opacity: 0.85;
 }
 
-/* margin: 0 by design — the gap to the column body belongs to the body
-   (.menu on /start, .form on the invite screen), so it can't be doubled. */
 .desc {
+  max-inline-size: 460px;
+  margin: 0 0 96px;
+  line-height: 1.65;
+  opacity: 0.85;
+}
+
+/* ===== compact density =====
+   The invite form is a fixed 513px tall, which at hero scale pushes its connect
+   button ~114px below a 900px fold. This rhythm is the largest that clears it:
+   72px of top padding leaves 315px for logo + tags + description, and the hero
+   opening spends 505px. Not a stylistic preference — a hard constraint. */
+
+.compact .content {
+  padding-block: 64px;
+}
+
+.compact .logo {
+  inline-size: 263px;
+  margin-inline-start: -7px;
+}
+
+.compact .tags {
+  margin-block-end: 22px;
+}
+
+.compact .desc {
   max-inline-size: 420px;
-  margin: 0;
+  margin-block-end: 44px;
   line-height: 1.6;
   opacity: 0.82;
 }
