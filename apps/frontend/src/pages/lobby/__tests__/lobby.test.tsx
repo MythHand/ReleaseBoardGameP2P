@@ -7,7 +7,10 @@ import LobbyView from '../_LobbyView'
 import LobbyPage from '../[lobbyId]'
 
 vi.mock('@release/translation', () => ({
-  useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'ru' } }),
+  useTranslation: () => ({
+    t: (k: string) => k,
+    i18n: { language: 'ru', resolvedLanguage: 'ru', changeLanguage: vi.fn() },
+  }),
 }))
 
 // All the lobby pieces read the session through useSession, so a single mock
@@ -43,11 +46,11 @@ function renderInRouter(ui: ReactNode) {
   return render(<MemoryRouter>{ui}</MemoryRouter>)
 }
 
-it('shows the join form when there is no session', () => {
+it('shows the invite screen when there is no session', () => {
   sessionValue = base()
   renderInRouter(<LobbyPage />)
-  expect(screen.getByText('lobby.joinTitle')).toBeTruthy()
-  expect(screen.getByText('start.joinCta')).toBeTruthy()
+  expect(screen.getByText('invite.formTitle')).toBeTruthy()
+  expect(screen.getByText('invite.joinCta')).toBeTruthy()
 })
 
 it('pre-fills the code from a shared /lobby/:lobbyId link', () => {
@@ -63,15 +66,15 @@ it('pre-fills the code from a shared /lobby/:lobbyId link', () => {
 })
 
 it('clears a stale error on mount', () => {
-  sessionValue = { ...base(), status: 'error', error: 'peer-unavailable' }
+  sessionValue = { ...base(), status: 'error', error: 'peer-unavailable', errorKind: 'not-found' }
   renderInRouter(<LobbyPage />)
   expect(sessionValue.clearError).toHaveBeenCalledOnce()
 })
 
-it('pre-session Back resets the (failed) session', () => {
-  sessionValue = { ...base(), status: 'error', error: 'peer-unavailable' }
+it('the invite screen home button resets the (failed) session', () => {
+  sessionValue = { ...base(), status: 'error', error: 'peer-unavailable', errorKind: 'not-found' }
   renderInRouter(<LobbyPage />)
-  fireEvent.click(screen.getByText('lobby.back'))
+  fireEvent.click(screen.getByText('invite.homePage'))
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
 })
 

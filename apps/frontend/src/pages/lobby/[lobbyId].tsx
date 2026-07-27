@@ -3,7 +3,7 @@ import { Button, Typography } from '@release/ui'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
-import JoinLobbyForm from '~/features/join-lobby/JoinLobbyForm'
+import InviteScreen from './_InviteScreen'
 import LobbyView from './_LobbyView'
 import { card, ghostBtn, label, Shell, styles } from './_ui'
 
@@ -73,33 +73,11 @@ export default function LobbyPage() {
         </Shell>
       )
     }
+    // The channel is open but the host's roster hasn't arrived; show the
+    // invite screen's `connected` beat rather than an empty lobby.
+    if (!session.state.peers[session.state.hostId]) return <InviteScreen />
     return <LobbyView />
   }
 
-  return (
-    <Shell>
-      {/* A failed join surfaces its error inside JoinLobbyForm itself (shared
-          with the start-screen modal), so it isn't repeated here. */}
-      {session.status === 'connecting' && (
-        <Typography base="body" as="p" className={styles.connecting}>
-          {t('lobby.connecting')}
-        </Typography>
-      )}
-      <div className={`${card} ${styles.cardStack}`}>
-        <Typography variant="panelTitle" as="h2" className={styles.joinTitle}>
-          {t('lobby.joinTitle')}
-        </Typography>
-        <JoinLobbyForm />
-      </div>
-      {/* No live session here (idle/connecting/error) — Back just resets any
-          dangling transport/error and returns to the chooser. */}
-      <Link
-        to="/start"
-        className={`${ghostBtn} ${styles.backStart}`}
-        onClick={() => session.leaveSession()}
-      >
-        <Typography base="body">{t('lobby.back')}</Typography>
-      </Link>
-    </Shell>
-  )
+  return <InviteScreen />
 }
