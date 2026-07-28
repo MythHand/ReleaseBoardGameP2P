@@ -7,6 +7,7 @@ export {
   rulesFor,
   SUPPORTED,
 } from './cards'
+export { type ConformanceOptions, describeEngine } from './conformance'
 export type { DeckEntry, Engine, GameConfig, Reduction } from './engine'
 export type { DefenceEffect, DiscardReason, Event, EventBase, EventType } from './events'
 export { randomAt, shuffle } from './rng'
