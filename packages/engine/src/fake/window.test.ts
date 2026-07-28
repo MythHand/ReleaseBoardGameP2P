@@ -1,8 +1,9 @@
 import type { GameConfig } from '../engine'
 import type { CardInstance, GameState, Setup } from '../state'
+import { createLog } from './core'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
 import { reduce } from './reduce'
-import { WINDOW_FIRST_MS } from './window'
+import { openWindow, WINDOW_FIRST_MS, WINDOW_NEXT_MS } from './window'
 
 const engine = createFakeEngine()
 
@@ -32,13 +33,13 @@ const CR: CardInstance = { uid: 'support-code-review#0', id: 'support-code-revie
 const BUG: CardInstance = { uid: 'attack-bug#0', id: 'attack-bug' }
 
 // p1 releases; p2 holds a Bug, p3 holds nothing useful.
-const released = (extra: Partial<Record<'p2' | 'p3', CardInstance[]>> = {}): GameState => {
+const released = (extra: Partial<Record<'p1' | 'p2' | 'p3', CardInstance[]>> = {}): GameState => {
   const s = engine.createGame(config())
   const primed: GameState = {
     ...s,
     players: {
       ...s.players,
-      p1: { ...s.players.p1, hand: [FE, CR] },
+      p1: { ...s.players.p1, hand: [FE, CR, ...(extra.p1 ?? [])] },
       p2: { ...s.players.p2, hand: extra.p2 ?? [BUG] },
       p3: { ...s.players.p3, hand: extra.p3 ?? [] },
     },
@@ -107,15 +108,24 @@ it('blocks the turn owner from acting while a window is open', () => {
 })
 
 it('projects the window with the viewer’s usable attacks', () => {
-  const s = released()
+  // The owner holds an attack-eligible card too (not just the non-combat CR),
+  // and a third responder holds a card that is not a release attack — so both
+  // exclusions below are exercised by an implementation that would otherwise
+  // have something to attack with, not vacuously satisfied by an empty hand.
+  const ownerBug: CardInstance = { uid: 'attack-bug#1', id: 'attack-bug' }
+  const p3Card: CardInstance = { uid: 'support-code-review#1', id: 'support-code-review' }
+  const s = released({ p1: [ownerBug], p3: [p3Card] })
+
   const attacker = engine.project(s, 'p2')
   expect(attacker.window?.round).toBe(1)
+  expect(attacker.window?.deadline).toBe(1000 + WINDOW_FIRST_MS)
+  expect(attacker.window?.passed).toEqual([])
   expect(attacker.window?.canAttackWith).toEqual([BUG.uid])
 
-  // The owner sees the window but can never throw into it.
+  // The owner holds attack-bug too, but can never throw it into their own window.
   const owner = engine.project(s, 'p1')
   expect(owner.window?.canAttackWith).toEqual([])
-  // A responder holding nothing relevant sees an empty option set.
+  // A responder holding a card that is not a release attack sees an empty option set.
   expect(engine.project(s, 'p3').window?.canAttackWith).toEqual([])
 })
 
@@ -123,4 +133,24 @@ it('does not count DDoS as a reaction-window attack', () => {
   const ddos: CardInstance = { uid: 'attack-ddos#0', id: 'attack-ddos' }
   const s = released({ p2: [ddos] })
   expect(engine.project(s, 'p2').window?.canAttackWith).toEqual([])
+})
+
+it('rejects UNPASS from a player who has not passed', () => {
+  const s = released()
+  const r = reduce(s, { type: 'UNPASS', player: 'p2', at: 1001 })
+  expect(r.state).toBe(s)
+  expect(r.events.map((e) => e.type)).toEqual(['rejected'])
+})
+
+it('opens a 10s window for a later round', () => {
+  const s = engine.createGame(config())
+  const log = createLog(s.eventSeq)
+  const reopened = openWindow(s, log, { player: 'p1', slot: 'frontend', card: FE.uid }, 2, 1000)
+  expect(reopened.window).toEqual({
+    target: { player: 'p1', slot: 'frontend', card: FE.uid },
+    round: 2,
+    deadline: 1000 + WINDOW_NEXT_MS,
+    passed: [],
+  })
+  expect(log.events.map((e) => e.type)).toEqual(['windowOpened'])
 })
