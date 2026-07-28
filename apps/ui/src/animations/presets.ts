@@ -126,6 +126,49 @@ export const PRESETS: Record<string, Preset> = {
   returnToDeck: (el: Element, p?: Record<string, unknown>): Animation | null =>
     move(el, p as MoveParams, durationOf(p, 480), EASE),
 
+  // ===== Смена содержимого слота (HUD, turn dock) =====
+  // Пара out/in для подмены текста/элемента в зарезервированном слоте: старое
+  // гаснет, новое проявляется. Чистый фейд по opacity — БЕЗ движения (слот
+  // фиксирован, содержимое не ездит). dur — длительность; delay (только у in) —
+  // держит новое невидимым, пока старое не ушло (последовательное появление).
+  rollOut: (el: Element, p?: Record<string, unknown>): Animation | null => {
+    const { dur = 220 } = (p ?? {}) as { dur?: number }
+    return el.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: dur,
+      easing: EASE,
+      fill: 'forwards',
+    })
+  },
+  rollIn: (el: Element, p?: Record<string, unknown>): Animation | null => {
+    const { dur = 300, delay = 0 } = (p ?? {}) as { dur?: number; delay?: number }
+    // fill 'both' so the start (opacity 0) is held through `delay`.
+    return el.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: dur,
+      delay,
+      easing: EASE,
+      fill: 'both',
+    })
+  },
+
+  // Появление/уход маленького элемента в зарезервированном слоте (напр. бейдж
+  // «drawn») — fade + масштаб, без сдвига соседей (слот держит размер).
+  popIn: (el: Element): Animation =>
+    el.animate(
+      [
+        { opacity: 0, transform: 'scale(0.9)' },
+        { opacity: 1, transform: 'scale(1)' },
+      ],
+      { duration: 260, easing: SNAP, fill: 'forwards' },
+    ),
+  popOut: (el: Element): Animation =>
+    el.animate(
+      [
+        { opacity: 1, transform: 'scale(1)' },
+        { opacity: 0, transform: 'scale(0.92)' },
+      ],
+      { duration: 200, easing: EASE, fill: 'forwards' },
+    ),
+
   // ===== Фидбек ввода =====
   // Тряска влево-вправо — «поле не заполнено». Разовый триггер по событию
   // (как flipCard), с затухающей амплитудой и возвратом в исходную точку.

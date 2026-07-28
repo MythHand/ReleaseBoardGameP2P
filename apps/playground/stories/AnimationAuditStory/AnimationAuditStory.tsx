@@ -255,6 +255,27 @@ const MODULES: Module[] = [
     },
     status: 'ok',
   },
+  {
+    mod: "play('rollOut' / 'rollIn')",
+    what: {
+      ru: 'Подмена содержимого слота чистым фейдом по opacity — БЕЗ движения. dur — длительность; delay (только у in) держит новое невидимым, пока старое не ушло (последовательное появление имени). Оркестрируется компонентом Swap: живой слой в потоке + уходящий абсолютом поверх (без сетки).',
+      en: 'Swap a slot’s content with a plain opacity fade — NO movement. dur — duration; delay (in only) holds the incoming invisible until the outgoing clears (sequential name entrance). Orchestrated by the Swap component: a live layer in flow + the outgoing one absolutely overlaid (no grid).',
+    },
+    where: { ru: 'словарь → TurnDock/Swap', en: 'registry → TurnDock/Swap' },
+    status: 'ok',
+  },
+  {
+    mod: "play('popIn' / 'popOut')",
+    what: {
+      ru: 'Появление/уход маленького элемента в зарезервированном слоте (fade + масштаб), без сдвига соседей. Оркестрируется компонентом Reveal.',
+      en: 'Appear/disappear of a small element in a reserved slot (fade + scale), without shifting neighbours. Orchestrated by the Reveal component.',
+    },
+    where: {
+      ru: 'словарь → TurnDock/Reveal («drawn»-бейдж)',
+      en: 'registry → TurnDock/Reveal (the “drawn” badge)',
+    },
+    status: 'ok',
+  },
 ]
 
 // ===== 2. Scenario combinations — sequences per situation (no statuses) =====
@@ -268,6 +289,14 @@ const SCENARIOS: Scenario[] = [
       en: 'flyer (fixed) from the card rect → playToCenter (move 480, EASE) by centers; wait — hold; nextFrames before start so the new node can paint; then centerToDiscard (move 420) + jitter() for the final scatter rotate/dx/dy.',
     },
     where: 'CardPlay, DeckAnimations',
+  },
+  {
+    name: { ru: 'Переход состояния TurnDock', en: 'TurnDock state transition' },
+    from: {
+      ru: 'один фиксированный каркас, слоты не двигаются. Ключ/имя — ОДНА фикс-ширина (≈ «добор» + 18px с каждой стороны), не ресайзится и не прыгает. Текст (фаза, метка ключа, ник) — чистый фейд rollOut→rollIn через Swap, без движения. Держит рамку кнопки, меняется только метка + акцент (CSS-transition на --btn-accent). Имя соперника (первый вход и смена ника подряд) появляется одинаково: ждёт ухода предыдущего (delayIn), потом проявляется. «drawn»-бейдж — popIn/popOut (Reveal). Кольцо и точка стоят на месте: только морф акцента (transition на stroke/--dot) + дозаполнение кольца до полного (progress→1 при смене фазы).',
+      en: 'one fixed frame, slots never move. Key/name — ONE fixed width (≈ the «добор» key + 18px each side), never resizes or jumps. Text (phase, key label, nick) — a plain opacity fade rollOut→rollIn via Swap, no movement. The button frame stays, only the label + accent change (CSS transition on --btn-accent). The opponent name (first entry and successive nick changes alike) appears the same way: it waits for the previous to clear (delayIn), then fades in. The “drawn” badge — popIn/popOut (Reveal). Ring and dot stay put: only the accent morphs (transition on stroke/--dot) + the ring fills back to full (progress→1 on a phase change).',
+    },
+    where: 'TurnDock (Swap, Reveal), RingTimer, StatusDot, Button hud',
   },
   {
     name: { ru: 'Розыгрыш комбо (пара)', en: 'Playing a combo (pair)' },

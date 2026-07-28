@@ -6,6 +6,17 @@
   background: var(--dot);
   border-radius: 50%;
   box-shadow: 0 0 6px color-mix(in srgb, var(--dot) 70%, transparent);
+
+  /* accent glides between phases (dot stays put — only its colour changes) */
+  transition:
+    background var(--t-base) var(--ease-soft),
+    box-shadow var(--t-base) var(--ease-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    transition: none;
+  }
 }
 
 .pulse {
