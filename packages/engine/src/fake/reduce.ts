@@ -2,7 +2,7 @@ import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, Setup } from '../state'
-import { createLog, reject, setHand } from './core'
+import { createLog, isWellFormedAction, reject, setHand } from './core'
 import { playableFor } from './project'
 
 const HAND_LIMITS: Record<string, number> = { '8bit': 8, memory: 5 }
@@ -123,6 +123,10 @@ function onHandLimit(state: GameState, action: Action & { type: 'RESOLVE' }): Re
   if (pending.player !== action.player) return reject(state, action, 'not your decision')
   const choice = action.choice
   if (choice.kind !== 'handLimit') return reject(state, action, 'wrong choice for this decision')
+  // The entry guard only checks that `choice.kind` is a string, not this
+  // variant's payload — a well-formed RESOLVE can still carry a handLimit
+  // choice with a missing or malformed `cards` array.
+  if (!Array.isArray(choice.cards)) return reject(state, action, 'malformed handLimit choice')
   if (choice.cards.length !== pending.excess) {
     return reject(state, action, `discard exactly ${pending.excess}`)
   }
@@ -164,7 +168,13 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
 }
 
 export function reduce(state: GameState, action: Action): Reduction {
-  switch (action?.type) {
+  // A malformed action (any shape survives JSON deserialization) is rejected
+  // before any handler destructures it, so no handler needs its own guard.
+  if (!isWellFormedAction(action)) {
+    return reject(state, action, 'malformed action')
+  }
+
+  switch (action.type) {
     case 'DRAW':
       return onDraw(state, action)
     case 'PUSH':

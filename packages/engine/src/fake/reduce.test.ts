@@ -158,6 +158,77 @@ it('rejects an unknown action without throwing', () => {
   expect(reduce(s, bogus).state).toBe(s)
 })
 
+// The TS Action type does not survive JSON deserialization, so a peer's message
+// may be any shape at all. `reduce` must stay total against every one of these
+// without ever descending into a handler that assumes a well-formed payload.
+describe('stays total against a malformed action', () => {
+  it('rejects a RESOLVE with no choice field, without throwing', () => {
+    const s = engine.createGame(config())
+    const bogus = { type: 'RESOLVE', player: 'p1', at: 1 } as unknown as Action
+    expect(() => reduce(s, bogus)).not.toThrow()
+    const r = reduce(s, bogus)
+    expect(r.state).toBe(s)
+    expect(r.events.map((e) => e.type)).toEqual(['rejected'])
+  })
+
+  it('rejects a RESOLVE with choice: null, without throwing', () => {
+    const s = engine.createGame(config())
+    const bogus = { type: 'RESOLVE', player: 'p1', choice: null, at: 1 } as unknown as Action
+    expect(() => reduce(s, bogus)).not.toThrow()
+    const r = reduce(s, bogus)
+    expect(r.state).toBe(s)
+    expect(r.events.map((e) => e.type)).toEqual(['rejected'])
+  })
+
+  it('rejects a handLimit choice missing its cards array, without throwing', () => {
+    const s = withoutTriggers(engine.createGame(config({ ...BASE, handLimit: 'memory' })))
+    const drawn = reduce(s, { type: 'DRAW', player: 'p1', at: 1000 })
+    const held = reduce(drawn.state, { type: 'PUSH', player: 'p1', at: 1001 })
+    const bogus = {
+      type: 'RESOLVE',
+      player: 'p1',
+      choice: { kind: 'handLimit' },
+      at: 1002,
+    } as unknown as Action
+    expect(() => reduce(held.state, bogus)).not.toThrow()
+    const r = reduce(held.state, bogus)
+    expect(r.state).toBe(held.state)
+    expect(r.events.map((e) => e.type)).toEqual(['rejected'])
+  })
+
+  it('rejects a handLimit choice whose cards is not an array, without throwing', () => {
+    const s = withoutTriggers(engine.createGame(config({ ...BASE, handLimit: 'memory' })))
+    const drawn = reduce(s, { type: 'DRAW', player: 'p1', at: 1000 })
+    const held = reduce(drawn.state, { type: 'PUSH', player: 'p1', at: 1001 })
+    // `null` has no `.length`, so this is the payload that actually forces the
+    // `Array.isArray` guard: a string like 'not-an-array' would coincidentally
+    // fail the length check below without ever exercising the guard.
+    const bogus = {
+      type: 'RESOLVE',
+      player: 'p1',
+      choice: { kind: 'handLimit', cards: null },
+      at: 1002,
+    } as unknown as Action
+    expect(() => reduce(held.state, bogus)).not.toThrow()
+    const r = reduce(held.state, bogus)
+    expect(r.state).toBe(held.state)
+    expect(r.events.map((e) => e.type)).toEqual(['rejected'])
+  })
+
+  it('rejects an action that is not an object at all, without throwing', () => {
+    const s = engine.createGame(config())
+    expect(() => reduce(s, null as unknown as Action)).not.toThrow()
+    const rNull = reduce(s, null as unknown as Action)
+    expect(rNull.state).toBe(s)
+    expect(rNull.events.map((e) => e.type)).toEqual(['rejected'])
+
+    expect(() => reduce(s, 'nope' as unknown as Action)).not.toThrow()
+    const rString = reduce(s, 'nope' as unknown as Action)
+    expect(rString.state).toBe(s)
+    expect(rString.events.map((e) => e.type)).toEqual(['rejected'])
+  })
+})
+
 it('offers every living opponent as a hand-attack target', () => {
   const s = withoutTriggers(engine.createGame(config()))
   const bug = { uid: 'attack-bug#0', id: 'attack-bug' }

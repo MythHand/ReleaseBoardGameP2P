@@ -39,3 +39,18 @@ export const setHand = (state: GameState, id: PlayerId, hand: PlayerState['hand'
   ...state,
   players: { ...state.players, [id]: { ...state.players[id], hand } },
 })
+
+// The TS Action type does not survive JSON deserialization, so an action from a
+// remote peer may be any shape at all. Validating once at the entry point means
+// every handler can destructure freely, and no later handler can reopen the hole.
+export function isWellFormedAction(action: unknown): action is Action {
+  if (typeof action !== 'object' || action === null) return false
+  const a = action as { type?: unknown; choice?: unknown }
+  if (typeof a.type !== 'string') return false
+  if (a.type !== 'RESOLVE') return true
+  return (
+    typeof a.choice === 'object' &&
+    a.choice !== null &&
+    typeof (a.choice as { kind?: unknown }).kind === 'string'
+  )
+}
