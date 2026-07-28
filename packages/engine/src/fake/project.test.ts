@@ -1,6 +1,16 @@
+import { rulesFor } from '../cards'
 import type { GameConfig } from '../engine'
+import type { CardInstance } from '../state'
 import { playableFor, project } from './project'
 import { createGame } from './setup'
+
+// A typo in a CardId is invisible to TypeScript (CardId is just string) and
+// silently routes a test through the unsupported-id path instead of the rule
+// it means to exercise. Fail loudly instead.
+const inst = (id: string, n = 0): CardInstance => {
+  if (!rulesFor(id)) throw new Error(`unknown card id in test fixture: ${id}`)
+  return { uid: `${id}#${n}`, id }
+}
 
 const config = (): GameConfig => ({
   gameId: 'g1',
@@ -103,7 +113,25 @@ it('publishes release zones as card ids for both sides', () => {
 
 it('marks a player on their own turn as able to play something', () => {
   const s = createGame(config())
-  expect(project(s, 'p1').self.playable.length).toBeGreaterThan(0)
+  // Add both a playable attack card and a non-playable support card
+  const attackCard = inst('attack-bug', 1)
+  const supportCard = inst('support-sudo', 1)
+  const withCards = {
+    ...s,
+    players: {
+      ...s.players,
+      p1: {
+        ...s.players.p1,
+        hand: [attackCard, supportCard, ...s.players.p1.hand],
+      },
+    },
+  }
+  const playable = project(withCards, 'p1').self.playable
+  // Should have playable cards (the attack card)
+  expect(playable.length).toBeGreaterThan(0)
+  // Should not include the support card
+  expect(playable).toContain(attackCard.uid)
+  expect(playable).not.toContain(supportCard.uid)
 })
 
 it('offers nothing playable to a player whose turn it is not', () => {
@@ -174,70 +202,85 @@ describe('playableFor legality rules', () => {
 
   it('does not include a frozen card', () => {
     const s = createGame(config())
-    const p1Card = s.players.p1.hand[0]
+    // Freeze an attack card that would otherwise be playable, not a protection card
+    const attackCard = inst('attack-bug', 1)
+    const unplayableAttack = inst('attack-bug', 2)
     const frozen = {
       ...s,
       players: {
         ...s.players,
-        p1: { ...s.players.p1, frozen: [p1Card.uid] },
+        p1: {
+          ...s.players.p1,
+          hand: [attackCard, unplayableAttack, ...s.players.p1.hand],
+          frozen: [attackCard.uid],
+        },
       },
     }
-    expect(playableFor(frozen, 'p1')).not.toContain(p1Card.uid)
+    const playable = playableFor(frozen, 'p1')
+    // The frozen attack card should not be playable
+    expect(playable).not.toContain(attackCard.uid)
+    // But an unfrozen attack card should be playable
+    expect(playable).toContain(unplayableAttack.uid)
   })
 
   it('does not include a release card when its slot is filled', () => {
     const s = createGame(config())
-    const releasedCard = { uid: 'release-frontend#0', id: 'release-frontend' }
+    // Explicitly put a release card in hand
+    const releaseCard = inst('release-frontend', 1)
+    const filledSlot = { card: inst('release-frontend', 0) }
     const filled = {
       ...s,
       players: {
         ...s.players,
         p1: {
           ...s.players.p1,
+          hand: [releaseCard, ...s.players.p1.hand],
           release: {
             ...s.players.p1.release,
-            frontend: { card: releasedCard },
+            frontend: filledSlot,
           },
         },
       },
     }
     const playable = playableFor(filled, 'p1')
-    // Check that no release-frontend card is playable
-    expect(
-      playable.every(
-        (uid) => !s.players.p1.hand.find((c) => c.uid === uid && c.id === 'release-frontend'),
-      ),
-    ).toBe(true)
+    // The release card should not be playable when slot is filled
+    expect(playable).not.toContain(releaseCard.uid)
   })
 
   it('does not include a release card when the cap is hit under releases: base', () => {
     const s = createGame(config())
+    // Explicitly put a release card in hand
+    const releaseCard = inst('release-database', 1)
     const withPlayedRelease = {
       ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1,
+          hand: [releaseCard, ...s.players.p1.hand],
+        },
+      },
       turn: { ...s.turn, releasesPlayed: 1 },
     }
     // Under releases: 'base', cap is 1, so with 1 already played, no more releases are playable
     const playable = playableFor(withPlayedRelease, 'p1')
-    // No release cards should be playable
-    expect(
-      playable.every(
-        (uid) => !s.players.p1.hand.find((c) => c.uid === uid && c.id.startsWith('release-')),
-      ),
-    ).toBe(true)
+    // The release card should not be playable when cap is hit
+    expect(playable).not.toContain(releaseCard.uid)
   })
 
   it('allows release cards when cap is not hit under releases: fast', () => {
     const fastConfig = { ...config(), setup: { ...config().setup, releases: 'fast' } }
     const fast = createGame(fastConfig)
     // Construct state with explicit release card in hand and cap already hit at 1
-    const releaseCard = { uid: 'release-backend#0', id: 'release-backend' }
+    const releaseCard = inst('release-backend', 1)
+    const supportCard = inst('support-sudo', 1)
     const withRelease = {
       ...fast,
       players: {
         ...fast.players,
         p1: {
           ...fast.players.p1,
-          hand: [releaseCard, ...fast.players.p1.hand],
+          hand: [releaseCard, supportCard, ...fast.players.p1.hand],
           // backend slot is empty, so card can be played
           release: { ...fast.players.p1.release, backend: undefined },
         },
@@ -247,33 +290,39 @@ describe('playableFor legality rules', () => {
     const playable = playableFor(withRelease, 'p1')
     // Under releases: 'fast', cap is Infinity, so even after 1 played, this release is playable
     expect(playable).toContain(releaseCard.uid)
+    // But support cards are never playable
+    expect(playable).not.toContain(supportCard.uid)
   })
 
   it('includes protection-monitoring when monitoring slot is empty', () => {
     const s = createGame(config())
-    // Explicitly add protection-monitoring to hand
-    const monitoringCard = { uid: 'protection-monitoring#0', id: 'protection-monitoring' }
+    // Explicitly add protection-monitoring and a trigger card (not playable) to hand
+    const monitoringCard = inst('protection-monitoring', 1)
+    const triggerCard = inst('trigger-ai', 1)
     const withMonitoring = {
       ...s,
       players: {
         ...s.players,
         p1: {
           ...s.players.p1,
-          hand: [monitoringCard, ...s.players.p1.hand],
+          hand: [monitoringCard, triggerCard, ...s.players.p1.hand],
           // Ensure monitoring slot is empty
           release: { ...s.players.p1.release, monitoring: undefined },
         },
       },
     }
     const playable = playableFor(withMonitoring, 'p1')
+    // Monitoring card should be playable
     expect(playable).toContain(monitoringCard.uid)
+    // Trigger card should not be playable
+    expect(playable).not.toContain(triggerCard.uid)
   })
 
   it('does not include protection-monitoring when monitoring slot is filled', () => {
     const s = createGame(config())
     // Explicitly add protection-monitoring to hand and fill the monitoring slot
-    const monitoringCard = { uid: 'protection-monitoring#0', id: 'protection-monitoring' }
-    const filledMonitoring = { uid: 'protection-monitoring#1', id: 'protection-monitoring' }
+    const monitoringCard = inst('protection-monitoring', 1)
+    const filledMonitoring = inst('protection-monitoring', 0)
     const filled = {
       ...s,
       players: {
@@ -295,7 +344,7 @@ describe('playableFor legality rules', () => {
   it('never includes protection-debugger', () => {
     const s = createGame(config())
     // Explicitly add protection-debugger to hand
-    const debuggerCard = { uid: 'protection-debugger#0', id: 'protection-debugger' }
+    const debuggerCard = inst('protection-debugger', 1)
     const withDebugger = {
       ...s,
       players: {
@@ -312,9 +361,9 @@ describe('playableFor legality rules', () => {
 
   it('never includes cancel (defence) cards', () => {
     const s = createGame(config())
-    // Explicitly add defence cards to hand
-    const cancelCard = { uid: 'defence-hotfix#0', id: 'defence-hotfix' }
-    const notABugCard = { uid: 'defence-not-a-bug#0', id: 'defence-not-a-bug' }
+    // Explicitly add defence cards to hand with correct spelling
+    const cancelCard = inst('defense-hotfix', 1)
+    const notABugCard = inst('defense-not-a-bug', 1)
     const withDefence = {
       ...s,
       players: {
@@ -332,37 +381,45 @@ describe('playableFor legality rules', () => {
 
   it('never includes support cards', () => {
     const s = createGame(config())
-    // Explicitly add support card to hand
-    const supportCard = { uid: 'support-sudo#0', id: 'support-sudo' }
+    // Explicitly add support card and an attack card (playable) to hand
+    const supportCard = inst('support-sudo', 1)
+    const attackCard = inst('attack-bug', 1)
     const withSupport = {
       ...s,
       players: {
         ...s.players,
         p1: {
           ...s.players.p1,
-          hand: [supportCard, ...s.players.p1.hand],
+          hand: [supportCard, attackCard, ...s.players.p1.hand],
         },
       },
     }
     const playable = playableFor(withSupport, 'p1')
+    // Support card should not be playable
     expect(playable).not.toContain(supportCard.uid)
+    // Attack card should be playable
+    expect(playable).toContain(attackCard.uid)
   })
 
   it('never includes trigger cards', () => {
     const s = createGame(config())
-    // Explicitly add trigger card to hand
-    const triggerCard = { uid: 'trigger-ai#0', id: 'trigger-ai' }
+    // Explicitly add trigger card and an attack card (playable) to hand
+    const triggerCard = inst('trigger-ai', 1)
+    const attackCard = inst('attack-bug', 1)
     const withTrigger = {
       ...s,
       players: {
         ...s.players,
         p1: {
           ...s.players.p1,
-          hand: [triggerCard, ...s.players.p1.hand],
+          hand: [triggerCard, attackCard, ...s.players.p1.hand],
         },
       },
     }
     const playable = playableFor(withTrigger, 'p1')
+    // Trigger card should not be playable
     expect(playable).not.toContain(triggerCard.uid)
+    // Attack card should be playable
+    expect(playable).toContain(attackCard.uid)
   })
 })
