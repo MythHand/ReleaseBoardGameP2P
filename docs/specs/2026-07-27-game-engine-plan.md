@@ -1764,6 +1764,9 @@ function onHandLimit(state: GameState, action: Action & { type: 'RESOLVE' }): Re
   if (pending.player !== action.player) return reject(state, action, 'not your decision')
   const choice = action.choice
   if (choice.kind !== 'handLimit') return reject(state, action, 'wrong choice for this decision')
+  // isWellFormedAction validates the action's shape but deliberately does not
+  // descend into per-variant payloads, so each handler guards its own.
+  if (!Array.isArray(choice.cards)) return reject(state, action, 'cards must be an array')
   if (choice.cards.length !== pending.excess) {
     return reject(state, action, `discard exactly ${pending.excess}`)
   }
