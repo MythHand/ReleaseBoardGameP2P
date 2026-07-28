@@ -21,7 +21,19 @@
   fill: none;
   stroke: color-mix(in srgb, var(--ring-accent) 85%, transparent);
   stroke-linecap: round;
-  transition: stroke-dashoffset var(--t-slow) var(--ease-out);
+
+  /* dashoffset — the sweep (incl. fill-to-full on a new phase); stroke/filter —
+     the accent morph between phases (colour glides, never snaps) */
+  transition:
+    stroke-dashoffset var(--t-slow) var(--ease-out),
+    stroke var(--t-base) var(--ease-soft),
+    filter var(--t-base) var(--ease-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prog {
+    transition: none;
+  }
 }
 
 /* centered readout — overlays the ring, centred on its true centre */

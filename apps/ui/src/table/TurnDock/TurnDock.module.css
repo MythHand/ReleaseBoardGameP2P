@@ -1,6 +1,6 @@
-/* Turn dock — layout only. The surface, ring, dot, action key, badge and avatar
-   all come from primitives; this module sizes the block and fixes the slots so
-   every state shares one layout (key, caption and badge never move). */
+/* Turn dock — layout only. The surface, ring, dot, action key and badge all come
+   from primitives; this module sizes the block and fixes the slots so every state
+   shares one layout (key, caption and badge never move). */
 
 /* fixed footprint on the HudSurface. Trim the bottom breathing room (half of the
    surface's default) so the action group can sit lower toward the edge. */
@@ -8,6 +8,18 @@
   inline-size: 300px;
   block-size: 150px;
   padding-block-end: 8px;
+  transition: filter var(--t-base) var(--ease-soft);
+}
+
+/* paused / frozen game — the whole block desaturates to grey */
+.paused {
+  filter: grayscale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock {
+    transition: none;
+  }
 }
 
 .inner {
@@ -50,17 +62,23 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  align-items: center;
   align-self: flex-end; /* sit the key + caption group low, near the bottom edge */
   min-inline-size: 0;
 }
 
-/* the key / spectate slot — constant height so all states share it */
+/* the key / spectate slot — ONE fixed width for every state (≈ the «добор» key
+   width + 18px of breathing room each side), so the key/name never resizes or
+   jumps between states. Constant height too. */
 .actionMain {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: center;
-  min-block-size: 54px;
+  position: relative;
+  inline-size: 152px;
+  block-size: 54px;
+}
+
+/* the HUD key fills the fixed slot width (all labels share the same width) */
+.key {
+  inline-size: 100%;
 }
 
 /* under-key caption — directly below the key, FIXED-height slot (empty and
@@ -74,10 +92,9 @@
   text-align: center;
 }
 
-/* opponent turn — active player name sits in the key's slot; wraps to a second
-   line rather than truncating */
+/* opponent turn — active player name sits in the key's slot (centred by the
+   fill layer); break a long nick rather than overflow the fixed slot */
 .name {
   color: var(--fg);
-  text-align: center;
   overflow-wrap: anywhere;
 }

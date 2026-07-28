@@ -1,0 +1,56 @@
+/* The slot's size is fixed up front, so content never reflows — only opacity
+   animates. Two ways to fix the size:
+   - sized: a hidden sizer (widest content) reserves the box; layers overlay it
+   - fill:  the parent already has a fixed size; layers fill 100% of it */
+.swap {
+  position: relative;
+  display: inline-block;
+  min-inline-size: 0;
+}
+
+/* ----- sized mode: hidden sizer reserves the box, layers overlay it ----- */
+.sizer {
+  visibility: hidden;
+}
+
+.sized > [data-live],
+.sized > [data-out] {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  display: flex;
+  align-items: center;
+}
+
+.center > [data-live],
+.center > [data-out] {
+  justify-content: center;
+}
+
+.start > [data-live],
+.start > [data-out] {
+  justify-content: flex-start;
+}
+
+/* ----- fill mode: both layers absolutely fill the fixed parent box and centre
+   their content, so a departing key/name keeps its size (never squeezed to the
+   incoming one) and nothing shifts ----- */
+.fill {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.fill > [data-live],
+.fill > [data-out] {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* the outgoing snapshot is inert while it fades out */
+.layer[data-out] {
+  pointer-events: none;
+}

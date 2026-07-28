@@ -5,10 +5,12 @@ import PhysicalEdition, { type PhysicalEditionCopy } from '@/blocks/PhysicalEdit
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { randomNickname, sanitizeNickname } from '@/game/nicknames'
 import DiceIcon from '@/icons/DiceIcon'
+import RefreshIcon from '@/icons/RefreshIcon'
 import Button from '@/primitives/Button'
 import HudBackground from '@/primitives/HudBackground'
 import Input from '@/primitives/Input'
 import Spinner from '@/primitives/Spinner'
+import Typography from '@/primitives/Typography'
 import styles from './Invite.module.css'
 
 // ссылка на заказ/предзаказ печатной версии — Instagram команды (как на Start)
@@ -21,6 +23,11 @@ const INSTAGRAM_URL = 'https://www.instagram.com/mythhand.team/'
 //                   мест», действие — «проверить слоты» (без красной строки)
 export type SlotAvailability = 'open' | 'spectatorOnly' | 'full'
 export type JoinRole = 'player' | 'spectator'
+
+// Проверка кода игры у поля (мок): ok — ничего; checking — идёт дозвон до хоста
+// (жёлтая подпись с бегущими точками); error — соединиться с хостом не удалось
+// (красная «couldn't connect»). В P2P «проверка» = реальная попытка коннекта.
+export type CodeCheckState = 'ok' | 'checking' | 'error'
 
 // Состояние экрана-приглашения — отдельная техническая ось от доступности слота:
 //   form        — форма готова к вводу
@@ -40,6 +47,11 @@ export interface InviteCopy {
   // заголовок формы приглашения (над полями)
   formTitle: string
   codeLabel: string
+  // ярлык кнопки перепроверки кода (иконка рефреша справа в поле)
+  checkCode: string
+  // подпись под полем кода: идёт проверка / не удалось подключиться
+  codeChecking: string
+  codeError: string
   nicknameLabel: string
   nicknamePlaceholder: string
   randomNick: string
@@ -70,6 +82,10 @@ interface InviteProps {
   availability: SlotAvailability
   // состояние экрана; ведёт его консьюмер (сетевой слой). По умолчанию — форма
   state?: InviteState
+  // мок-состояние проверки кода у поля (ok по умолч.); ведёт консьюмер
+  codeState?: CodeCheckState
+  // запуск проверки хоста по коду — кнопка рефреша справа в поле кода
+  onCheckCode?: () => void
   copy: InviteCopy
   // текст блока печатной версии (из центрального каталога, от консьюмера)
   physicalEditionCopy: PhysicalEditionCopy
@@ -89,6 +105,8 @@ export default function Invite({
   code,
   availability,
   state = 'form',
+  codeState = 'ok',
+  onCheckCode,
   copy,
   physicalEditionCopy,
   onJoin,
@@ -176,7 +194,49 @@ export default function Invite({
             {/* поля ввода в контейнере фикс-высоты — высота учитывает жёлтую
                 подпись: форма дышит внутри, а кнопки под контейнером не двигаются */}
             <div className={styles.fields}>
-              {/* выбор роли — первым; в стиле полей ввода (лейбл + сегменты) */}
+              {/* код игры — первым: роль/слоты зависят от игры за этим кодом.
+                  Справа кнопка рефреша (перепроверка хоста), под полем — статус
+                  проверки: ok — пусто, checking — жёлтым с точками, error — красным */}
+              <div ref={codeRef} className={styles.fieldWrap}>
+                <Input
+                  label={copy.codeLabel}
+                  value={codeValue}
+                  onChange={(e) => setCodeValue(e.target.value)}
+                  disabled={busy}
+                  trailing={
+                    <Button
+                      variant="icon"
+                      onClick={() => onCheckCode?.()}
+                      aria-label={copy.checkCode}
+                      title={copy.checkCode}
+                      disabled={busy}
+                    >
+                      <RefreshIcon />
+                    </Button>
+                  }
+                />
+                <div className={styles.codeStatus} data-state={codeState}>
+                  {codeState === 'checking' && (
+                    <>
+                      <Typography as="span" base="mono-xs">
+                        {copy.codeChecking}
+                      </Typography>
+                      <span className={styles.dots} aria-hidden="true">
+                        <i />
+                        <i />
+                        <i />
+                      </span>
+                    </>
+                  )}
+                  {codeState === 'error' && (
+                    <Typography as="span" base="mono-xs">
+                      {copy.codeError}
+                    </Typography>
+                  )}
+                </div>
+              </div>
+
+              {/* выбор роли — после кода (зависит от слотов игры) */}
               <div className={styles.role}>
                 <span className={styles.roleLabel}>{copy.roleTitle}</span>
                 <div className={styles.roleOptions}>
@@ -223,14 +283,6 @@ export default function Invite({
                       <DiceIcon />
                     </Button>
                   }
-                />
-              </div>
-              <div ref={codeRef} className={styles.fieldWrap}>
-                <Input
-                  label={copy.codeLabel}
-                  value={codeValue}
-                  onChange={(e) => setCodeValue(e.target.value)}
-                  disabled={busy}
                 />
               </div>
             </div>

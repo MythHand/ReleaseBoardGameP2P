@@ -32,6 +32,9 @@ interface LobbyProps {
   role?: 'host' | 'guest'
   initialSetup?: Setup
   initialLang?: SwitchLang
+  // ссылка-приглашение для копирования (мок в песочнице); выводится из кода,
+  // если не передана — экран показывает две кнопки: «ссылка» и «код»
+  link?: string
   // HUD-фон экрана (переключается снаружи — напр. из техстроки песочницы)
   bgTone?: HudBackgroundTone
   // экран сам переключает язык, поэтому копи из каталога приходит обоими языками
@@ -104,6 +107,7 @@ function specColorFor(n: number) {
 
 export default function Lobby({
   code = '4F2A-9K',
+  link,
   initialCapacity = 5,
   initialPlayers = MOCK_PLAYERS,
   role = 'host',
@@ -131,6 +135,8 @@ export default function Lobby({
   const copy = lobbyScreenCopy[lang]
   const modesCopy = gameModesCopy[lang]
   const codeCopy = lobbyCodeCopy[lang]
+  // мок ссылки-приглашения: та же форма, что и реальный shareUrl (origin/lobby/<code>)
+  const shareLink = link ?? `release.game/lobby/${code}`
   const rulesCopy = rulesBlockCopy[lang]
 
   const specColor = specColorFor(specCapacity)
@@ -196,7 +202,7 @@ export default function Lobby({
           <p className={styles.sub}>{copy.subtitle}</p>
         </div>
         <div className={styles.headRight}>
-          <LobbyCode code={code} copy={codeCopy} />
+          <LobbyCode code={code} link={shareLink} copy={codeCopy} />
           <LangSwitcher value={lang} onChange={setLang} label={copy.language} />
         </div>
       </header>

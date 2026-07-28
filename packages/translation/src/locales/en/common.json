@@ -252,6 +252,8 @@
   "lobbyCode": {
     "label": "game code",
     "copy": "copy",
+    "copyLink": "link",
+    "copyCode": "code",
     "copied": "copied"
   },
   "physicalEdition": {

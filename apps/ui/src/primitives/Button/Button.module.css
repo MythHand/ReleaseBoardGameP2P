@@ -142,8 +142,13 @@
   box-shadow:
     0 0 12px color-mix(in srgb, var(--a) 14%, transparent),
     inset 0 0 14px color-mix(in srgb, var(--a) 7%, transparent);
+
+  /* border/glow/text-shadow glide when --btn-accent changes phase (green →
+     amber → red), so the key recolours smoothly instead of snapping */
   transition:
     box-shadow var(--t-base) var(--ease-out),
+    border-color var(--t-base) var(--ease-soft),
+    text-shadow var(--t-base) var(--ease-soft),
     transform var(--t-fast) var(--ease-out);
 }
 

@@ -25,6 +25,9 @@ import styles from './Rules.module.css'
 // ── собранная форма (то, что рендерит компонент) ──────────────────────────
 export interface RuleCard {
   names: string[]
+  // explicit catalog card id — disambiguates faces that share a display name
+  // (e.g. two "Error 503" cards: trigger vs AI). Falls back to name lookup.
+  cardId?: string
   desc?: string
   lead?: string
   body?: string[]
@@ -53,6 +56,7 @@ export interface RulesSection {
 interface CardSkel {
   id: string
   names: string[]
+  cardId?: string
 }
 interface GroupSkel {
   id: string
@@ -149,7 +153,7 @@ const RULES: SectionSkel[] = [
           { id: 'ai.goodvibe', names: ['Good Vibe-Coding'] },
           { id: 'ai.badvibe', names: ['Bad Vibe-Coding'] },
           { id: 'ai.hallucination', names: ['Hallucination'] },
-          { id: 'ai.error503', names: ['Error 503'] },
+          { id: 'ai.error503', names: ['Error 503'], cardId: 'ai-error-503' },
         ],
       },
     ],
@@ -241,7 +245,14 @@ function buildSections(skel: SectionSkel[], copy: RulesCopy): RulesSection[] {
           outro: gt.outro,
           cards: g.cards?.map((c) => {
             const ct = t(c.id)
-            return { names: c.names, desc: ct.desc, lead: ct.lead, body: ct.body, outro: ct.outro }
+            return {
+              names: c.names,
+              cardId: c.cardId,
+              desc: ct.desc,
+              lead: ct.lead,
+              body: ct.body,
+              outro: ct.outro,
+            }
           }),
         }
       }),
@@ -342,6 +353,7 @@ const rich = (text: string): ReactNode =>
 type CatalogCard = (typeof CARDS)[number]
 const CARD_BY_NAME = new Map<string, CatalogCard>()
 for (const c of CARDS) if (!CARD_BY_NAME.has(c.name)) CARD_BY_NAME.set(c.name, c)
+const CARD_BY_ID = new Map<string, CatalogCard>(CARDS.map((c) => [c.id, c]))
 
 // Карты для имён записи: имена без карты в каталоге (режимы) отсеиваются.
 const cardsFor = (names: string[]) =>
@@ -502,7 +514,8 @@ export default function Rules({ copy, lang = 'ru' }: RulesProps) {
 
   const renderCards = (cards?: RuleCard[]) =>
     cards?.map((c) => {
-      const faces = cardsFor(c.names)
+      const byId = c.cardId ? CARD_BY_ID.get(c.cardId) : undefined
+      const faces = byId ? [byId] : cardsFor(c.names)
       const sudo = c.desc ? splitSudo(c.desc) : null
       return (
         <div key={c.names.join('/')} className={styles.card}>
