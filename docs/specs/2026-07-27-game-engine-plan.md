@@ -1937,6 +1937,8 @@ describeEngine('fake', createFakeEngine, { deck: FAKE_DECK, events: FAKE_EVENTS 
 Run: `pnpm --filter @release/engine test src/fake/fake.test.ts`
 Expected: FAIL — `Failed to resolve import "../conformance"`.
 
+> **Superseded in part by what shipped.** Review found four properties in the listing below that could not fail, and they were strengthened during implementation: mutation-safety now snapshots **every** transition rather than only the first; seed-divergence asserts on seed-*derived* data (draw-pile order and dealt hands) instead of whole-state inequality, which passed on the copied `seed` scalar alone; a second `MEMORY_SETUP` config (`handLimit: 'memory'`) runs the totality and structural properties so `onHandLimit` is reachable at all — under `BASE_SETUP` the limit is `Infinity` and it was dead code; and the privacy scan enumerates `decks.events` as well as `decks.main`. Each strengthening was verified by a targeted break. **`packages/engine/src/conformance.ts` as shipped is the source of truth**; the listing below records the original intent. Task 13 extends the shipped file.
+
 - [ ] **Step 3: Write the implementation**
 
 Create `packages/engine/src/conformance.ts`:
