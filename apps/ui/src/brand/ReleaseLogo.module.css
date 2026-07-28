@@ -9,15 +9,21 @@
   block-size: auto;
 }
 
-/* единственный rect в макете — курсор-квадрат справа от слова.
+/* курсор-квадрат справа от слова (путь помечен data-cursor в ReleaseLogo).
    мигание в ритме терминального курсора, чуть медленнее обычного (~1.2s) */
-.wrap rect {
+.wrap [data-cursor] {
   animation: cursor-blink 1.2s steps(1, end) infinite;
 }
 
 /* статичный вариант — без мигающего курсора (напр. в хедере) */
-.static rect {
+.static [data-cursor] {
   animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wrap [data-cursor] {
+    animation: none;
+  }
 }
 
 @keyframes cursor-blink {

@@ -93,7 +93,7 @@
   block-size: auto;
 
   /* компенсация glow/инсета глифа в SVG — «R» на левую линию (масштаб ширины) */
-  margin: 0 0 12px -7px;
+  margin: 0 0 8px -7px;
 }
 
 .tags {
