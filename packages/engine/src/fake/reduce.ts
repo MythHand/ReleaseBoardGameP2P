@@ -4,6 +4,7 @@ import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, Setup } from '../state'
 import { createLog, isWellFormedAction, reject, setHand } from './core'
 import { playableFor } from './project'
+import { onDiscardForRelease, onPlay } from './release'
 
 const HAND_LIMITS: Record<string, number> = { '8bit': 8, memory: 5 }
 
@@ -160,6 +161,8 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
   switch (action.choice.kind) {
     case 'handLimit':
       return onHandLimit(state, action)
+    case 'discardForRelease':
+      return onDiscardForRelease(state, action)
     // Later tasks add the remaining decisions. Until then an unimplemented choice
     // is rejected rather than silently ignored.
     default:
@@ -181,7 +184,9 @@ export function reduce(state: GameState, action: Action): Reduction {
       return onPush(state, action)
     case 'RESOLVE':
       return onResolve(state, action)
-    // PLAY, ATTACK, PASS, UNPASS and WINDOW_EXPIRED arrive in Tasks 7 and 8.
+    case 'PLAY':
+      return onPlay(state, action)
+    // ATTACK, PASS, UNPASS and WINDOW_EXPIRED arrive in Task 8.
     default:
       return reject(state, action, `unsupported action: ${String(action?.type)}`)
   }
