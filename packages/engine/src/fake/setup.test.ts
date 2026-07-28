@@ -57,11 +57,16 @@ it('deals five cards to every player', () => {
   for (const id of s.seating) expect(s.players[id].hand).toHaveLength(5)
 })
 
-it('gives every player exactly one Debugger', () => {
-  const s = createGame(config())
-  for (const id of s.seating) {
-    const n = s.players[id].hand.filter((c) => c.id === 'protection-debugger').length
-    expect(n, id).toBe(1)
+// "One Debugger plus 4 random" — and those 4 come from a deck that still holds
+// other Debuggers, so a second one by chance is rules-correct. The guarantee is
+// a floor, not an exact count. Swept across seeds so it cannot pass by luck.
+it('guarantees every player at least one Debugger, on any seed', () => {
+  for (let seed = 0; seed < 50; seed += 1) {
+    const s = createGame(config({ seed }))
+    for (const id of s.seating) {
+      const n = s.players[id].hand.filter((c) => c.id === 'protection-debugger').length
+      expect(n, `seed ${seed}, ${id}`).toBeGreaterThanOrEqual(1)
+    }
   }
 })
 

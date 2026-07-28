@@ -31,6 +31,10 @@ export function createGame(config: GameConfig): GameState {
 
   // Reserve one Debugger per player before dealing, so the guaranteed opening
   // card cannot depend on where the shuffle happened to put them.
+  // If the deck has fewer Debuggers than players (under-supplied), the players
+  // without a reserved Debugger will receive 5 fully random cards instead — no
+  // error is thrown. This is accepted rather than an error path, since the real
+  // deck has 8 Debuggers against at most 6 players (unreachable in practice).
   const debuggers: CardInstance[] = []
   const rest: CardInstance[] = []
   for (const c of first.items) {
