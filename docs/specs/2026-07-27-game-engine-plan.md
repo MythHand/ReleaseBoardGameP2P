@@ -50,6 +50,7 @@ Design: [`docs/specs/2026-07-27-game-page-design.md`](./2026-07-27-game-page-des
 | `src/fake/setup.test.ts` | Opening-hand rules, deck accounting, determinism |
 | `src/fake/project.ts` | `project` — the privacy boundary |
 | `src/fake/project.test.ts` | Own hand full, opponents counts only, no id leaks |
+| `src/fake/core.ts` | Shared helpers every module needs: `createLog`, `Log`, `reject`, `setHand` |
 | `src/fake/reduce.ts` | `reduce` — dispatch + turn cycle |
 | `src/fake/reduce.test.ts` | Turn cycle, hand limit, rejection |
 | `src/fake/release.ts` | Release play, discard cost, win detection |
@@ -333,6 +334,9 @@ export type Pending =
       player: PlayerId
       attacker: PlayerId
       attack: CardUid
+      // The attacking card's catalogue id, carried rather than parsed back out of
+      // the uid — nothing should depend on the uid's internal format.
+      attackId: CardId
       sudo: boolean
       canDefendWith: CardUid[]
       deadline: number
@@ -696,7 +700,7 @@ export const RELEASE_ATTACKS: ReadonlySet<CardId> = new Set([
 ```ts
 export { CARD_RULES, type CardKind, type CardRules, RELEASE_ATTACKS, rulesFor, SUPPORTED } from './cards'
 export type { Action, ActionType, Choice, Target } from './actions'
-export { describeEngine, type Feature } from './conformance'
+export { describeEngine, type ConformanceOptions } from './conformance'
 export type { DeckEntry, Engine, GameConfig, Reduction } from './engine'
 export type { DefenceEffect, DiscardReason, Event, EventBase, EventType } from './events'
 export { randomAt, shuffle } from './rng'
@@ -1549,17 +1553,20 @@ it('offers every living opponent as a hand-attack target', () => {
 Run: `pnpm --filter @release/engine test src/fake/reduce.test.ts`
 Expected: FAIL — `Failed to resolve import "./index"`.
 
-- [ ] **Step 3: Write the implementation**
+- [ ] **Step 3: Write the shared core**
 
-Create `packages/engine/src/fake/reduce.ts`:
+Every later module appends to the *same* event log and rejects the same way. Those
+helpers live in their own module from the start: `project`, `window`, `release` and
+`attacks` all need them, and importing them from `reduce.ts` — which imports
+`project` — would form an import cycle.
+
+Create `packages/engine/src/fake/core.ts`:
 
 ```ts
-import type { Action, Target } from '../actions'
-import { rulesFor } from '../cards'
+import type { Action } from '../actions'
 import type { Reduction } from '../engine'
 import type { Event } from '../events'
-import type { CardUid, GameState, PlayerId, PlayerState, Setup } from '../state'
-import { playableFor } from './project'
+import type { GameState, PlayerId, PlayerState } from '../state'
 
 // Omit over a union collapses to the shared keys, so distribute it first —
 // otherwise an event input loses every variant-specific field.
@@ -1584,6 +1591,37 @@ export function createLog(start: number) {
   }
 }
 
+export type Log = ReturnType<typeof createLog>
+
+export function reject(state: GameState, action: Action, reason: string): Reduction {
+  const log = createLog(state.eventSeq)
+  log.add({ type: 'rejected', action, reason })
+  // The state reference is deliberately unchanged — callers assert on identity.
+  return { state, events: log.events }
+}
+
+export const setHand = (
+  state: GameState,
+  id: PlayerId,
+  hand: PlayerState['hand'],
+): GameState => ({
+  ...state,
+  players: { ...state.players, [id]: { ...state.players[id], hand } },
+})
+```
+
+- [ ] **Step 4: Write the reducer**
+
+Create `packages/engine/src/fake/reduce.ts`:
+
+```ts
+import type { Action, Target } from '../actions'
+import { rulesFor } from '../cards'
+import type { Reduction } from '../engine'
+import type { CardUid, GameState, PlayerId, Setup } from '../state'
+import { createLog, reject, setHand } from './core'
+import { playableFor } from './project'
+
 const HAND_LIMITS: Record<string, number> = { '8bit': 8, memory: 5 }
 
 export function handLimitFor(setup: Setup): number {
@@ -1601,18 +1639,6 @@ export function nextSeat(state: GameState, from: PlayerId): PlayerId {
   // unreachable in practice; returning `from` keeps reduce total.
   return from
 }
-
-function reject(state: GameState, action: Action, reason: string): Reduction {
-  const log = createLog(state.eventSeq)
-  log.add({ type: 'rejected', action, reason })
-  // The state reference is deliberately unchanged — callers assert on identity.
-  return { state, events: log.events }
-}
-
-const setHand = (state: GameState, id: PlayerId, hand: PlayerState['hand']): GameState => ({
-  ...state,
-  players: { ...state.players, [id]: { ...state.players[id], hand } },
-})
 
 export function legalTargets(state: GameState, actor: PlayerId, card: CardUid): Target[] {
   if (!playableFor(state, actor).includes(card)) return []
@@ -1769,6 +1795,8 @@ export function reduce(state: GameState, action: Action): Reduction {
 }
 ```
 
+- [ ] **Step 5: Assemble the engine**
+
 Create `packages/engine/src/fake/index.ts`:
 
 ```ts
@@ -1822,16 +1850,18 @@ export function createFakeEngine(): Engine {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `pnpm --filter @release/engine test`
 Expected: PASS — 14 reduce tests plus the earlier suites.
 
-- [ ] **Step 5: Commit**
+Then: `pnpm -r typecheck`
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add packages/engine/src/fake
-git commit -m "feat(engine): turn cycle, hand limit, and the assembled fake engine"
+git commit -m "feat(engine): shared core, turn cycle, hand limit, assembled fake engine"
 ```
 
 ---
@@ -1849,11 +1879,9 @@ Lands now rather than last, so every later task inherits its guarantees. The sui
 - Consumes: `Engine`, `GameConfig`, `DeckEntry` from `./engine`; `Action`, `Choice` from `./actions`; `randomAt` from `./rng`.
 - Produces:
   ```ts
-  export type Feature = 'gitOps' | 'systemUpgrade' | 'aiEvents' | 'triggers'
   export interface ConformanceOptions {
     deck: DeckEntry[]
     events: DeckEntry[]
-    skip?: Feature[]
   }
   export function describeEngine(
     name: string, make: () => Engine, options: ConformanceOptions,
@@ -1868,13 +1896,9 @@ Create `packages/engine/src/fake/fake.test.ts`:
 import { describeEngine } from '../conformance'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
 
-// The real reducer calls this with no `skip`. Everything the fake omits is a
-// bespoke UI surface deferred by the design, not a rule it gets to ignore.
-describeEngine('fake', createFakeEngine, {
-  deck: FAKE_DECK,
-  events: FAKE_EVENTS,
-  skip: ['gitOps', 'systemUpgrade'],
-})
+// Every implementation runs the same suite. The fake's deck simply omits the
+// cards whose UI surfaces the design defers, so nothing here needs gating.
+describeEngine('fake', createFakeEngine, { deck: FAKE_DECK, events: FAKE_EVENTS })
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -1892,14 +1916,9 @@ import type { DeckEntry, Engine, GameConfig } from './engine'
 import { randomAt } from './rng'
 import type { GameState, PlayerId, Setup } from './state'
 
-// Capabilities an implementation may legitimately not have yet. The fake skips
-// the ones whose UI surfaces the design defers; the real engine skips nothing.
-export type Feature = 'gitOps' | 'systemUpgrade' | 'aiEvents' | 'triggers'
-
 export interface ConformanceOptions {
   deck: DeckEntry[]
   events: DeckEntry[]
-  skip?: Feature[]
 }
 
 const BASE_SETUP: Setup = {
@@ -1968,8 +1987,6 @@ export function describeEngine(
   make: () => Engine,
   options: ConformanceOptions,
 ): void {
-  const skip = new Set(options.skip ?? [])
-
   describe(`engine conformance: ${name}`, () => {
     describe('determinism', () => {
       it('builds an identical game from an identical config', () => {
@@ -2119,19 +2136,7 @@ export function describeEngine(
       })
     })
 
-    // Feature suites the design defers for the fake. Task 12 adds the rules
-    // invariants; these two guard the skip mechanism itself.
-    describe.skipIf(skip.has('gitOps'))('git operations', () => {
-      it('is exercised only by an implementation claiming gitOps', () => {
-        expect(skip.has('gitOps')).toBe(false)
-      })
-    })
-
-    describe.skipIf(skip.has('systemUpgrade'))('system upgrade', () => {
-      it('is exercised only by an implementation claiming systemUpgrade', () => {
-        expect(skip.has('systemUpgrade')).toBe(false)
-      })
-    })
+    // Task 13 adds the rules-invariant suite here.
   })
 }
 ```
@@ -2141,13 +2146,13 @@ export function describeEngine(
 In `packages/engine/src/index.ts`, add the line held back in Task 2:
 
 ```ts
-export { describeEngine, type ConformanceOptions, type Feature } from './conformance'
+export { describeEngine, type ConformanceOptions } from './conformance'
 ```
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `pnpm --filter @release/engine test`
-Expected: PASS. The two feature suites report as skipped.
+Expected: PASS.
 
 A privacy failure here is a real defect, not a flaky test — read which uid leaked into which viewer's view and fix `project`.
 
@@ -2168,7 +2173,7 @@ git commit -m "test(engine): conformance suite for determinism, totality, and pr
 - Test: `packages/engine/src/fake/release.test.ts`
 
 **Interfaces:**
-- Consumes: `createLog`, `reject`, `setHand`, `Log` from `./reduce`; `rulesFor` from `../cards`; `playableFor` from `./project`.
+- Consumes: `createLog`, `reject`, `setHand`, `Log` from `./core`; `rulesFor` from `../cards`; `playableFor` from `./project`.
 - Produces:
   ```ts
   export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Reduction
@@ -2179,17 +2184,7 @@ git commit -m "test(engine): conformance suite for determinism, totality, and pr
   export function checkWin(state: GameState, log: Log): GameState
   ```
 
-- [ ] **Step 1: Export the shared helpers from `reduce.ts`**
-
-`release.ts` must append to the *same* event log, or ids collide. In `packages/engine/src/fake/reduce.ts` add the alias and export the two module-locals:
-
-```ts
-export type Log = ReturnType<typeof createLog>
-```
-
-Change `function reject(` to `export function reject(` and `const setHand =` to `export const setHand =`. No behaviour changes.
-
-- [ ] **Step 2: Write the failing test**
+- [ ] **Step 1: Write the failing test**
 
 Create `packages/engine/src/fake/release.test.ts`:
 
@@ -2390,12 +2385,12 @@ it('rejects a play once the game is over, or of a frozen card', () => {
 })
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [ ] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter @release/engine test src/fake/release.test.ts`
 Expected: FAIL — every `PLAY` is rejected with "unsupported action: PLAY".
 
-- [ ] **Step 4: Write the implementation**
+- [ ] **Step 3: Write the implementation**
 
 Create `packages/engine/src/fake/release.ts`:
 
@@ -2405,7 +2400,7 @@ import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
 import { playableFor } from './project'
-import { createLog, type Log, reject, setHand } from './reduce'
+import { createLog, type Log, reject, setHand } from './core'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
@@ -2577,7 +2572,7 @@ export function onDiscardForRelease(
 }
 ```
 
-- [ ] **Step 5: Route the new cases in `reduce.ts`**
+- [ ] **Step 4: Route the new cases in `reduce.ts`**
 
 Add the import:
 
@@ -2599,14 +2594,14 @@ In `reduce`'s switch, above `default`:
       return onPlay(state, action)
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [ ] **Step 5: Run the tests to verify they pass**
 
 Run: `pnpm --filter @release/engine test`
 Expected: PASS — 13 release tests plus every earlier suite, conformance included.
 
 Then: `pnpm -r typecheck`
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add packages/engine/src/fake
@@ -2788,7 +2783,7 @@ import type { Action } from '../actions'
 import { RELEASE_ATTACKS } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, ReactionWindow } from '../state'
-import { createLog, type Log, reject } from './reduce'
+import { createLog, type Log, reject } from './core'
 
 // understanding.md §7: the first reaction gets 15s; every later round in the same
 // exchange gets 10s.
@@ -2953,7 +2948,7 @@ In `project.ts`, import `canAttackWith` from `./window` and replace the hardcode
     },
 ```
 
-> `project.ts` importing from `window.ts` while `window.ts` imports `reject` from `reduce.ts`, which imports `playableFor` from `project.ts`, forms an import cycle. ESM handles it here because every binding is used at call time rather than module-evaluation time. If Biome flags it, move `reject`, `createLog`, `setHand` and `Log` into a new `packages/engine/src/fake/core.ts` that the other three import from, and re-export them from `reduce.ts` for compatibility.
+> No cycle forms here, because `core.ts` (Task 5) owns the shared helpers: `project → window → core` and `reduce → {project, window, release}` are both acyclic. If a later import does reach back into `reduce.ts` from one of those modules, move the shared symbol down into `core.ts` rather than accepting the cycle.
 
 - [ ] **Step 6: Run the tests to verify they pass**
 
@@ -3266,7 +3261,7 @@ import { RELEASE_ATTACKS, rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardInstance, CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
 import type { PendingView } from '../view'
-import { createLog, type Log, reject, setHand } from './reduce'
+import { createLog, type Log, reject, setHand } from './core'
 import { closeWindow, openWindow, respondersFor } from './window'
 
 // A stalled defence blocks everyone, so it carries a deadline like the window.
@@ -3382,6 +3377,7 @@ export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }):
         player: w.target.player,
         attacker: action.player,
         attack: card.uid,
+        attackId: card.id,
         sudo,
         canDefendWith: defencesFor(state, w.target.player, sudo),
         deadline: action.at + DEFEND_MS,
@@ -3404,7 +3400,7 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
   const attacker = pending.attacker
   const { slot } = w.target
   // The attack card was removed from the attacker's hand when it was thrown.
-  const attackCard: CardInstance = { uid: pending.attack, id: pending.attack.split('#')[0] }
+  const attackCard: CardInstance = { uid: pending.attack, id: pending.attackId }
   const stealer = attackCard.id === 'attack-security-bug' ? attacker : null
 
   // Take the hit.
@@ -3480,7 +3476,7 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         kind: 'defend',
         player: p.player,
         attacker: p.attacker,
-        attackCard: p.attack.split('#')[0],
+        attackCard: p.attackId,
         sudo: p.sudo,
         options: mine ? [...p.canDefendWith] : [],
         deadline: p.deadline,
@@ -3508,8 +3504,6 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
   }
 }
 ```
-
-> `attackCard` is reconstructed from the uid via `pending.attack.split('#')[0]`, which relies on the uid format `` `${id}#${n}` `` set in Task 3. That coupling is deliberate and cheap, but if the rules author changes the uid scheme they must also carry the attack's `CardId` on the pending. Note it in the package README when Task 13 writes it.
 
 - [ ] **Step 5: Route the new cases**
 
@@ -3770,7 +3764,7 @@ import type { Reduction } from '../engine'
 import { randomAt } from '../rng'
 import type { CardInstance, GameState, PlayerId } from '../state'
 import { defencesFor, DEFEND_MS } from './attacks'
-import { createLog, type Log, reject, setHand } from './reduce'
+import { createLog, type Log, reject, setHand } from './core'
 
 const discard = (state: GameState, cards: CardInstance[]): GameState => ({
   ...state,
@@ -3796,6 +3790,7 @@ export function openHandAttack(
       player: target,
       attacker,
       attack: attack.uid,
+      attackId: attack.id,
       sudo,
       canDefendWith: defencesFor(state, target, sudo),
       deadline: at + DEFEND_MS,
@@ -4519,7 +4514,7 @@ Any failure here is an engine defect, not a test defect. Fix the implementation;
 
 - [ ] **Step 3: Write the handoff README**
 
-Create `packages/engine/README.md` covering: the four contract functions and their guarantees; the three hard rules (purity, totality, projection privacy) with why each exists; how to run the conformance suite against a new implementation (`describeEngine('real', createRealEngine, { deck, events })` with no `skip`); the `` `${id}#${n}` `` uid convention and the one place that depends on it (`pendingView` reconstructing an attack's `CardId`); which cards the fake omits and why; and that quantities come from `GameConfig.deck` while `CARD_RULES` holds rules metadata only.
+Create `packages/engine/README.md` covering: the four contract functions and their guarantees; the three hard rules (purity, totality, projection privacy) with why each exists; how to run the conformance suite against a new implementation (`describeEngine('real', createRealEngine, { deck, events })`); the `` `${id}#${n}` `` uid convention, noting that nothing reads its internal structure — a `CardId` is always carried explicitly, never parsed back out; which cards the fake omits and why; and that quantities come from `GameConfig.deck` while `CARD_RULES` holds rules metadata only.
 
 - [ ] **Step 4: Full verification**
 
@@ -4545,9 +4540,9 @@ git commit -m "test(engine): rules invariants in conformance; docs: engine hando
 
 - [ ] `packages/engine` has no runtime dependency on `@release/ui`, `@release/translation`, React, or `apps/frontend` — confirm with `grep -rn "@release/ui\|@release/translation\|from 'react'" packages/engine/src`, expecting no matches
 - [ ] No `Math.random`, `Date.now`, `performance.now` or `new Date` anywhere under `packages/engine/src` — confirm with `grep -rn "Math.random\|Date.now\|performance.now\|new Date" packages/engine/src`
-- [ ] `pnpm --filter @release/engine test` green, including the conformance suite with `gitOps` and `systemUpgrade` reported as skipped
+- [ ] `pnpm --filter @release/engine test` green, including the full conformance suite
 - [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` green from the repo root
-- [ ] `packages/engine/README.md` explains how the rules author runs `describeEngine` with no `skip`
+- [ ] `packages/engine/README.md` explains how the rules author runs `describeEngine` against their implementation
 - [ ] `apps/ui/src/cards/catalogue.ts` is **unmodified** — retiring its three mock-logic functions belongs to the screen plan, and `apps/playground/stories/ComboStory/ComboStory.tsx` still imports them
 - [ ] `apps/frontend/src/network/session/turn.ts` is **unmodified** — the network layer still owns it
 
