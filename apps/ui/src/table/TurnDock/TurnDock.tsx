@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react'
+import { type CSSProperties, useEffect, useState } from 'react'
 import Badge from '@/primitives/Badge'
 import Button from '@/primitives/Button'
 import HudSurface from '@/primitives/HudSurface'
@@ -16,6 +16,11 @@ import styles from './TurnDock.module.css'
 const SOFT: SwapMotion = { out: 220, in: 300 } // phase / key label
 const MODE: SwapMotion = { out: 240, in: 340 } // opponent → your turn (key back)
 const NAME: SwapMotion = { out: 240, in: 320, delayIn: 260 } // name appears (after prev clears)
+
+// Input-lockout: after the action key appears / swaps to a new action, ignore
+// clicks for a beat — an inertia-click aimed at the previous key would otherwise
+// fire the new action. Invisible (the key stays fully lit); ~one fade-in long.
+const LOCKOUT_MS = 300
 
 // Widest of the given strings — reserves a fixed slot so a text box never resizes
 // between states (all values are known up front).
@@ -109,6 +114,19 @@ export default function TurnDock({
   const label = state === 'draw' ? copy.draw : state === 'push' ? copy.push : copy.pass
   const handler = state === 'draw' ? onDraw : state === 'push' ? onPush : onPass
 
+  // re-arm the lockout whenever the actionable key changes (or reappears)
+  const keyId = buttonMode ? state : 'idle'
+  const [keyLocked, setKeyLocked] = useState(true)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyId is the re-arm trigger, not read inside
+  useEffect(() => {
+    setKeyLocked(true)
+    const id = setTimeout(() => setKeyLocked(false), LOCKOUT_MS)
+    return () => clearTimeout(id)
+  }, [keyId])
+  const onKey = () => {
+    if (!keyLocked) handler?.()
+  }
+
   // phase + key label share one plain fade; the action slot fades the name in
   // after the previous content clears (sequential), the key back in flat.
   const modeAnim = state === 'waiting' ? NAME : MODE
@@ -149,12 +167,7 @@ export default function TurnDock({
             <div className={styles.actionMain}>
               <Swap token={buttonMode ? 'btn' : 'name'} anim={modeAnim} fill>
                 {buttonMode ? (
-                  <Button
-                    variant="hud"
-                    className={styles.key}
-                    style={accentStyle}
-                    onClick={handler}
-                  >
+                  <Button variant="hud" className={styles.key} style={accentStyle} onClick={onKey}>
                     <Swap token={label} anim={SOFT} sizer={labelSizer}>
                       {label}
                     </Swap>
