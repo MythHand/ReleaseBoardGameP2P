@@ -1615,6 +1615,23 @@ export const setHand = (
   ...state,
   players: { ...state.players, [id]: { ...state.players[id], hand } },
 })
+
+// The TS Action type does not survive JSON deserialization, so an action from a
+// remote peer may be any shape at all. Validating once at reduce's entry means
+// every handler can destructure freely, and no later handler can reopen the hole
+// that "reduce never throws" exists to close. Per-variant payloads are NOT
+// checked here — a handler still guards its own choice fields.
+export function isWellFormedAction(action: unknown): action is Action {
+  if (typeof action !== 'object' || action === null) return false
+  const a = action as { type?: unknown; choice?: unknown }
+  if (typeof a.type !== 'string') return false
+  if (a.type !== 'RESOLVE') return true
+  return (
+    typeof a.choice === 'object' &&
+    a.choice !== null &&
+    typeof (a.choice as { kind?: unknown }).kind === 'string'
+  )
+}
 ```
 
 - [ ] **Step 4: Write the reducer**
@@ -1788,7 +1805,10 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
 }
 
 export function reduce(state: GameState, action: Action): Reduction {
-  switch (action?.type) {
+  // Shape-check once, before dispatch: a malformed action from a remote peer must
+  // reject, never throw.
+  if (!isWellFormedAction(action)) return reject(state, action, 'malformed action')
+  switch (action.type) {
     case 'DRAW':
       return onDraw(state, action)
     case 'PUSH':
