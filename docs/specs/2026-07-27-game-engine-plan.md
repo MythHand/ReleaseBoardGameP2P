@@ -1326,8 +1326,10 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
     // a projected view carries no window and no prompt.
     window: null,
     pending: null,
-    setup: state.setup,
-    over: state.over,
+    // Copied, not shared: handing out the live objects would let a caller mutate
+    // GameState through the view — the barrier this function exists to enforce.
+    setup: { ...state.setup },
+    over: state.over && { ...state.over },
   }
 }
 ```
