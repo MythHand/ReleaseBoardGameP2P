@@ -35,30 +35,54 @@ const configFor = (options: ConformanceOptions, seed: number, setup = BASE_SETUP
   events: options.events,
 })
 
+// Builds a valid choice from the data a pending decision itself carries, so the
+// fuzz stream always resolves what it opens instead of stalling on it. Left to
+// the random RESOLVE branch below (which only ever proposes a 'defend'
+// choice), any pending kind would perpetually reject as "wrong choice for this
+// decision" — `onDraw`/`onPush` also reject outright while `pending` is set,
+// so turn rotation freezes for the remainder of the stream and every property
+// built on `drive()` silently stops exercising anything past that point. A
+// pending kind with no case here falls through to `null`, i.e. to that same
+// random RESOLVE branch — the 'resolves every pending decision' property
+// below is what turns that silent stall into a failing test instead. A later
+// task that adds a new Pending variant (defend, neutralize503, crush,
+// requestCard, giveCard) adds a case here.
+function resolvePendingAction(state: GameState, n: number): Action | null {
+  const { pending } = state
+  if (!pending) return null
+  const at = 1000 + n
+  switch (pending.kind) {
+    case 'handLimit': {
+      const hand = state.players[pending.player].hand
+      const cards = hand.slice(0, pending.excess).map((c) => c.uid)
+      return { type: 'RESOLVE', player: pending.player, choice: { kind: 'handLimit', cards }, at }
+    }
+    case 'discardForRelease': {
+      const hand = state.players[pending.player].hand
+      // Neither the release nor its comboed Code Review can pay its own cost —
+      // onPlay already guaranteed a spare exists before opening this pending.
+      const spare = hand.find((c) => c.uid !== pending.release && c.uid !== pending.codeReview)
+      if (!spare) return null
+      return {
+        type: 'RESOLVE',
+        player: pending.player,
+        choice: { kind: 'discardForRelease', card: spare.uid },
+        at,
+      }
+    }
+    default:
+      return null
+  }
+}
+
 // A deterministic pseudo-random action stream. Deliberately includes illegal
 // actions — most of these will be rejected, which is exactly what totality means.
 function fuzzAction(state: GameState, seed: number, n: number): Action {
+  const resolving = resolvePendingAction(state, n)
+  if (resolving) return resolving
+
   const pick = <T>(items: readonly T[], salt: number): T =>
     items[Math.floor(randomAt(seed, n * 8 + salt) * items.length)]
-
-  // Under MEMORY_SETUP a hand-limit decision comes up on nearly every turn.
-  // Left to the random RESOLVE branch below (which only ever proposes a
-  // 'defend' choice), it would perpetually reject as "wrong choice for this
-  // decision" and onHandLimit's committing logic would never run. This branch
-  // is unreachable under BASE_SETUP, where the limit is unbounded and
-  // `pending.kind` is never 'handLimit', so it changes nothing there.
-  const { pending } = state
-  if (pending?.kind === 'handLimit') {
-    const hand = state.players[pending.player].hand
-    const cards = hand.slice(0, pending.excess).map((c) => c.uid)
-    return {
-      type: 'RESOLVE',
-      player: pending.player,
-      choice: { kind: 'handLimit', cards },
-      at: 1000 + n,
-    }
-  }
-
   const player: PlayerId = pick(state.seating, 1)
   const hand = state.players[player].hand
   const uid = hand.length > 0 ? pick(hand, 2).uid : 'no-such-card'
@@ -207,6 +231,48 @@ export function describeEngine(
         const ids = committed.map((e) => e.id)
         expect(new Set(ids).size).toBe(ids.length)
         expect([...ids].sort((x, y) => x - y)).toEqual(ids)
+      })
+    })
+
+    describe('progress', () => {
+      // The defect this guards against is silent, not loud: a pending decision
+      // the fuzz stream cannot resolve holds `state.pending` for the rest of
+      // the run — `onDraw`/`onPush` reject outright while it is set, so turn
+      // rotation freezes and every later step collapses into the same
+      // rejection. Every other property in this file would keep passing while
+      // exercising almost nothing past that point. This test is what turns
+      // that silent coverage loss into a red test.
+      const driveProgress = (setup: Setup, seed: number) => {
+        const engine = make()
+        let state = engine.createGame(configFor(options, seed, setup))
+        let streak = 0
+        let maxStreak = 0
+        for (let n = 0; n < 400; n += 1) {
+          state = engine.reduce(state, fuzzAction(state, seed, n)).state
+          streak = state.pending ? streak + 1 : 0
+          maxStreak = Math.max(maxStreak, streak)
+        }
+        return { maxStreak, finalTurnIndex: state.turn.index }
+      }
+
+      it('resolves every pending decision instead of stalling the stream', () => {
+        const { maxStreak, finalTurnIndex } = driveProgress(BASE_SETUP, 2468)
+        // One step of slack for the single step during which a decision is
+        // genuinely open before the very next fuzzed action closes it again.
+        expect(maxStreak).toBeLessThanOrEqual(1)
+        // A stalled stream also never rotates the turn again. This threshold
+        // is unattainable without genuinely resolving decisions the fuzz
+        // stream itself opens (hand-limit discards, release costs, ...).
+        expect(finalTurnIndex).toBeGreaterThan(5)
+      })
+
+      // BASE_SETUP's unbounded hand limit means a `handLimit` pending never
+      // arises under it (see the totality describe above) — without this run,
+      // a regression in that specific case would be invisible to this file.
+      it('resolves every pending decision under a constrained hand limit', () => {
+        const { maxStreak, finalTurnIndex } = driveProgress(MEMORY_SETUP, 2468)
+        expect(maxStreak).toBeLessThanOrEqual(1)
+        expect(finalTurnIndex).toBeGreaterThan(5)
       })
     })
 
