@@ -35,6 +35,18 @@ const configFor = (options: ConformanceOptions, seed: number, setup = BASE_SETUP
   events: options.events,
 })
 
+// The fuzz clock. A reaction window's deadline is `at_open + 15000` on its
+// first round and `+ 10000` after (see fake/window.ts). Advancing `at` by only
+// 1 per step, as a per-action counter would, makes every deadline forever in
+// the future — `onWindowExpired`'s guard could never fire naturally, and the
+// entire expiry path (one of only two ways a window closes) went unexercised.
+// 1000ms per step makes a round-1 window expirable about 15 steps after it
+// opens, which is fast enough to reach within a 400-step run, while still
+// spending roughly those same 15 steps with a premature WINDOW_EXPIRED
+// correctly rejecting on "the window has not expired" — both paths get
+// exercised, not just the accepting one.
+const atFor = (n: number): number => 1000 + n * 1000
+
 // Builds a valid choice from the data a pending decision itself carries, so the
 // fuzz stream always resolves what it opens instead of stalling on it. Left to
 // the random RESOLVE branch below (which only ever proposes a 'defend'
@@ -50,7 +62,7 @@ const configFor = (options: ConformanceOptions, seed: number, setup = BASE_SETUP
 function resolvePendingAction(state: GameState, n: number): Action | null {
   const { pending } = state
   if (!pending) return null
-  const at = 1000 + n
+  const at = atFor(n)
   switch (pending.kind) {
     case 'handLimit': {
       const hand = state.players[pending.player].hand
@@ -86,7 +98,7 @@ function fuzzAction(state: GameState, seed: number, n: number): Action {
   const player: PlayerId = pick(state.seating, 1)
   const hand = state.players[player].hand
   const uid = hand.length > 0 ? pick(hand, 2).uid : 'no-such-card'
-  const at = 1000 + n
+  const at = atFor(n)
 
   const kind = Math.floor(randomAt(seed, n * 8 + 3) * 7)
   switch (kind) {
@@ -235,44 +247,71 @@ export function describeEngine(
     })
 
     describe('progress', () => {
-      // The defect this guards against is silent, not loud: a pending decision
-      // the fuzz stream cannot resolve holds `state.pending` for the rest of
-      // the run — `onDraw`/`onPush` reject outright while it is set, so turn
-      // rotation freezes and every later step collapses into the same
-      // rejection. Every other property in this file would keep passing while
-      // exercising almost nothing past that point. This test is what turns
-      // that silent coverage loss into a red test.
+      // The defect this guards against is silent, not loud. Two different
+      // fields can each hold the stream hostage for the rest of a run, and
+      // every other property in this file would keep passing while exercising
+      // almost nothing past that point:
+      //  - a pending decision the fuzzer cannot resolve holds `state.pending`
+      //    (`onDraw`/`onPush` reject outright while it is set);
+      //  - an open reaction window that never closes holds `state.window`
+      //    (same rejection, different gate) — and closing is not guaranteed
+      //    by unanimous PASS alone: it is probabilistic per responder per
+      //    step, the fuzzer never emits UNPASS, and a window can also close
+      //    by expiring once its deadline has passed.
+      // This test is what turns either silent coverage loss into a red test.
       const driveProgress = (setup: Setup, seed: number) => {
         const engine = make()
         let state = engine.createGame(configFor(options, seed, setup))
-        let streak = 0
-        let maxStreak = 0
+        let pendingStreak = 0
+        let maxPendingStreak = 0
+        let windowStreak = 0
+        let maxWindowStreak = 0
         for (let n = 0; n < 400; n += 1) {
           state = engine.reduce(state, fuzzAction(state, seed, n)).state
-          streak = state.pending ? streak + 1 : 0
-          maxStreak = Math.max(maxStreak, streak)
+          pendingStreak = state.pending ? pendingStreak + 1 : 0
+          maxPendingStreak = Math.max(maxPendingStreak, pendingStreak)
+          windowStreak = state.window ? windowStreak + 1 : 0
+          maxWindowStreak = Math.max(maxWindowStreak, windowStreak)
         }
-        return { maxStreak, finalTurnIndex: state.turn.index }
+        return { maxPendingStreak, maxWindowStreak, finalTurnIndex: state.turn.index }
       }
 
       it('resolves every pending decision instead of stalling the stream', () => {
-        const { maxStreak, finalTurnIndex } = driveProgress(BASE_SETUP, 2468)
+        const { maxPendingStreak, maxWindowStreak, finalTurnIndex } = driveProgress(
+          BASE_SETUP,
+          2468,
+        )
         // One step of slack for the single step during which a decision is
         // genuinely open before the very next fuzzed action closes it again.
-        expect(maxStreak).toBeLessThanOrEqual(1)
+        expect(maxPendingStreak).toBeLessThanOrEqual(1)
+        // A window legitimately stays open for several steps while responders
+        // decide, so `<= 1` is the wrong bound here, unlike for `pending`. The
+        // fuzz clock (`atFor`) makes a round-1 deadline reachable ~15 steps
+        // after opening; from there, the probability of *not* drawing a
+        // WINDOW_EXPIRED action (1 of 7 fuzz kinds) within k more steps is
+        // (6/7)^k, under 0.1% by k = 45 — so 60 is a generous but non-trivial
+        // bound: comfortably above every legitimately-closing run observed in
+        // this suite (max 29), while far below what an unclosable window
+        // produces (330, observed by forcing one during verification).
+        expect(maxWindowStreak).toBeLessThanOrEqual(60)
         // A stalled stream also never rotates the turn again. This threshold
-        // is unattainable without genuinely resolving decisions the fuzz
-        // stream itself opens (hand-limit discards, release costs, ...).
-        expect(finalTurnIndex).toBeGreaterThan(5)
+        // is unattainable without genuinely resolving decisions and windows
+        // the fuzz stream itself opens (hand-limit discards, release costs,
+        // reaction windows, ...).
+        expect(finalTurnIndex).toBeGreaterThan(8)
       })
 
       // BASE_SETUP's unbounded hand limit means a `handLimit` pending never
       // arises under it (see the totality describe above) — without this run,
       // a regression in that specific case would be invisible to this file.
       it('resolves every pending decision under a constrained hand limit', () => {
-        const { maxStreak, finalTurnIndex } = driveProgress(MEMORY_SETUP, 2468)
-        expect(maxStreak).toBeLessThanOrEqual(1)
-        expect(finalTurnIndex).toBeGreaterThan(5)
+        const { maxPendingStreak, maxWindowStreak, finalTurnIndex } = driveProgress(
+          MEMORY_SETUP,
+          2468,
+        )
+        expect(maxPendingStreak).toBeLessThanOrEqual(1)
+        expect(maxWindowStreak).toBeLessThanOrEqual(60)
+        expect(finalTurnIndex).toBeGreaterThan(8)
       })
     })
 
