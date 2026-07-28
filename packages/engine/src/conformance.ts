@@ -17,6 +17,11 @@ const BASE_SETUP: Setup = {
   gitBranch: 'base',
 }
 
+// BASE_SETUP's hand limit is unbounded, so endTurn's overflow branch and
+// onHandLimit's committing path are otherwise dead code for this whole suite.
+// A 5-card limit collides with the 5-card opening hand on the very first draw.
+const MEMORY_SETUP: Setup = { ...BASE_SETUP, handLimit: 'memory' }
+
 const configFor = (options: ConformanceOptions, seed: number, setup = BASE_SETUP): GameConfig => ({
   gameId: 'conformance',
   seed,
@@ -35,6 +40,25 @@ const configFor = (options: ConformanceOptions, seed: number, setup = BASE_SETUP
 function fuzzAction(state: GameState, seed: number, n: number): Action {
   const pick = <T>(items: readonly T[], salt: number): T =>
     items[Math.floor(randomAt(seed, n * 8 + salt) * items.length)]
+
+  // Under MEMORY_SETUP a hand-limit decision comes up on nearly every turn.
+  // Left to the random RESOLVE branch below (which only ever proposes a
+  // 'defend' choice), it would perpetually reject as "wrong choice for this
+  // decision" and onHandLimit's committing logic would never run. This branch
+  // is unreachable under BASE_SETUP, where the limit is unbounded and
+  // `pending.kind` is never 'handLimit', so it changes nothing there.
+  const { pending } = state
+  if (pending?.kind === 'handLimit') {
+    const hand = state.players[pending.player].hand
+    const cards = hand.slice(0, pending.excess).map((c) => c.uid)
+    return {
+      type: 'RESOLVE',
+      player: pending.player,
+      choice: { kind: 'handLimit', cards },
+      at: 1000 + n,
+    }
+  }
+
   const player: PlayerId = pick(state.seating, 1)
   const hand = state.players[player].hand
   const uid = hand.length > 0 ? pick(hand, 2).uid : 'no-such-card'
@@ -86,7 +110,14 @@ export function describeEngine(
       it('diverges on a different seed', () => {
         const a = make().createGame(configFor(options, 777))
         const b = make().createGame(configFor(options, 778))
-        expect(a).not.toEqual(b)
+        // `state.seed` is copied verbatim from config.seed, so a whole-state
+        // `not.toEqual` would pass trivially on that one scalar even if the
+        // shuffle and deal ignored the seed entirely. Assert on seed-derived
+        // output instead: the draw-pile order and the dealt hands.
+        expect(a.decks.main[0].map((c) => c.uid)).not.toEqual(b.decks.main[0].map((c) => c.uid))
+        const handsA = a.seating.map((id) => a.players[id].hand.map((c) => c.uid))
+        const handsB = b.seating.map((id) => b.players[id].hand.map((c) => c.uid))
+        expect(handsA).not.toEqual(handsB)
       })
 
       it('yields identical state and events for an identical action stream', () => {
@@ -98,12 +129,19 @@ export function describeEngine(
         expect(a.events).toEqual(b.events)
       })
 
-      it('does not mutate the state handed to reduce', () => {
+      it('does not mutate the state handed to reduce, at every step', () => {
         const engine = make()
-        const start = engine.createGame(configFor(options, 4242))
-        const snapshot = structuredClone(start)
-        drive(engine, start, 5, 60)
-        expect(start).toEqual(snapshot)
+        let current = engine.createGame(configFor(options, 4242))
+        // `drive()` reassigns `current` to the new state after each call, so
+        // comparing only the very first input against a single snapshot would
+        // never catch a `reduce` that mutates its argument on a later,
+        // non-initial call — the likelier bug. Snapshot and compare every step.
+        for (let n = 0; n < 60; n += 1) {
+          const before = structuredClone(current)
+          const r = engine.reduce(current, fuzzAction(current, 5, n))
+          expect(current).toEqual(before)
+          current = r.state
+        }
       })
     })
 
@@ -111,6 +149,12 @@ export function describeEngine(
       it('never throws across a long fuzz stream', () => {
         const engine = make()
         const start = engine.createGame(configFor(options, 99))
+        expect(() => drive(engine, start, 17, 400)).not.toThrow()
+      })
+
+      it('never throws across a long fuzz stream under a constrained hand limit', () => {
+        const engine = make()
+        const start = engine.createGame(configFor(options, 99, MEMORY_SETUP))
         expect(() => drive(engine, start, 17, 400)).not.toThrow()
       })
 
@@ -131,6 +175,22 @@ export function describeEngine(
         for (const id of state.seating) expect(state.players[id]).toBeDefined()
         expect(state.decks.main.length).toBeGreaterThan(0)
         expect(state.eventSeq).toBeGreaterThanOrEqual(start.eventSeq)
+      })
+
+      it('keeps state structurally valid and actually resolves a hand-limit decision', () => {
+        const engine = make()
+        const start = engine.createGame(configFor(options, 55, MEMORY_SETUP))
+        const { state, events } = drive(engine, start, 23, 300)
+        expect(state.seating).toHaveLength(3)
+        for (const id of state.seating) expect(state.players[id]).toBeDefined()
+        expect(state.decks.main.length).toBeGreaterThan(0)
+        expect(state.eventSeq).toBeGreaterThanOrEqual(start.eventSeq)
+        // Proves onHandLimit's committing path actually ran, not merely that
+        // its rejection guards were exercised.
+        const discardedForHandLimit = events.some(
+          (e) => e.type === 'discarded' && e.reason === 'handLimit',
+        )
+        expect(discardedForHandLimit).toBe(true)
       })
 
       it('numbers every committed event uniquely and monotonically', () => {
@@ -169,6 +229,11 @@ export function describeEngine(
               for (const c of pile) {
                 expect(serialized, `${viewer} can see deck card ${c.uid}`).not.toContain(c.uid)
               }
+            }
+            // The event deck is equally ordered and secret — Task 11's AI
+            // event reveals make this load-bearing, not merely symmetric.
+            for (const c of state.decks.events) {
+              expect(serialized, `${viewer} can see event deck card ${c.uid}`).not.toContain(c.uid)
             }
           }
           state = engine.reduce(state, fuzzAction(state, 2024, n)).state
