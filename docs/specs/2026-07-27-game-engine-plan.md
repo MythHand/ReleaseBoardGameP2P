@@ -16,7 +16,7 @@ Design: [`docs/specs/2026-07-27-game-page-design.md`](./2026-07-27-game-page-des
 
 ## Global Constraints
 
-- **`packages/engine` has no runtime dependencies.** Not `@release/ui`, not `@release/translation`, not React, not `apps/frontend/src/network`. Only `@release/lint` as a dev dependency. A single import of anything else is a review rejection.
+- **`packages/engine` has no runtime dependencies.** Its `package.json` carries no `dependencies` field at all — not `@release/ui`, not `@release/translation`, not React, not `apps/frontend/src/network`. A single runtime import of anything outside the package is a review rejection. Dev dependencies are limited to the test and lint toolchain (`vitest`, `@release/lint`).
 - **Purity is absolute.** No `Math.random()` — use `randomAt(seed, cursor)` from `src/rng.ts` and advance the cursor through state. No `Date.now()`, no `performance.now()`, no `new Date()` — time arrives as `action.at`. No `console.*`. No mutation of an input argument: every function returns new objects.
 - **`reduce` never throws.** An illegal or unrecognised action returns `{ state, events: [rejectedEvent] }` with the state referentially unchanged.
 - **No code comments in Russian.** English only (root [`CLAUDE.md`](../../CLAUDE.md)). Existing Russian comments elsewhere in the repo are legacy and are not a licence.
