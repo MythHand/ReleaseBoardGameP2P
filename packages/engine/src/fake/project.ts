@@ -99,7 +99,7 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
     // a projected view carries no window and no prompt.
     window: null,
     pending: null,
-    setup: state.setup,
-    over: state.over,
+    setup: { ...state.setup },
+    over: state.over && { ...state.over },
   }
 }

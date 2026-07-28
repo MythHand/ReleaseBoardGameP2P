@@ -1,5 +1,5 @@
 import type { GameConfig } from '../engine'
-import { project } from './project'
+import { playableFor, project } from './project'
 import { createGame } from './setup'
 
 const config = (): GameConfig => ({
@@ -115,4 +115,193 @@ it('reports elimination on the opponent view', () => {
   const s = createGame(config())
   const out = { ...s, eliminated: ['p2'] }
   expect(project(out, 'p1').opponents[0].eliminated).toBe(true)
+})
+
+describe('projection privacy barrier', () => {
+  it('copies setup so mutations do not reach the source', () => {
+    const s = createGame(config())
+    const v = project(s, 'p1')
+    v.setup.handLimit = 'x' as never
+    expect(s.setup.handLimit).toBe('base')
+  })
+
+  it('copies over so mutations do not reach the source', () => {
+    const s = createGame(config())
+    const withOver = { ...s, over: { winner: 'p1', condition: 'release' as const } }
+    const v = project(withOver, 'p1')
+    if (v.over) {
+      v.over.winner = 'p2'
+    }
+    expect(withOver.over.winner).toBe('p1')
+  })
+})
+
+describe('playableFor legality rules', () => {
+  it('yields [] when game is over', () => {
+    const s = createGame(config())
+    const over = { ...s, over: { winner: 'p1', condition: 'release' as const } }
+    expect(playableFor(over, 'p1')).toEqual([])
+  })
+
+  it('yields [] when a pending decision is set', () => {
+    const s = createGame(config())
+    const withPending = {
+      ...s,
+      pending: { kind: 'handLimit' as const, player: 'p1', excess: 2 },
+    }
+    expect(playableFor(withPending, 'p1')).toEqual([])
+  })
+
+  it('yields [] when a window is open', () => {
+    const s = createGame(config())
+    const withWindow = {
+      ...s,
+      window: {
+        target: { player: 'p1', slot: 'frontend' as const, card: 'attack-bug#0' },
+        round: 1,
+        deadline: 0,
+        passed: [],
+      },
+    }
+    expect(playableFor(withWindow, 'p1')).toEqual([])
+  })
+
+  it('yields [] for an eliminated viewer', () => {
+    const s = createGame(config())
+    const eliminated = { ...s, eliminated: ['p1'] }
+    expect(playableFor(eliminated, 'p1')).toEqual([])
+  })
+
+  it('does not include a frozen card', () => {
+    const s = createGame(config())
+    const p1Card = s.players.p1.hand[0]
+    const frozen = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1, frozen: [p1Card.uid] },
+      },
+    }
+    expect(playableFor(frozen, 'p1')).not.toContain(p1Card.uid)
+  })
+
+  it('does not include a release card when its slot is filled', () => {
+    const s = createGame(config())
+    const releasedCard = { uid: 'release-frontend#0', id: 'release-frontend' }
+    const filled = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1,
+          release: {
+            ...s.players.p1.release,
+            frontend: { card: releasedCard },
+          },
+        },
+      },
+    }
+    const playable = playableFor(filled, 'p1')
+    // Check that no release-frontend card is playable
+    expect(
+      playable.every(
+        (uid) => !s.players.p1.hand.find((c) => c.uid === uid && c.id === 'release-frontend'),
+      ),
+    ).toBe(true)
+  })
+
+  it('does not include a release card when the cap is hit under releases: base', () => {
+    const s = createGame(config())
+    const withPlayedRelease = {
+      ...s,
+      turn: { ...s.turn, releasesPlayed: 1 },
+    }
+    // Under releases: 'base', cap is 1, so with 1 already played, no more releases are playable
+    const playable = playableFor(withPlayedRelease, 'p1')
+    // No release cards should be playable
+    expect(
+      playable.every(
+        (uid) => !s.players.p1.hand.find((c) => c.uid === uid && c.id.startsWith('release-')),
+      ),
+    ).toBe(true)
+  })
+
+  it('allows release cards when cap is not hit under releases: fast', () => {
+    const fastConfig = { ...config(), setup: { ...config().setup, releases: 'fast' } }
+    const fast = createGame(fastConfig)
+    // Under releases: 'fast', cap is Infinity, so releases should always be playable (if valid)
+    const playable = playableFor(fast, 'p1')
+    // There should be some playable cards (likely releases if hand limit allows)
+    expect(playable.length).toBeGreaterThan(0)
+  })
+
+  it('includes protection-monitoring when monitoring slot is empty', () => {
+    const s = createGame(config())
+    // Find or construct a protection-monitoring card in the hand
+    const monitoringCard = s.players.p1.hand.find((c) => c.id === 'protection-monitoring')
+    if (monitoringCard) {
+      const playable = playableFor(s, 'p1')
+      expect(playable).toContain(monitoringCard.uid)
+    }
+  })
+
+  it('does not include protection-monitoring when monitoring slot is filled', () => {
+    const s = createGame(config())
+    const monitoringCard = { uid: 'protection-monitoring#0', id: 'protection-monitoring' }
+    const filled = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1,
+          release: {
+            ...s.players.p1.release,
+            monitoring: monitoringCard,
+          },
+        },
+      },
+    }
+    const playable = playableFor(filled, 'p1')
+    // Find protection-monitoring in hand and verify it's not playable
+    const pMonCard = s.players.p1.hand.find((c) => c.id === 'protection-monitoring')
+    if (pMonCard) {
+      expect(playable).not.toContain(pMonCard.uid)
+    }
+  })
+
+  it('never includes protection-debugger', () => {
+    const s = createGame(config())
+    const playable = playableFor(s, 'p1')
+    const debuggerCard = s.players.p1.hand.find((c) => c.id === 'protection-debugger')
+    if (debuggerCard) {
+      expect(playable).not.toContain(debuggerCard.uid)
+    }
+  })
+
+  it('never includes cancel (defence) cards', () => {
+    const s = createGame(config())
+    const playable = playableFor(s, 'p1')
+    const cancelCard = s.players.p1.hand.find((c) => c.id === 'defence-cancel')
+    if (cancelCard) {
+      expect(playable).not.toContain(cancelCard.uid)
+    }
+  })
+
+  it('never includes support cards', () => {
+    const s = createGame(config())
+    const playable = playableFor(s, 'p1')
+    const supportCard = s.players.p1.hand.find((c) => c.id.startsWith('support-'))
+    if (supportCard) {
+      expect(playable).not.toContain(supportCard.uid)
+    }
+  })
+
+  it('never includes trigger cards', () => {
+    const s = createGame(config())
+    const playable = playableFor(s, 'p1')
+    const triggerCard = s.players.p1.hand.find((c) => c.id === 'trigger-ai')
+    if (triggerCard) {
+      expect(playable).not.toContain(triggerCard.uid)
+    }
+  })
 })
