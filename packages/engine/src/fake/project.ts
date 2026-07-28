@@ -1,6 +1,7 @@
 import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
 import type { PlayerView, ReleasedView, ReleaseView } from '../view'
+import { canAttackWith } from './window'
 
 const releasedView = (r: Released | undefined): ReleasedView | undefined =>
   r && { uid: r.card.uid, card: r.card.id, codeReview: r.codeReview?.id }
@@ -95,9 +96,15 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       index: state.turn.index,
       hasDrawn: state.turn.hasDrawn,
     },
-    // Task 8 fills these in as the window and pending machinery lands; until then
-    // a projected view carries no window and no prompt.
-    window: null,
+    window: state.window && {
+      player: state.window.target.player,
+      slot: state.window.target.slot,
+      round: state.window.round,
+      deadline: state.window.deadline,
+      passed: [...state.window.passed],
+      canAttackWith: canAttackWith(state, viewerId),
+    },
+    // Task 9+ fills in the pending prompt as its machinery lands.
     pending: null,
     setup: { ...state.setup },
     over: state.over && { ...state.over },

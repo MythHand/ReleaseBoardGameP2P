@@ -5,6 +5,7 @@ import type { CardUid, GameState, PlayerId, Setup } from '../state'
 import { createLog, isWellFormedAction, reject, setHand } from './core'
 import { playableFor } from './project'
 import { onDiscardForRelease, onPlay } from './release'
+import { onPass, onUnpass, onWindowExpired } from './window'
 
 const HAND_LIMITS: Record<string, number> = { '8bit': 8, memory: 5 }
 
@@ -186,7 +187,13 @@ export function reduce(state: GameState, action: Action): Reduction {
       return onResolve(state, action)
     case 'PLAY':
       return onPlay(state, action)
-    // ATTACK, PASS, UNPASS and WINDOW_EXPIRED arrive in Task 8.
+    case 'PASS':
+      return onPass(state, action)
+    case 'UNPASS':
+      return onUnpass(state, action)
+    case 'WINDOW_EXPIRED':
+      return onWindowExpired(state, action)
+    // ATTACK arrives in Task 9.
     default:
       return reject(state, action, `unsupported action: ${String(action?.type)}`)
   }

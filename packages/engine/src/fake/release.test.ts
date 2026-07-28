@@ -57,7 +57,7 @@ it('places the release once the cost is paid', () => {
   expect(r.state.players.p1.hand).toEqual([])
   expect(r.state.decks.discard.at(-1)).toEqual(BUG)
   expect(r.state.turn.releasesPlayed).toBe(1)
-  expect(r.events.map((e) => e.type)).toEqual(['discarded', 'released'])
+  expect(r.events.map((e) => e.type)).toEqual(['discarded', 'released', 'windowOpened'])
 })
 
 it('refuses to pay the cost with the release itself', () => {
@@ -98,7 +98,10 @@ it('rejects a second release in a turn under Base, allows it under Fast Release'
     card: FE.uid,
     at: 1000,
   })
-  const fast = reduce(fastFirst.state, { type: 'PLAY', player: 'p1', card: BE.uid, at: 1001 })
+  // The first release opened a reaction window (Task 8); the cap-lifting
+  // property this test targets only shows up once that window is out of the way.
+  const closed = reduce(fastFirst.state, { type: 'PASS', player: 'p2', at: 1001 })
+  const fast = reduce(closed.state, { type: 'PLAY', player: 'p1', card: BE.uid, at: 1002 })
   expect(fast.state.players.p1.release.backend?.card).toEqual(BE)
   expect(fast.state.turn.releasesPlayed).toBe(2)
 })

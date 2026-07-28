@@ -4,6 +4,7 @@ import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
 import { createLog, type Log, reject, setHand } from './core'
 import { playableFor } from './project'
+import { openWindow } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
@@ -22,6 +23,7 @@ export function checkWin(state: GameState, log: Log): GameState {
 export function placeRelease(
   state: GameState,
   log: Log,
+  at: number,
   player: PlayerId,
   release: CardUid,
   codeReview?: CardUid,
@@ -54,8 +56,11 @@ export function placeRelease(
     turn: { ...state.turn, releasesPlayed: state.turn.releasesPlayed + 1 },
     pending: null,
   }
-  // Task 8 opens the reaction window here when there is no Code Review.
-  return checkWin(placed, log)
+  const decided = checkWin(placed, log)
+  // A Code Review-protected release cannot be attacked at all, so no window opens
+  // (understanding.md §8). Neither does one on a game that just ended.
+  if (cr || decided.over) return decided
+  return openWindow(decided, log, { player, slot, card: card.uid }, 1, at)
 }
 
 export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Reduction {
@@ -90,7 +95,7 @@ export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Red
 
   if (rules.kind === 'release') {
     if (state.setup.releaseCond === 'easy') {
-      const next = placeRelease(state, log, action.player, action.card, codeReview)
+      const next = placeRelease(state, log, action.at, action.player, action.card, codeReview)
       return { state: next, events: log.events }
     }
     // The cost is a second card, so a lone release is unplayable.
@@ -169,7 +174,7 @@ export function onDiscardForRelease(
     decks: { ...withoutPaid.decks, discard: [...withoutPaid.decks.discard, paid] },
   }
   return {
-    state: placeRelease(banked, log, action.player, pending.release, pending.codeReview),
+    state: placeRelease(banked, log, action.at, action.player, pending.release, pending.codeReview),
     events: log.events,
   }
 }
