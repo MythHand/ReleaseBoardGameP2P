@@ -4579,6 +4579,20 @@ git commit -m "test(engine): rules invariants in conformance; docs: engine hando
 - [ ] `apps/ui/src/cards/catalogue.ts` is **unmodified** — retiring its three mock-logic functions belongs to the screen plan, and `apps/playground/stories/ComboStory/ComboStory.tsx` still imports them
 - [ ] `apps/frontend/src/network/session/turn.ts` is **unmodified** — the network layer still owns it
 
+## Discovered during execution — what the follow-on specs must know
+
+These came out of implementation and review, not the original design. They are constraints on the next two specs, not optional advice.
+
+**The screen plan must not reuse `runUntilIdle`.** It auto-resolves reactive pendings owed by the human — `defend`, `neutralize503`, `crush`, `handLimit` — which is correct for a headless driver and wrong for a UI. Answering a defend prompt on the player's behalf would silently remove the reaction window, the moment [understanding.md](../understanding.md) §7 identifies as the game's most distinctive. A UI driver needs its own loop that stops on any pending the human owes and surfaces it. `packages/engine/README.md` states this; cite it rather than rediscovering it.
+
+**`rejected` events are diagnostic, not moves.** Rejection leaves state referentially unchanged, so `eventSeq` cannot advance and consecutive rejections legitimately reuse an id. Never give one a causal `parent`, never append one to the move-history log, and do not expect their ids to be unique or monotonic. Any consumer building a history tree or a network replay log has to filter them out first. This resolves the open question the plan carried from Task 5.
+
+**`WINDOW_EXPIRED` carries no player identity**, and `onWindowExpired` rejects any submission before the deadline regardless of who sends it. So any peer with a synced clock may submit it — the P2P spec must not encode an owner-only assumption. The fake attributes it to the release owner purely as a single-process convenience.
+
+**`CardId` is `type CardId = string`, so a mistyped id is invisible to TypeScript** and silently routes through the "unsupported card" path — where it looks like a correctly-rejected card rather than a typo. This cost three fix rounds on one task. Any new test fixture should build instances through a helper that throws on an id absent from `CARD_RULES`; `project.test.ts`'s `inst()` is the pattern.
+
+**Tests must be verified by mutation, not by reasoning.** Nine times across this plan a test shipped green while asserting less than it appeared to — unreachable assertions, positive-only checks a broken implementation satisfies, a second guard masking the one under test, an assertion covering one field where the requirement covered two, and seeds that never reached the state the property named. Every one was found by asking "would this fail if I broke the thing it names?" and none by reading. Budget for that step explicitly.
+
 ## Follow-ups for the screen plan
 
 - Retire `cardCanTarget`, `isComboSource` and `validComboTarget` from `apps/ui/src/cards/catalogue.ts` (and both index files), moving the three helpers into `ComboStory` as story-local mocks — it is their only consumer.
