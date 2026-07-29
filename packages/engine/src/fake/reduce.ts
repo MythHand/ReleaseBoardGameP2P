@@ -1,31 +1,25 @@
 import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
-import type { CardUid, GameState, PlayerId, Setup } from '../state'
+import type { CardUid, GameState, PlayerId } from '../state'
 import { onAttack, onDefend } from './attacks'
-import { attackTargets, createLog, isWellFormedAction, reject, setHand } from './core'
+import {
+  attackTargets,
+  createLog,
+  endTurn,
+  handLimitFor,
+  isWellFormedAction,
+  nextSeat,
+  reject,
+  setHand,
+} from './core'
 import { onGiveCard, onRequestCard } from './handAttacks'
 import { playableFor } from './project'
 import { onDiscardForRelease, onPlay } from './release'
+import { fireTrigger, onNeutralize } from './triggers'
 import { onPass, onUnpass, onWindowExpired } from './window'
 
-const HAND_LIMITS: Record<string, number> = { '8bit': 8, memory: 5 }
-
-export function handLimitFor(setup: Setup): number {
-  return HAND_LIMITS[setup.handLimit] ?? Number.POSITIVE_INFINITY
-}
-
-export function nextSeat(state: GameState, from: PlayerId): PlayerId {
-  const n = state.seating.length
-  const start = state.seating.indexOf(from)
-  for (let step = 1; step <= n; step += 1) {
-    const candidate = state.seating[(start + step) % n]
-    if (!state.eliminated.includes(candidate)) return candidate
-  }
-  // The caller checks the last-standing condition before rotating, so this is
-  // unreachable in practice; returning `from` keeps reduce total.
-  return from
-}
+export { handLimitFor, nextSeat }
 
 export function legalTargets(state: GameState, actor: PlayerId, card: CardUid): Target[] {
   if (!playableFor(state, actor).includes(card)) return []
@@ -34,28 +28,6 @@ export function legalTargets(state: GameState, actor: PlayerId, card: CardUid): 
   const rules = rulesFor(held.id)
   if (rules?.kind !== 'attack') return []
   return attackTargets(state, actor, held.id)
-}
-
-// Ends the turn, or holds it open when the hand is over the mode's limit.
-function endTurn(state: GameState, log: ReturnType<typeof createLog>): GameState {
-  const me = state.turn.player
-  const limit = handLimitFor(state.setup)
-  const excess = state.players[me].hand.length - limit
-  if (excess > 0) {
-    return { ...state, pending: { kind: 'handLimit', player: me, excess }, eventSeq: log.seq }
-  }
-  log.add({ type: 'turnEnded', player: me })
-  const next = nextSeat(state, me)
-  log.add({ type: 'turnStarted', player: next, index: state.turn.index + 1 })
-  // A DDoS freeze lasts exactly one round: it lifts as its victim's next turn ends.
-  const thawed = { ...state.players[me], frozen: [] }
-  return {
-    ...state,
-    players: { ...state.players, [me]: thawed },
-    turn: { player: next, index: state.turn.index + 1, hasDrawn: false, releasesPlayed: 0 },
-    pending: null,
-    eventSeq: log.seq,
-  }
 }
 
 function onDraw(state: GameState, action: Action & { type: 'DRAW' }): Reduction {
@@ -72,8 +44,25 @@ function onDraw(state: GameState, action: Action & { type: 'DRAW' }): Reduction 
   const card = pile[0]
   const main = state.decks.main.map((p, i) => (i === pileIndex ? p.slice(1) : p))
   const log = createLog(state.eventSeq)
-  // Identity is private to the drawer. Task 10 replaces this for trigger cards,
-  // which must be revealed to everyone the moment they are drawn.
+
+  // A trigger cannot stay private: it is revealed the moment it is drawn, and it
+  // never reaches the drawer's hand.
+  if (rulesFor(card.id)?.kind === 'trigger') {
+    const base: GameState = {
+      ...state,
+      decks: { ...state.decks, main },
+      turn: { ...state.turn, hasDrawn: true },
+    }
+    log.add({
+      type: 'drawn',
+      player: action.player,
+      pile: pileIndex,
+      deckSize: main[pileIndex].length,
+    })
+    return { state: fireTrigger(base, log, action.player, card, action.at), events: log.events }
+  }
+
+  // Identity is private to the drawer.
   log.add({
     type: 'drawn',
     player: action.player,
@@ -158,10 +147,17 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
       return onRequestCard(state, action)
     case 'giveCard':
       return onGiveCard(state, action)
-    // Later tasks add the remaining decisions. Until then an unimplemented choice
-    // is rejected rather than silently ignored.
+    case 'neutralize503':
+    case 'crush':
+      return onNeutralize(state, action)
+    // Every Choice variant is now handled above; this default only guards
+    // against a malformed choice (any `kind` string) surviving deserialization.
     default:
-      return reject(state, action, `unsupported choice: ${action.choice.kind}`)
+      return reject(
+        state,
+        action,
+        `unsupported choice: ${(action.choice as { kind: string }).kind}`,
+      )
   }
 }
 

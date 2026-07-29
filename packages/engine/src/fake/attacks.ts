@@ -336,7 +336,10 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
       return { kind: 'requestCard', player: p.player, target: p.target }
     case 'giveCard':
       return { kind: 'giveCard', player: p.player, requested: p.requested }
-    // Task 11 fills in the trigger decisions.
+    case 'neutralize503':
+      return { kind: 'neutralize503', player: p.player, methods: [...p.methods] }
+    case 'crush':
+      return { kind: 'crush', player: p.player, slot: p.slot, methods: [...p.methods] }
     default:
       return null
   }

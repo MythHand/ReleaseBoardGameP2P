@@ -108,6 +108,56 @@ function resolvePendingAction(state: GameState, n: number): Action | null {
         at,
       }
     }
+    case 'neutralize503': {
+      // fireTrigger only ever offers a method this player can actually pay
+      // for, so the first one is always valid — resolving in one step either
+      // way.
+      const method = pending.methods[0]
+      if (!method) return null
+      if (method === 'sacrifice') {
+        const slots = ['frontend', 'backend', 'database'] as const
+        const slot = slots.find((s) => state.players[pending.player].release[s])
+        const card = slot && state.players[pending.player].release[slot]?.card.uid
+        if (!card) return null
+        return {
+          type: 'RESOLVE',
+          player: pending.player,
+          choice: { kind: 'neutralize503', method, card },
+          at,
+        }
+      }
+      return {
+        type: 'RESOLVE',
+        player: pending.player,
+        choice: { kind: 'neutralize503', method },
+        at,
+      }
+    }
+    case 'crush': {
+      // resolveAiEvent only ever offers a method this player can actually pay
+      // for, so the first one is always valid — resolving in one step either
+      // way.
+      const method = pending.methods[0]
+      if (!method) return null
+      if (method === 'sacrifice') {
+        const slots = ['frontend', 'backend', 'database'] as const
+        const slot = slots.find((s) => state.players[pending.player].release[s])
+        const card = slot && state.players[pending.player].release[slot]?.card.uid
+        if (!card) return null
+        return {
+          type: 'RESOLVE',
+          player: pending.player,
+          choice: { kind: 'crush', method, card },
+          at,
+        }
+      }
+      return {
+        type: 'RESOLVE',
+        player: pending.player,
+        choice: { kind: 'crush', method },
+        at,
+      }
+    }
     default:
       return null
   }

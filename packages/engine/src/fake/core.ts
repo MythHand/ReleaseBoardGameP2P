@@ -2,7 +2,7 @@ import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { Event } from '../events'
-import type { CardId, CardUid, GameState, PlayerId, PlayerState } from '../state'
+import type { CardId, CardUid, GameState, PlayerId, PlayerState, Setup } from '../state'
 
 // Omit over a union collapses to the shared keys, so distribute it first —
 // otherwise an event input loses every variant-specific field.
@@ -70,6 +70,50 @@ export function defencesFor(state: GameState, player: PlayerId, sudo: boolean): 
       return kind === 'unicorn' || (kind === 'cancel' && !sudo)
     })
     .map((c) => c.uid)
+}
+
+const HAND_LIMITS: Record<string, number> = { '8bit': 8, memory: 5 }
+
+export function handLimitFor(setup: Setup): number {
+  return HAND_LIMITS[setup.handLimit] ?? Number.POSITIVE_INFINITY
+}
+
+export function nextSeat(state: GameState, from: PlayerId): PlayerId {
+  const n = state.seating.length
+  const start = state.seating.indexOf(from)
+  for (let step = 1; step <= n; step += 1) {
+    const candidate = state.seating[(start + step) % n]
+    if (!state.eliminated.includes(candidate)) return candidate
+  }
+  // The caller checks the last-standing condition before rotating, so this is
+  // unreachable in practice; returning `from` keeps reduce total.
+  return from
+}
+
+// Ends the turn, or holds it open when the hand is over the mode's limit.
+// Lives here (rather than in reduce.ts, its natural home) because triggers.ts's
+// `ai-hallucination` event also ends the turn immediately, and reduce.ts
+// already needs to import triggers.ts for `fireTrigger`/`onNeutralize` —
+// keeping `endTurn` in reduce.ts would make that a cycle.
+export function endTurn(state: GameState, log: Log): GameState {
+  const me = state.turn.player
+  const limit = handLimitFor(state.setup)
+  const excess = state.players[me].hand.length - limit
+  if (excess > 0) {
+    return { ...state, pending: { kind: 'handLimit', player: me, excess }, eventSeq: log.seq }
+  }
+  log.add({ type: 'turnEnded', player: me })
+  const next = nextSeat(state, me)
+  log.add({ type: 'turnStarted', player: next, index: state.turn.index + 1 })
+  // A DDoS freeze lasts exactly one round: it lifts as its victim's next turn ends.
+  const thawed = { ...state.players[me], frozen: [] }
+  return {
+    ...state,
+    players: { ...state.players, [me]: thawed },
+    turn: { player: next, index: state.turn.index + 1, hasDrawn: false, releasesPlayed: 0 },
+    pending: null,
+    eventSeq: log.seq,
+  }
 }
 
 // Where an attack card can land right now. Shared by reduce.ts's `legalTargets`,
