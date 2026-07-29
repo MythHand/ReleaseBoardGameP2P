@@ -123,32 +123,24 @@ it('reveals an AI trigger together with the event it pulls', () => {
 
 // --- Review findings: discarded events on every trigger-caused discard ---
 
-it('discards the revealed Error 503 itself with a public trigger-reason event', () => {
+it('discards the revealed Error 503 itself, parented to the reveal', () => {
   const r = reduce(withTop(E503, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
-  expect(r.events).toContainEqual(
-    expect.objectContaining({
-      type: 'discarded',
-      player: 'p1',
-      card: 'trigger-error-503',
-      reason: 'trigger',
-    }),
-  )
+  const revealed = r.events.find((e) => e.type === 'revealed')
+  const discarded = r.events.find((e) => e.type === 'discarded' && e.card === 'trigger-error-503')
+  expect(revealed).toBeDefined()
+  expect(discarded).toMatchObject({ player: 'p1', reason: 'trigger', parent: revealed?.id })
 })
 
-it('discards the revealed AI trigger itself with a public trigger-reason event', () => {
+it('discards the revealed AI trigger itself, parented to the AI reveal', () => {
   const ai: CardInstance = { uid: 'trigger-ai#0', id: 'trigger-ai' }
   const r = reduce(withTop(ai, []), { type: 'DRAW', player: 'p1', at: 1000 })
-  expect(r.events).toContainEqual(
-    expect.objectContaining({
-      type: 'discarded',
-      player: 'p1',
-      card: 'trigger-ai',
-      reason: 'trigger',
-    }),
-  )
+  const revealed = r.events.find((e) => e.type === 'aiRevealed')
+  const discarded = r.events.find((e) => e.type === 'discarded' && e.card === 'trigger-ai')
+  expect(revealed).toBeDefined()
+  expect(discarded).toMatchObject({ player: 'p1', reason: 'trigger', parent: revealed?.id })
 })
 
-it('discards a spent Debugger with a neutralized-reason event', () => {
+it('discards a spent Debugger, parented to the neutralized event', () => {
   const drawn = reduce(withTop(E503, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
   const r = reduce(drawn.state, {
     type: 'RESOLVE',
@@ -156,17 +148,13 @@ it('discards a spent Debugger with a neutralized-reason event', () => {
     choice: { kind: 'neutralize503', method: 'debugger' },
     at: 1001,
   })
-  expect(r.events).toContainEqual(
-    expect.objectContaining({
-      type: 'discarded',
-      player: 'p1',
-      card: 'protection-debugger',
-      reason: 'neutralized',
-    }),
-  )
+  const neutralized = r.events.find((e) => e.type === 'neutralized')
+  const discarded = r.events.find((e) => e.type === 'discarded' && e.card === 'protection-debugger')
+  expect(neutralized).toBeDefined()
+  expect(discarded).toMatchObject({ player: 'p1', reason: 'neutralized', parent: neutralized?.id })
 })
 
-it('discards a sacrificed release with a neutralized-reason event', () => {
+it('discards a sacrificed release, parented to the neutralized event', () => {
   const s = withTop(E503, [])
   const holding: GameState = {
     ...s,
@@ -179,28 +167,20 @@ it('discards a sacrificed release with a neutralized-reason event', () => {
     choice: { kind: 'neutralize503', method: 'sacrifice', card: FE.uid },
     at: 1001,
   })
-  expect(r.events).toContainEqual(
-    expect.objectContaining({
-      type: 'discarded',
-      player: 'p1',
-      card: 'release-frontend',
-      reason: 'neutralized',
-    }),
-  )
+  const neutralized = r.events.find((e) => e.type === 'neutralized')
+  const discarded = r.events.find((e) => e.type === 'discarded' && e.card === 'release-frontend')
+  expect(neutralized).toBeDefined()
+  expect(discarded).toMatchObject({ player: 'p1', reason: 'neutralized', parent: neutralized?.id })
 })
 
-it("discards an eliminated player's hand with per-card events", () => {
+it("discards an eliminated player's hand, parented to the eliminated event", () => {
   const bug: CardInstance = { uid: 'attack-bug#0', id: 'attack-bug' }
   const r = reduce(withTop(E503, [bug]), { type: 'DRAW', player: 'p1', at: 1000 })
   expect(r.state.eliminated).toEqual(['p1'])
-  expect(r.events).toContainEqual(
-    expect.objectContaining({
-      type: 'discarded',
-      player: 'p1',
-      card: 'attack-bug',
-      reason: 'effect',
-    }),
-  )
+  const eliminated = r.events.find((e) => e.type === 'eliminated')
+  const discarded = r.events.find((e) => e.type === 'discarded' && e.card === 'attack-bug')
+  expect(eliminated).toBeDefined()
+  expect(discarded).toMatchObject({ player: 'p1', reason: 'effect', parent: eliminated?.id })
 })
 
 // --- Review finding: an ai-release-* placement must remain a plain, playable

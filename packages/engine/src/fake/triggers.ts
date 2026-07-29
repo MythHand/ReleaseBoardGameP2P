@@ -39,13 +39,16 @@ export function eliminate(state: GameState, log: Log, player: PlayerId): GameSta
   const monitoringCards = me.release.monitoring ? [me.release.monitoring] : []
   const spoils = [...me.hand, ...zoneCards, ...monitoringCards]
 
+  // `eliminated` is the cause, so it is logged first and its id captured as
+  // `parent` for every card discard that follows — those discards could not
+  // otherwise point at an event id that does not exist yet.
+  const eliminatedId = log.add({ type: 'eliminated', player })
   for (const c of me.hand) {
-    log.add({ type: 'discarded', player, card: c.id, reason: 'effect' })
+    log.add({ type: 'discarded', player, card: c.id, reason: 'effect' }, eliminatedId)
   }
   for (const c of [...zoneCards, ...monitoringCards]) {
-    log.add({ type: 'discarded', player, card: c.id, reason: 'destroyed' })
+    log.add({ type: 'discarded', player, card: c.id, reason: 'destroyed' }, eliminatedId)
   }
-  log.add({ type: 'eliminated', player })
 
   const cleared: GameState = {
     ...discard(state, spoils),
@@ -78,6 +81,7 @@ function destroySlot(
   player: PlayerId,
   slot: ReleaseSlot,
   reason?: DiscardReason,
+  parent?: number,
 ): GameState {
   const me = state.players[player]
   const released = me.release[slot]
@@ -85,7 +89,7 @@ function destroySlot(
   const spoils = [released.card, ...(released.codeReview ? [released.codeReview] : [])]
   log.add({ type: 'releaseDestroyed', player, slot, card: released.card.id })
   if (reason) {
-    for (const c of spoils) log.add({ type: 'discarded', player, card: c.id, reason })
+    for (const c of spoils) log.add({ type: 'discarded', player, card: c.id, reason }, parent)
   }
   const zone = { ...me.release }
   delete zone[slot]
@@ -108,8 +112,8 @@ export function fireTrigger(
   at: number,
 ): GameState {
   if (card.id === 'trigger-error-503') {
-    log.add({ type: 'revealed', player, card: card.id })
-    log.add({ type: 'discarded', player, card: card.id, reason: 'trigger' })
+    const revealedId = log.add({ type: 'revealed', player, card: card.id })
+    log.add({ type: 'discarded', player, card: card.id, reason: 'trigger' }, revealedId)
     const discarded = discard(state, [card])
     const methods = neutralizeOptions(discarded, player)
     if (methods.length === 0) return eliminate(discarded, log, player)
@@ -124,8 +128,8 @@ export function fireTrigger(
   const events = state.decks.events
   const index = Math.floor(randomAt(state.seed, state.rngCursor) * events.length)
   const event = events[index]
-  log.add({ type: 'aiRevealed', player, aiCard: card.id, eventCard: event.id })
-  log.add({ type: 'discarded', player, card: card.id, reason: 'trigger' })
+  const aiRevealedId = log.add({ type: 'aiRevealed', player, aiCard: card.id, eventCard: event.id })
+  log.add({ type: 'discarded', player, card: card.id, reason: 'trigger' }, aiRevealedId)
   const remainingEvents = events.filter((_, i) => i !== index)
   const discarded = discard(state, [card])
   const drawn: GameState = {
@@ -164,8 +168,8 @@ export function onNeutralize(state: GameState, action: Action & { type: 'RESOLVE
   if (choice.method === 'debugger') {
     const dbg = hand.find((c) => c.id === 'protection-debugger')
     if (!dbg) return reject(state, action, 'you do not hold a Debugger')
-    log.add({ type: 'neutralized', player, method: 'debugger' })
-    log.add({ type: 'discarded', player, card: dbg.id, reason: 'neutralized' })
+    const neutralizedId = log.add({ type: 'neutralized', player, method: 'debugger' })
+    log.add({ type: 'discarded', player, card: dbg.id, reason: 'neutralized' }, neutralizedId)
     const withoutDbg = setHand(
       state,
       player,
@@ -191,8 +195,8 @@ export function onNeutralize(state: GameState, action: Action & { type: 'RESOLVE
   if (!choice.card) return reject(state, action, 'sacrifice needs a release card')
   const slot = SLOTS.find((s) => state.players[player].release[s]?.card.uid === choice.card)
   if (!slot) return reject(state, action, 'you do not hold that release')
-  log.add({ type: 'neutralized', player, method: 'sacrifice' })
-  const destroyed = destroySlot(state, log, player, slot, 'neutralized')
+  const neutralizedId = log.add({ type: 'neutralized', player, method: 'sacrifice' })
+  const destroyed = destroySlot(state, log, player, slot, 'neutralized', neutralizedId)
   return { state: { ...destroyed, pending: null, eventSeq: log.seq }, events: log.events }
 }
 
