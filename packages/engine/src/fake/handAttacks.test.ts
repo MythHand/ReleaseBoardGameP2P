@@ -32,6 +32,14 @@ const MON: CardInstance = { uid: 'protection-monitoring#0', id: 'protection-moni
 const FE: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
 const CR: CardInstance = { uid: 'support-code-review#0', id: 'support-code-review' }
 const HOTFIX: CardInstance = { uid: 'defense-hotfix#0', id: 'defense-hotfix' }
+const ROLLBACK: CardInstance = { uid: 'defense-rollback#0', id: 'defense-rollback' }
+const WORKS: CardInstance = {
+  uid: 'defense-works-on-my-machine#0',
+  id: 'defense-works-on-my-machine',
+}
+const SUDO: CardInstance = { uid: 'support-sudo#0', id: 'support-sudo' }
+const SUDO2: CardInstance = { uid: 'support-sudo#1', id: 'support-sudo' }
+const SPARE: CardInstance = { uid: 'protection-debugger#0', id: 'protection-debugger' }
 
 const table = (p1: CardInstance[], p2: CardInstance[]): GameState => {
   const s = engine.createGame(config())
@@ -102,6 +110,82 @@ it('leaves the hand intact when the attack is cancelled', () => {
   expect(r.state.window).toBeNull()
 })
 
+it('returns the attack card to the attacker when Rollback defends a hand attack', () => {
+  const attacked = reduce(table([BUG], [ROLLBACK]), {
+    type: 'PLAY',
+    player: 'p1',
+    card: BUG.uid,
+    target: { kind: 'player', player: 'p2' },
+    at: 1000,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'defend', card: ROLLBACK.uid },
+    at: 1001,
+  })
+  expect(r.state.players.p1.hand.map((c) => c.uid)).toEqual([BUG.uid])
+  expect(r.state.players.p2.hand).toEqual([])
+  expect(r.state.decks.discard.map((c) => c.uid)).toContain(ROLLBACK.uid)
+})
+
+it('sudo Rollback keeps the attack card with the defender instead of the attacker', () => {
+  const attacked = reduce(table([BUG], [ROLLBACK, SUDO]), {
+    type: 'PLAY',
+    player: 'p1',
+    card: BUG.uid,
+    target: { kind: 'player', player: 'p2' },
+    at: 1000,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'defend', card: ROLLBACK.uid, combo: SUDO.uid },
+    at: 1001,
+  })
+  expect(r.state.players.p2.hand.map((c) => c.uid)).toEqual([BUG.uid])
+  expect(r.state.players.p1.hand).toEqual([])
+})
+
+it('reflects a random-steal attack: the defender steals from the attacker instead', () => {
+  // SPARE is the only card left in the attacker's hand once BUG is thrown, so
+  // it is the one thing the reflected steal could possibly take.
+  const attacked = reduce(table([BUG, SPARE], [WORKS]), {
+    type: 'PLAY',
+    player: 'p1',
+    card: BUG.uid,
+    target: { kind: 'player', player: 'p2' },
+    at: 1000,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'defend', card: WORKS.uid },
+    at: 1001,
+  })
+  expect(r.state.players.p1.hand).toEqual([])
+  expect(r.state.players.p2.hand.map((c) => c.uid)).toEqual([SPARE.uid])
+  const transfer = r.events.find((e) => e.type === 'handTransfer')
+  expect(transfer).toMatchObject({ from: 'p1', to: 'p2' })
+})
+
+it('reflects Security Bug: the roles swap, defender becomes the requester', () => {
+  const attacked = reduce(table([SEC], [WORKS]), {
+    type: 'PLAY',
+    player: 'p1',
+    card: SEC.uid,
+    target: { kind: 'player', player: 'p2' },
+    at: 1000,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'defend', card: WORKS.uid },
+    at: 1001,
+  })
+  expect(r.state.pending).toMatchObject({ kind: 'requestCard', player: 'p2', target: 'p1' })
+})
+
 it('asks Security Bug for a card type, and misses when it is absent', () => {
   const attacked = reduce(table([SEC], []), {
     type: 'PLAY',
@@ -126,6 +210,43 @@ it('asks Security Bug for a card type, and misses when it is absent', () => {
   })
   expect(r.state.pending).toBeNull()
   expect(r.events.some((e) => e.type === 'requested' && e.hit === false)).toBe(true)
+})
+
+it('surrenders the requested card on a hit, moving it from target to attacker', () => {
+  const attacked = reduce(table([SEC], [SUDO2]), {
+    type: 'PLAY',
+    player: 'p1',
+    card: SEC.uid,
+    target: { kind: 'player', player: 'p2' },
+    at: 1000,
+  })
+  const missed = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'defend', card: null },
+    at: 1001,
+  })
+  const hit = reduce(missed.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'requestCard', card: 'support-sudo' },
+    at: 1002,
+  })
+  expect(hit.state.pending).toMatchObject({ kind: 'giveCard', player: 'p2', attacker: 'p1' })
+  expect(hit.events.some((e) => e.type === 'requested' && e.hit === true)).toBe(true)
+
+  const r = reduce(hit.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'giveCard', card: SUDO2.uid },
+    at: 1003,
+  })
+  expect(r.state.pending).toBeNull()
+  expect(r.state.players.p2.hand).toEqual([])
+  expect(r.state.players.p1.hand.map((c) => c.uid)).toEqual([SUDO2.uid])
+  const transfer = r.events.find((e) => e.type === 'handTransfer')
+  expect(transfer).toMatchObject({ from: 'p2', to: 'p1', card: 'support-sudo' })
+  expect(transfer?.visibleTo?.sort()).toEqual(['p1', 'p2'])
 })
 
 it('destroys a Monitoring with DDoS', () => {

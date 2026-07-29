@@ -129,9 +129,10 @@ export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }):
 }
 
 // A hand attack's defence: the attacker's own turn, no reaction window. A miss
-// steals (or, for Security Bug, opens the request pending); a hit discards
-// both cards and simply closes the pending — there is no release to spare, so
-// nothing reopens.
+// steals (or, for Security Bug, opens the request pending); a hit resolves
+// per the defence's own effect — cancel, return, or reflect (see below) — and
+// clears the pending either way, since there is no release to spare and thus
+// no window to reopen.
 function onHandDefend(
   state: GameState,
   pending: Extract<Pending, { kind: 'defend' }>,
@@ -165,18 +166,56 @@ function onHandDefend(
   const defence = hand.find((c) => c.uid === choice.card)
   if (!defence) return reject(state, action, 'you do not hold that card')
 
-  log.add({ type: 'defended', player: action.player, card: defence.id, effect: 'cancel' })
+  // sudo Rollback: the defender keeps the attacking card instead of returning it.
+  let sudoDefence = false
+  if (choice.combo !== undefined) {
+    const partner = hand.find((c) => c.uid === choice.combo)
+    if (partner?.id !== 'support-sudo') return reject(state, action, 'invalid sudo combo')
+    if (!rulesFor(defence.id)?.sudo) return reject(state, action, 'that defence has no sudo effect')
+    sudoDefence = true
+  }
+
+  const effect =
+    defence.id === 'defense-rollback'
+      ? 'return'
+      : defence.id === 'defense-works-on-my-machine'
+        ? 'reflect'
+        : 'cancel'
+  log.add({ type: 'defended', player: action.player, card: defence.id, effect })
+
   const spentHand = setHand(
     state,
     action.player,
-    hand.filter((c) => c.uid !== choice.card),
+    hand.filter((c) => c.uid !== choice.card && c.uid !== choice.combo),
   )
-  const next: GameState = {
-    ...discard(spentHand, [defence, attackCard]),
-    pending: null,
-    eventSeq: log.seq,
+  const sudoCard = choice.combo ? hand.find((c) => c.uid === choice.combo) : undefined
+  const spentDefence = [defence, ...(sudoCard ? [sudoCard] : [])]
+  const next: GameState = { ...spentHand, pending: null, eventSeq: log.seq }
+
+  if (effect === 'return') {
+    // Rollback hands the attack back; sudo Rollback keeps it for the defender.
+    const recipient = sudoDefence ? action.player : attacker
+    const returned = setHand(next, recipient, [...next.players[recipient].hand, attackCard])
+    return { state: discard(returned, spentDefence), events: log.events }
   }
-  return { state: next, events: log.events }
+
+  if (effect === 'reflect') {
+    // Works on my Machine turns the attack back on its author: the roles swap,
+    // so the original target becomes the taker and the attacker the victim.
+    const swapped = discard(next, [attackCard, ...spentDefence])
+    if (attackCard.id === 'attack-security-bug') {
+      return {
+        state: {
+          ...swapped,
+          pending: { kind: 'requestCard', player: action.player, target: attacker },
+        },
+        events: log.events,
+      }
+    }
+    return { state: stealRandom(swapped, log, attacker, action.player), events: log.events }
+  }
+
+  return { state: discard(next, [attackCard, ...spentDefence]), events: log.events }
 }
 
 export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
