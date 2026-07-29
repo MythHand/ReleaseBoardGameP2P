@@ -27,7 +27,9 @@ const config = (): GameConfig => ({
 })
 
 const FE: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
+const FE2: CardInstance = { uid: 'release-frontend#1', id: 'release-frontend' }
 const BUG: CardInstance = { uid: 'attack-bug#0', id: 'attack-bug' }
+const BUG2: CardInstance = { uid: 'attack-bug#1', id: 'attack-bug' }
 const SEC: CardInstance = { uid: 'attack-security-bug#0', id: 'attack-security-bug' }
 const SUDO: CardInstance = { uid: 'support-sudo#0', id: 'support-sudo' }
 const HOTFIX: CardInstance = { uid: 'defense-hotfix#0', id: 'defense-hotfix' }
@@ -216,11 +218,46 @@ it('steals the release into the attacker’s zone with Security Bug', () => {
   expect(r.events.some((e) => e.type === 'releaseStolen')).toBe(true)
 })
 
+it('discards the stolen release instead of stealing it when the attacker’s slot is occupied', () => {
+  const s = staged([SEC], [])
+  // p2 (the attacker) already has a frontend release of their own — the exact
+  // slot Security Bug would otherwise steal p1's release into.
+  const withAttackerRelease: GameState = {
+    ...s,
+    players: {
+      ...s.players,
+      p2: { ...s.players.p2, release: { frontend: { card: FE2 } } },
+    },
+  }
+  const attacked = reduce(withAttackerRelease, {
+    type: 'ATTACK',
+    player: 'p2',
+    card: SEC.uid,
+    at: 1001,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: null },
+    at: 1002,
+  })
+  expect(r.state.players.p1.release.frontend).toBeUndefined()
+  // The attacker's existing release is untouched, and the stolen card lands in
+  // the discard rather than displacing it.
+  expect(r.state.players.p2.release.frontend?.card).toEqual(FE2)
+  expect(r.state.decks.discard.map((c) => c.uid)).toContain(FE.uid)
+  expect(r.events.some((e) => e.type === 'releaseStolen')).toBe(false)
+  expect(r.events.some((e) => e.type === 'releaseDestroyed')).toBe(true)
+})
+
 it('rejects an attack from someone who cannot respond', () => {
-  const s = staged([BUG], [])
-  expect(reduce(s, { type: 'ATTACK', player: 'p1', card: BUG.uid, at: 1001 }).events[0].type).toBe(
-    'rejected',
-  )
+  // p1 owns the target release (frontend) and genuinely holds an attack card
+  // (BUG2), so only the responders guard — not "you do not hold that card" —
+  // can be the cause of the rejection.
+  const s = staged([BUG], [BUG2])
+  const r = reduce(s, { type: 'ATTACK', player: 'p1', card: BUG2.uid, at: 1001 })
+  expect(r.events[0].type).toBe('rejected')
+  expect(r.state).toBe(s)
 })
 
 it('projects the defence prompt only to the player who owes it', () => {
