@@ -2,8 +2,9 @@ import type { Action, Target } from './actions'
 import { rulesFor } from './cards'
 import type { DeckEntry, Engine, GameConfig } from './engine'
 import type { Event } from './events'
+import { botAction } from './fake/bots'
 import { randomAt } from './rng'
-import type { GameState, PlayerId, Setup } from './state'
+import type { GameState, PlayerId, ReleaseSlot, Setup } from './state'
 
 export interface ConformanceOptions {
   deck: DeckEntry[]
@@ -230,6 +231,116 @@ function fuzzAction(state: GameState, seed: number, n: number): Action {
       return { type: 'WINDOW_EXPIRED', at }
     default:
       return { type: 'RESOLVE', player, choice: { kind: 'defend', card: null }, at }
+  }
+}
+
+// Forces a Code Review combo whenever the turn player holds both a release for
+// an open slot and a Code Review. The plain fuzz stream never attaches a
+// combo (see `fuzzAction`'s PLAY case), so left alone it would never produce a
+// Code Review-protected release at all, leaving the "protected release opens
+// no window" property permanently vacuous. Falls through to ordinary fuzzing
+// whenever the combo is not currently possible.
+function forceCodeReviewCombo(state: GameState, n: number): Action | null {
+  if (state.pending || state.window || state.over) return null
+  const player = state.turn.player
+  const releaseCap = state.setup.releases === 'fast' ? Number.POSITIVE_INFINITY : 1
+  if (state.turn.releasesPlayed >= releaseCap) return null
+  const hand = state.players[player].hand
+  const codeReview = hand.find((c) => c.id === 'support-code-review')
+  if (!codeReview) return null
+  const release = hand.find((c) => {
+    const rules = rulesFor(c.id)
+    return rules?.kind === 'release' && !state.players[player].release[rules.slot as ReleaseSlot]
+  })
+  if (!release) return null
+  return { type: 'PLAY', player, card: release.uid, combo: codeReview.uid, at: atFor(n) }
+}
+
+// Forces a DDoS onto a zone target (a Monitoring, or a Code Review-protected
+// release) whenever the turn player holds a DDoS and one exists.
+// `engine.legalTargets` is the same contract any real caller uses to find a
+// target, so this does not reach into fake internals to locate one — it just
+// removes the fuzz stream's randomness from which target gets picked, so a run
+// reliably lands a DDoS on a zone target instead of maybe never doing so.
+function forceDdosOnZone(engine: Engine, state: GameState, n: number): Action | null {
+  if (state.pending || state.window || state.over) return null
+  const player = state.turn.player
+  const ddos = state.players[player].hand.find((c) => c.id === 'attack-ddos')
+  if (!ddos) return null
+  const targets = engine.legalTargets(state, player, ddos.uid)
+  const zoneTarget = targets.find((t) => t.kind === 'release' || t.kind === 'monitoring')
+  if (!zoneTarget) return null
+  return { type: 'PLAY', player, card: ddos.uid, target: zoneTarget, at: atFor(n) }
+}
+
+// Drives a mixed stream — DDoS-onto-zone and Code Review combos forced
+// whenever possible, ordinary fuzzing otherwise — and reports what it saw
+// along the way. Shared by the two invariants that both need a protected
+// release to exist: "no window opens for one" and "DDoS is the only card that
+// reaches one".
+function driveProtectedReleaseAndDdos(
+  engine: Engine,
+  options: ConformanceOptions,
+  seed: number,
+  steps: number,
+) {
+  let state = engine.createGame(configFor(options, seed))
+  let sawProtectedRelease = false
+  let sawWindowOnProtectedRelease = false
+  let sawDdosOnProtectedRelease = false
+  let sawDdosOnMonitoring = false
+  let sawNonDdosZoneTarget = false
+
+  for (let n = 0; n < steps && !state.over; n += 1) {
+    const w = state.window
+    if (w) {
+      const target = state.players[w.target.player].release[w.target.slot]
+      if (target?.codeReview) sawWindowOnProtectedRelease = true
+    }
+    for (const id of state.seating) {
+      for (const slot of ['frontend', 'backend', 'database'] as const) {
+        if (state.players[id].release[slot]?.codeReview) sawProtectedRelease = true
+      }
+    }
+    // Only meaningful while a card is actually choosable — during a pending
+    // decision or an open window, `legalTargets` reflects that suspension
+    // rather than what the card could otherwise reach.
+    if (!state.pending && !state.window) {
+      const actor = state.turn.player
+      for (const c of state.players[actor].hand) {
+        if (rulesFor(c.id)?.kind !== 'attack' || c.id === 'attack-ddos') continue
+        const targets = engine.legalTargets(state, actor, c.uid)
+        if (targets.some((t) => t.kind === 'release' || t.kind === 'monitoring')) {
+          sawNonDdosZoneTarget = true
+        }
+      }
+    }
+
+    const action =
+      forceDdosOnZone(engine, state, n) ??
+      forceCodeReviewCombo(state, n) ??
+      fuzzAction(state, seed, n)
+
+    if (action.type === 'PLAY' && action.target) {
+      const held = state.players[action.player].hand.find((c) => c.uid === action.card)
+      if (held?.id === 'attack-ddos') {
+        if (action.target.kind === 'monitoring') sawDdosOnMonitoring = true
+        if (action.target.kind === 'release') {
+          const before = state.players[action.target.player].release[action.target.slot]
+          if (before?.codeReview) sawDdosOnProtectedRelease = true
+        }
+      }
+    }
+
+    state = engine.reduce(state, action).state
+  }
+
+  return {
+    sawProtectedRelease,
+    sawWindowOnProtectedRelease,
+    sawDdosOnProtectedRelease,
+    sawDdosOnMonitoring,
+    sawNonDdosZoneTarget,
   }
 }
 
@@ -526,6 +637,219 @@ export function describeEngine(
       })
     })
 
-    // Task 13 adds the rules-invariant suite here.
+    describe('rules invariants', () => {
+      // Transcribed from docs/rules-board-game.md and docs/understanding.md §7.
+      // Each test states which driver it uses (the fuzz stream, `botAction`, or
+      // a mix that forces a specific card interaction) and why that one reaches
+      // the state in question reliably, rather than defaulting to the fuzz
+      // stream everywhere out of habit.
+
+      it('never assigns a release to the wrong zone slot', () => {
+        // Fuzz-driven: this only needs *some* zone churn, not a deep decision
+        // chain. Under this seed the game runs to completion (a release win)
+        // around step 1811, filling all three slots along the way; 2200 steps
+        // leaves margin without relying on a game that never ends.
+        const engine = make()
+        let state = engine.createGame(configFor(options, 6161))
+        const sawSlot = { frontend: false, backend: false, database: false }
+        for (let n = 0; n < 2200 && !state.over; n += 1) {
+          for (const id of state.seating) {
+            const zone = state.players[id].release
+            for (const slot of ['frontend', 'backend', 'database'] as const) {
+              const released = zone[slot]
+              if (!released) continue
+              sawSlot[slot] = true
+              expect(released.card.id, `${id}'s ${slot} slot holds ${released.card.id}`).toBe(
+                `release-${slot}`,
+              )
+            }
+          }
+          state = engine.reduce(state, fuzzAction(state, 6161, n)).state
+        }
+        // A slot never once filled would make its own check above vacuous.
+        expect(sawSlot.frontend).toBe(true)
+        expect(sawSlot.backend).toBe(true)
+        expect(sawSlot.database).toBe(true)
+      })
+
+      it('respects the release cap in a turn under base, and lifts it under fast', () => {
+        // Fuzz-driven under two setups: only the cap itself is at stake here,
+        // not any deeper decision chain.
+        const engine = make()
+        const fastSetup: Setup = { ...BASE_SETUP, releases: 'fast' }
+
+        let base = engine.createGame(configFor(options, 6262))
+        for (let n = 0; n < 600; n += 1) {
+          expect(base.turn.releasesPlayed).toBeLessThanOrEqual(1)
+          base = engine.reduce(base, fuzzAction(base, 6262, n)).state
+        }
+
+        let fast = engine.createGame(configFor(options, 6262, fastSetup))
+        let sawMoreThanOne = false
+        for (let n = 0; n < 600; n += 1) {
+          if (fast.turn.releasesPlayed > 1) sawMoreThanOne = true
+          fast = engine.reduce(fast, fuzzAction(fast, 6262, n)).state
+        }
+        // Without this, a cap that silently still applied under 'fast' would
+        // pass the assertion above by never being tested against a run that
+        // could actually exceed 1.
+        expect(sawMoreThanOne).toBe(true)
+      })
+
+      it('enforces the hand limit at the end of a turn, per the mode axis', () => {
+        // Fuzz-driven under MEMORY_SETUP: BASE_SETUP's hand limit is unbounded
+        // (see MEMORY_SETUP's own comment above `configFor`), so this would be
+        // vacuous under base — the assertion below would never have anything to
+        // clamp.
+        const engine = make()
+        const handLimit = 5
+        let state = engine.createGame(configFor(options, 6363, MEMORY_SETUP))
+        let previousIndex = state.turn.index
+        let sawMidTurnOverflow = false
+        for (let n = 0; n < 900; n += 1) {
+          state = engine.reduce(state, fuzzAction(state, 6363, n)).state
+          for (const id of state.seating) {
+            if (state.players[id].hand.length > handLimit) sawMidTurnOverflow = true
+          }
+          // Checked only at a turn boundary: mid-turn a hand may legitimately
+          // sit over the limit until the discard prompt resolves (that is
+          // exactly the "per the mode axis, at the end of a turn" scope of this
+          // rule, not "at all times").
+          if (state.turn.index !== previousIndex) {
+            previousIndex = state.turn.index
+            for (const id of state.seating) {
+              expect(
+                state.players[id].hand.length,
+                `${id}'s hand is still over the limit at a turn boundary`,
+              ).toBeLessThanOrEqual(handLimit)
+            }
+          }
+        }
+        // Otherwise this test could pass merely because the limit was never
+        // exceeded at all, proving nothing about *when* it gets enforced.
+        expect(sawMidTurnOverflow).toBe(true)
+      })
+
+      it('opens no reaction window for a Code Review-protected release', () => {
+        // A mixed driver: `forceCodeReviewCombo` overrides the plain fuzz
+        // stream (which never attaches a combo) whenever a protected release is
+        // currently playable, so one reliably gets created within the run.
+        const engine = make()
+        const result = driveProtectedReleaseAndDdos(engine, options, 6464, 1500)
+        expect(
+          result.sawProtectedRelease,
+          'never created a protected release to test the property against',
+        ).toBe(true)
+        expect(result.sawWindowOnProtectedRelease).toBe(false)
+      })
+
+      it('times the window at 15s on the first round and 10s after', () => {
+        // Fuzz-driven: a defended-and-reopened window is common enough in a
+        // long fuzz run for both round shapes to appear without forcing
+        // anything. Under this seed a round-2+ window opens by step 63.
+        const engine = make()
+        let state = engine.createGame(configFor(options, 1))
+        let sawRound1 = false
+        let sawLaterRound = false
+        for (let n = 0; n < 800 && !state.over; n += 1) {
+          const r = engine.reduce(state, fuzzAction(state, 1, n))
+          for (const e of r.events) {
+            if (e.type !== 'windowOpened') continue
+            const expected = e.round === 1 ? 15_000 : 10_000
+            expect(e.deadline - atFor(n)).toBe(expected)
+            if (e.round === 1) sawRound1 = true
+            else sawLaterRound = true
+          }
+          state = r.state
+        }
+        expect(sawRound1).toBe(true)
+        // Without this, a bug that always used the first-round duration would
+        // pass the check above simply because no later round was ever seen.
+        expect(sawLaterRound).toBe(true)
+      })
+
+      it('genuinely revokes a pass with UNPASS', () => {
+        // Bot-driven to the first open window: any release a bot plays opens
+        // one immediately (bots never combo a Code Review), so this is quick
+        // and deterministic. PASS/UNPASS are then issued by hand, since no bot
+        // policy ever calls UNPASS.
+        const engine = make()
+        let state = engine.createGame(configFor(options, 6767))
+        const at = 1
+        for (let i = 0; i < 200 && !state.window && !state.over; i += 1) {
+          const seat = state.pending?.player ?? state.turn.player
+          const action = botAction(engine, state, seat, at)
+          if (!action) break
+          state = engine.reduce(state, action).state
+        }
+        expect(
+          state.window,
+          'never reached an open reaction window to test UNPASS against',
+        ).not.toBeNull()
+        const owner = state.window?.target.player
+        const responders = state.seating.filter(
+          (id) => id !== owner && !state.eliminated.includes(id),
+        )
+        expect(responders.length).toBeGreaterThanOrEqual(2)
+        const [a, b] = responders
+
+        state = engine.reduce(state, { type: 'PASS', player: a, at }).state
+        expect(state.window?.passed).toContain(a)
+
+        state = engine.reduce(state, { type: 'UNPASS', player: a, at }).state
+        expect(state.window?.passed).not.toContain(a)
+
+        // If UNPASS were a no-op, `a` would still count as passed here, and the
+        // window would already have closed on `b`'s pass alone (2 of 2) instead
+        // of needing both again below — this is what would go undetected by
+        // only checking `passed` above.
+        state = engine.reduce(state, { type: 'PASS', player: b, at }).state
+        expect(
+          state.window,
+          'closed after only one of two responders had genuinely passed',
+        ).not.toBeNull()
+
+        state = engine.reduce(state, { type: 'PASS', player: a, at }).state
+        expect(state.window).toBeNull()
+      })
+
+      it('is the only card that reaches a protected release or a Monitoring', () => {
+        // Same mixed driver as the Code Review window test above, plus
+        // `forceDdosOnZone`: without it, the fuzz stream's random target choice
+        // (see `attackTarget`) might never happen to land a DDoS on a zone
+        // target within any bounded run, leaving the positive half of this
+        // property untested.
+        const engine = make()
+        const result = driveProtectedReleaseAndDdos(engine, options, 6464, 1500)
+        expect(
+          result.sawNonDdosZoneTarget,
+          'a non-DDoS attack was offered a release or Monitoring target',
+        ).toBe(false)
+        expect(result.sawDdosOnProtectedRelease).toBe(true)
+        expect(result.sawDdosOnMonitoring).toBe(true)
+      })
+
+      it('ends exactly once and then accepts nothing', () => {
+        // Fuzz-driven: reaching gameOver at all, then continuing to throw
+        // actions at the ended game, is exactly what the stream already does
+        // for free over a long enough run. Under this seed the game ends
+        // around step 905; 1200 steps leaves margin to also exercise the
+        // "accepts nothing" half afterwards.
+        const engine = make()
+        let state = engine.createGame(configFor(options, 3))
+        let overAt = -1
+        for (let n = 0; n < 1200; n += 1) {
+          const r = engine.reduce(state, fuzzAction(state, 3, n))
+          if (r.state.over && overAt < 0) overAt = n
+          if (overAt >= 0 && n > overAt) {
+            expect(r.events.every((e) => e.type === 'rejected')).toBe(true)
+            expect(r.state).toBe(state)
+          }
+          state = r.state
+        }
+        // Otherwise every assertion above is vacuous: the game never ended.
+        expect(overAt).toBeGreaterThanOrEqual(0)
+      })
+    })
   })
 }
