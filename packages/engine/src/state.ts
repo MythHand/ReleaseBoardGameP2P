@@ -62,6 +62,11 @@ export type Pending =
       sudo: boolean
       canDefendWith: CardUid[]
       deadline: number
+      // 'release' answers a reaction window; 'hand' answers an attack on the
+      // player's hand, where surviving means the theft simply does not happen.
+      scope: 'release' | 'hand'
+      // Security Bug only: the card type the attacker named.
+      requested?: CardId
     }
   | { kind: 'neutralize503'; player: PlayerId; methods: NeutralizeMethod[] }
   | { kind: 'crush'; player: PlayerId; slot: ReleaseSlot; methods: NeutralizeMethod[] }

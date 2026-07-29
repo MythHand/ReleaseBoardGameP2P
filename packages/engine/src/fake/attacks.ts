@@ -1,25 +1,13 @@
-import type { Action } from '../actions'
+import type { Action, Choice } from '../actions'
 import { RELEASE_ATTACKS, rulesFor } from '../cards'
 import type { Reduction } from '../engine'
-import type { CardInstance, CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
+import type { CardInstance, GameState, Pending, PlayerId, ReleaseSlot } from '../state'
 import type { PendingView } from '../view'
-import { createLog, type Log, reject, setHand } from './core'
+import { createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
+import { stealRandom } from './handAttacks'
 import { closeWindow, openWindow, respondersFor } from './window'
 
-// A stalled defence blocks everyone, so it carries a deadline like the window.
-export const DEFEND_MS = 15_000
-
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
-
-// Cancel-type defences fail against a sudo attack; Unicorn-type never do.
-export function defencesFor(state: GameState, player: PlayerId, sudo: boolean): CardUid[] {
-  return state.players[player].hand
-    .filter((c) => {
-      const kind = rulesFor(c.id)?.kind
-      return kind === 'unicorn' || (kind === 'cancel' && !sudo)
-    })
-    .map((c) => c.uid)
-}
 
 const discard = (state: GameState, cards: CardInstance[]): GameState => ({
   ...state,
@@ -132,6 +120,7 @@ export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }):
         sudo,
         canDefendWith: defencesFor(state, w.target.player, sudo),
         deadline: action.at + DEFEND_MS,
+        scope: 'release',
       },
       eventSeq: log.seq,
     },
@@ -139,13 +128,68 @@ export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }):
   }
 }
 
+// A hand attack's defence: the attacker's own turn, no reaction window. A miss
+// steals (or, for Security Bug, opens the request pending); a hit discards
+// both cards and simply closes the pending — there is no release to spare, so
+// nothing reopens.
+function onHandDefend(
+  state: GameState,
+  pending: Extract<Pending, { kind: 'defend' }>,
+  action: Action & { type: 'RESOLVE' },
+): Reduction {
+  const choice = action.choice as Extract<Choice, { kind: 'defend' }>
+  const log = createLog(state.eventSeq)
+  const attacker = pending.attacker
+  const attackCard: CardInstance = { uid: pending.attack, id: pending.attackId }
+
+  if (choice.card === null) {
+    log.add({ type: 'tookHit', player: action.player })
+    const spent = discard({ ...state, pending: null }, [attackCard])
+    if (attackCard.id === 'attack-security-bug') {
+      return {
+        state: {
+          ...spent,
+          pending: { kind: 'requestCard', player: attacker, target: action.player },
+          eventSeq: log.seq,
+        },
+        events: log.events,
+      }
+    }
+    return { state: stealRandom(spent, log, action.player, attacker), events: log.events }
+  }
+
+  if (!pending.canDefendWith.includes(choice.card)) {
+    return reject(state, action, 'that card cannot defend this attack')
+  }
+  const hand = state.players[action.player].hand
+  const defence = hand.find((c) => c.uid === choice.card)
+  if (!defence) return reject(state, action, 'you do not hold that card')
+
+  log.add({ type: 'defended', player: action.player, card: defence.id, effect: 'cancel' })
+  const spentHand = setHand(
+    state,
+    action.player,
+    hand.filter((c) => c.uid !== choice.card),
+  )
+  const next: GameState = {
+    ...discard(spentHand, [defence, attackCard]),
+    pending: null,
+    eventSeq: log.seq,
+  }
+  return { state: next, events: log.events }
+}
+
 export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
   const pending = state.pending
-  const w = state.window
-  if (pending?.kind !== 'defend' || !w) return reject(state, action, 'no defence pending')
+  if (pending?.kind !== 'defend') return reject(state, action, 'no defence pending')
   if (pending.player !== action.player) return reject(state, action, 'not your decision')
   const choice = action.choice
   if (choice.kind !== 'defend') return reject(state, action, 'wrong choice for this decision')
+
+  if (pending.scope === 'hand') return onHandDefend(state, pending, action)
+
+  const w = state.window
+  if (!w) return reject(state, action, 'no defence pending')
 
   const log = createLog(state.eventSeq)
   const attacker = pending.attacker
@@ -230,6 +274,7 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         sudo: p.sudo,
         options: mine ? [...p.canDefendWith] : [],
         deadline: p.deadline,
+        scope: p.scope,
       }
     case 'discardForRelease':
       return {
@@ -248,7 +293,11 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         excess: p.excess,
         options: mine ? state.players[p.player].hand.map((c) => c.uid) : [],
       }
-    // Task 10 fills in the trigger decisions.
+    case 'requestCard':
+      return { kind: 'requestCard', player: p.player, target: p.target }
+    case 'giveCard':
+      return { kind: 'giveCard', player: p.player, requested: p.requested }
+    // Task 11 fills in the trigger decisions.
     default:
       return null
   }

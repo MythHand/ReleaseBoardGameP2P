@@ -1,12 +1,21 @@
-import type { Action } from '../actions'
+import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
-import { createLog, type Log, reject, setHand } from './core'
+import { attackTargets, createLog, type Log, reject, setHand } from './core'
+import { openHandAttack, resolveDdos } from './handAttacks'
 import { playableFor } from './project'
 import { openWindow } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
+
+// Structural target equality — targets are small value objects, so a field-wise
+// comparison is cheaper and clearer than serializing.
+const sameTarget = (a: Target, b: Target): boolean =>
+  a.kind === b.kind &&
+  ('player' in a ? a.player === (b as { player: string }).player : true) &&
+  ('slot' in a ? a.slot === (b as { slot: string }).slot : true) &&
+  ('card' in a ? a.card === (b as { card: string }).card : true)
 
 // Three different release types in one zone ends the game immediately.
 export function checkWin(state: GameState, log: Log): GameState {
@@ -138,7 +147,60 @@ export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Red
     }
   }
 
-  // Attacks route through Task 9; nothing else is a standalone play.
+  if (rules.kind === 'attack') {
+    if (!action.target) return reject(state, action, 'that card needs a target')
+    if (
+      !attackTargets(state, action.player, card.id).some((t) =>
+        sameTarget(t, action.target as Target),
+      )
+    ) {
+      return reject(state, action, 'illegal target')
+    }
+    let sudo = false
+    if (action.combo !== undefined) {
+      const partner = hand.find((c) => c.uid === action.combo)
+      if (partner?.id !== 'support-sudo') return reject(state, action, 'invalid sudo combo')
+      if (!rules.sudo) return reject(state, action, 'that card has no sudo effect')
+      sudo = true
+    }
+    const spentCards = hand.filter((c) => c.uid === action.card || c.uid === action.combo)
+    const spent = setHand(
+      state,
+      action.player,
+      hand.filter((c) => !spentCards.includes(c)),
+    )
+
+    // DDoS resolves immediately: it is not answerable by a defence card.
+    if (card.id === 'attack-ddos') {
+      const banked = {
+        ...spent,
+        decks: { ...spent.decks, discard: [...spent.decks.discard, ...spentCards] },
+      }
+      return { state: resolveDdos(banked, log, action.player, action.target), events: log.events }
+    }
+
+    if (action.target.kind !== 'player') return reject(state, action, 'illegal target')
+
+    const sudoOnly = spentCards.filter((c) => c.uid === action.combo)
+    const withSudoSpent = {
+      ...spent,
+      decks: { ...spent.decks, discard: [...spent.decks.discard, ...sudoOnly] },
+    }
+    return {
+      state: openHandAttack(
+        withSudoSpent,
+        log,
+        action.player,
+        card,
+        action.target.player,
+        sudo,
+        action.at,
+      ),
+      events: log.events,
+    }
+  }
+
+  // Nothing else is a standalone play.
   return reject(state, action, `cannot play ${card.id} this way`)
 }
 

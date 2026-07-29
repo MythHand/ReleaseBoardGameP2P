@@ -2,6 +2,7 @@ import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
 import type { PlayerView, ReleasedView, ReleaseView } from '../view'
 import { pendingView } from './attacks'
+import { attackTargets } from './core'
 import { canAttackWith } from './window'
 
 const releasedView = (r: Released | undefined): ReleasedView | undefined =>
@@ -48,7 +49,7 @@ export function playableFor(state: GameState, viewerId: PlayerId): CardUid[] {
           // trigger, so it is never played proactively.
           return c.id === 'protection-monitoring' ? !me.release.monitoring : false
         case 'attack':
-          return true
+          return attackTargets(state, viewerId, c.id).length > 0
         // Defences answer an attack, supports ride along with another card, and
         // triggers fire on the draw — none is a standalone play.
         case 'cancel':

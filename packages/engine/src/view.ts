@@ -44,6 +44,7 @@ export type PendingView =
       sudo: boolean
       options: CardUid[]
       deadline: number
+      scope: 'release' | 'hand'
     }
   | { kind: 'neutralize503'; player: PlayerId; methods: NeutralizeMethod[] }
   | { kind: 'crush'; player: PlayerId; slot: ReleaseSlot; methods: NeutralizeMethod[] }

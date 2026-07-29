@@ -1,4 +1,5 @@
-import type { Action } from './actions'
+import type { Action, Target } from './actions'
+import { rulesFor } from './cards'
 import type { DeckEntry, Engine, GameConfig } from './engine'
 import type { Event } from './events'
 import { randomAt } from './rng'
@@ -57,8 +58,7 @@ const atFor = (n: number): number => 1000 + n * 1000
 // pending kind with no case here falls through to `null`, i.e. to that same
 // random RESOLVE branch — the 'resolves every pending decision' property
 // below is what turns that silent stall into a failing test instead. A later
-// task that adds a new Pending variant (defend, neutralize503, crush,
-// requestCard, giveCard) adds a case here.
+// task that adds a new Pending variant (neutralize503, crush) adds a case here.
 function resolvePendingAction(state: GameState, n: number): Action | null {
   const { pending } = state
   if (!pending) return null
@@ -88,9 +88,58 @@ function resolvePendingAction(state: GameState, n: number): Action | null {
       const card = pending.canDefendWith[0] ?? null
       return { type: 'RESOLVE', player: pending.player, choice: { kind: 'defend', card }, at }
     }
+    case 'requestCard': {
+      // Guess the target's first held card's type if any, otherwise a fixed
+      // id that is certain to miss — either way the pending resolves in one step.
+      const targetHand = state.players[pending.target].hand
+      const card = targetHand[0]?.id ?? 'attack-bug'
+      return { type: 'RESOLVE', player: pending.player, choice: { kind: 'requestCard', card }, at }
+    }
+    case 'giveCard': {
+      // onRequestCard only opens this pending once it has confirmed the holder
+      // has a matching card, so this lookup cannot fail.
+      const hand = state.players[pending.player].hand
+      const match = hand.find((c) => c.id === pending.requested)
+      if (!match) return null
+      return {
+        type: 'RESOLVE',
+        player: pending.player,
+        choice: { kind: 'giveCard', card: match.uid },
+        at,
+      }
+    }
     default:
       return null
   }
+}
+
+// Picks a plausible target for a held card, if it is an attack. Undefined for
+// any other card (PLAY ignores `target` when it does not apply) and for an
+// attack with nowhere to land, which exercises onPlay's own "needs a target" /
+// "illegal target" rejections instead.
+function attackTarget(
+  state: GameState,
+  actor: PlayerId,
+  cardId: string | undefined,
+  seed: number,
+  n: number,
+): Target | undefined {
+  if (!cardId || rulesFor(cardId)?.kind !== 'attack') return undefined
+  const others = state.seating.filter((id) => id !== actor && !state.eliminated.includes(id))
+  if (others.length === 0) return undefined
+  const pick = <T>(items: readonly T[]): T =>
+    items[Math.floor(randomAt(seed, n * 8 + 6) * items.length)]
+
+  if (cardId !== 'attack-ddos') return { kind: 'player', player: pick(others) }
+
+  const targets: Target[] = []
+  for (const id of others) {
+    if (state.players[id].release.monitoring) targets.push({ kind: 'monitoring', player: id })
+    for (const slot of ['frontend', 'backend', 'database'] as const) {
+      if (state.players[id].release[slot]) targets.push({ kind: 'release', player: id, slot })
+    }
+  }
+  return targets.length > 0 ? pick(targets) : undefined
 }
 
 // A deterministic pseudo-random action stream. Deliberately includes illegal
@@ -106,6 +155,15 @@ function fuzzAction(state: GameState, seed: number, n: number): Action {
   const uid = hand.length > 0 ? pick(hand, 2).uid : 'no-such-card'
   const at = atFor(n)
 
+  // An attack card is only ever legally played with a target, and onPlay now
+  // rejects one outright without it — a fuzzer that never attaches a target
+  // would leave the whole attack path (and everything reachable only through
+  // it: hand theft, Security Bug's request/give handoff, DDoS) permanently
+  // unreached, which would in turn silently hide any regression there from
+  // every property in this file, `progress` included.
+  const held = hand.find((c) => c.uid === uid)
+  const target = attackTarget(state, player, held?.id, seed, n)
+
   const kind = Math.floor(randomAt(seed, n * 8 + 3) * 7)
   switch (kind) {
     case 0:
@@ -113,7 +171,7 @@ function fuzzAction(state: GameState, seed: number, n: number): Action {
     case 1:
       return { type: 'PUSH', player, at }
     case 2:
-      return { type: 'PLAY', player, card: uid, at }
+      return { type: 'PLAY', player, card: uid, ...(target ? { target } : {}), at }
     case 3:
       return { type: 'ATTACK', player, card: uid, at }
     case 4:
@@ -272,7 +330,13 @@ export function describeEngine(
         let maxPendingStreak = 0
         let windowStreak = 0
         let maxWindowStreak = 0
-        for (let n = 0; n < 400; n += 1) {
+        // 900 steps, not 400: Security Bug's hand-scope miss opens a three-deep
+        // decision chain (defend -> requestCard -> giveCard, see below), and
+        // reaching all three under this seed needs roughly 650 steps to first
+        // draw, play and miss a Security Bug at all. A shorter run would never
+        // exercise `requestCard`/`giveCard` here, silently hiding a regression
+        // in either from this property.
+        for (let n = 0; n < 900; n += 1) {
           state = engine.reduce(state, fuzzAction(state, seed, n)).state
           pendingStreak = state.pending ? pendingStreak + 1 : 0
           maxPendingStreak = Math.max(maxPendingStreak, pendingStreak)
@@ -287,9 +351,13 @@ export function describeEngine(
           BASE_SETUP,
           2468,
         )
-        // One step of slack for the single step during which a decision is
-        // genuinely open before the very next fuzzed action closes it again.
-        expect(maxPendingStreak).toBeLessThanOrEqual(1)
+        // A lone decision resolves in the one step it is genuinely open. Security
+        // Bug's hand-scope miss is the deepest legitimate chain: defend (open) ->
+        // requestCard (the attacker names a type) -> giveCard (the holder
+        // surrenders a copy), three consecutive steps each requiring a different
+        // player's input, not a stall. A real stall still stands out sharply from
+        // 3: it holds `pending` for the rest of the run (hundreds of steps).
+        expect(maxPendingStreak).toBeLessThanOrEqual(3)
         // A window legitimately stays open for several steps while responders
         // decide, so `<= 1` is the wrong bound here, unlike for `pending`. The
         // fuzz clock (`atFor`) makes a round-1 deadline reachable ~15 steps
@@ -315,7 +383,8 @@ export function describeEngine(
           MEMORY_SETUP,
           2468,
         )
-        expect(maxPendingStreak).toBeLessThanOrEqual(1)
+        // Same bound as above, for the same reason (see that test's comment).
+        expect(maxPendingStreak).toBeLessThanOrEqual(3)
         expect(maxWindowStreak).toBeLessThanOrEqual(60)
         expect(finalTurnIndex).toBeGreaterThan(8)
       })

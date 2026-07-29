@@ -3,7 +3,8 @@ import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, Setup } from '../state'
 import { onAttack, onDefend } from './attacks'
-import { createLog, isWellFormedAction, reject, setHand } from './core'
+import { attackTargets, createLog, isWellFormedAction, reject, setHand } from './core'
+import { onGiveCard, onRequestCard } from './handAttacks'
 import { playableFor } from './project'
 import { onDiscardForRelease, onPlay } from './release'
 import { onPass, onUnpass, onWindowExpired } from './window'
@@ -32,24 +33,7 @@ export function legalTargets(state: GameState, actor: PlayerId, card: CardUid): 
   if (!held) return []
   const rules = rulesFor(held.id)
   if (rules?.kind !== 'attack') return []
-
-  const others = state.seating.filter((id) => id !== actor && !state.eliminated.includes(id))
-
-  // DDoS does not touch a bare release or a hand: it destroys a Monitoring or
-  // returns a release (protected or not) to its owner's hand.
-  if (held.id === 'attack-ddos') {
-    const targets: Target[] = []
-    for (const id of others) {
-      if (state.players[id].release.monitoring) targets.push({ kind: 'monitoring', player: id })
-      for (const slot of ['frontend', 'backend', 'database'] as const) {
-        if (state.players[id].release[slot]) targets.push({ kind: 'release', player: id, slot })
-      }
-    }
-    return targets
-  }
-
-  // The other attacks, played on your own turn, take from a hand.
-  return others.map((id) => ({ kind: 'player', player: id }) as Target)
+  return attackTargets(state, actor, held.id)
 }
 
 // Ends the turn, or holds it open when the hand is over the mode's limit.
@@ -63,8 +47,11 @@ function endTurn(state: GameState, log: ReturnType<typeof createLog>): GameState
   log.add({ type: 'turnEnded', player: me })
   const next = nextSeat(state, me)
   log.add({ type: 'turnStarted', player: next, index: state.turn.index + 1 })
+  // A DDoS freeze lasts exactly one round: it lifts as its victim's next turn ends.
+  const thawed = { ...state.players[me], frozen: [] }
   return {
     ...state,
+    players: { ...state.players, [me]: thawed },
     turn: { player: next, index: state.turn.index + 1, hasDrawn: false, releasesPlayed: 0 },
     pending: null,
     eventSeq: log.seq,
@@ -167,6 +154,10 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
       return onDiscardForRelease(state, action)
     case 'defend':
       return onDefend(state, action)
+    case 'requestCard':
+      return onRequestCard(state, action)
+    case 'giveCard':
+      return onGiveCard(state, action)
     // Later tasks add the remaining decisions. Until then an unimplemented choice
     // is rejected rather than silently ignored.
     default:
