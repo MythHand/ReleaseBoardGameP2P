@@ -4,7 +4,7 @@ import { shuffle } from '../rng'
 import type { CardId, CardInstance, GameState, PlayerId, PlayerState } from '../state'
 
 // Trigger cards cannot sit in an opening hand: their effect fires on the draw, so
-// holding one from setup would mean an unfired trigger (rules, Подготовка §3).
+// holding one from setup would mean an unfired trigger (rules, Setup §3).
 export const OPENING_EXCLUDED: ReadonlySet<CardId> = new Set(['trigger-error-503', 'trigger-ai'])
 
 const OPENING_HAND = 5
@@ -47,7 +47,7 @@ export function createGame(config: GameConfig): GameState {
 
   const players: Record<PlayerId, PlayerState> = {}
   // Cards skipped because they are trigger cards go back into the deck, which is
-  // then reshuffled — the rules' "return them and take others" (Подготовка §3-4).
+  // then reshuffled — the rules' "return them and take others" (Setup §3-4).
   const skipped: CardInstance[] = []
   let i = 0
 

@@ -159,13 +159,12 @@ It is not part of the game's history in the same sense every other event is:
 ## What the fake omits, and why
 
 `CARD_RULES` (`src/cards.ts`) only defines the ids the fake actually
-implements. Three families are deliberately absent, and `createGame` filters
+implements. Two families are deliberately absent, and `createGame` filters
 any unsupported id out of the deck rather than erroring, so an omitted card is
 simply inert instead of fatal:
 
-- **Git operations** (`operation-*`) — need a bespoke UI surface the design
-  defers.
-- **System Upgrade** — same reason.
+- **Git operations** (`operation-*`, including System Upgrade) — need a bespoke
+  UI surface the design defers.
 - **`ai-inside`** — same reason.
 
 ## Quantities vs. rules
