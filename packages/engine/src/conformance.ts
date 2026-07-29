@@ -82,6 +82,12 @@ function resolvePendingAction(state: GameState, n: number): Action | null {
         at,
       }
     }
+    case 'defend': {
+      // Defend with the first legal card if one is held, otherwise take the hit
+      // (`null`) — either way the pending resolves in one step.
+      const card = pending.canDefendWith[0] ?? null
+      return { type: 'RESOLVE', player: pending.player, choice: { kind: 'defend', card }, at }
+    }
     default:
       return null
   }

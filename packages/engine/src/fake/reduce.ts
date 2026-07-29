@@ -2,6 +2,7 @@ import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, Setup } from '../state'
+import { onAttack, onDefend } from './attacks'
 import { createLog, isWellFormedAction, reject, setHand } from './core'
 import { playableFor } from './project'
 import { onDiscardForRelease, onPlay } from './release'
@@ -164,6 +165,8 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
       return onHandLimit(state, action)
     case 'discardForRelease':
       return onDiscardForRelease(state, action)
+    case 'defend':
+      return onDefend(state, action)
     // Later tasks add the remaining decisions. Until then an unimplemented choice
     // is rejected rather than silently ignored.
     default:
@@ -193,8 +196,13 @@ export function reduce(state: GameState, action: Action): Reduction {
       return onUnpass(state, action)
     case 'WINDOW_EXPIRED':
       return onWindowExpired(state, action)
-    // ATTACK arrives in Task 9.
+    case 'ATTACK':
+      return onAttack(state, action)
     default:
-      return reject(state, action, `unsupported action: ${String(action?.type)}`)
+      return reject(
+        state,
+        action as Action,
+        `unsupported action: ${String((action as Action)?.type)}`,
+      )
   }
 }

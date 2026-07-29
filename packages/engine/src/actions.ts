@@ -9,7 +9,8 @@ export type Target =
 export type Choice =
   | { kind: 'discardForRelease'; card: CardUid }
   // null is an explicit "I could block this and I choose not to".
-  | { kind: 'defend'; card: CardUid | null }
+  // `combo` carries a Sudo played alongside the defence (sudo Rollback).
+  | { kind: 'defend'; card: CardUid | null; combo?: CardUid }
   | { kind: 'neutralize503'; method: NeutralizeMethod; card?: CardUid }
   | { kind: 'crush'; method: NeutralizeMethod; card?: CardUid }
   // Security Bug names a card TYPE the opponent might hold — that is the bluff.

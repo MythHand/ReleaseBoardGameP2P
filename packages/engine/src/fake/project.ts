@@ -1,6 +1,7 @@
 import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
 import type { PlayerView, ReleasedView, ReleaseView } from '../view'
+import { pendingView } from './attacks'
 import { canAttackWith } from './window'
 
 const releasedView = (r: Released | undefined): ReleasedView | undefined =>
@@ -104,8 +105,7 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       passed: [...state.window.passed],
       canAttackWith: canAttackWith(state, viewerId),
     },
-    // Task 9+ fills in the pending prompt as its machinery lands.
-    pending: null,
+    pending: pendingView(state, viewerId),
     setup: { ...state.setup },
     over: state.over && { ...state.over },
   }
