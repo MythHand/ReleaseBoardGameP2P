@@ -110,8 +110,23 @@ export function botAction(
   return null
 }
 
-// Drives every non-human seat until the human owes the next action, the game
-// ends, or a policy bug would otherwise hang the caller.
+// Drives every non-human seat until the human's own PROACTIVE turn, the game
+// ends, or a policy bug would otherwise hang the caller (the 500-iteration
+// cap below).
+//
+// This also auto-resolves any REACTIVE pending owed by the human — `defend`,
+// `neutralize503`, `crush`, `handLimit` — using the same default policy as
+// any bot seat, whenever it interrupts someone else's turn. That is a
+// deliberate convenience for a HEADLESS driver (tests, simulation, "what does
+// a finished game look like"): it lets the loop reach the human's real turn
+// without a UI in the room to answer on their behalf.
+//
+// Do not point this at a live UI where a human answers their own prompts.
+// The reaction window is the game's most interactive moment (bluffing on
+// Security Bug, choosing to eat a hit vs. spend a defence) — auto-resolving
+// it removes the decision the player is meant to make. A UI-facing driver
+// must stop on any pending owed by the human and surface it instead of
+// calling into this function.
 export function runUntilIdle(
   engine: Engine,
   state: GameState,
@@ -120,11 +135,19 @@ export function runUntilIdle(
 ): GameState {
   let current = state
   for (let i = 0; i < MAX_IDLE_ITERATIONS; i += 1) {
+    // `current.over`/`current.pending`/`current.window`/`current.turn.player`
+    // below are raw GameState reads, but they are loop control — "whose turn
+    // is it, is the game over" — not a legality decision. The never-read-
+    // options-from-GameState rule is about what a seat may DO, which still
+    // comes from `project`/`legalTargets` inside `botAction`; it was never
+    // about knowing whose turn it structurally is.
     if (current.over) return current
     // "Owes an action" means it is their proactive turn — a reactive pending
     // interrupting someone else's turn (e.g. defending an attack) still gets
     // driven here, exactly like any other seat, so the table only actually
-    // hands back once it is genuinely the human's own turn to act.
+    // hands back once it is genuinely the human's own turn to act. See the
+    // doc comment above: this is the headless-driver behaviour, not safe to
+    // reuse verbatim for a UI driver.
     if (current.turn.player === human && !current.pending && !current.window) return current
     const seat = current.pending?.player ?? current.turn.player
     const action = botAction(engine, current, seat, at)

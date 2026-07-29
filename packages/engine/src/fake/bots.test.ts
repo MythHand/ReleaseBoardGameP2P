@@ -1,4 +1,4 @@
-import type { GameConfig } from '../engine'
+import type { Engine, GameConfig } from '../engine'
 import { botAction, runUntilIdle } from './bots'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
 
@@ -59,3 +59,26 @@ it('reaches a finished game when every seat is driven', () => {
   }
   expect(state.over).not.toBeNull()
 })
+
+// The iteration cap is the only thing standing between a policy that cannot
+// make progress and a hung caller — this stubs `reduce` to never advance the
+// state, so `runUntilIdle` would spin forever without the cap. An explicit
+// per-test timeout makes a regression here fail loudly instead of stalling
+// the whole suite.
+it('does not hang when the policy cannot make progress', () => {
+  const s = engine.createGame(config())
+  const stuck = { ...s, turn: { ...s.turn, player: 'p2' } }
+  const stub: Engine = {
+    createGame: engine.createGame,
+    // Every action is accepted but changes nothing: the table can never
+    // advance toward p1's turn or a finished game.
+    reduce: (state) => ({ state, events: [] }),
+    project: engine.project,
+    legalTargets: engine.legalTargets,
+  }
+
+  const result = runUntilIdle(stub, stuck, 'p1', 1000)
+
+  expect(result.turn.player).toBe('p2')
+  expect(result.over).toBeNull()
+}, 2_000)
