@@ -1,6 +1,7 @@
 import type { Action, Choice } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
+import type { DiscardReason } from '../events'
 import { randomAt } from '../rng'
 import type { CardInstance, GameState, NeutralizeMethod, PlayerId, ReleaseSlot } from '../state'
 import { createLog, endTurn, type Log, reject, setHand } from './core'
@@ -24,7 +25,11 @@ export function neutralizeOptions(state: GameState, player: PlayerId): Neutraliz
 }
 
 // Appends to `eliminated`, discards the hand and zone, and ends the game once
-// only one living player remains.
+// only one living player remains. Every card that leaves the board gets its
+// own public `discarded` event — a hand card as a side effect of the trigger
+// ('effect'), a release (and its Code Review) or a Monitoring as destroyed
+// alongside their owner ('destroyed') — so the causal trail survives an
+// elimination the same way it survives a hand-limit or release-cost discard.
 export function eliminate(state: GameState, log: Log, player: PlayerId): GameState {
   const me = state.players[player]
   const zoneCards = SLOTS.flatMap((slot) => {
@@ -34,6 +39,12 @@ export function eliminate(state: GameState, log: Log, player: PlayerId): GameSta
   const monitoringCards = me.release.monitoring ? [me.release.monitoring] : []
   const spoils = [...me.hand, ...zoneCards, ...monitoringCards]
 
+  for (const c of me.hand) {
+    log.add({ type: 'discarded', player, card: c.id, reason: 'effect' })
+  }
+  for (const c of [...zoneCards, ...monitoringCards]) {
+    log.add({ type: 'discarded', player, card: c.id, reason: 'destroyed' })
+  }
   log.add({ type: 'eliminated', player })
 
   const cleared: GameState = {
@@ -55,12 +66,27 @@ export function eliminate(state: GameState, log: Log, player: PlayerId): GameSta
   return cleared
 }
 
-function destroySlot(state: GameState, log: Log, player: PlayerId, slot: ReleaseSlot): GameState {
+// `reason` is only supplied when the destruction is a chosen answer (the
+// sacrifice neutralize method) rather than an automatic one (an unanswered
+// crush): a chosen sacrifice gets its own `discarded` event per card on top of
+// `releaseDestroyed`, matching the pattern the debugger/monitoring methods
+// use; an automatic destruction stays exactly as `takeRelease` in release.ts
+// already treats attack-caused destruction — `releaseDestroyed` alone.
+function destroySlot(
+  state: GameState,
+  log: Log,
+  player: PlayerId,
+  slot: ReleaseSlot,
+  reason?: DiscardReason,
+): GameState {
   const me = state.players[player]
   const released = me.release[slot]
   if (!released) return { ...state, eventSeq: log.seq }
   const spoils = [released.card, ...(released.codeReview ? [released.codeReview] : [])]
   log.add({ type: 'releaseDestroyed', player, slot, card: released.card.id })
+  if (reason) {
+    for (const c of spoils) log.add({ type: 'discarded', player, card: c.id, reason })
+  }
   const zone = { ...me.release }
   delete zone[slot]
   return {
@@ -83,6 +109,7 @@ export function fireTrigger(
 ): GameState {
   if (card.id === 'trigger-error-503') {
     log.add({ type: 'revealed', player, card: card.id })
+    log.add({ type: 'discarded', player, card: card.id, reason: 'trigger' })
     const discarded = discard(state, [card])
     const methods = neutralizeOptions(discarded, player)
     if (methods.length === 0) return eliminate(discarded, log, player)
@@ -98,6 +125,7 @@ export function fireTrigger(
   const index = Math.floor(randomAt(state.seed, state.rngCursor) * events.length)
   const event = events[index]
   log.add({ type: 'aiRevealed', player, aiCard: card.id, eventCard: event.id })
+  log.add({ type: 'discarded', player, card: card.id, reason: 'trigger' })
   const remainingEvents = events.filter((_, i) => i !== index)
   const discarded = discard(state, [card])
   const drawn: GameState = {
@@ -137,6 +165,7 @@ export function onNeutralize(state: GameState, action: Action & { type: 'RESOLVE
     const dbg = hand.find((c) => c.id === 'protection-debugger')
     if (!dbg) return reject(state, action, 'you do not hold a Debugger')
     log.add({ type: 'neutralized', player, method: 'debugger' })
+    log.add({ type: 'discarded', player, card: dbg.id, reason: 'neutralized' })
     const withoutDbg = setHand(
       state,
       player,
@@ -163,7 +192,7 @@ export function onNeutralize(state: GameState, action: Action & { type: 'RESOLVE
   const slot = SLOTS.find((s) => state.players[player].release[s]?.card.uid === choice.card)
   if (!slot) return reject(state, action, 'you do not hold that release')
   log.add({ type: 'neutralized', player, method: 'sacrifice' })
-  const destroyed = destroySlot(state, log, player, slot)
+  const destroyed = destroySlot(state, log, player, slot, 'neutralized')
   return { state: { ...destroyed, pending: null, eventSeq: log.seq }, events: log.events }
 }
 
@@ -191,7 +220,6 @@ export function resolveAiEvent(
       const slot = event.id.replace('ai-release-', '') as ReleaseSlot
       const me = state.players[player]
       if (me.release[slot]) return { ...state, eventSeq: log.seq }
-      log.add({ type: 'released', player, slot, card: event.id })
       // A fresh instance, not `event` itself: the event card returns to its own
       // deck once this resolves, while the placed release stays on the board —
       // sharing one uid between the two would make the same card exist in two
@@ -199,7 +227,17 @@ export function resolveAiEvent(
       // `release-<slot>#n` numbering, so it can never collide with a real
       // draw-pile card's uid in a projected view (see the privacy conformance
       // property in conformance.ts).
-      const placed: CardInstance = { uid: `ai-event-release-${slot}-${player}`, id: event.id }
+      //
+      // The id is the plain `release-<slot>` catalogue id, not the event's own
+      // `ai-release-<slot>` id: `rulesFor` classifies the latter as kind 'ai',
+      // which `playableFor` always refuses to play standalone. If this card is
+      // later bounced to hand by DDoS and thaws, it must read as an ordinary
+      // release or it can never be played again.
+      const placed: CardInstance = {
+        uid: `ai-event-release-${slot}-${player}`,
+        id: `release-${slot}`,
+      }
+      log.add({ type: 'released', player, slot, card: placed.id })
       return {
         ...state,
         players: {
@@ -213,8 +251,14 @@ export function resolveAiEvent(
     case 'ai-monitoring': {
       const me = state.players[player]
       if (me.release.monitoring) return { ...state, eventSeq: log.seq }
-      log.add({ type: 'placed', player, card: event.id })
-      const placed: CardInstance = { uid: `ai-event-monitoring-${player}`, id: event.id }
+      // Same reasoning as the release case above: the plain catalogue id, not
+      // the event's own `ai-monitoring` id, so the placed card plays and
+      // renders as an ordinary Monitoring if it is ever displaced and returns.
+      const placed: CardInstance = {
+        uid: `ai-event-monitoring-${player}`,
+        id: 'protection-monitoring',
+      }
+      log.add({ type: 'placed', player, card: placed.id })
       return {
         ...state,
         players: {
