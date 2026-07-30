@@ -16,7 +16,13 @@ import {
 // The peer side. It holds no GameState and cannot run `reduce`, so there is no
 // optimistic local application: every intent round-trips to the keeper, and the
 // view that comes back is the whole truth this peer is entitled to.
-export function createRemoteLink(args: { transport: Transport; keeperId: string }): {
+export function createRemoteLink(args: {
+  transport: Transport
+  keeperId: string
+  // `null` means the keeper is gone and the game cannot continue: the peer
+  // should surface @release/ui's Reconnect screen and return to the lobby.
+  onKeeperChanged?: (keeperId: PlayerId | null) => void
+}): {
   link: GameLink
   handleMessage(frame: WireMessage): void
 } {
@@ -36,6 +42,10 @@ export function createRemoteLink(args: { transport: Transport; keeperId: string 
       },
     },
     handleMessage(frame) {
+      if (frame.type === 'KEEPER_CHANGED') {
+        args.onKeeperChanged?.(frame.payload.keeperId)
+        return
+      }
       if (frame.type !== 'SYNC') return
       for (const listener of listeners) listener(frame.payload)
     },

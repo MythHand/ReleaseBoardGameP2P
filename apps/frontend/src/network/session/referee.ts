@@ -210,6 +210,43 @@ export function applyIntent(
   return { session: next, outgoing: syncAll(next, events) }
 }
 
+// Voluntary only. A keeper that crashes takes GameState and the seed with it,
+// and the game ends — peers cannot reconstruct it, because reconstructing it
+// means holding the seed, which is the deck order.
+export function handover(session: Session, toPlayerId: PlayerId): SessionResult {
+  const successor = session.seats.find((s) => s.playerId === toPlayerId)
+  if (!successor?.peerId) return { session, outgoing: [] }
+
+  const next: Session = { ...session, keeperId: toPlayerId }
+  return {
+    session: next,
+    outgoing: [
+      {
+        to: successor.peerId,
+        message: { type: 'KEEPER_STATE', payload: { state: session.state } },
+      },
+      { to: 'broadcast', message: { type: 'KEEPER_CHANGED', payload: { keeperId: toPlayerId } } },
+    ],
+  }
+}
+
+// The successor's side of a handover: it now holds the state it was given.
+export function adoptSession(args: {
+  state: GameState
+  gameId: string
+  keeperId: PlayerId
+  engine: Engine
+  seats: Seat[]
+}): Session {
+  return {
+    gameId: args.gameId,
+    keeperId: args.keeperId,
+    engine: args.engine,
+    state: args.state,
+    seats: args.seats,
+  }
+}
+
 // The keeper owns every clock in the session. `WINDOW_EXPIRED` carries no player
 // identity and the engine rejects it before the deadline regardless of sender,
 // so there is no owner rule to encode — the keeper simply fires it, and peers
