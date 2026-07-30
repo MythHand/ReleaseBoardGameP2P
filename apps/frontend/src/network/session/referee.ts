@@ -151,19 +151,26 @@ export function rebind(session: Session, playerId: PlayerId, peerId: string): Se
 // answer the reaction window for someone sitting right there. Here the seat is
 // empty, so there is no decision to take away.
 export function driveAbsent(session: Session, now: number): SessionResult {
-  const seat = session.seats.find(
+  const expired = session.seats.filter(
     (s) => s.peerId === null && s.absentSince !== null && now - s.absentSince >= ABSENT_GRACE_MS,
   )
-  if (!seat) return { session, outgoing: [] }
 
-  const action = botAction(session.engine, session.state, seat.playerId, now)
-  if (!action) return { session, outgoing: [] }
+  // Scan every expired-absent seat rather than picking the first: an absent
+  // seat that currently owes nothing (not its turn, nothing pending on it)
+  // must not shadow a later seat that does — with two or more seats gone,
+  // the one the game is actually waiting on need not be seated first.
+  for (const seat of expired) {
+    const action = botAction(session.engine, session.state, seat.playerId, now)
+    if (!action) continue
 
-  const { state, events } = session.engine.reduce(session.state, action)
-  if (state === session.state) return { session, outgoing: [] }
+    const { state, events } = session.engine.reduce(session.state, action)
+    if (state === session.state) continue
 
-  const next: Session = { ...session, state }
-  return { session: next, outgoing: syncAll(next, events) }
+    const next: Session = { ...session, state }
+    return { session: next, outgoing: syncAll(next, events) }
+  }
+
+  return { session, outgoing: [] }
 }
 
 // The keeper's answer to one peer's intent.

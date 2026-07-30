@@ -68,3 +68,43 @@ it('drives an absent seat once the grace period expires, so the game cannot stal
 
   expect(result.session.state).not.toBe(dropped.state)
 })
+
+// Three seats, so an absent seat that owes nothing (seated before the one
+// that owes the actual pending action) can be told apart from one that does.
+function threeSeatSession(): Session {
+  return createSession({
+    gameId: 'g2',
+    keeperId: 'a',
+    engine: createFakeEngine(),
+    seed: 11,
+    players: [
+      { playerId: 'a', peerId: 'peer-a', name: 'Ann' },
+      { playerId: 'b', peerId: 'peer-b', name: 'Bo' },
+      { playerId: 'c', peerId: 'peer-c', name: 'Cy' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  }).session
+}
+
+it('drives the absent seat that owes the action even when an earlier absent seat owes nothing', () => {
+  // Rotate the turn from 'a' onto 'c' (a's and b's turns each end with a bare
+  // draw + push, playing nothing) while every seat is still connected.
+  let s = threeSeatSession()
+  s = applyIntent(s, 'peer-a', { type: 'DRAW' }, 100).session
+  s = applyIntent(s, 'peer-a', { type: 'PUSH' }, 101).session
+  s = applyIntent(s, 'peer-b', { type: 'DRAW' }, 102).session
+  s = applyIntent(s, 'peer-b', { type: 'PUSH' }, 103).session
+  expect(s.state.turn.player).toBe('c')
+
+  // Seat order is [a, b, c]: 'a' is absent but owes nothing (it is not their
+  // turn and nothing is pending on them); 'c' — last in seating order — is
+  // the one actually on turn and owes the game its next move.
+  s = disconnect(s, 'peer-a', 1_000).session
+  s = disconnect(s, 'peer-c', 1_000).session
+
+  const result = driveAbsent(s, 1_000 + ABSENT_GRACE_MS + 1)
+
+  expect(result.session.state).not.toBe(s.state)
+})
