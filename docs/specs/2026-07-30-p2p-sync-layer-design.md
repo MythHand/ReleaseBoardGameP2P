@@ -129,7 +129,26 @@ The keeper never trusts what a frame claims about itself:
 - **`WINDOW_EXPIRED` is never sent by a peer.** The keeper owns the deadline timer
   and fires it itself. The engine's constraint — that `WINDOW_EXPIRED` carries no
   player identity and must not acquire an owner-only rule — is satisfied by
-  removing the question rather than answering it.
+  removing the question rather than answering it. `Intent` excludes it in the type
+  system, and the keeper *also* refuses it at runtime: what arrives is parsed JSON,
+  so the type is a statement about our own callers, never about the wire.
+- **The keeper drives absent seats, but not their clocks.** `botAction` answers for
+  a silent seat that owns an open window with `WINDOW_EXPIRED` stamped at that
+  window's own deadline. The keeper drops that suggestion rather than replaying it:
+  a bot's forged time is no more authoritative than a peer's, and honouring it would
+  end everyone else's reaction time early.
+
+**What "the connection the frame arrived on" covers, and what it does not.** The
+transport overwrites `from` with the peer id of the connection the frame came in
+on, so for a **directly connected** peer the claim above holds outright. A frame
+the host **relays** on another peer's behalf arrives on the *host's* connection, so
+a keeper that is not itself the host sees the relay's identity, not the origin's —
+within that topology a malicious host can act as any seat. Nothing in this layer
+closes that, and no cryptographic identity exists to close it with; it sits inside
+the same social-trust boundary as decision 1. One consequence is load-bearing today:
+because a relayed frame reaches a guest wearing the host's id, the host does not
+relay the lobby messages a guest treats as the host's word (roster, config, kick,
+disband, host transfer).
 
 ### Module layout
 
@@ -199,11 +218,28 @@ traffic takes a different road. Moving the keeper is separate and always volunta
 the keeper sends `KEEPER_STATE { state }` privately to its successor, who announces
 itself with `KEEPER_CHANGED { keeperId }`.
 
+This layer builds the **outgoing** half of that: `KeeperHandle.handover` sends the
+state, announces the change, and stops keeping the session. The successor's half —
+receiving `KEEPER_STATE`, calling `adoptSession`, and attaching its own keeper — is
+deferred to the page/lobby wiring in [#18](https://github.com/MythHand/ReleaseBoardGameP2P/issues/18),
+because only that layer knows the seat table and owns the transport to re-attach
+with. `adoptSession` exists and is tested; nothing calls it yet.
+
 **Keeper loss ends the game.** `KEEPER_CHANGED { keeperId: null }` is the death
 notice: when the keeper is the host, each peer sees its one connection drop and
 renders it locally; when the keeper is another peer, the host observes the loss and
 broadcasts. Players get `@release/ui`'s `Reconnect` surface and return to the lobby.
-The game is not resumable.
+The game is not resumable. Observing the loss is a lobby-level job — this layer
+never sends that notice, and wiring it is also #18's.
+
+**A seat's disconnection has no wire representation, by omission.** `disconnect`
+updates the keeper's seat table and produces no messages, and `PlayerView` carries
+no per-seat presence, so no peer can currently learn that another seat dropped —
+only that it has stopped acting. Nothing in this layer is the right place to fix
+it: presence is a screen concern, and the shape it needs (a badge, a greyed seat, a
+"playing for them" notice while the keeper drives an absent seat) is decided with
+the table UI in #18. Recorded here as a known gap rather than left to be
+rediscovered as a bug.
 
 **Absent seats are driven by the keeper.** The engine has no concept of a player who
 left, and a pending owed by a ghost stalls the game permanently — the deadlock the
