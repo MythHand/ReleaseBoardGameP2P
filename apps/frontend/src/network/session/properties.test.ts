@@ -1,5 +1,8 @@
 import { botAction, createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
-import type { Outgoing } from './referee'
+import type { Intent } from '../types'
+import { createLocalLink, type Ticker } from './link'
+import { createMemoryNetwork } from './memoryNetwork'
+import type { Outgoing, SessionRef } from './referee'
 import {
   ABSENT_GRACE_MS,
   applyIntent,
@@ -10,6 +13,7 @@ import {
   type Session,
   tick,
 } from './referee'
+import { attachKeeper, createRemoteLink } from './remoteLink'
 
 const PLAYERS = [
   { playerId: 'a', peerId: 'peer-a', name: 'Ann' },
@@ -141,12 +145,106 @@ it('never sends a peer a card identity it is not entitled to', () => {
   }
 })
 
-it('reaches the same state whether or not the intents crossed a wire', () => {
-  const direct = playOut(start(21)).session
-  const viaLink = playOut(start(21)).session
+// One recorded step of a game: either the keeper's ticker firing, or one seat
+// submitting one intent through its own GameLink. Replaying the same script on
+// both sides is what makes the comparison a seam test rather than a restatement
+// of the engine's determinism — the intents, the order, and the number of clock
+// reads are identical, so only the path they travelled differs.
+type Op = { kind: 'tick' } | { kind: 'submit'; seat: string; intent: Intent }
 
-  expect(viaLink.state).toEqual(direct.state)
-  expect(viaLink.state.eventSeq).toBe(direct.state.eventSeq)
+function manualTicker(): Ticker & { fire(): void } {
+  let fn: (() => void) | null = null
+  return { start: (f) => (fn = f), stop: () => (fn = null), fire: () => fn?.() }
+}
+
+const NO_TICKER: Ticker = { start: () => {}, stop: () => {} }
+
+// A clock shared by every link on one side. Each `submit` and each ticker fire
+// reads it exactly once, on both sides, so the `at` stamps line up step for
+// step and any divergence in the final state is the seam's, not the clock's.
+function clock() {
+  let t = 1_000
+  return () => (t += 100)
+}
+
+// Drives a full game through LocalLink, recording what it did.
+function throughLocalLink(seed: number): { ref: SessionRef; script: Op[] } {
+  const ref: SessionRef = { current: start(seed) }
+  const now = clock()
+  const ticker = manualTicker()
+  const links = new Map(
+    PLAYERS.map((p, i) => [
+      p.playerId,
+      createLocalLink({ ref, me: p.playerId, now, ticker: i === 0 ? ticker : NO_TICKER }),
+    ]),
+  )
+  const script: Op[] = []
+
+  for (let step = 0; step < 400 && !ref.current.state.over; step += 1) {
+    ticker.fire()
+    script.push({ kind: 'tick' })
+    if (ref.current.state.over) break
+
+    let moved = false
+    for (const p of PLAYERS) {
+      const action = botAction(ref.current.engine, ref.current.state, p.playerId, 0)
+      // `at` is unused below (the keeper stamps it), except in botAction's
+      // WINDOW_EXPIRED branch — which no peer may submit at all, so the ticker
+      // above is what closes windows here.
+      if (!action || action.type === 'WINDOW_EXPIRED') continue
+      const { player: _p, at: _a, ...intent } = action as { player?: string; at?: number }
+      const before = ref.current
+      links.get(p.playerId)?.submit(intent as Intent)
+      script.push({ kind: 'submit', seat: p.playerId, intent: intent as Intent })
+      if (ref.current === before) continue
+      moved = true
+      break
+    }
+    if (!moved) break
+  }
+
+  for (const link of links.values()) link.close()
+  return { ref, script }
+}
+
+// Replays that script through RemoteLink -> memory transport -> attachKeeper.
+// Every seat goes over the wire, the keeper's own included: its frame is
+// delivered to its own inbox, which is where a keeper that is also a player
+// really does receive it from.
+function throughTheWire(seed: number, script: Op[]): SessionRef {
+  const net = createMemoryNetwork(PLAYERS.map((p) => p.peerId))
+  const ref: SessionRef = { current: start(seed) }
+  const now = clock()
+  const ticker = manualTicker()
+  const links = new Map(
+    PLAYERS.map((p) => {
+      const remote = createRemoteLink({ transport: net.transport(p.peerId), keeperId: 'peer-a' })
+      net.onDeliver(p.peerId, (frame) => remote.handleMessage(frame))
+      return [p.playerId, remote.link]
+    }),
+  )
+  const keeper = attachKeeper({ ref, transport: net.transport('peer-a'), now, ticker })
+  // Registered last: 'peer-a' is the keeper's own inbox, and its seat's syncs
+  // reach it through onLocalSync rather than through a connection to itself.
+  net.onDeliver('peer-a', (frame) => keeper.handleMessage(frame))
+
+  for (const op of script) {
+    if (op.kind === 'tick') ticker.fire()
+    else links.get(op.seat)?.submit(op.intent)
+  }
+
+  keeper.close()
+  return ref
+}
+
+it('reaches the same state whether or not the intents crossed a wire', () => {
+  const { ref: local, script } = throughLocalLink(21)
+  const remote = throughTheWire(21, script)
+
+  // The script has to be a real game, or "identical" would be vacuous.
+  expect(script.filter((op) => op.kind === 'submit').length).toBeGreaterThan(20)
+  expect(remote.current.state).toEqual(local.current.state)
+  expect(remote.current.state.eventSeq).toBe(local.current.state.eventSeq)
 })
 
 it('restores a reconnecting peer to exactly its projection', () => {
