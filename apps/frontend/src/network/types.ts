@@ -1,8 +1,13 @@
-// The networking layer is decoupled from game rules: card identities are
-// opaque strings, and the per-turn snapshot is an opaque JSON object. The
-// game-engine spec refines these.
-export type CardId = string
-export type GameStateSnapshot = Record<string, unknown>
+import type { Action, Event, GameState, PlayerId, PlayerView } from '@release/engine'
+
+// A plain Omit over a union collapses it to its common members, so it has to
+// distribute. `player` and `at` are stripped because the keeper decides both:
+// a peer may not act as another seat, nor claim what time it is.
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
+// WINDOW_EXPIRED is excluded, not stripped: it carries no player identity and
+// is fired by the keeper's own deadline timer, never submitted by a peer.
+export type Intent = DistributiveOmit<Exclude<Action, { type: 'WINDOW_EXPIRED' }>, 'player' | 'at'>
 
 // Opaque key→value map for game mode settings (handLimit, releases, etc.).
 // Defined here so network/ doesn't import from @release/ui.
@@ -17,13 +22,6 @@ export interface PeerInfo {
   ready: boolean
 }
 
-export interface AttackResponse {
-  player: string
-  kind: 'attack' | 'pass'
-  card?: CardId
-  sudo?: boolean
-}
-
 // Discriminated union of every protocol message ({ type, payload }).
 export type Message =
   // --- Lobby ---
@@ -36,71 +34,15 @@ export type Message =
   | { type: 'PLAYER_KICKED'; payload: { peerId: string; reason?: string } }
   | { type: 'TRANSFER_HOST'; payload: { newHostId: string } }
   | { type: 'HOST_TRANSFERRED'; payload: { from: string; to: string } }
-  // --- Game start ---
-  | { type: 'HAND_DEALT'; payload: { cards: CardId[] } }
-  | {
-      type: 'GAME_STARTED'
-      payload: {
-        players: { id: string; name: string }[]
-        guests: { id: string; name: string }[]
-        deckSize: number
-        eventDeckSize: number
-        releaseZones: Record<string, never>
-        currentTurn: string
-        maxPlayers: number
-        modes: Record<string, unknown>
-      }
-    }
-  // --- Turn ---
-  | { type: 'TURN_START'; payload: { player: string; turnIndex: number } }
-  | {
-      type: 'CARD_PLAYED'
-      payload: { card: CardId; target?: string; sudo?: boolean; codeReview?: boolean }
-    }
-  | { type: 'CARD_DRAWN'; payload: { deckSize: number } }
-  | { type: 'TURN_END'; payload: Record<string, never> }
-  | {
-      type: 'ATTACK_WINDOW_OPEN'
-      payload: { releaseCard: CardId; releasePlayer: string; codeReview: boolean }
-    }
-  | { type: 'ATTACK'; payload: { card: CardId; sudo?: boolean } }
-  | { type: 'PASS'; payload: Record<string, never> }
-  | { type: 'DEFENSE_REQUEST'; payload: { attack: CardId; fromPlayer: string } }
-  | { type: 'DEFEND'; payload: { card: CardId } }
-  | { type: 'DECLINE'; payload: Record<string, never> }
-  | { type: 'TURN_RESOLVED'; payload: { state: GameStateSnapshot } }
-  // --- Rules-driven (TYPES ONLY; runtime deferred — see plan scope note) ---
-  | { type: 'DRAW_REQUEST'; payload: Record<string, never> }
-  | { type: 'DRAW_RESULT'; payload: { card: CardId } }
-  | { type: 'AI_REVEALED'; payload: { aiCard: CardId; eventCard: CardId } }
-  | { type: 'ERROR503_DRAWN'; payload: { player: string } }
-  | {
-      type: 'NEUTRALIZE'
-      payload: { method: 'debugger' | 'monitoring' | 'sacrifice'; releaseCard?: CardId }
-    }
-  | { type: 'PLAYER_ELIMINATED'; payload: { player: string } }
-  | {
-      type: 'HAND_ATTACK'
-      payload: { card: CardId; target: string; sudo?: boolean; requestedCard?: CardId }
-    }
-  | { type: 'HAND_GIVE'; payload: { card: CardId } }
-  | {
-      type: 'HAND_ATTACK_RESULT'
-      payload: {
-        attacker: string
-        target: string
-        attackerHandSize: number
-        targetHandSize: number
-      }
-    }
-  | { type: 'DISCARD_REQUEST'; payload: { fromCard: CardId } }
-  | { type: 'DISCARD_CHOICE'; payload: { card: CardId } }
-  | {
-      type: 'GIT_OP'
-      payload: { op: 'branch' | 'merge' | 'rebase' | 'cherry-pick'; sudo?: boolean }
-    }
-  | { type: 'GIT_PEEK'; payload: { cards: CardId[] } }
-  | { type: 'GIT_REORDER'; payload: { order: CardId[] } }
+  // --- Game ---
+  | { type: 'GAME_STARTED'; payload: { gameId: string; keeperId: PlayerId } }
+  | { type: 'INTENT'; payload: { intent: Intent } }
+  // Private, per recipient — one projection plus that viewer's events. Never broadcast.
+  | { type: 'SYNC'; payload: { view: PlayerView; events: Event[] } }
+  // The only message carrying GameState, and only to a handover successor.
+  | { type: 'KEEPER_STATE'; payload: { state: GameState } }
+  // null is the death notice: the keeper is gone and the game cannot continue.
+  | { type: 'KEEPER_CHANGED'; payload: { keeperId: PlayerId | null } }
 
 export type MessageType = Message['type']
 

@@ -4,6 +4,8 @@
     "types": ["vite/client", "vitest/globals"],
     "paths": {
       "@release/ui": ["../ui/src/index.ts"],
+      "@release/engine": ["../../packages/engine/src/index.ts"],
+      "@release/engine/fake": ["../../packages/engine/src/fake/index.ts"],
       "@release/translation": ["../../packages/translation/src/index.ts"],
       "@/*": ["../ui/src/*"],
       "~/*": ["./src/*"]
