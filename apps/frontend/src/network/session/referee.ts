@@ -1,4 +1,5 @@
 import type { Action, DeckEntry, Engine, Event, GameState, PlayerId, Setup } from '@release/engine'
+import { botAction } from '@release/engine/fake'
 import type { Intent, Message } from '../types'
 import { forViewer, rejectionsIn } from './audience'
 
@@ -111,6 +112,58 @@ export function commit(
 
 export function seatOfPeer(session: Session, peerId: string): Seat | undefined {
   return session.seats.find((s) => s.peerId === peerId)
+}
+
+// How long a seat may stay silent before the keeper starts playing it. Matches
+// the attack-window timeout the 2026-06-22 networking spec already chose.
+export const ABSENT_GRACE_MS = 30_000
+
+export function disconnect(session: Session, peerId: string, now: number): SessionResult {
+  const seat = seatOfPeer(session, peerId)
+  if (!seat) return { session, outgoing: [] }
+
+  // The seat survives its connection: hand, pending and turn all live in
+  // GameState, which never left the keeper.
+  const seats = session.seats.map((s) =>
+    s.peerId === peerId ? { ...s, peerId: null, absentSince: now } : s,
+  )
+  return { session: { ...session, seats }, outgoing: [] }
+}
+
+export function rebind(session: Session, playerId: PlayerId, peerId: string): SessionResult {
+  if (!session.seats.some((s) => s.playerId === playerId)) return { session, outgoing: [] }
+
+  const seats = session.seats.map((s) =>
+    s.playerId === playerId ? { ...s, peerId, absentSince: null } : s,
+  )
+  const next: Session = { ...session, seats }
+  // Catch-up is one projection, not a replay: a peer's state was never a fold
+  // over deltas it might have missed.
+  return { session: next, outgoing: [{ to: peerId, message: syncMessage(next, playerId, []) }] }
+}
+
+// The engine has no concept of a player who left, so a pending owed by one
+// would stall the game permanently. Past the grace period the keeper plays that
+// seat with the engine's own opponent policy.
+//
+// This is deliberately not `runUntilIdle`: that helper auto-resolves pendings
+// owed by the *human* and must never front a live UI, because it would silently
+// answer the reaction window for someone sitting right there. Here the seat is
+// empty, so there is no decision to take away.
+export function driveAbsent(session: Session, now: number): SessionResult {
+  const seat = session.seats.find(
+    (s) => s.peerId === null && s.absentSince !== null && now - s.absentSince >= ABSENT_GRACE_MS,
+  )
+  if (!seat) return { session, outgoing: [] }
+
+  const action = botAction(session.engine, session.state, seat.playerId, now)
+  if (!action) return { session, outgoing: [] }
+
+  const { state, events } = session.engine.reduce(session.state, action)
+  if (state === session.state) return { session, outgoing: [] }
+
+  const next: Session = { ...session, state }
+  return { session: next, outgoing: syncAll(next, events) }
 }
 
 // The keeper's answer to one peer's intent.
