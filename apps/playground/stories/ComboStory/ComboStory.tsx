@@ -2,7 +2,7 @@ import type { CardData } from '@release/ui'
 import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, wait } from '@/animations'
+import { jitter, nextFrames, play, restTransform, toDiscardParams, wait } from '@/animations'
 import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
@@ -169,20 +169,8 @@ export default function ComboStory() {
       const dRect = discardRef.current!.getBoundingClientRect()
       const jMain = jitter()
       const jAux = jitter()
-      const am = play('centerToDiscard', mainEl, {
-        from: cRect,
-        to: dRect,
-        rotate: jMain.rot,
-        dx: jMain.dx,
-        dy: jMain.dy,
-      })
-      const aa = play('centerToDiscard', auxEl, {
-        from: cRect,
-        to: dRect,
-        rotate: jAux.rot,
-        dx: jAux.dx,
-        dy: jAux.dy,
-      })
+      const am = play('centerToDiscard', mainEl, toDiscardParams(cRect, dRect, jMain))
+      const aa = play('centerToDiscard', auxEl, toDiscardParams(cRect, dRect, jAux))
       await Promise.all([am?.finished, aa?.finished])
       setDiscardPile((p) => [...p, { card: prt.card, ...jMain }, { card: src.card, ...jAux }])
       await nextFrames()
@@ -306,10 +294,7 @@ export default function ComboStory() {
               // biome-ignore lint/suspicious/noArrayIndexKey: discard pile is append-only (never reordered/removed), index is a stable key
               key={i}
               className={styles.discardCard}
-              style={{
-                transform: `translate(${d.dx}px, ${d.dy}px) rotate(${d.rot}deg)`,
-                zIndex: i,
-              }}
+              style={{ transform: restTransform(d), zIndex: i }}
             >
               <Card card={d.card} interactive={false} width="100%" />
             </div>

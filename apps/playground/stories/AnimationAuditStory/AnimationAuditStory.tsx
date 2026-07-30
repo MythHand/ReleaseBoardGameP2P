@@ -97,8 +97,8 @@ const MODULES: Module[] = [
       en: 'From the center to the discard with a turn and scatter (move, 420).',
     },
     where: {
-      ru: 'словарь → CardPlay, Combo, DeckAnimations',
-      en: 'registry → CardPlay, Combo, DeckAnimations',
+      ru: 'словарь → CardPlay, Combo, DeckAnimations, CherryPick',
+      en: 'registry → CardPlay, Combo, DeckAnimations, CherryPick',
     },
     status: 'ok',
   },
@@ -196,14 +196,14 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
-    mod: 'jitter()',
+    mod: 'scatterAt() / restTransform() / toDiscardParams()',
     what: {
-      ru: 'Разброс карты в сбросе (угол ±14°, смещение ±10/±8). Пара к centerToDiscard.',
-      en: 'Card scatter in the discard (angle ±14°, offset ±10/±8). The pair of centerToDiscard.',
+      ru: 'Единый источник «как карта ложится и лежит в куче сброса». Разброс (угол + смещение долями ширины карты) считается ОДИН раз по ключу карты (scatterAt — детерминирован, стабилен между ре-рендерами и пирами); полёт (toDiscardParams) и покой (restTransform) читают его же → карта приземляется ровно туда, где лежит, без подмены позиции в финале. jitter() — разовый случайный вариант. HEAP_SHOW — сколько верхних карт видно, нижние гаснут. Аналог slotPlacement() для веера руки.',
+      en: 'The single source of "how a card lands in and rests in the discard heap". Scatter (tilt + offset as fractions of card width) is computed ONCE by card key (scatterAt — deterministic, stable across re-renders and peers); the flight (toDiscardParams) and the rest (restTransform) read the same one → a card lands exactly where it rests, no position swap on the last frame. jitter() is the one-off random variant. HEAP_SHOW — how many top cards stay visible, the rest fade. The discard counterpart of slotPlacement() for the hand fan.',
     },
     where: {
-      ru: 'animations/scatter → Combo, CardPlay, DeckAnimations',
-      en: 'animations/scatter → Combo, CardPlay, DeckAnimations',
+      ru: 'animations/scatter → CherryPick, Combo, CardPlay, DeckAnimations',
+      en: 'animations/scatter → CherryPick, Combo, CardPlay, DeckAnimations',
     },
     status: 'ok',
   },

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { play } from '@/animations'
+import { HEAP_SHOW, play, restTransform, scatterAt, toDiscardParams } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
@@ -39,7 +39,6 @@ const FLIP_DUR = 420 // = the flipCard preset duration (flip before the deck fli
 const DECK_DUR = 480 // = the returnToDeck preset duration
 const DECK_HOLD = 360 // deck card holds face-down before it merges
 const STAGGER_CAP = 40 // don't stagger past this many cards
-const HEAP_SHOW = 6 // top cards kept visible in the resting discard heap
 // hand card, like the opponent-card stories: fly to centre, enlarge, hold, then
 // the shared useHandInsert drop into the fan
 const REVEAL_W = 220 // width the chosen card reaches in the centre
@@ -49,9 +48,10 @@ const HAND_MIN = REVEAL_DUR + REVEAL_HOLD + 520 // total before the round can fi
 
 type DiscardSize = (typeof SIZES)[number]
 type Phase = 'idle' | 'deal' | 'choose' | 'resolve' | 'done'
-// Each card carries its own scatter (tilt + offset), computed ONCE. Both the
-// return flight and the resting heap use these exact values, so a card lands
-// where it rests — no re-layout / position swap at the end of the animation.
+// Each card carries its own scatter (tilt + offset), from the shared discard
+// module (scatterAt). Both the return flight (toDiscardParams) and the resting
+// heap (restTransform) read these exact values, so a card lands where it rests —
+// no re-layout / position swap at the end of the animation.
 interface DiscardCard {
   uid: string
   card: CardType
@@ -76,13 +76,9 @@ function buildDiscard(n: number): DiscardCard[] {
     const j = Math.floor(Math.random() * (i + 1))
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
-  return arr.map((card) => ({
-    uid: nextHandUid(),
-    card,
-    rot: (Math.random() * 2 - 1) * 12,
-    dx: (Math.random() * 2 - 1) * PILE_W * 0.26,
-    dy: (Math.random() * 2 - 1) * PILE_W * 0.14,
-  }))
+  // scatter is width-relative (PILE_W) and keyed by heap index, so the heap is
+  // stable across re-renders and consistent with the other discard piles
+  return arr.map((card, i) => ({ uid: nextHandUid(), card, ...scatterAt(i, PILE_W) }))
 }
 
 function makeHand(n: number) {
@@ -340,15 +336,7 @@ export default function CherryPickStory() {
       if (!el || !from || !pileRect) return
       const visible = i >= remaining.length - HEAP_SHOW
       later(
-        () =>
-          play('centerToDiscard', el, {
-            from,
-            to: pileRect,
-            rotate: d.rot,
-            dx: d.dx,
-            dy: d.dy,
-            fade: !visible,
-          }),
+        () => play('centerToDiscard', el, toDiscardParams(from, pileRect, d, !visible)),
         Math.min(i, STAGGER_CAP) * RETURN_STEP,
       )
     })
@@ -427,10 +415,7 @@ export default function CherryPickStory() {
                 <div
                   key={d.uid}
                   className={styles.heapCard}
-                  style={{
-                    transform: `translate(${d.dx}px, ${d.dy}px) rotate(${d.rot}deg)`,
-                    zIndex: i,
-                  }}
+                  style={{ transform: restTransform(d), zIndex: i }}
                 >
                   <Card card={d.card} interactive={false} width="100%" />
                 </div>

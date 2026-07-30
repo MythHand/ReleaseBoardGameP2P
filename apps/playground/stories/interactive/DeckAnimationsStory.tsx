@@ -1,7 +1,7 @@
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, wait } from '@/animations'
+import { jitter, nextFrames, play, restTransform, toDiscardParams, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
@@ -305,13 +305,7 @@ export default function DeckAnimationsStory() {
         el.style.left = `${fromRect.left}px`
         el.style.top = `${fromRect.top}px`
         el.style.width = `${fromRect.width}px`
-        const anim = play('centerToDiscard', el, {
-          from: fromRect,
-          to: toRect,
-          rotate: e.rot,
-          dx: e.dx,
-          dy: e.dy,
-        })
+        const anim = play('centerToDiscard', el, toDiscardParams(fromRect, toRect, e))
         return anim?.finished
       }),
     )
@@ -502,9 +496,7 @@ export default function DeckAnimationsStory() {
               key={i}
               className={styles.discardCard}
               style={{
-                transform: discard.gathered
-                  ? 'translate(0, 0) rotate(0deg)'
-                  : `translate(${entry.dx}px, ${entry.dy}px) rotate(${entry.rot}deg)`,
+                transform: discard.gathered ? 'translate(0, 0) rotate(0deg)' : restTransform(entry),
                 zIndex: i,
               }}
             >

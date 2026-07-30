@@ -3,7 +3,7 @@ import ruCommon from '@release/translation/locales/ru/common.json'
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useRef, useState } from 'react'
-import { jitter, nextFrames, play } from '@/animations'
+import { jitter, nextFrames, play, restTransform, toDiscardParams } from '@/animations'
 import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
@@ -93,13 +93,7 @@ export default function CardPlayStory() {
       el.style.left = `${fromRect.left}px`
       el.style.top = `${fromRect.top}px`
       el.style.width = `${fromRect.width}px`
-      const anim = play('centerToDiscard', el, {
-        from: fromRect,
-        to: toRect,
-        rotate: j.rot,
-        dx: j.dx,
-        dy: j.dy,
-      })
+      const anim = play('centerToDiscard', el, toDiscardParams(fromRect, toRect, j))
       if (anim) await anim.finished
     }
     setDiscard((d) => [...d, { card, ...j }])
@@ -191,10 +185,7 @@ export default function CardPlayStory() {
               // biome-ignore lint/suspicious/noArrayIndexKey: discard is append-only, the index is stable
               key={i}
               className={styles.discardCard}
-              style={{
-                transform: `translate(${d.dx}px, ${d.dy}px) rotate(${d.rot}deg)`,
-                zIndex: i,
-              }}
+              style={{ transform: restTransform(d), zIndex: i }}
             >
               <Card card={d.card} interactive={false} width="100%" />
             </div>
