@@ -46,19 +46,52 @@ function start(seed: number): Session {
 // wherever the game ends up. The other three properties only need the final
 // session, hence `playOut` below as a thin wrapper — one driver, so the two
 // callers cannot drift out of sync with each other.
+// One simulated second per step: the grace period and the window deadlines are
+// tens of seconds, so a finer step would need thousands of iterations to reach
+// either, and a coarser one would step straight over them.
+const STEP_MS = 1_000
+
+// A run that changes nothing for this long has nothing left to wait for — the
+// longest timer in the session is the absent-seat grace period, so twice it is
+// past every deadline that could still wake a seat up.
+const IDLE_LIMIT_MS = ABSENT_GRACE_MS * 2
+
+interface PlayOut {
+  session: Session
+  sent: { outgoing: Outgoing; state: Session['state'] }[]
+  // True when the step budget ran out with the game still going: a caller
+  // asserting "the game finished" has to know it finished rather than that the
+  // harness simply stopped looking.
+  exhausted: boolean
+}
+
 function playOutWithHistory(
   session: Session,
   steps = 400,
-): { session: Session; sent: { outgoing: Outgoing; state: Session['state'] }[] } {
+  stopWhen?: (s: Session) => boolean,
+): PlayOut {
   const sent: { outgoing: Outgoing; state: Session['state'] }[] = []
+  // The keeper reads one clock, so the harness advances one clock: `tick`,
+  // `driveAbsent` and every stamped intent all see the same `now` within a
+  // step. Handing driveAbsent a forged future time instead would make every
+  // seat's grace period elapse instantly, which is the one thing this timing
+  // is here to exercise.
   let now = 1_000
+  let lastChange = now
+  let step = 0
 
   const record = (current: Session, outgoing: Outgoing[]) => {
     for (const o of outgoing) sent.push({ outgoing: o, state: current.state })
+    lastChange = now
   }
 
-  for (let step = 0; step < steps && !session.state.over; step += 1) {
-    now += 100
+  for (; step < steps && !session.state.over; step += 1) {
+    if (stopWhen?.(session)) break
+    now += STEP_MS
+    // Nothing has moved for longer than any timer in the session runs: the run
+    // is genuinely stuck, not merely waiting.
+    if (now - lastChange > IDLE_LIMIT_MS) break
+
     const expired = tick(session, now)
     if (expired.session !== session) {
       session = expired.session
@@ -69,34 +102,39 @@ function playOutWithHistory(
     // Mirrors attachKeeper's ticker: the keeper owns the clock, so it both
     // expires deadlines and plays seats that have gone silent. Without this a
     // seat that leaves on its own turn stalls every other player forever.
-    const driven = driveAbsent(session, now + ABSENT_GRACE_MS + 1)
+    const driven = driveAbsent(session, now)
     if (driven.session !== session) {
       session = driven.session
       record(session, driven.outgoing)
       continue
     }
 
-    let moved = false
     for (const seat of PLAYERS) {
       const action = botAction(session.engine, session.state, seat.playerId, now)
-      if (!action) continue
+      // WINDOW_EXPIRED is the keeper's own action and no peer may submit it —
+      // `tick` above is what closes a window here.
+      if (!action || action.type === 'WINDOW_EXPIRED') continue
       const { player: _p, at: _a, ...intent } = action as { player?: string; at?: number }
       const result = applyIntent(session, seat.peerId, intent as never, now)
       if (result.session === session) continue
       session = result.session
       record(session, result.outgoing)
-      moved = true
       break
     }
-    if (!moved) break
+    // No `break` on a step where nobody moved: a seat inside its grace period
+    // has nothing to do yet and the keeper will play it once time passes.
   }
 
-  return { session, sent }
+  return { session, sent, exhausted: step >= steps && !session.state.over }
 }
 
-function playOut(session: Session, steps = 400): { session: Session; sent: Outgoing[] } {
-  const { session: final, sent } = playOutWithHistory(session, steps)
-  return { session: final, sent: sent.map((s) => s.outgoing) }
+function playOut(
+  session: Session,
+  steps = 400,
+  stopWhen?: (s: Session) => boolean,
+): { session: Session; sent: Outgoing[]; exhausted: boolean } {
+  const { session: final, sent, exhausted } = playOutWithHistory(session, steps, stopWhen)
+  return { session: final, sent: sent.map((s) => s.outgoing), exhausted }
 }
 
 it('never sends a peer a card identity it is not entitled to', () => {
@@ -135,10 +173,14 @@ it('never sends a peer a card identity it is not entitled to', () => {
         }
       }
 
-      // 3. No deck leakage: the ordered draw pile as it stood at the moment
-      // of this message never appears on the wire, for anyone.
+      // 3. No deck leakage: the ordered piles as they stood at the moment of
+      // this message never appear on the wire, for anyone. Both piles count —
+      // the event deck is hidden ordered information exactly as the draw pile
+      // is, and knowing which event comes next is worth as much as knowing
+      // which card does.
       const wire = JSON.stringify(outgoing.message.payload)
-      for (const uid of state.decks.main.flat().map((c) => c.uid)) {
+      const hidden = [...state.decks.main.flat(), ...state.decks.events]
+      for (const uid of hidden.map((c) => c.uid)) {
         expect(wire).not.toContain(uid)
       }
     }
@@ -248,7 +290,12 @@ it('reaches the same state whether or not the intents crossed a wire', () => {
 })
 
 it('restores a reconnecting peer to exactly its projection', () => {
-  const { session } = playOut(start(34), 25)
+  // Mid-reaction-window is the case worth covering: a seat that drops with a
+  // decision open is the one whose view is hardest to rebuild, so the run
+  // stops the moment a window is live rather than at an arbitrary step.
+  const { session } = playOut(start(34), 400, (s) => s.state.window !== null)
+  expect(session.state.window).not.toBeNull()
+
   const dropped = disconnect(session, 'peer-b', 9_000).session
   const { outgoing } = rebind(dropped, 'b', 'peer-b-2')
   const sync = outgoing[0]
@@ -262,7 +309,12 @@ it('restores a reconnecting peer to exactly its projection', () => {
 it('never lets one seat stall the whole game', () => {
   // 'a' holds the turn at the deal and never speaks again.
   const abandoned = disconnect(start(55), 'peer-a', 1_000).session
-  const { session } = playOut(abandoned)
+  const { session, exhausted } = playOut(abandoned)
 
-  expect(session.state.turn.player).not.toBe('a')
+  // The criterion is that the game *finishes*, not that the turn moved once:
+  // a single handover of the turn is satisfied two turns before the same seat
+  // stalls everything again.
+  expect(session.state.over).not.toBeNull()
+  // And it finished on its own rather than the harness running out of steps.
+  expect(exhausted).toBe(false)
 })
