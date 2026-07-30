@@ -72,6 +72,8 @@ export default function TableStory() {
   const [dock, setDock] = useState<DockDemo>('push')
   const [specLimit, setSpecLimit] = useState(8)
   const [kicked, setKicked] = useState<Set<string>>(() => new Set())
+  const [paused, setPaused] = useState(false)
+  const [ready, setReady] = useState<Set<string>>(() => new Set())
 
   const base = useMemo(() => makeTable(opps), [opps])
   // spectators kicked by the host are removed from the roster
@@ -79,6 +81,57 @@ export default function TableStory() {
 
   const variant = END_VARIANTS.find((v) => v.id === end)
   const none = pick(lang, { ru: '— нет —', en: '— none —' })
+
+  // pause window — readiness lamps built from the roster; the local player is
+  // 'you', the host is 'you' when hosting, otherwise the first opponent
+  const pausePlayers = state.participants.map((p) => ({
+    id: p.id,
+    name: p.name,
+    ready: ready.has(p.id),
+  }))
+  const pauseHostId = role === 'host' ? 'you' : state.participants.find((p) => p.id !== 'you')?.id
+  const togglePause = (on: boolean) => {
+    setPaused(on)
+    if (on) setReady(new Set()) // a fresh pause starts with everyone not-ready
+  }
+  const toggleSelfReady = () =>
+    setReady((s) => {
+      const next = new Set(s)
+      if (next.has('you')) next.delete('you')
+      else next.add('you')
+      return next
+    })
+  const tableCopy = pick(lang, { ru: ruCommon.table, en: enCommon.table })
+  const pauseCopy = pick(lang, {
+    ru: {
+      title: 'игра на паузе',
+      subtitle: 'ждём готовности игроков',
+      subtitleReady: 'хост возобновит игру',
+      you: 'вы',
+      host: 'хост',
+      ready: 'готов',
+      notReady: 'не готов',
+      resume: 'продолжить игру',
+    },
+    en: {
+      title: 'game paused',
+      subtitle: 'waiting for players',
+      subtitleReady: 'host will resume the game',
+      you: 'you',
+      host: 'host',
+      ready: 'ready',
+      notReady: 'not ready',
+      resume: 'continue game',
+    },
+  })
+  const pauseLabel = pick(lang, { ru: 'пауза игры', en: 'pause game' })
+  const pauseHint = pick(lang, {
+    ru: 'таймер хода замрёт у всех игроков',
+    en: 'freezes the turn timer for everyone',
+  })
+  const generalTitle = pick(lang, { ru: 'общие', en: 'general' })
+  const pauseOn = pick(lang, { ru: 'включена', en: 'on' })
+  const pauseOff = pick(lang, { ru: 'выключена', en: 'off' })
 
   return (
     <div className={styles.root}>
@@ -151,7 +204,7 @@ export default function TableStory() {
           historyCopy={pick(lang, { ru: ruCommon.moveHistory, en: enCommon.moveHistory })}
           reconnectCopy={pick(lang, { ru: ruCommon.reconnect, en: enCommon.reconnect })}
           gameOverCopy={pick(lang, { ru: ruCommon.gameOver, en: enCommon.gameOver })}
-          copy={pick(lang, { ru: ruCommon.table, en: enCommon.table })}
+          copy={{ ...tableCopy, generalTitle, pauseGame: pauseLabel, pauseOn, pauseOff, pauseHint }}
           lobbyCodeCopy={pick(lang, { ru: ruCommon.lobbyCode, en: enCommon.lobbyCode })}
           lang={lang}
           onLangChange={setLang}
@@ -162,6 +215,13 @@ export default function TableStory() {
           onKickSpectator={(id) => setKicked((k) => new Set(k).add(id))}
           turnDockState={dock === 'reaction503' ? 'reaction' : dock}
           turnDockDanger={dock === 'reaction503'}
+          paused={paused}
+          onPauseChange={togglePause}
+          pausePlayers={pausePlayers}
+          pauseSelfId="you"
+          pauseHostId={pauseHostId}
+          onPauseToggleReady={toggleSelfReady}
+          pauseCopy={pauseCopy}
         />
       </div>
     </div>

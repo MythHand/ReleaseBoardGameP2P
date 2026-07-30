@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
 import Rules, { type RulesCopy } from '@/blocks/Rules'
@@ -11,6 +11,8 @@ import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
 import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
+import Toggle from '@/primitives/Toggle'
+import Typography from '@/primitives/Typography'
 import GameModes from '@/table/GameModes'
 import GameOver from '@/table/GameOver'
 import type { GameOverCondition, GameOverCopy } from '@/table/GameOver/GameOver'
@@ -20,6 +22,7 @@ import MoveHistory from '@/table/MoveHistory'
 import type { HistoryEntry, MoveHistoryCopy } from '@/table/MoveHistory/MoveHistory'
 import Participants from '@/table/Participants'
 import type { Participant, ParticipantsCopy, Spectator } from '@/table/Participants/Participants'
+import PauseGame, { type PauseGameCopy, type PausePlayer } from '@/table/PauseGame/PauseGame'
 import Reconnect, { type ReconnectCopy } from '@/table/Reconnect'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
@@ -109,6 +112,22 @@ interface TableProps {
   // defaults are static placeholders until the rules engine wires it up)
   turnDockSeconds?: number
   turnDockProgress?: number
+  // ===== pause (host-only) =====
+  // game paused — greys the dock and shows the pause window over the play area
+  // (the right-hand nav stays live). Toggled by the host from settings.
+  paused?: boolean
+  // host toggles pause on/off from the settings drawer; the window's central
+  // resume button calls this with `false`
+  onPauseChange?: (on: boolean) => void
+  // readiness lamps in the pause window — one per player (green ready / red not)
+  pausePlayers?: PausePlayer[]
+  // which lamp is the local player's (tappable) and which is the host's (tagged)
+  pauseSelfId?: string
+  pauseHostId?: string
+  // toggle the local player's readiness lamp
+  onPauseToggleReady?: () => void
+  // localized pause-window strings — required for the window to render
+  pauseCopy?: PauseGameCopy
 }
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
@@ -137,12 +156,21 @@ export interface TableCopy {
   discard: string
   // подпись вкладки-настроек (для screen-reader на иконке-шестерёнке)
   settings: string
-  // заголовки секций в панели настроек
+  // заголовок группы общих настроек — показывается только хосту (у него две
+  // группы: общие + управление хоста; у прочих одна группа, заголовок не нужен)
+  generalTitle?: string
+  // подписи полей в панели настроек
   langTitle: string
   codeTitle: string
-  // заголовок секции управления хоста + подпись слайдера лимита зрителей
+  // заголовок группы управления хоста + подпись поля лимита зрителей
   hostTitle: string
   specLimit: string
+  // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
+  // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
+  pauseGame?: string
+  pauseOn?: string
+  pauseOff?: string
+  pauseHint?: string
   // подписи текстовых вкладок рейла
   tabHistory: string
   tabParticipants: string
@@ -154,6 +182,52 @@ const EMPTY_RELEASE: ReleaseSlots = {
   frontend: undefined,
   backend: undefined,
   database: undefined,
+}
+
+// ===== settings drawer building blocks =====
+// A titled cluster of settings fields. The heading is optional: a non-host
+// player sees a single, self-evident group and needs no heading; the host sees
+// two groups (general + host controls) and both are titled to tell them apart.
+function SettingsGroup({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <section className={styles.group}>
+      {title && (
+        <Typography as="div" base="tag" tk="tk-10" className={styles.groupHead}>
+          {title}
+        </Typography>
+      )}
+      {children}
+    </section>
+  )
+}
+
+// One settings unit — the single pattern shared by every control: a caption on
+// top, the control, and an optional hint below. The control owns its own width
+// (the spectator slider fills via .sliderFull).
+function SettingsField({
+  label,
+  hint,
+  children,
+}: {
+  label?: string
+  hint?: string
+  children: ReactNode
+}) {
+  return (
+    <div className={styles.field}>
+      {label && (
+        <Typography as="div" variant="metaLabel" className={styles.fieldLabel}>
+          {label}
+        </Typography>
+      )}
+      {children}
+      {hint && (
+        <Typography as="div" base="mono-xs" className={styles.fieldHint}>
+          {hint}
+        </Typography>
+      )}
+    </div>
+  )
 }
 
 // Стол = активное состояние игры. Каждый блок позиционируется независимо
@@ -184,6 +258,13 @@ export default function Table({
   turnDockCopy,
   turnDockSeconds = 16,
   turnDockProgress = 0.55,
+  paused = false,
+  onPauseChange,
+  pausePlayers = [],
+  pauseSelfId,
+  pauseHostId,
+  onPauseToggleReady,
+  pauseCopy,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup, participants, spectators } = state
   const [panel, setPanel] = useState<Panel | null>(null)
@@ -194,8 +275,10 @@ export default function Table({
   // служебный док хода — состояние приходит пропсами (в игре — от логики хода,
   // в песочнице — из селектора истории); имя активного игрока берём со стола
   const dockPlayer = opponents[0]?.name
-  // секция управления хоста в настройках (сейчас — лимит зрителей)
-  const hostControls = isHost && onSpectatorLimitChange && spectatorLimit != null
+  // секция управления хоста в настройках: лимит зрителей и/или пауза игры
+  const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
+  const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.pauseGame)
+  const hostControls = canLimitSpectators || canPause
   const hasUpperSettings = Boolean(lang && onLangChange) || Boolean(code)
 
   // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
@@ -283,6 +366,7 @@ export default function Table({
           progress={turnDockProgress}
           activePlayer={dockPlayer}
           copy={turnCopy}
+          paused={paused}
         />
       </div>
 
@@ -293,35 +377,56 @@ export default function Table({
       <Drawer open={panel !== null} width={drawerWidth} className={styles.drawer}>
         {panel === 'settings' && (
           <div className={styles.settings}>
-            {lang && onLangChange && (
-              <section className={styles.settingsSection}>
-                <div className={styles.settingsHead}>{copy.langTitle}</div>
-                <LangSwitcher value={lang} onChange={onLangChange} variant="full" align="start" />
-              </section>
+            {hasUpperSettings && (
+              <SettingsGroup title={isHost ? copy.generalTitle : undefined}>
+                {lang && onLangChange && (
+                  <SettingsField label={copy.langTitle}>
+                    <LangSwitcher
+                      value={lang}
+                      onChange={onLangChange}
+                      variant="full"
+                      align="start"
+                    />
+                  </SettingsField>
+                )}
+                {code && (
+                  <SettingsField label={copy.codeTitle}>
+                    <LobbyCode
+                      code={code}
+                      copy={codeCopy}
+                      align="start"
+                      reverse
+                      showLabel={false}
+                    />
+                  </SettingsField>
+                )}
+              </SettingsGroup>
             )}
-            {code && (
-              <section className={styles.settingsSection}>
-                <div className={styles.settingsHead}>{copy.codeTitle}</div>
-                <LobbyCode code={code} copy={codeCopy} align="start" reverse showLabel={false} />
-              </section>
-            )}
-            {isHost && onSpectatorLimitChange && spectatorLimit != null && (
+            {hostControls && (
               <>
                 {hasUpperSettings && <div className={styles.divider} />}
-                <section className={styles.settingsSection}>
-                  <div className={styles.settingsHead}>{copy.hostTitle}</div>
-                  <div className={styles.specField}>
-                    <div className={styles.specLabel}>{copy.specLimit}</div>
-                    <Slider
-                      value={spectatorLimit}
-                      min={0}
-                      max={SPEC_MAX}
-                      onChange={onSpectatorLimitChange}
-                      color={specColorFor(spectatorLimit)}
-                      fill
-                    />
-                  </div>
-                </section>
+                <SettingsGroup title={copy.hostTitle}>
+                  {canLimitSpectators && (
+                    <SettingsField label={copy.specLimit}>
+                      <Slider
+                        value={spectatorLimit ?? 0}
+                        min={0}
+                        max={SPEC_MAX}
+                        onChange={(n) => onSpectatorLimitChange?.(n)}
+                        color={specColorFor(spectatorLimit ?? 0)}
+                        fill
+                        className={styles.sliderFull}
+                      />
+                    </SettingsField>
+                  )}
+                  {canPause && (
+                    <SettingsField label={copy.pauseGame} hint={copy.pauseHint}>
+                      <Toggle on={paused} onChange={(on) => onPauseChange?.(on)}>
+                        {(paused ? copy.pauseOn : copy.pauseOff) ?? copy.pauseGame}
+                      </Toggle>
+                    </SettingsField>
+                  )}
+                </SettingsGroup>
               </>
             )}
           </div>
@@ -343,6 +448,20 @@ export default function Table({
         )}
         {panel === 'modes' && <GameModes setup={setup} copy={modesCopy} />}
       </Drawer>
+
+      {/* pause window — over the play area, below the right-hand nav (its own
+          z-index), so the rail + drawer stay live while the game is frozen */}
+      {paused && pauseCopy && (
+        <PauseGame
+          players={pausePlayers}
+          selfId={pauseSelfId}
+          hostId={pauseHostId}
+          isHost={isHost}
+          onToggleReady={onPauseToggleReady}
+          onResume={() => onPauseChange?.(false)}
+          copy={pauseCopy}
+        />
+      )}
 
       {view === 'youDisconnect' && <Reconnect copy={reconnectCopy} />}
 

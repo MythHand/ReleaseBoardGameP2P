@@ -11,6 +11,7 @@ import LobbyCodeBlock from '../stories/blocks/LobbyCodeBlock'
 import MenuBlock from '../stories/blocks/MenuBlock'
 import MoveHistoryBlock from '../stories/blocks/MoveHistoryBlock'
 import ParticipantsBlock from '../stories/blocks/ParticipantsBlock'
+import PauseGameBlock from '../stories/blocks/PauseGameBlock'
 import PhysicalEditionBlock from '../stories/blocks/PhysicalEditionBlock'
 import PlayerSlotBlock from '../stories/blocks/PlayerSlotBlock'
 import ReconnectBlock from '../stories/blocks/ReconnectBlock'
@@ -201,6 +202,7 @@ const groups: Group[] = [
       { id: 'block-seat', title: 'Seat', render: () => <SeatBlock /> },
       { id: 'block-release-zone', title: 'Release zone', render: () => <ReleaseZoneBlock /> },
       { id: 'block-turn-dock', title: 'Turn dock', render: () => <TurnDockBlock /> },
+      { id: 'block-pause-game', title: 'Pause game', render: () => <PauseGameBlock /> },
       { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },
       { id: 'block-player-slot', title: 'Player slot', render: () => <PlayerSlotBlock /> },
       { id: 'block-lobby-code', title: 'Lobby code', render: () => <LobbyCodeBlock /> },
