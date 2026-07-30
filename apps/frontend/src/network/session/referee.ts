@@ -149,3 +149,37 @@ export function applyIntent(
   const next: Session = { ...session, state }
   return { session: next, outgoing: syncAll(next, events) }
 }
+
+// The keeper owns every clock in the session. `WINDOW_EXPIRED` carries no player
+// identity and the engine rejects it before the deadline regardless of sender,
+// so there is no owner rule to encode — the keeper simply fires it, and peers
+// never send it at all (Intent excludes it).
+export function tick(session: Session, now: number): SessionResult {
+  const window = session.state.window
+  if (window && now >= window.deadline) {
+    const { state, events } = session.engine.reduce(session.state, {
+      type: 'WINDOW_EXPIRED',
+      at: now,
+    })
+    if (state === session.state) return { session, outgoing: [] }
+    const next: Session = { ...session, state }
+    return { session: next, outgoing: syncAll(next, events) }
+  }
+
+  // A stalled defence blocks every other player, which is why the engine gives
+  // it a deadline — but it gives no expiry action, so the keeper answers with
+  // the passive default on the owing player's behalf.
+  const pending = session.state.pending
+  if (pending?.kind === 'defend' && now >= pending.deadline) {
+    const seat = session.seats.find((s) => s.playerId === pending.player)
+    if (!seat?.peerId) return { session, outgoing: [] }
+    return applyIntent(
+      session,
+      seat.peerId,
+      { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
+      now,
+    )
+  }
+
+  return { session, outgoing: [] }
+}

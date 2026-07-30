@@ -1,5 +1,5 @@
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
-import { applyIntent, createSession } from './referee'
+import { applyIntent, createSession, type Session, type SessionResult, tick } from './referee'
 
 function twoPlayerSession() {
   return createSession({
@@ -18,6 +18,53 @@ function twoPlayerSession() {
     deck: FAKE_DECK,
     events: FAKE_EVENTS,
   })
+}
+
+// One step of driving whichever seat holds the turn, using only applyIntent:
+// pays a pending release cost, plays a release when one is playable, else
+// draws or pushes. `twoPlayerSession()`'s seed-1 opening hand holds no release
+// and its `setup: {}` means releaseCond isn't 'easy', so a release play first
+// suspends on a `discardForRelease` pending rather than opening a window in
+// one step — both this and openWindowFixture below need to pay that cost, so
+// it lives in one place rather than two copies drifting apart.
+function stepTurn(session: Session, at: number): SessionResult {
+  const turnPlayer = session.state.turn.player
+  const peerId = turnPlayer === 'a' ? 'peer-a' : 'peer-b'
+  const pending = session.state.pending
+  const view = session.engine.project(session.state, turnPlayer)
+
+  if (pending?.kind === 'discardForRelease' && pending.player === turnPlayer) {
+    const spare = view.self.hand.find((c) => c.uid !== pending.release)
+    if (!spare) return { session, outgoing: [] }
+    return applyIntent(
+      session,
+      peerId,
+      { type: 'RESOLVE', choice: { kind: 'discardForRelease', card: spare.uid } },
+      at,
+    )
+  }
+
+  // `uid.startsWith('release-')` is a *test fixture* convenience over the
+  // fake's uid format, not production code — nothing under `src/network/` may
+  // infer a `CardId` from a `CardUid`.
+  const release = view.self.playable.find((uid) => uid.startsWith('release-'))
+  if (release) return applyIntent(session, peerId, { type: 'PLAY', card: release }, at)
+  if (!session.state.turn.hasDrawn) return applyIntent(session, peerId, { type: 'DRAW' }, at)
+  return applyIntent(session, peerId, { type: 'PUSH' }, at)
+}
+
+// Plays through both seats' turns until a release opens a reaction window.
+// Uses the view's `playable` list, so it stays correct if the fake's deck
+// changes.
+function openWindowFixture(start: Session): Session {
+  let session = start
+  for (let step = 0; step < 200 && !session.state.window; step += 1) {
+    const next = stepTurn(session, 1_000)
+    if (next.session === session) break
+    session = next.session
+  }
+  if (!session.state.window) throw new Error('fixture failed to open a window')
+  return session
 }
 
 it('announces the game and syncs every seat privately', () => {
@@ -101,13 +148,43 @@ it('hides the drawn card from everyone but the drawer', () => {
 
 it('stamps the keeper`s clock, ignoring any time the peer supplies', () => {
   const { session } = twoPlayerSession()
+  // Drive right up to the discardForRelease decision (the same play-through as
+  // openWindowFixture), then submit that final RESOLVE ourselves so we can
+  // forge a wildly wrong `at` on it. That RESOLVE is what actually calls
+  // placeRelease -> openWindow (packages/engine/src/fake/release.ts,
+  // packages/engine/src/fake/window.ts): a window's deadline is
+  // `at + WINDOW_FIRST_MS` (15_000), so if it were ever taken from the peer's
+  // forged value instead of the keeper's `now`, it would land near
+  // 999_999_999 + 15_000 instead of near the `now` passed below.
+  let s = session
+  for (let step = 0; step < 200; step += 1) {
+    if (s.state.pending?.kind === 'discardForRelease') break
+    const next = stepTurn(s, 1_000)
+    if (next.session === s) throw new Error('fixture stalled before a release cost was pending')
+    s = next.session
+  }
+  const pending = s.state.pending
+  if (pending?.kind !== 'discardForRelease') {
+    throw new Error('fixture failed to reach a release cost decision')
+  }
+
+  const peerId = pending.player === 'a' ? 'peer-a' : 'peer-b'
+  const view = s.engine.project(s.state, pending.player)
+  const spare = view.self.hand.find((c) => c.uid !== pending.release)
+  if (!spare) throw new Error('no spare card to pay the release cost')
+
   const { session: next } = applyIntent(
-    session,
-    'peer-a',
-    { type: 'DRAW', at: 999_999 } as never,
+    s,
+    peerId,
+    {
+      type: 'RESOLVE',
+      choice: { kind: 'discardForRelease', card: spare.uid },
+      at: 999_999_999,
+    } as never,
     5_000,
   )
-  expect(next.state.turn.hasDrawn).toBe(true)
+
+  expect(next.state.window?.deadline).toBe(5_000 + 15_000)
 })
 
 it('ignores an intent from a peer bound to no seat', () => {
@@ -116,4 +193,23 @@ it('ignores an intent from a peer bound to no seat', () => {
 
   expect(result.session).toBe(session)
   expect(result.outgoing).toEqual([])
+})
+
+it('does nothing while no deadline has passed', () => {
+  const { session } = twoPlayerSession()
+  const result = tick(session, 1_000)
+
+  expect(result.session).toBe(session)
+  expect(result.outgoing).toEqual([])
+})
+
+it('expires a reaction window once its deadline passes', () => {
+  const { session } = twoPlayerSession()
+  const opened = openWindowFixture(session)
+  expect(opened.state.window).not.toBeNull()
+
+  const result = tick(opened, (opened.state.window?.deadline ?? 0) + 1)
+
+  expect(result.session.state.window).toBeNull()
+  expect(result.outgoing.length).toBeGreaterThan(0)
 })
