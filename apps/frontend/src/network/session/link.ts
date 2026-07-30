@@ -46,6 +46,9 @@ export function createLocalLink(args: {
   // In a local session the seat's peer id is its player id: there is no
   // transport to address, only this subscriber.
   const deliver = (outgoing: Outgoing) => {
+    // 'broadcast' is unreachable for SYNC today (only GAME_STARTED broadcasts,
+    // and the type check below filters that out) — kept for future broadcast
+    // SYNC producers so this guard doesn't silently drop them later.
     if (outgoing.to !== args.me && outgoing.to !== 'broadcast') return
     if (outgoing.message.type !== 'SYNC') return
     for (const listener of listeners) listener(outgoing.message.payload)

@@ -2,16 +2,21 @@ import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { createLocalLink, type Sync, type Ticker } from './link'
 import { createSession, type SessionRef } from './referee'
 
-function manualTicker(): Ticker & { fire(): void } {
+function manualTicker(): Ticker & { fire(): void; stopped: boolean } {
   let fn: (() => void) | null = null
+  let stopped = false
   return {
     start: (f) => {
       fn = f
     },
     stop: () => {
       fn = null
+      stopped = true
     },
     fire: () => fn?.(),
+    get stopped() {
+      return stopped
+    },
   }
 }
 
@@ -59,15 +64,20 @@ it('delivers a rejection to the actor who caused it', () => {
   expect(seen[1].events.map((e) => e.type)).toEqual(['rejected'])
 })
 
-it('stops delivering after unsubscribe, and stops its ticker on close', () => {
-  const { link, ticker } = localSetup()
+it('stops delivering after unsubscribe', () => {
+  const { link } = localSetup()
   const seen: Sync[] = []
   const off = link.subscribe((sync) => seen.push(sync))
 
   off()
   link.submit({ type: 'DRAW' })
   expect(seen).toEqual([])
+})
+
+it('stops its ticker on close', () => {
+  const { link, ticker } = localSetup()
 
   link.close()
-  expect(() => ticker.fire()).not.toThrow()
+
+  expect(ticker.stopped).toBe(true)
 })
