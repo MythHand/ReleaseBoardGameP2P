@@ -29,6 +29,7 @@ import HandStory from '../stories/HandStory'
 import InviteStory from '../stories/InviteStory'
 import CardPlayStory from '../stories/interactive/CardPlayStory'
 import CardToHandStory from '../stories/interactive/CardToHandStory'
+import CherryPickStory from '../stories/interactive/CherryPickStory'
 import DealCardsStory from '../stories/interactive/DealCardsStory'
 import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
@@ -138,6 +139,7 @@ const groups: Group[] = [
         title: 'Opponent takes your card',
         render: () => <OpponentTakesCardStory />,
       },
+      { id: 'cherry-pick', title: 'Git cherry-pick', render: () => <CherryPickStory /> },
       { id: 'card-to-hand', title: 'Card to Hand', render: () => <CardToHandStory /> },
       { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
