@@ -1,5 +1,8 @@
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
-import { adoptSession, createSession, handover, type Session } from './referee'
+import type { WireMessage } from '../types'
+import { createMemoryNetwork } from './memoryNetwork'
+import { adoptSession, createSession, handover, type Session, type SessionRef } from './referee'
+import { attachKeeper } from './remoteLink'
 
 function session(): Session {
   return createSession({
@@ -31,9 +34,41 @@ it('hands the full state to the successor and announces the change', () => {
 
 it('sends GameState to the successor and to nobody else', () => {
   const { outgoing } = handover(session(), 'b')
-  const others = outgoing.filter((o) => o.to !== 'peer-b')
 
-  expect(JSON.stringify(others)).not.toContain('rngCursor')
+  // The branch's headline privacy claim, asserted structurally: KEEPER_STATE is
+  // the one message carrying GameState, and the successor is its only
+  // recipient. A field-name scan would keep passing if the payload were
+  // reshaped or if GameState rode inside some other message.
+  const recipients = outgoing.filter((o) => o.message.type === 'KEEPER_STATE').map((o) => o.to)
+  expect(recipients).toEqual(['peer-b'])
+  for (const o of outgoing) {
+    if (o.to !== 'peer-b') expect(o.message.type).not.toBe('KEEPER_STATE')
+  }
+})
+
+it('hands over through the keeper handle and stops keeping the session', () => {
+  const net = createMemoryNetwork(['peer-a', 'peer-b'])
+  const ref: SessionRef = { current: session() }
+  const received: WireMessage[] = []
+  net.onDeliver('peer-b', (frame) => received.push(frame))
+  let stopped = false
+  const keeper = attachKeeper({
+    ref,
+    transport: net.transport('peer-a'),
+    now: () => 1_000,
+    ticker: {
+      start: () => {},
+      stop: () => {
+        stopped = true
+      },
+    },
+  })
+
+  keeper.handover('b')
+
+  expect(ref.current.keeperId).toBe('b')
+  expect(received.map((f) => f.type)).toContain('KEEPER_STATE')
+  expect(stopped).toBe(true)
 })
 
 it('refuses to hand over to a seat that is not connected', () => {

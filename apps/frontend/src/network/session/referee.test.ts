@@ -251,6 +251,27 @@ it('expires a reaction window once its deadline passes', () => {
   expect(result.outgoing.length).toBeGreaterThan(0)
 })
 
+it('expires a window a deadline-free pending would otherwise hold open', () => {
+  const { session } = twoPlayerSession()
+  const opened = openWindowFixture(session)
+  const window = opened.state.window
+  if (!window) throw new Error('fixture failed to open a window')
+
+  // `handLimit` carries no deadline of its own (packages/engine/src/state.ts),
+  // so nothing else would ever close this window. Injected rather than played
+  // into existence: the two coexisting is a shape the fake's card set does not
+  // currently reach, and the guard has to be right the day it does.
+  const blocked: Session = {
+    ...opened,
+    state: { ...opened.state, pending: { kind: 'handLimit', player: 'b', excess: 1 } },
+  }
+
+  const result = tick(blocked, window.deadline + 1)
+
+  expect(result.session.state.window).toBeNull()
+  expect(result.session.state.pending?.kind).toBe('handLimit')
+})
+
 it('lets a stalled defence resolve even after its window has expired', () => {
   const { session } = twoPlayerSession()
   const opened = openWindowFixture(session)

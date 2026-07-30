@@ -7,6 +7,7 @@ import {
   commit,
   disconnect,
   driveAbsent,
+  handover,
   type Outgoing,
   rebind,
   type SessionRef,
@@ -58,6 +59,11 @@ export interface KeeperHandle {
   handleMessage(frame: WireMessage): void
   peerLeft(peerId: string): void
   peerReturned(playerId: PlayerId, peerId: string): void
+  // Voluntary keeper handover: hand GameState to the successor privately and
+  // announce the change. The successor's side of it — adopting that state and
+  // attaching its own keeper — belongs to the page/lobby wiring in #18, so
+  // nothing calls this yet from production code.
+  handover(toPlayerId: PlayerId): void
   close(): void
 }
 
@@ -104,6 +110,15 @@ export function attachKeeper(args: {
     },
     peerReturned(playerId, peerId) {
       commit(args.ref, rebind(args.ref.current, playerId, peerId), deliver)
+    },
+    handover(toPlayerId) {
+      const result = handover(args.ref.current, toPlayerId)
+      if (result.session === args.ref.current) return
+      commit(args.ref, result, deliver)
+      // The session it holds is no longer the one being played: from here the
+      // successor reduces, so this keeper's ticker must stop stamping clocks
+      // onto a state nobody will receive.
+      ticker.stop()
     },
     close() {
       ticker.stop()

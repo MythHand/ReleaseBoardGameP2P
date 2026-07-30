@@ -1,4 +1,4 @@
-import type { Action, Event, GameState, PlayerId, PlayerView } from '@release/engine'
+import type { Action, Event, GameState, PlayerId, PlayerView, Setup } from '@release/engine'
 
 // A plain Omit over a union collapses it to its common members, so it has to
 // distribute. `player` and `at` are stripped because the keeper decides both:
@@ -10,8 +10,10 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 export type Intent = DistributiveOmit<Exclude<Action, { type: 'WINDOW_EXPIRED' }>, 'player' | 'at'>
 
 // Opaque key→value map for game mode settings (handLimit, releases, etc.).
-// Defined here so network/ doesn't import from @release/ui.
-export type Setup = Record<string, string>
+// The engine's own, re-exported rather than redeclared: the lobby's setup is
+// handed straight to `createGame`, so a second same-named type inside
+// `network/` could only ever drift away from the one that has to match.
+export type { Setup }
 
 export type Role = 'host' | 'player' | 'guest'
 

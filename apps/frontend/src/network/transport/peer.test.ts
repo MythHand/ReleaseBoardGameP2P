@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, vi } from 'vitest'
-import type { Message } from '../types'
+import type { Message, WireMessage } from '../types'
 
 // Minimal in-memory fake of the PeerJS API surface we use.
 class FakeConn {
@@ -25,11 +25,16 @@ class FakeConn {
 // Records every outbound connection by peer id so tests can inspect what was sent.
 const outboundConns = new Map<string, FakeConn>()
 
+// The most recently constructed peer, so a test can play the broker and push
+// an inbound connection at the transport.
+let lastPeer: FakePeer | null = null
+
 class FakePeer {
   id: string
   private handlers: Record<string, ((arg: unknown) => void)[]> = {}
   constructor(id?: string) {
     this.id = id ?? 'self-generated'
+    lastPeer = this
   }
   on(event: string, cb: (arg: unknown) => void) {
     if (!this.handlers[event]) this.handlers[event] = []
@@ -86,6 +91,22 @@ it('send serializes an envelope to the target connection', async () => {
   expect(frame.type).toBe('PLAYER_READY')
   expect(typeof frame.seq).toBe('number')
   expect(frame.from).toBe(t.id)
+})
+
+it('attributes an incoming frame to the connection it arrived on', async () => {
+  const received: WireMessage[] = []
+  await createTransport({ peerId: 'host-1', onMessage: (m) => received.push(m) })
+
+  const conn = new FakeConn('peer-2')
+  lastPeer?.emit('connection', conn)
+  conn.emit('open')
+  // 'peer-2' claims to be 'peer-9'. The keeper resolves a seat from `from`, so
+  // honouring that claim would let any peer act as any other.
+  conn.emit('data', JSON.stringify({ type: 'PLAYER_READY', payload: {}, from: 'peer-9', seq: 4 }))
+
+  expect(received).toHaveLength(1)
+  expect(received[0].from).toBe('peer-2')
+  expect(received[0].seq).toBe(4)
 })
 
 it('relay forwards a wire frame verbatim, preserving the original sender', async () => {

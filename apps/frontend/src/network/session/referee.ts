@@ -314,7 +314,12 @@ export function tick(session: Session, now: number): SessionResult {
   // release-scope defend resolution (onDefend, attacks.ts) requires a window
   // to still exist — permanently stalling that pending. Resolving the pending
   // first (below) closes the window itself where that is the correct outcome.
-  if (window && !pending && now >= window.deadline) {
+  //
+  // Only `defend` defers it. A blanket "any pending" would be the wider rule,
+  // and the wrong one: `handLimit` and `crush` (state.ts) carry no deadline of
+  // their own, so one of those coexisting with an open window would hold that
+  // window open for as long as the pending seat stayed silent.
+  if (window && pending?.kind !== 'defend' && now >= window.deadline) {
     const { state, events } = session.engine.reduce(session.state, {
       type: 'WINDOW_EXPIRED',
       at: now,
