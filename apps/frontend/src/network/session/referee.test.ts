@@ -1,5 +1,13 @@
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
-import { applyIntent, createSession, type Session, type SessionResult, tick } from './referee'
+import {
+  ABSENT_GRACE_MS,
+  applyIntent,
+  createSession,
+  driveAbsent,
+  type Session,
+  type SessionResult,
+  tick,
+} from './referee'
 
 // Not exported from @release/engine or @release/engine/fake, so this is a
 // duplicated literal rather than an import — kept as a named constant (instead
@@ -274,6 +282,30 @@ it('lets a stalled defence resolve even after its window has expired', () => {
   // closes the window itself (onDefend's release-scope path), so both clear.
   expect(result.session.state.pending).toBeNull()
   expect(result.session.state.window).toBeNull()
+})
+
+it('never closes a live reaction window on an absent seat`s behalf', () => {
+  const { session } = twoPlayerSession()
+  const opened = openWindowFixture(session)
+  const window = opened.state.window
+  if (!window) throw new Error('fixture failed to open a window')
+
+  // The window's own owner is the seat botAction answers with WINDOW_EXPIRED
+  // (packages/engine/src/fake/bots.ts) — stamped at the deadline rather than
+  // now. Replaying that forged `at` would end the other seats' reaction time
+  // the instant the grace period elapses, up to a whole window early.
+  const owner = window.target.player
+  const absent: Session = {
+    ...opened,
+    seats: opened.seats.map((s) =>
+      s.playerId === owner ? { ...s, peerId: null, absentSince: 0 } : s,
+    ),
+  }
+
+  const result = driveAbsent(absent, ABSENT_GRACE_MS + 1)
+
+  expect(result.session.state.window).not.toBeNull()
+  expect(result.session.state.window?.deadline).toBe(window.deadline)
 })
 
 it('leaves a stalled defence for a disconnected seat to resolve on reconnection', () => {

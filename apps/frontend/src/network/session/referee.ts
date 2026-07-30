@@ -163,6 +163,15 @@ export function driveAbsent(session: Session, now: number): SessionResult {
     const action = botAction(session.engine, session.state, seat.playerId, now)
     if (!action) continue
 
+    // `tick` owns the window deadline, and it is the only thing that owns it.
+    // When the absent seat holds the open window, botAction answers with
+    // WINDOW_EXPIRED stamped at `Math.max(at, deadline)` (bots.ts) — a forged
+    // future time that would close the window for everyone still sitting
+    // there, the moment this seat's grace period runs out. The keeper's clock
+    // is the only clock (spec decision 6), so the suggestion is dropped and
+    // the window expires on its own deadline, through `tick`, or not at all.
+    if (action.type === 'WINDOW_EXPIRED') continue
+
     const { state, events } = session.engine.reduce(session.state, action)
     if (state !== session.state) {
       const next: Session = { ...session, state }
