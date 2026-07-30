@@ -74,25 +74,87 @@ function playOut(session: Session, steps = 400): { session: Session; sent: Outgo
   return { session, sent }
 }
 
+// Same drive as `playOut`, but pairs each outgoing message with the session
+// state as it stood at the moment that message was produced. A card a viewer
+// legitimately held is fine to see in their own SYNC even if the engine's
+// `handTransfer` mechanic later moves that same uid to another seat — the
+// leak property below must judge each message against its own moment, not
+// against wherever the game ends up.
+function playOutWithHistory(
+  session: Session,
+  steps = 400,
+): { session: Session; sent: { outgoing: Outgoing; state: Session['state'] }[] } {
+  const sent: { outgoing: Outgoing; state: Session['state'] }[] = []
+  let now = 1_000
+
+  const record = (current: Session, outgoing: Outgoing[]) => {
+    for (const o of outgoing) sent.push({ outgoing: o, state: current.state })
+  }
+
+  for (let step = 0; step < steps && !session.state.over; step += 1) {
+    now += 100
+    const expired = tick(session, now)
+    if (expired.session !== session) {
+      session = expired.session
+      record(session, expired.outgoing)
+      continue
+    }
+
+    const driven = driveAbsent(session, now + ABSENT_GRACE_MS + 1)
+    if (driven.session !== session) {
+      session = driven.session
+      record(session, driven.outgoing)
+      continue
+    }
+
+    let moved = false
+    for (const seat of PLAYERS) {
+      const action = botAction(session.engine, session.state, seat.playerId, now)
+      if (!action) continue
+      const { player: _p, at: _a, ...intent } = action as { player?: string; at?: number }
+      const result = applyIntent(session, seat.peerId, intent as never, now)
+      if (result.session === session) continue
+      session = result.session
+      record(session, result.outgoing)
+      moved = true
+      break
+    }
+    if (!moved) break
+  }
+
+  return { session, sent }
+}
+
 it('never sends a peer a card identity it is not entitled to', () => {
   for (const seed of [1, 2, 3, 5, 8, 13]) {
-    const { session, sent } = playOut(start(seed))
+    const { session, sent } = playOutWithHistory(start(seed))
 
-    for (const outgoing of sent) {
+    for (const { outgoing, state } of sent) {
       if (outgoing.message.type !== 'SYNC') continue
       const viewer = PLAYERS.find((p) => p.peerId === outgoing.to)
       if (!viewer) throw new Error(`SYNC addressed to a non-seat: ${outgoing.to}`)
 
+      // 1. Right recipient's projection: the fan-out must not cross-deliver
+      // one seat's view to another. The engine instance is stable across the
+      // whole game, so the final session's is as good as any at that moment.
+      expect(outgoing.message.payload.view).toEqual(session.engine.project(state, viewer.playerId))
+
+      // 2. Audience honoured: every event obeys its own `visibleTo`, and a
+      // `rejected` event only ever reaches the peer who submitted the action.
+      for (const event of outgoing.message.payload.events) {
+        if (event.type === 'rejected') {
+          expect('player' in event.action && event.action.player === viewer.playerId).toBe(true)
+        } else {
+          expect(!event.visibleTo || event.visibleTo.includes(viewer.playerId)).toBe(true)
+        }
+      }
+
+      // 3. No deck leakage: the ordered draw pile as it stood at the moment
+      // of this message never appears on the wire, for anyone.
       const wire = JSON.stringify(outgoing.message.payload)
-      const forbidden = [
-        // Every other seat's hand, at the moment the game ended.
-        ...PLAYERS.filter((p) => p.playerId !== viewer.playerId).flatMap((p) =>
-          session.state.players[p.playerId].hand.map((c) => c.uid),
-        ),
-        // And the ordered draw pile, which is the secret the keeper exists for.
-        ...session.state.decks.main.flat().map((c) => c.uid),
-      ]
-      for (const uid of forbidden) expect(wire).not.toContain(uid)
+      for (const uid of state.decks.main.flat().map((c) => c.uid)) {
+        expect(wire).not.toContain(uid)
+      }
     }
   }
 })
