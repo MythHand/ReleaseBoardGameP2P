@@ -26,9 +26,12 @@ function localSetup() {
     keeperId: 'a',
     engine: createFakeEngine(),
     seed: 11,
+    // Distinct peer ids: a `PlayerId` is a persisted client uuid and a peer id
+    // is a PeerJS connection id, and the two are never equal in a real session.
+    // Both being `string` is exactly what would hide the confusion.
     players: [
-      { playerId: 'a', peerId: 'a', name: 'Ann' },
-      { playerId: 'b', peerId: 'b', name: 'Bo' },
+      { playerId: 'a', peerId: 'peer-a', name: 'Ann' },
+      { playerId: 'b', peerId: 'peer-b', name: 'Bo' },
     ],
     setup: {},
     deck: FAKE_DECK,

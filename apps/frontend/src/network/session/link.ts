@@ -43,13 +43,18 @@ export function createLocalLink(args: {
 }): GameLink {
   const ticker = args.ticker ?? intervalTicker()
   const listeners = new Set<(sync: Sync) => void>()
-  // In a local session the seat's peer id is its player id: there is no
-  // transport to address, only this subscriber.
+  // The referee addresses seats by peer id, and a `PlayerId` is not one — it is
+  // a persisted client uuid. Resolved per call rather than once, because a
+  // rebind changes the seat's peer id under a link that outlives it. A seat
+  // holding no connection still has this subscriber, so its own player id
+  // stands in as the address the referee then fans out to.
+  const myPeerId = () =>
+    args.ref.current.seats.find((s) => s.playerId === args.me)?.peerId ?? args.me
   const deliver = (outgoing: Outgoing) => {
     // 'broadcast' is unreachable for SYNC today (only GAME_STARTED broadcasts,
     // and the type check below filters that out) — kept for future broadcast
     // SYNC producers so this guard doesn't silently drop them later.
-    if (outgoing.to !== args.me && outgoing.to !== 'broadcast') return
+    if (outgoing.to !== myPeerId() && outgoing.to !== 'broadcast') return
     if (outgoing.message.type !== 'SYNC') return
     for (const listener of listeners) listener(outgoing.message.payload)
   }
@@ -62,7 +67,7 @@ export function createLocalLink(args: {
 
   return {
     submit(intent) {
-      commit(args.ref, applyIntent(args.ref.current, args.me, intent, args.now()), deliver)
+      commit(args.ref, applyIntent(args.ref.current, myPeerId(), intent, args.now()), deliver)
     },
     subscribe(listener) {
       listeners.add(listener)
