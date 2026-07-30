@@ -1,6 +1,6 @@
-import type { DeckEntry, Engine, Event, GameState, PlayerId, Setup } from '@release/engine'
-import type { Message } from '../types'
-import { forViewer } from './audience'
+import type { Action, DeckEntry, Engine, Event, GameState, PlayerId, Setup } from '@release/engine'
+import type { Intent, Message } from '../types'
+import { forViewer, rejectionsIn } from './audience'
 
 export interface Seat {
   playerId: PlayerId
@@ -107,4 +107,45 @@ export function commit(
 ): void {
   ref.current = result.session
   for (const outgoing of result.outgoing) deliver(outgoing)
+}
+
+export function seatOfPeer(session: Session, peerId: string): Seat | undefined {
+  return session.seats.find((s) => s.peerId === peerId)
+}
+
+// The keeper's answer to one peer's intent.
+//
+// Identity and time are both overwritten rather than validated: `player` comes
+// from the connection the frame arrived on, so a peer cannot act as another
+// seat, and `at` comes from the keeper's own clock, so a peer cannot claim a
+// deadline has passed. There is consequently no clock synchronisation between
+// peers to get wrong.
+export function applyIntent(
+  session: Session,
+  fromPeerId: string,
+  intent: Intent,
+  now: number,
+): SessionResult {
+  const seat = seatOfPeer(session, fromPeerId)
+  if (!seat) return { session, outgoing: [] }
+
+  const action = { ...intent, player: seat.playerId, at: now } as Action
+  const { state, events } = session.engine.reduce(session.state, action)
+
+  // Referential, not structural: `reduce` hands back the identical object when
+  // it refuses an action, which is exactly what "nothing happened" means here.
+  // The event ids of consecutive rejections repeat, so they cannot be compared.
+  if (state === session.state) {
+    const message: Message = {
+      type: 'SYNC',
+      payload: {
+        view: session.engine.project(session.state, seat.playerId),
+        events: rejectionsIn(events),
+      },
+    }
+    return { session, outgoing: [{ to: fromPeerId, message }] }
+  }
+
+  const next: Session = { ...session, state }
+  return { session: next, outgoing: syncAll(next, events) }
 }
