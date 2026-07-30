@@ -1,0 +1,102 @@
+import type { PlayerId } from '@release/engine'
+import type { Transport } from '../transport/peer'
+import type { Intent, WireMessage } from '../types'
+import { type GameLink, intervalTicker, type Sync, type Ticker } from './link'
+import {
+  applyIntent,
+  commit,
+  disconnect,
+  driveAbsent,
+  type Outgoing,
+  rebind,
+  type SessionRef,
+  tick,
+} from './referee'
+
+// The peer side. It holds no GameState and cannot run `reduce`, so there is no
+// optimistic local application: every intent round-trips to the keeper, and the
+// view that comes back is the whole truth this peer is entitled to.
+export function createRemoteLink(args: { transport: Transport; keeperId: string }): {
+  link: GameLink
+  handleMessage(frame: WireMessage): void
+} {
+  const listeners = new Set<(sync: Sync) => void>()
+
+  return {
+    link: {
+      submit(intent: Intent) {
+        args.transport.send(args.keeperId, { type: 'INTENT', payload: { intent } })
+      },
+      subscribe(listener) {
+        listeners.add(listener)
+        return () => listeners.delete(listener)
+      },
+      close() {
+        listeners.clear()
+      },
+    },
+    handleMessage(frame) {
+      if (frame.type !== 'SYNC') return
+      for (const listener of listeners) listener(frame.payload)
+    },
+  }
+}
+
+// The result of attaching a keeper to a session: message handling plus the
+// membership hooks a lobby-level caller drives on connect/disconnect.
+export interface KeeperHandle {
+  handleMessage(frame: WireMessage): void
+  peerLeft(peerId: string): void
+  peerReturned(playerId: PlayerId, peerId: string): void
+  close(): void
+}
+
+// The keeper side: the only party that calls into the engine.
+export function attachKeeper(args: {
+  ref: SessionRef
+  transport: Transport
+  now: () => number
+  ticker?: Ticker
+  onLocalSync?: (sync: Sync) => void
+}): KeeperHandle {
+  const ticker = args.ticker ?? intervalTicker()
+  const deliver = (outgoing: Outgoing) => {
+    if (outgoing.to === 'broadcast') {
+      args.transport.broadcast(outgoing.message)
+      return
+    }
+    // The keeper is a player too: its own SYNC goes to its local link rather
+    // than out over a connection to itself.
+    if (outgoing.to === args.transport.id) {
+      if (outgoing.message.type === 'SYNC') args.onLocalSync?.(outgoing.message.payload)
+      return
+    }
+    args.transport.send(outgoing.to, outgoing.message)
+  }
+
+  ticker.start(() => {
+    const now = args.now()
+    commit(args.ref, tick(args.ref.current, now), deliver)
+    commit(args.ref, driveAbsent(args.ref.current, now), deliver)
+  })
+
+  return {
+    handleMessage(frame) {
+      if (frame.type !== 'INTENT') return
+      commit(
+        args.ref,
+        applyIntent(args.ref.current, frame.from, frame.payload.intent, args.now()),
+        deliver,
+      )
+    },
+    peerLeft(peerId) {
+      commit(args.ref, disconnect(args.ref.current, peerId, args.now()), deliver)
+    },
+    peerReturned(playerId, peerId) {
+      commit(args.ref, rebind(args.ref.current, playerId, peerId), deliver)
+    },
+    close() {
+      ticker.stop()
+    },
+  }
+}
