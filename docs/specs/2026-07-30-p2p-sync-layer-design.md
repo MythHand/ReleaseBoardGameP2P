@@ -68,9 +68,9 @@ seed and `GameState`, and it defaults to the host without being defined as the h
 
 **What this costs, stated plainly:** the keeper could read the deck and every hand.
 Nothing in the protocol prevents it — only the fact that it is someone's friend.
-The build accepts that and confines it: the keeper is one object, and a
-commit-reveal implementation replaces that object without touching `GameLink`,
-`useGame`, `Table`, or the page.
+The build accepts that and confines it: `referee.ts` is the only module that holds
+the seed and `GameState`, and a commit-reveal implementation replaces that module
+without touching `GameLink`, `useGame`, `Table`, or the page.
 
 **And what it costs the issue's premise:** [#60](https://github.com/MythHand/ReleaseBoardGameP2P/issues/60)
 expects determinism to make turn checkpoints "verifiable rather than hopeful". It
@@ -88,7 +88,7 @@ peer (player)                          keeper (default: host)
 useGame ──▶ GameLink.submit(intent)
               │  RemoteLink
               ▼
-         transport.send(keeperId) ─────▶ Referee
+         transport.send(keeperId) ─────▶ referee.ts
                                           ├─ resolve sender → PlayerId
                                           ├─ stamp `at` from its own clock
                                           ├─ engine.reduce(state, action)
@@ -100,7 +100,7 @@ useGame ──▶ GameLink.submit(intent)
 
 **`GameLink` is the seam**, and it is the only thing the page sees: submit an
 intent, subscribe to `{ view, events }`. Two implementations satisfy it.
-`LocalLink` owns a `Referee` in-process with no transport — solo play, the
+`LocalLink` owns a keeper session in-process with no transport — solo play, the
 playground, and every headless test. `RemoteLink` sends the intent to the keeper
 and applies what comes back. Neither `useGame` nor `Table` can tell which one it
 has, which is the property that lets this layer be built and verified before
@@ -220,7 +220,7 @@ which would otherwise never expire.
 
 ## Verification
 
-An in-memory transport wires N `RemoteLink`s to one `Referee` in a single process,
+An in-memory transport wires N `RemoteLink`s to one keeper session in a single process,
 with no PeerJS and no browser. The keeper's clock is injected rather than read, so
 `at` stamping and window deadlines are deterministic. Playwright multi-tab stays for
 one smoke path proving PeerJS is wired — not for protocol coverage.
@@ -254,6 +254,6 @@ every one was found this way rather than by reading
   nothing on the wire.
 - **The page itself** — [#18](https://github.com/MythHand/ReleaseBoardGameP2P/issues/18)'s
   remaining milestones. This spec defines `GameLink`; `useGame` consumes it.
-- **A trustless deck.** The seam is preserved, not built: `Referee` is the single
-  object holding the seed and `GameState`, and a commit-reveal implementation
+- **A trustless deck.** The seam is preserved, not built: `referee.ts` is the only
+  module holding the seed and `GameState`, and a commit-reveal implementation
   replaces it alone.
