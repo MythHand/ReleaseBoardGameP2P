@@ -131,6 +131,11 @@ export default function TurnDock({
   // after the previous content clears (sequential), the key back in flat.
   const modeAnim = state === 'waiting' ? NAME : MODE
 
+  // opponent's turn — the ring is dimmed (empty arc, bare track) with NO
+  // countdown: their per-phase inactivity timer resets on every action, so a
+  // mirrored number would only jump for a watcher and means nothing to them.
+  const idleRing = state === 'waiting'
+
   // widest known value per text slot — reserves a fixed box (no reflow)
   const phaseSizer = longest(copy.yourTurn, copy.turnOf, copy.reaction, copy.reactionDanger)
   const labelSizer = longest(copy.draw, copy.push, copy.pass)
@@ -161,7 +166,11 @@ export default function TurnDock({
         </div>
 
         <div className={styles.body}>
-          <RingTimer progress={progress} value={seconds} accent={accent} />
+          <RingTimer
+            progress={idleRing ? 0 : progress}
+            value={idleRing ? undefined : seconds}
+            accent={accent}
+          />
 
           <div className={styles.action}>
             <div className={styles.actionMain}>
