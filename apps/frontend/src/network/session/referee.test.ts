@@ -1,8 +1,7 @@
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { createSession } from './referee'
 
-// biome-ignore lint/suspicious/noExportsInTest: later tasks' tests import this fixture.
-export function twoPlayerSession() {
+function twoPlayerSession() {
   return createSession({
     gameId: 'g1',
     keeperId: 'a',
