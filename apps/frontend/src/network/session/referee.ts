@@ -164,10 +164,30 @@ export function driveAbsent(session: Session, now: number): SessionResult {
     if (!action) continue
 
     const { state, events } = session.engine.reduce(session.state, action)
-    if (state === session.state) continue
+    if (state !== session.state) {
+      const next: Session = { ...session, state }
+      return { session: next, outgoing: syncAll(next, events) }
+    }
 
-    const next: Session = { ...session, state }
-    return { session: next, outgoing: syncAll(next, events) }
+    // botAction's suggestion was rejected outright — `project`'s `playable`
+    // can list a card the seat cannot actually afford (e.g. a release with
+    // no spare card to pay its cost), and the bot policy never looks past
+    // its first choice. An absent seat still owes the table forward
+    // progress, so on its own uninterrupted turn fall back to the same
+    // escape hatch a human out of moves would take: draw if it hasn't, or
+    // end the turn if it has. Anything still rejected means there is truly
+    // nothing to do, and the next expired seat gets a turn instead.
+    const { turn, pending, window, over } = session.state
+    if (turn.player === seat.playerId && !pending && !window && !over) {
+      const fallback: Action = turn.hasDrawn
+        ? { type: 'PUSH', player: seat.playerId, at: now }
+        : { type: 'DRAW', player: seat.playerId, at: now }
+      const retried = session.engine.reduce(session.state, fallback)
+      if (retried.state !== session.state) {
+        const next: Session = { ...session, state: retried.state }
+        return { session: next, outgoing: syncAll(next, retried.events) }
+      }
+    }
   }
 
   return { session, outgoing: [] }
