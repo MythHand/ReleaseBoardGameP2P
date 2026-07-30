@@ -120,6 +120,28 @@ it('attributes an intent to the seat bound to the connection, not the payload', 
   expect(outgoing.map((o) => o.to)).toEqual(['peer-b'])
 })
 
+it('refuses a keeper-only action arriving as a peer intent', () => {
+  const { session } = twoPlayerSession()
+  const opened = openWindowFixture(session)
+  const window = opened.state.window
+  if (!window) throw new Error('fixture failed to open a window')
+
+  // `Intent` excludes WINDOW_EXPIRED in TypeScript only; the wire carries
+  // parsed JSON, so the keeper has to refuse it at runtime. Submitted past the
+  // deadline it would otherwise close the window out from under any pending
+  // defence — the deadlock `tick` is written to avoid.
+  const result = applyIntent(
+    opened,
+    'peer-b',
+    { type: 'WINDOW_EXPIRED' } as never,
+    window.deadline + 1,
+  )
+
+  expect(result.session).toBe(opened)
+  expect(result.session.state.window).not.toBeNull()
+  expect(result.outgoing).toEqual([])
+})
+
 it('returns a rejection to the submitter alone', () => {
   const { session } = twoPlayerSession()
   const { outgoing } = applyIntent(session, 'peer-b', { type: 'PASS' }, 1_000)

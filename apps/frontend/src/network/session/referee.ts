@@ -193,6 +193,22 @@ export function driveAbsent(session: Session, now: number): SessionResult {
   return { session, outgoing: [] }
 }
 
+// The action types a peer is allowed to ask for. `Intent` already excludes
+// WINDOW_EXPIRED, but only in TypeScript: what arrives here is parsed JSON from
+// a connection, and `parseEnvelope` validates the envelope, never the payload.
+// Without this check a peer could fire the keeper's own deadline action early
+// and close a reaction window out from under a pending defence, which
+// `onDefend` (packages/engine/src/fake/attacks.ts) then rejects forever.
+const PEER_INTENT_TYPES: ReadonlySet<string> = new Set<Action['type']>([
+  'DRAW',
+  'PLAY',
+  'PUSH',
+  'ATTACK',
+  'PASS',
+  'UNPASS',
+  'RESOLVE',
+])
+
 // The keeper's answer to one peer's intent.
 //
 // Identity and time are both overwritten rather than validated: `player` comes
@@ -208,6 +224,12 @@ export function applyIntent(
 ): SessionResult {
   const seat = seatOfPeer(session, fromPeerId)
   if (!seat) return { session, outgoing: [] }
+
+  // Dropped in silence rather than answered with a rejection: a well-behaved
+  // peer cannot produce this, so there is no UI to inform.
+  if (!PEER_INTENT_TYPES.has((intent as { type?: unknown }).type as string)) {
+    return { session, outgoing: [] }
+  }
 
   const action = { ...intent, player: seat.playerId, at: now } as Action
   const { state, events } = session.engine.reduce(session.state, action)
