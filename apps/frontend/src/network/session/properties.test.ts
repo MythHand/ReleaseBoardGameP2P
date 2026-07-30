@@ -30,56 +30,18 @@ function start(seed: number): Session {
   }).session
 }
 
-// Drives every seat with the engine's own policy, collecting what the keeper
-// would have put on the wire. Intents are stripped of `player`/`at` exactly as
-// a real peer's would be, so the keeper re-derives both.
-function playOut(session: Session, steps = 400): { session: Session; sent: Outgoing[] } {
-  const sent: Outgoing[] = []
-  let now = 1_000
-
-  for (let step = 0; step < steps && !session.state.over; step += 1) {
-    now += 100
-    const expired = tick(session, now)
-    if (expired.session !== session) {
-      session = expired.session
-      sent.push(...expired.outgoing)
-      continue
-    }
-
-    // Mirrors attachKeeper's ticker: the keeper owns the clock, so it both
-    // expires deadlines and plays seats that have gone silent. Without this a
-    // seat that leaves on its own turn stalls every other player forever.
-    const driven = driveAbsent(session, now + ABSENT_GRACE_MS + 1)
-    if (driven.session !== session) {
-      session = driven.session
-      sent.push(...driven.outgoing)
-      continue
-    }
-
-    let moved = false
-    for (const seat of PLAYERS) {
-      const action = botAction(session.engine, session.state, seat.playerId, now)
-      if (!action) continue
-      const { player: _p, at: _a, ...intent } = action as { player?: string; at?: number }
-      const result = applyIntent(session, seat.peerId, intent as never, now)
-      if (result.session === session) continue
-      session = result.session
-      sent.push(...result.outgoing)
-      moved = true
-      break
-    }
-    if (!moved) break
-  }
-
-  return { session, sent }
-}
-
-// Same drive as `playOut`, but pairs each outgoing message with the session
-// state as it stood at the moment that message was produced. A card a viewer
+// Drives every seat with the engine's own policy, pairing each outgoing
+// message with the session state as it stood at the moment that message was
+// produced. Intents are stripped of `player`/`at` exactly as a real peer's
+// would be, so the keeper re-derives both.
+//
+// The per-message state matters for the leak property: a card a viewer
 // legitimately held is fine to see in their own SYNC even if the engine's
-// `handTransfer` mechanic later moves that same uid to another seat — the
-// leak property below must judge each message against its own moment, not
-// against wherever the game ends up.
+// `handTransfer` mechanic later moves that same uid to another seat, so that
+// property must judge each message against its own moment, not against
+// wherever the game ends up. The other three properties only need the final
+// session, hence `playOut` below as a thin wrapper — one driver, so the two
+// callers cannot drift out of sync with each other.
 function playOutWithHistory(
   session: Session,
   steps = 400,
@@ -100,6 +62,9 @@ function playOutWithHistory(
       continue
     }
 
+    // Mirrors attachKeeper's ticker: the keeper owns the clock, so it both
+    // expires deadlines and plays seats that have gone silent. Without this a
+    // seat that leaves on its own turn stalls every other player forever.
     const driven = driveAbsent(session, now + ABSENT_GRACE_MS + 1)
     if (driven.session !== session) {
       session = driven.session
@@ -125,6 +90,11 @@ function playOutWithHistory(
   return { session, sent }
 }
 
+function playOut(session: Session, steps = 400): { session: Session; sent: Outgoing[] } {
+  const { session: final, sent } = playOutWithHistory(session, steps)
+  return { session: final, sent: sent.map((s) => s.outgoing) }
+}
+
 it('never sends a peer a card identity it is not entitled to', () => {
   for (const seed of [1, 2, 3, 5, 8, 13]) {
     const { session, sent } = playOutWithHistory(start(seed))
@@ -139,8 +109,20 @@ it('never sends a peer a card identity it is not entitled to', () => {
       // whole game, so the final session's is as good as any at that moment.
       expect(outgoing.message.payload.view).toEqual(session.engine.project(state, viewer.playerId))
 
-      // 2. Audience honoured: every event obeys its own `visibleTo`, and a
-      // `rejected` event only ever reaches the peer who submitted the action.
+      // 2. Audience honoured: every event obeys its own `visibleTo`. A
+      // `rejected` event reaching this loop at all is already a stronger
+      // guarantee than this harness can currently exercise: `forViewer`
+      // (audience.ts) strips every `rejected` event unconditionally, for
+      // every viewer, before any fan-out — see audience.test.ts's "never
+      // includes a rejection, not even for the actor named in it" — and the
+      // one path that does put a rejection on the wire, `applyIntent`'s
+      // rejection branch (referee.ts), unicasts it to the submitter alone —
+      // see referee.test.ts's "returns a rejection to the submitter alone".
+      // Those two tests carry the real coverage for "a rejection only ever
+      // reaches its submitter"; this clause is a belt-and-braces guard
+      // against a future change to that routing, kept honest about being
+      // structurally unreachable today rather than presented as evidence
+      // this full-game harness independently exercises it.
       for (const event of outgoing.message.payload.events) {
         if (event.type === 'rejected') {
           expect('player' in event.action && event.action.player === viewer.playerId).toBe(true)

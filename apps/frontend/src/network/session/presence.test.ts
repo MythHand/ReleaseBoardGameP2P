@@ -1,3 +1,4 @@
+import type { CardInstance } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import {
   ABSENT_GRACE_MS,
@@ -87,6 +88,41 @@ function threeSeatSession(): Session {
     events: FAKE_EVENTS,
   }).session
 }
+
+// Deal 'a' an exact one-card hand so this test is about the fallback rule,
+// not about which seed happens to strand a seat this way. Matches
+// packages/engine/src/fake/release.test.ts's own convention of overriding a
+// dealt hand after `createGame` rather than hunting for a seed.
+it('falls back to DRAW/PUSH when an absent seat holds the turn but its bot suggestion is rejected', () => {
+  const release: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
+  const created = session()
+  // `setup: {}` (see `session()` above) means `releaseCond` isn't 'easy', so
+  // playing a release costs a second card. `playableFor`
+  // (packages/engine/src/fake/project.ts) lists a release as playable
+  // without checking that cost, but `onPlay`
+  // (packages/engine/src/fake/release.ts) rejects it when the hand holds
+  // nothing else to pay with — the exact mismatch driveAbsent's fallback
+  // exists to survive.
+  const forced: Session = {
+    ...created,
+    state: {
+      ...created.state,
+      turn: { ...created.state.turn, player: 'a', hasDrawn: true },
+      players: { ...created.state.players, a: { ...created.state.players.a, hand: [release] } },
+    },
+  }
+  const dropped = disconnect(forced, 'peer-a', 1_000).session
+
+  const result = driveAbsent(dropped, 1_000 + ABSENT_GRACE_MS + 1)
+
+  // botAction's first (and only) suggestion for this hand is PLAY
+  // release-frontend#0, which the engine rejects. Without the fallback,
+  // driveAbsent gives up here — the "before" state in fix #1's
+  // investigation. With it, the turn ends via PUSH (hasDrawn is already
+  // true) and passes to 'b'.
+  expect(result.session.state).not.toBe(dropped.state)
+  expect(result.session.state.turn.player).toBe('b')
+})
 
 it('drives the absent seat that owes the action even when an earlier absent seat owes nothing', () => {
   // Rotate the turn from 'a' onto 'c' (a's and b's turns each end with a bare
