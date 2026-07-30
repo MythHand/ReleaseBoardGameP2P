@@ -156,7 +156,17 @@ export function applyIntent(
 // never send it at all (Intent excludes it).
 export function tick(session: Session, now: number): SessionResult {
   const window = session.state.window
-  if (window && now >= window.deadline) {
+  const pending = session.state.pending
+  // An attack thrown into an open window sets a `defend` pending but leaves
+  // `state.window` untouched (onAttack, packages/engine/src/fake/attacks.ts),
+  // so the two can coexist with the defend deadline at or after the window's.
+  // Every other window action already rejects while a decision is pending, so
+  // the keeper's own timeout must defer the same way: expiring the window out
+  // from under a pending defend would null `state.window`, and the
+  // release-scope defend resolution (onDefend, attacks.ts) requires a window
+  // to still exist — permanently stalling that pending. Resolving the pending
+  // first (below) closes the window itself where that is the correct outcome.
+  if (window && !pending && now >= window.deadline) {
     const { state, events } = session.engine.reduce(session.state, {
       type: 'WINDOW_EXPIRED',
       at: now,
@@ -169,9 +179,10 @@ export function tick(session: Session, now: number): SessionResult {
   // A stalled defence blocks every other player, which is why the engine gives
   // it a deadline — but it gives no expiry action, so the keeper answers with
   // the passive default on the owing player's behalf.
-  const pending = session.state.pending
   if (pending?.kind === 'defend' && now >= pending.deadline) {
     const seat = session.seats.find((s) => s.playerId === pending.player)
+    // A disconnected owing seat has nobody to resolve on: the stalled defence
+    // simply waits for that seat to reconnect rather than being force-resolved.
     if (!seat?.peerId) return { session, outgoing: [] }
     return applyIntent(
       session,

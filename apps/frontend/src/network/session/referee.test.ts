@@ -1,6 +1,13 @@
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { applyIntent, createSession, type Session, type SessionResult, tick } from './referee'
 
+// Not exported from @release/engine or @release/engine/fake, so this is a
+// duplicated literal rather than an import — kept as a named constant (instead
+// of an inline 15_000) so a future bump to the real constant in
+// packages/engine/src/fake/window.ts shows up here as an intentional edit
+// rather than this test silently drifting out of sync.
+const WINDOW_FIRST_MS = 15_000
+
 function twoPlayerSession() {
   return createSession({
     gameId: 'g1',
@@ -153,9 +160,9 @@ it('stamps the keeper`s clock, ignoring any time the peer supplies', () => {
   // forge a wildly wrong `at` on it. That RESOLVE is what actually calls
   // placeRelease -> openWindow (packages/engine/src/fake/release.ts,
   // packages/engine/src/fake/window.ts): a window's deadline is
-  // `at + WINDOW_FIRST_MS` (15_000), so if it were ever taken from the peer's
-  // forged value instead of the keeper's `now`, it would land near
-  // 999_999_999 + 15_000 instead of near the `now` passed below.
+  // `at + WINDOW_FIRST_MS`, so if it were ever taken from the peer's forged
+  // value instead of the keeper's `now`, it would land near
+  // 999_999_999 + WINDOW_FIRST_MS instead of near the `now` passed below.
   let s = session
   for (let step = 0; step < 200; step += 1) {
     if (s.state.pending?.kind === 'discardForRelease') break
@@ -184,7 +191,7 @@ it('stamps the keeper`s clock, ignoring any time the peer supplies', () => {
     5_000,
   )
 
-  expect(next.state.window?.deadline).toBe(5_000 + 15_000)
+  expect(next.state.window?.deadline).toBe(5_000 + WINDOW_FIRST_MS)
 })
 
 it('ignores an intent from a peer bound to no seat', () => {
@@ -212,4 +219,68 @@ it('expires a reaction window once its deadline passes', () => {
 
   expect(result.session.state.window).toBeNull()
   expect(result.outgoing.length).toBeGreaterThan(0)
+})
+
+it('lets a stalled defence resolve even after its window has expired', () => {
+  const { session } = twoPlayerSession()
+  const opened = openWindowFixture(session)
+  const window = opened.state.window
+  if (!window) throw new Error('fixture failed to open a window')
+
+  // Throw a release attack into the open window: onAttack (attacks.ts) sets a
+  // `defend` pending with its own deadline but leaves `state.window` open, so
+  // the two coexist. DEFEND_MS === WINDOW_FIRST_MS (both 15_000, core.ts /
+  // window.ts), so an attack thrown the instant the window opens gives the
+  // window and the defend pending the same deadline.
+  const owner = window.target.player
+  const responder = owner === 'a' ? 'b' : 'a'
+  const responderPeer = responder === 'a' ? 'peer-a' : 'peer-b'
+  const view = opened.engine.project(opened.state, responder)
+  const attackCard = view.window?.canAttackWith[0]
+  if (!attackCard) throw new Error('fixture responder has no release attack to throw')
+
+  const attacked = applyIntent(opened, responderPeer, { type: 'ATTACK', card: attackCard }, 1_000)
+  expect(attacked.session.state.pending?.kind).toBe('defend')
+  expect(attacked.session.state.window).not.toBeNull()
+
+  // Tick past both deadlines at once, as the keeper's normal cadence would.
+  const deadline = attacked.session.state.window?.deadline ?? 0
+  const result = tick(attacked.session, deadline + 1)
+
+  // The stalled defence must still resolve to its passive default, not stay
+  // stuck forever because the window closed out from under it. Taking the hit
+  // closes the window itself (onDefend's release-scope path), so both clear.
+  expect(result.session.state.pending).toBeNull()
+  expect(result.session.state.window).toBeNull()
+})
+
+it('leaves a stalled defence for a disconnected seat to resolve on reconnection', () => {
+  const { session } = twoPlayerSession()
+  const opened = openWindowFixture(session)
+  const window = opened.state.window
+  if (!window) throw new Error('fixture failed to open a window')
+
+  const owner = window.target.player
+  const responder = owner === 'a' ? 'b' : 'a'
+  const responderPeer = responder === 'a' ? 'peer-a' : 'peer-b'
+  const view = opened.engine.project(opened.state, responder)
+  const attackCard = view.window?.canAttackWith[0]
+  if (!attackCard) throw new Error('fixture responder has no release attack to throw')
+
+  const attacked = applyIntent(opened, responderPeer, { type: 'ATTACK', card: attackCard }, 1_000)
+  expect(attacked.session.state.pending?.kind).toBe('defend')
+
+  // The owing seat drops before the deadline passes.
+  const disconnected = {
+    ...attacked.session,
+    seats: attacked.session.seats.map((s) => (s.playerId === owner ? { ...s, peerId: null } : s)),
+  }
+  const deadline = disconnected.state.window?.deadline ?? 0
+  const result = tick(disconnected, deadline + 1)
+
+  // Nobody is there to resolve on the owing player's behalf, so the pending
+  // waits rather than being force-resolved: it is not the keeper's decision
+  // to make for an absent player.
+  expect(result.session).toBe(disconnected)
+  expect(result.outgoing).toEqual([])
 })
