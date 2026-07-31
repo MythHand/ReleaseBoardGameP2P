@@ -69,7 +69,10 @@ it('reports null when the active tab is clicked again', () => {
 
 it('marks an eliminated opponent with the eliminated badge and leaves the others alone', () => {
   const base = makeTableProps()
-  const [out, alive] = base.state.opponents
+  // Target index 1, not 0: the retired implementation was `i === 0`, so a
+  // regression back to index-based selection would keep an index-0 target
+  // green. Index 0 (`alive`) must stay the untouched live control.
+  const [alive, out] = base.state.opponents
   const opponents = base.state.opponents.map((o) =>
     o.id === out.id ? { ...o, eliminated: true } : o,
   )
@@ -92,9 +95,24 @@ it('shows the reconnect overlay from room.connection, not from a view flag', () 
   expect(getByText(base.copy.reconnect.label)).toBeTruthy()
 })
 
-it('marks an opponent listed in room.disconnected', () => {
+it('shows the youEliminated badge from state.you.eliminated', () => {
   const base = makeTableProps()
-  const id = base.state.opponents[0].id
-  const { getByText } = render(<Table {...base} room={{ ...base.room, disconnected: [id] }} />)
-  expect(getByText(base.copy.seat.disconnected)).toBeTruthy()
+  const { getByText } = render(
+    <Table {...base} state={{ ...base.state, you: { ...base.state.you, eliminated: true } }} />,
+  )
+  expect(getByText(base.copy.table.youEliminated)).toBeTruthy()
+})
+
+it('marks an opponent listed in room.disconnected and leaves the others alone', () => {
+  const base = makeTableProps()
+  // Same index-1 rationale as the elimination test above: index 0 stays the
+  // untouched live control so an `i === 0` regression cannot pass this test.
+  const [alive, out] = base.state.opponents
+  const { getByTestId } = render(
+    <Table {...base} room={{ ...base.room, disconnected: [out.id] }} />,
+  )
+  expect(within(getByTestId(`seat-${out.id}`)).getByText(base.copy.seat.disconnected)).toBeTruthy()
+  expect(
+    within(getByTestId(`seat-${alive.id}`)).queryByText(base.copy.seat.disconnected),
+  ).toBeNull()
 })
