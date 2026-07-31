@@ -1,5 +1,6 @@
 import { act, fireEvent, render, within } from '@testing-library/react'
 import { vi } from 'vitest'
+import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
 import Table from './Table'
 import { makeTableProps } from './testFixture'
 
@@ -150,4 +151,58 @@ it('draws from the dock, once its mount lockout clears', () => {
   fireEvent.click(getByTestId('dock-key'))
   expect(onDraw).toHaveBeenCalledTimes(1)
   vi.useRealTimers()
+})
+
+it('anchors the targeting arrow to the selected source card, not the last-clicked combo partner', () => {
+  const base = makeTableProps()
+  const sourceUid = base.state.you.hand[0].uid
+  const partnerUid = base.state.you.hand[1].uid
+  const targetPlayer = base.state.opponents[0].id
+  const { container } = render(
+    <Table
+      {...base}
+      state={{
+        ...base.state,
+        playable: [sourceUid, partnerUid],
+        comboOptions: { [sourceUid]: [partnerUid] },
+      }}
+      actions={{
+        onPlay: vi.fn(),
+        // Only the source card carries a legal target — matches the hook's
+        // own combo-then-target fixture in useTableInteractions.test.ts.
+        legalTargets: (card) =>
+          card === sourceUid ? [{ kind: 'player', player: targetPlayer }] : [],
+      }}
+    />,
+  )
+
+  const slots = container.querySelectorAll<HTMLElement>('[data-hand-slot]')
+  // Distinct, deterministic rects per slot (jsdom's real getBoundingClientRect
+  // is always all-zero) — this is what makes the two candidate origins
+  // (source vs. partner) actually distinguishable in the assertion below.
+  for (const [i, el] of slots.entries()) {
+    vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
+      left: i * 100,
+      top: 0,
+      width: 10,
+      height: 10,
+      right: i * 100 + 10,
+      bottom: 10,
+      x: i * 100,
+      y: 0,
+      toJSON: () => {},
+    })
+  }
+
+  fireEvent.mouseDown(slots[0]) // pick source — comboPending, no target awaited yet
+  fireEvent.mouseDown(slots[1]) // pick partner — phase becomes 'selected'
+
+  // Arrow's <circle class="origin"> sits at `from` — asserting on it, rather
+  // than on internal hook state, pins what actually reaches the screen. This
+  // leaves the arc/head geometry and the live cursor-follow (`to`) uncovered,
+  // but `from` is the only part this bug affects.
+  const origin = container.querySelector(`.${arrowStyles.origin}`)
+  expect(origin).toBeTruthy()
+  expect(origin?.getAttribute('cx')).toBe('5') // source (slot 0): left 0 + width/2
+  expect(origin?.getAttribute('cy')).toBe('5')
 })

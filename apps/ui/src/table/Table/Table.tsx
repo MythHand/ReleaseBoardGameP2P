@@ -4,7 +4,7 @@ import LangSwitcher from '@/blocks/LangSwitcher'
 import LobbyCode from '@/blocks/LobbyCode'
 import Rules from '@/blocks/Rules'
 import GearIcon from '@/icons/GearIcon'
-import Arrow, { centerOf, type Point, useArrow } from '@/primitives/Arrow'
+import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
@@ -148,19 +148,29 @@ export default function Table({
     comboOptions: (card) => state.comboOptions?.[card] ?? [],
   })
 
-  // targeting arrow: origin is the last-clicked hand card, tip follows the
-  // cursor. The mousemove listener (inside useArrow) is only mounted while
-  // `active` is true, which we keep in lockstep with `phase === 'selected'` —
-  // it comes down with every exit from that phase, including unmount.
-  const cardOriginRef = useRef<Point | null>(null)
+  // targeting arrow: origin is the SOURCE card's slot — `gestures.selected`,
+  // resolved through `data-hand-slot` — not whatever was clicked most
+  // recently. `selected` stays the source through the whole combo-then-target
+  // sequence (the partner click only sets `combo`), so re-deriving the origin
+  // from it on every phase change keeps the arrow anchored to the source even
+  // when a combo partner is picked afterwards. The tip follows the cursor via
+  // the mousemove listener inside useArrow, which is only mounted while
+  // `active` is true — kept in lockstep with `phase === 'selected'` here, so
+  // it comes down on every exit from that phase, including unmount.
+  const handRef = useRef<HTMLDivElement>(null)
   const arrow = useArrow()
   useEffect(() => {
-    if (gestures.phase === 'selected' && cardOriginRef.current) {
-      arrow.aim(cardOriginRef.current)
+    const index = gestures.selected ? you.hand.findIndex((c) => c.uid === gestures.selected) : -1
+    const slotEl =
+      index >= 0
+        ? handRef.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+        : undefined
+    if (gestures.phase === 'selected' && slotEl) {
+      arrow.aim(centerOf(slotEl))
     } else {
       arrow.stop()
     }
-  }, [gestures.phase, arrow.aim, arrow.stop])
+  }, [gestures.phase, gestures.selected, you.hand, arrow.aim, arrow.stop])
 
   // Escape cancels an in-flight target selection. Bound to the window (not a
   // React onKeyDown) so it fires regardless of what currently has focus, and
@@ -173,11 +183,6 @@ export default function Table({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [gestures.phase, gestures.cancel])
-
-  const handleCardClick = (index: number, el: HTMLElement) => {
-    cardOriginRef.current = centerOf(el)
-    gestures.onCardClick(index)
-  }
 
   // A click that lands outside any hand slot while a target is pending reads
   // as "changed my mind" — cancel. Clicks that land on a legal target already
@@ -289,10 +294,10 @@ export default function Table({
               onPick={(target) => gestures.onTargetPick(target)}
               targets={gestures.targets}
             />
-            <div className={styles.handWrap}>
+            <div className={styles.handWrap} ref={handRef}>
               <Hand
                 items={you.hand}
-                onCardClick={(i, el) => handleCardClick(i, el)}
+                onCardClick={(i) => gestures.onCardClick(i)}
                 accentAt={gestures.accentAt}
               />
             </div>
