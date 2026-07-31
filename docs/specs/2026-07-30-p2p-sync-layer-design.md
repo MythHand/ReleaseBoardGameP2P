@@ -124,8 +124,15 @@ The keeper never trusts what a frame claims about itself:
 
 - **`action.player` is overwritten** with the `PlayerId` bound to the connection the
   frame arrived on. A peer cannot act as another seat.
-- **`at` is stamped by the keeper**, so a peer cannot lie about time — and no clock
-  synchronisation exists to get wrong.
+- **`at` is stamped by the keeper**, so a peer cannot lie about time and every rules
+  decision reads one clock. Display is a separate question: `WindowView.deadline` and
+  `PendingView.deadline` are absolute keeper-epoch milliseconds and they ship inside
+  every `SYNC`, so a peer that renders `deadline - Date.now()` is off by the two
+  machines' clock skew — a fast local clock shows a reaction window already at zero
+  while the keeper still accepts attacks, a slow one closes it mid-decision. The UI
+  work owns this: derive the countdown from a keeper-relative offset (the remaining
+  duration, or the skew measured against a `SYNC`'s own stamp) rather than from the
+  absolute value.
 - **`WINDOW_EXPIRED` is never sent by a peer.** The keeper owns the deadline timer
   and fires it itself. The engine's constraint — that `WINDOW_EXPIRED` carries no
   player identity and must not acquire an owner-only rule — is satisfied by
@@ -143,12 +150,23 @@ transport overwrites `from` with the peer id of the connection the frame came in
 on, so for a **directly connected** peer the claim above holds outright. A frame
 the host **relays** on another peer's behalf arrives on the *host's* connection, so
 a keeper that is not itself the host sees the relay's identity, not the origin's —
-within that topology a malicious host can act as any seat. Nothing in this layer
-closes that, and no cryptographic identity exists to close it with; it sits inside
-the same social-trust boundary as decision 1. One consequence is load-bearing today:
-because a relayed frame reaches a guest wearing the host's id, the host does not
-relay the lobby messages a guest treats as the host's word (roster, config, kick,
-disband, host transfer).
+within that topology a malicious host can act as any seat, and an honest one still
+misattributes every relayed intent to itself. Nothing in this layer closes that, and
+no cryptographic identity exists to close it with; it sits inside the same
+social-trust boundary as decision 1.
+
+Two consequences are load-bearing today. Because a relayed frame reaches a guest
+wearing the host's id, the host does not relay the lobby messages a guest treats as
+the host's word (roster, config, kick, disband, host transfer). And because a wire
+frame names no recipient, relaying one is broadcasting it — so the host does not
+relay the game frames either: `SYNC` carries one seat's projection, `KEEPER_STATE`
+carries `GameState`, `INTENT` carries the card a player chose (including one the
+keeper rejected and emitted no event for), and `KEEPER_CHANGED` carries the death
+notice that ends the game for everyone. None of that costs anything while the keeper
+*is* the host, which is the only wiring that exists: every game frame then travels a
+direct connection in both directions. A keeper sitting behind the host needs a relay
+that routes by named recipient and a transport that sends through the host at all —
+part of the handover wiring in #18, not something a message-type rule can express.
 
 ### Module layout
 
