@@ -157,20 +157,32 @@ export default function Table({
   // the mousemove listener inside useArrow, which is only mounted while
   // `active` is true — kept in lockstep with `phase === 'selected'` here, so
   // it comes down on every exit from that phase, including unmount.
+  //
+  // The effect is keyed on `phase`/`selected` only — NOT on `you.hand` — on
+  // purpose: it arms once per selection, not once per render. `you.hand` is a
+  // fresh array on every projection update (Milestone 3's `toTableState`
+  // rebuilds `TableState` from scratch each time), and `Table` re-renders on
+  // the turn clock; if `you.hand` were a dependency, every such re-render
+  // while a target is pending would re-run `arrow.aim(origin)`, which sets
+  // `to = origin` and snaps the tracked cursor position back to the source —
+  // discarding whatever the mousemove listener had followed it to. `you.hand`
+  // is still read inside the effect (to resolve the selected uid's slot
+  // element), just not watched for changes.
   const handRef = useRef<HTMLDivElement>(null)
   const arrow = useArrow()
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `you.hand` is read to resolve the selected uid's slot element, not watched — see the comment above for why it must stay out of the dependency array
   useEffect(() => {
+    if (gestures.phase !== 'selected') {
+      arrow.stop()
+      return
+    }
     const index = gestures.selected ? you.hand.findIndex((c) => c.uid === gestures.selected) : -1
     const slotEl =
       index >= 0
         ? handRef.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
         : undefined
-    if (gestures.phase === 'selected' && slotEl) {
-      arrow.aim(centerOf(slotEl))
-    } else {
-      arrow.stop()
-    }
-  }, [gestures.phase, gestures.selected, you.hand, arrow.aim, arrow.stop])
+    if (slotEl) arrow.aim(centerOf(slotEl))
+  }, [gestures.phase, gestures.selected, arrow.aim, arrow.stop])
 
   // Escape cancels an in-flight target selection. Bound to the window (not a
   // React onKeyDown) so it fires regardless of what currently has focus, and

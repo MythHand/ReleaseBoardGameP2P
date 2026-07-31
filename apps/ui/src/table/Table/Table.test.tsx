@@ -206,3 +206,65 @@ it('anchors the targeting arrow to the selected source card, not the last-clicke
   expect(origin?.getAttribute('cx')).toBe('5') // source (slot 0): left 0 + width/2
   expect(origin?.getAttribute('cy')).toBe('5')
 })
+
+it('keeps the tracked cursor when a fresh-but-equivalent hand array re-renders mid-selection', () => {
+  const base = makeTableProps()
+  const sourceUid = base.state.you.hand[0].uid
+  const targetPlayer = base.state.opponents[0].id
+  const stateWithTarget = {
+    ...base.state,
+    playable: [sourceUid],
+  }
+  const actions = {
+    onPlay: vi.fn(),
+    legalTargets: (card: string) =>
+      card === sourceUid ? [{ kind: 'player' as const, player: targetPlayer }] : [],
+  }
+  const { container, rerender } = render(
+    <Table {...base} state={stateWithTarget} actions={actions} />,
+  )
+
+  const slot0 = container.querySelectorAll<HTMLElement>('[data-hand-slot]')[0]
+  vi.spyOn(slot0, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 10,
+    height: 10,
+    right: 10,
+    bottom: 10,
+    x: 0,
+    y: 0,
+    toJSON: () => {},
+  })
+
+  fireEvent.mouseDown(slot0) // select the source — phase becomes 'selected', arrow arms at (5, 5)
+
+  // Move the tracked cursor away from the origin — this is the `mousemove`
+  // listener useArrow mounts internally while `active`.
+  fireEvent.mouseMove(window, { clientX: 300, clientY: 300 })
+
+  const arrowSvg = container.querySelector(`.${arrowStyles.svg}`)
+  const tipBefore = arrowSvg?.querySelector('g')?.getAttribute('transform')
+  expect(tipBefore).toContain('translate(300 300)')
+
+  // Re-render with a *fresh array reference* holding the *same cards* — this
+  // is what every projection update produces in the real app (Milestone 3's
+  // `toTableState` rebuilds `TableState` from scratch), and it must not be
+  // mistaken for a new selection.
+  rerender(
+    <Table
+      {...base}
+      state={{
+        ...stateWithTarget,
+        you: { ...stateWithTarget.you, hand: [...base.state.you.hand] },
+      }}
+      actions={actions}
+    />,
+  )
+
+  const tipAfter = arrowSvg?.querySelector('g')?.getAttribute('transform')
+  // If the arming effect re-ran on this re-render (the bug), it would call
+  // `aim(origin)` again, snapping `to` back to (5, 5) — the tip must instead
+  // stay wherever the mouse left it.
+  expect(tipAfter).toContain('translate(300 300)')
+})
