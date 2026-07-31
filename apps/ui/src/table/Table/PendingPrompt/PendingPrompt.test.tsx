@@ -103,3 +103,58 @@ it('resolves requestCard with a real catalogue card id, not a release slot', () 
   expect(choice.kind).toBe('requestCard')
   expect(CARDS.some((c) => c.id === choice.card)).toBe(true)
 })
+
+it('cannot resolve a stale selection once a new pending of the same kind/player drops it', () => {
+  // The reset effect keys off `${pending.kind}:${pending.player}` — a second
+  // pending of the *same* kind for the *same* player (a real shape once the
+  // P2P layer lands: back-to-back same-kind-same-player sequences from a
+  // remote authority) does not change that fingerprint, so the reset never
+  // fires and `card` survives the re-render untouched. What must stop the
+  // stale value from confirming is membership in the *current* pending's
+  // `options`, not the reset — this test re-renders with a pending whose
+  // options no longer include the earlier selection and asserts confirm
+  // goes inert and nothing resolves.
+  const onResolve = vi.fn()
+  const handAll: HandItem[] = [
+    { uid: 'c1', card: makeCard('attack-bug') },
+    { uid: 'c2', card: makeCard('release-frontend') },
+    { uid: 'c3', card: makeCard('release-backend') },
+  ]
+  const first: TablePending = { kind: 'discardForRelease', player: 'you', options: ['c1', 'c2'] }
+  const second: TablePending = { kind: 'discardForRelease', player: 'you', options: ['c3'] }
+  const { getAllByRole, getByRole, rerender } = render(
+    <PendingPrompt pending={first} hand={handAll} copy={copy} onResolve={onResolve} />,
+  )
+  fireEvent.click(getAllByRole('option')[1]) // selects c2, offered by `first`
+
+  rerender(<PendingPrompt pending={second} hand={handAll} copy={copy} onResolve={onResolve} />)
+
+  const confirmBtn = getByRole('button', { name: copy.confirm })
+  expect(confirmBtn).toHaveProperty('disabled', true)
+  fireEvent.click(confirmBtn)
+  expect(onResolve).not.toHaveBeenCalled()
+})
+
+it('resolves giveCard with the hand uid, never the requested catalogue id', () => {
+  // giveCard sits on the same CardId/CardUid ambiguity that already produced
+  // one shipped defect in this component (requestCard resolving a
+  // ReleaseSlotId instead of a catalogue id) — a fixture where the requested
+  // id and the matching hand uid are visibly different values is what makes
+  // this assertion able to tell a correct resolve from a "simplified" one
+  // that accidentally resolves `pending.requested` straight through.
+  const onResolve = vi.fn()
+  const requestedId = 'attack-security-bug'
+  const uid = 'hand-slot-9'
+  const { getByRole } = render(
+    <PendingPrompt
+      pending={{ kind: 'giveCard', player: 'you', requested: requestedId }}
+      hand={[{ uid, card: makeCard(requestedId) }]}
+      copy={copy}
+      onResolve={onResolve}
+    />,
+  )
+  fireEvent.click(getByRole('option'))
+  fireEvent.click(getByRole('button', { name: copy.confirm }))
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'giveCard', card: uid })
+  expect(onResolve.mock.calls[0][0].card).not.toBe(requestedId)
+})

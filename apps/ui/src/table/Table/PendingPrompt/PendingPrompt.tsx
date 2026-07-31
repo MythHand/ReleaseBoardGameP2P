@@ -173,8 +173,17 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
 
   switch (pending.kind) {
     case 'discardForRelease': {
-      complete = card != null
-      confirm = () => card && onResolve({ kind: 'discardForRelease', card })
+      // `complete` (and the confirm dispatch itself) checks membership in
+      // *this render's* pending.options, not merely "is something selected".
+      // A selection made against an earlier pending of the same kind/player
+      // survives the fingerprint reset (same fingerprint → no reset), so
+      // without this check a stale `card` the current pending never offered
+      // could still confirm — membership makes that structurally impossible
+      // regardless of how the stale value got into state.
+      complete = card != null && pending.options.includes(card)
+      confirm = () => {
+        if (card && pending.options.includes(card)) onResolve({ kind: 'discardForRelease', card })
+      }
       options = pending.options.map((uid) => (
         <CardOption
           key={uid}
@@ -187,8 +196,10 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
       break
     }
     case 'defend': {
-      complete = card != null
-      confirm = () => card && onResolve({ kind: 'defend', card })
+      complete = card != null && pending.options.includes(card)
+      confirm = () => {
+        if (card && pending.options.includes(card)) onResolve({ kind: 'defend', card })
+      }
       options = pending.options.map((uid) => (
         <CardOption
           key={uid}
@@ -201,13 +212,17 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
       break
     }
     case 'giveCard': {
-      complete = card != null
-      confirm = () => card && onResolve({ kind: 'giveCard', card })
       // The pending carries no `options` — only `requested`, the id of the
       // card type asked for. Matching hand items by id equality is not
       // "inspecting tags/categories": it is comparing the exact identifier
-      // the engine already handed us.
+      // the engine already handed us. `offered` (hand uids) is what confirm
+      // checks membership against — resolving with `card`, a hand uid, never
+      // with `pending.requested`, the catalogue id being matched against.
       const offered = hand.filter((h) => h.card.id === pending.requested).map((h) => h.uid)
+      complete = card != null && offered.includes(card)
+      confirm = () => {
+        if (card && offered.includes(card)) onResolve({ kind: 'giveCard', card })
+      }
       options = offered.map((uid) => (
         <CardOption
           key={uid}
@@ -220,8 +235,11 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
       break
     }
     case 'handLimit': {
-      complete = cards.length === pending.excess
-      confirm = () => onResolve({ kind: 'handLimit', cards })
+      complete =
+        cards.length === pending.excess && cards.every((uid) => pending.options.includes(uid))
+      confirm = () => {
+        if (complete) onResolve({ kind: 'handLimit', cards })
+      }
       options = pending.options.map((uid) => (
         <CardOption
           key={uid}
@@ -242,8 +260,10 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
       break
     }
     case 'neutralize503': {
-      complete = method != null
-      confirm = () => method && onResolve({ kind: 'neutralize503', method })
+      complete = method != null && pending.methods.includes(method)
+      confirm = () => {
+        if (method && pending.methods.includes(method)) onResolve({ kind: 'neutralize503', method })
+      }
       options = pending.methods.map((m) => (
         <TextOption
           key={m}
@@ -255,8 +275,10 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
       break
     }
     case 'crush': {
-      complete = method != null
-      confirm = () => method && onResolve({ kind: 'crush', method })
+      complete = method != null && pending.methods.includes(method)
+      confirm = () => {
+        if (method && pending.methods.includes(method)) onResolve({ kind: 'crush', method })
+      }
       options = pending.methods.map((m) => (
         <TextOption
           key={m}
@@ -274,8 +296,16 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
       // guess space is every distinct card type the kit's catalogue knows —
       // 37 definitions, not the ~125-card physical deck (which counts
       // per-copy quantities the catalogue collapses into one entry each).
-      complete = requestedCard != null
-      confirm = () => requestedCard && onResolve({ kind: 'requestCard', card: requestedCard })
+      // The catalogue is static, so membership here can't go stale the way
+      // pending.options can — checked anyway, for the same structural reason
+      // as every other kind: confirm should never resolve an option that
+      // isn't actually on offer.
+      complete = requestedCard != null && CARDS.some((c) => c.id === requestedCard)
+      confirm = () => {
+        if (requestedCard && CARDS.some((c) => c.id === requestedCard)) {
+          onResolve({ kind: 'requestCard', card: requestedCard })
+        }
+      }
       options = CARDS.map((c) => (
         <CatalogueCardOption
           key={c.id}
