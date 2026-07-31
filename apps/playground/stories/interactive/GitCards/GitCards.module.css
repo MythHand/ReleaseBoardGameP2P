@@ -448,3 +448,58 @@
   display: flex;
   justify-content: center;
 }
+
+/* ===== System Upgrade ===== */
+
+/* opponents across the top — same placement as the Table screen (.opponents) */
+.suOpponents {
+  position: absolute;
+  inset-block-start: 22px;
+  inset-inline-start: 50%;
+  z-index: 20;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 18px;
+  justify-content: center;
+  max-inline-size: calc(100% - 80px);
+  transform: translateX(-50%);
+}
+
+/* the thrown cards, face-up, in a centred row. NO transform on this container:
+   a transformed ancestor would make the cards' position:fixed freeze (used when
+   they fly out on confirm) resolve against this box instead of the viewport, so
+   they'd teleport. Centre via full-area flex instead; the box lets clicks through
+   (pointer-events: none) so only the cards themselves are interactive. */
+.suCenter {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.suCard {
+  position: relative;
+  padding: 0;
+  pointer-events: auto;
+  cursor: default;
+  background: transparent;
+  border: 0;
+  transition: transform 180ms var(--ease-out);
+}
+
+.suCard:not(:disabled) {
+  cursor: pointer;
+}
+
+.suCard:not(:disabled):hover {
+  z-index: 5;
+  transform: translateY(-6px);
+}
+
+.suSelected {
+  z-index: 8;
+}

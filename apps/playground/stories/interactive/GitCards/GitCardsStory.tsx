@@ -2,16 +2,18 @@ import { useState } from 'react'
 import CherryPick from './CherryPick'
 import styles from './GitCards.module.css'
 import Rebase from './Rebase'
+import SystemUpgrade from './SystemUpgrade'
 
 // One page for the git-card interactions instead of a page per card. The
 // technical bar carries a card selector on the LEFT; each card renders it first
 // and lays out its own technical controls to the right. Adding another git card
 // is one entry here + one component — no new page.
-type GitCard = 'cherry' | 'rebase'
+type GitCard = 'cherry' | 'rebase' | 'system-upgrade'
 
 const CARDS: { id: GitCard; label: string }[] = [
   { id: 'cherry', label: 'cherry-pick' },
   { id: 'rebase', label: 'rebase' },
+  { id: 'system-upgrade', label: 'system upgrade' },
 ]
 
 export default function GitCardsStory() {
@@ -34,5 +36,7 @@ export default function GitCardsStory() {
     </div>
   )
 
-  return card === 'cherry' ? <CherryPick selector={selector} /> : <Rebase selector={selector} />
+  if (card === 'cherry') return <CherryPick selector={selector} />
+  if (card === 'rebase') return <Rebase selector={selector} />
+  return <SystemUpgrade selector={selector} />
 }
