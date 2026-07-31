@@ -6,6 +6,7 @@ import Rules from '@/blocks/Rules'
 import GearIcon from '@/icons/GearIcon'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Badge from '@/primitives/Badge'
+import Button from '@/primitives/Button'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
@@ -25,6 +26,7 @@ import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { deriveDock } from './dock'
+import PendingPrompt from './PendingPrompt'
 import styles from './Table.module.css'
 import type { Panel, TableProps } from './types'
 import { useTableInteractions } from './useTableInteractions'
@@ -113,8 +115,10 @@ export default function Table({
   onPanelChange,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup } = state
-  // `now` is a placeholder until the deadline interval lands (task 9) — the
-  // derived seconds/progress read 0 until then.
+  // `now` stays a placeholder inside the kit — the deadline interval belongs
+  // to the consumer (never Date.now() or a timer in here). A consumer that
+  // wants a live countdown drives its own clock and overrides via the `dock`
+  // prop; without one, seconds/progress read the span's start.
   const nowRef = useRef(0)
   const derived = deriveDock(state, state.selfId, nowRef.current)
   const dockView = { ...derived, ...dock }
@@ -331,7 +335,25 @@ export default function Table({
           onPush={actions?.onPush}
           onPass={actions?.onPass}
         />
+        {/* you already passed on the open window — TurnDock has no notion of
+            "unpass", so the affordance to take it back lives here instead */}
+        {state.window?.passed.includes(state.selfId) && copy.window && (
+          <Button variant="tech" className={styles.unpass} onClick={() => actions?.onUnpass?.()}>
+            {copy.window.unpass}
+          </Button>
+        )}
       </div>
+
+      {/* the engine is waiting on a decision from you — a pending owed to you
+          always renders, regardless of whose turn the projection says it is */}
+      {state.pending?.player === state.selfId && copy.pending && (
+        <PendingPrompt
+          pending={state.pending}
+          hand={you.hand}
+          copy={copy.pending}
+          onResolve={(choice) => actions?.onResolve?.(choice)}
+        />
+      )}
 
       {/* вертикальный рейл у правого края — переключает панели drawer */}
       <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />

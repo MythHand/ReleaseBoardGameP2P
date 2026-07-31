@@ -5,7 +5,7 @@ import type { TableState } from './types'
 export type Phase = 'idle' | 'selected' | 'comboPending'
 
 export interface Options {
-  state: Pick<TableState, 'selfId' | 'you' | 'playable' | 'frozen'>
+  state: Pick<TableState, 'selfId' | 'you' | 'playable' | 'frozen' | 'window'>
   actions?: TableActions
   // Legality of a combo pairing is the engine's answer — this hook never
   // inspects card tags, categories, or the catalogue to decide pairing.
@@ -59,7 +59,21 @@ export function useTableInteractions({ state, actions, comboOptions }: Options) 
   const onCardClick = useCallback(
     (index: number) => {
       const item = state.you.hand[index]
-      if (!item || !state.playable.includes(item.uid)) return
+      if (!item) return
+
+      // The window's attack affordance reuses the hand: while a window is
+      // open and offers attackers, the card that opens it is gated by
+      // `canAttackWith`, not `playable`, and dispatches onAttack instead of
+      // onPlay — no combo, no target, the window itself names the release.
+      const attackable = state.window?.canAttackWith ?? []
+      if (attackable.length > 0) {
+        if (!attackable.includes(item.uid)) return
+        actions?.onAttack?.(item.uid, undefined)
+        reset()
+        return
+      }
+
+      if (!state.playable.includes(item.uid)) return
 
       if (awaitingCombo && selected) {
         const partners = comboOptions?.(selected) ?? []
@@ -96,7 +110,16 @@ export function useTableInteractions({ state, actions, comboOptions }: Options) 
       setSelected(item.uid)
       setCombo(null)
     },
-    [state.you.hand, state.playable, actions, awaitingCombo, selected, comboOptions, reset],
+    [
+      state.you.hand,
+      state.playable,
+      state.window,
+      actions,
+      awaitingCombo,
+      selected,
+      comboOptions,
+      reset,
+    ],
   )
 
   const onTargetPick = useCallback(

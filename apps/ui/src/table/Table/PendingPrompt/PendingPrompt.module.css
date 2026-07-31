@@ -1,0 +1,68 @@
+/* Pending prompt — the engine demands a decision. Fills the same positioned
+   container as ConfirmAction (Table's root), sitting above the play area so
+   the offered options stay reachable while the confirm bar pins to the
+   bottom underneath it. */
+.prompt {
+  position: absolute;
+  inset: 0;
+  z-index: 92;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  padding: 20px 28px;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  border: 1px solid var(--white-10);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px var(--black-45);
+}
+
+.heading {
+  color: var(--white-85, var(--fg));
+  text-align: center;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+
+.option {
+  padding: 0;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.textOption {
+  padding-block: 10px;
+  padding-inline: 18px;
+  color: var(--fg);
+  background: var(--white-08);
+  border: 1px solid var(--white-10);
+  border-radius: 8px;
+  transition: border-color var(--t-base) var(--ease-out);
+}
+
+.textOptionSelected {
+  border-color: var(--turn-accent);
+}
+
+/* the decline affordance (defend only) — sits above the confirm bar, in the
+   normal document flow, so it never fights ConfirmAction's own bottom pin */
+.decline {
+  position: absolute;
+  inset-block-end: 110px;
+  pointer-events: auto;
+}

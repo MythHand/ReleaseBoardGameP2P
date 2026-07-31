@@ -24,8 +24,8 @@ const hand: HandItem[] = [
 ]
 
 // TableState requires more than this test cares about; Options only picks
-// selfId/you/playable/frozen, so the fixture completes exactly that slice
-// (name + release on `you`) rather than loosening the hook's type.
+// selfId/you/playable/frozen/window, so the fixture completes exactly that
+// slice (name + release on `you`) rather than loosening the hook's type.
 const setup = (over: Record<string, unknown> = {}) => ({
   state: {
     selfId: 'you',
@@ -36,6 +36,7 @@ const setup = (over: Record<string, unknown> = {}) => ({
   },
   actions: {
     onPlay: vi.fn(),
+    onAttack: vi.fn(),
     legalTargets: vi.fn((): TableTarget[] => []),
   } satisfies TableActions,
   comboOptions: undefined as Options['comboOptions'],
@@ -198,5 +199,31 @@ it('treats a target with the same fields in a different key order as legal', () 
     { slot: 'frontend', player: 'p2', kind: 'release' },
     undefined,
   )
+  expect(result.current.phase).toBe('idle')
+})
+
+it('attacks through the window when the card is offered, bypassing playable', () => {
+  // `playable` is deliberately empty — the window's own `canAttackWith` gates
+  // this path instead, and the dispatch goes through onAttack, not onPlay.
+  const opts = setup({
+    playable: [],
+    window: { player: 'p2', slot: 'frontend', round: 1, canAttackWith: ['c1'], passed: [] },
+  })
+  const { result } = renderHook(() => useTableInteractions(opts))
+  act(() => result.current.onCardClick(0))
+  expect(opts.actions.onAttack).toHaveBeenCalledWith('c1', undefined)
+  expect(opts.actions.onPlay).not.toHaveBeenCalled()
+  expect(result.current.phase).toBe('idle')
+})
+
+it('leaves a card outside canAttackWith untouched while a window is open', () => {
+  const opts = setup({
+    playable: [],
+    window: { player: 'p2', slot: 'frontend', round: 1, canAttackWith: ['c1'], passed: [] },
+  })
+  const { result } = renderHook(() => useTableInteractions(opts))
+  act(() => result.current.onCardClick(1)) // c2 — not offered by the window
+  expect(opts.actions.onAttack).not.toHaveBeenCalled()
+  expect(opts.actions.onPlay).not.toHaveBeenCalled()
   expect(result.current.phase).toBe('idle')
 })

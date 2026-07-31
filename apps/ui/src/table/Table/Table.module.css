@@ -57,6 +57,15 @@
   inset-inline-start: 26px;
 }
 
+/* unpass — take back an earlier pass on the open window; sits just above the
+   dock so it reads as an amendment to the pass you already made there */
+.unpass {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: 0;
+  margin-block-end: 8px;
+}
+
 .you {
   position: absolute;
   inset-block-end: 16px;
