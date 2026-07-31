@@ -146,7 +146,7 @@ export default function TurnDockBlock() {
       note2:
         'Окно реакции — время задано механикой правил: 15 сек первое окно, 10 сек каждый следующий раунд «продолжить атаку». Не выдумываем, только отображаем.',
       note3:
-        'Цвет кольца — акцент по фазе: зелёный (свой ход), нейтральный (ход оппонента), янтарный (реакция-атака), красный (danger — Error 503). При смене фазы кольцо дозаполняется до полного и перетекает в новый цвет.',
+        'Цвет кольца — акцент по фазе: зелёный (свой ход), янтарный (реакция-атака), красный (danger — Error 503). При смене фазы кольцо дозаполняется до полного и перетекает в новый цвет. На ходе соперника кольцо потухшее и без числа — чужой таймер бездействия сбрасывается на каждое действие, наблюдателю показывать нечего.',
     },
     en: {
       live: 'Transitions (live)',
@@ -162,7 +162,7 @@ export default function TurnDockBlock() {
       note2:
         'Reaction window — time is defined by the rules: 15s for the first window, 10s for each follow-up “keep attacking” round. Not invented, only displayed.',
       note3:
-        'Ring colour is the per-phase accent: green (your turn), neutral (opponent turn), amber (attack reaction), red (danger — Error 503). On a phase change the ring fills back to full and glides to the new colour.',
+        'Ring colour is the per-phase accent: green (your turn), amber (attack reaction), red (danger — Error 503). On a phase change the ring fills back to full and glides to the new colour. On the opponent’s turn the ring is dimmed with no number — their inactivity timer resets on every action, so there is nothing meaningful to show a watcher.',
     },
   })
   const ctl = pick(lang, {

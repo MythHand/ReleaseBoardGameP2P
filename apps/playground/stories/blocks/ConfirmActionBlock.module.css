@@ -1,0 +1,37 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-start;
+
+  /* fill the section width (a flex item in KitShell's .row would otherwise
+     collapse to the width of the controls row, leaving the stage narrow) */
+  inline-size: 100%;
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* mini table area — a positioned box so the bar pins to ITS bottom (not the
+   page) and slides up over the filler */
+.stage {
+  position: relative;
+  inline-size: 100%;
+  min-block-size: 440px;
+  overflow: hidden;
+  background: var(--surface-0);
+  border: 1px solid var(--white-08);
+  border-radius: 14px;
+}
+
+.filler {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 100%;
+  min-block-size: 440px;
+  color: var(--white-30);
+}

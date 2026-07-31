@@ -1,0 +1,142 @@
+/* Pause window over the table. Sits BELOW the right-hand nav (side rail 60,
+   drawer 50) on purpose: the play area behind reads as blocked, but the rail and
+   any open drawer stay above the scrim and clickable — "block the screen, not the
+   right nav". Above the plain table content (auto z). */
+.over {
+  --overlay-z: 40;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  inline-size: 680px;
+  max-inline-size: calc(100% - 48px);
+  padding-block: 40px;
+  padding-inline: 56px;
+  text-align: center;
+  background: color-mix(in srgb, var(--surface-1) 94%, var(--bg));
+  border: 1px solid var(--white-12);
+  box-shadow: 0 30px 80px var(--black-60);
+  animation: pause-in 360ms var(--ease-soft);
+}
+
+@keyframes pause-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+}
+
+/* pause glyph — two bars */
+.mark {
+  position: relative;
+  inline-size: 30px;
+  block-size: 34px;
+}
+
+.mark::before,
+.mark::after {
+  position: absolute;
+  inset-block: 0;
+  inline-size: 9px;
+  content: '';
+  background: var(--white-60);
+  border-radius: 2px;
+}
+
+.mark::before {
+  inset-inline-start: 2px;
+}
+
+.mark::after {
+  inset-inline-end: 2px;
+}
+
+.title {
+  margin-block-start: 16px;
+  color: var(--fg);
+}
+
+.subtitle {
+  margin-block-start: 8px;
+  color: var(--white-45);
+}
+
+/* readiness lamps — one full-width row per player, so each row grows with the
+   window (name on the left, status on the right, room for long nicks) */
+.lamps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  inline-size: 100%;
+  padding: 0;
+  margin-block: 28px 0;
+  list-style: none;
+}
+
+.lamp {
+  inline-size: 100%;
+}
+
+.row,
+.selfBtn {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  inline-size: 100%;
+  padding-block: 14px;
+  padding-inline: 20px;
+  text-align: start;
+  background: var(--white-04);
+  border: 1px solid transparent;
+}
+
+/* only the local player's lamp is interactive */
+.selfBtn {
+  cursor: pointer;
+  border-color: var(--white-12);
+  transition:
+    background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    opacity var(--t-fast) var(--ease-out);
+}
+
+.selfBtn:hover {
+  background: var(--white-08);
+  border-color: var(--white-25);
+}
+
+/* the 1.5s deafness after a tap — inert + visibly muted */
+.selfBtn[data-locked] {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.name {
+  color: var(--fg);
+}
+
+.you {
+  color: var(--white-45);
+}
+
+.status {
+  margin-inline-start: auto;
+  color: var(--lamp, var(--white-45));
+}
+
+.actions {
+  margin-block-start: 28px;
+}

@@ -1,0 +1,505 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* technical control bar */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid var(--white-08);
+}
+
+/* git-card selector — always first (left) in the bar; the card's own controls
+   sit to the right of the divider */
+.selector {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.selBtn {
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--white-45);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.selBtn.selOn {
+  color: var(--fg);
+  background: var(--white-08);
+}
+
+.sep {
+  align-self: stretch;
+  inline-size: 1px;
+  margin-inline: 4px;
+  background: var(--white-12);
+}
+
+.miniLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-45);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.seg {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.segBtn {
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--white-45);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.segBtn.on {
+  color: var(--brand-green);
+  background: var(--white-08);
+}
+
+.btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* draw deck (left) and discard (right) — Table-like placement, mid-height */
+.deckPile,
+.discardPile {
+  position: absolute;
+  inset-block-start: 44%;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  transform: translateY(-50%);
+}
+
+.deckPile {
+  inset-inline-start: 40px;
+}
+
+.discardPile {
+  inset-inline-end: 40px;
+}
+
+.pileLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-45);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+/* discard rest state — a tossed heap: the top cards sit at slight angles */
+.discardBox {
+  position: relative;
+  aspect-ratio: var(--card-aspect);
+}
+
+.heapCard {
+  position: absolute;
+  inset: 0;
+}
+
+.discardEmpty {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--white-12);
+  border-radius: 10px;
+}
+
+.heapCount {
+  position: absolute;
+  inset-block-end: 6px;
+  inset-inline-end: 6px;
+  z-index: 20;
+  padding: 1px 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg);
+  background: var(--black-60);
+  border-radius: 999px;
+}
+
+/* idle: start button in the centre */
+.controls {
+  position: absolute;
+  inset-block-start: 46%;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.callBtn {
+  padding: 14px 28px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--fg);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-20);
+  border-radius: 8px;
+  transition:
+    color var(--t-base) var(--ease-out),
+    border-color var(--t-base) var(--ease-out);
+}
+
+.callBtn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* backing under the picker: dims the rest so the selection sits above the hand */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  background: var(--black-60);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+/* raised overlay — above the decks too, so during the reorder the cards are the
+   only thing in focus (used while ordering, not while picking a deck) */
+.scrimOver {
+  z-index: 25;
+  background: var(--black-72);
+}
+
+/* the discard selection grid — centre band, between the two piles. The bottom
+   edge meets the top of the slide-up confirm bar (~145px tall with a caption),
+   so the cards run right down to the bar instead of being clipped high above it. */
+.gridWrap {
+  position: absolute;
+  inset-block: 92px 150px;
+  inset-inline: 210px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hint {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--white-45);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+}
+
+/* whole discard face-up; scrolls on the large (54) case, fits on the small (8) */
+.grid {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 26px 20px;
+  place-content: flex-start center;
+  padding-block: 8px;
+  overflow-y: auto;
+}
+
+/* while dealing out of the pile, don't clip — cards fly in from outside the band */
+.dealing {
+  overflow: visible;
+}
+
+.cell {
+  position: relative;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: transform 180ms var(--ease-out);
+}
+
+.cell:hover {
+  z-index: 5;
+  transform: translateY(-6px);
+}
+
+.selected {
+  z-index: 8;
+}
+
+/* 503 can't go to hand — dim + not-allowed, but still fully readable */
+.blocked {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.blocked:hover {
+  transform: none;
+}
+
+/* pinned marker: this card can never go to the hand */
+.lockTag {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-start: 50%;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--coral);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  border: 1px solid var(--coral-45);
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+/* which slot a chosen card goes to (→ hand / → deck) */
+.roleTag {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-start: 50%;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--deep-green);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+  background: var(--brand-green);
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+/* no z-index — hand cards share the context so a flying card tucks under the fan */
+.handWrap {
+  position: absolute;
+  inset-block-end: 20px;
+  inset-inline: 210px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ===== Git Rebase ===== */
+
+/* draw decks — same placement/behaviour as the Table screen (a split from Git
+   Branch grows a 2-row grid rightward; see DeckAnimationsStory .decks). Left-
+   centre, Pile width matches the Table (150). */
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  gap: 22px;
+  transform: translateY(-50%);
+}
+
+.deck {
+  position: relative;
+}
+
+.deckPickable {
+  cursor: pointer;
+}
+
+/* the reorder area — number header once on top, then a row of 3 cards per deck.
+   ONE constant layout across deal/order/resolve (cards fly straight to their
+   final spot — no re-layout between phases). `safe center`: a few rows sit
+   centred, but once they overflow it falls back to top-anchored + scroll (the
+   top row stays visible) instead of chewing off the top. */
+.orderWrap {
+  position: absolute;
+  inset-block: 72px 150px;
+  inset-inline: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  justify-content: safe center;
+  overflow-y: auto;
+}
+
+.numHeader {
+  display: flex;
+}
+
+/* smooth fade for the chrome (the 1-2-3 numbering) — in on appear, out on leave,
+   so it never just blinks away when the cards fly back */
+@keyframes chrome-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chrome-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+.chromeIn {
+  animation: chrome-in 340ms var(--ease-out) both;
+}
+
+.chromeOut {
+  animation: chrome-out 340ms var(--ease-out) both;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--white-45);
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* a single deck's row — cards are absolutely placed by slot index, so a reorder
+   animates the transform (siblings glide, the dragged card follows the pointer) */
+.orderRow {
+  position: relative;
+}
+
+.orderCard {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  touch-action: none;
+  cursor: grab;
+  transition: transform 300ms var(--ease-out);
+}
+
+.dragging {
+  z-index: 6;
+  cursor: grabbing;
+  transition: none;
+}
+
+/* rebase pick hint — pinned near the bottom, above the overlay (the confirm
+   itself is the shared slide-up ConfirmAction bar, which carries its own hint) */
+.rbHint {
+  position: absolute;
+  inset-block-end: 104px;
+  inset-inline: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+}
+
+/* ===== System Upgrade ===== */
+
+/* opponents across the top — same placement as the Table screen (.opponents) */
+.suOpponents {
+  position: absolute;
+  inset-block-start: 22px;
+  inset-inline-start: 50%;
+  z-index: 20;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 18px;
+  justify-content: center;
+  max-inline-size: calc(100% - 80px);
+  transform: translateX(-50%);
+}
+
+/* the thrown cards, face-up, in a centred row. NO transform on this container:
+   a transformed ancestor would make the cards' position:fixed freeze (used when
+   they fly out on confirm) resolve against this box instead of the viewport, so
+   they'd teleport. Centre via full-area flex instead; the box lets clicks through
+   (pointer-events: none) so only the cards themselves are interactive. */
+.suCenter {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.suCard {
+  position: relative;
+  padding: 0;
+  pointer-events: auto;
+  cursor: default;
+  background: transparent;
+  border: 0;
+  transition: transform 180ms var(--ease-out);
+}
+
+.suCard:not(:disabled) {
+  cursor: pointer;
+}
+
+.suCard:not(:disabled):hover {
+  z-index: 5;
+  transform: translateY(-6px);
+}
+
+.suSelected {
+  z-index: 8;
+}

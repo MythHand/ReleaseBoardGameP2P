@@ -1,0 +1,37 @@
+/* live demo — a separated control bar above, the pause window on a table-like
+   stage below (controls are a bar, never floating over the component) */
+.live {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  inline-size: 100%;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.spacer {
+  inline-size: 1px;
+  block-size: 24px;
+  margin-inline: 4px;
+  background: var(--white-08);
+}
+
+/* the stage stands in for the table under the window */
+.stage {
+  position: relative;
+  inline-size: 100%;
+  min-block-size: 560px;
+  overflow: hidden;
+  border: 1px solid var(--white-12);
+}
+
+.filler {
+  padding: 20px;
+  color: var(--white-30);
+}

@@ -1,7 +1,15 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { nextFrames, play, wait } from '@/animations'
+import {
+  jitter,
+  nextFrames,
+  play,
+  restTransform,
+  type Scatter,
+  toDiscardParams,
+  wait,
+} from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf, cardBoxIn } from '@/primitives/Card'
@@ -51,6 +59,13 @@ interface Opp {
   name: string
   handCount: number
 }
+// a card at rest in the discard heap — carries its own scatter (tilt + offset)
+interface DiscardEntry {
+  card: CardType
+  rot: number
+  dx: number
+  dy: number
+}
 const INITIAL_OPPONENTS: Opp[] = [
   { id: 'p2', name: 'kernel_panic', handCount: 5 },
   { id: 'p3', name: 'segfault', handCount: 7 },
@@ -87,10 +102,9 @@ export default function DrawCardStory() {
   )
   const [centerCard, setCenterCard] = useState<CardType | null>(null) // the revealed trigger at the center
   const [aiCard, setAiCard] = useState<CardType | null>(null) // the card from the nearby AI deck
-  const [discard, setDiscard] = useState<{ top: CardType | null; count: number }>({
-    top: null,
-    count: 0,
-  })
+  // discard as a tossed heap (like the other interactive stories): each card
+  // carries its own scatter, read by both the fly-in and the resting heap
+  const [discard, setDiscard] = useState<DiscardEntry[]>([])
   // cards leaving on AI resolution (trigger → discard, effect → deck)
   const [outs, setOuts] = useState<{ key: string; card: CardType; faceDown: boolean }[]>([])
   // red edge glow on Error 503 (full-screen): self — you drew
@@ -205,11 +219,12 @@ export default function DrawCardStory() {
     return ai
   }
 
-  // the trigger leaves to the discard (as it was, face up)
-  const leaveTrigger = async (fromRect?: DOMRect, discardRect?: DOMRect) => {
+  // the trigger leaves to the discard face up, landing scattered (like the other
+  // stories) — the same scatter `j` is stored so the resting heap matches
+  const leaveTrigger = async (j: Scatter, fromRect?: DOMRect, discardRect?: DOMRect) => {
     const el = outRefs.current.trig
     if (!el || !fromRect || !discardRect) return
-    const anim = play('centerToDiscard', el, { from: fromRect, to: cardAreaOf(discardRect) })
+    const anim = play('centerToDiscard', el, toDiscardParams(fromRect, cardAreaOf(discardRect), j))
     if (anim) await anim.finished
   }
 
@@ -253,9 +268,13 @@ export default function DrawCardStory() {
       eEl.style.top = `${effectRect.top}px`
       eEl.style.width = `${effectRect.width}px`
     }
-    await Promise.all([leaveTrigger(causeRect, discardRect), leaveEffect(effectRect, aiDeckRect)])
+    const j = jitter()
+    await Promise.all([
+      leaveTrigger(j, causeRect, discardRect),
+      leaveEffect(effectRect, aiDeckRect),
+    ])
     setOuts([])
-    setDiscard((d) => ({ top: trig, count: d.count + 1 }))
+    setDiscard((d) => [...d, { card: trig, ...j }])
   }
 
   // one draw: a specific card from a specific deck → center → branch.
@@ -343,7 +362,7 @@ export default function DrawCardStory() {
     setCenterCard(null)
     setAiCard(null)
     setAlert(null)
-    setDiscard({ top: null, count: 0 })
+    setDiscard([])
     setOuts([])
     setBusy(false)
     resetInsert()
@@ -472,14 +491,30 @@ export default function DrawCardStory() {
         {pick(lang, { ru: 'добрать', en: 'draw' })}
       </button>
 
-      {/* discard — on the right, as on the table */}
-      <div className={styles.discard} ref={discardRef}>
-        <Pile
-          label={pick(lang, { ru: 'сброс', en: 'discard' })}
-          topCard={discard.top}
-          count={discard.count}
-          width={116}
-        />
+      {/* discard — on the right; cards land scattered (a tossed heap) */}
+      <div className={styles.discard}>
+        <div className={styles.discardStack} ref={discardRef}>
+          {discard.length === 0 ? (
+            <span className={styles.discardEmpty}>
+              {pick(lang, { ru: 'сброс', en: 'discard' })}
+            </span>
+          ) : (
+            <>
+              {discard.map((d, i) => (
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: discard is append-only, the index is stable
+                  key={i}
+                  className={styles.discardCard}
+                  style={{ transform: restTransform(d), zIndex: i }}
+                >
+                  <Card card={d.card} interactive={false} width="100%" />
+                </div>
+              ))}
+              <span className={styles.discardCount}>{discard.length}</span>
+            </>
+          )}
+        </div>
+        <div className={styles.label}>{pick(lang, { ru: 'сброс', en: 'discard' })}</div>
       </div>
 
       {/* Error 503, you drew — a large glow UNDER the hand (before the hand in the DOM).
