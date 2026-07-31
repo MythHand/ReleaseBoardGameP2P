@@ -1,14 +1,15 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import { HEAP_SHOW, play, restTransform, scatterAt, toDiscardParams } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
+import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
-import { pick, useLang } from '../../Playground/lang'
-import styles from './CherryPickStory.module.css'
-import { useHandInsert } from './useHandInsert'
+import { pick, useLang } from '../../../Playground/lang'
+import { useHandInsert } from '../useHandInsert'
+import styles from './GitCards.module.css'
 
 // "Git Cherry-pick" — pick a card out of the whole discard.
 //  base: 1 card → your hand.
@@ -92,7 +93,7 @@ function between(from: DOMRect, to: DOMRect): string {
   return `translate(${dx}px, ${dy}px) scale(${to.width / from.width})`
 }
 
-export default function CherryPickStory() {
+export default function CherryPick({ selector }: { selector: ReactNode }) {
   const { lang } = useLang()
   const [sudo, setSudo] = useState(false)
   const [size, setSize] = useState<DiscardSize>(8)
@@ -268,12 +269,21 @@ export default function CherryPickStory() {
     const handCard = discard.find((d) => d.uid === handUid)?.card
     const remaining = discard.filter((d) => d.uid !== handUid && d.uid !== deckUid)
 
+    // pass 1: read EVERY cell's rect first, before touching layout. Pinning one
+    // cell to position:fixed removes it from the flex grid and reflows the rest,
+    // so reading + freezing in a single loop would capture already-shifted
+    // positions for every card after the first (they'd start their flight from
+    // the wrong place, drifting toward the grid's top-left).
     const rects = new Map<string, DOMRect>()
     for (const d of discard) {
       const el = cellRefs.current.get(d.uid)
-      if (!el) continue
-      const r = el.getBoundingClientRect()
-      rects.set(d.uid, r)
+      if (el) rects.set(d.uid, el.getBoundingClientRect())
+    }
+    // pass 2: pin them all at their captured rects (no more reflow matters)
+    for (const d of discard) {
+      const el = cellRefs.current.get(d.uid)
+      const r = rects.get(d.uid)
+      if (!el || !r) continue
       el.style.position = 'fixed'
       el.style.left = `${r.left}px`
       el.style.top = `${r.top}px`
@@ -361,19 +371,20 @@ export default function CherryPickStory() {
   }
 
   const showGrid = phase === 'deal' || phase === 'choose' || phase === 'resolve'
-  const hint =
-    phase === 'done'
-      ? pick(lang, { ru: 'готово · рестарт для повтора', en: 'done · restart to repeat' })
-      : sudo
-        ? pick(lang, {
-            ru: 'выбери 2: одна в руку, вторая на верх колоды',
-            en: 'choose 2: one to hand, one onto the deck top',
-          })
-        : pick(lang, { ru: 'выбери карту для добора в руку', en: 'choose a card to take to hand' })
+  // the selection instruction — rides in the confirm bar's caption (the shared
+  // bottom zone), not a separate hint above the grid
+  const hint = sudo
+    ? pick(lang, {
+        ru: 'выбери 2: одна в руку, вторая на верх колоды',
+        en: 'choose 2: one to hand, one onto the deck top',
+      })
+    : pick(lang, { ru: 'выбери карту для добора в руку', en: 'choose a card to take to hand' })
 
   return (
     <div className={styles.root} ref={rootRef}>
       <div className={styles.bar}>
+        {selector}
+        <span className={styles.sep} />
         <label className={styles.toggle}>
           <input type="checkbox" checked={sudo} onChange={(e) => changeSudo(e.target.checked)} />
           sudo
@@ -390,6 +401,7 @@ export default function CherryPickStory() {
             </button>
           ))}
         </div>
+        <span className={styles.miniLabel}>{pick(lang, { ru: 'в сбросе', en: 'in discard' })}</span>
         <button type="button" className={styles.btn} onClick={restart}>
           {pick(lang, { ru: 'рестарт', en: 'restart' })}
         </button>
@@ -444,7 +456,6 @@ export default function CherryPickStory() {
       {/* the whole discard, face-up, as a grid (scrolls on the 54 case) */}
       {showGrid && (
         <div className={styles.gridWrap}>
-          <div className={styles.hint}>{hint}</div>
           <div className={`${styles.grid} ${phase === 'deal' ? styles.dealing : ''}`}>
             {discard.map((d) => {
               const trigger = isTrigger(d.card)
@@ -494,19 +505,15 @@ export default function CherryPickStory() {
         </div>
       )}
 
-      {/* confirm the selection */}
-      {phase === 'choose' && (
-        <div className={styles.confirmBar}>
-          <button
-            type="button"
-            className={styles.confirmBtn}
-            disabled={!confirmReady}
-            onClick={confirmPick}
-          >
-            {pick(lang, { ru: 'подтвердить', en: 'confirm' })}
-          </button>
-        </div>
-      )}
+      {/* confirm the selection — the shared slide-up bar; the instruction rides
+          in its caption */}
+      <ConfirmAction
+        open={phase === 'choose'}
+        label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
+        caption={hint}
+        disabled={!confirmReady}
+        onConfirm={confirmPick}
+      />
 
       {overlay}
 

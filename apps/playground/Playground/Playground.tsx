@@ -4,6 +4,7 @@ import { CardLangProvider } from '@/cards/cardLang'
 import AnimationAuditStory from '../stories/AnimationAuditStory'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
+import ConfirmActionBlock from '../stories/blocks/ConfirmActionBlock'
 import GameOverBlock from '../stories/blocks/GameOverBlock'
 import GameSettingsBlock from '../stories/blocks/GameSettingsBlock'
 import LangSwitcherBlock from '../stories/blocks/LangSwitcherBlock'
@@ -29,10 +30,10 @@ import HandStory from '../stories/HandStory'
 import InviteStory from '../stories/InviteStory'
 import CardPlayStory from '../stories/interactive/CardPlayStory'
 import CardToHandStory from '../stories/interactive/CardToHandStory'
-import CherryPickStory from '../stories/interactive/CherryPickStory'
 import DealCardsStory from '../stories/interactive/DealCardsStory'
 import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
+import GitCardsStory from '../stories/interactive/GitCards/GitCardsStory'
 import OpponentTakesCardStory from '../stories/interactive/OpponentTakesCardStory'
 import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
 import PickSpecificCardStory from '../stories/interactive/PickSpecificCardStory'
@@ -139,7 +140,7 @@ const groups: Group[] = [
         title: 'Opponent takes your card',
         render: () => <OpponentTakesCardStory />,
       },
-      { id: 'cherry-pick', title: 'Git cherry-pick', render: () => <CherryPickStory /> },
+      { id: 'git-cards', title: 'Git cards', render: () => <GitCardsStory /> },
       { id: 'card-to-hand', title: 'Card to Hand', render: () => <CardToHandStory /> },
       { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
@@ -205,6 +206,7 @@ const groups: Group[] = [
       { id: 'block-release-zone', title: 'Release zone', render: () => <ReleaseZoneBlock /> },
       { id: 'block-turn-dock', title: 'Turn dock', render: () => <TurnDockBlock /> },
       { id: 'block-pause-game', title: 'Pause game', render: () => <PauseGameBlock /> },
+      { id: 'block-confirm-action', title: 'Confirm action', render: () => <ConfirmActionBlock /> },
       { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },
       { id: 'block-player-slot', title: 'Player slot', render: () => <PlayerSlotBlock /> },
       { id: 'block-lobby-code', title: 'Lobby code', render: () => <LobbyCodeBlock /> },

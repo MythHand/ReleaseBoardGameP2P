@@ -18,6 +18,46 @@
   border-block-end: 1px solid var(--white-08);
 }
 
+/* git-card selector — always first (left) in the bar; the card's own controls
+   sit to the right of the divider */
+.selector {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.selBtn {
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--white-45);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.selBtn.selOn {
+  color: var(--fg);
+  background: var(--white-08);
+}
+
+.sep {
+  align-self: stretch;
+  inline-size: 1px;
+  margin-inline: 4px;
+  background: var(--white-12);
+}
+
+.miniLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-45);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
 .toggle {
   display: flex;
   gap: 8px;
@@ -168,10 +208,19 @@
   backdrop-filter: blur(3px);
 }
 
-/* the discard selection grid — centre band, between the two piles */
+/* raised overlay — above the decks too, so during the reorder the cards are the
+   only thing in focus (used while ordering, not while picking a deck) */
+.scrimOver {
+  z-index: 25;
+  background: var(--black-72);
+}
+
+/* the discard selection grid — centre band, between the two piles. The bottom
+   edge meets the top of the slide-up confirm bar (~145px tall with a caption),
+   so the cards run right down to the bar instead of being clipped high above it. */
 .gridWrap {
   position: absolute;
-  inset-block: 92px 208px;
+  inset-block: 92px 150px;
   inset-inline: 210px;
   z-index: 30;
   display: flex;
@@ -268,41 +317,134 @@
   transform: translateX(-50%);
 }
 
-/* confirm the selection — centred, above the hand */
-.confirmBar {
-  position: absolute;
-  inset-block-end: 176px;
-  inset-inline: 0;
-  z-index: 40;
-  display: flex;
-  justify-content: center;
-}
-
-.confirmBtn {
-  padding: 12px 26px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--deep-green);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  background: var(--brand-green);
-  border: 0;
-  border-radius: 8px;
-  transition: opacity var(--t-base) var(--ease-out);
-}
-
-.confirmBtn:disabled {
-  color: var(--white-45);
-  cursor: not-allowed;
-  background: var(--white-08);
-}
-
 /* no z-index — hand cards share the context so a flying card tucks under the fan */
 .handWrap {
   position: absolute;
   inset-block-end: 20px;
   inset-inline: 210px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ===== Git Rebase ===== */
+
+/* draw decks — same placement/behaviour as the Table screen (a split from Git
+   Branch grows a 2-row grid rightward; see DeckAnimationsStory .decks). Left-
+   centre, Pile width matches the Table (150). */
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  gap: 22px;
+  transform: translateY(-50%);
+}
+
+.deck {
+  position: relative;
+}
+
+.deckPickable {
+  cursor: pointer;
+}
+
+/* the reorder area — number header once on top, then a row of 3 cards per deck.
+   ONE constant layout across deal/order/resolve (cards fly straight to their
+   final spot — no re-layout between phases). `safe center`: a few rows sit
+   centred, but once they overflow it falls back to top-anchored + scroll (the
+   top row stays visible) instead of chewing off the top. */
+.orderWrap {
+  position: absolute;
+  inset-block: 72px 150px;
+  inset-inline: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  justify-content: safe center;
+  overflow-y: auto;
+}
+
+.numHeader {
+  display: flex;
+}
+
+/* smooth fade for the chrome (the 1-2-3 numbering) — in on appear, out on leave,
+   so it never just blinks away when the cards fly back */
+@keyframes chrome-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chrome-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+.chromeIn {
+  animation: chrome-in 340ms var(--ease-out) both;
+}
+
+.chromeOut {
+  animation: chrome-out 340ms var(--ease-out) both;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--white-45);
+  text-align: center;
+  letter-spacing: 0.1em;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* a single deck's row — cards are absolutely placed by slot index, so a reorder
+   animates the transform (siblings glide, the dragged card follows the pointer) */
+.orderRow {
+  position: relative;
+}
+
+.orderCard {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  touch-action: none;
+  cursor: grab;
+  transition: transform 300ms var(--ease-out);
+}
+
+.dragging {
+  z-index: 6;
+  cursor: grabbing;
+  transition: none;
+}
+
+/* rebase pick hint — pinned near the bottom, above the overlay (the confirm
+   itself is the shared slide-up ConfirmAction bar, which carries its own hint) */
+.rbHint {
+  position: absolute;
+  inset-block-end: 104px;
+  inset-inline: 0;
+  z-index: 40;
   display: flex;
   justify-content: center;
 }
