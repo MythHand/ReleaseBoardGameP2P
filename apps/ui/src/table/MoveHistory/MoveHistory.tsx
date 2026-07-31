@@ -9,6 +9,9 @@ export interface HistoryTarget {
 
 export interface HistoryEntry {
   id: number
+  // The causing entry's id — mirrors Event.parent, so a consumer can build
+  // the tree `children` renders without the adapter doing it by hand.
+  parent?: number
   who: string
   kind?: string
   card?: string
