@@ -27,3 +27,9 @@ it('is `waiting` on someone else’s turn, and names them', () => {
   expect(d.state).toBe('waiting')
   expect(d.activePlayer).toBe('kernel_panic')
 })
+
+it('falls back to `waiting` with no name when turn names nobody on the roster', () => {
+  const d = deriveDock({ ...base, turn: 'ghost', hasDrawn: true }, 'you', 0)
+  expect(d.state).toBe('waiting')
+  expect(d.activePlayer).toBeUndefined()
+})

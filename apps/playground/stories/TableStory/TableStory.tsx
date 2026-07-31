@@ -258,6 +258,9 @@ export default function TableStory() {
             danger: dock === 'reaction503',
             seconds: 16,
             progress: 0.55,
+            // matches the dock's previous hardcoded lookup (always the first
+            // opponent), independent of whose turn `state.turn` actually names
+            activePlayer: state.opponents[0]?.name,
           }}
         />
       </div>

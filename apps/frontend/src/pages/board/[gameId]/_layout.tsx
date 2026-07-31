@@ -31,6 +31,9 @@ export default function BoardPage() {
       <Table
         state={PLACEHOLDER_STATE}
         room={{ participants: [], spectators: [] }}
+        // matches the dock's previous hardcoded defaults until the
+        // game-rules engine (and its deadline clock) lands
+        dock={{ seconds: 16, progress: 0.55 }}
         copy={{
           table: t('table', { returnObjects: true }),
           modes: t('gameModes', { returnObjects: true }),
