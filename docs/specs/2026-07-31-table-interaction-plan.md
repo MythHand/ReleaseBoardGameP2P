@@ -1038,7 +1038,7 @@ export function useTableInteractions({ state, actions }: Options) {
   )
 
   const accentAt = useCallback(
-    (index: number) => (state.you.hand[index]?.uid === selected ? 'var(--accent)' : undefined),
+    (index: number) => (state.you.hand[index]?.uid === selected ? 'var(--turn-accent)' : undefined),
     [state.you.hand, selected],
   )
 
@@ -1046,7 +1046,7 @@ export function useTableInteractions({ state, actions }: Options) {
 }
 ```
 
-Check `apps/ui/src/design/tokens.css` for the accent token's real name before using `var(--accent)`; if there is none, add one rather than hardcoding a color.
+`--turn-accent` is the existing semantic token for the player's active turn (`apps/ui/src/design/tokens.css:41`); there is no bare `--accent`. Do not hardcode a color.
 
 - [ ] **Step 4: Run to verify it passes**
 
@@ -1193,22 +1193,31 @@ it('plays a targetless card straight from the hand', () => {
   expect(onPlay).toHaveBeenCalledWith(uid, undefined, undefined)
 })
 
-it('draws from the dock', () => {
+it('draws from the dock, once its mount lockout clears', () => {
+  vi.useFakeTimers()
   const base = makeTableProps()
   const onDraw = vi.fn()
-  const { getByRole } = render(
+  const { getByTestId } = render(
     <Table
       {...base}
       state={{ ...base.state, turn: 'you', hasDrawn: false }}
       actions={{ onDraw }}
     />,
   )
-  fireEvent.click(getByRole('button', { name: base.copy.turnDock.draw }))
+  // TurnDock arms `keyLocked` on mount and releases it after LOCKOUT_MS (300ms,
+  // TurnDock.tsx:23). A click before that is swallowed by design, so the timer
+  // has to advance or this asserts nothing about wiring.
+  act(() => vi.advanceTimersByTime(400))
+  fireEvent.click(getByTestId('dock-key'))
   expect(onDraw).toHaveBeenCalledTimes(1)
+  vi.useRealTimers()
 })
 ```
 
-Read the real key off `enCommon.turnDock` for the draw button's accessible name. `Hand` already passes the slot element to `onCardClick`; add `data-hand-slot` to its slot `<div>` so tests and the anchor registry (milestone 4) have a stable hook.
+Two markup hooks this needs, both on elements that genuinely render — never add markup that exists only for a test:
+
+1. `data-hand-slot` on `Hand`'s slot `<div>` (it already forwards the element to `onCardClick`; milestone 4's anchor registry wants the same hook). Note the slot fires on **`onMouseDown`**, not `onClick` — hence `fireEvent.mouseDown` in the test above.
+2. `data-testid="dock-key"` on the `<Button variant="hud">` inside `TurnDock` (`TurnDock.tsx:179`). Query it by testid rather than by accessible name: the button wraps its label in a `<Swap>` with a hidden `sizer` element, so the computed accessible name is not simply `copy.turnDock.draw`.
 
 - [ ] **Step 2: Run to verify it fails**
 
