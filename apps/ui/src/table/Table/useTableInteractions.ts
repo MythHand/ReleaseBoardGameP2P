@@ -9,10 +9,23 @@ interface Options {
   actions?: TableActions
 }
 
-// Order-sensitive, but targets are always built by the same code path (the
-// engine's legalTargets), so key order matches by construction.
-const sameTarget = (a: TableTarget, b: TableTarget) =>
-  a.kind === b.kind && JSON.stringify(a) === JSON.stringify(b)
+// Structural, order-independent — a click site building a target object with
+// its fields in a different literal order than legalTargets() must still
+// compare equal. The switch on `kind` gets exhaustiveness checking from
+// TableTarget's union: a new variant that isn't handled here is a type error.
+const sameTarget = (a: TableTarget, b: TableTarget): boolean => {
+  if (a.kind !== b.kind) return false
+  switch (a.kind) {
+    case 'player':
+      return b.kind === 'player' && a.player === b.player
+    case 'release':
+      return b.kind === 'release' && a.player === b.player && a.slot === b.slot
+    case 'monitoring':
+      return b.kind === 'monitoring' && a.player === b.player
+    case 'card':
+      return b.kind === 'card' && a.card === b.card
+  }
+}
 
 // Gesture state for the table: which card is selected, what its legal targets
 // are, and how a click resolves into a completed intent. Legality is always

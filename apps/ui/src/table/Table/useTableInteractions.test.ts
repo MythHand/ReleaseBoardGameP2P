@@ -95,3 +95,31 @@ it('cancels back to idle without dispatching', () => {
   expect(result.current.phase).toBe('idle')
   expect(opts.actions.onPlay).not.toHaveBeenCalled()
 })
+
+it('accents the selected card and no other, clearing on cancel', () => {
+  const opts = setup()
+  opts.actions.legalTargets = vi.fn(() => [{ kind: 'player', player: 'p2' }])
+  const { result } = renderHook(() => useTableInteractions(opts))
+  act(() => result.current.onCardClick(0))
+  expect(result.current.accentAt(0)).toBe('var(--turn-accent)')
+  expect(result.current.accentAt(1)).toBeUndefined()
+  act(() => result.current.cancel())
+  expect(result.current.accentAt(0)).toBeUndefined()
+  expect(result.current.accentAt(1)).toBeUndefined()
+})
+
+it('treats a target with the same fields in a different key order as legal', () => {
+  const opts = setup()
+  // legalTargets returns `kind` first; the click site (Task 8) may build the
+  // object with `slot`/`player` first instead — the comparison must not care.
+  opts.actions.legalTargets = vi.fn(() => [{ kind: 'release', player: 'p2', slot: 'frontend' }])
+  const { result } = renderHook(() => useTableInteractions(opts))
+  act(() => result.current.onCardClick(0))
+  act(() => result.current.onTargetPick({ slot: 'frontend', player: 'p2', kind: 'release' }))
+  expect(opts.actions.onPlay).toHaveBeenCalledWith(
+    'c1',
+    { slot: 'frontend', player: 'p2', kind: 'release' },
+    undefined,
+  )
+  expect(result.current.phase).toBe('idle')
+})
