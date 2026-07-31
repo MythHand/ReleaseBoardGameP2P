@@ -52,6 +52,7 @@ it('opens a 15s window on a bare release', () => {
   expect(s.window).toEqual({
     target: { player: 'p1', slot: 'frontend', card: FE.uid },
     round: 1,
+    openedAt: 1000,
     deadline: 1000 + WINDOW_FIRST_MS,
     passed: [],
   })
@@ -149,6 +150,7 @@ it('opens a 10s window for a later round', () => {
   expect(reopened.window).toEqual({
     target: { player: 'p1', slot: 'frontend', card: FE.uid },
     round: 2,
+    openedAt: 1000,
     deadline: 1000 + WINDOW_NEXT_MS,
     passed: [],
   })

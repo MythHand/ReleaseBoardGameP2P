@@ -104,7 +104,7 @@ export default function Table({
   copy,
   slots,
   over = null,
-  onOverContinue,
+  actions,
   dock,
   panel: panelProp,
   onPanelChange,
@@ -349,7 +349,7 @@ export default function Table({
         <GameOver
           winner={overWinner}
           condition={over.condition}
-          onContinue={onOverContinue}
+          onContinue={actions?.onOverContinue}
           copy={copy.gameOver}
         />
       )}

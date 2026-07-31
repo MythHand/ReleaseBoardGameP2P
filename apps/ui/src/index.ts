@@ -101,6 +101,13 @@ export { default as Seat } from './table/Seat'
 export type { SeatCopy } from './table/Seat/Seat'
 export { default as Table } from './table/Table'
 export type {
+  TableActions,
+  TableChoice,
+  TablePending,
+  TableTarget,
+  TableWindow,
+} from './table/Table/intents'
+export type {
   TableChromeCopy as TableCopy,
   TableCopyBundle,
   TableProps,

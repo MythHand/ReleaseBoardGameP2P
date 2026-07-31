@@ -14,6 +14,7 @@ import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import type { SeatCopy } from '@/table/Seat/Seat'
 import type { TurnDockCopy } from '@/table/TurnDock/TurnDock'
 import type { DockView } from './dock'
+import type { TableActions, TablePending, TableWindow } from './intents'
 
 export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes'
 
@@ -49,6 +50,13 @@ export interface TableState {
   selfId: string
   history: HistoryEntry[]
   setup: Setup
+  playable: string[]
+  frozen: string[]
+  pending?: TablePending | null
+  window?: TableWindow | null
+  // Keyed by card uid — the projection's answer to "what may pair with this",
+  // so the kit looks the pairing up rather than deciding it.
+  comboOptions?: Record<string, string[]>
 }
 
 // Everything the session/P2P layer answers. The engine has no concept of a
@@ -137,7 +145,7 @@ export interface TableProps {
   copy: TableCopyBundle
   slots?: TableSlots
   over?: TableOver | null
-  onOverContinue?: () => void
+  actions?: TableActions
   // override for the dock derived from `state` — the playground's manual
   // selector uses this to force a specific demo state
   dock?: Partial<DockView>

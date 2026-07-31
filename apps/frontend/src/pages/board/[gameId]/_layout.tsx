@@ -20,6 +20,8 @@ const PLACEHOLDER_STATE = {
   selfId: 'you',
   history: [],
   setup: DEFAULT_SETUP,
+  playable: [],
+  frozen: [],
 }
 
 export default function BoardPage() {

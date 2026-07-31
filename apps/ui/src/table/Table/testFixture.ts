@@ -15,6 +15,8 @@ export function makeTableProps(over: Partial<TableProps> = {}): TableProps {
       selfId: 'you',
       history: mock.history,
       setup: mock.setup,
+      playable: [],
+      frozen: [],
     },
     room: {
       role: 'host',

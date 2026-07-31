@@ -86,6 +86,8 @@ export default function TableStory() {
     selfId: 'you',
     history: base.history,
     setup: base.setup,
+    playable: [],
+    frozen: [],
   }
 
   // the four-option selector still drives one demo state at a time, now mapped
@@ -252,7 +254,7 @@ export default function TableStory() {
             pause: pauseCopy,
           }}
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
-          onOverContinue={() => setEnd(null)}
+          actions={{ onOverContinue: () => setEnd(null) }}
           dock={{
             state: dock === 'reaction503' ? 'reaction' : dock,
             danger: dock === 'reaction503',

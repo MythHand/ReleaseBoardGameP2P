@@ -110,6 +110,7 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       player: state.window.target.player,
       slot: state.window.target.slot,
       round: state.window.round,
+      openedAt: state.window.openedAt,
       deadline: state.window.deadline,
       passed: [...state.window.passed],
       canAttackWith: canAttackWith(state, viewerId),

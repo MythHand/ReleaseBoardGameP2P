@@ -42,6 +42,9 @@ export interface ReactionWindow {
   target: { player: PlayerId; slot: ReleaseSlot; card: CardUid }
   // 1 -> 15s, 2+ -> 10s. A repelled attack reopens the window at round + 1.
   round: number
+  // The `at` of the action that opened this window — the other end of the
+  // deadline span, so a countdown can be exact rather than assumed.
+  openedAt: number
   deadline: number
   // Revocable: passing only means "fine, close early". A passer may still attack.
   passed: PlayerId[]
@@ -61,6 +64,9 @@ export type Pending =
       attackId: CardId
       sudo: boolean
       canDefendWith: CardUid[]
+      // The `at` of the action that opened this pending — the other end of the
+      // deadline span, so a countdown can be exact rather than assumed.
+      openedAt: number
       deadline: number
       // 'release' answers a reaction window; 'hand' answers an attack on the
       // player's hand, where surviving means the theft simply does not happen.

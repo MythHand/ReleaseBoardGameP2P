@@ -10,6 +10,8 @@ const base: Omit<TableState, 'turn' | 'hasDrawn'> = {
   history: [],
   setup: {},
   selfId: 'you',
+  playable: [],
+  frozen: [],
 }
 
 it('is `draw` on your turn before you have drawn', () => {
