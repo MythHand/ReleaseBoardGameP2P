@@ -6,10 +6,23 @@ it('never forwards a message a guest would read as the host`s word', () => {
   expect(isRelayable('LOBBY_DISBANDED')).toBe(false)
 })
 
-it('forwards the game traffic a keeper behind the host depends on', () => {
-  expect(isRelayable('INTENT')).toBe(true)
-  expect(isRelayable('SYNC')).toBe(true)
-  expect(isRelayable('KEEPER_CHANGED')).toBe(true)
+it('never forwards a frame addressed to one party, because forwarding is broadcasting', () => {
+  // A wire frame names no recipient, so `relayTargets` fans it out to everyone.
+  // SYNC is one seat's projection, KEEPER_STATE is GameState itself, and INTENT
+  // is the card a player chose — including one the keeper rejected, which the
+  // engine emitted no event for at all. Relaying any of them hands the whole
+  // table what the keeper's per-seat fan-out exists to keep private.
+  expect(isRelayable('SYNC')).toBe(false)
+  expect(isRelayable('INTENT')).toBe(false)
+  expect(isRelayable('KEEPER_STATE')).toBe(false)
+})
+
+it('never forwards the keeper`s own announcements', () => {
+  // Authored by the keeper alone, and `KEEPER_CHANGED` with `keeperId: null` is
+  // the death notice — forwarding a peer-originated one is a kill switch any
+  // player could pull on the whole table.
+  expect(isRelayable('KEEPER_CHANGED')).toBe(false)
+  expect(isRelayable('GAME_STARTED')).toBe(false)
 })
 
 it('forwards to all peers except the sender and the host', () => {

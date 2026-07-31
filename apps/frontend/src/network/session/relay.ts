@@ -1,21 +1,47 @@
 import type { MessageType } from '../types'
 
-// Messages a guest accepts only from the host: the roster, the lobby config,
-// and the three that end someone's membership. Since the transport now stamps
-// `from` with the connection a frame arrived on (transport/peer.ts), a relayed
-// frame reaches a guest wearing the host's id — so a peer-originated one of
-// these would arrive looking authoritative. The host does not forward them.
-const HOST_ONLY: ReadonlySet<MessageType> = new Set<MessageType>([
+// Messages the host never forwards on a peer's behalf, for two distinct
+// reasons.
+//
+// Authority: the roster, the lobby config, and the three that end someone's
+// membership are the host's own word. The transport stamps `from` with the
+// connection a frame arrived on (transport/peer.ts), so a relayed frame reaches
+// a guest wearing the host's id — forwarding a peer-originated one of these
+// would hand any player the host's authority over everyone else.
+//
+// Privacy and authorship: every game frame is addressed to exactly one party,
+// but a wire frame names no recipient, so relaying one is broadcasting it.
+// SYNC carries a single seat's projection and KEEPER_STATE carries GameState
+// itself — the deck order included — and INTENT carries the card a player just
+// chose, including one the keeper went on to reject and therefore emitted no
+// event for at all. Forwarding any of them puts a private payload in front of
+// the whole table, which is the one thing the keeper's per-seat fan-out exists
+// to prevent. KEEPER_CHANGED is not private but is authored by the keeper
+// alone, and `keeperId: null` is the death notice that ends the game for
+// everyone: a forwarded peer-originated one is a table-wide kill switch.
+//
+// Nothing legitimate is lost. The keeper is the host, so every game frame
+// travels a direct connection in both directions and never reaches the relay.
+// A keeper sitting behind the host needs the opposite of a type-only rule — a
+// relay that routes each frame to its named recipient, and a transport that
+// sends through the host in the first place — which is part of the handover
+// wiring in #18.
+const NEVER_RELAYED: ReadonlySet<MessageType> = new Set<MessageType>([
   'PEER_LIST',
   'PEER_JOINED',
   'LOBBY_CONFIG_UPDATED',
   'PLAYER_KICKED',
   'LOBBY_DISBANDED',
   'HOST_TRANSFERRED',
+  'GAME_STARTED',
+  'INTENT',
+  'SYNC',
+  'KEEPER_STATE',
+  'KEEPER_CHANGED',
 ])
 
 export function isRelayable(type: MessageType): boolean {
-  return !HOST_ONLY.has(type)
+  return !NEVER_RELAYED.has(type)
 }
 
 // Host relay: a message arriving from one peer is forwarded to every other
