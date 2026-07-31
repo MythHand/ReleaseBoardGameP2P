@@ -12,7 +12,8 @@ import type { PauseGameCopy, PausePlayer } from '@/table/PauseGame/PauseGame'
 import type { ReconnectCopy } from '@/table/Reconnect'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import type { SeatCopy } from '@/table/Seat/Seat'
-import type { TurnDockCopy, TurnDockState } from '@/table/TurnDock/TurnDock'
+import type { TurnDockCopy } from '@/table/TurnDock/TurnDock'
+import type { DockView } from './dock'
 
 export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes'
 
@@ -41,6 +42,11 @@ export interface TableState {
     discardCount: number
   }
   turn?: string
+  // whether the player on turn has already drawn this turn — drives the dock
+  // between its 'draw' and 'push' phases
+  hasDrawn?: boolean
+  // the local player's id, as the projection names it (`PlayerView.self.id`)
+  selfId: string
   history: HistoryEntry[]
   setup: Setup
 }
@@ -132,10 +138,9 @@ export interface TableProps {
   slots?: TableSlots
   over?: TableOver | null
   onOverContinue?: () => void
-  turnDockState?: TurnDockState
-  turnDockDanger?: boolean
-  turnDockSeconds?: number
-  turnDockProgress?: number
+  // override for the dock derived from `state` — the playground's manual
+  // selector uses this to force a specific demo state
+  dock?: Partial<DockView>
   // Controlled/uncontrolled: omit both and Table owns the open panel. Supply
   // `panel` and Table renders exactly what it is told, reporting intent through
   // `onPanelChange` — which is how the page binds the drawer to the URL.

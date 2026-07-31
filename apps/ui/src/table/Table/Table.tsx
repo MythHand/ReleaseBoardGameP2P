@@ -22,6 +22,7 @@ import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
+import { deriveDock } from './dock'
 import styles from './Table.module.css'
 import type { Panel, TableProps } from './types'
 
@@ -104,14 +105,16 @@ export default function Table({
   slots,
   over = null,
   onOverContinue,
-  turnDockState = 'push',
-  turnDockDanger = false,
-  turnDockSeconds = 16,
-  turnDockProgress = 0.55,
+  dock,
   panel: panelProp,
   onPanelChange,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup } = state
+  // `now` is a placeholder until the deadline interval lands (task 9) — the
+  // derived seconds/progress read 0 until then.
+  const nowRef = useRef(0)
+  const derived = deriveDock(state, state.selfId, nowRef.current)
+  const dockView = { ...derived, ...dock }
   const {
     role = 'guest',
     code,
@@ -134,9 +137,6 @@ export default function Table({
   const panel = controlled ? panelProp : ownPanel
 
   const isHost = role === 'host'
-  // служебный док хода — состояние приходит пропсами (в игре — от логики хода,
-  // в песочнице — из селектора истории); имя активного игрока берём со стола
-  const dockPlayer = opponents[0]?.name
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
   const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
@@ -235,11 +235,11 @@ export default function Table({
       {/* служебный док хода — низ слева, под колодами, слева от руки */}
       <div className={styles.turnDock}>
         <TurnDock
-          state={turnDockState}
-          danger={turnDockDanger}
-          seconds={turnDockSeconds}
-          progress={turnDockProgress}
-          activePlayer={dockPlayer}
+          state={dockView.state}
+          danger={dockView.danger}
+          seconds={dockView.seconds}
+          progress={dockView.progress}
+          activePlayer={dockView.activePlayer}
           copy={copy.turnDock}
           paused={paused}
         />

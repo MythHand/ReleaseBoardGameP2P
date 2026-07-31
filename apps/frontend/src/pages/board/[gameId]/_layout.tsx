@@ -13,6 +13,11 @@ const PLACEHOLDER_STATE = {
   },
   opponents: [],
   decks: { main: 0, events: 0, discard: null, discardCount: 0 },
+  // matches the dock's previous hardcoded default ('push') until the
+  // game-rules engine supplies a real turn/hasDrawn
+  turn: 'you',
+  hasDrawn: true,
+  selfId: 'you',
   history: [],
   setup: DEFAULT_SETUP,
 }

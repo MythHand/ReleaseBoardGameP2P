@@ -12,6 +12,7 @@ export function makeTableProps(over: Partial<TableProps> = {}): TableProps {
       opponents: mock.opponents,
       decks: mock.decks,
       turn: mock.turn,
+      selfId: 'you',
       history: mock.history,
       setup: mock.setup,
     },

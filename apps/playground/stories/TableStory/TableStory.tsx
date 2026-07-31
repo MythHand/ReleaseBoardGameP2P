@@ -83,6 +83,7 @@ export default function TableStory() {
     opponents: base.opponents,
     decks: base.decks,
     turn: base.turn,
+    selfId: 'you',
     history: base.history,
     setup: base.setup,
   }
@@ -252,8 +253,12 @@ export default function TableStory() {
           }}
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
           onOverContinue={() => setEnd(null)}
-          turnDockState={dock === 'reaction503' ? 'reaction' : dock}
-          turnDockDanger={dock === 'reaction503'}
+          dock={{
+            state: dock === 'reaction503' ? 'reaction' : dock,
+            danger: dock === 'reaction503',
+            seconds: 16,
+            progress: 0.55,
+          }}
         />
       </div>
     </div>
