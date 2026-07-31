@@ -1,0 +1,7 @@
+{
+  "extends": "@release/lint/tsconfig",
+  "compilerOptions": {
+    "types": ["vitest/globals"]
+  },
+  "include": ["src"]
+}
