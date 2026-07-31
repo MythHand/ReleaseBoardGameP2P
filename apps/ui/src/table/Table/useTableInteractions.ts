@@ -75,9 +75,14 @@ export function useTableInteractions({ state, actions, comboOptions }: Options) 
         return
       }
 
+      // Every branch below starts a fresh selection, not a continuation of an
+      // active combo — a `combo` chosen for a previous source must never
+      // survive to be attached to a different card's dispatch (invariant: a
+      // combo partner may only exist while its own source is selected).
       const partners = comboOptions?.(item.uid) ?? []
       if (partners.length > 0) {
         setSelected(item.uid)
+        setCombo(null)
         setAwaitingCombo(true)
         return
       }
@@ -85,10 +90,11 @@ export function useTableInteractions({ state, actions, comboOptions }: Options) 
       const legal = actions?.legalTargets?.(item.uid) ?? []
       if (legal.length === 0) {
         actions?.onPlay?.(item.uid, undefined, undefined)
-        setSelected(null)
+        reset()
         return
       }
       setSelected(item.uid)
+      setCombo(null)
     },
     [state.you.hand, state.playable, actions, awaitingCombo, selected, comboOptions, reset],
   )
@@ -96,11 +102,15 @@ export function useTableInteractions({ state, actions, comboOptions }: Options) 
   const onTargetPick = useCallback(
     (target: TableTarget) => {
       if (!selected) return
+      // A target can only resolve a source that already has its combo
+      // decided (or needs none) — while a partner is still outstanding,
+      // `targets` may be populated from `selected` but nothing is playable.
+      if (awaitingCombo) return
       if (!targets.some((t) => sameTarget(t, target))) return
       actions?.onPlay?.(selected, target, combo ?? undefined)
       reset()
     },
-    [selected, targets, actions, combo, reset],
+    [selected, targets, actions, combo, reset, awaitingCombo],
   )
 
   const accentAt = useCallback(

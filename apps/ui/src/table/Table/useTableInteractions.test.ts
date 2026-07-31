@@ -20,6 +20,7 @@ const makeCard = (id: string): Card => ({
 const hand: HandItem[] = [
   { uid: 'c1', card: makeCard('attack-bug') },
   { uid: 'c2', card: makeCard('release-frontend') },
+  { uid: 'c3', card: makeCard('attack-other') },
 ]
 
 // TableState requires more than this test cares about; Options only picks
@@ -126,6 +127,7 @@ it('dispatches one intent carrying the combo once the partner is picked', () => 
   act(() => result.current.onCardClick(1))
   expect(opts.actions.onPlay).toHaveBeenCalledTimes(1)
   expect(opts.actions.onPlay).toHaveBeenCalledWith('c1', undefined, 'c2')
+  expect(result.current.phase).toBe('idle')
 })
 
 it('refuses a partner outside the offered options', () => {
@@ -156,6 +158,31 @@ it('waits for a target after the combo partner is picked, dispatching nothing ye
   act(() => result.current.onTargetPick(target))
   expect(opts.actions.onPlay).toHaveBeenCalledTimes(1)
   expect(opts.actions.onPlay).toHaveBeenCalledWith('c1', target, 'c2')
+})
+
+it('drops a chosen combo when selection moves to an unrelated card', () => {
+  // A picks combo partner B and also has a legal target — lands in
+  // combo='c2', selected='c1', phase='selected'. Reselecting a different
+  // playable card C (no combo options of its own, but its own legal target)
+  // must not let B leak into C's eventual dispatch: `combo` may only survive
+  // alongside its own source, never a reselection.
+  const opts = setup({ playable: ['c1', 'c2', 'c3'] })
+  const target = { kind: 'player', player: 'p2' } as const
+  opts.comboOptions = vi.fn((card) => (card === 'c1' ? ['c2'] : []))
+  opts.actions.legalTargets = vi.fn(() => [target])
+  const { result } = renderHook(() => useTableInteractions(opts))
+
+  act(() => result.current.onCardClick(0)) // pick A (c1) — comboPending
+  act(() => result.current.onCardClick(1)) // pick partner B (c2) — combo='c2', selected='c1'
+  expect(result.current.phase).toBe('selected')
+
+  act(() => result.current.onCardClick(2)) // reselect C (c3), which has no combo options
+  expect(result.current.phase).toBe('selected')
+  expect(opts.actions.onPlay).not.toHaveBeenCalled()
+
+  act(() => result.current.onTargetPick(target))
+  expect(opts.actions.onPlay).toHaveBeenCalledTimes(1)
+  expect(opts.actions.onPlay).toHaveBeenCalledWith('c3', target, undefined)
 })
 
 it('treats a target with the same fields in a different key order as legal', () => {
