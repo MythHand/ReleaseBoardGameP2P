@@ -109,6 +109,8 @@ export default function Table({
   turnDockDanger = false,
   turnDockSeconds = 16,
   turnDockProgress = 0.55,
+  panel: panelProp,
+  onPanelChange,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup } = state
   const {
@@ -128,7 +130,9 @@ export default function Table({
     pauseHostId,
     onPauseToggleReady,
   } = room
-  const [panel, setPanel] = useState<Panel | null>(null)
+  const [ownPanel, setOwnPanel] = useState<Panel | null>(null)
+  const controlled = panelProp !== undefined
+  const panel = controlled ? panelProp : ownPanel
 
   const isHost = role === 'host'
   // служебный док хода — состояние приходит пропсами (в игре — от логики хода,
@@ -159,7 +163,11 @@ export default function Table({
   const overWinner = over ? participants.find((p) => p.id === over.winnerId) : null
   const youEliminated = view === 'youEliminated'
 
-  const toggle = (p: Panel) => setPanel((cur) => (cur === p ? null : p))
+  const toggle = (p: Panel) => {
+    const next = panel === p ? null : p
+    if (!controlled) setOwnPanel(next)
+    onPanelChange?.(next)
+  }
 
   // при закрытии держим ширину последней открытой вкладки — чтобы панель
   // уезжала своей шириной, без скачка; при смене вкладок ширина плавно меняется
@@ -299,7 +307,11 @@ export default function Table({
             )}
           </div>
         )}
-        {panel === 'history' && <MoveHistory entries={history} copy={copy.history} />}
+        {panel === 'history' && (
+          <div data-testid="panel-history">
+            <MoveHistory entries={history} copy={copy.history} />
+          </div>
+        )}
         {panel === 'participants' && (
           <Participants
             players={participants}

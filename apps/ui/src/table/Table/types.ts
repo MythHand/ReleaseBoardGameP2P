@@ -131,6 +131,11 @@ export interface TableProps {
   turnDockDanger?: boolean
   turnDockSeconds?: number
   turnDockProgress?: number
+  // Controlled/uncontrolled: omit both and Table owns the open panel. Supply
+  // `panel` and Table renders exactly what it is told, reporting intent through
+  // `onPanelChange` — which is how the page binds the drawer to the URL.
+  panel?: Panel | null
+  onPanelChange?: (panel: Panel | null) => void
 }
 
 // Retired in Task 3 — kept here so Task 1 stays a pure regrouping.

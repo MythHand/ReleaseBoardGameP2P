@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react'
+import { vi } from 'vitest'
 import Table from './Table'
 import { makeTableProps } from './testFixture'
 
@@ -37,4 +38,31 @@ it('renders the participants roster from room, not state', () => {
     />,
   )
   expect(queryByText('oracle')).toBeNull()
+})
+
+it('opens a panel on its own when `panel` is not supplied', () => {
+  const props = makeTableProps()
+  const { getByRole, getByTestId } = render(<Table {...props} />)
+  fireEvent.click(getByRole('button', { name: props.copy.table.tabHistory }))
+  expect(getByTestId('panel-history')).toBeTruthy()
+})
+
+it('does not update itself when `panel` is supplied', () => {
+  const props = makeTableProps()
+  const onPanelChange = vi.fn()
+  const { getByRole, queryByTestId } = render(
+    <Table {...props} panel={null} onPanelChange={onPanelChange} />,
+  )
+  fireEvent.click(getByRole('button', { name: props.copy.table.tabHistory }))
+  expect(onPanelChange).toHaveBeenCalledWith('history')
+  // Controlled: the parent did not re-render with a new panel, so nothing opened.
+  expect(queryByTestId('panel-history')).toBeNull()
+})
+
+it('reports null when the active tab is clicked again', () => {
+  const props = makeTableProps()
+  const onPanelChange = vi.fn()
+  const { getByRole } = render(<Table {...props} panel="history" onPanelChange={onPanelChange} />)
+  fireEvent.click(getByRole('button', { name: props.copy.table.tabHistory }))
+  expect(onPanelChange).toHaveBeenCalledWith(null)
 })
