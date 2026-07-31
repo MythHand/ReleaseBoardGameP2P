@@ -46,7 +46,7 @@ Milestone 1 is deliberately a no-op refactor so it reviews as one. Every task he
 - Test: `apps/ui/src/table/Table/Table.test.tsx`
 
 **Interfaces:**
-- Produces: `TableState`, `TableRoom`, `TableCopyBundle`, `TableSlots`, `Panel`, `TableProps` from `apps/ui/src/table/Table/types.ts`. Task 2 adds `panel`/`onPanelChange` to `TableProps`; Task 3 adds `eliminated` and `connection`; Task 6 adds `TableActions`.
+- Produces: `TableState`, `TableRoom`, `TableCopyBundle`, `TableSlots`, `Panel`, `TableProps` from `apps/ui/src/table/Table/types.ts`. Task 2 adds `panel`/`onPanelChange` to `TableProps`; Task 3 adds `eliminated` and `connection`; Task 5 adds `TableActions`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -398,7 +398,7 @@ git commit -m "refactor(ui): Table props group by who owns the data"
 
 **Interfaces:**
 - Consumes: `TableProps`, `Panel`, `makeTableProps` from Task 1.
-- Produces: `panel?: Panel | null` and `onPanelChange?: (panel: Panel | null) => void` on `TableProps`. Task 19 binds them to `?panel=`.
+- Produces: `panel?: Panel | null` and `onPanelChange?: (panel: Panel | null) => void` on `TableProps`. Task 17 binds them to `?panel=`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -505,16 +505,26 @@ git commit -m "feat(ui): Table's drawer answers to its consumer"
 
 - [ ] **Step 1: Write the failing tests**
 
+First add two stable hooks to `Seat`, because the table renders many zeros and a
+bare `getByText('0')` would pass against a no-op: `data-testid={`seat-${player.id}`}`
+on its root, and `data-testid="hand-count"` on the card-count element.
+
 ```tsx
-it('empties a released zone and zeroes the hand of an eliminated opponent', () => {
+it('zeroes the hand of an eliminated opponent and leaves the others alone', () => {
   const base = makeTableProps()
-  const opponents = base.state.opponents.map((o, i) =>
-    i === 0 ? { ...o, eliminated: true } : o,
+  const [out, alive] = base.state.opponents
+  const opponents = base.state.opponents.map((o) =>
+    o.id === out.id ? { ...o, eliminated: true } : o,
   )
-  const { getByText } = render(
+  const { getByTestId } = render(
     <Table {...base} state={{ ...base.state, opponents }} />,
   )
-  expect(getByText('0')).toBeTruthy()
+  // The comparison against a live sibling is what makes this falsifiable —
+  // the mock gives every opponent a non-zero hand.
+  expect(within(getByTestId(`seat-${out.id}`)).getByTestId('hand-count').textContent).toBe('0')
+  expect(
+    within(getByTestId(`seat-${alive.id}`)).getByTestId('hand-count').textContent,
+  ).not.toBe('0')
 })
 
 it('shows the reconnect overlay from room.connection, not from a view flag', () => {
@@ -602,7 +612,7 @@ Expected: PASS.
 
 - [ ] **Step 6: Verify by mutation**
 
-Hardcode `disconnectedIds` to an empty set. Confirm the `room.disconnected` test goes red. Restore.
+Hardcode `disconnectedIds` to an empty set — confirm the `room.disconnected` test goes red. Then make the eliminated branch keep the original `handCount` — confirm the elimination test goes red. Restore both.
 
 - [ ] **Step 7: Commit**
 
@@ -626,7 +636,7 @@ git commit -m "refactor(ui): elimination is state, disconnection is the room"
 - Consumes: `TableState` from Task 1.
 - Produces: `deriveDock(state, selfId, now)` from `apps/ui/src/table/Table/dock.ts`, returning `{ state: TurnDockState; danger: boolean; seconds: number; progress: number; activePlayer?: string }`. `TableProps.dock?: Partial<DockView>` replaces the four `turnDock*` props.
 
-`state.window` and `state.pending` do not exist on `TableState` until Task 6. So this task derives from what exists — `turn` and `you` — and Task 10 extends `deriveDock` once the window and pending land. Write `deriveDock` with that seam in mind: it takes the whole `state`.
+`state.window` and `state.pending` do not exist on `TableState` until Task 5. So this task derives from what exists — `turn` and `you` — and Task 9 extends `deriveDock` once the window and pending land. Write `deriveDock` with that seam in mind: it takes the whole `state`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -702,7 +712,7 @@ const derived = deriveDock(state, state.selfId, nowRef.current)
 const dockView = { ...derived, ...dock }
 ```
 
-where `dock?: Partial<DockView>` is the new prop and `nowRef` is `useRef(0)` for now — Task 10 replaces it with the deadline interval. Pass `dockView.state` / `.danger` / `.seconds` / `.progress` / `.activePlayer` to `<TurnDock>`, and delete the four `turnDock*` props from `types.ts`.
+where `dock?: Partial<DockView>` is the new prop and `nowRef` is `useRef(0)` for now — Task 9 replaces it with the deadline interval. Pass `dockView.state` / `.danger` / `.seconds` / `.progress` / `.activePlayer` to `<TurnDock>`, and delete the four `turnDock*` props from `types.ts`.
 
 - [ ] **Step 5: Update the story**
 
@@ -740,7 +750,7 @@ git commit -m "feat(ui): the dock reads the turn instead of being told"
 - Modify: `apps/ui/src/index.ts`
 
 **Interfaces:**
-- Produces: `TableTarget`, `TableChoice`, `TablePending`, `TableWindow`, `TableActions` from `apps/ui/src/table/Table/intents.ts`. Task 14 asserts these are mutually assignable with the engine's `Target`, `Choice`, `PendingView`, `WindowView`.
+- Produces: `TableTarget`, `TableChoice`, `TablePending`, `TableWindow`, `TableActions` from `apps/ui/src/table/Table/intents.ts`. Task 11 asserts these are mutually assignable with the engine's `Target`, `Choice`, `PendingView`, `WindowView`.
 
 These mirror `packages/engine/src/actions.ts` and `packages/engine/src/view.ts` member for member. The kit imports nothing from the engine (Decision 7); `packages/engine/src/state.ts:11-13` already sets this precedent for `Setup`.
 
@@ -780,6 +790,7 @@ export type TablePending =
       attackCard: string
       sudo: boolean
       options: string[]
+      openedAt: number
       deadline: number
       scope: 'release' | 'hand'
     }
@@ -793,6 +804,8 @@ export interface TableWindow {
   player: string
   slot: ReleaseSlotId
   round: number
+  // Both ends of the span, so the ring's sweep is exact rather than assumed.
+  openedAt: number
   deadline: number
   passed: string[]
   canAttackWith: string[]
@@ -834,7 +847,24 @@ In `types.ts`, add to `TableState`:
 
 and to `TableProps`: `actions?: TableActions`. Move `onOverContinue` off `TableProps` into `TableActions` and update the `<GameOver>` call to `actions?.onOverContinue`.
 
-- [ ] **Step 3: Export from the kit**
+- [ ] **Step 3: Give the engine the other end of the span**
+
+`WindowView` and `PendingView`'s `defend` variant carry only `deadline`. A ring
+sweep needs the span, and deriving it from a hardcoded constant would make a
+visible countdown wrong whenever the engine's timings change. So add
+`openedAt: number` to both in `packages/engine/src/view.ts`, and set it where the
+fake opens a window (`packages/engine/src/fake/window.ts`) and where it raises a
+`defend` pending (`packages/engine/src/fake/attacks.ts`) — in both cases it is
+the `at` of the action that opened it, which the reducer already has.
+
+The mirror in `intents.ts` above already declares both fields; the assertions in
+Task 11 are what will catch it if one side is missed.
+
+Run: `pnpm --filter @release/engine test`
+Expected: PASS — the conformance suite covers projection shape, so a missed
+assignment surfaces here.
+
+- [ ] **Step 4: Export from the kit**
 
 ```ts
 export type {
@@ -846,16 +876,16 @@ export type {
 } from './table/Table/intents'
 ```
 
-- [ ] **Step 4: Fix the fixture and both consumers**
+- [ ] **Step 5: Fix the fixture and both consumers**
 
 `makeTableProps` gains `selfId: 'you'`, `playable: []`, `frozen: []`. `TableStory` and `_layout.tsx` gain the same on their state objects.
 
-- [ ] **Step 5: Verify**
+- [ ] **Step 6: Verify**
 
 Run: `pnpm typecheck && pnpm --filter @release/ui test`
 Expected: PASS, no behaviour change.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add apps/ui/src apps/playground apps/frontend/src/pages/board
@@ -1262,7 +1292,7 @@ git commit -m "feat(ui): the hand answers the pointer"
 - Consumes: `TablePending`, `TableChoice`, `TableWindow` (Task 5); `ConfirmAction` from `@/table/ConfirmAction`.
 - Produces: `<PendingPrompt pending copy onResolve />`, rendering one prompt per `TablePending` kind. `deriveDock` gains window/pending handling.
 
-`PendingPromptCopy` is a new copy block — one prompt string plus one action label per kind, plus shared `confirm` and `decline`. Declare it in `PendingPrompt.tsx`, and add `pending?: PendingPromptCopy` and `window?: WindowCopy` to `TableCopyBundle` in `types.ts`. Task 16 adds the keys to both catalogs; this task's fixture supplies literals so the tests do not wait on translation.
+`PendingPromptCopy` is a new copy block — one prompt string plus one action label per kind, plus shared `confirm` and `decline`. Declare it in `PendingPrompt.tsx`, and add `pending?: PendingPromptCopy` and `window?: WindowCopy` to `TableCopyBundle` in `types.ts`. Task 15 adds the keys to both catalogs; this task's fixture supplies literals so the tests do not wait on translation.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1308,11 +1338,12 @@ it('is a danger reaction while a defence is pending against you', () => {
   expect(d.danger).toBe(true)
 })
 
-it('counts down the window deadline from the supplied clock', () => {
-  const d = deriveDock({ ...base, turn: 'p2', window: { deadline: 10_000, canAttackWith: ['c1'] } }, 'you', 4_000)
+it('sweeps the ring across the window’s own span, not a constant', () => {
+  const window = { openedAt: 0, deadline: 10_000, canAttackWith: ['c1'] }
+  const d = deriveDock({ ...base, turn: 'p2', window }, 'you', 4_000)
   expect(d.seconds).toBe(6)
-  expect(d.progress).toBeGreaterThan(0)
-  expect(d.progress).toBeLessThanOrEqual(1)
+  // 6s left of a 10s span — exact, so a wrong span cannot pass this.
+  expect(d.progress).toBeCloseTo(0.6)
 })
 ```
 
@@ -1332,20 +1363,29 @@ One component, switching on `pending.kind`. Card-picking kinds (`discardForRelea
 ```ts
 const mine = state.pending?.player === selfId
 if (mine && state.pending) {
-  const deadline = 'deadline' in state.pending ? state.pending.deadline : undefined
+  const timed = 'deadline' in state.pending ? state.pending : undefined
   return {
     state: 'reaction',
     danger: state.pending.kind === 'defend' || state.pending.kind === 'neutralize503',
-    ...clock(deadline, now),
+    ...clock(timed?.openedAt, timed?.deadline, now),
     activePlayer,
   }
 }
 if (state.window && state.window.canAttackWith.length > 0) {
-  return { state: 'reaction', danger: false, ...clock(state.window.deadline, now), activePlayer }
+  const { openedAt, deadline } = state.window
+  return { state: 'reaction', danger: false, ...clock(openedAt, deadline, now), activePlayer }
 }
 ```
 
-with `clock(deadline, now)` returning `{ seconds: 0, progress: 0 }` when `deadline` is undefined, and otherwise `seconds: Math.max(0, Math.ceil((deadline - now) / 1000))` plus a `progress` clamped to `0..1`. The window's total duration is not in the view, so derive `progress` from the remaining fraction of a `WINDOW_MS` constant exported alongside — and note in a comment that it is presentational only.
+with `clock(openedAt, deadline, now)` returning `{ seconds: 0, progress: 0 }` when either bound is undefined, and otherwise:
+
+```ts
+const seconds = Math.max(0, Math.ceil((deadline - now) / 1000))
+const span = deadline - openedAt
+const progress = span > 0 ? Math.min(1, Math.max(0, (deadline - now) / span)) : 0
+```
+
+Both bounds come off the view (Task 5's `openedAt`), so the sweep is exact and no constant is involved. `span > 0` guards a zero-length window rather than dividing by zero.
 
 - [ ] **Step 5: Render both in `Table.tsx`**
 
@@ -1425,7 +1465,280 @@ git commit -m "refactor(ui): mock legality leaves the library"
 
 ---
 
-### Task 11: An engine-driven `TableStory`
+### Task 11: `@release/table-adapter` — the shared seam
+
+**Files:**
+- Create: `packages/table-adapter/package.json`
+- Create: `packages/table-adapter/src/toTableState.ts` + `src/toTableState.test.ts`
+- Create: `packages/table-adapter/src/toAction.ts` + `src/toAction.test.ts`
+- Create: `packages/table-adapter/tsconfig.json`
+- Create: `packages/table-adapter/vitest.config.ts`
+- Create: `packages/table-adapter/src/index.ts`
+- Create: `packages/table-adapter/src/contract.test-d.ts`
+
+**Interfaces:**
+- Consumes: `@release/engine` types; `TableTarget`, `TableChoice`, `TablePending`, `TableWindow`, `TableState` from `@release/ui` (Task 5).
+- Produces: the package `@release/table-adapter`, which Task 12 (playground) and Task 17 (the board page) both import. This task delivers the scaffold, the compile-time assertions, and both adapters.
+
+`PlayerView` → `TableState` is needed by two consumers: the playground's live story and the frontend's board page. Neither can import the other — the playground must not depend on `@release/web`. And it cannot live in `@release/ui`, which imports nothing from the engine (Decision 7).
+
+So it is its own package: the one place allowed to see both sides, which makes it the natural home for the assertions that keep the structural mirror honest. `@release/ui` stays engine-free; the frontend's `entities/game/` becomes a re-export, preserving its layer rule.
+
+- [ ] **Step 1: Scaffold the package**
+
+`packages/table-adapter/package.json`, mirroring `packages/engine`'s shape:
+
+```json
+{
+  "name": "@release/table-adapter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "release-tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@release/engine": "workspace:*",
+    "@release/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@release/lint": "workspace:*"
+  }
+}
+```
+
+Copy `packages/engine/tsconfig.json` and `vitest.config.ts` as the starting point, adding path aliases for `@release/engine` and `@release/ui` so both resolve from source. `pnpm-workspace.yaml` already globs `packages/*`, so no change there.
+
+`src/index.ts` starts as a barrel exporting only the assertions' types; Tasks 15 and 16 fill it in.
+
+- [ ] **Step 2: Write the assertions**
+
+`packages/table-adapter/src/contract.test-d.ts` — compile-time only, `release-tsc` is the runner:
+
+```ts
+import type { Choice, PendingView, Target, WindowView } from '@release/engine'
+import type { TableChoice, TablePending, TableTarget, TableWindow } from '@release/ui'
+
+// Decision 7: @release/ui mirrors the engine's action surface structurally
+// rather than importing it. These assertions are what make that safe — if the
+// engine gains a Target variant or a Pending kind and the kit does not, this
+// file stops compiling and names the missing member.
+type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never
+
+export const targetsMatch: Exact<Target, TableTarget> = true
+export const choicesMatch: Exact<Choice, TableChoice> = true
+export const pendingMatch: Exact<PendingView, TablePending> = true
+export const windowMatch: Exact<WindowView, TableWindow> = true
+```
+
+- [ ] **Step 3: Join it to the workspace scripts**
+
+Run: `pnpm install`, then `pnpm -r typecheck`
+Expected: the new package is picked up by `pnpm -r` and typechecks clean.
+
+- [ ] **Step 4: Verify by mutation**
+
+Add `| { kind: 'bogus' }` to `Target` in `packages/engine/src/actions.ts`. Re-run `pnpm -r typecheck`; expect FAILURE on `targetsMatch`. Restore.
+
+This mutation is the single most important one in the plan — it is the only thing standing between Decision 7 and silent drift. Do not skip it.
+
+- [ ] **Step 5: Commit the scaffold**
+
+```bash
+git add packages/table-adapter pnpm-lock.yaml
+git commit -m "feat(adapter): one place may see both sides"
+```
+
+---
+
+#### `toTableState` — the projection becomes a table
+
+Lives at `packages/table-adapter/src/toTableState.ts`, tested at `packages/table-adapter/src/toTableState.test.ts`. Both the playground (Task 12) and the board page (Task 17) import it from here.
+
+**Interfaces:**
+- Consumes: `PlayerView`, `Event` from `@release/engine`; `TableState` from `@release/ui`.
+- Produces: `toTableState(view: PlayerView, log: Event[], labels: HistoryLabels): TableState`, plus:
+
+```ts
+// One label per member of the engine's Event union — the adapter maps event
+// types to translated text, replacing the mock's free-form `kind` literals.
+// Task 15 adds the matching keys under `moveHistory` in both catalogs.
+export type HistoryLabels = Record<Event['type'], string>
+```
+
+Tests build `labels` with `Object.fromEntries` over the event types they exercise.
+
+- [ ] **Step 6: Write the failing tests**
+
+```ts
+import { describe, expect, it } from 'vitest'
+import { toTableState } from './toTableState'
+
+const view = {
+  self: {
+    id: 'you',
+    name: 'you',
+    hand: [{ uid: 'c1', id: 'attack-bug' }],
+    release: {},
+    playable: ['c1'],
+    frozen: [],
+  },
+  opponents: [{ id: 'p2', name: 'bot', handCount: 3, release: {}, eliminated: false }],
+  decks: { piles: [30, 10], events: 8, discardCount: 2, discardTop: 'attack-ddos' },
+  turn: { player: 'you', index: 4, hasDrawn: false },
+  window: null,
+  pending: null,
+  setup: {},
+  over: null,
+}
+
+it('sums the piles into the single deck count the table renders', () => {
+  expect(toTableState(view, [], labels).decks.main).toBe(40)
+})
+
+it('carries hand uids through unchanged so animation keys stay stable', () => {
+  expect(toTableState(view, [], labels).you.hand[0].uid).toBe('c1')
+})
+
+it('renders a placeholder for a card id the catalogue does not know', () => {
+  const unknown = { ...view, self: { ...view.self, hand: [{ uid: 'c9', id: 'not-a-card' }] } }
+  expect(() => toTableState(unknown, [], labels)).not.toThrow()
+  expect(toTableState(unknown, [], labels).you.hand[0].card).toBeTruthy()
+})
+
+it('marks an eliminated opponent', () => {
+  const out = { ...view, opponents: [{ ...view.opponents[0], eliminated: true }] }
+  expect(toTableState(out, [], labels).opponents[0].eliminated).toBe(true)
+})
+
+it('folds the event log into history newest first', () => {
+  const log = [
+    { type: 'drawn', player: 'you', at: 1 },
+    { type: 'played', player: 'p2', card: 'attack-bug', at: 2 },
+  ]
+  const history = toTableState(view, log, labels).history
+  expect(history.length).toBe(2)
+  expect(history[0].kind).toBe(labels.played)
+})
+```
+
+Read the real `Event` union from `packages/engine/src/events.ts` and the real `HistoryEntry` from `apps/ui/src/table/MoveHistory/MoveHistory.tsx` before writing the last test — match their actual field names, including `parent`.
+
+- [ ] **Step 7: Run to verify it fails**
+
+Run: `pnpm --filter @release/table-adapter test -- toTableState`
+Expected: FAIL — module not found.
+
+- [ ] **Step 8: Implement**
+
+Pure function, no React. Key decisions to encode:
+
+1. `decks.main` is `piles.reduce((a, b) => a + b, 0)` — the kit renders one deck; split piles are #61's problem.
+2. `discardTop` resolves through `cardById`; a miss yields the placeholder card rather than throwing, since `assetUrl` throws on unknown assets.
+3. `history` maps each visible event's `type` to a translated label from `copy`, and preserves `parent` so `MoveHistory` can build its tree.
+4. `playable`, `frozen`, `pending`, `window`, `selfId`, `hasDrawn` and `comboOptions` pass through structurally — the assertions in Task 11 are what license that.
+5. `participants` and `spectators` are *not* produced here. They are `room`.
+
+- [ ] **Step 9: Run to verify it passes**
+
+Run: `pnpm --filter @release/table-adapter test -- toTableState`
+Expected: PASS.
+
+- [ ] **Step 10: Verify by mutation**
+
+Change the pile sum to `piles[0]`. Confirm the deck-count test goes red. Then make the unknown-card path call `assetUrl` directly and confirm the placeholder test goes red. Restore both.
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add packages/table-adapter
+git commit -m "feat(adapter): the projection becomes a table"
+```
+
+
+---
+
+#### `toAction` — an intent becomes an action
+
+Lives at `packages/table-adapter/src/toAction.ts`, tested at `packages/table-adapter/src/toAction.test.ts`.
+
+**Interfaces:**
+- Consumes: `Action`, `Target`, `Choice` from `@release/engine`.
+- Produces: `toAction(intent, player, at): Action`, where `intent` is a discriminated union mirroring `TableActions`' callbacks.
+
+- [ ] **Step 12: Write the failing tests**
+
+```ts
+it('stamps the player and the clock onto a play', () => {
+  expect(toAction({ kind: 'play', card: 'c1' }, 'you', 1234)).toEqual({
+    type: 'PLAY',
+    player: 'you',
+    card: 'c1',
+    target: undefined,
+    combo: undefined,
+    at: 1234,
+  })
+})
+
+it('carries the target and the combo through untouched', () => {
+  const target = { kind: 'player', player: 'p2' } as const
+  const a = toAction({ kind: 'play', card: 'c1', target, combo: 'c2' }, 'you', 9)
+  expect(a).toMatchObject({ type: 'PLAY', target, combo: 'c2' })
+})
+
+it('omits the player on WINDOW_EXPIRED, which belongs to no one', () => {
+  expect(toAction({ kind: 'windowExpired' }, 'you', 7)).toEqual({ type: 'WINDOW_EXPIRED', at: 7 })
+})
+
+it('wraps a choice into RESOLVE', () => {
+  const choice = { kind: 'defend', card: null } as const
+  expect(toAction({ kind: 'resolve', choice }, 'you', 3)).toEqual({
+    type: 'RESOLVE',
+    player: 'you',
+    choice,
+    at: 3,
+  })
+})
+```
+
+- [ ] **Step 13: Run to verify it fails**
+
+Run: `pnpm --filter @release/table-adapter test -- toAction`
+Expected: FAIL — module not found.
+
+- [ ] **Step 14: Implement**
+
+An exhaustive `switch` over the intent kinds with a `never` default, so a new engine action that gains a kit callback cannot be silently dropped:
+
+```ts
+default: {
+  const exhaustive: never = intent
+  throw new Error(`unhandled intent: ${JSON.stringify(exhaustive)}`)
+}
+```
+
+`WINDOW_EXPIRED` is the one action carrying no `player` — its type in `actions.ts` has only `type` and `at`.
+
+- [ ] **Step 15: Run to verify it passes**
+
+Run: `pnpm --filter @release/table-adapter test -- toAction`
+Expected: PASS.
+
+- [ ] **Step 16: Verify by mutation**
+
+Hardcode `at: 0` in the play branch. Confirm the stamping test goes red. Restore.
+
+- [ ] **Step 17: Commit**
+
+```bash
+git add packages/table-adapter
+git commit -m "feat(adapter): an intent becomes an action"
+```
+
+
+### Task 12: An engine-driven `TableStory`
 
 **Files:**
 - Modify: `apps/playground/package.json`
@@ -1503,7 +1816,7 @@ Read `engine.createGame`'s real `setup` expectations from `packages/engine/src/f
 
 A `mock | live` toggle beside the existing `host | guest` switch. In `live`, the story builds `TableProps` from `useFakeGame`'s `view` and passes real `actions` that stamp `player: 'you'` and `at: Date.now()` — the playground is a consumer, so it owns the clock, exactly as the frontend will. In `mock`, everything behaves as today. The existing selectors (`view`, `end`, `dock`) apply only in `mock` mode and are disabled in `live`.
 
-Reuse the `toTableState` logic here only if it can be shared without the playground depending on `@release/web` — it cannot, so write the story's mapping inline and accept the duplication for now. Task 15 writes the frontend's adapter; if the two converge, a later task can lift it into the kit.
+Build the story's `TableProps` with `toTableState` from `@release/table-adapter` (Task 11) — the same adapter the board page uses in Task 17. There is no second mapping to keep in sync.
 
 - [ ] **Step 4: Play it**
 
@@ -1527,7 +1840,7 @@ git commit -m "feat(playground): the table plays a real game"
 
 # Milestone 3 — The page
 
-### Task 12: `@release/engine` in the frontend build
+### Task 13: `@release/engine` and `@release/table-adapter` in the frontend build
 
 **Files:**
 - Modify: `apps/frontend/package.json`
@@ -1537,13 +1850,13 @@ git commit -m "feat(playground): the table plays a real game"
 
 - [ ] **Step 1: Add the dependency and the three aliases**
 
-`package.json` dependencies gain `"@release/engine": "workspace:*"`. In `vite.config.ts`:
+`package.json` dependencies gain `"@release/engine": "workspace:*"` and `"@release/table-adapter": "workspace:*"`. In `vite.config.ts`:
 
 ```ts
 const engineSrc = fileURLToPath(new URL('../../packages/engine/src/index.ts', import.meta.url))
 ```
 
-and `{ find: '@release/engine', replacement: engineSrc }` in the alias array. `tsconfig.json` paths gain `"@release/engine": ["../../packages/engine/src/index.ts"]`. Mirror the alias into `vitest.config.ts` so tests resolve it too.
+and `{ find: '@release/engine', replacement: engineSrc }` in the alias array, plus the same pair for `@release/table-adapter` → `../../packages/table-adapter/src/index.ts`. `tsconfig.json` paths gain both. Mirror both aliases into `vitest.config.ts` so tests resolve them too.
 
 - [ ] **Step 2: Verify**
 
@@ -1554,29 +1867,30 @@ Expected: PASS.
 
 ```bash
 git add apps/frontend/package.json apps/frontend/vite.config.ts apps/frontend/tsconfig.json apps/frontend/vitest.config.ts pnpm-lock.yaml
-git commit -m "build(web): the frontend can see the engine"
+git commit -m "build(web): the frontend can see the engine and the adapter"
 ```
 
 ---
 
-### Task 13: The seam — types re-export and compile-time assertions
+### Task 14: `entities/game` re-exports the contract
 
 **Files:**
 - Modify: `apps/frontend/src/entities/game/types.ts`
-- Create: `apps/frontend/src/entities/game/contract.test-d.ts`
 
 **Interfaces:**
-- Consumes: `@release/engine` types; `TableTarget`, `TableChoice`, `TablePending`, `TableWindow` from `@release/ui` (Task 5).
-- Produces: `entities/game/types.ts` re-exports the engine's contract; the assertions guard Decision 7.
+- Consumes: `@release/engine` types; `@release/table-adapter` (Task 11).
+- Produces: `entities/game` as the frontend's single door onto the contract, so `features/` and `pages/` never import either package directly.
+
+The compile-time assertions live in `@release/table-adapter` (Task 11), not here — the package is the layer that sees both sides.
 
 - [ ] **Step 1: Replace the placeholder**
 
-`types.ts` currently declares a three-field `GameState` placeholder. Replace it wholesale:
+`types.ts` currently declares a three-field `GameState` placeholder whose comment says so. Replace it wholesale:
 
 ```ts
 // The engine is the contract. This module exists so the frontend's one-way
 // import rule holds: features/ and pages/ import game types from entities/,
-// not from the package directly.
+// not from the packages directly.
 export type {
   Action,
   CardId,
@@ -1593,240 +1907,31 @@ export type {
   Target,
   WindowView,
 } from '@release/engine'
+
+export { toAction, toTableState } from '@release/table-adapter'
+export type { HistoryLabels } from '@release/table-adapter'
 ```
 
-Grep for importers of the old placeholder and repoint them: `grep -rn "entities/game" apps/frontend/src`.
+- [ ] **Step 2: Repoint the old placeholder's importers**
 
-- [ ] **Step 2: Write the assertions**
+Run: `grep -rn "entities/game" apps/frontend/src`
+Every hit that used the three-field `GameState` needs repointing at the engine's real one. `network/types.ts` carries the per-turn snapshot as an opaque object — leave that alone; it is the sync layer's, not the engine's.
 
-Create `contract.test-d.ts`. These are compile-time only — `release-tsc` is the runner, so the file needs no test framework.
+- [ ] **Step 3: Verify**
 
-```ts
-import type { Choice, PendingView, Target, WindowView } from '@release/engine'
-import type { TableChoice, TablePending, TableTarget, TableWindow } from '@release/ui'
-
-// Decision 7: @release/ui mirrors the engine's action surface structurally
-// rather than importing it. These assertions are what make that safe — if the
-// engine gains a Target variant or a Pending kind and the kit does not, this
-// file stops compiling and names the missing member.
-type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never
-
-export const targetsMatch: Exact<Target, TableTarget> = true
-export const choicesMatch: Exact<Choice, TableChoice> = true
-export const pendingMatch: Exact<PendingView, TablePending> = true
-export const windowMatch: Exact<WindowView, TableWindow> = true
-```
-
-- [ ] **Step 3: Run to verify it compiles**
-
-Run: `pnpm --filter @release/web typecheck`
+Run: `pnpm --filter @release/web typecheck && pnpm --filter @release/web test`
 Expected: PASS.
 
-- [ ] **Step 4: Verify by mutation**
-
-Add `| { kind: 'bogus' }` to `Target` in `packages/engine/src/actions.ts`. Re-run typecheck; expect it to FAIL on `targetsMatch`. Restore.
-
-This mutation is the single most important one in the plan — it is the only thing standing between Decision 7 and silent drift. Do not skip it.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add apps/frontend/src/entities/game
-git commit -m "feat(web): the seam is checked, not trusted"
+git commit -m "feat(web): one door onto the contract"
 ```
 
 ---
 
-### Task 14: `toTableState`
-
-**Files:**
-- Create: `apps/frontend/src/entities/game/toTableState.ts`
-- Test: `apps/frontend/src/entities/game/toTableState.test.ts`
-
-**Interfaces:**
-- Consumes: `PlayerView`, `Event` (Task 13); `TableState` from `@release/ui`.
-- Produces: `toTableState(view: PlayerView, log: Event[], labels: HistoryLabels): TableState`, plus:
-
-```ts
-// One label per member of the engine's Event union — the adapter maps event
-// types to translated text, replacing the mock's free-form `kind` literals.
-// Task 16 adds the matching keys under `moveHistory` in both catalogs.
-export type HistoryLabels = Record<Event['type'], string>
-```
-
-Tests build `labels` with `Object.fromEntries` over the event types they exercise.
-
-- [ ] **Step 1: Write the failing tests**
-
-```ts
-import { describe, expect, it } from 'vitest'
-import { toTableState } from './toTableState'
-
-const view = {
-  self: {
-    id: 'you',
-    name: 'you',
-    hand: [{ uid: 'c1', id: 'attack-bug' }],
-    release: {},
-    playable: ['c1'],
-    frozen: [],
-  },
-  opponents: [{ id: 'p2', name: 'bot', handCount: 3, release: {}, eliminated: false }],
-  decks: { piles: [30, 10], events: 8, discardCount: 2, discardTop: 'attack-ddos' },
-  turn: { player: 'you', index: 4, hasDrawn: false },
-  window: null,
-  pending: null,
-  setup: {},
-  over: null,
-}
-
-it('sums the piles into the single deck count the table renders', () => {
-  expect(toTableState(view, [], labels).decks.main).toBe(40)
-})
-
-it('carries hand uids through unchanged so animation keys stay stable', () => {
-  expect(toTableState(view, [], labels).you.hand[0].uid).toBe('c1')
-})
-
-it('renders a placeholder for a card id the catalogue does not know', () => {
-  const unknown = { ...view, self: { ...view.self, hand: [{ uid: 'c9', id: 'not-a-card' }] } }
-  expect(() => toTableState(unknown, [], labels)).not.toThrow()
-  expect(toTableState(unknown, [], labels).you.hand[0].card).toBeTruthy()
-})
-
-it('marks an eliminated opponent', () => {
-  const out = { ...view, opponents: [{ ...view.opponents[0], eliminated: true }] }
-  expect(toTableState(out, [], labels).opponents[0].eliminated).toBe(true)
-})
-
-it('folds the event log into history newest first', () => {
-  const log = [
-    { type: 'drawn', player: 'you', at: 1 },
-    { type: 'played', player: 'p2', card: 'attack-bug', at: 2 },
-  ]
-  const history = toTableState(view, log, labels).history
-  expect(history.length).toBe(2)
-  expect(history[0].kind).toBe(labels.played)
-})
-```
-
-Read the real `Event` union from `packages/engine/src/events.ts` and the real `HistoryEntry` from `apps/ui/src/table/MoveHistory/MoveHistory.tsx` before writing the last test — match their actual field names, including `parent`.
-
-- [ ] **Step 2: Run to verify it fails**
-
-Run: `pnpm --filter @release/web test -- toTableState`
-Expected: FAIL — module not found.
-
-- [ ] **Step 3: Implement**
-
-Pure function, no React. Key decisions to encode:
-
-1. `decks.main` is `piles.reduce((a, b) => a + b, 0)` — the kit renders one deck; split piles are #61's problem.
-2. `discardTop` resolves through `cardById`; a miss yields the placeholder card rather than throwing, since `assetUrl` throws on unknown assets.
-3. `history` maps each visible event's `type` to a translated label from `copy`, and preserves `parent` so `MoveHistory` can build its tree.
-4. `playable`, `frozen`, `pending`, `window`, `selfId`, `hasDrawn` and `comboOptions` pass through structurally — the assertions in Task 13 are what license that.
-5. `participants` and `spectators` are *not* produced here. They are `room`.
-
-- [ ] **Step 4: Run to verify it passes**
-
-Run: `pnpm --filter @release/web test -- toTableState`
-Expected: PASS.
-
-- [ ] **Step 5: Verify by mutation**
-
-Change the pile sum to `piles[0]`. Confirm the deck-count test goes red. Then make the unknown-card path call `assetUrl` directly and confirm the placeholder test goes red. Restore both.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add apps/frontend/src/entities/game
-git commit -m "feat(web): the projection becomes a table"
-```
-
----
-
-### Task 15: `toAction`
-
-**Files:**
-- Create: `apps/frontend/src/entities/game/toAction.ts`
-- Test: `apps/frontend/src/entities/game/toAction.test.ts`
-
-**Interfaces:**
-- Consumes: `Action`, `Target`, `Choice` (Task 13).
-- Produces: `toAction(intent, player, at): Action`, where `intent` is a discriminated union mirroring `TableActions`' callbacks.
-
-- [ ] **Step 1: Write the failing tests**
-
-```ts
-it('stamps the player and the clock onto a play', () => {
-  expect(toAction({ kind: 'play', card: 'c1' }, 'you', 1234)).toEqual({
-    type: 'PLAY',
-    player: 'you',
-    card: 'c1',
-    target: undefined,
-    combo: undefined,
-    at: 1234,
-  })
-})
-
-it('carries the target and the combo through untouched', () => {
-  const target = { kind: 'player', player: 'p2' } as const
-  const a = toAction({ kind: 'play', card: 'c1', target, combo: 'c2' }, 'you', 9)
-  expect(a).toMatchObject({ type: 'PLAY', target, combo: 'c2' })
-})
-
-it('omits the player on WINDOW_EXPIRED, which belongs to no one', () => {
-  expect(toAction({ kind: 'windowExpired' }, 'you', 7)).toEqual({ type: 'WINDOW_EXPIRED', at: 7 })
-})
-
-it('wraps a choice into RESOLVE', () => {
-  const choice = { kind: 'defend', card: null } as const
-  expect(toAction({ kind: 'resolve', choice }, 'you', 3)).toEqual({
-    type: 'RESOLVE',
-    player: 'you',
-    choice,
-    at: 3,
-  })
-})
-```
-
-- [ ] **Step 2: Run to verify it fails**
-
-Run: `pnpm --filter @release/web test -- toAction`
-Expected: FAIL — module not found.
-
-- [ ] **Step 3: Implement**
-
-An exhaustive `switch` over the intent kinds with a `never` default, so a new engine action that gains a kit callback cannot be silently dropped:
-
-```ts
-default: {
-  const exhaustive: never = intent
-  throw new Error(`unhandled intent: ${JSON.stringify(exhaustive)}`)
-}
-```
-
-`WINDOW_EXPIRED` is the one action carrying no `player` — its type in `actions.ts` has only `type` and `at`.
-
-- [ ] **Step 4: Run to verify it passes**
-
-Run: `pnpm --filter @release/web test -- toAction`
-Expected: PASS.
-
-- [ ] **Step 5: Verify by mutation**
-
-Hardcode `at: 0` in the play branch. Confirm the stamping test goes red. Restore.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add apps/frontend/src/entities/game
-git commit -m "feat(web): an intent becomes an action"
-```
-
----
-
-### Task 16: Copy for pending, window and the error banner
+### Task 15: Copy for pending, window and the error banner
 
 **Files:**
 - Modify: `packages/translation/src/locales/en/common.json`
@@ -1864,15 +1969,15 @@ git commit -m "feat(i18n): the table learns to ask in two languages"
 
 ---
 
-### Task 17: `useGame`
+### Task 16: `useGame`
 
 **Files:**
 - Create: `apps/frontend/src/features/play-game/useGame.ts`
 - Test: `apps/frontend/src/features/play-game/useGame.test.ts`
 
 **Interfaces:**
-- Consumes: `toAction` (Task 15), `Engine`, `GameState`, `PlayerView` (Task 13).
-- Produces: `useGame({ engine, config, selfId })` returning `{ view, log, error, dispatch, legalTargets }`. Task 18 renders it.
+- Consumes: `toAction` from `@release/table-adapter` (Task 11); `Engine`, `GameState`, `PlayerView` via `entities/game` (Task 14).
+- Produces: `useGame({ engine, config, selfId })` returning `{ view, log, error, dispatch, legalTargets }`. Task 17 renders it.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1965,14 +2070,14 @@ git commit -m "feat(web): the game survives its own reducer"
 
 ---
 
-### Task 18: The page
+### Task 17: The page
 
 **Files:**
 - Modify: `apps/frontend/src/pages/board/[gameId]/_layout.tsx`
 - Test: `apps/frontend/src/pages/board/[gameId]/__tests__/board.test.tsx`
 
 **Interfaces:**
-- Consumes: `useGame` (Task 17), `toTableState` (Task 14), `useSession` from `~/app/providers/SessionProvider`.
+- Consumes: `useGame` (Task 16), `toTableState` from `@release/table-adapter` (Task 11), `useSession` from `~/app/providers/SessionProvider`.
 - Produces: `/board/:gameId` on real state. `PLACEHOLDER_STATE` is deleted.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2117,7 +2222,9 @@ git commit -m "feat(web): the board stops pretending"
 - [ ] `Table` takes six grouped props; no `turnDock*`, no `view`, no flat `*Copy`
 - [ ] `panel` is controlled from `?panel=` on the page and uncontrolled in the playground
 - [ ] Gesture state lives only in `useTableInteractions`; `Table` has no domain `useState`
-- [ ] `@release/ui` imports nothing from `@release/engine`, and `contract.test-d.ts` proves the mirror is exact
+- [ ] `@release/ui` imports nothing from `@release/engine`, and `@release/table-adapter`'s `contract.test-d.ts` proves the mirror is exact
+- [ ] `toTableState` exists once, in `@release/table-adapter`, and both the playground story and the board page import it
+- [ ] `WindowView` and the `defend` pending carry `openedAt`, so the ring sweeps a real span
 - [ ] A solo game is playable end to end at `playground/table` with no frontend
 - [ ] `/board/:gameId` renders projected state; `PLACEHOLDER_STATE` is deleted
 - [ ] `cardCanTarget`, `isComboSource`, `validComboTarget` are gone from `@release/ui`'s public API
