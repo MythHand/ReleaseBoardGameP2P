@@ -26,9 +26,6 @@ export {
   CARDS,
   COVERS,
   cardById,
-  cardCanTarget,
-  isComboSource,
-  validComboTarget,
 } from './cards/catalogue'
 export { CATEGORIES } from './cards/categories'
 // The card *type* is re-exported as `CardData` to avoid colliding with the `Card`

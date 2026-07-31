@@ -3,12 +3,13 @@ import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { jitter, nextFrames, play, restTransform, toDiscardParams, wait } from '@/animations'
-import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
+import { cardById } from '@/cards'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import styles from './ComboStory.module.css'
+import { cardCanTarget, isComboSource, validComboTarget } from './mockLegality'
 
 type Loc = Record<Lang, string>
 
