@@ -37,6 +37,7 @@ const setup = (over: Record<string, unknown> = {}) => ({
     onPlay: vi.fn(),
     legalTargets: vi.fn((): TableTarget[] => []),
   } satisfies TableActions,
+  comboOptions: undefined as ((card: string) => string[]) | undefined,
 })
 
 it('ignores a card that is not playable', () => {
@@ -106,6 +107,35 @@ it('accents the selected card and no other, clearing on cancel', () => {
   act(() => result.current.cancel())
   expect(result.current.accentAt(0)).toBeUndefined()
   expect(result.current.accentAt(1)).toBeUndefined()
+})
+
+it('enters comboPending when the selected card has combo partners', () => {
+  const opts = setup()
+  opts.comboOptions = vi.fn(() => ['c2'])
+  const { result } = renderHook(() => useTableInteractions(opts))
+  act(() => result.current.onCardClick(0))
+  expect(result.current.phase).toBe('comboPending')
+  expect(opts.actions.onPlay).not.toHaveBeenCalled()
+})
+
+it('dispatches one intent carrying the combo once the partner is picked', () => {
+  const opts = setup({ playable: ['c1', 'c2'] })
+  opts.comboOptions = vi.fn((card) => (card === 'c1' ? ['c2'] : []))
+  const { result } = renderHook(() => useTableInteractions(opts))
+  act(() => result.current.onCardClick(0))
+  act(() => result.current.onCardClick(1))
+  expect(opts.actions.onPlay).toHaveBeenCalledTimes(1)
+  expect(opts.actions.onPlay).toHaveBeenCalledWith('c1', undefined, 'c2')
+})
+
+it('refuses a partner outside the offered options', () => {
+  const opts = setup({ playable: ['c1', 'c2'] })
+  opts.comboOptions = vi.fn(() => ['c3'])
+  const { result } = renderHook(() => useTableInteractions(opts))
+  act(() => result.current.onCardClick(0))
+  act(() => result.current.onCardClick(1))
+  expect(opts.actions.onPlay).not.toHaveBeenCalled()
+  expect(result.current.phase).toBe('comboPending')
 })
 
 it('treats a target with the same fields in a different key order as legal', () => {
