@@ -1,4 +1,4 @@
-import type { CardInstance } from '@release/engine'
+import type { CardInstance, Engine } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import {
   ABSENT_GRACE_MS,
@@ -54,6 +54,19 @@ it('restores the seat on reconnect with one fresh SYNC', () => {
   if (sync.message.type === 'SYNC') expect(sync.message.payload.view.self.id).toBe('b')
 })
 
+it('refuses to rebind a seat that is still connected', () => {
+  // Nothing authenticates a PlayerId — it is a uuid the client persists and
+  // announces — so without this guard a peer naming someone else's would take
+  // a live seat, receive its full projection (hand included) in the catch-up
+  // SYNC, and leave the player still holding it hearing nothing at all.
+  const live = session()
+  const result = rebind(live, 'b', 'peer-attacker')
+
+  expect(result.session).toBe(live)
+  expect(result.outgoing).toEqual([])
+  expect(live.seats.find((s) => s.playerId === 'b')?.peerId).toBe('peer-b')
+})
+
 it('leaves an absent seat alone inside the grace period', () => {
   const dropped = disconnect(session(), 'peer-a', 1_000).session
   const result = driveAbsent(dropped, 1_000 + ABSENT_GRACE_MS - 1)
@@ -96,15 +109,32 @@ function threeSeatSession(): Session {
 it('falls back to DRAW/PUSH when an absent seat holds the turn but its bot suggestion is rejected', () => {
   const release: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
   const created = session()
+  // `botAction` picks from `view.self.playable`, so a `playable` list that
+  // offers more than `reduce` accepts sends the keeper into a move the engine
+  // refuses — and an absent seat whose only suggestion bounces would stall the
+  // whole game forever.
+  //
+  // The mismatch is injected rather than borrowed from the engine, because the
+  // engine no longer has one to borrow: `playableFor`
+  // (packages/engine/src/fake/project.ts) now checks that the hand can pay a
+  // release's cost, which is where that disagreement belonged. This is a test
+  // of the referee's net, and it should not go quiet the next time the engine
+  // gets its lists right.
+  const base = createFakeEngine()
+  const overreporting: Engine = {
+    ...base,
+    project(state, viewer) {
+      const view = base.project(state, viewer)
+      if (viewer !== 'a') return view
+      return { ...view, self: { ...view.self, playable: [release.uid] } }
+    },
+  }
   // `setup: {}` (see `session()` above) means `releaseCond` isn't 'easy', so
-  // playing a release costs a second card. `playableFor`
-  // (packages/engine/src/fake/project.ts) lists a release as playable
-  // without checking that cost, but `onPlay`
-  // (packages/engine/src/fake/release.ts) rejects it when the hand holds
-  // nothing else to pay with — the exact mismatch driveAbsent's fallback
-  // exists to survive.
+  // playing this release costs a second card and the hand holds none: `onPlay`
+  // (packages/engine/src/fake/release.ts) rejects it.
   const forced: Session = {
     ...created,
+    engine: overreporting,
     state: {
       ...created.state,
       turn: { ...created.state.turn, player: 'a', hasDrawn: true },
@@ -117,9 +147,8 @@ it('falls back to DRAW/PUSH when an absent seat holds the turn but its bot sugge
 
   // botAction's first (and only) suggestion for this hand is PLAY
   // release-frontend#0, which the engine rejects. Without the fallback,
-  // driveAbsent gives up here — the "before" state in fix #1's
-  // investigation. With it, the turn ends via PUSH (hasDrawn is already
-  // true) and passes to 'b'.
+  // driveAbsent gives up here. With it, the turn ends via PUSH (hasDrawn is
+  // already true) and passes to 'b'.
   expect(result.session.state).not.toBe(dropped.state)
   expect(result.session.state.turn.player).toBe('b')
 })

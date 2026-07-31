@@ -26,6 +26,12 @@ export function createMemoryNetwork(peerIds: string[]) {
         id: self,
         connectTo() {},
         send(to: string, message: Message) {
+          // A peer holds no connection to itself, so PeerJS's `send` resolves
+          // `connections.get(self)` to undefined and drops the frame
+          // (transport/peer.ts). Mirrored here: delivering it to the sender's
+          // own inbox would let a keeper-as-player wiring pass in tests and
+          // then silently do nothing in production.
+          if (to === self) return
           deliver(to, createEnvelope(message, self, nextSeq()))
         },
         broadcast(message: Message) {

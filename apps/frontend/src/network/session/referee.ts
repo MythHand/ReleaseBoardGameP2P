@@ -131,7 +131,17 @@ export function disconnect(session: Session, peerId: string, now: number): Sessi
 }
 
 export function rebind(session: Session, playerId: PlayerId, peerId: string): SessionResult {
-  if (!session.seats.some((s) => s.playerId === playerId)) return { session, outgoing: [] }
+  const seat = session.seats.find((s) => s.playerId === playerId)
+  if (!seat) return { session, outgoing: [] }
+
+  // Only an absent seat can be claimed. Nothing authenticates a PlayerId — it
+  // is a uuid the client persists and announces — so a peer naming someone
+  // else's would otherwise take a seat that is still connected: the fan-out
+  // would follow the new peer id, the claimant would immediately receive that
+  // seat's full projection (hand included) from the SYNC below, and the player
+  // still holding it would stop hearing anything with no error. `disconnect`
+  // is the only thing that frees a seat, and it runs on the connection closing.
+  if (seat.peerId !== null) return { session, outgoing: [] }
 
   const seats = session.seats.map((s) =>
     s.playerId === playerId ? { ...s, peerId, absentSince: null } : s,
@@ -178,14 +188,21 @@ export function driveAbsent(session: Session, now: number): SessionResult {
       return { session: next, outgoing: syncAll(next, events) }
     }
 
-    // botAction's suggestion was rejected outright — `project`'s `playable`
-    // can list a card the seat cannot actually afford (e.g. a release with
-    // no spare card to pay its cost), and the bot policy never looks past
-    // its first choice. An absent seat still owes the table forward
-    // progress, so on its own uninterrupted turn fall back to the same
-    // escape hatch a human out of moves would take: draw if it hasn't, or
-    // end the turn if it has. Anything still rejected means there is truly
-    // nothing to do, and the next expired seat gets a turn instead.
+    // botAction's suggestion was rejected outright. An absent seat still owes
+    // the table forward progress, so on its own uninterrupted turn fall back
+    // to the same escape hatch a human out of moves would take: draw if it
+    // hasn't, or end the turn if it has. Anything still rejected means there
+    // is truly nothing to do, and the next expired seat gets a turn instead.
+    //
+    // This covers a proactive turn only, and deliberately so: it is a net for
+    // a `playable` list that offers more than `onPlay` accepts, and `playable`
+    // is only consulted on a seat's own turn. A pending is answered from the
+    // option list the engine itself publishes on the pending view, so its
+    // answer is legal by construction and there is nothing to fall back to —
+    // which is why an option list the engine cannot answer has to be fixed in
+    // the engine rather than papered over here. `playableFor`
+    // (packages/engine/src/fake/project.ts) checking the release cost is that
+    // fix for the case this net was written against.
     const { turn, pending, window, over } = session.state
     if (turn.player === seat.playerId && !pending && !window && !over) {
       const fallback: Action = turn.hasDrawn
@@ -218,17 +235,31 @@ const PEER_INTENT_TYPES: ReadonlySet<string> = new Set<Action['type']>([
   'RESOLVE',
 ])
 
+// Parsed JSON, not an `Intent`: the type annotation on the wire is a claim the
+// sender made. `null`, a string, or a missing payload all reach here, so the
+// shape is checked before anything reads through it.
+function isPeerIntent(intent: unknown): intent is Intent {
+  if (typeof intent !== 'object' || intent === null) return false
+  return PEER_INTENT_TYPES.has((intent as { type?: unknown }).type as string)
+}
+
 // The keeper's answer to one peer's intent.
 //
 // Identity and time are both overwritten rather than validated: `player` comes
 // from the connection the frame arrived on, so a peer cannot act as another
 // seat, and `at` comes from the keeper's own clock, so a peer cannot claim a
-// deadline has passed. There is consequently no clock synchronisation between
-// peers to get wrong.
+// deadline has passed. Rules evaluation therefore reads one clock. Display does
+// not: `window.deadline` and `pending.deadline` are absolute keeper-epoch
+// milliseconds and they travel inside every SYNC, so a peer rendering a
+// countdown from them is off by the two machines' clock skew — see the
+// deadlines note in docs/specs/2026-07-30-p2p-sync-layer-design.md.
 export function applyIntent(
   session: Session,
   fromPeerId: string,
-  intent: Intent,
+  // Deliberately not `Intent`: this is the keeper's trust boundary and what
+  // arrives is whatever the connection carried. Callers holding a real Intent
+  // pass it unchanged.
+  intent: unknown,
   now: number,
 ): SessionResult {
   const seat = seatOfPeer(session, fromPeerId)
@@ -236,9 +267,7 @@ export function applyIntent(
 
   // Dropped in silence rather than answered with a rejection: a well-behaved
   // peer cannot produce this, so there is no UI to inform.
-  if (!PEER_INTENT_TYPES.has((intent as { type?: unknown }).type as string)) {
-    return { session, outgoing: [] }
-  }
+  if (!isPeerIntent(intent)) return { session, outgoing: [] }
 
   const action = { ...intent, player: seat.playerId, at: now } as Action
   const { state, events } = session.engine.reduce(session.state, action)
@@ -265,6 +294,14 @@ export function applyIntent(
 // and the game ends — peers cannot reconstruct it, because reconstructing it
 // means holding the seed, which is the deck order.
 export function handover(session: Session, toPlayerId: PlayerId): SessionResult {
+  // Handing over to yourself is not a handover, and it cannot be treated as
+  // one: the fresh `next` below would pass attachKeeper's "did anything
+  // change" identity check, so the keeper would announce a change and stop its
+  // ticker while still holding the session — leaving every deadline in the
+  // game unowned. The first reaction window or disconnect would then hang the
+  // whole table with no error.
+  if (toPlayerId === session.keeperId) return { session, outgoing: [] }
+
   const successor = session.seats.find((s) => s.playerId === toPlayerId)
   if (!successor?.peerId) return { session, outgoing: [] }
 

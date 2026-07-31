@@ -1,6 +1,6 @@
 import { botAction, createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import type { Intent } from '../types'
-import { createLocalLink, type Ticker } from './link'
+import { createLocalLink, type GameLink, type Ticker } from './link'
 import { createMemoryNetwork } from './memoryNetwork'
 import type { Outgoing, SessionRef } from './referee'
 import {
@@ -149,6 +149,11 @@ it('never sends a peer a card identity it is not entitled to', () => {
       // 1. Right recipient's projection: the fan-out must not cross-deliver
       // one seat's view to another. The engine instance is stable across the
       // whole game, so the final session's is as good as any at that moment.
+      //
+      // This clause says nothing about what `project` itself may reveal — both
+      // sides of the comparison come from the same function, so a leak inside
+      // it appears identically in each and cancels out. Clauses 3 and 4 are
+      // what read the wire against the state directly.
       expect(outgoing.message.payload.view).toEqual(session.engine.project(state, viewer.playerId))
 
       // 2. Audience honoured: every event obeys its own `visibleTo`. A
@@ -181,6 +186,19 @@ it('never sends a peer a card identity it is not entitled to', () => {
       const wire = JSON.stringify(outgoing.message.payload)
       const hidden = [...state.decks.main.flat(), ...state.decks.events]
       for (const uid of hidden.map((c) => c.uid)) {
+        expect(wire).not.toContain(uid)
+      }
+
+      // 4. No hand leakage: the other seats' hands at that same moment. This is
+      // the half of the property the full-game harness exists for — the deck
+      // never moves between seats, but hands do, through `handTransfer`
+      // (requestCard/giveCard) and `discardForRelease`, and those are the paths
+      // where a uid can end up in front of the wrong player. Judged against the
+      // state as it stood, not the final one: a card the viewer legitimately
+      // held is fine to see in their own SYNC even if the same uid later moves
+      // to someone else's hand.
+      const others = Object.values(state.players).filter((p) => p.id !== viewer.playerId)
+      for (const uid of others.flatMap((p) => p.hand.map((c) => c.uid))) {
         expect(wire).not.toContain(uid)
       }
     }
@@ -250,25 +268,28 @@ function throughLocalLink(seed: number): { ref: SessionRef; script: Op[] } {
 }
 
 // Replays that script through RemoteLink -> memory transport -> attachKeeper.
-// Every seat goes over the wire, the keeper's own included: its frame is
-// delivered to its own inbox, which is where a keeper that is also a player
-// really does receive it from.
+// Every remote seat goes over the wire; the keeper's own seat goes through
+// `KeeperHandle.link`, because a peer holds no connection to itself and a
+// self-addressed send is dropped — pointing a RemoteLink at its own peer id
+// would only work here, against an in-memory transport that can do what PeerJS
+// cannot.
 function throughTheWire(seed: number, script: Op[]): SessionRef {
   const net = createMemoryNetwork(PLAYERS.map((p) => p.peerId))
   const ref: SessionRef = { current: start(seed) }
   const now = clock()
   const ticker = manualTicker()
-  const links = new Map(
-    PLAYERS.map((p) => {
-      const remote = createRemoteLink({ transport: net.transport(p.peerId), keeperId: 'peer-a' })
-      net.onDeliver(p.peerId, (frame) => remote.handleMessage(frame))
-      return [p.playerId, remote.link]
-    }),
-  )
   const keeper = attachKeeper({ ref, transport: net.transport('peer-a'), now, ticker })
-  // Registered last: 'peer-a' is the keeper's own inbox, and its seat's syncs
-  // reach it through onLocalSync rather than through a connection to itself.
   net.onDeliver('peer-a', (frame) => keeper.handleMessage(frame))
+
+  const links = new Map<string, GameLink>([['a', keeper.link]])
+  for (const seat of PLAYERS.filter((p) => p.peerId !== 'peer-a')) {
+    const remote = createRemoteLink({
+      transport: net.transport(seat.peerId),
+      keeperPeerId: 'peer-a',
+    })
+    net.onDeliver(seat.peerId, (frame) => remote.handleMessage(frame))
+    links.set(seat.playerId, remote.link)
+  }
 
   for (const op of script) {
     if (op.kind === 'tick') ticker.fire()

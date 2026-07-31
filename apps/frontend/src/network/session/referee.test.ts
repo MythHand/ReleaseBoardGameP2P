@@ -150,6 +150,21 @@ it('refuses a keeper-only action arriving as a peer intent', () => {
   expect(result.outgoing).toEqual([])
 })
 
+it('refuses a payload that is not an intent at all', () => {
+  const { session } = twoPlayerSession()
+
+  // `parseEnvelope` checks type/from/seq and nothing else, so the payload is
+  // whatever the connection carried. The guard that exists because of that
+  // must not itself read through it: `null.type` is a TypeError, and over the
+  // real transport it lands in the receive loop's catch — the keeper swallows
+  // it in silence while the honest peers see nothing at all.
+  for (const payload of [null, undefined, 'DRAW', 42, [], {}]) {
+    const result = applyIntent(session, 'peer-a', payload, 1_000)
+    expect(result.session).toBe(session)
+    expect(result.outgoing).toEqual([])
+  }
+})
+
 it('returns a rejection to the submitter alone', () => {
   const { session } = twoPlayerSession()
   const { outgoing } = applyIntent(session, 'peer-b', { type: 'PASS' }, 1_000)

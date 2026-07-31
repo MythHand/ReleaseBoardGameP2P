@@ -71,6 +71,41 @@ it('hands over through the keeper handle and stops keeping the session', () => {
   expect(stopped).toBe(true)
 })
 
+it('refuses to hand over to itself, which would leave the clock unowned', () => {
+  // A keeper who is also a player can pick their own name from the successor
+  // list. Committing it would announce a change and stop the ticker while this
+  // keeper still holds the session: no reaction window would ever expire and no
+  // disconnected seat would ever be driven, hanging the whole table with no
+  // error.
+  const start = session()
+  const result = handover(start, 'a')
+
+  expect(result.session).toBe(start)
+  expect(result.outgoing).toEqual([])
+})
+
+it('keeps its ticker running when a self-handover is refused', () => {
+  const net = createMemoryNetwork(['peer-a', 'peer-b'])
+  const ref: SessionRef = { current: session() }
+  let stopped = false
+  const keeper = attachKeeper({
+    ref,
+    transport: net.transport('peer-a'),
+    now: () => 1_000,
+    ticker: {
+      start: () => {},
+      stop: () => {
+        stopped = true
+      },
+    },
+  })
+
+  keeper.handover('a')
+
+  expect(ref.current.keeperId).toBe('a')
+  expect(stopped).toBe(false)
+})
+
 it('refuses to hand over to a seat that is not connected', () => {
   const start = session()
   const orphaned: Session = {
