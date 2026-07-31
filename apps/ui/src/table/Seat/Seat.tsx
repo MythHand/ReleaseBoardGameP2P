@@ -46,6 +46,7 @@ export default function Seat({
   const statusPulse = status !== 'idle'
   return (
     <div
+      data-testid={`seat-${player.id}`}
       className={`${styles.seat} ${active ? styles.active : ''} ${
         eliminated ? styles.eliminated : ''
       } ${disconnected ? styles.disconnected : ''}`}
@@ -54,16 +55,23 @@ export default function Seat({
         <StatusDot accent={statusAccent} pulse={statusPulse} size={7} />
         <span className={styles.name}>{player.name}</span>
         {eliminated ? (
-          <Badge tone="muted" size="sm" className={styles.status}>
-            {copy.eliminated}
-          </Badge>
+          <>
+            <Badge tone="muted" size="sm" className={styles.status}>
+              {copy.eliminated}
+            </Badge>
+            {/* Badge replaces the visible counter, but the (now zeroed) count
+                stays queryable — hidden, not removed. */}
+            <span data-testid="hand-count" hidden>
+              {player.handCount}
+            </span>
+          </>
         ) : disconnected ? (
           <Badge tone="danger" size="sm" className={styles.status}>
             {copy.disconnected}
           </Badge>
         ) : (
           <span className={styles.hand}>
-            {player.handCount} {copy.cards}
+            <span data-testid="hand-count">{player.handCount}</span> {copy.cards}
           </span>
         )}
       </div>

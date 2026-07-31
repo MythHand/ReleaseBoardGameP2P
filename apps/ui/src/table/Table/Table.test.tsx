@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react'
+import { fireEvent, render, within } from '@testing-library/react'
 import { vi } from 'vitest'
 import Table from './Table'
 import { makeTableProps } from './testFixture'
@@ -65,4 +65,34 @@ it('reports null when the active tab is clicked again', () => {
   const { getByRole } = render(<Table {...props} panel="history" onPanelChange={onPanelChange} />)
   fireEvent.click(getByRole('button', { name: props.copy.table.tabHistory }))
   expect(onPanelChange).toHaveBeenCalledWith(null)
+})
+
+it('zeroes the hand of an eliminated opponent and leaves the others alone', () => {
+  const base = makeTableProps()
+  const [out, alive] = base.state.opponents
+  const opponents = base.state.opponents.map((o) =>
+    o.id === out.id ? { ...o, eliminated: true } : o,
+  )
+  const { getByTestId } = render(<Table {...base} state={{ ...base.state, opponents }} />)
+  // The comparison against a live sibling is what makes this falsifiable —
+  // the mock gives every opponent a non-zero hand.
+  expect(within(getByTestId(`seat-${out.id}`)).getByTestId('hand-count').textContent).toBe('0')
+  expect(within(getByTestId(`seat-${alive.id}`)).getByTestId('hand-count').textContent).not.toBe(
+    '0',
+  )
+})
+
+it('shows the reconnect overlay from room.connection, not from a view flag', () => {
+  const base = makeTableProps()
+  const { getByText } = render(
+    <Table {...base} room={{ ...base.room, connection: 'reconnecting' }} />,
+  )
+  expect(getByText(base.copy.reconnect.label)).toBeTruthy()
+})
+
+it('marks an opponent listed in room.disconnected', () => {
+  const base = makeTableProps()
+  const id = base.state.opponents[0].id
+  const { getByText } = render(<Table {...base} room={{ ...base.room, disconnected: [id] }} />)
+  expect(getByText(base.copy.seat.disconnected)).toBeTruthy()
 })

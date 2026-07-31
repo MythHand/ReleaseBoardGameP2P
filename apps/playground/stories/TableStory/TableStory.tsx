@@ -87,6 +87,16 @@ export default function TableStory() {
     setup: base.setup,
   }
 
+  // the four-option selector still drives one demo state at a time, now mapped
+  // onto the real per-player/room facts instead of a view flag
+  const eliminatedId = view === 'oppEliminated' ? state.opponents[0]?.id : undefined
+  const disconnected = view === 'oppDisconnect' && state.opponents[0] ? [state.opponents[0].id] : []
+  const storyState = {
+    ...state,
+    you: { ...state.you, eliminated: view === 'youEliminated' },
+    opponents: state.opponents.map((o) => ({ ...o, eliminated: o.id === eliminatedId })),
+  }
+
   const variant = END_VARIANTS.find((v) => v.id === end)
   const none = pick(lang, { ru: '— нет —', en: '— none —' })
 
@@ -200,7 +210,7 @@ export default function TableStory() {
       </div>
       <div className={styles.stage}>
         <Table
-          state={state}
+          state={storyState}
           room={{
             role,
             code: '4F2A-9K',
@@ -217,6 +227,8 @@ export default function TableStory() {
             pauseSelfId: 'you',
             pauseHostId,
             onPauseToggleReady: toggleSelfReady,
+            connection: view === 'youDisconnect' ? 'reconnecting' : 'online',
+            disconnected,
           }}
           copy={{
             table: {
@@ -238,7 +250,6 @@ export default function TableStory() {
             turnDock: pick(lang, { ru: ruCommon.turnDock, en: enCommon.turnDock }),
             pause: pauseCopy,
           }}
-          view={view}
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
           onOverContinue={() => setEnd(null)}
           turnDockState={dock === 'reaction503' ? 'reaction' : dock}

@@ -21,6 +21,7 @@ export interface TableOpponent {
   name: string
   handCount: number
   release: ReleaseSlots
+  eliminated?: boolean
 }
 
 // Everything the engine's projection can answer. Assembled by the consumer's
@@ -30,6 +31,7 @@ export interface TableState {
     name: string
     hand: HandItem[]
     release: ReleaseSlots
+    eliminated?: boolean
   }
   opponents: TableOpponent[]
   decks: {
@@ -61,6 +63,10 @@ export interface TableRoom {
   pauseSelfId?: string
   pauseHostId?: string
   onPauseToggleReady?: () => void
+  // Connection is a session fact, never a game fact. `reconnecting` is the
+  // local peer; `disconnected` names peers seen as gone.
+  connection?: 'online' | 'reconnecting'
+  disconnected?: string[]
 }
 
 // Собственный «хром»-текст стола по языку (бейдж выбывания + подписи стопок).
@@ -126,7 +132,6 @@ export interface TableProps {
   slots?: TableSlots
   over?: TableOver | null
   onOverContinue?: () => void
-  view?: ViewState | null
   turnDockState?: TurnDockState
   turnDockDanger?: boolean
   turnDockSeconds?: number
@@ -137,6 +142,3 @@ export interface TableProps {
   panel?: Panel | null
   onPanelChange?: (panel: Panel | null) => void
 }
-
-// Retired in Task 3 — kept here so Task 1 stays a pure regrouping.
-export type ViewState = 'oppEliminated' | 'youEliminated' | 'oppDisconnect' | 'youDisconnect'

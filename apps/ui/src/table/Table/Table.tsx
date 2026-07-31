@@ -104,7 +104,6 @@ export default function Table({
   slots,
   over = null,
   onOverContinue,
-  view = null,
   turnDockState = 'push',
   turnDockDanger = false,
   turnDockSeconds = 16,
@@ -161,7 +160,8 @@ export default function Table({
 
   // завершение партии — оверлей поверх стола (триггерится извне)
   const overWinner = over ? participants.find((p) => p.id === over.winnerId) : null
-  const youEliminated = view === 'youEliminated'
+  const youEliminated = Boolean(you.eliminated)
+  const disconnectedIds = new Set(room.disconnected ?? [])
 
   const toggle = (p: Panel) => {
     const next = panel === p ? null : p
@@ -185,9 +185,9 @@ export default function Table({
       {slots?.corner && <div className={styles.corner}>{slots.corner}</div>}
 
       <div className={styles.opponents}>
-        {opponents.map((p, i) => {
-          const eliminated = view === 'oppEliminated' && i === 0
-          const disconnected = view === 'oppDisconnect' && i === 0
+        {opponents.map((p) => {
+          const eliminated = Boolean(p.eliminated)
+          const disconnected = disconnectedIds.has(p.id)
           // выбыл → карты в сброс: пустая зона релиза, рука = 0
           const shown = eliminated ? { ...p, handCount: 0, release: EMPTY_RELEASE } : p
           return (
@@ -343,7 +343,7 @@ export default function Table({
         />
       )}
 
-      {view === 'youDisconnect' && <Reconnect copy={copy.reconnect} />}
+      {room.connection === 'reconnecting' && <Reconnect copy={copy.reconnect} />}
 
       {over && (
         <GameOver
