@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, vi } from 'vitest'
+import type { WireMessage } from './types'
 import { formatRoomCode, makeRoomCode, parseRoomCode, useLobby } from './useLobby'
 
 // Every fake transport createTransport hands out, with the callbacks useLobby
@@ -7,9 +8,11 @@ import { formatRoomCode, makeRoomCode, parseRoomCode, useLobby } from './useLobb
 interface FakeTransport {
   id: string
   close: ReturnType<typeof vi.fn>
+  broadcast: ReturnType<typeof vi.fn>
   onError?: (err: { type?: string; message: string }) => void
   onConnection?: (peerId: string) => void
   onDisconnect?: (peerId: string) => void
+  onMessage?: (msg: WireMessage) => void
 }
 
 // vi.mock is hoisted above the imports, so the array it closes over has to be
@@ -22,6 +25,7 @@ vi.mock('./transport/peer', () => ({
       onError?: (err: { type?: string; message: string }) => void
       onConnection?: (peerId: string) => void
       onDisconnect?: (peerId: string) => void
+      onMessage?: (msg: WireMessage) => void
     }) => {
       const fake = {
         id: `peer${transports.length}`,
@@ -34,6 +38,7 @@ vi.mock('./transport/peer', () => ({
         onError: args.onError,
         onConnection: args.onConnection,
         onDisconnect: args.onDisconnect,
+        onMessage: args.onMessage,
       }
       transports.push(fake)
       return fake
@@ -165,4 +170,80 @@ it('reports connection for a host disconnect after a successful connection, even
   })
   expect(result.current.status).toBe('error')
   expect(result.current.errorKind).toBe('connection')
+})
+
+// --- leaving the lobby for the board, together ---
+
+it('host startGame broadcasts GAME_STARTING and records the game id', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.createRoom('Dimbo', 6)
+  })
+  expect(result.current.gameId).toBeNull()
+
+  act(() => {
+    result.current.startGame()
+  })
+
+  const hostId = result.current.state?.hostId
+  expect(transports[0].broadcast).toHaveBeenCalledWith({
+    type: 'GAME_STARTING',
+    payload: { gameId: hostId },
+  })
+  expect(result.current.gameId).toBe(hostId)
+})
+
+it('a guest follows the host out of the lobby', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: hostId },
+      from: hostId,
+    } as WireMessage)
+  })
+
+  // The guest never clicked anything: this is the whole point of broadcasting.
+  expect(result.current.gameId).toBe(hostId)
+})
+
+it('ignores a GAME_STARTING that did not come from the host', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: 'somewhere-else' },
+      from: 'another-guest',
+    } as WireMessage)
+  })
+
+  // Starting the game is the host's word alone — otherwise any peer could drag
+  // the table to a board of its choosing.
+  expect(result.current.gameId).toBeNull()
+})
+
+it('forgets the game id when the session is torn down', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.createRoom('Dimbo', 6)
+  })
+  act(() => {
+    result.current.startGame()
+  })
+  expect(result.current.gameId).not.toBeNull()
+
+  act(() => {
+    result.current.leaveSession()
+  })
+  // A stale id would bounce the player straight back to the board they left.
+  expect(result.current.gameId).toBeNull()
 })

@@ -3,11 +3,13 @@ import type { MessageType } from '../types'
 // Messages the host never forwards on a peer's behalf, for two distinct
 // reasons.
 //
-// Authority: the roster, the lobby config, and the three that end someone's
-// membership are the host's own word. The transport stamps `from` with the
-// connection a frame arrived on (transport/peer.ts), so a relayed frame reaches
-// a guest wearing the host's id — forwarding a peer-originated one of these
-// would hand any player the host's authority over everyone else.
+// Authority: the roster, the lobby config, the three that end someone's
+// membership, and the call to leave for the board are the host's own word. The
+// transport stamps `from` with the connection a frame arrived on
+// (transport/peer.ts), so a relayed frame reaches a guest wearing the host's id
+// — forwarding a peer-originated one of these would hand any player the host's
+// authority over everyone else. A forwarded GAME_STARTING would let any peer
+// drag the whole table out of the lobby.
 //
 // Privacy and authorship: every game frame is addressed to exactly one party,
 // but a wire frame names no recipient, so relaying one is broadcasting it.
@@ -33,6 +35,7 @@ const NEVER_RELAYED: ReadonlySet<MessageType> = new Set<MessageType>([
   'PLAYER_KICKED',
   'LOBBY_DISBANDED',
   'HOST_TRANSFERRED',
+  'GAME_STARTING',
   'GAME_STARTED',
   'INTENT',
   'SYNC',

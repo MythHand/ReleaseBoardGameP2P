@@ -25,6 +25,13 @@ it('never forwards the keeper`s own announcements', () => {
   expect(isRelayable('GAME_STARTED')).toBe(false)
 })
 
+it('never forwards the call to leave the lobby', () => {
+  // A relayed frame reaches guests wearing the host's id, so forwarding a
+  // peer-originated GAME_STARTING would let any player drag the whole table
+  // out of the lobby to a board of its choosing.
+  expect(isRelayable('GAME_STARTING')).toBe(false)
+})
+
 it('forwards to all peers except the sender and the host', () => {
   const targets = relayTargets({ connectedPeerIds: ['h', 'a', 'b', 'c'], hostId: 'h', from: 'a' })
   expect(targets.sort()).toEqual(['b', 'c'])

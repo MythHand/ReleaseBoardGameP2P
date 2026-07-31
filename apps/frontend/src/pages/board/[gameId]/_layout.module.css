@@ -1,0 +1,10 @@
+/* Table is `block-size: 100%` and clips its absolutely-positioned children with
+   `overflow: hidden`, so it needs a parent with a *definite* height. The app
+   root only sets `min-block-size: 100vh`, which is a minimum and not definite,
+   so without this the percentage resolved against nothing, the table collapsed
+   to zero, and every child was clipped — the page rendered black.
+   `dvh` rather than `vh` so mobile browser chrome doesn't push the table under
+   the viewport, which it cannot scroll back into view. */
+.page {
+  block-size: 100dvh;
+}

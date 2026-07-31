@@ -1,6 +1,8 @@
 import { useTranslation } from '@release/translation'
 import { DEFAULT_SETUP, Table } from '@release/ui'
 import { Outlet } from 'react-router'
+import { useSession } from '~/app/providers/SessionProvider'
+import styles from './_layout.module.css'
 
 // Placeholder board state — empty hands/zones. Real state arrives with the
 // game-rules engine (separate spec). TableState is structural; only DEFAULT_SETUP
@@ -27,12 +29,29 @@ const PLACEHOLDER_STATE = {
 export default function BoardPage() {
   // All Table copy comes from the central catalog via i18next — one namespace per
   // sub-block, matching the @release/ui prop names.
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  // The roster is a room fact, not a game fact — the engine's projection has no
+  // concept of a spectator — so it comes from the session, split by role exactly
+  // as the lobby splits it.
+  const session = useSession()
+  const peers = Object.values(session.state?.peers ?? {})
+  const participants = peers.filter((p) => p.role === 'host' || p.role === 'player')
+  const spectators = peers.filter((p) => p.role === 'guest')
   return (
-    <div data-testid="board-page">
+    <div className={styles.page} data-testid="board-page">
       <Table
         state={PLACEHOLDER_STATE}
-        room={{ participants: [], spectators: [] }}
+        room={{
+          role: session.isHost ? 'host' : 'guest',
+          code: session.roomCode ?? undefined,
+          participants,
+          spectators,
+          onKickSpectator: session.kick,
+          lang: i18n.resolvedLanguage === 'ru' ? 'ru' : 'en',
+          onLangChange: (lang) => {
+            void i18n.changeLanguage(lang)
+          },
+        }}
         // matches the dock's previous hardcoded defaults until the
         // game-rules engine (and its deadline clock) lands
         dock={{ seconds: 16, progress: 0.55 }}
