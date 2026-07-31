@@ -1,11 +1,13 @@
 import { type ReactNode, useEffect, useState } from 'react'
+import { CARDS } from '@/cards'
+import type { Card as CardType } from '@/cards/types'
 import Button from '@/primitives/Button'
 import Card from '@/primitives/Card'
 import Typography from '@/primitives/Typography'
 import type { ConfirmActionProps } from '@/table/ConfirmAction'
 import ConfirmAction from '@/table/ConfirmAction'
 import type { HandItem } from '@/table/Hand/Hand'
-import type { NeutralizeMethodId, ReleaseSlotId, TableChoice, TablePending } from '../intents'
+import type { NeutralizeMethodId, TableChoice, TablePending } from '../intents'
 import styles from './PendingPrompt.module.css'
 
 // One prompt string plus one action label per TablePending kind, plus the two
@@ -37,21 +39,15 @@ export interface WindowCopy {
   unpass: string
 }
 
-// Hardcoded, catalogue-independent labels for the two closed enums a pending
-// may offer — NeutralizeMethodId and ReleaseSlotId. Neither is a card
-// property, so reading them is not "inspecting card tags/categories" — it
-// mirrors ReleaseZone's own SLOTS labels (ReleaseZone.tsx), which are plain
-// English for the same reason.
+// Hardcoded, catalogue-independent labels for the one closed enum a pending
+// may offer that isn't a card — NeutralizeMethodId. Not a card property, so
+// reading it is not "inspecting card tags/categories" — it mirrors
+// ReleaseZone's own SLOTS labels (ReleaseZone.tsx), which are plain English
+// for the same reason.
 const METHOD_LABEL: Record<NeutralizeMethodId, string> = {
   debugger: 'Debugger',
   monitoring: 'Monitoring',
   sacrifice: 'Sacrifice',
-}
-
-const SLOT_LABEL: Record<ReleaseSlotId, string> = {
-  frontend: 'Frontend',
-  backend: 'Backend',
-  database: 'Database',
 }
 
 // A selectable card, resolved against `hand` — never against the catalogue.
@@ -87,8 +83,37 @@ function CardOption({
   )
 }
 
-// A selectable plain-text option (a neutralize/crush method, a release-slot
-// card type) — same option semantics as CardOption, no card face to show.
+// A selectable card TYPE from the kit's own catalogue — used only by
+// `requestCard`, where the choice names a card the opponent might hold, not
+// one you own. This is not a legality lookup: `requestCard`'s `Choice` is a
+// bluff (Security Bug names a card type the opponent might hold —
+// packages/engine/src/actions.ts:16), so there is no engine answer to defer
+// to and no `pending.options` to defer against. Reading the catalogue here is
+// how the UI presents the guess space, not how it decides what is legal.
+function CatalogueCardOption({
+  card,
+  selected,
+  onClick,
+}: {
+  card: CardType
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      className={styles.option}
+      onClick={onClick}
+    >
+      <Card card={card} interactive={false} width={72} state={selected ? 'selected' : 'idle'} />
+    </button>
+  )
+}
+
+// A selectable plain-text option (a neutralize/crush method) — same option
+// semantics as CardOption, no card face to show.
 function TextOption({
   label,
   selected,
@@ -119,8 +144,10 @@ function TextOption({
 // contract's "I could block this and I choose not to", never a cancel).
 //
 // Legality is always the engine's answer: every option rendered below comes
-// from `pending.options` / `pending.methods`, resolved against `hand` — this
-// component never inspects card tags, categories, or the catalogue.
+// from `pending.options` / `pending.methods`, resolved against `hand`. The
+// one exception is `requestCard`, which is a bluff rather than a legal move —
+// see CatalogueCardOption above for why reading the catalogue there is not a
+// legality decision.
 export default function PendingPrompt({ pending, hand, copy, onResolve }: PendingPromptProps) {
   // Reset selection when the pending itself changes (a new kind/player, not a
   // referential change to the same one — TableState is rebuilt from scratch on
@@ -130,13 +157,13 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
   const [card, setCard] = useState<string | null>(null)
   const [cards, setCards] = useState<string[]>([])
   const [method, setMethod] = useState<NeutralizeMethodId | null>(null)
-  const [slot, setSlot] = useState<ReleaseSlotId | null>(null)
+  const [requestedCard, setRequestedCard] = useState<string | null>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: fingerprint is the re-arm trigger, not read inside
   useEffect(() => {
     setCard(null)
     setCards([])
     setMethod(null)
-    setSlot(null)
+    setRequestedCard(null)
   }, [fingerprint])
 
   const kindCopy = copy[pending.kind]
@@ -241,14 +268,20 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
       break
     }
     case 'requestCard': {
-      complete = slot != null
-      confirm = () => slot && onResolve({ kind: 'requestCard', card: slot })
-      options = (Object.keys(SLOT_LABEL) as ReleaseSlotId[]).map((s) => (
-        <TextOption
-          key={s}
-          label={SLOT_LABEL[s]}
-          selected={slot === s}
-          onClick={() => setSlot(s)}
+      // The pending names who's being asked (`target`), not what may be
+      // asked for — there is no `pending.options` because this is a guess,
+      // not a legal move (see the module comment on CatalogueCardOption). The
+      // guess space is every distinct card type the kit's catalogue knows —
+      // 37 definitions, not the ~125-card physical deck (which counts
+      // per-copy quantities the catalogue collapses into one entry each).
+      complete = requestedCard != null
+      confirm = () => requestedCard && onResolve({ kind: 'requestCard', card: requestedCard })
+      options = CARDS.map((c) => (
+        <CatalogueCardOption
+          key={c.id}
+          card={c}
+          selected={requestedCard === c.id}
+          onClick={() => setRequestedCard(c.id)}
         />
       ))
       break
@@ -269,7 +302,11 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
         <Typography as="div" base="label-md" tk="tk-10" className={styles.heading}>
           {kindCopy.prompt}
         </Typography>
-        <div className={styles.options}>{options}</div>
+        <div
+          className={`${styles.options} ${pending.kind === 'requestCard' ? styles.optionsScroll : ''}`}
+        >
+          {options}
+        </div>
       </div>
 
       {pending.kind === 'defend' && (

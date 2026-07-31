@@ -38,6 +38,15 @@
   justify-content: center;
 }
 
+/* requestCard's guess space is the full catalogue (37 distinct card types) —
+   too tall to fit flat, so it scrolls inside a capped box instead of pushing
+   the confirm bar off-screen. */
+.optionsScroll {
+  max-inline-size: 560px;
+  max-block-size: 260px;
+  overflow-y: auto;
+}
+
 .option {
   padding: 0;
   cursor: pointer;

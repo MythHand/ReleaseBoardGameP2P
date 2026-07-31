@@ -1,5 +1,6 @@
 import { fireEvent, render } from '@testing-library/react'
 import { vi } from 'vitest'
+import { CARDS } from '@/cards'
 import type { Card } from '@/cards/types'
 import type { HandItem } from '@/table/Hand/Hand'
 import type { TablePending } from '../intents'
@@ -76,4 +77,29 @@ it('keeps confirm inert until a selection exists', () => {
     <PendingPrompt pending={defendPending} hand={hand} copy={copy} onResolve={vi.fn()} />,
   )
   expect(getByRole('button', { name: copy.confirm })).toHaveProperty('disabled', true)
+})
+
+it('resolves requestCard with a real catalogue card id, not a release slot', () => {
+  // requestCard is a bluff, not a legal move (Choice.requestCard: CardId,
+  // packages/engine/src/actions.ts:16-17) — the pending carries no `options`,
+  // so the guess space is the kit's own catalogue. Asserting the resolved
+  // `card` is an id CARDS actually knows is what makes it impossible to
+  // regress back to a ReleaseSlotId ('frontend'/'backend'/'database'), which
+  // typechecks (both are `string` in the kit's structural mirror) but is not
+  // a value the engine's catalogue recognizes.
+  const onResolve = vi.fn()
+  const { getAllByRole, getByRole } = render(
+    <PendingPrompt
+      pending={{ kind: 'requestCard', player: 'you', target: 'p2' }}
+      hand={hand}
+      copy={copy}
+      onResolve={onResolve}
+    />,
+  )
+  fireEvent.click(getAllByRole('option')[0])
+  fireEvent.click(getByRole('button', { name: copy.confirm }))
+  expect(onResolve).toHaveBeenCalledTimes(1)
+  const choice = onResolve.mock.calls[0][0]
+  expect(choice.kind).toBe('requestCard')
+  expect(CARDS.some((c) => c.id === choice.card)).toBe(true)
 })
