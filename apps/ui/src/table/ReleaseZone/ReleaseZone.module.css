@@ -27,3 +27,12 @@
 .compact .empty {
   writing-mode: vertical-rl;
 }
+
+/* легитимная цель текущего прицеливания — подсветка того, что пришло в
+   `targets`; сам слот не решает, что легально */
+.targetable {
+  cursor: pointer;
+  border-radius: 6cqw;
+  box-shadow: 0 0 0 2px var(--turn-accent),
+    0 0 16px 2px color-mix(in srgb, var(--turn-accent) 40%, transparent);
+}

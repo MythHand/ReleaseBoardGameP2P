@@ -1,4 +1,4 @@
-import { fireEvent, render, within } from '@testing-library/react'
+import { act, fireEvent, render, within } from '@testing-library/react'
 import { vi } from 'vitest'
 import Table from './Table'
 import { makeTableProps } from './testFixture'
@@ -115,4 +115,39 @@ it('marks an opponent listed in room.disconnected and leaves the others alone', 
   expect(
     within(getByTestId(`seat-${alive.id}`)).queryByText(base.copy.seat.disconnected),
   ).toBeNull()
+})
+
+it('plays a targetless card straight from the hand', () => {
+  const base = makeTableProps()
+  const onPlay = vi.fn()
+  const uid = base.state.you.hand[0].uid
+  const { container } = render(
+    <Table
+      {...base}
+      state={{ ...base.state, playable: [uid] }}
+      actions={{ onPlay, legalTargets: () => [] }}
+    />,
+  )
+  fireEvent.mouseDown(container.querySelectorAll('[data-hand-slot]')[0])
+  expect(onPlay).toHaveBeenCalledWith(uid, undefined, undefined)
+})
+
+it('draws from the dock, once its mount lockout clears', () => {
+  vi.useFakeTimers()
+  const base = makeTableProps()
+  const onDraw = vi.fn()
+  const { getByTestId } = render(
+    <Table
+      {...base}
+      state={{ ...base.state, turn: 'you', hasDrawn: false }}
+      actions={{ onDraw }}
+    />,
+  )
+  // TurnDock arms `keyLocked` on mount and releases it after LOCKOUT_MS (300ms,
+  // TurnDock.tsx:23). A click before that is swallowed by design, so the timer
+  // has to advance or this asserts nothing about wiring.
+  act(() => vi.advanceTimersByTime(400))
+  fireEvent.click(getByTestId('dock-key'))
+  expect(onDraw).toHaveBeenCalledTimes(1)
+  vi.useRealTimers()
 })

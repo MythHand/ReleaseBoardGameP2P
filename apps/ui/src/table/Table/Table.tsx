@@ -1,8 +1,10 @@
+import type React from 'react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import LangSwitcher from '@/blocks/LangSwitcher'
 import LobbyCode from '@/blocks/LobbyCode'
 import Rules from '@/blocks/Rules'
 import GearIcon from '@/icons/GearIcon'
+import Arrow, { centerOf, type Point, useArrow } from '@/primitives/Arrow'
 import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
@@ -25,6 +27,7 @@ import TurnDock from '@/table/TurnDock/TurnDock'
 import { deriveDock } from './dock'
 import styles from './Table.module.css'
 import type { Panel, TableProps } from './types'
+import { useTableInteractions } from './useTableInteractions'
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
 // 0–8 зелёный, 9–18 жёлтый, 19–28 красный
@@ -136,6 +139,57 @@ export default function Table({
   const controlled = panelProp !== undefined
   const panel = controlled ? panelProp : ownPanel
 
+  // gesture machine (Tasks 6–7): turns clicks into completed intents. Legality
+  // is always the engine's answer (state.playable / actions.legalTargets) —
+  // Table only renders what the hook decided, never re-derives it.
+  const gestures = useTableInteractions({
+    state,
+    actions,
+    comboOptions: (card) => state.comboOptions?.[card] ?? [],
+  })
+
+  // targeting arrow: origin is the last-clicked hand card, tip follows the
+  // cursor. The mousemove listener (inside useArrow) is only mounted while
+  // `active` is true, which we keep in lockstep with `phase === 'selected'` —
+  // it comes down with every exit from that phase, including unmount.
+  const cardOriginRef = useRef<Point | null>(null)
+  const arrow = useArrow()
+  useEffect(() => {
+    if (gestures.phase === 'selected' && cardOriginRef.current) {
+      arrow.aim(cardOriginRef.current)
+    } else {
+      arrow.stop()
+    }
+  }, [gestures.phase, arrow.aim, arrow.stop])
+
+  // Escape cancels an in-flight target selection. Bound to the window (not a
+  // React onKeyDown) so it fires regardless of what currently has focus, and
+  // — like the arrow's mousemove — only while there is something to cancel.
+  useEffect(() => {
+    if (gestures.phase !== 'selected') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') gestures.cancel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [gestures.phase, gestures.cancel])
+
+  const handleCardClick = (index: number, el: HTMLElement) => {
+    cardOriginRef.current = centerOf(el)
+    gestures.onCardClick(index)
+  }
+
+  // A click that lands outside any hand slot while a target is pending reads
+  // as "changed my mind" — cancel. Clicks that land on a legal target already
+  // resolve (and reset) through onTargetPick before bubbling here, so this is
+  // a no-op in that case, not a race.
+  const handleTableClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (gestures.phase !== 'selected') return
+    const target = e.target as HTMLElement
+    if (target.closest('[data-hand-slot]')) return
+    gestures.cancel()
+  }
+
   const isHost = role === 'host'
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
@@ -178,8 +232,10 @@ export default function Table({
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
 
   return (
-    <div className={styles.table}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-cancel for an in-flight target selection; the accessible affordance is the Escape handler above
+    <div className={styles.table} onClick={handleTableClick} role="presentation">
       <HudBackground tone="neutral" className={styles.bgLayer} />
+      <Arrow from={arrow.from} to={arrow.to} />
 
       {slots?.banner && <div className={styles.banner}>{slots.banner}</div>}
       {slots?.corner && <div className={styles.corner}>{slots.corner}</div>}
@@ -198,6 +254,8 @@ export default function Table({
               eliminated={eliminated}
               disconnected={disconnected}
               copy={copy.seat}
+              onPick={(target) => gestures.onTargetPick(target)}
+              targets={gestures.targets}
             />
           )
         })}
@@ -224,9 +282,19 @@ export default function Table({
           </Badge>
         ) : (
           <>
-            <ReleaseZone release={you.release} size="100px" />
+            <ReleaseZone
+              release={you.release}
+              size="100px"
+              player={state.selfId}
+              onPick={(target) => gestures.onTargetPick(target)}
+              targets={gestures.targets}
+            />
             <div className={styles.handWrap}>
-              <Hand items={you.hand} />
+              <Hand
+                items={you.hand}
+                onCardClick={(i, el) => handleCardClick(i, el)}
+                accentAt={gestures.accentAt}
+              />
             </div>
           </>
         )}
@@ -242,6 +310,9 @@ export default function Table({
           activePlayer={dockView.activePlayer}
           copy={copy.turnDock}
           paused={paused}
+          onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
+          onPush={actions?.onPush}
+          onPass={actions?.onPass}
         />
       </div>
 

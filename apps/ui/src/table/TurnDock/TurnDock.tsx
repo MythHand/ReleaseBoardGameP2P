@@ -176,7 +176,13 @@ export default function TurnDock({
             <div className={styles.actionMain}>
               <Swap token={buttonMode ? 'btn' : 'name'} anim={modeAnim} fill>
                 {buttonMode ? (
-                  <Button variant="hud" className={styles.key} style={accentStyle} onClick={onKey}>
+                  <Button
+                    variant="hud"
+                    data-testid="dock-key"
+                    className={styles.key}
+                    style={accentStyle}
+                    onClick={onKey}
+                  >
                     <Swap token={label} anim={SOFT} sizer={labelSizer}>
                       {label}
                     </Swap>
