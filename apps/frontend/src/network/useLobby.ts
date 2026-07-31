@@ -18,7 +18,7 @@ import {
   createLobbyState,
   type LobbyState,
 } from './lobby/state'
-import { relayTargets } from './session/relay'
+import { isRelayable, relayTargets } from './session/relay'
 import { createTransport, type Transport } from './transport/peer'
 import type { PeerInfo, Setup, WireMessage } from './types'
 
@@ -195,7 +195,7 @@ export function useLobby(): UseLobby {
           // to every other connected peer (never back to the sender or itself),
           // preserving the original sender via relay() rather than re-stamping.
           const t = transportRef.current
-          if (!t) return
+          if (!t || !isRelayable(msg.type)) return
           const targets = relayTargets({
             connectedPeerIds: t.connectedIds(),
             hostId: current.hostId,
@@ -398,10 +398,10 @@ export function useLobby(): UseLobby {
   )
 
   // NOTE: transferHost currently only broadcasts the intent (TRANSFER_HOST).
-  // The actual host handoff — reconnecting peers to the new host, re-broadcasting
-  // the last TURN_RESOLVED state, and sending HOST_TRANSFERRED confirmation — is
-  // intentionally not implemented yet. It depends on the game-engine spec and the
-  // open deck-keeper decision, both deferred to a later milestone.
+  // The actual host handoff — reconnecting peers to the new host and sending the
+  // HOST_TRANSFERRED confirmation — is not implemented yet; it belongs to the
+  // page wiring in #18. Moving the host is only moving the relay: the keeper
+  // keeps playing and its state does not travel, so no game state is involved.
   const transferHost = useCallback(
     (id: string) => {
       const current = stateRef.current

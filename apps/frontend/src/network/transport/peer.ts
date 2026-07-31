@@ -87,7 +87,14 @@ export function createTransport(args: {
       })
       conn.on('data', (data) => {
         try {
-          args.onMessage(parseEnvelope(typeof data === 'string' ? data : JSON.stringify(data)))
+          const frame = parseEnvelope(typeof data === 'string' ? data : JSON.stringify(data))
+          // `from` is overwritten with the connection it arrived on, never read
+          // from the payload: the sender wrote that field and could write any
+          // peer id into it, and the keeper resolves a seat from it. The
+          // guarantee reaches directly-connected peers only — a frame relayed
+          // by the host arrives on the host's connection, so a keeper that is
+          // not the host still sees the relay's identity, not the origin's.
+          args.onMessage({ ...frame, from: conn.peer })
         } catch {
           // Drop malformed frames rather than crash the relay.
         }
