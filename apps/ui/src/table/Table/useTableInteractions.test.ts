@@ -3,7 +3,7 @@ import { vi } from 'vitest'
 import type { Card } from '@/cards/types'
 import type { HandItem } from '@/table/Hand/Hand'
 import type { TableActions, TableTarget } from './intents'
-import { useTableInteractions } from './useTableInteractions'
+import { type Options, useTableInteractions } from './useTableInteractions'
 
 // Minimal but complete Card fixtures — the hook never reads beyond `id`, but
 // the type is not loosened for the test.
@@ -37,7 +37,7 @@ const setup = (over: Record<string, unknown> = {}) => ({
     onPlay: vi.fn(),
     legalTargets: vi.fn((): TableTarget[] => []),
   } satisfies TableActions,
-  comboOptions: undefined as ((card: string) => string[]) | undefined,
+  comboOptions: undefined as Options['comboOptions'],
 })
 
 it('ignores a card that is not playable', () => {
@@ -136,6 +136,26 @@ it('refuses a partner outside the offered options', () => {
   act(() => result.current.onCardClick(1))
   expect(opts.actions.onPlay).not.toHaveBeenCalled()
   expect(result.current.phase).toBe('comboPending')
+})
+
+it('waits for a target after the combo partner is picked, dispatching nothing yet', () => {
+  const opts = setup({ playable: ['c1', 'c2'] })
+  const target = { kind: 'player', player: 'p2' } as const
+  opts.comboOptions = vi.fn((card) => (card === 'c1' ? ['c2'] : []))
+  opts.actions.legalTargets = vi.fn(() => [target])
+  const { result } = renderHook(() => useTableInteractions(opts))
+
+  act(() => result.current.onCardClick(0))
+  expect(result.current.phase).toBe('comboPending')
+  expect(opts.actions.onPlay).not.toHaveBeenCalled()
+
+  act(() => result.current.onCardClick(1))
+  expect(result.current.phase).toBe('selected')
+  expect(opts.actions.onPlay).not.toHaveBeenCalled()
+
+  act(() => result.current.onTargetPick(target))
+  expect(opts.actions.onPlay).toHaveBeenCalledTimes(1)
+  expect(opts.actions.onPlay).toHaveBeenCalledWith('c1', target, 'c2')
 })
 
 it('treats a target with the same fields in a different key order as legal', () => {

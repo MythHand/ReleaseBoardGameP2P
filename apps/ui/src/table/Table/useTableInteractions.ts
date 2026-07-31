@@ -4,7 +4,7 @@ import type { TableState } from './types'
 
 export type Phase = 'idle' | 'selected' | 'comboPending'
 
-interface Options {
+export interface Options {
   state: Pick<TableState, 'selfId' | 'you' | 'playable' | 'frozen'>
   actions?: TableActions
   // Legality of a combo pairing is the engine's answer — this hook never
