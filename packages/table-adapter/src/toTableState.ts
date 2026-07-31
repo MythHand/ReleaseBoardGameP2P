@@ -1,4 +1,5 @@
 import type { Event, PlayerView, ReleaseView } from '@release/engine'
+import { rulesFor } from '@release/engine'
 import type { HistoryEntry, TableState } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
 
@@ -33,6 +34,27 @@ function toReleaseSlots(release: ReleaseView) {
     database: release.database ? cardOrPlaceholder(release.database.card) : undefined,
     monitoring: release.monitoring ? cardOrPlaceholder(release.monitoring.card) : undefined,
   }
+}
+
+// Derivation, not a projected field: `PlayerView` carries no `comboOptions` —
+// the engine only exposes the sudo flag (`rulesFor(id)?.sudo`) and the
+// `support-sudo` card id, not a precomputed pairing table. Every sudo-capable
+// card in hand is mapped to the uids of every `support-sudo` card also in
+// hand; a hand with no `support-sudo` yields an empty partner list for each
+// sudo-capable card (not an absent entry), and a card that is not
+// sudo-capable gets no entry at all. If the engine ever changes how sudo
+// pairing works (e.g. gains a per-card cap or a used/consumed flag), this
+// derivation must be revisited alongside it — it is not sourced from the
+// engine's own answer, only from its rules table.
+function toComboOptions(hand: PlayerView['self']['hand']): Record<string, string[]> {
+  const supportSudoUids = hand.filter((c) => c.id === 'support-sudo').map((c) => c.uid)
+  const options: Record<string, string[]> = {}
+  for (const c of hand) {
+    if (rulesFor(c.id)?.sudo === true) {
+      options[c.uid] = supportSudoUids
+    }
+  }
+  return options
 }
 
 // Who the event happened to/because of. Most variants carry `player`; the few
@@ -130,9 +152,9 @@ export function toTableState(view: PlayerView, log: Event[], labels: HistoryLabe
     // contract.test-d.ts. Both carry openedAt alongside deadline already.
     pending: view.pending,
     window: view.window,
-    // comboOptions has no source in PlayerView yet — the engine's projection
-    // does not compute pairing legality, so this stays unset rather than
-    // guessed. participants/spectators are room facts and are never produced
-    // here (Decision 7 / the constraint on this task).
+    // Derived, not passed through — see toComboOptions for why and its
+    // maintenance caveat. participants/spectators are room facts and are
+    // never produced here (Decision 7 / the constraint on this task).
+    comboOptions: toComboOptions(view.self.hand),
   }
 }
