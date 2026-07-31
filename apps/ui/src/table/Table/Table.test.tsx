@@ -67,19 +67,21 @@ it('reports null when the active tab is clicked again', () => {
   expect(onPanelChange).toHaveBeenCalledWith(null)
 })
 
-it('zeroes the hand of an eliminated opponent and leaves the others alone', () => {
+it('marks an eliminated opponent with the eliminated badge and leaves the others alone', () => {
   const base = makeTableProps()
   const [out, alive] = base.state.opponents
   const opponents = base.state.opponents.map((o) =>
     o.id === out.id ? { ...o, eliminated: true } : o,
   )
   const { getByTestId } = render(<Table {...base} state={{ ...base.state, opponents }} />)
-  // The comparison against a live sibling is what makes this falsifiable —
-  // the mock gives every opponent a non-zero hand.
-  expect(within(getByTestId(`seat-${out.id}`)).getByTestId('hand-count').textContent).toBe('0')
-  expect(within(getByTestId(`seat-${alive.id}`)).getByTestId('hand-count').textContent).not.toBe(
-    '0',
-  )
+  // The comparison against a live sibling is what makes this falsifiable — the
+  // eliminated seat shows the eliminated badge and no card count; the live
+  // sibling shows its (non-zero, per the mock) card count and no badge.
+  expect(within(getByTestId(`seat-${out.id}`)).getByText(base.copy.seat.eliminated)).toBeTruthy()
+  expect(within(getByTestId(`seat-${out.id}`)).queryByTestId('hand-count')).toBeNull()
+  const aliveSeat = within(getByTestId(`seat-${alive.id}`))
+  expect(aliveSeat.queryByText(base.copy.seat.eliminated)).toBeNull()
+  expect(aliveSeat.getByTestId('hand-count').textContent).not.toBe('0')
 })
 
 it('shows the reconnect overlay from room.connection, not from a view flag', () => {

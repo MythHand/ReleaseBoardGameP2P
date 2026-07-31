@@ -55,16 +55,9 @@ export default function Seat({
         <StatusDot accent={statusAccent} pulse={statusPulse} size={7} />
         <span className={styles.name}>{player.name}</span>
         {eliminated ? (
-          <>
-            <Badge tone="muted" size="sm" className={styles.status}>
-              {copy.eliminated}
-            </Badge>
-            {/* Badge replaces the visible counter, but the (now zeroed) count
-                stays queryable — hidden, not removed. */}
-            <span data-testid="hand-count" hidden>
-              {player.handCount}
-            </span>
-          </>
+          <Badge tone="muted" size="sm" className={styles.status}>
+            {copy.eliminated}
+          </Badge>
         ) : disconnected ? (
           <Badge tone="danger" size="sm" className={styles.status}>
             {copy.disconnected}
