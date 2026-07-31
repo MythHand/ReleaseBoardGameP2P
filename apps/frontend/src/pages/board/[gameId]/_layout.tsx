@@ -15,8 +15,6 @@ const PLACEHOLDER_STATE = {
   decks: { main: 0, events: 0, discard: null, discardCount: 0 },
   history: [],
   setup: DEFAULT_SETUP,
-  participants: [],
-  spectators: [],
 }
 
 export default function BoardPage() {
@@ -27,16 +25,19 @@ export default function BoardPage() {
     <div data-testid="board-page">
       <Table
         state={PLACEHOLDER_STATE}
-        copy={t('table', { returnObjects: true })}
-        modesCopy={t('gameModes', { returnObjects: true })}
-        rulesCopy={t('rulesBlock', { returnObjects: true })}
-        seatCopy={t('seat', { returnObjects: true })}
-        participantsCopy={t('participants', { returnObjects: true })}
-        historyCopy={t('moveHistory', { returnObjects: true })}
-        reconnectCopy={t('reconnect', { returnObjects: true })}
-        gameOverCopy={t('gameOver', { returnObjects: true })}
-        lobbyCodeCopy={t('lobbyCode', { returnObjects: true })}
-        turnDockCopy={t('turnDock', { returnObjects: true })}
+        room={{ participants: [], spectators: [] }}
+        copy={{
+          table: t('table', { returnObjects: true }),
+          modes: t('gameModes', { returnObjects: true }),
+          rules: t('rulesBlock', { returnObjects: true }),
+          seat: t('seat', { returnObjects: true }),
+          participants: t('participants', { returnObjects: true }),
+          history: t('moveHistory', { returnObjects: true }),
+          reconnect: t('reconnect', { returnObjects: true }),
+          gameOver: t('gameOver', { returnObjects: true }),
+          lobbyCode: t('lobbyCode', { returnObjects: true }),
+          turnDock: t('turnDock', { returnObjects: true }),
+        }}
       />
       <Outlet />
     </div>

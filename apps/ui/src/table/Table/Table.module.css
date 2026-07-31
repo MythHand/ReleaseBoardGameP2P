@@ -145,3 +145,22 @@
   margin: 4px 0;
   background: var(--white-10);
 }
+
+/* slot positions — app-only chrome supplied by the consumer (`slots.banner` /
+   `slots.corner`), rendered right after the HUD background layer. */
+.banner {
+  position: absolute;
+  inset-block-start: 16px;
+  inset-inline: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.corner {
+  position: absolute;
+  inset-block-start: 16px;
+  inset-inline-start: 16px;
+  z-index: 5;
+}

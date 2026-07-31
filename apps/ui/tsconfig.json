@@ -2,7 +2,10 @@
   "extends": "@release/lint/tsconfig",
   "compilerOptions": {
     "allowJs": false,
-    "paths": { "@/*": ["./src/*"] },
+    "paths": {
+      "@/*": ["./src/*"],
+      "@release/translation/*": ["../../packages/translation/src/*"]
+    },
     "types": ["vite/client", "vitest/globals"]
   },
   "include": ["src"]

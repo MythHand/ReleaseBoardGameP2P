@@ -77,19 +77,27 @@ export default function TableStory() {
 
   const base = useMemo(() => makeTable(opps), [opps])
   // spectators kicked by the host are removed from the roster
-  const state = { ...base, spectators: base.spectators.filter((s) => !kicked.has(s.id)) }
+  const spectators = base.spectators.filter((s) => !kicked.has(s.id))
+  const state = {
+    you: base.you,
+    opponents: base.opponents,
+    decks: base.decks,
+    turn: base.turn,
+    history: base.history,
+    setup: base.setup,
+  }
 
   const variant = END_VARIANTS.find((v) => v.id === end)
   const none = pick(lang, { ru: '— нет —', en: '— none —' })
 
   // pause window — readiness lamps built from the roster; the local player is
   // 'you', the host is 'you' when hosting, otherwise the first opponent
-  const pausePlayers = state.participants.map((p) => ({
+  const pausePlayers = base.participants.map((p) => ({
     id: p.id,
     name: p.name,
     ready: ready.has(p.id),
   }))
-  const pauseHostId = role === 'host' ? 'you' : state.participants.find((p) => p.id !== 'you')?.id
+  const pauseHostId = role === 'host' ? 'you' : base.participants.find((p) => p.id !== 'you')?.id
   const togglePause = (on: boolean) => {
     setPaused(on)
     if (on) setReady(new Set()) // a fresh pause starts with everyone not-ready
@@ -193,35 +201,48 @@ export default function TableStory() {
       <div className={styles.stage}>
         <Table
           state={state}
+          room={{
+            role,
+            code: '4F2A-9K',
+            participants: base.participants,
+            spectators,
+            spectatorLimit: specLimit,
+            onSpectatorLimitChange: setSpecLimit,
+            onKickSpectator: (id) => setKicked((k) => new Set(k).add(id)),
+            lang,
+            onLangChange: setLang,
+            paused,
+            onPauseChange: togglePause,
+            pausePlayers,
+            pauseSelfId: 'you',
+            pauseHostId,
+            onPauseToggleReady: toggleSelfReady,
+          }}
+          copy={{
+            table: {
+              ...tableCopy,
+              generalTitle,
+              pauseGame: pauseLabel,
+              pauseOn,
+              pauseOff,
+              pauseHint,
+            },
+            modes: pick(lang, { ru: ruCommon.gameModes, en: enCommon.gameModes }),
+            rules: pick(lang, { ru: ruCommon.rulesBlock, en: enCommon.rulesBlock }),
+            seat: pick(lang, { ru: ruCommon.seat, en: enCommon.seat }),
+            participants: pick(lang, { ru: ruCommon.participants, en: enCommon.participants }),
+            history: pick(lang, { ru: ruCommon.moveHistory, en: enCommon.moveHistory }),
+            reconnect: pick(lang, { ru: ruCommon.reconnect, en: enCommon.reconnect }),
+            gameOver: pick(lang, { ru: ruCommon.gameOver, en: enCommon.gameOver }),
+            lobbyCode: pick(lang, { ru: ruCommon.lobbyCode, en: enCommon.lobbyCode }),
+            turnDock: pick(lang, { ru: ruCommon.turnDock, en: enCommon.turnDock }),
+            pause: pauseCopy,
+          }}
           view={view}
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
           onOverContinue={() => setEnd(null)}
-          modesCopy={pick(lang, { ru: ruCommon.gameModes, en: enCommon.gameModes })}
-          rulesCopy={pick(lang, { ru: ruCommon.rulesBlock, en: enCommon.rulesBlock })}
-          seatCopy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
-          turnDockCopy={pick(lang, { ru: ruCommon.turnDock, en: enCommon.turnDock })}
-          participantsCopy={pick(lang, { ru: ruCommon.participants, en: enCommon.participants })}
-          historyCopy={pick(lang, { ru: ruCommon.moveHistory, en: enCommon.moveHistory })}
-          reconnectCopy={pick(lang, { ru: ruCommon.reconnect, en: enCommon.reconnect })}
-          gameOverCopy={pick(lang, { ru: ruCommon.gameOver, en: enCommon.gameOver })}
-          copy={{ ...tableCopy, generalTitle, pauseGame: pauseLabel, pauseOn, pauseOff, pauseHint }}
-          lobbyCodeCopy={pick(lang, { ru: ruCommon.lobbyCode, en: enCommon.lobbyCode })}
-          lang={lang}
-          onLangChange={setLang}
-          code="4F2A-9K"
-          role={role}
-          spectatorLimit={specLimit}
-          onSpectatorLimitChange={setSpecLimit}
-          onKickSpectator={(id) => setKicked((k) => new Set(k).add(id))}
           turnDockState={dock === 'reaction503' ? 'reaction' : dock}
           turnDockDanger={dock === 'reaction503'}
-          paused={paused}
-          onPauseChange={togglePause}
-          pausePlayers={pausePlayers}
-          pauseSelfId="you"
-          pauseHostId={pauseHostId}
-          onPauseToggleReady={toggleSelfReady}
-          pauseCopy={pauseCopy}
         />
       </div>
     </div>
