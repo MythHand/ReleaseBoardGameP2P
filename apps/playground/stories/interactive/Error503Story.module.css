@@ -1,0 +1,292 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* while a card is being dragged — kill text selection so interface copy doesn't
+   highlight under the cursor (breaks the game feel) */
+.dragging {
+  user-select: none;
+}
+
+/* technical top control line — dev controls (TableStory pattern) */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid var(--white-08);
+}
+
+/* dev toggle chip — off = outline, on = brand-green fill */
+.chip {
+  padding: 8px 14px;
+  color: var(--fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.chip[data-on="true"] {
+  color: var(--deep-green);
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.reset {
+  padding: 8px 14px;
+  margin-inline-start: auto;
+  color: var(--fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.reset:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* ===== table layout — positions mirror @release/ui Table.module.css ===== */
+
+/* draw deck — left-centre */
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  transform: translateY(-50%);
+}
+
+/* discard — right of centre, before the (implicit) right rail */
+.discard {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 86px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  transform: translateY(-50%);
+}
+
+.discardStack {
+  position: relative;
+  inline-size: 116px;
+  aspect-ratio: var(--card-aspect);
+}
+
+.discardCard {
+  position: absolute;
+  inset: 0;
+}
+
+.discardEmpty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white-30);
+  border: 1px dashed var(--white-15);
+  border-radius: 8px;
+}
+
+.discardCount {
+  position: absolute;
+  inset-block-start: 6px;
+  inset-inline-start: 8px;
+  z-index: 20;
+  color: var(--white-45);
+}
+
+.label {
+  color: var(--white-45);
+}
+
+/* turn dock — bottom-left, under the deck, left of the hand. Sits ABOVE the red
+   edge glow (which paints from the table edges). */
+.turnDock {
+  position: absolute;
+  inset-block-end: 20px;
+  inset-inline-start: 26px;
+  z-index: 55;
+}
+
+/* release zone + hand — bottom-centre, clear of the dock (left) and rail (right).
+   Positioning context for the cross-fading "you are out" overlay. */
+.you {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
+}
+
+/* the live play area (release zone + hand) — cross-fades out on elimination */
+.playArea {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  transition: opacity 420ms var(--ease-out);
+}
+
+.playArea[data-hidden="true"] {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.releaseZone {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.slot {
+  position: relative;
+  inline-size: 92px;
+  aspect-ratio: var(--card-aspect);
+}
+
+/* a release that can defend the 503 — grabbable + a category-accent glow ring
+   (mirrors the Card "playable" state, which CardPair can't take as a prop) */
+.playable {
+  cursor: grab;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 2px var(--hl),
+    0 0 22px 2px color-mix(in srgb, var(--hl) 50%, transparent);
+}
+
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--white-30);
+  text-align: center;
+  border: 1px dashed var(--white-12);
+  border-radius: 8px;
+}
+
+/* release + code review — a flat stack (code review peeks behind, NO rotation),
+   so nothing's bounding box drifts when the cards fly to the discard */
+.pairStack {
+  position: relative;
+  inline-size: 100%;
+  aspect-ratio: var(--card-aspect);
+}
+
+.pairAux {
+  position: absolute;
+  inset: 0;
+  filter: brightness(0.82);
+  transform: translateY(-12%);
+}
+
+.pairMain {
+  position: absolute;
+  inset: 0;
+}
+
+.handWrap {
+  inline-size: 100%;
+}
+
+/* "you are out" — fades in over the play area, lifted off the very bottom
+   (mirrors the Table screen) */
+.eliminated {
+  position: absolute;
+  inset-block-end: 92px;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 420ms var(--ease-out);
+}
+
+.eliminated[data-shown="true"] {
+  opacity: 1;
+}
+
+/* centre staging — the 503 comes out here and defence covers it here.
+   150px = the deck / hand card width, so nothing skews in size across the table */
+.center {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(-50%, -50%);
+}
+
+/* a card revealed / resting at the centre */
+.centerCard {
+  position: absolute;
+  inset: 0;
+}
+
+/* full-area bounds for the edge glow — offset below the tech bar so the glow
+   sits in the table zone, not across the whole screen (set inline via barH) */
+.glowBounds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* the flying draw card / cards leaving to the discard — fixed, viewport coords */
+.flyer {
+  position: fixed;
+  z-index: 70;
+  pointer-events: none;
+}
+
+/* the card being dragged as a defence — rides above everything, follows cursor */
+.dragFlyer {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  cursor: grabbing;
+}
+
+/* elimination video — full-screen overlay above everything, shown to all players
+   when someone is knocked out; fades in on mount, out via data-out */
+.gifOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--surface-0) 82%, transparent);
+  opacity: 1;
+  transition: opacity 340ms var(--ease-out);
+  animation: gif-in 340ms var(--ease-out);
+}
+
+.gifOverlay[data-out="true"] {
+  opacity: 0;
+}
+
+.gifVideo {
+  max-inline-size: 72%;
+  max-block-size: 72%;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px var(--black-50);
+}
+
+@keyframes gif-in {
+  from {
+    opacity: 0;
+  }
+}

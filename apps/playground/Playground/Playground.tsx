@@ -33,6 +33,7 @@ import CardToHandStory from '../stories/interactive/CardToHandStory'
 import DealCardsStory from '../stories/interactive/DealCardsStory'
 import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
+import Error503Story from '../stories/interactive/Error503Story'
 import GitCardsStory from '../stories/interactive/GitCards/GitCardsStory'
 import OpponentTakesCardStory from '../stories/interactive/OpponentTakesCardStory'
 import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
@@ -141,6 +142,7 @@ const groups: Group[] = [
         render: () => <OpponentTakesCardStory />,
       },
       { id: 'git-cards', title: 'Git cards', render: () => <GitCardsStory /> },
+      { id: 'error-503', title: 'Error 503', render: () => <Error503Story /> },
       { id: 'card-to-hand', title: 'Card to Hand', render: () => <CardToHandStory /> },
       { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
