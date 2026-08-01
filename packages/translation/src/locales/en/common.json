@@ -67,21 +67,42 @@
       "offline": "offline"
     },
     "achievements": {
-      "ddos": { "title": "King of DDoS", "unit": "times played DDoS" },
-      "ai": { "title": "AI Addict", "unit": "AI cards from deck" },
-      "err503": { "title": "Lucky One", "unit": "Error 503s from deck" },
-      "cherryPick": { "title": "Treasure Hunter", "unit": "times pulled from discard" },
-      "attackedInto": { "title": "Bug Magnet", "unit": "attack cards taken" }
+      "ddos": {
+        "title": "King of DDoS",
+        "unit": "times played DDoS"
+      },
+      "ai": {
+        "title": "AI Addict",
+        "unit": "AI cards from deck"
+      },
+      "err503": {
+        "title": "Lucky One",
+        "unit": "Error 503s from deck"
+      },
+      "cherryPick": {
+        "title": "Treasure Hunter",
+        "unit": "times pulled from discard"
+      },
+      "attackedInto": {
+        "title": "Bug Magnet",
+        "unit": "attack cards taken"
+      }
     }
   },
-  "help": { "title": "How to play", "back": "Back to start" },
+  "help": {
+    "title": "How to play",
+    "back": "Back to start"
+  },
   "error": {
     "title": "Something went wrong",
     "description": "An unexpected error occurred. Try reloading the page.",
     "reload": "Reload",
     "backToStart": "Back to start"
   },
-  "language": { "en": "EN", "ru": "RU" },
+  "language": {
+    "en": "EN",
+    "ru": "RU"
+  },
   "rules": {
     "searchPlaceholder": "search rules…",
     "notFound": "Nothing found",
@@ -208,7 +229,10 @@
   },
   "gameOver": {
     "winner": "winner",
-    "conditions": { "release": "3 releases shipped", "lastStanding": "last one standing" },
+    "conditions": {
+      "release": "3 releases shipped",
+      "lastStanding": "last one standing"
+    },
     "continue": "to stats"
   },
   "participants": {
@@ -221,10 +245,6 @@
     "noSpectators": "no spectators yet",
     "actions": "actions",
     "kick": "kick"
-  },
-  "moveHistory": {
-    "draw": "draw",
-    "eliminated": "is out"
   },
   "reconnect": {
     "label": "reconnecting…",
@@ -600,5 +620,37 @@
     "disbandTitle": "Disband lobby?",
     "disbandText": "The lobby will be closed and all connected players disconnected. This cannot be undone.",
     "cancel": "cancel"
+  },
+  "moveHistory": {
+    "draw": "draw",
+    "eliminated": "is out"
+  },
+  "historyLabels": {
+    "aiRevealed": "AI event",
+    "attacked": "attack",
+    "dealt": "dealt in",
+    "defended": "defence",
+    "discarded": "discard",
+    "drawn": "draw",
+    "eliminated": "is out",
+    "gameOver": "game over",
+    "handTransfer": "handed over",
+    "monitoringDestroyed": "monitoring destroyed",
+    "neutralized": "neutralised",
+    "passed": "passed",
+    "placed": "placed",
+    "rejected": "rejected",
+    "releaseDestroyed": "release destroyed",
+    "releaseReturned": "release returned",
+    "releaseStolen": "release stolen",
+    "released": "release",
+    "requested": "demand",
+    "revealed": "revealed",
+    "tookHit": "took the hit",
+    "turnEnded": "turn over",
+    "turnStarted": "turn",
+    "unpassed": "back in",
+    "windowClosed": "reaction over",
+    "windowOpened": "reaction"
   }
 }

@@ -1,5 +1,7 @@
+import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { DEFAULT_SETUP } from '@release/ui'
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { seatOf, seatsFor } from '~/entities/game/seats'
 import {
   canStart as canStartFn,
   disbandLobby as disbandLobbyFn,
@@ -18,7 +20,10 @@ import {
   createLobbyState,
   type LobbyState,
 } from './lobby/state'
+import type { GameLink, Sync } from './session/link'
+import { createSession, type SessionRef } from './session/referee'
 import { isRelayable, relayTargets } from './session/relay'
+import { attachKeeper, createRemoteLink } from './session/remoteLink'
 import { createTransport, type Transport } from './transport/peer'
 import type { PeerInfo, Setup, WireMessage } from './types'
 
@@ -70,6 +75,17 @@ export interface UseLobby {
   // when the host's GAME_STARTING arrives. Both roles navigate off this single
   // signal, so nobody is left behind in the lobby.
   gameId: string | null
+  // The seam the page holds, and nothing else — it cannot tell a local keeper
+  // from a remote one, which is what keeps solo play and networked play on the
+  // same code path. Null until a game starts, and for a spectator, who has no
+  // seat to submit from.
+  gameLink: GameLink | null
+  // The most recent projection this peer received. Held here rather than
+  // subscribed to by the page, because the link is born inside the message
+  // handler and the page only mounts after navigating — a SYNC arriving in that
+  // gap would reach an empty listener set and be lost, leaving the player
+  // staring at an empty table until someone else moved.
+  gameSync: Sync | null
   error: string | null
   errorKind: ErrorKind
   createRoom(name: string, maxPlayers: number, setup?: Setup): Promise<string>
@@ -93,7 +109,15 @@ export function useLobby(): UseLobby {
   const [error, setError] = useState<string | null>(null)
   const [errorKind, setErrorKind] = useState<ErrorKind>(null)
   const [gameId, setGameId] = useState<string | null>(null)
+  const [gameLink, setGameLink] = useState<GameLink | null>(null)
+  const [gameSync, setGameSync] = useState<Sync | null>(null)
   const transportRef = useRef<Transport | null>(null)
+  // The keeper's session, held only by the host. `sessionRef` is the state the
+  // referee reduces; `keeperRef` and `remoteRef` are the two mutually exclusive
+  // ends of the wire — a peer is one or the other, never both.
+  const sessionRef = useRef<SessionRef | null>(null)
+  const keeperRef = useRef<ReturnType<typeof attachKeeper> | null>(null)
+  const remoteRef = useRef<ReturnType<typeof createRemoteLink> | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
   // Whether the guest's DataChannel to the host ever opened. Distinguishes a
@@ -196,6 +220,11 @@ export function useLobby(): UseLobby {
           const r = handleReady(current, msg.from)
           commit(r.state)
           dispatch(r.outgoing)
+        } else if (msg.type === 'INTENT') {
+          // The only party that calls into the engine. `applyIntent` resolves the
+          // seat from the sender's peer id and stamps the player itself, so a
+          // peer cannot act for anyone but itself however it labels the frame.
+          keeperRef.current?.handleMessage(msg)
         } else {
           // Star topology: the host forwards any other peer-originated message
           // to every other connected peer (never back to the sender or itself),
@@ -232,11 +261,29 @@ export function useLobby(): UseLobby {
           if (msg.payload.peerId === current.selfId) setStatus('kicked')
           else commit(applyPeerLeft(current, msg.payload.peerId))
           break
-        case 'GAME_STARTING':
+        case 'GAME_STARTING': {
           // The host has left for the board; follow it. The id is carried rather
           // than derived so a future host handover can rename the room without
           // every guest recomputing it.
-          if (fromHost) setGameId(msg.payload.gameId)
+          if (!fromHost) break
+          const t = transportRef.current
+          if (t && !remoteRef.current) {
+            // The keeper is the host today. `keeperPeerId` is a peer id, never a
+            // PlayerId — the two spaces are both `string`, so the distinction has
+            // to be kept by hand (session/remoteLink.ts:34).
+            const remote = createRemoteLink({ transport: t, keeperPeerId: current.hostId })
+            remoteRef.current = remote
+            remote.link.subscribe(setGameSync)
+            setGameLink(() => remote.link)
+          }
+          setGameId(msg.payload.gameId)
+          break
+        }
+        case 'SYNC':
+        case 'KEEPER_CHANGED':
+          // The remote link re-checks the sender against the keeper it knows, so
+          // this is a route rather than a trust decision.
+          remoteRef.current?.handleMessage(msg)
           break
         case 'LOBBY_DISBANDED':
           if (fromHost) {
@@ -447,6 +494,13 @@ export function useLobby(): UseLobby {
     setIsHost(false)
     // Or returning to /start would immediately bounce back to the board.
     setGameId(null)
+    keeperRef.current?.close()
+    remoteRef.current?.link.close()
+    keeperRef.current = null
+    remoteRef.current = null
+    sessionRef.current = null
+    setGameLink(null)
+    setGameSync(null)
     if (!t) return
     if (flushMs) setTimeout(() => t.close(), flushMs)
     else t.close()
@@ -469,10 +523,41 @@ export function useLobby(): UseLobby {
   // component must not be what the others are waiting on.
   const startGame = useCallback(() => {
     const current = stateRef.current
-    if (!current || !isHostRef.current) return
+    const t = transportRef.current
+    if (!current || !t || !isHostRef.current) return
     const id = current.hostId
+
+    const seats = seatsFor(current.peers)
+    const mine = seatOf(seats, current.selfId)
+    if (!mine) return
+
+    // The engine never sources randomness, so the seed is the host's and travels
+    // with the deal. Determinism is what lets every peer replay identically.
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0]
+
+    const { session } = createSession({
+      gameId: id,
+      keeperId: mine.playerId,
+      engine: createFakeEngine(),
+      seed,
+      players: seats,
+      setup: current.setup,
+      deck: FAKE_DECK,
+      events: FAKE_EVENTS,
+    })
+    const ref: SessionRef = { current: session }
+    sessionRef.current = ref
+    const keeper = attachKeeper({ ref, transport: t, now: () => Date.now() })
+    keeperRef.current = keeper
+    keeper.link.subscribe(setGameSync)
+    setGameLink(() => keeper.link)
+
+    // Tell the table to follow before dealing, so a guest has built its remote
+    // link by the time its projection arrives. DataChannels preserve order, so
+    // GAME_STARTING is always ahead of the SYNC that follows it.
     dispatch([{ to: 'broadcast', message: { type: 'GAME_STARTING', payload: { gameId: id } } }])
     setGameId(id)
+    keeper.resync()
   }, [dispatch])
 
   const disband = useCallback(() => {
@@ -508,6 +593,8 @@ export function useLobby(): UseLobby {
       isHost,
       canStart: state ? canStartFn(state) : false,
       gameId,
+      gameLink,
+      gameSync,
       error,
       errorKind,
       createRoom,
@@ -528,6 +615,8 @@ export function useLobby(): UseLobby {
       roomCode,
       isHost,
       gameId,
+      gameLink,
+      gameSync,
       error,
       errorKind,
       createRoom,

@@ -11,6 +11,7 @@ import {
   type Outgoing,
   rebind,
   type SessionRef,
+  syncAll,
   tick,
 } from './referee'
 
@@ -94,6 +95,10 @@ export interface KeeperHandle {
   // is always undefined, so a self-addressed send is silently dropped), so they
   // go straight into the referee and its own SYNCs come back the same way.
   link: GameLink
+  // Push every seat its current projection. `createSession` returns the opening
+  // deal as `outgoing`, but a caller holding only this handle has nowhere to put
+  // it — so without this nobody sees their hand until they act.
+  resync(): void
   handleMessage(frame: WireMessage): void
   peerLeft(peerId: string): void
   peerReturned(playerId: PlayerId, peerId: string): void
@@ -163,6 +168,16 @@ export function attachKeeper(args: {
       close() {
         listeners.clear()
       },
+    },
+    resync() {
+      if (!keeping) return
+      // No events: a statement of where the game stands, not a replay of how it
+      // got there.
+      commit(
+        args.ref,
+        { session: args.ref.current, outgoing: syncAll(args.ref.current, []) },
+        deliver,
+      )
     },
     handleMessage(frame) {
       if (!keeping) return

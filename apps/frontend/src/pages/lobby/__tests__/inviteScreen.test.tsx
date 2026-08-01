@@ -32,6 +32,8 @@ function base(): UseLobby {
     isHost: false,
     canStart: false,
     gameId: null,
+    gameLink: null,
+    gameSync: null,
     error: null,
     errorKind: null,
     createRoom: vi.fn(),
