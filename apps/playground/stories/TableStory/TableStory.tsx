@@ -54,6 +54,9 @@ const VIEW_STATES: ViewItem[] = [
 
 // служебный док: демо-состояния (reaction503 = красная danger-реакция →
 // в Table это state='reaction' + turnDockDanger)
+// Fixed span the reaction demo states sweep against.
+const DEMO_WINDOW_MS = 16_000
+
 type DockDemo = 'draw' | 'push' | 'waiting' | 'reaction' | 'reaction503'
 const DOCK_STATES: { id: DockDemo; label: Loc }[] = [
   { id: 'draw', label: { ru: 'ход · добор', en: 'turn · draw' } },
@@ -79,6 +82,13 @@ export default function TableStory() {
     const id = setInterval(() => setNow(Date.now()), 250)
     return () => clearInterval(id)
   }, [])
+  // Anchor for the reaction demo states' sweep, reset each time either is
+  // (re-)selected so switching back into it restarts the countdown.
+  const [demoOpenedAt, setDemoOpenedAt] = useState<number | null>(null)
+  const isReactionDemo = dock === 'reaction' || dock === 'reaction503'
+  useEffect(() => {
+    if (isReactionDemo) setDemoOpenedAt(Date.now())
+  }, [isReactionDemo])
 
   const base = useMemo(() => makeTable(opps), [opps])
   // spectators kicked by the host are removed from the roster
@@ -266,8 +276,21 @@ export default function TableStory() {
           dock={{
             state: dock === 'reaction503' ? 'reaction' : dock,
             danger: dock === 'reaction503',
-            seconds: 16,
-            progress: 0.55,
+            // Only the two reaction demo states own a countdown to show; for
+            // 'draw' / 'push' / 'waiting' the ring is either not rendered or
+            // reads 0, so seconds/progress fall through to Table's own
+            // `deriveDock(state, selfId, now)` instead of freezing them —
+            // an unconditional override here previously always won, so the
+            // ring never actually swept no matter how often `now` ticked.
+            ...(isReactionDemo && demoOpenedAt !== null
+              ? {
+                  seconds: Math.max(0, Math.ceil((demoOpenedAt + DEMO_WINDOW_MS - now) / 1000)),
+                  progress: Math.min(
+                    1,
+                    Math.max(0, (demoOpenedAt + DEMO_WINDOW_MS - now) / DEMO_WINDOW_MS),
+                  ),
+                }
+              : {}),
             // matches the dock's previous hardcoded lookup (always the first
             // opponent), independent of whose turn `state.turn` actually names
             activePlayer: state.opponents[0]?.name,
