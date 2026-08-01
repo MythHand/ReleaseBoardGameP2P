@@ -337,7 +337,7 @@ export default function Table({
         />
         {/* you already passed on the open window — TurnDock has no notion of
             "unpass", so the affordance to take it back lives here instead */}
-        {state.window?.passed.includes(state.selfId) && copy.window && (
+        {state.window?.passed.includes(state.selfId) && (
           <Button variant="tech" className={styles.unpass} onClick={() => actions?.onUnpass?.()}>
             {copy.window.unpass}
           </Button>
@@ -346,7 +346,7 @@ export default function Table({
 
       {/* the engine is waiting on a decision from you — a pending owed to you
           always renders, regardless of whose turn the projection says it is */}
-      {state.pending?.player === state.selfId && copy.pending && (
+      {state.pending?.player === state.selfId && (
         <PendingPrompt
           pending={state.pending}
           hand={you.hand}

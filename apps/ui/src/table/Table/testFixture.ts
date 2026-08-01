@@ -42,6 +42,8 @@ export function makeTableProps(over: Partial<TableProps> = {}): TableProps {
       gameOver: enCommon.gameOver,
       lobbyCode: enCommon.lobbyCode,
       turnDock: enCommon.turnDock,
+      pending: enCommon.pending,
+      window: enCommon.window,
     },
     ...over,
   } as TableProps

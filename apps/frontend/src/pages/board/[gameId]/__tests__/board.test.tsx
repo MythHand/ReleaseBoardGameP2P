@@ -111,3 +111,41 @@ it('renders a real projection: own hand in full, opponents by count only', async
   expect(opponentHand.length).toBeGreaterThan(0)
   for (const uid of opponentHand) expect(container.innerHTML).not.toContain(uid)
 })
+
+it('renders the pending prompt from the real catalog when a decision is owed', async () => {
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 7,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const projected = engine.project(state, 'p1')
+  const view = {
+    ...projected,
+    pending: {
+      kind: 'discardForRelease' as const,
+      player: 'p1',
+      options: projected.self.hand.map((c) => c.uid),
+    },
+  }
+  sessionValue = { ...session(), gameSync: { view, events: [] } } as unknown as UseLobby
+
+  renderBoard()
+
+  // The prompt is gated on `copy.pending` being present. With the key absent
+  // from the catalogs the whole branch is skipped silently — the game then
+  // deadlocks, because a pending rejects every subsequent action.
+  // Asserted on the heading, which PendingPrompt renders as plain text from
+  // `kindCopy.prompt`; `copy.confirm` is a ConfirmAction label and reaching it
+  // would test that component's affordance rather than this binding.
+  const heading = await screen.findByText(
+    /^(discard a card to ship this release|сбросьте карту, чтобы выложить релиз)$/i,
+  )
+  expect(heading).toBeTruthy()
+})

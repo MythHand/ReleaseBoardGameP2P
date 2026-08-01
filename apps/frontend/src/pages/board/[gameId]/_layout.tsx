@@ -79,6 +79,8 @@ export default function BoardPage() {
           gameOver: t('gameOver', { returnObjects: true }),
           lobbyCode: t('lobbyCode', { returnObjects: true }),
           turnDock: t('turnDock', { returnObjects: true }),
+          pending: t('pending', { returnObjects: true }),
+          window: t('window', { returnObjects: true }),
         }}
       />
       <Outlet />

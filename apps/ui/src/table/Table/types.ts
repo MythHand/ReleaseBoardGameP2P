@@ -126,8 +126,8 @@ export interface TableCopyBundle {
   lobbyCode: LobbyCodeCopy
   turnDock: TurnDockCopy
   pause?: PauseGameCopy
-  pending?: PendingPromptCopy
-  window?: WindowCopy
+  pending: PendingPromptCopy
+  window: WindowCopy
 }
 
 export interface TableSlots {
