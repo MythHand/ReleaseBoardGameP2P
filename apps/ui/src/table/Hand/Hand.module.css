@@ -28,11 +28,14 @@
   filter: grayscale(0.7) brightness(0.55);
 }
 
-/* the card being dragged out of the hand — rides above everything, at the cursor */
+/* the card being dragged out of the hand — rides above everything, at the cursor.
+   Rotates about bottom-center to MATCH .slot's pivot, so the settle glide lands
+   exactly where the real slot card rests (no end-of-transition micro-jump). */
 .flyer {
   position: fixed;
   z-index: 1200;
   pointer-events: none;
+  transform-origin: bottom center;
   will-change: left, top;
 }
 
