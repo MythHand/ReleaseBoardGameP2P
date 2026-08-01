@@ -24,7 +24,9 @@ Add a `pending` block to both catalogs matching `PendingPromptCopy` (`PendingPro
 
 ### 2. The game-over path
 
-`toTableState` maps `PlayerView.over` to `TableOver` — a rename, `winner` → `winnerId`, `condition` passed through. The page passes `over` and an `onOverContinue` that navigates to `/board/:gameId/stats`, already a child route of the board layout's `Outlet`.
+`over` is a member of `TableProps`, not of `TableState`, so `toTableState` structurally cannot carry it. The adapter gains a second entry point beside it — `toTableOver(view): TableOver | null` — which is a rename, `winner` → `winnerId`, with `condition` passed through. The mapping stays in the adapter because that is the one package allowed to see both `@release/engine` and `@release/ui`.
+
+The page passes `over` and an `onOverContinue` that navigates to `/board/:gameId/stats`, already a child route of the board layout's `Outlet`.
 
 `Stats` renders an empty result table until [#19](https://github.com/MythHand/ReleaseBoardGameP2P/issues/19) computes per-player statistics — the engine produces none today. Landing on a real, empty route is chosen over dismissing the overlay to nothing: the route is the designed flow, and its `toLobby` action already works.
 
