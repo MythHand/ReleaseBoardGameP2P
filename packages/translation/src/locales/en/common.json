@@ -222,6 +222,23 @@
     "locked": "PUSH after draw",
     "canDefend": "you can defend"
   },
+  "pending": {
+    "confirm": "confirm",
+    "decline": "let it through",
+    "discardForRelease": { "prompt": "discard a card to ship this release", "action": "discard" },
+    "defend": { "prompt": "you are under attack", "action": "defend" },
+    "neutralize503": {
+      "prompt": "error 503 — neutralize it or you are out",
+      "action": "neutralize"
+    },
+    "crush": { "prompt": "your release is being crushed", "action": "neutralize" },
+    "requestCard": { "prompt": "name the card you demand", "action": "demand" },
+    "giveCard": { "prompt": "hand over the card", "action": "give" },
+    "handLimit": { "prompt": "your hand is over the limit", "action": "discard" }
+  },
+  "window": {
+    "unpass": "cancel pass"
+  },
   "seat": {
     "eliminated": "eliminated",
     "disconnected": "offline",
