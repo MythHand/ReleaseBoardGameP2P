@@ -67,21 +67,42 @@
       "offline": "не в сети"
     },
     "achievements": {
-      "ddos": { "title": "King of DDoS", "unit": "раз сыграл DDoS" },
-      "ai": { "title": "AI зависимый", "unit": "карт AI из колоды" },
-      "err503": { "title": "Везучий", "unit": "ошибок 503 из колоды" },
-      "cherryPick": { "title": "Кладоискатель", "unit": "раз достал из сброса" },
-      "attackedInto": { "title": "Забагованный", "unit": "карт атаки прилетело" }
+      "ddos": {
+        "title": "King of DDoS",
+        "unit": "раз сыграл DDoS"
+      },
+      "ai": {
+        "title": "AI зависимый",
+        "unit": "карт AI из колоды"
+      },
+      "err503": {
+        "title": "Везучий",
+        "unit": "ошибок 503 из колоды"
+      },
+      "cherryPick": {
+        "title": "Кладоискатель",
+        "unit": "раз достал из сброса"
+      },
+      "attackedInto": {
+        "title": "Забагованный",
+        "unit": "карт атаки прилетело"
+      }
     }
   },
-  "help": { "title": "Как играть", "back": "Назад" },
+  "help": {
+    "title": "Как играть",
+    "back": "Назад"
+  },
   "error": {
     "title": "Что-то пошло не так",
     "description": "Произошла непредвиденная ошибка. Попробуйте перезагрузить страницу.",
     "reload": "Перезагрузить",
     "backToStart": "На главную"
   },
-  "language": { "en": "EN", "ru": "RU" },
+  "language": {
+    "en": "EN",
+    "ru": "RU"
+  },
   "rules": {
     "searchPlaceholder": "поиск по правилам…",
     "notFound": "Ничего не найдено",
@@ -208,7 +229,10 @@
   },
   "gameOver": {
     "winner": "победитель",
-    "conditions": { "release": "Собраны 3 релиза", "lastStanding": "Остался последним" },
+    "conditions": {
+      "release": "Собраны 3 релиза",
+      "lastStanding": "Остался последним"
+    },
     "continue": "к статистике"
   },
   "participants": {
@@ -221,10 +245,6 @@
     "noSpectators": "пока без зрителей",
     "actions": "действия",
     "kick": "исключить"
-  },
-  "moveHistory": {
-    "draw": "добор",
-    "eliminated": "выбыл из игры"
   },
   "reconnect": {
     "label": "переподключение…",
@@ -600,5 +620,37 @@
     "disbandTitle": "Расформировать лобби?",
     "disbandText": "Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить.",
     "cancel": "отмена"
+  },
+  "moveHistory": {
+    "draw": "добор",
+    "eliminated": "выбыл из игры"
+  },
+  "historyLabels": {
+    "aiRevealed": "событие AI",
+    "attacked": "атака",
+    "dealt": "раздача",
+    "defended": "защита",
+    "discarded": "сброс",
+    "drawn": "добор",
+    "eliminated": "выбыл из игры",
+    "gameOver": "игра окончена",
+    "handTransfer": "передача карты",
+    "monitoringDestroyed": "мониторинг разрушен",
+    "neutralized": "нейтрализовано",
+    "passed": "пас",
+    "placed": "выложил",
+    "rejected": "отклонено",
+    "releaseDestroyed": "релиз разрушен",
+    "releaseReturned": "релиз возвращён",
+    "releaseStolen": "релиз украден",
+    "released": "релиз",
+    "requested": "требование",
+    "revealed": "раскрыто",
+    "tookHit": "принял удар",
+    "turnEnded": "ход завершён",
+    "turnStarted": "ход",
+    "unpassed": "вернулся",
+    "windowClosed": "реакция завершена",
+    "windowOpened": "реакция"
   }
 }

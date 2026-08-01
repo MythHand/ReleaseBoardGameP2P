@@ -1,5 +1,5 @@
 export type { LobbyState } from './lobby/state'
-export type { PeerInfo, Role } from './types'
+export type { Intent, PeerInfo, Role } from './types'
 export {
   type ErrorKind,
   formatRoomCode,
