@@ -35,6 +35,9 @@ importers:
       '@release/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@release/table-adapter':
+        specifier: workspace:*
+        version: link:../../packages/table-adapter
       '@release/translation':
         specifier: workspace:*
         version: link:../../packages/translation
