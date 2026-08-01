@@ -1,8 +1,8 @@
 import type { Event } from '@release/engine'
-import { toTableState } from '@release/table-adapter'
+import { toTableOver, toTableState } from '@release/table-adapter'
 import { useTranslation } from '@release/translation'
 import { DEFAULT_SETUP, Table } from '@release/ui'
-import { Outlet } from 'react-router'
+import { Outlet, useNavigate } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useGame } from '~/features/play-game/useGame'
 import styles from './_layout.module.css'
@@ -30,6 +30,8 @@ export default function BoardPage() {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const game = useGame()
+  const navigate = useNavigate()
+  const gameId = session.gameId
 
   // The roster is a room fact, not a game fact — the engine's projection has no
   // concept of a spectator — so it comes from the session, split by role exactly
@@ -48,6 +50,7 @@ export default function BoardPage() {
     <div className={styles.page} data-testid="board-page">
       <Table
         state={state}
+        over={game.view ? toTableOver(game.view) : null}
         room={{
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,
@@ -67,6 +70,7 @@ export default function BoardPage() {
           onPass: game.pass,
           onUnpass: game.unpass,
           onResolve: game.resolve,
+          onOverContinue: () => navigate(`/board/${gameId}/stats`),
         }}
         copy={{
           table: t('table', { returnObjects: true }),
