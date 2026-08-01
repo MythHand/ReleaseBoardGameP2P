@@ -22,6 +22,7 @@ import Seat from '@/table/Seat'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './DrawCardStory.module.css'
+import { reorderHand } from './reorderHand'
 import { useHandInsert } from './useHandInsert'
 
 type Loc = Record<Lang, string>
@@ -525,7 +526,11 @@ export default function DrawCardStory() {
 
       {/* player hand — fanned at the bottom */}
       <div className={styles.handWrap} ref={handRef}>
-        <Hand items={hand} gapAt={gapAt} />
+        <Hand
+          items={hand}
+          gapAt={gapAt}
+          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        />
       </div>
 
       {/* Error 503, the opponent drew — a small glow OVER the hand (doesn't block hover) */}

@@ -8,6 +8,7 @@ import Slider from '@/primitives/Slider'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './PickOpponentCardStory.module.css'
+import { reorderHand } from './reorderHand'
 import { useHandInsert } from './useHandInsert'
 
 // "Take a random card from the opponent's hand" — as if the player across the
@@ -225,7 +226,11 @@ export default function PickOpponentCardStory() {
       {overlay}
 
       <div className={styles.handWrap} ref={handRef}>
-        <Hand items={hand} gapAt={gapAt} />
+        <Hand
+          items={hand}
+          gapAt={gapAt}
+          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        />
       </div>
     </div>
   )

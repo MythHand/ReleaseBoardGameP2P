@@ -11,6 +11,7 @@ import Hand from '@/table/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import { pick, useLang } from '../../../Playground/lang'
+import { reorderHand } from '../reorderHand'
 import { useHandInsert } from '../useHandInsert'
 import styles from './GitCards.module.css'
 
@@ -400,7 +401,11 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
         ref={handRef}
         style={{ pointerEvents: phase === 'idle' || phase === 'done' ? undefined : 'none' }}
       >
-        <Hand items={hand} gapAt={gapAt} />
+        <Hand
+          items={hand}
+          gapAt={gapAt}
+          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        />
       </div>
     </div>
   )

@@ -7,6 +7,7 @@ import Card from '@/primitives/Card'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './OpponentTakesCardStory.module.css'
+import { reorderHand } from './reorderHand'
 
 // Mirror of "take a specific card" — the VICTIM's view: the opponent takes a
 // chosen card from YOUR hand. Nodes shown:
@@ -254,7 +255,7 @@ export default function OpponentTakesCardStory() {
       )}
 
       <div className={styles.handWrap} ref={handRef}>
-        <Hand items={hand} />
+        <Hand items={hand} onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))} />
       </div>
     </div>
   )
