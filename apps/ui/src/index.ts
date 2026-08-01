@@ -107,6 +107,7 @@ export type {
 export type {
   TableChromeCopy as TableCopy,
   TableCopyBundle,
+  TableOver,
   TableProps,
   TableRoom,
   TableSlots,

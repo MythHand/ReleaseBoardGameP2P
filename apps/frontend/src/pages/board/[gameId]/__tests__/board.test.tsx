@@ -149,3 +149,28 @@ it('renders the pending prompt from the real catalog when a decision is owed', a
   )
   expect(heading).toBeTruthy()
 })
+
+it('shows the winner overlay when the projection says the game is over', async () => {
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 7,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const projected = engine.project(state, 'p1')
+  const view = { ...projected, over: { winner: 'p2', condition: 'release' as const } }
+  sessionValue = { ...session(), gameSync: { view, events: [] } } as unknown as UseLobby
+
+  renderBoard()
+
+  // The winner is resolved against the room roster by id, so the overlay
+  // proves both the adapter's rename and the page's binding.
+  expect(await screen.findByText(/^(winner|победитель)$/i)).toBeTruthy()
+  expect(await screen.findByText(/^(3 releases shipped|Собраны 3 релиза)$/i)).toBeTruthy()
+})
