@@ -111,16 +111,12 @@ export default function Table({
   over = null,
   actions,
   dock,
+  now = 0,
   panel: panelProp,
   onPanelChange,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup } = state
-  // `now` stays a placeholder inside the kit — the deadline interval belongs
-  // to the consumer (never Date.now() or a timer in here). A consumer that
-  // wants a live countdown drives its own clock and overrides via the `dock`
-  // prop; without one, seconds/progress read the span's start.
-  const nowRef = useRef(0)
-  const derived = deriveDock(state, state.selfId, nowRef.current)
+  const derived = deriveDock(state, state.selfId, now)
   const dockView = { ...derived, ...dock }
   const {
     role = 'guest',
