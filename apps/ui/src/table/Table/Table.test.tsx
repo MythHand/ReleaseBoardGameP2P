@@ -268,3 +268,25 @@ it('keeps the tracked cursor when a fresh-but-equivalent hand array re-renders m
   // stay wherever the mouse left it.
   expect(tipAfter).toContain('translate(300 300)')
 })
+
+it('sweeps the countdown from the now it is given', () => {
+  const base = makeTableProps()
+  const props = makeTableProps({
+    state: {
+      ...base.state,
+      window: {
+        player: 'p2',
+        slot: 'frontend',
+        round: 1,
+        openedAt: 1_000,
+        deadline: 16_000,
+        passed: [],
+        canAttackWith: [base.state.you.hand[0]?.uid ?? 'x'],
+      },
+    },
+    now: 6_000,
+  })
+  const { container } = render(<Table {...props} />)
+  // 16000 - 6000 = 10s left. Frozen at now=0 the dock reads 16.
+  expect(container.textContent).toContain('10')
+})

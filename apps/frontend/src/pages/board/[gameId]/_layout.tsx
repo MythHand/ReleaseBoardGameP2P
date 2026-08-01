@@ -5,6 +5,7 @@ import { DEFAULT_SETUP, Table } from '@release/ui'
 import { Outlet, useNavigate } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useGame } from '~/features/play-game/useGame'
+import { useNow } from '~/features/play-game/useNow'
 import styles from './_layout.module.css'
 
 // What the table shows before the first projection arrives — a beat on a live
@@ -31,6 +32,11 @@ export default function BoardPage() {
   const session = useSession()
   const game = useGame()
   const navigate = useNavigate()
+  // A window is open, or a pending owes a timed decision — the only two states
+  // that put a live deadline on screen.
+  const counting =
+    Boolean(game.view?.window) || Boolean(game.view?.pending && 'deadline' in game.view.pending)
+  const now = useNow(counting)
   const gameId = session.gameId
 
   // The roster is a room fact, not a game fact — the engine's projection has no
@@ -51,6 +57,7 @@ export default function BoardPage() {
       <Table
         state={state}
         over={game.view ? toTableOver(game.view) : null}
+        now={now}
         room={{
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,

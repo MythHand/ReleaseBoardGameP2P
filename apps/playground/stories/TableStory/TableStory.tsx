@@ -1,6 +1,6 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { makeTable } from '@/mocks/table'
 import Table from '@/table/Table'
 import { type Lang, pick, useLang } from '../../Playground/lang'
@@ -74,6 +74,11 @@ export default function TableStory() {
   const [kicked, setKicked] = useState<Set<string>>(() => new Set())
   const [paused, setPaused] = useState(false)
   const [ready, setReady] = useState<Set<string>>(() => new Set())
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 250)
+    return () => clearInterval(id)
+  }, [])
 
   const base = useMemo(() => makeTable(opps), [opps])
   // spectators kicked by the host are removed from the roster
@@ -257,6 +262,7 @@ export default function TableStory() {
           }}
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
           actions={{ onOverContinue: () => setEnd(null) }}
+          now={now}
           dock={{
             state: dock === 'reaction503' ? 'reaction' : dock,
             danger: dock === 'reaction503',
