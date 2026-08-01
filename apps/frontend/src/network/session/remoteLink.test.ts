@@ -176,3 +176,39 @@ it('never hands a subscriber a SYNC with no view in it', () => {
 
   expect(seen).toEqual([])
 })
+
+it('deals every seat its opening hand without anyone acting first', () => {
+  const { keeper, link } = twoPeerGame()
+  const remoteSeen: Sync[] = []
+  const keeperSeen: Sync[] = []
+  link.subscribe((sync) => remoteSeen.push(sync))
+  keeper.link.subscribe((sync) => keeperSeen.push(sync))
+
+  // Nobody has submitted anything. Without resync the table sits empty until
+  // someone clicks, which is not a game.
+  keeper.resync()
+
+  expect(remoteSeen).toHaveLength(1)
+  expect(keeperSeen).toHaveLength(1)
+  expect(remoteSeen[0].view.self.id).toBe('b')
+  expect(keeperSeen[0].view.self.id).toBe('a')
+  expect(remoteSeen[0].view.self.hand.length).toBeGreaterThan(0)
+  expect(keeperSeen[0].view.self.hand.length).toBeGreaterThan(0)
+  // A statement of position, not a replay.
+  expect(remoteSeen[0].events).toEqual([])
+})
+
+it('still sends each seat only its own hand on a resync', () => {
+  const { ref, keeper, link } = twoPeerGame()
+  const seen: Sync[] = []
+  link.subscribe((sync) => seen.push(sync))
+
+  keeper.resync()
+
+  // The same guarantee the per-intent fan-out gives: none of a's card instances
+  // may appear anywhere in what b receives.
+  const handA = ref.current.state.players.a.hand.map((c) => c.uid)
+  const wire = JSON.stringify(seen)
+  expect(handA.length).toBeGreaterThan(0)
+  for (const uid of handA) expect(wire).not.toContain(uid)
+})

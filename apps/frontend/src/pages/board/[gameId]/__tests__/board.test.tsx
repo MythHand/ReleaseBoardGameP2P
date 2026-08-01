@@ -1,3 +1,4 @@
+import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
@@ -77,4 +78,36 @@ it('lists players and spectators from the session roster', async () => {
   expect(await screen.findByText('HostPeer')).toBeTruthy()
   expect(await screen.findByText('GuestPeer')).toBeTruthy()
   expect(await screen.findByText('Watcher')).toBeTruthy()
+})
+
+it('renders a real projection: own hand in full, opponents by count only', async () => {
+  // Built by the actual engine rather than hand-rolled, so the test breaks if
+  // the projection's shape drifts from what the adapter expects.
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 7,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const view = engine.project(state, 'p1')
+  sessionValue = { ...session(), gameSync: { view, events: [] } } as unknown as UseLobby
+
+  const { container } = renderBoard()
+
+  // p1's own cards are rendered as cards; p2's are a number, never a card.
+  const slots = container.querySelectorAll('[data-hand-slot]')
+  expect(slots.length).toBe(view.self.hand.length)
+  expect(slots.length).toBeGreaterThan(0)
+  expect(await screen.findByText('Bo')).toBeTruthy()
+
+  // The privacy guarantee, asserted on what actually reached the DOM.
+  const opponentHand = state.players.p2.hand.map((c) => c.uid)
+  expect(opponentHand.length).toBeGreaterThan(0)
+  for (const uid of opponentHand) expect(container.innerHTML).not.toContain(uid)
 })
