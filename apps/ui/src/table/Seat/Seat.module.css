@@ -57,3 +57,11 @@
   border-color: var(--coral-45);
 }
 
+/* легитимная цель текущего прицеливания — подсветка того, что пришло в
+   `targets`; сам Seat не решает, что легально */
+.targetable {
+  cursor: pointer;
+  border-color: var(--turn-accent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--turn-accent) 32%, transparent);
+}
+

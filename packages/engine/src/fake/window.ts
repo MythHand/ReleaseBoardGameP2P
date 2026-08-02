@@ -35,7 +35,11 @@ export function openWindow(
   if (respondersFor(state, target.player).length === 0) return { ...state, eventSeq: log.seq }
   const deadline = at + (round === 1 ? WINDOW_FIRST_MS : WINDOW_NEXT_MS)
   log.add({ type: 'windowOpened', player: target.player, slot: target.slot, round, deadline })
-  return { ...state, window: { target, round, deadline, passed: [] }, eventSeq: log.seq }
+  return {
+    ...state,
+    window: { target, round, openedAt: at, deadline, passed: [] },
+    eventSeq: log.seq,
+  }
 }
 
 export function closeWindow(state: GameState, log: Log): GameState {

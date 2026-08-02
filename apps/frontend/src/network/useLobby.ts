@@ -66,6 +66,10 @@ export interface UseLobby {
   roomCode: string | null
   isHost: boolean
   canStart: boolean
+  // Set once the game has begun — on the host when it starts one, on a guest
+  // when the host's GAME_STARTING arrives. Both roles navigate off this single
+  // signal, so nobody is left behind in the lobby.
+  gameId: string | null
   error: string | null
   errorKind: ErrorKind
   createRoom(name: string, maxPlayers: number, setup?: Setup): Promise<string>
@@ -75,6 +79,7 @@ export interface UseLobby {
   setMaxPlayers(n: number): void
   transferHost(id: string): void
   setSetup(setup: Setup): void
+  startGame(): void
   disband(): void
   leaveSession(): void
   clearError(): void
@@ -87,6 +92,7 @@ export function useLobby(): UseLobby {
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [errorKind, setErrorKind] = useState<ErrorKind>(null)
+  const [gameId, setGameId] = useState<string | null>(null)
   const transportRef = useRef<Transport | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
@@ -225,6 +231,12 @@ export function useLobby(): UseLobby {
           if (!fromHost) break
           if (msg.payload.peerId === current.selfId) setStatus('kicked')
           else commit(applyPeerLeft(current, msg.payload.peerId))
+          break
+        case 'GAME_STARTING':
+          // The host has left for the board; follow it. The id is carried rather
+          // than derived so a future host handover can rename the room without
+          // every guest recomputing it.
+          if (fromHost) setGameId(msg.payload.gameId)
           break
         case 'LOBBY_DISBANDED':
           if (fromHost) {
@@ -433,6 +445,8 @@ export function useLobby(): UseLobby {
     setError(null)
     setErrorKind(null)
     setIsHost(false)
+    // Or returning to /start would immediately bounce back to the board.
+    setGameId(null)
     if (!t) return
     if (flushMs) setTimeout(() => t.close(), flushMs)
     else t.close()
@@ -448,6 +462,18 @@ export function useLobby(): UseLobby {
     },
     [commit, dispatch],
   )
+
+  // Host-only: tell the table to follow, then move. The board route is keyed by
+  // the host peer id, so every peer resolves the same URL from the payload.
+  // Broadcast first — setGameId navigates this peer away, and an unmounting
+  // component must not be what the others are waiting on.
+  const startGame = useCallback(() => {
+    const current = stateRef.current
+    if (!current || !isHostRef.current) return
+    const id = current.hostId
+    dispatch([{ to: 'broadcast', message: { type: 'GAME_STARTING', payload: { gameId: id } } }])
+    setGameId(id)
+  }, [dispatch])
 
   const disband = useCallback(() => {
     const current = stateRef.current
@@ -481,6 +507,7 @@ export function useLobby(): UseLobby {
       roomCode,
       isHost,
       canStart: state ? canStartFn(state) : false,
+      gameId,
       error,
       errorKind,
       createRoom,
@@ -490,6 +517,7 @@ export function useLobby(): UseLobby {
       setMaxPlayers,
       transferHost,
       setSetup,
+      startGame,
       disband,
       leaveSession,
       clearError,
@@ -499,6 +527,7 @@ export function useLobby(): UseLobby {
       status,
       roomCode,
       isHost,
+      gameId,
       error,
       errorKind,
       createRoom,
@@ -508,6 +537,7 @@ export function useLobby(): UseLobby {
       setMaxPlayers,
       transferHost,
       setSetup,
+      startGame,
       disband,
       leaveSession,
       clearError,

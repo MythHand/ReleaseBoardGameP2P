@@ -1,0 +1,13 @@
+{
+  "extends": "@release/lint/tsconfig",
+  "compilerOptions": {
+    "types": ["vitest/globals"],
+    "paths": {
+      "@release/engine": ["../engine/src/index.ts"],
+      "@release/ui": ["../../apps/ui/src/index.ts"],
+      "@release/translation/*": ["../../packages/translation/src/*"],
+      "@/*": ["../../apps/ui/src/*"]
+    }
+  },
+  "include": ["src"]
+}

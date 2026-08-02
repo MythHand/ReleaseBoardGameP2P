@@ -187,6 +187,7 @@ describe('playableFor legality rules', () => {
       window: {
         target: { player: 'p1', slot: 'frontend' as const, card: 'attack-bug#0' },
         round: 1,
+        openedAt: 0,
         deadline: 0,
         passed: [],
       },

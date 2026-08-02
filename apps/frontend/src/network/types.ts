@@ -36,6 +36,12 @@ export type Message =
   | { type: 'PLAYER_KICKED'; payload: { peerId: string; reason?: string } }
   | { type: 'TRANSFER_HOST'; payload: { newHostId: string } }
   | { type: 'HOST_TRANSFERRED'; payload: { from: string; to: string } }
+  // The host leaving the lobby for the board, so every peer follows. Lobby-scoped
+  // on purpose: it carries no keeper, because the lobby has no PlayerId to name
+  // one with — peers are identified by PeerJS id here, and seats are assigned by
+  // the engine's setup. GAME_STARTED below is the sync layer's handshake and
+  // stays reserved for it.
+  | { type: 'GAME_STARTING'; payload: { gameId: string } }
   // --- Game ---
   | { type: 'GAME_STARTED'; payload: { gameId: string; keeperId: PlayerId } }
   | { type: 'INTENT'; payload: { intent: Intent } }

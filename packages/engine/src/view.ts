@@ -27,6 +27,8 @@ export interface WindowView {
   player: PlayerId
   slot: ReleaseSlot
   round: number
+  // Both ends of the span, so the ring's sweep is exact rather than assumed.
+  openedAt: number
   deadline: number
   passed: PlayerId[]
   // Which of the viewer's cards may be thrown into this window. Empty for the
@@ -43,6 +45,7 @@ export type PendingView =
       attackCard: CardId
       sudo: boolean
       options: CardUid[]
+      openedAt: number
       deadline: number
       scope: 'release' | 'hand'
     }

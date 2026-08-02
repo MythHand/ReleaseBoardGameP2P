@@ -112,6 +112,7 @@ export default function Hand({
           // biome-ignore lint/a11y/noStaticElementInteractions: hover only drives the decorative fan-spread (lift/read the hovered card); cards are non-interactive here, no keyboard affordance implied
           <div
             key={item.uid}
+            data-hand-slot
             className={`${styles.slot} ${onCardClick ? styles.clickable : ''}`}
             style={{ transform, zIndex: z }}
             onMouseEnter={() => setHovered(i)}

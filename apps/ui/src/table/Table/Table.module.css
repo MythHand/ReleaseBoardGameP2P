@@ -57,6 +57,15 @@
   inset-inline-start: 26px;
 }
 
+/* unpass — take back an earlier pass on the open window; sits just above the
+   dock so it reads as an amendment to the pass you already made there */
+.unpass {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: 0;
+  margin-block-end: 8px;
+}
+
 .you {
   position: absolute;
   inset-block-end: 16px;
@@ -144,4 +153,23 @@
   block-size: 1px;
   margin: 4px 0;
   background: var(--white-10);
+}
+
+/* slot positions — app-only chrome supplied by the consumer (`slots.banner` /
+   `slots.corner`), rendered right after the HUD background layer. */
+.banner {
+  position: absolute;
+  inset-block-start: 16px;
+  inset-inline: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.corner {
+  position: absolute;
+  inset-block-start: 16px;
+  inset-inline-start: 16px;
+  z-index: 5;
 }
