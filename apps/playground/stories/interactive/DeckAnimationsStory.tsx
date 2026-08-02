@@ -10,6 +10,7 @@ import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './DeckAnimationsStory.module.css'
+import { reorderHand } from './reorderHand'
 
 // A scene of deck operations. Triggers — playing cards from the hand (the Hand fan):
 // Git Branch — split; Git Branch + Sudo — split + the discard becomes a deck;
@@ -512,7 +513,12 @@ export default function DeckAnimationsStory() {
 
       {/* player hand — fanned (Hand); clicking a card plays it */}
       <div className={styles.handWrap}>
-        <Hand items={hand} onCardClick={handlePlay} accentAt={accentAt} />
+        <Hand
+          items={hand}
+          onCardClick={handlePlay}
+          accentAt={accentAt}
+          onReorder={(cardUid, toIndex) => setHand((h) => reorderHand(h, cardUid, toIndex))}
+        />
       </div>
 
       {/* the flying discard (single card) */}

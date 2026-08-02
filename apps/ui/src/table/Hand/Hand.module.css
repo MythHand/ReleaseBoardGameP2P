@@ -14,5 +14,54 @@
 }
 
 .clickable {
-  cursor: pointer;
+  cursor: grab;
+}
+
+/* face wrapper — Hand owns the grey-out for a disabled card, and transitions it
+   so the state change fades for a human instead of snapping instantly */
+.faceWrap {
+  inline-size: fit-content;
+  transition: filter 380ms var(--ease-out);
+}
+
+.faceWrap[data-state="disabled"] {
+  filter: grayscale(0.7) brightness(0.55);
+}
+
+/* the card being dragged out of the hand — rides above everything, at the cursor.
+   Rotates about bottom-center to MATCH .slot's pivot, so the settle glide lands
+   exactly where the real slot card rests (no end-of-transition micro-jump). */
+.flyer {
+  position: fixed;
+  z-index: 1200;
+  pointer-events: none;
+  transform-origin: bottom center;
+  will-change: left, top;
+}
+
+/* hover zoom preview — enlarged card above the hand; never grabbed.
+   Appearance: a one-shot rise (transform) — ONLY on appear. Exit: opacity only,
+   no downward movement. */
+.zoom {
+  position: fixed;
+  z-index: 1100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 260ms var(--ease-out);
+  animation: zoom-rise 260ms var(--ease-out);
+  will-change: opacity, transform;
+}
+
+.zoom[data-shown="true"] {
+  opacity: 1;
+}
+
+@keyframes zoom-rise {
+  from {
+    transform: translateY(10px);
+  }
+
+  to {
+    transform: translateY(0);
+  }
 }

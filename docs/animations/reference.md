@@ -82,3 +82,70 @@ card (not at a wider cell/seat) — invariant **I6**. The `CARD_RATIO` value is 
 |---|---|---|
 | `useHandInsert` | `useHandInsert(handRef, onInserted)` → `{ gapAt, overlay, insert, reset, flyingCard, FLIGHT_MS }` | opens a gap in the fan and flies a card into the slot; `insert(card, source, handLength)` starts it, `onInserted(card, gapIndex)` fires on landing |
 | `InsertSource` | `{ left, top, width, height }` | the source rect the card flies from |
+
+---
+
+## Discard scatter
+
+`apps/ui/src/animations/scatter.ts` — the single source of "how a card lands in and rests in the discard heap".
+The flight (`toDiscardParams`) and the rest (`restTransform`) read the **same** `Scatter`, so a card lands
+exactly where it lies — no position swap on the last frame (invariant **I7**). The ± ranges are in the glossary.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `Scatter` | `{ rot, dx, dy }` | one card's heap pose (tilt + offset) |
+| `Rect` | `{ left, top, width, height }` | the geometry travel presets take |
+| `scatterAt` | `scatterAt(key, width?)` → `Scatter` | **deterministic** scatter by a card key (stable across re-renders and peers) — use for a persistent heap |
+| `jitter` | `jitter(width?)` → `Scatter` | a **one-off random** scatter — use for a card just tossed in |
+| `restTransform` | `restTransform(s)` → `string` | the CSS `transform` for a card at rest in the heap |
+| `toDiscardParams` | `toDiscardParams(from, to, s, fade?)` → `MoveParams` | params for `play('centerToDiscard', …)` that land the card exactly on `restTransform(s)` |
+| `HEAP_SHOW` | `6` | how many top cards render; the rest are hidden/faded |
+
+---
+
+## Hand — the interactive fan
+
+`apps/ui/src/table/Hand/Hand.tsx`. A **self-animating** component: it owns hover (lift + neighbour spread + a
+separate zoom preview), the pick-up/drag gesture (drag out → play, drag inside → reorder), the click/drag
+threshold, per-card dim, and the settle-back glide. A consumer supplies data and intent callbacks; it does not
+drive any of the motion. Legality is the consumer's (engine's) answer — the Hand only reflects it via `stateAt`.
+
+| Prop | Type | What it does |
+|---|---|---|
+| `items` | `HandItem[]` (`{ uid, card }`) | the fan, in order |
+| `faceDown?` | `boolean` | render backs (opponent fan); disables the zoom preview |
+| `gapAt?` | `number \| null` | open an insert gap at this slot (paired with `useHandInsert`) |
+| `onCardClick?` | `(index, el, e) => void` | a click (no drag) — coexists with drag via the threshold |
+| `accentAt?` | `(index) => string \| undefined` | a glow colour for a slot (arrow target) |
+| `stateAt?` | `(index) => HandCardState` | `'idle' \| 'playable' \| 'selected' \| 'disabled'` — mirrors the engine's `playable`/`frozen`; `disabled` dims via the Hand's own transitioned filter |
+| `onPlay?` | `(uid, drop: HandPlayDrop) => boolean` | card dragged OUT of the hand; return `true` to accept (played), else it glides back |
+| `onReorder?` | `(uid, toIndex) => void` | card dragged WITHIN the hand — local reorder, never networked |
+| `renderFace?` | `(item, ctx: HandFaceContext) => ReactNode` | override the default flat `Card` face |
+| `HandPlayDrop` | `{ x, y, rect? }` | where a played card was released |
+
+Drag mode turns on when `onPlay` or `onReorder` is supplied. Tuning constants (`HOVER_LIFT`, `NEIGHBOR_PUSH`,
+`SETTLE_MS`, `DRAG_THRESHOLD`, `BAND_PAD`, the zoom clamps) are in the glossary.
+
+### Hand geometry — `apps/ui/src/table/Hand/fan.ts`
+
+The single source of fan geometry; `Hand` and `useHandInsert` compute slots from the **same** formula.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `slotPlacement` | `slotPlacement(slot, total)` → `{ x, y, rotate, z }` | a slot's offset/tilt/z in a fan of `total` cards |
+| `handStep` | `handStep(n)` → `number` | horizontal pitch between cards for a hand of `n` (also re-exported from `@/table/Hand`) |
+| `CARD_W` | `150` | the canonical hand-card width |
+
+---
+
+## Self-animating components
+
+Import and use declaratively — the animation is built in.
+
+| Component | Path | Self-animation |
+|---|---|---|
+| `Card` | `@/primitives/Card` | plays `flipCard` on a `faceDown` change |
+| `EdgeGlow` | `@/primitives/EdgeGlow` | `<EdgeGlow visible? intensity? color? className? />` — inward edge veil, CSS opacity fade; `intensity: 'strong' \| 'weak'`. The consumer owns the bounds/layer (container + mount point). |
+| `ConfirmAction` | `@/table/ConfirmAction` | `<ConfirmAction open? label disabled? onConfirm? caption? className? />` — the shared "confirm the selection" bar; slides up/down on `open`, pins to the bottom of its positioned container. Used by pick flows (Inside choice, Git cards). |
+| `ReleaseZone` | `@/table/ReleaseZone` | `slotRef?(key, el)` exposes each slot's node so a consumer can measure it and fly a card into that slot (AI Release / Monitoring landing). A position hook only — no visual effect. |
+| `Arrow` | `@/primitives/Arrow` | see the Arrow toolkit above (`useArrow`) |

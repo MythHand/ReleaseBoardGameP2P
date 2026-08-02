@@ -15,6 +15,10 @@ interface ReleaseZoneProps {
   size?: string
   // compact — карты в 1.4× меньше, подпись пустого слота вертикальная
   variant?: 'default' | 'compact'
+  // per-slot DOM node — so a consumer can measure a slot and fly a card into it
+  // (e.g. an AI Release / Monitoring landing in its slot). Purely a position hook;
+  // no visual effect.
+  slotRef?: (key: keyof ReleaseSlots, el: HTMLDivElement | null) => void
 }
 
 const SLOTS: [keyof ReleaseSlots, string][] = [
@@ -30,6 +34,7 @@ export default function ReleaseZone({
   release = {},
   size = '84px',
   variant = 'default',
+  slotRef,
 }: ReleaseZoneProps) {
   const compact = variant === 'compact'
   const slotSize = compact ? `calc(${size} / 1.4)` : size
@@ -38,7 +43,12 @@ export default function ReleaseZone({
       {SLOTS.map(([key, label]) => {
         const card = release[key]
         return (
-          <div key={key} className={styles.slot} style={{ width: slotSize }}>
+          <div
+            key={key}
+            className={styles.slot}
+            style={{ width: slotSize }}
+            ref={(el) => slotRef?.(key, el)}
+          >
             {card ? (
               <Card card={card} interactive={false} width="100%" />
             ) : (

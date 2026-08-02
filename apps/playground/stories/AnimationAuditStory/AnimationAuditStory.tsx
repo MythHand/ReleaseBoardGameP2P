@@ -276,6 +276,27 @@ const MODULES: Module[] = [
     },
     status: 'ok',
   },
+  {
+    mod: 'Hand (canonical)',
+    what: {
+      ru: 'Интерактивный веер: ховер (подъём + расступание + отдельный зум-превью), взять-потянуть (наружу — розыгрыш, внутри — перестановка), порог клик/drag, settle-back с transform-origin bottom-center. Всё внутри компонента; наружу — данные и колбэки намерения (onPlay/onReorder/onCardClick/stateAt).',
+      en: 'The interactive fan: hover (lift + spread + a separate zoom preview), pick-up & drag (out → play, inside → reorder), a click/drag threshold, settle-back with transform-origin bottom-center. All internal; the consumer supplies data and intent callbacks (onPlay/onReorder/onCardClick/stateAt).',
+    },
+    where: { ru: 'table/Hand → все руки', en: 'table/Hand → every hand' },
+    status: 'ok',
+  },
+  {
+    mod: 'ConfirmAction',
+    what: {
+      ru: 'Общий слайд-бар подтверждения выбора: заезжает по open, прижат к низу контейнера, опциональная подпись. Презентационный, i18n-agnostic.',
+      en: 'The shared confirm-the-selection bar: slides up on open, pinned to the bottom of its container, an optional caption. Presentational, i18n-agnostic.',
+    },
+    where: {
+      ru: 'table/ConfirmAction → CherryPick, AI cards (Inside)',
+      en: 'table/ConfirmAction → CherryPick, AI cards (Inside)',
+    },
+    status: 'ok',
+  },
 ]
 
 // ===== 2. Scenario combinations — sequences per situation (no statuses) =====
@@ -377,6 +398,70 @@ const SCENARIOS: Scenario[] = [
       en: 'a deal-grid of face-down cards → flipCard reveal of the chosen one → useHandInsert (a gap in the hand + landing at the slot bottom-center per slotPlacement).',
     },
     where: 'PickOpponentCard',
+  },
+  {
+    name: { ru: 'Каноничная рука (взять-потянуть)', en: 'Canonical hand (pick up & drag)' },
+    from: {
+      ru: 'взять карту мышкой и потянуть: наружу из руки → розыгрыш (onPlay), внутри руки → перестановка (onReorder, локальная). Порог DRAG_THRESHOLD различает клик и drag — клик (onCardClick) сосуществует. Летящая карта — fixed flyer за курсором (rAF); при отпускании settleInto доводит её в слот (rotate до угла, z под соседей). transform-origin: bottom center у флайера совпадает с пивотом слота — без финального прыжка. Ховер: подъём + расступание соседей (без in-place scale и без выхода на верхний слой), читаемость — отдельный зум-превью над рукой (появление разово через @keyframes zoom-rise, уход только opacity).',
+      en: 'pick a card with the mouse and drag: out of the hand → play (onPlay), inside the hand → reorder (onReorder, local). A DRAG_THRESHOLD tells a click from a drag — a click (onCardClick) coexists. The flyer is a fixed node following the cursor (rAF); on release settleInto glides it into the slot (rotate to the slot angle, z tucked under the neighbours). The flyer’s transform-origin: bottom center matches the slot pivot — no end-of-glide jump. Hover: lift + neighbours part (no in-place scale, no jump to the top layer); readability comes from a separate zoom preview above the hand (one-shot appear via @keyframes zoom-rise, exit is opacity only).',
+    },
+    where: 'Hand (fan), HandStory',
+  },
+  {
+    name: { ru: 'Error 503 — ход игрока и защита', en: 'Error 503 — player turn & defence' },
+    from: {
+      ru: 'добор из колоды → 503 в центр + красное краевое свечение (EdgeGlow strong в зоне стола). Защита ПЕРЕТАСКИВАНИЕМ карты на 503 (невидимые хит-зоны, drag как в игре, не клик): Release тащится вместе с прикреплённым Code Review (связка по позиции, не «сгруппированы»); карта накрывает 503, обе уходят в сброс (порядок стопки: 503, code review, release). Выбывание: PASS (рука + зона релиза → центр → сброс) или нет защиты (задержка → рука → сброс) → игрок становится зрителем, TurnDock → waiting. Полноэкранное видео выбывания для всех (мин. длительность, доигрывает текущий цикл).',
+      en: 'draw from the deck → 503 to the center + red edge glow (EdgeGlow strong in the table zone). Defence is a DRAG of a card onto the 503 (invisible hit areas, a real-game drag, not a click): a Release drags together with its attached Code Review (bound by position, not «grouped»); the card covers the 503 and both leave to the discard (stack order: 503, code review, release). Elimination: PASS (hand + release zone → center → discard) or no defence available (delay → hand → discard) → the player becomes a spectator, TurnDock → waiting. A full-screen elimination video for everyone (min duration, finishes the current loop).',
+    },
+    where: 'Error503Story',
+  },
+  {
+    name: { ru: 'AI-эффекты — разрешение', en: 'AI effects — resolution' },
+    from: {
+      ru: 'добор AI-триггера из базовой колоды → выбранная AI-карта из колоды событий в центр (drawToCenter, крупнее) → hold на столе → разрешение по эффекту. Карта события ВСЕГДА возвращается в AI-колоду (returnToDeck); в общий сброс идут только триггер (centerToDiscard) и уничтоженный ОБЫЧНЫЙ релиз. Release/Monitoring → в пустой слот (playToReleaseZone) и остаётся. Crush → уничтожает совпавший релиз (AI-релиз → AI-колода, обычный → сброс). Inside → релиз из сброса через центр в руку (useHandInsert); при нескольких — открытый ряд-выбор с ConfirmAction, невыбранные летят обратно в сброс. Good Vibe → добор 2 карт; триггер в доборе отыгрывается полностью первым, Hallucination ставит флаг прерывания — 2-й добор пропускается. Bad Vibe → игрок кликает карту руки → в центр (показ) → в сброс. Ховер руки заглушён во время анимаций (pointer-events).',
+      en: 'draw the AI trigger from the base deck → the chosen AI card from the events deck to the center (drawToCenter, larger) → hold → resolve by effect. An event card ALWAYS returns to the AI deck (returnToDeck); only the trigger (centerToDiscard) and a destroyed ORDINARY release reach the common discard. Release/Monitoring → into an empty slot (playToReleaseZone) and stays. Crush → destroys the matching release (AI release → AI deck, ordinary → discard). Inside → a release from the discard through the center into the hand (useHandInsert); with several, an open row choice + ConfirmAction, the rest fly back to the discard. Good Vibe → draws 2 cards; a drawn trigger resolves fully first, Hallucination raises a turn-interrupt flag — the 2nd draw is skipped. Bad Vibe → the player clicks a hand card → to the center (shown) → to the discard. Hand hover is muted during animations (pointer-events).',
+    },
+    where: 'AiCardsStory',
+  },
+  {
+    name: { ru: 'Забрать конкретную карту', en: 'Take a specific card' },
+    from: {
+      ru: 'каталог-грид (без триггеров) в центре + веер соперника рубашкой сверху (data-in слайд). Выбор держит PICK_BEAT; хит — карта вылетает из слота соперника к центру стола (CSS-transition, центр от rootRef, не window), flip лицом, REVEAL_HOLD, затем useHandInsert в руку; мисс — тряска + подпись, веер уезжает. Слот-донор рендерит null, пока карту несёт flyer.',
+      en: 'a catalog grid (no triggers) at the centre + the opponent fan back-up from the top (data-in slide). The pick holds PICK_BEAT; hit — the card flies out of the opponent slot to the stage centre (CSS transition, centre from rootRef not window), flips face up, REVEAL_HOLD, then useHandInsert into the hand; miss — shake + note, the fan leaves. The donor slot renders null while the flyer carries the card.',
+    },
+    where: 'PickSpecificCardStory',
+  },
+  {
+    name: { ru: 'У тебя забирают карту', en: 'Opponent takes your card' },
+    from: {
+      ru: 'зеркало «забрать конкретную» со стороны жертвы: two-hop CSS-transition from → center → up. В центре flip РУБАШКОЙ (теперь карта соперника), затем к центру его веера rotate(180); zIndex падает до 30 на подъёме, чтобы подоткнуться под веер. useHandInsert НЕ используется — карта уходит из руки, а не встаёт в неё.',
+      en: 'mirror of "take a specific card" from the victim: a two-hop CSS transition from → center → up. At the centre it flips FACE-DOWN (now the opponent’s card), then to their fan centre rotate(180); zIndex drops to 30 on the way up to tuck behind the fan. No useHandInsert — the card leaves the hand, it does not settle into one.',
+    },
+    where: 'OpponentTakesCardStory',
+  },
+  {
+    name: { ru: 'Git Cherry-pick (прототип)', en: 'Git Cherry-pick (prototype)' },
+    from: {
+      ru: 'сброс раздаётся в грид выбора (стаггер DEAL_STEP, cap STAGGER_CAP); выбранная — к центру, useHandInsert в руку; sudo-вторая — flipCard рубашкой + returnToDeck на колоду; невыбранные возвращаются в стопку по scatterAt (порядок сохраняется, без перетасовки). Rules-complete отложен (#61).',
+      en: 'the discard deals into a selection grid (stagger DEAL_STEP, cap STAGGER_CAP); the pick → centre, useHandInsert into the hand; a sudo second card → flipCard back-up + returnToDeck onto the deck; the unpicked return to the pile by scatterAt (order kept, no reshuffle). Rules-complete deferred (#61).',
+    },
+    where: 'GitCards/CherryPick',
+  },
+  {
+    name: { ru: 'Git Rebase (прототип)', en: 'Git Rebase (prototype)' },
+    from: {
+      ru: 'верхние 3 карты колоды вылетают в нумерованный ряд (DEAL_DUR/STEP), игрок меняет порядок, затем flipCard рубашкой + returnToDeck обратно на колоду в выбранном порядке (BACK_DUR/STEP). Знание о колоде не моделируется (#61 q9). Rules-complete отложен.',
+      en: 'the top 3 cards fly out into a numbered row (DEAL_DUR/STEP), the player reorders, then flipCard back-up + returnToDeck onto the deck in the chosen order (BACK_DUR/STEP). Deck knowledge is not modelled (#61 q9). Rules-complete deferred.',
+    },
+    where: 'GitCards/Rebase',
+  },
+  {
+    name: { ru: 'System Upgrade (прототип)', en: 'System Upgrade (prototype)' },
+    from: {
+      ru: 'каждый соперник бросает карту с места в центр (THROW_DUR/STEP, рост THROW_SCALE→1); base — после HOLD_MS всё в сброс (centerToDiscard, стаггер CLEAR_STEP); sudo — игрок берёт одну (reveal + useHandInsert), остальные в сброс. Rules-complete отложен.',
+      en: 'each opponent throws a card from its seat to the centre (THROW_DUR/STEP, growing THROW_SCALE→1); base — after HOLD_MS all to the discard (centerToDiscard, stagger CLEAR_STEP); sudo — the player takes one (reveal + useHandInsert), the rest to the discard. Rules-complete deferred.',
+    },
+    where: 'GitCards/SystemUpgrade',
   },
 ]
 

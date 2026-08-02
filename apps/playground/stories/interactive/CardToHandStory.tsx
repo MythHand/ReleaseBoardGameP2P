@@ -5,6 +5,7 @@ import Card from '@/primitives/Card'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './CardToHandStory.module.css'
+import { reorderHand } from './reorderHand'
 import { useHandInsert } from './useHandInsert'
 
 // Showcase of the universal "card settles into the hand" step (useHandInsert).
@@ -84,7 +85,11 @@ export default function CardToHandStory() {
       {overlay}
 
       <div className={styles.handWrap} ref={handRef}>
-        <Hand items={hand} gapAt={gapAt} />
+        <Hand
+          items={hand}
+          gapAt={gapAt}
+          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        />
       </div>
     </div>
   )
