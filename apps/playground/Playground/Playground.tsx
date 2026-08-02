@@ -28,6 +28,7 @@ import TokenPreview from '../stories/foundations/TokenPreview'
 import TypographyPreview from '../stories/foundations/TypographyPreview'
 import HandStory from '../stories/HandStory'
 import InviteStory from '../stories/InviteStory'
+import AiCardsStory from '../stories/interactive/AiCardsStory'
 import CardPlayStory from '../stories/interactive/CardPlayStory'
 import CardToHandStory from '../stories/interactive/CardToHandStory'
 import DealCardsStory from '../stories/interactive/DealCardsStory'
@@ -143,6 +144,7 @@ const groups: Group[] = [
       },
       { id: 'git-cards', title: 'Git cards', render: () => <GitCardsStory /> },
       { id: 'error-503', title: 'Error 503', render: () => <Error503Story /> },
+      { id: 'ai-cards', title: 'AI cards', render: () => <AiCardsStory /> },
       { id: 'card-to-hand', title: 'Card to Hand', render: () => <CardToHandStory /> },
       { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },

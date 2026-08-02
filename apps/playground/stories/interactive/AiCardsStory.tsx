@@ -1,0 +1,882 @@
+import { useLayoutEffect, useRef, useState } from 'react'
+import {
+  jitter,
+  nextFrames,
+  play,
+  restTransform,
+  type Scatter,
+  toDiscardParams,
+  wait,
+} from '@/animations'
+import { CARDS, cardById } from '@/cards'
+import type { Card as CardType } from '@/cards/types'
+import Card, { cardAreaOf } from '@/primitives/Card'
+import EdgeGlow from '@/primitives/EdgeGlow'
+import Pile from '@/primitives/Pile'
+import ConfirmAction from '@/table/ConfirmAction'
+import Hand from '@/table/Hand'
+import type { HandItem } from '@/table/Hand/Hand'
+import ReleaseZone from '@/table/ReleaseZone'
+import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
+import { type Lang, pick, useLang } from '../../Playground/lang'
+import HoverSelect from '../controls/HoverSelect'
+import styles from './AiCardsStory.module.css'
+import { reorderHand } from './reorderHand'
+import { useHandInsert } from './useHandInsert'
+
+type Loc = Record<Lang, string>
+
+// AI cards — the scene for AI-effect animations. Start scenario: draw the AI
+// trigger from the base deck, pull the chosen AI card from the events deck,
+// reveal it at the centre, hold, then resolve by effect.
+//
+// GAME-LOGIC NOTE — where the cards go on resolution:
+//   • the AI TRIGGER (a base-deck card) goes to the common discard;
+//   • an AI EVENT card NEVER goes to the common discard — played out, did
+//     nothing, or killed in the zone, it returns to the AI (events) deck.
+//     Release/Monitoring are the exception while they live in the zone.
+//   • Crush destroys the matching release IF one is in the zone (AI release → AI
+//     deck, ordinary release → common discard); the Crush card returns to the AI deck.
+//   • Error 503 behaves like the ordinary one — here we only raise the red edge
+//     glow and halt (reset the screen to continue).
+//   • Inside takes a Release card from the discard into the hand, shown to all
+//     via the centre; with several releases the player picks one (confirm bar).
+//   • Good Vibe-Coding draws 2 base cards to the hand; a trigger among them
+//     resolves fully first. Hallucination interrupts the turn — the 2nd draw is
+//     skipped (a real turn-interrupt flag, not just a note).
+//   • Bad Vibe-Coding: the player picks a hand card; it flies to the centre
+//     (shown to all) and then to the discard. The Bad Vibe card stays revealed
+//     at the centre until the pick is made.
+
+const AI_TRIGGER = 'trigger-ai'
+const ERROR_503_BASE = 'trigger-error-503' // the base-deck Error 503 trigger
+const AI_DECK = CARDS.filter((c) => c.deck === 'ai')
+// hand filler — ordinary (non-trigger) base cards
+const HAND_POOL = CARDS.filter((c) => c.deck === 'base' && c.category !== 'trigger')
+const MONITORING = 'protection-monitoring'
+const HALLUCINATION = 'ai-hallucination'
+const AI_ERROR_503 = 'ai-error-503'
+const INSIDE = 'ai-inside'
+const GOOD_VIBE = 'ai-good-vibe-coding'
+const BAD_VIBE = 'ai-bad-vibe-coding'
+// ordinary releases used to seed the discard (for Inside), cycled by count
+const REL_POOL = ['release-frontend', 'release-backend', 'release-database']
+
+// AI cards that live in the release zone: each maps to the slot it fills.
+const RELEASE_SLOT: Record<string, keyof ReleaseSlots> = {
+  'ai-release-frontend': 'frontend',
+  'ai-release-backend': 'backend',
+  'ai-release-database': 'database',
+  'ai-monitoring': 'monitoring',
+}
+
+// Crush cards → the release slot they destroy.
+const CRUSH_SLOT: Record<string, keyof ReleaseSlots> = {
+  'ai-crush-frontend': 'frontend',
+  'ai-crush-backend': 'backend',
+  'ai-crush-database': 'database',
+}
+
+// Good Vibe draw composition (dev choice) — what the 2 base draws contain
+type VibeComp = '2plain' | 'ai-first' | '503-first'
+const VIBE_OPTIONS: { value: VibeComp; label: Loc }[] = [
+  { value: '2plain', label: { ru: '2 обычные', en: '2 plain' } },
+  { value: 'ai-first', label: { ru: 'AI-триггер + обычная', en: 'AI trigger + plain' } },
+  { value: '503-first', label: { ru: '503 + обычная', en: '503 + plain' } },
+]
+
+const FLIP_MS = 420 // flipCard duration — let the in-place flip play
+const TABLE_HOLD = 2600 // how long a revealed AI card is held before it resolves
+const HALLUCINATION_HOLD = TABLE_HOLD * 2 // Hallucination lingers twice as long
+const SHOW_HOLD = 1500 // how long a card is shown to all at the centre
+
+const makeHand = (): HandItem[] => HAND_POOL.slice(0, 6).map((card, i) => ({ uid: `h${i}`, card }))
+
+const isRelease = (c: CardType) => c.category === 'release'
+const buildRelease = (monitoring: boolean): ReleaseSlots => ({
+  monitoring: monitoring ? cardById(MONITORING) : undefined,
+})
+const buildDiscard = (n: number): DiscardEntry[] => {
+  const out: DiscardEntry[] = []
+  for (let i = 0; i < n; i++) {
+    const c = cardById(REL_POOL[i % REL_POOL.length])
+    if (c) out.push({ card: c, ...jitter() })
+  }
+  return out
+}
+
+interface Flyer {
+  card: CardType
+  faceDown: boolean
+  seq: number // flight id — a new flight = a fresh Card key (no mid-flight flip)
+}
+// a card at rest in the discard — carries its own scatter (tilt + offset)
+interface DiscardEntry extends Scatter {
+  card: CardType
+}
+// the cards leaving on resolution (trigger → discard, effect → AI deck, …)
+interface Out {
+  key: string
+  card: CardType
+  faceDown: boolean
+}
+
+export default function AiCardsStory() {
+  const { lang } = useLang()
+  const [aiChoice, setAiChoice] = useState('ai-release-frontend')
+  const [monitoring, setMonitoring] = useState(false)
+  const [discardCount, setDiscardCount] = useState(0)
+  const [vibeComp, setVibeComp] = useState<VibeComp>('2plain')
+  const [release, setRelease] = useState<ReleaseSlots>(() => buildRelease(false))
+  const [hand, setHand] = useState<HandItem[]>(makeHand)
+  const [flyer, setFlyer] = useState<Flyer | null>(null)
+  const [trigger, setTrigger] = useState<CardType | null>(null) // AI trigger at the cause slot
+  const [aiCard, setAiCard] = useState<CardType | null>(null) // the AI effect at the centre
+  const [outs, setOuts] = useState<Out[]>([])
+  const [discard, setDiscard] = useState<DiscardEntry[]>(() => buildDiscard(0))
+  const [alert, setAlert] = useState(false) // red edge glow (Error 503)
+  const [busy, setBusy] = useState(false)
+  // Inside: releases offered for choice + the picked index
+  const [insideCandidates, setInsideCandidates] = useState<DiscardEntry[] | null>(null)
+  const [insidePickIdx, setInsidePickIdx] = useState<number | null>(null)
+  const [insideRevealed, setInsideRevealed] = useState(false) // row shown (after the fly-out)
+  const [handPickMode, setHandPickMode] = useState(false) // Bad Vibe: pick a card to discard
+
+  const barRef = useRef<HTMLDivElement>(null)
+  const baseDeckRef = useRef<HTMLDivElement>(null)
+  const aiDeckRef = useRef<HTMLDivElement>(null)
+  const causeRef = useRef<HTMLDivElement>(null) // AI trigger (cause) — left of centre
+  const effectRef = useRef<HTMLDivElement>(null) // AI effect (main) — centre, larger
+  const discardRef = useRef<HTMLDivElement>(null)
+  const flyerRef = useRef<HTMLDivElement>(null)
+  const outRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const releaseSlotRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const handRef = useRef<HTMLDivElement>(null)
+  const flightSeq = useRef(0)
+  const uidSeq = useRef(0)
+  const turnInterrupted = useRef(false) // Hallucination stops Good Vibe's 2nd draw
+  const halted = useRef(false) // Error 503 halts the scene (reset to continue)
+  const insideResolver = useRef<((entry: DiscardEntry) => void) | null>(null)
+  const handPickResolver = useRef<((i: number) => void) | null>(null)
+  const handPickRect = useRef<DOMRect | null>(null)
+  const pickRefs = useRef<Record<number, HTMLElement | null>>({}) // Inside choice row cells
+
+  // the tech-bar height — so the edge glow lives in the TABLE zone (under the bar)
+  const [barH, setBarH] = useState(0)
+  useLayoutEffect(() => {
+    if (barRef.current) setBarH(barRef.current.offsetHeight)
+  }, [])
+
+  const {
+    gapAt,
+    overlay,
+    insert,
+    reset: resetInsert,
+    FLIGHT_MS,
+  } = useHandInsert(handRef, (card, gap) => {
+    setHand((h) => {
+      const copy = [...h]
+      copy.splice(gap, 0, { uid: `ins${++uidSeq.current}`, card })
+      return copy
+    })
+  })
+
+  const previewCard = cardById(aiChoice)
+
+  // dev toggle — Monitoring is a starting zone condition; flip it in the zone
+  const toggleMonitoring = () => {
+    const next = !monitoring
+    setMonitoring(next)
+    setRelease((r) => ({ ...r, monitoring: next ? cardById(MONITORING) : undefined }))
+  }
+
+  // one card pulled from a deck to a slot: fly back-up (drawToCenter), then flip
+  // face up in place. The slot card is placed by the caller once it lands.
+  const pullTo = async (
+    card: CardType,
+    fromRef: React.RefObject<HTMLDivElement | null>,
+    toRef: React.RefObject<HTMLDivElement | null>,
+  ) => {
+    const fromCell = fromRef.current?.getBoundingClientRect()
+    const toRect = toRef.current?.getBoundingClientRect()
+    setFlyer({ card, faceDown: true, seq: ++flightSeq.current })
+    await nextFrames()
+    const el = flyerRef.current
+    if (el && fromCell && toRect) {
+      const from = cardAreaOf(fromCell)
+      el.style.left = `${from.left}px`
+      el.style.top = `${from.top}px`
+      el.style.width = `${from.width}px`
+      const anim = play('drawToCenter', el, { from, to: toRect })
+      if (anim) await anim.finished
+      // pin the flyer in the slot (identity) so the reveal flip plays in place
+      for (const a of el.getAnimations()) a.cancel()
+      el.style.left = `${toRect.left}px`
+      el.style.top = `${toRect.top}px`
+      el.style.width = `${toRect.width}px`
+    }
+    await wait(160)
+    setFlyer((f) => (f ? { ...f, faceDown: false } : f))
+    await wait(FLIP_MS + 140)
+  }
+
+  // position an out-flyer element on the rect it starts its flight from
+  const placeOut = (key: string, rect?: DOMRect) => {
+    const el = outRefs.current[key]
+    if (!el || !rect) return
+    el.style.left = `${rect.left}px`
+    el.style.top = `${rect.top}px`
+    el.style.width = `${rect.width}px`
+  }
+
+  // the AI event card returns to the AI (events) deck: flips back-up in place
+  // first (like cards entering play), then shrinks back to the deck (returnToDeck)
+  const returnAiToDeck = async (fromRect?: DOMRect, deckRect?: DOMRect) => {
+    setOuts((os) => os.map((o) => (o.key === 'eff' ? { ...o, faceDown: true } : o)))
+    await wait(FLIP_MS)
+    const el = outRefs.current.eff
+    if (!el || !fromRect || !deckRect) return
+    const anim = play('returnToDeck', el, { from: fromRect, to: cardAreaOf(deckRect) })
+    if (anim) await anim.finished
+  }
+
+  // an AI Release / Monitoring card lands in its (empty) release slot and stays
+  const placeIntoSlot = async (
+    slotKey: keyof ReleaseSlots,
+    ai: CardType,
+    fromRect?: DOMRect,
+    slotRect?: DOMRect,
+  ) => {
+    const el = outRefs.current.eff
+    if (el && fromRect && slotRect) {
+      const anim = play('playToReleaseZone', el, { from: fromRect, to: slotRect })
+      if (anim) await anim.finished
+    }
+    setRelease((r) => ({ ...r, [slotKey]: ai }))
+  }
+
+  // a crushed release leaves the zone: an AI release returns to the AI deck (flips
+  // back-up first), an ordinary (base) release goes to the common discard
+  const destroyRelease = async (card: CardType, fromRect?: DOMRect) => {
+    const el = outRefs.current.crushed
+    if (card.deck === 'ai') {
+      setOuts((os) => os.map((o) => (o.key === 'crushed' ? { ...o, faceDown: true } : o)))
+      await wait(FLIP_MS)
+      const deckRect = aiDeckRef.current?.getBoundingClientRect()
+      if (el && fromRect && deckRect) {
+        const anim = play('returnToDeck', el, { from: fromRect, to: cardAreaOf(deckRect) })
+        if (anim) await anim.finished
+      }
+      return
+    }
+    const discardRect = discardRef.current?.getBoundingClientRect()
+    const jc = jitter()
+    if (el && fromRect && discardRect) {
+      const anim = play(
+        'centerToDiscard',
+        el,
+        toDiscardParams(fromRect, cardAreaOf(discardRect), jc),
+      )
+      if (anim) await anim.finished
+    }
+    setDiscard((d) => [...d, { card, ...jc }])
+  }
+
+  // the AI trigger leaves to the common discard, landing scattered
+  const triggerToDiscard = async (j: Scatter, fromRect?: DOMRect, discardRect?: DOMRect) => {
+    const el = outRefs.current.trig
+    if (!el || !fromRect || !discardRect) return
+    const anim = play('centerToDiscard', el, toDiscardParams(fromRect, cardAreaOf(discardRect), j))
+    if (anim) await anim.finished
+  }
+
+  const confirmInside = () => {
+    if (insidePickIdx == null || !insideCandidates) return
+    const entry = insideCandidates[insidePickIdx]
+    const res = insideResolver.current
+    insideResolver.current = null
+    res?.(entry) // insideChoose reads the row rects, then tears the row down
+  }
+
+  // Inside (several releases): the candidates fly OUT of the discard into an open
+  // row at the centre, resizing up to hand-card size. The player picks one and
+  // confirms — the chosen release goes to the hand, the rest fly back to the discard.
+  const insideChoose = async (cands: DiscardEntry[]) => {
+    // they leave the discard heap as they come out for the choice
+    setDiscard((d) => d.filter((e) => !cands.includes(e)))
+    setInsidePickIdx(null)
+    setInsideRevealed(false)
+    setInsideCandidates(cands)
+    await nextFrames() // the (hidden) row is laid out — its cell rects are the targets
+
+    const discardRect = discardRef.current?.getBoundingClientRect()
+    const targets = cands.map((_, i) => pickRefs.current[i]?.getBoundingClientRect())
+    setOuts(cands.map((e, i) => ({ key: `pick${i}`, card: e.card, faceDown: false })))
+    await nextFrames()
+    await Promise.all(
+      cands.map(async (_, i) => {
+        const el = outRefs.current[`pick${i}`]
+        const to = targets[i]
+        if (!el || !discardRect || !to) return
+        const from = cardAreaOf(discardRect)
+        el.style.left = `${from.left}px`
+        el.style.top = `${from.top}px`
+        el.style.width = `${from.width}px`
+        const anim = play('drawToCenter', el, { from, to }) // scales up to the row size
+        if (anim) await anim.finished
+        el.style.left = `${to.left}px`
+        el.style.top = `${to.top}px`
+        el.style.width = `${to.width}px`
+      }),
+    )
+    setInsideRevealed(true) // reveal the interactive row (flyers hand off to it)
+    setOuts([])
+
+    // wait for the player's confirmed pick
+    const chosen = await new Promise<DiscardEntry>((res) => {
+      insideResolver.current = res
+    })
+
+    // read the row rects before tearing the row down
+    const rectOf = (e: DiscardEntry) => pickRefs.current[cands.indexOf(e)]?.getBoundingClientRect()
+    const chosenRect = rectOf(chosen)
+    const others = cands.filter((e) => e !== chosen)
+    const otherRects = others.map(rectOf)
+    setInsideCandidates(null)
+    setInsidePickIdx(null)
+
+    // chosen → hand (from its row position)
+    if (chosenRect) {
+      insert(
+        chosen.card,
+        {
+          left: chosenRect.left,
+          top: chosenRect.top,
+          width: chosenRect.width,
+          height: chosenRect.height,
+        },
+        hand.length,
+      )
+    }
+    // the rest fly back into the discard heap (re-added with their own scatter)
+    if (others.length > 0) {
+      const dRect = discardRef.current?.getBoundingClientRect()
+      setOuts(others.map((e, i) => ({ key: `back${i}`, card: e.card, faceDown: false })))
+      await nextFrames()
+      await Promise.all(
+        others.map(async (e, i) => {
+          const el = outRefs.current[`back${i}`]
+          const from = otherRects[i]
+          if (!el || !from || !dRect) return
+          el.style.left = `${from.left}px`
+          el.style.top = `${from.top}px`
+          el.style.width = `${from.width}px`
+          const anim = play('centerToDiscard', el, toDiscardParams(from, cardAreaOf(dRect), e))
+          if (anim) await anim.finished
+        }),
+      )
+      setOuts([])
+      setDiscard((d) => [...d, ...others])
+    }
+  }
+
+  // Inside: pull a Release from the discard through the centre (shown to all) into
+  // the hand. Removed by reference, so it survives the trigger append.
+  const insideGrab = async (entry: DiscardEntry) => {
+    const discardRect = discardRef.current?.getBoundingClientRect()
+    const centerRect = effectRef.current?.getBoundingClientRect()
+    const card = entry.card
+    setDiscard((d) => d.filter((e) => e !== entry))
+
+    // 1) discard → centre, face up (shown to all players)
+    setOuts([{ key: 'inside', card, faceDown: false }])
+    await nextFrames()
+    const el = outRefs.current.inside
+    if (el && discardRect && centerRect) {
+      const from = cardAreaOf(discardRect)
+      el.style.left = `${from.left}px`
+      el.style.top = `${from.top}px`
+      el.style.width = `${from.width}px`
+      const anim = play('drawToCenter', el, { from, to: centerRect })
+      if (anim) await anim.finished
+      for (const a of el.getAnimations()) a.cancel()
+      el.style.left = `${centerRect.left}px`
+      el.style.top = `${centerRect.top}px`
+      el.style.width = `${centerRect.width}px`
+    }
+    await wait(SHOW_HOLD)
+
+    // 2) centre → hand
+    const startRect = el?.getBoundingClientRect()
+    setOuts([])
+    if (startRect) {
+      insert(
+        card,
+        {
+          left: startRect.left,
+          top: startRect.top,
+          width: startRect.width,
+          height: startRect.height,
+        },
+        hand.length,
+      )
+    }
+  }
+
+  // Bad Vibe: the chosen hand card is shown at the centre, then discarded
+  const discardFromHand = async (card: CardType, fromRect?: DOMRect) => {
+    const centerRect = effectRef.current?.getBoundingClientRect()
+    const discardRect = discardRef.current?.getBoundingClientRect()
+    setOuts([{ key: 'fromhand', card, faceDown: false }])
+    await nextFrames()
+    const el = outRefs.current.fromhand
+    if (el && fromRect && centerRect) {
+      const from = {
+        left: fromRect.left,
+        top: fromRect.top,
+        width: fromRect.width,
+        height: fromRect.height,
+      }
+      el.style.left = `${from.left}px`
+      el.style.top = `${from.top}px`
+      el.style.width = `${from.width}px`
+      const anim = play('drawToCenter', el, { from, to: centerRect })
+      if (anim) await anim.finished
+      for (const a of el.getAnimations()) a.cancel()
+      el.style.left = `${centerRect.left}px`
+      el.style.top = `${centerRect.top}px`
+      el.style.width = `${centerRect.width}px`
+    }
+    await wait(SHOW_HOLD)
+    const startRect = el?.getBoundingClientRect()
+    const jc = jitter()
+    if (el && startRect && discardRect) {
+      const anim = play(
+        'centerToDiscard',
+        el,
+        toDiscardParams(startRect, cardAreaOf(discardRect), jc),
+      )
+      if (anim) await anim.finished
+    }
+    setOuts([])
+    setDiscard((d) => [...d, { card, ...jc }])
+  }
+
+  // Error 503 — raise the red glow and halt (reset the screen to continue)
+  const raise503 = async () => {
+    await wait(200)
+    setAlert(true)
+    halted.current = true
+  }
+
+  // the shared "trigger → discard, AI card → slot/deck (+ crush, + Inside)" tail,
+  // WITHOUT the reveal hold (the caller holds first)
+  const resolveGeneric = async (trig: CardType, ai: CardType) => {
+    const causeRect = causeRef.current?.getBoundingClientRect()
+    const effectRect = effectRef.current?.getBoundingClientRect()
+    const discardRect = discardRef.current?.getBoundingClientRect()
+    const aiDeckRect = aiDeckRef.current?.getBoundingClientRect()
+
+    // Release / Monitoring settle into an EMPTY matching slot (and stay there)
+    const placeKey = RELEASE_SLOT[ai.id]
+    const placeable = placeKey != null && release[placeKey] == null
+    const slotRect =
+      placeable && placeKey ? releaseSlotRefs.current[placeKey]?.getBoundingClientRect() : undefined
+
+    // Crush destroys the matching release IF one is present (else nothing happens)
+    const crushKey = CRUSH_SLOT[ai.id]
+    const crushed = crushKey ? release[crushKey] : undefined
+    const crushRect =
+      crushed && crushKey ? releaseSlotRefs.current[crushKey]?.getBoundingClientRect() : undefined
+
+    // Inside pulls a Release from the discard (captured now, before the trigger lands)
+    const insideReleases = ai.id === INSIDE ? discard.filter((e) => isRelease(e.card)) : []
+
+    const outList: Out[] = [
+      { key: 'trig', card: trig, faceDown: false },
+      { key: 'eff', card: ai, faceDown: false },
+    ]
+    if (crushed) outList.push({ key: 'crushed', card: crushed, faceDown: false })
+    setOuts(outList)
+    setTrigger(null)
+    setAiCard(null)
+    if (crushed && crushKey) setRelease((r) => ({ ...r, [crushKey]: undefined }))
+    await nextFrames()
+    placeOut('trig', causeRect)
+    placeOut('eff', effectRect)
+    if (crushed) placeOut('crushed', crushRect)
+
+    const j = jitter()
+    await Promise.all([
+      triggerToDiscard(j, causeRect, discardRect),
+      placeable && placeKey && slotRect
+        ? placeIntoSlot(placeKey, ai, effectRect, slotRect)
+        : returnAiToDeck(effectRect, aiDeckRect),
+      ...(crushed ? [destroyRelease(crushed, crushRect)] : []),
+    ])
+    setOuts([])
+    setDiscard((d) => [...d, { card: trig, ...j }])
+
+    // Inside takes a release after the centre has cleared: a single one is taken
+    // straight through the centre; several are offered for an open choice first
+    if (ai.id === INSIDE && insideReleases.length > 0) {
+      if (insideReleases.length === 1) await insideGrab(insideReleases[0])
+      else await insideChoose(insideReleases)
+    }
+  }
+
+  // hold on the table, then the generic resolution. Hallucination holds 2× and
+  // raises the turn-interrupt flag (stops Good Vibe's second draw).
+  const resolveEvent = async (trig: CardType, ai: CardType) => {
+    await wait(ai.id === HALLUCINATION ? HALLUCINATION_HOLD : TABLE_HOLD)
+    if (ai.id === HALLUCINATION) turnInterrupted.current = true
+    await resolveGeneric(trig, ai)
+  }
+
+  // run an AI trigger from scratch: base deck → cause, pull the event to the
+  // centre, resolve it. Used by the start scenario and Good Vibe's recursion.
+  const runAiTrigger = async (event: CardType) => {
+    const trig = cardById(AI_TRIGGER)
+    if (!trig) return
+    await pullTo(trig, baseDeckRef, causeRef)
+    setTrigger(trig)
+    setFlyer(null)
+    await pullTo(event, aiDeckRef, effectRef)
+    setAiCard(event)
+    setFlyer(null)
+    await resolveEvent(trig, event)
+  }
+
+  // a plain base card drawn to the hand (deck → centre → flip → into the hand)
+  const drawToHand = async (card: CardType, handLen: number) => {
+    await pullTo(card, baseDeckRef, effectRef)
+    const r = flyerRef.current?.getBoundingClientRect()
+    setFlyer(null)
+    if (r) insert(card, { left: r.left, top: r.top, width: r.width, height: r.height }, handLen)
+    await wait(FLIGHT_MS + 140)
+  }
+
+  // an Error 503 drawn into the hand's stead: it reveals at the centre and halts
+  const draw503ToHalt = async (card: CardType) => {
+    await pullTo(card, baseDeckRef, effectRef)
+    setAiCard(card)
+    setFlyer(null)
+    await raise503()
+  }
+
+  // Good Vibe-Coding — draw 2 base cards; a trigger among them resolves fully
+  // first. Hallucination interrupts (2nd draw skipped); 503 halts the scene.
+  const goodVibe = async (trig: CardType, ai: CardType) => {
+    await resolveEvent(trig, ai) // Good Vibe → AI deck, trigger → discard
+    turnInterrupted.current = false
+    const ordinary = () => HAND_POOL[Math.floor(Math.random() * HAND_POOL.length)]
+    const seq: CardType[] =
+      vibeComp === 'ai-first'
+        ? [cardById(AI_TRIGGER) ?? ordinary(), ordinary()]
+        : vibeComp === '503-first'
+          ? [cardById(ERROR_503_BASE) ?? ordinary(), ordinary()]
+          : [ordinary(), ordinary()]
+
+    let handLen = hand.length
+    for (const card of seq) {
+      if (turnInterrupted.current || halted.current) break
+      if (card.id === AI_TRIGGER) {
+        // the drawn AI trigger plays out anew — here it pulls Hallucination,
+        // which interrupts the turn (the next iteration is skipped)
+        await runAiTrigger(cardById(HALLUCINATION) ?? card)
+      } else if (card.id === ERROR_503_BASE) {
+        await draw503ToHalt(card)
+      } else {
+        await drawToHand(card, handLen++)
+      }
+    }
+  }
+
+  // Bad Vibe-Coding — the player picks a hand card; it's shown at the centre and
+  // discarded. The Bad Vibe card stays at the centre until the pick is made.
+  const badVibe = async (trig: CardType, ai: CardType) => {
+    const i = await new Promise<number>((res) => {
+      handPickResolver.current = res
+      setHandPickMode(true)
+    })
+    const chosen = hand[i]
+    const fromRect = handPickRect.current ?? undefined
+    // no extra hold — waiting for the player's pick already held it at the centre
+    await resolveGeneric(trig, ai) // Bad Vibe → AI deck, trigger → discard (centre clears)
+    if (chosen) {
+      setHand((h) => h.filter((x) => x.uid !== chosen.uid))
+      await discardFromHand(chosen.card, fromRect)
+    }
+  }
+
+  const onHandPick = (i: number, el: HTMLElement) => {
+    if (!handPickMode) return
+    handPickRect.current = el.getBoundingClientRect()
+    const res = handPickResolver.current
+    handPickResolver.current = null
+    setHandPickMode(false)
+    res?.(i)
+  }
+
+  // dispatch the revealed AI card to its effect
+  const dispatch = (trig: CardType, ai: CardType): Promise<void> => {
+    if (ai.id === AI_ERROR_503) return raise503()
+    if (ai.id === BAD_VIBE) return badVibe(trig, ai)
+    if (ai.id === GOOD_VIBE) return goodVibe(trig, ai)
+    return resolveEvent(trig, ai)
+  }
+
+  // start scenario: base deck → AI trigger (cause) → chosen AI card → resolve.
+  const start = async () => {
+    if (busy) return
+    const trig = cardById(AI_TRIGGER)
+    const ai = cardById(aiChoice)
+    if (!trig || !ai) return
+    setBusy(true)
+    setTrigger(null)
+    setAiCard(null)
+    halted.current = false
+
+    await pullTo(trig, baseDeckRef, causeRef)
+    setTrigger(trig)
+    setFlyer(null)
+
+    await pullTo(ai, aiDeckRef, effectRef)
+    setAiCard(ai)
+    setFlyer(null)
+
+    await dispatch(trig, ai)
+
+    if (!halted.current) setBusy(false)
+  }
+
+  const reset = () => {
+    setHand(makeHand())
+    setRelease(buildRelease(monitoring))
+    setFlyer(null)
+    setTrigger(null)
+    setAiCard(null)
+    setOuts([])
+    setDiscard(buildDiscard(discardCount))
+    setAlert(false)
+    setInsideCandidates(null)
+    setInsidePickIdx(null)
+    setInsideRevealed(false)
+    setHandPickMode(false)
+    turnInterrupted.current = false
+    halted.current = false
+    insideResolver.current = null
+    handPickResolver.current = null
+    resetInsert()
+    setBusy(false)
+  }
+
+  return (
+    <div className={styles.root}>
+      <div className={styles.bar} ref={barRef}>
+        <button type="button" className={styles.btn} onClick={reset}>
+          {pick(lang, { ru: 'сброс', en: 'reset' })}
+        </button>
+        <HoverSelect
+          label={pick(lang, { ru: 'AI-карта', en: 'AI card' })}
+          value={aiChoice}
+          options={AI_DECK.map((c) => ({ value: c.id, label: c.name }))}
+          onChange={setAiChoice}
+        />
+        <button
+          type="button"
+          className={styles.chip}
+          data-on={monitoring}
+          onClick={toggleMonitoring}
+        >
+          {pick(lang, { ru: 'мониторинг в зоне', en: 'monitoring in zone' })}
+        </button>
+        {aiChoice === INSIDE && (
+          <HoverSelect
+            label={pick(lang, { ru: 'релизов в сбросе', en: 'releases in discard' })}
+            value={String(discardCount)}
+            options={[0, 1, 2, 3].map((n) => ({ value: String(n), label: String(n) }))}
+            onChange={(v) => {
+              const n = Number(v)
+              setDiscardCount(n)
+              setDiscard(buildDiscard(n))
+            }}
+          />
+        )}
+        {aiChoice === GOOD_VIBE && (
+          <HoverSelect
+            label={pick(lang, { ru: 'состав добора', en: 'draw makeup' })}
+            value={vibeComp}
+            options={VIBE_OPTIONS.map((o) => ({ value: o.value, label: o.label[lang] }))}
+            onChange={(v) => setVibeComp(v as VibeComp)}
+          />
+        )}
+        {previewCard && (
+          <div className={styles.preview}>
+            <span className={styles.previewLabel}>
+              {pick(lang, { ru: 'вытянется', en: 'draws' })}
+            </span>
+            <Card card={previewCard} interactive={false} width={46} />
+          </div>
+        )}
+      </div>
+
+      {/* AI trigger (cause) — left of the centre, normal size */}
+      <div className={styles.causeSlot} ref={causeRef} aria-hidden={!trigger}>
+        {trigger && <Card card={trigger} interactive={false} width="100%" />}
+      </div>
+
+      {/* AI effect (main) — at the centre, larger */}
+      <div className={styles.effectSlot} ref={effectRef} aria-hidden={!aiCard}>
+        {aiCard && <Card card={aiCard} interactive={false} width="100%" />}
+      </div>
+
+      {/* base draw deck (click — start) + the AI events deck */}
+      <div className={styles.decks}>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only draw by clicking the deck; sandbox story */}
+        <div ref={baseDeckRef} className={`${styles.deck} ${styles.drawable}`} onMouseDown={start}>
+          <Pile
+            label={pick(lang, { ru: 'колода', en: 'deck' })}
+            deck="base"
+            count={40}
+            width={150}
+            countPos="tl"
+          />
+        </div>
+        <div className={styles.deck} ref={aiDeckRef}>
+          <Pile
+            label={pick(lang, { ru: 'события', en: 'events' })}
+            deck="ai"
+            count={12}
+            width={150}
+            countPos="tl"
+          />
+        </div>
+      </div>
+
+      <button type="button" className={styles.startBtn} onClick={start} disabled={busy}>
+        {pick(lang, { ru: 'добрать', en: 'draw' })}
+      </button>
+
+      {/* discard — on the right; triggers, crushed ordinary releases and Bad Vibe
+          discards land here as a tossed heap */}
+      <div className={styles.discard}>
+        <div className={styles.discardStack} ref={discardRef}>
+          {discard.length === 0 ? (
+            <span className={styles.discardEmpty}>
+              {pick(lang, { ru: 'сброс', en: 'discard' })}
+            </span>
+          ) : (
+            <>
+              {discard.map((d, i) => (
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: discard is append-only, the index is stable
+                  key={i}
+                  className={styles.discardCard}
+                  style={{ transform: restTransform(d), zIndex: i }}
+                >
+                  <Card card={d.card} interactive={false} width="100%" />
+                </div>
+              ))}
+              <span className={styles.discardCount}>{discard.length}</span>
+            </>
+          )}
+        </div>
+        <div className={styles.label}>{pick(lang, { ru: 'сброс', en: 'discard' })}</div>
+      </div>
+
+      {/* Inside — releases offered for choice, in an open row at the centre */}
+      {insideCandidates && (
+        <div className={styles.pickRow} data-revealed={insideRevealed}>
+          {insideCandidates.map((e, i) => (
+            <button
+              // biome-ignore lint/suspicious/noArrayIndexKey: candidates are a stable snapshot for this pick
+              key={i}
+              type="button"
+              className={styles.pickCard}
+              ref={(el) => {
+                pickRefs.current[i] = el
+              }}
+              onClick={() => setInsidePickIdx(i)}
+            >
+              <Card
+                card={e.card}
+                interactive={false}
+                width="100%"
+                state={insidePickIdx === i ? 'selected' : 'idle'}
+              />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Error 503 — red edge glow in the table zone (below the tech bar) */}
+      <div className={styles.glowBounds} style={{ insetBlockStart: barH }}>
+        <EdgeGlow visible={alert} intensity="strong" />
+      </div>
+
+      {/* player area — release zone above the hand */}
+      <div className={styles.you}>
+        <ReleaseZone
+          release={release}
+          size="92px"
+          slotRef={(key, el) => {
+            releaseSlotRefs.current[key] = el
+          }}
+        />
+        <div
+          className={styles.handWrap}
+          ref={handRef}
+          // ignore hand hover during animations (e.g. after Inside's confirm, while
+          // the card settles in) — Bad Vibe's pick keeps the hand interactive
+          style={{ pointerEvents: busy && !handPickMode ? 'none' : undefined }}
+        >
+          <Hand
+            items={hand}
+            gapAt={gapAt}
+            stateAt={handPickMode ? () => 'playable' : undefined}
+            onCardClick={handPickMode ? onHandPick : undefined}
+            onReorder={
+              handPickMode ? undefined : (uid, to) => setHand((h) => reorderHand(h, uid, to))
+            }
+          />
+        </div>
+      </div>
+
+      {/* the flying draw card — keyed by seq: a new flight = a fresh Card (no flip) */}
+      {flyer && (
+        <div key={flyer.seq} className={styles.flyer} ref={flyerRef}>
+          <Card card={flyer.card} faceDown={flyer.faceDown} interactive={false} width="100%" />
+        </div>
+      )}
+
+      {/* cards leaving on resolution */}
+      {outs.map((o) => (
+        <div
+          key={o.key}
+          className={styles.flyer}
+          ref={(el) => {
+            outRefs.current[o.key] = el
+          }}
+        >
+          <Card card={o.card} faceDown={o.faceDown} interactive={false} width="100%" />
+        </div>
+      ))}
+
+      {/* the "settle into hand" overlay (Inside / Good Vibe draws) */}
+      {overlay}
+
+      {/* Inside — confirm the chosen release (shared slide-up bar) */}
+      <ConfirmAction
+        open={insideCandidates != null}
+        label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
+        caption={pick(lang, {
+          ru: 'выберите релиз из сброса',
+          en: 'pick a release from the discard',
+        })}
+        disabled={insidePickIdx == null}
+        onConfirm={confirmInside}
+      />
+    </div>
+  )
+}
