@@ -27,11 +27,14 @@ Not everything these docs describe is a shared library module. As of now:
 
 **In `@release/ui` — import and use directly:**
 - The animation vocabulary: `play`, the presets (`PRESETS`), and `move` / `jitter` / `wait` /
-  `nextFrames` (`apps/ui/src/animations/`); the card geometry helpers `cardAreaOf` / `cardBoxIn`
-  (`@/primitives/Card`).
-- Primitives that **animate themselves** — used declaratively, the animation is built in:
-  `Card` (plays `flipCard` on a `faceDown` change), `EdgeGlow` (CSS opacity fade), `Input` (shake),
-  `Arrow` (via `useArrow`).
+  `nextFrames` (`apps/ui/src/animations/`); the discard-scatter model `scatterAt` / `restTransform` /
+  `toDiscardParams` / `HEAP_SHOW` (same folder); the card geometry helpers `cardAreaOf` / `cardBoxIn`
+  (`@/primitives/Card`); the fan geometry `slotPlacement` / `handStep` (`@/table/Hand/fan`).
+- Primitives / components that **animate themselves** — used declaratively, the animation is built in:
+  `Card` (plays `flipCard` on a `faceDown` change), `Hand` (the interactive fan: hover lift + zoom
+  preview, drag-to-play/reorder, click/drag threshold, settle-back — all internal), `EdgeGlow` (CSS
+  opacity fade), `ConfirmAction` (slide-up confirm bar), `Input` (shake), `Arrow` (via `useArrow`).
+  `ReleaseZone` exposes `slotRef(key, el)` so a consumer can fly a card into a specific slot.
 
 **NOT in the library — lives only in the playground stories (`apps/playground/stories/...`):**
 - The **travel / flight machinery** — the `flyer` element plus the measure → `nextFrames` →
