@@ -88,18 +88,6 @@
   overflow: visible;
 }
 
-.hint {
-  position: absolute;
-  inset-block-start: -30px;
-  inset-inline: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-45);
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-}
-
 /* карта каталога: вылетает при появлении (стаггер через inline animation-delay),
    по ховеру увеличивается, чтобы прочитать эффект */
 .cell {

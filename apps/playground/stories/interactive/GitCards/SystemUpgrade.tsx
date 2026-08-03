@@ -374,6 +374,9 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
                   interactive={false}
                   width={CENTER_W}
                   state={phase === 'choose' && selected ? 'selected' : 'idle'}
+                  // pick one out of a set — uniform selection colour, not the
+                  // per-category accent
+                  accent="var(--select-accent)"
                 />
               </button>
             )

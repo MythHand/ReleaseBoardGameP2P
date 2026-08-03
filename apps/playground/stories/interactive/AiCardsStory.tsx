@@ -15,7 +15,7 @@ import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
-import type { HandItem } from '@/table/Hand/Hand'
+import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import { type Lang, pick, useLang } from '../../Playground/lang'
@@ -157,7 +157,7 @@ export default function AiCardsStory() {
   const turnInterrupted = useRef(false) // Hallucination stops Good Vibe's 2nd draw
   const halted = useRef(false) // Error 503 halts the scene (reset to continue)
   const insideResolver = useRef<((entry: DiscardEntry) => void) | null>(null)
-  const handPickResolver = useRef<((i: number) => void) | null>(null)
+  const handPickResolver = useRef<((uid: string) => void) | null>(null)
   const handPickRect = useRef<DOMRect | null>(null)
   const pickRefs = useRef<Record<number, HTMLElement | null>>({}) // Inside choice row cells
 
@@ -592,14 +592,15 @@ export default function AiCardsStory() {
     }
   }
 
-  // Bad Vibe-Coding — the player picks a hand card; it's shown at the centre and
-  // discarded. The Bad Vibe card stays at the centre until the pick is made.
+  // Bad Vibe-Coding — the player discards a hand card; it's shown at the centre
+  // and discarded. The Bad Vibe card stays at the centre until the pick is made.
+  // The pick is the canonical discard gesture: drag the card OUT of the hand.
   const badVibe = async (trig: CardType, ai: CardType) => {
-    const i = await new Promise<number>((res) => {
+    const uid = await new Promise<string>((res) => {
       handPickResolver.current = res
       setHandPickMode(true)
     })
-    const chosen = hand[i]
+    const chosen = hand.find((x) => x.uid === uid)
     const fromRect = handPickRect.current ?? undefined
     // no extra hold — waiting for the player's pick already held it at the centre
     await resolveGeneric(trig, ai) // Bad Vibe → AI deck, trigger → discard (centre clears)
@@ -609,13 +610,15 @@ export default function AiCardsStory() {
     }
   }
 
-  const onHandPick = (i: number, el: HTMLElement) => {
-    if (!handPickMode) return
-    handPickRect.current = el.getBoundingClientRect()
+  // dragged out of the hand while Bad Vibe waits — accept it as the discard
+  const onHandDrop = (uid: string, drop: HandPlayDrop): boolean => {
+    if (!handPickMode) return false
+    handPickRect.current = drop.rect ?? null
     const res = handPickResolver.current
     handPickResolver.current = null
     setHandPickMode(false)
-    res?.(i)
+    res?.(uid)
+    return true
   }
 
   // dispatch the revealed AI card to its effect
@@ -804,6 +807,9 @@ export default function AiCardsStory() {
                 interactive={false}
                 width="100%"
                 state={insidePickIdx === i ? 'selected' : 'idle'}
+                // pick one out of a set — uniform selection colour, not the
+                // per-category accent
+                accent="var(--select-accent)"
               />
             </button>
           ))}
@@ -835,10 +841,13 @@ export default function AiCardsStory() {
             items={hand}
             gapAt={gapAt}
             stateAt={handPickMode ? () => 'playable' : undefined}
-            onCardClick={handPickMode ? onHandPick : undefined}
-            onReorder={
-              handPickMode ? undefined : (uid, to) => setHand((h) => reorderHand(h, uid, to))
-            }
+            // Bad Vibe discards ANY card — uniform colour, not the per-category
+            // accent; and it costs a card, so the hue is the loss one
+            accentAt={handPickMode ? () => 'var(--danger-accent)' : undefined}
+            // the discard gesture is the same everywhere: pull the card OUT of
+            // the hand (never a click) — see the Hand limit scene
+            onPlay={handPickMode ? onHandDrop : undefined}
+            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
           />
         </div>
       </div>

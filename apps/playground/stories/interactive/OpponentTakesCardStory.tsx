@@ -4,6 +4,7 @@ import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
+import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './OpponentTakesCardStory.module.css'
@@ -99,12 +100,18 @@ export default function OpponentTakesCardStory() {
     requestAnimationFrame(() => requestAnimationFrame(() => setHandIn(true)))
   }
 
-  // the opponent picks a card — it holds, the rest leave, then we check your hand
+  // the opponent selects a card — naming a card is irreversible, so the choice is
+  // only armed here and committed from the confirm bar
   function pickWanted(card: CardType) {
     if (phase !== 'choose') return
     setWanted(card)
+  }
+
+  // confirmed — the named card holds, the rest leave, then we check your hand
+  function confirmWanted() {
+    if (phase !== 'choose' || !wanted) return
     setPhase('picked')
-    later(() => resolve(card), PICK_BEAT)
+    later(() => resolve(wanted), PICK_BEAT)
   }
 
   // check YOUR hand: hit lifts the card out and up; miss shows a note
@@ -212,11 +219,6 @@ export default function OpponentTakesCardStory() {
       {/* the opponent's broadcast catalog (choose which of your cards to take) */}
       {phase !== 'idle' && (
         <div className={styles.grid}>
-          {phase === 'choose' && (
-            <div className={styles.hint}>
-              {pick(lang, { ru: 'соперник выбирает карту', en: 'the opponent is choosing' })}
-            </div>
-          )}
           {BASE_TYPES.map((c, i) => (
             <button
               key={c.id}
@@ -225,7 +227,15 @@ export default function OpponentTakesCardStory() {
               style={{ animationDelay: `${i * 18}ms` }}
               onClick={phase === 'choose' ? () => pickWanted(c) : undefined}
             >
-              <Card card={c} interactive={false} width={GRID_W} />
+              <Card
+                card={c}
+                interactive={false}
+                width={GRID_W}
+                state={phase === 'choose' && wanted?.id === c.id ? 'selected' : 'idle'}
+                // pick one out of a set — uniform selection colour, not the
+                // per-category accent
+                accent="var(--select-accent)"
+              />
             </button>
           ))}
         </div>
@@ -257,6 +267,15 @@ export default function OpponentTakesCardStory() {
       <div className={styles.handWrap} ref={handRef}>
         <Hand items={hand} onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))} />
       </div>
+
+      {/* naming a card is irreversible — confirm it (the shared slide-up bar) */}
+      <ConfirmAction
+        open={phase === 'choose'}
+        label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
+        caption={pick(lang, { ru: 'соперник выбирает карту', en: 'the opponent is choosing' })}
+        disabled={wanted == null}
+        onConfirm={confirmWanted}
+      />
     </div>
   )
 }

@@ -483,6 +483,9 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
                     width={GRID_W}
                     faceDown={flipped.has(d.uid)}
                     state={phase === 'choose' && selected ? 'selected' : 'idle'}
+                    // pick one out of a set — uniform selection colour, not the
+                    // per-category accent
+                    accent="var(--select-accent)"
                   />
                   {phase === 'choose' && trigger && !selected && (
                     <span className={styles.lockTag}>

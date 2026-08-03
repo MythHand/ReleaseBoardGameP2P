@@ -146,23 +146,12 @@
   opacity: 0.5;
 }
 
-/* рука игрока — снизу по центру */
+/* player hand — the canonical fan, bottom-centre (Hand sizes itself to the
+   wrapper's width and lays the fan out from its centre) */
 .hand {
   position: absolute;
-  inset-block-end: 28px;
-  inset-inline-start: 50%;
-  display: flex;
-  gap: 12px;
-  transform: translateX(-50%);
-}
-
-.card {
-  cursor: pointer;
-  transition: transform var(--t-fast) var(--ease-out);
-}
-
-.card:hover {
-  transform: translateY(-10px);
+  inset-block-end: 16px;
+  inset-inline: 56px;
 }
 
 /* летящая карта — позиционируется и анимируется императивно (пресеты move) */

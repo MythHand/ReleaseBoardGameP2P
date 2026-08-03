@@ -6,10 +6,13 @@ import { useRef, useState } from 'react'
 import { jitter, nextFrames, play, restTransform, toDiscardParams } from '@/animations'
 import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
+import Hand from '@/table/Hand'
+import type { HandPlayDrop } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './CardPlayStory.module.css'
+import { reorderHand } from './reorderHand'
 
 // Showcase of two reusable card-play presets:
 //   part 1 — hand/opponent → table center (the playToCenter preset),
@@ -39,8 +42,8 @@ interface DiscardEntry {
 }
 
 let seq = 0
-const uid = () => `p${++seq}`
-const makeHand = (cards: CardData[]): HandItem[] => cards.map((card) => ({ uid: uid(), card }))
+const nextUid = () => `p${++seq}`
+const makeHand = (cards: CardData[]): HandItem[] => cards.map((card) => ({ uid: nextUid(), card }))
 
 export default function CardPlayStory() {
   const { lang } = useLang()
@@ -51,7 +54,6 @@ export default function CardPlayStory() {
   const [flyer, setFlyer] = useState<CardData | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const handRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const seatRef = useRef<HTMLDivElement>(null)
   const centerRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
@@ -101,12 +103,16 @@ export default function CardPlayStory() {
     setBusy(false)
   }
 
-  const playFromPlayer = (e: React.MouseEvent, item: HandItem) => {
-    e.stopPropagation()
-    const el = handRefs.current[item.uid]
-    if (!el || busy || center) return
-    setPlayerHand((h) => h.filter((it) => it.uid !== item.uid))
-    void flyToCenter(item.card, el.getBoundingClientRect())
+  // the player plays by pulling a card OUT of the fan (the canonical gesture).
+  // The centre holds one card — while it is busy the drop is rejected and the
+  // Hand glides the card back.
+  const playFromPlayer = (uid: string, drop: HandPlayDrop): boolean => {
+    if (busy || center || !drop.rect) return false
+    const item = playerHand.find((it) => it.uid === uid)
+    if (!item) return false
+    setPlayerHand((h) => h.filter((it) => it.uid !== uid))
+    void flyToCenter(item.card, drop.rect)
+    return true
   }
 
   // the opponent "plays" — a card flies from the Seat spot (card-sized)
@@ -145,8 +151,8 @@ export default function CardPlayStory() {
         </button>
         <span className={styles.hint}>
           {pick(lang, {
-            ru: 'клик по карте игрока / по сопернику → в центр; клик по карте в центре → в сброс',
-            en: 'click a player card / the opponent → to the center; click the card at the center → to the discard',
+            ru: 'вытащи карту из руки / клик по сопернику → в центр; клик по карте в центре → в сброс',
+            en: 'pull a card out of the hand / click the opponent → to the center; click the card at the center → to the discard',
           })}
         </span>
       </div>
@@ -200,21 +206,13 @@ export default function CardPlayStory() {
         <div className={styles.label}>{pick(lang, { ru: 'сброс', en: 'discard' })}</div>
       </div>
 
-      {/* player hand — bottom, face up */}
+      {/* player hand — bottom, the canonical fan */}
       <div className={styles.hand}>
-        {playerHand.map((item) => (
-          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only play; sandbox story
-          <div
-            key={item.uid}
-            ref={(el) => {
-              handRefs.current[item.uid] = el
-            }}
-            className={styles.card}
-            onMouseDown={(e) => playFromPlayer(e, item)}
-          >
-            <Card card={item.card} interactive={false} width={108} />
-          </div>
-        ))}
+        <Hand
+          items={playerHand}
+          onPlay={playFromPlayer}
+          onReorder={(uid, to) => setPlayerHand((h) => reorderHand(h, uid, to))}
+        />
       </div>
 
       {flyer && (
