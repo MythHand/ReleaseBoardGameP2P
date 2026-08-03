@@ -102,6 +102,11 @@ export default function ComposedFace({
     ...shift(l.depth),
   })
 
+  // LOD is NOT a second face — it is the same layers holding different values.
+  // What changes size/position (illustration, title) just gets other numbers and
+  // eases there via the CSS transition on the layer; what LOD drops (category,
+  // fast icon, description) stays MOUNTED and fades out, because unmounting it
+  // would pop instead of easing.
   // LOD enlarges the illustration and drops it lower; everything else is shared
   const illustration: ImageLayer = lod
     ? {
@@ -156,9 +161,10 @@ export default function ComposedFace({
       )}
       <img className={styles.img} src={config.grid.src} alt="" style={imgStyle(config.grid)} />
       <img className={styles.img} src={illustration.src} alt="" style={imgStyle(illustration)} />
-      {!lod && config.category && CategoryIcon && (
+      {config.category && CategoryIcon && (
         <div
           className={styles.category}
+          data-off={lod}
           style={{
             top: cqw(config.category.top),
             left: cqw(config.category.left),
@@ -177,9 +183,10 @@ export default function ComposedFace({
           </span>
         </div>
       )}
-      {!lod && config.fast && (
+      {config.fast && (
         <span
           className={styles.fastBox}
+          data-off={lod}
           style={{
             top: cqw(config.fast.top),
             right: cqw(config.fast.right),
@@ -198,11 +205,13 @@ export default function ComposedFace({
       <div className={styles.title} style={textStyle(config.title, titleSize)}>
         {content.title}
       </div>
-      {!lod && (
-        <div className={styles.desc} style={textStyle(config.description, CARD_FONT.description)}>
-          {description}
-        </div>
-      )}
+      <div
+        className={styles.desc}
+        data-off={lod}
+        style={textStyle(config.description, CARD_FONT.description)}
+      >
+        {description}
+      </div>
     </>
   )
 }

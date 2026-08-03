@@ -28,7 +28,11 @@
   backface-visibility: hidden;
 }
 
-/* every layer eases back to its calm position when the pointer leaves */
+/* Every layer eases back to its calm position when the pointer leaves — and the
+   same layers ease between the full and the LOD reading of the card. LOD is not
+   a second face: the illustration and the title just get other values, so the
+   size/offset properties are transitioned alongside the parallax transform. The
+   longer step is the LOD one; the parallax stays as short as it was. */
 .img,
 .panel,
 .category,
@@ -36,8 +40,25 @@
 .title,
 .desc {
   position: absolute;
-  transition: transform 0.16s ease-out;
+  transition:
+    transform 0.16s ease-out,
+    width 0.32s var(--ease-out),
+    height 0.32s var(--ease-out),
+    margin-top 0.32s var(--ease-out),
+    margin-left 0.32s var(--ease-out),
+    font-size 0.32s var(--ease-out),
+    opacity 0.28s var(--ease-out);
   will-change: transform;
+}
+
+/* a layer the LOD reading drops. It stays MOUNTED and fades — unmounting it
+   would pop, and the point of LOD here is that the card rebuilds its own
+   contents rather than being swapped for another card. */
+.category[data-off="true"],
+.fastBox[data-off="true"],
+.desc[data-off="true"] {
+  pointer-events: none;
+  opacity: 0;
 }
 
 /* centered images — native size (in cqw), never distorted; overflow is clipped */

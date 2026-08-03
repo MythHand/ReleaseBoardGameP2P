@@ -21,6 +21,10 @@ interface CardProps {
   accent?: string
   // force the flat PNG face instead of the composed one (OG-card showcase)
   png?: boolean
+  // simplified reading of the face — used where a card is furniture rather than
+  // something to read in full (a release standing in its zone). The layers stay
+  // the same and only their values change, so it animates between the two.
+  lod?: boolean
 }
 
 /**
@@ -36,6 +40,7 @@ export default function Card({
   onClick,
   accent: accentProp,
   png,
+  lod,
 }: CardProps) {
   const flipRef = useRef<HTMLDivElement>(null)
   const initialDown = useRef(faceDown)
@@ -98,7 +103,7 @@ export default function Card({
           style={{ transform: `rotateY(${initialDown.current ? 180 : 0}deg)` }}
         >
           <div className={styles.face}>
-            <CardFace card={card} p={p} png={png} />
+            <CardFace card={card} p={p} png={png} lod={lod} />
           </div>
           <div className={`${styles.face} ${styles.back}`}>
             <CardBack deck={card?.deck} />

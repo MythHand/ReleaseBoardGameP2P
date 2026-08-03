@@ -24,6 +24,10 @@ interface SeatProps {
   eliminated?: boolean
   disconnected?: boolean
   copy: SeatCopy
+  // проброс до слотов мини-зоны релиза: потребителю нужен DOM-узел конкретного
+  // слота, чтобы прицелить в него полёт карты (Security Bug забирает чужой
+  // релиз в СВОЮ зону). Чисто позиционный хук, на вид не влияет.
+  slotRef?: (key: keyof ReleaseSlots, el: HTMLDivElement | null) => void
 }
 
 // Место оппонента: имя, индикатор хода, число карт / статус, мини-зона релиза.
@@ -33,6 +37,7 @@ export default function Seat({
   eliminated = false,
   disconnected = false,
   copy,
+  slotRef,
 }: SeatProps) {
   // status dot — colour by state; idle seats hold a static dot, offline and the
   // active turn pulse to read as live
@@ -67,7 +72,9 @@ export default function Seat({
           </span>
         )}
       </div>
-      <ReleaseZone release={player.release} size="72px" variant="compact" />
+      {/* зона СОПЕРНИКА — карты в ней не читают, поэтому LOD; своя зона игрока
+          остаётся полной (её включает сам экран, а не этот компонент) */}
+      <ReleaseZone release={player.release} size="72px" variant="compact" slotRef={slotRef} lod />
     </div>
   )
 }

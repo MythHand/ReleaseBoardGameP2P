@@ -19,6 +19,9 @@ interface ReleaseZoneProps {
   // (e.g. an AI Release / Monitoring landing in its slot). Purely a position hook;
   // no visual effect.
   slotRef?: (key: keyof ReleaseSlots, el: HTMLDivElement | null) => void
+  // упрощённое чтение карт в зоне (LOD). Решает ПОТРЕБИТЕЛЬ: чужая зона —
+  // мебель, её карты читать не нужно; своя зона по умолчанию остаётся полной.
+  lod?: boolean
 }
 
 const SLOTS: [keyof ReleaseSlots, string][] = [
@@ -35,6 +38,7 @@ export default function ReleaseZone({
   size = '84px',
   variant = 'default',
   slotRef,
+  lod = false,
 }: ReleaseZoneProps) {
   const compact = variant === 'compact'
   const slotSize = compact ? `calc(${size} / 1.4)` : size
@@ -50,7 +54,7 @@ export default function ReleaseZone({
             ref={(el) => slotRef?.(key, el)}
           >
             {card ? (
-              <Card card={card} interactive={false} width="100%" />
+              <Card card={card} interactive={false} width="100%" lod={lod} />
             ) : (
               <div className={styles.empty}>{label}</div>
             )}
