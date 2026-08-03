@@ -100,12 +100,22 @@
   border-radius: 8px;
 }
 
+/* discard counter — the Pile "br" badge (the canonical discard counter) */
 .discardCount {
   position: absolute;
-  inset-block-start: 6px;
-  inset-inline-start: 8px;
+  inset-block-end: 8px;
+  inset-inline-end: 8px;
   z-index: 20;
-  color: var(--white-45);
+  padding: 3px 9px;
+  color: var(--fg);
+  background: var(--black-78);
+  border: 1px solid var(--white-20);
+  border-radius: 6px;
+}
+
+.discardCount::before {
+  content: "// ";
+  opacity: 0.4;
 }
 
 .label {

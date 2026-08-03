@@ -159,8 +159,10 @@
   will-change: transform;
 }
 
+/* player hand — canonical Table position: the left inset clears the turn dock,
+   the right one clears the rail */
 .handWrap {
   position: absolute;
-  inset-block-end: 24px;
-  inset-inline: 0;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
 }

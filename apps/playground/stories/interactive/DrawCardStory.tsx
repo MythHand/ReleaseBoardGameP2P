@@ -19,6 +19,7 @@ import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
+import TurnDock from '@/table/TurnDock/TurnDock'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './DrawCardStory.module.css'
@@ -90,6 +91,7 @@ const randomNonTrigger = (): CardType => NON_TRIGGER[Math.floor(Math.random() * 
 
 export default function DrawCardStory() {
   const { lang } = useLang()
+  const turnCopy = (lang === 'en' ? enCommon : ruCommon).turnDock
   const [deckCount, setDeckCount] = useState(1)
   const [forced, setForced] = useState<Forced>('ordinary')
   const [forcedAt, setForcedAt] = useState(1) // on which draw the forced card shows up
@@ -487,10 +489,17 @@ export default function DrawCardStory() {
         </div>
       </div>
 
-      {/* the draw button — under the decks (we don't move the decks) */}
-      <button type="button" className={styles.drawBtn} onClick={drawBatch} disabled={busy}>
-        {pick(lang, { ru: 'добрать', en: 'draw' })}
-      </button>
+      {/* the draw affordance — the canonical TurnDock in its 'draw' state, at its
+          canonical spot (bottom-left, under the decks, left of the hand) */}
+      <div className={styles.turnDock}>
+        <TurnDock
+          state={busy ? 'push' : 'draw'}
+          seconds={20}
+          progress={1}
+          copy={turnCopy}
+          onDraw={busy ? undefined : drawBatch}
+        />
+      </div>
 
       {/* discard — on the right; cards land scattered (a tossed heap) */}
       <div className={styles.discard}>

@@ -82,17 +82,18 @@
 
 /* сброс — справа; карты ложатся вразброс. Центрируем margin:auto (без transform),
    чтобы не создавать stacking context и держать счётчик верхним слоем. */
+
+/* discard — right of centre, before the right rail (canonical Table position) */
 .discard {
   position: absolute;
-  inset-block: 0;
+  inset-block-start: 50%;
   inset-inline-end: 86px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: center;
   inline-size: 116px;
-  block-size: fit-content;
-  margin-block: auto;
+  transform: translateY(-50%);
 }
 
 .discardStack {
@@ -151,7 +152,9 @@
 .hand {
   position: absolute;
   inset-block-end: 16px;
-  inset-inline: 56px;
+
+  /* canonical Table insets: the left one clears the turn dock, the right the rail */
+  inset-inline: 196px 56px;
 }
 
 /* летящая карта — позиционируется и анимируется императивно (пресеты move) */

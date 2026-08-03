@@ -111,11 +111,11 @@
   transform: translate(calc(-50% + 82px), -50%);
 }
 
-/* discard — right of centre, as on the table */
+/* discard — right of centre, before the right rail (canonical Table position) */
 .discard {
   position: absolute;
   inset-block-start: 50%;
-  inset-inline-end: 40px;
+  inset-inline-end: 86px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -149,6 +149,7 @@
   border-radius: 10px;
 }
 
+/* discard counter — the Pile "br" badge (the canonical discard counter) */
 .discardCount {
   position: absolute;
   inset-block-end: 8px;
@@ -161,7 +162,12 @@
   letter-spacing: 0.02em;
   background: var(--black-78);
   border: 1px solid var(--white-20);
-  border-radius: 999px;
+  border-radius: 6px;
+}
+
+.discardCount::before {
+  content: "// ";
+  opacity: 0.4;
 }
 
 .label {
@@ -172,31 +178,14 @@
   letter-spacing: 0.14em;
 }
 
-/* the start button — under the decks (decks aren't moved, this is positioned) */
-.startBtn {
+/* turn dock — canonical Table position: bottom-left, under the decks, left of
+   the hand. It carries the draw action instead of a local button. Sits ABOVE the
+   red edge glow (which paints from the table edges). */
+.turnDock {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-end: 20px;
   inset-inline-start: 26px;
-  min-inline-size: 150px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-  transform: translateY(236px);
-}
-
-.startBtn:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
-}
-
-.startBtn:disabled {
-  cursor: default;
-  opacity: 0.4;
+  z-index: 55;
 }
 
 /* player area — release zone above the hand, bottom-centre (mirrors Table `.you`) */

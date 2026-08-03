@@ -108,11 +108,11 @@
   border-color: var(--brand-green);
 }
 
-/* draw deck (left) and discard (right) — Table-like placement, mid-height */
+/* draw deck (left) and discard (right) — canonical Table placement */
 .deckPile,
 .discardPile {
   position: absolute;
-  inset-block-start: 44%;
+  inset-block-start: 50%;
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -122,11 +122,11 @@
 }
 
 .deckPile {
-  inset-inline-start: 40px;
+  inset-inline-start: 26px;
 }
 
 .discardPile {
-  inset-inline-end: 40px;
+  inset-inline-end: 86px;
 }
 
 .pileLabel {
@@ -155,17 +155,25 @@
   border-radius: 10px;
 }
 
+/* discard counter — the Pile "br" badge (the canonical discard counter) */
 .heapCount {
   position: absolute;
-  inset-block-end: 6px;
-  inset-inline-end: 6px;
+  inset-block-end: 8px;
+  inset-inline-end: 8px;
   z-index: 20;
-  padding: 1px 7px;
+  padding: 3px 9px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 15px;
   color: var(--fg);
-  background: var(--black-60);
-  border-radius: 999px;
+  letter-spacing: 0.02em;
+  background: var(--black-78);
+  border: 1px solid var(--white-20);
+  border-radius: 6px;
+}
+
+.heapCount::before {
+  content: "// ";
+  opacity: 0.4;
 }
 
 /* idle: start button in the centre */
@@ -318,10 +326,13 @@
 }
 
 /* no z-index — hand cards share the context so a flying card tucks under the fan */
+
+/* player hand — canonical Table position: the left inset clears the turn dock,
+   the right one clears the rail */
 .handWrap {
   position: absolute;
-  inset-block-end: 20px;
-  inset-inline: 210px;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
   display: flex;
   justify-content: center;
 }

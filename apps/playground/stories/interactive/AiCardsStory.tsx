@@ -1,3 +1,5 @@
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import { useLayoutEffect, useRef, useState } from 'react'
 import {
   jitter,
@@ -18,6 +20,7 @@ import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
+import TurnDock from '@/table/TurnDock/TurnDock'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './AiCardsStory.module.css'
@@ -123,6 +126,7 @@ interface Out {
 
 export default function AiCardsStory() {
   const { lang } = useLang()
+  const turnCopy = (lang === 'en' ? enCommon : ruCommon).turnDock
   const [aiChoice, setAiChoice] = useState('ai-release-frontend')
   const [monitoring, setMonitoring] = useState(false)
   const [discardCount, setDiscardCount] = useState(0)
@@ -757,9 +761,17 @@ export default function AiCardsStory() {
         </div>
       </div>
 
-      <button type="button" className={styles.startBtn} onClick={start} disabled={busy}>
-        {pick(lang, { ru: 'добрать', en: 'draw' })}
-      </button>
+      {/* the draw affordance — the canonical TurnDock in its 'draw' state, at its
+          canonical spot (bottom-left, under the decks, left of the hand) */}
+      <div className={styles.turnDock}>
+        <TurnDock
+          state={busy ? 'push' : 'draw'}
+          seconds={20}
+          progress={1}
+          copy={turnCopy}
+          onDraw={busy ? undefined : start}
+        />
+      </div>
 
       {/* discard — on the right; triggers, crushed ordinary releases and Bad Vibe
           discards land here as a tossed heap */}

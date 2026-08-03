@@ -74,17 +74,18 @@
 /* сброс — справа, как на столе; лицом вверх, вразброс.
    Центрируем по вертикали через margin:auto (без transform) — иначе transform
    создаёт stacking context и счётчик не поднять выше летящих карт. */
+
+/* discard — right of centre, before the right rail (canonical Table position) */
 .discard {
   position: absolute;
-  inset-block: 0;
+  inset-block-start: 50%;
   inset-inline-end: 86px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: center;
   inline-size: 116px;
-  block-size: fit-content;
-  margin-block: auto;
+  transform: translateY(-50%);
 }
 
 .discardStack {
@@ -183,9 +184,12 @@
 
 
 /* рука игрока снизу — компонент Hand (веер) */
+
+/* player hand — canonical Table position: the left inset clears the turn dock,
+   the right one clears the rail */
 .handWrap {
   position: absolute;
-  inset-block-end: 0;
-  inset-inline: 0;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
   z-index: 40;
 }

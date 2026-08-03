@@ -129,7 +129,7 @@
 .discard {
   position: absolute;
   inset-block-start: 50%;
-  inset-inline-end: 40px;
+  inset-inline-end: 86px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -176,7 +176,14 @@
   letter-spacing: 0.02em;
   background: var(--black-78);
   border: 1px solid var(--white-20);
-  border-radius: 999px;
+
+  /* the Pile "br" badge — the canonical discard counter */
+  border-radius: 6px;
+}
+
+.discardCount::before {
+  content: "// ";
+  opacity: 0.4;
 }
 
 .label {
@@ -187,31 +194,13 @@
   letter-spacing: 0.14em;
 }
 
-/* кнопка добора — под блоком колод (колоды не двигаем, позиционируем отдельно) */
-.drawBtn {
+/* turn dock — canonical Table position: bottom-left, under the decks, left of
+   the hand. It carries the draw action instead of a local button. */
+.turnDock {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-end: 20px;
   inset-inline-start: 26px;
-  min-inline-size: 150px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-  transform: translateY(236px);
-}
-
-.drawBtn:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
-}
-
-.drawBtn:disabled {
-  cursor: default;
-  opacity: 0.4;
+  z-index: 55;
 }
 
 /* контейнер зоны стола для краевого свечения — ниже тех-панели (inset-block-start
@@ -227,8 +216,11 @@
 /* рука игрока снизу — компонент Hand (веер).
    Без z-index намеренно: оверлей вставки (useHandInsert) подтыкается под веер
    по z слотов — общий stacking-контекст с рукой нужен, чтобы карта не пряталась. */
+
+/* player hand — canonical Table position: the left inset clears the turn dock,
+   the right one clears the rail, so the fan sits where it does in the game */
 .handWrap {
   position: absolute;
-  inset-block-end: 0;
-  inset-inline: 0;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
 }

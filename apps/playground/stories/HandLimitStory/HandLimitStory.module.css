@@ -104,23 +104,35 @@
   border-radius: 8px;
 }
 
+/* discard counter — the Pile "br" badge (the canonical discard counter) */
 .discardCount {
   position: absolute;
-  inset-block-start: 6px;
-  inset-inline-start: 8px;
+  inset-block-end: 8px;
+  inset-inline-end: 8px;
   z-index: 20;
-  color: var(--white-45);
+  padding: 3px 9px;
+  color: var(--fg);
+  background: var(--black-78);
+  border: 1px solid var(--white-20);
+  border-radius: 6px;
+}
+
+.discardCount::before {
+  content: "// ";
+  opacity: 0.4;
 }
 
 .label {
   color: var(--white-45);
 }
 
-/* hand — bottom-centre (no dock/rail on this page, so it stays symmetric) */
+/* player hand — canonical Table position: the left inset clears the turn dock,
+   the right one clears the rail, so the fan sits where it does in the game even
+   though this page renders neither */
 .you {
   position: absolute;
   inset-block-end: 16px;
-  inset-inline: 56px;
+  inset-inline: 196px 56px;
 }
 
 .hint {
