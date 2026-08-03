@@ -32,8 +32,8 @@ import InviteStory from '../stories/InviteStory'
 import AiCardsStory from '../stories/interactive/AiCardsStory'
 import CardPlayStory from '../stories/interactive/CardPlayStory'
 import CardToHandStory from '../stories/interactive/CardToHandStory'
-import DealCardsStory from '../stories/interactive/DealCardsStory'
 import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
+import DefenseReleaseStory from '../stories/interactive/DefenseReleaseStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
 import Error503Story from '../stories/interactive/Error503Story'
 import GitCardsStory from '../stories/interactive/GitCards/GitCardsStory'
@@ -146,12 +146,16 @@ const groups: Group[] = [
       },
       { id: 'git-cards', title: 'Git cards', render: () => <GitCardsStory /> },
       { id: 'error-503', title: 'Error 503', render: () => <Error503Story /> },
+      {
+        id: 'defense-release',
+        title: 'Defense Release',
+        render: () => <DefenseReleaseStory />,
+      },
       { id: 'ai-cards', title: 'AI cards', render: () => <AiCardsStory /> },
       { id: 'card-to-hand', title: 'Card to Hand', render: () => <CardToHandStory /> },
       { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
       { id: 'deck-animations', title: 'Deck animations', render: () => <DeckAnimationsStory /> },
-      { id: 'deal-cards', title: 'Deal cards', render: () => <DealCardsStory /> },
     ],
   },
   {

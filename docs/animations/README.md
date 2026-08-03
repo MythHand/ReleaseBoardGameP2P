@@ -148,6 +148,16 @@ teleports on screen.
 - **I8 — Pass data as arguments, not from state, inside an async sequence.** A long sequence
   reads stale state after `await`; pass the cards/rects it needs as function args (avoids the
   stale-closure bug on click).
+- **I9 — A card's layer is a value it carries, never DOM order.** Whenever more than one card
+  overlaps — resting in a stack, travelling, or landing — its stacking position must be an
+  explicit `zIndex` derived from its place in that stack, and the **same order** must drive the
+  array it is appended to at the destination. Two flyers left on the same `z` fall back to
+  document order, which is the order of the array you happened to build — so the card that lay
+  underneath paints on top and the stack silently turns over mid-flight. The existing pieces all
+  follow this: the discard heap layers by its own index (`zIndex: i`), and `useHandInsert` /
+  `Hand.settleInto` set the flyer's `z` to the target slot's `z` **before** the flight, so the
+  card tucks into the fan at the right depth instead of riding over it. When a stack lands in the
+  heap, append **bottom-up**: the lowest card has to arrive first, or the heap inverts it.
 
 ---
 

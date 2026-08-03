@@ -18,12 +18,16 @@ export interface InsertSource {
   top: number
   width: number
   height: number
+  // tilt the card is resting at, if it comes off the table rather than out of a
+  // flight (a card lying in a table slot carries a pose). Rotated about its own
+  // CENTRE, as table poses are. Default 0 — an upright source.
+  rot?: number
 }
 
 interface Flying {
   card: CardType
   z: number
-  from: { left: number; top: number; width: number }
+  from: { left: number; top: number; width: number; rot: number }
   to: string
 }
 
@@ -54,11 +58,20 @@ export function useHandInsert(
     // the gap-slot position — from the single source (layout as for handLength+1 slots)
     const place = slotPlacement(gap, handLength + 1)
     const hr = handEl.getBoundingClientRect()
+    // The flight pivots on the slot's bottom center (like Hand's .slot), while a
+    // tilted source rests on its own center. Same angle, different pivot — so the
+    // mount point is shifted by the difference between the two, or the very first
+    // frame jumps by ~h/2·sin(rot) before anything has started moving.
+    const src = (source.rot ?? 0) * (Math.PI / 180)
+    const offX = src === 0 ? 0 : (source.height / 2) * Math.sin(src)
+    const offY = src === 0 ? 0 : (source.height / 2) * (1 - Math.cos(src))
+    const left = source.left - offX
+    const top = source.top - offY
     // aim at the fan slot bottom-center (like Hand's .slot) — the pivot matches
     const targetBcX = hr.left + hr.width / 2 + place.x
     const targetBcY = hr.bottom + place.y
-    const dx = targetBcX - (source.left + source.width / 2)
-    const dy = targetBcY - (source.top + source.height)
+    const dx = targetBcX - (left + source.width / 2)
+    const dy = targetBcY - (top + source.height)
     const rot = place.rotate
     const scale = CARD_W / source.width // adapt size to the hand
 
@@ -66,7 +79,7 @@ export function useHandInsert(
     setFlying({
       card,
       z: place.z, // = the slot index: the right half of the fan stays over the card
-      from: { left: source.left, top: source.top, width: source.width },
+      from: { left, top, width: source.width, rot: source.rot ?? 0 },
       to: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(${scale})`,
     })
     setStarted(false)
@@ -93,7 +106,7 @@ export function useHandInsert(
         top: flying.from.top,
         inlineSize: flying.from.width,
         zIndex: tucked ? flying.z : TRAVEL_Z,
-        transform: started ? flying.to : 'none',
+        transform: started ? flying.to : `rotate(${flying.from.rot}deg)`,
       }}
       onTransitionEnd={settle}
     >
