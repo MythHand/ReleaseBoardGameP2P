@@ -76,7 +76,8 @@
   opacity: 1;
 }
 
-/* центр стола — куда ложатся не-релизы */
+/* staging area at the centre — the cards put into this turn stand here, open to
+   everyone, until the play resolves */
 .centerSlot {
   position: absolute;
   inset-block-start: 50%;
@@ -88,15 +89,17 @@
   transform: translate(-50%, -50%);
 }
 
-/* сброс — правый нижний угол */
+/* discard — right of centre, before the right rail (canonical Table position) */
 .discard {
   position: absolute;
-  inset-block-end: 28px;
-  inset-inline-end: 28px;
+  inset-block-start: 50%;
+  inset-inline-end: 86px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: center;
+  inline-size: 116px;
+  transform: translateY(-50%);
 }
 
 .discardSlot {
@@ -104,7 +107,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  inline-size: 104px;
+  inline-size: 100%;
   aspect-ratio: var(--card-aspect);
   border: 1px dashed var(--white-16);
   border-radius: 12px;
@@ -115,20 +118,42 @@
   inset: 0;
 }
 
+/* discard counter — the Pile "br" badge (the canonical discard counter) */
+.discardCount {
+  position: absolute;
+  inset-block-end: 8px;
+  inset-inline-end: 8px;
+  z-index: 20;
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--fg);
+  letter-spacing: 0.02em;
+  background: var(--black-78);
+  border: 1px solid var(--white-20);
+  border-radius: 6px;
+}
+
+.discardCount::before {
+  content: "// ";
+  opacity: 0.4;
+}
+
 .cap {
   font-family: var(--font-mono);
   font-size: 11px;
   opacity: 0.5;
 }
 
-/* низ: зона релиза над рукой */
+/* player area — release zone above the hand, canonical Table position: the left
+   inset clears the turn dock, the right one clears the rail */
 .bottom {
   position: absolute;
-  inset-block-end: 24px;
-  inset-inline: 0;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 4px;
   align-items: center;
 }
 
@@ -155,23 +180,26 @@
   opacity: 0.4;
 }
 
+/* player hand — the canonical fan (Hand lays itself out from the wrapper's centre) */
 .hand {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  justify-content: center;
+  inline-size: 100%;
 }
 
-.cell {
-  position: relative;
-  cursor: pointer;
-  border-radius: 14px;
-  transition: box-shadow var(--t-base) var(--ease-soft);
+/* the source travelling from the fan to the centre — positioned imperatively */
+.entering {
+  position: fixed;
+  z-index: var(--z-modal);
+  pointer-events: none;
 }
 
-.valid,
-.partner {
-  box-shadow: 0 0 26px color-mix(in srgb, var(--hl) 55%, transparent);
+/* cancel — a card gliding from the centre back into the fan. Same pivot as the
+   fan slot (bottom centre), so the tilt and scale land exactly on the slot. */
+.returning {
+  position: fixed;
+  z-index: var(--z-modal);
+  transform-origin: bottom center;
+  transition: transform 480ms var(--ease-soft);
+  will-change: transform;
 }
 
 /* летящая карта (overlay) */

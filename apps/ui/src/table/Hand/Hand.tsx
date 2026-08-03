@@ -322,7 +322,16 @@ export default function Hand({
     }
     const item = items.find((it) => it.uid === hoveredUid)
     const hr = handRef.current?.getBoundingClientRect()
-    if (!item || !hr) return
+    // наведённая карта ушла из руки (сыграна/выбрана) — превью обязано уйти
+    // вместе с ней, иначе увеличенная карта повисает над столом и закрывает
+    // ровно то, ради чего она из руки и ушла
+    if (!item) {
+      setHoveredUid(null)
+      setZoomShown(false)
+      zoomHide.current = window.setTimeout(() => setZoomView(null), 220)
+      return
+    }
+    if (!hr) return
     const h = clamp(hr.top - ZOOM_TOP_AIR - ZOOM_GAP, ZOOM_MIN_H, ZOOM_MAX_H)
     const w = h * CARD_WH
     setZoomView({
