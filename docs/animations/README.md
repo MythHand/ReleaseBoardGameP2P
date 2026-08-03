@@ -151,6 +151,65 @@ teleports on screen.
 
 ---
 
+## Gating the hand while something plays out
+
+Three approaches are in use, and that is deliberate — they are **not** variants of one thing to
+be unified. Each blocks a different amount, so pick by what the scene actually needs to protect.
+
+### 1. Drop the intent props — the hand stays readable
+
+```tsx
+onPlay={busy ? undefined : handPlay}
+onReorder={busy ? undefined : reorder}
+```
+
+`Hand` turns drag mode on only when `onPlay ?? onReorder` is supplied, so dropping both switches
+the whole gesture off. **Hover, the card lift and the zoom preview keep working** — the player can
+still read their hand, they just cannot pull a card out of it.
+
+Use when the scene is playing out one action and a second one would collide with it, but the hand
+must remain legible. No visual change is added on purpose: the gate lasts about as long as a
+flight, and a state that appears and disappears in half a second reads as flicker.
+
+*Live reference:* `Error503Story` (`busy`).
+
+### 2. Kill pointer events on the wrapper — the hand goes inert
+
+```tsx
+<div className={styles.handWrap} style={{ pointerEvents: busy ? 'none' : undefined }}>
+```
+
+Everything stops: hover, lift, zoom preview, grab. The fan becomes a picture.
+
+Use when something is **open above the fan** — a selection row, a reveal — and the hand's own
+zoom preview (which rises out of the top of the fan) would fight it for the same space. Note that
+this is really a property of the overlay, not of the hand: the trigger to reach for it is
+"an overlay owns this area now", not "an animation is running".
+
+*Live reference:* `AiCardsStory` (the Inside pick row; `busy && !handPickMode`).
+
+### 3. No gate at all — the hand is never blocked
+
+Nothing is dropped and nothing is disabled; several flights run in parallel and the next card can
+be pulled out while the previous one is still travelling.
+
+Use when discarding/playing **is** the interaction and the player's tempo is not linear — they
+think, then dump several cards quickly. Any gate here reads as lag, not as safety.
+
+*Live reference:* `HandLimitStory` (discarding down to the hand limit).
+
+### What none of them do, and what is a different thing entirely
+
+- **None of the three aborts a drag already in progress.** The drag lifecycle lives in a `useEffect`
+  keyed on the drag state and its handlers are captured in that closure, so a card already picked up
+  finishes its release normally. All three mean "do not start a new action", never "cancel the
+  current one". A real interrupt does not exist anywhere yet.
+- **`disabled` is not a gate.** `stateAt` → `'disabled'` means *this card cannot be played by the
+  rules* (Error 503: only the Debugger answers, the rest grey out). It is a durable, meaningful
+  state the player must read. Do not use it to mark "an animation is running".
+
+---
+
 ## Notes for reproduction
 
 - Numbers (durations, holds, offsets) and preset choices in the recipes are **verbatim from

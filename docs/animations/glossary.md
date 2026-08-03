@@ -88,6 +88,7 @@ playground.
 | `CENTER_HOLD` | `420` | `DeckAnimationsStory` | card rests at center before leaving to discard |
 | `STEP_HOLD` | `360` | `DeckAnimationsStory` | standard short beat between deck steps |
 | `SETTLE_MS` | `340` | `@/table/Hand` | reorder / rejected-play glide back into the fan |
+| `RETURN_MS` | `480` | `DeckAnimationsStory` | cancel: the staged cards glide from the centre back into the fan — **must equal the `.returning` CSS transition** |
 | `ResizeMs` | `200` | `Error503Story` | dragged defence eases from its source width to `CARD_W` |
 | `ELIM_MIN_MS` | `5000` | `Error503Story` | minimum elimination-video play time before it fades |
 | `TABLE_HOLD` | `2600` | `AiCardsStory` | hold on the table after an AI card reveals, before it resolves |

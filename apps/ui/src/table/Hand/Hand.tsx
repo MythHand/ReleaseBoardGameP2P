@@ -87,9 +87,15 @@ function defaultFace(item: HandItem, ctx: HandFaceContext): React.ReactNode {
 interface HandProps {
   items: HandItem[]
   faceDown?: boolean
-  // индекс «вставочного» промежутка: веер раскладывается как на n+1 карт,
-  // оставляя слот gapAt пустым (под прилетающую карту). null — обычная рука.
+  // индекс «вставочного» промежутка: веер раскладывается как на n+gapSize карт,
+  // оставляя слоты gapAt…gapAt+gapSize-1 пустыми (под прилетающие карты).
+  // null — обычная рука.
   gapAt?: number | null
+  // ширина промежутка в картах (по умолчанию 1). Больше единицы нужно, когда в
+  // руку одновременно возвращается несколько карт (отмена сборки комбо) — веер
+  // должен раздвинуться заранее сразу под все, иначе карты сядут внахлёст и
+  // соседи разъедутся уже ПОСЛЕ приземления.
+  gapSize?: number
   // клик по карте (для розыгрыша): отдаёт индекс, DOM-элемент слота и событие.
   // Игнорируется в drag-режиме (когда задан onPlay/onReorder).
   onCardClick?: (index: number, el: HTMLElement, e: React.MouseEvent) => void
@@ -128,7 +134,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 /**
  * Рука веером. Ховер поднимает/читает карту и раздвигает соседей;
  * добавление/удаление карт плавно переукладывает веер (CSS-transition).
- * gapAt открывает промежуток под вставку — сосед­ние карты разъезжаются.
+ * gapAt (+ gapSize) открывает промежуток под вставку — соседние карты разъезжаются.
  * В drag-режиме (onPlay/onReorder) карту можно взять мышкой: перетащить внутри
  * руки — переставить; вытащить на стол — разыграть (отдаётся наружу).
  */
@@ -136,6 +142,7 @@ export default function Hand({
   items,
   faceDown = false,
   gapAt = null,
+  gapSize = 1,
   onCardClick,
   accentAt,
   stateAt,
@@ -340,9 +347,10 @@ export default function Hand({
       placement.set(it.uid, { slot, total })
     })
   } else {
-    const total = gapAt == null ? n : n + 1
+    const gap = gapAt == null ? 0 : Math.max(1, Math.round(gapSize))
+    const total = n + gap
     items.forEach((it, i) => {
-      placement.set(it.uid, { slot: gapAt != null && i >= gapAt ? i + 1 : i, total })
+      placement.set(it.uid, { slot: gapAt != null && i >= gapAt ? i + gap : i, total })
     })
   }
 

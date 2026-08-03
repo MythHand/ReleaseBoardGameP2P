@@ -114,7 +114,8 @@ drive any of the motion. Legality is the consumer's (engine's) answer — the Ha
 |---|---|---|
 | `items` | `HandItem[]` (`{ uid, card }`) | the fan, in order |
 | `faceDown?` | `boolean` | render backs (opponent fan); disables the zoom preview |
-| `gapAt?` | `number \| null` | open an insert gap at this slot (paired with `useHandInsert`) |
+| `gapAt?` | `number \| null` | open an insert gap at this slot (paired with `useHandInsert`) — the fan lays out as `n + gapSize` and spreads **before** the card lands |
+| `gapSize?` | `number` (default `1`) | how many cards the gap holds. `> 1` when several cards return at once (cancelling a combo assembly), so they land in ready room instead of on top of the neighbours |
 | `onCardClick?` | `(index, el, e) => void` | a click (no drag) — coexists with drag via the threshold |
 | `accentAt?` | `(index) => string \| undefined` | a glow colour for a slot (arrow target) |
 | `stateAt?` | `(index) => HandCardState` | `'idle' \| 'playable' \| 'selected' \| 'disabled'` — mirrors the engine's `playable`/`frozen`; `disabled` dims via the Hand's own transitioned filter |
