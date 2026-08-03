@@ -26,6 +26,7 @@ import ComboStory from '../stories/ComboStory'
 import TextStyles from '../stories/foundations/TextStyles'
 import TokenPreview from '../stories/foundations/TokenPreview'
 import TypographyPreview from '../stories/foundations/TypographyPreview'
+import HandLimitStory from '../stories/HandLimitStory'
 import HandStory from '../stories/HandStory'
 import InviteStory from '../stories/InviteStory'
 import AiCardsStory from '../stories/interactive/AiCardsStory'
@@ -114,6 +115,7 @@ const groups: Group[] = [
       { id: 'card', title: 'OG Card (PNG)', render: () => <CardStory /> },
       { id: 'card-parallax', title: 'Card', render: () => <CardParallaxStory /> },
       { id: 'hand', title: 'Hand', render: () => <HandStory /> },
+      { id: 'hand-limit', title: 'Hand limit', render: () => <HandLimitStory /> },
     ],
   },
   {
