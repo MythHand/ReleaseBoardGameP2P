@@ -2,7 +2,7 @@ import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import type React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, restTransform, toDiscardParams, wait } from '@/animations'
+import { jitter, nextFrames, play, toDiscardParams, wait } from '@/animations'
 import { CARDS, CATEGORIES, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Badge from '@/primitives/Badge'
@@ -10,6 +10,7 @@ import Card, { cardAreaOf } from '@/primitives/Card'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
 import Typography from '@/primitives/Typography'
+import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import TurnDock, { type TurnDockState } from '@/table/TurnDock/TurnDock'
@@ -652,36 +653,12 @@ export default function Error503Story() {
 
       {/* discard — right of centre; cards land scattered (a tossed heap) */}
       <div className={styles.discard}>
-        <div className={styles.discardStack} ref={discardRef}>
-          {discard.length === 0 ? (
-            <span className={styles.discardEmpty}>
-              <Typography base="label-sm" tk="tk-16">
-                {pick(lang, { ru: 'сброс', en: 'discard' })}
-              </Typography>
-            </span>
-          ) : (
-            <>
-              {discard.map((d, i) => (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: discard is append-only, the index is stable
-                  key={i}
-                  className={styles.discardCard}
-                  style={{ transform: restTransform(d), zIndex: i }}
-                >
-                  <Card card={d.card} interactive={false} width="100%" />
-                </div>
-              ))}
-              <span className={styles.discardCount}>
-                <Typography base="mono-xs">{discard.length}</Typography>
-              </span>
-            </>
-          )}
-        </div>
-        <div className={styles.label}>
-          <Typography base="label-sm" tk="tk-16">
-            {pick(lang, { ru: 'сброс', en: 'discard' })}
-          </Typography>
-        </div>
+        <DiscardHeap
+          cards={discard}
+          stackRef={discardRef}
+          logoVariant={lang}
+          label={pick(lang, { ru: 'сброс', en: 'discard' })}
+        />
       </div>
 
       {/* turn dock — bottom-left */}

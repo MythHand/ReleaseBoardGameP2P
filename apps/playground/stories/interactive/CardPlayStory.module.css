@@ -83,68 +83,13 @@
 /* сброс — справа; карты ложатся вразброс. Центрируем margin:auto (без transform),
    чтобы не создавать stacking context и держать счётчик верхним слоем. */
 
-/* discard — right of centre, before the right rail (canonical Table position) */
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the block itself is DiscardHeap. */
 .discard {
   position: absolute;
   inset-block-start: 50%;
   inset-inline-end: 86px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-  inline-size: 116px;
   transform: translateY(-50%);
-}
-
-.discardStack {
-  position: relative;
-  inline-size: 100%;
-  aspect-ratio: var(--card-aspect);
-}
-
-.discardCard {
-  position: absolute;
-  inset: 0;
-}
-
-.discardEmpty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  block-size: 100%;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-28);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  border: 1px dashed var(--white-14);
-  border-radius: 8px;
-}
-
-.discardCount {
-  position: absolute;
-  inset-block-end: 8px;
-  inset-inline-end: 8px;
-  z-index: 90;
-  padding: 3px 9px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  letter-spacing: 0.02em;
-  background: var(--black-78);
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-}
-
-.discardCount::before {
-  content: "// ";
-  opacity: 0.4;
-}
-
-.label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
-  opacity: 0.5;
 }
 
 /* player hand — the canonical fan, bottom-centre (Hand sizes itself to the

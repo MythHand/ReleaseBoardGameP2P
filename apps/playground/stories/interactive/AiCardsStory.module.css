@@ -111,71 +111,13 @@
   transform: translate(calc(-50% + 82px), -50%);
 }
 
-/* discard — right of centre, before the right rail (canonical Table position) */
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the block itself is DiscardHeap. */
 .discard {
   position: absolute;
   inset-block-start: 50%;
   inset-inline-end: 86px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-  inline-size: 116px;
   transform: translateY(-50%);
-}
-
-.discardStack {
-  position: relative;
-  inline-size: 100%;
-  aspect-ratio: var(--card-aspect);
-}
-
-.discardCard {
-  position: absolute;
-  inset: 0;
-}
-
-.discardEmpty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  block-size: 100%;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-28);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  border: 1px dashed var(--white-14);
-  border-radius: 10px;
-}
-
-/* discard counter — the Pile "br" badge (the canonical discard counter) */
-.discardCount {
-  position: absolute;
-  inset-block-end: 8px;
-  inset-inline-end: 8px;
-  z-index: 90;
-  padding: 3px 9px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  color: var(--fg);
-  letter-spacing: 0.02em;
-  background: var(--black-78);
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-}
-
-.discardCount::before {
-  content: "// ";
-  opacity: 0.4;
-}
-
-.label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--white-45);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
 }
 
 /* turn dock — canonical Table position: bottom-left, under the decks, left of

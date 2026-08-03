@@ -2,11 +2,12 @@ import type { CardData } from '@release/ui'
 import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, restTransform, toDiscardParams, wait } from '@/animations'
+import { jitter, nextFrames, play, toDiscardParams, wait } from '@/animations'
 import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO, cardBoxIn } from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
+import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
@@ -447,25 +448,12 @@ export default function ComboStory() {
       </div>
 
       <div className={styles.discard}>
-        <div className={styles.discardSlot} ref={discardRef}>
-          {discardPile.length === 0 && (
-            <span className={styles.empty}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
-          )}
-          {discardPile.map((d, i) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: discard pile is append-only (never reordered/removed), index is a stable key
-              key={i}
-              className={styles.discardCard}
-              style={{ transform: restTransform(d), zIndex: i }}
-            >
-              <Card card={d.card} interactive={false} width="100%" />
-            </div>
-          ))}
-          {discardPile.length > 0 && (
-            <span className={styles.discardCount}>{discardPile.length}</span>
-          )}
-        </div>
-        <span className={styles.cap}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
+        <DiscardHeap
+          cards={discardPile}
+          stackRef={discardRef}
+          logoVariant={lang}
+          label={pick(lang, { ru: 'сброс', en: 'discard' })}
+        />
       </div>
 
       <div className={styles.bottom}>

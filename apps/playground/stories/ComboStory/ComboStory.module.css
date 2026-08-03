@@ -89,60 +89,13 @@
   transform: translate(-50%, -50%);
 }
 
-/* discard — right of centre, before the right rail (canonical Table position) */
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the block itself is DiscardHeap. */
 .discard {
   position: absolute;
   inset-block-start: 50%;
   inset-inline-end: 86px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-  inline-size: 116px;
   transform: translateY(-50%);
-}
-
-.discardSlot {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 100%;
-  aspect-ratio: var(--card-aspect);
-  border: 1px dashed var(--white-16);
-  border-radius: 12px;
-}
-
-.discardCard {
-  position: absolute;
-  inset: 0;
-}
-
-/* discard counter — the Pile "br" badge (the canonical discard counter) */
-.discardCount {
-  position: absolute;
-  inset-block-end: 8px;
-  inset-inline-end: 8px;
-  z-index: 20;
-  padding: 3px 9px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  color: var(--fg);
-  letter-spacing: 0.02em;
-  background: var(--black-78);
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-}
-
-.discardCount::before {
-  content: "// ";
-  opacity: 0.4;
-}
-
-.cap {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  opacity: 0.5;
 }
 
 /* player area — release zone above the hand, canonical Table position: the left

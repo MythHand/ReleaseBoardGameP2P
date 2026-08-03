@@ -3,9 +3,10 @@ import ruCommon from '@release/translation/locales/ru/common.json'
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useRef, useState } from 'react'
-import { jitter, nextFrames, play, restTransform, toDiscardParams } from '@/animations'
+import { jitter, nextFrames, play, toDiscardParams } from '@/animations'
 import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
+import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
@@ -185,25 +186,12 @@ export default function CardPlayStory() {
 
       {/* discard — on the right, cards land scattered */}
       <div className={styles.discard}>
-        <div className={styles.discardStack} ref={discardRef}>
-          {discard.map((d, i) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: discard is append-only, the index is stable
-              key={i}
-              className={styles.discardCard}
-              style={{ transform: restTransform(d), zIndex: i }}
-            >
-              <Card card={d.card} interactive={false} width="100%" />
-            </div>
-          ))}
-          {discard.length === 0 && (
-            <span className={styles.discardEmpty}>
-              {pick(lang, { ru: 'сброс', en: 'discard' })}
-            </span>
-          )}
-          {discard.length > 0 && <span className={styles.discardCount}>{discard.length}</span>}
-        </div>
-        <div className={styles.label}>{pick(lang, { ru: 'сброс', en: 'discard' })}</div>
+        <DiscardHeap
+          cards={discard}
+          stackRef={discardRef}
+          logoVariant={lang}
+          label={pick(lang, { ru: 'сброс', en: 'discard' })}
+        />
       </div>
 
       {/* player hand — bottom, the canonical fan */}

@@ -71,62 +71,13 @@
   grid-column: 1;
 }
 
-/* сброс — справа, как на столе; лицом вверх, вразброс.
-   Центрируем по вертикали через margin:auto (без transform) — иначе transform
-   создаёт stacking context и счётчик не поднять выше летящих карт. */
-
-/* discard — right of centre, before the right rail (canonical Table position) */
+/* discard — right of centre, as on the table. Only its place lives here;
+   the block itself is DiscardHeap. */
 .discard {
   position: absolute;
   inset-block-start: 50%;
   inset-inline-end: 86px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-  inline-size: 116px;
   transform: translateY(-50%);
-}
-
-.discardStack {
-  position: relative;
-  inline-size: 100%;
-  aspect-ratio: var(--card-aspect);
-}
-
-/* карта сброса — собирается в стопку (transform → identity) при перевороте */
-.discardCard {
-  position: absolute;
-  inset: 0;
-  transition: transform 320ms var(--ease-soft);
-}
-
-/* счётчик сброса — бейдж в правом нижнем; всегда верхний слой (выше летящих
-   карт z80), чтобы карта не перекрывала его при приземлении */
-.discardCount {
-  position: absolute;
-  inset-block-end: 8px;
-  inset-inline-end: 8px;
-  z-index: 90;
-  padding: 3px 9px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  letter-spacing: 0.02em;
-  background: var(--black-78);
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-}
-
-.discardCount::before {
-  content: "// ";
-  opacity: 0.4;
-}
-
-.label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
-  opacity: 0.5;
 }
 
 /* staging area — a row of card slots at the centre of the table; the cards put

@@ -1,20 +1,13 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import {
-  jitter,
-  nextFrames,
-  play,
-  restTransform,
-  type Scatter,
-  toDiscardParams,
-  wait,
-} from '@/animations'
+import { jitter, nextFrames, play, type Scatter, toDiscardParams, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf, cardBoxIn } from '@/primitives/Card'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
+import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
@@ -503,28 +496,12 @@ export default function DrawCardStory() {
 
       {/* discard — on the right; cards land scattered (a tossed heap) */}
       <div className={styles.discard}>
-        <div className={styles.discardStack} ref={discardRef}>
-          {discard.length === 0 ? (
-            <span className={styles.discardEmpty}>
-              {pick(lang, { ru: 'сброс', en: 'discard' })}
-            </span>
-          ) : (
-            <>
-              {discard.map((d, i) => (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: discard is append-only, the index is stable
-                  key={i}
-                  className={styles.discardCard}
-                  style={{ transform: restTransform(d), zIndex: i }}
-                >
-                  <Card card={d.card} interactive={false} width="100%" />
-                </div>
-              ))}
-              <span className={styles.discardCount}>{discard.length}</span>
-            </>
-          )}
-        </div>
-        <div className={styles.label}>{pick(lang, { ru: 'сброс', en: 'discard' })}</div>
+        <DiscardHeap
+          cards={discard}
+          stackRef={discardRef}
+          logoVariant={lang}
+          label={pick(lang, { ru: 'сброс', en: 'discard' })}
+        />
       </div>
 
       {/* Error 503, you drew — a large glow UNDER the hand (before the hand in the DOM).

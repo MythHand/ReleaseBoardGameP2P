@@ -1,11 +1,12 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
-import { HEAP_SHOW, play, restTransform, scatterAt, toDiscardParams } from '@/animations'
+import { HEAP_SHOW, play, scatterAt, toDiscardParams } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
+import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../../Playground/lang'
 import { reorderHand } from '../reorderHand'
@@ -419,24 +420,14 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
       {/* discard (right) — the source; cards deal out of here and return here.
           Rest state is a tossed heap (top cards tilted), not a neat column. */}
       <div className={styles.discardPile}>
-        <div ref={discardRef} className={styles.discardBox} style={{ inlineSize: PILE_W }}>
-          {showGrid || discard.length === 0 ? (
-            <span className={styles.discardEmpty} />
-          ) : (
-            <>
-              {discard.slice(-HEAP_SHOW).map((d, i) => (
-                <div
-                  key={d.uid}
-                  className={styles.heapCard}
-                  style={{ transform: restTransform(d), zIndex: i }}
-                >
-                  <Card card={d.card} interactive={false} width="100%" />
-                </div>
-              ))}
-              <span className={styles.heapCount}>{discard.length}</span>
-            </>
-          )}
-        </div>
+        <DiscardHeap
+          cards={discard}
+          stackRef={discardRef}
+          width={PILE_W}
+          maxVisible={HEAP_SHOW}
+          empty={showGrid}
+          logoVariant={lang}
+        />
         <span className={styles.pileLabel}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
       </div>
 

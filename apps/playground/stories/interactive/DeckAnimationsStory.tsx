@@ -1,11 +1,12 @@
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, restTransform, toDiscardParams, wait } from '@/animations'
+import { jitter, nextFrames, play, toDiscardParams, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
+import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
@@ -147,7 +148,6 @@ export default function DeckAnimationsStory() {
   const choosingDeck = waiting === 'deck'
   const choosingCard = waiting === 'partner'
   const armColor = choosingCard ? SUPPORT : OPERATION
-  const discardCardCount = discard.cards.length
 
   // FLIP of the new deck on split: it flies out from the source deck to its spot
   // (the flyFrom preset — a "from the previous rect" animation to the current position)
@@ -607,25 +607,14 @@ export default function DeckAnimationsStory() {
 
       {/* discard — face up, scattered */}
       <div className={styles.discard}>
-        <div className={styles.discardStack} ref={discardRef}>
-          {discard.cards.map((entry, i) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: discard cards are positional, never reordered
-              key={i}
-              className={styles.discardCard}
-              style={{
-                transform: discard.gathered ? 'translate(0, 0) rotate(0deg)' : restTransform(entry),
-                zIndex: i,
-              }}
-            >
-              <Card card={entry.card} interactive={false} width="100%" />
-            </div>
-          ))}
-          {discard.showCount && discardCardCount > 0 && (
-            <span className={styles.discardCount}>{discardCardCount}</span>
-          )}
-        </div>
-        <div className={styles.label}>{pick(lang, { ru: 'сброс', en: 'discard' })}</div>
+        <DiscardHeap
+          cards={discard.cards}
+          stackRef={discardRef}
+          gathered={discard.gathered}
+          showCount={discard.showCount}
+          logoVariant={lang}
+          label={pick(lang, { ru: 'сброс', en: 'discard' })}
+        />
       </div>
 
       {/* player hand — fanned (Hand); a card is played by pulling it OUT of the

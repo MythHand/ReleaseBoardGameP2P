@@ -1,0 +1,49 @@
+.heap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.stack {
+  position: relative;
+  inline-size: 100%;
+  aspect-ratio: var(--card-aspect);
+  container-type: inline-size;
+}
+
+/* карта кучи — лежит со своим разбросом; транзишен нужен, когда сброс
+   собирается в ровную стопку (gathered) */
+.card {
+  position: absolute;
+  inset: 0;
+  transition: transform 320ms var(--ease-soft);
+}
+
+/* пустой сброс — ровно та же зона, что у пустого сброса Pile: определение
+   живёт там, здесь только ссылка, чтобы копии не разъезжались */
+.emptyZone {
+  composes: emptyZone from "../../primitives/Pile/Pile.module.css";
+}
+
+.emptyLogo {
+  composes: emptyLogo from "../../primitives/Pile/Pile.module.css";
+}
+
+/* счётчик — бейдж сброса из Pile (коробка + позиция в правом нижнем).
+   Слой выше летящих карт (z 80), чтобы приземляющаяся карта его не закрывала. */
+.count {
+  composes: br from "../../primitives/Pile/Pile.module.css";
+  position: absolute;
+  z-index: 90;
+  color: var(--fg);
+}
+
+.count::before {
+  content: "// ";
+  opacity: 0.4;
+}
+
+.label {
+  color: var(--white-45);
+}

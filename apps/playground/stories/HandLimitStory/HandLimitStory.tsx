@@ -1,17 +1,10 @@
 import { useRef, useState } from 'react'
-import {
-  jitter,
-  nextFrames,
-  play,
-  restTransform,
-  type Scatter,
-  toDiscardParams,
-  wait,
-} from '@/animations'
+import { jitter, nextFrames, play, type Scatter, toDiscardParams, wait } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf } from '@/primitives/Card'
 import Typography from '@/primitives/Typography'
+import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import { pick, useLang } from '../../Playground/lang'
@@ -264,36 +257,12 @@ export default function HandLimitStory() {
 
       {/* discard — right of centre; cards land scattered (a tossed heap) */}
       <div className={styles.discard}>
-        <div className={styles.discardStack} ref={discardRef}>
-          {discard.length === 0 ? (
-            <span className={styles.discardEmpty}>
-              <Typography base="label-sm" tk="tk-16">
-                {pick(lang, { ru: 'сброс', en: 'discard' })}
-              </Typography>
-            </span>
-          ) : (
-            <>
-              {discard.map((d, i) => (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: discard is append-only, the index is stable
-                  key={i}
-                  className={styles.discardCard}
-                  style={{ transform: restTransform(d), zIndex: i }}
-                >
-                  <Card card={d.card} interactive={false} width="100%" />
-                </div>
-              ))}
-              <span className={styles.discardCount}>
-                <Typography base="mono-xs">{discard.length}</Typography>
-              </span>
-            </>
-          )}
-        </div>
-        <div className={styles.label}>
-          <Typography base="label-sm" tk="tk-16">
-            {pick(lang, { ru: 'сброс', en: 'discard' })}
-          </Typography>
-        </div>
+        <DiscardHeap
+          cards={discard}
+          stackRef={discardRef}
+          logoVariant={lang}
+          label={pick(lang, { ru: 'сброс', en: 'discard' })}
+        />
       </div>
 
       {/* hand — bottom-centre; over the limit every card is a valid discard.

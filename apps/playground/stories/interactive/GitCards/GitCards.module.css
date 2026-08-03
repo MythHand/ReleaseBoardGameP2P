@@ -137,44 +137,8 @@
   letter-spacing: 0.14em;
 }
 
-/* discard rest state — a tossed heap: the top cards sit at slight angles */
-.discardBox {
-  position: relative;
-  aspect-ratio: var(--card-aspect);
-}
-
-.heapCard {
-  position: absolute;
-  inset: 0;
-}
-
-.discardEmpty {
-  position: absolute;
-  inset: 0;
-  border: 1px dashed var(--white-12);
-  border-radius: 10px;
-}
-
-/* discard counter — the Pile "br" badge (the canonical discard counter) */
-.heapCount {
-  position: absolute;
-  inset-block-end: 8px;
-  inset-inline-end: 8px;
-  z-index: 20;
-  padding: 3px 9px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  color: var(--fg);
-  letter-spacing: 0.02em;
-  background: var(--black-78);
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-}
-
-.heapCount::before {
-  content: "// ";
-  opacity: 0.4;
-}
+/* the discard's rest state — a tossed heap — is DiscardHeap; only the pile's
+   place and caption live here */
 
 /* idle: start button in the centre */
 .controls {
