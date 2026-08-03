@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { CARD_CONTENT, CARDS } from '@/cards'
 import CardParallax, { PARALLAX_CARDS } from '@/cards/CardParallax'
 import type { Card as CardType } from '@/cards/types'
@@ -9,7 +9,6 @@ import {
   type HandCardState,
   type HandFaceContext,
   type HandItem,
-  type HandPlayDrop,
   handStep,
 } from '@/table/Hand/Hand'
 import { useLang } from '../../Playground/lang'
@@ -33,10 +32,8 @@ const COPY = {
     states: 'состояния карт',
     step: 'шаг между картами',
     fan: 'ширина веера',
-    hint: 'перетащи карту внутри руки — переставить; вытащи на стол — разыграть',
-    played: 'разыграно',
+    hint: 'перетащи карту внутри руки — переставить',
     reset: 'сброс',
-    playZone: 'стол — сюда играть',
   },
   en: {
     cardsInHand: 'cards in hand',
@@ -46,10 +43,8 @@ const COPY = {
     states: 'card states',
     step: 'step between cards',
     fan: 'fan width',
-    hint: 'drag a card within the hand to reorder; pull it onto the table to play',
-    played: 'played',
+    hint: 'drag a card within the hand to reorder',
     reset: 'reset',
-    playZone: 'table — drop to play',
   },
 }
 
@@ -77,32 +72,17 @@ export default function HandStory() {
   const [parallax, setParallax] = useState(false)
   const [drag, setDrag] = useState(true)
   const [states, setStates] = useState(false)
-  const [played, setPlayed] = useState<string[]>([])
-  const playZoneRef = useRef<HTMLDivElement>(null)
 
   const setCount = (n: number) => setItems((prev) => resize(n, prev))
 
   // reorder within the hand (local — nothing to sync; others see only count)
   const reorder = (u: string, toIndex: number) => setItems((prev) => reorderHand(prev, u, toIndex))
 
-  // play — only accepted when dropped on the table zone (a valid target). Random
-  // drops are rejected → the Hand glides the card back instead of it vanishing.
-  const play = (u: string, drop: HandPlayDrop): boolean => {
-    const zone = playZoneRef.current?.getBoundingClientRect()
-    const onTable =
-      zone != null &&
-      drop.x >= zone.left &&
-      drop.x <= zone.right &&
-      drop.y >= zone.top &&
-      drop.y <= zone.bottom
-    if (!onTable) return false
-    setItems((prev) => {
-      const card = prev.find((it) => it.uid === u)?.card
-      if (card) setPlayed((p) => [card.name, ...p].slice(0, 6))
-      return prev.filter((it) => it.uid !== u)
-    })
-    return true
-  }
+  // this page demonstrates the FAN, so the hand keeps its cards: no drop is a
+  // valid target here. Rejecting is the Hand's own path — it glides the card back
+  // into its slot instead of it vanishing. Playing a card belongs to the
+  // interactive scenes, which have a table to play it onto.
+  const play = (): boolean => false
 
   // technical face swap: render the composed CardParallax face for cards that
   // have one; fall back to the PNG Card when face-down or no composed content.
@@ -177,23 +157,10 @@ export default function HandStory() {
 
       <p className={styles.readout}>
         {t.step}: <b>{step}px</b> · {t.fan}: <b>{span}px</b>
-        {played.length > 0 && (
-          <>
-            {' · '}
-            {t.played}: <b>{played.join(', ')}</b>
-          </>
-        )}
       </p>
       {drag && <p className={styles.hint}>{t.hint}</p>}
 
       <div className={styles.stage}>
-        {/* a valid target — dropping a card here plays it; anywhere else it
-            returns to the hand */}
-        {drag && (
-          <div className={styles.playZone} ref={playZoneRef}>
-            {t.playZone}
-          </div>
-        )}
         <Hand
           items={items}
           faceDown={faceDown}
