@@ -1,14 +1,13 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useLayoutEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, type Scatter, toDiscardParams, wait } from '@/animations'
+import { jitter, nextFrames, play, type Scatter, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf } from '@/primitives/Card'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
-import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
@@ -18,6 +17,7 @@ import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './AiCardsStory.module.css'
 import { reorderHand } from './reorderHand'
+import { useDiscardExit } from './useDiscardExit'
 import { useHandInsert } from './useHandInsert'
 
 type Loc = Record<Lang, string>
@@ -145,6 +145,9 @@ export default function AiCardsStory() {
   const causeRef = useRef<HTMLDivElement>(null) // AI trigger (cause) — left of centre
   const effectRef = useRef<HTMLDivElement>(null) // AI effect (main) — centre, larger
   const discardRef = useRef<HTMLDivElement>(null)
+  const { send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
+    setDiscard((d) => [...d, ...cards]),
+  )
   const flyerRef = useRef<HTMLDivElement>(null)
   const outRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const releaseSlotRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -266,25 +269,12 @@ export default function AiCardsStory() {
       }
       return
     }
-    const discardRect = discardRef.current?.getBoundingClientRect()
-    const jc = jitter()
-    if (el && fromRect && discardRect) {
-      const anim = play(
-        'centerToDiscard',
-        el,
-        toDiscardParams(fromRect, cardAreaOf(discardRect), jc),
-      )
-      if (anim) await anim.finished
-    }
-    setDiscard((d) => [...d, { card, ...jc }])
+    await sendToDiscard([{ key: 'crushed', card, node: el }])
   }
 
   // the AI trigger leaves to the common discard, landing scattered
-  const triggerToDiscard = async (j: Scatter, fromRect?: DOMRect, discardRect?: DOMRect) => {
-    const el = outRefs.current.trig
-    if (!el || !fromRect || !discardRect) return
-    const anim = play('centerToDiscard', el, toDiscardParams(fromRect, cardAreaOf(discardRect), j))
-    if (anim) await anim.finished
+  const triggerToDiscard = async (card: CardType, j: Scatter) => {
+    await sendToDiscard([{ key: 'trigger', card, node: outRefs.current.trig, scatter: j }])
   }
 
   const confirmInside = () => {
@@ -357,23 +347,28 @@ export default function AiCardsStory() {
     }
     // the rest fly back into the discard heap (re-added with their own scatter)
     if (others.length > 0) {
-      const dRect = discardRef.current?.getBoundingClientRect()
       setOuts(others.map((e, i) => ({ key: `back${i}`, card: e.card, faceDown: false })))
       await nextFrames()
-      await Promise.all(
-        others.map(async (e, i) => {
-          const el = outRefs.current[`back${i}`]
-          const from = otherRects[i]
-          if (!el || !from || !dRect) return
-          el.style.left = `${from.left}px`
-          el.style.top = `${from.top}px`
-          el.style.width = `${from.width}px`
-          const anim = play('centerToDiscard', el, toDiscardParams(from, cardAreaOf(dRect), e))
-          if (anim) await anim.finished
-        }),
+      // each goes back to the scatter it already had in the heap — it was taken
+      // OUT of that spot, so it must return to exactly it
+      others.forEach((_, i) => {
+        const el = outRefs.current[`back${i}`]
+        const from = otherRects[i]
+        if (!el || !from) return
+        el.style.left = `${from.left}px`
+        el.style.top = `${from.top}px`
+        el.style.width = `${from.width}px`
+      })
+      await sendToDiscard(
+        others.map((e, i) => ({
+          key: `back${i}`,
+          card: e.card,
+          node: outRefs.current[`back${i}`],
+          scatter: e,
+          layer: i,
+        })),
       )
       setOuts([])
-      setDiscard((d) => [...d, ...others])
     }
   }
 
@@ -423,7 +418,6 @@ export default function AiCardsStory() {
   // Bad Vibe: the chosen hand card is shown at the centre, then discarded
   const discardFromHand = async (card: CardType, fromRect?: DOMRect) => {
     const centerRect = effectRef.current?.getBoundingClientRect()
-    const discardRect = discardRef.current?.getBoundingClientRect()
     setOuts([{ key: 'fromhand', card, faceDown: false }])
     await nextFrames()
     const el = outRefs.current.fromhand
@@ -445,18 +439,8 @@ export default function AiCardsStory() {
       el.style.width = `${centerRect.width}px`
     }
     await wait(SHOW_HOLD)
-    const startRect = el?.getBoundingClientRect()
-    const jc = jitter()
-    if (el && startRect && discardRect) {
-      const anim = play(
-        'centerToDiscard',
-        el,
-        toDiscardParams(startRect, cardAreaOf(discardRect), jc),
-      )
-      if (anim) await anim.finished
-    }
+    await sendToDiscard([{ key: 'shown', card, node: el }])
     setOuts([])
-    setDiscard((d) => [...d, { card, ...jc }])
   }
 
   // Error 503 — raise the red glow and halt (reset the screen to continue)
@@ -471,7 +455,6 @@ export default function AiCardsStory() {
   const resolveGeneric = async (trig: CardType, ai: CardType) => {
     const causeRect = causeRef.current?.getBoundingClientRect()
     const effectRect = effectRef.current?.getBoundingClientRect()
-    const discardRect = discardRef.current?.getBoundingClientRect()
     const aiDeckRect = aiDeckRef.current?.getBoundingClientRect()
 
     // Release / Monitoring settle into an EMPTY matching slot (and stay there)
@@ -503,16 +486,14 @@ export default function AiCardsStory() {
     placeOut('eff', effectRect)
     if (crushed) placeOut('crushed', crushRect)
 
-    const j = jitter()
     await Promise.all([
-      triggerToDiscard(j, causeRect, discardRect),
+      triggerToDiscard(trig, jitter()),
       placeable && placeKey && slotRect
         ? placeIntoSlot(placeKey, ai, effectRect, slotRect)
         : returnAiToDeck(effectRect, aiDeckRect),
       ...(crushed ? [destroyRelease(crushed, crushRect)] : []),
     ])
     setOuts([])
-    setDiscard((d) => [...d, { card: trig, ...j }])
 
     // Inside takes a release after the centre has cleared: a single one is taken
     // straight through the centre; several are offered for an open choice first
@@ -769,9 +750,12 @@ export default function AiCardsStory() {
       {/* discard — on the right; triggers, crushed ordinary releases and Bad Vibe
           discards land here as a tossed heap */}
       <div className={styles.discard}>
-        <DiscardHeap
-          cards={discard}
-          stackRef={discardRef}
+        <Pile
+          heap={discard}
+          count={discard.length}
+          width={116}
+          countLayer={90}
+          boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
         />

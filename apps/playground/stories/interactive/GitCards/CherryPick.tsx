@@ -1,15 +1,15 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
-import { HEAP_SHOW, play, scatterAt, toDiscardParams } from '@/animations'
+import { HEAP_SHOW, play, scatterAt } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
-import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../../Playground/lang'
 import { reorderHand } from '../reorderHand'
+import { useDiscardExit } from '../useDiscardExit'
 import { useHandInsert } from '../useHandInsert'
 import styles from './GitCards.module.css'
 
@@ -110,6 +110,7 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
   const cellRefs = useRef<Map<string, HTMLElement>>(new Map())
   const deckRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
+  const { send: sendToDiscard } = useDiscardExit(discardRef)
   const handRef = useRef<HTMLDivElement>(null)
   const timers = useRef<number[]>([])
 
@@ -266,7 +267,6 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
   function confirmPick() {
     if (phase !== 'choose' || !confirmReady) return
     const { handUid, deckUid } = roles
-    const pileRect = discardRef.current?.getBoundingClientRect()
     const deckRect = deckRef.current?.getBoundingClientRect()
     const handCard = discard.find((d) => d.uid === handUid)?.card
     const remaining = discard.filter((d) => d.uid !== handUid && d.uid !== deckUid)
@@ -342,16 +342,20 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
     // (rot/dx/dy) — the exact transform the resting heap will render, so there's
     // no position swap when the animation ends. The top HEAP_SHOW stay visible;
     // the ones beneath fade out (merge into the pile) instead of vanishing.
-    remaining.forEach((d, i) => {
-      const el = cellRefs.current.get(d.uid)
-      const from = rects.get(d.uid)
-      if (!el || !from || !pileRect) return
-      const visible = i >= remaining.length - HEAP_SHOW
-      later(
-        () => play('centerToDiscard', el, toDiscardParams(from, pileRect, d, !visible)),
-        Math.min(i, STAGGER_CAP) * RETURN_STEP,
-      )
-    })
+    // the scene keeps its own books on the heap (finishResolve rebuilds it), so
+    // the shared step only owns the motion here
+    void sendToDiscard(
+      remaining.map((d, i) => ({
+        key: d.uid,
+        card: d.card,
+        node: cellRefs.current.get(d.uid),
+        scatter: d,
+        // the top HEAP_SHOW stay visible; the ones beneath dissolve on the way
+        fade: i < remaining.length - HEAP_SHOW,
+        delay: Math.min(i, STAGGER_CAP) * RETURN_STEP,
+        layer: i,
+      })),
+    )
 
     const returnDone = RETURN_DUR + Math.min(remaining.length, STAGGER_CAP) * RETURN_STEP
     const deckDone = deckUid ? FLIP_DUR + DECK_DUR + DECK_HOLD : 0
@@ -420,12 +424,12 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
       {/* discard (right) — the source; cards deal out of here and return here.
           Rest state is a tossed heap (top cards tilted), not a neat column. */}
       <div className={styles.discardPile}>
-        <DiscardHeap
-          cards={discard}
-          stackRef={discardRef}
+        <Pile
+          heap={showGrid ? [] : discard}
+          count={showGrid ? 0 : discard.length}
+          heapShow={HEAP_SHOW}
           width={PILE_W}
-          maxVisible={HEAP_SHOW}
-          empty={showGrid}
+          boxRef={discardRef}
           logoVariant={lang}
         />
         <span className={styles.pileLabel}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>

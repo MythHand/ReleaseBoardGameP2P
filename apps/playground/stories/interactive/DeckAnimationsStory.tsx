@@ -1,18 +1,18 @@
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, toDiscardParams, wait } from '@/animations'
+import { jitter, nextFrames, play, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
-import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './DeckAnimationsStory.module.css'
 import { reorderHand } from './reorderHand'
+import { useDiscardExit } from './useDiscardExit'
 
 // A scene of deck operations. Triggers — playing cards from the hand (the Hand fan):
 // Git Branch — split; Git Branch + Sudo — split + the discard becomes a deck;
@@ -118,19 +118,19 @@ export default function DeckAnimationsStory() {
   const [returning, setReturning] = useState<ReturnFlight[]>([])
   const [returnStarted, setReturnStarted] = useState(false)
   const [returnGap, setReturnGap] = useState<number | null>(null)
-  // center → discard: each card flies as a separate single (a combo splits)
-  const [discardFlyers, setDiscardFlyers] = useState<{ key: string; card: CardData }[]>([])
 
   const pileRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const discardRef = useRef<HTMLDivElement>(null)
   const flyerRef = useRef<HTMLDivElement>(null)
   const playFlyerRef = useRef<HTMLDivElement>(null)
-  const discardFlyerRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const centerRef = useRef<HTMLDivElement>(null)
   const stageRefs = useRef<(HTMLDivElement | null)[]>([])
   const handWrapRef = useRef<HTMLDivElement>(null)
   const flip = useRef<{ id: number; from: DOMRect } | null>(null)
   const { from, to, aim, stop } = useArrow()
+  const { overlay: discardOverlay, send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
+    setDiscard((d) => ({ cards: [...d.cards, ...cards], showCount: true, gathered: false })),
+  )
 
   // what the staging still needs before the play can resolve
   const waiting: Waiting = (() => {
@@ -310,38 +310,18 @@ export default function DeckAnimationsStory() {
     setPlayFlyer(null)
   }
 
-  // stage → discard: every staged card flies from ITS OWN slot as a separate
-  // single with its own scatter (a combo splits into two entries)
+  // stage → discard: through the shared exit step — every staged card flies from
+  // ITS OWN slot as a single, all at once
   const flyStageToDiscard = async (items: HandItem[]) => {
-    const toRect = discardRef.current?.getBoundingClientRect()
-    const entries = items.map((it, i) => ({
-      card: it.card,
-      ...jitter(),
-      from: stageRefs.current[i]?.getBoundingClientRect(),
-    }))
-    setDiscardFlyers(entries.map((e, i) => ({ key: `df${i}`, card: e.card })))
+    const leaving = items
+      .map((it, i) => ({
+        key: `df${i}`,
+        card: it.card,
+        from: stageRefs.current[i]?.getBoundingClientRect(),
+      }))
+      .filter((e): e is { key: string; card: CardData; from: DOMRect } => e.from != null)
     setStaged([])
-    await nextFrames()
-    await Promise.all(
-      entries.map((e, i) => {
-        const el = discardFlyerRefs.current[`df${i}`]
-        if (!el || !e.from || !toRect) return undefined
-        el.style.left = `${e.from.left}px`
-        el.style.top = `${e.from.top}px`
-        el.style.width = `${e.from.width}px`
-        const anim = play('centerToDiscard', el, toDiscardParams(e.from, toRect, e))
-        return anim?.finished
-      }),
-    )
-    setDiscard((d) => ({
-      cards: [
-        ...d.cards,
-        ...entries.map((e) => ({ card: e.card, rot: e.rot, dx: e.dx, dy: e.dy })),
-      ],
-      showCount: true,
-      gathered: false,
-    }))
-    setDiscardFlyers([])
+    await sendToDiscard(leaving)
   }
 
   // the staged cards are complete and the target is known — run the effect and
@@ -517,7 +497,6 @@ export default function DeckAnimationsStory() {
     setReturning([])
     setReturnStarted(false)
     setReturnGap(null)
-    setDiscardFlyers([])
     setFlyer(null)
     setBusy(false)
   }
@@ -607,11 +586,13 @@ export default function DeckAnimationsStory() {
 
       {/* discard — face up, scattered */}
       <div className={styles.discard}>
-        <DiscardHeap
-          cards={discard.cards}
-          stackRef={discardRef}
+        <Pile
+          heap={discard.cards}
+          count={discard.showCount ? discard.cards.length : 0}
           gathered={discard.gathered}
-          showCount={discard.showCount}
+          width={116}
+          countLayer={90}
+          boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
         />
@@ -665,18 +646,7 @@ export default function DeckAnimationsStory() {
         </div>
       ))}
 
-      {/* center → discard: each card flies as a separate single */}
-      {discardFlyers.map((f) => (
-        <div
-          key={f.key}
-          className={styles.playFlyer}
-          ref={(el) => {
-            discardFlyerRefs.current[f.key] = el
-          }}
-        >
-          <Card card={f.card} interactive={false} width="100%" />
-        </div>
-      ))}
+      {discardOverlay}
 
       {waiting && <Arrow from={from} to={to} color={armColor} />}
     </div>

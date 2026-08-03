@@ -1,18 +1,19 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
-import { HEAP_SHOW, play, scatterAt, toDiscardParams } from '@/animations'
+import { HEAP_SHOW, scatterAt } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
+import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
-import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import { pick, useLang } from '../../../Playground/lang'
 import { reorderHand } from '../reorderHand'
+import { useDiscardExit } from '../useDiscardExit'
 import { useHandInsert } from '../useHandInsert'
 import styles from './GitCards.module.css'
 
@@ -59,13 +60,6 @@ interface DiscardCard {
 
 const rand = (pool: CardType[]) => pool[Math.floor(Math.random() * pool.length)]
 const makeHand = (n: number) => HAND_POOL.slice(0, n).map((card) => ({ uid: nextHandUid(), card }))
-// the card area at the top of a pile (a Pile is taller than its card)
-const cardAreaOf = (r: DOMRect) => ({
-  left: r.left,
-  top: r.top,
-  width: r.width,
-  height: r.width * 1.4,
-})
 
 export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
   const { lang } = useLang()
@@ -81,6 +75,7 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
   const seatRefs = useRef<Map<string, HTMLElement>>(new Map())
   const centerRefs = useRef<Map<string, HTMLElement>>(new Map())
   const discardRef = useRef<HTMLDivElement>(null)
+  const { send: sendToDiscard } = useDiscardExit(discardRef)
   const handRef = useRef<HTMLDivElement>(null)
   const timers = useRef<number[]>([])
 
@@ -189,7 +184,6 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
   // centre cards leave: the chosen one (sudo) to the hand, the rest to the discard
   function resolve(handUid: string | null) {
     setPhase('resolve')
-    const pileRect = discardRef.current?.getBoundingClientRect()
     const rest = center.filter((c) => c.uid !== handUid)
 
     // pass 1: read every rect before freezing (freezing reflows the flex row)
@@ -244,19 +238,20 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
 
     // rest → discard, each landing at its own scatter
     const heap = rest.map((c, i) => ({ uid: c.uid, card: c.card, ...scatterAt(i, PILE_W) }))
-    if (pileRect) {
-      const to = cardAreaOf(pileRect)
-      rest.forEach((c, i) => {
-        const el = centerRefs.current.get(c.uid)
-        const from = rects.get(c.uid)
-        if (!el || !from) return
-        const visible = i >= rest.length - HEAP_SHOW
-        later(
-          () => play('centerToDiscard', el, toDiscardParams(from, to, heap[i], !visible)),
-          i * CLEAR_STEP,
-        )
-      })
-    }
+    // the scene appends the heap itself when the round finishes, so the shared
+    // step only owns the motion here
+    void sendToDiscard(
+      rest.map((c, i) => ({
+        key: c.uid,
+        card: c.card,
+        node: centerRefs.current.get(c.uid),
+        scatter: heap[i],
+        // the top HEAP_SHOW stay visible; the ones beneath dissolve on the way
+        fade: i < rest.length - HEAP_SHOW,
+        delay: i * CLEAR_STEP,
+        layer: i,
+      })),
+    )
 
     const clearDone = RETURN_DUR + Math.max(0, rest.length - 1) * CLEAR_STEP
     later(
@@ -320,11 +315,12 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
 
       {/* discard — right-centre, as on the table; cards land here scattered */}
       <div className={styles.discardPile}>
-        <DiscardHeap
-          cards={discard}
-          stackRef={discardRef}
+        <Pile
+          heap={discard}
+          count={discard.length}
+          heapShow={HEAP_SHOW}
           width={PILE_W}
-          maxVisible={HEAP_SHOW}
+          boxRef={discardRef}
           logoVariant={lang}
         />
         <span className={styles.pileLabel}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>

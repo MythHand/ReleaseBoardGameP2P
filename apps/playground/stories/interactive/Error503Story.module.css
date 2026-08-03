@@ -66,8 +66,8 @@
   transform: translateY(-50%);
 }
 
-/* discard — right of centre, before the (implicit) right rail. Only its place
-   lives here; the block itself is DiscardHeap. */
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
   inset-block-start: 50%;

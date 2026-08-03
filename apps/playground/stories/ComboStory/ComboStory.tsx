@@ -2,17 +2,18 @@ import type { CardData } from '@release/ui'
 import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, toDiscardParams, wait } from '@/animations'
+import { nextFrames, play, wait } from '@/animations'
 import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO, cardBoxIn } from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
-import DiscardHeap from '@/table/DiscardHeap'
+import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import { reorderHand } from '../interactive/reorderHand'
+import { useDiscardExit } from '../interactive/useDiscardExit'
 import styles from './ComboStory.module.css'
 
 type Loc = Record<Lang, string>
@@ -99,6 +100,9 @@ export default function ComboStory() {
   const [playing, setPlaying] = useState(false)
   const [released, setReleased] = useState<Record<string, ReleasedEntry>>({})
   const [discardPile, setDiscardPile] = useState<DiscardEntry[]>([])
+  const { overlay: discardOverlay, send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
+    setDiscardPile((p) => [...p, ...cards]),
+  )
   const [flyPair, setFlyPair] = useState<{ main: CardData; aux: CardData } | null>(null)
   const [entering, setEntering] = useState<CardData | null>(null) // hand → centre (single)
   const [returning, setReturning] = useState<ReturnFlight[]>([])
@@ -243,19 +247,12 @@ export default function ComboStory() {
       await nextFrames() // let the final card paint before hiding the flyer
       hideFlyer()
     } else {
-      const dRect = discardRef.current?.getBoundingClientRect()
-      const mainEl = el.querySelector<HTMLElement>('[data-main]')
-      const auxEl = el.querySelector<HTMLElement>('[data-aux]')
-      const jMain = jitter()
-      const jAux = jitter()
-      if (dRect) {
-        const am = play('centerToDiscard', mainEl, toDiscardParams(cRect, dRect, jMain))
-        const aa = play('centerToDiscard', auxEl, toDiscardParams(cRect, dRect, jAux))
-        await Promise.all([am?.finished, aa?.finished])
-      }
-      setDiscardPile((p) => [...p, { card: main.card, ...jMain }, { card: aux.card, ...jAux }])
-      await nextFrames()
+      // the pair leaves through the shared exit step: it splits into its two
+      // singles, each from where it actually stands, both at once
       hideFlyer()
+      await sendToDiscard([
+        { key: 'combo', card: main.card, aux: aux.card, el, from: cRect, layer: 0 },
+      ])
     }
     setLog(
       targetLabel
@@ -448,9 +445,12 @@ export default function ComboStory() {
       </div>
 
       <div className={styles.discard}>
-        <DiscardHeap
-          cards={discardPile}
-          stackRef={discardRef}
+        <Pile
+          heap={discardPile}
+          count={discardPile.length}
+          width={116}
+          countLayer={20}
+          boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
         />
@@ -525,6 +525,8 @@ export default function ComboStory() {
           <Card card={r.card} width={r.from.width} interactive={false} />
         </div>
       ))}
+
+      {discardOverlay}
 
       <div className={styles.flyer} ref={flyRef} aria-hidden="true">
         {flyPair && <CardPair main={flyPair.main} aux={flyPair.aux} width="100%" />}

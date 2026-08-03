@@ -1,23 +1,14 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  jitter,
-  nextFrames,
-  play,
-  restTransform,
-  type Scatter,
-  scatterAt,
-  toDiscardParams,
-  wait,
-} from '@/animations'
+import { nextFrames, play, restTransform, type Scatter, scatterAt, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Arrow, { useArrow } from '@/primitives/Arrow'
-import Card, { CARD_RATIO, cardAreaOf, cardBoxIn } from '@/primitives/Card'
+import Card, { CARD_RATIO, cardBoxIn } from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
+import Pile from '@/primitives/Pile'
 import Typography from '@/primitives/Typography'
-import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
@@ -29,6 +20,7 @@ import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './DefenseReleaseStory.module.css'
 import { reorderHand } from './reorderHand'
+import { type Leaving, useDiscardExit } from './useDiscardExit'
 import { useHandInsert } from './useHandInsert'
 
 // Defense Release — playing a Release and defending it.
@@ -49,10 +41,11 @@ import { useHandInsert } from './useHandInsert'
 // something you can actually walk through — the Sudo that enhances a defence, and
 // every defence card, one of each, so both answers (Cancel-type and Unicorn-type)
 // are always in hand.
+const SUDO = 'support-sudo'
 const HAND_IDS = [
   'release-backend',
   'release-frontend',
-  'support-sudo',
+  SUDO,
   ...CARDS.filter((c) => c.category === 'defense').map((c) => c.id),
 ]
 const DISCARD_POOL = CARDS.filter(
@@ -71,7 +64,7 @@ const SECURITY_BUG = 'attack-security-bug'
 // defender's own Sudo, the defender keeps it and it lands in THEIR hand instead.
 const ROLLBACK = 'defense-rollback'
 // the sudo an opponent lays under an attack — not the one in the player's hand
-const SUDO_CARD = cardById('support-sudo') ?? null
+const SUDO_CARD = cardById(SUDO) ?? null
 
 const SHOW_HOLD = 1200 // a card shown open on the table before it moves on
 const LAND_HOLD = 700 // the attack rests at the centre before it can be answered
@@ -116,19 +109,6 @@ interface Flyer {
   // a fixed transform for the WRAPPER while its inner cards animate into a pair
   pose?: string
 }
-// a card leaving the table for the discard; several leave at once
-interface Leaving {
-  key: string
-  card: CardType
-  aux?: CardType | null
-  from: Rect // where it stood — measured before it is unmounted (I1)
-  pose: string // the table tilt it starts from, unwound during the flight
-  scatter: Scatter
-  // its layer on the table. Carried explicitly through the flight and into the
-  // heap: two cards flying with the same z fall back to DOM order, which is the
-  // array order and not the stacking order — that is how a stack flips over.
-  z: number
-}
 
 const EMPTY_RELEASE: ReleaseSlots = { frontend: undefined, backend: undefined, database: undefined }
 
@@ -155,6 +135,13 @@ const slotOf = (card: CardType) => card.name.toLowerCase() as keyof ReleaseSlots
 // unicorn-type cards still work (rules: "Карты защиты Cancel не работают")
 const canDefend = (card: CardType, sudo: boolean): boolean =>
   card.category === 'defense' && (!sudo || card.tags.includes('unicorn'))
+
+// …and the player's own Sudo is an answer only if the hand holds a defence it can
+// BOTH enhance and that still works against this attack. Against a sudo-enhanced
+// attack those two never meet in the catalogue (the only sudo-able defence is a
+// cancel-type one), so the Sudo is dead weight and must not read as available.
+const canEnhance = (card: CardType, sudo: boolean): boolean =>
+  canDefend(card, sudo) && card.tags.includes('sudo')
 
 export default function DefenseReleaseStory() {
   const { lang } = useLang()
@@ -188,8 +175,6 @@ export default function DefenseReleaseStory() {
   // the same Sudo once it has merged under the defence — a separate slot only so
   // the standing one can be handed to the flyer without ever being on screen twice
   const [coverAux, setCoverAux] = useState<CardType | null>(null)
-  const [exits, setExits] = useState<Leaving[]>([])
-  const [exitStraight, setExitStraight] = useState(false)
   const [flyer, setFlyer] = useState<Flyer | null>(null)
   const [busy, setBusy] = useState(false)
   // tech bar
@@ -201,7 +186,6 @@ export default function DefenseReleaseStory() {
   const centerRef = useRef<HTMLDivElement>(null)
   const coverRef = useRef<HTMLDivElement>(null)
   const sudoRef = useRef<HTMLDivElement>(null)
-  const exitRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const discardRef = useRef<HTMLDivElement>(null)
   const flyerRef = useRef<HTMLDivElement>(null)
   const seatRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -237,8 +221,19 @@ export default function DefenseReleaseStory() {
   handItemsRef.current = hand
 
   const attackCard = cardById(attackId)
+  // is the player's own Sudo an answer at all right now — i.e. does the hand hold
+  // a defence it can enhance that also works against THIS attack
+  const sudoUsable = hand.some((it) => canEnhance(it.card, sudo))
   // the aiming arrow — drawn only while a choice is actually pending
   const { from: arrowFrom, to: arrowTo, active: aiming, aim, stop: stopAim } = useArrow()
+
+  // Cards leave the table for the discard through the shared exit step: one by
+  // one but all at once, a pair splitting into its two singles.
+  const {
+    overlay: discardOverlay,
+    send: sendToDiscard,
+    reset: resetExit,
+  } = useDiscardExit(discardRef, (cards) => setDiscard((d) => [...d, ...cards]))
 
   // A card coming back into the hand settles through the shared insert: the fan
   // opens a gap in the MIDDLE in advance, the card scales to the fan and tucks
@@ -305,57 +300,11 @@ export default function DefenseReleaseStory() {
     // frame before the resting card takes over — a visible straightening blink
   }
 
-  // the flyer leaves for the discard from wherever it currently is. A pair flies
-  // as one and lands as two entries — the heap holds single cards.
-  const toDiscard = async (card: CardType, aux?: CardType | null) => {
-    const el = flyerRef.current
-    const dRect = discardRef.current?.getBoundingClientRect()
-    const j = jitter() // I7 — one scatter for both the flight and the rest
-    if (el && dRect) {
-      const from = el.getBoundingClientRect()
-      const anim = play('centerToDiscard', el, toDiscardParams(from, cardAreaOf(dRect), j))
-      if (anim) await anim.finished
-    }
+  // the flyer leaves for the discard from wherever it currently is — the same
+  // shared step, flying the element that is already on screen
+  const toDiscard = async (card: CardType) => {
+    await sendToDiscard([{ key: 'spent', card, node: flyerRef.current }])
     setFlyer(null)
-    setDiscard((d) => [...d, ...(aux ? [{ card: aux, ...jitter() }] : []), { card, ...j }])
-  }
-
-  // Several cards leave the table for the discard AT ONCE — an attack and the
-  // defence that answered it are one exchange, so they go together rather than
-  // queueing. Each carries its own scatter (I7) and unwinds its table tilt on the
-  // way, so it lands in exactly the pose the heap will render it in.
-  const leaveTogether = async (items: Leaving[]) => {
-    const dRect = discardRef.current?.getBoundingClientRect()
-    setExits(items)
-    await nextFrames()
-    // straighten as they go — the tilt is a table pose, not a heap pose
-    setExitStraight(true)
-    await Promise.all(
-      items.map((it) => {
-        const el = exitRefs.current[it.key]
-        if (!el || !dRect) return undefined
-        return play('centerToDiscard', el, toDiscardParams(it.from, cardAreaOf(dRect), it.scatter))
-          ?.finished
-      }),
-    )
-    // the heap is layered by index, so append BOTTOM-UP: the card that lay under
-    // the others on the table has to reach the heap first, or the stack lands
-    // inverted
-    const bottomUp = [...items].sort((a, b) => a.z - b.z)
-    setDiscard((d) => [
-      ...d,
-      ...bottomUp.flatMap((it) =>
-        it.aux
-          ? [
-              { card: it.aux, ...jitter() },
-              { card: it.card, ...it.scatter },
-            ]
-          : [{ card: it.card, ...it.scatter }],
-      ),
-    ])
-    setExits([])
-    setExitStraight(false)
-    exitRefs.current = {}
   }
 
   // ===== the turn =====
@@ -598,6 +547,39 @@ export default function DefenseReleaseStory() {
     const returns = item.card.id === ROLLBACK
     const toMe = returns && mySudo != null
     const seatBox = by ? seatRefs.current[by]?.getBoundingClientRect() : undefined
+    // what leaves the table, card by card — built while the slots are still there
+    const attackExit: Leaving[] = attBox
+      ? [
+          {
+            key: 'attack',
+            card: att,
+            aux,
+            el: centerRef.current,
+            from: attBox,
+            pose: ATTACK_POSE,
+            layer: 0,
+          },
+        ]
+      : []
+    const exiting = [
+      // the defence is always spent, with the Sudo that backed it
+      ...(defBox
+        ? [
+            {
+              key: 'defence',
+              card: item.card,
+              aux: mySudo,
+              el: coverRef.current,
+              from: defBox,
+              pose: COVER_POSE,
+              layer: 1,
+            },
+          ]
+        : []),
+      // the attack burns with it — unless Rollback is sending it back, and then
+      // only the Sudo that backed the attack is spent
+      ...(returns ? attackExit.filter((e) => e.key !== 'attack') : attackExit),
+    ]
 
     setIncoming(null)
     setIncomingSudo(false)
@@ -608,32 +590,7 @@ export default function DefenseReleaseStory() {
 
     if (attBox && defBox) {
       await Promise.all([
-        // the defence is always spent — with the Sudo that backed it
-        leaveTogether([
-          {
-            key: 'defence',
-            card: item.card,
-            aux: mySudo,
-            from: defBox,
-            pose: restTransform(COVER_POSE),
-            scatter: jitter(),
-            z: 1, // the defence lies ON the attack
-          },
-          // the attack burns with it, unless Rollback is sending it back
-          ...(returns
-            ? []
-            : [
-                {
-                  key: 'attack',
-                  card: att,
-                  aux,
-                  from: attBox,
-                  pose: restTransform(ATTACK_POSE),
-                  scatter: jitter(),
-                  z: 0,
-                },
-              ]),
-        ]),
+        sendToDiscard(exiting),
         // …and the returned attack travels at the same time
         returns
           ? (async () => {
@@ -659,8 +616,6 @@ export default function DefenseReleaseStory() {
                 if (by) setOppHand((o) => ({ ...o, [by]: (o[by] ?? 0) + 1 }))
                 setFlyer(null)
               }
-              // the attacker's own Sudo is spent either way
-              if (aux) setDiscard((d) => [...d, { card: aux, ...jitter() }])
             })()
           : undefined,
       ])
@@ -691,6 +646,27 @@ export default function DefenseReleaseStory() {
       att.id === SECURITY_BUG && by != null && oppReleaseRef.current[by]?.[slotKey] == null
     const takeSlot = takes && by ? oppSlotRefs.current[`${by}:${slotKey}`] : null
     const takeBox = takeSlot?.getBoundingClientRect()
+    // what leaves the table, card by card — built while the slots are still there
+    const exiting = [
+      // the spent attack, with the Sudo that backed it — it lies over the release
+      ...(centre
+        ? [
+            {
+              key: 'attack',
+              card: att,
+              aux,
+              el: centerRef.current,
+              from: centre,
+              pose: ATTACK_POSE,
+              layer: 1,
+            },
+          ]
+        : []),
+      // …and the release with it, unless it is being taken
+      ...(relCard && !takes
+        ? [{ key: 'release', card: relCard, from: slot as Rect, layer: 0 }]
+        : []),
+    ]
 
     setIncoming(null)
     setIncomingSudo(false)
@@ -700,31 +676,7 @@ export default function DefenseReleaseStory() {
 
     if (centre && slot) {
       await Promise.all([
-        // the spent attack always leaves for the discard
-        leaveTogether([
-          {
-            key: 'attack',
-            card: att,
-            aux,
-            from: centre,
-            pose: restTransform(ATTACK_POSE),
-            scatter: jitter(),
-            z: 1, // the attack lies over the release it destroyed
-          },
-          // …and the release with it, unless it is being taken
-          ...(relCard && !takes
-            ? [
-                {
-                  key: 'release',
-                  card: relCard,
-                  from: slot,
-                  pose: 'none',
-                  scatter: jitter(),
-                  z: 0,
-                },
-              ]
-            : []),
-        ]),
+        sendToDiscard(exiting),
         // the taken release crosses to the attacker's zone at the same time
         relCard && takes && takeBox && by
           ? // it is crossing into an OPPONENT's zone, where cards are read as
@@ -763,8 +715,7 @@ export default function DefenseReleaseStory() {
     setAttacker(null)
     setOppRelease({})
     setOppHand({})
-    setExits([])
-    setExitStraight(false)
+    resetExit()
     setFlyer(null)
     resetInsert()
     setBusy(false)
@@ -793,7 +744,7 @@ export default function DefenseReleaseStory() {
     if (phase === 'answer') {
       // your own Sudo goes onto the table first and waits for the defence it
       // enhances — the partner of a combo is CLICKED, never pulled out
-      if (item.card.id === 'support-sudo' && !defSudo) {
+      if (item.card.id === SUDO && !defSudo && sudoUsable) {
         void stageDefSudo(item, drop.rect, drop)
         return true
       }
@@ -810,7 +761,7 @@ export default function DefenseReleaseStory() {
   const pickEnhanced = (i: number) => {
     if (phaseRef.current !== 'answer' || !defSudoRef.current || busy) return
     const item = hand[i]
-    if (!item || !canDefend(item.card, sudo) || !item.card.tags.includes('sudo')) {
+    if (!item || !canEnhance(item.card, sudo)) {
       cancelStaged()
       return
     }
@@ -833,11 +784,8 @@ export default function DefenseReleaseStory() {
     if (phase === 'answer') {
       // with your Sudo already on the table only the defences it can enhance
       // stay lit; otherwise every working defence does, plus the Sudo itself
-      if (defSudo)
-        return canDefend(card, sudo) && card.tags.includes('sudo')
-          ? ('playable' as const)
-          : ('idle' as const)
-      return canDefend(card, sudo) || card.id === 'support-sudo'
+      if (defSudo) return canEnhance(card, sudo) ? ('playable' as const) : ('idle' as const)
+      return canDefend(card, sudo) || (card.id === SUDO && sudoUsable)
         ? ('playable' as const)
         : ('idle' as const)
     }
@@ -1001,9 +949,11 @@ export default function DefenseReleaseStory() {
 
       {/* discard — right of centre; cards lie scattered (a tossed heap) */}
       <div className={styles.discard}>
-        <DiscardHeap
-          cards={discard}
-          stackRef={discardRef}
+        <Pile
+          heap={discard}
+          count={discard.length}
+          width={116}
+          boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
         />
@@ -1056,34 +1006,6 @@ export default function DefenseReleaseStory() {
       {/* the travelling card — keyed by seq so each flight mounts a fresh Card (I5) */}
       {aiming && <Arrow from={arrowFrom} to={arrowTo} color="var(--cat-support)" />}
 
-      {/* the exchange leaving for the discard — all of it at once */}
-      {exits.map((e) => (
-        <div
-          key={e.key}
-          className={styles.flyer}
-          // the table layer travels with the card — without it two flyers share
-          // one z and paint in array order, flipping the stack over
-          style={{ left: e.from.left, top: e.from.top, width: e.from.width, zIndex: 80 + e.z }}
-          ref={(el) => {
-            exitRefs.current[e.key] = el
-          }}
-        >
-          {/* the table tilt unwinds while it travels, so it lands in the heap's
-              own pose instead of jumping straight on the last frame */}
-          <div
-            className={styles.pose}
-            data-straight={exitStraight}
-            style={{ transform: exitStraight ? 'none' : e.pose }}
-          >
-            {e.aux ? (
-              <CardPair main={e.card} aux={e.aux} width="100%" />
-            ) : (
-              <Card card={e.card} interactive={false} width="100%" />
-            )}
-          </div>
-        </div>
-      ))}
-
       {flyer && (
         <div
           key={flyer.seq}
@@ -1104,8 +1026,10 @@ export default function DefenseReleaseStory() {
         </div>
       )}
 
-      {/* a card settling into the fan (Rollback under Sudo) — the shared insert */}
+      {/* the shared steps' own overlays: a card settling into the fan (Rollback
+          under Sudo), and the cards leaving the table for the discard */}
       {insertOverlay}
+      {discardOverlay}
     </div>
   )
 }

@@ -5,6 +5,13 @@
   align-items: center;
 }
 
+/* коробка карты: сама стопка + бейдж счётчика поверх неё. Бейдж вынесен из
+   .stack, потому что containment (container-type) запирает слои внутри. */
+.box {
+  position: relative;
+  inline-size: 100%;
+}
+
 .stack {
   position: relative;
   inline-size: 100%;
@@ -31,6 +38,18 @@
 .top {
   position: absolute;
   inset: 0;
+}
+
+/* карта, лежащая в куче сброса — та же коробка, что и верх стопки, но со своим
+   разбросом. Транзишена по умолчанию НЕТ: куча перекладывается мгновенно, иначе
+   любая смена состава поехала бы картами друг сквозь друга. */
+.heapCard {
+  composes: top;
+}
+
+/* …и он есть там, где переезд — это и есть эффект: куча собирается в стопку */
+.heapCard[data-gathers="true"] {
+  transition: transform 320ms var(--ease-soft);
 }
 
 .back {

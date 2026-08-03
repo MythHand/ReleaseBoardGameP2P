@@ -1,13 +1,12 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { jitter, nextFrames, play, type Scatter, toDiscardParams, wait } from '@/animations'
+import { jitter, nextFrames, play, type Scatter, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf, cardBoxIn } from '@/primitives/Card'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
-import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
@@ -17,6 +16,7 @@ import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import styles from './DrawCardStory.module.css'
 import { reorderHand } from './reorderHand'
+import { useDiscardExit } from './useDiscardExit'
 import { useHandInsert } from './useHandInsert'
 
 type Loc = Record<Lang, string>
@@ -122,6 +122,9 @@ export default function DrawCardStory() {
   const handRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const flightSeq = useRef(0)
+  const { send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
+    setDiscard((d) => [...d, ...cards]),
+  )
 
   // the tech-bar height — so the edge glow lives in the TABLE zone (under the bar),
   // not across the whole screen (otherwise table edge = screen edge, ignoring tech elements)
@@ -217,11 +220,8 @@ export default function DrawCardStory() {
 
   // the trigger leaves to the discard face up, landing scattered (like the other
   // stories) — the same scatter `j` is stored so the resting heap matches
-  const leaveTrigger = async (j: Scatter, fromRect?: DOMRect, discardRect?: DOMRect) => {
-    const el = outRefs.current.trig
-    if (!el || !fromRect || !discardRect) return
-    const anim = play('centerToDiscard', el, toDiscardParams(fromRect, cardAreaOf(discardRect), j))
-    if (anim) await anim.finished
+  const leaveTrigger = async (card: CardType, j: Scatter) => {
+    await sendToDiscard([{ key: 'trigger', card, node: outRefs.current.trig, scatter: j }])
   }
 
   // the effect first flips back-up IN PLACE (consistent with cards entering
@@ -242,7 +242,6 @@ export default function DrawCardStory() {
     await wait(AI_HOLD)
     const causeRect = causeRef.current?.getBoundingClientRect()
     const effectRect = effectRef.current?.getBoundingClientRect()
-    const discardRect = discardRef.current?.getBoundingClientRect()
     const aiDeckRect = aiRef.current?.getBoundingClientRect()
     // the static cards become flyers in their places
     setOuts([
@@ -264,13 +263,10 @@ export default function DrawCardStory() {
       eEl.style.top = `${effectRect.top}px`
       eEl.style.width = `${effectRect.width}px`
     }
-    const j = jitter()
-    await Promise.all([
-      leaveTrigger(j, causeRect, discardRect),
-      leaveEffect(effectRect, aiDeckRect),
-    ])
+    // the trigger goes to the discard through the shared step (which commits it),
+    // the effect returns to the AI deck — both at once
+    await Promise.all([leaveTrigger(trig, jitter()), leaveEffect(effectRect, aiDeckRect)])
     setOuts([])
-    setDiscard((d) => [...d, { card: trig, ...j }])
   }
 
   // one draw: a specific card from a specific deck → center → branch.
@@ -496,9 +492,12 @@ export default function DrawCardStory() {
 
       {/* discard — on the right; cards land scattered (a tossed heap) */}
       <div className={styles.discard}>
-        <DiscardHeap
-          cards={discard}
-          stackRef={discardRef}
+        <Pile
+          heap={discard}
+          count={discard.length}
+          width={116}
+          countLayer={90}
+          boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
         />

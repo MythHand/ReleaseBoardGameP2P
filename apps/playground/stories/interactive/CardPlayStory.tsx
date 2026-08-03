@@ -3,10 +3,10 @@ import ruCommon from '@release/translation/locales/ru/common.json'
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useRef, useState } from 'react'
-import { jitter, nextFrames, play, toDiscardParams } from '@/animations'
+import { nextFrames, play } from '@/animations'
 import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
-import DiscardHeap from '@/table/DiscardHeap'
+import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
@@ -14,6 +14,7 @@ import Seat from '@/table/Seat'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './CardPlayStory.module.css'
 import { reorderHand } from './reorderHand'
+import { useDiscardExit } from './useDiscardExit'
 
 // Showcase of two reusable card-play presets:
 //   part 1 — hand/opponent → table center (the playToCenter preset),
@@ -59,6 +60,9 @@ export default function CardPlayStory() {
   const centerRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
   const flyerRef = useRef<HTMLDivElement>(null)
+  const { overlay: discardOverlay, send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
+    setDiscard((d) => [...d, ...cards]),
+  )
 
   // part 1: a card flies from the "from" rect to the center (the playToCenter preset)
   const flyToCenter = async (card: CardData, from: Rect) => {
@@ -86,21 +90,8 @@ export default function CardPlayStory() {
     setBusy(true)
     const card = center
     const fromRect = centerRef.current?.getBoundingClientRect()
-    const toRect = discardRef.current?.getBoundingClientRect()
-    const j = jitter()
     setCenter(null)
-    setFlyer(card)
-    await nextFrames()
-    const el = flyerRef.current
-    if (el && fromRect && toRect) {
-      el.style.left = `${fromRect.left}px`
-      el.style.top = `${fromRect.top}px`
-      el.style.width = `${fromRect.width}px`
-      const anim = play('centerToDiscard', el, toDiscardParams(fromRect, toRect, j))
-      if (anim) await anim.finished
-    }
-    setDiscard((d) => [...d, { card, ...j }])
-    setFlyer(null)
+    if (fromRect) await sendToDiscard([{ key: 'played', card, from: fromRect }])
     setBusy(false)
   }
 
@@ -186,9 +177,12 @@ export default function CardPlayStory() {
 
       {/* discard — on the right, cards land scattered */}
       <div className={styles.discard}>
-        <DiscardHeap
-          cards={discard}
-          stackRef={discardRef}
+        <Pile
+          heap={discard}
+          count={discard.length}
+          width={116}
+          countLayer={90}
+          boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
         />
@@ -202,6 +196,8 @@ export default function CardPlayStory() {
           onReorder={(uid, to) => setPlayerHand((h) => reorderHand(h, uid, to))}
         />
       </div>
+
+      {discardOverlay}
 
       {flyer && (
         <div className={styles.flyer} ref={flyerRef}>

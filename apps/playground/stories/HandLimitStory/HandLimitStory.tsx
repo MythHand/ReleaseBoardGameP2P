@@ -1,15 +1,16 @@
 import { useRef, useState } from 'react'
-import { jitter, nextFrames, play, type Scatter, toDiscardParams, wait } from '@/animations'
+import { nextFrames, play, type Scatter, wait } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
-import Card, { cardAreaOf } from '@/primitives/Card'
+import Card from '@/primitives/Card'
+import Pile from '@/primitives/Pile'
 import Typography from '@/primitives/Typography'
-import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import { reorderHand } from '../interactive/reorderHand'
+import { useDiscardExit } from '../interactive/useDiscardExit'
 import styles from './HandLimitStory.module.css'
 
 // Hand limit — discarding down to the end-of-turn hand limit (the `handLimit`
@@ -83,6 +84,9 @@ export default function HandLimitStory() {
   const [placed, setPlaced] = useState<Placed[]>([])
 
   const discardRef = useRef<HTMLDivElement>(null)
+  const { send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
+    setDiscard((d) => [...d, ...cards]),
+  )
   const cellRefs = useRef<(HTMLDivElement | null)[]>([])
   const flightRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const flightSeq = useRef(0)
@@ -123,27 +127,18 @@ export default function HandLimitStory() {
   const flushGrid = async (run: number) => {
     await wait(GRID_HOLD)
     if (runId.current !== run) return
-    const discardRect = discardRef.current?.getBoundingClientRect()
-    const els = cellRefs.current.slice()
-    const scatters = els.map(() => jitter()) // I7 — one scatter for flight and rest
-    const flying = els.map(async (el, i) => {
-      if (!el || !discardRect) return
-      await wait(i * CLEAR_STEP)
-      if (runId.current !== run) return
-      const from = el.getBoundingClientRect()
-      const anim = play(
-        'centerToDiscard',
-        el,
-        toDiscardParams(from, cardAreaOf(discardRect), scatters[i]),
-      )
-      if (anim) await anim.finished
-    })
-    await Promise.all(flying)
+    // the finished grid leaves through the shared step: every card on its own,
+    // staggered, each flying the cell element it already occupies
+    await sendToDiscard(
+      placedRef.current.map((p) => ({
+        key: `g${p.slot}`,
+        card: p.card,
+        node: cellRefs.current[p.slot],
+        layer: p.slot,
+        delay: p.slot * CLEAR_STEP,
+      })),
+    )
     if (runId.current !== run) return
-    setDiscard((d) => [
-      ...d,
-      ...placedRef.current.map((p) => ({ card: p.card, ...scatters[p.slot] })),
-    ])
     taken.current = 0
     landed.current = 0
     cellRefs.current = []
@@ -257,9 +252,12 @@ export default function HandLimitStory() {
 
       {/* discard — right of centre; cards land scattered (a tossed heap) */}
       <div className={styles.discard}>
-        <DiscardHeap
-          cards={discard}
-          stackRef={discardRef}
+        <Pile
+          heap={discard}
+          count={discard.length}
+          width={116}
+          countLayer={20}
+          boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
         />

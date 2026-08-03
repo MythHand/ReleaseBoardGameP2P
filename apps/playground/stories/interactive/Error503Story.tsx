@@ -2,7 +2,7 @@ import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import type React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, toDiscardParams, wait } from '@/animations'
+import { nextFrames, play, wait } from '@/animations'
 import { CARDS, CATEGORIES, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Badge from '@/primitives/Badge'
@@ -10,13 +10,13 @@ import Card, { cardAreaOf } from '@/primitives/Card'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
 import Typography from '@/primitives/Typography'
-import DiscardHeap from '@/table/DiscardHeap'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import TurnDock, { type TurnDockState } from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './Error503Story.module.css'
 import { reorderHand } from './reorderHand'
+import { useDiscardExit } from './useDiscardExit'
 
 // Error 503 — the player-turn story. From TurnDock 'draw' (no timer wired): the
 // player draws, Error 503 comes out of the deck to the centre and reveals to
@@ -173,6 +173,9 @@ export default function Error503Story() {
   const deckRef = useRef<HTMLDivElement>(null)
   const centerRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
+  const { send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
+    setDiscard((d) => [...d, ...cards]),
+  )
   const flyerRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<HTMLDivElement>(null)
   const handWrapRef = useRef<HTMLDivElement>(null)
@@ -302,28 +305,28 @@ export default function Error503Story() {
       starts = items.map(() => centerRect)
     }
 
-    const js = items.map(() => jitter())
     await nextFrames()
-    await Promise.all(
-      items.map((_, i) => {
-        const el = outRefs.current[`o${i}`]
-        if (!el) return undefined
-        const from = starts[i]
-        el.style.transition = 'none'
-        el.style.left = `${from.left}px`
-        el.style.top = `${from.top}px`
-        el.style.width = `${from.width}px`
-        void el.offsetWidth // flush before the WAAPI flight
-        const anim = play(
-          'centerToDiscard',
-          el,
-          toDiscardParams(from, cardAreaOf(discardRect), js[i]),
-        )
-        return anim?.finished
-      }),
+    // each card is put where it stands, then the shared step flies them all out
+    // at once and commits them to the heap
+    items.forEach((_, i) => {
+      const el = outRefs.current[`o${i}`]
+      const from = starts[i]
+      if (!el) return
+      el.style.transition = 'none'
+      el.style.left = `${from.left}px`
+      el.style.top = `${from.top}px`
+      el.style.width = `${from.width}px`
+      void el.offsetWidth // flush before the WAAPI flight
+    })
+    await sendToDiscard(
+      items.map((it, i) => ({
+        key: `o${i}`,
+        card: it.card,
+        node: outRefs.current[`o${i}`],
+        layer: i,
+      })),
     )
     setOuts([])
-    setDiscard((prev) => [...prev, ...items.map((it, i) => ({ card: it.card, ...js[i] }))])
   }
 
   // ===== the draw =====
@@ -653,9 +656,12 @@ export default function Error503Story() {
 
       {/* discard — right of centre; cards land scattered (a tossed heap) */}
       <div className={styles.discard}>
-        <DiscardHeap
-          cards={discard}
-          stackRef={discardRef}
+        <Pile
+          heap={discard}
+          count={discard.length}
+          width={116}
+          countLayer={20}
+          boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
         />

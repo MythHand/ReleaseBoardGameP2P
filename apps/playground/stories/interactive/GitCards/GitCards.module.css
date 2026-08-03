@@ -137,9 +137,6 @@
   letter-spacing: 0.14em;
 }
 
-/* the discard's rest state — a tossed heap — is DiscardHeap; only the pile's
-   place and caption live here */
-
 /* idle: start button in the centre */
 .controls {
   position: absolute;
