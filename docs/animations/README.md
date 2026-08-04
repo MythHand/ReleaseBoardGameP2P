@@ -34,32 +34,49 @@ Not everything these docs describe is a shared library module. As of now:
   `Card` (plays `flipCard` on a `faceDown` change), `Hand` (the interactive fan: hover lift + zoom
   preview, drag-to-play/reorder, click/drag threshold, settle-back — all internal), `EdgeGlow` (CSS
   opacity fade), `ConfirmAction` (slide-up confirm bar), `Input` (shake), `Arrow` (via `useArrow`).
-  `ReleaseZone` exposes `slotRef(key, el)` so a consumer can fly a card into a specific slot.
+  `ReleaseZone` reflects what the consumer decided and hands the gesture back — the same model as
+  `Hand`: `slotRef(key, el)` to fly a card into a specific slot, `support` for a release with the
+  card laid WITH it (Code Review / Monitoring, shown as a `CardPair`), `accentAt` / `liftedAt` /
+  `onSlotDown` for "this one can be taken now", "this one is currently lifted" and the grab itself.
+  `Pile` renders the discard as a **heap** (`heap`, `heapShow`, `gathered`) and exposes `boxRef`
+  for flights to aim at and `countLayer` so a landing card cannot cover the counter.
 
-**NOT in the library — lives only in the playground stories (`apps/playground/stories/...`):**
-- The **travel / flight machinery** — the `flyer` element plus the measure → `nextFrames` →
-  position → `play` → cancel/pin dance. There is **no shared `Flyer` / flight primitive**; each
-  story hand-rolls it.
-- The **`useHandInsert`** hook (it works, but sits in the playground, not `@/ui`).
-- The per-scenario **orchestration**: `playSequence`, `drawOne`, `resolveAi`, `flyToCenter`,
-  `runPlay`, the bespoke combo merge.
+**Shared, but living in the playground (`apps/playground/stories/interactive/`):**
+Three **named steps** — one per kind of movement, not one generic flight engine. Import them from
+a story; they own their own overlay, their own geometry and their own rule:
+- **`useHandInsert`** — *a card settles into the hand.* One card. The fan opens a gap in the
+  middle, the card matches the fan's size and tucks under its right half.
+- **`useDiscardExit`** — *cards leave the table for the discard.* Any number: one by one but all
+  at once. A pair splits into its two singles; one scatter drives both a card's flight and its
+  rest; the table tilt unwinds in flight; the layer a card had decides the order it joins the heap.
+- **`useHandReturn`** — *the staging goes back into the hand.* The undo of a play: the whole
+  staging at once, into the MIDDLE of the fan, with the fan opening while the cards travel.
 
-**What this means for these docs:** the recipes describe the **playground implementation** (the
-visual source of truth). The atoms and self-animating primitives you can **import**; the flight
-machinery and orchestration you **reproduce** from the recipe. Do **not** assume
+**Still per-scene, and that is fine:** the orchestration — `playSequence`, `drawOne`, `resolveAi`,
+`flyToCenter`, the combo merge. A scene's own sequence of beats is the scene's subject; only the
+recurring *movements* are shared.
+
+**What this means for these docs:** the atoms, the self-animating primitives and the three steps
+you **import**. Only a scene's own orchestration is **reproduced** from its recipe. Where a
+movement has a step, the recipe says *which step and what to pass it* — the frame-by-frame
+mechanics live inside the step, in one place, and are not restated per scene.
+
+**Where they live:** the steps sit in the playground, not in `@release/ui`, because the playground
+is their only consumer today. They move into the library when something outside it needs them —
+that is the later, game-screen phase, not now. Do **not** assume
 `import { useHandInsert } from '@release/ui'` — it isn't there.
 
-**Honest status:** early scaffolding. The flight-glue has **not** been consolidated into a shared
-primitive/hook — that gap is not yet designed. This section states what is true today, not a
-finished architecture; update it when the boundary moves.
-
-> **Открытый вопрос (требует согласования в команде — не решать в одиночку).**
-> Как готовить переиспользуемую машинерию анимаций — ещё не согласовано. Кандидаты: перенести
-> `useHandInsert` в `@/ui`; спроектировать общий `useFlight` / `<Flyer>` (обязательно с учётом
-> **мульти-флаера** — Combo-пара, AI `outs`, параллельный merge) и перевести стори на его
-> потребление с проверкой на экране. **До согласования новые интерактив-экраны воспроизводят
-> текущий паттерн** (как существующие) — это допустимо и разработку НЕ блокирует; при выносе их
-> потом мигрируем. Архитектуру полёта не финализировать без общего решения (иначе — заплатка).
+> **Решено (было открытым вопросом).** Как готовить переиспользуемую машинерию анимаций.
+> Рассматривались два кандидата — перенести `useHandInsert` в `@/ui` и спроектировать общий
+> `useFlight` / `<Flyer>`. Взят **третий путь: именованные шаги по смыслу движения**, а не один
+> универсальный полётный примитив. Причина: у каждого движения своё правило (куда целиться, какой
+> разброс, в каком порядке ложиться, что делать с парой), и универсальный флаер это правило не
+> удержит — он удержит только транспорт. Мульти-флаер при этом покрыт: шаг сам поднимает столько
+> карт, сколько ему дали, и умеет лететь уже существующим элементом.
+>
+> Практика показала, зачем это нужно: пока правило ухода в сброс лежало копиями в трёх сценах,
+> копии разъехались — вторая карта пары получала случайный разброс в момент коммита и телепортом
+> прыгала из точки приземления.
 
 ---
 
@@ -117,7 +134,7 @@ if (anim) await anim.finished                      // wait for the flight
 
 ## Global invariants
 
-These hold across **every** recipe. Recipes reference them by number (I1…I8) instead of
+These hold across **every** recipe. Recipes reference them by number (I1…I9) instead of
 repeating them. Break one and the animation "works on paper" but jumps, double-flips, or
 teleports on screen.
 

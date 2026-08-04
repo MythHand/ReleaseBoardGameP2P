@@ -73,15 +73,32 @@ card (not at a wider cell/seat) — invariant **I6**. The `CARD_RATIO` value is 
 
 ---
 
-## Hand-insert
+## The three movement steps
 
-`apps/playground/stories/interactive/useHandInsert.tsx` — the "card settles into the hand" step
-(CSS-transition based, not a `play()` preset). Its tuning constants are in the glossary.
+`apps/playground/stories/interactive/` — one step per **kind of movement**, not one generic flight
+engine. Each owns its overlay, its geometry and its rule; a scene calls it and passes what it has.
+Tuning constants are in the glossary.
+
+### Hand-insert — a card settles into the hand
 
 | Name | Signature | What it does |
 |---|---|---|
-| `useHandInsert` | `useHandInsert(handRef, onInserted)` → `{ gapAt, overlay, insert, reset, flyingCard, FLIGHT_MS }` | opens a gap in the fan and flies a card into the slot; `insert(card, source, handLength)` starts it, `onInserted(card, gapIndex)` fires on landing |
-| `InsertSource` | `{ left, top, width, height }` | the source rect the card flies from |
+| `useHandInsert` | `useHandInsert(handRef, onInserted)` → `{ gapAt, overlay, insert, reset, flyingCard, FLIGHT_MS }` | opens a gap in the fan and flies **one** card into the slot; `insert(card, source, handLength)` starts it, `onInserted(card, gapIndex)` fires on landing |
+| `InsertSource` | `{ left, top, width, height, rot? }` | the source rect. `rot` — the tilt the card rests at on the table; the step compensates the pivot difference, so the first frame does not jump |
+
+### Discard-exit — cards leave the table for the discard
+
+| Name | Signature | What it does |
+|---|---|---|
+| `useDiscardExit` | `useDiscardExit(boxRef, onLanded?)` → `{ overlay, send, reset, FLIGHT_MS }` | `send(items)` flies **any number** of cards out at once and resolves when they land; `onLanded(cards)` gets them bottom-up for the heap. Omit `onLanded` when the scene keeps its own books on the heap |
+| `Leaving` | `{ key, card, from? \| node?, aux?, el?, pose?, layer?, scatter?, fade?, delay? }` | `from` — it stands in a slot, the step raises its own flyer; `node` — it IS an element already on screen, that element flies. `aux` + `el` — a pair: split into two singles, the aux measured off `[data-aux]`. `layer` — its layer on the table (decides the heap order). `scatter` — bring your own (a card going back to its place). `fade` — it sinks below the visible top. `delay` — a stagger |
+
+### Hand-return — the staging goes back into the hand
+
+| Name | Signature | What it does |
+|---|---|---|
+| `useHandReturn` | `useHandReturn(handRef, onLanded)` → `{ overlay, gapAt, gapSize, send, reset, RETURN_MS }` | `send(items, handLength)` returns the whole staging at once into the MIDDLE of the fan; the fan opens the gap while they travel. `onLanded(gap)` fires on landing — the scene splices its own items at that index |
+| `Returning` | `{ key, card, from? \| (el + anchor) }` | `from` — where it stands; `el` + `anchor: 'main' \| 'aux'` — one half of a pair, measured off its own anchor |
 
 ---
 

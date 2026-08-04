@@ -250,8 +250,44 @@ const MODULES: Module[] = [
       en: 'A card "settles into the hand": the hand opens a gap, the card matches size and sits at the slot bottom-center. The slot position comes from table/Hand/fan (slotPlacement).',
     },
     where: {
-      ru: 'stories/interactive → DrawCard, CardToHand, PickOpponentCard',
-      en: 'stories/interactive → DrawCard, CardToHand, PickOpponentCard',
+      ru: 'stories/interactive → DrawCard, CardToHand, PickOpponentCard, CherryPick, SystemUpgrade, AiCards, DefenseRelease',
+      en: 'stories/interactive → DrawCard, CardToHand, PickOpponentCard, CherryPick, SystemUpgrade, AiCards, DefenseRelease',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'useDiscardExit()',
+    what: {
+      ru: 'Карты уходят со стола в сброс: по одной, но ВСЕ СРАЗУ — одновременность и читается как «стопка ушла». Пара распадается на две одиночки, каждая летит из своего настоящего места. Один разброс на карту ведёт и полёт, и покой (I7). Наклон стола раскручивается В ПОЛЁТЕ. Слой со стола едет с картой и решает порядок добавления в кучу — снизу вверх (I9). Умеет: свой разброс (карта возвращается на своё место), растворение (уходит под видимый верх кучи), стаггер, и полёт уже существующим элементом вместо своего флаера.',
+      en: 'Cards leave the table for the discard: one by one but ALL AT ONCE — the simultaneity is what reads as "the pile went to the discard". A pair splits into two singles, each flying from where it actually stands. One scatter per card drives both its flight and its rest (I7). The table tilt unwinds IN FLIGHT. The layer a card had travels with it and decides the order it joins the heap — bottom-up (I9). Supports: a card\'s own scatter (going back to its place), fading (sinking under the visible top), a stagger, and flying an element that already exists instead of raising a flyer.',
+    },
+    where: {
+      ru: 'stories/interactive → все 10 сцен со сбросом',
+      en: 'stories/interactive → all 10 scenes with a discard',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'useHandReturn()',
+    what: {
+      ru: 'Отмена розыгрыша: сборка со стола возвращается в руку ВСЯ РАЗОМ — розыгрыш был одним действием, отмена тоже одно. Приземляется в СЕРЕДИНУ веера (как любая другая вставка), веер раздвигается ПОКА карты летят. Каждая целится в свой будущий слот и садится на его нижний центр. Пара — снова две карты, каждая от своего якоря.',
+      en: 'Undo of a play: the staging comes back into the hand ALL AT ONCE — the play was one act, so undoing it is one act too. It lands in the MIDDLE of the fan (like every other insert), and the fan opens the gap WHILE the cards travel. Each card aims at the slot it will occupy and sits on its bottom centre. A pair is two cards again, each from its own anchor.',
+    },
+    where: {
+      ru: 'stories/interactive → Combo, DeckAnimations',
+      en: 'stories/interactive → Combo, DeckAnimations',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'Pile (heap)',
+    what: {
+      ru: 'Сброс как наброшенная КУЧА, а не ровная стопка: карты лежат каждая со своим разбросом (scatterAt/restTransform), под ними «глубина» стопки — и она показывается только когда под видимыми картами реально что-то есть. Отдаёт наружу коробку карты (boxRef) — в неё целятся полёты, слой счётчика (countLayer) — чтобы приземляющаяся карта его не накрыла, и собранное состояние (gathered) — когда сброс превращается в колоду.',
+      en: 'The discard as a tossed HEAP, not a neat stack: every card lies at its own scatter (scatterAt/restTransform), with the pile depth beneath — shown only when something is actually hidden under the visible cards. Exposes the card box (boxRef) for flights to aim at, the counter layer (countLayer) so a landing card cannot cover it, and the gathered state for when the discard turns into a deck.',
+    },
+    where: {
+      ru: 'primitives/Pile → Table + все сцены',
+      en: 'primitives/Pile → Table + every scene',
     },
     status: 'ok',
   },
@@ -322,8 +358,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Розыгрыш комбо (пара)', en: 'Playing a combo (pair)' },
     from: {
-      ru: 'useArrow + centerOf ведёт прицел; совмещение через CardPair (доп. карта подтыкается под углом); релиз → playToReleaseZone (move 480, SNAP-приземление); в сброс — пара распадается на 2 одиночки, каждой свой centerToDiscard + jitter().',
-      en: 'useArrow + centerOf drives the aim; pairing via CardPair (the extra card tucks in at an angle); release → playToReleaseZone (move 480, SNAP landing); to the discard — the pair splits into 2 singles, each with its own centerToDiscard + jitter().',
+      ru: 'useArrow + centerOf ведёт прицел; совмещение через CardPair (доп. карта подтыкается под углом); релиз → playToReleaseZone (move 480, SNAP-приземление); в сброс — через useDiscardExit (пара распадается на 2 одиночки, каждая от своего якоря); отмена — через useHandReturn (сборка возвращается в середину веера разом).',
+      en: 'useArrow + centerOf drives the aim; pairing via CardPair (the extra card tucks in at an angle); release → playToReleaseZone (move 480, SNAP landing); to the discard — via useDiscardExit (the pair splits into 2 singles, each from its own anchor); cancel — via useHandReturn (the staging returns to the middle of the fan at once).',
     },
     where: 'Combo',
   },
@@ -462,6 +498,22 @@ const SCENARIOS: Scenario[] = [
       en: 'each opponent throws a card from its seat to the centre (THROW_DUR/STEP, growing THROW_SCALE→1); base — after HOLD_MS all to the discard (centerToDiscard, stagger CLEAR_STEP); sudo — the player takes one (reveal + useHandInsert), the rest to the discard. Rules-complete deferred.',
     },
     where: 'GitCards/SystemUpgrade',
+  },
+  {
+    name: { ru: 'Лимит карт в руке', en: 'Hand limit' },
+    from: {
+      ru: 'пока рука ВЫШЕ лимита, карту можно вытащить из веера — иначе Hand отклоняет и карта уезжает обратно. Сброшенные не идут в кучу по одной: они строят СЕТКУ в центре (форма выбрана заранее по известному числу лишних карт, каждая летит сразу в свою ячейку — playToCenter), сетка держится открытой, и только когда села последняя, вся она уходит в сброс через useDiscardExit со стаггером. Рука никогда не блокируется полётом: выбрасывание нелинейно — «подумал и быстро скинул».',
+      en: 'while the hand is OVER the limit a card can be pulled out of the fan — otherwise Hand rejects the drop and it glides back. Discards do not reach the heap one at a time: they build a GRID at the centre (its shape chosen upfront from the known excess, every card flying straight to its own cell — playToCenter), the grid is held open, and only when the last one lands does the whole of it leave via useDiscardExit with a stagger. The hand is never blocked by a flight: discarding is non-linear — think, then dump fast.',
+    },
+    where: 'HandLimit',
+  },
+  {
+    name: { ru: 'Защита релиза (полный ход)', en: 'Defending a release (a whole turn)' },
+    from: {
+      ru: 'релиз из веера встаёт в центр и НЕ приземляется — по правилам он стоит одной карты, оплата показывается рядом открыто; только после этого релиз садится в свой слот зоны (playToReleaseZone) и открывается окно атак. Атака летит с места соперника в центр (cardBoxIn — прицел по карточной коробке, не по всей сидушке) и ложится под своим наклоном. Ответ: защита накрывает атаку, обе уходят в сброс одним обменом (useDiscardExit, слои сохраняются). Своё судо встаёт в СВОЙ слот со стрелкой и складывается с выбранной защитой в пару (покадровое слияние, без дублей и телепортов). Security Bug не жжёт релиз, а забирает его в зону атакующего — карта морфит в LOD прямо В ПОЛЁТЕ. Rollback возвращает атаку: без судо — в руку атакующего, с судо — в свою через useHandInsert. Промах мимо цели отменяет выложенное.',
+      en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence (a frame-by-frame merge, no duplicates and no teleports). Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandInsert. A press on nothing valid takes a staged play back.",
+    },
+    where: 'DefenseRelease',
   },
 ]
 

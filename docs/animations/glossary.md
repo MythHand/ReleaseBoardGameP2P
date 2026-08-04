@@ -77,6 +77,9 @@ playground.
 |---|---|---|---|
 | `START_HIGH_MS` | `140` | `useHandInsert` | how long the high layer is held before tucking under the fan |
 | `FLIGHT_MS` | `480` | `useHandInsert` | hand-insert flight — **must equal the `.flying` CSS transition** |
+| `FLIGHT_MS` | `420` | `useDiscardExit` | discard flight — matches `centerToDiscard`, so the table tilt finishes unwinding exactly as the card lands |
+| `AUX_TILT` | `-7` | `useDiscardExit` | the tilt `CardPair` gives its aux card — kept while that half flies out on its own |
+| `RETURN_MS` | `480` | `useHandReturn` | staging → fan — **must equal the `.returning` CSS transition** |
 | `FLIP_MS` | `420` | `DrawCardStory` | mirror of the `flipCard` preset — JS waits the in-place flip |
 | `SPLIT_MS` | `520` | `DeckAnimationsStory` | the `flyFrom` split fly-out duration |
 | `MERGE_MS` | `520` | `DeckAnimationsStory` | each deck's `absorbToDeck` flight on merge |

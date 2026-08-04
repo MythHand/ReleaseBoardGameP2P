@@ -4,8 +4,15 @@ Each recipe is an **independent action**: an explicit trigger + guard, the exact
 sequence, the verbatim params/timings, the invariants that keep it stable, and the cleanup —
 so it can be called at the right game moment and replay identically on repeat.
 
-Read the shared model and the `I1…I8` invariants in [`README.md`](./README.md) first; recipes
+Read the shared model and the `I1…I9` invariants in [`README.md`](./README.md) first; recipes
 reference those by number instead of repeating them.
+
+**Where a movement has a step, the recipe names the step — it does not restate its mechanics.**
+Three movements are shared and live in one place each ([`reference.md`](./reference.md#the-three-movement-steps)):
+`useHandInsert` (a card settles into the hand), `useDiscardExit` (cards leave the table for the
+discard), `useHandReturn` (the staging goes back into the hand). A recipe says *which step and what
+it is passed*; the frame-by-frame — measuring, `nextFrames`, the scatter coupling, the layer order,
+splitting a pair — lives inside the step and is described there, once.
 
 **Recipe schema** (every recipe has these sections):
 
@@ -158,11 +165,12 @@ that scatter into the discard.
     - **release** → `toRect = slotRefs[key]`; `play('playToReleaseZone', el, { from: cRect, to: toRect })`
       (the whole pair, SNAP); await; `setReleased(key → { card: prt.card, aux: src.card })`;
       `await nextFrames()`; `hideFlyer()`.
-    - **else (discard, the pair splits)** → `dRect = discardRef`; `jMain = jitter()`, `jAux = jitter()` — **[I7]**;
-      `play('centerToDiscard', mainEl, { from: cRect, to: dRect, rotate: jMain.rot, dx, dy })` and the same
-      for `auxEl` with `jAux`; `await Promise.all([...])`;
-      `setDiscardPile([...p, { card: prt.card, ...jMain }, { card: src.card, ...jAux }])` (**two** single entries);
-      `await nextFrames()`; `hideFlyer()`.
+    - **else (discard)** → hand the pair to **`useDiscardExit`** — one entry with `aux` + `el` (the
+      flyer), and it becomes **two** singles, each flying from where that half actually stands.
+      **Order matters:** call the step **first**, while the pair is still on screen (it measures both
+      halves as it starts), and only then clear the staging and hide the flyer — the centre slot
+      renders the source whenever the pair is gone, so hiding first puts the source card back on the
+      table for the whole flight.
 11. `setLog(...)`; `setPlaying(false)`.
 
 **Params & timings**
@@ -172,15 +180,17 @@ that scatter into the discard.
 | merge — aux (tuck) | inline `animate()` | 620 ms | SNAP → `translateY(-26%) rotate(-7deg)` |
 | hold assembled pair | `wait(2100)` | 2100 ms | — |
 | release → zone | `playToReleaseZone` | 480 ms | SNAP |
-| discard (per card) | `centerToDiscard` | 420 ms | EASE + `jitter()` |
+| discard (per card) | `useDiscardExit` | 420 ms | EASE + its own scatter |
 
 **Invariants**
 - **I1** measure the three rects before mutating the hand. **I2** `nextFrames()` after mounting the
   pair and before the merge. **I3** cancel subtree animations on the reused flyer before
-  repositioning. **I7** `jitter()` once per card, passed in **and** stored with the entry.
+  repositioning. **I7** is the step's job now — one scatter per card, flight and rest from the same value.
 - Local: the flyer is a **persistent opacity-toggled** node with one `CardPair` (not mounted per
   flight) — hence the mandatory **[I3]** and `hideFlyer()` (opacity → 0) instead of unmount.
-- The discard holds **singles**: a combo appends **two** entries, each with its own jitter.
+- The discard holds **singles**: a pair reaches it as **two** entries — the step splits it.
+- Cancel goes through **`useHandReturn`**: the whole staging back into the middle of the fan at once
+  (a lone card from the centre slot, a merged pair by its two anchors).
 
 **End state & cleanup**
 - Release: `released[key] = { card, aux }`; flyer hidden. Discard: two `DiscardEntry` appended;
@@ -506,7 +516,7 @@ The three deck operations below (split, merge, discard→deck) are the **effect*
 wrapper: `playSequence(played, fromRect, effect)` — guard `busy`; `setBusy(true)`;
 `setHand(remove played uids)`; `await flyHandToCenter(cards, fromRect)` (the `playToCenter` flight,
 a single `Card` or a `CardPair` for a Sudo combo); `await effect()`; `await wait(CENTER_HOLD = 420)`;
-`await flyCenterToDiscard(cards)` (each card a separate `centerToDiscard` + `jitter()`, landing as its
+`await sendToDiscard(cards)` — the shared step (each card a separate single, landing as its
 own discard entry); `setBusy(false)`. The card is picked from the `Hand` fan; a deck target (Branch)
 is chosen with a `useArrow` arrow. Only the **effect** differs per recipe.
 
@@ -1200,15 +1210,96 @@ holds, drops into the hand — and the rest go to the discard.
 
 ---
 
+## Hand limit — discard the hand down to the limit
+
+**When to call.** End of turn, the hand is over the limit. Guard: a pull-out is accepted only while
+`hand.length > limit`; at or under it `Hand` rejects the drop and glides the card back.
+
+**Visual result.** Discarded cards do **not** trickle into the heap one at a time. They build an open
+**grid** at the centre — everyone reads the whole cost of the turn — and only when the last excess card
+lands does the finished grid leave for the discard.
+
+**Elements / refs.** The `Hand` fan; a grid of cells at the centre (`cellRefs`); the `Pile` discard
+(`boxRef`); a flight overlay per card in transit.
+
+**Sequence.**
+1. The excess is known before anything moves (`hand.length − limit`), so the **grid shape is chosen
+   upfront** — 1–4 one row, 5–6 two rows of 3, 7–8 two rows of 4, 9–10 two rows of 5, past 10 three
+   rows. Every card therefore flies straight to **its own cell**, never to a growing pile.
+2. Each pull-out: claim the next free cell, remove the card from the hand, `playToCenter` from the fan
+   slot's card box into that cell. Several run **concurrently** — a flight must never gate the next
+   drag (discarding is "think, then dump fast").
+3. The grid is held open (`GRID_HOLD`).
+4. The whole grid leaves through **`useDiscardExit`**: one entry per placed card, `node` = its cell
+   element, `layer` = its slot, `delay` = `slot × CLEAR_STEP` — one by one, but as one movement.
+
+**Params & timings.** grid card width 150 / 132 / 116 px by row count · `GRID_HOLD` 1500 ms ·
+`CLEAR_STEP` 90 ms · flights `playToCenter` 480 ms.
+
+**Invariants.** **I1** measure the cell before it unmounts · **I8** the card, its slot and its source
+rect come in as arguments (the sequence spans several awaits) · a `runId` guard drops flights from a
+previous deal.
+
+**End state & cleanup.** Cells released, `placed` cleared, grid size back to 0, the cards lie in the heap.
+
+**Live reference.** `Hand limit` (Cards group).
+
+---
+
+## Defending a release — the whole turn, play through defence
+
+**When to call.** Turn start with a Release in hand. The turn is a chain: play → cost → attack window
+→ answer.
+
+**Visual result.** A Release pulled from the fan stands at the centre and does **not** land — by the
+rules it costs one card, and the cost is shown open beside it. Only then does the Release settle into
+its zone slot and the opponents' attack window opens.
+
+**Elements / refs.** Stage / cost / centre / sudo / cover slots around the table centre (each
+axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the true card box); the
+`ReleaseZone` (`slotRef`); opponent `Seat`s; the `Pile` discard; the `Hand`.
+
+**Sequence.**
+1. **Play** — the Release flies to the stage slot and waits. A press on nothing valid takes it back
+   (see *cancel* below).
+2. **Cost** — any hand card pays: it flies to the cost slot, is held open, then leaves via
+   **`useDiscardExit`**. Only now does the Release fly into its zone slot (`playToReleaseZone`, SNAP).
+3. **Attack** — thrown from a seat: aimed with `cardBoxIn` at a card-sized box inside the seat, not at
+   the whole cell (**I6**), landing already at its table tilt (**I7**). A sudo-backed attack travels as
+   one `CardPair`.
+4. **Answer** — a defence covers the attack; both leave as **one exchange** through `useDiscardExit`,
+   each carrying its table layer so the heap keeps the order they lay in (**I9**).
+   - The player's own **Sudo** takes its **own** slot with an arrow pointing out of it, then folds with
+     the chosen defence into a pair — a frame-by-frame merge of the two elements already on screen, no
+     duplicate and no teleport.
+   - **Security Bug** does not burn the release: it crosses into the attacker's zone and morphs into
+     its LOD reading **in flight** (opponents' cards read at a glance, not in full).
+   - **Rollback** sends the attack back — plain to the thrower's hand, under Sudo into your own via
+     `useHandInsert`; the sudo that backed it is spent and leaves normally.
+5. **Cancel** — a press on nothing valid takes back whatever is staged (the Release awaiting its cost,
+   or the Sudo awaiting its defence) through `useHandInsert`, into the middle of the fan.
+
+**Params & timings.** `SHOW_HOLD` 1200 ms · `LAND_HOLD` 700 ms · `MERGE_MS` 620 ms · poses: attack
+`rot −4`, cover `rot 6, dx 16, dy −12`, sudo `rot −7`.
+
+**Invariants.** **I1** measure every slot before the state clears · **I6** aim at card boxes, never at
+rotated slot rects · **I8** the sequences span many awaits — refs, not closures · **I9** each card
+carries its layer into the heap.
+
+**Rules encoded.** Two Releases are playable, one per zone slot, and the next waits for the current
+one's attack window to close — the dock's green state is that moment. The attack always answers the
+Release played **this** turn. The player's Sudo is only offered when the hand actually holds a defence
+it can enhance that also works against this attack — under a sudo-backed attack it can enhance nothing.
+
+**Live reference.** `Defense Release` (interactive group).
+
+---
+
 ## Not yet built (situations without a recipe)
 
-No playground scene exists for these yet, so no recipe is transcribed — recipes describe real code, never a
-plan:
-
-- **discardForRelease** — playing a Release with its discard cost, then the opponents' attack window.
-- **defend** against an ordinary attack (Bug / Out of Memory / Legacy Code / Security Bug) — the reaction window
-  with Cancel / Unicorn.
-- **handLimit** — discarding the hand down to the limit.
+Recipes describe real code, never a plan. The three situations that used to stand here —
+`discardForRelease`, `defend`, `handLimit` — are built and have recipes above (**Defending a release**,
+**Hand limit**), so nothing is currently without one.
 
 (Git Cherry-pick / Rebase / System Upgrade have **prototype** recipes above; only their rules-complete resolution
 — the #61 open questions — is pending.)
