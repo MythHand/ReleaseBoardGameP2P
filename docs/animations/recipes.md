@@ -4,7 +4,7 @@ Each recipe is an **independent action**: an explicit trigger + guard, the exact
 sequence, the verbatim params/timings, the invariants that keep it stable, and the cleanup —
 so it can be called at the right game moment and replay identically on repeat.
 
-Read the shared model and the `I1…I9` invariants in [`README.md`](./README.md) first; recipes
+Read the shared model and the `I1…I10` invariants in [`README.md`](./README.md) first; recipes
 reference those by number instead of repeating them.
 
 **Where a movement has a step, the recipe names the step — it does not restate its mechanics.**
@@ -50,8 +50,10 @@ the pile.
 - `seatRef` — the opponent's seat (A source, opponent).
 - `centerRef` — the one-card center slot (A target / B source).
 - `discardRef` — the discard slot (B target).
-- `flyerRef` — the **single** fixed flyer node that carries the card during both flights.
-- State: `center: CardData | null`, `discard: DiscardEntry[]`, `flyer`, `busy`.
+- `flyerRef` — the **single** fixed flyer node that carries the card to the centre.
+- State: `center: CardData | null`, `discard: DiscardEntry[]`, `flyer: { card, at } | null`, `busy`.
+  The flyer's state carries **where it mounts** (`at`), not only which card — **[I10]**.
+- The trip to the discard is not hand-rolled here: it is the shared step `useDiscardExit`.
 
 **Sequence**
 
@@ -65,31 +67,28 @@ _Phase A — to center_ (trigger handler `playFromPlayer` / `playFromOpponent`, 
      the wide `Seat`). `FIXED_CARD_W = 108` is this showcase's fixed card width; a real build would
      measure the actual card instead.
 2. `flyToCenter(card, from)`: `setBusy(true)`; measure `to = centerRef.getBoundingClientRect()`.
-3. `setFlyer(card)`; `await nextFrames()` — **[I2]**.
-4. Position the flyer at the source: `flyer.style.left/top/width = from.left/top/width`.
+3. `setFlyer({ card, at: from })` — the flyer is rendered with `style={{ left: at.left, top: at.top,
+   inlineSize: at.width }}`, so its **first painted frame is already on the card** — **[I10]**.
+4. `await nextFrames()` — **[I2]**, let it paint at `at` before it starts moving.
 5. `const anim = play('playToCenter', flyer, { from, to })`; `if (anim) await anim.finished`.
 6. `setCenter(card)`; `setFlyer(null)`; `setBusy(false)`. The card now rests in the center.
 
-_Phase B — center → discard (separate trigger):_
+_Phase B — center → discard (separate trigger):_ this is the shared step, not a local flight.
 1. Guard `busy || !center`; `setBusy(true)`; `const card = center`.
-2. Measure `from = centerRef` rect, `to = discardRef` rect — **[I1]**.
-3. `const j = jitter()` — **once**, **[I7]**.
-4. `setCenter(null)`; `setFlyer(card)`; `await nextFrames()` — **[I2]**.
-5. Position the flyer at `from`.
-6. `const anim = play('centerToDiscard', flyer, { from, to, rotate: j.rot, dx: j.dx, dy: j.dy })`;
-   `if (anim) await anim.finished`.
-7. `setDiscard(d => [...d, { card, ...j }])` — store the **same** `j` so the static card in the
-   pile matches the landed pose — **[I7]**.
-8. `setFlyer(null)`; `setBusy(false)`.
+2. Measure `from = centerRef` rect — **[I1]**; `setCenter(null)`.
+3. `await sendToDiscard([{ key: 'played', card, from }])` — `useDiscardExit`, wired once as
+   `useDiscardExit(discardRef, (cards) => setDiscard(d => [...d, ...cards]))`. The step owns the
+   scatter, the flight and the landing pose (**[I7]**), and hands back the entries to append.
+4. `setBusy(false)`.
 
 **Params & timings**
 
 | Step | Preset | Duration | Easing | Extra |
 |---|---|---|---|---|
 | A: hand/seat → center | `playToCenter` | 480 ms | EASE | — |
-| B: center → discard | `centerToDiscard` | 420 ms | EASE | `rotate/dx/dy` from `jitter()` |
-| opponent source box | — | — | — | `cardBoxIn(seat, FIXED_CARD_W)`, `FIXED_CARD_W = 108`, centered on the seat |
-| `jitter()` ranges | — | — | — | `rot ±14°`, `dx ±10px`, `dy ±8px` |
+| B: center → discard | `useDiscardExit` | `FLIGHT_MS = 420` | — | the step owns the preset and the scatter |
+| opponent source box | — | — | — | `cardBoxIn(seat, 108)` — a card-sized box centred on the seat; 108 is the seat card's width, set inline in the scene |
+| `jitter()` ranges | — | — | — | `rot ±14°`, `dx ±10px`, `dy ±8px` (inside the step) |
 
 - Card height/width ratio = **1.4** (`CARD_RATIO`, shared from `@/primitives/Card`).
 - Hold between A and B is **user-driven** (the card waits in the center until it resolves). For
@@ -98,11 +97,12 @@ _Phase B — center → discard (separate trigger):_
 
 **Invariants**
 - Global: **I1** (measure before mutate), **I2** (`nextFrames` before each flight), **I7**
-  (`jitter()` once, passed into the preset **and** stored with the entry).
+  (`jitter()` once, passed into the preset **and** stored with the entry — inside the step here),
+  **I10** (the flyer carries the rect it mounts at, or it flashes at the bottom of the page).
 - Local — **the center is a one-card gate**: the `busy || center` guard makes the action safe to
   re-trigger; a card must leave the center (Phase B) before another can enter.
-- A **single flyer** carries the card for the whole arc. Commit to `center`/`discard` state only
-  after `anim.finished`, then drop the flyer.
+- The scene's own flyer carries the card only to the centre; the step raises its own for the trip
+  to the discard. Commit to `center` / `discard` state only after the flight resolves, then drop it.
 
 **End state & cleanup**
 - After A: `center = card`, flyer gone, `busy = false`.
@@ -110,9 +110,9 @@ _Phase B — center → discard (separate trigger):_
   `busy = false`. State is clean for the next play.
 
 **Building blocks**
-[`playToCenter`](./reference.md#presets) · [`centerToDiscard`](./reference.md#presets)
-(both `move()` travel) · [`cardBoxIn`](./reference.md#card-geometry-helpers) ·
-[`jitter()`](./reference.md#travel-and-timing-helpers) · [`nextFrames()`](./reference.md#travel-and-timing-helpers).
+[`playToCenter`](./reference.md#presets) (`move()` travel) · the step
+[`useDiscardExit`](./reference.md#the-three-movement-steps) · [`cardBoxIn`](./reference.md#card-geometry-helpers) ·
+[`nextFrames()`](./reference.md#travel-and-timing-helpers).
 
 **Live reference**
 `Card play` — `apps/playground/stories/interactive/CardPlayStory.tsx`.
@@ -280,7 +280,7 @@ half and lands at the slot's bottom-center.
 3. `setGapAt(gap)` (the fan opens the gap); `setFlying({ card, z: place.z, from: source, to: \`translate(dx,dy) rotate(rot) scale(scale)\` })`;
    `setStarted(false)`, `setTucked(false)`.
 4. **Double-rAF** — **[I2]** → `setStarted(true)` (the overlay transitions to `to`); start a `START_HIGH_MS` timer → `setTucked(true)`.
-5. The overlay div: `zIndex = tucked ? place.z : TRAVEL_Z`; `transform = started ? to : 'none'`; the move is a CSS
+5. The overlay div: `zIndex = tucked ? place.z : 'var(--z-flight)'`; `transform = started ? to : 'none'`; the move is a CSS
    transition on `.flying` (`FLIGHT_MS`).
 6. `onTransitionEnd` (`settle`): if the finished property is `transform` and `gapAt != null` →
    `onInserted(card, gapAt)` (the consumer splices the card into `hand` at `gap`) → `reset()` (clear gap/flying/started/tucked).
@@ -289,7 +289,7 @@ half and lands at the slot's bottom-center.
 | Aspect | Value |
 |---|---|
 | flight | CSS transition on `.flying`, `FLIGHT_MS = 480` |
-| high-layer hold | `START_HIGH_MS = 140` (then z drops from `TRAVEL_Z = 500` to the slot's z) |
+| high-layer hold | `START_HIGH_MS = 140` (then z drops from `var(--z-flight)` to the slot's z) |
 | target size | `scale = CARD_W / source.width` (`CARD_W = 150`, the fan's card width) |
 | slot | `slotPlacement(gap, handLength + 1)` from `@/table/Hand/fan` — `x`, `y`, `rotate`, `z` |
 
@@ -298,7 +298,7 @@ half and lands at the slot's bottom-center.
   on, so the overlay paints at the source before transitioning (else it jumps).
 - Local: this is **CSS-transition based, not a `play()` preset**. The gap (`gapAt`) and the flight are one
   coordinated move — the fan must render `handLength + 1` slots so the landing slot exists. The high→tuck
-  z-swap (`TRAVEL_Z` → `place.z`) makes the card ride over the fan, then slip under its right half. Landing is
+  z-swap (`--z-flight` → `place.z`) makes the card ride over the fan, then slip under its right half. Landing is
   detected by the `transitionend` of `transform`.
 
 **End state & cleanup**
@@ -637,8 +637,9 @@ spot, flips back-up, and the new deck appears there.
 2. `runDiscardFlight(toRect)`:
    - `fromRect = await gatherDiscardToFlyer()`: `setDiscard(showCount:false, gathered:true)` (cards stack to
      `translate(0,0) rotate(0)`); `await wait(GATHER_MS = 360)`; `await wait(STEP_HOLD)`; measure `discardRef`
-     rect; `setFlyer({ card: top, faceDown:false })`; `setDiscard(cards:[])`; `await nextFrames()`; position the
-     flyer at the discard rect; return it.
+     rect; `setFlyer({ card: top, faceDown: false, at: discardRect })` — the flyer's state carries the rect it
+     mounts at, so it paints on the pile from the first frame (**[I10]**); `setDiscard(cards:[])`;
+     `await nextFrames()` (**[I2]**); return the rect.
    - Aim at the card area: `aspect = fromRect.height / fromRect.width`; `cardTo = { left, top, width: toRect.width,
      height: toRect.width * aspect }` — **[I6]**, inline via the measured aspect (not the shared `cardAreaOf`).
    - `play('gatherToDeck', flyerRef, { from: fromRect, to: cardTo, duration: 560 })`; await.
@@ -1227,8 +1228,9 @@ lands does the finished grid leave for the discard.
    upfront** — 1–4 one row, 5–6 two rows of 3, 7–8 two rows of 4, 9–10 two rows of 5, past 10 three
    rows. Every card therefore flies straight to **its own cell**, never to a growing pile.
 2. Each pull-out: claim the next free cell, remove the card from the hand, `playToCenter` from the fan
-   slot's card box into that cell. Several run **concurrently** — a flight must never gate the next
-   drag (discarding is "think, then dump fast").
+   slot's card box into that cell. The flight entry carries the source rect (`at`) so the flyer paints
+   on the card from its first frame — **[I10]**. Several run **concurrently** — a flight must never
+   gate the next drag (discarding is "think, then dump fast").
 3. The grid is held open (`GRID_HOLD`).
 4. The whole grid leaves through **`useDiscardExit`**: one entry per placed card, `node` = its cell
    element, `layer` = its slot, `delay` = `slot × CLEAR_STEP` — one by one, but as one movement.
@@ -1237,8 +1239,8 @@ lands does the finished grid leave for the discard.
 `CLEAR_STEP` 90 ms · flights `playToCenter` 480 ms.
 
 **Invariants.** **I1** measure the cell before it unmounts · **I8** the card, its slot and its source
-rect come in as arguments (the sequence spans several awaits) · a `runId` guard drops flights from a
-previous deal.
+rect come in as arguments (the sequence spans several awaits) · **I10** every concurrent flyer carries
+its own mount rect · a `runId` guard drops flights from a previous deal.
 
 **End state & cleanup.** Cells released, `placed` cleared, grid size back to 0, the cards lie in the heap.
 

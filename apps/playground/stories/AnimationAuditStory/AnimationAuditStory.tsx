@@ -282,8 +282,8 @@ const MODULES: Module[] = [
   {
     mod: 'Pile (heap)',
     what: {
-      ru: 'Сброс как наброшенная КУЧА, а не ровная стопка: карты лежат каждая со своим разбросом (scatterAt/restTransform), под ними «глубина» стопки — и она показывается только когда под видимыми картами реально что-то есть. Отдаёт наружу коробку карты (boxRef) — в неё целятся полёты, слой счётчика (countLayer) — чтобы приземляющаяся карта его не накрыла, и собранное состояние (gathered) — когда сброс превращается в колоду.',
-      en: 'The discard as a tossed HEAP, not a neat stack: every card lies at its own scatter (scatterAt/restTransform), with the pile depth beneath — shown only when something is actually hidden under the visible cards. Exposes the card box (boxRef) for flights to aim at, the counter layer (countLayer) so a landing card cannot cover it, and the gathered state for when the discard turns into a deck.',
+      ru: 'Сброс как наброшенная КУЧА, а не ровная стопка: карты лежат каждая со своим разбросом (scatterAt/restTransform), под ними «глубина» стопки — и она показывается только когда под видимыми картами реально что-то есть. Отдаёт наружу коробку карты (boxRef) — в неё целятся полёты, и собранное состояние (gathered) — когда сброс превращается в колоду. Счётчик стоит на ступень ВЫШЕ полёта: прилетающая карта проходит под ним, а не накрывает и потом ныряет вниз — поэтому место стопки на столе нельзя центрировать трансформом (он запер бы бейдж внутри).',
+      en: "The discard as a tossed HEAP, not a neat stack: every card lies at its own scatter (scatterAt/restTransform), with the pile depth beneath — shown only when something is actually hidden under the visible cards. Exposes the card box (boxRef) for flights to aim at, and the gathered state for when the discard turns into a deck. The counter sits one rung ABOVE the flight: an arriving card passes under it instead of covering it and then dropping beneath — which is why a pile's place on the table must not be centred with a transform (that would trap the badge inside the wrapper).",
     },
     where: {
       ru: 'primitives/Pile → Table + все сцены',

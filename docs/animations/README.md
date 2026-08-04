@@ -39,7 +39,21 @@ Not everything these docs describe is a shared library module. As of now:
   card laid WITH it (Code Review / Monitoring, shown as a `CardPair`), `accentAt` / `liftedAt` /
   `onSlotDown` for "this one can be taken now", "this one is currently lifted" and the grab itself.
   `Pile` renders the discard as a **heap** (`heap`, `heapShow`, `gathered`) and exposes `boxRef`
-  for flights to aim at and `countLayer` so a landing card cannot cover the counter.
+  for flights to aim at.
+
+  A card in flight sits on its own rung of the layer ladder — `--z-flight`, above the hand and a
+  lifted card, below the arrow and the overlays. Every flyer reads it; a step that carries several
+  cards at once adds the card's own table layer on top (`calc(var(--z-flight) + n)`), so the order
+  they had on the table is the order they land in. A card held by the cursor goes one step higher
+  again (`+10`) — what you are holding is above what is flying on its own.
+
+  The pile's counter sits above the whole flight BAND (`+40`, still under the arrow) — above the
+  base is not enough, since the per-card offsets land right on top of it — so a card arriving passes under
+  the badge instead of covering it and then jumping beneath. That only works while the consumer's
+  placement is not a stacking context: **do not centre a pile with a `transform`** — a transform
+  would trap the badge inside the wrapper. The scenes and the `Table` screen centre `.discard` with
+  a full-height flex column (`inset-block: 0; align-items: center`), pointer-transparent so the
+  column does not shadow the hand behind it.
 
 **Shared, but living in the playground (`apps/playground/stories/interactive/`):**
 Three **named steps** — one per kind of movement, not one generic flight engine. Import them from
@@ -134,7 +148,7 @@ if (anim) await anim.finished                      // wait for the flight
 
 ## Global invariants
 
-These hold across **every** recipe. Recipes reference them by number (I1…I9) instead of
+These hold across **every** recipe. Recipes reference them by number (I1…I10) instead of
 repeating them. Break one and the animation "works on paper" but jumps, double-flips, or
 teleports on screen.
 
@@ -175,6 +189,14 @@ teleports on screen.
   `Hand.settleInto` set the flyer's `z` to the target slot's `z` **before** the flight, so the
   card tucks into the fan at the right depth instead of riding over it. When a stack lands in the
   heap, append **bottom-up**: the lowest card has to arrive first, or the heap inverts it.
+- **I10 — A flyer carries the coordinates it mounts at.** A `position: fixed` node with no
+  `left`/`top` paints at its **flow** position — the bottom of the page — for every frame that
+  passes before the code gives it one. Setting them imperatively after `nextFrames()` *is* that
+  gap, and it reads as a flash in a corner of the screen. Put the source rect into the flyer's
+  state and render it inline (`style={{ left, top, inlineSize }}`); `nextFrames()` then only does
+  its own job (**I2** — paint at the source before moving). The flash is timing-dependent, so it
+  looks intermittent: usually the browser swallows those frames, sometimes it does not. Four
+  flyers in the playground carried this bug, each found by eye rather than by the code.
 
 ---
 

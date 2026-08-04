@@ -49,7 +49,8 @@ The words that flow into a preset as `params`.
 | `DEAL_CARD_W` | `150` | `PickOpponentCardStory` | deal-grid card width |
 | `FIXED_CARD_W` | `108` | `CardPlayStory` | fixed showcase card width — a stopgap: this scene renders the hand by hand, not via `@/table/Hand`, so there is no real card to measure |
 | `ROT` / `DX` / `DY` | `14` / `10` / `8` | `scatter.ts` | `jitter` ±ranges: `rot ±14°`, `dx ±10px`, `dy ±8px` |
-| `TRAVEL_Z` | `500` | `useHandInsert` | z-index of the high travel layer during a hand-insert flight |
+| `--z-flight` | `250` | `tokens.css` | the BASE of the flight band — above the hand and a lifted card, below the arrow and the overlays. Every flyer reads it; `useHandInsert` holds it for `START_HIGH_MS` before dropping to the slot's own layer |
+| flight band offsets | `+n` / `+10` / `+40` | `useDiscardExit`, `Error503Story`, `Pile` | on top of `--z-flight`: `n` = the card's own table layer, so a group keeps its order (**I9**); `+10` = a card held by the cursor, above anything flying on its own; `+40` = the pile counter, clear of the whole band so an arriving card passes under the badge |
 | `CARD_WH` | `368 / 515` (width / height) | `@/table/Hand` | inverse of `CARD_RATIO`; sizes the drag flyer height and the zoom preview |
 | `HOVER_LIFT` / `NEIGHBOR_PUSH` | `28` / `36` | `@/table/Hand` | hover: lift of the hovered card / spread of its neighbours (px) |
 | `BAND_PAD` | `32` | `@/table/Hand` | how far above the fan still counts as "in the hand" (reorder) vs a play |
