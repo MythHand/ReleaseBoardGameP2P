@@ -53,7 +53,11 @@ export default function CardPlayStory() {
   const [oppDeck, setOppDeck] = useState(() => BASE.slice(5, 10))
   const [center, setCenter] = useState<CardData | null>(null)
   const [discard, setDiscard] = useState<DiscardEntry[]>([])
-  const [flyer, setFlyer] = useState<CardData | null>(null)
+  // the flyer carries WHERE it mounts. Rendered as an inline style rather than
+  // assigned after nextFrames(): a position:fixed node with no coordinates paints
+  // at its flow position first, so the card blinks at the wrong place for the two
+  // frames before the flight starts.
+  const [flyer, setFlyer] = useState<{ card: CardData; at: Rect } | null>(null)
   const [busy, setBusy] = useState(false)
 
   const seatRef = useRef<HTMLDivElement>(null)
@@ -69,13 +73,10 @@ export default function CardPlayStory() {
     if (busy || center) return // the center is busy — send to the discard first
     setBusy(true)
     const toRect = centerRef.current?.getBoundingClientRect()
-    setFlyer(card)
-    await nextFrames()
+    setFlyer({ card, at: from })
+    await nextFrames() // I2 — let it paint at `at` before it starts moving
     const el = flyerRef.current
     if (el && toRect) {
-      el.style.left = `${from.left}px`
-      el.style.top = `${from.top}px`
-      el.style.width = `${from.width}px`
       const anim = play('playToCenter', el, { from, to: toRect })
       if (anim) await anim.finished
     }
@@ -200,8 +201,12 @@ export default function CardPlayStory() {
       {discardOverlay}
 
       {flyer && (
-        <div className={styles.flyer} ref={flyerRef}>
-          <Card card={flyer} interactive={false} width="100%" />
+        <div
+          className={styles.flyer}
+          ref={flyerRef}
+          style={{ left: flyer.at.left, top: flyer.at.top, width: flyer.at.width }}
+        >
+          <Card card={flyer.card} interactive={false} width="100%" />
         </div>
       )}
     </div>
