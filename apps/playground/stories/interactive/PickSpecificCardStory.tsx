@@ -9,7 +9,7 @@ import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './PickSpecificCardStory.module.css'
 import { reorderHand } from './reorderHand'
-import { useHandInsert } from './useHandInsert'
+import { useHandArrival } from './useHandArrival'
 
 // "Take a SPECIFIC card from the opponent's hand" — every logical node is shown:
 //  idle:    a start button in the centre;
@@ -82,13 +82,14 @@ export default function PickSpecificCardStory() {
   // final step is shared: the card settles into the hand, then back to the start
   const {
     gapAt,
+    gapSize,
     overlay,
-    insert,
+    arrive,
     reset: resetInsert,
-  } = useHandInsert(handRef, (card, gap) => {
+  } = useHandArrival(handRef, (gap, landed) => {
     setHand((h) => {
       const copy = [...h]
-      copy.splice(gap, 0, { uid: nextHandUid(), card })
+      copy.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return copy
     })
     backToIdle()
@@ -183,11 +184,7 @@ export default function PickSpecificCardStory() {
     const el = revealRef.current
     if (el && reveal) {
       const r = el.getBoundingClientRect()
-      insert(
-        reveal.card,
-        { left: r.left, top: r.top, width: r.width, height: r.height },
-        hand.length,
-      )
+      void arrive([{ key: nextHandUid(), card: reveal.card, from: r }], hand.length)
     }
     setReveal(null)
   }
@@ -305,6 +302,7 @@ export default function PickSpecificCardStory() {
         <Hand
           items={hand}
           gapAt={gapAt}
+          gapSize={gapSize}
           onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
         />
       </div>

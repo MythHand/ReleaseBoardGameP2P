@@ -15,7 +15,7 @@ import ReleaseZone from '@/table/ReleaseZone'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import { reorderHand } from '../interactive/reorderHand'
 import { useDiscardExit } from '../interactive/useDiscardExit'
-import { useHandReturn } from '../interactive/useHandReturn'
+import { useHandArrival } from '../interactive/useHandArrival'
 import styles from './ComboStory.module.css'
 
 type Loc = Record<Lang, string>
@@ -102,17 +102,19 @@ export default function ComboStory() {
     overlay: returnOverlay,
     gapAt: returnGap,
     gapSize: returnSize,
-    send: returnToHand,
+    arrive: returnToHand,
     reset: resetReturn,
-  } = useHandReturn(handWrapRef, (gap) =>
+  } = useHandArrival(handWrapRef, (gap, landed) =>
     setHand((h) => {
       const next = h.slice()
-      next.splice(gap, 0, ...stagedRef.current)
+      next.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return next
     }),
   )
   const [flyPair, setFlyPair] = useState<{ main: CardData; aux: CardData } | null>(null)
-  const [entering, setEntering] = useState<CardData | null>(null) // hand → centre (single)
+  // hand → centre (single). It carries where it mounts: a flyer is position:fixed,
+  // so without coordinates its first painted frame lands at its flow position
+  const [entering, setEntering] = useState<{ card: CardData; at: Rect } | null>(null)
   const [log, setLog] = useState<string | null>(null)
 
   const enterRef = useRef<HTMLDivElement>(null)
@@ -182,12 +184,13 @@ export default function ComboStory() {
     // where each card physically is: a lone staged card fills the centre slot; a
     // merged pair sits in the flyer, and the step measures each half off its own
     // anchor (staged[0] became the pair's aux, staged[1] its main)
+    // the key is the card's identity in the hand — the step hands it back on landing
     const leaving =
       items.length === 1
-        ? [{ key: 'rt0', card: items[0].card, from: cRect }]
+        ? [{ key: items[0].uid, card: items[0].card, from: cRect }]
         : [
-            { key: 'rt0', card: items[0].card, el, anchor: 'aux' as const, from: cRect },
-            { key: 'rt1', card: items[1].card, el, anchor: 'main' as const, from: cRect },
+            { key: items[0].uid, card: items[0].card, el, anchor: 'aux' as const, from: cRect },
+            { key: items[1].uid, card: items[1].card, el, anchor: 'main' as const, from: cRect },
           ]
     const flight = returnToHand(leaving, hand.length)
     setStaged([])
@@ -259,13 +262,10 @@ export default function ComboStory() {
     setPhase('partner')
     void (async () => {
       const cRect = centerRef.current?.getBoundingClientRect()
-      setEntering(item.card)
-      await nextFrames()
+      setEntering({ card: item.card, at: rect })
+      await nextFrames() // I2 — let it paint at `at` before it starts moving
       const el = enterRef.current
       if (el && cRect) {
-        el.style.left = `${rect.left}px`
-        el.style.top = `${rect.top}px`
-        el.style.width = `${rect.width}px`
         const anim = play('playToCenter', el, { from: rect, to: cRect })
         if (anim) await anim.finished
       }
@@ -428,7 +428,6 @@ export default function ComboStory() {
           heap={discardPile}
           count={discardPile.length}
           width={116}
-          countLayer={20}
           boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
@@ -472,8 +471,12 @@ export default function ComboStory() {
 
       {/* the source on its way from the fan to the centre */}
       {entering && (
-        <div className={styles.entering} ref={enterRef}>
-          <Card card={entering} interactive={false} width="100%" />
+        <div
+          className={styles.entering}
+          ref={enterRef}
+          style={{ left: entering.at.left, top: entering.at.top, inlineSize: entering.at.width }}
+        >
+          <Card card={entering.card} interactive={false} width="100%" />
         </div>
       )}
 

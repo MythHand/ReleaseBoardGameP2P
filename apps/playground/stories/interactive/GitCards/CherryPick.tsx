@@ -10,7 +10,7 @@ import Hand from '@/table/Hand'
 import { pick, useLang } from '../../../Playground/lang'
 import { reorderHand } from '../reorderHand'
 import { useDiscardExit } from '../useDiscardExit'
-import { useHandInsert } from '../useHandInsert'
+import { useHandArrival } from '../useHandArrival'
 import styles from './GitCards.module.css'
 
 // "Git Cherry-pick" — pick a card out of the whole discard.
@@ -43,7 +43,7 @@ const DECK_DUR = 480 // = the returnToDeck preset duration
 const DECK_HOLD = 360 // deck card holds face-down before it merges
 const STAGGER_CAP = 40 // don't stagger past this many cards
 // hand card, like the opponent-card stories: fly to centre, enlarge, hold, then
-// the shared useHandInsert drop into the fan
+// the shared useHandArrival drop into the fan
 const REVEAL_W = 220 // width the chosen card reaches in the centre
 const REVEAL_DUR = 460 // fly-to-centre duration
 const REVEAL_HOLD = 560 // pause in the centre before dropping into the hand
@@ -129,13 +129,14 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
   // the chosen card settles into the hand fan (proven family insert)
   const {
     gapAt,
+    gapSize,
     overlay,
-    insert,
+    arrive,
     reset: resetInsert,
-  } = useHandInsert(handRef, (card, gap) => {
+  } = useHandArrival(handRef, (gap, landed) => {
     setHand((h) => {
       const copy = [...h]
-      copy.splice(gap, 0, { uid: nextHandUid(), card })
+      copy.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return copy
     })
   })
@@ -296,7 +297,7 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
 
     setPhase('resolve')
 
-    // chosen → hand: fly to centre, enlarge, hold, then the shared useHandInsert
+    // chosen → hand: fly to centre, enlarge, hold, then the shared useHandArrival
     // drop into the fan — same as taking an opponent card
     const handEl = handUid ? cellRefs.current.get(handUid) : null
     const handRect = handUid ? rects.get(handUid) : null
@@ -316,13 +317,9 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
       later(() => {
         const el = cellRefs.current.get(handUid as string)
         if (!el) return
-        const r = el.getBoundingClientRect()
-        el.style.opacity = '0' // the insert overlay takes over from here
-        insert(
-          handCard,
-          { left: r.left, top: r.top, width: r.width, height: r.height },
-          hand.length,
-        )
+        // the card on screen IS the one that flies — the step measures it and
+        // takes it off screen itself, no local copy and no opacity trick
+        void arrive([{ key: nextHandUid(), card: handCard, el }], hand.length)
       }, REVEAL_DUR + REVEAL_HOLD)
     }
 
@@ -526,6 +523,7 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
         <Hand
           items={hand}
           gapAt={gapAt}
+          gapSize={gapSize}
           onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
         />
       </div>

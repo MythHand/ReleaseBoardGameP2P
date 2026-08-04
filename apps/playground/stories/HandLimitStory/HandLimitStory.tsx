@@ -61,6 +61,9 @@ interface DiscardEntry extends Scatter {
 interface Flight {
   card: CardType
   id: number // flight id — also the React key, so every flight is a fresh Card (I5)
+  // where it mounts: a flyer is position:fixed, so without coordinates its first
+  // painted frame lands at its flow position — a flash in the page corner
+  at?: DOMRect
 }
 // a card that has landed in the grid, in its own cell
 interface Placed {
@@ -151,15 +154,12 @@ export default function HandLimitStory() {
   const flyToCell = async (card: CardType, slot: number, fromRect?: DOMRect) => {
     const run = runId.current
     const id = ++flightSeq.current
-    setFlights((f) => [...f, { card, id }])
+    setFlights((f) => [...f, { card, id, at: fromRect }])
     await nextFrames() // I2 — and it also lets the grid cells mount before measuring
     if (runId.current !== run) return
     const el = flightRefs.current[id]
     const to = cellRefs.current[slot]?.getBoundingClientRect()
     if (el && fromRect && to) {
-      el.style.left = `${fromRect.left}px`
-      el.style.top = `${fromRect.top}px`
-      el.style.width = `${fromRect.width}px`
       const anim = play('playToCenter', el, { from: fromRect, to })
       if (anim) await anim.finished
     }
@@ -256,7 +256,6 @@ export default function HandLimitStory() {
           heap={discard}
           count={discard.length}
           width={116}
-          countLayer={20}
           boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
@@ -298,6 +297,7 @@ export default function HandLimitStory() {
         <div
           key={f.id}
           className={styles.flyer}
+          style={f.at ? { left: f.at.left, top: f.at.top, inlineSize: f.at.width } : undefined}
           ref={(el) => {
             flightRefs.current[f.id] = el
           }}

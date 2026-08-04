@@ -182,7 +182,6 @@ export default function CardPlayStory() {
           heap={discard}
           count={discard.length}
           width={116}
-          countLayer={90}
           boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
@@ -204,7 +203,7 @@ export default function CardPlayStory() {
         <div
           className={styles.flyer}
           ref={flyerRef}
-          style={{ left: flyer.at.left, top: flyer.at.top, width: flyer.at.width }}
+          style={{ left: flyer.at.left, top: flyer.at.top, inlineSize: flyer.at.width }}
         >
           <Card card={flyer.card} interactive={false} width="100%" />
         </div>

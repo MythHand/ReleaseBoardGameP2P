@@ -15,7 +15,7 @@ import type { HeapCard } from '@/primitives/Pile/Pile'
 import styles from './useDiscardExit.module.css'
 
 // THE step "cards leave the table for the discard" — the discard counterpart of
-// useHandInsert. Extracted because three scenes were each carrying their own copy
+// useHandArrival. Extracted because three scenes were each carrying their own copy
 // of it, and the copies drifted.
 //
 // The rule it holds:
@@ -174,8 +174,14 @@ export function useDiscardExit(
       key={f.key}
       className={styles.flyer}
       // the table layer travels with the card — without it two flyers share one z
-      // and paint in array order, which is not the stacking order
-      style={{ left: f.from.left, top: f.from.top, width: f.from.width, zIndex: 80 + f.z }}
+      // and paint in array order, which is not the stacking order. The base is the
+      // flight rung of the ladder; the card's own layer is added on top of it.
+      style={{
+        left: f.from.left,
+        top: f.from.top,
+        inlineSize: f.from.width,
+        zIndex: `calc(var(--z-flight) + ${f.z})`,
+      }}
       ref={(el) => {
         refs.current[f.key] = el
       }}

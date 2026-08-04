@@ -645,7 +645,6 @@ export default function Error503Story() {
           heap={discard}
           count={discard.length}
           width={116}
-          countLayer={20}
           boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}

@@ -14,7 +14,7 @@ import Seat from '@/table/Seat'
 import { pick, useLang } from '../../../Playground/lang'
 import { reorderHand } from '../reorderHand'
 import { useDiscardExit } from '../useDiscardExit'
-import { useHandInsert } from '../useHandInsert'
+import { useHandArrival } from '../useHandArrival'
 import styles from './GitCards.module.css'
 
 // "System Upgrade" — every OTHER player discards one card (their choice) to the
@@ -99,13 +99,14 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
   // the chosen card settles into the hand (proven family insert)
   const {
     gapAt,
+    gapSize,
     overlay,
-    insert,
+    arrive,
     reset: resetInsert,
-  } = useHandInsert(handRef, (card, gap) => {
+  } = useHandArrival(handRef, (gap, landed) => {
     setHand((h) => {
       const copy = [...h]
-      copy.splice(gap, 0, { uid: nextHandUid(), card })
+      copy.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return copy
     })
   })
@@ -206,7 +207,7 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
     }
 
     // chosen → hand: reveal to the centre (enlarged), hold, then drop into the
-    // fan (the shared useHandInsert) — the same beat as cherry-pick
+    // fan (the shared useHandArrival) — the same beat as cherry-pick
     const handCard = center.find((c) => c.uid === handUid)?.card
     const handRect = handUid ? rects.get(handUid) : null
     const handEl = handUid ? centerRefs.current.get(handUid) : null
@@ -226,13 +227,9 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
       later(() => {
         const el = centerRefs.current.get(handUid as string)
         if (!el) return
-        const r = el.getBoundingClientRect()
-        el.style.opacity = '0' // the insert overlay takes over
-        insert(
-          handCard,
-          { left: r.left, top: r.top, width: r.width, height: r.height },
-          hand.length,
-        )
+        // the card on screen IS the one that flies — the step measures it and
+        // takes it off screen itself, no local copy and no opacity trick
+        void arrive([{ key: nextHandUid(), card: handCard, el }], hand.length)
       }, REVEAL_DUR + REVEAL_HOLD)
     }
 
@@ -393,6 +390,7 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
         <Hand
           items={hand}
           gapAt={gapAt}
+          gapSize={gapSize}
           onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
         />
       </div>

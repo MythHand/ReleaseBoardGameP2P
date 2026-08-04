@@ -21,7 +21,7 @@ import HoverSelect from '../controls/HoverSelect'
 import styles from './DefenseReleaseStory.module.css'
 import { reorderHand } from './reorderHand'
 import { type Leaving, useDiscardExit } from './useDiscardExit'
-import { useHandInsert } from './useHandInsert'
+import { useHandArrival } from './useHandArrival'
 
 // Defense Release — playing a Release and defending it.
 //
@@ -240,14 +240,15 @@ export default function DefenseReleaseStory() {
   // under the right half of it. One motion for every scene — never a bare flight.
   const {
     gapAt,
+    gapSize,
     overlay: insertOverlay,
-    insert,
+    arrive,
     reset: resetInsert,
     FLIGHT_MS,
-  } = useHandInsert(handWrapRef, (card, gap) => {
+  } = useHandArrival(handWrapRef, (gap, landed) => {
     setHand((h) => {
       const next = h.slice()
-      next.splice(gap, 0, { uid: `r${++seq.current}`, card })
+      next.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return next
     })
   })
@@ -430,11 +431,7 @@ export default function DefenseReleaseStory() {
     if (busyRef.current) return
     const toHand = (card: CardType, box: DOMRect | undefined, rot = 0) => {
       if (!box) return
-      insert(
-        card,
-        { left: box.left, top: box.top, width: box.width, height: box.height, rot },
-        handItemsRef.current.length,
-      )
+      void arrive([{ key: `r${++seq.current}`, card, from: box, rot }], handItemsRef.current.length)
     }
     const waitingRelease = stagedRef.current
     if (phaseRef.current === 'cost' && waitingRelease) {
@@ -450,7 +447,7 @@ export default function DefenseReleaseStory() {
     const from = sudoRef.current?.getBoundingClientRect()
     setDefSudo(null)
     toHand(mySudo, from, SUDO_POSE.rot)
-  }, [insert, stopAim])
+  }, [arrive, stopAim])
 
   // a press on nothing valid cancels. Presses inside the hand stop propagation —
   // those are answers (or a card being picked up), not a miss.
@@ -598,14 +595,8 @@ export default function DefenseReleaseStory() {
               // the middle in advance and the card scales down into it. The one
               // "card settles into the hand" motion every other scene uses.
               if (toMe) {
-                insert(
-                  att,
-                  {
-                    left: attBox.left,
-                    top: attBox.top,
-                    width: attBox.width,
-                    height: attBox.height,
-                  },
+                void arrive(
+                  [{ key: `r${++seq.current}`, card: att, from: attBox }],
                   handItemsRef.current.length,
                 )
                 await wait(FLIGHT_MS)
@@ -994,6 +985,7 @@ export default function DefenseReleaseStory() {
           <Hand
             items={hand}
             gapAt={gapAt}
+            gapSize={gapSize}
             stateAt={stateAt}
             accentAt={accentAt}
             onPlay={handPlay}

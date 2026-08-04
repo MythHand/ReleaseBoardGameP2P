@@ -18,7 +18,7 @@ import HoverSelect from '../controls/HoverSelect'
 import styles from './AiCardsStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
-import { useHandInsert } from './useHandInsert'
+import { useHandArrival } from './useHandArrival'
 
 type Loc = Record<Lang, string>
 
@@ -169,14 +169,15 @@ export default function AiCardsStory() {
 
   const {
     gapAt,
+    gapSize,
     overlay,
-    insert,
+    arrive,
     reset: resetInsert,
     FLIGHT_MS,
-  } = useHandInsert(handRef, (card, gap) => {
+  } = useHandArrival(handRef, (gap, landed) => {
     setHand((h) => {
       const copy = [...h]
-      copy.splice(gap, 0, { uid: `ins${++uidSeq.current}`, card })
+      copy.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return copy
     })
   })
@@ -334,14 +335,8 @@ export default function AiCardsStory() {
 
     // chosen → hand (from its row position)
     if (chosenRect) {
-      insert(
-        chosen.card,
-        {
-          left: chosenRect.left,
-          top: chosenRect.top,
-          width: chosenRect.width,
-          height: chosenRect.height,
-        },
+      void arrive(
+        [{ key: `ins${++uidSeq.current}`, card: chosen.card, from: chosenRect }],
         hand.length,
       )
     }
@@ -402,16 +397,7 @@ export default function AiCardsStory() {
     const startRect = el?.getBoundingClientRect()
     setOuts([])
     if (startRect) {
-      insert(
-        card,
-        {
-          left: startRect.left,
-          top: startRect.top,
-          width: startRect.width,
-          height: startRect.height,
-        },
-        hand.length,
-      )
+      void arrive([{ key: `ins${++uidSeq.current}`, card, from: startRect }], hand.length)
     }
   }
 
@@ -530,7 +516,7 @@ export default function AiCardsStory() {
     await pullTo(card, baseDeckRef, effectRef)
     const r = flyerRef.current?.getBoundingClientRect()
     setFlyer(null)
-    if (r) insert(card, { left: r.left, top: r.top, width: r.width, height: r.height }, handLen)
+    if (r) void arrive([{ key: `ins${++uidSeq.current}`, card, from: r }], handLen)
     await wait(FLIGHT_MS + 140)
   }
 
@@ -754,7 +740,6 @@ export default function AiCardsStory() {
           heap={discard}
           count={discard.length}
           width={116}
-          countLayer={90}
           boxRef={discardRef}
           logoVariant={lang}
           label={pick(lang, { ru: 'сброс', en: 'discard' })}
@@ -813,6 +798,7 @@ export default function AiCardsStory() {
           <Hand
             items={hand}
             gapAt={gapAt}
+            gapSize={gapSize}
             stateAt={handPickMode ? () => 'playable' : undefined}
             // Bad Vibe discards ANY card — uniform colour, not the per-category
             // accent; and it costs a card, so the hue is the loss one
