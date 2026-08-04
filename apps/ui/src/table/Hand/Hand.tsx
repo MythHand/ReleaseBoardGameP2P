@@ -1,5 +1,5 @@
 import type React from 'react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
 import { CARD_W, handStep, slotPlacement } from './fan'
@@ -427,10 +427,17 @@ export default function Hand({
           style={{ left: zoomView.left, top: zoomView.top, width: zoomView.width }}
           aria-hidden="true"
         >
-          {renderFace(
-            { uid: zoomView.uid, card: zoomView.card },
-            { faceDown, tilt: false, width: zoomView.width, state: 'idle' },
-          )}
+          {/* keyed by the card: the preview mounts a FRESH face for every card the
+              cursor moves onto, so the composed layers appear at their values instead
+              of easing over from the previous card's. Sliding along the fan would
+              otherwise keep the whole face in motion — a preview you have to wait
+              for stops being readable. */}
+          <Fragment key={zoomView.uid}>
+            {renderFace(
+              { uid: zoomView.uid, card: zoomView.card },
+              { faceDown, tilt: false, width: zoomView.width, state: 'idle' },
+            )}
+          </Fragment>
         </div>
       )}
 

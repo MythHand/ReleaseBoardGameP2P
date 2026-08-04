@@ -954,10 +954,21 @@ export default function DefenseReleaseStory() {
           release is the AMBER reaction, not the red one: red is reserved for the
           Error 503 danger reaction. Its PASS key is the answer "I do not defend",
           so pressing it lets the attack succeed — the dock owns that decision
-          rather than a dev button. */}
+          rather than a dev button.
+
+          The reaction lasts the whole window, not just the moment an attack is on
+          the table: it opens when the release lands and holds until the attackers
+          pass. Between two attacks the player is still under the window — the dock
+          must not fall back to "your move". */}
       <div className={styles.turnDock}>
         <TurnDock
-          state={phase === 'answer' ? 'reaction' : phase === 'idle' ? 'draw' : 'push'}
+          state={
+            phase === 'window' || phase === 'answer'
+              ? 'reaction'
+              : phase === 'idle'
+                ? 'draw'
+                : 'push'
+          }
           seconds={20}
           progress={1}
           activePlayer={OPPONENTS[nextSeat.current % OPPONENTS.length].name}

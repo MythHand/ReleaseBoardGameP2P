@@ -340,6 +340,7 @@ export default function ComboStory() {
     if (phaseRef.current !== 'target') return
     const [src, prt] = stagedRef.current
     if (!src || !prt) return
+    stop() // the choice is made — the arrow points at nothing while the play flies
     setPlaying(true)
     void resolve(prt, src, false, t.label[lang])
   }
@@ -401,7 +402,12 @@ export default function ComboStory() {
 
       <div className={styles.targets}>
         {TARGETS.map((t) => {
-          const lit = phase === 'target'
+          // the same rule the hand's highlight follows: the moment the choice is
+          // made the highlight goes out. It also has to go out THEN and not when
+          // the phase finally resets — the staging is already cleared, so the
+          // accent it was lit in no longer exists and it would fall back to the
+          // neutral colour, flashing green while the play is still flying.
+          const lit = phase === 'target' && !playing
           return (
             // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only combo target (mousedown to play); sandbox story
             <div
