@@ -165,12 +165,8 @@
   pointer-events: none;
 }
 
-/* the flying draw card / cards leaving to the discard — fixed, viewport coords */
-.flyer {
-  position: fixed;
-  z-index: var(--z-flight);
-  pointer-events: none;
-}
+/* the cards in the air belong to the shared carrier (useFlyer); only the dragged
+   card below is the scene's own — it follows the cursor rather than flying */
 
 /* the card being dragged as a defence — follows the cursor, and a card held by the
    hand rides above any card flying on its own */

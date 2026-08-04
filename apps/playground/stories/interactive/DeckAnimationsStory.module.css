@@ -119,22 +119,8 @@
   border-radius: 8px;
 }
 
-/* летящая стопка сброса (сброс → колода / слияние): полёт через пресеты
-   gatherToDeck/absorbToDeck (move, центр-в-центр) — origin по умолчанию (центр) */
-.flyer {
-  position: fixed;
-  z-index: var(--z-flight);
-  pointer-events: none;
-}
-
-/* летящие разыгранные карты (рука → центр → сброс): пресет move считает по
-   центрам, поэтому transform-origin по умолчанию (центр) */
-.playFlyer {
-  position: fixed;
-  z-index: var(--z-flight);
-  aspect-ratio: var(--card-aspect);
-  pointer-events: none;
-}
+/* the cards in the air belong to the shared carrier (useFlyer) — the scene has no
+   flyer rule of its own any more */
 
 
 /* рука игрока снизу — компонент Hand (веер) */

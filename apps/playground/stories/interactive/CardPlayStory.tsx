@@ -3,7 +3,7 @@ import ruCommon from '@release/translation/locales/ru/common.json'
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useRef, useState } from 'react'
-import { nextFrames, play } from '@/animations'
+import { play } from '@/animations'
 import { CARDS } from '@/cards'
 import Card from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
@@ -15,6 +15,7 @@ import { pick, useLang } from '../../Playground/lang'
 import styles from './CardPlayStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
+import { useFlyer } from './useFlyer'
 
 // Showcase of two reusable card-play presets:
 //   part 1 — hand/opponent → table center (the playToCenter preset),
@@ -53,17 +54,13 @@ export default function CardPlayStory() {
   const [oppDeck, setOppDeck] = useState(() => BASE.slice(5, 10))
   const [center, setCenter] = useState<CardData | null>(null)
   const [discard, setDiscard] = useState<DiscardEntry[]>([])
-  // the flyer carries WHERE it mounts. Rendered as an inline style rather than
-  // assigned after nextFrames(): a position:fixed node with no coordinates paints
-  // at its flow position first, so the card blinks at the wrong place for the two
-  // frames before the flight starts.
-  const [flyer, setFlyer] = useState<{ card: CardData; at: Rect } | null>(null)
   const [busy, setBusy] = useState(false)
 
   const seatRef = useRef<HTMLDivElement>(null)
   const centerRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
-  const flyerRef = useRef<HTMLDivElement>(null)
+  // the card on its way to the centre — the shared carrier holds it
+  const { overlay: flyerOverlay, raise, drop } = useFlyer()
   const { overlay: discardOverlay, send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
     setDiscard((d) => [...d, ...cards]),
   )
@@ -73,15 +70,13 @@ export default function CardPlayStory() {
     if (busy || center) return // the center is busy — send to the discard first
     setBusy(true)
     const toRect = centerRef.current?.getBoundingClientRect()
-    setFlyer({ card, at: from })
-    await nextFrames() // I2 — let it paint at `at` before it starts moving
-    const el = flyerRef.current
+    const [el] = await raise([{ key: 'play', card, at: from }])
     if (el && toRect) {
       const anim = play('playToCenter', el, { from, to: toRect })
       if (anim) await anim.finished
     }
     setCenter(card)
-    setFlyer(null)
+    drop('play')
     setBusy(false)
   }
 
@@ -99,12 +94,12 @@ export default function CardPlayStory() {
   // the player plays by pulling a card OUT of the fan (the canonical gesture).
   // The centre holds one card — while it is busy the drop is rejected and the
   // Hand glides the card back.
-  const playFromPlayer = (uid: string, drop: HandPlayDrop): boolean => {
-    if (busy || center || !drop.rect) return false
+  const playFromPlayer = (uid: string, dropped: HandPlayDrop): boolean => {
+    if (busy || center || !dropped.rect) return false
     const item = playerHand.find((it) => it.uid === uid)
     if (!item) return false
     setPlayerHand((h) => h.filter((it) => it.uid !== uid))
-    void flyToCenter(item.card, drop.rect)
+    void flyToCenter(item.card, dropped.rect)
     return true
   }
 
@@ -132,7 +127,7 @@ export default function CardPlayStory() {
     setOppDeck(BASE.slice(5, 10))
     setCenter(null)
     setDiscard([])
-    setFlyer(null)
+    drop() // every card still in the air comes down
     setBusy(false)
   }
 
@@ -199,15 +194,8 @@ export default function CardPlayStory() {
 
       {discardOverlay}
 
-      {flyer && (
-        <div
-          className={styles.flyer}
-          ref={flyerRef}
-          style={{ left: flyer.at.left, top: flyer.at.top, inlineSize: flyer.at.width }}
-        >
-          <Card card={flyer.card} interactive={false} width="100%" />
-        </div>
-      )}
+      {/* the card in the air — the shared carrier */}
+      {flyerOverlay}
     </div>
   )
 }

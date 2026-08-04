@@ -15,6 +15,7 @@ import ReleaseZone from '@/table/ReleaseZone'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import { reorderHand } from '../interactive/reorderHand'
 import { useDiscardExit } from '../interactive/useDiscardExit'
+import { useFlyer } from '../interactive/useFlyer'
 import { useHandArrival } from '../interactive/useHandArrival'
 import styles from './ComboStory.module.css'
 
@@ -112,12 +113,11 @@ export default function ComboStory() {
     }),
   )
   const [flyPair, setFlyPair] = useState<{ main: CardData; aux: CardData } | null>(null)
-  // hand → centre (single). It carries where it mounts: a flyer is position:fixed,
-  // so without coordinates its first painted frame lands at its flow position
-  const [entering, setEntering] = useState<{ card: CardData; at: Rect } | null>(null)
+  // hand → centre (a single card). The merge STAGE below is a different thing: it
+  // is mounted for the whole scene and the pair choreography animates inside it.
+  const { overlay: flyerOverlay, raise, drop } = useFlyer()
   const [log, setLog] = useState<string | null>(null)
 
-  const enterRef = useRef<HTMLDivElement>(null)
   // read from handlers that run after an await / from a captured closure (I8)
   const phaseRef = useRef(phase)
   phaseRef.current = phase
@@ -252,24 +252,22 @@ export default function ComboStory() {
   // GESTURE — pulling a combo source out of the fan puts it on the table and opens
   // the assembly. Anything else is not a combo start: the drop is rejected and the
   // Hand glides the card back.
-  const handPlay = (uid: string, drop: HandPlayDrop): boolean => {
+  const handPlay = (uid: string, dropped: HandPlayDrop): boolean => {
     if (playing || staged.length > 0) return false
     const item = hand.find((it) => it.uid === uid)
-    const rect = drop.rect
+    const rect = dropped.rect
     if (!item || !rect || !isComboSource(item.card)) return false
     setHand((h) => h.filter((it) => it.uid !== uid))
     setStaged([item])
     setPhase('partner')
     void (async () => {
       const cRect = centerRef.current?.getBoundingClientRect()
-      setEntering({ card: item.card, at: rect })
-      await nextFrames() // I2 — let it paint at `at` before it starts moving
-      const el = enterRef.current
+      const [el] = await raise([{ key: 'enter', card: item.card, at: rect }])
       if (el && cRect) {
         const anim = play('playToCenter', el, { from: rect, to: cRect })
         if (anim) await anim.finished
       }
-      setEntering(null)
+      drop('enter')
       aimFromCentre()
     })()
     return true
@@ -352,7 +350,7 @@ export default function ComboStory() {
     setPlaying(false)
     setReleased({})
     setDiscardPile([])
-    setEntering(null)
+    drop() // every card still in the air comes down
     resetReturn()
     hideFlyer()
     setLog(null)
@@ -424,7 +422,8 @@ export default function ComboStory() {
 
       {/* the staging area — the source stands here until its partner joins it */}
       <div className={styles.centerSlot} ref={centerRef}>
-        {source && !merged && !entering && (
+        {/* …unless it is still flying in: the carrier is holding it */}
+        {source && !merged && flyerOverlay.length === 0 && (
           <Card card={source.card} interactive={false} width="100%" />
         )}
       </div>
@@ -476,15 +475,7 @@ export default function ComboStory() {
       {aiming && <Arrow from={from} to={to} color={color} />}
 
       {/* the source on its way from the fan to the centre */}
-      {entering && (
-        <div
-          className={styles.entering}
-          ref={enterRef}
-          style={{ left: entering.at.left, top: entering.at.top, inlineSize: entering.at.width }}
-        >
-          <Card card={entering.card} interactive={false} width="100%" />
-        </div>
-      )}
+      {flyerOverlay}
 
       {returnOverlay}
 

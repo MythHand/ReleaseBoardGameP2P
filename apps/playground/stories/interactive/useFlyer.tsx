@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { nextFrames, type Rect } from '@/animations'
+import { useCallback, useRef, useState } from 'react'
+import { nextFrames, type Rect, wait } from '@/animations'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
 import styles from './useFlyer.module.css'
@@ -49,42 +49,69 @@ export function useFlyer() {
   const els = useRef<Record<string, HTMLDivElement | null>>({})
   const seq = useRef(0)
 
-  const elOf = (key: string) => els.current[key] ?? null
+  // every one of these is stable: they touch refs and state setters only. A scene
+  // may depend on them from a useCallback without re-creating it on every render.
+  const elOf = useCallback((key: string) => els.current[key] ?? null, [])
 
   // put N cards in the air at their own rects and let them paint there before
   // anything moves. Returns their elements, in the order they were given.
-  const raise = async (items: Raise[]): Promise<(HTMLDivElement | null)[]> => {
-    if (items.length === 0) return []
-    setHeld((h) => [...h, ...items.map((it) => ({ ...it, seq: ++seq.current }))])
-    await nextFrames() // I2 — painted at `at`, and mounted, before the caller measures
-    return items.map((it) => {
-      const el = elOf(it.key)
-      if (el) for (const a of el.getAnimations()) a.cancel() // I3
-      return el
-    })
-  }
+  const raise = useCallback(
+    async (items: Raise[]): Promise<(HTMLDivElement | null)[]> => {
+      if (items.length === 0) return []
+      setHeld((h) => [...h, ...items.map((it) => ({ ...it, seq: ++seq.current }))])
+      await nextFrames() // I2 — painted at `at`, and mounted, before the caller measures
+      return items.map((it) => {
+        const el = elOf(it.key)
+        if (el) for (const a of el.getAnimations()) a.cancel() // I3
+        return el
+      })
+    },
+    [elOf],
+  )
 
   // I4 — the card has landed: it now IS at `rect`. Written to the DOM at once (no
   // frame at the old transform) AND to the state, or the next render would put it
   // back at the rect it was raised from.
-  const pin = (key: string, rect: Rect) => {
-    const el = elOf(key)
-    if (el) {
-      for (const a of el.getAnimations()) a.cancel()
-      el.style.left = `${rect.left}px`
-      el.style.top = `${rect.top}px`
-      el.style.width = `${rect.width}px`
-      el.style.transform = ''
-    }
-    setHeld((h) => h.map((it) => (it.key === key ? { ...it, at: rect } : it)))
-  }
+  const pin = useCallback(
+    (key: string, rect: Rect) => {
+      const el = elOf(key)
+      if (el) {
+        for (const a of el.getAnimations()) a.cancel()
+        el.style.left = `${rect.left}px`
+        el.style.top = `${rect.top}px`
+        el.style.width = `${rect.width}px`
+        el.style.transform = ''
+      }
+      setHeld((h) => h.map((it) => (it.key === key ? { ...it, at: rect } : it)))
+    },
+    [elOf],
+  )
+
+  // move a card that is already in the air to another rect, over `ms`. Where a
+  // flyer IS is state here, so a scene cannot just set left/top on the node — the
+  // next render would put it back. The transition goes on the element, the value
+  // into the state, and the render does the move.
+  const glide = useCallback(
+    async (key: string, rect: Rect, ms: number) => {
+      const el = elOf(key)
+      const props = ['left', 'top', 'inline-size'].map((p) => `${p} ${ms}ms var(--ease-soft)`)
+      if (el) el.style.transition = props.join(', ')
+      setHeld((h) => h.map((it) => (it.key === key ? { ...it, at: rect } : it)))
+      await wait(ms)
+      if (el) el.style.transition = ''
+    },
+    [elOf],
+  )
 
   // change what the card shows without touching where it is — the flip in place
-  const patch = (key: string, next: Partial<Pick<Raise, 'card' | 'faceDown'>>) =>
-    setHeld((h) => h.map((it) => (it.key === key ? { ...it, ...next } : it)))
+  const patch = useCallback(
+    (key: string, next: Partial<Pick<Raise, 'card' | 'faceDown'>>) =>
+      setHeld((h) => h.map((it) => (it.key === key ? { ...it, ...next } : it))),
+    [],
+  )
 
   // take one down, or all of them
-  const drop = (key?: string) => {
+  const drop = useCallback((key?: string) => {
     if (key == null) {
       els.current = {}
       setHeld([])
@@ -92,7 +119,7 @@ export function useFlyer() {
     }
     delete els.current[key]
     setHeld((h) => h.filter((it) => it.key !== key))
-  }
+  }, [])
 
   const overlay = held.map((h) => (
     <div
@@ -113,5 +140,5 @@ export function useFlyer() {
     </div>
   ))
 
-  return { overlay, raise, pin, patch, drop, elOf }
+  return { overlay, raise, pin, glide, patch, drop, elOf }
 }

@@ -195,9 +195,5 @@
   pointer-events: none;
 }
 
-/* the flying draw card — positioned/animated imperatively (presets) */
-.flyer {
-  position: fixed;
-  z-index: var(--z-flight);
-  pointer-events: none;
-}
+/* the cards in the air belong to the shared carrier (useFlyer) — the scene has no
+   flyer rule of its own any more */

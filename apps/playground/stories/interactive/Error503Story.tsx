@@ -2,7 +2,7 @@ import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import type React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { nextFrames, play, wait } from '@/animations'
+import { play, wait } from '@/animations'
 import { CARDS, CATEGORIES, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Badge from '@/primitives/Badge'
@@ -19,6 +19,7 @@ import { pick, useLang } from '../../Playground/lang'
 import styles from './Error503Story.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
+import { useFlyer } from './useFlyer'
 
 // Error 503 — the player-turn story. From TurnDock 'draw' (no timer wired): the
 // player draws, Error 503 comes out of the deck to the centre and reveals to
@@ -91,15 +92,6 @@ interface DragState {
   originCy: number
   startW: number // source on-screen width (eases to CARD_W)
 }
-interface Flyer {
-  card: CardType
-  faceDown: boolean
-  seq: number
-}
-interface OutEntry {
-  key: string
-  card: CardType
-}
 // a card at rest in the discard heap — carries its own scatter (tilt + offset)
 interface DiscardEntry {
   card: CardType
@@ -138,8 +130,6 @@ export default function Error503Story() {
   const [handItems, setHandItems] = useState<HandItem[]>(() => buildHand(true))
   const [rel, setRel] = useState<Rel>(() => buildRel(false, false, false))
   const [centerCard, setCenterCard] = useState<CardType | null>(null)
-  const [flyer, setFlyer] = useState<Flyer | null>(null)
-  const [outs, setOuts] = useState<OutEntry[]>([])
   const [discard, setDiscard] = useState<DiscardEntry[]>([])
   const [drag, setDrag] = useState<DragState | null>(null)
   const [alert, setAlert] = useState(false) // red edge glow
@@ -156,13 +146,14 @@ export default function Error503Story() {
   const { send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
     setDiscard((d) => [...d, ...cards]),
   )
-  const flyerRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<HTMLDivElement>(null)
   const handWrapRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const relSlotRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const outRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const seqRef = useRef(0)
+  // every card this scene puts in the air: the drawn 503 ('draw') and the cards
+  // swept to the discard ('o0', 'o1', …). The dragged defence is NOT one of them —
+  // it follows the cursor rather than flying, and stays the scene's own.
+  const { overlay: flyerOverlay, raise, pin, glide, patch, drop, elOf } = useFlyer()
   const gifStart = useRef(0)
   const gifResolve = useRef<(() => void) | null>(null)
 
@@ -225,8 +216,7 @@ export default function Error503Story() {
     setHandItems(buildHand(a))
     setRel(buildRel(b, c, d))
     setCenterCard(null)
-    setFlyer(null)
-    setOuts([])
+    drop() // every card still in the air comes down
     setDiscard([])
     setDrag(null)
     setAlert(false)
@@ -253,60 +243,22 @@ export default function Error503Story() {
     const centerRect = centerRef.current?.getBoundingClientRect()
     const discardRect = discardRef.current?.getBoundingClientRect()
     if (!discardRect || items.length === 0) return
-    setOuts(items.map((it, i) => ({ key: `o${i}`, card: it.card })))
-    await nextFrames()
-    const place = (i: number, r: DOMRect | { left: number; top: number; width: number }) => {
-      const el = outRefs.current[`o${i}`]
-      if (!el) return
-      el.style.transition = 'none'
-      el.style.left = `${r.left}px`
-      el.style.top = `${r.top}px`
-      el.style.width = `${r.width}px`
-    }
-    items.forEach((it, i) => {
-      place(i, it.fromRect)
-    })
-
-    let starts: { left: number; top: number; width: number; height: number }[] = items.map(
-      (it) => it.fromRect,
-    )
+    // the cards become flyers exactly where they stand
+    await raise(items.map((it, i) => ({ key: `o${i}`, card: it.card, at: it.fromRect })))
     if (gather && centerRect) {
-      await nextFrames()
-      items.forEach((_, i) => {
-        const el = outRefs.current[`o${i}`]
-        if (!el) return
-        el.style.transition =
-          'left 300ms var(--ease-soft), top 300ms var(--ease-soft), width 300ms var(--ease-soft)'
-        el.style.left = `${centerRect.left}px`
-        el.style.top = `${centerRect.top}px`
-        el.style.width = `${centerRect.width}px`
-      })
-      await wait(560) // glide in (300) + a beat at the centre
-      starts = items.map(() => centerRect)
+      await Promise.all(items.map((_, i) => glide(`o${i}`, centerRect, 300)))
+      await wait(260) // a beat at the centre before they scatter
     }
-
-    await nextFrames()
-    // each card is put where it stands, then the shared step flies them all out
-    // at once and commits them to the heap
-    items.forEach((_, i) => {
-      const el = outRefs.current[`o${i}`]
-      const from = starts[i]
-      if (!el) return
-      el.style.transition = 'none'
-      el.style.left = `${from.left}px`
-      el.style.top = `${from.top}px`
-      el.style.width = `${from.width}px`
-      void el.offsetWidth // flush before the WAAPI flight
-    })
+    // the shared step flies them all out at once and commits them to the heap
     await sendToDiscard(
       items.map((it, i) => ({
         key: `o${i}`,
         card: it.card,
-        node: outRefs.current[`o${i}`],
+        node: elOf(`o${i}`),
         layer: i,
       })),
     )
-    setOuts([])
+    drop()
   }
 
   // ===== the draw =====
@@ -315,27 +267,21 @@ export default function Error503Story() {
     setBusy(true)
     const deckRect = deckRef.current?.getBoundingClientRect()
     const centerRect = centerRef.current?.getBoundingClientRect()
-    setFlyer({ card: ERROR503_CARD, faceDown: true, seq: ++seqRef.current })
-    await nextFrames()
-    const el = flyerRef.current
-    if (el && deckRect && centerRect) {
+    if (deckRect && centerRect) {
       const from = cardAreaOf(deckRect)
-      el.style.left = `${from.left}px`
-      el.style.top = `${from.top}px`
-      el.style.width = `${from.width}px`
-      const anim = play('drawToCenter', el, { from, to: centerRect })
-      if (anim) await anim.finished
-      for (const a of el.getAnimations()) a.cancel()
-      el.style.left = `${centerRect.left}px`
-      el.style.top = `${centerRect.top}px`
-      el.style.width = `${centerRect.width}px`
+      const [el] = await raise([{ key: 'draw', card: ERROR503_CARD, at: from, faceDown: true }])
+      if (el) {
+        const anim = play('drawToCenter', el, { from, to: centerRect })
+        if (anim) await anim.finished
+        pin('draw', centerRect) // I4 — it stands at the centre, the flip plays in place
+      }
     }
     await wait(180)
-    setFlyer((f) => (f ? { ...f, faceDown: false } : f)) // flip face up for everyone
+    patch('draw', { faceDown: false }) // flip face up for everyone
     await wait(560)
     // drawn from the deck → lands straight at the centre (no tilt)
     setCenterCard(ERROR503_CARD)
-    setFlyer(null)
+    drop('draw')
 
     // Monitoring auto-neutralizes: a brief reveal at the centre, then to discard,
     // no glow. Monitoring stays in the zone.
@@ -386,19 +332,19 @@ export default function Error503Story() {
   // the hand is on the canonical Hand: dragging the Debugger onto the 503 plays
   // it. onPlay is accepted only for the Debugger dropped on the 503; anything
   // else is rejected and the Hand glides the card back.
-  function handPlay(uid: string, drop: HandPlayDrop): boolean {
+  function handPlay(uid: string, dropped: HandPlayDrop): boolean {
     if (!pending || busy) return false
     const item = handItems.find((x) => x.uid === uid)
     if (!item || item.card.id !== DEBUGGER) return false
     const c = centerRef.current?.getBoundingClientRect()
     if (!c) return false
     const hit =
-      drop.x >= c.left - DROP_PAD &&
-      drop.x <= c.right + DROP_PAD &&
-      drop.y >= c.top - DROP_PAD &&
-      drop.y <= c.bottom + DROP_PAD
+      dropped.x >= c.left - DROP_PAD &&
+      dropped.x <= c.right + DROP_PAD &&
+      dropped.y >= c.top - DROP_PAD &&
+      dropped.y <= c.bottom + DROP_PAD
     if (!hit) return false
-    void neutralizeWithDebugger(uid, item.card, drop.rect ?? c)
+    void neutralizeWithDebugger(uid, item.card, dropped.rect ?? c)
     return true
   }
   // Debugger played onto the 503 → both go to the discard
@@ -717,25 +663,8 @@ export default function Error503Story() {
         </div>
       </div>
 
-      {/* the flying draw card — keyed by seq so each flight is a fresh Card */}
-      {flyer && (
-        <div key={flyer.seq} className={styles.flyer} ref={flyerRef}>
-          <Card card={flyer.card} faceDown={flyer.faceDown} interactive={false} width="100%" />
-        </div>
-      )}
-
-      {/* cards leaving to the discard */}
-      {outs.map((o) => (
-        <div
-          key={o.key}
-          className={styles.flyer}
-          ref={(el) => {
-            outRefs.current[o.key] = el
-          }}
-        >
-          <Card card={o.card} interactive={false} width="100%" />
-        </div>
-      ))}
+      {/* every card this scene has in the air — the shared carrier */}
+      {flyerOverlay}
 
       {/* the card being dragged as a defence */}
       {drag && (

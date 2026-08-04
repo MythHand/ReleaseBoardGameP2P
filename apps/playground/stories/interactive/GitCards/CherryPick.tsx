@@ -30,7 +30,8 @@ const HAND_POOL = BASE.filter((c) => !isTrigger(c))
 const INITIAL_HAND = 5
 const DECK_START = 24
 const GRID_W = 150 // discard card width in the selection grid (large, readable)
-const PILE_W = 132
+const DECK_W = 150 // draw-deck pile width — the Table screen's value
+const PILE_W = 116 // discard pile width — the Table screen's value
 const SIZES = [8, 54] as const // technical toggle: no-scroll vs scroll case
 
 // timings
@@ -413,7 +414,7 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
       {/* draw deck (left) — the sudo target */}
       <div className={styles.deckPile}>
         <div ref={deckRef}>
-          <Pile deck="base" count={deckCount} width={PILE_W} countPos="tl" />
+          <Pile deck="base" count={deckCount} width={DECK_W} countPos="tl" />
         </div>
         <span className={styles.pileLabel}>{pick(lang, { ru: 'колода', en: 'deck' })}</span>
       </div>

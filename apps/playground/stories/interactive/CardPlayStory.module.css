@@ -112,9 +112,4 @@
   inset-inline: 196px 56px;
 }
 
-/* летящая карта — позиционируется и анимируется императивно (пресеты move) */
-.flyer {
-  position: fixed;
-  z-index: var(--z-flight);
-  pointer-events: none;
-}
+/* the cards in the air belong to the shared carrier (useFlyer) */

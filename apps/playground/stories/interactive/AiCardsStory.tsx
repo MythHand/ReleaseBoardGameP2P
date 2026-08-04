@@ -18,6 +18,7 @@ import HoverSelect from '../controls/HoverSelect'
 import styles from './AiCardsStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
+import { useFlyer } from './useFlyer'
 import { useHandArrival } from './useHandArrival'
 
 type Loc = Record<Lang, string>
@@ -101,20 +102,9 @@ const buildDiscard = (n: number): DiscardEntry[] => {
   return out
 }
 
-interface Flyer {
-  card: CardType
-  faceDown: boolean
-  seq: number // flight id — a new flight = a fresh Card key (no mid-flight flip)
-}
 // a card at rest in the discard — carries its own scatter (tilt + offset)
 interface DiscardEntry extends Scatter {
   card: CardType
-}
-// the cards leaving on resolution (trigger → discard, effect → AI deck, …)
-interface Out {
-  key: string
-  card: CardType
-  faceDown: boolean
 }
 
 export default function AiCardsStory() {
@@ -126,10 +116,8 @@ export default function AiCardsStory() {
   const [vibeComp, setVibeComp] = useState<VibeComp>('2plain')
   const [release, setRelease] = useState<ReleaseSlots>(() => buildRelease(false))
   const [hand, setHand] = useState<HandItem[]>(makeHand)
-  const [flyer, setFlyer] = useState<Flyer | null>(null)
   const [trigger, setTrigger] = useState<CardType | null>(null) // AI trigger at the cause slot
   const [aiCard, setAiCard] = useState<CardType | null>(null) // the AI effect at the centre
-  const [outs, setOuts] = useState<Out[]>([])
   const [discard, setDiscard] = useState<DiscardEntry[]>(() => buildDiscard(0))
   const [alert, setAlert] = useState(false) // red edge glow (Error 503)
   const [busy, setBusy] = useState(false)
@@ -148,11 +136,11 @@ export default function AiCardsStory() {
   const { send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
     setDiscard((d) => [...d, ...cards]),
   )
-  const flyerRef = useRef<HTMLDivElement>(null)
-  const outRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  // every card this scene puts in the air: the pull from a deck ('draw'), the
+  // cards leaving on resolution ('trig' / 'eff' / 'crushed') and the Inside row
+  const { overlay: flyerOverlay, raise, pin, patch, drop, elOf } = useFlyer()
   const releaseSlotRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const handRef = useRef<HTMLDivElement>(null)
-  const flightSeq = useRef(0)
   const uidSeq = useRef(0)
   const turnInterrupted = useRef(false) // Hallucination stops Good Vibe's 2nd draw
   const halted = useRef(false) // Error 503 halts the scene (reset to continue)
@@ -200,42 +188,25 @@ export default function AiCardsStory() {
   ) => {
     const fromCell = fromRef.current?.getBoundingClientRect()
     const toRect = toRef.current?.getBoundingClientRect()
-    setFlyer({ card, faceDown: true, seq: ++flightSeq.current })
-    await nextFrames()
-    const el = flyerRef.current
-    if (el && fromCell && toRect) {
-      const from = cardAreaOf(fromCell)
-      el.style.left = `${from.left}px`
-      el.style.top = `${from.top}px`
-      el.style.width = `${from.width}px`
+    if (!fromCell || !toRect) return
+    const from = cardAreaOf(fromCell)
+    const [el] = await raise([{ key: 'draw', card, at: from, faceDown: true }])
+    if (el) {
       const anim = play('drawToCenter', el, { from, to: toRect })
       if (anim) await anim.finished
-      // pin the flyer in the slot (identity) so the reveal flip plays in place
-      for (const a of el.getAnimations()) a.cancel()
-      el.style.left = `${toRect.left}px`
-      el.style.top = `${toRect.top}px`
-      el.style.width = `${toRect.width}px`
+      pin('draw', toRect) // I4 — it stands in the slot, so the flip plays in place
     }
     await wait(160)
-    setFlyer((f) => (f ? { ...f, faceDown: false } : f))
+    patch('draw', { faceDown: false })
     await wait(FLIP_MS + 140)
-  }
-
-  // position an out-flyer element on the rect it starts its flight from
-  const placeOut = (key: string, rect?: DOMRect) => {
-    const el = outRefs.current[key]
-    if (!el || !rect) return
-    el.style.left = `${rect.left}px`
-    el.style.top = `${rect.top}px`
-    el.style.width = `${rect.width}px`
   }
 
   // the AI event card returns to the AI (events) deck: flips back-up in place
   // first (like cards entering play), then shrinks back to the deck (returnToDeck)
   const returnAiToDeck = async (fromRect?: DOMRect, deckRect?: DOMRect) => {
-    setOuts((os) => os.map((o) => (o.key === 'eff' ? { ...o, faceDown: true } : o)))
+    patch('eff', { faceDown: true })
     await wait(FLIP_MS)
-    const el = outRefs.current.eff
+    const el = elOf('eff')
     if (!el || !fromRect || !deckRect) return
     const anim = play('returnToDeck', el, { from: fromRect, to: cardAreaOf(deckRect) })
     if (anim) await anim.finished
@@ -248,7 +219,7 @@ export default function AiCardsStory() {
     fromRect?: DOMRect,
     slotRect?: DOMRect,
   ) => {
-    const el = outRefs.current.eff
+    const el = elOf('eff')
     if (el && fromRect && slotRect) {
       const anim = play('playToReleaseZone', el, { from: fromRect, to: slotRect })
       if (anim) await anim.finished
@@ -259,9 +230,9 @@ export default function AiCardsStory() {
   // a crushed release leaves the zone: an AI release returns to the AI deck (flips
   // back-up first), an ordinary (base) release goes to the common discard
   const destroyRelease = async (card: CardType, fromRect?: DOMRect) => {
-    const el = outRefs.current.crushed
+    const el = elOf('crushed')
     if (card.deck === 'ai') {
-      setOuts((os) => os.map((o) => (o.key === 'crushed' ? { ...o, faceDown: true } : o)))
+      patch('crushed', { faceDown: true })
       await wait(FLIP_MS)
       const deckRect = aiDeckRef.current?.getBoundingClientRect()
       if (el && fromRect && deckRect) {
@@ -275,7 +246,7 @@ export default function AiCardsStory() {
 
   // the AI trigger leaves to the common discard, landing scattered
   const triggerToDiscard = async (card: CardType, j: Scatter) => {
-    await sendToDiscard([{ key: 'trigger', card, node: outRefs.current.trig, scatter: j }])
+    await sendToDiscard([{ key: 'trigger', card, node: elOf('trig'), scatter: j }])
   }
 
   const confirmInside = () => {
@@ -299,26 +270,22 @@ export default function AiCardsStory() {
 
     const discardRect = discardRef.current?.getBoundingClientRect()
     const targets = cands.map((_, i) => pickRefs.current[i]?.getBoundingClientRect())
-    setOuts(cands.map((e, i) => ({ key: `pick${i}`, card: e.card, faceDown: false })))
-    await nextFrames()
-    await Promise.all(
-      cands.map(async (_, i) => {
-        const el = outRefs.current[`pick${i}`]
-        const to = targets[i]
-        if (!el || !discardRect || !to) return
-        const from = cardAreaOf(discardRect)
-        el.style.left = `${from.left}px`
-        el.style.top = `${from.top}px`
-        el.style.width = `${from.width}px`
-        const anim = play('drawToCenter', el, { from, to }) // scales up to the row size
-        if (anim) await anim.finished
-        el.style.left = `${to.left}px`
-        el.style.top = `${to.top}px`
-        el.style.width = `${to.width}px`
-      }),
-    )
+    const fromHeap = discardRect ? cardAreaOf(discardRect) : undefined
+    if (fromHeap) {
+      await raise(cands.map((e, i) => ({ key: `pick${i}`, card: e.card, at: fromHeap })))
+      await Promise.all(
+        cands.map(async (_, i) => {
+          const el = elOf(`pick${i}`)
+          const to = targets[i]
+          if (!el || !to) return
+          const anim = play('drawToCenter', el, { from: fromHeap, to }) // up to row size
+          if (anim) await anim.finished
+          pin(`pick${i}`, to)
+        }),
+      )
+    }
     setInsideRevealed(true) // reveal the interactive row (flyers hand off to it)
-    setOuts([])
+    drop()
 
     // wait for the player's confirmed pick
     const chosen = await new Promise<DiscardEntry>((res) => {
@@ -342,28 +309,24 @@ export default function AiCardsStory() {
     }
     // the rest fly back into the discard heap (re-added with their own scatter)
     if (others.length > 0) {
-      setOuts(others.map((e, i) => ({ key: `back${i}`, card: e.card, faceDown: false })))
-      await nextFrames()
       // each goes back to the scatter it already had in the heap — it was taken
       // OUT of that spot, so it must return to exactly it
-      others.forEach((_, i) => {
-        const el = outRefs.current[`back${i}`]
-        const from = otherRects[i]
-        if (!el || !from) return
-        el.style.left = `${from.left}px`
-        el.style.top = `${from.top}px`
-        el.style.width = `${from.width}px`
-      })
+      await raise(
+        others.flatMap((e, i) => {
+          const at = otherRects[i]
+          return at ? [{ key: `back${i}`, card: e.card, at }] : []
+        }),
+      )
       await sendToDiscard(
         others.map((e, i) => ({
           key: `back${i}`,
           card: e.card,
-          node: outRefs.current[`back${i}`],
+          node: elOf(`back${i}`),
           scatter: e,
           layer: i,
         })),
       )
-      setOuts([])
+      drop()
     }
   }
 
@@ -376,26 +339,19 @@ export default function AiCardsStory() {
     setDiscard((d) => d.filter((e) => e !== entry))
 
     // 1) discard → centre, face up (shown to all players)
-    setOuts([{ key: 'inside', card, faceDown: false }])
-    await nextFrames()
-    const el = outRefs.current.inside
-    if (el && discardRect && centerRect) {
-      const from = cardAreaOf(discardRect)
-      el.style.left = `${from.left}px`
-      el.style.top = `${from.top}px`
-      el.style.width = `${from.width}px`
+    if (!discardRect || !centerRect) return
+    const from = cardAreaOf(discardRect)
+    const [el] = await raise([{ key: 'inside', card, at: from }])
+    if (el) {
       const anim = play('drawToCenter', el, { from, to: centerRect })
       if (anim) await anim.finished
-      for (const a of el.getAnimations()) a.cancel()
-      el.style.left = `${centerRect.left}px`
-      el.style.top = `${centerRect.top}px`
-      el.style.width = `${centerRect.width}px`
+      pin('inside', centerRect) // I4 — it stands at the centre for the hold
     }
     await wait(SHOW_HOLD)
 
     // 2) centre → hand
     const startRect = el?.getBoundingClientRect()
-    setOuts([])
+    drop('inside')
     if (startRect) {
       void arrive([{ key: `ins${++uidSeq.current}`, card, from: startRect }], hand.length)
     }
@@ -404,29 +360,16 @@ export default function AiCardsStory() {
   // Bad Vibe: the chosen hand card is shown at the centre, then discarded
   const discardFromHand = async (card: CardType, fromRect?: DOMRect) => {
     const centerRect = effectRef.current?.getBoundingClientRect()
-    setOuts([{ key: 'fromhand', card, faceDown: false }])
-    await nextFrames()
-    const el = outRefs.current.fromhand
-    if (el && fromRect && centerRect) {
-      const from = {
-        left: fromRect.left,
-        top: fromRect.top,
-        width: fromRect.width,
-        height: fromRect.height,
-      }
-      el.style.left = `${from.left}px`
-      el.style.top = `${from.top}px`
-      el.style.width = `${from.width}px`
-      const anim = play('drawToCenter', el, { from, to: centerRect })
+    if (!fromRect || !centerRect) return
+    const [el] = await raise([{ key: 'fromhand', card, at: fromRect }])
+    if (el) {
+      const anim = play('drawToCenter', el, { from: fromRect, to: centerRect })
       if (anim) await anim.finished
-      for (const a of el.getAnimations()) a.cancel()
-      el.style.left = `${centerRect.left}px`
-      el.style.top = `${centerRect.top}px`
-      el.style.width = `${centerRect.width}px`
+      pin('fromhand', centerRect) // I4 — shown at the centre before it leaves
     }
     await wait(SHOW_HOLD)
     await sendToDiscard([{ key: 'shown', card, node: el }])
-    setOuts([])
+    drop('fromhand')
   }
 
   // Error 503 — raise the red glow and halt (reset the screen to continue)
@@ -458,19 +401,16 @@ export default function AiCardsStory() {
     // Inside pulls a Release from the discard (captured now, before the trigger lands)
     const insideReleases = ai.id === INSIDE ? discard.filter((e) => isRelease(e.card)) : []
 
-    const outList: Out[] = [
-      { key: 'trig', card: trig, faceDown: false },
-      { key: 'eff', card: ai, faceDown: false },
-    ]
-    if (crushed) outList.push({ key: 'crushed', card: crushed, faceDown: false })
-    setOuts(outList)
+    // the cards standing on the table become flyers exactly where they stand
+    const raised = raise([
+      ...(causeRect ? [{ key: 'trig', card: trig, at: causeRect }] : []),
+      ...(effectRect ? [{ key: 'eff', card: ai, at: effectRect }] : []),
+      ...(crushed && crushRect ? [{ key: 'crushed', card: crushed, at: crushRect }] : []),
+    ])
     setTrigger(null)
     setAiCard(null)
     if (crushed && crushKey) setRelease((r) => ({ ...r, [crushKey]: undefined }))
-    await nextFrames()
-    placeOut('trig', causeRect)
-    placeOut('eff', effectRect)
-    if (crushed) placeOut('crushed', crushRect)
+    await raised
 
     await Promise.all([
       triggerToDiscard(trig, jitter()),
@@ -479,7 +419,7 @@ export default function AiCardsStory() {
         : returnAiToDeck(effectRect, aiDeckRect),
       ...(crushed ? [destroyRelease(crushed, crushRect)] : []),
     ])
-    setOuts([])
+    drop()
 
     // Inside takes a release after the centre has cleared: a single one is taken
     // straight through the centre; several are offered for an open choice first
@@ -504,18 +444,18 @@ export default function AiCardsStory() {
     if (!trig) return
     await pullTo(trig, baseDeckRef, causeRef)
     setTrigger(trig)
-    setFlyer(null)
+    drop('draw')
     await pullTo(event, aiDeckRef, effectRef)
     setAiCard(event)
-    setFlyer(null)
+    drop('draw')
     await resolveEvent(trig, event)
   }
 
   // a plain base card drawn to the hand (deck → centre → flip → into the hand)
   const drawToHand = async (card: CardType, handLen: number) => {
     await pullTo(card, baseDeckRef, effectRef)
-    const r = flyerRef.current?.getBoundingClientRect()
-    setFlyer(null)
+    const r = elOf('draw')?.getBoundingClientRect()
+    drop('draw')
     if (r) void arrive([{ key: `ins${++uidSeq.current}`, card, from: r }], handLen)
     await wait(FLIGHT_MS + 140)
   }
@@ -524,7 +464,7 @@ export default function AiCardsStory() {
   const draw503ToHalt = async (card: CardType) => {
     await pullTo(card, baseDeckRef, effectRef)
     setAiCard(card)
-    setFlyer(null)
+    drop('draw')
     await raise503()
   }
 
@@ -575,9 +515,9 @@ export default function AiCardsStory() {
   }
 
   // dragged out of the hand while Bad Vibe waits — accept it as the discard
-  const onHandDrop = (uid: string, drop: HandPlayDrop): boolean => {
+  const onHandDrop = (uid: string, dropped: HandPlayDrop): boolean => {
     if (!handPickMode) return false
-    handPickRect.current = drop.rect ?? null
+    handPickRect.current = dropped.rect ?? null
     const res = handPickResolver.current
     handPickResolver.current = null
     setHandPickMode(false)
@@ -606,11 +546,11 @@ export default function AiCardsStory() {
 
     await pullTo(trig, baseDeckRef, causeRef)
     setTrigger(trig)
-    setFlyer(null)
+    drop('draw')
 
     await pullTo(ai, aiDeckRef, effectRef)
     setAiCard(ai)
-    setFlyer(null)
+    drop('draw')
 
     await dispatch(trig, ai)
 
@@ -620,10 +560,9 @@ export default function AiCardsStory() {
   const reset = () => {
     setHand(makeHand())
     setRelease(buildRelease(monitoring))
-    setFlyer(null)
+    drop() // every card still in the air comes down
     setTrigger(null)
     setAiCard(null)
-    setOuts([])
     setDiscard(buildDiscard(discardCount))
     setAlert(false)
     setInsideCandidates(null)
@@ -811,25 +750,8 @@ export default function AiCardsStory() {
         </div>
       </div>
 
-      {/* the flying draw card — keyed by seq: a new flight = a fresh Card (no flip) */}
-      {flyer && (
-        <div key={flyer.seq} className={styles.flyer} ref={flyerRef}>
-          <Card card={flyer.card} faceDown={flyer.faceDown} interactive={false} width="100%" />
-        </div>
-      )}
-
-      {/* cards leaving on resolution */}
-      {outs.map((o) => (
-        <div
-          key={o.key}
-          className={styles.flyer}
-          ref={(el) => {
-            outRefs.current[o.key] = el
-          }}
-        >
-          <Card card={o.card} faceDown={o.faceDown} interactive={false} width="100%" />
-        </div>
-      ))}
+      {/* every card this scene has in the air — the shared carrier */}
+      {flyerOverlay}
 
       {/* the "settle into hand" overlay (Inside / Good Vibe draws) */}
       {overlay}

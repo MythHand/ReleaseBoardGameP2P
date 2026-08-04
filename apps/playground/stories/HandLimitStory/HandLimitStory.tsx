@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { nextFrames, play, type Scatter, wait } from '@/animations'
+import { play, type Scatter, wait } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
@@ -11,6 +11,7 @@ import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import { reorderHand } from '../interactive/reorderHand'
 import { useDiscardExit } from '../interactive/useDiscardExit'
+import { useFlyer } from '../interactive/useFlyer'
 import styles from './HandLimitStory.module.css'
 
 // Hand limit — discarding down to the end-of-turn hand limit (the `handLimit`
@@ -56,15 +57,6 @@ const GRID_CARD_W = [150, 132, 116]
 interface DiscardEntry extends Scatter {
   card: CardType
 }
-// a card in transit hand → its grid cell. Several run at once: discarding is
-// "think, then dump fast", so a flight must never gate the next drag.
-interface Flight {
-  card: CardType
-  id: number // flight id — also the React key, so every flight is a fresh Card (I5)
-  // where it mounts: a flyer is position:fixed, so without coordinates its first
-  // painted frame lands at its flow position — a flash in the page corner
-  at?: DOMRect
-}
 // a card that has landed in the grid, in its own cell
 interface Placed {
   card: CardType
@@ -80,7 +72,6 @@ export default function HandLimitStory() {
   const [size, setSize] = useState(9)
   const [hand, setHand] = useState<HandItem[]>(() => makeHand(9))
   const [discard, setDiscard] = useState<DiscardEntry[]>([])
-  const [flights, setFlights] = useState<Flight[]>([])
   // the open grid at the centre: `cells` is its fixed size for this turn (0 = no
   // grid yet), `placed` are the cards that have already landed in it
   const [cells, setCells] = useState(0)
@@ -91,7 +82,9 @@ export default function HandLimitStory() {
     setDiscard((d) => [...d, ...cards]),
   )
   const cellRefs = useRef<(HTMLDivElement | null)[]>([])
-  const flightRefs = useRef<Record<number, HTMLDivElement | null>>({})
+  // the cards in transit — several are in the air at once, so each carries its own
+  // key. Discarding is "think, then dump fast": a flight must never gate the next drag.
+  const { overlay: flyerOverlay, raise, drop } = useFlyer()
   const flightSeq = useRef(0)
   const taken = useRef(0) // cells already claimed by a flight (in flight or landed)
   const landed = useRef(0) // cells actually filled — the last one flushes the grid
@@ -116,12 +109,11 @@ export default function HandLimitStory() {
     taken.current = 0
     landed.current = 0
     cellRefs.current = []
-    flightRefs.current = {}
+    drop()
     setSize(n)
     setLimit(nextLimit)
     setHand(makeHand(n))
     setDiscard([])
-    setFlights([])
     setPlaced([])
     setCells(0)
   }
@@ -154,19 +146,19 @@ export default function HandLimitStory() {
   const flyToCell = async (card: CardType, slot: number, fromRect?: DOMRect) => {
     const run = runId.current
     const id = ++flightSeq.current
-    setFlights((f) => [...f, { card, id, at: fromRect }])
-    await nextFrames() // I2 — and it also lets the grid cells mount before measuring
+    if (!fromRect) return
+    const key = `f${id}`
+    // raising also lets the grid cells mount before they are measured
+    const [el] = await raise([{ key, card, at: fromRect }])
     if (runId.current !== run) return
-    const el = flightRefs.current[id]
     const to = cellRefs.current[slot]?.getBoundingClientRect()
-    if (el && fromRect && to) {
+    if (el && to) {
       const anim = play('playToCenter', el, { from: fromRect, to })
       if (anim) await anim.finished
     }
     if (runId.current !== run) return
     // the real card takes over the cell as the flyer unmounts (same commit — no gap)
-    delete flightRefs.current[id]
-    setFlights((f) => f.filter((x) => x.id !== id))
+    drop(key)
     setPlaced((p) => [...p, { card, slot }])
     landed.current += 1
     if (landed.current === cellsRef.current) void flushGrid(run)
@@ -174,7 +166,7 @@ export default function HandLimitStory() {
 
   // pulled out of the fan → into the grid, but only while the hand is over the
   // limit; otherwise the drop is rejected and the Hand glides the card back
-  const onPlay = (uid: string, drop: HandPlayDrop): boolean => {
+  const onPlay = (uid: string, dropped: HandPlayDrop): boolean => {
     if (hand.length <= limit) return false
     const card = hand.find((it) => it.uid === uid)?.card
     if (!card) return false
@@ -185,7 +177,7 @@ export default function HandLimitStory() {
     }
     const slot = taken.current++
     setHand((h) => h.filter((it) => it.uid !== uid))
-    void flyToCell(card, slot, drop.rect)
+    void flyToCell(card, slot, dropped.rect)
     return true
   }
 
@@ -291,20 +283,8 @@ export default function HandLimitStory() {
         />
       </div>
 
-      {/* the cards on their way to a cell — several can be in the air at once;
-          keyed by flight id, so every flight mounts a fresh Card (I5) */}
-      {flights.map((f) => (
-        <div
-          key={f.id}
-          className={styles.flyer}
-          style={f.at ? { left: f.at.left, top: f.at.top, inlineSize: f.at.width } : undefined}
-          ref={(el) => {
-            flightRefs.current[f.id] = el
-          }}
-        >
-          <Card card={f.card} interactive={false} width="100%" />
-        </div>
-      ))}
+      {/* the cards on their way to a cell — several can be in the air at once */}
+      {flyerOverlay}
     </div>
   )
 }

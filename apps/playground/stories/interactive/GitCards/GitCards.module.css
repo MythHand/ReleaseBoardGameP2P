@@ -108,17 +108,25 @@
   border-color: var(--brand-green);
 }
 
-/* draw deck (left) and discard (right) — canonical Table placement */
+/* draw deck (left) and discard (right) — canonical Table placement. Centred by a
+   full-height column and NOT by a transform: a transform would make this a stacking
+   context and trap the pile's counter under the cards flying in. */
 .deckPile,
 .discardPile {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block: 0;
   z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 8px;
   align-items: center;
-  transform: translateY(-50%);
+  justify-content: center;
+  pointer-events: none;
+}
+
+.deckPile > *,
+.discardPile > * {
+  pointer-events: auto;
 }
 
 .deckPile {

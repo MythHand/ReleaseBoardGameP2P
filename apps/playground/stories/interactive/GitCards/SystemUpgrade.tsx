@@ -27,7 +27,7 @@ const OPP_COUNTS = [1, 2, 3, 4, 5] as const
 const OPP_NAMES = ['neo', 'trinity', 'morpheus', 'smith', 'oracle']
 const INITIAL_HAND = 5
 const CENTER_W = 150 // thrown card width at the centre (readable, like the cherry grid)
-const PILE_W = 132 // discard pile width
+const PILE_W = 116 // discard pile width — the Table screen's value
 const EMPTY_RELEASE: ReleaseSlots = { frontend: undefined, backend: undefined, database: undefined }
 
 // timings

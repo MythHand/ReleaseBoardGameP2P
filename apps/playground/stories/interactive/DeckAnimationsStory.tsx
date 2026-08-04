@@ -13,6 +13,7 @@ import { pick, useLang } from '../../Playground/lang'
 import styles from './DeckAnimationsStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
+import { useFlyer } from './useFlyer'
 import { useHandArrival } from './useHandArrival'
 
 // A scene of deck operations. Triggers — playing cards from the hand (the Hand fan):
@@ -103,15 +104,12 @@ export default function DeckAnimationsStory() {
   const [staged, setStaged] = useState<HandItem[]>([])
   const [hovered, setHovered] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
-  // both flyers carry where they mount (`at`): a flyer is position:fixed, so without
-  // coordinates its first painted frame lands at its flow position, not on the card
-  const [flyer, setFlyer] = useState<{ card: CardData; faceDown: boolean; at: Rect } | null>(null) // discard
-  const [playFlyer, setPlayFlyer] = useState<{ card: CardData; at: Rect } | null>(null) // hand → a stage slot
 
   const pileRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const discardRef = useRef<HTMLDivElement>(null)
-  const flyerRef = useRef<HTMLDivElement>(null)
-  const playFlyerRef = useRef<HTMLDivElement>(null)
+  // the two cards this scene puts in the air: the discard pile on its way to a deck
+  // ('pile') and the card played from the fan into a stage slot ('play')
+  const { overlay: flyerOverlay, raise, patch, drop, elOf } = useFlyer()
   const centerRef = useRef<HTMLDivElement>(null)
   const stageRefs = useRef<(HTMLDivElement | null)[]>([])
   const handWrapRef = useRef<HTMLDivElement>(null)
@@ -187,11 +185,11 @@ export default function DeckAnimationsStory() {
     await wait(STEP_HOLD)
     const fromRect = discardRef.current?.getBoundingClientRect()
     if (!fromRect) return undefined
-    setFlyer({ card: top, faceDown: false, at: fromRect })
+    const raised = raise([{ key: 'pile', card: top, at: fromRect }])
     setDiscard((d) => ({ ...d, cards: [] }))
-    await nextFrames() // I2 — let it paint at `at` before it starts moving
+    await raised
     return fromRect
-  }, [discard.cards])
+  }, [discard.cards, raise])
 
   // discard → to toRect face up → flip back-up (for "into the deck")
   const runDiscardFlight = useCallback(
@@ -208,19 +206,19 @@ export default function DeckAnimationsStory() {
         width: toRect.width,
         height: toRect.width * aspect,
       }
-      const anim = play('gatherToDeck', flyerRef.current, {
+      const anim = play('gatherToDeck', elOf('pile'), {
         from: fromRect,
         to: cardTo,
         duration: 560,
       })
       if (anim) await anim.finished
       await wait(STEP_HOLD)
-      setFlyer((f) => (f ? { ...f, faceDown: true } : f))
+      patch('pile', { faceDown: true })
       await wait(TURN_MS)
       await wait(STEP_HOLD)
-      setFlyer(null)
+      drop('pile')
     },
-    [gatherDiscardToFlyer],
+    [gatherDiscardToFlyer, elOf, patch, drop],
   )
 
   // flipping the discard into a NEW draw deck
@@ -260,7 +258,7 @@ export default function DeckAnimationsStory() {
     let discardFrom: DOMRect | undefined
     if (discardCount) {
       discardFrom = await gatherDiscardToFlyer()
-      setFlyer((f) => (f ? { ...f, faceDown: true } : f))
+      patch('pile', { faceDown: true })
       await wait(TURN_MS)
       await wait(STEP_HOLD)
     }
@@ -275,7 +273,7 @@ export default function DeckAnimationsStory() {
         if (a) flights.push(a.finished)
       }
       if (discardCount && discardFrom) {
-        const a = play('absorbToDeck', flyerRef.current, {
+        const a = play('absorbToDeck', elOf('pile'), {
           from: discardFrom,
           to: tRect,
           duration: MERGE_MS,
@@ -286,7 +284,7 @@ export default function DeckAnimationsStory() {
     await Promise.all(flights)
     const total = decks.reduce((s, d) => s + d.count, 0) + discardCount
     setDecks([{ id: target.id, count: total }])
-    setFlyer(null)
+    drop('pile')
   }
 
   // ===== playing a card: hand → center → (effect) → discard =====
@@ -294,16 +292,15 @@ export default function DeckAnimationsStory() {
   // hand → a slot of the staging area. This IS the play flight: the card ends up
   // standing where it will be played, so nothing has to fly again on commit.
   const flyToStage = async (item: HandItem, fromRect: Rect, slot: number) => {
-    setPlayFlyer({ card: item.card, at: fromRect })
-    await nextFrames() // I2 — and it lets the stage slots mount before measuring
-    const el = playFlyerRef.current
+    // raising also lets the stage slots mount before they are measured
+    const [el] = await raise([{ key: 'play', card: item.card, at: fromRect }])
     const toRect = stageRefs.current[slot]?.getBoundingClientRect()
     if (el && toRect) {
       const anim = play('playToCenter', el, { from: fromRect, to: toRect })
       if (anim) await anim.finished
     }
     setStaged((s) => [...s, item])
-    setPlayFlyer(null)
+    drop('play')
   }
 
   // stage → discard: through the shared exit step — every staged card flies from
@@ -360,10 +357,10 @@ export default function DeckAnimationsStory() {
   // to the staging area at the centre, open for everyone. Picking what it acts on
   // is a CLICK (a hand card, a deck). A second card of a combo is therefore
   // clicked, not pulled: while something is staged, a pull-out is rejected.
-  const handPlay = (uid: string, drop: HandPlayDrop): boolean => {
+  const handPlay = (uid: string, dropped: HandPlayDrop): boolean => {
     if (busy || stageSize > 0) return false
     const item = hand.find((it) => it.uid === uid)
-    const rect = drop.rect
+    const rect = dropped.rect
     if (!item || !rect) return false
     const id = item.card.id
     const take = (size: number) => {
@@ -375,7 +372,7 @@ export default function DeckAnimationsStory() {
       take(2) // Sudo never plays alone — the empty second slot says so
       void flyToStage(item, rect, 0).then(() => {
         const r = stageRefs.current[0]?.getBoundingClientRect()
-        if (r) aim({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, drop)
+        if (r) aim({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, dropped)
       })
       return true
     }
@@ -386,7 +383,7 @@ export default function DeckAnimationsStory() {
         const only = decks.length <= 1 ? decks[0]?.id : undefined
         if (only != null) return resolveStage(() => splitEffect(only))
         const r = stageRefs.current[0]?.getBoundingClientRect()
-        if (r) aim({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, drop)
+        if (r) aim({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, dropped)
       })
       return true
     }
@@ -455,9 +452,9 @@ export default function DeckAnimationsStory() {
     setDiscard({ cards: makeDiscard(), showCount: true, gathered: false })
     setStageSize(0)
     setStaged([])
-    setPlayFlyer(null)
+    drop('play')
     resetReturn()
-    setFlyer(null)
+    drop() // every card still in the air comes down
     setBusy(false)
   }
 
@@ -575,27 +572,8 @@ export default function DeckAnimationsStory() {
         />
       </div>
 
-      {/* the flying discard (single card) */}
-      {flyer && (
-        <div
-          className={styles.flyer}
-          ref={flyerRef}
-          style={{ left: flyer.at.left, top: flyer.at.top, inlineSize: flyer.at.width }}
-        >
-          <Card card={flyer.card} faceDown={flyer.faceDown} interactive={false} width="100%" />
-        </div>
-      )}
-
-      {/* hand → center: fly as one entry (a single card or a CardPair) */}
-      {playFlyer && (
-        <div
-          className={styles.playFlyer}
-          ref={playFlyerRef}
-          style={{ left: playFlyer.at.left, top: playFlyer.at.top, inlineSize: playFlyer.at.width }}
-        >
-          <Card card={playFlyer.card} interactive={false} width="100%" />
-        </div>
-      )}
+      {/* every card this scene has in the air — the shared carrier */}
+      {flyerOverlay}
 
       {returnOverlay}
 

@@ -103,10 +103,4 @@
   text-align: center;
 }
 
-/* the card leaving the hand — fixed, viewport coords */
-.flyer {
-  position: fixed;
-  z-index: var(--z-flight);
-  inline-size: 150px;
-  pointer-events: none;
-}
+/* the cards in the air belong to the shared carrier (useFlyer) */
