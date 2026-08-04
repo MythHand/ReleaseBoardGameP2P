@@ -34,10 +34,22 @@
   border-color: var(--brand-green);
 }
 
+/* the pair example — a release with the card laid WITH it, sitting together above
+   the single cards. The two are one source: a click on either sends both. */
+.pair {
+  position: absolute;
+  inset-block-start: 96px;
+  inset-inline: 0;
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  transition: opacity 200ms var(--ease-out);
+}
+
 /* превью: ряд из 5 карт по центру сверху */
 .source {
   position: absolute;
-  inset-block-start: 104px;
+  inset-block-start: 324px;
   inset-inline: 0;
   display: flex;
   gap: 18px;

@@ -80,7 +80,7 @@
   color: var(--white-28);
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  border: 1px dashed var(--white-14);
+  border: 1px dashed var(--white-12);
   border-radius: 8px;
 }
 
@@ -88,9 +88,18 @@
    Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block: 0;
   inset-inline-end: 86px;
-  transform: translateY(-50%);
+
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
 }
 
 /* player hand — the canonical fan, bottom-centre (Hand sizes itself to the
@@ -106,6 +115,6 @@
 /* летящая карта — позиционируется и анимируется императивно (пресеты move) */
 .flyer {
   position: fixed;
-  z-index: 80;
+  z-index: var(--z-flight);
   pointer-events: none;
 }

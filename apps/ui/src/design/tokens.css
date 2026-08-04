@@ -177,6 +177,14 @@
   --z-table: 0;
   --z-hand: 100;
   --z-card-lifted: 200; /* всплывшая карта при ховере */
+
+  /* a card in flight over the table: above the hand and a lifted card — it has
+     left them — and below the UI drawn over the cards (arrow, overlays). This is
+     the BASE of a band, not a single layer: a step that carries several cards adds
+     each card's own table layer on top (calc(var(--z-flight) + n), n small), and a
+     card held by the cursor rides at +10. Anything that must stay readable over the
+     whole band — the pile counter — sits at +40, still under the arrow. */
+  --z-flight: 250;
   --z-arrow: 300; /* targeting-стрелка */
   --z-reaction: 400; /* оверлей окна реакции */
   --z-modal: 500;

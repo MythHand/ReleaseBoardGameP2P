@@ -66,7 +66,7 @@
 .cellEmpty {
   position: absolute;
   inset: 0;
-  border: 1px dashed var(--white-10);
+  border: 1px dashed var(--white-12);
   border-radius: 8px;
 }
 
@@ -74,9 +74,18 @@
    Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block: 0;
   inset-inline-end: 86px;
-  transform: translateY(-50%);
+
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
 }
 
 /* player hand — canonical Table position: the left inset clears the turn dock,
@@ -97,7 +106,7 @@
 /* the card leaving the hand — fixed, viewport coords */
 .flyer {
   position: fixed;
-  z-index: 80;
+  z-index: var(--z-flight);
   inline-size: 150px;
   pointer-events: none;
 }

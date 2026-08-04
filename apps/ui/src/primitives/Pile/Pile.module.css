@@ -95,9 +95,15 @@
   opacity: 1;
 }
 
+/* the counter stands over the pile AND over the cards flying into it, so an arriving
+   card passes UNDER the badge instead of covering it and then jumping beneath. The
+   offset clears the whole flight BAND, not just its base: a step that carries several
+   cards adds each card's own layer to --z-flight. Works only while the consumer's
+   placement is not a stacking context (see .discard in the scenes and on Table). */
 .count {
   composes: mono-lg tk-02 from '../../design/typography.module.css';
   position: absolute;
+  z-index: calc(var(--z-flight) + 40);
 }
 
 .count::before {

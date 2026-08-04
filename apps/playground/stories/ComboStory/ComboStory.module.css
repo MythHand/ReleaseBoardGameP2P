@@ -88,8 +88,8 @@
   inset-inline-start: 50%;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  border: 1px dashed var(--white-10);
-  border-radius: 14px;
+  border: 1px dashed var(--white-12);
+  border-radius: 8px;
   transform: translate(-50%, -50%);
 }
 
@@ -97,9 +97,18 @@
    Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block: 0;
   inset-inline-end: 86px;
-  transform: translateY(-50%);
+
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
 }
 
 /* player area — release zone above the hand, canonical Table position: the left
@@ -122,7 +131,7 @@
 /* the source travelling from the fan to the centre — positioned imperatively */
 .entering {
   position: fixed;
-  z-index: var(--z-modal);
+  z-index: var(--z-flight);
   pointer-events: none;
 }
 
@@ -131,7 +140,7 @@
   position: fixed;
   inset-block-start: 0;
   inset-inline-start: 0;
-  z-index: var(--z-modal);
+  z-index: var(--z-flight);
   pointer-events: none;
   opacity: 0;
 }

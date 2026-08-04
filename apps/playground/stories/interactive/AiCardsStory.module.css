@@ -119,9 +119,18 @@
    Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block: 0;
   inset-inline-end: 86px;
-  transform: translateY(-50%);
+
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
 }
 
 /* turn dock — canonical Table position: bottom-left, under the decks, left of
@@ -189,6 +198,6 @@
 /* the flying draw card — positioned/animated imperatively (presets) */
 .flyer {
   position: fixed;
-  z-index: 80;
+  z-index: var(--z-flight);
   pointer-events: none;
 }

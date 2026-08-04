@@ -44,11 +44,6 @@ interface PileProps {
   heapShow?: number
   /** куча собирается в ровную стопку — сброс превращается в колоду */
   gathered?: boolean
-  /**
-   * Слой бейджа счётчика. Поднимается там, где в стопку ЛЕТЯТ карты: иначе
-   * приземляющаяся карта накрывает счётчик на последних кадрах полёта.
-   */
-  countLayer?: number
   /** DOM-узел коробки карты — в него целятся полёты в эту стопку */
   boxRef?: Ref<HTMLDivElement>
 }
@@ -68,7 +63,6 @@ export default function Pile({
   heap,
   heapShow,
   gathered,
-  countLayer,
   boxRef,
 }: PileProps) {
   const cards = heap ?? []
@@ -85,9 +79,10 @@ export default function Pile({
       className={styles.pile}
       style={{ width: typeof width === 'number' ? `${width}px` : width }}
     >
-      {/* коробка карты. Бейдж счётчика живёт здесь, а НЕ внутри .stack: там
-          container-type (ради cqw-радиусов) создаёт containment и запер бы слой
-          бейджа внутри — а он должен уметь встать выше летящих в стопку карт. */}
+      {/* The card box. The counter badge lives HERE and not inside .stack: there
+          container-type (for the cqw radii) brings containment, which traps any
+          layer set inside the stack. From the box it clears the whole pile with one
+          layer of its own (.count) — no consumer has to pass one. */}
       <div className={styles.box}>
         <div
           className={styles.stack}
@@ -139,10 +134,7 @@ export default function Pile({
           {!emptyDiscard && <span className={styles.glow} aria-hidden="true" />}
         </div>
         {count > 0 && (
-          <span
-            className={`${styles.count} ${countPos === 'tl' ? styles.tl : styles.br}`}
-            style={countLayer == null ? undefined : { zIndex: countLayer }}
-          >
+          <span className={`${styles.count} ${countPos === 'tl' ? styles.tl : styles.br}`}>
             {count}
           </span>
         )}

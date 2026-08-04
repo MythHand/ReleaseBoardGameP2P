@@ -70,9 +70,18 @@
    Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block: 0;
   inset-inline-end: 86px;
-  transform: translateY(-50%);
+
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
 }
 
 /* turn dock — bottom-left, under the deck, left of the hand. Sits ABOVE the red
@@ -159,14 +168,15 @@
 /* the flying draw card / cards leaving to the discard — fixed, viewport coords */
 .flyer {
   position: fixed;
-  z-index: 70;
+  z-index: var(--z-flight);
   pointer-events: none;
 }
 
-/* the card being dragged as a defence — rides above everything, follows cursor */
+/* the card being dragged as a defence — follows the cursor, and a card held by the
+   hand rides above any card flying on its own */
 .dragFlyer {
   position: fixed;
-  z-index: 90;
+  z-index: calc(var(--z-flight) + 10);
   pointer-events: none;
   cursor: grabbing;
 }
@@ -176,7 +186,7 @@
 .gifOverlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
