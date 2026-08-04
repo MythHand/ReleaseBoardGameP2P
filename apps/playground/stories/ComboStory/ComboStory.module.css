@@ -76,13 +76,17 @@
   opacity: 1;
 }
 
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
 /* staging area at the centre — the cards put into this turn stand here, open to
    everyone, until the play resolves */
 .centerSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
-  inline-size: 160px;
+  inline-size: 150px;
   aspect-ratio: var(--card-aspect);
   border: 1px dashed var(--white-10);
   border-radius: 14px;
@@ -110,29 +114,6 @@
   align-items: center;
 }
 
-.releaseZone {
-  display: flex;
-  gap: 12px;
-}
-
-.slot {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 92px;
-  aspect-ratio: var(--card-aspect);
-  border: 1px dashed var(--white-16);
-  border-radius: 12px;
-}
-
-.empty {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
-  opacity: 0.4;
-}
-
 /* player hand — the canonical fan (Hand lays itself out from the wrapper's centre) */
 .hand {
   inline-size: 100%;
@@ -143,16 +124,6 @@
   position: fixed;
   z-index: var(--z-modal);
   pointer-events: none;
-}
-
-/* cancel — a card gliding from the centre back into the fan. Same pivot as the
-   fan slot (bottom centre), so the tilt and scale land exactly on the slot. */
-.returning {
-  position: fixed;
-  z-index: var(--z-modal);
-  transform-origin: bottom center;
-  transition: transform 480ms var(--ease-soft);
-  will-change: transform;
 }
 
 /* летящая карта (overlay) */

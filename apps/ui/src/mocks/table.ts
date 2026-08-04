@@ -1,10 +1,22 @@
-import { cardById } from '@/cards'
+import { scatterAt } from '@/animations'
+import { CARDS, cardById } from '@/cards'
 import type { Card } from '@/cards/types'
 import type { Setup } from '@/game/modes'
+import type { HeapCard } from '@/primitives/Pile/Pile'
 import type { HistoryEntry } from '@/table/MoveHistory/MoveHistory'
 import type { Participant, Spectator } from '@/table/Participants/Participants'
 import type { HandCard } from './hand'
 import { makeHand } from './hand'
+
+// Сброс на столе — наброшенная куча. Разброс детерминирован по индексу карты
+// (scatterAt), так что стопка лежит одинаково между ре-рендерами.
+const DISCARD_N = 12
+const DISCARD_POOL = CARDS.filter((c) => c.deck === 'base' && c.category !== 'trigger')
+const makeDiscardHeap = (n: number): HeapCard[] =>
+  Array.from({ length: n }, (_, i) => ({
+    card: DISCARD_POOL[i % DISCARD_POOL.length],
+    ...scatterAt(i, 116),
+  }))
 
 // Пул возможных оппонентов (для вариативности 1-5; всего 2-6 игроков).
 interface OpponentTemplate {
@@ -38,6 +50,7 @@ interface TableState {
     main: number
     events: number
     discard: Card | undefined
+    discardHeap: HeapCard[]
     discardCount: number
   }
   turn: string | undefined
@@ -108,7 +121,8 @@ export function makeTable(opponentCount = 3): TableState {
       main: 78,
       events: 21,
       discard: cardById('attack-security-bug'),
-      discardCount: 12,
+      discardHeap: makeDiscardHeap(DISCARD_N),
+      discardCount: DISCARD_N,
     },
     turn: opponents[Math.min(1, opponents.length - 1)]?.id,
 

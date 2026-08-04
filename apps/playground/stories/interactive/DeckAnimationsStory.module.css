@@ -80,11 +80,15 @@
   transform: translateY(-50%);
 }
 
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
 /* staging area — a row of card slots at the centre of the table; the cards put
    into this turn stand here, open to everyone, until the play resolves */
 .center {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   z-index: 50;
   display: flex;
@@ -96,16 +100,6 @@
   position: relative;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-}
-
-/* cancel — a card gliding from the stage back into the fan. Same pivot as the
-   fan slot (bottom centre), so the tilt and scale land exactly on the slot. */
-.returning {
-  position: fixed;
-  z-index: 500;
-  transform-origin: bottom center;
-  transition: transform 480ms var(--ease-soft);
-  will-change: transform;
 }
 
 /* a slot still to be filled — the ask for the second card of a combo */

@@ -106,61 +106,6 @@
   opacity: 0;
 }
 
-.releaseZone {
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  justify-content: center;
-}
-
-.slot {
-  position: relative;
-  inline-size: 92px;
-  aspect-ratio: var(--card-aspect);
-}
-
-/* a release that can defend the 503 — grabbable + a category-accent glow ring
-   (mirrors the Card "playable" state, which CardPair can't take as a prop) */
-.playable {
-  cursor: grab;
-  border-radius: 8px;
-  box-shadow:
-    0 0 0 2px var(--hl),
-    0 0 22px 2px color-mix(in srgb, var(--hl) 50%, transparent);
-}
-
-.empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--white-30);
-  text-align: center;
-  border: 1px dashed var(--white-12);
-  border-radius: 8px;
-}
-
-/* release + code review — a flat stack (code review peeks behind, NO rotation),
-   so nothing's bounding box drifts when the cards fly to the discard */
-.pairStack {
-  position: relative;
-  inline-size: 100%;
-  aspect-ratio: var(--card-aspect);
-}
-
-.pairAux {
-  position: absolute;
-  inset: 0;
-  filter: brightness(0.82);
-  transform: translateY(-12%);
-}
-
-.pairMain {
-  position: absolute;
-  inset: 0;
-}
-
 .handWrap {
   inline-size: 100%;
 }
@@ -181,6 +126,10 @@
 .eliminated[data-shown="true"] {
   opacity: 1;
 }
+
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
 
 /* centre staging — the 503 comes out here and defence covers it here.
    150px = the deck / hand card width, so nothing skews in size across the table */

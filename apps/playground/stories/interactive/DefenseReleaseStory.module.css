@@ -63,11 +63,15 @@
 
 /* ===== table layout — positions mirror @release/ui Table.module.css ===== */
 
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
 /* the played Release waits at the centre for its cost; the cost is shown to its
    right, so both are open on the table at the same time */
 .stageSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
@@ -76,7 +80,7 @@
 
 .costSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
@@ -87,7 +91,7 @@
    and covered by the defence that answers it */
 .centerSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   z-index: 10;
   inline-size: 150px;
@@ -99,7 +103,7 @@
    place left of the attack, not on top of anything */
 .sudoSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   z-index: 9;
   inline-size: 150px;
@@ -110,7 +114,7 @@
 /* the card covering the attack — same centre, nudged aside so both are read */
 .coverSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   z-index: 11;
   inline-size: 150px;
@@ -133,7 +137,7 @@
    the table; mounted always so it can fade out as well as in. */
 .ask {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   z-index: 12;
   padding: 10px 18px;

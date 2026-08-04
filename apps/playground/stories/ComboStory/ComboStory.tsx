@@ -5,15 +5,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { nextFrames, play, wait } from '@/animations'
 import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
-import Card, { CARD_RATIO, cardBoxIn } from '@/primitives/Card'
+import Card, { CARD_RATIO } from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
+import ReleaseZone from '@/table/ReleaseZone'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import { reorderHand } from '../interactive/reorderHand'
 import { useDiscardExit } from '../interactive/useDiscardExit'
+import { useHandReturn } from '../interactive/useHandReturn'
 import styles from './ComboStory.module.css'
 
 type Loc = Record<Lang, string>
@@ -48,13 +50,6 @@ interface Rect {
   width: number
   height: number
 }
-// a staged card on its way back to the fan (cancel)
-interface ReturnFlight {
-  key: string
-  card: CardData
-  from: { left: number; top: number; width: number }
-  to: string
-}
 
 let _u = 0
 const nextUid = () => `c${++_u}`
@@ -78,7 +73,6 @@ const RELEASE_SLOTS = ['frontend', 'backend', 'database']
 
 const MERGE_MS = 620 // the two cards fold into a pair at the centre
 const PAIR_HOLD = 2100 // the assembled pair is held open to everyone
-const RETURN_MS = 480 // cancel: centre → fan; MUST equal the .returning transition
 
 export default function ComboStory() {
   const { lang } = useLang()
@@ -103,11 +97,22 @@ export default function ComboStory() {
   const { overlay: discardOverlay, send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
     setDiscardPile((p) => [...p, ...cards]),
   )
+  // cancel: the whole staging goes back into the fan at once
+  const {
+    overlay: returnOverlay,
+    gapAt: returnGap,
+    gapSize: returnSize,
+    send: returnToHand,
+    reset: resetReturn,
+  } = useHandReturn(handWrapRef, (gap) =>
+    setHand((h) => {
+      const next = h.slice()
+      next.splice(gap, 0, ...stagedRef.current)
+      return next
+    }),
+  )
   const [flyPair, setFlyPair] = useState<{ main: CardData; aux: CardData } | null>(null)
   const [entering, setEntering] = useState<CardData | null>(null) // hand → centre (single)
-  const [returning, setReturning] = useState<ReturnFlight[]>([])
-  const [returnStarted, setReturnStarted] = useState(false)
-  const [returnGap, setReturnGap] = useState<number | null>(null)
   const [log, setLog] = useState<string | null>(null)
 
   const enterRef = useRef<HTMLDivElement>(null)
@@ -174,51 +179,21 @@ export default function ComboStory() {
     if (items.length === 0) return
     const cRect = centerRef.current?.getBoundingClientRect()
     const el = flyRef.current
-    const mainEl = el?.querySelector<HTMLElement>('[data-main]')
-    const auxEl = el?.querySelector<HTMLElement>('[data-aux]')
-    // where each card physically is right now: a lone staged card fills the centre
-    // slot; a merged pair sits in the flyer (aux tilted, so trim its bbox to the
-    // card box — the bbox of a rotated card is centred on the card)
-    const froms: (Rect | undefined)[] =
-      items.length === 1 || !cRect
-        ? [cRect]
+    // where each card physically is: a lone staged card fills the centre slot; a
+    // merged pair sits in the flyer, and the step measures each half off its own
+    // anchor (staged[0] became the pair's aux, staged[1] its main)
+    const leaving =
+      items.length === 1
+        ? [{ key: 'rt0', card: items[0].card, from: cRect }]
         : [
-            auxEl ? cardBoxIn(auxEl.getBoundingClientRect(), cRect.width) : cRect,
-            mainEl ? cardBoxIn(mainEl.getBoundingClientRect(), cRect.width) : cRect,
+            { key: 'rt0', card: items[0].card, el, anchor: 'aux' as const, from: cRect },
+            { key: 'rt1', card: items[1].card, el, anchor: 'main' as const, from: cRect },
           ]
-    const hr = handWrapRef.current?.getBoundingClientRect()
-    const gap = Math.round(hand.length / 2)
-    const total = hand.length + items.length
-    const flights = items.map((it, i) => {
-      const f = froms[i]
-      const place = slotPlacement(gap + i, total)
-      if (!f || !hr) return null
-      const dx = hr.left + hr.width / 2 + place.x - (f.left + f.width / 2)
-      const dy = hr.bottom + place.y - (f.top + f.height)
-      return {
-        key: `rt${i}`,
-        card: it.card,
-        from: { left: f.left, top: f.top, width: f.width },
-        to: `translate(${dx}px, ${dy}px) rotate(${place.rotate}deg) scale(${CARD_W / f.width})`,
-      }
-    })
-    const live = flights.filter((f): f is NonNullable<typeof f> => f != null)
-    setReturning(live)
-    setReturnGap(gap) // the fan starts spreading NOW, while the cards travel
+    const flight = returnToHand(leaving, hand.length)
     setStaged([])
     hideFlyer()
-    await nextFrames() // I2 — let the flyers paint at their source before moving
-    setReturnStarted(true)
-    await wait(RETURN_MS)
-    setHand((h) => {
-      const next = h.slice()
-      next.splice(gap, 0, ...items)
-      return next
-    })
-    setReturnGap(null)
-    setReturning([])
-    setReturnStarted(false)
-  }, [hand.length, stop])
+    await flight
+  }, [hand.length, stop, returnToHand])
 
   // a press on nothing valid cancels the staging. Presses on a target and inside
   // the hand stop propagation — those are answers, not a miss.
@@ -247,12 +222,18 @@ export default function ComboStory() {
       await nextFrames() // let the final card paint before hiding the flyer
       hideFlyer()
     } else {
-      // the pair leaves through the shared exit step: it splits into its two
-      // singles, each from where it actually stands, both at once
-      hideFlyer()
-      await sendToDiscard([
+      // The pair leaves through the shared exit step: it splits into its two
+      // singles, each from where it actually stands, both at once.
+      // Hand it over while it is STILL on screen — the step measures both halves
+      // as it starts. Only then is the staging cleared: the centre slot renders
+      // the source whenever the pair is gone, so hiding first would put the
+      // source card back on the table for the whole flight.
+      const leaving = sendToDiscard([
         { key: 'combo', card: main.card, aux: aux.card, el, from: cRect, layer: 0 },
       ])
+      setStaged([])
+      hideFlyer()
+      await leaving
     }
     setLog(
       targetLabel
@@ -371,9 +352,7 @@ export default function ComboStory() {
     setReleased({})
     setDiscardPile([])
     setEntering(null)
-    setReturning([])
-    setReturnStarted(false)
-    setReturnGap(null)
+    resetReturn()
     hideFlyer()
     setLog(null)
     setHand(makeHand())
@@ -457,26 +436,14 @@ export default function ComboStory() {
       </div>
 
       <div className={styles.bottom}>
-        <div className={styles.releaseZone}>
-          {RELEASE_SLOTS.map((key) => {
-            const r = released[key]
-            return (
-              <div
-                key={key}
-                ref={(el) => {
-                  slotRefs.current[key] = el
-                }}
-                className={styles.slot}
-              >
-                {r ? (
-                  <CardPair main={r.card} aux={r.aux} width="100%" />
-                ) : (
-                  <span className={styles.empty}>{key}</span>
-                )}
-              </div>
-            )
-          })}
-        </div>
+        <ReleaseZone
+          size="92px"
+          release={Object.fromEntries(RELEASE_SLOTS.map((key) => [key, released[key]?.card]))}
+          support={Object.fromEntries(RELEASE_SLOTS.map((key) => [key, released[key]?.aux]))}
+          slotRef={(key, el) => {
+            slotRefs.current[key] = el
+          }}
+        />
 
         {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan is never read as "pointed at nothing"; the Hand owns the real interaction */}
         <div
@@ -492,7 +459,7 @@ export default function ComboStory() {
           <Hand
             items={hand}
             gapAt={returnGap}
-            gapSize={returning.length || 1}
+            gapSize={returnSize}
             accentAt={accentAt}
             onPlay={handPlay}
             onCardClick={phase === 'partner' ? pickPartner : undefined}
@@ -510,21 +477,7 @@ export default function ComboStory() {
         </div>
       )}
 
-      {/* cancel — the whole staging glides back into the fan together */}
-      {returning.map((r) => (
-        <div
-          key={r.key}
-          className={styles.returning}
-          style={{
-            left: r.from.left,
-            top: r.from.top,
-            inlineSize: r.from.width,
-            transform: returnStarted ? r.to : 'none',
-          }}
-        >
-          <Card card={r.card} width={r.from.width} interactive={false} />
-        </div>
-      ))}
+      {returnOverlay}
 
       {discardOverlay}
 

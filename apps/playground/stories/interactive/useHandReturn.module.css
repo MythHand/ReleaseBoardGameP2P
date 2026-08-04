@@ -1,0 +1,10 @@
+/* a card gliding from the table back into the fan. Same pivot as a fan slot
+   (bottom centre), so the tilt and the scale land exactly on the slot instead of
+   drifting on the last frame. The duration MUST equal RETURN_MS. */
+.returning {
+  position: fixed;
+  z-index: var(--z-modal);
+  transform-origin: bottom center;
+  transition: transform 480ms var(--ease-soft);
+  will-change: transform;
+}

@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { HEAP_SHOW } from '@/animations'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
 import Rules, { type RulesCopy } from '@/blocks/Rules'
@@ -9,6 +10,7 @@ import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
+import type { HeapCard } from '@/primitives/Pile/Pile'
 import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
 import Toggle from '@/primitives/Toggle'
@@ -48,7 +50,11 @@ interface TableState {
   decks: {
     main: number
     events: number
+    // верх сброса одной картой — запасной вид, когда куча не передана
     discard?: Card | null
+    // сброс как он есть на столе: наброшенная куча. Необязательно — экран
+    // остаётся рабочим у потребителя, который её ещё не отдаёт.
+    discardHeap?: HeapCard[]
     discardCount: number
   }
   turn?: string
@@ -338,8 +344,17 @@ export default function Table({
         <Pile label={copy.events} deck="ai" count={decks.events} width={150} countPos="tl" />
       </div>
 
+      {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними
+          «глубина» стопки, счётчик показывает весь сброс */}
       <div className={styles.discard}>
-        <Pile label={copy.discard} topCard={decks.discard} count={decks.discardCount} width={116} />
+        <Pile
+          label={copy.discard}
+          heap={decks.discardHeap}
+          heapShow={HEAP_SHOW}
+          topCard={decks.discard}
+          count={decks.discardCount}
+          width={116}
+        />
       </div>
 
       <div className={styles.you}>

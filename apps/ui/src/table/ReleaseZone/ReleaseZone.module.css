@@ -9,6 +9,16 @@
   container-type: inline-size;
 }
 
+/* карту отсюда сейчас можно взять — обводка и свечение в цвете, который назвал
+   потребитель (как playable-состояние у Card, которого паре не передать) */
+.grabbable {
+  cursor: grab;
+  border-radius: 6cqw;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 22px 2px color-mix(in srgb, var(--accent) 50%, transparent);
+}
+
 .empty {
   composes: tag-sm tk-08 from '../../design/typography.module.css';
   display: flex;

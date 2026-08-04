@@ -50,10 +50,14 @@
   transform: translateX(-50%);
 }
 
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
 /* центр стола */
 .center {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);

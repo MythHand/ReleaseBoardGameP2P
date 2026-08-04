@@ -81,10 +81,14 @@
   cursor: pointer;
 }
 
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
 /* центр стола — точка staging добора (якорь для измерения) */
 .center {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
@@ -94,7 +98,7 @@
 /* AI-триггер (причина) — слева от центра, обычный размер карты */
 .causeSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
@@ -104,7 +108,7 @@
 /* AI-эффект (главная) — в центре, крупнее триггера */
 .effectSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   z-index: 1;
   inline-size: 200px;

@@ -13,6 +13,7 @@ import { pick, useLang } from '../../Playground/lang'
 import styles from './DeckAnimationsStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
+import { useHandReturn } from './useHandReturn'
 
 // A scene of deck operations. Triggers — playing cards from the hand (the Hand fan):
 // Git Branch — split; Git Branch + Sudo — split + the discard becomes a deck;
@@ -59,13 +60,6 @@ interface Rect {
 }
 // What the staging area at the centre is still waiting for.
 type Waiting = 'partner' | 'deck' | null
-// A cancelled card on its way from the stage back into the fan.
-interface ReturnFlight {
-  key: string
-  card: CardData
-  from: { left: number; top: number; width: number }
-  to: string // the transform that lands it on its fan slot (bottom-centre pivot)
-}
 
 let deckSeq = 1
 const nextDeckId = () => ++deckSeq
@@ -93,7 +87,6 @@ const GATHER_MS = 360
 const TURN_MS = 460
 const STEP_HOLD = 360 // standard short beat between deck steps
 const CENTER_HOLD = 420 // pause of the card at the center after the effect before it leaves to the discard
-const RETURN_MS = 480 // cancel: stage → fan; MUST equal the .returning transition
 
 export default function DeckAnimationsStory() {
   const { lang } = useLang()
@@ -112,12 +105,6 @@ export default function DeckAnimationsStory() {
   const [busy, setBusy] = useState(false)
   const [flyer, setFlyer] = useState<{ card: CardData; faceDown: boolean } | null>(null) // discard
   const [playFlyer, setPlayFlyer] = useState<CardData | null>(null) // hand → a stage slot
-  // cancel: the whole staging flies back into the fan at once. `returnGap` is the
-  // slot the fan opens for them WHILE they fly (gapAt/gapSize on Hand), so they
-  // land in ready room instead of on top of the neighbours.
-  const [returning, setReturning] = useState<ReturnFlight[]>([])
-  const [returnStarted, setReturnStarted] = useState(false)
-  const [returnGap, setReturnGap] = useState<number | null>(null)
 
   const pileRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const discardRef = useRef<HTMLDivElement>(null)
@@ -130,6 +117,21 @@ export default function DeckAnimationsStory() {
   const { from, to, aim, stop } = useArrow()
   const { overlay: discardOverlay, send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
     setDiscard((d) => ({ cards: [...d.cards, ...cards], showCount: true, gathered: false })),
+  )
+  // cancel: the whole staging flies back into the fan at once, the fan opening
+  // room for it while the cards travel
+  const {
+    overlay: returnOverlay,
+    gapAt: returnGap,
+    gapSize: returnSize,
+    send: returnToHand,
+    reset: resetReturn,
+  } = useHandReturn(handWrapRef, (gap) =>
+    setHand((h) => {
+      const next = h.slice()
+      next.splice(gap, 0, ...stagedRef.current)
+      return next
+    }),
   )
 
   // what the staging still needs before the play can resolve
@@ -349,50 +351,16 @@ export default function DeckAnimationsStory() {
       return
     }
     // I1 — measure the slots BEFORE they unmount, or there is nothing to fly from
-    const froms = items.map((_, i) => stageRefs.current[i]?.getBoundingClientRect())
-    const handEl = handWrapRef.current
-    const hr = handEl?.getBoundingClientRect()
-    const total = hand.length + items.length
-    // a card always comes back to the MIDDLE of the fan — the same landing spot
-    // useHandInsert uses everywhere else, so a return never reads as a different
-    // kind of insert
-    const gap = Math.round(hand.length / 2)
-    // The whole staging comes back AT ONCE — the play was one act, so undoing it
-    // is one act too. Each card aims at the fan slot it will occupy, and lands on
-    // the slot's BOTTOM-CENTRE pivot (same as Hand's .slot and useHandInsert), so
-    // the tilt and scale match the fan exactly instead of drifting on landing.
-    const flights = items.map((it, i) => {
-      const f = froms[i]
-      const place = slotPlacement(gap + i, total)
-      if (!f || !hr) return null
-      const dx = hr.left + hr.width / 2 + place.x - (f.left + f.width / 2)
-      const dy = hr.bottom + place.y - (f.top + f.height)
-      return {
-        key: `rt${i}`,
-        card: it.card,
-        from: { left: f.left, top: f.top, width: f.width },
-        to: `translate(${dx}px, ${dy}px) rotate(${place.rotate}deg) scale(${CARD_W / f.width})`,
-      }
-    })
-    const live = flights.filter((f): f is NonNullable<typeof f> => f != null)
-    setReturning(live)
-    setReturnGap(gap) // the fan starts spreading NOW, while the cards travel
+    const leaving = items.map((it, i) => ({
+      key: `rt${i}`,
+      card: it.card,
+      from: stageRefs.current[i]?.getBoundingClientRect(),
+    }))
+    const flight = returnToHand(leaving, hand.length)
     setStageSize(0)
     setStaged([])
-    await nextFrames() // I2 — let the flyers paint at their source before moving
-    setReturnStarted(true)
-    await wait(RETURN_MS)
-    // the cards land in the slots the gap was holding — closing the gap and
-    // adding them is the same layout, so nothing shifts on the last frame
-    setHand((h) => {
-      const next = h.slice()
-      next.splice(gap, 0, ...items)
-      return next
-    })
-    setReturnGap(null)
-    setReturning([])
-    setReturnStarted(false)
-  }, [hand.length, stop])
+    await flight
+  }, [hand.length, stop, returnToHand])
 
   // GESTURE RULE — pulling a card OUT of the fan puts it INTO the turn: it flies
   // to the staging area at the centre, open for everyone. Picking what it acts on
@@ -494,9 +462,7 @@ export default function DeckAnimationsStory() {
     setStageSize(0)
     setStaged([])
     setPlayFlyer(null)
-    setReturning([])
-    setReturnStarted(false)
-    setReturnGap(null)
+    resetReturn()
     setFlyer(null)
     setBusy(false)
   }
@@ -606,7 +572,7 @@ export default function DeckAnimationsStory() {
         <Hand
           items={hand}
           gapAt={returnGap}
-          gapSize={returning.length || 1}
+          gapSize={returnSize}
           onPlay={handPlay}
           accentAt={accentAt}
           // a click answers the staging (choose the card Sudo enhances); a pull
@@ -630,21 +596,7 @@ export default function DeckAnimationsStory() {
         </div>
       )}
 
-      {/* cancel — the whole staging glides back into the fan together */}
-      {returning.map((r) => (
-        <div
-          key={r.key}
-          className={styles.returning}
-          style={{
-            left: r.from.left,
-            top: r.from.top,
-            inlineSize: r.from.width,
-            transform: returnStarted ? r.to : 'none',
-          }}
-        >
-          <Card card={r.card} width={r.from.width} interactive={false} />
-        </div>
-      ))}
+      {returnOverlay}
 
       {discardOverlay}
 

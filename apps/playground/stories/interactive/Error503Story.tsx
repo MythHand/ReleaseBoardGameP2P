@@ -7,11 +7,13 @@ import { CARDS, CATEGORIES, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Badge from '@/primitives/Badge'
 import Card, { cardAreaOf } from '@/primitives/Card'
+import CardPair from '@/primitives/CardPair'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
 import Typography from '@/primitives/Typography'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
+import ReleaseZone from '@/table/ReleaseZone'
 import TurnDock, { type TurnDockState } from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './Error503Story.module.css'
@@ -55,12 +57,6 @@ const FILLERS = BASE.filter(
 
 type SlotKey = 'frontend' | 'backend' | 'database' | 'monitoring'
 const SLOTS: SlotKey[] = ['frontend', 'backend', 'database', 'monitoring']
-const SLOT_LABEL: Record<SlotKey, string> = {
-  frontend: 'Frontend',
-  backend: 'Backend',
-  database: 'Database',
-  monitoring: 'Monitoring',
-}
 const WAITING_PLAYER = 'kernel_panic'
 const DROP_PAD = 48 // forgiveness around the 503 when releasing a dragged card
 const CARD_W = 150 // normal card width — deck / hand / centre all match (no size skew)
@@ -125,22 +121,6 @@ function buildRel(release: boolean, releaseCR: boolean, monitoring: boolean): Re
       : undefined,
     monitoring: monitoring ? { main: must('protection-monitoring') } : undefined,
   }
-}
-
-// Release with its Code Review as a FLAT stack (code review peeks behind, no
-// rotation). A rotated pair's bounding box ≠ the card, which is what teleported
-// the cards on the discard hand-off. data-main / data-aux anchor the real rects.
-function RelStack({ main, aux }: { main: CardType; aux: CardType }) {
-  return (
-    <div className={styles.pairStack}>
-      <div className={styles.pairAux} data-aux>
-        <Card card={aux} interactive={false} width="100%" />
-      </div>
-      <div className={styles.pairMain} data-main>
-        <Card card={main} interactive={false} width="100%" />
-      </div>
-    </div>
-  )
 }
 
 export default function Error503Story() {
@@ -436,6 +416,11 @@ export default function Error503Story() {
     setDock('push')
     setBusy(false)
   }
+  // which release can answer the 503 right now — the zone reads this for both the
+  // highlight and the grab, so what lights up is exactly what can be taken
+  const grabbable = (key: SlotKey) =>
+    pending && !busy && !drag && (key === 'frontend' || key === 'backend') && Boolean(rel[key])
+
   function onRelDown(e: React.MouseEvent, key: SlotKey) {
     if (!pending || busy || drag) return
     const s = rel[key]
@@ -690,44 +675,25 @@ export default function Error503Story() {
           badge (release zone gone) when the player is knocked out, as on Table */}
       <div className={styles.you}>
         <div className={styles.playArea} data-hidden={eliminated}>
-          <div className={styles.releaseZone}>
-            {SLOTS.map((key) => {
-              const s = rel[key]
-              const grab =
-                pending && !busy && !drag && (key === 'frontend' || key === 'backend') && Boolean(s)
-              const hidden = drag?.kind === 'release' && drag.slot === key
-              // release cards can defend the 503 → highlight them (category accent)
-              const hl = grab && s ? CATEGORIES[s.main.category]?.accent : undefined
-              return (
-                // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only drag-to-play (mousedown lifts the release); sandbox story
-                <div
-                  key={key}
-                  ref={(el) => {
-                    relSlotRefs.current[key] = el
-                  }}
-                  className={`${styles.slot} ${grab ? styles.playable : ''}`}
-                  style={hl ? ({ '--hl': hl } as React.CSSProperties) : undefined}
-                  onMouseDown={grab ? (e) => onRelDown(e, key) : undefined}
-                >
-                  {/* card, unless it's lifted onto the drag flyer — then the slot
-                      shows its empty placeholder, so the zone never goes blank */}
-                  {s && !hidden ? (
-                    s.aux ? (
-                      <RelStack main={s.main} aux={s.aux} />
-                    ) : (
-                      <Card card={s.main} interactive={false} width="100%" />
-                    )
-                  ) : (
-                    <span className={styles.empty}>
-                      <Typography base="label-sm" tk="tk-16">
-                        {SLOT_LABEL[key]}
-                      </Typography>
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          {/* the zone reflects what the scene decided and hands the grab back:
+              a release that can answer the 503 lights in its category accent, and
+              the one being dragged shows its empty place instead of a hole */}
+          <ReleaseZone
+            size="92px"
+            release={Object.fromEntries(SLOTS.map((key) => [key, rel[key]?.main]))}
+            support={Object.fromEntries(SLOTS.map((key) => [key, rel[key]?.aux]))}
+            slotRef={(key, el) => {
+              relSlotRefs.current[key] = el
+            }}
+            accentAt={(key) => {
+              const card = rel[key]?.main
+              return grabbable(key) && card ? CATEGORIES[card.category]?.accent : undefined
+            }}
+            liftedAt={(key) => drag?.kind === 'release' && drag.slot === key}
+            onSlotDown={(key, e) => {
+              if (grabbable(key)) onRelDown(e, key)
+            }}
+          />
 
           <div className={styles.handWrap} ref={handWrapRef}>
             <Hand
@@ -776,7 +742,7 @@ export default function Error503Story() {
       {drag && (
         <div className={styles.dragFlyer} ref={dragRef} style={{ width: CARD_W }}>
           {drag.aux ? (
-            <RelStack main={drag.main} aux={drag.aux} />
+            <CardPair main={drag.main} aux={drag.aux} width="100%" />
           ) : (
             <Card card={drag.main} interactive={false} width="100%" />
           )}
