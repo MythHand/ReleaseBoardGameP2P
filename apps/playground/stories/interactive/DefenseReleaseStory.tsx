@@ -21,6 +21,7 @@ import HoverSelect from '../controls/HoverSelect'
 import styles from './DefenseReleaseStory.module.css'
 import { reorderHand } from './reorderHand'
 import { type Leaving, useDiscardExit } from './useDiscardExit'
+import { useFlyer } from './useFlyer'
 import { useHandArrival } from './useHandArrival'
 
 // Defense Release — playing a Release and defending it.
@@ -90,25 +91,17 @@ interface Opp {
 interface DiscardEntry extends Scatter {
   card: CardType
 }
-// a card in flight, rendered on the fixed overlay layer. `aux` is the sudo that
-// enhances an attack — a sudo-enhanced attack is one play, so it travels and
-// rests as one pair, never as two separate cards.
-interface Flyer {
-  card: CardType
-  aux?: CardType | null
-  seq: number
-  // where it mounts. Rendered as an inline style rather than assigned after
-  // nextFrames(): a position:fixed node with no coordinates paints at its flow
-  // position first, so the card would flash at the top-left corner for the two
-  // frames before the flight starts.
-  at: Rect
-  // the card morphs into its LOD reading WHILE it travels — it mounts in the
-  // full reading and flips on the frame the flight starts, so the layers ease
-  // over the flight instead of being swapped on landing.
-  toLod?: boolean
-  // a fixed transform for the WRAPPER while its inner cards animate into a pair
-  pose?: string
-}
+// What rides in the flyer. `aux` is the sudo that enhances an attack — a
+// sudo-enhanced attack is one play, so it travels and rests as ONE pair, never as
+// two separate cards. `lod` is the at-a-glance reading: the card is handed it on
+// the frame the flight starts, so its layers ease over the flight instead of
+// being swapped on landing.
+const faceOf = (card: CardType, aux?: CardType | null, lod?: boolean) =>
+  aux ? (
+    <CardPair main={card} aux={aux} width="100%" />
+  ) : (
+    <Card card={card} interactive={false} width="100%" lod={lod} />
+  )
 
 const EMPTY_RELEASE: ReleaseSlots = { frontend: undefined, backend: undefined, database: undefined }
 
@@ -175,7 +168,6 @@ export default function DefenseReleaseStory() {
   // the same Sudo once it has merged under the defence — a separate slot only so
   // the standing one can be handed to the flyer without ever being on screen twice
   const [coverAux, setCoverAux] = useState<CardType | null>(null)
-  const [flyer, setFlyer] = useState<Flyer | null>(null)
   const [busy, setBusy] = useState(false)
   // tech bar
   const [attackId, setAttackId] = useState(ATTACKS[0])
@@ -187,7 +179,10 @@ export default function DefenseReleaseStory() {
   const coverRef = useRef<HTMLDivElement>(null)
   const sudoRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
-  const flyerRef = useRef<HTMLDivElement>(null)
+  // the card in the air. It carries a PAIR as often as a single card, rests at a
+  // table pose, and morphs into its at-a-glance reading mid-flight — so what rides
+  // in the node is this scene's own element; the carrier holds the node.
+  const { overlay: flyerOverlay, raise, patch, drop, elOf } = useFlyer()
   const seatRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const relSlotRefs = useRef<Record<string, HTMLDivElement | null>>({})
   // an opponent's own release slots, keyed `${seatId}:${slot}`
@@ -281,13 +276,11 @@ export default function DefenseReleaseStory() {
     toLod?: boolean,
   ) => {
     const at = { left: from.left, top: from.top, width: from.width, height: from.height }
-    setFlyer({ card, aux, seq: ++seq.current, at })
-    await nextFrames() // I2 — let it paint at `at` before it starts moving
-    const el = flyerRef.current
+    const [el] = await raise([{ key: 'fly', at, content: faceOf(card, aux) }])
     if (!el) return
     // flip the reading on the same frame the travel starts: the face layers ease
     // to their LOD values over the flight, so nothing is swapped on arrival
-    if (toLod) setFlyer((f) => (f ? { ...f, toLod: true } : f))
+    if (toLod) patch('fly', { content: faceOf(card, aux, true) })
     const anim = play('playToCenter', el, {
       from,
       to,
@@ -296,16 +289,17 @@ export default function DefenseReleaseStory() {
       dy: pose?.dy,
     })
     if (anim) await anim.finished
-    // the animation is left filled on purpose: the node is keyed by `seq`, so it
-    // is never reused, and cancelling here would drop the landing pose for the
-    // frame before the resting card takes over — a visible straightening blink
+    // the animation is left filled on purpose: the carrier mounts a fresh node per
+    // flight, so it is never reused, and pinning here would cancel the animation and
+    // drop the landing pose for the frame before the resting card takes over — a
+    // visible straightening blink. This flight does NOT end in pin().
   }
 
   // the flyer leaves for the discard from wherever it currently is — the same
   // shared step, flying the element that is already on screen
   const toDiscard = async (card: CardType) => {
-    await sendToDiscard([{ key: 'spent', card, node: flyerRef.current }])
-    setFlyer(null)
+    await sendToDiscard([{ key: 'spent', card, node: elOf('fly') }])
+    drop('fly')
   }
 
   // ===== the turn =====
@@ -317,7 +311,7 @@ export default function DefenseReleaseStory() {
     const to = stageRef.current?.getBoundingClientRect()
     if (to) await fly(item.card, rect, to)
     setStaged(item.card)
-    setFlyer(null)
+    drop('fly')
     setPhase('cost')
     setBusy(false)
   }
@@ -330,7 +324,7 @@ export default function DefenseReleaseStory() {
     const to = costRef.current?.getBoundingClientRect()
     if (to) await fly(item.card, rect, to)
     setCost(item.card)
-    setFlyer(null)
+    drop('fly')
     await wait(SHOW_HOLD)
 
     // the cost leaves for the discard
@@ -350,18 +344,18 @@ export default function DefenseReleaseStory() {
       // the staged card and the flyer swap in the SAME commit — otherwise there
       // is one frame with neither on screen
       setStaged(null)
-      setFlyer({
-        card: relCard,
-        seq: ++seq.current,
-        at: {
-          left: fromRect.left,
-          top: fromRect.top,
-          width: fromRect.width,
-          height: fromRect.height,
+      const [el] = await raise([
+        {
+          key: 'fly',
+          at: {
+            left: fromRect.left,
+            top: fromRect.top,
+            width: fromRect.width,
+            height: fromRect.height,
+          },
+          content: faceOf(relCard),
         },
-      })
-      await nextFrames()
-      const el = flyerRef.current
+      ])
       if (el) {
         // a release lands with a snap — the one preset that is not playToCenter
         const anim = play('playToReleaseZone', el, { from: fromRect, to: slot })
@@ -370,7 +364,7 @@ export default function DefenseReleaseStory() {
       setRelease((r) => ({ ...r, [slotKey]: relCard }))
       // it is fresh — this is the release the opening attack window is about
       setTarget(slotKey)
-      setFlyer(null)
+      drop('fly')
     }
     setPhase('window')
     setBusy(false)
@@ -397,7 +391,7 @@ export default function DefenseReleaseStory() {
     setIncoming(attackCard)
     setIncomingSudo(sudo)
     setAttacker(seat.id)
-    setFlyer(null)
+    drop('fly')
     setPhase('answer')
     await wait(LAND_HOLD)
     setBusy(false)
@@ -408,16 +402,16 @@ export default function DefenseReleaseStory() {
   // Same as the Combo scene: the Sudo goes to its OWN staging slot on the table
   // and an arrow points from it at what it will enhance. It must not fly to the
   // card it is about to back — that reads as the pair already being assembled.
-  const stageDefSudo = async (item: HandItem, rect: DOMRect, drop: HandPlayDrop) => {
+  const stageDefSudo = async (item: HandItem, rect: DOMRect, dropped: HandPlayDrop) => {
     setBusy(true)
     setHand((h) => h.filter((it) => it.uid !== item.uid))
     const box = sudoRef.current?.getBoundingClientRect()
     if (box) await fly(item.card, rect, box, null, SUDO_POSE)
     setDefSudo(item.card)
-    setFlyer(null)
+    drop('fly')
     setBusy(false)
     // the arrow starts where the Sudo now stands and follows the cursor
-    if (box) aim({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, drop)
+    if (box) aim({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, dropped)
   }
 
   // A card put onto the table WAITS for an answer from the hand, and pressing on
@@ -480,15 +474,14 @@ export default function DefenseReleaseStory() {
     // the standing Sudo is handed over to the flyer in the SAME commit, so it is
     // never on screen twice and never off screen either
     setDefSudo(null)
-    setFlyer({
-      card: defCard,
-      aux: sudoCard,
-      seq: ++seq.current,
-      at: { left: box.left, top: box.top, width: box.width, height: box.height },
-      pose: restTransform(COVER_POSE),
-    })
-    await nextFrames()
-    const el = flyerRef.current
+    const [el] = await raise([
+      {
+        key: 'fly',
+        at: { left: box.left, top: box.top, width: box.width, height: box.height },
+        content: faceOf(defCard, sudoCard),
+        pose: restTransform(COVER_POSE),
+      },
+    ])
     const mainEl = el?.querySelector<HTMLElement>('[data-main]')
     const auxEl = el?.querySelector<HTMLElement>('[data-aux]')
     if (!mainEl || !auxEl) return
@@ -532,7 +525,7 @@ export default function DefenseReleaseStory() {
     }
     setCover(item.card)
     setCoverAux(mySudo)
-    setFlyer(null)
+    drop('fly')
     await wait(SHOW_HOLD)
 
     // I1 — measure both while they are still on the table, then let them go
@@ -605,7 +598,7 @@ export default function DefenseReleaseStory() {
                 if (!to) return
                 await fly(att, attBox, to)
                 if (by) setOppHand((o) => ({ ...o, [by]: (o[by] ?? 0) + 1 }))
-                setFlyer(null)
+                drop('fly')
               }
             })()
           : undefined,
@@ -674,7 +667,7 @@ export default function DefenseReleaseStory() {
             // LOD — so it morphs on the way instead of being swapped on arrival
             fly(relCard, slot, takeBox, null, undefined, true).then(() => {
               setOppRelease((r) => ({ ...r, [by]: { ...r[by], [slotKey]: relCard } }))
-              setFlyer(null)
+              drop('fly')
             })
           : undefined,
       ])
@@ -707,7 +700,7 @@ export default function DefenseReleaseStory() {
     setOppRelease({})
     setOppHand({})
     resetExit()
-    setFlyer(null)
+    drop('fly')
     resetInsert()
     setBusy(false)
     nextSeat.current = 0
@@ -716,8 +709,8 @@ export default function DefenseReleaseStory() {
   // GESTURE — pulling a card out of the fan puts it into the turn. Which card is
   // legal depends on the step: the Release starts the play, any card can pay its
   // cost, and only a working defence answers an attack.
-  const handPlay = (uid: string, drop: HandPlayDrop): boolean => {
-    if (busy || !drop.rect) return false
+  const handPlay = (uid: string, dropped: HandPlayDrop): boolean => {
+    if (busy || !dropped.rect) return false
     const item = hand.find((it) => it.uid === uid)
     if (!item) return false
     // A release can only be started while the turn is green (phase idle) — by the
@@ -725,22 +718,22 @@ export default function DefenseReleaseStory() {
     // over, and the dock's green state IS that moment. Its own slot must also be
     // free: the zone holds one card per type.
     if (phase === 'idle' && item.card.category === 'release' && !release[slotOf(item.card)]) {
-      void stageRelease(item, drop.rect)
+      void stageRelease(item, dropped.rect)
       return true
     }
     if (phase === 'cost') {
-      void payCost(item, drop.rect)
+      void payCost(item, dropped.rect)
       return true
     }
     if (phase === 'answer') {
       // your own Sudo goes onto the table first and waits for the defence it
       // enhances — the partner of a combo is CLICKED, never pulled out
       if (item.card.id === SUDO && !defSudo && sudoUsable) {
-        void stageDefSudo(item, drop.rect, drop)
+        void stageDefSudo(item, dropped.rect, dropped)
         return true
       }
       if (!defSudo && canDefend(item.card, sudo)) {
-        void defend(item, drop.rect)
+        void defend(item, dropped.rect)
         return true
       }
     }
@@ -1006,28 +999,10 @@ export default function DefenseReleaseStory() {
         </div>
       </div>
 
-      {/* the travelling card — keyed by seq so each flight mounts a fresh Card (I5) */}
       {aiming && <Arrow from={arrowFrom} to={arrowTo} color="var(--cat-support)" />}
 
-      {flyer && (
-        <div
-          key={flyer.seq}
-          className={styles.flyer}
-          ref={flyerRef}
-          style={{
-            left: flyer.at.left,
-            top: flyer.at.top,
-            width: flyer.at.width,
-            transform: flyer.pose,
-          }}
-        >
-          {flyer.aux ? (
-            <CardPair main={flyer.card} aux={flyer.aux} width="100%" />
-          ) : (
-            <Card card={flyer.card} interactive={false} width="100%" lod={flyer.toLod} />
-          )}
-        </div>
-      )}
+      {/* the travelling card — the shared carrier */}
+      {flyerOverlay}
 
       {/* the shared steps' own overlays: a card settling into the fan (Rollback
           under Sudo), and the cards leaving the table for the discard */}

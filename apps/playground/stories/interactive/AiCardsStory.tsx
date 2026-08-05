@@ -86,6 +86,7 @@ const FLIP_MS = 420 // flipCard duration — let the in-place flip play
 const TABLE_HOLD = 2600 // how long a revealed AI card is held before it resolves
 const HALLUCINATION_HOLD = TABLE_HOLD * 2 // Hallucination lingers twice as long
 const SHOW_HOLD = 1500 // how long a card is shown to all at the centre
+const PICK_HOLD = 900 // Bad Vibe: the given-up card stands beside the AI card, open
 
 const makeHand = (): HandItem[] => HAND_POOL.slice(0, 6).map((card, i) => ({ uid: `h${i}`, card }))
 
@@ -132,6 +133,7 @@ export default function AiCardsStory() {
   const aiDeckRef = useRef<HTMLDivElement>(null)
   const causeRef = useRef<HTMLDivElement>(null) // AI trigger (cause) — left of centre
   const effectRef = useRef<HTMLDivElement>(null) // AI effect (main) — centre, larger
+  const pickedRef = useRef<HTMLDivElement>(null) // Bad Vibe: the given-up card, right of it
   const discardRef = useRef<HTMLDivElement>(null)
   const { send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
     setDiscard((d) => [...d, ...cards]),
@@ -357,19 +359,19 @@ export default function AiCardsStory() {
     }
   }
 
-  // Bad Vibe: the chosen hand card is shown at the centre, then discarded
-  const discardFromHand = async (card: CardType, fromRect?: DOMRect) => {
-    const centerRect = effectRef.current?.getBoundingClientRect()
-    if (!fromRect || !centerRect) return
-    const [el] = await raise([{ key: 'fromhand', card, at: fromRect }])
+  // Bad Vibe: the card the player gives up is pulled OUT of the fan and put on the
+  // table beside the AI card — the same "a card leaves the hand and stands open"
+  // beat the hand limit uses. It goes there AT ONCE, while the AI card is still
+  // being read; only after that do both leave.
+  const putPickedCard = async (card: CardType, fromRect: DOMRect) => {
+    const to = pickedRef.current?.getBoundingClientRect()
+    if (!to) return
+    const [el] = await raise([{ key: 'picked', card, at: fromRect }])
     if (el) {
-      const anim = play('drawToCenter', el, { from: fromRect, to: centerRect })
+      const anim = play('playToCenter', el, { from: fromRect, to })
       if (anim) await anim.finished
-      pin('fromhand', centerRect) // I4 — shown at the centre before it leaves
+      pin('picked', to) // I4 — it stands there, open to everyone
     }
-    await wait(SHOW_HOLD)
-    await sendToDiscard([{ key: 'shown', card, node: el }])
-    drop('fromhand')
   }
 
   // Error 503 — raise the red glow and halt (reset the screen to continue)
@@ -419,7 +421,9 @@ export default function AiCardsStory() {
         : returnAiToDeck(effectRect, aiDeckRect),
       ...(crushed ? [destroyRelease(crushed, crushRect)] : []),
     ])
-    drop()
+    drop('trig')
+    drop('eff')
+    drop('crushed')
 
     // Inside takes a release after the centre has cleared: a single one is taken
     // straight through the centre; several are offered for an open choice first
@@ -506,12 +510,23 @@ export default function AiCardsStory() {
     })
     const chosen = hand.find((x) => x.uid === uid)
     const fromRect = handPickRect.current ?? undefined
-    // no extra hold — waiting for the player's pick already held it at the centre
-    await resolveGeneric(trig, ai) // Bad Vibe → AI deck, trigger → discard (centre clears)
-    if (chosen) {
+    // it leaves the hand the moment it is pulled out and takes its place beside the
+    // AI card — the pull and the flight are one movement, not two
+    if (chosen && fromRect) {
       setHand((h) => h.filter((x) => x.uid !== chosen.uid))
-      await discardFromHand(chosen.card, fromRect)
+      await putPickedCard(chosen.card, fromRect)
+      await wait(PICK_HOLD)
     }
+    // …and then everything on the table leaves at once: the trigger to the discard,
+    // the AI card back to its deck, the given-up card to the discard
+    await Promise.all([
+      resolveGeneric(trig, ai),
+      chosen
+        ? sendToDiscard([{ key: 'picked', card: chosen.card, node: elOf('picked') }]).then(() =>
+            drop('picked'),
+          )
+        : Promise.resolve(),
+    ])
   }
 
   // dragged out of the hand while Bad Vibe waits — accept it as the discard
@@ -636,6 +651,10 @@ export default function AiCardsStory() {
       <div className={styles.effectSlot} ref={effectRef} aria-hidden={!aiCard}>
         {aiCard && <Card card={aiCard} interactive={false} width="100%" />}
       </div>
+
+      {/* Bad Vibe: where the given-up card stands while both are read. Only a place —
+          the card itself is on the carrier until it leaves for the discard. */}
+      <div className={styles.pickedSlot} ref={pickedRef} aria-hidden="true" />
 
       {/* base draw deck (click — start) + the AI events deck */}
       <div className={styles.decks}>

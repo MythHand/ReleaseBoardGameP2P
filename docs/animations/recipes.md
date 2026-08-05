@@ -9,8 +9,8 @@ reference those by number instead of repeating them.
 
 **Where a movement has a step, the recipe names the step — it does not restate its mechanics.**
 Three movements are shared and live in one place each ([`reference.md`](./reference.md#the-three-movement-steps)):
-`useHandInsert` (a card settles into the hand), `useDiscardExit` (cards leave the table for the
-discard), `useHandReturn` (the staging goes back into the hand). A recipe says *which step and what
+`useHandArrival` (cards arrive in the hand), `useDiscardExit` (cards leave the table for the
+discard), and the carrier `useFlyer` under both. A recipe says *which step and what
 it is passed*; the frame-by-frame — measuring, `nextFrames`, the scatter coupling, the layer order,
 splitting a pair — lives inside the step and is described there, once.
 
@@ -62,10 +62,9 @@ _Phase A — to center_ (trigger handler `playFromPlayer` / `playFromOpponent`, 
    tick, in this exact order (as in the code):
    - player → `setPlayerHand(remove the item)`, **then** `from = handEl.getBoundingClientRect()`.
      React defers the unmount, so measuring the still-mounted node on the same tick is valid.
-   - opponent → pop the top of `oppDeck`, then `from = cardBoxIn(seatRect, FIXED_CARD_W)` — the
-     shared helper returns a card-sized box centered on the seat (so the card does not inflate to
-     the wide `Seat`). `FIXED_CARD_W = 108` is this showcase's fixed card width; a real build would
-     measure the actual card instead.
+   - opponent → pop the top of `oppDeck`, then `from = cardBoxIn(seatRect, CARD_W)` — a `Seat` is
+     wider than a card and shows only a counter, so there is no card element to measure; the shared
+     helper centres a card-sized box on the seat, at the width a card has on the table.
 2. `flyToCenter(card, from)`: `setBusy(true)`; measure `to = centerRef.getBoundingClientRect()`.
 3. `setFlyer({ card, at: from })` — the flyer is rendered with `style={{ left: at.left, top: at.top,
    inlineSize: at.width }}`, so its **first painted frame is already on the card** — **[I10]**.
@@ -87,7 +86,7 @@ _Phase B — center → discard (separate trigger):_ this is the shared step, no
 |---|---|---|---|---|
 | A: hand/seat → center | `playToCenter` | 480 ms | EASE | — |
 | B: center → discard | `useDiscardExit` | `FLIGHT_MS = 420` | — | the step owns the preset and the scatter |
-| opponent source box | — | — | — | `cardBoxIn(seat, 108)` — a card-sized box centred on the seat; 108 is the seat card's width, set inline in the scene |
+| opponent source box | — | — | — | `cardBoxIn(seat, CARD_W)` — a card-sized box centred on the seat |
 | `jitter()` ranges | — | — | — | `rot ±14°`, `dx ±10px`, `dy ±8px` (inside the step) |
 
 - Card height/width ratio = **1.4** (`CARD_RATIO`, shared from `@/primitives/Card`).
@@ -189,7 +188,7 @@ that scatter into the discard.
 - Local: the flyer is a **persistent opacity-toggled** node with one `CardPair` (not mounted per
   flight) — hence the mandatory **[I3]** and `hideFlyer()` (opacity → 0) instead of unmount.
 - The discard holds **singles**: a pair reaches it as **two** entries — the step splits it.
-- Cancel goes through **`useHandReturn`**: the whole staging back into the middle of the fan at once
+- Cancel goes through **`useHandArrival`**: the whole staging back into the middle of the fan at once
   (a lone card from the centre slot, a merged pair by its two anchors).
 
 **End state & cleanup**
@@ -253,64 +252,69 @@ the cursor; hovering a target zone lights it in the same color; clicking empty s
 
 ---
 
-## Card to hand — settle a card into the fan (`useHandInsert`)
+## Cards arrive in the hand (`useHandArrival`)
 
 **When to call**
-The base "a card settles into the hand" step, reused wherever a card ends up in the player's hand
-(draw, take-opponent). Standalone trigger (showcase): click a source card → `click(i)`. Guard:
-`if (flyingCard || used[i]) return`. Then `insert(card, sourceRect, hand.length)`.
+Wherever a card ends up in the player's hand — a draw, a card taken from an opponent, a card pulled
+out of the discard, a play taken back. Standalone trigger (showcase, the `Card to Hand` page): click
+a source card, or the pair example, → `arrive(items, hand.length)`.
 
 **Visual result**
-The hand fan opens a gap; the card flies from its source spot into that gap, scaling to the hand-card
-size and rotating to the slot's angle; it rides above the fan briefly, then tucks under the fan's right
-half and lands at the slot's bottom-center.
+The fan opens a gap in its MIDDLE — as wide as the number of arriving cards; they fly from their
+source spots into that gap, scaling to the hand-card size and rotating to their slots' angles; they
+ride above the fan briefly, then tuck under it and land at their slots' bottom-centre.
 
 **Elements / refs**
-- `handRef` — the `Hand` fan container (the hook measures it and reads `@/table/Hand/fan` geometry).
-- `sourceRefs[i]` — source card spots (the flight origin).
-- `useHandInsert(handRef, onInserted)` → `{ gapAt, overlay, insert, reset, flyingCard }`.
-- State: `hand`; the hook owns `gapAt`, `flying`, `started`, `tucked`.
+- `handRef` — the `Hand` fan container (the step measures it and reads `@/table/Hand/fan` geometry).
+- the source spots (the flight origins), whichever they are.
+- `useHandArrival(handRef, onLanded)` → `{ overlay, gapAt, gapSize, arrive, reset, busy, FLIGHT_MS }`.
+- `Hand` gets BOTH `gapAt` and `gapSize` — a gap of one is the default, and a two-card arrival into a
+  gap of one lands two cards on the same slot.
 
-**Sequence** (`insert(card, source, handLength)`, inside the hook)
-1. Guard `if (flying) return`. `gap = round(handLength / 2)` (≈ fan center); `place = slotPlacement(gap, handLength + 1)`
-   — the target slot in a fan of `handLength + 1` slots (the single source of fan geometry).
-2. Measure the hand rect `hr` — **[I1]**. Target the slot **bottom-center**:
-   `targetBcX = hr.left + hr.width/2 + place.x`, `targetBcY = hr.bottom + place.y`. Compute `dx/dy` from the
-   source's bottom-center, `rot = place.rotate`, `scale = CARD_W / source.width`.
-3. `setGapAt(gap)` (the fan opens the gap); `setFlying({ card, z: place.z, from: source, to: \`translate(dx,dy) rotate(rot) scale(scale)\` })`;
-   `setStarted(false)`, `setTucked(false)`.
-4. **Double-rAF** — **[I2]** → `setStarted(true)` (the overlay transitions to `to`); start a `START_HIGH_MS` timer → `setTucked(true)`.
-5. The overlay div: `zIndex = tucked ? place.z : 'var(--z-flight)'`; `transform = started ? to : 'none'`; the move is a CSS
-   transition on `.flying` (`FLIGHT_MS`).
-6. `onTransitionEnd` (`settle`): if the finished property is `transform` and `gapAt != null` →
-   `onInserted(card, gapAt)` (the consumer splices the card into `hand` at `gap`) → `reset()` (clear gap/flying/started/tucked).
+**Sequence** (`arrive(items, handLength)`, inside the step)
+1. Guard `if (flights.length) return`. `gap = round(handLength / 2)` (the middle of the fan);
+   `total = handLength + items.length`; card `i` aims at `slotPlacement(gap + i, total)`.
+2. Measure the hand rect `hr` — **[I1]**. Each card's source is resolved in one of three ways: its
+   `from` rect; the element it IS (`el` — measured, then taken off screen for the flight); or one half
+   of a pair (`el` + `anchor`, whose tilted bbox is trimmed with `cardBoxIn` — **[I6]**).
+3. A source resting at a tilt (`rot`) is mounted with the pivot difference compensated: the slot
+   pivots on its bottom centre, a tilted card rests on its own centre, and without the shift the very
+   first frame jumps by ~`h/2·sin(rot)`.
+4. `setFlights(list)`; `setGapAt(gap)` — the fan starts opening WHILE the cards travel; **double-rAF**
+   — **[I2]** → `started = true`; a `START_HIGH_MS` timer → `tucked = true`.
+5. Each overlay div: `zIndex = tucked ? place.z : 'var(--z-flight)'`; the move is a CSS transition on
+   `.arriving` (`FLIGHT_MS`).
+6. After `FLIGHT_MS`: `onLanded(gap, landed)` — the step hands back WHAT arrived (each entry's `key`
+   is the card's uid), the scene splices its own items at `gap` — then `reset()`. Closing the gap and
+   adding the cards is the same layout, so nothing shifts on the last frame.
 
 **Params & timings**
 | Aspect | Value |
 |---|---|
-| flight | CSS transition on `.flying`, `FLIGHT_MS = 480` |
-| high-layer hold | `START_HIGH_MS = 140` (then z drops from `var(--z-flight)` to the slot's z) |
+| flight | CSS transition on `.arriving`, `FLIGHT_MS = 480` |
+| travel-layer hold | `START_HIGH_MS = 140` (then z drops from `var(--z-flight)` to the slot's z) |
 | target size | `scale = CARD_W / source.width` (`CARD_W = 150`, the fan's card width) |
-| slot | `slotPlacement(gap, handLength + 1)` from `@/table/Hand/fan` — `x`, `y`, `rotate`, `z` |
+| slot | `slotPlacement(gap + i, handLength + items.length)` from `@/table/Hand/fan` |
 
 **Invariants**
-- **I1** measure the hand rect (and the source rect) before starting. **I2** double-rAF before flipping `started`
-  on, so the overlay paints at the source before transitioning (else it jumps).
-- Local: this is **CSS-transition based, not a `play()` preset**. The gap (`gapAt`) and the flight are one
-  coordinated move — the fan must render `handLength + 1` slots so the landing slot exists. The high→tuck
-  z-swap (`--z-flight` → `place.z`) makes the card ride over the fan, then slip under its right half. Landing is
-  detected by the `transitionend` of `transform`.
+- **I1** measure the hand rect (and the sources) before starting. **I2** double-rAF before flipping
+  `started`, or the overlay jumps from its origin. **I6** a tilted half is trimmed to a card box.
+- **I8** do not read the scene's staging on landing — it is cleared the moment the flight starts (or
+  the cards would be drawn twice); that is why the step hands back what arrived.
+- Local: this is **CSS-transition based, not a `play()` preset**. The gap and the flight are one
+  coordinated move — the fan must render `handLength + items.length` slots so the landing slots exist.
 
 **End state & cleanup**
-- `onInserted` splices the card into `hand` at `gap`; the hook `reset()`s (`gapAt = null`, flying cleared). The
-  fan is whole again with the new card.
+- `onLanded` splices the cards into `hand` at `gap`; the step resets (`gapAt = null`, flights cleared).
+  The fan is whole again with the new cards.
 
 **Building blocks**
-[`useHandInsert`](./reference.md#hand-insert) (**playground-local** — see the README "Current state" note) ·
-`@/table/Hand/fan` (`slotPlacement`, `CARD_W`) · `Hand` (renders the `gapAt`).
+[`useHandArrival`](./reference.md#hand-arrival--cards-arrive-in-the-hand) (**playground-local** — see
+the README "Current state" note) · `@/table/Hand/fan` (`slotPlacement`, `CARD_W`) · `Hand` (renders
+`gapAt` + `gapSize`).
 
-**Live reference**
-`Card to Hand` — `apps/playground/stories/interactive/CardToHandStory.tsx`.
+**Live reference.** `Card to Hand` — a single card, and a Release with the Code Review laid with it
+arriving together.
 
 ---
 
@@ -328,7 +332,7 @@ opponent's sinks back-up into their seat; a trigger stays revealed at the center
 
 **Elements / refs**
 - `deckRefs[i]` — draw-deck cells (source). `centerRef` — staging; `causeRef` — AI-trigger staging (left).
-- `seatRefs[oppId]` — opponent seats. `handRef` — the player fan (via `useHandInsert`). `discardRef`, `aiRef`.
+- `seatRefs[oppId]` — opponent seats. `handRef` — the player fan (via `useHandArrival`). `discardRef`, `aiRef`.
 - `flyerRef` — the flyer, **keyed by `seq`** (`flightSeq`). State: `flyer {card, faceDown, seq}`, `centerCard`, `busy`.
 
 **Sequence** (`drawOne(card, deckIndex)` → `boolean` "can continue")
@@ -341,7 +345,7 @@ opponent's sinks back-up into their seat; a trigger stays revealed at the center
      `flipCard`) → `wait(560)` (let the 420 flip play) → `setCenterCard(card)`; `setFlyer(null)`. Then AI
      vs Error 503 (separate recipes below).
    - **non-trigger, player** → `toPlayerHand(card)`: `wait(220)` → flip (`faceDown:false`) → `wait(560)` →
-     measure the flyer rect → `setFlyer(null)` → `insert(card, rect, hand.length)` (`useHandInsert`). returns `true`.
+     measure the flyer rect → `setFlyer(null)` → `arrive([{ key: uid, card, from: rect }], hand.length)` (`useHandArrival`). returns `true`.
    - **non-trigger, opponent** → `toOpponent(drawer)`: `wait(160)` → `to = cardBoxIn(seatRect, fromRect.width * 0.7)` →
      `play('dealToSeat', el, { from: fromRect, to })` (fades in) → bump `handCount` → `setFlyer(null)`. returns `true`.
 
@@ -350,7 +354,7 @@ opponent's sinks back-up into their seat; a trigger stays revealed at the center
 |---|---|---|---|
 | deck → staging | `drawToCenter` | 480 ms | back-up; `from = cardAreaOf(deckCell)` |
 | flip reveal | `flipCard` (auto, on `faceDown` change) | 420 ms | JS waits `220 + 560` around it |
-| player → hand | `useHandInsert` | `FLIGHT_MS = 480` | see the hand-insert reference entry |
+| player → hand | `useHandArrival` | `FLIGHT_MS = 480` | see the hand-insert reference entry |
 | opponent → seat | `dealToSeat` | 460 ms | +fade; `to = cardBoxIn(seat, w*0.7)` |
 
 **Invariants**
@@ -362,12 +366,12 @@ opponent's sinks back-up into their seat; a trigger stays revealed at the center
   the `Card`'s auto-`flipCard`.
 
 **End state & cleanup**
-- Player: card inserted at `gap` (via `onInserted` splice); flyer gone. Opponent: `handCount+1`; flyer gone.
+- Player: card inserted at `gap` (via the `onLanded` splice); flyer gone. Opponent: `handCount+1`; flyer gone.
   Trigger: `centerCard = card` stays; flyer gone.
 
 **Building blocks**
 [`drawToCenter`](./reference.md#presets) · [`dealToSeat`](./reference.md#presets) · `flipCard` (auto) ·
-[`useHandInsert`](./reference.md#hand-insert) · [`cardAreaOf`/`cardBoxIn`](./reference.md#card-geometry-helpers) ·
+[`useHandArrival`](./reference.md#hand-arrival--cards-arrive-in-the-hand) · [`cardAreaOf`/`cardBoxIn`](./reference.md#card-geometry-helpers) ·
 [`nextFrames`/`wait`](./reference.md#travel-and-timing-helpers).
 
 **Live reference**
@@ -679,7 +683,7 @@ forward and flips it face up; after a pause the chosen card flies into the playe
 shrink back to the origin.
 
 **Elements / refs**
-- `slotRefs[i]` — the deal-grid slots (each a face-down `Card`). `handRef` — the player fan (`useHandInsert`).
+- `slotRefs[i]` — the deal-grid slots (each a face-down `Card`). `handRef` — the player fan (`useHandArrival`).
 - State: `phase`, `pool: PoolCard[]`, `chosen: number | null`, `dealt: boolean`, `hand`.
 
 **Sequence**
@@ -691,10 +695,10 @@ shrink back to the origin.
      `transitionDelay: i*45ms` (while `chosen === null`).
 3. `pickCard(i)` (only in `deal`, `chosen === null`): `setChosen(i)` → the chosen `Card` flips face up
    (`faceDown={chosen !== i}`) and slides forward (`scale(1.12)`, `z 40`); `window.setTimeout(() => resolve(i), REVEAL_HOLD = 820)`.
-4. `resolve(i)`: measure `slotRefs[i]` rect; `insert(pool[i].card, rect, hand.length)` (the `useHandInsert` hook
+4. `resolve(i)`: measure `slotRefs[i]` rect; `arrive([{ key: uid, card: pool[i].card, from: rect }], hand.length)` (the `useHandArrival` hook
    flies it into the fan); `setPhase('resolve')`. In `resolve`, `slotStyle` sends the chosen slot to `opacity:0`
    (the hook owns the flight) and the rest back to `ORIGIN` (`opacity:0`).
-5. `useHandInsert` `onInserted(card, gap)`: splice into `hand` at `gap`; `setPhase('idle')`; clear `chosen/dealt/pool`.
+5. `useHandArrival` `onLanded(gap, landed)`: splice into `hand` at `gap`; `setPhase('idle')`; clear `chosen/dealt/pool`.
 
 **Params & timings**
 | Step | Mechanism | Duration |
@@ -702,11 +706,11 @@ shrink back to the origin.
 | deal-in / return | CSS transition on the slot (`ORIGIN ↔ grid`), staggered `i*45ms` | (CSS) |
 | flip the pick | `Card` `flipCard` on `faceDown` change | 420 ms |
 | reveal hold before flight | `setTimeout(REVEAL_HOLD)` | 820 ms |
-| chosen → hand | `useHandInsert` | `FLIGHT_MS = 480` |
+| chosen → hand | `useHandArrival` | `FLIGHT_MS = 480` |
 
 **Invariants**
 - The deal / reveal / return are **CSS transitions** on the slots (not `play()` presets); the flip is the
-  `Card`'s own `flipCard`. Only the final hand insert uses a module (`useHandInsert`).
+  `Card`'s own `flipCard`. Only the final hand insert uses a module (`useHandArrival`).
 - Local: the double-rAF (like **I2**) lets slots paint at `ORIGIN` before transitioning to the grid; the
   reveal→flight gap is `REVEAL_HOLD`.
 
@@ -714,7 +718,7 @@ shrink back to the origin.
 - Chosen card inserted into the hand at `gap`; pool cleared; `phase` back to `idle` (via the hook callback).
 
 **Building blocks**
-[`useHandInsert`](./reference.md#hand-insert) · `Card` `flipCard` (auto). Grid geometry: `gridPositions`
+[`useHandArrival`](./reference.md#hand-arrival--cards-arrive-in-the-hand) · `Card` `flipCard` (auto). Grid geometry: `gridPositions`
 (uses `DEAL_CARD_W`, `CARD_H`, `GAP_X/Y`, `COLS_MAX`); the `ORIGIN` transform.
 
 **Live reference**
@@ -913,9 +917,9 @@ Vibe).
    the discard. Then Inside: single → `insideGrab` (discard → centre → hand); several → `insideChoose`.
 6. `insideChoose`: remove candidates from the discard; render a hidden pick row; fly each from the discard to its
    row cell (`drawToCenter`, scaling up to hand-card width); reveal the row; await `ConfirmAction`; chosen →
-   `useHandInsert` into the hand; the rest fly back to the discard (`centerToDiscard`, own scatter).
+   `useHandArrival` into the hand; the rest fly back to the discard (`centerToDiscard`, own scatter).
 7. `goodVibe`: `resolveEvent` (Good Vibe → AI deck, trigger → discard); reset `turnInterrupted`; draw 2 per the
-   makeup selector — plain card via `drawToHand` (`pullTo` → `useHandInsert`), AI trigger via
+   makeup selector — plain card via `drawToHand` (`pullTo` → `useHandArrival`), AI trigger via
    `runAiTrigger(Hallucination)` (sets `turnInterrupted`), 503 via `draw503ToHalt`; break on `turnInterrupted ||
    halted` (Hallucination's interrupt skips the 2nd draw).
 8. `badVibe`: `setHandPickMode(true)` and await a hand click (`Hand.onCardClick`); `resolveGeneric` (Bad Vibe →
@@ -948,7 +952,7 @@ Vibe).
 
 **Building blocks**
 [`play('drawToCenter' / 'playToReleaseZone' / 'returnToDeck' / 'centerToDiscard')`](./reference.md) ·
-`useHandInsert` · `ConfirmAction` · `ReleaseZone.slotRef` · `jitter`/`toDiscardParams`.
+`useHandArrival` · `ConfirmAction` · `ReleaseZone.slotRef` · `jitter`/`toDiscardParams`.
 
 **Live reference**
 `AI cards` — `apps/playground/stories/interactive/AiCardsStory.tsx`.
@@ -986,8 +990,8 @@ leaves (miss).
    `scale(REVEAL_W / r.width)`, `rotate(0)`); double-rAF → `centered=true` (a CSS transition drives the flight).
 4. `onRevealEnd` (transform end, `centered && !flipped`): `flipped=true` (flip face up), `later(fall,
    REVEAL_HOLD)`.
-5. `fall()`: measure the reveal rect; `insert(card, rect, hand.length)` — the shared `useHandInsert` flies it into
-   the fan; `onInserted` splices it into `hand` and `backToIdle()`.
+5. `fall()`: measure the reveal rect; `arrive([{ key: uid, card, from: rect }], hand.length)` — the shared `useHandArrival` flies it into
+   the fan; `onLanded` splices it into `hand` and `backToIdle()`.
 
 **Params & timings**
 | Step | Value |
@@ -997,7 +1001,7 @@ leaves (miss).
 | centre hold before the drop | `REVEAL_HOLD = 820` ms |
 | miss shake + note | `MISS_HOLD = 1620` ms (+560 to idle) |
 | opponent fan / grid width | `OPP_HAND = 6`, `GRID_W = 100` |
-| final drop | `useHandInsert` (`FLIGHT_MS = 480`) |
+| final drop | `useHandArrival` (`FLIGHT_MS = 480`) |
 
 **Invariants**
 - The centre is measured against the **stage** (`rootRef`), not `window` — the playground sidebar offsets the
@@ -1011,7 +1015,7 @@ leaves (miss).
   the hand.
 
 **Building blocks**
-`useHandInsert` · `Hand` (`faceDown`, `renderFace`) · CSS transitions on `.reveal` / `.topHand`.
+`useHandArrival` · `Hand` (`faceDown`, `renderFace`) · CSS transitions on `.reveal` / `.topHand`.
 
 **Live reference**
 `Specific opponent card` — `apps/playground/stories/interactive/PickSpecificCardStory.tsx`.
@@ -1058,7 +1062,7 @@ up behind the opponent fan; else a "you don't have that card" note shows and not
 - The taken card ends **face-down**, `rotate(180)` — it becomes the opponent's hidden card, matching their fan.
 - The centre is measured against the **stage**, not `window` (**I1** + sidebar).
 - Two-hop flight (`from → center → up`) via **CSS transitions**; `zIndex` drops to 30 on the way up so it tucks
-  behind the opponent fan. No `useHandInsert` — the card leaves the hand, it does not settle into one.
+  behind the opponent fan. No `useHandArrival` — the card leaves the hand, it does not settle into one.
 
 **End state & cleanup**
 - Hit → the card is gone from your hand and shown joining the opponent fan; back to `idle`. Miss → nothing leaves.
@@ -1087,7 +1091,7 @@ chosen card flies to the centre, enlarges, holds, then drops into your hand; a s
 and flies onto the draw deck; the unpicked cards return to the pile in their original order (no reshuffle).
 
 **Elements / refs**
-- `pileRef` (discard), `deckRef` (draw deck), grid slot refs, `handRef` (`useHandInsert`).
+- `pileRef` (discard), `deckRef` (draw deck), grid slot refs, `handRef` (`useHandArrival`).
 - State: `phase`, the discard pool, picks, `deckCount`, the size toggle `SIZES = [8, 54]` (no-scroll vs scroll).
 
 **Sequence**
@@ -1095,7 +1099,7 @@ and flies onto the draw deck; the unpicked cards return to the pile in their ori
    `DEAL_STEP` (capped at `STAGGER_CAP`), `DEAL_DUR` each; → `setPhase('choose')`.
 2. Pick (base 1 / sudo 2) under the trigger rule above.
 3. `resolve` (`setPhase('resolve')`): the hand card flies to the centre (`REVEAL_W`, `REVEAL_DUR`), holds
-   `REVEAL_HOLD`, then `useHandInsert` into the fan; a sudo deck card `flipCard` face-down (`FLIP_DUR`), holds
+   `REVEAL_HOLD`, then `useHandArrival` into the fan; a sudo deck card `flipCard` face-down (`FLIP_DUR`), holds
    `DECK_HOLD`, then `play('returnToDeck', {from, to: deckRect})` (`DECK_DUR`); the rest return to the pile via
    `play('centerToDiscard', toDiscardParams(from, pileRect, scatterAt(...), !visible))`, staggered `RETURN_STEP`
    (`RETURN_DUR`), keeping order. → `setPhase('done')`.
@@ -1117,7 +1121,7 @@ and flies onto the draw deck; the unpicked cards return to the pile in their ori
 
 **Building blocks**
 `play('returnToDeck' / 'centerToDiscard')` · `scatterAt` / `restTransform` / `toDiscardParams` / `HEAP_SHOW` ·
-`useHandInsert` · `Card` `flipCard`.
+`useHandArrival` · `Card` `flipCard`.
 
 **Live reference**
 `Git cards` → Cherry-pick — `apps/playground/stories/interactive/GitCards/CherryPick.tsx`.
@@ -1180,14 +1184,14 @@ after a hold they all sweep to the discard. sudo: the player picks one — it re
 holds, drops into the hand — and the rest go to the discard.
 
 **Elements / refs**
-- Seat refs (throw sources), `centerRef`, `pileRef` (discard), `handRef` (`useHandInsert`).
+- Seat refs (throw sources), `centerRef`, `pileRef` (discard), `handRef` (`useHandArrival`).
 - State: `phase`, opponent count `OPP_COUNTS`, the thrown cards, `sudo`.
 
 **Sequence**
 1. `throw`: each opponent's card flies seat → centre, `THROW_DUR`, staggered `THROW_STEP`, scaling `THROW_SCALE →
    1`.
 2. base → `hold` (`HOLD_MS`); sudo → `choose`.
-3. `resolve`: a sudo pick reveals to the centre (`REVEAL_W`, `REVEAL_DUR`), holds `REVEAL_HOLD`, `useHandInsert`
+3. `resolve`: a sudo pick reveals to the centre (`REVEAL_W`, `REVEAL_DUR`), holds `REVEAL_HOLD`, `useHandArrival`
    into the fan; the rest go to the discard via `play('centerToDiscard', toDiscardParams(from, to, scatterAt(...),
    !visible))`, staggered `CLEAR_STEP` (`RETURN_DUR`) → `done`.
 
@@ -1204,7 +1208,7 @@ holds, drops into the hand — and the rest go to the discard.
 - **I1 / I3 / I4** on every flight; `scatterAt` / `HEAP_SHOW` for the discard (**I7**).
 
 **Building blocks**
-`play('centerToDiscard')` · `scatterAt` / `restTransform` / `toDiscardParams` / `HEAP_SHOW` · `useHandInsert`.
+`play('centerToDiscard')` · `scatterAt` / `restTransform` / `toDiscardParams` / `HEAP_SHOW` · `useHandArrival`.
 
 **Live reference**
 `Git cards` → System Upgrade — `apps/playground/stories/interactive/GitCards/SystemUpgrade.tsx`.
@@ -1277,9 +1281,9 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
    - **Security Bug** does not burn the release: it crosses into the attacker's zone and morphs into
      its LOD reading **in flight** (opponents' cards read at a glance, not in full).
    - **Rollback** sends the attack back — plain to the thrower's hand, under Sudo into your own via
-     `useHandInsert`; the sudo that backed it is spent and leaves normally.
+     `useHandArrival`; the sudo that backed it is spent and leaves normally.
 5. **Cancel** — a press on nothing valid takes back whatever is staged (the Release awaiting its cost,
-   or the Sudo awaiting its defence) through `useHandInsert`, into the middle of the fan.
+   or the Sudo awaiting its defence) through `useHandArrival`, into the middle of the fan.
 
 **Params & timings.** `SHOW_HOLD` 1200 ms · `LAND_HOLD` 700 ms · `MERGE_MS` 620 ms · poses: attack
 `rot −4`, cover `rot 6, dx 16, dy −12`, sudo `rot −7`.

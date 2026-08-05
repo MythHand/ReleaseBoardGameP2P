@@ -89,6 +89,13 @@
   transition: opacity var(--t-base) var(--ease-out);
 }
 
+/* стопку можно выбрать: спокойная обводка по краю карты, без свечения — она
+   говорит «сюда можно», а не «вот эта». */
+.stack[data-pickable="true"] .glow {
+  box-shadow: 0 0 0 2px var(--white-25);
+  opacity: 1;
+}
+
 .stack[data-selected="true"] .glow {
   box-shadow: 0 0 0 2px var(--accent),
     0 0 22px 2px color-mix(in srgb, var(--accent) 50%, transparent);

@@ -102,6 +102,7 @@ export default function DeckAnimationsStory() {
   // (Sudo always needs a partner → 2), `staged` are the ones already standing there
   const [stageSize, setStageSize] = useState(0)
   const [staged, setStaged] = useState<HandItem[]>([])
+  const [arriving, setArriving] = useState(0) // cards on their way to the staging area
   const [hovered, setHovered] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -134,9 +135,13 @@ export default function DeckAnimationsStory() {
     }),
   )
 
-  // what the staging still needs before the play can resolve
+  // what the staging still needs before the play can resolve. Nothing is asked
+  // while a card is still ON ITS WAY to the centre: the slots are opened before the
+  // flight (they have to be there to be measured), so without this the table asks
+  // for a partner for the whole flight — and the hand lights up the cards that
+  // could be one, in a colour that is not theirs, until the card lands.
   const waiting: Waiting = (() => {
-    if (stageSize === 0 || busy) return null
+    if (stageSize === 0 || busy || arriving > 0) return null
     if (staged.length < stageSize) return 'partner'
     if (staged.some((s) => s.card.id === BRANCH) && decks.length > 1) return 'deck'
     return null
@@ -292,6 +297,7 @@ export default function DeckAnimationsStory() {
   // hand → a slot of the staging area. This IS the play flight: the card ends up
   // standing where it will be played, so nothing has to fly again on commit.
   const flyToStage = async (item: HandItem, fromRect: Rect, slot: number) => {
+    setArriving((n) => n + 1)
     // raising also lets the stage slots mount before they are measured
     const [el] = await raise([{ key: 'play', card: item.card, at: fromRect }])
     const toRect = stageRefs.current[slot]?.getBoundingClientRect()
@@ -300,6 +306,7 @@ export default function DeckAnimationsStory() {
       if (anim) await anim.finished
     }
     setStaged((s) => [...s, item])
+    setArriving((n) => n - 1)
     drop('play')
   }
 
@@ -448,6 +455,7 @@ export default function DeckAnimationsStory() {
     deckSeq = 1
     handSeq = 0
     setDecks([{ id: 1, count: 24 }])
+    setArriving(0)
     setHand(makeHand())
     setDiscard({ cards: makeDiscard(), showCount: true, gathered: false })
     setStageSize(0)
@@ -501,6 +509,7 @@ export default function DeckAnimationsStory() {
               count={d.count}
               width={150}
               countPos="tl"
+              pickable={choosingDeck && !d.hidden}
               selected={choosingDeck && hovered === d.id}
               accent={OPERATION}
             />
@@ -534,7 +543,10 @@ export default function DeckAnimationsStory() {
               {staged[i] ? (
                 <Card card={staged[i].card} interactive={false} width="100%" />
               ) : (
-                <span className={styles.stageEmpty} />
+                // an empty cell is drawn only while the table is ASKING for a card
+                // here — the Sudo's open second slot. A slot whose card is still on
+                // its way is not an ask, and framing it reads as a landing marker.
+                choosingCard && <span className={styles.stageEmpty} />
               )}
             </div>
           ))}

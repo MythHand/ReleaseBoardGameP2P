@@ -5,9 +5,10 @@ import type React from 'react'
 import { useRef, useState } from 'react'
 import { play } from '@/animations'
 import { CARDS } from '@/cards'
-import Card from '@/primitives/Card'
+import Card, { cardBoxIn } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
+import { CARD_W } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
@@ -24,7 +25,6 @@ import { useFlyer } from './useFlyer'
 // opponent (top — represented by a Seat, as on the table; the card flies from its spot).
 
 const BASE = CARDS.filter((c) => c.deck === 'base')
-const CARD_RATIO = 1.4 // card height/width
 const EMPTY_RELEASE: ReleaseSlots = { frontend: undefined, backend: undefined, database: undefined }
 
 interface HandItem {
@@ -110,15 +110,11 @@ export default function CardPlayStory() {
     if (!el || busy || center || oppDeck.length === 0) return
     const card = oppDeck[0]
     setOppDeck((d) => d.slice(1))
-    const r = el.getBoundingClientRect()
-    const w = 108
-    const h = w * CARD_RATIO
-    void flyToCenter(card, {
-      left: r.left + r.width / 2 - w / 2,
-      top: r.top + r.height / 2 - h / 2,
-      width: w,
-      height: h,
-    })
+    // a Seat is wider than a card and shows only a counter, so there is no card
+    // element to measure: the shared helper centres a card-sized box on the seat,
+    // at the width a card has on the table (the same box Defense Release throws
+    // an attack from)
+    void flyToCenter(card, cardBoxIn(el.getBoundingClientRect(), CARD_W))
   }
 
   const reset = () => {

@@ -2,7 +2,7 @@ import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import type React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { play, wait } from '@/animations'
+import { play, type Rect, wait } from '@/animations'
 import { CARDS, CATEGORIES, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Badge from '@/primitives/Badge'
@@ -18,7 +18,7 @@ import TurnDock, { type TurnDockState } from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './Error503Story.module.css'
 import { reorderHand } from './reorderHand'
-import { useDiscardExit } from './useDiscardExit'
+import { type Leaving, useDiscardExit } from './useDiscardExit'
 import { useFlyer } from './useFlyer'
 
 // Error 503 — the player-turn story. From TurnDock 'draw' (no timer wired): the
@@ -59,7 +59,11 @@ const FILLERS = BASE.filter(
 type SlotKey = 'frontend' | 'backend' | 'database' | 'monitoring'
 const SLOTS: SlotKey[] = ['frontend', 'backend', 'database', 'monitoring']
 const WAITING_PLAYER = 'kernel_panic'
-const DROP_PAD = 48 // forgiveness around the 503 when releasing a dragged card
+// Where a dragged defence may be released. Not "on the 503": every other scene
+// accepts a card dropped anywhere on the table and takes it to where it belongs,
+// and having to hit one card exactly is a rule this screen invented for itself.
+// The one place that gives the card back is the player's own area — dropping it
+// back where it came from reads as changing your mind.
 const CARD_W = 150 // normal card width — deck / hand / centre all match (no size skew)
 const CARD_H = (CARD_W * 515) / 368 // matching --card-aspect (368 / 515)
 
@@ -68,6 +72,15 @@ const CARD_H = (CARD_W * 515) / 368 // matching --card-aspect (368 / 515)
 const ELIM_VIDEOS = Object.values(
   import.meta.glob('./eliminate/*.mp4', { eager: true, query: '?url', import: 'default' }),
 ) as string[]
+// Every answer to the 503 has the SAME shape, whichever card gives it: the card
+// travels to the centre, covers the alarm slightly off so both are read, both
+// stand open long enough for the table to see what happened, and only then do they
+// leave together as one exchange. Monitoring is the same beat without a card: the
+// alarm is shown neutralized, held, and goes.
+const COVER_DX = 16 // the cover sits a touch off the alarm — or it just hides it
+const COVER_DY = -12
+const COVER_HOLD = 1200 // the answer and the alarm stand open, читаемые всеми
+const GATHER_HOLD = 1500 // the swept cards are held open at the centre before they scatter
 const ELIM_MIN_MS = 5000 // play at least this long, then finish the current loop
 
 interface RelSlot {
@@ -143,10 +156,11 @@ export default function Error503Story() {
   const deckRef = useRef<HTMLDivElement>(null)
   const centerRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
-  const { send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
+  const { overlay: discardOverlay, send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
     setDiscard((d) => [...d, ...cards]),
   )
   const dragRef = useRef<HTMLDivElement>(null)
+  const youRef = useRef<HTMLDivElement>(null) // the player's own area: zone + hand
   const handWrapRef = useRef<HTMLDivElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const relSlotRefs = useRef<Record<string, HTMLDivElement | null>>({})
@@ -239,7 +253,7 @@ export default function Error503Story() {
   // fly a set of cards to the discard as a scattered heap. `gather` first draws
   // them together at the centre (elimination), then scatters; without it the
   // cards are already at the centre (a resolved defence) and just scatter.
-  async function sweep(items: { card: CardType; fromRect: DOMRect }[], gather: boolean) {
+  async function sweep(items: { card: CardType; fromRect: Rect }[], gather: boolean) {
     const centerRect = centerRef.current?.getBoundingClientRect()
     const discardRect = discardRef.current?.getBoundingClientRect()
     if (!discardRect || items.length === 0) return
@@ -247,7 +261,9 @@ export default function Error503Story() {
     await raise(items.map((it, i) => ({ key: `o${i}`, card: it.card, at: it.fromRect })))
     if (gather && centerRect) {
       await Promise.all(items.map((_, i) => glide(`o${i}`, centerRect, 300)))
-      await wait(260) // a beat at the centre before they scatter
+      // held open at the centre — the same beat the hand-limit grid gets before it
+      // leaves: the table has to be readable before the cards scatter
+      await wait(GATHER_HOLD)
     }
     // the shared step flies them all out at once and commits them to the heap
     await sendToDiscard(
@@ -287,7 +303,7 @@ export default function Error503Story() {
     // no glow. Monitoring stays in the zone.
     if (rel.monitoring) {
       setDock('push')
-      await wait(750)
+      await wait(COVER_HOLD) // neutralized, and held open like any other answer
       const cRect = centerRef.current?.getBoundingClientRect()
       setCenterCard(null)
       if (cRect) await sweep([{ card: ERROR503_CARD, fromRect: cRect }], false)
@@ -311,6 +327,14 @@ export default function Error503Story() {
   }
 
   // ===== defence by drag =====
+
+  // the table takes the card; the player's own area (release zone + hand) gives it
+  // back. Everything else on screen is table.
+  const onTable = (x: number, y: number) => {
+    const you = youRef.current?.getBoundingClientRect()
+    return !you || y < you.top || x < you.left || x > you.right
+  }
+
   function beginDrag(
     el: HTMLElement,
     e: React.MouseEvent,
@@ -338,27 +362,51 @@ export default function Error503Story() {
     if (!item || item.card.id !== DEBUGGER) return false
     const c = centerRef.current?.getBoundingClientRect()
     if (!c) return false
-    const hit =
-      dropped.x >= c.left - DROP_PAD &&
-      dropped.x <= c.right + DROP_PAD &&
-      dropped.y >= c.top - DROP_PAD &&
-      dropped.y <= c.bottom + DROP_PAD
-    if (!hit) return false
+    if (!onTable(dropped.x, dropped.y)) return false
     void neutralizeWithDebugger(uid, item.card, dropped.rect ?? c)
     return true
   }
-  // Debugger played onto the 503 → both go to the discard
+  // where an answer comes to rest: over the alarm, nudged so both are readable
+  const coverRect = (): Rect | undefined => {
+    const c = centerRef.current?.getBoundingClientRect()
+    return c && { left: c.left + COVER_DX, top: c.top + COVER_DY, width: c.width, height: c.height }
+  }
+
+  // the alarm and the answer leave together — one exchange, the alarm underneath
+  function discardExchange(
+    answer: CardType,
+    from: Rect,
+    aux?: CardType | null,
+    el?: HTMLElement | null,
+  ) {
+    const rect503 = centerRef.current?.getBoundingClientRect()
+    const leaving: Leaving[] = []
+    if (rect503) leaving.push({ key: 'e503', card: ERROR503_CARD, from: rect503, layer: 0 })
+    leaving.push({ key: 'def', card: answer, aux, el, from, layer: 1 })
+    return sendToDiscard(leaving)
+  }
+
+  // Debugger played from the hand: it flies to the centre and covers the 503 —
+  // the same journey the release makes, so an answer always reads the same way
   async function neutralizeWithDebugger(uid: string, card: CardType, fromRect: DOMRect) {
     setPending(false)
     setBusy(true)
     setAlert(false)
     setHandItems((h) => h.filter((x) => x.uid !== uid))
-    const rect503 = centerRef.current?.getBoundingClientRect()
-    setCenterCard(null)
-    const items: { card: CardType; fromRect: DOMRect }[] = []
-    if (rect503) items.push({ card: ERROR503_CARD, fromRect: rect503 })
-    items.push({ card, fromRect })
-    await sweep(items, false)
+    const to = coverRect()
+    if (to) {
+      const [el] = await raise([{ key: 'cover', card, at: fromRect }])
+      if (el) {
+        const anim = play('playToCenter', el, { from: fromRect, to })
+        if (anim) await anim.finished
+        pin('cover', to) // I4 — it covers the alarm and stands there
+      }
+      await wait(COVER_HOLD)
+      setCenterCard(null)
+      const gone = discardExchange(card, to)
+      drop('cover')
+      await gone
+    }
     setDock('push')
     setBusy(false)
   }
@@ -417,14 +465,7 @@ export default function Error503Story() {
       cancelAnimationFrame(raf)
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
-      const c = centerRef.current?.getBoundingClientRect()
-      const hit =
-        c &&
-        e.clientX >= c.left - DROP_PAD &&
-        e.clientX <= c.right + DROP_PAD &&
-        e.clientY >= c.top - DROP_PAD &&
-        e.clientY <= c.bottom + DROP_PAD
-      if (hit) void resolveDefense(drag)
+      if (onTable(e.clientX, e.clientY)) void resolveDefense(drag)
       else void returnDrag(drag)
     }
     window.addEventListener('mousemove', onMove)
@@ -441,29 +482,34 @@ export default function Error503Story() {
   async function resolveDefense(d: DragState) {
     setBusy(true)
     setPending(false)
-    const centerRect = centerRef.current?.getBoundingClientRect()
+    const to = coverRect()
     const el = dragRef.current
-    if (el && centerRect) {
-      // cover the 503 straight (no tilt) — a rotated cover makes the cards'
-      // bounding boxes drift, which is exactly what teleported them on hand-off.
-      // Settle to the normal width too (in case a quick drag ended mid-resize).
+    if (el && to) {
+      // the dragged card finishes its own journey: it settles over the alarm at the
+      // cover spot and at the normal width (a quick drag can end mid-resize)
       el.style.transition =
         'left 240ms var(--ease-out), top 240ms var(--ease-out), width 240ms var(--ease-out)'
-      el.style.left = `${centerRect.left}px`
-      el.style.top = `${centerRect.top}px`
+      el.style.left = `${to.left}px`
+      el.style.top = `${to.top}px`
       el.style.width = `${CARD_W}px`
       await wait(300)
+      await wait(COVER_HOLD) // …and both stand open, exactly as long as any answer
     }
-    // read each card's ACTUAL current rect (the pair's main/aux anchors + the 503
-    // at the centre) so the discard flight continues from where they lie — no
-    // recompute, no teleport (works because nothing is rotated → bbox = card)
-    const anchor = (sel: string): DOMRect | undefined =>
-      (el?.querySelector(sel) as HTMLElement | null)?.getBoundingClientRect()
-    const mainRect = d.aux ? anchor('[data-main]') : el?.getBoundingClientRect()
-    const auxRect = d.aux ? anchor('[data-aux]') : undefined
-    const rect503 = centerRef.current?.getBoundingClientRect()
+    // Hand the defence to the shared exit step AS A PAIR and let it do what it
+    // does everywhere else: it measures the tilted aux half itself, trims that box
+    // back to a card box (I6) and unwinds the tilt DURING the flight. Feeding it
+    // two straightened rects instead is what made the Code Review shift — the
+    // trimmed box was right, but the card still snapped upright on hand-off.
+    const mainRect = d.aux
+      ? ((el?.querySelector('[data-main]') as HTMLElement | null)?.getBoundingClientRect() ??
+        el?.getBoundingClientRect())
+      : el?.getBoundingClientRect()
 
     setAlert(false)
+    // the pair is still ON SCREEN while the step measures it (Combo's rule) — only
+    // then is the drag taken down, in the same turn React commits
+    const gone = mainRect ? discardExchange(d.main, mainRect, d.aux, el) : Promise.resolve()
+
     // debugger leaves the hand → the fan closes the gap (like Deck animations);
     // tell the fan the mouse left so it doesn't leave a card lit up
     if (d.kind === 'debugger' && d.uid) {
@@ -472,13 +518,7 @@ export default function Error503Story() {
     } else if (d.slot) setRel((r) => ({ ...r, [d.slot as SlotKey]: undefined }))
     setCenterCard(null)
     setDrag(null)
-
-    // discard, keeping the landed order bottom → top: 503, Code Review, Release
-    const items: { card: CardType; fromRect: DOMRect }[] = []
-    if (rect503) items.push({ card: ERROR503_CARD, fromRect: rect503 })
-    if (d.aux && auxRect) items.push({ card: d.aux, fromRect: auxRect })
-    if (mainRect) items.push({ card: d.main, fromRect: mainRect })
-    await sweep(items, false)
+    await gone
     setDock('push')
     setBusy(false)
   }
@@ -618,7 +658,7 @@ export default function Error503Story() {
 
       {/* release zone + hand — bottom-centre. Cross-fades to the "you are out"
           badge (release zone gone) when the player is knocked out, as on Table */}
-      <div className={styles.you}>
+      <div className={styles.you} ref={youRef}>
         <div className={styles.playArea} data-hidden={eliminated}>
           {/* the zone reflects what the scene decided and hands the grab back:
               a release that can answer the 503 lights in its category accent, and
@@ -663,8 +703,11 @@ export default function Error503Story() {
         </div>
       </div>
 
-      {/* every card this scene has in the air — the shared carrier */}
+      {/* every card this scene has in the air — the shared carrier, and the
+          discard step's own overlay (it raises its own flyers for a card handed
+          over as a rect rather than as an element) */}
       {flyerOverlay}
+      {discardOverlay}
 
       {/* the card being dragged as a defence */}
       {drag && (

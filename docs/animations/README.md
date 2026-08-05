@@ -56,15 +56,23 @@ Not everything these docs describe is a shared library module. As of now:
   column does not shadow the hand behind it.
 
 **Shared, but living in the playground (`apps/playground/stories/interactive/`):**
-Three **named steps** — one per kind of movement, not one generic flight engine. Import them from
-a story; they own their own overlay, their own geometry and their own rule:
-- **`useHandInsert`** — *a card settles into the hand.* One card. The fan opens a gap in the
-  middle, the card matches the fan's size and tucks under its right half.
+Two **named steps** — one per kind of movement, not one generic flight engine — and one **carrier**
+underneath them. Import them from a story; a step owns its rule and its geometry, the carrier owns
+the node:
+- **`useHandArrival`** — *cards arrive in the hand.* Any number, from any kind of source: a rect, a
+  card resting at a tilt, an element already on screen, one half of a pair. The fan opens a gap for
+  all of them in the MIDDLE and they tuck under it as they land. A draw and the undo of a play are
+  the same movement — that is why this is one step and not two.
 - **`useDiscardExit`** — *cards leave the table for the discard.* Any number: one by one but all
   at once. A pair splits into its two singles; one scatter drives both a card's flight and its
   rest; the table tilt unwinds in flight; the layer a card had decides the order it joins the heap.
-- **`useHandReturn`** — *the staging goes back into the hand.* The undo of a play: the whole
-  staging at once, into the MIDDLE of the fan, with the fan opening while the cards travel.
+- **`useFlyer`** — *the carrier.* Not a movement: the fixed node a card rides in, and the five
+  invariants that belong to it (I10, I5, I2, I3, I4). Scenes and steps raise cards through it; it
+  does not know where they fly.
+
+**Render what you take.** A step handed a RECT raises a flyer of its own, and that flyer lives in
+the step's `overlay`. Forget to render it and there is no flight, no error, and a card that simply
+appears at the destination.
 
 **Still per-scene, and that is fine:** the orchestration — `playSequence`, `drawOne`, `resolveAi`,
 `flyToCenter`, the combo merge. A scene's own sequence of beats is the scene's subject; only the
@@ -78,10 +86,10 @@ mechanics live inside the step, in one place, and are not restated per scene.
 **Where they live:** the steps sit in the playground, not in `@release/ui`, because the playground
 is their only consumer today. They move into the library when something outside it needs them —
 that is the later, game-screen phase, not now. Do **not** assume
-`import { useHandInsert } from '@release/ui'` — it isn't there.
+`import { useHandArrival } from '@release/ui'` — it isn't there.
 
 > **Решено (было открытым вопросом).** Как готовить переиспользуемую машинерию анимаций.
-> Рассматривались два кандидата — перенести `useHandInsert` в `@/ui` и спроектировать общий
+> Рассматривались два кандидата — перенести шаг вставки в руку в `@/ui` и спроектировать общий
 > `useFlight` / `<Flyer>`. Взят **третий путь: именованные шаги по смыслу движения**, а не один
 > универсальный полётный примитив. Причина: у каждого движения своё правило (куда целиться, какой
 > разброс, в каком порядке ложиться, что делать с парой), и универсальный флаер это правило не
@@ -185,7 +193,7 @@ teleports on screen.
   array it is appended to at the destination. Two flyers left on the same `z` fall back to
   document order, which is the order of the array you happened to build — so the card that lay
   underneath paints on top and the stack silently turns over mid-flight. The existing pieces all
-  follow this: the discard heap layers by its own index (`zIndex: i`), and `useHandInsert` /
+  follow this: the discard heap layers by its own index (`zIndex: i`), and `useHandArrival` /
   `Hand.settleInto` set the flyer's `z` to the target slot's `z` **before** the flight, so the
   card tucks into the fan at the right depth instead of riding over it. When a stack lands in the
   heap, append **bottom-up**: the lowest card has to arrive first, or the heap inverts it.

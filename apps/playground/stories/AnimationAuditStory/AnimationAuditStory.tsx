@@ -238,20 +238,20 @@ const MODULES: Module[] = [
       en: 'The single source of hand-fan geometry: tilt, arc, width and step-from-card-count. The slot layout in Hand and the insert landing are computed by ONE formula — no copies that drift apart under tuning.',
     },
     where: {
-      ru: 'table/Hand/fan → Hand, useHandInsert',
-      en: 'table/Hand/fan → Hand, useHandInsert',
+      ru: 'table/Hand/fan → Hand, useHandArrival',
+      en: 'table/Hand/fan → Hand, useHandArrival',
     },
     status: 'ok',
   },
   {
-    mod: 'useHandInsert()',
+    mod: 'useHandArrival()',
     what: {
-      ru: 'Карта «встаёт в руку»: рука раздвигает зазор, карта подгоняет размер и садится в bottom-center слота. Место слота берёт из table/Hand/fan (slotPlacement).',
-      en: 'A card "settles into the hand": the hand opens a gap, the card matches size and sits at the slot bottom-center. The slot position comes from table/Hand/fan (slotPlacement).',
+      ru: 'Карты ПРИХОДЯТ в руку — одно движение на любое их число. Раньше это были два шага («карта встаёт в руку» и «сборка возвращается»), а на экране движение одно: веер раздвигает зазор в СЕРЕДИНЕ, карта подгоняет размер, садится на нижний центр слота и подтыкается под веер. Источник любой: прямоугольник; карта, лежащая с наклоном (пивот компенсируется, первый кадр не дёргается); уже нарисованный элемент (шаг сам убирает его с экрана); половина пары (по своему якорю, наклонённая рамка обрезается — I6). На приземлении отдаёт НАЗАД то, что прилетело: сцена не читает свою выкладку, которую к тому моменту уже очистила (I8).',
+      en: 'Cards ARRIVE in the hand — one movement for any number of them. It used to be two steps ("a card settles in" and "the staging comes back"), but on screen the movement is one: the fan opens a gap in the MIDDLE, the card matches the size, lands on the slot bottom-centre and tucks under the fan. Any source: a rect; a card resting at a tilt (the pivot is compensated, so the first frame does not jump); an element already drawn (the step takes it off screen itself); one half of a pair (measured off its anchor, the tilted box trimmed — I6). On landing it hands BACK what arrived: the scene does not read its own staging, which it cleared the moment the flight started (I8).',
     },
     where: {
-      ru: 'stories/interactive → DrawCard, CardToHand, PickOpponentCard, CherryPick, SystemUpgrade, AiCards, DefenseRelease',
-      en: 'stories/interactive → DrawCard, CardToHand, PickOpponentCard, CherryPick, SystemUpgrade, AiCards, DefenseRelease',
+      ru: 'stories/interactive → 12 мест: добор, карта соперника, Inside, Cherry-pick, System Upgrade, отмены в Combo и DeckAnimations, Rollback',
+      en: 'stories/interactive → 12 places: draws, an opponent card, Inside, Cherry-pick, System Upgrade, the undos in Combo and DeckAnimations, Rollback',
     },
     status: 'ok',
   },
@@ -268,22 +268,22 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
-    mod: 'useHandReturn()',
+    mod: 'useFlyer()',
     what: {
-      ru: 'Отмена розыгрыша: сборка со стола возвращается в руку ВСЯ РАЗОМ — розыгрыш был одним действием, отмена тоже одно. Приземляется в СЕРЕДИНУ веера (как любая другая вставка), веер раздвигается ПОКА карты летят. Каждая целится в свой будущий слот и садится на его нижний центр. Пара — снова две карты, каждая от своего якоря.',
-      en: 'Undo of a play: the staging comes back into the hand ALL AT ONCE — the play was one act, so undoing it is one act too. It lands in the MIDDLE of the fan (like every other insert), and the fan opens the gap WHILE the cards travel. Each card aims at the slot it will occupy and sits on its bottom centre. A pair is two cards again, each from its own anchor.',
+      ru: 'ПЕРЕВОЗЧИК — та половина полёта, которая не правило. Под каждым полётом один и тот же узел: закреплённая карта над столом. Его писали заново в каждой сцене, а вместе с ним пять инвариантов, и каждый хоть раз ломался: рисоваться там, где смонтировался (I10 — иначе вспышка внизу страницы), свежий узел на полёт (I5), прокраска у источника (I2), гашение остатков анимаций (I3), прикол после посадки (I4). Умеет нести не только карту: пару, карту в беглом чтении, карту в морфе — содержимое остаётся сценовым, узел общий. Не знает, куда лететь и каким пресетом. I4 сцена вправе не применять: если поза приземления живёт в залитой анимации, прикол её погасит.',
+      en: "THE CARRIER — the half of a flight that is not the rule. Under every flight there is the same node: a fixed card over the table. It was written from scratch per scene, and with it five invariants, each broken at least once: paint where it MOUNTS (I10 — else a flash at the bottom of the page), a fresh node per flight (I5), a painted frame at the source (I2), leftover animations cancelled (I3), the pin after landing (I4). It can carry more than a card — a pair, a card in its at-a-glance reading, a card mid-morph: the content stays the scene's, the node is shared. It does not know where to fly or which preset. A scene may decline I4: if the landing pose lives in a filled animation, pinning would cancel it.",
     },
     where: {
-      ru: 'stories/interactive → Combo, DeckAnimations',
-      en: 'stories/interactive → Combo, DeckAnimations',
+      ru: 'stories/interactive → все сцены с полётами',
+      en: 'stories/interactive → every scene with flights',
     },
     status: 'ok',
   },
   {
     mod: 'Pile (heap)',
     what: {
-      ru: 'Сброс как наброшенная КУЧА, а не ровная стопка: карты лежат каждая со своим разбросом (scatterAt/restTransform), под ними «глубина» стопки — и она показывается только когда под видимыми картами реально что-то есть. Отдаёт наружу коробку карты (boxRef) — в неё целятся полёты, и собранное состояние (gathered) — когда сброс превращается в колоду. Счётчик стоит на ступень ВЫШЕ полёта: прилетающая карта проходит под ним, а не накрывает и потом ныряет вниз — поэтому место стопки на столе нельзя центрировать трансформом (он запер бы бейдж внутри).',
-      en: "The discard as a tossed HEAP, not a neat stack: every card lies at its own scatter (scatterAt/restTransform), with the pile depth beneath — shown only when something is actually hidden under the visible cards. Exposes the card box (boxRef) for flights to aim at, and the gathered state for when the discard turns into a deck. The counter sits one rung ABOVE the flight: an arriving card passes under it instead of covering it and then dropping beneath — which is why a pile's place on the table must not be centred with a transform (that would trap the badge inside the wrapper).",
+      ru: 'Сброс как наброшенная КУЧА, а не ровная стопка: карты лежат каждая со своим разбросом (scatterAt/restTransform), под ними «глубина» стопки — и она показывается только когда под видимыми картами реально что-то есть. Отдаёт наружу коробку карты (boxRef) — в неё целятся полёты, и собранное состояние (gathered) — когда сброс превращается в колоду. Два состояния выбора, как у карты в руке: pickable — спокойная обводка «сюда можно» (идёт выбор, целей несколько), selected — свечение в цвете под курсором. Счётчик стоит на ступень ВЫШЕ полёта: прилетающая карта проходит под ним, а не накрывает и потом ныряет вниз — поэтому место стопки на столе нельзя центрировать трансформом (он запер бы бейдж внутри).',
+      en: "The discard as a tossed HEAP, not a neat stack: every card lies at its own scatter (scatterAt/restTransform), with the pile depth beneath — shown only when something is actually hidden under the visible cards. Exposes the card box (boxRef) for flights to aim at, and the gathered state for when the discard turns into a deck. Two pick states, like a hand card: pickable — a calm outline meaning 'this one can be picked' (a choice is open and there are several targets), selected — the accent glow under the cursor. The counter sits one rung ABOVE the flight: an arriving card passes under it instead of covering it and then dropping beneath — which is why a pile's place on the table must not be centred with a transform (that would trap the badge inside the wrapper).",
     },
     where: {
       ru: 'primitives/Pile → Table + все сцены',
@@ -358,8 +358,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Розыгрыш комбо (пара)', en: 'Playing a combo (pair)' },
     from: {
-      ru: 'useArrow + centerOf ведёт прицел; совмещение через CardPair (доп. карта подтыкается под углом); релиз → playToReleaseZone (move 480, SNAP-приземление); в сброс — через useDiscardExit (пара распадается на 2 одиночки, каждая от своего якоря); отмена — через useHandReturn (сборка возвращается в середину веера разом).',
-      en: 'useArrow + centerOf drives the aim; pairing via CardPair (the extra card tucks in at an angle); release → playToReleaseZone (move 480, SNAP landing); to the discard — via useDiscardExit (the pair splits into 2 singles, each from its own anchor); cancel — via useHandReturn (the staging returns to the middle of the fan at once).',
+      ru: 'useArrow + centerOf ведёт прицел; совмещение через CardPair (доп. карта подтыкается под углом); релиз → playToReleaseZone (move 480, SNAP-приземление); в сброс — через useDiscardExit (пара распадается на 2 одиночки, каждая от своего якоря); отмена — через useHandArrival (сборка возвращается в середину веера разом).',
+      en: 'useArrow + centerOf drives the aim; pairing via CardPair (the extra card tucks in at an angle); release → playToReleaseZone (move 480, SNAP landing); to the discard — via useDiscardExit (the pair splits into 2 singles, each from its own anchor); cancel — via useHandArrival (the staging returns to the middle of the fan at once).',
     },
     where: 'Combo',
   },
@@ -398,8 +398,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Добор карты (одиночный)', en: 'Drawing a card (single)' },
     from: {
-      ru: 'drawToCenter (move 480) колода→центр рубашкой вверх; ветвление по карте: игрок — flipCard + useHandInsert.insert (садится в слот руки); соперник — dealToSeat (move + fade) в card-area места ×0.7, без скейла вверх; триггер/AI — flipCard в центре (reveal для всех), AI ещё добирает эффект из AI-колоды рядом (flyer с key={seq}, чтобы Card не переиспользовалась и не крутилась).',
-      en: 'drawToCenter (move 480) deck→center back-up; branch by card: player — flipCard + useHandInsert.insert (sits into a hand slot); opponent — dealToSeat (move + fade) into the seat card-area ×0.7, no upward scale; trigger/AI — flipCard at the center (reveal for all), AI also draws an effect from the nearby AI deck (flyer with key={seq} so the Card is not reused and does not spin).',
+      ru: 'drawToCenter (move 480) колода→центр рубашкой вверх; ветвление по карте: игрок — flipCard + useHandArrival.insert (садится в слот руки); соперник — dealToSeat (move + fade) в card-area места ×0.7, без скейла вверх; триггер/AI — flipCard в центре (reveal для всех), AI ещё добирает эффект из AI-колоды рядом (flyer с key={seq}, чтобы Card не переиспользовалась и не крутилась).',
+      en: 'drawToCenter (move 480) deck→center back-up; branch by card: player — flipCard + useHandArrival.insert (sits into a hand slot); opponent — dealToSeat (move + fade) into the seat card-area ×0.7, no upward scale; trigger/AI — flipCard at the center (reveal for all), AI also draws an effect from the nearby AI deck (flyer with key={seq} so the Card is not reused and does not spin).',
     },
     where: 'DrawCard',
   },
@@ -430,8 +430,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Взятие карты соперника', en: "Taking an opponent's card" },
     from: {
-      ru: 'раздача-грид карт рубашкой → flipCard reveal выбранной → useHandInsert (зазор в руке + посадка в bottom-center слота по slotPlacement).',
-      en: 'a deal-grid of face-down cards → flipCard reveal of the chosen one → useHandInsert (a gap in the hand + landing at the slot bottom-center per slotPlacement).',
+      ru: 'раздача-грид карт рубашкой → flipCard reveal выбранной → useHandArrival (зазор в руке + посадка в bottom-center слота по slotPlacement).',
+      en: 'a deal-grid of face-down cards → flipCard reveal of the chosen one → useHandArrival (a gap in the hand + landing at the slot bottom-center per slotPlacement).',
     },
     where: 'PickOpponentCard',
   },
@@ -446,40 +446,40 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Error 503 — ход игрока и защита', en: 'Error 503 — player turn & defence' },
     from: {
-      ru: 'добор из колоды → 503 в центр + красное краевое свечение (EdgeGlow strong в зоне стола). Защита ПЕРЕТАСКИВАНИЕМ карты на 503 (невидимые хит-зоны, drag как в игре, не клик): Release тащится вместе с прикреплённым Code Review (связка по позиции, не «сгруппированы»); карта накрывает 503, обе уходят в сброс (порядок стопки: 503, code review, release). Выбывание: PASS (рука + зона релиза → центр → сброс) или нет защиты (задержка → рука → сброс) → игрок становится зрителем, TurnDock → waiting. Полноэкранное видео выбывания для всех (мин. длительность, доигрывает текущий цикл).',
-      en: 'draw from the deck → 503 to the center + red edge glow (EdgeGlow strong in the table zone). Defence is a DRAG of a card onto the 503 (invisible hit areas, a real-game drag, not a click): a Release drags together with its attached Code Review (bound by position, not «grouped»); the card covers the 503 and both leave to the discard (stack order: 503, code review, release). Elimination: PASS (hand + release zone → center → discard) or no defence available (delay → hand → discard) → the player becomes a spectator, TurnDock → waiting. A full-screen elimination video for everyone (min duration, finishes the current loop).',
+      ru: 'добор из колоды → 503 в центр + красное краевое свечение. У ЛЮБОГО ответа одна форма: карта летит в центр, накрывает тревогу со смещением (обе читаются), обе стоят открытыми COVER_HOLD и уходят в сброс одним обменом (useDiscardExit: тревога снизу, ответ сверху, пара с Code Review разбирается шагом). Monitoring — тот же такт без карты. Бросок принимает ВЕСЬ стол; отдаёт назад только своя область (зона + рука). Без защиты: рука сметается к центру, держится GATHER_HOLD (такт из Hand limit) и разлетается в сброс, дальше полноэкранное видео вылета (случайное из папки сцены).',
+      en: "draw from the deck → 503 to the centre + red edge glow. EVERY answer has the same shape: the card flies to the centre, covers the alarm nudged aside (both readable), both stand open for COVER_HOLD and leave as one exchange (useDiscardExit: the alarm underneath, the answer on top, a pair with its Code Review split by the step). Monitoring is the same beat without a card. The WHOLE table accepts the drop; only the player's own area (zone + hand) gives the card back. No defence: the hand sweeps to the centre, holds for GATHER_HOLD (the hand-limit beat) and scatters to the discard, then a full-screen elimination video (random from the scene folder).",
     },
     where: 'Error503Story',
   },
   {
     name: { ru: 'AI-эффекты — разрешение', en: 'AI effects — resolution' },
     from: {
-      ru: 'добор AI-триггера из базовой колоды → выбранная AI-карта из колоды событий в центр (drawToCenter, крупнее) → hold на столе → разрешение по эффекту. Карта события ВСЕГДА возвращается в AI-колоду (returnToDeck); в общий сброс идут только триггер (centerToDiscard) и уничтоженный ОБЫЧНЫЙ релиз. Release/Monitoring → в пустой слот (playToReleaseZone) и остаётся. Crush → уничтожает совпавший релиз (AI-релиз → AI-колода, обычный → сброс). Inside → релиз из сброса через центр в руку (useHandInsert); при нескольких — открытый ряд-выбор с ConfirmAction, невыбранные летят обратно в сброс. Good Vibe → добор 2 карт; триггер в доборе отыгрывается полностью первым, Hallucination ставит флаг прерывания — 2-й добор пропускается. Bad Vibe → игрок кликает карту руки → в центр (показ) → в сброс. Ховер руки заглушён во время анимаций (pointer-events).',
-      en: 'draw the AI trigger from the base deck → the chosen AI card from the events deck to the center (drawToCenter, larger) → hold → resolve by effect. An event card ALWAYS returns to the AI deck (returnToDeck); only the trigger (centerToDiscard) and a destroyed ORDINARY release reach the common discard. Release/Monitoring → into an empty slot (playToReleaseZone) and stays. Crush → destroys the matching release (AI release → AI deck, ordinary → discard). Inside → a release from the discard through the center into the hand (useHandInsert); with several, an open row choice + ConfirmAction, the rest fly back to the discard. Good Vibe → draws 2 cards; a drawn trigger resolves fully first, Hallucination raises a turn-interrupt flag — the 2nd draw is skipped. Bad Vibe → the player clicks a hand card → to the center (shown) → to the discard. Hand hover is muted during animations (pointer-events).',
+      ru: 'добор AI-триггера из базовой колоды → выбранная AI-карта из колоды событий в центр (drawToCenter, крупнее) → hold на столе → разрешение по эффекту. Карта события ВСЕГДА возвращается в AI-колоду (returnToDeck); в общий сброс идут только триггер (centerToDiscard) и уничтоженный ОБЫЧНЫЙ релиз. Release/Monitoring → в пустой слот (playToReleaseZone) и остаётся. Crush → уничтожает совпавший релиз (AI-релиз → AI-колода, обычный → сброс). Inside → релиз из сброса через центр в руку (useHandArrival); при нескольких — открытый ряд-выбор с ConfirmAction, невыбранные летят обратно в сброс. Good Vibe → добор 2 карт; триггер в доборе отыгрывается полностью первым, Hallucination ставит флаг прерывания — 2-й добор пропускается. Bad Vibe → карта вытаскивается ИЗ ВЕЕРА и тем же движением встаёт справа от AI-карты, стоит открыто PICK_HOLD, и дальше всё уходит одновременно: триггер в сброс, AI-карта в колоду событий, отданная карта в сброс. Ховер руки заглушён во время анимаций (pointer-events).',
+      en: 'draw the AI trigger from the base deck → the chosen AI card from the events deck to the center (drawToCenter, larger) → hold → resolve by effect. An event card ALWAYS returns to the AI deck (returnToDeck); only the trigger (centerToDiscard) and a destroyed ORDINARY release reach the common discard. Release/Monitoring → into an empty slot (playToReleaseZone) and stays. Crush → destroys the matching release (AI release → AI deck, ordinary → discard). Inside → a release from the discard through the center into the hand (useHandArrival); with several, an open row choice + ConfirmAction, the rest fly back to the discard. Good Vibe → draws 2 cards; a drawn trigger resolves fully first, Hallucination raises a turn-interrupt flag — the 2nd draw is skipped. Bad Vibe → the card is pulled OUT of the fan and, in the same movement, takes its place to the right of the AI card; it stands open for PICK_HOLD, and then everything leaves at once: the trigger to the discard, the AI card back to its deck, the given-up card to the discard. Hand hover is muted during animations (pointer-events).',
     },
     where: 'AiCardsStory',
   },
   {
     name: { ru: 'Забрать конкретную карту', en: 'Take a specific card' },
     from: {
-      ru: 'каталог-грид (без триггеров) в центре + веер соперника рубашкой сверху (data-in слайд). Выбор держит PICK_BEAT; хит — карта вылетает из слота соперника к центру стола (CSS-transition, центр от rootRef, не window), flip лицом, REVEAL_HOLD, затем useHandInsert в руку; мисс — тряска + подпись, веер уезжает. Слот-донор рендерит null, пока карту несёт flyer.',
-      en: 'a catalog grid (no triggers) at the centre + the opponent fan back-up from the top (data-in slide). The pick holds PICK_BEAT; hit — the card flies out of the opponent slot to the stage centre (CSS transition, centre from rootRef not window), flips face up, REVEAL_HOLD, then useHandInsert into the hand; miss — shake + note, the fan leaves. The donor slot renders null while the flyer carries the card.',
+      ru: 'каталог-грид (без триггеров) в центре + веер соперника рубашкой сверху (data-in слайд). Выбор держит PICK_BEAT; хит — карта вылетает из слота соперника к центру стола (CSS-transition, центр от rootRef, не window), flip лицом, REVEAL_HOLD, затем useHandArrival в руку; мисс — тряска + подпись, веер уезжает. Слот-донор рендерит null, пока карту несёт flyer.',
+      en: 'a catalog grid (no triggers) at the centre + the opponent fan back-up from the top (data-in slide). The pick holds PICK_BEAT; hit — the card flies out of the opponent slot to the stage centre (CSS transition, centre from rootRef not window), flips face up, REVEAL_HOLD, then useHandArrival into the hand; miss — shake + note, the fan leaves. The donor slot renders null while the flyer carries the card.',
     },
     where: 'PickSpecificCardStory',
   },
   {
     name: { ru: 'У тебя забирают карту', en: 'Opponent takes your card' },
     from: {
-      ru: 'зеркало «забрать конкретную» со стороны жертвы: two-hop CSS-transition from → center → up. В центре flip РУБАШКОЙ (теперь карта соперника), затем к центру его веера rotate(180); zIndex падает до 30 на подъёме, чтобы подоткнуться под веер. useHandInsert НЕ используется — карта уходит из руки, а не встаёт в неё.',
-      en: 'mirror of "take a specific card" from the victim: a two-hop CSS transition from → center → up. At the centre it flips FACE-DOWN (now the opponent’s card), then to their fan centre rotate(180); zIndex drops to 30 on the way up to tuck behind the fan. No useHandInsert — the card leaves the hand, it does not settle into one.',
+      ru: 'зеркало «забрать конкретную» со стороны жертвы: two-hop CSS-transition from → center → up. В центре flip РУБАШКОЙ (теперь карта соперника), затем к центру его веера rotate(180); zIndex падает до 30 на подъёме, чтобы подоткнуться под веер. useHandArrival НЕ используется — карта уходит из руки, а не встаёт в неё.',
+      en: 'mirror of "take a specific card" from the victim: a two-hop CSS transition from → center → up. At the centre it flips FACE-DOWN (now the opponent’s card), then to their fan centre rotate(180); zIndex drops to 30 on the way up to tuck behind the fan. No useHandArrival — the card leaves the hand, it does not settle into one.',
     },
     where: 'OpponentTakesCardStory',
   },
   {
     name: { ru: 'Git Cherry-pick (прототип)', en: 'Git Cherry-pick (prototype)' },
     from: {
-      ru: 'сброс раздаётся в грид выбора (стаггер DEAL_STEP, cap STAGGER_CAP); выбранная — к центру, useHandInsert в руку; sudo-вторая — flipCard рубашкой + returnToDeck на колоду; невыбранные возвращаются в стопку по scatterAt (порядок сохраняется, без перетасовки). Rules-complete отложен (#61).',
-      en: 'the discard deals into a selection grid (stagger DEAL_STEP, cap STAGGER_CAP); the pick → centre, useHandInsert into the hand; a sudo second card → flipCard back-up + returnToDeck onto the deck; the unpicked return to the pile by scatterAt (order kept, no reshuffle). Rules-complete deferred (#61).',
+      ru: 'сброс раздаётся в грид выбора (стаггер DEAL_STEP, cap STAGGER_CAP); выбранная — к центру, useHandArrival в руку; sudo-вторая — flipCard рубашкой + returnToDeck на колоду; невыбранные возвращаются в стопку по scatterAt (порядок сохраняется, без перетасовки). Rules-complete отложен (#61).',
+      en: 'the discard deals into a selection grid (stagger DEAL_STEP, cap STAGGER_CAP); the pick → centre, useHandArrival into the hand; a sudo second card → flipCard back-up + returnToDeck onto the deck; the unpicked return to the pile by scatterAt (order kept, no reshuffle). Rules-complete deferred (#61).',
     },
     where: 'GitCards/CherryPick',
   },
@@ -494,8 +494,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'System Upgrade (прототип)', en: 'System Upgrade (prototype)' },
     from: {
-      ru: 'каждый соперник бросает карту с места в центр (THROW_DUR/STEP, рост THROW_SCALE→1); base — после HOLD_MS всё в сброс (centerToDiscard, стаггер CLEAR_STEP); sudo — игрок берёт одну (reveal + useHandInsert), остальные в сброс. Rules-complete отложен.',
-      en: 'each opponent throws a card from its seat to the centre (THROW_DUR/STEP, growing THROW_SCALE→1); base — after HOLD_MS all to the discard (centerToDiscard, stagger CLEAR_STEP); sudo — the player takes one (reveal + useHandInsert), the rest to the discard. Rules-complete deferred.',
+      ru: 'каждый соперник бросает карту с места в центр (THROW_DUR/STEP, рост THROW_SCALE→1); base — после HOLD_MS всё в сброс (centerToDiscard, стаггер CLEAR_STEP); sudo — игрок берёт одну (reveal + useHandArrival), остальные в сброс. Rules-complete отложен.',
+      en: 'each opponent throws a card from its seat to the centre (THROW_DUR/STEP, growing THROW_SCALE→1); base — after HOLD_MS all to the discard (centerToDiscard, stagger CLEAR_STEP); sudo — the player takes one (reveal + useHandArrival), the rest to the discard. Rules-complete deferred.',
     },
     where: 'GitCards/SystemUpgrade',
   },
@@ -510,8 +510,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Защита релиза (полный ход)', en: 'Defending a release (a whole turn)' },
     from: {
-      ru: 'релиз из веера встаёт в центр и НЕ приземляется — по правилам он стоит одной карты, оплата показывается рядом открыто; только после этого релиз садится в свой слот зоны (playToReleaseZone) и открывается окно атак. Атака летит с места соперника в центр (cardBoxIn — прицел по карточной коробке, не по всей сидушке) и ложится под своим наклоном. Ответ: защита накрывает атаку, обе уходят в сброс одним обменом (useDiscardExit, слои сохраняются). Своё судо встаёт в СВОЙ слот со стрелкой и складывается с выбранной защитой в пару (покадровое слияние, без дублей и телепортов). Security Bug не жжёт релиз, а забирает его в зону атакующего — карта морфит в LOD прямо В ПОЛЁТЕ. Rollback возвращает атаку: без судо — в руку атакующего, с судо — в свою через useHandInsert. Промах мимо цели отменяет выложенное.',
-      en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence (a frame-by-frame merge, no duplicates and no teleports). Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandInsert. A press on nothing valid takes a staged play back.",
+      ru: 'релиз из веера встаёт в центр и НЕ приземляется — по правилам он стоит одной карты, оплата показывается рядом открыто; только после этого релиз садится в свой слот зоны (playToReleaseZone) и открывается окно атак. Атака летит с места соперника в центр (cardBoxIn — прицел по карточной коробке, не по всей сидушке) и ложится под своим наклоном. Ответ: защита накрывает атаку, обе уходят в сброс одним обменом (useDiscardExit, слои сохраняются). Своё судо встаёт в СВОЙ слот со стрелкой и складывается с выбранной защитой в пару (покадровое слияние, без дублей и телепортов). Security Bug не жжёт релиз, а забирает его в зону атакующего — карта морфит в LOD прямо В ПОЛЁТЕ. Rollback возвращает атаку: без судо — в руку атакующего, с судо — в свою через useHandArrival. Промах мимо цели отменяет выложенное.',
+      en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence (a frame-by-frame merge, no duplicates and no teleports). Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandArrival. A press on nothing valid takes a staged play back.",
     },
     where: 'DefenseRelease',
   },

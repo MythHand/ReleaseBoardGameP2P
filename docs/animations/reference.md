@@ -73,32 +73,44 @@ card (not at a wider cell/seat) — invariant **I6**. The `CARD_RATIO` value is 
 
 ---
 
-## The three movement steps
+## The movement steps, and the carrier under them
 
 `apps/playground/stories/interactive/` — one step per **kind of movement**, not one generic flight
-engine. Each owns its overlay, its geometry and its rule; a scene calls it and passes what it has.
-Tuning constants are in the glossary.
+engine. Each owns its rule and its geometry; under all of them sits one carrier that owns the node.
+A scene calls a step and passes what it has. Tuning constants are in the glossary.
 
-### Hand-insert — a card settles into the hand
+**Render what you take.** A step that is handed a RECT raises a flyer of its own, and that flyer
+lives in the step's `overlay`. A scene that forgets to render it gets no flight, no error and a card
+that simply appears at the destination. `useDiscardExit` says so in the console now; the rule is:
+destructure `overlay` and render it.
+
+### Hand-arrival — cards arrive in the hand
 
 | Name | Signature | What it does |
 |---|---|---|
-| `useHandInsert` | `useHandInsert(handRef, onInserted)` → `{ gapAt, overlay, insert, reset, flyingCard, FLIGHT_MS }` | opens a gap in the fan and flies **one** card into the slot; `insert(card, source, handLength)` starts it, `onInserted(card, gapIndex)` fires on landing |
-| `InsertSource` | `{ left, top, width, height, rot? }` | the source rect. `rot` — the tilt the card rests at on the table; the step compensates the pivot difference, so the first frame does not jump |
+| `useHandArrival` | `useHandArrival(handRef, onLanded)` → `{ overlay, gapAt, gapSize, arrive, reset, busy, FLIGHT_MS }` | `arrive(items, handLength)` opens a gap for **any number** of cards in the MIDDLE of the fan and flies them all in; they ride over the fan and tuck under it at the end. `onLanded(gap, landed)` fires on landing and hands back what arrived — the scene splices its own items at that index |
+| `Arriving` | `{ key, card, from? \| el?, rot?, anchor? }` | `key` — the card's identity in the scene's hand (its uid), handed back on landing. `from` — where it stands; `rot` — the tilt it rests at (the pivot difference is compensated, so the first frame does not jump); `el` — it IS an element on screen: the step measures it and takes it off screen for the flight; `el` + `anchor: 'main' \| 'aux'` — one half of a pair |
 
 ### Discard-exit — cards leave the table for the discard
 
 | Name | Signature | What it does |
 |---|---|---|
 | `useDiscardExit` | `useDiscardExit(boxRef, onLanded?)` → `{ overlay, send, reset, FLIGHT_MS }` | `send(items)` flies **any number** of cards out at once and resolves when they land; `onLanded(cards)` gets them bottom-up for the heap. Omit `onLanded` when the scene keeps its own books on the heap |
-| `Leaving` | `{ key, card, from? \| node?, aux?, el?, pose?, layer?, scatter?, fade?, delay? }` | `from` — it stands in a slot, the step raises its own flyer; `node` — it IS an element already on screen, that element flies. `aux` + `el` — a pair: split into two singles, the aux measured off `[data-aux]`. `layer` — its layer on the table (decides the heap order). `scatter` — bring your own (a card going back to its place). `fade` — it sinks below the visible top. `delay` — a stagger |
+| `Leaving` | `{ key, card, from? \| node?, aux?, el?, pose?, layer?, scatter?, fade?, delay? }` | `from` — it stands in a slot, the step raises its own flyer; `node` — it IS an element already on screen, that element flies. `aux` + `el` — a pair: split into two singles, the aux measured off `[data-aux]`, its tilt unwound in flight. `layer` — its layer on the table (decides the heap order). `scatter` — bring your own (a card going back to its place). `fade` — it sinks below the visible top. `delay` — a stagger |
 
-### Hand-return — the staging goes back into the hand
+### The carrier — a card in the air
+
+Not a movement: the node. It owns the five invariants that belong to a flyer (I10, I5, I2, I3, I4)
+so no scene writes them again. It does not know where to fly or which preset.
 
 | Name | Signature | What it does |
 |---|---|---|
-| `useHandReturn` | `useHandReturn(handRef, onLanded)` → `{ overlay, gapAt, gapSize, send, reset, RETURN_MS }` | `send(items, handLength)` returns the whole staging at once into the MIDDLE of the fan; the fan opens the gap while they travel. `onLanded(gap)` fires on landing — the scene splices its own items at that index |
-| `Returning` | `{ key, card, from? \| (el + anchor) }` | `from` — where it stands; `el` + `anchor: 'main' \| 'aux'` — one half of a pair, measured off its own anchor |
+| `useFlyer` | `useFlyer()` → `{ overlay, raise, pin, glide, patch, drop, elOf }` | `raise(items)` mounts N flyers at their rects, paints them there and returns their elements; `pin(key, rect)` fixes one where it landed; `glide(key, rect, ms)` moves one with a transition; `patch(key, next)` changes what it shows without moving it; `drop(key?)` takes one or all down; `elOf(key)` is the node |
+| `Raise` | `{ key, at, card?, faceDown?, content?, pose?, layer? }` | one key is one flyer — raising a live key replaces it. `card` is the common case; `content` is the scene's own element (a pair, a card mid-morph) when the node has to carry more than a card; `pose` is the tilt it rests at; `layer` rides on top of the flight rung (**I9**) |
+
+**I4 is the one a scene may decline.** A flight whose landing pose lives in the filled WAAPI
+animation must NOT be pinned — pinning cancels it and the card straightens for a frame. Drop the
+node instead, once the resting card has taken over (Defense Release).
 
 ---
 
@@ -131,7 +143,7 @@ drive any of the motion. Legality is the consumer's (engine's) answer — the Ha
 |---|---|---|
 | `items` | `HandItem[]` (`{ uid, card }`) | the fan, in order |
 | `faceDown?` | `boolean` | render backs (opponent fan); disables the zoom preview |
-| `gapAt?` | `number \| null` | open an insert gap at this slot (paired with `useHandInsert`) — the fan lays out as `n + gapSize` and spreads **before** the card lands |
+| `gapAt?` | `number \| null` | open an insert gap at this slot (paired with `useHandArrival`) — the fan lays out as `n + gapSize` and spreads **before** the card lands |
 | `gapSize?` | `number` (default `1`) | how many cards the gap holds. `> 1` when several cards return at once (cancelling a combo assembly), so they land in ready room instead of on top of the neighbours |
 | `onCardClick?` | `(index, el, e) => void` | a click (no drag) — coexists with drag via the threshold |
 | `accentAt?` | `(index) => string \| undefined` | a glow colour for a slot (arrow target) |
@@ -146,7 +158,7 @@ Drag mode turns on when `onPlay` or `onReorder` is supplied. Tuning constants (`
 
 ### Hand geometry — `apps/ui/src/table/Hand/fan.ts`
 
-The single source of fan geometry; `Hand` and `useHandInsert` compute slots from the **same** formula.
+The single source of fan geometry; `Hand` and `useHandArrival` compute slots from the **same** formula.
 
 | Name | Signature | What it does |
 |---|---|---|

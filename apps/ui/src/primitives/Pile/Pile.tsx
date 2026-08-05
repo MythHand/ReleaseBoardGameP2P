@@ -25,6 +25,11 @@ interface PileProps {
   width?: number | string
   /** 'br' — бейдж в правом нижнем (сброс) | 'tl' — текст в левом верхнем (колоды) */
   countPos?: 'br' | 'tl'
+  /**
+   * стопку сейчас МОЖНО выбрать — спокойная нейтральная обводка. Говорит, что
+   * выбор идёт и целей несколько; какая именно под курсором — это уже `selected`.
+   */
+  pickable?: boolean
   /** выделение обложки: обводка + свечение в цвете accent (как у Card) */
   selected?: boolean
   accent?: string
@@ -57,6 +62,7 @@ export default function Pile({
   topCard = null,
   width = 88,
   countPos = 'br',
+  pickable = false,
   selected = false,
   accent = 'var(--brand-green)',
   logoVariant = 'ru',
@@ -87,6 +93,7 @@ export default function Pile({
         <div
           className={styles.stack}
           ref={boxRef}
+          data-pickable={pickable}
           data-selected={selected}
           style={{ '--accent': accent } as CSSProperties}
         >

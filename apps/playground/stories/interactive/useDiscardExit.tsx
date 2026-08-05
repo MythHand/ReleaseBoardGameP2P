@@ -152,6 +152,11 @@ export function useDiscardExit(
     await Promise.all(
       list.map(async (f) => {
         const el = f.node ?? refs.current[f.key]
+        // a card handed over as a rect flies on a flyer this step MOUNTS — which
+        // only exists if the scene renders `overlay`. Without it the cards would
+        // simply appear in the heap with no flight and no error at all.
+        if (!el && !f.node)
+          console.error('useDiscardExit: no flyer for %s — is `overlay` rendered?', f.key)
         if (!el || !to) return
         if (f.delay) await wait(f.delay)
         const anim = play(

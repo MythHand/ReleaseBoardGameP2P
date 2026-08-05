@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useCallback, useRef, useState } from 'react'
 import { nextFrames, type Rect, wait } from '@/animations'
 import type { Card as CardType } from '@/cards/types'
@@ -23,7 +24,12 @@ import styles from './useFlyer.module.css'
 //     starts from there and not from the old origin.
 //
 // What it does NOT know: where to fly, which preset, in what order, what to do with
-// a pair. That stays with the step or with the scene.
+// a pair. That stays with the step or with the scene — which is also why a scene may
+// put its OWN element in the node (`content`) and reach into it afterwards.
+//
+// I4 is the one a scene may decline: a flight whose landing pose lives in the filled
+// WAAPI animation must NOT be pinned, because pinning cancels it. Then the node is
+// simply dropped after the resting card takes over (see Defense Release).
 //
 //   const [el] = await raise([{ key: 'draw', card, at: from, faceDown: true }])
 //   await play('drawToCenter', el, { from, to })?.finished
@@ -33,9 +39,19 @@ import styles from './useFlyer.module.css'
 
 export interface Raise {
   key: string // the scene's own name for this flyer — pin/patch/drop take it
-  card: CardType
   at: Rect // where it mounts: its FIRST painted frame is here (I10)
+  /** the card it carries — the common case */
+  card?: CardType
   faceDown?: boolean
+  /**
+   * …or whatever the scene puts in the node instead: a pair, a card in its
+   * at-a-glance reading, a card mid-morph. The node and its five invariants are
+   * the carrier's; WHAT rides in it can be the scene's own — including elements
+   * the scene then reaches into (a pair's halves are animated frame by frame).
+   */
+  content?: ReactNode
+  /** the pose it rests in — the tilt a card lies at on the table */
+  pose?: string
   /** its layer on the table, when several are in the air at once (I9) */
   layer?: number
 }
@@ -58,7 +74,13 @@ export function useFlyer() {
   const raise = useCallback(
     async (items: Raise[]): Promise<(HTMLDivElement | null)[]> => {
       if (items.length === 0) return []
-      setHeld((h) => [...h, ...items.map((it) => ({ ...it, seq: ++seq.current }))])
+      // a key is ONE flyer: raising a key that is still up replaces it instead of
+      // hanging a second node on the same name
+      const keys = new Set(items.map((it) => it.key))
+      setHeld((h) => [
+        ...h.filter((it) => !keys.has(it.key)),
+        ...items.map((it) => ({ ...it, seq: ++seq.current })),
+      ])
       await nextFrames() // I2 — painted at `at`, and mounted, before the caller measures
       return items.map((it) => {
         const el = elOf(it.key)
@@ -105,7 +127,7 @@ export function useFlyer() {
 
   // change what the card shows without touching where it is — the flip in place
   const patch = useCallback(
-    (key: string, next: Partial<Pick<Raise, 'card' | 'faceDown'>>) =>
+    (key: string, next: Partial<Pick<Raise, 'card' | 'faceDown' | 'content' | 'pose'>>) =>
       setHeld((h) => h.map((it) => (it.key === key ? { ...it, ...next } : it))),
     [],
   )
@@ -134,9 +156,11 @@ export function useFlyer() {
         inlineSize: h.at.width,
         // the layer travels with the card (I9); without one it rides the rung
         zIndex: h.layer == null ? undefined : `calc(var(--z-flight) + ${h.layer})`,
+        transform: h.pose,
       }}
     >
-      <Card card={h.card} faceDown={h.faceDown} interactive={false} width="100%" />
+      {h.content ??
+        (h.card && <Card card={h.card} faceDown={h.faceDown} interactive={false} width="100%" />)}
     </div>
   ))
 

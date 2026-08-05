@@ -89,6 +89,9 @@ export default function ReleaseZone({
             ) : (
               <div className={styles.empty}>{label}</div>
             )}
+            {/* the highlight is a layer INSIDE the slot, so it is drawn on the card's
+                own box and its radius scales with the card (see the module CSS) */}
+            <span className={styles.glow} aria-hidden="true" />
           </div>
         )
       })}
