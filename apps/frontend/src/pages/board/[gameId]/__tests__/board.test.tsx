@@ -38,7 +38,7 @@ function renderBoard(path = '/board/g1') {
     ],
     { initialEntries: [path] },
   )
-  return render(<RouterProvider router={router} />)
+  return { router, ...render(<RouterProvider router={router} />) }
 }
 
 it('keeps the board mounted and shows stats in its outlet', async () => {
@@ -110,4 +110,118 @@ it('renders a real projection: own hand in full, opponents by count only', async
   const opponentHand = state.players.p2.hand.map((c) => c.uid)
   expect(opponentHand.length).toBeGreaterThan(0)
   for (const uid of opponentHand) expect(container.innerHTML).not.toContain(uid)
+})
+
+it('renders the pending prompt from the real catalog when a decision is owed', async () => {
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 7,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const projected = engine.project(state, 'p1')
+  const view = {
+    ...projected,
+    pending: {
+      kind: 'discardForRelease' as const,
+      player: 'p1',
+      options: projected.self.hand.map((c) => c.uid),
+    },
+  }
+  sessionValue = { ...session(), gameSync: { view, events: [] } } as unknown as UseLobby
+
+  renderBoard()
+
+  // The prompt is gated on `copy.pending` being present. With the key absent
+  // from the catalogs the whole branch is skipped silently — the game then
+  // deadlocks, because a pending rejects every subsequent action.
+  // Asserted on the heading, which PendingPrompt renders as plain text from
+  // `kindCopy.prompt`; `copy.confirm` is a ConfirmAction label and reaching it
+  // would test that component's affordance rather than this binding.
+  const heading = await screen.findByText(
+    /^(discard a card to ship this release|сбросьте карту, чтобы выложить релиз)$/i,
+  )
+  expect(heading).toBeTruthy()
+})
+
+it('shows the winner overlay when the projection says the game is over', async () => {
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 7,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const projected = engine.project(state, 'p1')
+  const view = { ...projected, over: { winner: 'p2', condition: 'release' as const } }
+  // A roster whose peers map onto the engine's seats via seatsFor: peer ids
+  // sort 'peer-ann' < 'peer-bo', so seatsFor assigns them p1 and p2 in that
+  // order, matching the engine's own seating above. Without a real roster
+  // here, `over.winnerId` (a playerId) has nothing to resolve against in
+  // `room.participants` (peer ids) and the overlay silently names no one.
+  sessionValue = {
+    ...session({
+      'peer-ann': { id: 'peer-ann', name: 'Ann', role: 'host', ready: true },
+      'peer-bo': { id: 'peer-bo', name: 'Bo', role: 'player', ready: true },
+    }),
+    gameSync: { view, events: [] },
+  } as unknown as UseLobby
+
+  renderBoard()
+
+  // The winner is resolved against the room roster by id, so the overlay
+  // proves both the adapter's rename and the page's peerId translation.
+  expect(await screen.findByText(/^(winner|победитель)$/i)).toBeTruthy()
+  expect(await screen.findByText(/^(3 releases shipped|Собраны 3 релиза)$/i)).toBeTruthy()
+  const winnerName = await screen.findByTestId('game-over-winner')
+  expect(winnerName.textContent).toBe('Bo')
+})
+
+it('sends the game-over continue action to this game’s own stats route', async () => {
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 7,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const projected = engine.project(state, 'p1')
+  const view = { ...projected, over: { winner: 'p1', condition: 'release' as const } }
+  // `session.gameId` is deliberately left unset (null until GAME_STARTED) —
+  // the point of the fix is that the continue action must use the route's own
+  // :gameId param instead, which would otherwise navigate to
+  // `/board/null/stats` rather than this game's stats.
+  sessionValue = { ...session(), gameSync: { view, events: [] } } as unknown as UseLobby
+
+  const { router } = renderBoard('/board/g1')
+
+  // Wait for the overlay itself before looking for its button — it mounts off
+  // the same async projection as the winner-name assertions above.
+  await screen.findByText(/^(winner|победитель)$/i)
+  // Button renders its label bracketed (e.g. "[to stats]"), same as every
+  // other keyed action in this kit.
+  const button = screen
+    .getAllByRole('button')
+    .find((b) => /^\[(to stats|к статистике)\]$/i.test(b.textContent?.trim() ?? ''))
+  expect(button).toBeTruthy()
+  fireEvent.click(button as HTMLElement)
+
+  expect(await screen.findByTestId('stats-page')).toBeTruthy()
+  expect(router.state.location.pathname).toBe('/board/g1/stats')
 })

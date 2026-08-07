@@ -1,10 +1,12 @@
 import type { Event } from '@release/engine'
-import { toTableState } from '@release/table-adapter'
+import { toTableOver, toTableState } from '@release/table-adapter'
 import { useTranslation } from '@release/translation'
 import { DEFAULT_SETUP, Table } from '@release/ui'
-import { Outlet } from 'react-router'
+import { Outlet, useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
+import { seatsFor } from '~/entities/game/seats'
 import { useGame } from '~/features/play-game/useGame'
+import { useNow } from '~/features/play-game/useNow'
 import styles from './_layout.module.css'
 
 // What the table shows before the first projection arrives — a beat on a live
@@ -30,6 +32,20 @@ export default function BoardPage() {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const game = useGame()
+  const navigate = useNavigate()
+  const { gameId } = useParams()
+  // A ring only actually appears on screen for a window with something legal
+  // to throw at it (deriveDock ignores an empty-canAttackWith window), or for
+  // a pending owed to the viewer that carries a deadline — mirrors the guards
+  // in apps/ui/src/table/Table/dock.ts so the clock does not tick for states
+  // that never render it.
+  const selfId = game.view?.self.id
+  const counting =
+    Boolean(game.view?.window && game.view.window.canAttackWith.length > 0) ||
+    Boolean(
+      game.view?.pending && game.view.pending.player === selfId && 'deadline' in game.view.pending,
+    )
+  const now = useNow(counting)
 
   // The roster is a room fact, not a game fact — the engine's projection has no
   // concept of a spectator — so it comes from the session, split by role exactly
@@ -37,6 +53,21 @@ export default function BoardPage() {
   const peers = Object.values(session.state?.peers ?? {})
   const participants = peers.filter((p) => p.role === 'host' || p.role === 'player')
   const spectators = peers.filter((p) => p.role === 'guest')
+
+  // `toTableOver` renames the engine's `over.winner` — a playerId minted as
+  // p1..pN (see ~/entities/game/seats) — but Table.tsx resolves `over.winnerId`
+  // against `room.participants`, which are peers keyed by *peer* id. PlayerId
+  // and peer id are separate spaces that happen to both be strings, so without
+  // this translation the lookup silently misses and the overlay names no one.
+  const seats = seatsFor(session.state?.peers ?? {})
+  const engineOver = game.view ? toTableOver(game.view) : null
+  const over = engineOver
+    ? {
+        ...engineOver,
+        winnerId:
+          seats.find((s) => s.playerId === engineOver.winnerId)?.peerId ?? engineOver.winnerId,
+      }
+    : null
 
   // Two different consumers, so two blocks: `moveHistory` is the kit's own chrome
   // (the draw badge, the elimination suffix), `historyLabels` is one label per
@@ -48,6 +79,8 @@ export default function BoardPage() {
     <div className={styles.page} data-testid="board-page">
       <Table
         state={state}
+        over={over}
+        now={now}
         room={{
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,
@@ -67,6 +100,7 @@ export default function BoardPage() {
           onPass: game.pass,
           onUnpass: game.unpass,
           onResolve: game.resolve,
+          onOverContinue: () => navigate(`/board/${gameId}/stats`),
         }}
         copy={{
           table: t('table', { returnObjects: true }),
@@ -79,6 +113,8 @@ export default function BoardPage() {
           gameOver: t('gameOver', { returnObjects: true }),
           lobbyCode: t('lobbyCode', { returnObjects: true }),
           turnDock: t('turnDock', { returnObjects: true }),
+          pending: t('pending', { returnObjects: true }),
+          window: t('window', { returnObjects: true }),
         }}
       />
       <Outlet />
