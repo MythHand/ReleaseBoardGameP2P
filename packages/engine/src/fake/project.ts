@@ -56,6 +56,10 @@ export function playableFor(state: GameState, viewerId: PlayerId): CardUid[] {
           // Monitoring goes to the zone (one at a time); Debugger only answers a
           // trigger, so it is never played proactively.
           return c.id === 'protection-monitoring' ? !me.release.monitoring : false
+        case 'operation':
+          // Playable even when the discard cannot satisfy it: answer 11 makes
+          // that a legal move with consequences, not a rejection.
+          return true
         case 'attack':
           return attackTargets(state, viewerId, c.id).length > 0
         // Defences answer an attack, supports ride along with another card, and

@@ -342,6 +342,16 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
       return { kind: 'neutralize503', player: p.player, methods: [...p.methods] }
     case 'crush':
       return { kind: 'crush', player: p.player, slot: p.slot, methods: [...p.methods] }
+    case 'pickFromDiscard':
+      // The discard is public, so every viewer sees the same options — unlike
+      // the other pending variants, this one is not gated behind `mine`.
+      return {
+        kind: 'pickFromDiscard',
+        player: p.player,
+        options: [...p.options],
+        picks: p.picks,
+        source: p.source,
+      }
     default:
       return null
   }

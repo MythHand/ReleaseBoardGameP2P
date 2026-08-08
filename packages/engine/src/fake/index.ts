@@ -6,8 +6,9 @@ import { createGame } from './setup'
 export { botAction, runUntilIdle } from './bots'
 
 // Quantities mirror apps/ui/src/cards/catalogue.ts. Only the ids the fake
-// implements appear — Git operations, System Upgrade and ai-inside are deferred
-// per the design, and createGame filters anything unsupported anyway.
+// implements appear — System Upgrade, ai-inside and the rest of the Git
+// operations are deferred per the design, and createGame filters anything
+// unsupported anyway.
 export const FAKE_DECK: DeckEntry[] = [
   { id: 'release-frontend', qty: 4 },
   { id: 'release-backend', qty: 4 },
@@ -29,6 +30,7 @@ export const FAKE_DECK: DeckEntry[] = [
   { id: 'support-code-review', qty: 5 },
   { id: 'trigger-error-503', qty: 7 },
   { id: 'trigger-ai', qty: 12 },
+  { id: 'operation-git-cherry-pick', qty: 3 },
 ]
 
 export const FAKE_EVENTS: DeckEntry[] = [

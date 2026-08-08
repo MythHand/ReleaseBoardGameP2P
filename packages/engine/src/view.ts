@@ -54,6 +54,15 @@ export type PendingView =
   | { kind: 'requestCard'; player: PlayerId; target: PlayerId }
   | { kind: 'giveCard'; player: PlayerId; requested: CardId }
   | { kind: 'handLimit'; player: PlayerId; excess: number; options: CardUid[] }
+  // The discard is public, so unlike the other pending variants this one shows
+  // full card identity to every viewer, not only to the acting player.
+  | {
+      kind: 'pickFromDiscard'
+      player: PlayerId
+      options: CardInstance[]
+      picks: 1 | 2
+      source: CardId
+    }
 
 export interface OpponentView {
   id: PlayerId

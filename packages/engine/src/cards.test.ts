@@ -34,12 +34,15 @@ it('omits the deferred cards', () => {
     'operation-git-branch',
     'operation-git-merge',
     'operation-git-rebase',
-    'operation-git-cherry-pick',
     'operation-system-upgrade',
     'ai-inside',
   ]) {
     expect(rulesFor(id), id).toBeUndefined()
   }
+})
+
+it('implements Git Cherry-pick as a sudo-capable operation', () => {
+  expect(rulesFor('operation-git-cherry-pick')).toEqual({ kind: 'operation', sudo: true })
 })
 
 it('returns undefined for an unknown id rather than throwing', () => {

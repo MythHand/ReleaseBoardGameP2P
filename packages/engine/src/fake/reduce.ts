@@ -13,6 +13,7 @@ import {
   reject,
   setHand,
 } from './core'
+import { onPickFromDiscard } from './discard'
 import { onGiveCard, onRequestCard } from './handAttacks'
 import { playableFor } from './project'
 import { onDiscardForRelease, onPlay } from './release'
@@ -150,6 +151,8 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
     case 'neutralize503':
     case 'crush':
       return onNeutralize(state, action)
+    case 'pickFromDiscard':
+      return onPickFromDiscard(state, action)
     // Every Choice variant is now handled above; this default only guards
     // against a malformed choice (any `kind` string) surviving deserialization.
     default:

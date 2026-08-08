@@ -113,7 +113,12 @@ export default function BoardPage() {
           gameOver: t('gameOver', { returnObjects: true }),
           lobbyCode: t('lobbyCode', { returnObjects: true }),
           turnDock: t('turnDock', { returnObjects: true }),
-          pending: t('pending', { returnObjects: true }),
+          pending: {
+            ...t('pending', { returnObjects: true }),
+            // Placeholder only — packages/translation's catalogs gain the real
+            // copy in the task that builds Cherry-pick's own prompt UI.
+            pickFromDiscard: { prompt: 'pick a card from the discard', action: 'pick' },
+          },
           window: t('window', { returnObjects: true }),
         }}
       />

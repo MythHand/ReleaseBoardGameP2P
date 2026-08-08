@@ -1,0 +1,104 @@
+import type { Action } from '../actions'
+import { rulesFor } from '../cards'
+import type { Reduction } from '../engine'
+import type { CardInstance, GameState, PlayerId } from '../state'
+import { createLog, type Log, reject } from './core'
+
+// Cherry-pick offers the whole pile; Inside offers only Releases. Everything
+// else about the two effects is identical, which is why they share a pending.
+export function discardOptions(state: GameState, releasesOnly: boolean): CardInstance[] {
+  if (!releasesOnly) return state.decks.discard
+  return state.decks.discard.filter((c) => rulesFor(c.id)?.kind === 'release')
+}
+
+const discard = (state: GameState, cards: CardInstance[]): GameState => ({
+  ...state,
+  decks: { ...state.decks, discard: [...state.decks.discard, ...cards] },
+})
+
+// `card` and `combo` have already left the hand by the time this runs. The
+// discard pile is read *before* either of them lands there, which is what
+// stops Cherry-pick offering itself (or its Sudo) back as a pick — but both
+// still join the discard unconditionally afterward. A card can never leave
+// the game: an exhausted draw pile is refilled by shuffling the discard back
+// in (rules answer 7), so a card that vanished here would permanently shrink
+// the game's card pool.
+export function openPickFromDiscard(
+  state: GameState,
+  log: Log,
+  player: PlayerId,
+  card: CardInstance,
+  combo: CardInstance | undefined,
+  releasesOnly: boolean,
+): GameState {
+  const options = discardOptions(state, releasesOnly)
+  const spent = combo ? [card, combo] : [card]
+  const spentState = discard(state, spent)
+  if (options.length === 0) return { ...spentState, eventSeq: log.seq }
+  const picks = Math.min(combo ? 2 : 1, options.length) as 1 | 2
+  return {
+    ...spentState,
+    pending: { kind: 'pickFromDiscard', player, options, picks, source: card.id },
+    eventSeq: log.seq,
+  }
+}
+
+export function onPickFromDiscard(
+  state: GameState,
+  action: Action & { type: 'RESOLVE' },
+): Reduction {
+  const pending = state.pending
+  if (pending?.kind !== 'pickFromDiscard') {
+    return reject(state, action, 'no discard pick is pending')
+  }
+  if (pending.player !== action.player) return reject(state, action, 'not your decision')
+  const choice = action.choice
+  if (choice.kind !== 'pickFromDiscard') return reject(state, action, 'wrong choice for pending')
+
+  const offered = (uid: string) => pending.options.find((c) => c.uid === uid)
+  const toHand = offered(choice.card)
+  // Membership in *this* pending's options, not merely "some card": a stale
+  // selection the current pending never offered must not resolve.
+  if (!toHand) return reject(state, action, 'that card is not on offer')
+
+  const toDeck = pending.picks === 2 && choice.toDeck ? offered(choice.toDeck) : undefined
+  if (pending.picks === 2 && choice.toDeck && !toDeck) {
+    return reject(state, action, 'that card is not on offer')
+  }
+  if (toDeck && toDeck.uid === toHand.uid) {
+    return reject(state, action, 'one card cannot go to both places')
+  }
+
+  const log = createLog(state.eventSeq)
+  const taken = new Set([toHand.uid, ...(toDeck ? [toDeck.uid] : [])])
+  const remaining = state.decks.discard.filter((c) => !taken.has(c.uid))
+  const player = state.players[action.player]
+
+  log.add({ type: 'takenFromDiscard', player: action.player, card: toHand.id, to: 'hand' })
+  // The rules place this one unseen, so its identity is private to the placer —
+  // the same treatment `drawn` gives a card whose face only the drawer saw.
+  if (toDeck) {
+    log.add({
+      type: 'takenFromDiscard',
+      player: action.player,
+      card: toDeck.id,
+      to: 'deck',
+      visibleTo: [action.player],
+    })
+  }
+
+  const main = toDeck
+    ? state.decks.main.map((p, i) => (i === 0 ? [toDeck, ...p] : p))
+    : state.decks.main
+
+  return {
+    state: {
+      ...state,
+      players: { ...state.players, [action.player]: { ...player, hand: [...player.hand, toHand] } },
+      decks: { ...state.decks, discard: remaining, main },
+      pending: null,
+      eventSeq: log.seq,
+    },
+    events: log.events,
+  }
+}

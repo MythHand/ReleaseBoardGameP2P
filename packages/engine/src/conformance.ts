@@ -159,6 +159,19 @@ function resolvePendingAction(state: GameState, n: number): Action | null {
         at,
       }
     }
+    case 'pickFromDiscard': {
+      // openPickFromDiscard only ever offers a nonempty list, so the first
+      // option is always valid; the second pick only exists when `picks` is 2.
+      const card = pending.options[0]?.uid
+      if (!card) return null
+      const toDeck = pending.picks === 2 ? pending.options[1]?.uid : undefined
+      return {
+        type: 'RESOLVE',
+        player: pending.player,
+        choice: { kind: 'pickFromDiscard', card, ...(toDeck ? { toDeck } : {}) },
+        at,
+      }
+    }
     default:
       return null
   }
@@ -746,13 +759,13 @@ export function describeEngine(
       it('times the window at 15s on the first round and 10s after', () => {
         // Fuzz-driven: a defended-and-reopened window is common enough in a
         // long fuzz run for both round shapes to appear without forcing
-        // anything. Under this seed a round-2+ window opens by step 63.
+        // anything. Under this seed a round-2+ window opens by step 368.
         const engine = make()
-        let state = engine.createGame(configFor(options, 1))
+        let state = engine.createGame(configFor(options, 2))
         let sawRound1 = false
         let sawLaterRound = false
-        for (let n = 0; n < 800 && !state.over; n += 1) {
-          const r = engine.reduce(state, fuzzAction(state, 1, n))
+        for (let n = 0; n < 600 && !state.over; n += 1) {
+          const r = engine.reduce(state, fuzzAction(state, 2, n))
           for (const e of r.events) {
             if (e.type !== 'windowOpened') continue
             const expected = e.round === 1 ? 15_000 : 10_000
@@ -820,7 +833,7 @@ export function describeEngine(
         // target within any bounded run, leaving the positive half of this
         // property untested.
         const engine = make()
-        const result = driveProtectedReleaseAndDdos(engine, options, 6464, 1500)
+        const result = driveProtectedReleaseAndDdos(engine, options, 7, 1500)
         expect(
           result.sawNonDdosZoneTarget,
           'a non-DDoS attack was offered a release or Monitoring target',
@@ -833,12 +846,12 @@ export function describeEngine(
         // Fuzz-driven: reaching gameOver at all, then continuing to throw
         // actions at the ended game, is exactly what the stream already does
         // for free over a long enough run. Under this seed the game ends
-        // around step 905; 1200 steps leaves margin to also exercise the
+        // around step 1821; 2200 steps leaves margin to also exercise the
         // "accepts nothing" half afterwards.
         const engine = make()
         let state = engine.createGame(configFor(options, 3))
         let overAt = -1
-        for (let n = 0; n < 1200; n += 1) {
+        for (let n = 0; n < 2200; n += 1) {
           const r = engine.reduce(state, fuzzAction(state, 3, n))
           if (r.state.over && overAt < 0) overAt = n
           if (overAt >= 0 && n > overAt) {

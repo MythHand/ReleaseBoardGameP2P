@@ -39,6 +39,7 @@ export type Event = EventBase &
     | { type: 'turnEnded'; player: PlayerId }
     | { type: 'gameOver'; winner: PlayerId; condition: 'release' | 'lastStanding' }
     | { type: 'rejected'; action: Action; reason: string }
+    | { type: 'takenFromDiscard'; player: PlayerId; card: CardId; to: 'hand' | 'deck' }
   )
 
 export type DiscardReason =

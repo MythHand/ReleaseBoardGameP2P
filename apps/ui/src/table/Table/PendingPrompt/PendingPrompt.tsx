@@ -24,6 +24,10 @@ export interface PendingPromptCopy {
   requestCard: { prompt: string; action: string }
   giveCard: { prompt: string; action: string }
   handLimit: { prompt: string; action: string }
+  // Git Cherry-pick's discard pick. No case in the switch below yet renders
+  // it — that is a later task — but the copy contract must stay total over
+  // every TablePending kind, since `copy[pending.kind]` indexes it.
+  pickFromDiscard: { prompt: string; action: string }
 }
 
 export interface PendingPromptProps {
@@ -314,6 +318,12 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
           onClick={() => setRequestedCard(c.id)}
         />
       ))
+      break
+    }
+    case 'pickFromDiscard': {
+      // Renders nothing yet — this pending's own prompt UI is a later task.
+      // `complete` stays false, so ConfirmAction stays disabled rather than
+      // silently confirming an empty choice.
       break
     }
   }
