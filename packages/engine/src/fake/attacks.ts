@@ -343,12 +343,14 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
     case 'crush':
       return { kind: 'crush', player: p.player, slot: p.slot, methods: [...p.methods] }
     case 'pickFromDiscard':
-      // The discard is public, so every viewer sees the same options — unlike
-      // the other pending variants, this one is not gated behind `mine`.
+      // Only discardTop/discardCount are ever projected of the discard pile
+      // (project.ts) — its full contents are not public. Gated behind `mine`
+      // like every other variant here: an effect brings its own viewing
+      // surface for the player using it, not a reveal to the table.
       return {
         kind: 'pickFromDiscard',
         player: p.player,
-        options: [...p.options],
+        options: mine ? [...p.options] : [],
         picks: p.picks,
         source: p.source,
       }

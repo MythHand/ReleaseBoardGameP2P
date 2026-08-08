@@ -33,6 +33,12 @@ export function openPickFromDiscard(
 ): GameState {
   const options = discardOptions(state, releasesOnly)
   const spent = combo ? [card, combo] : [card]
+  // Every other spend path logs a `discarded` event for the card it consumes
+  // (release.ts's release-cost pay, reduce.ts's hand-limit discard,
+  // triggers.ts's elimination spoils) — without this, the fizzle path (an
+  // empty or ineligible discard) produced zero events at all: MoveHistory
+  // showed nothing and eventSeq never advanced for a legal, consequential play.
+  for (const c of spent) log.add({ type: 'discarded', player, card: c.id, reason: 'effect' })
   const spentState = discard(state, spent)
   if (options.length === 0) return { ...spentState, eventSeq: log.seq }
   const picks = Math.min(combo ? 2 : 1, options.length) as 1 | 2
@@ -67,6 +73,17 @@ export function onPickFromDiscard(
   }
   if (toDeck && toDeck.uid === toHand.uid) {
     return reject(state, action, 'one card cannot go to both places')
+  }
+
+  // The pending's options are a snapshot taken when it opened; nothing today
+  // changes the discard while a pending is set (every other action rejects
+  // outright), but trusting the snapshot over live state would duplicate a
+  // card instead of moving it the moment that stops being true — the mirror
+  // image of the vanishing-card defect, and a one-line guard against it.
+  const inLiveDiscard = (uid: string) => state.decks.discard.some((c) => c.uid === uid)
+  if (!inLiveDiscard(toHand.uid)) return reject(state, action, 'that card left the discard')
+  if (toDeck && !inLiveDiscard(toDeck.uid)) {
+    return reject(state, action, 'that card left the discard')
   }
 
   const log = createLog(state.eventSeq)

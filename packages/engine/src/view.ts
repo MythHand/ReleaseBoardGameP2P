@@ -54,8 +54,9 @@ export type PendingView =
   | { kind: 'requestCard'; player: PlayerId; target: PlayerId }
   | { kind: 'giveCard'; player: PlayerId; requested: CardId }
   | { kind: 'handLimit'; player: PlayerId; excess: number; options: CardUid[] }
-  // The discard is public, so unlike the other pending variants this one shows
-  // full card identity to every viewer, not only to the acting player.
+  // Full card identity, but gated behind `mine` in pendingView (attacks.ts)
+  // like the other owner-only variants: only discardTop/discardCount are
+  // ever public (project.ts), so the discard's full contents are not.
   | {
       kind: 'pickFromDiscard'
       player: PlayerId

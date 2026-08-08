@@ -56,22 +56,33 @@ const STEP_MS = 1_000
 // past every deadline that could still wake a seat up.
 const IDLE_LIMIT_MS = ABSENT_GRACE_MS * 2
 
-// Every string value reachable anywhere in `value`'s structure, walked
-// recursively through plain objects and arrays. Used to check leak
-// properties by exact membership rather than substring search over a
-// serialized blob — a uid like `trigger-ai#1` is a literal prefix of
+// Every string reachable anywhere in `value`'s structure — as a value, or as
+// an object key — walked recursively through plain objects and arrays. Used
+// to check leak properties by exact membership rather than substring search
+// over a serialized blob — a uid like `trigger-ai#1` is a literal prefix of
 // `trigger-ai#10`, so `JSON.stringify(x).includes(uid)` gives a false
 // positive the moment both are on the wire at once (see clause 3 below).
 // Deliberately untyped/unscoped to any particular field: a leak can land on
-// any key, and narrowing this to "the fields we expect a leak to appear in"
-// would trade a false positive for a false negative.
+// any key or value, and narrowing this to "the fields we expect a leak to
+// appear in" would trade a false positive for a false negative.
+//
+// Coverage note: this catches a uid used as a whole string (value or key),
+// matching what JSON.stringify + .includes caught for values plus what it
+// missed for keys. It does NOT catch a uid embedded as a substring inside a
+// longer, unrelated string (e.g. some other field's free text happening to
+// contain a uid as a fragment) — accepted, since nothing in this payload
+// shape does that; it is not "unrestricted reach" the way scanning the raw
+// serialized text was.
 function collectStringValues(value: unknown, into: Set<string> = new Set()): Set<string> {
   if (typeof value === 'string') {
     into.add(value)
   } else if (Array.isArray(value)) {
     for (const item of value) collectStringValues(item, into)
   } else if (value !== null && typeof value === 'object') {
-    for (const v of Object.values(value)) collectStringValues(v, into)
+    for (const [k, v] of Object.entries(value)) {
+      into.add(k)
+      collectStringValues(v, into)
+    }
   }
   return into
 }

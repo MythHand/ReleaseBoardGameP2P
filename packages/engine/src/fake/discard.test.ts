@@ -75,6 +75,13 @@ describe('Git Cherry-pick', () => {
     expect(next.pending).toBeNull()
     expect(next.decks.discard.map((c) => c.id)).toContain(CHERRY)
     expect(next.players.p1.hand.some((c) => c.id === CHERRY)).toBe(false)
+    // The fizzle path must still be observable: a legal, consequential play
+    // that emits zero events would show nothing in MoveHistory and leave
+    // eventSeq unmoved, indistinguishable from nothing having happened.
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'discarded', player: 'p1', card: CHERRY, reason: 'effect' }),
+    )
+    expect(next.eventSeq).toBeGreaterThan(state.eventSeq)
   })
 
   it('owes two picks with sudo, and puts the second on top of pile 0', () => {
@@ -165,5 +172,22 @@ describe('Git Cherry-pick', () => {
       next.players.p1.hand.length +
       next.decks.main.reduce((n, p) => n + p.length, 0)
     expect(after).toBe(before)
+  })
+
+  it("hides the discard options from an opponent's projection", () => {
+    const state = gameWith(['attack-bug', 'release-frontend'], [CHERRY])
+    const { state: next } = engine.reduce(state, {
+      type: 'PLAY',
+      player: 'p1',
+      card: `${CHERRY}#h0`,
+      at: 1,
+    })
+    // Only discardTop/discardCount are ever public (project.ts) — the pile's
+    // full contents are not, so an opponent's projection of this pending must
+    // carry no option uids at all, the same as every other owner-only pending.
+    const opponentView = engine.project(next, 'p2')
+    expect(opponentView.pending).toMatchObject({ kind: 'pickFromDiscard', player: 'p1' })
+    const pending = opponentView.pending as { options: { uid: string }[] }
+    expect(pending.options).toEqual([])
   })
 })
