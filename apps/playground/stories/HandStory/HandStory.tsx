@@ -5,8 +5,14 @@ import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
 import Slider from '@/primitives/Slider'
 import Hand from '@/table/Hand'
-import { type HandFaceContext, type HandItem, handStep } from '@/table/Hand/Hand'
+import {
+  type HandCardState,
+  type HandFaceContext,
+  type HandItem,
+  handStep,
+} from '@/table/Hand/Hand'
 import { useLang } from '../../Playground/lang'
+import { reorderHand } from '../interactive/reorderHand'
 import styles from './HandStory.module.css'
 
 let _u = 0
@@ -22,15 +28,23 @@ const COPY = {
     cardsInHand: 'карт в руке',
     faceDown: 'рубашкой вверх',
     parallax: 'parallax-лицо',
+    drag: 'перетаскивание',
+    states: 'состояния карт',
     step: 'шаг между картами',
     fan: 'ширина веера',
+    hint: 'перетащи карту внутри руки — переставить',
+    reset: 'сброс',
   },
   en: {
     cardsInHand: 'cards in hand',
     faceDown: 'face down',
     parallax: 'parallax face',
+    drag: 'drag',
+    states: 'card states',
     step: 'step between cards',
     fan: 'fan width',
+    hint: 'drag a card within the hand to reorder',
+    reset: 'reset',
   },
 }
 
@@ -41,14 +55,34 @@ function resize(n: number, prev: Item[] = []): Item[] {
   return next
 }
 
+// a demo state mix so the glow (playable / selected) and the transitioned dim
+// (disabled) are both visible — in the real game this comes from PlayerView
+function demoState(i: number): HandCardState {
+  if (i === 0) return 'selected'
+  if (i === 1) return 'playable'
+  if (i % 4 === 2) return 'disabled'
+  return 'idle'
+}
+
 export default function HandStory() {
   const { lang } = useLang()
   const t = COPY[lang]
   const [items, setItems] = useState<Item[]>(() => resize(6))
   const [faceDown, setFaceDown] = useState(false)
   const [parallax, setParallax] = useState(false)
+  const [drag, setDrag] = useState(true)
+  const [states, setStates] = useState(false)
 
   const setCount = (n: number) => setItems((prev) => resize(n, prev))
+
+  // reorder within the hand (local — nothing to sync; others see only count)
+  const reorder = (u: string, toIndex: number) => setItems((prev) => reorderHand(prev, u, toIndex))
+
+  // this page demonstrates the FAN, so the hand keeps its cards: no drop is a
+  // valid target here. Rejecting is the Hand's own path — it glides the card back
+  // into its slot instead of it vanishing. Playing a card belongs to the
+  // interactive scenes, which have a table to play it onto.
+  const play = (): boolean => false
 
   // technical face swap: render the composed CardParallax face for cards that
   // have one; fall back to the PNG Card when face-down or no composed content.
@@ -108,14 +142,33 @@ export default function HandStory() {
           />
           {t.parallax}
         </label>
+        <label className={styles.check}>
+          <input type="checkbox" checked={drag} onChange={(e) => setDrag(e.target.checked)} />
+          {t.drag}
+        </label>
+        <label className={styles.check}>
+          <input type="checkbox" checked={states} onChange={(e) => setStates(e.target.checked)} />
+          {t.states}
+        </label>
+        <button type="button" className={styles.reset} onClick={() => setItems(resize(6))}>
+          {t.reset}
+        </button>
       </div>
 
       <p className={styles.readout}>
         {t.step}: <b>{step}px</b> · {t.fan}: <b>{span}px</b>
       </p>
+      {drag && <p className={styles.hint}>{t.hint}</p>}
 
       <div className={styles.stage}>
-        <Hand items={items} faceDown={faceDown} renderFace={renderFace} />
+        <Hand
+          items={items}
+          faceDown={faceDown}
+          renderFace={renderFace}
+          stateAt={states ? demoState : undefined}
+          onReorder={drag ? reorder : undefined}
+          onPlay={drag ? play : undefined}
+        />
       </div>
     </div>
   )

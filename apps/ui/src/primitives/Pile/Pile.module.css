@@ -5,6 +5,13 @@
   align-items: center;
 }
 
+/* коробка карты: сама стопка + бейдж счётчика поверх неё. Бейдж вынесен из
+   .stack, потому что containment (container-type) запирает слои внутри. */
+.box {
+  position: relative;
+  inline-size: 100%;
+}
+
 .stack {
   position: relative;
   inline-size: 100%;
@@ -31,6 +38,18 @@
 .top {
   position: absolute;
   inset: 0;
+}
+
+/* карта, лежащая в куче сброса — та же коробка, что и верх стопки, но со своим
+   разбросом. Транзишена по умолчанию НЕТ: куча перекладывается мгновенно, иначе
+   любая смена состава поехала бы картами друг сквозь друга. */
+.heapCard {
+  composes: top;
+}
+
+/* …и он есть там, где переезд — это и есть эффект: куча собирается в стопку */
+.heapCard[data-gathers="true"] {
+  transition: transform 320ms var(--ease-soft);
 }
 
 .back {
@@ -70,15 +89,28 @@
   transition: opacity var(--t-base) var(--ease-out);
 }
 
+/* стопку можно выбрать: спокойная обводка по краю карты, без свечения — она
+   говорит «сюда можно», а не «вот эта». */
+.stack[data-pickable="true"] .glow {
+  box-shadow: 0 0 0 2px var(--white-25);
+  opacity: 1;
+}
+
 .stack[data-selected="true"] .glow {
   box-shadow: 0 0 0 2px var(--accent),
     0 0 22px 2px color-mix(in srgb, var(--accent) 50%, transparent);
   opacity: 1;
 }
 
+/* the counter stands over the pile AND over the cards flying into it, so an arriving
+   card passes UNDER the badge instead of covering it and then jumping beneath. The
+   offset clears the whole flight BAND, not just its base: a step that carries several
+   cards adds each card's own layer to --z-flight. Works only while the consumer's
+   placement is not a stacking context (see .discard in the scenes and on Table). */
 .count {
   composes: mono-lg tk-02 from '../../design/typography.module.css';
   position: absolute;
+  z-index: calc(var(--z-flight) + 40);
 }
 
 .count::before {

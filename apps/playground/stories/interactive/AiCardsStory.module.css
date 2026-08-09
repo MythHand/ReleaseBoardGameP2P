@@ -1,0 +1,210 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* technical top control line — dev controls (TableStory pattern) */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  padding: 12px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid var(--white-08);
+}
+
+.btn {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* dev toggle chip — off = outline, on = brand-green fill */
+.chip {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.chip[data-on="true"] {
+  color: var(--deep-green);
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* preview of the AI card that will be drawn */
+.preview {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.previewLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-45);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* ===== table layout — positions mirror the Table screen ===== */
+
+/* draw deck + AI events deck — left of centre, stacked (base on top, AI below) */
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  gap: 22px;
+  transform: translateY(-50%);
+}
+
+.deck {
+  position: relative;
+}
+
+.drawable {
+  cursor: pointer;
+}
+
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
+/* the AI trigger (cause) — left of the centre, normal card size */
+.causeSlot {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(calc(-50% - 107px), -50%);
+}
+
+/* the AI effect (main) — at the centre, larger than the trigger */
+.effectSlot {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  z-index: 1;
+  inline-size: 200px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(calc(-50% + 82px), -50%);
+}
+
+/* Bad Vibe: the card the player gives up stands to the RIGHT of the Bad Vibe card,
+   open to everyone, until both leave. A hand card's width — it came from the fan. */
+.pickedSlot {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(calc(-50% + 277px), -50%);
+}
+
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the pile itself is the Pile primitive. */
+.discard {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 86px;
+
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
+}
+
+/* turn dock — canonical Table position: bottom-left, under the decks, left of
+   the hand. It carries the draw action instead of a local button. Sits ABOVE the
+   red edge glow (which paints from the table edges). */
+.turnDock {
+  position: absolute;
+  inset-block-end: 20px;
+  inset-inline-start: 26px;
+  z-index: 55;
+}
+
+/* player area — release zone above the hand, bottom-centre (mirrors Table `.you`) */
+.you {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.handWrap {
+  inline-size: 100%;
+}
+
+/* Inside — releases from the discard offered for choice, in an open row centred
+   above the middle of the table */
+.pickRow {
+  position: absolute;
+  inset-block-start: 40%;
+  inset-inline-start: 50%;
+  z-index: 100;
+  display: flex;
+  gap: 20px;
+  transform: translate(-50%, -50%);
+}
+
+/* hidden while the cards fly out of the discard — the flyers do the entrance,
+   then the row is revealed and takes over */
+.pickRow[data-revealed="false"] {
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* selection cards are hand-card sized (150px = the fan card width) */
+.pickCard {
+  inline-size: 150px;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+/* full-area bounds for the red edge glow (Error 503) — offset below the tech bar
+   (set inline via barH), so the glow sits in the table zone, not the whole screen */
+.glowBounds {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  pointer-events: none;
+}
+
+/* the cards in the air belong to the shared carrier (useFlyer) — the scene has no
+   flyer rule of its own any more */

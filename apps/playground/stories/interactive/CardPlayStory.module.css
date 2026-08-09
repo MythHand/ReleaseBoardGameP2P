@@ -50,10 +50,14 @@
   transform: translateX(-50%);
 }
 
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
 /* центр стола */
 .center {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
@@ -76,98 +80,36 @@
   color: var(--white-28);
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  border: 1px dashed var(--white-14);
+  border: 1px dashed var(--white-12);
   border-radius: 8px;
 }
 
-/* сброс — справа; карты ложатся вразброс. Центрируем margin:auto (без transform),
-   чтобы не создавать stacking context и держать счётчик верхним слоем. */
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
   inset-block: 0;
   inset-inline-end: 86px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-  inline-size: 116px;
-  block-size: fit-content;
-  margin-block: auto;
-}
 
-.discardStack {
-  position: relative;
-  inline-size: 100%;
-  aspect-ratio: var(--card-aspect);
-}
-
-.discardCard {
-  position: absolute;
-  inset: 0;
-}
-
-.discardEmpty {
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
   display: flex;
   align-items: center;
-  justify-content: center;
-  block-size: 100%;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-28);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  border: 1px dashed var(--white-14);
-  border-radius: 8px;
-}
-
-.discardCount {
-  position: absolute;
-  inset-block-end: 8px;
-  inset-inline-end: 8px;
-  z-index: 90;
-  padding: 3px 9px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  letter-spacing: 0.02em;
-  background: var(--black-78);
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-}
-
-.discardCount::before {
-  content: "// ";
-  opacity: 0.4;
-}
-
-.label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
-  opacity: 0.5;
-}
-
-/* рука игрока — снизу по центру */
-.hand {
-  position: absolute;
-  inset-block-end: 28px;
-  inset-inline-start: 50%;
-  display: flex;
-  gap: 12px;
-  transform: translateX(-50%);
-}
-
-.card {
-  cursor: pointer;
-  transition: transform var(--t-fast) var(--ease-out);
-}
-
-.card:hover {
-  transform: translateY(-10px);
-}
-
-/* летящая карта — позиционируется и анимируется императивно (пресеты move) */
-.flyer {
-  position: fixed;
-  z-index: 80;
   pointer-events: none;
 }
+
+.discard > * {
+  pointer-events: auto;
+}
+
+/* player hand — the canonical fan, bottom-centre (Hand sizes itself to the
+   wrapper's width and lays the fan out from its centre) */
+.hand {
+  position: absolute;
+  inset-block-end: 16px;
+
+  /* canonical Table insets: the left one clears the turn dock, the right the rail */
+  inset-inline: 196px 56px;
+}
+
+/* the cards in the air belong to the shared carrier (useFlyer) */

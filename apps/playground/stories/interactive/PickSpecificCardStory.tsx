@@ -4,10 +4,12 @@ import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
+import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './PickSpecificCardStory.module.css'
-import { useHandInsert } from './useHandInsert'
+import { reorderHand } from './reorderHand'
+import { useHandArrival } from './useHandArrival'
 
 // "Take a SPECIFIC card from the opponent's hand" — every logical node is shown:
 //  idle:    a start button in the centre;
@@ -80,13 +82,14 @@ export default function PickSpecificCardStory() {
   // final step is shared: the card settles into the hand, then back to the start
   const {
     gapAt,
+    gapSize,
     overlay,
-    insert,
+    arrive,
     reset: resetInsert,
-  } = useHandInsert(handRef, (card, gap) => {
+  } = useHandArrival(handRef, (gap, landed) => {
     setHand((h) => {
       const copy = [...h]
-      copy.splice(gap, 0, { uid: nextHandUid(), card })
+      copy.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return copy
     })
     backToIdle()
@@ -121,12 +124,18 @@ export default function PickSpecificCardStory() {
     requestAnimationFrame(() => requestAnimationFrame(() => setHandIn(true)))
   }
 
-  // pick which card you want — it holds, the rest leave the grid, then we check
+  // select which card you want — naming a card is irreversible, so the choice is
+  // only armed here and committed from the confirm bar
   function pickWanted(card: CardType) {
     if (phase !== 'choose') return
     setWanted(card)
+  }
+
+  // confirmed — the chosen card holds, the rest leave the grid, then we check
+  function confirmWanted() {
+    if (phase !== 'choose' || !wanted) return
     setPhase('picked')
-    later(() => resolve(card), PICK_BEAT)
+    later(() => resolve(wanted), PICK_BEAT)
   }
 
   // check against the opponent's fan: hit flies out, miss shakes
@@ -175,11 +184,7 @@ export default function PickSpecificCardStory() {
     const el = revealRef.current
     if (el && reveal) {
       const r = el.getBoundingClientRect()
-      insert(
-        reveal.card,
-        { left: r.left, top: r.top, width: r.width, height: r.height },
-        hand.length,
-      )
+      void arrive([{ key: nextHandUid(), card: reveal.card, from: r }], hand.length)
     }
     setReveal(null)
   }
@@ -246,14 +251,6 @@ export default function PickSpecificCardStory() {
       {/* step 1: choose which card you want (catalog grid, not a fan) */}
       {phase !== 'idle' && (
         <div className={styles.grid}>
-          {phase === 'choose' && (
-            <div className={styles.hint}>
-              {pick(lang, {
-                ru: 'выбери карту, которую хочешь забрать',
-                en: 'choose the card to take',
-              })}
-            </div>
-          )}
           {BASE_TYPES.map((c, i) => (
             <button
               key={c.id}
@@ -262,7 +259,15 @@ export default function PickSpecificCardStory() {
               style={{ animationDelay: `${i * 18}ms` }}
               onClick={phase === 'choose' ? () => pickWanted(c) : undefined}
             >
-              <Card card={c} interactive={false} width={GRID_W} />
+              <Card
+                card={c}
+                interactive={false}
+                width={GRID_W}
+                state={phase === 'choose' && wanted?.id === c.id ? 'selected' : 'idle'}
+                // pick one out of a set — uniform selection colour, not the
+                // per-category accent
+                accent="var(--select-accent)"
+              />
             </button>
           ))}
         </div>
@@ -294,8 +299,25 @@ export default function PickSpecificCardStory() {
       {overlay}
 
       <div className={styles.handWrap} ref={handRef}>
-        <Hand items={hand} gapAt={gapAt} />
+        <Hand
+          items={hand}
+          gapAt={gapAt}
+          gapSize={gapSize}
+          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        />
       </div>
+
+      {/* naming a card is irreversible — confirm it (the shared slide-up bar) */}
+      <ConfirmAction
+        open={phase === 'choose'}
+        label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
+        caption={pick(lang, {
+          ru: 'выбери карту, которую хочешь забрать',
+          en: 'choose the card to take',
+        })}
+        disabled={wanted == null}
+        onConfirm={confirmWanted}
+      />
     </div>
   )
 }

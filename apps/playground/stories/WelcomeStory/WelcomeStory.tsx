@@ -40,15 +40,15 @@ const SECTIONS: { name: Loc; desc: Loc }[] = [
   {
     name: { ru: 'Карты', en: 'Cards' },
     desc: {
-      ru: 'Игровая карта и веер руки — базовые сущности стола.',
-      en: 'The game card and the hand fan — core table entities.',
+      ru: 'Игровая карта и веер руки — базовые сущности стола, плюс правило лимита руки на том же веере.',
+      en: 'The game card and the hand fan — the core table entities — plus the hand-limit rule on that same fan.',
     },
   },
   {
     name: { ru: 'Интерактив', en: 'Interactive' },
     desc: {
-      ru: 'Живые сценарии анимаций: розыгрыш, добор, комбо, адресная стрелка и работа с колодами.',
-      en: 'Live animation scenarios: play, draw, combos, the targeting arrow and deck handling.',
+      ru: 'Живые сценарии анимаций: розыгрыш и добор, комбо, адресная стрелка, работа с колодами, ход с Error 503, защита релиза, эффекты AI-карт и Git-карты. Первая страница группы — Interaction audit: карта состояния всей анимационной работы, что готово и что требует доработок.',
+      en: 'Live animation scenarios: play and draw, combos, the targeting arrow, deck handling, the Error 503 turn, defending a release, AI-card effects and the Git cards. The first page of the group is Interaction audit — the state map of all animation work: what is ready and what still needs it.',
     },
   },
   {
@@ -61,15 +61,22 @@ const SECTIONS: { name: Loc; desc: Loc }[] = [
   {
     name: { ru: 'UI KIT · поверхности', en: 'UI KIT · surfaces' },
     desc: {
-      ru: 'Индикаторы и поверхности: бейджи, аватары, стопки, модалки, оверлеи, свечения, спиннер.',
-      en: 'Indicators and surfaces: badges, avatars, piles, modals, overlays, glows, spinner.',
+      ru: 'Индикаторы и поверхности: бейджи, аватары, стопки, модалки, шторка, оверлеи, краевое свечение, спиннер, видеоплеер.',
+      en: 'Indicators and surfaces: badges, avatars, piles, modals, drawer, overlays, edge glow, spinner, video player.',
+    },
+  },
+  {
+    name: { ru: 'UI KIT · HUD', en: 'UI KIT · HUD' },
+    desc: {
+      ru: 'Служебный игровой интерфейс: таймер хода, индикатор состояния, поверхность и фон HUD.',
+      en: 'The in-game service interface: the turn timer, the status dot, the HUD surface and its background.',
     },
   },
   {
     name: { ru: 'Блоки', en: 'Blocks' },
     desc: {
-      ru: 'Композитные куски экранов из примитивов: настройки, правила, меню, места игроков и прочее.',
-      en: 'Composite screen pieces built from primitives: settings, rules, menu, player seats and more.',
+      ru: 'Композитные куски экранов из примитивов: настройки и правила, меню, место игрока и зона релизов, док хода, участники, история ходов, переподключение и конец игры.',
+      en: 'Composite screen pieces built from primitives: settings and rules, the menu, a player seat and the release zone, the turn dock, participants, move history, reconnect and game over.',
     },
   },
 ]

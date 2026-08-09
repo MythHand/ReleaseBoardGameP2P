@@ -1,0 +1,213 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* while a card is being dragged — kill text selection so interface copy doesn't
+   highlight under the cursor (breaks the game feel) */
+.dragging {
+  user-select: none;
+}
+
+/* technical top control line — dev controls (TableStory pattern) */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid var(--white-08);
+}
+
+/* dev toggle chip — off = outline, on = brand-green fill */
+.chip {
+  padding: 8px 14px;
+  color: var(--fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.chip[data-on="true"] {
+  color: var(--deep-green);
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.reset {
+  padding: 8px 14px;
+  margin-inline-start: auto;
+  color: var(--fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.reset:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* ===== table layout — positions mirror @release/ui Table.module.css ===== */
+
+/* draw deck — left-centre */
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  transform: translateY(-50%);
+}
+
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the pile itself is the Pile primitive. */
+.discard {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 86px;
+
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
+}
+
+/* turn dock — bottom-left, under the deck, left of the hand. Sits ABOVE the red
+   edge glow (which paints from the table edges). */
+.turnDock {
+  position: absolute;
+  inset-block-end: 20px;
+  inset-inline-start: 26px;
+  z-index: 55;
+}
+
+/* release zone + hand — bottom-centre, clear of the dock (left) and rail (right).
+   Positioning context for the cross-fading "you are out" overlay. */
+.you {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
+}
+
+/* the live play area (release zone + hand) — cross-fades out on elimination */
+.playArea {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  transition: opacity 420ms var(--ease-out);
+}
+
+.playArea[data-hidden="true"] {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.handWrap {
+  inline-size: 100%;
+}
+
+/* "you are out" — fades in over the play area, lifted off the very bottom
+   (mirrors the Table screen) */
+.eliminated {
+  position: absolute;
+  inset-block-end: 92px;
+  inset-inline: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 420ms var(--ease-out);
+}
+
+.eliminated[data-shown="true"] {
+  opacity: 1;
+}
+
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
+/* centre staging — the 503 comes out here and defence covers it here.
+   150px = the deck / hand card width, so nothing skews in size across the table */
+.center {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(-50%, -50%);
+}
+
+/* a card revealed / resting at the centre */
+.centerCard {
+  position: absolute;
+  inset: 0;
+}
+
+/* full-area bounds for the edge glow — offset below the tech bar so the glow
+   sits in the table zone, not across the whole screen (set inline via barH) */
+.glowBounds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* the cards in the air belong to the shared carrier (useFlyer); only the dragged
+   card below is the scene's own — it follows the cursor rather than flying */
+
+/* the card being dragged as a defence — follows the cursor, and a card held by the
+   hand rides above any card flying on its own */
+.dragFlyer {
+  position: fixed;
+  z-index: calc(var(--z-flight) + 10);
+  pointer-events: none;
+  cursor: grabbing;
+}
+
+/* elimination video — an overlay above everything, shown to all players when
+   someone is knocked out; fades in on mount, out via data-out.
+   In the GAME this covers the whole screen. Here it covers the DEMO AREA instead —
+   absolute inside the scene root, so it stops at the playground navigation, and its
+   top comes inline from the tech-bar height (as .glowBounds does). The video is
+   centred in the table, not in a window that has a nav rail and a bar the game
+   does not have. */
+.gifOverlay {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--surface-0) 82%, transparent);
+
+  /* comes in with a short fade, goes away at once — the video is already playing
+     under the fade, it is not held back by it */
+  animation: gif-in 260ms var(--ease-out);
+}
+
+.gifVideo {
+  max-inline-size: 72%;
+  max-block-size: 72%;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px var(--black-50);
+}
+
+@keyframes gif-in {
+  from {
+    opacity: 0;
+  }
+}

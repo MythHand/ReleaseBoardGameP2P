@@ -1,17 +1,20 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
-import { HEAP_SHOW, play, restTransform, scatterAt, toDiscardParams } from '@/animations'
+import { HEAP_SHOW, scatterAt } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
+import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import { pick, useLang } from '../../../Playground/lang'
-import { useHandInsert } from '../useHandInsert'
+import { reorderHand } from '../reorderHand'
+import { useDiscardExit } from '../useDiscardExit'
+import { useHandArrival } from '../useHandArrival'
 import styles from './GitCards.module.css'
 
 // "System Upgrade" — every OTHER player discards one card (their choice) to the
@@ -24,7 +27,7 @@ const OPP_COUNTS = [1, 2, 3, 4, 5] as const
 const OPP_NAMES = ['neo', 'trinity', 'morpheus', 'smith', 'oracle']
 const INITIAL_HAND = 5
 const CENTER_W = 150 // thrown card width at the centre (readable, like the cherry grid)
-const PILE_W = 132 // discard pile width
+const PILE_W = 116 // discard pile width — the Table screen's value
 const EMPTY_RELEASE: ReleaseSlots = { frontend: undefined, backend: undefined, database: undefined }
 
 // timings
@@ -57,13 +60,6 @@ interface DiscardCard {
 
 const rand = (pool: CardType[]) => pool[Math.floor(Math.random() * pool.length)]
 const makeHand = (n: number) => HAND_POOL.slice(0, n).map((card) => ({ uid: nextHandUid(), card }))
-// the card area at the top of a pile (a Pile is taller than its card)
-const cardAreaOf = (r: DOMRect) => ({
-  left: r.left,
-  top: r.top,
-  width: r.width,
-  height: r.width * 1.4,
-})
 
 export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
   const { lang } = useLang()
@@ -79,6 +75,7 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
   const seatRefs = useRef<Map<string, HTMLElement>>(new Map())
   const centerRefs = useRef<Map<string, HTMLElement>>(new Map())
   const discardRef = useRef<HTMLDivElement>(null)
+  const { send: sendToDiscard } = useDiscardExit(discardRef)
   const handRef = useRef<HTMLDivElement>(null)
   const timers = useRef<number[]>([])
 
@@ -102,13 +99,14 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
   // the chosen card settles into the hand (proven family insert)
   const {
     gapAt,
+    gapSize,
     overlay,
-    insert,
+    arrive,
     reset: resetInsert,
-  } = useHandInsert(handRef, (card, gap) => {
+  } = useHandArrival(handRef, (gap, landed) => {
     setHand((h) => {
       const copy = [...h]
-      copy.splice(gap, 0, { uid: nextHandUid(), card })
+      copy.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return copy
     })
   })
@@ -187,7 +185,6 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
   // centre cards leave: the chosen one (sudo) to the hand, the rest to the discard
   function resolve(handUid: string | null) {
     setPhase('resolve')
-    const pileRect = discardRef.current?.getBoundingClientRect()
     const rest = center.filter((c) => c.uid !== handUid)
 
     // pass 1: read every rect before freezing (freezing reflows the flex row)
@@ -210,7 +207,7 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
     }
 
     // chosen → hand: reveal to the centre (enlarged), hold, then drop into the
-    // fan (the shared useHandInsert) — the same beat as cherry-pick
+    // fan (the shared useHandArrival) — the same beat as cherry-pick
     const handCard = center.find((c) => c.uid === handUid)?.card
     const handRect = handUid ? rects.get(handUid) : null
     const handEl = handUid ? centerRefs.current.get(handUid) : null
@@ -230,31 +227,28 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
       later(() => {
         const el = centerRefs.current.get(handUid as string)
         if (!el) return
-        const r = el.getBoundingClientRect()
-        el.style.opacity = '0' // the insert overlay takes over
-        insert(
-          handCard,
-          { left: r.left, top: r.top, width: r.width, height: r.height },
-          hand.length,
-        )
+        // the card on screen IS the one that flies — the step measures it and
+        // takes it off screen itself, no local copy and no opacity trick
+        void arrive([{ key: nextHandUid(), card: handCard, el }], hand.length)
       }, REVEAL_DUR + REVEAL_HOLD)
     }
 
     // rest → discard, each landing at its own scatter
     const heap = rest.map((c, i) => ({ uid: c.uid, card: c.card, ...scatterAt(i, PILE_W) }))
-    if (pileRect) {
-      const to = cardAreaOf(pileRect)
-      rest.forEach((c, i) => {
-        const el = centerRefs.current.get(c.uid)
-        const from = rects.get(c.uid)
-        if (!el || !from) return
-        const visible = i >= rest.length - HEAP_SHOW
-        later(
-          () => play('centerToDiscard', el, toDiscardParams(from, to, heap[i], !visible)),
-          i * CLEAR_STEP,
-        )
-      })
-    }
+    // the scene appends the heap itself when the round finishes, so the shared
+    // step only owns the motion here
+    void sendToDiscard(
+      rest.map((c, i) => ({
+        key: c.uid,
+        card: c.card,
+        node: centerRefs.current.get(c.uid),
+        scatter: heap[i],
+        // the top HEAP_SHOW stay visible; the ones beneath dissolve on the way
+        fade: i < rest.length - HEAP_SHOW,
+        delay: i * CLEAR_STEP,
+        layer: i,
+      })),
+    )
 
     const clearDone = RETURN_DUR + Math.max(0, rest.length - 1) * CLEAR_STEP
     later(
@@ -318,24 +312,14 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
 
       {/* discard — right-centre, as on the table; cards land here scattered */}
       <div className={styles.discardPile}>
-        <div ref={discardRef} className={styles.discardBox} style={{ inlineSize: PILE_W }}>
-          {discard.length === 0 ? (
-            <span className={styles.discardEmpty} />
-          ) : (
-            <>
-              {discard.slice(-HEAP_SHOW).map((d, i) => (
-                <div
-                  key={d.uid}
-                  className={styles.heapCard}
-                  style={{ transform: restTransform(d), zIndex: i }}
-                >
-                  <Card card={d.card} interactive={false} width="100%" />
-                </div>
-              ))}
-              <span className={styles.heapCount}>{discard.length}</span>
-            </>
-          )}
-        </div>
+        <Pile
+          heap={discard}
+          count={discard.length}
+          heapShow={HEAP_SHOW}
+          width={PILE_W}
+          boxRef={discardRef}
+          logoVariant={lang}
+        />
         <span className={styles.pileLabel}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
       </div>
 
@@ -373,6 +357,9 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
                   interactive={false}
                   width={CENTER_W}
                   state={phase === 'choose' && selected ? 'selected' : 'idle'}
+                  // pick one out of a set — uniform selection colour, not the
+                  // per-category accent
+                  accent="var(--select-accent)"
                 />
               </button>
             )
@@ -400,7 +387,12 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
         ref={handRef}
         style={{ pointerEvents: phase === 'idle' || phase === 'done' ? undefined : 'none' }}
       >
-        <Hand items={hand} gapAt={gapAt} />
+        <Hand
+          items={hand}
+          gapAt={gapAt}
+          gapSize={gapSize}
+          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        />
       </div>
     </div>
   )

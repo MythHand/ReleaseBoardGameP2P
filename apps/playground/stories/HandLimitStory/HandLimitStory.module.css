@@ -1,0 +1,106 @@
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+
+  /* cards are dragged across the whole page — kill text selection so interface
+     copy doesn't highlight under the cursor (breaks the game feel) */
+  user-select: none;
+}
+
+/* technical top control line — dev controls (TableStory pattern) */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid var(--white-08);
+}
+
+/* the live readout — limit / in hand / still to discard */
+.readout {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-inline-start: auto;
+  color: var(--white-45);
+}
+
+.readout b {
+  font-weight: inherit;
+  color: var(--brand-green);
+}
+
+/* over the limit — the excess is the thing the player must act on */
+.readout[data-over="true"] b {
+  color: var(--danger-accent);
+}
+
+/* ===== table layout — positions mirror @release/ui Table.module.css ===== */
+
+/* the turn's discard, built openly at the centre — the columns and the card
+   width come from the known card count (set inline). Sits above the discard
+   heap, so the cards fly over it when the finished grid leaves. */
+.grid {
+  position: absolute;
+  inset-block-start: 44%;
+  inset-inline-start: 50%;
+  z-index: 70;
+  display: grid;
+  gap: 12px;
+  transform: translate(-50%, -50%);
+}
+
+.cell {
+  position: relative;
+  aspect-ratio: var(--card-aspect);
+}
+
+/* a cell still to be filled — shows the shape the discard is taking */
+.cellEmpty {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--white-12);
+  border-radius: 8px;
+}
+
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the pile itself is the Pile primitive. */
+.discard {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 86px;
+
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
+}
+
+/* player hand — canonical Table position: the left inset clears the turn dock,
+   the right one clears the rail, so the fan sits where it does in the game even
+   though this page renders neither */
+.you {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
+}
+
+.hint {
+  margin-block-end: 10px;
+  color: var(--white-45);
+  text-align: center;
+}
+
+/* the cards in the air belong to the shared carrier (useFlyer) */

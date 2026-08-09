@@ -4,6 +4,7 @@ import type { LobbyCodeCopy } from '@/blocks/LobbyCode'
 import type { RulesCopy } from '@/blocks/Rules'
 import type { Card } from '@/cards/types'
 import type { GameModesCopy, Setup } from '@/game/modes'
+import type { HeapCard } from '@/primitives/Pile/Pile'
 import type { GameOverCopy } from '@/table/GameOver/GameOver'
 import type { HandItem } from '@/table/Hand/Hand'
 import type { HistoryEntry, MoveHistoryCopy } from '@/table/MoveHistory/MoveHistory'
@@ -40,7 +41,11 @@ export interface TableState {
   decks: {
     main: number
     events: number
+    // верх сброса одной картой — запасной вид, когда куча не передана
     discard?: Card | null
+    // сброс как он есть на столе: наброшенная куча. Необязательно — экран
+    // остаётся рабочим у потребителя, который её ещё не отдаёт.
+    discardHeap?: HeapCard[]
     discardCount: number
   }
   turn?: string

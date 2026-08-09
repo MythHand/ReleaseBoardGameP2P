@@ -1,5 +1,5 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
-import { HEAP_SHOW, play, restTransform, scatterAt, toDiscardParams } from '@/animations'
+import { HEAP_SHOW, play, scatterAt } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
@@ -8,7 +8,9 @@ import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../../Playground/lang'
-import { useHandInsert } from '../useHandInsert'
+import { reorderHand } from '../reorderHand'
+import { useDiscardExit } from '../useDiscardExit'
+import { useHandArrival } from '../useHandArrival'
 import styles from './GitCards.module.css'
 
 // "Git Cherry-pick" — pick a card out of the whole discard.
@@ -28,7 +30,8 @@ const HAND_POOL = BASE.filter((c) => !isTrigger(c))
 const INITIAL_HAND = 5
 const DECK_START = 24
 const GRID_W = 150 // discard card width in the selection grid (large, readable)
-const PILE_W = 132
+const DECK_W = 150 // draw-deck pile width — the Table screen's value
+const PILE_W = 116 // discard pile width — the Table screen's value
 const SIZES = [8, 54] as const // technical toggle: no-scroll vs scroll case
 
 // timings
@@ -41,7 +44,7 @@ const DECK_DUR = 480 // = the returnToDeck preset duration
 const DECK_HOLD = 360 // deck card holds face-down before it merges
 const STAGGER_CAP = 40 // don't stagger past this many cards
 // hand card, like the opponent-card stories: fly to centre, enlarge, hold, then
-// the shared useHandInsert drop into the fan
+// the shared useHandArrival drop into the fan
 const REVEAL_W = 220 // width the chosen card reaches in the centre
 const REVEAL_DUR = 460 // fly-to-centre duration
 const REVEAL_HOLD = 560 // pause in the centre before dropping into the hand
@@ -108,6 +111,7 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
   const cellRefs = useRef<Map<string, HTMLElement>>(new Map())
   const deckRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
+  const { send: sendToDiscard } = useDiscardExit(discardRef)
   const handRef = useRef<HTMLDivElement>(null)
   const timers = useRef<number[]>([])
 
@@ -126,13 +130,14 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
   // the chosen card settles into the hand fan (proven family insert)
   const {
     gapAt,
+    gapSize,
     overlay,
-    insert,
+    arrive,
     reset: resetInsert,
-  } = useHandInsert(handRef, (card, gap) => {
+  } = useHandArrival(handRef, (gap, landed) => {
     setHand((h) => {
       const copy = [...h]
-      copy.splice(gap, 0, { uid: nextHandUid(), card })
+      copy.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return copy
     })
   })
@@ -264,7 +269,6 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
   function confirmPick() {
     if (phase !== 'choose' || !confirmReady) return
     const { handUid, deckUid } = roles
-    const pileRect = discardRef.current?.getBoundingClientRect()
     const deckRect = deckRef.current?.getBoundingClientRect()
     const handCard = discard.find((d) => d.uid === handUid)?.card
     const remaining = discard.filter((d) => d.uid !== handUid && d.uid !== deckUid)
@@ -294,7 +298,7 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
 
     setPhase('resolve')
 
-    // chosen → hand: fly to centre, enlarge, hold, then the shared useHandInsert
+    // chosen → hand: fly to centre, enlarge, hold, then the shared useHandArrival
     // drop into the fan — same as taking an opponent card
     const handEl = handUid ? cellRefs.current.get(handUid) : null
     const handRect = handUid ? rects.get(handUid) : null
@@ -314,13 +318,9 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
       later(() => {
         const el = cellRefs.current.get(handUid as string)
         if (!el) return
-        const r = el.getBoundingClientRect()
-        el.style.opacity = '0' // the insert overlay takes over from here
-        insert(
-          handCard,
-          { left: r.left, top: r.top, width: r.width, height: r.height },
-          hand.length,
-        )
+        // the card on screen IS the one that flies — the step measures it and
+        // takes it off screen itself, no local copy and no opacity trick
+        void arrive([{ key: nextHandUid(), card: handCard, el }], hand.length)
       }, REVEAL_DUR + REVEAL_HOLD)
     }
 
@@ -340,16 +340,20 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
     // (rot/dx/dy) — the exact transform the resting heap will render, so there's
     // no position swap when the animation ends. The top HEAP_SHOW stay visible;
     // the ones beneath fade out (merge into the pile) instead of vanishing.
-    remaining.forEach((d, i) => {
-      const el = cellRefs.current.get(d.uid)
-      const from = rects.get(d.uid)
-      if (!el || !from || !pileRect) return
-      const visible = i >= remaining.length - HEAP_SHOW
-      later(
-        () => play('centerToDiscard', el, toDiscardParams(from, pileRect, d, !visible)),
-        Math.min(i, STAGGER_CAP) * RETURN_STEP,
-      )
-    })
+    // the scene keeps its own books on the heap (finishResolve rebuilds it), so
+    // the shared step only owns the motion here
+    void sendToDiscard(
+      remaining.map((d, i) => ({
+        key: d.uid,
+        card: d.card,
+        node: cellRefs.current.get(d.uid),
+        scatter: d,
+        // the top HEAP_SHOW stay visible; the ones beneath dissolve on the way
+        fade: i < remaining.length - HEAP_SHOW,
+        delay: Math.min(i, STAGGER_CAP) * RETURN_STEP,
+        layer: i,
+      })),
+    )
 
     const returnDone = RETURN_DUR + Math.min(remaining.length, STAGGER_CAP) * RETURN_STEP
     const deckDone = deckUid ? FLIP_DUR + DECK_DUR + DECK_HOLD : 0
@@ -410,7 +414,7 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
       {/* draw deck (left) — the sudo target */}
       <div className={styles.deckPile}>
         <div ref={deckRef}>
-          <Pile deck="base" count={deckCount} width={PILE_W} countPos="tl" />
+          <Pile deck="base" count={deckCount} width={DECK_W} countPos="tl" />
         </div>
         <span className={styles.pileLabel}>{pick(lang, { ru: 'колода', en: 'deck' })}</span>
       </div>
@@ -418,24 +422,14 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
       {/* discard (right) — the source; cards deal out of here and return here.
           Rest state is a tossed heap (top cards tilted), not a neat column. */}
       <div className={styles.discardPile}>
-        <div ref={discardRef} className={styles.discardBox} style={{ inlineSize: PILE_W }}>
-          {showGrid || discard.length === 0 ? (
-            <span className={styles.discardEmpty} />
-          ) : (
-            <>
-              {discard.slice(-HEAP_SHOW).map((d, i) => (
-                <div
-                  key={d.uid}
-                  className={styles.heapCard}
-                  style={{ transform: restTransform(d), zIndex: i }}
-                >
-                  <Card card={d.card} interactive={false} width="100%" />
-                </div>
-              ))}
-              <span className={styles.heapCount}>{discard.length}</span>
-            </>
-          )}
-        </div>
+        <Pile
+          heap={showGrid ? [] : discard}
+          count={showGrid ? 0 : discard.length}
+          heapShow={HEAP_SHOW}
+          width={PILE_W}
+          boxRef={discardRef}
+          logoVariant={lang}
+        />
         <span className={styles.pileLabel}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
       </div>
 
@@ -482,6 +476,9 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
                     width={GRID_W}
                     faceDown={flipped.has(d.uid)}
                     state={phase === 'choose' && selected ? 'selected' : 'idle'}
+                    // pick one out of a set — uniform selection colour, not the
+                    // per-category accent
+                    accent="var(--select-accent)"
                   />
                   {phase === 'choose' && trigger && !selected && (
                     <span className={styles.lockTag}>
@@ -524,7 +521,12 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
         ref={handRef}
         style={{ pointerEvents: phase === 'idle' || phase === 'done' ? undefined : 'none' }}
       >
-        <Hand items={hand} gapAt={gapAt} />
+        <Hand
+          items={hand}
+          gapAt={gapAt}
+          gapSize={gapSize}
+          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        />
       </div>
     </div>
   )

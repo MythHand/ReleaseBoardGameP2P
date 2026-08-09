@@ -47,9 +47,19 @@ The words that flow into a preset as `params`.
 | `CARD_W` | `150` | `@/table/Hand/fan` | canonical hand-card width (the real source) |
 | `SOURCE_CARD_W` | `140` | `CardToHandStory` | preview source-card width |
 | `DEAL_CARD_W` | `150` | `PickOpponentCardStory` | deal-grid card width |
-| `FIXED_CARD_W` | `108` | `CardPlayStory` | fixed showcase card width — a stopgap: this scene renders the hand by hand, not via `@/table/Hand`, so there is no real card to measure |
 | `ROT` / `DX` / `DY` | `14` / `10` / `8` | `scatter.ts` | `jitter` ±ranges: `rot ±14°`, `dx ±10px`, `dy ±8px` |
-| `TRAVEL_Z` | `500` | `useHandInsert` | z-index of the high travel layer during a hand-insert flight |
+| `--z-flight` | `250` | `tokens.css` | the BASE of the flight band — above the hand and a lifted card, below the arrow and the overlays. Every flyer reads it; `useHandArrival` holds it for `START_HIGH_MS` before dropping to the slot's own layer |
+| flight band offsets | `+n` / `+10` / `+40` | `useDiscardExit`, `Error503Story`, `Pile` | on top of `--z-flight`: `n` = the card's own table layer, so a group keeps its order (**I9**); `+10` = a card held by the cursor, above anything flying on its own; `+40` = the pile counter, clear of the whole band so an arriving card passes under the badge |
+| `CARD_WH` | `368 / 515` (width / height) | `@/table/Hand` | inverse of `CARD_RATIO`; sizes the drag flyer height and the zoom preview |
+| `HOVER_LIFT` / `NEIGHBOR_PUSH` | `28` / `36` | `@/table/Hand` | hover: lift of the hovered card / spread of its neighbours (px) |
+| `BAND_PAD` | `32` | `@/table/Hand` | how far above the fan still counts as "in the hand" (reorder) vs a play |
+| `DRAG_THRESHOLD` | `6` | `@/table/Hand` | pointer travel (px) that turns a press into a drag (below it = a click) |
+| `ZOOM_TOP_AIR` / `ZOOM_GAP` | `32` / `44` | `@/table/Hand` | zoom preview: min gap from the top edge / gap above the fan |
+| `ZOOM_MIN_H` / `ZOOM_MAX_H` | `240` / `460` | `@/table/Hand` | zoom preview height clamp |
+| `SPREAD_DEG` / `ARC_DROP` | `3.8` / `2.5` | `@/table/Hand/fan` | fan tilt per step (deg) / arc drop across the fan (`handStep` also uses tuned quadratic `STEP_ANCHORS`) |
+| `REVEAL_W` | `220` | pick / cherry / sysupg | width a card reaches at the centre before the hand-insert |
+| `GRID_W` | `100` (pick) / `150` (cherry) | selection-grid card width |
+| `CENTER_W` / `THROW_SCALE` | `150` / `0.42` | `SystemUpgrade` | thrown-card width at the centre / start scale at the seat |
 
 Card widths differ per view by design — not duplicates.
 
@@ -64,8 +74,10 @@ playground.
 
 | Name | Value | Where | Beat |
 |---|---|---|---|
-| `START_HIGH_MS` | `140` | `useHandInsert` | how long the high layer is held before tucking under the fan |
-| `FLIGHT_MS` | `480` | `useHandInsert` | hand-insert flight — **must equal the `.flying` CSS transition** |
+| `START_HIGH_MS` | `140` | `useHandArrival` | how long the travel layer is held before the card tucks under the fan |
+| `FLIGHT_MS` | `480` | `useHandArrival` | arrival into the fan — **must equal the `.arriving` CSS transition** |
+| `FLIGHT_MS` | `420` | `useDiscardExit` | discard flight — matches `centerToDiscard`, so the table tilt finishes unwinding exactly as the card lands |
+| `AUX_TILT` | `-7` | `useDiscardExit` | the tilt `CardPair` gives its aux card — kept while that half flies out on its own |
 | `FLIP_MS` | `420` | `DrawCardStory` | mirror of the `flipCard` preset — JS waits the in-place flip |
 | `SPLIT_MS` | `520` | `DeckAnimationsStory` | the `flyFrom` split fly-out duration |
 | `MERGE_MS` | `520` | `DeckAnimationsStory` | each deck's `absorbToDeck` flight on merge |
@@ -76,6 +88,27 @@ playground.
 | `SPLIT_HOLD` | `600` | `DeckAnimationsStory` | pause after split, before touching discard |
 | `CENTER_HOLD` | `420` | `DeckAnimationsStory` | card rests at center before leaving to discard |
 | `STEP_HOLD` | `360` | `DeckAnimationsStory` | standard short beat between deck steps |
+| `SETTLE_MS` | `340` | `@/table/Hand` | reorder / rejected-play glide back into the fan |
+| `ResizeMs` | `200` | `Error503Story` | dragged defence eases from its source width to `CARD_W` |
+| `ELIM_MIN_MS` | `5000` | `Error503Story` | minimum elimination-video play time before it fades |
+| `COVER_DX` / `COVER_DY` | `16` / `-12` | `Error503Story` | the answer covers the 503 nudged, so both cards are read |
+| `COVER_HOLD` | `1200` | `Error503Story` | the answer and the alarm stand open before they leave together |
+| `GATHER_HOLD` | `1500` | `Error503Story` | the swept hand is held at the centre before it scatters (the hand-limit beat) |
+| `PICK_HOLD` | `900` | `AiCardsStory` | Bad Vibe: the given-up card stands beside the AI card before both leave |
+| `TABLE_HOLD` | `2600` | `AiCardsStory` | hold on the table after an AI card reveals, before it resolves |
+| `HALLUCINATION_HOLD` | `5200` | `AiCardsStory` | `×2 TABLE_HOLD` — Hallucination lingers |
+| `SHOW_HOLD` | `1500` | `AiCardsStory` | a card shown to all at the centre (Inside / Bad Vibe) |
+| `PICK_BEAT` | `620` | pick stories | chosen holds / others leave, before the check |
+| `REVEAL_HOLD` (pick-specific) | `820` | `PickSpecificCardStory` | centre hold after the flip, before the drop |
+| `CENTER_HOLD` (pick) | `820` | `OpponentTakesCardStory` | centre hold before the card flies up to the opponent |
+| `MISS_HOLD` | `1620` | pick stories | shake / note before the fan leaves (miss case) |
+| `REVEAL_HOLD` (git) | `560` | `CherryPick`, `SystemUpgrade` | centre hold before the sudo card drops into the hand |
+| `DEAL_DUR` / `DEAL_STEP` | `360`/`16` (cherry), `520`/`80` (rebase) | Git cards | deal cards out / per-card stagger |
+| `RETURN_DUR` / `RETURN_STEP` | `420`/`14` | `CherryPick` | return unpicked to the pile / stagger |
+| `DECK_DUR` / `DECK_HOLD` | `480`/`360` | `CherryPick` | sudo deck-card flight (`returnToDeck`) / face-down hold |
+| `BACK_DUR` / `BACK_STEP` | `600`/`90` | `Rebase` | fly the reordered three back to the deck / stagger |
+| `THROW_DUR` / `THROW_STEP` | `460`/`260` | `SystemUpgrade` | seat → centre throw / per-opponent stagger |
+| `HOLD_MS` / `CLEAR_STEP` | `2500`/`90` | `SystemUpgrade` | base hold before discard / centre → discard stagger |
 
 ---
 

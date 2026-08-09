@@ -1,5 +1,6 @@
 import type React from 'react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { HEAP_SHOW } from '@/animations'
 import LangSwitcher from '@/blocks/LangSwitcher'
 import LobbyCode from '@/blocks/LobbyCode'
 import Rules from '@/blocks/Rules'
@@ -287,9 +288,13 @@ export default function Table({
         <Pile label={copy.table.events} deck="ai" count={decks.events} width={150} countPos="tl" />
       </div>
 
+      {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними
+          «глубина» стопки, счётчик показывает весь сброс */}
       <div className={styles.discard}>
         <Pile
           label={copy.table.discard}
+          heap={decks.discardHeap}
+          heapShow={HEAP_SHOW}
           topCard={decks.discard}
           count={decks.discardCount}
           width={116}

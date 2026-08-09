@@ -25,6 +25,10 @@ interface SeatProps {
   eliminated?: boolean
   disconnected?: boolean
   copy: SeatCopy
+  // проброс до слотов мини-зоны релиза: потребителю нужен DOM-узел конкретного
+  // слота, чтобы прицелить в него полёт карты (Security Bug забирает чужой
+  // релиз в СВОЮ зону). Чисто позиционный хук, на вид не влияет.
+  slotRef?: (key: keyof ReleaseSlots, el: HTMLDivElement | null) => void
   // legality is the engine's answer: the seat (and its release zone) highlight
   // and accept a click only for what appears in `targets` — Seat decides
   // nothing about which plays are legal.
@@ -39,6 +43,7 @@ export default function Seat({
   eliminated = false,
   disconnected = false,
   copy,
+  slotRef,
   onPick,
   targets = [],
 }: SeatProps) {
@@ -95,10 +100,14 @@ export default function Seat({
           </span>
         )}
       </div>
+      {/* зона СОПЕРНИКА — карты в ней не читают, поэтому LOD; своя зона игрока
+          остаётся полной (её включает сам экран, а не этот компонент) */}
       <ReleaseZone
         release={player.release}
         size="72px"
         variant="compact"
+        slotRef={slotRef}
+        lod
         player={player.id}
         onPick={onPick}
         targets={releaseTargets}

@@ -4,9 +4,35 @@
 }
 
 .slot {
+  position: relative;
   flex: 0 0 auto;
   aspect-ratio: var(--card-aspect);
   container-type: inline-size;
+}
+
+.grabbable {
+  cursor: grab;
+}
+
+/* карту отсюда сейчас можно взять — обводка и свечение в цвете, который назвал
+   потребитель (как playable-состояние у Card, которого паре не передать).
+   Отдельным слоем ВНУТРИ слота, а не на самом слоте: cqw считаются от ближайшего
+   контейнера-предка, и на самом слоте (он и есть контейнер) 6cqw ушли бы в размер
+   вьюпорта — радиус получался больше карты, и свечение читалось овалом под ней. */
+.glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 6cqw;
+  opacity: 0;
+  transition: opacity var(--t-base) var(--ease-out);
+}
+
+.grabbable .glow {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 22px 2px color-mix(in srgb, var(--accent) 50%, transparent);
+  opacity: 1;
 }
 
 .empty {
@@ -29,10 +55,16 @@
 }
 
 /* легитимная цель текущего прицеливания — подсветка того, что пришло в
-   `targets`; сам слот не решает, что легально */
+   `targets`; сам слот не решает, что легально. Свечение — тем же слоем .glow,
+   что и у grabbable, и по той же причине (см. комментарий выше): на самом слоте
+   6cqw считаются не от него, и подсветка расплывается овалом под картой. */
 .targetable {
   cursor: pointer;
-  border-radius: 6cqw;
-  box-shadow: 0 0 0 2px var(--turn-accent),
+}
+
+.targetable .glow {
+  box-shadow:
+    0 0 0 2px var(--turn-accent),
     0 0 16px 2px color-mix(in srgb, var(--turn-accent) 40%, transparent);
+  opacity: 1;
 }

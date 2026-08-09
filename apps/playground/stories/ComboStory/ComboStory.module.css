@@ -76,110 +76,68 @@
   opacity: 1;
 }
 
-/* центр стола — куда ложатся не-релизы */
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
+/* staging area at the centre — the cards put into this turn stand here, open to
+   everyone, until the play resolves */
 .centerSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
-  inline-size: 160px;
+  inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  border: 1px dashed var(--white-10);
-  border-radius: 14px;
+  border: 1px dashed var(--white-12);
+  border-radius: 8px;
   transform: translate(-50%, -50%);
 }
 
-/* сброс — правый нижний угол */
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
-  inset-block-end: 28px;
-  inset-inline-end: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-}
+  inset-block: 0;
+  inset-inline-end: 86px;
 
-.discardSlot {
-  position: relative;
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
   display: flex;
   align-items: center;
-  justify-content: center;
-  inline-size: 104px;
-  aspect-ratio: var(--card-aspect);
-  border: 1px dashed var(--white-16);
-  border-radius: 12px;
+  pointer-events: none;
 }
 
-.discardCard {
-  position: absolute;
-  inset: 0;
+.discard > * {
+  pointer-events: auto;
 }
 
-.cap {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  opacity: 0.5;
-}
-
-/* низ: зона релиза над рукой */
+/* player area — release zone above the hand, canonical Table position: the left
+   inset clears the turn dock, the right one clears the rail */
 .bottom {
   position: absolute;
-  inset-block-end: 24px;
-  inset-inline: 0;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 4px;
   align-items: center;
 }
 
-.releaseZone {
-  display: flex;
-  gap: 12px;
-}
-
-.slot {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 92px;
-  aspect-ratio: var(--card-aspect);
-  border: 1px dashed var(--white-16);
-  border-radius: 12px;
-}
-
-.empty {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
-  opacity: 0.4;
-}
-
+/* player hand — the canonical fan (Hand lays itself out from the wrapper's centre) */
 .hand {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  justify-content: center;
+  inline-size: 100%;
 }
 
-.cell {
-  position: relative;
-  cursor: pointer;
-  border-radius: 14px;
-  transition: box-shadow var(--t-base) var(--ease-soft);
-}
-
-.valid,
-.partner {
-  box-shadow: 0 0 26px color-mix(in srgb, var(--hl) 55%, transparent);
-}
+/* the source travelling from the fan to the centre belongs to the shared carrier
+   (useFlyer); the .flyer below is NOT a flyer — it is the merge stage the pair is
+   assembled on, mounted for the whole scene */
 
 /* летящая карта (overlay) */
 .flyer {
   position: fixed;
   inset-block-start: 0;
   inset-inline-start: 0;
-  z-index: var(--z-modal);
+  z-index: var(--z-flight);
   pointer-events: none;
   opacity: 0;
 }

@@ -8,13 +8,14 @@ import Slider from '@/primitives/Slider'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './PickOpponentCardStory.module.css'
-import { useHandInsert } from './useHandInsert'
+import { reorderHand } from './reorderHand'
+import { useHandArrival } from './useHandArrival'
 
 // "Take a random card from the opponent's hand" — as if the player across the
 // table extends a fan face-down for you to choose from. The opponent hand (the
 // same Hand component, backs up) slides in from the top; picking a card sends the
 // fan back up off-screen while the chosen card travels to the centre and flips
-// face-up, then drops into the player's hand (the shared useHandInsert step).
+// face-up, then drops into the player's hand (the shared useHandArrival step).
 const REVEAL_HOLD = 820 // pause in the centre after the flip, before the drop
 const INITIAL_HAND = 5
 const REVEAL_W = 220 // width the chosen card reaches in the centre
@@ -60,13 +61,14 @@ export default function PickOpponentCardStory() {
   // final step is shared: the card settles into the hand, then reset the round
   const {
     gapAt,
+    gapSize,
     overlay,
-    insert,
+    arrive,
     reset: resetInsert,
-  } = useHandInsert(handRef, (card, gap) => {
+  } = useHandArrival(handRef, (gap, landed) => {
     setHand((h) => {
       const copy = [...h]
-      copy.splice(gap, 0, { uid: nextHandUid(), card })
+      copy.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
       return copy
     })
     setPhase('idle')
@@ -133,11 +135,7 @@ export default function PickOpponentCardStory() {
     const el = revealRef.current
     if (el && reveal) {
       const r = el.getBoundingClientRect()
-      insert(
-        reveal.card,
-        { left: r.left, top: r.top, width: r.width, height: r.height },
-        hand.length,
-      )
+      void arrive([{ key: nextHandUid(), card: reveal.card, from: r }], hand.length)
     }
     setReveal(null)
   }
@@ -225,7 +223,12 @@ export default function PickOpponentCardStory() {
       {overlay}
 
       <div className={styles.handWrap} ref={handRef}>
-        <Hand items={hand} gapAt={gapAt} />
+        <Hand
+          items={hand}
+          gapAt={gapAt}
+          gapSize={gapSize}
+          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        />
       </div>
     </div>
   )

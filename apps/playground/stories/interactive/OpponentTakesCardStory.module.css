@@ -76,18 +76,6 @@
   overflow: visible;
 }
 
-.hint {
-  position: absolute;
-  inset-block-start: -30px;
-  inset-inline: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-45);
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-}
-
 /* карта каталога: вылетает при появлении (стаггер), увеличивается по ховеру */
 .cell {
   padding: 0;
@@ -171,8 +159,10 @@
   will-change: transform;
 }
 
+/* player hand — canonical Table position: the left inset clears the turn dock,
+   the right one clears the rail */
 .handWrap {
   position: absolute;
-  inset-block-end: 24px;
-  inset-inline: 0;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
 }

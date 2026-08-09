@@ -27,36 +27,78 @@ Not everything these docs describe is a shared library module. As of now:
 
 **In `@release/ui` — import and use directly:**
 - The animation vocabulary: `play`, the presets (`PRESETS`), and `move` / `jitter` / `wait` /
-  `nextFrames` (`apps/ui/src/animations/`); the card geometry helpers `cardAreaOf` / `cardBoxIn`
-  (`@/primitives/Card`).
-- Primitives that **animate themselves** — used declaratively, the animation is built in:
-  `Card` (plays `flipCard` on a `faceDown` change), `EdgeGlow` (CSS opacity fade), `Input` (shake),
-  `Arrow` (via `useArrow`).
+  `nextFrames` (`apps/ui/src/animations/`); the discard-scatter model `scatterAt` / `restTransform` /
+  `toDiscardParams` / `HEAP_SHOW` (same folder); the card geometry helpers `cardAreaOf` / `cardBoxIn`
+  (`@/primitives/Card`); the fan geometry `slotPlacement` / `handStep` (`@/table/Hand/fan`).
+- Primitives / components that **animate themselves** — used declaratively, the animation is built in:
+  `Card` (plays `flipCard` on a `faceDown` change), `Hand` (the interactive fan: hover lift + zoom
+  preview, drag-to-play/reorder, click/drag threshold, settle-back — all internal), `EdgeGlow` (CSS
+  opacity fade), `ConfirmAction` (slide-up confirm bar), `Input` (shake), `Arrow` (via `useArrow`).
+  `ReleaseZone` reflects what the consumer decided and hands the gesture back — the same model as
+  `Hand`: `slotRef(key, el)` to fly a card into a specific slot, `support` for a release with the
+  card laid WITH it (Code Review / Monitoring, shown as a `CardPair`), `accentAt` / `liftedAt` /
+  `onSlotDown` for "this one can be taken now", "this one is currently lifted" and the grab itself.
+  `Pile` renders the discard as a **heap** (`heap`, `heapShow`, `gathered`) and exposes `boxRef`
+  for flights to aim at.
 
-**NOT in the library — lives only in the playground stories (`apps/playground/stories/...`):**
-- The **travel / flight machinery** — the `flyer` element plus the measure → `nextFrames` →
-  position → `play` → cancel/pin dance. There is **no shared `Flyer` / flight primitive**; each
-  story hand-rolls it.
-- The **`useHandInsert`** hook (it works, but sits in the playground, not `@/ui`).
-- The per-scenario **orchestration**: `playSequence`, `drawOne`, `resolveAi`, `flyToCenter`,
-  `runPlay`, the bespoke combo merge.
+  A card in flight sits on its own rung of the layer ladder — `--z-flight`, above the hand and a
+  lifted card, below the arrow and the overlays. Every flyer reads it; a step that carries several
+  cards at once adds the card's own table layer on top (`calc(var(--z-flight) + n)`), so the order
+  they had on the table is the order they land in. A card held by the cursor goes one step higher
+  again (`+10`) — what you are holding is above what is flying on its own.
 
-**What this means for these docs:** the recipes describe the **playground implementation** (the
-visual source of truth). The atoms and self-animating primitives you can **import**; the flight
-machinery and orchestration you **reproduce** from the recipe. Do **not** assume
-`import { useHandInsert } from '@release/ui'` — it isn't there.
+  The pile's counter sits above the whole flight BAND (`+40`, still under the arrow) — above the
+  base is not enough, since the per-card offsets land right on top of it — so a card arriving passes under
+  the badge instead of covering it and then jumping beneath. That only works while the consumer's
+  placement is not a stacking context: **do not centre a pile with a `transform`** — a transform
+  would trap the badge inside the wrapper. The scenes and the `Table` screen centre `.discard` with
+  a full-height flex column (`inset-block: 0; align-items: center`), pointer-transparent so the
+  column does not shadow the hand behind it.
 
-**Honest status:** early scaffolding. The flight-glue has **not** been consolidated into a shared
-primitive/hook — that gap is not yet designed. This section states what is true today, not a
-finished architecture; update it when the boundary moves.
+**Shared, but living in the playground (`apps/playground/stories/interactive/`):**
+Two **named steps** — one per kind of movement, not one generic flight engine — and one **carrier**
+underneath them. Import them from a story; a step owns its rule and its geometry, the carrier owns
+the node:
+- **`useHandArrival`** — *cards arrive in the hand.* Any number, from any kind of source: a rect, a
+  card resting at a tilt, an element already on screen, one half of a pair. The fan opens a gap for
+  all of them in the MIDDLE and they tuck under it as they land. A draw and the undo of a play are
+  the same movement — that is why this is one step and not two.
+- **`useDiscardExit`** — *cards leave the table for the discard.* Any number: one by one but all
+  at once. A pair splits into its two singles; one scatter drives both a card's flight and its
+  rest; the table tilt unwinds in flight; the layer a card had decides the order it joins the heap.
+- **`useFlyer`** — *the carrier.* Not a movement: the fixed node a card rides in, and the five
+  invariants that belong to it (I10, I5, I2, I3, I4). Scenes and steps raise cards through it; it
+  does not know where they fly.
 
-> **Открытый вопрос (требует согласования в команде — не решать в одиночку).**
-> Как готовить переиспользуемую машинерию анимаций — ещё не согласовано. Кандидаты: перенести
-> `useHandInsert` в `@/ui`; спроектировать общий `useFlight` / `<Flyer>` (обязательно с учётом
-> **мульти-флаера** — Combo-пара, AI `outs`, параллельный merge) и перевести стори на его
-> потребление с проверкой на экране. **До согласования новые интерактив-экраны воспроизводят
-> текущий паттерн** (как существующие) — это допустимо и разработку НЕ блокирует; при выносе их
-> потом мигрируем. Архитектуру полёта не финализировать без общего решения (иначе — заплатка).
+**Render what you take.** A step handed a RECT raises a flyer of its own, and that flyer lives in
+the step's `overlay`. Forget to render it and there is no flight, no error, and a card that simply
+appears at the destination.
+
+**Still per-scene, and that is fine:** the orchestration — `playSequence`, `drawOne`, `resolveAi`,
+`flyToCenter`, the combo merge. A scene's own sequence of beats is the scene's subject; only the
+recurring *movements* are shared.
+
+**What this means for these docs:** the atoms, the self-animating primitives and the three steps
+you **import**. Only a scene's own orchestration is **reproduced** from its recipe. Where a
+movement has a step, the recipe says *which step and what to pass it* — the frame-by-frame
+mechanics live inside the step, in one place, and are not restated per scene.
+
+**Where they live:** the steps sit in the playground, not in `@release/ui`, because the playground
+is their only consumer today. They move into the library when something outside it needs them —
+that is the later, game-screen phase, not now. Do **not** assume
+`import { useHandArrival } from '@release/ui'` — it isn't there.
+
+> **Решено (было открытым вопросом).** Как готовить переиспользуемую машинерию анимаций.
+> Рассматривались два кандидата — перенести шаг вставки в руку в `@/ui` и спроектировать общий
+> `useFlight` / `<Flyer>`. Взят **третий путь: именованные шаги по смыслу движения**, а не один
+> универсальный полётный примитив. Причина: у каждого движения своё правило (куда целиться, какой
+> разброс, в каком порядке ложиться, что делать с парой), и универсальный флаер это правило не
+> удержит — он удержит только транспорт. Мульти-флаер при этом покрыт: шаг сам поднимает столько
+> карт, сколько ему дали, и умеет лететь уже существующим элементом.
+>
+> Практика показала, зачем это нужно: пока правило ухода в сброс лежало копиями в трёх сценах,
+> копии разъехались — вторая карта пары получала случайный разброс в момент коммита и телепортом
+> прыгала из точки приземления.
 
 ---
 
@@ -114,7 +156,7 @@ if (anim) await anim.finished                      // wait for the flight
 
 ## Global invariants
 
-These hold across **every** recipe. Recipes reference them by number (I1…I8) instead of
+These hold across **every** recipe. Recipes reference them by number (I1…I10) instead of
 repeating them. Break one and the animation "works on paper" but jumps, double-flips, or
 teleports on screen.
 
@@ -145,6 +187,83 @@ teleports on screen.
 - **I8 — Pass data as arguments, not from state, inside an async sequence.** A long sequence
   reads stale state after `await`; pass the cards/rects it needs as function args (avoids the
   stale-closure bug on click).
+- **I9 — A card's layer is a value it carries, never DOM order.** Whenever more than one card
+  overlaps — resting in a stack, travelling, or landing — its stacking position must be an
+  explicit `zIndex` derived from its place in that stack, and the **same order** must drive the
+  array it is appended to at the destination. Two flyers left on the same `z` fall back to
+  document order, which is the order of the array you happened to build — so the card that lay
+  underneath paints on top and the stack silently turns over mid-flight. The existing pieces all
+  follow this: the discard heap layers by its own index (`zIndex: i`), and `useHandArrival` /
+  `Hand.settleInto` set the flyer's `z` to the target slot's `z` **before** the flight, so the
+  card tucks into the fan at the right depth instead of riding over it. When a stack lands in the
+  heap, append **bottom-up**: the lowest card has to arrive first, or the heap inverts it.
+- **I10 — A flyer carries the coordinates it mounts at.** A `position: fixed` node with no
+  `left`/`top` paints at its **flow** position — the bottom of the page — for every frame that
+  passes before the code gives it one. Setting them imperatively after `nextFrames()` *is* that
+  gap, and it reads as a flash in a corner of the screen. Put the source rect into the flyer's
+  state and render it inline (`style={{ left, top, inlineSize }}`); `nextFrames()` then only does
+  its own job (**I2** — paint at the source before moving). The flash is timing-dependent, so it
+  looks intermittent: usually the browser swallows those frames, sometimes it does not. Four
+  flyers in the playground carried this bug, each found by eye rather than by the code.
+
+---
+
+## Gating the hand while something plays out
+
+Three approaches are in use, and that is deliberate — they are **not** variants of one thing to
+be unified. Each blocks a different amount, so pick by what the scene actually needs to protect.
+
+### 1. Drop the intent props — the hand stays readable
+
+```tsx
+onPlay={busy ? undefined : handPlay}
+onReorder={busy ? undefined : reorder}
+```
+
+`Hand` turns drag mode on only when `onPlay ?? onReorder` is supplied, so dropping both switches
+the whole gesture off. **Hover, the card lift and the zoom preview keep working** — the player can
+still read their hand, they just cannot pull a card out of it.
+
+Use when the scene is playing out one action and a second one would collide with it, but the hand
+must remain legible. No visual change is added on purpose: the gate lasts about as long as a
+flight, and a state that appears and disappears in half a second reads as flicker.
+
+*Live reference:* `Error503Story` (`busy`).
+
+### 2. Kill pointer events on the wrapper — the hand goes inert
+
+```tsx
+<div className={styles.handWrap} style={{ pointerEvents: busy ? 'none' : undefined }}>
+```
+
+Everything stops: hover, lift, zoom preview, grab. The fan becomes a picture.
+
+Use when something is **open above the fan** — a selection row, a reveal — and the hand's own
+zoom preview (which rises out of the top of the fan) would fight it for the same space. Note that
+this is really a property of the overlay, not of the hand: the trigger to reach for it is
+"an overlay owns this area now", not "an animation is running".
+
+*Live reference:* `AiCardsStory` (the Inside pick row; `busy && !handPickMode`).
+
+### 3. No gate at all — the hand is never blocked
+
+Nothing is dropped and nothing is disabled; several flights run in parallel and the next card can
+be pulled out while the previous one is still travelling.
+
+Use when discarding/playing **is** the interaction and the player's tempo is not linear — they
+think, then dump several cards quickly. Any gate here reads as lag, not as safety.
+
+*Live reference:* `HandLimitStory` (discarding down to the hand limit).
+
+### What none of them do, and what is a different thing entirely
+
+- **None of the three aborts a drag already in progress.** The drag lifecycle lives in a `useEffect`
+  keyed on the drag state and its handlers are captured in that closure, so a card already picked up
+  finishes its release normally. All three mean "do not start a new action", never "cancel the
+  current one". A real interrupt does not exist anywhere yet.
+- **`disabled` is not a gate.** `stateAt` → `'disabled'` means *this card cannot be played by the
+  rules* (Error 503: only the Debugger answers, the rest grey out). It is a durable, meaningful
+  state the player must read. Do not use it to mark "an animation is running".
 
 ---
 

@@ -81,10 +81,14 @@
   cursor: pointer;
 }
 
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
+
 /* центр стола — точка staging добора (якорь для измерения) */
 .center {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
@@ -94,7 +98,7 @@
 /* AI-триггер (причина) — слева от центра, обычный размер карты */
 .causeSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
@@ -104,7 +108,7 @@
 /* AI-эффект (главная) — в центре, крупнее триггера */
 .effectSlot {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   z-index: 1;
   inline-size: 200px;
@@ -112,12 +116,8 @@
   transform: translate(calc(-50% + 82px), -50%);
 }
 
-/* летящая карта добора — позиционируется и анимируется императивно (пресеты) */
-.flyer {
-  position: fixed;
-  z-index: 80;
-  pointer-events: none;
-}
+/* the cards in the air belong to the shared carrier (useFlyer) — the scene has no
+   flyer rule of its own any more */
 
 /* колода событий (AI) — закреплена в нижней-левой ячейке */
 .ai {
@@ -125,93 +125,31 @@
   grid-column: 1;
 }
 
-/* сброс — справа по центру, как на столе */
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
-  inset-block-start: 50%;
-  inset-inline-end: 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-  inline-size: 116px;
-  transform: translateY(-50%);
-}
+  inset-block: 0;
+  inset-inline-end: 86px;
 
-/* the discard as a tossed heap — top cards tilted, not a neat pile */
-.discardStack {
-  position: relative;
-  inline-size: 100%;
-  aspect-ratio: var(--card-aspect);
-}
-
-.discardCard {
-  position: absolute;
-  inset: 0;
-}
-
-.discardEmpty {
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
   display: flex;
   align-items: center;
-  justify-content: center;
-  block-size: 100%;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-28);
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  border: 1px dashed var(--white-14);
-  border-radius: 10px;
+  pointer-events: none;
 }
 
-.discardCount {
+.discard > * {
+  pointer-events: auto;
+}
+
+/* turn dock — canonical Table position: bottom-left, under the decks, left of
+   the hand. It carries the draw action instead of a local button. */
+.turnDock {
   position: absolute;
-  inset-block-end: 8px;
-  inset-inline-end: 8px;
-  z-index: 90;
-  padding: 3px 9px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  color: var(--fg);
-  letter-spacing: 0.02em;
-  background: var(--black-78);
-  border: 1px solid var(--white-20);
-  border-radius: 999px;
-}
-
-.label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--white-45);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-}
-
-/* кнопка добора — под блоком колод (колоды не двигаем, позиционируем отдельно) */
-.drawBtn {
-  position: absolute;
-  inset-block-start: 50%;
+  inset-block-end: 20px;
   inset-inline-start: 26px;
-  min-inline-size: 150px;
-  padding: 10px 14px;
-  font-size: 13px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-  transform: translateY(236px);
-}
-
-.drawBtn:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
-}
-
-.drawBtn:disabled {
-  cursor: default;
-  opacity: 0.4;
+  z-index: 55;
 }
 
 /* контейнер зоны стола для краевого свечения — ниже тех-панели (inset-block-start
@@ -227,8 +165,11 @@
 /* рука игрока снизу — компонент Hand (веер).
    Без z-index намеренно: оверлей вставки (useHandInsert) подтыкается под веер
    по z слотов — общий stacking-контекст с рукой нужен, чтобы карта не пряталась. */
+
+/* player hand — canonical Table position: the left inset clears the turn dock,
+   the right one clears the rail, so the fan sits where it does in the game */
 .handWrap {
   position: absolute;
-  inset-block-end: 0;
-  inset-inline: 0;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
 }

@@ -1,0 +1,18 @@
+/* a card on its way out to the discard — fixed, viewport coords; its layer is set
+   inline so the table stacking order travels with it */
+.flyer {
+  position: fixed;
+  pointer-events: none;
+}
+
+/* the table tilt lives on this inner element, so the flyer's own box stays
+   axis-aligned and the flight math reads the true card rect */
+.pose {
+  block-size: 100%;
+}
+
+/* …and it unwinds DURING the flight (same duration), so the card lands already in
+   the pose the heap will render it in — nothing straightens on arrival */
+.pose[data-straight="true"] {
+  transition: transform 420ms var(--ease-out);
+}

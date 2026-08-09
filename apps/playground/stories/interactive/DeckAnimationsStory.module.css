@@ -71,95 +71,65 @@
   grid-column: 1;
 }
 
-/* сброс — справа, как на столе; лицом вверх, вразброс.
-   Центрируем по вертикали через margin:auto (без transform) — иначе transform
-   создаёт stacking context и счётчик не поднять выше летящих карт. */
+/* discard — right of centre, before the right rail (canonical Table position).
+   Only its place lives here; the pile itself is the Pile primitive. */
 .discard {
   position: absolute;
   inset-block: 0;
   inset-inline-end: 86px;
+
+  /* centred by the column, NOT by a transform: a transform would make this a
+     stacking context and trap the pile's counter under the cards flying in */
   display: flex;
-  flex-direction: column;
-  gap: 8px;
   align-items: center;
-  inline-size: 116px;
-  block-size: fit-content;
-  margin-block: auto;
+  pointer-events: none;
 }
 
-.discardStack {
-  position: relative;
-  inline-size: 100%;
-  aspect-ratio: var(--card-aspect);
+.discard > * {
+  pointer-events: auto;
 }
 
-/* карта сброса — собирается в стопку (transform → identity) при перевороте */
-.discardCard {
-  position: absolute;
-  inset: 0;
-  transition: transform 320ms var(--ease-soft);
-}
+/* the centre of the table sits a touch ABOVE the geometric middle (42%, not
+   50%): it clears the hand and the zoom preview that rises out of it. Same
+   value in every scene — do not "fix" it back. */
 
-/* счётчик сброса — бейдж в правом нижнем; всегда верхний слой (выше летящих
-   карт z80), чтобы карта не перекрывала его при приземлении */
-.discardCount {
-  position: absolute;
-  inset-block-end: 8px;
-  inset-inline-end: 8px;
-  z-index: 90;
-  padding: 3px 9px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  letter-spacing: 0.02em;
-  background: var(--black-78);
-  border: 1px solid var(--white-20);
-  border-radius: 6px;
-}
-
-.discardCount::before {
-  content: "// ";
-  opacity: 0.4;
-}
-
-.label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking);
-  opacity: 0.5;
-}
-
-/* центр стола — разыгранные карты лежат тут на время эффекта */
+/* staging area — a row of card slots at the centre of the table; the cards put
+   into this turn stand here, open to everyone, until the play resolves */
 .center {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block-start: 42%;
   inset-inline-start: 50%;
   z-index: 50;
-  inline-size: 150px;
-  aspect-ratio: var(--card-aspect);
+  display: flex;
+  gap: 18px;
   transform: translate(-50%, -50%);
 }
 
-/* летящая стопка сброса (сброс → колода / слияние): полёт через пресеты
-   gatherToDeck/absorbToDeck (move, центр-в-центр) — origin по умолчанию (центр) */
-.flyer {
-  position: fixed;
-  z-index: 80;
-  pointer-events: none;
+.stageSlot {
+  position: relative;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
 }
 
-/* летящие разыгранные карты (рука → центр → сброс): пресет move считает по
-   центрам, поэтому transform-origin по умолчанию (центр) */
-.playFlyer {
-  position: fixed;
-  z-index: 80;
-  aspect-ratio: var(--card-aspect);
-  pointer-events: none;
+/* a slot still to be filled — the ask for the second card of a combo */
+.stageEmpty {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--white-12);
+  border-radius: 8px;
 }
+
+/* the cards in the air belong to the shared carrier (useFlyer) — the scene has no
+   flyer rule of its own any more */
+
 
 /* рука игрока снизу — компонент Hand (веер) */
+
+/* player hand — canonical Table position: the left inset clears the turn dock,
+   the right one clears the rail */
 .handWrap {
   position: absolute;
-  inset-block-end: 0;
-  inset-inline: 0;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
   z-index: 40;
 }
