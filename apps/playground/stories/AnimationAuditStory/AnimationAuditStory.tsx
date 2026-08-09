@@ -333,6 +333,15 @@ const MODULES: Module[] = [
     },
     status: 'ok',
   },
+  {
+    mod: "play('confettiFly')",
+    what: {
+      ru: 'Одна частица хлопушки: выстрел в заданном направлении, дуга через верх (peak) и падение с вращением, в конце — растворение. Пресет знает только полёт ОДНОЙ частицы; разброс, количество и символы — на сцене.',
+      en: 'One piece of a party popper: a throw in a given direction, an arc over the top (peak) and a fall with spin, dissolving at the end. The preset knows one PIECE’s flight only; the spread, the count and the symbols belong to the scene.',
+    },
+    where: { ru: 'словарь → Game End', en: 'registry → Game End' },
+    status: 'ok',
+  },
 ]
 
 // ===== 2. Scenario combinations — sequences per situation (no statuses) =====
@@ -514,6 +523,14 @@ const SCENARIOS: Scenario[] = [
       en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence (a frame-by-frame merge, no duplicates and no teleports). Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandArrival. A press on nothing valid takes a staged play back.",
     },
     where: 'DefenseRelease',
+  },
+  {
+    name: { ru: 'Конец партии', en: 'The end of a match' },
+    from: {
+      ru: "последний релиз вытягивается из веера и садится в свой слот (playToReleaseZone, SNAP) — зона закрыта. Дальше хлопушки: ТРИ независимых залпа (0 / 620 / 1450ms), у каждого своя сила — она задаёт число частиц, дальность и время в воздухе, поэтому это три события, а не один повтор. Залп — отдельный компонент: частицы создаются один раз и стартуют один раз в эффекте на монтирование (запуск из ref-колбэка убивал уже летящие: колбэк переприсваивается на каждом рендере, а play вешает вторую анимацию на летящий узел). Частица — свой символ кода, цвет-токен и ступень моно-шкалы; дуга — play('confettiFly'). Окно GameOver встаёт на 2.4s, ПОКА конфетти ещё летит, и конфетти идёт поверх окна. В плейграунде оба слоя начинаются под технической линией — она часть плейграунда, а не экрана.",
+      en: "the last release is pulled out of the fan and settles into its slot (playToReleaseZone, SNAP) — the zone is closed. Then the poppers: THREE independent bangs (0 / 620 / 1450ms), each with its own power — it drives the piece count, the reach and the time in the air, so they are three events and not one repeat. A volley is its own component: the pieces are made once and started once in a mount effect (starting from a render-time ref callback killed the pieces already in the air: the callback re-fires on every render and play stacks a second animation on a node mid-flight). Every piece its own code symbol, colour token and step of the mono scale; the arc is play('confettiFly'). The GameOver window comes up at 2.4s WHILE the confetti is still flying, and the confetti flies over it. In the playground both layers start below the technical line — it belongs to the playground, not the screen.",
+    },
+    where: 'GameEnd',
   },
 ]
 

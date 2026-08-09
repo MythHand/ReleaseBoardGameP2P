@@ -1,0 +1,148 @@
+/* Расстановка — та же, что у экрана стола (apps/ui/src/table/Table/Table.module.css),
+   со сдвигом верхнего ряда под техническую линию, как в остальных сценах. */
+
+.root {
+  position: relative;
+  min-block-size: 100vh;
+  overflow: hidden;
+}
+
+/* techническая верхняя линия управления — dev-контролы (паттерн TableStory) */
+.bar {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  padding: 16px 24px;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  border-block-end: 1px solid var(--white-08);
+}
+
+.btn {
+  padding: 8px 14px;
+  color: var(--fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.hint {
+  color: var(--white-45);
+}
+
+/* соперники — один ряд сверху по центру, под технической линией */
+.opponents {
+  position: absolute;
+  inset-block-start: 84px;
+  inset-inline-start: 50%;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 18px;
+  justify-content: center;
+  max-inline-size: calc(100% - 80px);
+  transform: translateX(-50%);
+}
+
+/* колоды добора — левый край, по центру высоты */
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  transform: translateY(-50%);
+}
+
+/* сброс — справа от центра, перед правым рейлом. Центрируется колонкой, а НЕ
+   трансформом: трансформ создал бы контекст наложения и запер счётчик кучи под
+   прилетающими картами. */
+.discard {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 86px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
+}
+
+/* служебный док хода — нижний левый угол, под колодами, слева от руки */
+.turnDock {
+  position: absolute;
+  inset-block-end: 20px;
+  inset-inline-start: 26px;
+}
+
+/* зона релиза над рукой: слева учитываем док, справа — рейл */
+.you {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.handWrap {
+  inline-size: 100%;
+}
+
+/* ===== хлопушки ===== */
+
+/* поле для конфетти — над столом И над окном завершения (праздник продолжается
+   поверх итога), клики не ловит. Верх приходит инлайном от высоты технической
+   линии: она часть плейграунда, конфетти на неё не залетает. */
+.pops {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  z-index: 120;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* окно завершения — в ИГРЕ оно во весь экран; здесь ограничено областью
+   демонстрации (верх — инлайном от высоты технической линии), а Overlay внутри
+   растягивается по этой области, потому что она позиционирована. */
+.overArea {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+}
+
+/* один залп — самостоятельный слой на всю область: свои частицы, свой старт.
+   Соседний залп его не касается. */
+.volley {
+  position: absolute;
+  inset: 0;
+}
+
+/* одна частица: стоит в углу, дальше её ведёт пресет confettiFly */
+.pop {
+  position: absolute;
+  inset-block-end: 24px;
+  will-change: transform, opacity;
+}
+
+.popLeft {
+  inset-inline-start: 40px;
+}
+
+.popRight {
+  inset-inline-end: 40px;
+}
