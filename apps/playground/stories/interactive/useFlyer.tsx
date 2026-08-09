@@ -116,7 +116,11 @@ export function useFlyer() {
   const glide = useCallback(
     async (key: string, rect: Rect, ms: number) => {
       const el = elOf(key)
-      const props = ['left', 'top', 'inline-size'].map((p) => `${p} ${ms}ms var(--ease-soft)`)
+      // transform rides along: a card can ease INTO a pose (its own scatter) while
+      // it moves, instead of snapping into the tilt and then sliding
+      const props = ['left', 'top', 'inline-size', 'transform'].map(
+        (p) => `${p} ${ms}ms var(--ease-soft)`,
+      )
       if (el) el.style.transition = props.join(', ')
       setHeld((h) => h.map((it) => (it.key === key ? { ...it, at: rect } : it)))
       await wait(ms)

@@ -177,23 +177,26 @@
   cursor: grabbing;
 }
 
-/* elimination video — full-screen overlay above everything, shown to all players
-   when someone is knocked out; fades in on mount, out via data-out */
+/* elimination video — an overlay above everything, shown to all players when
+   someone is knocked out; fades in on mount, out via data-out.
+   In the GAME this covers the whole screen. Here it covers the DEMO AREA instead —
+   absolute inside the scene root, so it stops at the playground navigation, and its
+   top comes inline from the tech-bar height (as .glowBounds does). The video is
+   centred in the table, not in a window that has a nav rail and a bar the game
+   does not have. */
 .gifOverlay {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
   z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
   background: color-mix(in srgb, var(--surface-0) 82%, transparent);
-  opacity: 1;
-  transition: opacity 340ms var(--ease-out);
-  animation: gif-in 340ms var(--ease-out);
-}
 
-.gifOverlay[data-out="true"] {
-  opacity: 0;
+  /* comes in with a short fade, goes away at once — the video is already playing
+     under the fade, it is not held back by it */
+  animation: gif-in 260ms var(--ease-out);
 }
 
 .gifVideo {

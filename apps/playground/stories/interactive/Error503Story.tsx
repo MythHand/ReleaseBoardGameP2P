@@ -2,7 +2,7 @@ import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import type React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { play, type Rect, wait } from '@/animations'
+import { play, type Rect, restTransform, scatterAt, wait } from '@/animations'
 import { CARDS, CATEGORIES, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Badge from '@/primitives/Badge'
@@ -16,6 +16,7 @@ import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
 import TurnDock, { type TurnDockState } from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
+import HoverSelect from '../controls/HoverSelect'
 import styles from './Error503Story.module.css'
 import { reorderHand } from './reorderHand'
 import { type Leaving, useDiscardExit } from './useDiscardExit'
@@ -80,6 +81,7 @@ const ELIM_VIDEOS = Object.values(
 const COVER_DX = 16 // the cover sits a touch off the alarm — or it just hides it
 const COVER_DY = -12
 const COVER_HOLD = 1200 // the answer and the alarm stand open, читаемые всеми
+const GIF_DELAY = 400 // a beat after the table empties, before the video comes in
 const GATHER_HOLD = 1500 // the swept cards are held open at the centre before they scatter
 const ELIM_MIN_MS = 5000 // play at least this long, then finish the current loop
 
@@ -149,7 +151,9 @@ export default function Error503Story() {
   const [pending, setPending] = useState(false) // 503 at centre, awaiting the player
   const [eliminated, setEliminated] = useState(false)
   const [gif, setGif] = useState<string | null>(null) // elimination video overlay
-  const [gifOut, setGifOut] = useState(false) // overlay fading out
+  // dev pick: 'random' or an index into ELIM_VIDEOS. Read through a ref — the
+  // sequence that plays it spans several awaits (I8)
+  const [gifPick, setGifPick] = useState('random')
   const [dock, setDock] = useState<TurnDockState>('draw')
   const [busy, setBusy] = useState(false)
 
@@ -167,7 +171,10 @@ export default function Error503Story() {
   // every card this scene puts in the air: the drawn 503 ('draw') and the cards
   // swept to the discard ('o0', 'o1', …). The dragged defence is NOT one of them —
   // it follows the cursor rather than flying, and stays the scene's own.
-  const { overlay: flyerOverlay, raise, pin, glide, patch, drop, elOf } = useFlyer()
+  const { overlay: flyerOverlay, raise, pin, glide, patch, drop } = useFlyer()
+  const gifPickRef = useRef('random')
+  gifPickRef.current = gifPick
+  const eliminating = useRef(false) // one elimination at a time
   const gifStart = useRef(0)
   const gifResolve = useRef<(() => void) | null>(null)
 
@@ -187,13 +194,21 @@ export default function Error503Story() {
     })
   }
 
-  // elimination video: full-screen for everyone, looped, at least ELIM_MIN_MS,
-  // then let the current loop finish before it fades out. Resolves when hidden.
-  function playEliminationGif(): Promise<void> {
-    if (ELIM_VIDEOS.length === 0) return Promise.resolve()
-    const src = ELIM_VIDEOS[Math.floor(Math.random() * ELIM_VIDEOS.length)]
+  // elimination video: shown to everyone, looped, at least ELIM_MIN_MS, then the
+  // current loop finishes and it is gone. Resolves when hidden.
+  //
+  // It comes in a beat AFTER the table has emptied (GIF_DELAY) — landing on the
+  // same frame reads as a cut — and fades in while it is ALREADY playing: the fade
+  // is on the overlay, it does not hold the video back. Going away is abrupt on
+  // purpose: the turn is over, there is nothing left to watch out of.
+  async function playEliminationGif(): Promise<void> {
+    if (ELIM_VIDEOS.length === 0) return
+    const chosen = Number(gifPickRef.current)
+    const src = Number.isInteger(chosen)
+      ? ELIM_VIDEOS[chosen]
+      : ELIM_VIDEOS[Math.floor(Math.random() * ELIM_VIDEOS.length)]
+    await wait(GIF_DELAY)
     gifStart.current = performance.now()
-    setGifOut(false)
     setGif(src)
     return new Promise((res) => {
       gifResolve.current = res
@@ -207,13 +222,9 @@ export default function Error503Story() {
       void v.play()
       return
     }
-    setGifOut(true)
-    window.setTimeout(() => {
-      setGif(null)
-      setGifOut(false)
-      gifResolve.current?.()
-      gifResolve.current = null
-    }, 360)
+    setGif(null)
+    gifResolve.current?.()
+    gifResolve.current = null
   }
 
   // tech-bar height → the edge glow lives in the TABLE zone (under the bar)
@@ -237,7 +248,6 @@ export default function Error503Story() {
     setPending(false)
     setEliminated(false)
     setGif(null)
-    setGifOut(false)
     setBusy(false)
     setDock('draw')
   }
@@ -259,22 +269,44 @@ export default function Error503Story() {
     if (!discardRect || items.length === 0) return
     // the cards become flyers exactly where they stand
     await raise(items.map((it, i) => ({ key: `o${i}`, card: it.card, at: it.fromRect })))
+    // where each card lies once gathered: a HEAP, not a neat stack — the same
+    // scatter model the discard uses, so the pile at the centre reads as a pile
+    const heap = items.map((_, i) => scatterAt(i, CARD_W))
+    let boxes = items.map((it) => it.fromRect)
     if (gather && centerRect) {
-      await Promise.all(items.map((_, i) => glide(`o${i}`, centerRect, 300)))
+      boxes = heap.map((sc) => ({
+        left: centerRect.left + sc.dx,
+        top: centerRect.top + sc.dy,
+        width: centerRect.width,
+        height: centerRect.height,
+      }))
+      await Promise.all(
+        items.map((_, i) => {
+          // the tilt travels with the move (the carrier transitions it), so the card
+          // eases into its place in the pile instead of snapping into the angle
+          patch(`o${i}`, { pose: restTransform({ ...heap[i], dx: 0, dy: 0 }) })
+          return glide(`o${i}`, boxes[i], 300)
+        }),
+      )
       // held open at the centre — the same beat the hand-limit grid gets before it
       // leaves: the table has to be readable before the cards scatter
       await wait(GATHER_HOLD)
     }
-    // the shared step flies them all out at once and commits them to the heap
-    await sendToDiscard(
+    // Hand the step the card BOXES, not the tilted nodes: a rotated node's bounding
+    // rect is the box around it (I6). The step raises its own flyers, unwinds the
+    // tilt in flight and commits them to the heap — so the carrier's are dropped in
+    // the same turn the step's appear.
+    const gone = sendToDiscard(
       items.map((it, i) => ({
         key: `o${i}`,
         card: it.card,
-        node: elOf(`o${i}`),
+        from: boxes[i],
+        pose: gather ? { rot: heap[i].rot, dx: 0, dy: 0 } : undefined,
         layer: i,
       })),
     )
     drop()
+    await gone
   }
 
   // ===== the draw =====
@@ -541,6 +573,11 @@ export default function Error503Story() {
   // ===== elimination =====
   async function eliminate(includeRelease: boolean) {
     if (busy && !pending) return
+    // …and only ONE elimination at a time. The defenceless path is already running
+    // (busy AND pending), so PASS during its beat used to start a second one — two
+    // sweeps, two videos, one after the other.
+    if (eliminating.current) return
+    eliminating.current = true
     setBusy(true)
     setPending(false)
     const handRects = handSlotRects()
@@ -568,6 +605,7 @@ export default function Error503Story() {
     setEliminated(true)
     setDock('waiting')
     await playEliminationGif()
+    eliminating.current = false
     setBusy(false)
   }
 
@@ -594,6 +632,15 @@ export default function Error503Story() {
             </Typography>
           </button>
         ))}
+        <HoverSelect
+          label="gif"
+          value={gifPick}
+          options={[
+            { value: 'random', label: pick(lang, { ru: 'случайная', en: 'random' }) },
+            ...ELIM_VIDEOS.map((_, i) => ({ value: String(i), label: `Gif ${i + 1}` })),
+          ]}
+          onChange={setGifPick}
+        />
         <button
           type="button"
           className={styles.reset}
@@ -723,8 +770,11 @@ export default function Error503Story() {
       {/* elimination video — full-screen for everyone; loops for at least
           ELIM_MIN_MS, then finishes the current loop and fades out */}
       {gif && (
-        <div className={styles.gifOverlay} data-out={gifOut}>
+        <div className={styles.gifOverlay} style={{ insetBlockStart: barH }}>
           <video
+            // a media element does NOT re-fetch when `src` changes: keyed by the
+            // source, so a different video is a different element (I5)
+            key={gif}
             className={styles.gifVideo}
             src={gif}
             autoPlay
