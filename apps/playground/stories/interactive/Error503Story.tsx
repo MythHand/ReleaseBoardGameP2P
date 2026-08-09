@@ -711,7 +711,7 @@ export default function Error503Story() {
               a release that can answer the 503 lights in its category accent, and
               the one being dragged shows its empty place instead of a hole */}
           <ReleaseZone
-            size="92px"
+            size="100px"
             release={Object.fromEntries(SLOTS.map((key) => [key, rel[key]?.main]))}
             support={Object.fromEntries(SLOTS.map((key) => [key, rel[key]?.aux]))}
             slotRef={(key, el) => {
