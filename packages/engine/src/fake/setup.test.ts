@@ -106,14 +106,13 @@ it('is deterministic for a given seed and divergent across seeds', () => {
 it('excludes deck entries the engine does not implement', () => {
   const s = createGame(
     config({
-      deck: [...DECK, { id: 'operation-git-branch', qty: 3 }, { id: 'ai-inside', qty: 2 }],
+      deck: [...DECK, { id: 'operation-git-branch', qty: 3 }],
     }),
   )
   const ids = [...s.seating.flatMap((id) => s.players[id].hand), ...s.decks.main.flat()].map(
     (c) => c.id,
   )
   expect(ids).not.toContain('operation-git-branch')
-  expect(ids).not.toContain('ai-inside')
 })
 
 it('opens on the first seat with nothing drawn or released', () => {

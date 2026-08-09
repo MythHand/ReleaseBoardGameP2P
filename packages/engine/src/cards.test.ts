@@ -35,7 +35,6 @@ it('omits the deferred cards', () => {
     'operation-git-merge',
     'operation-git-rebase',
     'operation-system-upgrade',
-    'ai-inside',
   ]) {
     expect(rulesFor(id), id).toBeUndefined()
   }

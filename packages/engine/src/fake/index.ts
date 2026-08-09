@@ -45,6 +45,7 @@ export const FAKE_EVENTS: DeckEntry[] = [
   { id: 'ai-bad-vibe-coding', qty: 2 },
   { id: 'ai-hallucination', qty: 2 },
   { id: 'ai-error-503', qty: 1 },
+  { id: 'ai-inside', qty: 2 },
 ]
 
 export function createFakeEngine(): Engine {

@@ -65,6 +65,7 @@ export const CARD_RULES: Record<CardId, CardRules> = {
   'ai-bad-vibe-coding': { kind: 'ai' },
   'ai-hallucination': { kind: 'ai' },
   'ai-error-503': { kind: 'ai' },
+  'ai-inside': { kind: 'ai' },
 }
 
 export const SUPPORTED: ReadonlySet<CardId> = new Set(Object.keys(CARD_RULES))

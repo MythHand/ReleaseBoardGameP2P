@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { GameState } from '../state'
+import type { CardInstance, GameState, PlayerId } from '../state'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
+import { reduce } from './reduce'
 
 const engine = createFakeEngine()
 
@@ -28,6 +29,24 @@ function gameWith(discard: string[], hand: string[]): GameState {
 }
 
 const CHERRY = 'operation-git-cherry-pick'
+
+// Drives the AI event the same way triggers.test.ts drives every other AI
+// event: stack a trigger-ai on top of pile 0 and shrink the events deck to a
+// single entry so which event fires is deterministic, then DRAW.
+function applyAiInside(state: GameState, player: PlayerId): GameState {
+  const ai: CardInstance = { uid: 'trigger-ai#ai0', id: 'trigger-ai' }
+  const inside: CardInstance = { uid: 'ai-inside#e0', id: 'ai-inside' }
+  const staged: GameState = {
+    ...state,
+    turn: { ...state.turn, player, hasDrawn: false },
+    decks: {
+      ...state.decks,
+      main: [[ai, ...state.decks.main[0]], ...state.decks.main.slice(1)],
+      events: [inside],
+    },
+  }
+  return reduce(staged, { type: 'DRAW', player, at: 1 }).state
+}
 
 describe('Git Cherry-pick', () => {
   it('opens a pending offering the whole discard, one pick', () => {
@@ -189,5 +208,20 @@ describe('Git Cherry-pick', () => {
     expect(opponentView.pending).toMatchObject({ kind: 'pickFromDiscard', player: 'p1' })
     const pending = opponentView.pending as { options: { uid: string }[] }
     expect(pending.options).toEqual([])
+  })
+})
+
+describe('Inside', () => {
+  it('offers only Release cards from the discard', () => {
+    const state = gameWith(['attack-bug', 'release-frontend', 'release-backend'], [])
+    const next = applyAiInside(state, 'p1')
+    const pending = next.pending as { options: { id: string }[]; picks: number }
+    expect(pending.options.map((o) => o.id)).toEqual(['release-frontend', 'release-backend'])
+    expect(pending.picks).toBe(1)
+  })
+
+  it('resolves to nothing when the discard holds no Release', () => {
+    const state = gameWith(['attack-bug', 'attack-ddos'], [])
+    expect(applyAiInside(state, 'p1').pending).toBeNull()
   })
 })
