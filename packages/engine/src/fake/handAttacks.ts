@@ -31,6 +31,7 @@ export function openHandAttack(
       attackId: attack.id,
       sudo,
       canDefendWith: defencesFor(state, target, sudo),
+      openedAt: at,
       deadline: at + DEFEND_MS,
       scope: 'hand',
     },

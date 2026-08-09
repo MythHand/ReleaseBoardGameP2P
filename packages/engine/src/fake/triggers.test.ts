@@ -204,11 +204,16 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
   }
   const base = engine.createGame(cfg)
   const ai: CardInstance = { uid: 'trigger-ai#0', id: 'trigger-ai' }
+  // `releaseCond: 'base'` makes a release cost a second card, so p1 holds one
+  // spare for the final assertion to be about the thaw rather than the cost.
+  // Code Review is never playable on its own, so it cannot itself appear in the
+  // `playableFor` results checked below.
+  const spare: CardInstance = { uid: 'support-code-review#0', id: 'support-code-review' }
   const s: GameState = {
     ...base,
     players: {
       ...base.players,
-      p1: { ...base.players.p1, hand: [] },
+      p1: { ...base.players.p1, hand: [spare] },
     },
     decks: { ...base.decks, main: [[ai, ...base.decks.main[0]]] },
   }

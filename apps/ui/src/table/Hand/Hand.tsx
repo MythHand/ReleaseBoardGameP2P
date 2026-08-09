@@ -394,6 +394,7 @@ export default function Hand({
           // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only hover-spread / drag pick-up on non-interactive cards; no keyboard affordance implied
           <div
             key={item.uid}
+            data-hand-slot
             className={`${styles.slot} ${dragEnabled || onCardClick ? styles.clickable : ''}`}
             style={{ transform, zIndex: z }}
             onMouseEnter={drag ? undefined : () => setHoveredUid(item.uid)}

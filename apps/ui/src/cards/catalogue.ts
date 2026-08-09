@@ -381,16 +381,3 @@ export const CARDS: Card[] = [
 ]
 
 export const cardById = (id: string): Card | undefined => CARDS.find((c) => c.id === id)
-
-// МОК ЛОГИКИ: может ли карта выбирать цель (атаки — да). Реально решает логика друга.
-export const cardCanTarget = (card?: Card): boolean => !!card?.tags?.includes('lightning')
-
-// МОК ЛОГИКИ комбо «две карты как одно действие» (Sudo / Code Review).
-export const isComboSource = (card?: Card): boolean => !!card?.tags?.includes('combo-source')
-
-export const validComboTarget = (source?: Card, target?: Card): boolean => {
-  if (!source || !target || source.id === target.id) return false
-  if (source.id === 'support-sudo') return !!target.tags?.includes('sudo')
-  if (source.id === 'support-code-review') return target.category === 'release'
-  return false
-}

@@ -187,6 +187,7 @@ describe('playableFor legality rules', () => {
       window: {
         target: { player: 'p1', slot: 'frontend' as const, card: 'attack-bug#0' },
         round: 1,
+        openedAt: 0,
         deadline: 0,
         passed: [],
       },
@@ -245,6 +246,44 @@ describe('playableFor legality rules', () => {
     const playable = playableFor(filled, 'p1')
     // The release card should not be playable when slot is filled
     expect(playable).not.toContain(releaseCard.uid)
+  })
+
+  // `playable` is a promise to every consumer that reads it — the UI renders
+  // it, `botAction` picks from it, and the keeper drives an absent seat from
+  // it. A release the hand cannot pay for is one `onPlay` rejects (release.ts,
+  // "no card left to pay the release cost"), so offering it shows a player a
+  // card that bounces back with nothing to explain it and sends a policy into
+  // a move that cannot land.
+  it('does not include a lone release, whose cost the hand cannot pay', () => {
+    const s = createGame(config())
+    const releaseCard = inst('release-frontend', 1)
+    const lone = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1, hand: [releaseCard] } },
+    }
+
+    expect(playableFor(lone, 'p1')).not.toContain(releaseCard.uid)
+
+    // One spare card is the whole difference: it is what pays the cost.
+    const affordable = {
+      ...lone,
+      players: {
+        ...lone.players,
+        p1: { ...lone.players.p1, hand: [releaseCard, inst('support-sudo', 3)] },
+      },
+    }
+    expect(playableFor(affordable, 'p1')).toContain(releaseCard.uid)
+  })
+
+  it('includes a lone release under releaseCond: easy, where it costs nothing', () => {
+    const s = createGame({ ...config(), setup: { ...config().setup, releaseCond: 'easy' } })
+    const releaseCard = inst('release-frontend', 1)
+    const lone = {
+      ...s,
+      players: { ...s.players, p1: { ...s.players.p1, hand: [releaseCard] } },
+    }
+
+    expect(playableFor(lone, 'p1')).toContain(releaseCard.uid)
   })
 
   it('does not include a release card when the cap is hit under releases: base', () => {

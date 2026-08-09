@@ -1,140 +1,36 @@
+import type React from 'react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { HEAP_SHOW } from '@/animations'
-import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
-import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
-import Rules, { type RulesCopy } from '@/blocks/Rules'
-import type { Card } from '@/cards/types'
-import type { GameModesCopy, Setup } from '@/game/modes'
+import LangSwitcher from '@/blocks/LangSwitcher'
+import LobbyCode from '@/blocks/LobbyCode'
+import Rules from '@/blocks/Rules'
 import GearIcon from '@/icons/GearIcon'
+import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Badge from '@/primitives/Badge'
+import Button from '@/primitives/Button'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
-import type { HeapCard } from '@/primitives/Pile/Pile'
 import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
 import Toggle from '@/primitives/Toggle'
 import Typography from '@/primitives/Typography'
 import GameModes from '@/table/GameModes'
 import GameOver from '@/table/GameOver'
-import type { GameOverCondition, GameOverCopy } from '@/table/GameOver/GameOver'
 import Hand from '@/table/Hand'
-import type { HandItem } from '@/table/Hand/Hand'
 import MoveHistory from '@/table/MoveHistory'
-import type { HistoryEntry, MoveHistoryCopy } from '@/table/MoveHistory/MoveHistory'
 import Participants from '@/table/Participants'
-import type { Participant, ParticipantsCopy, Spectator } from '@/table/Participants/Participants'
-import PauseGame, { type PauseGameCopy, type PausePlayer } from '@/table/PauseGame/PauseGame'
-import Reconnect, { type ReconnectCopy } from '@/table/Reconnect'
+import PauseGame from '@/table/PauseGame/PauseGame'
+import Reconnect from '@/table/Reconnect'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
-import type { SeatCopy } from '@/table/Seat/Seat'
-import TurnDock, { type TurnDockCopy, type TurnDockState } from '@/table/TurnDock/TurnDock'
+import TurnDock from '@/table/TurnDock/TurnDock'
+import { deriveDock } from './dock'
+import PendingPrompt from './PendingPrompt'
 import styles from './Table.module.css'
-
-interface Opponent {
-  id: string
-  name: string
-  handCount: number
-  release: ReleaseSlots
-}
-
-interface TableState {
-  you: {
-    name: string
-    hand: HandItem[]
-    release: ReleaseSlots
-  }
-  opponents: Opponent[]
-  decks: {
-    main: number
-    events: number
-    // верх сброса одной картой — запасной вид, когда куча не передана
-    discard?: Card | null
-    // сброс как он есть на столе: наброшенная куча. Необязательно — экран
-    // остаётся рабочим у потребителя, который её ещё не отдаёт.
-    discardHeap?: HeapCard[]
-    discardCount: number
-  }
-  turn?: string
-  history: HistoryEntry[]
-  setup: Setup
-  participants: Participant[]
-  spectators: Spectator[]
-}
-
-type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes'
-type View = 'oppEliminated' | 'youEliminated' | 'oppDisconnect' | 'youDisconnect'
-
-interface Over {
-  winnerId: string
-  condition?: GameOverCondition
-}
-
-interface TableProps {
-  state: TableState
-  over?: Over | null
-  onOverContinue?: () => void
-  view?: View | null
-  // текст режимов по языку (read-only панель «игровой режим»)
-  modesCopy: GameModesCopy
-  // текст правил по языку (панель «правила»)
-  rulesCopy: RulesCopy
-  // текст мест оппонентов по языку (статус / счётчик карт)
-  seatCopy: SeatCopy
-  // текст панели «участники» по языку
-  participantsCopy: ParticipantsCopy
-  // текст ленты ходов по языку
-  historyCopy: MoveHistoryCopy
-  // текст окна переподключения по языку
-  reconnectCopy: ReconnectCopy
-  // текст окна завершения партии по языку
-  gameOverCopy: GameOverCopy
-  // собственный «хром»-текст стола по языку
-  copy: TableCopy
-  // текст блока кода игры (передаётся дальше в LobbyCode)
-  lobbyCodeCopy: LobbyCodeCopy
-  // текущий язык и его смена — для свитчера языка в служебной вкладке
-  lang?: SwitchLang
-  onLangChange?: (lang: SwitchLang) => void
-  // код игры — показывается в служебной вкладке (для зрителей), с копированием
-  code?: string
-  // роль: хост видит управление (лимит зрителей, исключение зрителей)
-  role?: 'host' | 'guest'
-  // лимит зрителей и его смена — слайдер в служебной вкладке (только для хоста)
-  spectatorLimit?: number
-  onSpectatorLimitChange?: (n: number) => void
-  // исключение зрителя из панели «участники» (только для хоста)
-  onKickSpectator?: (id: string) => void
-  // состояние служебного дока хода (в игре — от логики; в песочнице — из истории)
-  turnDockState?: TurnDockState
-  // danger-тон реакции (напр. Error 503) — красная реакция вместо янтарной
-  turnDockDanger?: boolean
-  // localized TurnDock strings — from the central catalog, supplied by the consumer
-  turnDockCopy: TurnDockCopy
-  // turn clock — seconds left and 0..1 progress driving the TurnDock ring;
-  // passed through so game/sandbox turn state controls the countdown (the
-  // defaults are static placeholders until the rules engine wires it up)
-  turnDockSeconds?: number
-  turnDockProgress?: number
-  // ===== pause (host-only) =====
-  // game paused — greys the dock and shows the pause window over the play area
-  // (the right-hand nav stays live). Toggled by the host from settings.
-  paused?: boolean
-  // host toggles pause on/off from the settings drawer; the window's central
-  // resume button calls this with `false`
-  onPauseChange?: (on: boolean) => void
-  // readiness lamps in the pause window — one per player (green ready / red not)
-  pausePlayers?: PausePlayer[]
-  // which lamp is the local player's (tappable) and which is the host's (tagged)
-  pauseSelfId?: string
-  pauseHostId?: string
-  // toggle the local player's readiness lamp
-  onPauseToggleReady?: () => void
-  // localized pause-window strings — required for the window to render
-  pauseCopy?: PauseGameCopy
-}
+import type { Panel, TableProps } from './types'
+import { useTableInteractions } from './useTableInteractions'
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
 // 0–8 зелёный, 9–18 жёлтый, 19–28 красный
@@ -152,36 +48,6 @@ const DRAWER_WIDTH: Record<Panel, number> = {
   participants: 420, // участники — как история
   modes: 680, // режимы — как правила
   rules: 680, // правила — сильно шире
-}
-
-// Собственный «хром»-текст стола по языку (бейдж выбывания + подписи стопок).
-export interface TableCopy {
-  youEliminated: string
-  deck: string
-  events: string
-  discard: string
-  // подпись вкладки-настроек (для screen-reader на иконке-шестерёнке)
-  settings: string
-  // заголовок группы общих настроек — показывается только хосту (у него две
-  // группы: общие + управление хоста; у прочих одна группа, заголовок не нужен)
-  generalTitle?: string
-  // подписи полей в панели настроек
-  langTitle: string
-  codeTitle: string
-  // заголовок группы управления хоста + подпись поля лимита зрителей
-  hostTitle: string
-  specLimit: string
-  // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
-  // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
-  pauseGame?: string
-  pauseOn?: string
-  pauseOff?: string
-  pauseHint?: string
-  // подписи текстовых вкладок рейла
-  tabHistory: string
-  tabParticipants: string
-  tabRules: string
-  tabModes: string
 }
 
 const EMPTY_RELEASE: ReleaseSlots = {
@@ -240,73 +106,144 @@ function SettingsField({
 // (абсолютно), без жёсткой сетки. Заполняет экран без скролла.
 export default function Table({
   state,
-  over = null,
-  onOverContinue,
-  view = null,
-  modesCopy,
-  rulesCopy,
-  seatCopy,
-  participantsCopy,
-  historyCopy,
-  reconnectCopy,
-  gameOverCopy,
+  room,
   copy,
-  lobbyCodeCopy,
-  lang,
-  onLangChange,
-  code,
-  role = 'guest',
-  spectatorLimit,
-  onSpectatorLimitChange,
-  onKickSpectator,
-  turnDockState = 'push',
-  turnDockDanger = false,
-  turnDockCopy,
-  turnDockSeconds = 16,
-  turnDockProgress = 0.55,
-  paused = false,
-  onPauseChange,
-  pausePlayers = [],
-  pauseSelfId,
-  pauseHostId,
-  onPauseToggleReady,
-  pauseCopy,
+  slots,
+  over = null,
+  actions,
+  dock,
+  panel: panelProp,
+  onPanelChange,
 }: TableProps) {
-  const { you, opponents, decks, turn, history, setup, participants, spectators } = state
-  const [panel, setPanel] = useState<Panel | null>(null)
+  const { you, opponents, decks, turn, history, setup } = state
+  // `now` stays a placeholder inside the kit — the deadline interval belongs
+  // to the consumer (never Date.now() or a timer in here). A consumer that
+  // wants a live countdown drives its own clock and overrides via the `dock`
+  // prop; without one, seconds/progress read the span's start.
+  const nowRef = useRef(0)
+  const derived = deriveDock(state, state.selfId, nowRef.current)
+  const dockView = { ...derived, ...dock }
+  const {
+    role = 'guest',
+    code,
+    participants,
+    spectators,
+    spectatorLimit,
+    onSpectatorLimitChange,
+    onKickSpectator,
+    lang,
+    onLangChange,
+    paused = false,
+    onPauseChange,
+    pausePlayers = [],
+    pauseSelfId,
+    pauseHostId,
+    onPauseToggleReady,
+  } = room
+  const [ownPanel, setOwnPanel] = useState<Panel | null>(null)
+  const controlled = panelProp !== undefined
+  const panel = controlled ? panelProp : ownPanel
+
+  // gesture machine (Tasks 6–7): turns clicks into completed intents. Legality
+  // is always the engine's answer (state.playable / actions.legalTargets) —
+  // Table only renders what the hook decided, never re-derives it.
+  const gestures = useTableInteractions({
+    state,
+    actions,
+    comboOptions: (card) => state.comboOptions?.[card] ?? [],
+  })
+
+  // targeting arrow: origin is the SOURCE card's slot — `gestures.selected`,
+  // resolved through `data-hand-slot` — not whatever was clicked most
+  // recently. `selected` stays the source through the whole combo-then-target
+  // sequence (the partner click only sets `combo`), so re-deriving the origin
+  // from it on every phase change keeps the arrow anchored to the source even
+  // when a combo partner is picked afterwards. The tip follows the cursor via
+  // the mousemove listener inside useArrow, which is only mounted while
+  // `active` is true — kept in lockstep with `phase === 'selected'` here, so
+  // it comes down on every exit from that phase, including unmount.
+  //
+  // The effect is keyed on `phase`/`selected` only — NOT on `you.hand` — on
+  // purpose: it arms once per selection, not once per render. `you.hand` is a
+  // fresh array on every projection update (Milestone 3's `toTableState`
+  // rebuilds `TableState` from scratch each time), and `Table` re-renders on
+  // the turn clock; if `you.hand` were a dependency, every such re-render
+  // while a target is pending would re-run `arrow.aim(origin)`, which sets
+  // `to = origin` and snaps the tracked cursor position back to the source —
+  // discarding whatever the mousemove listener had followed it to. `you.hand`
+  // is still read inside the effect (to resolve the selected uid's slot
+  // element), just not watched for changes.
+  const handRef = useRef<HTMLDivElement>(null)
+  const arrow = useArrow()
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `you.hand` is read to resolve the selected uid's slot element, not watched — see the comment above for why it must stay out of the dependency array
+  useEffect(() => {
+    if (gestures.phase !== 'selected') {
+      arrow.stop()
+      return
+    }
+    const index = gestures.selected ? you.hand.findIndex((c) => c.uid === gestures.selected) : -1
+    const slotEl =
+      index >= 0
+        ? handRef.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+        : undefined
+    if (slotEl) arrow.aim(centerOf(slotEl))
+  }, [gestures.phase, gestures.selected, arrow.aim, arrow.stop])
+
+  // Escape cancels an in-flight target selection. Bound to the window (not a
+  // React onKeyDown) so it fires regardless of what currently has focus, and
+  // — like the arrow's mousemove — only while there is something to cancel.
+  useEffect(() => {
+    if (gestures.phase !== 'selected') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') gestures.cancel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [gestures.phase, gestures.cancel])
+
+  // A click that lands outside any hand slot while a target is pending reads
+  // as "changed my mind" — cancel. Clicks that land on a legal target already
+  // resolve (and reset) through onTargetPick before bubbling here, so this is
+  // a no-op in that case, not a race.
+  const handleTableClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (gestures.phase !== 'selected') return
+    const target = e.target as HTMLElement
+    if (target.closest('[data-hand-slot]')) return
+    gestures.cancel()
+  }
 
   const isHost = role === 'host'
-  const codeCopy = lobbyCodeCopy
-  const turnCopy = turnDockCopy
-  // служебный док хода — состояние приходит пропсами (в игре — от логики хода,
-  // в песочнице — из селектора истории); имя активного игрока берём со стола
-  const dockPlayer = opponents[0]?.name
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
-  const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.pauseGame)
+  const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
   const hostControls = canLimitSpectators || canPause
   const hasUpperSettings = Boolean(lang && onLangChange) || Boolean(code)
 
   // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
   const textTabs: TabRailItem[] = [
-    { id: 'history', label: copy.tabHistory },
-    { id: 'participants', label: copy.tabParticipants },
-    { id: 'rules', label: copy.tabRules },
-    { id: 'modes', label: copy.tabModes },
+    { id: 'history', label: copy.table.tabHistory },
+    { id: 'participants', label: copy.table.tabParticipants },
+    { id: 'rules', label: copy.table.tabRules },
+    { id: 'modes', label: copy.table.tabModes },
   ]
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
   // (свитчер языка и/или код игры); служебный слот под визуальные опции
   const hasSettings = Boolean(onLangChange) || Boolean(code) || Boolean(hostControls)
   const railItems: TabRailItem[] = hasSettings
-    ? [{ id: 'settings', label: copy.settings, icon: <GearIcon /> }, ...textTabs]
+    ? [{ id: 'settings', label: copy.table.settings, icon: <GearIcon /> }, ...textTabs]
     : textTabs
 
   // завершение партии — оверлей поверх стола (триггерится извне)
   const overWinner = over ? participants.find((p) => p.id === over.winnerId) : null
-  const youEliminated = view === 'youEliminated'
+  const youEliminated = Boolean(you.eliminated)
+  const disconnectedIds = new Set(room.disconnected ?? [])
 
-  const toggle = (p: Panel) => setPanel((cur) => (cur === p ? null : p))
+  const toggle = (p: Panel) => {
+    const next = panel === p ? null : p
+    if (!controlled) setOwnPanel(next)
+    onPanelChange?.(next)
+  }
 
   // при закрытии держим ширину последней открытой вкладки — чтобы панель
   // уезжала своей шириной, без скачка; при смене вкладок ширина плавно меняется
@@ -317,13 +254,18 @@ export default function Table({
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
 
   return (
-    <div className={styles.table}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-cancel for an in-flight target selection; the accessible affordance is the Escape handler above
+    <div className={styles.table} onClick={handleTableClick} role="presentation">
       <HudBackground tone="neutral" className={styles.bgLayer} />
+      <Arrow from={arrow.from} to={arrow.to} />
+
+      {slots?.banner && <div className={styles.banner}>{slots.banner}</div>}
+      {slots?.corner && <div className={styles.corner}>{slots.corner}</div>}
 
       <div className={styles.opponents}>
-        {opponents.map((p, i) => {
-          const eliminated = view === 'oppEliminated' && i === 0
-          const disconnected = view === 'oppDisconnect' && i === 0
+        {opponents.map((p) => {
+          const eliminated = Boolean(p.eliminated)
+          const disconnected = disconnectedIds.has(p.id)
           // выбыл → карты в сброс: пустая зона релиза, рука = 0
           const shown = eliminated ? { ...p, handCount: 0, release: EMPTY_RELEASE } : p
           return (
@@ -333,22 +275,24 @@ export default function Table({
               active={turn === p.id}
               eliminated={eliminated}
               disconnected={disconnected}
-              copy={seatCopy}
+              copy={copy.seat}
+              onPick={(target) => gestures.onTargetPick(target)}
+              targets={gestures.targets}
             />
           )
         })}
       </div>
 
       <div className={styles.decks}>
-        <Pile label={copy.deck} deck="base" count={decks.main} width={150} countPos="tl" />
-        <Pile label={copy.events} deck="ai" count={decks.events} width={150} countPos="tl" />
+        <Pile label={copy.table.deck} deck="base" count={decks.main} width={150} countPos="tl" />
+        <Pile label={copy.table.events} deck="ai" count={decks.events} width={150} countPos="tl" />
       </div>
 
       {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними
           «глубина» стопки, счётчик показывает весь сброс */}
       <div className={styles.discard}>
         <Pile
-          label={copy.discard}
+          label={copy.table.discard}
           heap={decks.discardHeap}
           heapShow={HEAP_SHOW}
           topCard={decks.discard}
@@ -360,13 +304,23 @@ export default function Table({
       <div className={styles.you}>
         {youEliminated ? (
           <Badge size="lg" className={styles.youBadge}>
-            {copy.youEliminated}
+            {copy.table.youEliminated}
           </Badge>
         ) : (
           <>
-            <ReleaseZone release={you.release} size="100px" />
-            <div className={styles.handWrap}>
-              <Hand items={you.hand} />
+            <ReleaseZone
+              release={you.release}
+              size="100px"
+              player={state.selfId}
+              onPick={(target) => gestures.onTargetPick(target)}
+              targets={gestures.targets}
+            />
+            <div className={styles.handWrap} ref={handRef}>
+              <Hand
+                items={you.hand}
+                onCardClick={(i) => gestures.onCardClick(i)}
+                accentAt={gestures.accentAt}
+              />
             </div>
           </>
         )}
@@ -375,15 +329,36 @@ export default function Table({
       {/* служебный док хода — низ слева, под колодами, слева от руки */}
       <div className={styles.turnDock}>
         <TurnDock
-          state={turnDockState}
-          danger={turnDockDanger}
-          seconds={turnDockSeconds}
-          progress={turnDockProgress}
-          activePlayer={dockPlayer}
-          copy={turnCopy}
+          state={dockView.state}
+          danger={dockView.danger}
+          seconds={dockView.seconds}
+          progress={dockView.progress}
+          activePlayer={dockView.activePlayer}
+          copy={copy.turnDock}
           paused={paused}
+          onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
+          onPush={actions?.onPush}
+          onPass={actions?.onPass}
         />
+        {/* you already passed on the open window — TurnDock has no notion of
+            "unpass", so the affordance to take it back lives here instead */}
+        {state.window?.passed.includes(state.selfId) && copy.window && (
+          <Button variant="tech" className={styles.unpass} onClick={() => actions?.onUnpass?.()}>
+            {copy.window.unpass}
+          </Button>
+        )}
       </div>
+
+      {/* the engine is waiting on a decision from you — a pending owed to you
+          always renders, regardless of whose turn the projection says it is */}
+      {state.pending?.player === state.selfId && copy.pending && (
+        <PendingPrompt
+          pending={state.pending}
+          hand={you.hand}
+          copy={copy.pending}
+          onResolve={(choice) => actions?.onResolve?.(choice)}
+        />
+      )}
 
       {/* вертикальный рейл у правого края — переключает панели drawer */}
       <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
@@ -393,9 +368,9 @@ export default function Table({
         {panel === 'settings' && (
           <div className={styles.settings}>
             {hasUpperSettings && (
-              <SettingsGroup title={isHost ? copy.generalTitle : undefined}>
+              <SettingsGroup title={isHost ? copy.table.generalTitle : undefined}>
                 {lang && onLangChange && (
-                  <SettingsField label={copy.langTitle}>
+                  <SettingsField label={copy.table.langTitle}>
                     <LangSwitcher
                       value={lang}
                       onChange={onLangChange}
@@ -405,10 +380,10 @@ export default function Table({
                   </SettingsField>
                 )}
                 {code && (
-                  <SettingsField label={copy.codeTitle}>
+                  <SettingsField label={copy.table.codeTitle}>
                     <LobbyCode
                       code={code}
-                      copy={codeCopy}
+                      copy={copy.lobbyCode}
                       align="start"
                       reverse
                       showLabel={false}
@@ -420,9 +395,9 @@ export default function Table({
             {hostControls && (
               <>
                 {hasUpperSettings && <div className={styles.divider} />}
-                <SettingsGroup title={copy.hostTitle}>
+                <SettingsGroup title={copy.table.hostTitle}>
                   {canLimitSpectators && (
-                    <SettingsField label={copy.specLimit}>
+                    <SettingsField label={copy.table.specLimit}>
                       <Slider
                         value={spectatorLimit ?? 0}
                         min={0}
@@ -435,9 +410,10 @@ export default function Table({
                     </SettingsField>
                   )}
                   {canPause && (
-                    <SettingsField label={copy.pauseGame} hint={copy.pauseHint}>
+                    <SettingsField label={copy.table.pauseGame} hint={copy.table.pauseHint}>
                       <Toggle on={paused} onChange={(on) => onPauseChange?.(on)}>
-                        {(paused ? copy.pauseOn : copy.pauseOff) ?? copy.pauseGame}
+                        {(paused ? copy.table.pauseOn : copy.table.pauseOff) ??
+                          copy.table.pauseGame}
                       </Toggle>
                     </SettingsField>
                   )}
@@ -446,27 +422,31 @@ export default function Table({
             )}
           </div>
         )}
-        {panel === 'history' && <MoveHistory entries={history} copy={historyCopy} />}
+        {panel === 'history' && (
+          <div data-testid="panel-history">
+            <MoveHistory entries={history} copy={copy.history} />
+          </div>
+        )}
         {panel === 'participants' && (
           <Participants
             players={participants}
             spectators={spectators}
-            copy={participantsCopy}
+            copy={copy.participants}
             isHost={isHost}
             onKickSpectator={onKickSpectator}
           />
         )}
         {panel === 'rules' && (
           <div className={styles.scrollPanel}>
-            <Rules copy={rulesCopy} />
+            <Rules copy={copy.rules} />
           </div>
         )}
-        {panel === 'modes' && <GameModes setup={setup} copy={modesCopy} />}
+        {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
       </Drawer>
 
       {/* pause window — over the play area, below the right-hand nav (its own
           z-index), so the rail + drawer stay live while the game is frozen */}
-      {paused && pauseCopy && (
+      {paused && copy.pause && (
         <PauseGame
           players={pausePlayers}
           selfId={pauseSelfId}
@@ -474,18 +454,18 @@ export default function Table({
           isHost={isHost}
           onToggleReady={onPauseToggleReady}
           onResume={() => onPauseChange?.(false)}
-          copy={pauseCopy}
+          copy={copy.pause}
         />
       )}
 
-      {view === 'youDisconnect' && <Reconnect copy={reconnectCopy} />}
+      {room.connection === 'reconnecting' && <Reconnect copy={copy.reconnect} />}
 
       {over && (
         <GameOver
           winner={overWinner}
           condition={over.condition}
-          onContinue={onOverContinue}
-          copy={gameOverCopy}
+          onContinue={actions?.onOverContinue}
+          copy={copy.gameOver}
         />
       )}
     </div>

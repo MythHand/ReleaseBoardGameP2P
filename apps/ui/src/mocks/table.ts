@@ -37,6 +37,7 @@ interface Opponent {
   name: string
   handCount: number
   release: ReleaseSlots
+  eliminated: boolean
 }
 
 interface TableState {
@@ -104,6 +105,7 @@ export function makeTable(opponentCount = 3): TableState {
   const opponents: Opponent[] = OPPONENT_POOL.slice(0, opponentCount).map((o) => ({
     ...o,
     release: resolveRelease(o.release),
+    eliminated: false,
   }))
 
   return {

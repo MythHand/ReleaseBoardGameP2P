@@ -53,3 +53,18 @@
 .compact .empty {
   writing-mode: vertical-rl;
 }
+
+/* легитимная цель текущего прицеливания — подсветка того, что пришло в
+   `targets`; сам слот не решает, что легально. Свечение — тем же слоем .glow,
+   что и у grabbable, и по той же причине (см. комментарий выше): на самом слоте
+   6cqw считаются не от него, и подсветка расплывается овалом под картой. */
+.targetable {
+  cursor: pointer;
+}
+
+.targetable .glow {
+  box-shadow:
+    0 0 0 2px var(--turn-accent),
+    0 0 16px 2px color-mix(in srgb, var(--turn-accent) 40%, transparent);
+  opacity: 1;
+}

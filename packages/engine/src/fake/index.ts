@@ -3,6 +3,8 @@ import { project } from './project'
 import { legalTargets, reduce } from './reduce'
 import { createGame } from './setup'
 
+export { botAction, runUntilIdle } from './bots'
+
 // Quantities mirror apps/ui/src/cards/catalogue.ts. Only the ids the fake
 // implements appear — Git operations, System Upgrade and ai-inside are deferred
 // per the design, and createGame filters anything unsupported anyway.

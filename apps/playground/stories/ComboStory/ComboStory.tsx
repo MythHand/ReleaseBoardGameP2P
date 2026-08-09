@@ -3,7 +3,7 @@ import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { nextFrames, play, wait } from '@/animations'
-import { cardById, cardCanTarget, isComboSource, validComboTarget } from '@/cards'
+import { cardById } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO } from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
@@ -18,6 +18,7 @@ import { useDiscardExit } from '../interactive/useDiscardExit'
 import { useFlyer } from '../interactive/useFlyer'
 import { useHandArrival } from '../interactive/useHandArrival'
 import styles from './ComboStory.module.css'
+import { cardCanTarget, isComboSource, validComboTarget } from './mockLegality'
 
 type Loc = Record<Lang, string>
 

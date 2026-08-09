@@ -119,6 +119,7 @@ export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }):
         attackId: card.id,
         sudo,
         canDefendWith: defencesFor(state, w.target.player, sudo),
+        openedAt: action.at,
         deadline: action.at + DEFEND_MS,
         scope: 'release',
       },
@@ -312,6 +313,7 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         attackCard: p.attackId,
         sudo: p.sudo,
         options: mine ? [...p.canDefendWith] : [],
+        openedAt: p.openedAt,
         deadline: p.deadline,
         scope: p.scope,
       }

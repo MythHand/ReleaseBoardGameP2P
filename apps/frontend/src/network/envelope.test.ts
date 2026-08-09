@@ -1,5 +1,5 @@
 import { createEnvelope, nextSeq, parseEnvelope } from './envelope'
-import type { Message } from './types'
+import type { Intent, Message, WireMessage } from './types'
 
 const joinMsg: Message = { type: 'JOIN_REQUEST', payload: { name: 'Ann' } }
 
@@ -23,4 +23,14 @@ it('nextSeq increases monotonically', () => {
   const a = nextSeq()
   const b = nextSeq()
   expect(b).toBeGreaterThan(a)
+})
+
+it('round-trips an INTENT carrying an engine action', () => {
+  const intent: Intent = { type: 'PLAY', card: 'release-frontend#0' }
+  const frame = createEnvelope({ type: 'INTENT', payload: { intent } }, 'peer-a', 7)
+  const parsed = parseEnvelope(JSON.stringify(frame))
+
+  expect(parsed.type).toBe('INTENT')
+  expect(parsed.from).toBe('peer-a')
+  expect((parsed as Extract<WireMessage, { type: 'INTENT' }>).payload.intent).toEqual(intent)
 })

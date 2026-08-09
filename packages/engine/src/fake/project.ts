@@ -42,7 +42,15 @@ export function playableFor(state: GameState, viewerId: PlayerId): CardUid[] {
         case 'release': {
           if (state.turn.releasesPlayed >= releaseCap) return false
           // One card of each type only; the slot must be free.
-          return !me.release[rules.slot as 'frontend']
+          if (me.release[rules.slot as 'frontend']) return false
+          // Unless the mode makes releases free, the cost is a second card, so
+          // a lone release is unplayable — `onPlay` (release.ts) rejects it.
+          // Listing it anyway would show a player a card that bounces back as
+          // a rejection with nothing to explain it, and would send any policy
+          // reading this list (bots.ts, the keeper driving an absent seat) into
+          // a move the engine refuses.
+          if (state.setup.releaseCond !== 'easy' && me.hand.length < 2) return false
+          return true
         }
         case 'protection':
           // Monitoring goes to the zone (one at a time); Debugger only answers a
@@ -102,6 +110,7 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       player: state.window.target.player,
       slot: state.window.target.slot,
       round: state.window.round,
+      openedAt: state.window.openedAt,
       deadline: state.window.deadline,
       passed: [...state.window.passed],
       canAttackWith: canAttackWith(state, viewerId),
