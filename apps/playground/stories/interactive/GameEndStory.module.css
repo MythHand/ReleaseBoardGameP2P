@@ -1,0 +1,174 @@
+/* Страница = строка технических контролов + область экрана под ней. Форма взята
+   у TableStory — страницы, которая показывает целый экран: линия НЕ лежит поверх
+   стола, она отдельная строка колонки, а стол забирает остаток высоты.
+   Расстановка внутри области — та же, что у экрана стола
+   (apps/ui/src/table/Table/Table.module.css). */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
+  overflow: hidden;
+}
+
+/* строка технических контролов — своя высота, экран начинается под ней */
+.controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 22px;
+  row-gap: 10px;
+  align-items: center;
+  padding: 12px 16px;
+  border-block-end: 1px solid var(--white-08);
+}
+
+/* область экрана — остаток страницы. Это и есть «стол»: координаты внутри
+   считаются от него самого, ровно как на экране стола. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow: hidden;
+
+  /* фон стола — объявлен ровно как на экране стола. Видна из него только заливка:
+     первый слой в background рисуется СВЕРХУ, а он непрозрачный (#050605), так что
+     оба repeating-градиента под ним не проявляются. Видимая сетка приходит из
+     HudBackground ниже — своя, 22px, приглушённая маской. Оставлено один в один
+     со столом, чтобы страницы не разъезжались, если объявление там поправят. */
+  background:
+    linear-gradient(0deg, var(--surface-0), var(--surface-0)),
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 28px);
+
+  /* свой контекст наложения — чтобы слой фона с z-index: -1 остался НАД
+     собственным фоном области, а не провалился под него (как на экране стола) */
+  isolation: isolate;
+}
+
+/* HudBackground как слой-подложка: без рамки и скруглений, во всю площадь.
+   z-index: -1 обязателен: внутри у него .content с position:relative и z-index:1,
+   и без этого пустой слой ложится ПОВЕРХ стола и съедает мышь (рука перестаёт
+   ловить нажатие). Ровно так же сделано на экране стола. */
+.stage .hud {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 0;
+  border-radius: 0;
+}
+
+.btn {
+  padding: 8px 14px;
+  color: var(--fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.btn:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.hint {
+  color: var(--white-45);
+}
+
+/* соперники — один ряд сверху по центру, столовый отступ */
+.opponents {
+  position: absolute;
+  inset-block-start: 22px;
+  inset-inline-start: 50%;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 18px;
+  justify-content: center;
+  max-inline-size: calc(100% - 80px);
+  transform: translateX(-50%);
+}
+
+/* колоды добора — левый край, по центру высоты */
+.decks {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  transform: translateY(-50%);
+}
+
+/* сброс — справа от центра, перед правым рейлом. Центрируется колонкой, а НЕ
+   трансформом: трансформ создал бы контекст наложения и запер счётчик кучи под
+   прилетающими картами. */
+.discard {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 86px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.discard > * {
+  pointer-events: auto;
+}
+
+/* служебный док хода — нижний левый угол, под колодами, слева от руки */
+.turnDock {
+  position: absolute;
+  inset-block-end: 20px;
+  inset-inline-start: 26px;
+}
+
+/* зона релиза над рукой: слева учитываем док, справа — рейл */
+.you {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline: 196px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.handWrap {
+  inline-size: 100%;
+}
+
+/* ===== хлопушки ===== */
+
+/* поле для конфетти — над столом И над окном завершения (праздник продолжается
+   поверх итога), клики не ловит. Живёт внутри области экрана, поэтому на строку
+   контролов не залетает. */
+.pops {
+  position: absolute;
+  inset: 0;
+  z-index: 120;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* один залп — самостоятельный слой на всю область: свои частицы, свой старт.
+   Соседний залп его не касается. */
+.volley {
+  position: absolute;
+  inset: 0;
+}
+
+/* одна частица: стоит в углу, дальше её ведёт пресет confettiFly */
+.pop {
+  position: absolute;
+  inset-block-end: 24px;
+  will-change: transform, opacity;
+}
+
+.popLeft {
+  inset-inline-start: 40px;
+}
+
+.popRight {
+  inset-inline-end: 40px;
+}

@@ -116,26 +116,16 @@
   }
 }
 
-/* веер соперника (забирающего) — рубашкой вверх, развёрнут на 180° */
-.topHand {
+/* соперники — сверху по центру, как на столе: рука у них скрыта в месте */
+.opponents {
   position: absolute;
-  inset-block-start: 76px;
-  inset-inline: 0;
-  z-index: 40;
-  transition: transform 520ms var(--ease-soft);
-  will-change: transform;
-}
-
-.topHand[data-in="false"] {
-  transform: translateY(-160%);
-}
-
-.topHand[data-in="true"] {
-  transform: translateY(0);
-}
-
-.topHandInner {
-  transform: rotate(180deg);
+  inset-block-start: 84px;
+  inset-inline-start: 50%;
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  max-inline-size: calc(100% - 80px);
+  transform: translateX(-50%);
 }
 
 .miss {
@@ -151,11 +141,13 @@
   letter-spacing: 0.2em;
 }
 
-/* карта, которую забирают: из твоей руки → центр (флип рубашкой) → вверх за веер */
+/* карта, которую забирают: из твоей руки → центр (флип рубашкой) → в место соперника,
+   где она сжимается и растворяется (движение dealToSeat) */
 .take {
   position: fixed;
   transform-origin: center center;
-  transition: transform 460ms var(--ease-soft);
+  transition: transform 460ms var(--ease-soft),
+    opacity 460ms var(--ease-soft);
   will-change: transform;
 }
 

@@ -36,6 +36,8 @@ import DeckAnimationsStory from '../stories/interactive/DeckAnimationsStory'
 import DefenseReleaseStory from '../stories/interactive/DefenseReleaseStory'
 import DrawCardStory from '../stories/interactive/DrawCardStory'
 import Error503Story from '../stories/interactive/Error503Story'
+import GameDealStory from '../stories/interactive/GameDealStory'
+import GameEndStory from '../stories/interactive/GameEndStory'
 import GitCardsStory from '../stories/interactive/GitCards/GitCardsStory'
 import OpponentTakesCardStory from '../stories/interactive/OpponentTakesCardStory'
 import PickOpponentCardStory from '../stories/interactive/PickOpponentCardStory'
@@ -156,6 +158,10 @@ const groups: Group[] = [
       { id: 'card-play', title: 'Card play', render: () => <CardPlayStory /> },
       { id: 'draw-card', title: 'Draw card', render: () => <DrawCardStory /> },
       { id: 'deck-animations', title: 'Deck animations', render: () => <DeckAnimationsStory /> },
+      // the bookends of a match — the table before anything is dealt and one
+      // move before it is over; both stand on the shared TableStage
+      { id: 'game-deal', title: 'Game Deal', render: () => <GameDealStory /> },
+      { id: 'game-end', title: 'Game End', render: () => <GameEndStory /> },
     ],
   },
   {
