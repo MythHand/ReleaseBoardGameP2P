@@ -159,3 +159,137 @@ it('resolves giveCard with the hand uid, never the requested catalogue id', () =
   expect(onResolve).toHaveBeenCalledWith({ kind: 'giveCard', card: uid })
   expect(onResolve.mock.calls[0][0].card).not.toBe(requestedId)
 })
+
+const discardOptions = [
+  { uid: 'a#1', id: 'attack-bug' },
+  { uid: 'b#1', id: 'release-frontend' },
+]
+
+it('offers every discard option and resolves the single pick', () => {
+  const onResolve = vi.fn()
+  const { getAllByRole, getByRole } = render(
+    <PendingPrompt
+      pending={{
+        kind: 'pickFromDiscard',
+        player: 'you',
+        options: discardOptions,
+        picks: 1,
+        source: 'operation-git-cherry-pick',
+      }}
+      hand={[]}
+      copy={copy}
+      onResolve={onResolve}
+    />,
+  )
+  // The cards were never in hand, so an option renderer resolving uids against
+  // `hand` would render nothing at all here.
+  const options = getAllByRole('option')
+  expect(options).toHaveLength(2)
+  fireEvent.click(options[0])
+  fireEvent.click(getByRole('button', { name: copy.confirm }))
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'pickFromDiscard',
+    card: 'a#1',
+    toDeck: undefined,
+  })
+})
+
+it('asks for the deck card only after the hand card, and resolves once with both', () => {
+  const onResolve = vi.fn()
+  const { getAllByRole, getByRole } = render(
+    <PendingPrompt
+      pending={{
+        kind: 'pickFromDiscard',
+        player: 'you',
+        options: discardOptions,
+        picks: 2,
+        source: 'operation-git-cherry-pick',
+      }}
+      hand={[]}
+      copy={copy}
+      onResolve={onResolve}
+    />,
+  )
+  const confirmBtn = getByRole('button', { name: copy.confirm })
+  fireEvent.click(getAllByRole('option')[0]) // picks 'a#1'
+  // Only one of the two owed picks made — confirm must stay inert.
+  expect(confirmBtn).toHaveProperty('disabled', true)
+  fireEvent.click(confirmBtn)
+  expect(onResolve).not.toHaveBeenCalled()
+
+  // The chosen card is removed from the option list (picked once already),
+  // so the remaining option is the deck card.
+  fireEvent.click(getAllByRole('option')[0]) // picks 'b#1'
+  fireEvent.click(confirmBtn)
+  expect(onResolve).toHaveBeenCalledTimes(1)
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'pickFromDiscard',
+    card: 'a#1',
+    toDeck: 'b#1',
+  })
+})
+
+it('cannot resolve a stale discard pick once a new pickFromDiscard pending for the same player drops it', () => {
+  // Same failure mode as the discardForRelease staleness test above, for the
+  // new discardPicks state: a second pickFromDiscard pending for the same
+  // player does not change the fingerprint, so the reset effect alone cannot
+  // be trusted — membership against the current pending's options is what
+  // must stop the stale pick from resolving.
+  const onResolve = vi.fn()
+  const first: TablePending = {
+    kind: 'pickFromDiscard',
+    player: 'you',
+    options: discardOptions,
+    picks: 1,
+    source: 'operation-git-cherry-pick',
+  }
+  const second: TablePending = {
+    kind: 'pickFromDiscard',
+    player: 'you',
+    options: [{ uid: 'c#1', id: 'release-backend' }],
+    picks: 1,
+    source: 'ai-inside',
+  }
+  const { getAllByRole, getByRole, rerender } = render(
+    <PendingPrompt pending={first} hand={[]} copy={copy} onResolve={onResolve} />,
+  )
+  fireEvent.click(getAllByRole('option')[0]) // selects 'a#1', offered by `first`
+
+  rerender(<PendingPrompt pending={second} hand={[]} copy={copy} onResolve={onResolve} />)
+
+  const confirmBtn = getByRole('button', { name: copy.confirm })
+  expect(confirmBtn).toHaveProperty('disabled', true)
+  fireEvent.click(confirmBtn)
+  expect(onResolve).not.toHaveBeenCalled()
+})
+
+it('drops a discard pick when the pending kind changes and later offers the same card again', () => {
+  // The membership check cannot catch this one: the stale uid is legitimately
+  // on offer the second time, so `complete` would be satisfied by a pick the
+  // player never made in *this* pending. Only the fingerprint reset stops it,
+  // and the fingerprint is `kind:player` — so it takes a change of kind, not
+  // another pickFromDiscard, to exercise that reset at all.
+  const onResolve = vi.fn()
+  const picking: TablePending = {
+    kind: 'pickFromDiscard',
+    player: 'you',
+    options: discardOptions,
+    picks: 1,
+    source: 'operation-git-cherry-pick',
+  }
+  const other: TablePending = { kind: 'neutralize503', player: 'you', methods: ['debugger'] }
+
+  const { getAllByRole, getByRole, rerender } = render(
+    <PendingPrompt pending={picking} hand={[]} copy={copy} onResolve={onResolve} />,
+  )
+  fireEvent.click(getAllByRole('option')[0]) // selects 'a#1'
+
+  // Away and back: the same card is on offer again.
+  rerender(<PendingPrompt pending={other} hand={[]} copy={copy} onResolve={onResolve} />)
+  rerender(<PendingPrompt pending={picking} hand={[]} copy={copy} onResolve={onResolve} />)
+
+  const confirmBtn = getByRole('button', { name: copy.confirm })
+  expect(confirmBtn).toHaveProperty('disabled', true)
+  fireEvent.click(confirmBtn)
+  expect(onResolve).not.toHaveBeenCalled()
+})

@@ -116,6 +116,33 @@ function CatalogueCardOption({
   )
 }
 
+// A discard card: selected by uid like a hand card, drawn from the catalogue
+// like a named card. Neither existing renderer covers it, because nothing
+// before this offered a card the player never held.
+function DiscardCardOption({
+  option,
+  selected,
+  onClick,
+}: {
+  option: { uid: string; id: string }
+  selected: boolean
+  onClick: () => void
+}) {
+  const card = CARDS.find((c) => c.id === option.id)
+  if (!card) return null
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      className={styles.option}
+      onClick={onClick}
+    >
+      <Card card={card} interactive={false} width={72} state={selected ? 'selected' : 'idle'} />
+    </button>
+  )
+}
+
 // A selectable plain-text option (a neutralize/crush method) — same option
 // semantics as CardOption, no card face to show.
 function TextOption({
@@ -162,12 +189,14 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
   const [cards, setCards] = useState<string[]>([])
   const [method, setMethod] = useState<NeutralizeMethodId | null>(null)
   const [requestedCard, setRequestedCard] = useState<string | null>(null)
+  const [discardPicks, setDiscardPicks] = useState<string[]>([])
   // biome-ignore lint/correctness/useExhaustiveDependencies: fingerprint is the re-arm trigger, not read inside
   useEffect(() => {
     setCard(null)
     setCards([])
     setMethod(null)
     setRequestedCard(null)
+    setDiscardPicks([])
   }, [fingerprint])
 
   const kindCopy = copy[pending.kind]
@@ -321,9 +350,32 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
       break
     }
     case 'pickFromDiscard': {
-      // Renders nothing yet — this pending's own prompt UI is a later task.
-      // `complete` stays false, so ConfirmAction stays disabled rather than
-      // silently confirming an empty choice.
+      // Same membership discipline as every other kind: `complete` and
+      // `confirm` both re-check against *this render's* pending.options, not
+      // merely "picks.length reached the owed count" — a stale discardPicks
+      // entry from an earlier same-kind/same-player pending must not confirm
+      // just because the count happens to line up.
+      const owed = pending.picks
+      const offered = pending.options.map((o) => o.uid)
+      complete = discardPicks.length === owed && discardPicks.every((uid) => offered.includes(uid))
+      confirm = () => {
+        if (!complete) return
+        onResolve({
+          kind: 'pickFromDiscard',
+          card: discardPicks[0],
+          toDeck: owed === 2 ? discardPicks[1] : undefined,
+        })
+      }
+      options = pending.options
+        .filter((o) => !discardPicks.includes(o.uid))
+        .map((o) => (
+          <DiscardCardOption
+            key={o.uid}
+            option={o}
+            selected={false}
+            onClick={() => setDiscardPicks((cur) => [...cur, o.uid])}
+          />
+        ))
       break
     }
   }
