@@ -234,7 +234,8 @@
     "crush": { "prompt": "your release is being crushed", "action": "neutralize" },
     "requestCard": { "prompt": "name the card you demand", "action": "demand" },
     "giveCard": { "prompt": "hand over the card", "action": "give" },
-    "handLimit": { "prompt": "your hand is over the limit", "action": "discard" }
+    "handLimit": { "prompt": "your hand is over the limit", "action": "discard" },
+    "pickFromDiscard": { "prompt": "take a card from the discard", "action": "take" }
   },
   "window": {
     "unpass": "cancel pass"
@@ -663,6 +664,7 @@
     "released": "release",
     "requested": "demand",
     "revealed": "revealed",
+    "takenFromDiscard": "took from the discard",
     "tookHit": "took the hit",
     "turnEnded": "turn over",
     "turnStarted": "turn",

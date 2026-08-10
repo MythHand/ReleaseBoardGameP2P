@@ -21,6 +21,7 @@ export type TableChoice =
   | { kind: 'requestCard'; card: string }
   | { kind: 'giveCard'; card: string }
   | { kind: 'handLimit'; cards: string[] }
+  | { kind: 'pickFromDiscard'; card: string; toDeck?: string }
 
 export type TablePending =
   | { kind: 'discardForRelease'; player: string; options: string[] }
@@ -40,6 +41,13 @@ export type TablePending =
   | { kind: 'requestCard'; player: string; target: string }
   | { kind: 'giveCard'; player: string; requested: string }
   | { kind: 'handLimit'; player: string; excess: number; options: string[] }
+  | {
+      kind: 'pickFromDiscard'
+      player: string
+      options: { uid: string; id: string }[]
+      picks: 1 | 2
+      source: string
+    }
 
 export interface TableWindow {
   player: string

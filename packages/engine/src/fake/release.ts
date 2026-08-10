@@ -1,8 +1,9 @@
 import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
-import type { CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
+import type { CardInstance, CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
 import { attackTargets, createLog, type Log, reject, setHand } from './core'
+import { openPickFromDiscard } from './discard'
 import { openHandAttack, resolveDdos } from './handAttacks'
 import { playableFor } from './project'
 import { openWindow } from './window'
@@ -86,21 +87,38 @@ export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Red
   const rules = rulesFor(card.id)
   if (!rules) return reject(state, action, 'unknown card')
 
-  // Code Review is the only combo a release accepts, and only at play time.
+  // Code Review is a release-only combo; Sudo rides along with any card whose
+  // rules mark it sudo-capable (currently the attacks and Git Cherry-pick).
   let codeReview: CardUid | undefined
+  let sudoCombo: CardInstance | undefined
   if (action.combo !== undefined) {
     const partner = hand.find((c) => c.uid === action.combo)
     if (!partner) return reject(state, action, 'you do not hold the combo card')
-    if (partner.id !== 'support-code-review') {
+    if (partner.id === 'support-sudo') {
+      if (rules.sudo !== true) return reject(state, action, 'that card has no sudo variant')
+      sudoCombo = partner
+    } else if (partner.id !== 'support-code-review') {
       return reject(state, action, 'that card cannot be comboed here')
-    }
-    if (rules.kind !== 'release') {
+    } else if (rules.kind === 'release') {
+      codeReview = partner.uid
+    } else {
       return reject(state, action, 'Code Review only pairs with a release')
     }
-    codeReview = partner.uid
   }
 
   const log = createLog(state.eventSeq)
+
+  if (rules.kind === 'operation') {
+    const withoutCards = setHand(
+      state,
+      action.player,
+      hand.filter((c) => c.uid !== action.card && c.uid !== sudoCombo?.uid),
+    )
+    return {
+      state: openPickFromDiscard(withoutCards, log, action.player, card, sudoCombo, false),
+      events: log.events,
+    }
+  }
 
   if (rules.kind === 'release') {
     if (state.setup.releaseCond === 'easy') {

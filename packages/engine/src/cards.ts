@@ -12,6 +12,7 @@ export type CardKind =
   | 'support'
   | 'trigger'
   | 'ai'
+  | 'operation'
 
 export interface CardRules {
   kind: CardKind
@@ -21,8 +22,9 @@ export interface CardRules {
   slot?: ReleaseSlot
 }
 
-// The ids the fake implements. Git operations (operation-*) and ai-inside are
-// deliberately absent — each needs a bespoke UI surface, deferred per the design.
+// The ids the fake implements. ai-inside and the rest of the Git operations
+// are deliberately absent — each needs a bespoke UI surface, deferred per the
+// design. Git Cherry-pick is the first exception.
 export const CARD_RULES: Record<CardId, CardRules> = {
   'release-frontend': { kind: 'release', slot: 'frontend' },
   'release-backend': { kind: 'release', slot: 'backend' },
@@ -47,6 +49,8 @@ export const CARD_RULES: Record<CardId, CardRules> = {
   'support-sudo': { kind: 'support' },
   'support-code-review': { kind: 'support' },
 
+  'operation-git-cherry-pick': { kind: 'operation', sudo: true },
+
   'trigger-error-503': { kind: 'trigger' },
   'trigger-ai': { kind: 'trigger' },
 
@@ -61,6 +65,7 @@ export const CARD_RULES: Record<CardId, CardRules> = {
   'ai-bad-vibe-coding': { kind: 'ai' },
   'ai-hallucination': { kind: 'ai' },
   'ai-error-503': { kind: 'ai' },
+  'ai-inside': { kind: 'ai' },
 }
 
 export const SUPPORTED: ReadonlySet<CardId> = new Set(Object.keys(CARD_RULES))
