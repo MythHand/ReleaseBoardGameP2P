@@ -1,25 +1,50 @@
-/* Расстановка — та же, что у экрана стола (apps/ui/src/table/Table/Table.module.css),
-   со сдвигом верхнего ряда под техническую линию, как в остальных сценах. */
+/* Страница = строка технических контролов + область экрана под ней. Форма взята
+   у TableStory — страницы, которая показывает целый экран: линия НЕ лежит поверх
+   стола, она отдельная строка колонки, а стол забирает остаток высоты.
+   Расстановка внутри области — та же, что у экрана стола
+   (apps/ui/src/table/Table/Table.module.css). */
 
 .root {
-  position: relative;
-  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
   overflow: hidden;
 }
 
-/* techническая верхняя линия управления — dev-контролы (паттерн TableStory) */
-.bar {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  z-index: 60;
+/* строка технических контролов — своя высота, экран начинается под ней */
+.controls {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 22px;
+  row-gap: 10px;
   align-items: center;
-  padding: 16px 24px;
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  padding: 12px 16px;
   border-block-end: 1px solid var(--white-08);
+}
+
+/* область экрана — остаток страницы. Это и есть «стол»: координаты внутри
+   считаются от него самого, ровно как на экране стола. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow: hidden;
+
+  /* фон стола как на экране стола: заливка + техно-сетка */
+  background:
+    linear-gradient(0deg, var(--surface-0), var(--surface-0)),
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 28px);
+}
+
+/* HudBackground как слой-подложка: без рамки и скруглений, во всю площадь.
+   Первый в DOM — остальные блоки рисуются над ним. */
+.stage .hud {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
 }
 
 .btn {
@@ -40,10 +65,10 @@
   color: var(--white-45);
 }
 
-/* соперники — один ряд сверху по центру, под технической линией */
+/* соперники — один ряд сверху по центру, столовый отступ */
 .opponents {
   position: absolute;
-  inset-block-start: 84px;
+  inset-block-start: 22px;
   inset-inline-start: 50%;
   display: flex;
   flex-wrap: nowrap;
@@ -105,24 +130,14 @@
 /* ===== хлопушки ===== */
 
 /* поле для конфетти — над столом И над окном завершения (праздник продолжается
-   поверх итога), клики не ловит. Верх приходит инлайном от высоты технической
-   линии: она часть плейграунда, конфетти на неё не залетает. */
+   поверх итога), клики не ловит. Живёт внутри области экрана, поэтому на строку
+   контролов не залетает. */
 .pops {
   position: absolute;
-  inset-block-end: 0;
-  inset-inline: 0;
+  inset: 0;
   z-index: 120;
   overflow: hidden;
   pointer-events: none;
-}
-
-/* окно завершения — в ИГРЕ оно во весь экран; здесь ограничено областью
-   демонстрации (верх — инлайном от высоты технической линии), а Overlay внутри
-   растягивается по этой области, потому что она позиционирована. */
-.overArea {
-  position: absolute;
-  inset-block-end: 0;
-  inset-inline: 0;
 }
 
 /* один залп — самостоятельный слой на всю область: свои частицы, свой старт.

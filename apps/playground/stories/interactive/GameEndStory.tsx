@@ -1,10 +1,11 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { play, scatterAt } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
+import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
 import type { HeapCard } from '@/primitives/Pile/Pile'
 import TabRail from '@/primitives/TabRail'
@@ -204,15 +205,6 @@ export default function GameEndStory() {
   const timers = useRef<number[]>([])
   const { overlay: flyerOverlay, raise, drop } = useFlyer()
 
-  // the technical line belongs to the PLAYGROUND, not to the screen being shown:
-  // everything the scene paints over the table — the confetti, the game-over
-  // window — starts below it. In the game both cover the whole screen.
-  const barRef = useRef<HTMLDivElement>(null)
-  const [barH, setBarH] = useState(0)
-  useLayoutEffect(() => {
-    if (barRef.current) setBarH(barRef.current.offsetHeight)
-  }, [])
-
   const later = (fn: () => void, ms: number) => timers.current.push(window.setTimeout(fn, ms))
 
   function restart() {
@@ -274,8 +266,10 @@ export default function GameEndStory() {
 
   return (
     <div className={styles.root}>
-      {/* technical top control line — dev controls (TableStory pattern) */}
-      <div className={styles.bar} ref={barRef}>
+      {/* The technical line is a ROW of the playground, not a layer over the
+          screen: it takes its own height, and the table below owns everything
+          left — so nothing the scene paints over the table has to dodge it. */}
+      <div className={styles.controls}>
         <button type="button" className={styles.btn} onClick={restart}>
           <Typography base="label-sm" tk="tk-16">
             {pick(lang, { ru: 'рестарт', en: 'restart' })}
@@ -291,95 +285,98 @@ export default function GameEndStory() {
         </div>
       </div>
 
-      {/* opponents — one row on top, as on the table; late in the match their
+      <div className={styles.stage}>
+        {/* the table's own background layer, over the grid the area paints */}
+        <HudBackground tone="neutral" className={styles.hud} />
+
+        {/* opponents — one row on top, as on the table; late in the match their
           hands are thin and a release stands in two of the zones */}
-      <div className={styles.opponents}>
-        {OPPONENTS.map((o) => (
-          <Seat
-            key={o.id}
-            player={{ id: o.id, name: o.name, handCount: o.handCount, release: o.release }}
-            copy={copy.seat}
-          />
-        ))}
-      </div>
+        <div className={styles.opponents}>
+          {OPPONENTS.map((o) => (
+            <Seat
+              key={o.id}
+              player={{ id: o.id, name: o.name, handCount: o.handCount, release: o.release }}
+              copy={copy.seat}
+            />
+          ))}
+        </div>
 
-      {/* draw decks — the base one worn down by a whole match, the events one whole */}
-      <div className={styles.decks}>
-        <Pile label={copy.table.deck} deck="base" count={DECK_MAIN} width={150} countPos="tl" />
-        <Pile label={copy.table.events} deck="ai" count={DECK_EVENTS} width={150} countPos="tl" />
-      </div>
+        {/* draw decks — the base one worn down by a whole match, the events one whole */}
+        <div className={styles.decks}>
+          <Pile label={copy.table.deck} deck="base" count={DECK_MAIN} width={150} countPos="tl" />
+          <Pile label={copy.table.events} deck="ai" count={DECK_EVENTS} width={150} countPos="tl" />
+        </div>
 
-      {/* discard — a tossed heap by now, as it lies on the table */}
-      <div className={styles.discard}>
-        <Pile
-          label={copy.table.discard}
-          heap={HEAP}
-          count={HEAP.length}
-          width={116}
-          logoVariant={lang}
-        />
-      </div>
-
-      {/* your turn — the deciding release is in hand */}
-      <div className={styles.turnDock}>
-        <TurnDock state="draw" seconds={20} progress={1} copy={copy.turnDock} />
-      </div>
-
-      <div className={styles.you}>
-        <ReleaseZone
-          release={release}
-          size="100px"
-          slotRef={(key, el) => {
-            slotRefs.current[key] = el
-          }}
-        />
-        <div className={styles.handWrap} style={{ pointerEvents: busy ? 'none' : undefined }}>
-          <Hand
-            items={hand}
-            stateAt={(i) => (hand[i]?.card.id === WINNING_CARD ? 'playable' : 'idle')}
-            onPlay={handPlay}
-            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        {/* discard — a tossed heap by now, as it lies on the table */}
+        <div className={styles.discard}>
+          <Pile
+            label={copy.table.discard}
+            heap={HEAP}
+            count={HEAP.length}
+            width={116}
+            logoVariant={lang}
           />
         </div>
-      </div>
 
-      {/* the page rail, as on the table. Inert: this page is a choreography, not
+        {/* your turn — the deciding release is in hand */}
+        <div className={styles.turnDock}>
+          <TurnDock state="draw" seconds={20} progress={1} copy={copy.turnDock} />
+        </div>
+
+        <div className={styles.you}>
+          <ReleaseZone
+            release={release}
+            size="100px"
+            slotRef={(key, el) => {
+              slotRefs.current[key] = el
+            }}
+          />
+          <div className={styles.handWrap} style={{ pointerEvents: busy ? 'none' : undefined }}>
+            <Hand
+              items={hand}
+              stateAt={(i) => (hand[i]?.card.id === WINNING_CARD ? 'playable' : 'idle')}
+              onPlay={handPlay}
+              onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+            />
+          </div>
+        </div>
+
+        {/* the page rail, as on the table. Inert: this page is a choreography, not
           the panels — a tab that opened nothing would read as broken. */}
-      <TabRail
-        items={[
-          { id: 'history', label: copy.table.tabHistory },
-          { id: 'participants', label: copy.table.tabParticipants },
-          { id: 'rules', label: copy.table.tabRules },
-          { id: 'modes', label: copy.table.tabModes },
-        ]}
-        active={null}
-        onSelect={() => {}}
-      />
+        <TabRail
+          items={[
+            { id: 'history', label: copy.table.tabHistory },
+            { id: 'participants', label: copy.table.tabParticipants },
+            { id: 'rules', label: copy.table.tabRules },
+            { id: 'modes', label: copy.table.tabModes },
+          ]}
+          active={null}
+          onSelect={() => {}}
+        />
 
-      {/* the poppers: code symbols out of both bottom corners. Each volley is its
+        {/* the poppers: code symbols out of both bottom corners. Each volley is its
           own element and starts once — the scene owns the spread and the timing,
           the `confettiFly` preset owns one piece's arc. */}
-      <div className={styles.pops} style={{ insetBlockStart: barH }} aria-hidden="true">
-        {volleys.map((v) => (
-          <Volley key={v.id} pieces={v.pieces} />
-        ))}
-      </div>
+        <div className={styles.pops} aria-hidden="true">
+          {volleys.map((v) => (
+            <Volley key={v.id} pieces={v.pieces} />
+          ))}
+        </div>
 
-      {/* the card on its way to the slot */}
-      {flyerOverlay}
+        {/* the card on its way to the slot */}
+        {flyerOverlay}
 
-      {/* the game-over window — in the GAME it covers the whole screen; here it
-          covers the DEMO AREA, so the playground's own technical line stays free */}
-      {over && (
-        <div className={styles.overArea} style={{ insetBlockStart: barH }}>
+        {/* the game-over window — it covers the table area, which is the screen
+          being shown; the playground's technical line is outside it */}
+        {over && (
           <GameOver
             winner={{ name: pick(lang, { ru: 'ты', en: 'you' }) }}
             condition="release"
             copy={copy.gameOver}
             onContinue={restart}
           />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
