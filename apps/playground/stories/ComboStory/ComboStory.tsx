@@ -442,7 +442,7 @@ export default function ComboStory() {
 
       <div className={styles.bottom}>
         <ReleaseZone
-          size="92px"
+          size="100px"
           release={Object.fromEntries(RELEASE_SLOTS.map((key) => [key, released[key]?.card]))}
           support={Object.fromEntries(RELEASE_SLOTS.map((key) => [key, released[key]?.aux]))}
           slotRef={(key, el) => {

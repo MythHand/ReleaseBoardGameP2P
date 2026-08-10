@@ -741,7 +741,7 @@ export default function AiCardsStory() {
       <div className={styles.you}>
         <ReleaseZone
           release={release}
-          size="92px"
+          size="100px"
           slotRef={(key, el) => {
             releaseSlotRefs.current[key] = el
           }}

@@ -40,6 +40,12 @@ export interface Arriving {
   /** the card's identity in the scene's hand (its uid) — handed back on landing */
   key: string
   card: CardType
+  /**
+   * which side is up on the way in. A dealt card travels closed and is turned
+   * over only once the whole hand is in (see Game Deal); a drawn or returned
+   * card is already known to its owner and flies open, which is the default.
+   */
+  faceDown?: boolean
   from?: Rect
   rot?: number
   el?: HTMLElement | null
@@ -55,6 +61,7 @@ export interface Landed {
 interface Flight {
   key: string
   card: CardType
+  faceDown: boolean
   at: { left: number; top: number; width: number; rot: number }
   to: string
   z: number // the slot's layer, taken once it has tucked under the fan
@@ -120,6 +127,7 @@ export function useHandArrival(
         return {
           key: it.key,
           card: it.card,
+          faceDown: it.faceDown ?? false,
           at: { left, top, width: src.box.width, rot: src.rot },
           to: `translate(${dx}px, ${dy}px) rotate(${place.rotate}deg) scale(${CARD_W / src.box.width})`,
           z: place.z,
@@ -161,7 +169,7 @@ export function useHandArrival(
         transform: started ? f.to : `rotate(${f.at.rot}deg)`,
       }}
     >
-      <Card card={f.card} width={f.at.width} interactive={false} />
+      <Card card={f.card} faceDown={f.faceDown} width={f.at.width} interactive={false} />
     </div>
   ))
 

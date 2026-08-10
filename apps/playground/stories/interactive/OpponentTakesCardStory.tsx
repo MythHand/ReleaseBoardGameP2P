@@ -1,11 +1,15 @@
+import enCommon from '@release/translation/locales/en/common.json'
+import ruCommon from '@release/translation/locales/ru/common.json'
 import type React from 'react'
 import { type CSSProperties, useRef, useState } from 'react'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
-import Card from '@/primitives/Card'
+import Card, { cardBoxIn } from '@/primitives/Card'
 import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
+import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
+import Seat from '@/table/Seat'
 import { pick, useLang } from '../../Playground/lang'
 import styles from './OpponentTakesCardStory.module.css'
 import { reorderHand } from './reorderHand'
@@ -13,15 +17,18 @@ import { reorderHand } from './reorderHand'
 // Mirror of "take a specific card" — the VICTIM's view: the opponent takes a
 // chosen card from YOUR hand. Nodes shown:
 //  idle:   a start button in the centre;
-//  choose: the opponent's catalog grid appears (broadcast) + their fan slides in
-//          on top; you (standing in for the remote picker) hover to "consider"
-//          a card and click to confirm;
+//  choose: the opponent's catalog grid appears (broadcast); you (standing in for
+//          the remote picker) hover to "consider" a card and click to confirm;
 //  picked: the chosen card holds, the rest leave the grid;
 //  check:  against YOUR hand (bottom) — hit: that card lifts out, flies to the
-//          centre, flips face-down (now theirs) and tucks up behind the opponent
-//          fan; miss: "you don't have that card", nothing leaves.
+//          centre, flips face-down (now theirs) and sinks into the taker's seat,
+//          whose counter goes up; miss: "you don't have that card", nothing leaves.
+//
+// The opponents are SEATS, as on the table — their hands are hidden there, and a
+// card going to a hidden hand is the `dealToSeat` movement: it shrinks into the
+// seat's card box and fades out (see Draw card, where the same thing happens).
 const REVEAL_W = 220 // width the leaving card reaches in the centre
-const OPP_HAND = 6 // opponent fan size (context — the taker)
+const SEAT_SHRINK = 0.7 // how small the card gets in the seat (as in Draw card)
 const INITIAL_HAND = 6 // your hand (the source)
 const PICK_BEAT = 620 // chosen holds / others leave, before the hand check
 const CENTER_HOLD = 820 // pause in the centre before it flies up to the opponent
@@ -31,12 +38,16 @@ const GRID_W = 100 // card width in the choose-grid
 const BASE = CARDS.filter((c) => c.deck === 'base')
 const BASE_TYPES = CARDS.filter((c) => c.deck === 'base' && c.category !== 'trigger')
 
+const EMPTY_RELEASE: ReleaseSlots = { frontend: undefined, backend: undefined, database: undefined }
+// the opponents' row, as on the table; the first of them is the one taking
+const OPPONENTS = [
+  { id: 'p2', name: 'kernel_panic', handCount: 5 },
+  { id: 'p3', name: 'segfault', handCount: 7 },
+]
+const TAKER = OPPONENTS[0].id
+
 type Phase = 'idle' | 'choose' | 'picked' | 'take' | 'miss'
 type Stage = 'from' | 'center' | 'up'
-interface PoolCard {
-  uid: string
-  card: CardType
-}
 interface Take {
   card: CardType
   from: { left: number; top: number; width: number }
@@ -56,16 +67,15 @@ export default function OpponentTakesCardStory() {
   const { lang } = useLang()
   const [phase, setPhase] = useState<Phase>('idle')
   const [wanted, setWanted] = useState<CardType | null>(null)
-  const [oppHand, setOppHand] = useState<PoolCard[]>([])
-  const [handIn, setHandIn] = useState(false)
   const [hand, setHand] = useState(() => makeHand(INITIAL_HAND))
+  const [taken, setTaken] = useState(0) // cards the taker has gained in this run
   const [take, setTake] = useState<Take | null>(null)
   const [stage, setStage] = useState<Stage>('from')
   const [flipped, setFlipped] = useState(false)
 
   const rootRef = useRef<HTMLDivElement>(null)
   const handRef = useRef<HTMLDivElement>(null) // wraps the player Hand — slots are inner children
-  const fanRef = useRef<HTMLDivElement>(null) // wraps the opponent fan — the take lands here
+  const seatRefs = useRef<Record<string, HTMLDivElement | null>>({}) // the take lands in a seat
   const timers = useRef<number[]>([])
 
   const clearTimers = () => {
@@ -77,8 +87,6 @@ export default function OpponentTakesCardStory() {
   function backToIdle() {
     setPhase('idle')
     setWanted(null)
-    setOppHand([])
-    setHandIn(false)
     setTake(null)
     setStage('from')
     setFlipped(false)
@@ -87,17 +95,15 @@ export default function OpponentTakesCardStory() {
   function restart() {
     clearTimers()
     setHand(makeHand(INITIAL_HAND))
+    setTaken(0)
     backToIdle()
   }
 
-  // start: the opponent's catalog grid and their fan appear together
+  // start: the opponent broadcasts their catalog of choices
   function start() {
-    setOppHand(sampleBase(OPP_HAND).map((card) => ({ uid: nextHandUid(), card })))
     setWanted(null)
     setTake(null)
     setPhase('choose')
-    setHandIn(false)
-    requestAnimationFrame(() => requestAnimationFrame(() => setHandIn(true)))
   }
 
   // the opponent selects a card — naming a card is irreversible, so the choice is
@@ -131,19 +137,23 @@ export default function OpponentTakesCardStory() {
     const sC = REVEAL_W / r.width
     const dxC = cx - (r.left + r.width / 2)
     const dyC = cy - (r.top + r.height / 2)
-    // land in the opponent's fan (mirrors "into your hand"): aim at its centre and
-    // match its 180° orientation, so the taken card tucks in as their new card
-    const fan = fanRef.current?.getBoundingClientRect()
-    const fx = fan ? fan.left + fan.width / 2 : cx
-    const fy = fan ? fan.top + fan.height / 2 : r.top - r.width
-    const dxU = fx - (r.left + r.width / 2)
-    const dyU = fy - (r.top + r.height / 2)
+    // sink into the taker's SEAT — their hand is hidden there. Aim at a card-sized
+    // box inside the seat, not at the seat itself (its rect is far wider than a
+    // card and the card would inflate to it); the card shrinks into it and fades,
+    // which is the `dealToSeat` movement the other scenes use.
+    const seat = seatRefs.current[TAKER]?.getBoundingClientRect()
+    const box = seat ? cardBoxIn(seat, r.width * SEAT_SHRINK) : null
+    const sU = box ? box.width / r.width : 1
+    const ux = box ? box.left + box.width / 2 : cx
+    const uy = box ? box.top + box.height / 2 : r.top - r.width
+    const dxU = ux - (r.left + r.width / 2)
+    const dyU = uy - (r.top + r.height / 2)
     setHand((h) => h.filter((_, i) => i !== index)) // your hand closes the gap
     setTake({
       card,
       from: { left: r.left, top: r.top, width: r.width },
       center: `translate(${dxC}px, ${dyC}px) scale(${sC}) rotate(0deg)`,
-      up: `translate(${dxU}px, ${dyU}px) scale(1) rotate(180deg)`,
+      up: `translate(${dxU}px, ${dyU}px) scale(${sU}) rotate(0deg)`,
     })
     setStage('from')
     setFlipped(false)
@@ -158,11 +168,11 @@ export default function OpponentTakesCardStory() {
       setFlipped(true)
       later(() => setStage('up'), CENTER_HOLD)
     } else if (stage === 'up') {
-      // the taken card joins the opponent's fan, then (after a beat) the fan leaves
-      if (take) setOppHand((h) => [...h, { uid: nextHandUid(), card: take.card }])
+      // the card is inside the seat now: it is gone from the table and the taker's
+      // counter carries it — that counter IS the hidden hand
+      setTaken((n) => n + 1)
       setTake(null)
-      later(() => setHandIn(false), 640)
-      later(backToIdle, 1200)
+      later(backToIdle, 620)
     }
   }
 
@@ -180,26 +190,29 @@ export default function OpponentTakesCardStory() {
         </button>
       </div>
 
-      {/* opponent fan (the taker) — face-down, rotated 180°, up top */}
-      {phase !== 'idle' && (
-        <div className={styles.topHand} data-in={handIn}>
-          <div className={styles.topHandInner} ref={fanRef}>
-            <Hand
-              items={oppHand}
-              faceDown
-              renderFace={(item, ctx) => (
-                <Card
-                  card={item.card}
-                  faceDown={ctx.faceDown}
-                  interactive={false}
-                  tilt={ctx.tilt}
-                  width={ctx.width}
-                />
-              )}
+      {/* opponents — top-centre, as on the table. Their hands are hidden in the
+          seats: the taker's counter is where the taken card ends up. */}
+      <div className={styles.opponents}>
+        {OPPONENTS.map((o) => (
+          <div
+            key={o.id}
+            ref={(el) => {
+              seatRefs.current[o.id] = el
+            }}
+          >
+            <Seat
+              player={{
+                id: o.id,
+                name: o.name,
+                handCount: o.handCount + (o.id === TAKER ? taken : 0),
+                release: EMPTY_RELEASE,
+              }}
+              active={o.id === TAKER && phase !== 'idle'}
+              copy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
             />
           </div>
-        </div>
-      )}
+        ))}
+      </div>
 
       {phase === 'miss' && (
         <div className={styles.miss}>
@@ -249,7 +262,10 @@ export default function OpponentTakesCardStory() {
               left: take.from.left,
               top: take.from.top,
               width: take.from.width,
-              zIndex: stage === 'up' ? 30 : 55, // tuck behind the opponent fan on the way up
+              zIndex: 55,
+              // it dissolves as it reaches the seat — the hand there is hidden,
+              // so the card stops being a card the moment it arrives
+              opacity: stage === 'up' ? 0 : 1,
               transform:
                 stage === 'from'
                   ? 'translate(0px, 0px) scale(1) rotate(0deg)'
@@ -264,7 +280,15 @@ export default function OpponentTakesCardStory() {
         </div>
       )}
 
-      <div className={styles.handWrap} ref={handRef}>
+      {/* once the choice is confirmed the scene plays itself out — the fan goes
+          inert for the whole sequence, so moving the cursor off the confirm bar
+          doesn't lift a card and raise its zoom preview into the play. Same guard
+          the other scenes use while they resolve (Combo, AI cards, Cherry-pick). */}
+      <div
+        className={styles.handWrap}
+        ref={handRef}
+        style={{ pointerEvents: phase === 'idle' || phase === 'choose' ? undefined : 'none' }}
+      >
         <Hand items={hand} onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))} />
       </div>
 
