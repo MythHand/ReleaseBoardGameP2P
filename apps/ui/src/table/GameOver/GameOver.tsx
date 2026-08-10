@@ -30,7 +30,9 @@ export default function GameOver({
       <div className={styles.card}>
         <span className={styles.crown}>♛</span>
         <div className={styles.label}>{copy.winner}</div>
-        <div className={styles.name}>{winner?.name}</div>
+        <div className={styles.name} data-testid="game-over-winner">
+          {winner?.name}
+        </div>
         <div className={styles.condition}>{copy.conditions[condition]}</div>
         <div className={styles.actions}>
           <Button onClick={onContinue}>{copy.continue}</Button>

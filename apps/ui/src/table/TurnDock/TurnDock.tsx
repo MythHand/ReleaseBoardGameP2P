@@ -55,8 +55,10 @@ export interface TurnDockCopy {
 
 interface TurnDockProps {
   state: TurnDockState
-  // seconds left on the clock — the ticking number reads as the timer
-  seconds: number
+  // seconds left on the clock — the ticking number reads as the timer. Omitted
+  // when the state has no deadline, which leaves a bare ring: a rendered `0`
+  // would read as a timer stuck at zero rather than as no timer at all.
+  seconds?: number
   // 0..1 of the time still left — drives the ring sweep
   progress: number
   // localized strings — sourced from the central catalog by the consumer and

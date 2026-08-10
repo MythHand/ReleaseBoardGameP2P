@@ -112,16 +112,12 @@ export default function Table({
   over = null,
   actions,
   dock,
+  now,
   panel: panelProp,
   onPanelChange,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup } = state
-  // `now` stays a placeholder inside the kit — the deadline interval belongs
-  // to the consumer (never Date.now() or a timer in here). A consumer that
-  // wants a live countdown drives its own clock and overrides via the `dock`
-  // prop; without one, seconds/progress read the span's start.
-  const nowRef = useRef(0)
-  const derived = deriveDock(state, state.selfId, nowRef.current)
+  const derived = deriveDock(state, state.selfId, now)
   const dockView = { ...derived, ...dock }
   const {
     role = 'guest',
@@ -342,7 +338,7 @@ export default function Table({
         />
         {/* you already passed on the open window — TurnDock has no notion of
             "unpass", so the affordance to take it back lives here instead */}
-        {state.window?.passed.includes(state.selfId) && copy.window && (
+        {state.window?.passed.includes(state.selfId) && (
           <Button variant="tech" className={styles.unpass} onClick={() => actions?.onUnpass?.()}>
             {copy.window.unpass}
           </Button>
@@ -351,7 +347,7 @@ export default function Table({
 
       {/* the engine is waiting on a decision from you — a pending owed to you
           always renders, regardless of whose turn the projection says it is */}
-      {state.pending?.player === state.selfId && copy.pending && (
+      {state.pending?.player === state.selfId && (
         <PendingPrompt
           pending={state.pending}
           hand={you.hand}

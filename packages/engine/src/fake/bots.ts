@@ -73,6 +73,16 @@ export function botAction(
           at,
         }
       }
+      case 'pickFromDiscard': {
+        const card = pending.options[0]?.uid ?? ''
+        const toDeck = pending.picks === 2 ? pending.options[1]?.uid : undefined
+        return {
+          type: 'RESOLVE',
+          player: me,
+          choice: { kind: 'pickFromDiscard', card, ...(toDeck ? { toDeck } : {}) },
+          at,
+        }
+      }
       default:
         return null
     }

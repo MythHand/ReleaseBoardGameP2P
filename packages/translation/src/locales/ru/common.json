@@ -222,6 +222,24 @@
     "locked": "PUSH после добора",
     "canDefend": "можно отбить"
   },
+  "pending": {
+    "confirm": "подтвердить",
+    "decline": "пропустить",
+    "discardForRelease": { "prompt": "сбросьте карту, чтобы выложить релиз", "action": "сбросить" },
+    "defend": { "prompt": "вас атакуют", "action": "защититься" },
+    "neutralize503": {
+      "prompt": "error 503 — нейтрализуйте или выбываете",
+      "action": "нейтрализовать"
+    },
+    "crush": { "prompt": "ваш релиз уничтожают", "action": "нейтрализовать" },
+    "requestCard": { "prompt": "назовите нужную карту", "action": "запросить" },
+    "giveCard": { "prompt": "отдайте карту", "action": "отдать" },
+    "handLimit": { "prompt": "на руке слишком много карт", "action": "сбросить" },
+    "pickFromDiscard": { "prompt": "возьмите карту из сброса", "action": "взять" }
+  },
+  "window": {
+    "unpass": "отменить пас"
+  },
   "seat": {
     "eliminated": "выбыл",
     "disconnected": "нет связи",
@@ -646,6 +664,7 @@
     "released": "релиз",
     "requested": "требование",
     "revealed": "раскрыто",
+    "takenFromDiscard": "взял из сброса",
     "tookHit": "принял удар",
     "turnEnded": "ход завершён",
     "turnStarted": "ход",

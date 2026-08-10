@@ -131,8 +131,8 @@ export interface TableCopyBundle {
   lobbyCode: LobbyCodeCopy
   turnDock: TurnDockCopy
   pause?: PauseGameCopy
-  pending?: PendingPromptCopy
-  window?: WindowCopy
+  pending: PendingPromptCopy
+  window: WindowCopy
 }
 
 export interface TableSlots {
@@ -157,6 +157,12 @@ export interface TableProps {
   // override for the dock derived from `state` — the playground's manual
   // selector uses this to force a specific demo state
   dock?: Partial<DockView>
+  // The consumer's clock. The kit never reads the system clock itself, so a
+  // live countdown is the consumer ticking this. Required: optional here would
+  // let a consumer compile while every deadline silently sweeps against a
+  // default, which is the shape that hid the missing `pending` and `window`
+  // copy — a page that built cleanly and showed a dead ring.
+  now: number
   // Controlled/uncontrolled: omit both and Table owns the open panel. Supply
   // `panel` and Table renders exactly what it is told, reporting intent through
   // `onPanelChange` — which is how the page binds the drawer to the URL.

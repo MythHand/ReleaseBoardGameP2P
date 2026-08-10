@@ -342,6 +342,18 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
       return { kind: 'neutralize503', player: p.player, methods: [...p.methods] }
     case 'crush':
       return { kind: 'crush', player: p.player, slot: p.slot, methods: [...p.methods] }
+    case 'pickFromDiscard':
+      // Only discardTop/discardCount are ever projected of the discard pile
+      // (project.ts) — its full contents are not public. Gated behind `mine`
+      // like every other variant here: an effect brings its own viewing
+      // surface for the player using it, not a reveal to the table.
+      return {
+        kind: 'pickFromDiscard',
+        player: p.player,
+        options: mine ? [...p.options] : [],
+        picks: p.picks,
+        source: p.source,
+      }
     default:
       return null
   }

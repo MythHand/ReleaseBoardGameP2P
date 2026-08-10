@@ -79,6 +79,20 @@ export type Pending =
   | { kind: 'requestCard'; player: PlayerId; target: PlayerId }
   | { kind: 'giveCard'; player: PlayerId; requested: CardId; attacker: PlayerId }
   | { kind: 'handLimit'; player: PlayerId; excess: number }
+  // The options travel on the pending rather than opening the discard globally:
+  // only discardTop/discardCount are ever public (project.ts) — the pile's
+  // full contents are not — so an effect that reaches into it brings its own
+  // private viewing surface for the player using it, gated behind `mine` in
+  // pendingView (attacks.ts) like every other owner-only pending. `picks` is
+  // min(sudo ? 2 : 1, options.length), which folds "the discard is empty or
+  // short" into one expression instead of a guard at every step.
+  | {
+      kind: 'pickFromDiscard'
+      player: PlayerId
+      options: CardInstance[]
+      picks: 1 | 2
+      source: CardId
+    }
 
 export interface GameState {
   gameId: string

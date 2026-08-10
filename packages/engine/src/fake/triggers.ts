@@ -5,6 +5,7 @@ import type { DiscardReason } from '../events'
 import { randomAt } from '../rng'
 import type { CardInstance, GameState, NeutralizeMethod, PlayerId, ReleaseSlot } from '../state'
 import { createLog, endTurn, type Log, reject, setHand } from './core'
+import { discardOptions } from './discard'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
@@ -303,6 +304,20 @@ export function resolveAiEvent(
       const methods = neutralizeOptions(state, player)
       if (methods.length === 0) return eliminate(state, log, player)
       return { ...state, pending: { kind: 'neutralize503', player, methods }, eventSeq: log.seq }
+    }
+
+    case 'ai-inside': {
+      // Unlike a played card, the event card itself is never spent to the
+      // discard here — fireTrigger's caller returns it to the events deck once
+      // this resolves, so it takes no part in openPickFromDiscard's spend list.
+      // Only a Release may be taken back; an empty discard resolves to nothing.
+      const options = discardOptions(state, true)
+      if (options.length === 0) return { ...state, eventSeq: log.seq }
+      return {
+        ...state,
+        pending: { kind: 'pickFromDiscard', player, options, picks: 1, source: event.id },
+        eventSeq: log.seq,
+      }
     }
 
     default:

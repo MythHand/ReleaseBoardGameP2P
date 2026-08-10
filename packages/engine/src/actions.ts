@@ -18,6 +18,8 @@ export type Choice =
   | { kind: 'giveCard'; card: CardUid }
   // An array: Memory Problem can leave a hand several cards over the limit.
   | { kind: 'handLimit'; cards: CardUid[] }
+  // `toDeck` is the sudo second pick, placed on top of pile 0 unseen.
+  | { kind: 'pickFromDiscard'; card: CardUid; toDeck?: CardUid }
 
 export type Action =
   | { type: 'DRAW'; player: PlayerId; pile?: number; at: number }

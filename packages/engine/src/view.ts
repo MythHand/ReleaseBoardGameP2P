@@ -54,6 +54,16 @@ export type PendingView =
   | { kind: 'requestCard'; player: PlayerId; target: PlayerId }
   | { kind: 'giveCard'; player: PlayerId; requested: CardId }
   | { kind: 'handLimit'; player: PlayerId; excess: number; options: CardUid[] }
+  // Full card identity, but gated behind `mine` in pendingView (attacks.ts)
+  // like the other owner-only variants: only discardTop/discardCount are
+  // ever public (project.ts), so the discard's full contents are not.
+  | {
+      kind: 'pickFromDiscard'
+      player: PlayerId
+      options: CardInstance[]
+      picks: 1 | 2
+      source: CardId
+    }
 
 export interface OpponentView {
   id: PlayerId

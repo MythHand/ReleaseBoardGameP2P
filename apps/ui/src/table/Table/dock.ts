@@ -4,7 +4,10 @@ import type { TableState } from './types'
 export interface DockView {
   state: TurnDockState
   danger: boolean
-  seconds: number
+  // Absent when the state carries no deadline. A number here always means time
+  // genuinely left, so `0` reads as expired rather than as "no clock" — the two
+  // are different things and a single number cannot say both.
+  seconds?: number
   progress: number
   activePlayer?: string
 }
@@ -17,12 +20,23 @@ function clock(
   openedAt: number | undefined,
   deadline: number | undefined,
   now: number,
-): { seconds: number; progress: number } {
-  if (openedAt === undefined || deadline === undefined) return { seconds: 0, progress: 0 }
+): { seconds?: number; progress: number } {
+  if (openedAt === undefined || deadline === undefined) return { progress: 0 }
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000))
   const span = deadline - openedAt
   const progress = span > 0 ? Math.min(1, Math.max(0, (deadline - now) / span)) : 0
   return { seconds, progress }
+}
+
+// Whether any deadline is running for this viewer — the states where
+// `deriveDock` draws a counting ring, and so the only states where a
+// consumer's clock has to tick. Exported because a consumer that ticks on a
+// different rule than the one the ring is drawn from will freeze the
+// countdown for whatever state the two disagree about; there is one rule and
+// this is it.
+export function isCounting(state: TableState, selfId: string): boolean {
+  if (state.pending?.player === selfId) return 'deadline' in state.pending
+  return Boolean(state.window && state.window.canAttackWith.length > 0)
 }
 
 // `now` is supplied by the caller — the kit never reads the clock itself.
@@ -52,7 +66,6 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
   return {
     state: yours ? (state.hasDrawn ? 'push' : 'draw') : 'waiting',
     danger: false,
-    seconds: 0,
     progress: 0,
     activePlayer,
   }
