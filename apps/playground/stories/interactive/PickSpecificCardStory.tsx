@@ -298,7 +298,15 @@ export default function PickSpecificCardStory() {
 
       {overlay}
 
-      <div className={styles.handWrap} ref={handRef}>
+      {/* once the choice is confirmed the scene plays itself out — the fan goes
+          inert for the whole sequence, so moving the cursor off the confirm bar
+          doesn't lift a card and raise its zoom preview into the play. Same guard
+          the other scenes use while they resolve (Combo, AI cards, Cherry-pick). */}
+      <div
+        className={styles.handWrap}
+        ref={handRef}
+        style={{ pointerEvents: phase === 'idle' || phase === 'choose' ? undefined : 'none' }}
+      >
         <Hand
           items={hand}
           gapAt={gapAt}

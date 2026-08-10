@@ -169,6 +169,57 @@ export const PRESETS: Record<string, Preset> = {
       { duration: 200, easing: EASE, fill: 'forwards' },
     ),
 
+  // ===== Появление интерфейса =====
+  // Блок HUD приходит на своё место: короткий сдвиг по заданной оси + проявление.
+  // dx/dy — ОТКУДА он приходит (0/0 — чистое проявление, как у фоновой сетки).
+  // Сдвиг вешается на transform, поэтому анимировать нужно ВНУТРЕННИЙ узел блока:
+  // на самом блоке transform часто держит позиционирование (translate(-50%)).
+  hudIn: (el: Element, p?: Record<string, unknown>): Animation => {
+    const {
+      dx = 0,
+      dy = 0,
+      dur = 340,
+      delay = 0,
+    } = (p ?? {}) as { dx?: number; dy?: number; dur?: number; delay?: number }
+    return el.animate(
+      [
+        { opacity: 0, transform: `translate(${dx}px, ${dy}px)` },
+        { opacity: 1, transform: 'translate(0, 0)' },
+      ],
+      // fill both: пока идёт delay, блок держится невидимым — иначе он мигнёт
+      // на своём месте до старта своей очереди
+      { duration: dur, delay, easing: EASE, fill: 'both' },
+    )
+  },
+
+  // ===== Праздник =====
+  // Одна частица хлопушки: выстрел в заданном направлении, дуга через верх и
+  // падение с вращением, в конце — растворение. Разброс, количество и символы —
+  // на сцене; пресет знает только полёт ОДНОЙ частицы.
+  // dx/dy — конечное смещение, peak — высота дуги, spin — оборот в градусах.
+  confettiFly: (el: Element, p?: Record<string, unknown>): Animation => {
+    const {
+      dx = 0,
+      dy = 400,
+      peak = 220,
+      spin = 540,
+      dur = 2200,
+    } = (p ?? {}) as { dx?: number; dy?: number; peak?: number; spin?: number; dur?: number }
+    return el.animate(
+      [
+        { transform: 'translate(0, 0) rotate(0deg)', opacity: 1, offset: 0, easing: 'ease-out' },
+        {
+          transform: `translate(${dx * 0.55}px, ${-peak}px) rotate(${spin * 0.5}deg)`,
+          opacity: 1,
+          offset: 0.42,
+          easing: 'ease-in',
+        },
+        { transform: `translate(${dx}px, ${dy}px) rotate(${spin}deg)`, opacity: 0, offset: 1 },
+      ],
+      { duration: dur, fill: 'forwards' },
+    )
+  },
+
   // ===== Фидбек ввода =====
   // Тряска влево-вправо — «поле не заполнено». Разовый триггер по событию
   // (как flipCard), с затухающей амплитудой и возвратом в исходную точку.

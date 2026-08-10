@@ -105,7 +105,9 @@
 .playArea {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+
+  /* the same 4px the Table screen keeps between the zone and the fan */
+  gap: 4px;
   align-items: center;
   transition: opacity 420ms var(--ease-out);
 }
