@@ -77,17 +77,27 @@ export default function TableStory() {
   const [kicked, setKicked] = useState<Set<string>>(() => new Set())
   const [paused, setPaused] = useState(false)
   const [ready, setReady] = useState<Set<string>>(() => new Set())
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 250)
-    return () => clearInterval(id)
-  }, [])
   // Anchor for the reaction demo states' sweep, reset each time either is
-  // (re-)selected so switching back into it restarts the countdown.
+  // (re-)selected so switching back into it restarts the countdown. Keyed on
+  // `dock` rather than on the boolean: `reaction` → `reaction503` leaves a
+  // boolean unchanged, and the second demo would inherit the first's anchor and
+  // open part-swept.
   const [demoOpenedAt, setDemoOpenedAt] = useState<number | null>(null)
   const isReactionDemo = dock === 'reaction' || dock === 'reaction503'
   useEffect(() => {
-    if (isReactionDemo) setDemoOpenedAt(Date.now())
+    if (dock === 'reaction' || dock === 'reaction503') setDemoOpenedAt(Date.now())
+  }, [dock])
+
+  // Only the reaction demos sweep a ring, so only they need a clock — ticking
+  // four times a second through an entire session to animate something not on
+  // screen is the cost `useNow` exists to avoid, and a sandbox is no reason for
+  // the code to contradict that.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!isReactionDemo) return
+    setNow(Date.now())
+    const id = setInterval(() => setNow(Date.now()), 250)
+    return () => clearInterval(id)
   }, [isReactionDemo])
 
   const base = useMemo(() => makeTable(opps), [opps])

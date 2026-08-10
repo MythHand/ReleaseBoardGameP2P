@@ -1,7 +1,7 @@
 import type { Event } from '@release/engine'
 import { toTableOver, toTableState } from '@release/table-adapter'
 import { useTranslation } from '@release/translation'
-import { DEFAULT_SETUP, Table } from '@release/ui'
+import { DEFAULT_SETUP, isCounting, Table } from '@release/ui'
 import { Outlet, useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { seatsFor } from '~/entities/game/seats'
@@ -34,18 +34,6 @@ export default function BoardPage() {
   const game = useGame()
   const navigate = useNavigate()
   const { gameId } = useParams()
-  // A ring only actually appears on screen for a window with something legal
-  // to throw at it (deriveDock ignores an empty-canAttackWith window), or for
-  // a pending owed to the viewer that carries a deadline — mirrors the guards
-  // in apps/ui/src/table/Table/dock.ts so the clock does not tick for states
-  // that never render it.
-  const selfId = game.view?.self.id
-  const counting =
-    Boolean(game.view?.window && game.view.window.canAttackWith.length > 0) ||
-    Boolean(
-      game.view?.pending && game.view.pending.player === selfId && 'deadline' in game.view.pending,
-    )
-  const now = useNow(counting)
 
   // The roster is a room fact, not a game fact — the engine's projection has no
   // concept of a spectator — so it comes from the session, split by role exactly
@@ -81,6 +69,12 @@ export default function BoardPage() {
   // member of the engine's Event union for the adapter to map onto.
   const labels = t('historyLabels', { returnObjects: true }) as Record<Event['type'], string>
   const state = game.view ? toTableState(game.view, game.events, labels) : EMPTY_TABLE
+
+  // The clock runs only while the dock actually draws a counting ring, so it is
+  // asked from the same predicate the ring is derived from. Restating that rule
+  // here would let the two drift, and the countdown would freeze for whichever
+  // state they stopped agreeing about.
+  const now = useNow(isCounting(state, state.selfId))
 
   return (
     <div className={styles.page} data-testid="board-page">
