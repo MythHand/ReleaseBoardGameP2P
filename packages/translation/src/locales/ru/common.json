@@ -647,6 +647,7 @@
     "aiRevealed": "событие AI",
     "attacked": "атака",
     "dealt": "раздача",
+    "deckReshuffled": "колода перемешана",
     "defended": "защита",
     "discarded": "сброс",
     "drawn": "добор",

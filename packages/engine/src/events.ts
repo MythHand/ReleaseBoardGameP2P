@@ -40,6 +40,10 @@ export type Event = EventBase &
     | { type: 'gameOver'; winner: PlayerId; condition: 'release' | 'lastStanding' }
     | { type: 'rejected'; action: Action; reason: string }
     | { type: 'takenFromDiscard'; player: PlayerId; card: CardId; to: 'hand' | 'deck' }
+    // Belongs to no player: the table recycles its own discard, and the count
+    // is the only detail worth showing — the cards themselves were public on
+    // the way in and are secret again on the way out.
+    | { type: 'deckReshuffled'; cards: number }
   )
 
 export type DiscardReason =

@@ -387,12 +387,13 @@ it('restores a reconnecting peer to exactly its projection', () => {
 
 it('never lets one seat stall the whole game', () => {
   // 'a' holds the turn at the deal and never speaks again.
-  // Seed changed from 55: the reshuffle from adding Cherry-pick to FAKE_DECK
-  // pushed this trajectory into deck exhaustion, which stalls forever because
-  // the discard is never recycled (#79). The property is about seat stalling,
-  // not deck exhaustion, so it runs on a seed that isolates its own subject —
-  // confirmed driveAbsent genuinely fires (the absent-seat path is actually
-  // exercised) and the game reaches `over` on its own, clean of #79 and #80.
+  // Seed changed from 55, which under an older FAKE_DECK reached deck
+  // exhaustion (#79). That no longer stalls anything, but the seed is not worth
+  // restoring: with the refill disabled this property still passes on 55, so
+  // its current trajectory never reaches exhaustion and it would witness
+  // nothing. The refill's own guard is packages/engine/src/fake/reshuffle.test.ts.
+  // Seed 4 is kept for the reasons that outlived #79 — driveAbsent genuinely
+  // fires, the game reaches `over` on its own, and it steers clear of #80.
   const abandoned = disconnect(start(4), 'peer-a', 1_000).session
   const { session, exhausted } = playOut(abandoned)
 

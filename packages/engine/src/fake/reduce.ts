@@ -1,6 +1,7 @@
 import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
+import { shuffle } from '../rng'
 import type { CardUid, GameState, PlayerId } from '../state'
 import { onAttack, onDefend } from './attacks'
 import {
@@ -9,6 +10,7 @@ import {
   endTurn,
   handLimitFor,
   isWellFormedAction,
+  type Log,
   nextSeat,
   reject,
   setHand,
@@ -31,6 +33,34 @@ export function legalTargets(state: GameState, actor: PlayerId, card: CardUid): 
   return attackTargets(state, actor, held.id)
 }
 
+// Rules decisions answer 7, first case: with no draw cards left anywhere, the
+// discard is taken, shuffled, and becomes a single new draw pile. Without it the
+// deck is finite and the draw is mandatory, so an ordinary game does not end —
+// it stops, with `onPush` refusing the turn and every pile empty.
+//
+// Deterministic like every other shuffle here: keyed on (seed, cursor) and the
+// advanced cursor written back, so each peer recomputes the same pile from the
+// same serialized state rather than agreeing over the wire.
+//
+// Answer 7's second case — one pile of several running out, which removes that
+// pile rather than recycling anything — is not here. It cannot be reached while
+// `main` only ever holds one pile, and the split that creates the others is
+// slice A of #61.
+function refillFromDiscard(state: GameState, log: Log): GameState {
+  if (state.decks.main.some((pile) => pile.length > 0)) return state
+  // Nothing to recycle: every card is in a hand or a release zone. The draw
+  // stays rejected, which is honest, rather than being handed an empty pile.
+  if (state.decks.discard.length === 0) return state
+
+  const { items, cursor } = shuffle(state.decks.discard, state.seed, state.rngCursor)
+  log.add({ type: 'deckReshuffled', cards: items.length })
+  return {
+    ...state,
+    decks: { ...state.decks, main: [items], discard: [] },
+    rngCursor: cursor,
+  }
+}
+
 function onDraw(state: GameState, action: Action & { type: 'DRAW' }): Reduction {
   if (state.over) return reject(state, action, 'game is over')
   if (state.pending) return reject(state, action, 'a decision is pending')
@@ -38,21 +68,27 @@ function onDraw(state: GameState, action: Action & { type: 'DRAW' }): Reduction 
   if (state.turn.player !== action.player) return reject(state, action, 'not your turn')
   if (state.turn.hasDrawn) return reject(state, action, 'already drew this turn')
 
+  const log = createLog(state.eventSeq)
+  // Before the emptiness check, so an exhausted table refills and the draw
+  // proceeds in the same action rather than costing the player a turn.
+  const filled = refillFromDiscard(state, log)
+
   const pileIndex = action.pile ?? 0
-  const pile = state.decks.main[pileIndex]
+  const pile = filled.decks.main[pileIndex]
+  // `state`, not `filled`: a rejected draw changes nothing, so a refill that
+  // could not satisfy it is discarded along with its event.
   if (!pile || pile.length === 0) return reject(state, action, 'that pile is empty')
 
   const card = pile[0]
-  const main = state.decks.main.map((p, i) => (i === pileIndex ? p.slice(1) : p))
-  const log = createLog(state.eventSeq)
+  const main = filled.decks.main.map((p, i) => (i === pileIndex ? p.slice(1) : p))
 
   // A trigger cannot stay private: it is revealed the moment it is drawn, and it
   // never reaches the drawer's hand.
   if (rulesFor(card.id)?.kind === 'trigger') {
     const base: GameState = {
-      ...state,
-      decks: { ...state.decks, main },
-      turn: { ...state.turn, hasDrawn: true },
+      ...filled,
+      decks: { ...filled.decks, main },
+      turn: { ...filled.turn, hasDrawn: true },
     }
     log.add({
       type: 'drawn',
@@ -73,12 +109,12 @@ function onDraw(state: GameState, action: Action & { type: 'DRAW' }): Reduction 
     visibleTo: [action.player],
   })
 
-  const withCard = setHand(state, action.player, [...state.players[action.player].hand, card])
+  const withCard = setHand(filled, action.player, [...filled.players[action.player].hand, card])
   return {
     state: {
       ...withCard,
       decks: { ...withCard.decks, main },
-      turn: { ...state.turn, hasDrawn: true },
+      turn: { ...filled.turn, hasDrawn: true },
       eventSeq: log.seq,
     },
     events: log.events,
