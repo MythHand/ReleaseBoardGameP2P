@@ -98,6 +98,7 @@ export { default as ReleaseZone } from './table/ReleaseZone'
 export { default as Seat } from './table/Seat'
 export type { SeatCopy } from './table/Seat/Seat'
 export { default as Table } from './table/Table'
+export { isCounting } from './table/Table/dock'
 export type {
   TableActions,
   TableChoice,

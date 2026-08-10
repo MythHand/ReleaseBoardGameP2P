@@ -45,6 +45,9 @@ export function makeTableProps(over: Partial<TableProps> = {}): TableProps {
       pending: enCommon.pending,
       window: enCommon.window,
     },
+    // A frozen clock, so a test that does not care about the countdown gets a
+    // stable one and a test that does overrides it with both bounds it needs.
+    now: 0,
     ...over,
   } as TableProps
 }

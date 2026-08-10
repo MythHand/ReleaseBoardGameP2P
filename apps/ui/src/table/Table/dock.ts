@@ -28,6 +28,17 @@ function clock(
   return { seconds, progress }
 }
 
+// Whether any deadline is running for this viewer — the states where
+// `deriveDock` draws a counting ring, and so the only states where a
+// consumer's clock has to tick. Exported because a consumer that ticks on a
+// different rule than the one the ring is drawn from will freeze the
+// countdown for whatever state the two disagree about; there is one rule and
+// this is it.
+export function isCounting(state: TableState, selfId: string): boolean {
+  if (state.pending?.player === selfId) return 'deadline' in state.pending
+  return Boolean(state.window && state.window.canAttackWith.length > 0)
+}
+
 // `now` is supplied by the caller — the kit never reads the clock itself.
 export function deriveDock(state: TableState, selfId: string, now: number): DockView {
   const yours = state.turn === selfId

@@ -112,7 +112,7 @@ export default function Table({
   over = null,
   actions,
   dock,
-  now = 0,
+  now,
   panel: panelProp,
   onPanelChange,
 }: TableProps) {
