@@ -79,6 +79,12 @@
   border-color: var(--brand-green);
 }
 
+/* «всего: N» рядом с селектом оппонентов — как в TableStory */
+.total {
+  margin-inline-start: -12px;
+  color: var(--white-45);
+}
+
 /* соперники — один ряд сверху по центру, столовый отступ */
 .opponents {
   position: absolute;

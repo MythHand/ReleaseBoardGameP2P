@@ -16,6 +16,7 @@ import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
+import HoverSelect from '../controls/HoverSelect'
 import styles from './GameDealStory.module.css'
 import { useFlyer } from './useFlyer'
 import { useHandArrival } from './useHandArrival'
@@ -59,10 +60,14 @@ const DEAL_POOL = CARDS.filter(
 
 const EMPTY_RELEASE: ReleaseSlots = { frontend: undefined, backend: undefined, database: undefined }
 
-const OPPONENTS = [
+// the same roster the shared table mock uses; the dev line picks how many of
+// them sit down, so the choreography can be watched at any table size
+const OPPONENT_POOL = [
   { id: 'p2', name: 'kernel_panic' },
   { id: 'p3', name: 'segfault' },
   { id: 'p4', name: 'null_ptr' },
+  { id: 'p5', name: 'race_cond' },
+  { id: 'p6', name: 'off_by_one' },
 ]
 
 // The beats of the arrival. This is a screen being entered, not interface
@@ -125,6 +130,8 @@ export default function GameDealStory() {
   const started = useRef(false) // StrictMode mounts twice — the intro plays once
 
   const [run, setRun] = useState(0)
+  const [oppCount, setOppCount] = useState(3)
+  const opponents = OPPONENT_POOL.slice(0, oppCount)
   const [deck, setDeck] = useState(DECK_MAIN)
   const [oppCards, setOppCards] = useState<Record<string, number>>({})
   const [staged, setStaged] = useState<Staged[]>([]) // the heap at the centre
@@ -244,7 +251,7 @@ export default function GameDealStory() {
         await wait(DEAL_STEP)
         if (halt()) return
 
-        for (const o of OPPONENTS) {
+        for (const o of opponents) {
           const card = open
             ? cardById(DEBUGGER)
             : DEAL_POOL[Math.floor(Math.random() * DEAL_POOL.length)]
@@ -323,6 +330,20 @@ export default function GameDealStory() {
             {pick(lang, { ru: 'рестарт', en: 'restart' })}
           </Typography>
         </button>
+        {/* how many sit at the table. Changing it replays the whole thing — the
+            deal is built round by round around who is seated. */}
+        <HoverSelect
+          label={pick(lang, { ru: 'оппонентов', en: 'opponents' })}
+          value={String(oppCount)}
+          options={OPPONENT_POOL.map((_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+          onChange={(v) => {
+            setOppCount(Number(v))
+            restart()
+          }}
+        />
+        <span className={styles.total}>
+          {pick(lang, { ru: 'всего', en: 'total' })}: {oppCount + 1}
+        </span>
       </div>
 
       <div className={styles.stage}>
@@ -335,7 +356,7 @@ export default function GameDealStory() {
         {/* opponents — one row on top, as on the table. Their hands are hidden in
             the seats: the counter IS the hand a dealt card sinks into. */}
         <div className={styles.opponents} ref={seats}>
-          {OPPONENTS.map((o) => (
+          {opponents.map((o) => (
             <div
               key={o.id}
               className={styles.enter}
