@@ -266,12 +266,7 @@ export default function TableStory() {
             gameOver: pick(lang, { ru: ruCommon.gameOver, en: enCommon.gameOver }),
             lobbyCode: pick(lang, { ru: ruCommon.lobbyCode, en: enCommon.lobbyCode }),
             turnDock: pick(lang, { ru: ruCommon.turnDock, en: enCommon.turnDock }),
-            pending: {
-              ...pick(lang, { ru: ruCommon.pending, en: enCommon.pending }),
-              // Placeholder only — packages/translation's catalogs gain the real
-              // copy in the task that builds Cherry-pick's own prompt UI.
-              pickFromDiscard: { prompt: 'pick a card from the discard', action: 'pick' },
-            },
+            pending: pick(lang, { ru: ruCommon.pending, en: enCommon.pending }),
             window: pick(lang, { ru: ruCommon.window, en: enCommon.window }),
             pause: pauseCopy,
           }}

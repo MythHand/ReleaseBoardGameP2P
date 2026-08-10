@@ -150,6 +150,40 @@ it('renders the pending prompt from the real catalog when a decision is owed', a
   expect(heading).toBeTruthy()
 })
 
+it('renders the discard picker from the real catalog', async () => {
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 7,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const projected = engine.project(state, 'p1')
+  const view = {
+    ...projected,
+    pending: {
+      kind: 'pickFromDiscard' as const,
+      player: 'p1',
+      options: [{ uid: 'attack-bug#d0', id: 'attack-bug' }],
+      picks: 1 as const,
+      source: 'operation-git-cherry-pick',
+    },
+  }
+  sessionValue = { ...session(), gameSync: { view, events: [] } } as unknown as UseLobby
+
+  renderBoard()
+
+  const heading = await screen.findByText(
+    /^(take a card from the discard|возьмите карту из сброса)$/i,
+  )
+  expect(heading).toBeTruthy()
+})
+
 it('shows the winner overlay when the projection says the game is over', async () => {
   const engine = createFakeEngine()
   const state = engine.createGame({

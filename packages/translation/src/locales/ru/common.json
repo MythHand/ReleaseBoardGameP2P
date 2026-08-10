@@ -234,7 +234,8 @@
     "crush": { "prompt": "ваш релиз уничтожают", "action": "нейтрализовать" },
     "requestCard": { "prompt": "назовите нужную карту", "action": "запросить" },
     "giveCard": { "prompt": "отдайте карту", "action": "отдать" },
-    "handLimit": { "prompt": "на руке слишком много карт", "action": "сбросить" }
+    "handLimit": { "prompt": "на руке слишком много карт", "action": "сбросить" },
+    "pickFromDiscard": { "prompt": "возьмите карту из сброса", "action": "взять" }
   },
   "window": {
     "unpass": "отменить пас"
@@ -663,6 +664,7 @@
     "released": "релиз",
     "requested": "требование",
     "revealed": "раскрыто",
+    "takenFromDiscard": "взял из сброса",
     "tookHit": "принял удар",
     "turnEnded": "ход завершён",
     "turnStarted": "ход",
