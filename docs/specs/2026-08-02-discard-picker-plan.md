@@ -172,7 +172,13 @@ describe('Git Cherry-pick', () => {
     })
     expect(next.players.p1.hand.map((c) => c.id)).toContain('attack-bug')
     expect(next.decks.main[0][0].uid).toBe('release-frontend#d1')
-    expect(next.decks.discard).toHaveLength(0)
+    // Both offered cards left the pile, and the spent Cherry-pick and Sudo
+    // joined it. Cards never leave the game: answer 7 refills an exhausted
+    // deck by shuffling the discard, so a card that vanished would shrink the
+    // game's card pool permanently.
+    expect(next.decks.discard.map((c) => c.id).sort()).toEqual(
+      [CHERRY, 'support-sudo'].sort(),
+    )
   })
 
   it('owes only one pick with sudo when the discard holds a single card', () => {
