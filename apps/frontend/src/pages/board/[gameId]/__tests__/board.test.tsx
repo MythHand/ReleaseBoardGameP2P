@@ -188,6 +188,44 @@ it('shows the winner overlay when the projection says the game is over', async (
   expect(winnerName.textContent).toBe('Bo')
 })
 
+it('complains loudly instead of handing the kit a playerId it cannot resolve', async () => {
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 7,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const projected = engine.project(state, 'p1')
+  const view = { ...projected, over: { winner: 'p2', condition: 'release' as const } }
+  // The winner has no seat: `over` rides the projection and the roster rides the
+  // session, so a projection can land before the roster syncs, and a winning peer
+  // can be pruned from `peers` on disconnect — the end of a game being exactly
+  // when a peer is most likely to have dropped. Only p1 is seated here.
+  sessionValue = {
+    ...session({ 'peer-ann': { id: 'peer-ann', name: 'Ann', role: 'host', ready: true } }),
+    gameSync: { view, events: [] },
+  } as unknown as UseLobby
+  const complained = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+  renderBoard()
+  await screen.findByText(/^(winner|победитель)$/i)
+
+  // Falling back to the raw playerId hands `room.participants` a value from the
+  // other id space — the crown, the label and the condition all render, and only
+  // the name is blank. That is the defect this page exists to fix, so the miss
+  // has to be audible rather than papered over with a value known to resolve to
+  // nothing.
+  const said = complained.mock.calls.map((c) => c.join(' ')).join('\n')
+  expect(said).toContain('p2')
+  complained.mockRestore()
+})
+
 it('sends the game-over continue action to this game’s own stats route', async () => {
   const engine = createFakeEngine()
   const state = engine.createGame({
