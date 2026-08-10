@@ -25,7 +25,7 @@ import { useHandArrival } from './useHandArrival'
 //
 // Step 1 — the interface arrives:
 //   1.1 the right-hand page rail
-//   1.2 the background — the grid and the HUD layer
+//   1.2 the background — the HUD layer, whose own faint grid is the table's
 //   2.  the piles: the two decks at the left edge, the discard at the right
 //   3.  the opponents' seats on top, the turn dock at the bottom
 //
@@ -155,7 +155,7 @@ export default function GameDealStory() {
       await wait(RAIL_MS + BEAT)
       if (halt()) return
 
-      // 1.2 — the table itself: the grid and the HUD layer, a plain fade
+      // 1.2 — the table itself: the HUD layer with its grid, a plain fade
       play('hudIn', bg.current, { dur: BG_MS })
       await wait(BG_MS + BEAT)
       if (halt()) return
@@ -326,10 +326,9 @@ export default function GameDealStory() {
       </div>
 
       <div className={styles.stage}>
-        {/* the table's own background: the grid and the HUD layer over it. Both
-            arrive together in beat 1.2, so they sit in one element. */}
+        {/* the table's background — the HUD layer, whose own faint grid IS the
+            grid of this table. It arrives whole in beat 1.2. */}
         <div className={styles.bg} ref={bg}>
-          <div className={styles.grid} aria-hidden="true" />
           <HudBackground tone="neutral" className={styles.hud} />
         </div>
 
