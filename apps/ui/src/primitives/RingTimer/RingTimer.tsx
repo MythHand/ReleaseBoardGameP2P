@@ -47,7 +47,7 @@ export default function RingTimer({
         />
       </svg>
       {value != null && (
-        <Typography as="span" base="numeric-lg" className={styles.value}>
+        <Typography as="span" base="numeric-lg" className={styles.value} data-testid="ring-value">
           {value}
         </Typography>
       )}

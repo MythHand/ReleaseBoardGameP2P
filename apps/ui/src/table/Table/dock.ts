@@ -4,7 +4,10 @@ import type { TableState } from './types'
 export interface DockView {
   state: TurnDockState
   danger: boolean
-  seconds: number
+  // Absent when the state carries no deadline. A number here always means time
+  // genuinely left, so `0` reads as expired rather than as "no clock" — the two
+  // are different things and a single number cannot say both.
+  seconds?: number
   progress: number
   activePlayer?: string
 }
@@ -17,8 +20,8 @@ function clock(
   openedAt: number | undefined,
   deadline: number | undefined,
   now: number,
-): { seconds: number; progress: number } {
-  if (openedAt === undefined || deadline === undefined) return { seconds: 0, progress: 0 }
+): { seconds?: number; progress: number } {
+  if (openedAt === undefined || deadline === undefined) return { progress: 0 }
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000))
   const span = deadline - openedAt
   const progress = span > 0 ? Math.min(1, Math.max(0, (deadline - now) / span)) : 0
@@ -52,7 +55,6 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
   return {
     state: yours ? (state.hasDrawn ? 'push' : 'draw') : 'waiting',
     danger: false,
-    seconds: 0,
     progress: 0,
     activePlayer,
   }

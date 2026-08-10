@@ -1,4 +1,4 @@
-import { act, fireEvent, render, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { vi } from 'vitest'
 import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
 import Table from './Table'
@@ -286,7 +286,37 @@ it('sweeps the countdown from the now it is given', () => {
     },
     now: 6_000,
   })
-  const { container } = render(<Table {...props} />)
-  // 16000 - 6000 = 10s left. Frozen at now=0 the dock reads 16.
-  expect(container.textContent).toContain('10')
+  render(<Table {...props} />)
+  // 16000 - 6000 = 10s left. Frozen at now=0 the dock reads 16. Asserted on the
+  // readout itself rather than the page text, which would equally accept a 10
+  // from a deck count and could not tell 10 from 100.
+  expect(screen.getByTestId('ring-value').textContent).toBe('10')
+})
+
+it('shows no countdown readout when nothing is counting down', () => {
+  // Your own turn: no window, no pending, so there is no deadline to count. The
+  // dock's clock reports that as zero seconds, and a rendered `0` reads as a
+  // stuck timer for the state a player spends most of the game in.
+  const base = makeTableProps()
+  render(<Table {...makeTableProps({ state: { ...base.state, turn: base.state.selfId } })} />)
+  expect(screen.queryByTestId('ring-value')).toBeNull()
+})
+
+it('shows no countdown readout for a pending that carries no deadline', () => {
+  // A decision owed to you puts the dock in `reaction`, but only a defence
+  // carries a deadline. Without one there is nothing to count, so the ring is
+  // bare here too — the same stuck `0` reached by the other branch of the clock.
+  const base = makeTableProps()
+  const props = makeTableProps({
+    state: {
+      ...base.state,
+      pending: {
+        kind: 'discardForRelease',
+        player: base.state.selfId,
+        options: [base.state.you.hand[0]?.uid ?? 'x'],
+      },
+    },
+  })
+  render(<Table {...props} />)
+  expect(screen.queryByTestId('ring-value')).toBeNull()
 })
