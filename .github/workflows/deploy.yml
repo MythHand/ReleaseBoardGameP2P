@@ -7,6 +7,17 @@ on:
         description: "Git ref to deploy (tag, branch, or SHA). Leave empty to deploy the ref this run was started from."
         required: false
         default: ""
+  # Publishing follows the Release workflow, so the live site cannot drift
+  # behind a release the way it did between v0.7.0 and v0.8.0 — five merges
+  # during which the only deploy was a manual one nobody ran.
+  #
+  # `workflow_run` rather than `release: published`: Release creates its release
+  # with `secrets.GITHUB_TOKEN`, and GitHub does not start workflows from events
+  # raised by that token. A `release` trigger here would read correctly and
+  # never once fire, which is the same silent gap this is meant to close.
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
 
 concurrency:
   group: deploy
@@ -16,13 +27,20 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
+    # A failed Release leaves the tag and the release notes in whatever state it
+    # got to, so its head is not something to publish.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.ref }}
+          # Whatever Release actually ran on, so the deploy publishes the commit
+          # that was released rather than whatever main has drifted to since.
+          # Both sides are empty for a dispatch with no ref, which checks out the
+          # ref the run was started from.
+          ref: ${{ inputs.ref || github.event.workflow_run.head_sha }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
