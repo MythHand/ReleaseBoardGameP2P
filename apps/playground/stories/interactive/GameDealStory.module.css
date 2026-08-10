@@ -1,24 +1,66 @@
-/* Расстановка — та же, что у экрана стола (apps/ui/src/table/Table/Table.module.css),
-   со сдвигом верхнего ряда под техническую линию, как в остальных сценах. */
-
+/* Страница плейграунда = строка технических контролов + область экрана под ней.
+   Форма взята у TableStory — страницы, которая показывает целый экран: линия НЕ
+   лежит поверх стола, она отдельная строка колонки, а стол забирает остаток. */
 .root {
-  position: relative;
-  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
   overflow: hidden;
 }
 
-/* техническая верхняя линия управления — dev-контролы (паттерн TableStory) */
-.bar {
+/* область экрана — остаток страницы. Это и есть «стол»: координаты внутри
+   считаются от него самого, ровно как на экране стола. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow: hidden;
+
+  /* сплошная заливка: сетка приходит отдельным слоем (шаг 1.2), поэтому её нет
+     на самой области — иначе она была бы на экране с самого начала */
+  background: var(--surface-0);
+}
+
+/* фон стола: техно-сетка + HUD-слой поверх неё. Оба приходят одним шагом,
+   поэтому лежат в одном узле; он первый в DOM, остальные блоки рисуются над ним. */
+.bg {
   position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  z-index: 60;
+  inset: 0;
+  opacity: 0;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 28px);
+}
+
+/* HudBackground как слой-подложка: без рамки и скруглений, во всю площадь */
+.stage .hud {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+/* блок интерфейса до своей очереди — не показан. Дальше его ведёт пресет hudIn
+   (fill: both держит и паузу до старта, и конечное состояние). Сдвиг вешается
+   на ВНУТРЕННИЙ узел: на самих блоках transform держит позиционирование. */
+.enter {
+  opacity: 0;
+}
+
+/* строка технических контролов — своя высота, экран начинается под ней */
+.controls {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 22px;
+  row-gap: 10px;
   align-items: center;
-  padding: 16px 24px;
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  padding: 12px 16px;
   border-block-end: 1px solid var(--white-08);
 }
 
@@ -36,10 +78,10 @@
   border-color: var(--brand-green);
 }
 
-/* соперники — один ряд сверху по центру, под технической линией */
+/* соперники — один ряд сверху по центру, столовый отступ */
 .opponents {
   position: absolute;
-  inset-block-start: 84px;
+  inset-block-start: 22px;
   inset-inline-start: 50%;
   display: flex;
   flex-wrap: nowrap;
@@ -54,10 +96,13 @@
   position: absolute;
   inset-block-start: 50%;
   inset-inline-start: 26px;
+  transform: translateY(-50%);
+}
+
+.decks .enter {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  transform: translateY(-50%);
 }
 
 /* сброс — справа от центра, перед правым рейлом. Центрируется колонкой, а НЕ
@@ -74,6 +119,24 @@
 
 .discard > * {
   pointer-events: auto;
+}
+
+/* центр стола — чуть ВЫШЕ геометрической середины (42%, не 50%): так он не
+   спорит с рукой и превью, которое из неё поднимается. То же значение во всех
+   сценах. Здесь в нём собирается кучка карт игрока перед уходом в веер. */
+.centre {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  transform: translate(-50%, -50%);
+}
+
+/* карта в этой кучке — та же коробка, свой разброс (как в сбросе) */
+.stagedCard {
+  position: absolute;
+  inset: 0;
 }
 
 /* служебный док хода — нижний левый угол, под колодами, слева от руки */
@@ -96,4 +159,17 @@
 
 .handWrap {
   inline-size: 100%;
+}
+
+/* слой правой навигации: сам TabRail позиционируется по краю, слой нужен только
+   чтобы вести его появление, не трогая его собственный transform */
+.railLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.railLayer > * {
+  pointer-events: auto;
 }
