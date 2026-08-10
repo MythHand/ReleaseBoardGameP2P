@@ -59,15 +59,22 @@ export default function BoardPage() {
   // against `room.participants`, which are peers keyed by *peer* id. PlayerId
   // and peer id are separate spaces that happen to both be strings, so without
   // this translation the lookup silently misses and the overlay names no one.
+  //
+  // The miss is reachable rather than theoretical — `over` rides the projection
+  // and the roster rides the session, so a projection can land before the roster
+  // syncs, and a winning peer can be pruned from `peers` on disconnect. Falling
+  // back to the playerId there would restore the very defect above, and just as
+  // quietly, so a miss yields no id at all and says so where a developer will
+  // see it. The complaint is what catches the next id crossing too.
   const seats = seatsFor(session.state?.peers ?? {})
   const engineOver = game.view ? toTableOver(game.view) : null
-  const over = engineOver
-    ? {
-        ...engineOver,
-        winnerId:
-          seats.find((s) => s.playerId === engineOver.winnerId)?.peerId ?? engineOver.winnerId,
-      }
-    : null
+  const winnerSeat = engineOver ? seats.find((s) => s.playerId === engineOver.winnerId) : undefined
+  if (engineOver && !winnerSeat && import.meta.env.DEV) {
+    console.error(
+      `[board] no seat for winner ${engineOver.winnerId}: the engine names seats p1..pN, the roster is keyed by peer id. Roster: ${seats.map((s) => `${s.playerId}=${s.peerId}`).join(', ') || '(empty)'}`,
+    )
+  }
+  const over = engineOver ? { ...engineOver, winnerId: winnerSeat?.peerId ?? '' } : null
 
   // Two different consumers, so two blocks: `moveHistory` is the kit's own chrome
   // (the draw badge, the elimination suffix), `historyLabels` is one label per
