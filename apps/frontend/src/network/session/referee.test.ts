@@ -83,6 +83,31 @@ function openWindowFixture(start: Session): Session {
   return session
 }
 
+it('opens the feed with the deal rather than a blank', () => {
+  const { outgoing } = createSession({
+    gameId: 'g1',
+    keeperId: 'p1',
+    engine: createFakeEngine(),
+    seed: 7,
+    players: [
+      { playerId: 'p1', peerId: 'peer-1', name: 'One' },
+      { playerId: 'p2', peerId: 'peer-2', name: 'Two' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+
+  const syncs = outgoing.filter((o) => o.message.type === 'SYNC')
+  expect(syncs).toHaveLength(2)
+  for (const s of syncs) {
+    if (s.message.type !== 'SYNC') continue
+    const dealt = s.message.payload.events.filter((e) => e.type === 'dealt')
+    // The deal is public, so every seat hears about every seat's hand size.
+    expect(dealt).toHaveLength(2)
+  }
+})
+
 it('announces the game and syncs every seat privately', () => {
   const { outgoing } = twoPlayerSession()
 

@@ -96,7 +96,10 @@ export function createSession(args: {
           payload: { gameId: args.gameId, keeperId: args.keeperId },
         },
       },
-      ...syncAll(session, []),
+      // The deal is the first thing that happened in this game, so it is the
+      // first thing in the feed — the move history opened on a blank without it,
+      // and the board's intro reads the deal from here.
+      ...syncAll(session, args.engine.setupEvents(state)),
     ],
   }
 }
