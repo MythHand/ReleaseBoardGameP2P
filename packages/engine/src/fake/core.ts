@@ -4,6 +4,7 @@ import type { Reduction } from '../engine'
 import type { Event } from '../events'
 import type {
   CardId,
+  CardInstance,
   CardUid,
   GameState,
   PlayerId,
@@ -121,6 +122,26 @@ export function checkWin(state: GameState, log: Log): GameState {
   }
   return { ...state, eventSeq: log.seq }
 }
+
+// A phantom stands in for an AI event card that has already gone back to the AI
+// deck: `ai-monitoring` and `ai-release-*` mint a fresh instance to hold the
+// board while the real card leaves. One physical card, two representations, on
+// purpose — but only for as long as the phantom is on the board.
+//
+// So a phantom that leaves the board evaporates rather than being banked. Let
+// one into the discard and it stops being a representation and becomes a second
+// physical card, which #61's sudo Git Branch then shuffles into a draw pile.
+export const isPhantom = (card: CardInstance): boolean => card.uid.startsWith('ai-event-')
+
+// The one way a card enters the discard, so the phantom rule cannot be missed
+// by a caller that banks cards its own way.
+export const bankToDiscard = (state: GameState, cards: CardInstance[]): GameState => ({
+  ...state,
+  decks: {
+    ...state.decks,
+    discard: [...state.decks.discard, ...cards.filter((c) => !isPhantom(c))],
+  },
+})
 
 // Ends the turn, or holds it open when the hand is over the mode's limit.
 //

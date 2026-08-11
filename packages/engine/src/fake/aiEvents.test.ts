@@ -142,3 +142,41 @@ describe('Bad Vibe-Coding (#69)', () => {
     expect(r.state.pending).toBeNull()
   })
 })
+
+describe('phantom AI placements (#71)', () => {
+  it('does not leave a phantom in the discard when it is destroyed', () => {
+    // `ai-monitoring` places a fresh instance while the event card itself goes
+    // straight back to the AI deck, so one physical card is on the table twice.
+    // If the phantom then reaches the discard it becomes a real extra copy —
+    // and #61's sudo Git Branch turns the discard into a draw pile.
+    const base = engine.createGame(config())
+    const placed = fireEvent(game(), 'ai-monitoring')
+    expect(placed.state.players.p1.release.monitoring).toBeTruthy()
+    const phantomUid = placed.state.players.p1.release.monitoring?.uid as string
+    expect(phantomUid.startsWith('ai-event-')).toBe(true)
+
+    // p2 DDoS's it off the board.
+    const ddos: CardInstance = { uid: 'attack-ddos#0', id: 'attack-ddos' }
+    const armed: GameState = {
+      ...placed.state,
+      window: null,
+      pending: null,
+      drawing: null,
+      turn: { ...placed.state.turn, player: 'p2', hasDrawn: true },
+      players: {
+        ...placed.state.players,
+        p2: { ...base.players.p2, hand: [ddos] },
+      },
+    }
+    const hit = reduce(armed, {
+      type: 'PLAY',
+      player: 'p2',
+      card: ddos.uid,
+      target: { kind: 'monitoring', player: 'p1' },
+      at: 2000,
+    })
+
+    expect(hit.state.players.p1.release.monitoring).toBeFalsy()
+    expect(hit.state.decks.discard.map((c) => c.uid)).not.toContain(phantomUid)
+  })
+})

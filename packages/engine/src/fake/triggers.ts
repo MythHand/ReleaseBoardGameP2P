@@ -3,16 +3,13 @@ import type { Reduction } from '../engine'
 import type { DiscardReason } from '../events'
 import { randomAt } from '../rng'
 import type { CardInstance, GameState, NeutralizeMethod, PlayerId, ReleaseSlot } from '../state'
-import { checkWin, createLog, endTurn, type Log, reject, setHand } from './core'
+import { bankToDiscard, checkWin, createLog, endTurn, type Log, reject, setHand } from './core'
 import { discardOptions } from './discard'
 import { openWindow } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
-const discard = (state: GameState, cards: CardInstance[]): GameState => ({
-  ...state,
-  decks: { ...state.decks, discard: [...state.decks.discard, ...cards] },
-})
+const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
 
 // The order the rules give: Debugger first, Monitoring second, sacrificing a
 // release last — a player answers with the cheapest option they hold.

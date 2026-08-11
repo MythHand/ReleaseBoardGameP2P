@@ -357,6 +357,40 @@ function driveProtectedReleaseAndDdos(
   }
 }
 
+// Every card instance the game is holding, wherever it is. The AI events deck
+// counts: `fireTrigger` returns an event card to it, so a card that left it and
+// never came back is a leak like any other.
+//
+// `ai-event-` uids are excluded on purpose. Those are phantoms — `ai-monitoring`
+// and `ai-release-*` mint a fresh instance to stand on the board while the event
+// card itself goes back to the AI deck, so one physical card is represented
+// twice on purpose. Counting them would make the total climb legitimately and
+// the invariant would say nothing; `phantomsStayOffTheDeck` below is what keeps
+// them honest instead.
+function realCardUids(state: GameState): string[] {
+  const uids = [
+    ...state.decks.main.flat(),
+    ...state.decks.discard,
+    ...state.decks.events,
+    ...Object.values(state.players).flatMap((p) => [
+      ...p.hand,
+      // The three release slots hold { card, codeReview? }; `monitoring` holds
+      // the instance itself, so it cannot go through the same branch.
+      ...(['frontend', 'backend', 'database'] as const).flatMap((slot) => {
+        const r = p.release[slot]
+        return r ? [r.card, ...(r.codeReview ? [r.codeReview] : [])] : []
+      }),
+      ...(p.release.monitoring ? [p.release.monitoring] : []),
+    ]),
+  ].map((c) => c.uid)
+  // A thrown attack card is in mid-air while a `defend` is owed: out of the
+  // attacker's hand and not yet anywhere else. It is still very much in the
+  // game, so a stream that simply ends while one is open must not read as a
+  // loss — that is a snapshot artefact, not a leaked card.
+  if (state.pending?.kind === 'defend') uids.push(state.pending.attack)
+  return uids.filter((uid) => !uid.startsWith('ai-event-')).sort()
+}
+
 function drive(engine: Engine, state: GameState, seed: number, steps: number) {
   let current = state
   const events: Event[] = []
@@ -465,6 +499,30 @@ export function describeEngine(
           (e) => e.type === 'discarded' && e.reason === 'handLimit',
         )
         expect(discardedForHandLimit).toBe(true)
+      })
+
+      it('never creates or loses a card across a long stream', () => {
+        // One property covering the whole class: a deck that grows, a hand card
+        // that evaporates, a release destroyed into nowhere. Each of those is
+        // otherwise invisible until counts drift far enough for someone to
+        // notice at the table, and #61's git operations turn the discard into a
+        // draw pile, which is exactly when a stray instance starts circulating.
+        const engine = make()
+        const start = engine.createGame(configFor(options, 55))
+        const before = realCardUids(start)
+        const { state } = drive(engine, start, 23, 300)
+        expect(realCardUids(state)).toEqual(before)
+      })
+
+      it('keeps a phantom AI placement off the deck and out of the discard', () => {
+        // A phantom stands in for an event card that is already back in the AI
+        // deck. If one reaches the discard it becomes a real extra copy the
+        // moment the discard is recycled into a draw pile.
+        const engine = make()
+        const start = engine.createGame(configFor(options, 55))
+        const { state } = drive(engine, start, 23, 300)
+        const loose = [...state.decks.main.flat(), ...state.decks.discard, ...state.decks.events]
+        expect(loose.filter((c) => c.uid.startsWith('ai-event-'))).toEqual([])
       })
 
       it('numbers every committed event uniquely and monotonically', () => {

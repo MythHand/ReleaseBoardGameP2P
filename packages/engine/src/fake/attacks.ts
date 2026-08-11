@@ -3,16 +3,13 @@ import { RELEASE_ATTACKS, rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardInstance, GameState, Pending, PlayerId, ReleaseSlot } from '../state'
 import type { PendingView } from '../view'
-import { createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
+import { bankToDiscard, createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
 import { stealRandom } from './handAttacks'
 import { closeWindow, openWindow, respondersFor } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
-const discard = (state: GameState, cards: CardInstance[]): GameState => ({
-  ...state,
-  decks: { ...state.decks, discard: [...state.decks.discard, ...cards] },
-})
+const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
 
 function clearSlot(state: GameState, player: PlayerId, slot: ReleaseSlot): GameState {
   const zone = { ...state.players[player].release }
