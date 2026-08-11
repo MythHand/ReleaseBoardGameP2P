@@ -15,9 +15,20 @@ Read in this order:
 4. **[`glossary.md`](./glossary.md)** — the properties & values you pass and tune: `play(...)`
    parameters, easing tokens, geometry/timing constants, holds. Look up *what a word or number means*.
 5. **[`extending.md`](./extending.md)** — add a new preset/module when nothing fits.
+6. **[`backlog.md`](./backlog.md)** — what is **missing, disputed or temporarily patched**. The other
+   files describe what exists and is verified; this is the only one allowed to describe what does
+   not. **Run into a gap — write it there and raise it, do not invent a local way around it.**
 
 The live status map of what exists is the playground **`Interaction audit`** page
-(`apps/playground/stories/AnimationAuditStory`). Keep it and these docs in sync on changes.
+(`apps/playground/stories/AnimationAuditStory`); the live, runnable catalogue of the vocabulary is
+the **`Animations`** page, where each preset is shown in the form it actually is (a travel, a slot
+swap, a badge, an arriving block, a volley, a fold) and a preset with no form says so instead of
+faking one. Keep both and these docs in sync on changes.
+
+One part of that is enforced rather than promised: **every preset must have a row in
+[`reference.md`](./reference.md)**, checked by `apps/ui/src/animations/docs.test.ts` against
+`presetNames()`. Seven presets had drifted out of the docs before that test existed. Recipes have no
+such signal — they stay on discipline.
 
 ---
 
@@ -26,14 +37,21 @@ The live status map of what exists is the playground **`Interaction audit`** pag
 Not everything these docs describe is a shared library module. As of now:
 
 **In `@release/ui` — import and use directly:**
-- The animation vocabulary: `play`, the presets (`PRESETS`), and `move` / `jitter` / `wait` /
-  `nextFrames` (`apps/ui/src/animations/`); the discard-scatter model `scatterAt` / `restTransform` /
-  `toDiscardParams` / `HEAP_SHOW` (same folder); the card geometry helpers `cardAreaOf` / `cardBoxIn`
-  (`@/primitives/Card`); the fan geometry `slotPlacement` / `handStep` (`@/table/Hand/fan`).
+- The animation vocabulary: `play`, the presets (`PRESETS`), and `enterPose` / `wait` /
+  `nextFrames` (`apps/ui/src/animations/`) — `move` is the travel base **inside** the presets, not
+  a call site's tool: a flight goes through a named preset; the discard-scatter model
+  `scatterAt` / `jitter` /
+  `restTransform` / `toDiscardParams` / `HEAP_SHOW` (same folder); the shake characters
+  `SHAKE_SHAPES`; the card geometry helpers `cardAreaOf` / `cardBoxIn` (`@/primitives/Card`); the
+  fan geometry `slotPlacement` / `handStep` (`@/table/Hand/fan`); the pair's resting pose
+  `PAIR_AUX_POSE` (`@/primitives/CardPair`), which the fold lands on.
 - Primitives / components that **animate themselves** — used declaratively, the animation is built in:
   `Card` (plays `flipCard` on a `faceDown` change), `Hand` (the interactive fan: hover lift + zoom
   preview, drag-to-play/reorder, click/drag threshold, settle-back — all internal), `EdgeGlow` (CSS
-  opacity fade), `ConfirmAction` (slide-up confirm bar), `Input` (shake), `Arrow` (via `useArrow`).
+  opacity fade), `ConfirmAction` (slide-up confirm bar), `CardCatalog` (the set of face-up cards you
+  name one from: staggered entrance, hover growth, the named one holds while the rest leave),
+  `TurnDock` (its `Swap` and `Reveal` orchestrate the slot presets), `Input` (shake), `Arrow` (via
+  `useArrow`).
   `ReleaseZone` reflects what the consumer decided and hands the gesture back — the same model as
   `Hand`: `slotRef(key, el)` to fly a card into a specific slot, `support` for a release with the
   card laid WITH it (Code Review / Monitoring, shown as a `CardPair`), `accentAt` / `liftedAt` /

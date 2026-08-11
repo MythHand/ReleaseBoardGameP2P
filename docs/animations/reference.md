@@ -13,8 +13,14 @@ code, the code wins — fix this file.
 ## Presets
 
 `PRESETS` in `apps/ui/src/animations/presets.ts`. Call by name: `play('name', el, params)`.
-All are `fill: 'forwards'` except `shake`. Durations in ms; `EASE` / `SNAP` are defined in the
-glossary; the param words (`from`, `to`, `rotate`, `dx`, `dy`, `fade`, …) are in the glossary too.
+Durations in ms; `EASE` / `SNAP` are defined in the glossary; the param words (`from`, `to`,
+`rotate`, `dx`, `dy`, `fade`, `dur`, …) are in the glossary too. **Watch the duration word:** the
+travel presets take `duration`, the slot/HUD ones take `dur` — passing the wrong one is silent, the
+preset simply keeps its default.
+
+Fill: `forwards` everywhere except `shake` (none — it returns to the origin by itself) and
+`rollIn` / `hudIn` (**`both`**, so a `delay` holds the element invisible until its turn instead of
+letting it flash in place first).
 
 | Preset | Duration | Easing | Fade | Params | Purpose |
 |---|---|---|---|---|---|
@@ -28,7 +34,18 @@ glossary; the param words (`from`, `to`, `rotate`, `dx`, `dy`, `fade`, …) are 
 | `drawToCenter` | `duration` ?? **480** | EASE | — | `{ from, to, duration? }` | a card leaves the draw deck to the center |
 | `dealToSeat` | `duration` ?? **460** | EASE | **yes** | `{ from, to, duration? }` | a card goes center → a player seat and dissolves |
 | `returnToDeck` | `duration` ?? **480** | EASE | — | `{ from, to, duration? }` | a card returns center → deck (pair of `drawToCenter`) |
-| `shake` | 380 | EASE | — | — | left–right shake ("field not filled"), returns to origin |
+| `foldIntoPair` | `dur` ?? **620** | EASE, **SNAP** with `snap` | — | `{ from, box, pose?, dur?, snap? }` | one HALF of a pair travels into its pose inside the pair. Called once per half; the pair itself does not move |
+| `rollOut` | `dur` ?? **220** | EASE | — | `{ dur? }` | a slot's content fades out — first half of a swap. No movement: the slot is fixed |
+| `rollIn` | `dur` ?? **300** | EASE | — | `{ dur?, delay? }` | the new content fades in — second half. `delay` waits out the outgoing one |
+| `popIn` | 260 | **SNAP** | — | — | a small element appears in a reserved slot (fade + scale), neighbours do not shift |
+| `popOut` | 200 | EASE | — | — | …and the same element leaves |
+| `hudIn` | `dur` ?? **340** | EASE | — | `{ dx?, dy?, dur?, delay? }` | a HUD block arrives at its place: a short shift + a fade. `dx`/`dy` is WHERE FROM (`0/0` = a plain fade) |
+| `confettiFly` | `dur` ?? **2200** | per-keyframe (`ease-out` → `ease-in`) | **yes** (last frame) | `{ dx?, dy?, peak?, spin?, dur? }` | ONE popper piece: the throw, the arc over `peak`, the fall with `spin`. The count, the symbols and the spread belong to the scene |
+| `shake` | `dur` ?? **380** | EASE | — | `{ amp?, dur?, shape? }` | left–right shake ("this will not do"), returns to the origin. `amp` — the swing, `shape` — the character (`SHAKE_SHAPES`) |
+
+> A preset with no row here fails `apps/ui/src/animations/docs.test.ts` — the table is checked
+> against `presetNames()`, because a preset missing from these docs does not exist for whoever
+> reads them instead of the code.
 
 ---
 
@@ -38,13 +55,17 @@ glossary; the param words (`from`, `to`, `rotate`, `dx`, `dy`, `fade`, …) are 
 
 | Name | File | Signature | What it does |
 |---|---|---|---|
-| `move` | `presets.ts` | `move(el, { from, to, rotate=0, dx=0, dy=0, fade=false }, duration=460, easing=EASE)` | the travel base under every "flight" preset: translate-by-centers + scale-by-width + rotate/dx/dy (+ optional fade). Its `duration=460` default is never hit — every preset passes an explicit duration. |
-| `durationOf` | `presets.ts` | `durationOf(p, fallback=520)` | reads `p.duration`, else the fallback. The `520` default is the fallback for the variable-time presets. |
+| `move` **(internal)** | `presets.ts` | `move(el, { from, to, rotate=0, dx=0, dy=0, fade=false }, duration=460, easing=EASE)` | the travel base under every "flight" preset: translate-by-centers + scale-by-width + rotate/dx/dy (+ optional fade). **Not exported** — listed so the presets are readable, not so you can call it: a flight goes through a named preset, never through the base. Its `duration=460` default is never hit — every preset passes an explicit duration. |
+| `enterPose` | `presets.ts` | `enterPose(from, box)` → `string` | the transform that makes an element sitting in `box` LOOK like it sits in `from` (offset by centers + scale by width). The entry pose of a FLIP flight: paint the first frame with it before starting, or the element flashes in its final place. `foldIntoPair` uses the same call inside. |
+| `durationOf` **(internal)** | `presets.ts` | `durationOf(p, fallback=520)` | reads `p.duration`, else the fallback. The `520` default is the fallback for the variable-time presets. Not exported either. |
+| `SHAKE_SHAPES` | `presets.ts` | `{ settle, spring }` → `number[]` | the CHARACTER of a shake as fractions of the swing per frame — `settle` (a jolt and a calm-down) and `spring` (two full swings, then two smaller). Fractions, not px, so a character reads the same at any `amp`. `ShakeShape` is the key type. |
 | `play` | `play.ts` | `play(name, el, params={})` → `Animation \| null` | registry dispatch; warns on unknown name; no-op without `el`/WAAPI |
 | `presetNames` | `play.ts` | `presetNames()` → `string[]` | the registry keys |
-| `jitter` | `scatter.ts` | `jitter()` → `{ rot, dx, dy }` | random scatter for the discard, precomputed once (the ±ranges are in the glossary) |
 | `wait` | `timing.ts` | `wait(ms)` → `Promise` | `setTimeout` promise — holds a beat between phases |
 | `nextFrames` | `timing.ts` | `nextFrames()` → `Promise` | double `requestAnimationFrame` — let a new node paint before a flight |
+
+`jitter` belongs to the discard-scatter model and is catalogued with it below, next to `scatterAt`
+— the two are a pair of choices (one-off vs. deterministic), not two unrelated helpers.
 
 ---
 
@@ -89,7 +110,7 @@ destructure `overlay` and render it.
 | Name | Signature | What it does |
 |---|---|---|
 | `useHandArrival` | `useHandArrival(handRef, onLanded)` → `{ overlay, gapAt, gapSize, arrive, reset, busy, FLIGHT_MS }` | `arrive(items, handLength)` opens a gap for **any number** of cards in the MIDDLE of the fan and flies them all in; they ride over the fan and tuck under it at the end. `onLanded(gap, landed)` fires on landing and hands back what arrived — the scene splices its own items at that index |
-| `Arriving` | `{ key, card, from? \| el?, rot?, anchor? }` | `key` — the card's identity in the scene's hand (its uid), handed back on landing. `from` — where it stands; `rot` — the tilt it rests at (the pivot difference is compensated, so the first frame does not jump); `el` — it IS an element on screen: the step measures it and takes it off screen for the flight; `el` + `anchor: 'main' \| 'aux'` — one half of a pair |
+| `Arriving` | `{ key, card, faceDown?, from? \| el?, rot?, anchor? }` | `key` — the card's identity in the scene's hand (its uid), handed back on landing. `faceDown` — which side is up on the way in: a dealt card travels closed and is turned over only once the whole hand is in (Game Deal), a drawn or returned card is already known to its owner and flies open (the default). `from` — where it stands; `rot` — the tilt it rests at (the pivot difference is compensated, so the first frame does not jump); `el` — it IS an element on screen: the step measures it and takes it off screen for the flight; `el` + `anchor: 'main' \| 'aux'` — one half of a pair |
 
 ### Discard-exit — cards leave the table for the discard
 
@@ -177,5 +198,9 @@ Import and use declaratively — the animation is built in.
 | `Card` | `@/primitives/Card` | plays `flipCard` on a `faceDown` change |
 | `EdgeGlow` | `@/primitives/EdgeGlow` | `<EdgeGlow visible? intensity? color? className? />` — inward edge veil, CSS opacity fade; `intensity: 'strong' \| 'weak'`. The consumer owns the bounds/layer (container + mount point). |
 | `ConfirmAction` | `@/table/ConfirmAction` | `<ConfirmAction open? label disabled? onConfirm? caption? className? />` — the shared "confirm the selection" bar; slides up/down on `open`, pins to the bottom of its positioned container. Used by pick flows (Inside choice, Git cards). |
+| `CardCatalog` | `@/table/CardCatalog` | `<CardCatalog cards open selected? chosen? onPick? width? stagger? />` — the set of face-up cards you name one from. Cells appear with a stagger and GROW on hover (they are there to be read, not lifted); `open` means the choice is on, `chosen` holds the named one enlarged while the rest slide away, `selected` is armed-but-not-committed. Confirmation lives outside it (usually `ConfirmAction` — naming a card is irreversible). It fills the area it is given; where that area is belongs to the screen. |
+| `CardPair` | `@/primitives/CardPair` | `<CardPair main aux width? />` — the aux card tucks under the main at `PAIR_AUX_POSE`, derived from `PAIR_AUX` (`{ rot, dy }`, both exported). One declaration in two forms, because the readers differ: the component and `foldIntoPair` take the string, `useDiscardExit` takes `.rot` as a number when a pair splits and the aux flies out alone. `[data-main]` / `[data-aux]` are the anchors a fold or a split-out measures. |
+| `Pile` | `@/primitives/Pile` | the discard as a tossed **heap**: `heap` (cards with their own `Scatter`), `heapShow`, `gathered` (it turned into a deck), `boxRef` — the card box a flight aims at. Its counter sits above the whole flight band, so an arriving card passes under the badge. **Do not centre a pile with a `transform`** — that traps the badge in the wrapper. |
+| `TurnDock` | `@/table/TurnDock` | one fixed frame whose slots never move; the content inside them changes. `Swap` orchestrates `rollOut` → `rollIn` (a live layer in flow + the outgoing one absolutely overlaid), `Reveal` orchestrates `popIn` / `popOut` for a small element in reserved space. |
 | `ReleaseZone` | `@/table/ReleaseZone` | `slotRef?(key, el)` exposes each slot's node so a consumer can measure it and fly a card into that slot (AI Release / Monitoring landing). A position hook only — no visual effect. |
 | `Arrow` | `@/primitives/Arrow` | see the Arrow toolkit above (`useArrow`) |

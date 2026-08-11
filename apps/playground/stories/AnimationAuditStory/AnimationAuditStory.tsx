@@ -14,12 +14,13 @@ import styles from './AnimationAuditStory.module.css'
 // Language: technical names (module ids, file paths, rect/FLIP/move/fade/DOM…)
 // stay English in both languages; descriptive prose is bilingual via useLang().
 type Loc = Record<Lang, string>
-type Status = 'ok' | 'rework' | 'reuse'
+type Status = 'ok' | 'rework' | 'reuse' | 'open'
 
 const STATUS: Record<Status, { cls: string; label: Loc }> = {
   ok: { cls: styles.ok, label: { ru: 'оформлено', en: 'done' } },
   rework: { cls: styles.rework, label: { ru: 'доработать', en: 'rework' } },
   reuse: { cls: styles.reuse, label: { ru: 'есть готовое', en: 'reuse' } },
+  open: { cls: styles.open, label: { ru: 'нет решения', en: 'undecided' } },
 }
 
 interface Module {
@@ -186,8 +187,8 @@ const MODULES: Module[] = [
   {
     mod: 'CardPair + PAIR_AUX_POSE',
     what: {
-      ru: 'Визуальный атом пары: вспомогательная карта подтыкается под основную под углом. Сам наклон объявлен ОДИН раз — константой PAIR_AUX_POSE, которую компонент ставит инлайном, а анимация складывания берёт как конечный кадр. Тот же приём, что restTransform() у кучи сброса: поправишь позу — сойдутся и покой, и полёт.',
-      en: 'The visual atom of a pair: a helper card tucks under the main one at an angle. The tilt itself is declared ONCE — as PAIR_AUX_POSE, which the component applies inline and the folding animation takes as its final frame. The same trick as restTransform() for the discard heap: tune the pose and both the rest and the flight follow.',
+      ru: 'Визуальный атом пары: вспомогательная карта подтыкается под основную под углом. Поза объявлена ОДИН раз и ДАННЫМИ — PAIR_AUX { rot, dy }, а CSS-строка PAIR_AUX_POSE выводится из них: читателей трое и формы им нужны разные. Компонент ставит строку инлайном, складывание садится на неё финальным кадром, а шаг ухода в сброс берёт угол числом — при распаде пары половина улетает своим полётом и должна стартовать с того наклона, который был виден. Тот же приём, что Scatter + restTransform() у кучи: поза — значение, CSS — её представление.',
+      en: 'The visual atom of a pair: a helper card tucks under the main one at an angle. The pose is declared ONCE and as DATA — PAIR_AUX { rot, dy } — with the CSS string PAIR_AUX_POSE derived from it: there are three readers and they need different forms. The component applies the string inline, the fold lands on it as its final frame, and the discard-exit step takes the angle as a number — when a pair splits, the half flying out on its own must start at the tilt it was seen at. The same trick as Scatter + restTransform() for the heap: the pose is a value, the CSS is its representation.',
     },
     where: {
       ru: 'primitives/CardPair → Combo, DefenseRelease, Error503, ReleaseZone, useDiscardExit',
@@ -599,14 +600,28 @@ const SCENARIOS: Scenario[] = [
   },
 ]
 
-// ===== 3. Needs rework =====
-// Empty again: the three copies this section held were closed by the modules
-// above — the pair merge became foldIntoPair + enterPose, Rebase took the shared
-// card geometry, and the pick grid became the CardCatalog block (its shake is
-// now the registry's, with a character parameter instead of a CSS twin).
-// The rule the emptiness stands on: a movement that exists in two scenes is a
-// module that has not been packaged yet.
-const ISSUES: Issue[] = []
+// ===== 3. Needs rework — THE register of findings =====
+// Everything found about the animations lands here: this page is where the work
+// is looked at, so it is where a finding has to be visible. Two kinds live side
+// by side, and the status tells them apart:
+//   • what is VISIBLE in the scenes — a movement written twice, a ready module
+//     not used (rework / reuse). The rule: a movement that exists in two scenes
+//     is a module that has not been packaged yet.
+//   • what CANNOT be seen in a scene — a rule nobody decided, a value out of
+//     reach (open). The long form of these — what it costs and what would close
+//     it — is in docs/animations/backlog.md; here they are visible, there they
+//     are actionable.
+const ISSUES: Issue[] = [
+  {
+    what: { ru: 'Сцена ничем не обязана оставить рецепт', en: 'A scene owes no recipe' },
+    problem: {
+      ru: 'Про доку, не про игровую логику. Пресеты проверяются тестом: нет строки в reference.md — падает CI. У сцен такого признака нет, и дока уже отставала на семь пресетов, пока это не вскрылось сплошной сверкой; со сценами выйдет так же. Машинного признака не нашли — сцена это файл истории, а не запись в реестре, — поэтому держится на дисциплине. Правится не сейчас: цена вопроса появится, когда рецептами начнут пользоваться снаружи плейграунда.',
+      en: 'About the docs, not the game logic. Presets are covered by a test: no row in reference.md, no green CI. Scenes have no such signal, and the docs had already fallen seven presets behind before a full sweep caught it; scenes will go the same way. No machine signal was found — a scene is a story file, not a registry entry — so it rests on discipline. Not being fixed now: the cost shows up once recipes are used outside the playground.',
+    },
+    where: { ru: 'docs/animations/recipes.md', en: 'docs/animations/recipes.md' },
+    status: 'open',
+  },
+]
 
 // Section headings, notes, legend and table headers.
 const UI = {
@@ -618,11 +633,17 @@ const UI = {
     scenariosNote:
       'Реализованные последовательности из модулей выше — под конкретные ситуации игры.',
     issuesH: 'Требует доработок',
+    issuesNote:
+      'Реестр находок: сюда заносится всё, что нашли про анимации. Видимое в сценах — движение, написанное дважды, готовый модуль без применения. И невидимое — нерешённое правило, значение, до которого не дотянуться. Наткнулся на дыру — запиши сюда, а не обходи её на месте.',
     issuesEmpty:
       'Открытых проблем нет — всё свелось к модулям. Правило, на котором держится эта пустота: движение, встретившееся в двух сценах, — это модуль, который ещё не оформили.',
     legendOk: 'оформлено модулем, переиспользуется',
     legendRework: 'код есть, но кривой/дублируется — доработать',
     legendReuse: 'есть готовый модуль, но не используется — применить',
+    legendOpen: 'решения нет — нужен выбор, а не работа',
+    docsH: 'Спека в проекте',
+    docsNote:
+      'У этой страницы есть письменная пара — docs/animations/. Здесь состояние в лицах: что готово, из чего собрано, что нашли. Там — как этим пользоваться из игровой логики: README (модель и инварианты I1–I10), recipes (последовательности по игровым ситуациям), reference (вызываемое: пресеты, хелперы, шаги), glossary (параметры и значения), extending (как добавить своё), backlog (развёрнутые находки: чем грозит и что закроет). Правило синхронности одностороннее только на словах: пресет без строки в reference роняет тест.',
     colModule: 'модуль',
     colWhatDoes: 'что делает',
     colWhereMod: 'где живёт · используется',
@@ -641,11 +662,17 @@ const UI = {
     scenariosH: 'Scenario combinations',
     scenariosNote: 'Implemented sequences from the modules above — for concrete game situations.',
     issuesH: 'Needs rework',
+    issuesNote:
+      'The register of findings: everything found about the animations lands here. What is visible in the scenes — a movement written twice, a ready module left unused. And what is not — a rule nobody decided, a value out of reach. Run into a gap: write it here instead of working around it in place.',
     issuesEmpty:
       'No open issues — everything reduced to modules. The rule this emptiness rests on: a movement found in two scenes is a module that has not been packaged yet.',
     legendOk: 'packaged as a module, reused',
     legendRework: 'code exists but messy/duplicated — rework',
     legendReuse: 'a ready module exists but unused — apply it',
+    legendOpen: 'undecided — it needs a choice, not work',
+    docsH: 'The written spec',
+    docsNote:
+      'This page has a written counterpart — docs/animations/. Here is the state in the flesh: what is ready, what it is assembled from, what has been found. There is how to use it from game logic: README (the model and the I1–I10 invariants), recipes (ordered sequences by game situation), reference (the callable API: presets, helpers, steps), glossary (parameters and values), extending (how to add your own), backlog (findings in full: what it costs and what would close it). The sync rule is one-way only in wording: a preset with no row in reference fails a test.',
     colModule: 'module',
     colWhatDoes: 'what it does',
     colWhereMod: 'where it lives · used',
@@ -797,16 +824,17 @@ export default function AnimationAuditStory() {
             Источник состояния работы с анимациями. Сначала готовые <b>модули</b> — кирпичики для
             сборки. Затем <b>сценарные комбинации</b> — как кирпичики складываются под игровые
             ситуации (сценарий — это последовательность, а не модуль: его не оформляют отдельно,
-            поэтому без статусов). И в конце — раздел <b>что требует доработок</b>: места, где сцена
-            несёт свою копию того, что уже есть в словаре.
+            поэтому без статусов). И в конце — <b>реестр находок</b>: всё, что нашли про анимации,
+            от копии словарного движения в сцене до вопроса, который никто не решил.
           </>
         ) : (
           <>
             The source of state for animation work. First the ready <b>modules</b> — building
             blocks. Then <b>scenario combinations</b> — how the blocks assemble for game situations
             (a scenario is a sequence, not a module: it isn't formalized separately, so no
-            statuses). And at the end — the <b>what needs rework</b> section: places where a scene
-            carries its own copy of something the registry already owns.
+            statuses). And at the end — the <b>register of findings</b>: everything found about the
+            animations, from a scene carrying its own copy of a registry movement to a question
+            nobody has decided.
           </>
         )}
       </p>
@@ -815,7 +843,15 @@ export default function AnimationAuditStory() {
         <LegendItem status="ok">{ui.legendOk}</LegendItem>
         <LegendItem status="rework">{ui.legendRework}</LegendItem>
         <LegendItem status="reuse">{ui.legendReuse}</LegendItem>
+        <LegendItem status="open">{ui.legendOpen}</LegendItem>
       </div>
+
+      {/* the written half of the same subject — named on the page itself, so it
+          is reachable from where the work is looked at */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>{ui.docsH}</h2>
+        <p className={styles.sectionNote}>{ui.docsNote}</p>
+      </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>{ui.modulesH}</h2>
@@ -831,6 +867,7 @@ export default function AnimationAuditStory() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>{ui.issuesH}</h2>
+        <p className={styles.sectionNote}>{ui.issuesNote}</p>
         {ISSUES.length > 0 ? (
           <IssueTable rows={ISSUES} />
         ) : (

@@ -14,8 +14,12 @@ the code wins — fix this file.
 
 | Name | Value | Used by |
 |---|---|---|
-| `EASE` | `cubic-bezier(0.4, 0, 0.2, 1)` | every preset except `playToReleaseZone` |
-| `SNAP` | `cubic-bezier(0.2, 0.9, 0.1, 1)` | `playToReleaseZone` (snap landing) |
+| `EASE` | `cubic-bezier(0.4, 0, 0.2, 1)` | every preset except the three below |
+| `SNAP` | `cubic-bezier(0.2, 0.9, 0.1, 1)` | `playToReleaseZone` (snap landing), `popIn`, `foldIntoPair` when called with `snap` (the half that tucks under) |
+| per-keyframe | `ease-out` → `ease-in` | `confettiFly` only — the throw accelerates out, the arc falls back in, so the easing lives on the keyframes and not on the animation |
+
+`EASE` is the same curve as the `--ease-soft` CSS token. There is no CSS token for `SNAP`: it exists
+only in the registry, so a CSS transition cannot reproduce a snap landing.
 
 ---
 
@@ -27,11 +31,29 @@ The words that flow into a preset as `params`.
 |---|---|---|
 | `from` / `to` | `Rect` = `{ left, top, width, height }` | source / target geometry for a travel preset |
 | `rotate` | number (deg) | final rotation of the flyer at landing |
-| `dx` / `dy` | number (px) | extra final offset (land in the exact pose, no post-jump) |
+| `dx` / `dy` | number (px) | travel presets: extra final offset (land in the exact pose, no post-jump). `hudIn` and `confettiFly` read them differently — see below |
 | `fade` | boolean | dissolve opacity during the flight (baked into `absorbToDeck` / `dealToSeat`) |
-| `duration` | number (ms) | override the preset's default time (variable-time presets) |
+| `duration` | number (ms) | override the default time — **travel presets only** |
+| `dur` | number (ms) | override the default time — **the slot / HUD / fold / shake presets** (`rollOut`, `rollIn`, `popIn`-family, `hudIn`, `foldIntoPair`, `confettiFly`, `shake`) |
+| `delay` | number (ms) | hold the element at its first keyframe before starting (`rollIn`, `hudIn`; both are `fill: 'both'`, which is what makes the wait invisible instead of a flash) |
 | `faceDown` | boolean | `flipCard` direction (the `Card` auto-plays `flipCard` when this prop changes) |
+| `box` | `Rect` | `foldIntoPair`: the frame of the pair — where the halves fold INTO |
+| `pose` | string (transform) | `foldIntoPair`: the resting pose of this half inside the pair. Empty for the main one (it IS the frame); `PAIR_AUX_POSE` for the aux |
+| `snap` | boolean | `foldIntoPair`: land with the snap curve instead of ease (the half that tucks under) |
+| `amp` | number (px) | `shake`: the swing of the first jolt. 7 by default — sized for an input field; a whole fan takes ~9 |
+| `shape` | `'settle' \| 'spring'` | `shake`: the CHARACTER, a key of `SHAKE_SHAPES` (§3) |
+| `peak` | number (px) | `confettiFly`: the height of the arc at its top (frame 0.42) |
+| `spin` | number (deg) | `confettiFly`: how far the piece turns over its whole flight |
 
+> **The duration word is a trap.** `duration` and `dur` mean the same thing and are not
+> interchangeable: a travel preset reads `duration` via `durationOf`, the rest destructure `dur`.
+> Pass the wrong one and nothing errors — the preset silently keeps its default. Check the preset's
+> row in [`reference.md`](./reference.md) before overriding a time.
+>
+> **`dx`/`dy` are directional in two different senses.** For a travel preset they are a nudge added
+> to the LANDING. For `hudIn` they are where the block comes FROM (`0/0` = a plain fade, no
+> movement); for `confettiFly` they are where the piece ends up.
+>
 > Two rect shapes: travel presets use `{ left, top, width, height }`; `Point` (arrows) uses `{ x, y }`.
 >
 > `seq` (seen in recipes) is **not** a `play()` argument — it is the flyer's React `key`, bumped per
@@ -47,7 +69,9 @@ The words that flow into a preset as `params`.
 | `CARD_W` | `150` | `@/table/Hand/fan` | canonical hand-card width (the real source) |
 | `SOURCE_CARD_W` | `140` | `CardToHandStory` | preview source-card width |
 | `DEAL_CARD_W` | `150` | `PickOpponentCardStory` | deal-grid card width |
-| `ROT` / `DX` / `DY` | `14` / `10` / `8` | `scatter.ts` | `jitter` ±ranges: `rot ±14°`, `dx ±10px`, `dy ±8px` |
+| `ROT` / `DX_FRAC` / `DY_FRAC` | `14` / `0.083` / `0.067` | `scatter.ts` | scatter ±ranges: tilt `±14°` (absolute — a tilt does not scale with size), offsets as FRACTIONS of the card width (`≈ ±10px` / `±8px` at `REF_WIDTH = 120`), so a heap looks equally tossed at any card size |
+| `PAIR_AUX` / `PAIR_AUX_POSE` | `{ rot: -7, dy: -26 }` → `translateY(-26%) rotate(-7deg)` | `@/primitives/CardPair` | the aux card's pose inside a pair. Declared as **data**, the CSS string derived from it — three readers need two forms: the component and `foldIntoPair` take the string, `useDiscardExit` takes `.rot` as a number when a pair splits and the aux half flies out at the tilt it was seen at. Same shape as `Scatter` + `restTransform` for the heap. (`dy` is a % of the card height; a split does not need it — the half's place comes from its measured rect.) |
+| `SHAKE_SHAPES` | `settle: 1, 6/7, 4/7, 3/7` · `spring: 1, 1, 2/3, 2/3` | `presets.ts` | the character of a shake as fractions of `amp`, out-and-back through zero. `settle` = a jolt that calms down (an input field), `spring` = two full swings then two smaller (a large element that flinched whole) |
 | `--z-flight` | `250` | `tokens.css` | the BASE of the flight band — above the hand and a lifted card, below the arrow and the overlays. Every flyer reads it; `useHandArrival` holds it for `START_HIGH_MS` before dropping to the slot's own layer |
 | flight band offsets | `+n` / `+10` / `+40` | `useDiscardExit`, `Error503Story`, `Pile` | on top of `--z-flight`: `n` = the card's own table layer, so a group keeps its order (**I9**); `+10` = a card held by the cursor, above anything flying on its own; `+40` = the pile counter, clear of the whole band so an arriving card passes under the badge |
 | `CARD_WH` | `368 / 515` (width / height) | `@/table/Hand` | inverse of `CARD_RATIO`; sizes the drag flyer height and the zoom preview |
@@ -77,10 +101,12 @@ playground.
 | `START_HIGH_MS` | `140` | `useHandArrival` | how long the travel layer is held before the card tucks under the fan |
 | `FLIGHT_MS` | `480` | `useHandArrival` | arrival into the fan — **must equal the `.arriving` CSS transition** |
 | `FLIGHT_MS` | `420` | `useDiscardExit` | discard flight — matches `centerToDiscard`, so the table tilt finishes unwinding exactly as the card lands |
-| `AUX_TILT` | `-7` | `useDiscardExit` | the tilt `CardPair` gives its aux card — kept while that half flies out on its own |
 | `FLIP_MS` | `420` | `DrawCardStory` | mirror of the `flipCard` preset — JS waits the in-place flip |
 | `SPLIT_MS` | `520` | `DeckAnimationsStory` | the `flyFrom` split fly-out duration |
 | `MERGE_MS` | `520` | `DeckAnimationsStory` | each deck's `absorbToDeck` flight on merge |
+| `MERGE_MS` (pair) | `620` | `ComboStory`, `DefenseReleaseStory` | the fold into a pair — the `dur` both halves are given. Same name, a different movement: one merges decks, the other folds two cards |
+| `SHOW_HOLD` / `LAND_HOLD` | `1200` / `700` | `DefenseReleaseStory` | a card stands open on the table before it moves on / the attack rests at the centre before it can be answered |
+| `ATTACK_POSE` / `COVER_POSE` / `SUDO_POSE` | `rot -4` / `rot 6, dx 16, dy -12` / `rot -7` | `DefenseReleaseStory` | cards thrown on the table are not laid straight: the attack lands tilted, the defence covers it at another angle and offset (so the two read as two plays, not one neat stack), the defender's own Sudo waits at its own tilt |
 | `GATHER_MS` | `360` | `DeckAnimationsStory` | gather the scattered discard before it flies |
 | `TURN_MS` | `460` | `DeckAnimationsStory` | flip a card back-up in place (discard→deck / merge prep) |
 | `AI_HOLD` | `4000` | `DrawCardStory` | table hold while the AI effect is read |
@@ -109,6 +135,34 @@ playground.
 | `BACK_DUR` / `BACK_STEP` | `600`/`90` | `Rebase` | fly the reordered three back to the deck / stagger |
 | `THROW_DUR` / `THROW_STEP` | `460`/`260` | `SystemUpgrade` | seat → centre throw / per-opponent stagger |
 | `HOLD_MS` / `CLEAR_STEP` | `2500`/`90` | `SystemUpgrade` | base hold before discard / centre → discard stagger |
+
+### The two ends of a match
+
+`GameDealStory` — the interface arriving, then the deal. Every beat of the arrival is one `hudIn`,
+and `BEAT` is the pause between beats, so the order reads as an order and not as one event.
+
+| Name | Value | Beat |
+|---|---|---|
+| `RAIL_MS` | `640` | the page rail slides in from its own edge (`dx: 44`) |
+| `BG_MS` | `900` | the table layer with its grid — a plain fade, and the longest: it is the room lighting up |
+| `PILE_MS` / `PILE_STAGGER` | `620` / `180` | the decks from the left (`dx: -34`) and the discard from the right (`dx: 34`) — one after the other, not together |
+| `SEAT_MS` / `SEAT_STAGGER` | `560` / `140` | the opponent seats drop in from above (`dy: -28`), each after the one before |
+| `DOCK_DELAY` | `320` | the dock rises from below (`dy: 30`) in the same beat as the seats |
+| `ZONE_MS` | `620` | the player's own release zone (`dy: 22`) — last of all, and only after the hand has turned over |
+| `BEAT` | `320` | the pause between one beat of the arrival and the next |
+| `DEAL_LEAD` | `420` | the table is set; before the first card leaves the deck |
+| `DEAL_STEP` / `ROUND_GAP` | `230` / `160` | between one card and the next / an extra breath between rounds, so rounds stay countable |
+| `HEAP_HOLD` | `640` | the finished heap stands open at the centre before it goes to the fan |
+| `FLIP_HOLD` / `REVEAL_HOLD` | `380` / `620` | it is all in the hand, then it turns over / the hand is read, and only then the zone arrives |
+
+`GameEndStory` — the last release, the poppers, the window.
+
+| Name | Value | Beat |
+|---|---|---|
+| `POPPERS` | `[0, 1] [620, 0.7] [1450, 1.25]` | `[when, power]` — three separate bangs, not one repeated. Power drives the piece count, the reach and the time in the air, which is what makes them three events |
+| `POP_PER_SIDE` | `33` | pieces per corner, before power scales it |
+| `OVER_AT` | `2400` | the GameOver window comes up WHILE the confetti is still in the air |
+| `CONFETTI_MS` | `8500` | by then every piece has flown its arc out and the volley can be taken down |
 
 ---
 
