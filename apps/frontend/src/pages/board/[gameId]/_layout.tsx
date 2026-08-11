@@ -1,12 +1,13 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
-import { DEFAULT_SETUP, isCounting, Table } from '@release/ui'
+import { DEFAULT_SETUP, isCounting } from '@release/ui'
 import { Outlet, useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { toBoardOver, toBoardState } from '~/entities/game/board'
 import { seatsFor } from '~/entities/game/seats'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
+import Board from './_Board'
 import styles from './_layout.module.css'
 
 // What the table shows before the first projection arrives — a beat on a live
@@ -78,7 +79,7 @@ export default function BoardPage() {
 
   return (
     <div className={styles.page} data-testid="board-page">
-      <Table
+      <Board
         state={state}
         over={over}
         now={now}
