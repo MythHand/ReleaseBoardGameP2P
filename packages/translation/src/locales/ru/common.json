@@ -220,7 +220,8 @@
     "pass": "пас",
     "drawn": "добор ✓",
     "locked": "PUSH после добора",
-    "canDefend": "можно отбить"
+    "canDefend": "можно отбить",
+    "gameStart": "старт игры"
   },
   "pending": {
     "confirm": "подтвердить",

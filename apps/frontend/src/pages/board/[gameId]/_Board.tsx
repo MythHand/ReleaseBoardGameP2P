@@ -10,7 +10,10 @@ import {
   Arrow,
   Badge,
   Button,
+  Card,
+  cardById,
   centerOf,
+  type DockView,
   Drawer,
   deriveDock,
   GameModes,
@@ -30,8 +33,10 @@ import {
   type ReleaseSlots,
   ReleaseZone,
   Rules,
+  restTransform,
   Seat,
   Slider,
+  type TableActions,
   TabRail,
   type TabRailItem,
   Toggle,
@@ -40,8 +45,10 @@ import {
   useArrow,
 } from '@release/ui'
 import type React from 'react'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BoardProps, Panel } from '~/entities/game/board/types'
+import type { IntroRefs } from '~/features/game-intro/useDealIntro'
+import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import styles from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
 
@@ -62,6 +69,13 @@ const DRAWER_WIDTH: Record<Panel, number> = {
   modes: 680, // режимы — как правила
   rules: 680, // правила — сильно шире
 }
+
+// The board while the intro runs: nothing the player does may reach the game.
+// One frozen object, so the gesture hook is not handed a new identity on every
+// frame of the deal.
+const INERT_ACTIONS: TableActions = {}
+
+const cls = (...parts: (string | undefined)[]) => parts.filter(Boolean).join(' ')
 
 const EMPTY_RELEASE: ReleaseSlots = {
   frontend: undefined,
@@ -118,20 +132,84 @@ function SettingsField({
 // Стол = активное состояние игры. Каждый блок позиционируется независимо
 // (абсолютно), без жёсткой сетки. Заполняет экран без скролла.
 export default function Board({
-  state,
+  state: live,
   room,
   copy,
   slots,
   over = null,
-  actions,
+  actions: liveActions,
   dock,
   now,
   panel: panelProp,
   onPanelChange,
+  intro,
 }: BoardProps) {
+  // ===== the opening =====
+  // Every ref the deal aims at. The shift the `hudIn` preset applies rides on
+  // `transform`, so a block whose own transform holds its position (the seats'
+  // row, the decks column) is animated through an INNER node — hence the
+  // wrappers below rather than the positioned blocks themselves.
+  const railRef = useRef<HTMLDivElement>(null)
+  const bgRef = useRef<HTMLDivElement>(null)
+  const decksRef = useRef<HTMLDivElement>(null)
+  const discardRef = useRef<HTMLDivElement>(null)
+  const seatsRef = useRef<HTMLDivElement>(null)
+  const dockRef = useRef<HTMLDivElement>(null)
+  const zoneRef = useRef<HTMLDivElement>(null)
+  const deckBoxRef = useRef<HTMLDivElement>(null)
+  const centreRef = useRef<HTMLDivElement>(null)
+  const handRef = useRef<HTMLDivElement>(null)
+  const seatEls = useRef<Record<string, HTMLElement | null>>({})
+  const introRefs = useMemo<IntroRefs>(
+    () => ({
+      rail: railRef,
+      bg: bgRef,
+      decks: decksRef,
+      discard: discardRef,
+      seats: seatsRef,
+      dock: dockRef,
+      zone: zoneRef,
+      deckBox: deckBoxRef,
+      centre: centreRef,
+      hand: handRef,
+      seatOf: (player: string) => seatEls.current[player] ?? null,
+    }),
+    [],
+  )
+
+  // The blocks stay hidden from the FIRST committed frame until the intro is
+  // over — not merely while it is `active`. `hudIn` only holds a block down
+  // once its own animation exists, and the last of them is armed seconds in.
+  const [introOver, setIntroOver] = useState(false)
+  const onIntroDone = useCallback(() => {
+    setIntroOver(true)
+    intro?.onDone()
+  }, [intro?.onDone])
+  const deal = useDealIntro({
+    live,
+    view: intro?.view ?? null,
+    events: intro?.events ?? [],
+    refs: introRefs,
+    onDone: onIntroDone,
+  })
+  const entering = intro != null && !introOver
+  const enter = entering ? styles.enter : undefined
+  // While the deal runs the board renders its shadow of the projection. The
+  // shadow's last frame IS the projection, so the handover changes nothing on
+  // screen — provided nothing here keys off `introPhase`, and nothing does.
+  const state = deal.shadow ?? live
+  const actions = deal.active ? INERT_ACTIONS : liveActions
+
   const { you, opponents, decks, turn, history, setup } = state
   const derived = deriveDock(state, state.selfId, now)
-  const dockView = { ...derived, ...dock }
+  // Nobody is on turn during the opening: the dock stands in its waiting state
+  // and names the moment where it would name a player.
+  const dockView: DockView = deal.active
+    ? { state: 'waiting', danger: false, seconds: 0, progress: 0, activePlayer: undefined }
+    : { ...derived, ...dock }
+  const dockCopy = deal.active
+    ? { ...copy.turnDock, turnOf: copy.turnDock.gameStart }
+    : copy.turnDock
   const {
     role = 'guest',
     code,
@@ -182,7 +260,8 @@ export default function Board({
   // discarding whatever the mousemove listener had followed it to. `you.hand`
   // is still read inside the effect (to resolve the selected uid's slot
   // element), just not watched for changes.
-  const handRef = useRef<HTMLDivElement>(null)
+  // (`handRef` is declared with the intro's refs above — the deal lands its
+  // cards in this very element, so the two must be the same node.)
   const arrow = useArrow()
   // biome-ignore lint/correctness/useExhaustiveDependencies: `you.hand` is read to resolve the selected uid's slot element, not watched — see the comment above for why it must stay out of the dependency array
   useEffect(() => {
@@ -210,11 +289,28 @@ export default function Board({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [gestures.phase, gestures.cancel])
 
+  // Escape skips the opening. Same window binding and the same reason as the
+  // cancel above; `finish` is idempotent, so a second press is a no-op.
+  const dealFinish = deal.finish
+  useEffect(() => {
+    if (!deal.active) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dealFinish()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [deal.active, dealFinish])
+
   // A click that lands outside any hand slot while a target is pending reads
   // as "changed my mind" — cancel. Clicks that land on a legal target already
   // resolve (and reset) through onTargetPick before bubbling here, so this is
   // a no-op in that case, not a race.
   const handleTableClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // …and anywhere on the table while the opening plays, it skips it.
+    if (deal.active) {
+      dealFinish()
+      return
+    }
     if (gestures.phase !== 'selected') return
     const target = e.target as HTMLElement
     if (target.closest('[data-hand-slot]')) return
@@ -265,50 +361,102 @@ export default function Board({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-cancel for an in-flight target selection; the accessible affordance is the Escape handler above
     <div className={styles.table} onClick={handleTableClick} role="presentation">
-      <HudBackground tone="neutral" className={styles.bgLayer} />
+      {/* the table's own ambience — a layer, so the opening can bring it in
+          whole without touching the screen's base fill */}
+      <div className={cls(styles.bgWrap, enter)} ref={bgRef}>
+        <HudBackground tone="neutral" className={styles.bgLayer} />
+      </div>
       <Arrow from={arrow.from} to={arrow.to} />
 
       {slots?.banner && <div className={styles.banner}>{slots.banner}</div>}
       {slots?.corner && <div className={styles.corner}>{slots.corner}</div>}
 
-      <div className={styles.opponents}>
+      {/* the seats: each in its own wrapper, so the opening can drop them in one
+          after another and the deal can aim a card at the seat it belongs to */}
+      <div className={styles.opponents} ref={seatsRef}>
         {opponents.map((p) => {
           const eliminated = Boolean(p.eliminated)
           const disconnected = disconnectedIds.has(p.id)
           // выбыл → карты в сброс: пустая зона релиза, рука = 0
           const shown = eliminated ? { ...p, handCount: 0, release: EMPTY_RELEASE } : p
           return (
-            <Seat
+            <div
               key={p.id}
-              player={shown}
-              active={turn === p.id}
-              eliminated={eliminated}
-              disconnected={disconnected}
-              copy={copy.seat}
-              onPick={(target) => gestures.onTargetPick(target)}
-              targets={gestures.targets}
-            />
+              className={enter}
+              ref={(el) => {
+                seatEls.current[p.id] = el
+              }}
+            >
+              <Seat
+                player={shown}
+                active={turn === p.id}
+                eliminated={eliminated}
+                disconnected={disconnected}
+                copy={copy.seat}
+                onPick={(target) => gestures.onTargetPick(target)}
+                targets={gestures.targets}
+              />
+            </div>
           )
         })}
       </div>
 
       <div className={styles.decks}>
-        <Pile label={copy.table.deck} deck="base" count={decks.main} width={150} countPos="tl" />
-        <Pile label={copy.table.events} deck="ai" count={decks.events} width={150} countPos="tl" />
+        <div className={cls(styles.deckStack, enter)} ref={decksRef}>
+          <Pile
+            label={copy.table.deck}
+            deck="base"
+            count={decks.main}
+            width={150}
+            countPos="tl"
+            boxRef={deckBoxRef}
+          />
+          <Pile
+            label={copy.table.events}
+            deck="ai"
+            count={decks.events}
+            width={150}
+            countPos="tl"
+          />
+        </div>
       </div>
 
       {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними
           «глубина» стопки, счётчик показывает весь сброс */}
       <div className={styles.discard}>
-        <Pile
-          label={copy.table.discard}
-          heap={decks.discardHeap}
-          heapShow={HEAP_SHOW}
-          topCard={decks.discard}
-          count={decks.discardCount}
-          width={116}
-        />
+        <div className={enter} ref={discardRef}>
+          <Pile
+            label={copy.table.discard}
+            heap={decks.discardHeap}
+            heapShow={HEAP_SHOW}
+            topCard={decks.discard}
+            count={decks.discardCount}
+            width={116}
+          />
+        </div>
       </div>
+
+      {/* the centre: the player's own cards gather here before they go into the
+          fan, each at its own scatter — a small heap, not a neat stack. It is
+          mounted for the whole of an intro-bearing mount (the sequencer aims at
+          it from its first layout effect) and is empty the rest of the time. */}
+      {intro && (
+        <div className={styles.centre} ref={centreRef}>
+          {deal.staged.map((s) => {
+            const data = cardById(s.card)
+            if (!data) return null
+            return (
+              <div
+                key={s.uid}
+                className={styles.stagedCard}
+                style={{ transform: restTransform(s.sc) }}
+              >
+                <Card card={data} faceDown={s.faceDown} interactive={false} width="100%" />
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <div className={styles.you}>
         {youEliminated ? (
@@ -317,18 +465,44 @@ export default function Board({
           </Badge>
         ) : (
           <>
-            <ReleaseZone
-              release={you.release}
-              size="100px"
-              player={state.selfId}
-              onPick={(target) => gestures.onTargetPick(target)}
-              targets={gestures.targets}
-            />
+            {/* the zone is the last thing to arrive: it is yours, and it comes
+                once you have a hand to play from */}
+            <div className={enter} ref={zoneRef}>
+              <ReleaseZone
+                release={you.release}
+                size="100px"
+                player={state.selfId}
+                onPick={(target) => gestures.onTargetPick(target)}
+                targets={gestures.targets}
+              />
+            </div>
             <div className={styles.handWrap} ref={handRef}>
               <Hand
                 items={you.hand}
-                onCardClick={(i) => gestures.onCardClick(i)}
+                // the fan opens room for the arriving heap while it travels
+                gapAt={deal.gapAt}
+                gapSize={deal.gapSize}
+                // while the deal runs the hand is held: no clicks reach the
+                // gesture machine, and the cards that travelled closed stay
+                // closed until the flip. Both are gone the moment it ends, so
+                // the released hand is the plain one this board always drew.
+                onCardClick={deal.active ? undefined : (i) => gestures.onCardClick(i)}
                 accentAt={gestures.accentAt}
+                renderFace={
+                  deal.active
+                    ? (item, ctx) => (
+                        <Card
+                          card={item.card}
+                          faceDown={deal.faceDown(item.uid)}
+                          interactive={false}
+                          tilt={ctx.tilt}
+                          width={ctx.width}
+                          state={ctx.state}
+                          accent={ctx.accent}
+                        />
+                      )
+                    : undefined
+                }
               />
             </div>
           </>
@@ -337,18 +511,20 @@ export default function Board({
 
       {/* служебный док хода — низ слева, под колодами, слева от руки */}
       <div className={styles.turnDock}>
-        <TurnDock
-          state={dockView.state}
-          danger={dockView.danger}
-          seconds={dockView.seconds}
-          progress={dockView.progress}
-          activePlayer={dockView.activePlayer}
-          copy={copy.turnDock}
-          paused={paused}
-          onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
-          onPush={actions?.onPush}
-          onPass={actions?.onPass}
-        />
+        <div className={enter} ref={dockRef}>
+          <TurnDock
+            state={dockView.state}
+            danger={dockView.danger}
+            seconds={dockView.seconds}
+            progress={dockView.progress}
+            activePlayer={dockView.activePlayer}
+            copy={dockCopy}
+            paused={paused}
+            onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
+            onPush={actions?.onPush}
+            onPass={actions?.onPass}
+          />
+        </div>
         {/* you already passed on the open window — TurnDock has no notion of
             "unpass", so the affordance to take it back lives here instead */}
         {state.window?.passed.includes(state.selfId) && (
@@ -369,8 +545,12 @@ export default function Board({
         />
       )}
 
-      {/* вертикальный рейл у правого края — переключает панели drawer */}
-      <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
+      {/* вертикальный рейл у правого края — переключает панели drawer. Слой
+          нужен только чтобы вести его появление, не трогая его собственный
+          transform (the rail is the first thing the opening brings in). */}
+      <div className={cls(styles.railLayer, enter)} ref={railRef}>
+        <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
+      </div>
 
       {/* выезжающая панель поверх контента (ширина — per-tab) */}
       <Drawer open={panel !== null} width={drawerWidth} className={styles.drawer}>
@@ -477,6 +657,10 @@ export default function Board({
           copy={copy.gameOver}
         />
       )}
+
+      {/* the cards in the air: the carrier for the deal, and the arrival step
+          for the heap going into the fan. Last, so they fly over everything. */}
+      {deal.overlays}
     </div>
   )
 }

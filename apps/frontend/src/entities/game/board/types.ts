@@ -6,6 +6,7 @@
 // two will drift, and contract.test-d.ts is what makes the drift a compile
 // error instead of a misrender.
 
+import type { Event, PlayerView } from '@release/engine'
 import type {
   CardData,
   DockView,
@@ -151,7 +152,10 @@ export interface BoardCopyBundle {
   reconnect: ReconnectCopy
   gameOver: GameOverCopy
   lobbyCode: LobbyCodeCopy
-  turnDock: TurnDockCopy
+  // The dock's copy plus one line the kit has no notion of: while the deal
+  // intro runs nobody is on turn, so the dock names the moment where it would
+  // name a player.
+  turnDock: TurnDockCopy & { gameStart: string }
   pause?: PauseGameCopy
   pending: PendingPromptCopy
   window: WindowCopy
@@ -190,4 +194,11 @@ export interface BoardProps {
   // `onPanelChange` — which is how the page binds the drawer to the URL.
   panel?: Panel | null
   onPanelChange?: (panel: Panel | null) => void
+  // The opening. Present only on a fresh entry; the board renders the intro's
+  // shadow of `state` while it runs and the live `state` afterwards.
+  intro?: {
+    view: PlayerView | null
+    events: Event[]
+    onDone: () => void
+  }
 }

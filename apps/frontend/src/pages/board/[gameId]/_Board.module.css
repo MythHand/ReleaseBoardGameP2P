@@ -9,6 +9,22 @@
   isolation: isolate; /* own stacking context so the bg layer sits behind content */
 }
 
+/* Обёртка HUD-фона: слой целиком, чтобы вступление могло привести его одним
+   куском (opacity ведёт пресет hudIn), не трогая базовую заливку стола. */
+.bgWrap {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+/* Блок интерфейса до своей очереди — не показан. Дальше его ведёт пресет hudIn
+   (fill: both держит и паузу до старта, и конечное состояние). Сдвиг вешается
+   на ВНУТРЕННИЙ узел: на самих блоках transform держит позиционирование.
+   Класс висит только пока идёт вступление — вне его разметка ровно та же. */
+.enter {
+  opacity: 0;
+}
+
 /* HUD-фон (нейтральный) — слой над базовым фоном, под контентом (z-index: -1).
    Селектор специфичнее .bg из HudBackground, иначе его position:relative победит
    по порядку и слой схлопнется в поток. */
@@ -37,10 +53,15 @@
   position: absolute;
   inset-block-start: 50%;
   inset-inline-start: 26px;
+  transform: translateY(-50%);
+}
+
+/* колонка колод живёт на внутреннем узле: transform блока держит центровку,
+   а вступление сдвигает именно этот узел */
+.deckStack {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  transform: translateY(-50%);
 }
 
 .discard {
@@ -56,6 +77,39 @@
 }
 
 .discard > * {
+  pointer-events: auto;
+}
+
+/* центр стола — чуть ВЫШЕ геометрической середины (42%, не 50%): так он не
+   спорит с рукой и превью, которое из неё поднимается. То же значение во всех
+   сценах. Здесь в нём собирается кучка карт игрока перед уходом в веер.
+   pointer-events: none — вне сдачи это пустая коробка, она не должна ловить
+   клики по столу. */
+.centre {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* карта в этой кучке — та же коробка, свой разброс (как в сбросе) */
+.stagedCard {
+  position: absolute;
+  inset: 0;
+}
+
+/* слой правой навигации: сам TabRail позиционируется по краю, слой нужен только
+   чтобы вести его появление, не трогая его собственный transform */
+.railLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.railLayer > * {
   pointer-events: auto;
 }
 

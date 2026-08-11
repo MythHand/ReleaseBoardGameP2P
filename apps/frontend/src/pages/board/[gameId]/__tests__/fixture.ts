@@ -6,6 +6,7 @@
 // than its `src` directory, so that subpath does not resolve here. `index.ts`
 // already assembles the same object as `resources.en.common`, so that's the
 // public-surface route to the same data.
+import type { Event, PlayerView } from '@release/engine'
 import { resources } from '@release/translation'
 // `makeTable` builds the deterministic mock snapshot (roster, hand, history…)
 // that both the kit's Table suite and this ported one assert against. It is
@@ -65,4 +66,38 @@ export function makeBoardProps(over: Partial<BoardProps> = {}): BoardProps {
     now: 0,
     ...over,
   } as BoardProps
+}
+
+// The opening as the intro reads it: a projection nobody has moved in yet, and
+// the deal events that produced it. Same shapes as the sequencer's own suite
+// (features/game-intro/__tests__/useDealIntro.test.tsx) — minimal but real, no
+// casts, so drift in PlayerView / Event is a compile error here too.
+export function introFixture(): { view: PlayerView; events: Event[] } {
+  return {
+    view: {
+      self: {
+        id: 'p1',
+        name: 'One',
+        hand: [
+          { uid: 'protection-debugger#0', id: 'protection-debugger' },
+          { uid: 'attack-bug#1', id: 'attack-bug' },
+        ],
+        release: {},
+        playable: [],
+        frozen: [],
+      },
+      opponents: [{ id: 'p2', name: 'Two', handCount: 2, release: {}, eliminated: false }],
+      decks: { piles: [100], events: 21, discardCount: 0 },
+      turn: { player: 'p1', index: 0, hasDrawn: false },
+      window: null,
+      pending: null,
+      // `Setup` is Record<string, string> in both the engine and the kit.
+      setup: {},
+      over: null,
+    },
+    events: [
+      { id: 1, type: 'dealt', player: 'p1', count: 2, open: ['protection-debugger'] },
+      { id: 2, type: 'dealt', player: 'p2', count: 2, open: ['protection-debugger'] },
+    ],
+  }
 }

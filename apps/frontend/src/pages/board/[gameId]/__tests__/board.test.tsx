@@ -6,6 +6,14 @@ import type { UseLobby } from '~/entities/lobby'
 import BoardPage from '../_layout'
 import StatsPage from '../stats'
 
+// The route now hands the board an opening to play (#89). This suite is about
+// the route, not the choreography, so it takes the reduced-motion path: the
+// intro collapses to its last frame during the first commit and the board this
+// file has always asserted against is the one on screen. Without it every test
+// here runs on top of a live, second-long sequence whose re-renders outlive the
+// file (the kit's Hand arms a 220ms zoom timer it only clears on its next run).
+vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => true }))
+
 // The board reads the roster through the session, so every test drives it from
 // here rather than through a live transport.
 let sessionValue: UseLobby

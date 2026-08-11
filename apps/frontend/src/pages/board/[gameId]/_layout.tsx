@@ -83,6 +83,10 @@ export default function BoardPage() {
         state={state}
         over={over}
         now={now}
+        // The opening. `onDone` is the gate that lets the game move: it is
+        // wired to the session in Task 14 (`session.introReady`), and until
+        // then reporting completion goes nowhere.
+        intro={{ view: game.view, events: game.events, onDone: () => {} }}
         room={{
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,
