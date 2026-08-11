@@ -1,5 +1,4 @@
 import type { Action, Choice } from '../actions'
-import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { DiscardReason } from '../events'
 import { randomAt } from '../rng'
@@ -291,24 +290,16 @@ export function resolveAiEvent(
       }
     }
 
-    case 'ai-good-vibe-coding': {
-      let next = state
-      for (let i = 0; i < 2; i += 1) {
-        const pile = next.decks.main[0]
-        if (!pile || pile.length === 0) continue
-        const top = pile[0]
-        const main = next.decks.main.map((p, idx) => (idx === 0 ? p.slice(1) : p))
-        if (rulesFor(top.id)?.kind === 'trigger') {
-          next = fireTrigger({ ...next, decks: { ...next.decks, main } }, log, player, top, at)
-        } else {
-          next = setHand({ ...next, decks: { ...next.decks, main } }, player, [
-            ...next.players[player].hand,
-            top,
-          ])
-        }
-      }
-      return { ...next, eventSeq: log.seq }
-    }
+    case 'ai-good-vibe-coding':
+      // "доберите 2 карты (карты AI/Error 503 срабатывают как при обычном
+      // доборе)" — two cards off the draw pile, one at a time. Handing the
+      // sequence to `drawing` rather than looping here is what makes the
+      // "срабатывают" half true: a trigger drawn first pauses the sequence and
+      // the second card waits, instead of a second trigger overwriting the
+      // single pending slot and erasing the first threat.
+      //
+      // The reducer runs and resumes the sequence; this only declares it.
+      return { ...state, drawing: { player, piles: [0, 0] }, eventSeq: log.seq }
 
     case 'ai-bad-vibe-coding':
       // "сбросьте одну карту из руки" — nothing about the turn. An empty hand

@@ -27,6 +27,9 @@ export function playableFor(state: GameState, viewerId: PlayerId): CardUid[] {
   // pending view instead.
   if (state.pending) return []
   if (state.window) return []
+  // Answer 2: playing from hand is impossible while a draw is in progress. A
+  // paused sequence is still in progress — the pause is owed to a trigger, not
+  // an opening for the drawer to spend on something else.
   if (state.turn.player !== viewerId) return []
   if (state.eliminated.includes(viewerId)) return []
 

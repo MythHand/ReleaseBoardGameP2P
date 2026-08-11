@@ -88,6 +88,7 @@ export function createGame(config: GameConfig): GameState {
     eliminated: [],
     turn: { player: seating[0], index: 0, hasDrawn: false, releasesPlayed: 0 },
     decks: { main: [remaining.items], events: eventDeck.items, discard: [] },
+    drawing: null,
     pending: null,
     window: null,
     setup: config.setup,

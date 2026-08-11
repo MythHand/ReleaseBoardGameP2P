@@ -124,6 +124,16 @@ export interface GameState {
     discard: CardInstance[]
   }
 
+  // A draw in progress, as the remaining pile indices to draw from — one entry
+  // per card still owed. A draw is one action carrying an interruptible
+  // sequence (rules decisions answer 2): a trigger drawn partway through pauses
+  // it, and resolving that trigger resumes it where it stopped.
+  //
+  // Indices rather than a count because the same sequence serves both shapes:
+  // Good Vibe-Coding is two cards off pile 0 (`[0, 0]`), and the multi-pile
+  // draw #61 slice A introduces is one card off each existing pile (`[0, 1, …]`).
+  drawing: { player: PlayerId; piles: number[] } | null
+
   pending: Pending | null
   window: ReactionWindow | null
 

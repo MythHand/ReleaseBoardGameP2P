@@ -61,6 +61,69 @@ function refillFromDiscard(state: GameState, log: Log): GameState {
   }
 }
 
+// One step of an in-progress draw, repeated until the sequence is spent or
+// something interrupts it. This is the machinery rules decisions answer 2
+// describes: the draw is neither atomic nor a series of player-issued actions,
+// but one action carrying a sequence that survives a pending.
+//
+// It stops rather than finishing when the drawer can no longer be drawing —
+// the game ended, they were eliminated, or the turn moved on. Each of those
+// used to keep dealing: a card into an eliminated player's hand, or a second
+// card for a player whose turn Hallucination had already ended.
+export function runDrawSequence(state: GameState, log: Log, at: number): GameState {
+  let next = state
+  while (next.drawing && next.drawing.piles.length > 0) {
+    const owed = next.drawing
+    if (next.over || next.eliminated.includes(owed.player) || next.turn.player !== owed.player) {
+      return { ...next, drawing: null, eventSeq: log.seq }
+    }
+
+    const [pileIndex, ...rest] = owed.piles
+    const remaining = rest.length > 0 ? { ...owed, piles: rest } : null
+    const filled = refillFromDiscard(next, log)
+    const pile = filled.decks.main[pileIndex]
+    // A pile with nothing in it and nothing to recycle yields no card; the step
+    // is spent either way rather than retried forever.
+    if (!pile || pile.length === 0) {
+      next = { ...filled, drawing: remaining, eventSeq: log.seq }
+      continue
+    }
+
+    const card = pile[0]
+    const main = filled.decks.main.map((p, i) => (i === pileIndex ? p.slice(1) : p))
+    const advanced: GameState = {
+      ...filled,
+      decks: { ...filled.decks, main },
+      drawing: remaining,
+    }
+
+    if (rulesFor(card.id)?.kind === 'trigger') {
+      log.add({
+        type: 'drawn',
+        player: owed.player,
+        pile: pileIndex,
+        deckSize: main[pileIndex].length,
+      })
+      next = fireTrigger(advanced, log, owed.player, card, at)
+    } else {
+      log.add({
+        type: 'drawn',
+        player: owed.player,
+        card: card.id,
+        pile: pileIndex,
+        deckSize: main[pileIndex].length,
+        visibleTo: [owed.player],
+      })
+      next = setHand(advanced, owed.player, [...advanced.players[owed.player].hand, card])
+    }
+
+    // Paused, not finished: whatever the card raised is owed first, and the
+    // rest of the sequence waits in `drawing` for the resume.
+    if (next.pending) return { ...next, eventSeq: log.seq }
+  }
+  return { ...next, drawing: null, eventSeq: log.seq }
+}
+
 function onDraw(state: GameState, action: Action & { type: 'DRAW' }): Reduction {
   if (state.over) return reject(state, action, 'game is over')
   if (state.pending) return reject(state, action, 'a decision is pending')
@@ -213,6 +276,21 @@ export function reduce(state: GameState, action: Action): Reduction {
     return reject(state, action, 'malformed action')
   }
 
+  const result = dispatch(state, action)
+  // A paused draw resumes the moment nothing is owed ahead of it, inside the
+  // same reduction that cleared the way. Doing it here rather than in each
+  // resolution path means every way a pending can end — answered, declined,
+  // fatal — resumes identically, and no future one can forget to.
+  if (!result.state.drawing || result.state.pending) return result
+  const log = createLog(result.state.eventSeq)
+  const at = 'at' in action && typeof action.at === 'number' ? action.at : 0
+  return {
+    state: runDrawSequence(result.state, log, at),
+    events: [...result.events, ...log.events],
+  }
+}
+
+function dispatch(state: GameState, action: Action): Reduction {
   switch (action.type) {
     case 'DRAW':
       return onDraw(state, action)
