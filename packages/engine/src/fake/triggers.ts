@@ -4,7 +4,7 @@ import type { Reduction } from '../engine'
 import type { DiscardReason } from '../events'
 import { randomAt } from '../rng'
 import type { CardInstance, GameState, NeutralizeMethod, PlayerId, ReleaseSlot } from '../state'
-import { createLog, endTurn, type Log, reject, setHand } from './core'
+import { checkWin, createLog, endTurn, type Log, reject, setHand } from './core'
 import { discardOptions } from './discard'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
@@ -243,14 +243,20 @@ export function resolveAiEvent(
         id: `release-${slot}`,
       }
       log.add({ type: 'released', player, slot, card: placed.id })
-      return {
-        ...state,
-        players: {
-          ...state.players,
-          [player]: { ...me, release: { ...me.release, [slot]: { card: placed } } },
+      // This path never goes through `placeRelease`, so it has to ask about the
+      // win itself — a third release arriving by AI event completed a winning
+      // zone and the game carried on regardless.
+      return checkWin(
+        {
+          ...state,
+          players: {
+            ...state.players,
+            [player]: { ...me, release: { ...me.release, [slot]: { card: placed } } },
+          },
+          eventSeq: log.seq,
         },
-        eventSeq: log.seq,
-      }
+        log,
+      )
     }
 
     case 'ai-monitoring': {

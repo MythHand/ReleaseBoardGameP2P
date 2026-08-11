@@ -2,7 +2,15 @@ import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { Event } from '../events'
-import type { CardId, CardUid, GameState, PlayerId, PlayerState, Setup } from '../state'
+import type {
+  CardId,
+  CardUid,
+  GameState,
+  PlayerId,
+  PlayerState,
+  ReleaseSlot,
+  Setup,
+} from '../state'
 
 // Omit over a union collapses to the shared keys, so distribute it first —
 // otherwise an event input loses every variant-specific field.
@@ -90,7 +98,32 @@ export function nextSeat(state: GameState, from: PlayerId): PlayerId {
   return from
 }
 
+const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
+
+// Three different release types in one zone ends the game. Every mutation that
+// can complete a zone has to ask — placement is only the most obvious one, and
+// when it was the only caller a zone completed by theft or by an AI event won
+// nothing until someone later happened to play a release.
+//
+// Lives here rather than in release.ts because window.ts is where a contested
+// release is finally settled, and release.ts already imports window.ts.
+//
+// Idempotent: a game that is already over keeps the winner it had, so callers
+// can ask freely without racing to log `gameOver` twice.
+export function checkWin(state: GameState, log: Log): GameState {
+  if (state.over) return { ...state, eventSeq: log.seq }
+  for (const id of state.seating) {
+    if (state.eliminated.includes(id)) continue
+    if (SLOTS.every((slot) => state.players[id].release[slot])) {
+      log.add({ type: 'gameOver', winner: id, condition: 'release' })
+      return { ...state, over: { winner: id, condition: 'release' }, eventSeq: log.seq }
+    }
+  }
+  return { ...state, eventSeq: log.seq }
+}
+
 // Ends the turn, or holds it open when the hand is over the mode's limit.
+//
 // Lives here (rather than in reduce.ts, its natural home) because triggers.ts's
 // `ai-hallucination` event also ends the turn immediately, and reduce.ts
 // already needs to import triggers.ts for `fireTrigger`/`onNeutralize` —
