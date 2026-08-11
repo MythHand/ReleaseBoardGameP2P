@@ -1,0 +1,10 @@
+/* a card on its way into the hand. The pivot is the fan slot's own (bottom centre),
+   so the tilt and the scale land exactly on the slot instead of drifting on the last
+   frame. The layer is set inline: high while it travels, the slot's own once it
+   tucks under the fan. The duration MUST equal FLIGHT_MS. */
+.arriving {
+  position: fixed;
+  transform-origin: bottom center;
+  transition: transform 480ms var(--ease-soft);
+  will-change: transform;
+}
