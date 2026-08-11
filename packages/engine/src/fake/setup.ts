@@ -92,7 +92,13 @@ export function createGame(config: GameConfig): GameState {
     gameId: config.gameId,
     seed,
     rngCursor: cursor,
-    eventSeq: 0,
+    // The deal genuinely consumes the first `seating.length` event ids — one
+    // `dealt` per player, numbered 1..N by `setupEvents` below — so the
+    // returned state's counter starts past them. Without this, `reduce`'s
+    // first committed event (via `createLog(state.eventSeq)`) would reuse id 1
+    // and collide with the deal's own id 1, which breaks once both feeds are
+    // merged into one history (the `parent` field is an event id).
+    eventSeq: seating.length,
     seating,
     players,
     eliminated: [],
@@ -113,6 +119,10 @@ export function createGame(config: GameConfig): GameState {
 //
 // Every field here is public: a count is not a secret, and `open` names only
 // what the rules deal face up. The closed four are never identified.
+//
+// Ids 1..seating.length: `createGame` reserves exactly this many ids for the
+// deal (see its `eventSeq` above) before `reduce`'s own `createLog` starts
+// counting from there, so the two feeds are disjoint and mergeable.
 export function setupEvents(state: GameState): Event[] {
   return state.seating.map((id, n) => {
     const hand = state.players[id].hand
