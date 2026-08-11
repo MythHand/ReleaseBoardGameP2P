@@ -24,6 +24,7 @@ import type { GameLink, Sync } from './session/link'
 import { createSession, type SessionRef } from './session/referee'
 import { isRelayable, relayTargets } from './session/relay'
 import { attachKeeper, createRemoteLink } from './session/remoteLink'
+import { createStartGate, type StartGate } from './session/startGate'
 import { createTransport, type Transport } from './transport/peer'
 import type { PeerInfo, Setup, WireMessage } from './types'
 
@@ -96,6 +97,9 @@ export interface UseLobby {
   transferHost(id: string): void
   setSetup(setup: Setup): void
   startGame(): void
+  // The local seat has finished its opening deal. A no-op outside a game, and
+  // for a spectator, whose report the host's gate is not waiting on.
+  introReady(): void
   disband(): void
   leaveSession(): void
   clearError(): void
@@ -118,6 +122,12 @@ export function useLobby(): UseLobby {
   const sessionRef = useRef<SessionRef | null>(null)
   const keeperRef = useRef<ReturnType<typeof attachKeeper> | null>(null)
   const remoteRef = useRef<ReturnType<typeof createRemoteLink> | null>(null)
+  // The host's start gate, born with the keeper and dying with it: it holds a
+  // pending cap timer, so it must never outlive the session it gates.
+  const gateRef = useRef<StartGate | null>(null)
+  // `gameId` as a ref, so reporting readiness reads the live value instead of
+  // whichever render closed over it.
+  const gameIdRef = useRef<string | null>(null)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
   // Whether the guest's DataChannel to the host ever opened. Distinguishes a
@@ -220,10 +230,12 @@ export function useLobby(): UseLobby {
           const r = handleReady(current, msg.from)
           commit(r.state)
           dispatch(r.outgoing)
-        } else if (msg.type === 'INTENT') {
+        } else if (msg.type === 'INTENT' || msg.type === 'INTRO_READY') {
           // The only party that calls into the engine. `applyIntent` resolves the
           // seat from the sender's peer id and stamps the player itself, so a
           // peer cannot act for anyone but itself however it labels the frame.
+          // A seat's INTRO_READY is resolved the same way, off the connection —
+          // and like an intent it is addressed to the keeper, never relayed.
           keeperRef.current?.handleMessage(msg)
         } else {
           // Star topology: the host forwards any other peer-originated message
@@ -276,6 +288,7 @@ export function useLobby(): UseLobby {
             remote.link.subscribe(setGameSync)
             setGameLink(() => remote.link)
           }
+          gameIdRef.current = msg.payload.gameId
           setGameId(msg.payload.gameId)
           break
         }
@@ -493,7 +506,12 @@ export function useLobby(): UseLobby {
     setErrorKind(null)
     setIsHost(false)
     // Or returning to /start would immediately bounce back to the board.
+    gameIdRef.current = null
     setGameId(null)
+    // Before the keeper goes: a gate left running would fire its 12s cap into a
+    // session that no longer exists.
+    gateRef.current?.cancel()
+    gateRef.current = null
     keeperRef.current?.close()
     remoteRef.current?.link.close()
     keeperRef.current = null
@@ -547,7 +565,12 @@ export function useLobby(): UseLobby {
     })
     const ref: SessionRef = { current: session }
     sessionRef.current = ref
-    const keeper = attachKeeper({ ref, transport: t, now: () => Date.now() })
+    // Every seat, including the host's own: one rule for the table. Spectators
+    // hold no seat and are never waited on — they have no projection to replay,
+    // so they never run a deal and could never report done.
+    const gate = createStartGate({ expect: seats.map((s) => s.playerId) })
+    gateRef.current = gate
+    const keeper = attachKeeper({ ref, transport: t, now: () => Date.now(), gate })
     keeperRef.current = keeper
     keeper.link.subscribe(setGameSync)
     setGameLink(() => keeper.link)
@@ -556,8 +579,26 @@ export function useLobby(): UseLobby {
     // link by the time its projection arrives. DataChannels preserve order, so
     // GAME_STARTING is always ahead of the SYNC that follows it.
     dispatch([{ to: 'broadcast', message: { type: 'GAME_STARTING', payload: { gameId: id } } }])
+    gameIdRef.current = id
     setGameId(id)
     keeper.resync()
+  }, [dispatch])
+
+  // The local seat has finished its opening. The host reports into its own
+  // keeper; a guest sends the frame, and the host's keeper resolves the seat
+  // from the connection it arrived on — the same path an intent takes, so a
+  // peer cannot report for somebody else.
+  const introReady = useCallback(() => {
+    const id = gameIdRef.current
+    const current = stateRef.current
+    // No game means nothing to report into: send nothing, touch nothing.
+    if (!id || !current) return
+    if (isHostRef.current) {
+      const t = transportRef.current
+      if (t) keeperRef.current?.introReady(t.id)
+      return
+    }
+    dispatch([{ to: current.hostId, message: { type: 'INTRO_READY', payload: { gameId: id } } }])
   }, [dispatch])
 
   const disband = useCallback(() => {
@@ -605,6 +646,7 @@ export function useLobby(): UseLobby {
       transferHost,
       setSetup,
       startGame,
+      introReady,
       disband,
       leaveSession,
       clearError,
@@ -627,6 +669,7 @@ export function useLobby(): UseLobby {
       transferHost,
       setSetup,
       startGame,
+      introReady,
       disband,
       leaveSession,
       clearError,

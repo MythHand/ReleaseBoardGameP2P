@@ -52,6 +52,7 @@ function base(): UseLobby {
     kick: vi.fn(),
     setMaxPlayers: vi.fn(),
     startGame: vi.fn(),
+    introReady: vi.fn(),
     transferHost: vi.fn(),
     setSetup: vi.fn(),
     disband: vi.fn(),

@@ -94,10 +94,11 @@ export default function BoardPage() {
         over={over}
         now={now}
         // The opening — for a seated peer only (see `seated` above). `onDone`
-        // is the gate that lets the game move: it is wired to the session in
-        // Task 14 (`session.introReady`), and until then reporting completion
-        // goes nowhere.
-        intro={seated ? { view: game.view, events: game.events, onDone: () => {} } : undefined}
+        // reports this seat to the host's start gate: until every seat has
+        // reported (or the cap fires), no peer's action may reach the engine.
+        intro={
+          seated ? { view: game.view, events: game.events, onDone: session.introReady } : undefined
+        }
         room={{
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,
