@@ -27,7 +27,6 @@ const config = (setup: Setup = BASE): GameConfig => ({
 
 const FE: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
 const BE: CardInstance = { uid: 'release-backend#0', id: 'release-backend' }
-const DB: CardInstance = { uid: 'release-database#0', id: 'release-database' }
 const CR: CardInstance = { uid: 'support-code-review#0', id: 'support-code-review' }
 const MON: CardInstance = { uid: 'protection-monitoring#0', id: 'protection-monitoring' }
 const BUG: CardInstance = { uid: 'attack-bug#0', id: 'attack-bug' }
@@ -168,19 +167,10 @@ it('never lets Debugger be played proactively', () => {
   expect(r.events[0].type).toBe('rejected')
 })
 
-it('ends the game when a third release lands', () => {
-  const s = handed([DB], { ...BASE, releaseCond: 'easy' })
-  const primed: GameState = {
-    ...s,
-    players: {
-      ...s.players,
-      p1: { ...s.players.p1, release: { frontend: { card: FE }, backend: { card: BE } } },
-    },
-  }
-  const r = reduce(primed, { type: 'PLAY', player: 'p1', card: DB.uid, at: 1000 })
-  expect(r.state.over).toEqual({ winner: 'p1', condition: 'release' })
-  expect(r.events.map((e) => e.type)).toEqual(['released', 'gameOver'])
-})
+// The third release no longer ends the game where it lands — it opens a window
+// like any other, and the win is settled when that window closes. The whole
+// lifecycle, including the paths that never reach a window, lives in
+// ./win.test.ts, which replaced the assertion that used to sit here.
 
 it('rejects a play once the game is over, or of a frozen card', () => {
   const s = handed([FE], { ...BASE, releaseCond: 'easy' })

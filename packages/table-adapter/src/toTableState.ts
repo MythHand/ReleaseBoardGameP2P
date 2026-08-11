@@ -71,6 +71,9 @@ function actorOf(e: Event): string | undefined {
       return e.winner
     case 'rejected':
       return 'player' in e.action ? e.action.player : undefined
+    // The table did it, not a player: recycling the discard belongs to no seat.
+    case 'deckReshuffled':
+      return undefined
     default:
       return e.player
   }

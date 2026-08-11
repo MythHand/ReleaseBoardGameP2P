@@ -647,6 +647,7 @@
     "aiRevealed": "AI event",
     "attacked": "attack",
     "dealt": "dealt in",
+    "deckReshuffled": "deck reshuffled",
     "defended": "defence",
     "discarded": "discard",
     "drawn": "draw",

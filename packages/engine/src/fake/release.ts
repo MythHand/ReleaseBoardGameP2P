@@ -2,13 +2,11 @@ import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardInstance, CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
-import { attackTargets, createLog, type Log, reject, setHand } from './core'
+import { attackTargets, checkWin, createLog, type Log, reject, setHand } from './core'
 import { openPickFromDiscard } from './discard'
 import { openHandAttack, resolveDdos } from './handAttacks'
 import { playableFor } from './project'
 import { openWindow } from './window'
-
-const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
 // Structural target equality — targets are small value objects, so a field-wise
 // comparison is cheaper and clearer than serializing.
@@ -17,18 +15,6 @@ const sameTarget = (a: Target, b: Target): boolean =>
   ('player' in a ? a.player === (b as { player: string }).player : true) &&
   ('slot' in a ? a.slot === (b as { slot: string }).slot : true) &&
   ('card' in a ? a.card === (b as { card: string }).card : true)
-
-// Three different release types in one zone ends the game immediately.
-export function checkWin(state: GameState, log: Log): GameState {
-  for (const id of state.seating) {
-    if (state.eliminated.includes(id)) continue
-    if (SLOTS.every((slot) => state.players[id].release[slot])) {
-      log.add({ type: 'gameOver', winner: id, condition: 'release' })
-      return { ...state, over: { winner: id, condition: 'release' }, eventSeq: log.seq }
-    }
-  }
-  return { ...state, eventSeq: log.seq }
-}
 
 export function placeRelease(
   state: GameState,
@@ -66,11 +52,22 @@ export function placeRelease(
     turn: { ...state.turn, releasesPlayed: state.turn.releasesPlayed + 1 },
     pending: null,
   }
-  const decided = checkWin(placed, log)
-  // A Code Review-protected release cannot be attacked at all, so no window opens
-  // (understanding.md §8). Neither does one on a game that just ended.
-  if (cr || decided.over) return decided
-  return openWindow(decided, log, { player, slot, card: card.uid }, 1, at)
+  // The win is deliberately not decided here. Three releases win only after the
+  // attacks are repelled, and the rules grant an instant-attack right on every
+  // fresh release with no exception for the third — so a release that faces a
+  // window is settled when that window closes, in `closeWindow`. Winning on
+  // placement deleted the one moment the win condition is about.
+  //
+  // A Code Review-protected release cannot be attacked at all, so no window
+  // opens (understanding.md §8) and there is nothing to wait for.
+  if (cr) return checkWin(placed, log)
+
+  const opened = openWindow(placed, log, { player, slot, card: card.uid }, 1, at)
+  if (!opened.window) return checkWin(opened, log)
+  // `openWindow` declines when nobody is left alive to respond. Nothing will
+  // ever close a window that never opened, so the win is settled now rather
+  // than leaving the game hanging one release short of its end.
+  return opened
 }
 
 export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Reduction {
