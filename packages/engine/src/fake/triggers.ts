@@ -6,6 +6,7 @@ import { randomAt } from '../rng'
 import type { CardInstance, GameState, NeutralizeMethod, PlayerId, ReleaseSlot } from '../state'
 import { checkWin, createLog, endTurn, type Log, reject, setHand } from './core'
 import { discardOptions } from './discard'
+import { openWindow } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
@@ -214,6 +215,11 @@ export function resolveAiEvent(
     case 'ai-crush-backend':
     case 'ai-crush-database': {
       const slot = event.id.replace('ai-crush-', '') as ReleaseSlot
+      // Crush destroys "соответствующую карту Release". With that slot empty
+      // there is nothing to destroy, so there is nothing to neutralize either —
+      // opening the prompt made a player burn a Debugger, or sacrifice a
+      // different release, against a threat that had no legal target.
+      if (!state.players[player].release[slot]) return { ...state, eventSeq: log.seq }
       const methods = neutralizeOptions(state, player)
       if (methods.length === 0) return destroySlot(state, log, player, slot)
       return { ...state, pending: { kind: 'crush', player, slot, methods }, eventSeq: log.seq }
@@ -243,20 +249,25 @@ export function resolveAiEvent(
         id: `release-${slot}`,
       }
       log.add({ type: 'released', player, slot, card: placed.id })
-      // This path never goes through `placeRelease`, so it has to ask about the
-      // win itself — a third release arriving by AI event completed a winning
-      // zone and the game carried on regardless.
-      return checkWin(
-        {
-          ...state,
-          players: {
-            ...state.players,
-            [player]: { ...me, release: { ...me.release, [slot]: { card: placed } } },
-          },
-          eventSeq: log.seq,
+      const zoned: GameState = {
+        ...state,
+        players: {
+          ...state.players,
+          [player]: { ...me, release: { ...me.release, [slot]: { card: placed } } },
         },
-        log,
-      )
+        eventSeq: log.seq,
+      }
+      // "Этот релиз можно атаковать" — the window is the engine's only route to
+      // ATTACK, so a release placed without one is permanently safe, which
+      // makes an AI-granted release strictly better than a shipped one.
+      // No Code Review here, by the same rule, so the window is unconditional.
+      //
+      // Win timing mirrors `placeRelease`: a release that faces a window is
+      // settled when the window closes, and only a placement no window can
+      // follow is settled on the spot.
+      const opened = openWindow(zoned, log, { player, slot, card: placed.uid }, 1, at)
+      if (!opened.window) return checkWin(opened, log)
+      return opened
     }
 
     case 'ai-monitoring': {
@@ -300,7 +311,18 @@ export function resolveAiEvent(
     }
 
     case 'ai-bad-vibe-coding':
-      return { ...state, pending: { kind: 'handLimit', player, excess: 1 }, eventSeq: log.seq }
+      // "сбросьте одну карту из руки" — nothing about the turn. An empty hand
+      // has nothing to give, and the pending would be unanswerable: `[]` never
+      // matches `excess: 1`, and a pending blocks every action for every
+      // player, so the table stalls for good.
+      if (state.players[player].hand.length === 0) return { ...state, eventSeq: log.seq }
+      // Reuses the handLimit pending for its prompt and resolution, but not its
+      // consequence: `endsTurn` false keeps the seat with its owner.
+      return {
+        ...state,
+        pending: { kind: 'handLimit', player, excess: 1, endsTurn: false },
+        eventSeq: log.seq,
+      }
 
     case 'ai-hallucination':
       return endTurn(state, log)

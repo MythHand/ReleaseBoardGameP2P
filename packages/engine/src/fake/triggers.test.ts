@@ -224,8 +224,15 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
   expect(drawn.state.players.p1.release.frontend?.card.id).toBe('release-frontend')
   const placedUid = drawn.state.players.p1.release.frontend?.card.uid as string
 
+  // The AI-placed release is attackable, so it opens a reaction window, and no
+  // turn ends while one is open. Nobody throws anything, so it times out.
+  const settled = reduce(drawn.state, {
+    type: 'WINDOW_EXPIRED',
+    at: drawn.state.window?.deadline ?? 1001,
+  })
+
   // End p1's turn.
-  const p1Pushed = reduce(drawn.state, { type: 'PUSH', player: 'p1', at: 1001 })
+  const p1Pushed = reduce(settled.state, { type: 'PUSH', player: 'p1', at: 1001 })
   expect(p1Pushed.state.turn.player).toBe('p2')
 
   // p2 DDoS's the placed release: it bounces to p1's hand and freezes.

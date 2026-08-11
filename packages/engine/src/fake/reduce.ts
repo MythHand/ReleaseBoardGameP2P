@@ -169,6 +169,12 @@ function onHandLimit(state: GameState, action: Action & { type: 'RESOLVE' }): Re
     decks: { ...kept.decks, discard: [...kept.decks.discard, ...discarded] },
     pending: null,
   }
+  // Bad Vibe-Coding asks the same question without ending anything — it is a
+  // card off the hand, not a lost turn. Only the hand limit that a turn's own
+  // ending raised goes on to end it.
+  if (pending.endsTurn === false) {
+    return { state: { ...withDiscard, eventSeq: log.seq }, events: log.events }
+  }
   return { state: endTurn(withDiscard, log), events: log.events }
 }
 

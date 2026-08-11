@@ -147,9 +147,16 @@ describe('a zone completed by something other than a play', () => {
     }
 
     const r = reduce(staged, { type: 'DRAW', player: 'p1', at: 1000 })
-
     expect(r.state.players.p1.release.database).toBeTruthy()
-    expect(r.state.over).toEqual({ winner: 'p1', condition: 'release' })
+
+    // An AI-placed release is attackable too (#73), so like a shipped one it
+    // faces its window first and the win is settled when that window closes.
+    expect(r.state.over).toBeNull()
+    const settled = reduce(r.state, {
+      type: 'WINDOW_EXPIRED',
+      at: r.state.window?.deadline ?? 2000,
+    })
+    expect(settled.state.over).toEqual({ winner: 'p1', condition: 'release' })
   })
 
   it('wins when the third release arrives by Security Bug steal', () => {
