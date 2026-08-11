@@ -1,7 +1,8 @@
 import type { Event, PlayerView, ReleaseView } from '@release/engine'
 import { rulesFor } from '@release/engine'
-import type { HistoryEntry, TableState } from '@release/ui'
+import type { HistoryEntry } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
+import type { BoardState } from './types'
 
 // One label per member of the engine's Event union — the adapter maps event
 // types to translated text, replacing the mock's free-form `kind` literals.
@@ -122,7 +123,7 @@ function toHistoryEntry(e: Event, labels: HistoryLabels): HistoryEntry {
 // clock, no randomness. Total — an unknown card id renders a placeholder
 // rather than throwing (`assetUrl` throws; `cardById` does not, and this
 // function never calls `assetUrl` directly).
-export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabels): TableState {
+export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabels): BoardState {
   const visible = log.filter((e) => !e.visibleTo || e.visibleTo.includes(view.self.id))
   const history = visible.map((e) => toHistoryEntry(e, labels)).reverse()
 
