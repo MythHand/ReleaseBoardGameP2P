@@ -45,10 +45,28 @@ export function reject(state: GameState, action: Action, reason: string): Reduct
   return { state, events: log.events }
 }
 
-export const setHand = (state: GameState, id: PlayerId, hand: PlayerState['hand']): GameState => ({
-  ...state,
-  players: { ...state.players, [id]: { ...state.players[id], hand } },
-})
+// Both locks name cards in a hand, so a card that leaves the hand takes its
+// lock with it (#80). Left behind, a stale uid is not merely untidy: `frozen`
+// is projected, so it hands its former owner the identity of a card now sitting
+// in someone else's hand — a leak of exactly the kind the projection exists to
+// prevent. Pruning here rather than at each mover means no future path that
+// moves a card can forget.
+export const setHand = (state: GameState, id: PlayerId, hand: PlayerState['hand']): GameState => {
+  const held = new Set(hand.map((c) => c.uid))
+  const me = state.players[id]
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [id]: {
+        ...me,
+        hand,
+        frozen: me.frozen.filter((uid) => held.has(uid)),
+        replayLocked: me.replayLocked.filter((uid) => held.has(uid)),
+      },
+    },
+  }
+}
 
 // The TS Action type does not survive JSON deserialization, so an action from a
 // remote peer may be any shape at all. Validating once at the entry point means
@@ -161,9 +179,12 @@ export function endTurn(state: GameState, log: Log): GameState {
   log.add({ type: 'turnStarted', player: next, index: state.turn.index + 1 })
   // A DDoS freeze lasts exactly one round: it lifts as its victim's next turn ends.
   const thawed = { ...state.players[me], frozen: [] }
+  // A replay lock lifts as its holder's next turn *begins*, which is here —
+  // the same moment, seen from the other seat.
+  const unlocked = { ...state.players[next], replayLocked: [] }
   return {
     ...state,
-    players: { ...state.players, [me]: thawed },
+    players: { ...state.players, [me]: thawed, [next]: unlocked },
     turn: { player: next, index: state.turn.index + 1, hasDrawn: false, releasesPlayed: 0 },
     pending: null,
     eventSeq: log.seq,

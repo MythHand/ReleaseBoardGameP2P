@@ -67,6 +67,7 @@ export function createGame(config: GameConfig): GameState {
       hand,
       release: {},
       frozen: [],
+      replayLocked: [],
     }
   }
 

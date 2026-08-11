@@ -21,7 +21,15 @@ export function canAttackWith(state: GameState, viewer: PlayerId): CardUid[] {
   if (!w || state.pending) return []
   if (viewer === w.target.player) return []
   if (state.eliminated.includes(viewer)) return []
-  return state.players[viewer].hand.filter((c) => RELEASE_ATTACKS.has(c.id)).map((c) => c.uid)
+  const me = state.players[viewer]
+  // A locked or frozen card is unplayable everywhere, not only from hand. The
+  // window is the one route to ATTACK, so skipping the check here would leave
+  // Rollback's lock enforced for PLAY and bypassed by the very re-throw it
+  // exists to stop.
+  return me.hand
+    .filter((c) => RELEASE_ATTACKS.has(c.id))
+    .filter((c) => !me.frozen.includes(c.uid) && !me.replayLocked.includes(c.uid))
+    .map((c) => c.uid)
 }
 
 export function openWindow(

@@ -34,8 +34,16 @@ export interface PlayerState {
     // Monitoring / AI Monitoring — in the zone but not a Release.
     monitoring?: CardInstance
   }
-  // DDoS returns a Release to hand and freezes that instance for one round.
+  // DDoS returns a Release to hand and freezes that instance for one round:
+  // "не может быть разыграна в следующем ходу" — it costs the holder their
+  // whole next turn, so this thaws when that turn ends.
   frozen: CardUid[]
+  // An attack card Rollback handed back to whoever threw it. "он не может
+  // сыграть её повторно до своего следующего хода" — barred for the rest of the
+  // exchange, playable again on their next turn, so this thaws when that turn
+  // begins. A separate list precisely because the two thaw at different moments;
+  // one list could only ever be right for one of them.
+  replayLocked: CardUid[]
 }
 
 export interface ReactionWindow {

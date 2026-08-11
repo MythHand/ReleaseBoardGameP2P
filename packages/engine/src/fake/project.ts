@@ -38,7 +38,7 @@ export function playableFor(state: GameState, viewerId: PlayerId): CardUid[] {
 
   return me.hand
     .filter((c) => {
-      if (me.frozen.includes(c.uid)) return false
+      if (me.frozen.includes(c.uid) || me.replayLocked.includes(c.uid)) return false
       const rules = rulesFor(c.id)
       if (!rules) return false
       switch (rules.kind) {
