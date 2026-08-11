@@ -3,6 +3,9 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
+// The board's own style module — the `.enter` class the opening hides blocks
+// with is reached the same way the ported suite reaches Arrow's classnames.
+import boardStyles from '../_Board.module.css'
 import BoardPage from '../_layout'
 import StatsPage from '../stats'
 
@@ -53,6 +56,20 @@ it('keeps the board mounted and shows stats in its outlet', async () => {
   renderBoard('/board/g1/stats')
   expect(await screen.findByTestId('board-page')).toBeTruthy()
   expect(await screen.findByTestId('stats-page')).toBeTruthy()
+})
+
+it('shows a spectator the live table, not a board held hidden', async () => {
+  sessionValue = session({
+    host: { id: 'host', name: 'HostPeer', role: 'host', ready: true },
+    me: { id: 'me', name: 'Watcher', role: 'guest', ready: false },
+  })
+  const { container } = renderBoard()
+  await screen.findByTestId('board-page')
+  // A spectator holds no seat, so the keeper never projects to them and
+  // `game.view` stays null for good — an intro armed here could never report
+  // done, and every block it hides (`.enter`, opacity 0) would stay hidden for
+  // the whole match. So the opening is not armed for them at all.
+  expect(container.querySelectorAll(`.${boardStyles.enter}`)).toHaveLength(0)
 })
 
 it('fills the viewport so the table is not clipped to nothing', () => {

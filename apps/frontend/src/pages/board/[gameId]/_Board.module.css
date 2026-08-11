@@ -9,18 +9,19 @@
   isolation: isolate; /* own stacking context so the bg layer sits behind content */
 }
 
-/* Обёртка HUD-фона: слой целиком, чтобы вступление могло привести его одним
-   куском (opacity ведёт пресет hudIn), не трогая базовую заливку стола. */
+/* The HUD background as one layer, so the opening can bring it in whole (the
+   hudIn preset drives its opacity) without touching the table's base fill. */
 .bgWrap {
   position: absolute;
   inset: 0;
   z-index: -1;
 }
 
-/* Блок интерфейса до своей очереди — не показан. Дальше его ведёт пресет hudIn
-   (fill: both держит и паузу до старта, и конечное состояние). Сдвиг вешается
-   на ВНУТРЕННИЙ узел: на самих блоках transform держит позиционирование.
-   Класс висит только пока идёт вступление — вне его разметка ровно та же. */
+/* A block of the interface before its beat — not shown. From here the hudIn
+   preset carries it (fill: both holds both the wait before its turn and the
+   end state). The shift rides on an INNER node: on the blocks themselves
+   transform holds the positioning. The class is on only while the opening
+   plays — outside it the markup is exactly the same. */
 .enter {
   opacity: 0;
 }
@@ -56,8 +57,8 @@
   transform: translateY(-50%);
 }
 
-/* колонка колод живёт на внутреннем узле: transform блока держит центровку,
-   а вступление сдвигает именно этот узел */
+/* the decks' column lives on an inner node: the block's own transform holds it
+   centred, and the opening shifts this node instead */
 .deckStack {
   display: flex;
   flex-direction: column;
@@ -80,11 +81,11 @@
   pointer-events: auto;
 }
 
-/* центр стола — чуть ВЫШЕ геометрической середины (42%, не 50%): так он не
-   спорит с рукой и превью, которое из неё поднимается. То же значение во всех
-   сценах. Здесь в нём собирается кучка карт игрока перед уходом в веер.
-   pointer-events: none — вне сдачи это пустая коробка, она не должна ловить
-   клики по столу. */
+/* the centre of the table — a little ABOVE the geometric middle (42%, not 50%):
+   there it does not argue with the hand, nor with the preview that rises out of
+   it. The same value in every scene. Here the player's own cards gather in it
+   before they go into the fan. pointer-events: none — outside the deal it is an
+   empty box and must not catch clicks meant for the table. */
 .centre {
   position: absolute;
   inset-block-start: 42%;
@@ -95,14 +96,14 @@
   transform: translate(-50%, -50%);
 }
 
-/* карта в этой кучке — та же коробка, свой разброс (как в сбросе) */
+/* a card of that heap — the same box, its own scatter (as in the discard) */
 .stagedCard {
   position: absolute;
   inset: 0;
 }
 
-/* слой правой навигации: сам TabRail позиционируется по краю, слой нужен только
-   чтобы вести его появление, не трогая его собственный transform */
+/* the right-hand nav's layer: TabRail positions itself against the edge, and
+   this layer exists only to lead its arrival without touching that transform */
 .railLayer {
   position: absolute;
   inset: 0;

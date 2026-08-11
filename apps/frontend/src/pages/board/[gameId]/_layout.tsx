@@ -43,6 +43,16 @@ export default function BoardPage() {
   const participants = peers.filter((p) => p.role === 'host' || p.role === 'player')
   const spectators = peers.filter((p) => p.role === 'guest')
 
+  // Whether this peer holds a seat — the same split, asked about ourselves.
+  // Only a seated peer is ever projected to, so only a seated peer gets the
+  // opening: a spectator's `game.view` is null for the whole match, the intro
+  // could never report done, and the board would sit behind its entering state
+  // (every block at opacity 0) for good. The question has to be asked HERE and
+  // not inside the board off `view`: a seated peer's first frame has no
+  // projection either, and unhiding on that would flash the table open and shut
+  // at every real game start.
+  const seated = participants.some((p) => p.id === session.state?.selfId)
+
   // `toTableOver` renames the engine's `over.winner` — a playerId minted as
   // p1..pN (see ~/entities/game/seats) — but Table.tsx resolves `over.winnerId`
   // against `room.participants`, which are peers keyed by *peer* id. PlayerId
@@ -83,10 +93,11 @@ export default function BoardPage() {
         state={state}
         over={over}
         now={now}
-        // The opening. `onDone` is the gate that lets the game move: it is
-        // wired to the session in Task 14 (`session.introReady`), and until
-        // then reporting completion goes nowhere.
-        intro={{ view: game.view, events: game.events, onDone: () => {} }}
+        // The opening — for a seated peer only (see `seated` above). `onDone`
+        // is the gate that lets the game move: it is wired to the session in
+        // Task 14 (`session.introReady`), and until then reporting completion
+        // goes nowhere.
+        intro={seated ? { view: game.view, events: game.events, onDone: () => {} } : undefined}
         room={{
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,
