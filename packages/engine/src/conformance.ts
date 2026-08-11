@@ -651,7 +651,7 @@ export function describeEngine(
     })
 
     describe('rules invariants', () => {
-      // Transcribed from docs/rules-board-game.md and docs/understanding.md §7.
+      // Transcribed from docs/rules/rules-board-game.md and docs/understanding.md §7.
       // Each test states which driver it uses (the fuzz stream, `botAction`, or
       // a mix that forces a specific card interaction) and why that one reaches
       // the state in question reliably, rather than defaulting to the fuzz

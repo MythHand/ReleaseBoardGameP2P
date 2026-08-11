@@ -89,7 +89,7 @@ The current root Vite app (`index.html`, `vite.config.js`, `src/main.jsx`, `src/
 - **TypeScript** — `tsconfig.base.json` at root, extended per package.
 
 ## Docs
-- **CLAUDE.md** — full project guide: monorepo layout, the 3 apps + UI package, stack per app, pnpm workspace commands (dev/build/lint), the styling rule (CSS Modules stay; Tailwind only for frontend layout, themed off tokens; do not rewrite CSS Modules into Tailwind), the i18n rule (react-i18next in the frontend, English + Russian, no string literals in TSX, UI package text via props), the P2P/signaling architecture, and a pointer to `docs/rules-board-game.md`.
+- **CLAUDE.md** — full project guide: monorepo layout, the 3 apps + UI package, stack per app, pnpm workspace commands (dev/build/lint), the styling rule (CSS Modules stay; Tailwind only for frontend layout, themed off tokens; do not rewrite CSS Modules into Tailwind), the i18n rule (react-i18next in the frontend, English + Russian, no string literals in TSX, UI package text via props), the P2P/signaling architecture, and a pointer to `docs/rules/rules-board-game.md`.
 - **AGENTS.md** — short pointer to CLAUDE.md so cross-tool agents (Cursor, Codex, etc.) pick up the same guidance without a second maintained copy.
 
 ## Process

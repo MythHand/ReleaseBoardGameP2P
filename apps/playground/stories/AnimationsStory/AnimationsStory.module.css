@@ -272,6 +272,123 @@
   position: relative;
 }
 
+/* ===== формы сцены, не связанные с перелётом ===== */
+
+/* общий центр для HUD-форм: слот, бейдж, приход блока */
+.hudSlot {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* зарезервированный слот: рамка стоит намертво, меняется только содержимое —
+   поэтому у неё фиксированный размер, а не размер текста */
+.slotBox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 200px;
+  block-size: 56px;
+  border: 1px dashed var(--white-20);
+  border-radius: 10px;
+}
+
+/* строка с бейджем: слева соседи, справа слот бейджа — он держит место, чтобы
+   появление ничего не сдвигало */
+.badgeRow {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px dashed var(--white-20);
+  border-radius: 10px;
+}
+
+.badgeSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 74px;
+  block-size: 26px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  color: var(--brand-green);
+  border: 1px solid var(--brand-green);
+  border-radius: 999px;
+}
+
+/* место блока интерфейса: пунктир — это КУДА он приходит, сам блок внутри */
+.hudFrame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 260px;
+  block-size: 96px;
+  border: 1px dashed var(--white-16);
+  border-radius: 12px;
+}
+
+.hudBlock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  block-size: 100%;
+  color: var(--white-75);
+  background: var(--white-06);
+  border: 1px solid var(--white-20);
+  border-radius: 12px;
+}
+
+/* складывание пары: два источника по краям, рамка пары в центре */
+.foldStage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 56px;
+  align-items: center;
+  justify-content: center;
+}
+
+.foldSrc {
+  position: relative;
+  inline-size: 110px;
+  aspect-ratio: var(--card-aspect);
+  border: 1px dashed var(--white-20);
+  border-radius: 12px;
+}
+
+.pairBox {
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+}
+
+/* хлопушка: слой залпов на всю сцену, частицы стартуют из её низа по центру */
+.bursts {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.burst {
+  position: absolute;
+  inset: 0;
+}
+
+.pop {
+  position: absolute;
+  inset-block-end: 60px;
+  inset-inline-start: 50%;
+  will-change: transform, opacity;
+}
+
 /* ===== верхняя область: заголовок → описание → дивайдер → play ===== */
 .header {
   flex: 0 0 auto;
@@ -335,6 +452,45 @@
 }
 
 .playBtn:hover:not(:disabled) {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* параметры пресета — рядом с play, только там, где без параметра пресет
+   бессмыслен (направление прихода, характер тряски) */
+.params {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-inline-start: 8px;
+}
+
+.paramLabel {
+  margin-inline-end: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--white-45);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.chip {
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-60);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-16);
+  border-radius: 999px;
+}
+
+.chip:hover {
+  color: var(--fg);
+  border-color: var(--white-30);
+}
+
+.chipActive {
   color: var(--brand-green);
   border-color: var(--brand-green);
 }

@@ -1,6 +1,7 @@
 // Каталог карт = «сущности карт»: статические определения (арт + метаданные).
 // Источник арта — assets/cards/. Имена/категории/теги считаны с самих артов.
-// tags: lightning (атака), sudo (есть sudo-эффект), cancel/unicorn (тип защиты),
+// tags: lightning (значок «мгновенный розыгрыш» на арте — четыре атаки и ВСЯ оборона;
+//       у DDoS его нет), sudo (есть sudo-эффект), cancel/unicorn (тип защиты),
 //       trigger, ai, combo-source (Sudo/Code Review).
 
 import type { Card } from './types'
@@ -75,7 +76,7 @@ export const CARDS: Card[] = [
     category: 'attack',
     deck: 'base',
     art: B('Attack 2 - 6 qty.png'),
-    tags: ['lightning'],
+    tags: [],
     qty: 6,
   },
   {
@@ -113,7 +114,7 @@ export const CARDS: Card[] = [
     category: 'defense',
     deck: 'base',
     art: B('Defense 1 - 2 qty.png'),
-    tags: ['unicorn'],
+    tags: ['lightning', 'unicorn'],
     qty: 2,
   },
   {
@@ -122,7 +123,7 @@ export const CARDS: Card[] = [
     category: 'defense',
     deck: 'base',
     art: B('Defense 2 - 2 qty.png'),
-    tags: ['unicorn'],
+    tags: ['lightning', 'unicorn'],
     qty: 2,
   },
   {
@@ -131,7 +132,7 @@ export const CARDS: Card[] = [
     category: 'defense',
     deck: 'base',
     art: B('Defense 3 - 3 qty.png'),
-    tags: ['cancel', 'sudo'],
+    tags: ['lightning', 'cancel', 'sudo'],
     qty: 3,
   },
   {
@@ -140,7 +141,7 @@ export const CARDS: Card[] = [
     category: 'defense',
     deck: 'base',
     art: B('Defense 4 - 3 qty.png'),
-    tags: ['cancel'],
+    tags: ['lightning', 'cancel'],
     qty: 3,
   },
   {
@@ -149,7 +150,7 @@ export const CARDS: Card[] = [
     category: 'defense',
     deck: 'base',
     art: B('Defense 5 - 2 qty.png'),
-    tags: ['cancel'],
+    tags: ['lightning', 'cancel'],
     qty: 2,
   },
   {
@@ -158,7 +159,7 @@ export const CARDS: Card[] = [
     category: 'defense',
     deck: 'base',
     art: B('Defense 6 - 2 qty.png'),
-    tags: ['cancel'],
+    tags: ['lightning', 'cancel'],
     qty: 2,
   },
 

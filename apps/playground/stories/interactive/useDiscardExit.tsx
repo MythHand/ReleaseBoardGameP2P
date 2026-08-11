@@ -11,6 +11,7 @@ import {
 } from '@/animations'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf, cardBoxIn } from '@/primitives/Card'
+import { PAIR_AUX } from '@/primitives/CardPair'
 import type { HeapCard } from '@/primitives/Pile/Pile'
 import styles from './useDiscardExit.module.css'
 
@@ -33,9 +34,6 @@ import styles from './useDiscardExit.module.css'
 // how long a card travels — matches the centerToDiscard preset, so the tilt
 // finishes unwinding exactly as the card lands
 const FLIGHT_MS = 420
-// the tilt CardPair gives its aux card (CardPair.module.css) — the second card of
-// a pair keeps it while it flies out on its own
-const AUX_TILT = -7
 
 interface Pose {
   rot: number
@@ -128,8 +126,9 @@ export function useDiscardExit(
         key: `${it.key}-aux`,
         card: it.aux,
         from: auxEl ? cardBoxIn(auxEl.getBoundingClientRect(), box.width) : box,
-        // its place is already in `from`; only the tilt CardPair gives it
-        pose: poseOf({ rot: (it.pose?.rot ?? 0) + AUX_TILT, dx: 0, dy: 0 }),
+        // its place is already in `from`; only the tilt CardPair gives it —
+        // taken from the pair's own pose, so the two cannot drift apart
+        pose: poseOf({ rot: (it.pose?.rot ?? 0) + PAIR_AUX.rot, dx: 0, dy: 0 }),
         scatter: jitter(),
         fade: main.fade,
         delay: main.delay,

@@ -3,7 +3,21 @@
 ## Overview
 
 **Release любой ценой** — a P2P web version of the board card game.
-Rules and card mechanics: [`docs/rules-board-game.md`](./docs/rules-board-game.md).
+
+**Rules and card mechanics — [`docs/rules/`](./docs/rules/).** The player-facing rules text is
+canon and lives in the translation catalog (`rulesBlock.text`); `docs/rules/rules-board-game.md` is
+that same text as md. Everything else in the folder is the **technical spec** of the same rules —
+what happens, in what order, under which card id: `general` (frame of a match), `cards` (every card
+with its id, print run, effect, what cancels it), `resolution` (order of resolution — windows,
+priority, when a win is final), `modes` (the five mode axes), `backlog` (disputed and undecided).
+Do not "improve" the rules text from the spec; a disagreement means the text wins and the finding
+goes to `docs/rules/backlog.md`.
+
+**Working on the rules, guessing is forbidden.** Not "by the sense of it", not "obviously", not
+"at a table this is how it goes". Anything that so much as hints at inference becomes an open
+question in `docs/rules/backlog.md` **and** a marker in the spec at the exact paragraph where it
+came up (`> ❓ **Не из правил.**`). A guess written down as a rule stops being a guess: code gets
+written from it, a test pins it, and it becomes the source everyone checks against.
 
 **Design specs live in [`docs/specs/`](./docs/specs/)** (`YYYY-MM-DD-<topic>-design.md`).
 
@@ -149,7 +163,9 @@ Styling is uniform across all packages: **CSS Modules + design tokens.**
 ## Animations Rule
 
 - Анимации собираются **из модулей**, а не пишутся полётами вручную. Словарь и хелперы — в `apps/ui/src/animations/`: пресеты через `play('name', el, params)` плюс `jitter`, `wait`, `nextFrames`. Нужен новый кусочек — оформляй его модулем, потом используй.
-- **Источник состояния работы с анимациями — страница плейграунда `Interaction audit`** (`apps/playground/stories/AnimationAuditStory`): какие модули готовы (со статусами), какие сценарии из них собраны, и что требует доработок. Перед работой над анимациями сверяй актуальные статусы там; при изменениях вписывай их обратно в эту страницу.
+- **Источник состояния работы с анимациями — страница плейграунда `Interaction audit`** (`apps/playground/stories/AnimationAuditStory`): какие модули готовы (со статусами), какие сценарии из них собраны, и реестр находок. Перед работой над анимациями сверяй актуальные статусы там; при изменениях вписывай их обратно в эту страницу. Живой каталог самого словаря — соседняя страница `Animations`: каждый пресет показан в своей форме и запускается.
+- **Письменная пара этих страниц — [`docs/animations/`](./docs/animations/)**, спека под чтение агентом: `README` (модель и инварианты I1–I10), `recipes` (последовательности по игровым ситуациям), `reference` (вызываемое: пресеты, хелперы, шаги), `glossary` (параметры и значения), `extending` (как добавить своё), `backlog` (находки развёрнуто). Страница показывает состояние, спека объясняет применение — это не дубли, а разные потребители. Часть синхронности проверяется машиной: пресет без строки в `reference.md` роняет тест (`apps/ui/src/animations/docs.test.ts`).
+- **Наткнулся на дыру — заноси её, а не обходи.** Нет модуля под нужное движение, значение недостижимо, правило не решено — запись идёт в реестр находок на странице аудита (видно), развёрнуто — в `docs/animations/backlog.md` (чем грозит и что закроет). Местный обход, о котором никто не узнал, — это то, из-за чего одно движение оказывается написанным трижды.
 
 ---
 

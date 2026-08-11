@@ -552,7 +552,7 @@ The core suite asserts:
    valid state.
 3. **Projection privacy** — a property test over generated states: `project(state, A)`
    never contains another player's card identity.
-4. **Rules invariants** transcribed from [`docs/rules-board-game.md`](../rules-board-game.md)
+4. **Rules invariants** transcribed from [`docs/rules/rules-board-game.md`](../rules/rules-board-game.md)
    and understanding.md §7 — no duplicate release types in a zone, releases-per-turn
    honoured per mode, hand limit enforced per mode, 15s then 10s window rounds, `UNPASS`
    works, Code Review suppresses the window entirely, DDoS is the only card that reaches a
@@ -583,7 +583,7 @@ Above that:
 - Real rules evaluation. The fake's coverage above is the boundary; everything outside it
   is the rules author's, behind the same contract.
 - UI surfaces for Git Cherry-pick, Git Rebase, Git Branch / Merge and System Upgrade.
-- The `Release Profit` extension, which `docs/rules-board-game.md` marks as not being
+- The `Release Profit` extension, which `docs/rules/rules-board-game.md` marks as not being
   implemented.
 - The open architectural question in understanding.md §4 — PNG card faces versus
   code-composed ones. Unaffected either way, since the engine deals in `CardId`.

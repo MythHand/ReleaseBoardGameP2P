@@ -1,5 +1,5 @@
 export { play, presetNames } from './play'
-export { PRESETS } from './presets'
+export { enterPose, PRESETS, SHAKE_SHAPES, type ShakeShape } from './presets'
 export {
   HEAP_SHOW,
   jitter,

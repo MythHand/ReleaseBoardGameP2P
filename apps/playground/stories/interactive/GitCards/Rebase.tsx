@@ -10,7 +10,7 @@ import { play } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
-import Card from '@/primitives/Card'
+import Card, { CARD_RATIO, cardAreaOf } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
 import { pick, useLang } from '../../../Playground/lang'
@@ -25,7 +25,6 @@ import styles from './GitCards.module.css'
 const BASE = CARDS.filter((c) => c.deck === 'base')
 const DECK_COUNTS = [1, 2, 3, 4, 5] as const // technical toggle: number of draw decks
 
-const CARD_RATIO = 1.4 // card height / width
 const DECK_W = 150 // draw-deck pile width — same as the Table screen
 const REORDER_W = 150 // reorder card width — full size (never shrunk; the area scrolls)
 const GAP = 30 // gap between slots in a row
@@ -66,15 +65,6 @@ interface Drag {
 // the draw decks in play, derived from the toggle (counts are cosmetic)
 const decksFor = (n: DeckCount) =>
   Array.from({ length: n }, (_, i) => ({ id: i, count: 22 - i * 2 }))
-
-// the card area at the top of a pile (a Pile is taller than its card — the label
-// sits below), so a flight aims at the card, not the label
-const cardAreaOf = (r: DOMRect) => ({
-  left: r.left,
-  top: r.top,
-  width: r.width,
-  height: r.width * CARD_RATIO,
-})
 
 const buildRow = (deckId: number): Row => ({
   deckId,

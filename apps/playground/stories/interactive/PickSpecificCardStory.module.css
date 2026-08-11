@@ -74,59 +74,14 @@
   border-color: var(--brand-green);
 }
 
-/* шаг 1: каталог базовых карт лицом вверх — сетка (НЕ веер), средняя полоса
-   между веером оппонента (сверху) и рукой игрока (снизу) */
+/* шаг 1: место каталога на экране — средняя полоса между веером оппонента
+   (сверху) и рукой игрока (снизу). Сама сетка и жизнь ячеек — в CardCatalog */
 .grid {
   position: absolute;
   inset-block: 300px 268px;
   inset-inline: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px 18px;
-  place-content: center;
   padding: 0 32px;
   overflow: visible;
-}
-
-/* карта каталога: вылетает при появлении (стаггер через inline animation-delay),
-   по ховеру увеличивается, чтобы прочитать эффект */
-.cell {
-  padding: 0;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
-  animation: cell-in 360ms var(--ease-out) backwards;
-}
-
-.cell:hover {
-  z-index: 20;
-  transform: scale(1.9);
-}
-
-/* выбранная — держится увеличенной, пока остальные уходят */
-.chosen {
-  z-index: 15;
-  transform: scale(1.7);
-}
-
-/* остальные — уезжают из сетки */
-.leaving {
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(24px) scale(0.86);
-}
-
-@keyframes cell-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.94);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 /* веер соперника — та же рука (Hand), рубашкой вверх, у верхнего края;
@@ -152,33 +107,8 @@
   transform: rotate(180deg);
 }
 
-/* крайний кейс: карты нет — веер вздрагивает на месте (translateY 0 сохраняем) */
-.shake {
-  animation: shake 460ms var(--ease-soft);
-}
-
-@keyframes shake {
-  0%,
-  100% {
-    transform: translateY(0) translateX(0);
-  }
-
-  20% {
-    transform: translateY(0) translateX(-9px);
-  }
-
-  40% {
-    transform: translateY(0) translateX(9px);
-  }
-
-  60% {
-    transform: translateY(0) translateX(-6px);
-  }
-
-  80% {
-    transform: translateY(0) translateX(6px);
-  }
-}
+/* крайний кейс «карты нет» — веер вздрагивает на месте: словарный play('shake')
+   со своей силой, вызывается из сцены (см. MISS_SHAKE) */
 
 .miss {
   position: absolute;

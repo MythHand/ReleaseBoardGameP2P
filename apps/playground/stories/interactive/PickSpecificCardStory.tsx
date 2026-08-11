@@ -1,9 +1,11 @@
 import type React from 'react'
 import { type CSSProperties, useRef, useState } from 'react'
+import { play } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
+import CardCatalog from '@/table/CardCatalog'
 import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
@@ -24,6 +26,8 @@ const REVEAL_W = 220 // width the flown card reaches in the centre
 const OPP_HAND = 6 // opponent hand size
 const PICK_BEAT = 620 // chosen holds / others leave, before the opponent check
 const MISS_HOLD = 1620 // shake + note duration before the fan leaves (miss case)
+const MISS_SHAKE = 9 // the fan's flinch — a whole fan needs more than an input
+const MISS_SHAKE_MS = 460
 const GRID_W = 100 // card width in the choose-grid
 const INITIAL_HAND = 5 // the player already holds a hand
 
@@ -68,6 +72,7 @@ export default function PickSpecificCardStory() {
   const [hand, setHand] = useState(() => makeHand(INITIAL_HAND))
 
   const rootRef = useRef<HTMLDivElement>(null) // the story stage — centre is relative to it
+  const topHandRef = useRef<HTMLDivElement>(null) // the opponent fan — it flinches on a miss
   const handRef = useRef<HTMLDivElement>(null)
   const fanRef = useRef<HTMLDivElement>(null) // wraps <Hand> — slots are its inner children
   const revealRef = useRef<HTMLDivElement>(null)
@@ -142,6 +147,14 @@ export default function PickSpecificCardStory() {
   function resolve(card: CardType) {
     if (!inHand) {
       setPhase('miss')
+      // the fan flinches in place — the shared refusal gesture, in its springy
+      // character and at the force a whole fan needs (the 7px settle default is
+      // sized for an input field)
+      play('shake', topHandRef.current, {
+        amp: MISS_SHAKE,
+        dur: MISS_SHAKE_MS,
+        shape: 'spring',
+      })
       later(() => setHandIn(false), MISS_HOLD)
       later(backToIdle, MISS_HOLD + 560)
       return
@@ -189,12 +202,6 @@ export default function PickSpecificCardStory() {
     setReveal(null)
   }
 
-  const cellClass = (id: string) => {
-    if (phase === 'choose') return styles.cell
-    if (phase === 'picked' && id === wanted?.id) return `${styles.cell} ${styles.chosen}`
-    return `${styles.cell} ${styles.leaving}`
-  }
-
   return (
     <div className={styles.root} ref={rootRef}>
       <div className={styles.bar}>
@@ -209,10 +216,7 @@ export default function PickSpecificCardStory() {
 
       {/* opponent fan (across the table) — face-down, rotated 180° */}
       {phase !== 'idle' && (
-        <div
-          className={`${styles.topHand} ${phase === 'miss' ? styles.shake : ''}`}
-          data-in={handIn}
-        >
+        <div className={styles.topHand} data-in={handIn} ref={topHandRef}>
           <div className={styles.topHandInner} ref={fanRef}>
             <Hand
               items={oppHand}
@@ -248,28 +252,17 @@ export default function PickSpecificCardStory() {
         </div>
       )}
 
-      {/* step 1: choose which card you want (catalog grid, not a fan) */}
+      {/* step 1: choose which card you want (the catalog block, not a fan) */}
       {phase !== 'idle' && (
         <div className={styles.grid}>
-          {BASE_TYPES.map((c, i) => (
-            <button
-              key={c.id}
-              type="button"
-              className={cellClass(c.id)}
-              style={{ animationDelay: `${i * 18}ms` }}
-              onClick={phase === 'choose' ? () => pickWanted(c) : undefined}
-            >
-              <Card
-                card={c}
-                interactive={false}
-                width={GRID_W}
-                state={phase === 'choose' && wanted?.id === c.id ? 'selected' : 'idle'}
-                // pick one out of a set — uniform selection colour, not the
-                // per-category accent
-                accent="var(--select-accent)"
-              />
-            </button>
-          ))}
+          <CardCatalog
+            cards={BASE_TYPES}
+            open={phase === 'choose'}
+            selected={wanted?.id}
+            chosen={phase === 'picked' ? wanted?.id : null}
+            onPick={pickWanted}
+            width={GRID_W}
+          />
         </div>
       )}
 

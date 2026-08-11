@@ -2,11 +2,11 @@ import type { CardData } from '@release/ui'
 import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { nextFrames, play, wait } from '@/animations'
+import { enterPose, nextFrames, play, wait } from '@/animations'
 import { cardById } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO } from '@/primitives/Card'
-import CardPair from '@/primitives/CardPair'
+import CardPair, { PAIR_AUX_POSE } from '@/primitives/CardPair'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
@@ -163,14 +163,6 @@ export default function ComboStory() {
     if (flyRef.current) flyRef.current.style.opacity = '0'
   }
 
-  // transform that places a card from a source rect into the centre's coordinates
-  const enterTransform = (srcRect: Rect, boxRect: DOMRect) => {
-    const dx = srcRect.left + srcRect.width / 2 - (boxRect.left + boxRect.width / 2)
-    const dy = srcRect.top + srcRect.height / 2 - (boxRect.top + boxRect.height / 2)
-    const s = srcRect.width / boxRect.width
-    return `translate(${dx}px, ${dy}px) scale(${s})`
-  }
-
   // cancel — the whole staging goes back to the MIDDLE of the fan at once, on the
   // slot's bottom-centre pivot (the landing every other scene uses), with the fan
   // opening room for all of them while they travel
@@ -304,24 +296,23 @@ export default function ComboStory() {
       const mainEl = el.querySelector<HTMLElement>('[data-main]')
       const auxEl = el.querySelector<HTMLElement>('[data-aux]')
       if (!mainEl || !auxEl) return
-      const enterMain = enterTransform(mainHand, cRect)
-      // the source is ALREADY standing at the centre — it only folds under
-      const enterAux = 'translate(0px, 0px) scale(1)'
-      mainEl.style.transform = enterMain
-      auxEl.style.transform = enterAux
+      // the source is ALREADY standing at the centre — it only folds under, so
+      // its own place IS the pair's frame and its entry pose is identity
+      mainEl.style.transform = enterPose(mainHand, cRect)
+      auxEl.style.transform = enterPose(cRect, cRect)
       el.style.opacity = '1'
       await nextFrames()
 
       // MERGING AT THE CENTRE — the partner arrives and the pair folds together
-      const a1 = mainEl.animate(
-        [{ transform: enterMain }, { transform: 'translate(0, 0) scale(1)' }],
-        { duration: MERGE_MS, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' },
-      )
-      const a2 = auxEl.animate(
-        [{ transform: enterAux }, { transform: 'translateY(-26%) rotate(-7deg)' }],
-        { duration: MERGE_MS, easing: 'cubic-bezier(0.2, 0.9, 0.1, 1)', fill: 'forwards' },
-      )
-      await Promise.all([a1.finished, a2.finished])
+      const a1 = play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: MERGE_MS })
+      const a2 = play('foldIntoPair', auxEl, {
+        from: cRect,
+        box: cRect,
+        pose: PAIR_AUX_POSE,
+        dur: MERGE_MS,
+        snap: true,
+      })
+      await Promise.all([a1?.finished, a2?.finished])
 
       if (cardCanTarget(item.card)) {
         // the pair waits at the centre for a target — the player's own beat is the hold

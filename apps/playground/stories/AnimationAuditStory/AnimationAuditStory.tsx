@@ -14,12 +14,13 @@ import styles from './AnimationAuditStory.module.css'
 // Language: technical names (module ids, file paths, rect/FLIP/move/fade/DOM…)
 // stay English in both languages; descriptive prose is bilingual via useLang().
 type Loc = Record<Lang, string>
-type Status = 'ok' | 'rework' | 'reuse'
+type Status = 'ok' | 'rework' | 'reuse' | 'open'
 
 const STATUS: Record<Status, { cls: string; label: Loc }> = {
   ok: { cls: styles.ok, label: { ru: 'оформлено', en: 'done' } },
   rework: { cls: styles.rework, label: { ru: 'доработать', en: 'rework' } },
   reuse: { cls: styles.reuse, label: { ru: 'есть готовое', en: 'reuse' } },
+  open: { cls: styles.open, label: { ru: 'нет решения', en: 'undecided' } },
 }
 
 interface Module {
@@ -63,12 +64,12 @@ const MODULES: Module[] = [
   {
     mod: "play('shake')",
     what: {
-      ru: 'Тряска влево-вправо — фидбек «поле не заполнено». Разовый триггер по событию (как flipCard): затухающая амплитуда, возврат в исходную точку. Перезапускается на повторный вызов.',
-      en: 'Left-right shake — the "field is empty" feedback. A one-shot event trigger (like flipCard): decaying amplitude, returns to the start point. Restarts on a repeat call.',
+      ru: 'Тряска влево-вправо — «не годится»: поле не заполнено, карты нет в руке. Разовый триггер по событию (как flipCard), с возвратом в исходную точку. Три параметра, каждый про своё: amp — размах первого рывка в px, dur — время, shape — ХАРАКТЕР (доли размаха по кадрам, SHAKE_SHAPES). Характеров два: settle — рывок и успокоение (жест поля ввода, по умолчанию 7px/380ms), spring — два полных размаха и два поменьше (крупный элемент, вздрогнувший всем собой). Доли, а не пиксели, поэтому характер читается одинаково на любой силе.',
+      en: 'Left-right shake — "this will not do": an empty field, a card that is not in the hand. A one-shot event trigger (like flipCard), returning to the start point. Three parameters, each its own thing: amp — the first swing in px, dur — the time, shape — the CHARACTER (fractions of the swing per frame, SHAKE_SHAPES). Two characters: settle — a jolt and a calm-down (the input-field gesture, 7px/380ms by default), spring — two full swings then two smaller ones (a large element that flinched whole). Fractions, not pixels, so a character reads the same at any force.',
     },
     where: {
-      ru: 'словарь → Invite, Start (модалка входа)',
-      en: 'registry → Invite, Start (entry modal)',
+      ru: 'словарь → Input (сам примитив), Invite, Start (модалка входа), Form во фронтенде; spring — веер соперника в PickSpecific',
+      en: 'registry → Input (the primitive itself), Invite, Start (entry modal), Form in the frontend; spring — the opponent fan in PickSpecific',
     },
     status: 'ok',
   },
@@ -78,7 +79,10 @@ const MODULES: Module[] = [
       ru: 'Выкладывание карты в центр стола (move, 480/ease).',
       en: 'Playing a card to the table center (move, 480/ease).',
     },
-    where: { ru: 'словарь → CardPlay, DeckAnimations', en: 'registry → CardPlay, DeckAnimations' },
+    where: {
+      ru: 'словарь → CardPlay, DeckAnimations, Combo, HandLimit, AiCards, Error503, DefenseRelease',
+      en: 'registry → CardPlay, DeckAnimations, Combo, HandLimit, AiCards, Error503, DefenseRelease',
+    },
     status: 'ok',
   },
   {
@@ -87,7 +91,10 @@ const MODULES: Module[] = [
       ru: 'Карта в слот зоны релиза (move, 480, снап-приземление).',
       en: 'A card into a release-zone slot (move, 480, snap landing).',
     },
-    where: { ru: 'словарь → Combo', en: 'registry → Combo' },
+    where: {
+      ru: 'словарь → Combo, AiCards, DefenseRelease, GameEnd',
+      en: 'registry → Combo, AiCards, DefenseRelease, GameEnd',
+    },
     status: 'ok',
   },
   {
@@ -97,8 +104,8 @@ const MODULES: Module[] = [
       en: 'From the center to the discard with a turn and scatter (move, 420).',
     },
     where: {
-      ru: 'словарь → CardPlay, Combo, DeckAnimations, CherryPick',
-      en: 'registry → CardPlay, Combo, DeckAnimations, CherryPick',
+      ru: 'словарь → только через useDiscardExit (сцены его не зовут напрямую)',
+      en: 'registry → through useDiscardExit only (no scene calls it directly)',
     },
     status: 'ok',
   },
@@ -138,7 +145,10 @@ const MODULES: Module[] = [
       ru: 'Карта выходит из колоды добора в центр стола. Отдельно от playToCenter — у добора своя вариативность (число карт, спец-механики).',
       en: 'A card comes out of the draw deck to the table center. Separate from playToCenter — drawing has its own variability (card count, special mechanics).',
     },
-    where: { ru: 'словарь → DrawCard', en: 'registry → DrawCard' },
+    where: {
+      ru: 'словарь → DrawCard, AiCards, Error503, GameDeal, useFlyer',
+      en: 'registry → DrawCard, AiCards, Error503, GameDeal, useFlyer',
+    },
     status: 'ok',
   },
   {
@@ -147,7 +157,7 @@ const MODULES: Module[] = [
       ru: 'Карта из центра уходит к месту игрока и растворяется в скрытой руке (move + fade).',
       en: 'A card leaves the center for a player seat and dissolves into the hidden hand (move + fade).',
     },
-    where: { ru: 'словарь → DrawCard', en: 'registry → DrawCard' },
+    where: { ru: 'словарь → DrawCard, GameDeal', en: 'registry → DrawCard, GameDeal' },
     status: 'ok',
   },
   {
@@ -156,7 +166,10 @@ const MODULES: Module[] = [
       ru: 'Карта возвращается из центра обратно в колоду (центр→колода) с уменьшением до размера колоды. Парный к drawToCenter.',
       en: 'A card returns from the center back to the deck (center→deck), shrinking to the deck size. The pair of drawToCenter.',
     },
-    where: { ru: 'словарь → DrawCard', en: 'registry → DrawCard' },
+    where: {
+      ru: 'словарь → DrawCard, AiCards, CherryPick, Rebase',
+      en: 'registry → DrawCard, AiCards, CherryPick, Rebase',
+    },
     status: 'ok',
   },
   {
@@ -172,15 +185,24 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
-    mod: 'CardPair',
+    mod: 'CardPair + PAIR_AUX_POSE',
     what: {
-      ru: 'Визуальный атом пары: вспомогательная карта подтыкается под основную под углом.',
-      en: 'The visual atom of a pair: a helper card tucks under the main one at an angle.',
+      ru: 'Визуальный атом пары: вспомогательная карта подтыкается под основную под углом. Поза объявлена ОДИН раз и ДАННЫМИ — PAIR_AUX { rot, dy }, а CSS-строка PAIR_AUX_POSE выводится из них: читателей трое и формы им нужны разные. Компонент ставит строку инлайном, складывание садится на неё финальным кадром, а шаг ухода в сброс берёт угол числом — при распаде пары половина улетает своим полётом и должна стартовать с того наклона, который был виден. Тот же приём, что Scatter + restTransform() у кучи: поза — значение, CSS — её представление.',
+      en: 'The visual atom of a pair: a helper card tucks under the main one at an angle. The pose is declared ONCE and as DATA — PAIR_AUX { rot, dy } — with the CSS string PAIR_AUX_POSE derived from it: there are three readers and they need different forms. The component applies the string inline, the fold lands on it as its final frame, and the discard-exit step takes the angle as a number — when a pair splits, the half flying out on its own must start at the tilt it was seen at. The same trick as Scatter + restTransform() for the heap: the pose is a value, the CSS is its representation.',
     },
     where: {
-      ru: 'primitives/CardPair → Combo, DeckAnimations',
-      en: 'primitives/CardPair → Combo, DeckAnimations',
+      ru: 'primitives/CardPair → Combo, DefenseRelease, Error503, ReleaseZone, useDiscardExit',
+      en: 'primitives/CardPair → Combo, DefenseRelease, Error503, ReleaseZone, useDiscardExit',
     },
+    status: 'ok',
+  },
+  {
+    mod: "play('foldIntoPair') / enterPose()",
+    what: {
+      ru: 'Две карты СКЛАДЫВАЮТСЯ в пару: каждая половина приезжает из своего настоящего места на столе в свою позу внутри пары (у основной — рамка, у вспомогательной — PAIR_AUX_POSE, с snap-приземлением). Отличается от travel-пресетов тем, что пара никуда не летит: двигаются только внутренние узлы data-main / data-aux. enterPose(from, box) — вход FLIP-полёта отдельным хелпером, потому что сцена красит им первый кадр ДО старта: иначе половины успевают мигнуть в конечной позе.',
+      en: 'Two cards FOLD into a pair: each half arrives from where it actually stands on the table into its pose inside the pair (the main one — the frame, the aux — PAIR_AUX_POSE with a snap landing). Unlike the travel presets the pair does not fly anywhere: only the inner data-main / data-aux nodes move. enterPose(from, box) is the FLIP entry pose as its own helper, because the scene paints the first frame with it BEFORE the start — otherwise the halves flash in their final pose.',
+    },
+    where: { ru: 'словарь → Combo, DefenseRelease', en: 'registry → Combo, DefenseRelease' },
     status: 'ok',
   },
   {
@@ -190,8 +212,8 @@ const MODULES: Module[] = [
       en: 'Inward edge glow of a container (inset veil) with a smooth fade in/out (CSS-transition). Two strength variants: strong (player table) / weak (opponent seat). Color/intensity via props.',
     },
     where: {
-      ru: 'primitives/EdgeGlow → DrawCard (тревога Error 503), UI KIT',
-      en: 'primitives/EdgeGlow → DrawCard (Error 503 alarm), UI KIT',
+      ru: 'primitives/EdgeGlow → DrawCard и Error503 (тревога 503), AiCards, UI KIT',
+      en: 'primitives/EdgeGlow → DrawCard and Error503 (the 503 alarm), AiCards, UI KIT',
     },
     status: 'ok',
   },
@@ -202,8 +224,20 @@ const MODULES: Module[] = [
       en: 'The single source of "how a card lands in and rests in the discard heap". Scatter (tilt + offset as fractions of card width) is computed ONCE by card key (scatterAt — deterministic, stable across re-renders and peers); the flight (toDiscardParams) and the rest (restTransform) read the same one → a card lands exactly where it rests, no position swap on the last frame. jitter() is the one-off random variant. HEAP_SHOW — how many top cards stay visible, the rest fade. The discard counterpart of slotPlacement() for the hand fan.',
     },
     where: {
-      ru: 'animations/scatter → CherryPick, Combo, CardPlay, DeckAnimations',
-      en: 'animations/scatter → CherryPick, Combo, CardPlay, DeckAnimations',
+      ru: 'animations/scatter → useDiscardExit (значит все сцены со сбросом) + напрямую CherryPick, Combo, CardPlay, DeckAnimations, Error503, DefenseRelease, GameDeal, GameEnd',
+      en: 'animations/scatter → useDiscardExit (hence every scene with a discard) + directly CherryPick, Combo, CardPlay, DeckAnimations, Error503, DefenseRelease, GameDeal, GameEnd',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'cardBoxIn() / cardAreaOf() / CARD_RATIO',
+    what: {
+      ru: 'Прицел полёта: карточная КОРОБКА внутри чужого прямоугольника. Место соперника, ячейка колоды, сидушка — шире карты и другой пропорции, и целиться в них целиком нельзя: карта раздулась бы до их ширины. cardBoxIn(rect, width) вписывает коробку заданной ширины по центру; cardAreaOf(cell) берёт ширину ячейки и достраивает высоту по CARD_RATIO (1.4) — единственному месту, где это отношение объявлено. Отвечает на «куда лететь», ровно как scatter отвечает на «как лечь».',
+      en: 'The aim of a flight: the card BOX inside somebody else’s rectangle. An opponent seat, a deck cell, a seat plate — all wider than a card and of another proportion, and aiming at them whole is wrong: the card would inflate to their width. cardBoxIn(rect, width) centres a box of the given width inside; cardAreaOf(cell) takes the cell width and derives the height from CARD_RATIO (1.4) — the one place that ratio is declared. It answers "where to fly", exactly as scatter answers "how to lie".',
+    },
+    where: {
+      ru: 'primitives/Card/geometry → useDiscardExit, useHandArrival, CardPlay, DrawCard, GameDeal, DefenseRelease, Error503, AiCards, OpponentTakes, DeckAnimations, Combo, Rebase',
+      en: 'primitives/Card/geometry → useDiscardExit, useHandArrival, CardPlay, DrawCard, GameDeal, DefenseRelease, Error503, AiCards, OpponentTakes, DeckAnimations, Combo, Rebase',
     },
     status: 'ok',
   },
@@ -214,8 +248,8 @@ const MODULES: Module[] = [
       en: 'A double requestAnimationFrame — wait for the new node to paint before starting the animation.',
     },
     where: {
-      ru: 'animations/timing → Combo, CardPlay, DeckAnimations, DrawCard',
-      en: 'animations/timing → Combo, CardPlay, DeckAnimations, DrawCard',
+      ru: 'animations/timing → useFlyer, useHandArrival, useDiscardExit (значит под каждым полётом), Combo, AiCards, DeckAnimations, DefenseRelease',
+      en: 'animations/timing → useFlyer, useHandArrival, useDiscardExit (hence under every flight), Combo, AiCards, DeckAnimations, DefenseRelease',
     },
     status: 'ok',
   },
@@ -226,8 +260,8 @@ const MODULES: Module[] = [
       en: 'A pause timer to hold phases between animations.',
     },
     where: {
-      ru: 'animations/timing → Combo, CardPlay, DeckAnimations, DrawCard, Animations',
-      en: 'animations/timing → Combo, CardPlay, DeckAnimations, DrawCard, Animations',
+      ru: 'animations/timing → 12 сцен и все три хука полёта',
+      en: 'animations/timing → 12 scenes and all three flight hooks',
     },
     status: 'ok',
   },
@@ -250,8 +284,8 @@ const MODULES: Module[] = [
       en: 'Cards ARRIVE in the hand — one movement for any number of them. It used to be two steps ("a card settles in" and "the staging comes back"), but on screen the movement is one: the fan opens a gap in the MIDDLE, the card matches the size, lands on the slot bottom-centre and tucks under the fan. Any source: a rect; a card resting at a tilt (the pivot is compensated, so the first frame does not jump); an element already drawn (the step takes it off screen itself); one half of a pair (measured off its anchor, the tilted box trimmed — I6). On landing it hands BACK what arrived: the scene does not read its own staging, which it cleared the moment the flight started (I8).',
     },
     where: {
-      ru: 'stories/interactive → 12 мест: добор, карта соперника, Inside, Cherry-pick, System Upgrade, отмены в Combo и DeckAnimations, Rollback',
-      en: 'stories/interactive → 12 places: draws, an opponent card, Inside, Cherry-pick, System Upgrade, the undos in Combo and DeckAnimations, Rollback',
+      ru: 'stories/interactive → 11 сцен: добор, карта соперника (обе сцены выбора), Inside, Cherry-pick, System Upgrade, отмены в Combo и DeckAnimations, Rollback, раздача в GameDeal, CardToHand как витрина самого шага',
+      en: 'stories/interactive → 11 scenes: draws, an opponent card (both picking scenes), Inside, Cherry-pick, System Upgrade, the undos in Combo and DeckAnimations, Rollback, the deal in GameDeal, CardToHand as the showcase of the step itself',
     },
     status: 'ok',
   },
@@ -322,15 +356,36 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
+    mod: 'CardCatalog',
+    what: {
+      ru: 'Каталог выбора карты: набор карт лицом вверх, из которого называют одну. Не веер и не куча — карты разложены, чтобы их прочитали и сравнили, поэтому по ховеру ячейка ВЫРАСТАЕТ до читаемого размера, а не поднимается. Жизнь каталога — два пропса: open (выбор идёт: все ячейки живые) и chosen (названная держится увеличенной, пока остальные уезжают вниз); selected — то, на чём выбор заряжен, но ещё не подтверждён. Появление — стаггером по ячейкам. Подтверждение снаружи, обычно ConfirmAction: назвать карту необратимо. ГДЕ каталог стоит — дело сцены, блок занимает выданную область.',
+      en: 'The card-pick catalog: a set of face-up cards to name one from. Not a fan and not a heap — the cards are laid out to be read and compared, so on hover a cell GROWS to a readable size instead of lifting. Its life is two props: open (the choice is on: every cell alive) and chosen (the named one holds enlarged while the rest slide away); selected is what the choice is armed on but not yet committed. Entrance — a per-cell stagger. Confirmation lives outside, usually ConfirmAction: naming a card is irreversible. WHERE the catalog stands is the scene’s business; the block fills the area it is given.',
+    },
+    where: {
+      ru: 'table/CardCatalog → PickSpecific, OpponentTakes',
+      en: 'table/CardCatalog → PickSpecific, OpponentTakes',
+    },
+    status: 'ok',
+  },
+  {
     mod: 'ConfirmAction',
     what: {
       ru: 'Общий слайд-бар подтверждения выбора: заезжает по open, прижат к низу контейнера, опциональная подпись. Презентационный, i18n-agnostic.',
       en: 'The shared confirm-the-selection bar: slides up on open, pinned to the bottom of its container, an optional caption. Presentational, i18n-agnostic.',
     },
     where: {
-      ru: 'table/ConfirmAction → CherryPick, AI cards (Inside)',
-      en: 'table/ConfirmAction → CherryPick, AI cards (Inside)',
+      ru: 'table/ConfirmAction → CherryPick, Rebase, SystemUpgrade, AiCards (Inside), PickSpecific, OpponentTakes',
+      en: 'table/ConfirmAction → CherryPick, Rebase, SystemUpgrade, AiCards (Inside), PickSpecific, OpponentTakes',
     },
+    status: 'ok',
+  },
+  {
+    mod: "play('hudIn')",
+    what: {
+      ru: 'Блок интерфейса приходит на своё место: короткий сдвиг по заданной оси + проявление. dx/dy — ОТКУДА он приходит (0/0 — чистое проявление, как у фоновой сетки), delay держит его невидимым до своей очереди (fill: both). Сдвиг живёт на transform, поэтому вешать пресет надо на ВНУТРЕННИЙ узел блока: на самом блоке transform обычно держит позиционирование (translate(-50%)). Из него собирается вся очередь появления экрана.',
+      en: 'A HUD block arrives at its place: a short shift along the given axis + a fade in. dx/dy — WHERE it comes from (0/0 is a plain fade, as the background grid does), delay holds it invisible until its turn (fill: both). The shift lives on transform, so the preset goes on the block’s INNER node: on the block itself transform usually holds the positioning (translate(-50%)). The whole entrance order of a screen is built from it.',
+    },
+    where: { ru: 'словарь → Game Deal', en: 'registry → Game Deal' },
     status: 'ok',
   },
   {
@@ -367,8 +422,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Розыгрыш комбо (пара)', en: 'Playing a combo (pair)' },
     from: {
-      ru: 'useArrow + centerOf ведёт прицел; совмещение через CardPair (доп. карта подтыкается под углом); релиз → playToReleaseZone (move 480, SNAP-приземление); в сброс — через useDiscardExit (пара распадается на 2 одиночки, каждая от своего якоря); отмена — через useHandArrival (сборка возвращается в середину веера разом).',
-      en: 'useArrow + centerOf drives the aim; pairing via CardPair (the extra card tucks in at an angle); release → playToReleaseZone (move 480, SNAP landing); to the discard — via useDiscardExit (the pair splits into 2 singles, each from its own anchor); cancel — via useHandArrival (the staging returns to the middle of the fan at once).',
+      ru: 'useArrow + centerOf ведёт прицел; совмещение — foldIntoPair по разу на половину (первый кадр красится enterPose, иначе половины мигнут в конечной позе; вспомогательная приземляется в PAIR_AUX_POSE самого CardPair, поэтому передача пары в статичный слот не видна). Здесь у неё вырожденный случай: вторая карта УЖЕ стоит в центре, и это выражено как enterPose(box, box) — та же формула даёт identity, отдельной ветки нет. Релиз → playToReleaseZone (move 480, SNAP-приземление); в сброс — через useDiscardExit (пара распадается на 2 одиночки, каждая от своего якоря); отмена — через useHandArrival (сборка возвращается в середину веера разом).',
+      en: 'useArrow + centerOf drives the aim; the pairing — foldIntoPair once per half (the first frame painted with enterPose, else the halves flash in their final pose; the aux lands on CardPair’s own PAIR_AUX_POSE, so handing the pair to a static slot is invisible). Here it has the degenerate case: the second card is ALREADY at the centre, expressed as enterPose(box, box) — the same formula yields identity, no separate branch. Release → playToReleaseZone (move 480, SNAP landing); to the discard — via useDiscardExit (the pair splits into 2 singles, each from its own anchor); cancel — via useHandArrival (the staging returns to the middle of the fan at once).',
     },
     where: 'Combo',
   },
@@ -471,16 +526,16 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Забрать конкретную карту', en: 'Take a specific card' },
     from: {
-      ru: 'каталог-грид (без триггеров) в центре + веер соперника рубашкой сверху (data-in слайд). Выбор держит PICK_BEAT; хит — карта вылетает из слота соперника к центру стола (CSS-transition, центр от rootRef, не window), flip лицом, REVEAL_HOLD, затем useHandArrival в руку; мисс — тряска + подпись, веер уезжает. Слот-донор рендерит null, пока карту несёт flyer.',
-      en: 'a catalog grid (no triggers) at the centre + the opponent fan back-up from the top (data-in slide). The pick holds PICK_BEAT; hit — the card flies out of the opponent slot to the stage centre (CSS transition, centre from rootRef not window), flips face up, REVEAL_HOLD, then useHandArrival into the hand; miss — shake + note, the fan leaves. The donor slot renders null while the flyer carries the card.',
+      ru: "CardCatalog (без триггеров) в средней полосе + веер соперника рубашкой сверху (data-in слайд). Выбор заряжается кликом и подтверждается ConfirmAction, дальше держит PICK_BEAT: названная карта стоит увеличенной, остальные уезжают. Хит — карта вылетает из слота соперника к центру стола (CSS-transition, центр от rootRef, не window), flip лицом, REVEAL_HOLD, затем useHandArrival в руку. Мисс — веер вздрагивает на месте: play('shake') характером spring, amp 9 / 460ms (крупный элемент вздрагивает всем собой), подпись, веер уезжает. Слот-донор рендерит null, пока карту несёт flyer.",
+      en: "CardCatalog (no triggers) in the middle band + the opponent fan back-up from the top (data-in slide). The pick is armed by a click and committed through ConfirmAction, then holds PICK_BEAT: the named card stands enlarged while the rest slide away. Hit — the card flies out of the opponent slot to the stage centre (CSS transition, centre from rootRef not window), flips face up, REVEAL_HOLD, then useHandArrival into the hand. Miss — the fan flinches in place: play('shake') in its spring character, amp 9 / 460ms (a large element flinches whole), a note, and the fan leaves. The donor slot renders null while the flyer carries the card.",
     },
     where: 'PickSpecificCardStory',
   },
   {
     name: { ru: 'У тебя забирают карту', en: 'Opponent takes your card' },
     from: {
-      ru: 'зеркало «забрать конкретную» со стороны жертвы: two-hop CSS-transition from → center → up. В центре flip РУБАШКОЙ (теперь карта соперника), затем к центру его веера rotate(180); zIndex падает до 30 на подъёме, чтобы подоткнуться под веер. useHandArrival НЕ используется — карта уходит из руки, а не встаёт в неё.',
-      en: 'mirror of "take a specific card" from the victim: a two-hop CSS transition from → center → up. At the centre it flips FACE-DOWN (now the opponent’s card), then to their fan centre rotate(180); zIndex drops to 30 on the way up to tuck behind the fan. No useHandArrival — the card leaves the hand, it does not settle into one.',
+      ru: 'зеркало «забрать конкретную» со стороны жертвы, и каталог выбора у них общий — тот же CardCatalog, только называет карту соперник (бродкаст). Дальше two-hop CSS-transition from → center → up. В центре flip РУБАШКОЙ (теперь карта соперника), затем к центру его веера rotate(180); zIndex падает до 30 на подъёме, чтобы подоткнуться под веер. useHandArrival НЕ используется — карта уходит из руки, а не встаёт в неё.',
+      en: 'mirror of "take a specific card" from the victim, and the pick catalog is shared — the same CardCatalog, only the opponent names the card (a broadcast). Then a two-hop CSS transition from → center → up. At the centre it flips FACE-DOWN (now the opponent’s card), then to their fan centre rotate(180); zIndex drops to 30 on the way up to tuck behind the fan. No useHandArrival — the card leaves the hand, it does not settle into one.',
     },
     where: 'OpponentTakesCardStory',
   },
@@ -519,10 +574,21 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Защита релиза (полный ход)', en: 'Defending a release (a whole turn)' },
     from: {
-      ru: 'релиз из веера встаёт в центр и НЕ приземляется — по правилам он стоит одной карты, оплата показывается рядом открыто; только после этого релиз садится в свой слот зоны (playToReleaseZone) и открывается окно атак. Атака летит с места соперника в центр (cardBoxIn — прицел по карточной коробке, не по всей сидушке) и ложится под своим наклоном. Ответ: защита накрывает атаку, обе уходят в сброс одним обменом (useDiscardExit, слои сохраняются). Своё судо встаёт в СВОЙ слот со стрелкой и складывается с выбранной защитой в пару (покадровое слияние, без дублей и телепортов). Security Bug не жжёт релиз, а забирает его в зону атакующего — карта морфит в LOD прямо В ПОЛЁТЕ. Rollback возвращает атаку: без судо — в руку атакующего, с судо — в свою через useHandArrival. Промах мимо цели отменяет выложенное.',
-      en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence (a frame-by-frame merge, no duplicates and no teleports). Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandArrival. A press on nothing valid takes a staged play back.",
+      ru: 'релиз из веера встаёт в центр и НЕ приземляется — по правилам он стоит одной карты, оплата показывается рядом открыто; только после этого релиз садится в свой слот зоны (playToReleaseZone) и открывается окно атак. Атака летит с места соперника в центр (cardBoxIn — прицел по карточной коробке, не по всей сидушке) и ложится под своим наклоном. Ответ: защита накрывает атаку, обе уходят в сброс одним обменом (useDiscardExit, слои сохраняются). Своё судо встаёт в СВОЙ слот со стрелкой и складывается с выбранной защитой в пару через foldIntoPair — без дублей и телепортов: судо со стола передаётся флаеру тем же коммитом, поэтому оно ни на кадр не оказывается на экране дважды. Security Bug не жжёт релиз, а забирает его в зону атакующего — карта морфит в LOD прямо В ПОЛЁТЕ. Rollback возвращает атаку: без судо — в руку атакующего, с судо — в свою через useHandArrival. Промах мимо цели отменяет выложенное.',
+      en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence via foldIntoPair — no duplicates and no teleports: the standing Sudo is handed to the flyer in the same commit, so it is never on screen twice for even a frame. Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandArrival. A press on nothing valid takes a staged play back.",
     },
     where: 'DefenseRelease',
+  },
+  {
+    name: {
+      ru: 'Начало партии: интерфейс и раздача',
+      en: 'The start of a match: interface and deal',
+    },
+    from: {
+      ru: "две хореографии подряд. ПЕРВАЯ — приход интерфейса, вся на play('hudIn') с паузой BEAT между тактами: правая навигация въезжает от своего края (dx: 44), затем слой стола вместе с сеточкой чистым проявлением (dx/dy: 0), затем колоды слева (dx: -34) и сброс справа (dx: 34) со сдвигом PILE_STAGGER — не вместе, а друг за другом; последними места соперников падают сверху по одному (dy: -28, SEAT_STAGGER) и в тот же такт снизу поднимается док (dy: 30, DOCK_DELAY) — в состоянии «ход соперника», но с текстом «старт игры». Зоны релиза в этой очереди НЕТ. ВТОРАЯ — раздача по кругу, начиная с игрока, DEAL_STEP между картами и ROUND_GAP между кругами: карта игрока идёт drawToCenter в центр и ОСТАЁТСЯ там под своим scatterAt (один разброс ведёт и полёт, и покой — та же связка, что в сбросе), карта соперника уходит dealToSeat в cardBoxIn его места ×0.7 и растворяется в счётчике. Первый круг — Debugger, в открытую; остальное рубашкой. Что легло в центр, копится в локальный массив, а не читается из staged: замыкание не перезапускается, и staged в нём навсегда пустой (I8). Когда сели все пять — HEAP_HOLD, центр очищается в том же коммите, что стартует полёт, и вся кучка ОДНИМ useHandArrival уходит в веер (from = место карты в куче, rot её же) — всё ещё закрытой. FLIP_HOLD — рука переворачивается (Card играет flipCard сам, по faceDown). И только через REVEAL_HOLD hudIn выводит зону релиза игрока (dy: 22) — у него одного, у соперников её нет. Сцена вооружена started-рефом (StrictMode монтирует дважды), рестарт снимает его и перезапускает всё по key.",
+      en: "two choreographies in a row. THE FIRST — the interface arriving, all of it on play('hudIn') with a BEAT between steps: the page rail slides in from its own edge (dx: 44), then the table layer with its grid as a plain fade (dx/dy: 0), then the decks from the left (dx: -34) and the discard from the right (dx: 34) offset by PILE_STAGGER — one after the other, not together; last the opponent seats drop in from above one by one (dy: -28, SEAT_STAGGER) and in the same beat the dock rises from below (dy: 30, DOCK_DELAY) — in its «opponent's turn» state but reading «game start». The release zone is NOT in this order. THE SECOND — the deal, round by round starting with the player, DEAL_STEP between cards and ROUND_GAP between rounds: the player's card goes drawToCenter to the centre and STAYS there at its own scatterAt (one scatter drives both flight and rest — the discard's own coupling), an opponent's card leaves dealToSeat into cardBoxIn of their seat ×0.7 and dissolves into the counter. The first round is the Debugger, dealt open; everything else face down. What landed at the centre is collected in a local array instead of read back off staged: the closure never re-runs, so staged in it stays the empty array it was (I8). When all five have landed — HEAP_HOLD, the centre empties in the same commit that starts the flight, and the whole heap goes into the fan with ONE useHandArrival (from = the card's place in the heap, rot its own) — still face down. FLIP_HOLD — the hand turns over (Card plays flipCard itself, off faceDown). And only after REVEAL_HOLD does hudIn bring in the player's release zone (dy: 22) — his alone, the opponents have none. The scene is armed with a started ref (StrictMode mounts twice); restart clears it and re-runs everything by key.",
+    },
+    where: 'GameDeal',
   },
   {
     name: { ru: 'Конец партии', en: 'The end of a match' },
@@ -534,11 +600,28 @@ const SCENARIOS: Scenario[] = [
   },
 ]
 
-// ===== 3. Needs rework =====
-// Empty: everything reduced to modules. (Pairing in Combo is intentionally left
-// as is — it's cards sliding into a stack, not a rect→rect flight; routing it
-// through move() would be extra complexity, not a fix.)
-const ISSUES: Issue[] = []
+// ===== 3. Needs rework — THE register of findings =====
+// Everything found about the animations lands here: this page is where the work
+// is looked at, so it is where a finding has to be visible. Two kinds live side
+// by side, and the status tells them apart:
+//   • what is VISIBLE in the scenes — a movement written twice, a ready module
+//     not used (rework / reuse). The rule: a movement that exists in two scenes
+//     is a module that has not been packaged yet.
+//   • what CANNOT be seen in a scene — a rule nobody decided, a value out of
+//     reach (open). The long form of these — what it costs and what would close
+//     it — is in docs/animations/backlog.md; here they are visible, there they
+//     are actionable.
+const ISSUES: Issue[] = [
+  {
+    what: { ru: 'Сцена ничем не обязана оставить рецепт', en: 'A scene owes no recipe' },
+    problem: {
+      ru: 'Про доку, не про игровую логику. Пресеты проверяются тестом: нет строки в reference.md — падает CI. У сцен такого признака нет, и дока уже отставала на семь пресетов, пока это не вскрылось сплошной сверкой; со сценами выйдет так же. Машинного признака не нашли — сцена это файл истории, а не запись в реестре, — поэтому держится на дисциплине. Правится не сейчас: цена вопроса появится, когда рецептами начнут пользоваться снаружи плейграунда.',
+      en: 'About the docs, not the game logic. Presets are covered by a test: no row in reference.md, no green CI. Scenes have no such signal, and the docs had already fallen seven presets behind before a full sweep caught it; scenes will go the same way. No machine signal was found — a scene is a story file, not a registry entry — so it rests on discipline. Not being fixed now: the cost shows up once recipes are used outside the playground.',
+    },
+    where: { ru: 'docs/animations/recipes.md', en: 'docs/animations/recipes.md' },
+    status: 'open',
+  },
+]
 
 // Section headings, notes, legend and table headers.
 const UI = {
@@ -550,10 +633,17 @@ const UI = {
     scenariosNote:
       'Реализованные последовательности из модулей выше — под конкретные ситуации игры.',
     issuesH: 'Требует доработок',
-    issuesEmpty: 'Открытых проблем нет — всё свелось к модулям.',
+    issuesNote:
+      'Реестр находок: сюда заносится всё, что нашли про анимации. Видимое в сценах — движение, написанное дважды, готовый модуль без применения. И невидимое — нерешённое правило, значение, до которого не дотянуться. Наткнулся на дыру — запиши сюда, а не обходи её на месте.',
+    issuesEmpty:
+      'Открытых проблем нет — всё свелось к модулям. Правило, на котором держится эта пустота: движение, встретившееся в двух сценах, — это модуль, который ещё не оформили.',
     legendOk: 'оформлено модулем, переиспользуется',
     legendRework: 'код есть, но кривой/дублируется — доработать',
     legendReuse: 'есть готовый модуль, но не используется — применить',
+    legendOpen: 'решения нет — нужен выбор, а не работа',
+    docsH: 'Спека в проекте',
+    docsNote:
+      'У этой страницы есть письменная пара — docs/animations/. Здесь состояние в лицах: что готово, из чего собрано, что нашли. Там — как этим пользоваться из игровой логики: README (модель и инварианты I1–I10), recipes (последовательности по игровым ситуациям), reference (вызываемое: пресеты, хелперы, шаги), glossary (параметры и значения), extending (как добавить своё), backlog (развёрнутые находки: чем грозит и что закроет). Правило синхронности одностороннее только на словах: пресет без строки в reference роняет тест.',
     colModule: 'модуль',
     colWhatDoes: 'что делает',
     colWhereMod: 'где живёт · используется',
@@ -572,10 +662,17 @@ const UI = {
     scenariosH: 'Scenario combinations',
     scenariosNote: 'Implemented sequences from the modules above — for concrete game situations.',
     issuesH: 'Needs rework',
-    issuesEmpty: 'No open issues — everything reduced to modules.',
+    issuesNote:
+      'The register of findings: everything found about the animations lands here. What is visible in the scenes — a movement written twice, a ready module left unused. And what is not — a rule nobody decided, a value out of reach. Run into a gap: write it here instead of working around it in place.',
+    issuesEmpty:
+      'No open issues — everything reduced to modules. The rule this emptiness rests on: a movement found in two scenes is a module that has not been packaged yet.',
     legendOk: 'packaged as a module, reused',
     legendRework: 'code exists but messy/duplicated — rework',
     legendReuse: 'a ready module exists but unused — apply it',
+    legendOpen: 'undecided — it needs a choice, not work',
+    docsH: 'The written spec',
+    docsNote:
+      'This page has a written counterpart — docs/animations/. Here is the state in the flesh: what is ready, what it is assembled from, what has been found. There is how to use it from game logic: README (the model and the I1–I10 invariants), recipes (ordered sequences by game situation), reference (the callable API: presets, helpers, steps), glossary (parameters and values), extending (how to add your own), backlog (findings in full: what it costs and what would close it). The sync rule is one-way only in wording: a preset with no row in reference fails a test.',
     colModule: 'module',
     colWhatDoes: 'what it does',
     colWhereMod: 'where it lives · used',
@@ -727,16 +824,17 @@ export default function AnimationAuditStory() {
             Источник состояния работы с анимациями. Сначала готовые <b>модули</b> — кирпичики для
             сборки. Затем <b>сценарные комбинации</b> — как кирпичики складываются под игровые
             ситуации (сценарий — это последовательность, а не модуль: его не оформляют отдельно,
-            поэтому без статусов). И в конце — раздел <b>что требует доработок</b> (сейчас пусто:
-            всё свелось к модулям).
+            поэтому без статусов). И в конце — <b>реестр находок</b>: всё, что нашли про анимации,
+            от копии словарного движения в сцене до вопроса, который никто не решил.
           </>
         ) : (
           <>
             The source of state for animation work. First the ready <b>modules</b> — building
             blocks. Then <b>scenario combinations</b> — how the blocks assemble for game situations
             (a scenario is a sequence, not a module: it isn't formalized separately, so no
-            statuses). And at the end — the <b>what needs rework</b> section (currently empty:
-            everything reduced to modules).
+            statuses). And at the end — the <b>register of findings</b>: everything found about the
+            animations, from a scene carrying its own copy of a registry movement to a question
+            nobody has decided.
           </>
         )}
       </p>
@@ -745,7 +843,15 @@ export default function AnimationAuditStory() {
         <LegendItem status="ok">{ui.legendOk}</LegendItem>
         <LegendItem status="rework">{ui.legendRework}</LegendItem>
         <LegendItem status="reuse">{ui.legendReuse}</LegendItem>
+        <LegendItem status="open">{ui.legendOpen}</LegendItem>
       </div>
+
+      {/* the written half of the same subject — named on the page itself, so it
+          is reachable from where the work is looked at */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>{ui.docsH}</h2>
+        <p className={styles.sectionNote}>{ui.docsNote}</p>
+      </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>{ui.modulesH}</h2>
@@ -761,6 +867,7 @@ export default function AnimationAuditStory() {
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>{ui.issuesH}</h2>
+        <p className={styles.sectionNote}>{ui.issuesNote}</p>
         {ISSUES.length > 0 ? (
           <IssueTable rows={ISSUES} />
         ) : (

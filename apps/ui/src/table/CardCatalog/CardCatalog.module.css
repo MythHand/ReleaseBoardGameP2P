@@ -1,0 +1,52 @@
+/* сетка каталога: карты раскладываются по центру области, которую ему дали.
+   Позиционирование области — на потребителе, блок занимает её целиком. */
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 18px;
+  place-content: center;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: visible;
+}
+
+/* ячейка каталога: вылетает при появлении (стаггер через inline animation-delay),
+   по ховеру увеличивается, чтобы прочитать эффект */
+.cell {
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
+  animation: cell-in 360ms var(--ease-out) backwards;
+}
+
+.cell:hover {
+  z-index: 20;
+  transform: scale(1.9);
+}
+
+/* названная — держится увеличенной, пока остальные уходят */
+.chosen {
+  z-index: 15;
+  transform: scale(1.7);
+}
+
+/* остальные — уезжают из сетки */
+.leaving {
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(24px) scale(0.86);
+}
+
+@keyframes cell-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

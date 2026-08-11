@@ -8,11 +8,17 @@ grows with real needs, not future guesses.
 
 ## Where things live
 
-- **Presets** — `apps/ui/src/animations/presets.ts` (the `PRESETS` registry) + the `move` / `durationOf` helpers.
-- **Scatter** — `apps/ui/src/animations/scatter.ts` (`jitter`, `ROT/DX/DY`).
+- **Presets** — `apps/ui/src/animations/presets.ts` (the `PRESETS` registry), the internal `move` /
+  `durationOf` helpers, the exported `enterPose` and the shake characters `SHAKE_SHAPES`.
+- **Scatter** — `apps/ui/src/animations/scatter.ts` (`scatterAt` / `jitter` / `restTransform` /
+  `toDiscardParams` / `HEAP_SHOW`; the ranges are `ROT` and the **fractions** `DX_FRAC` / `DY_FRAC`
+  — offsets scale with the card width, the tilt does not).
 - **Timing** — `apps/ui/src/animations/timing.ts` (`wait`, `nextFrames`).
-- **Public surface** — `apps/ui/src/animations/index.ts` re-exports `play`, `presetNames`, `PRESETS`, `jitter`, `nextFrames`, `wait`.
-- **Toolkit modules** — under `apps/ui/src/primitives/` (`Arrow`, `Card/geometry`).
+- **Public surface** — `apps/ui/src/animations/index.ts` re-exports `play`, `presetNames`,
+  `PRESETS`, `enterPose`, `SHAKE_SHAPES`, the whole scatter model and the timing helpers. `move` and
+  `durationOf` stay inside on purpose: a flight goes through a named preset, never through the base.
+- **Toolkit modules** — under `apps/ui/src/primitives/` (`Arrow`, `Card/geometry`, `CardPair` with
+  its `PAIR_AUX` pose).
 
 ---
 
@@ -49,10 +55,21 @@ glossary. Durations are parameters, not names (see the glossary).
 
 ## Follow the invariants
 
-Any new flight obeys **I1–I8** (see [`README.md`](./README.md)): measure before mutate; `nextFrames`
+Any new flight obeys **I1–I10** (see [`README.md`](./README.md)): measure before mutate; `nextFrames`
 before start; cancel leftover animations on a reused node; pin the flyer after landing; `key={seq}` for a
 reused flyer `Card`; aim at the card box (**I6**); precompute variance and pass it in (**I7**); pass data
-as arguments inside async sequences (**I8**).
+as arguments inside async sequences (**I8**); make a card's layer a value it carries, never DOM order
+(**I9**); render the flyer at the coordinates it mounts with (**I10**). The last two are the flight
+ones — a new flight that skips them lands in the wrong order or flashes at the bottom of the page.
+
+---
+
+## When nothing fits and you cannot decide it alone
+
+Adding a preset is the easy case. The hard one is a movement whose rule nobody has settled, a value
+you need but cannot reach, or a fix you can only make locally. Do **not** solve that one in place:
+write it into [`backlog.md`](./backlog.md) — the gap, what it costs, and the smallest thing that
+would close it — and raise it. A local workaround is invisible; a backlog entry can be scheduled.
 
 ---
 

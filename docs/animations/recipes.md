@@ -8,7 +8,7 @@ Read the shared model and the `I1…I10` invariants in [`README.md`](./README.md
 reference those by number instead of repeating them.
 
 **Where a movement has a step, the recipe names the step — it does not restate its mechanics.**
-Three movements are shared and live in one place each ([`reference.md`](./reference.md#the-three-movement-steps)):
+Three movements are shared and live in one place each ([`reference.md`](./reference.md#the-movement-steps-and-the-carrier-under-them)):
 `useHandArrival` (cards arrive in the hand), `useDiscardExit` (cards leave the table for the
 discard), and the carrier `useFlyer` under both. A recipe says *which step and what
 it is passed*; the frame-by-frame — measuring, `nextFrames`, the scatter coupling, the layer order,
@@ -110,7 +110,7 @@ _Phase B — center → discard (separate trigger):_ this is the shared step, no
 
 **Building blocks**
 [`playToCenter`](./reference.md#presets) (`move()` travel) · the step
-[`useDiscardExit`](./reference.md#the-three-movement-steps) · [`cardBoxIn`](./reference.md#card-geometry-helpers) ·
+[`useDiscardExit`](./reference.md#the-movement-steps-and-the-carrier-under-them) · [`cardBoxIn`](./reference.md#card-geometry-helpers) ·
 [`nextFrames()`](./reference.md#travel-and-timing-helpers).
 
 **Live reference**
@@ -1301,11 +1301,170 @@ it can enhance that also works against this attack — under a sudo-backed attac
 
 ---
 
-## Not yet built (situations without a recipe)
+## Entering a game — the interface arrives, then the table is dealt
 
-Recipes describe real code, never a plan. The three situations that used to stand here —
-`discardForRelease`, `defend`, `handLimit` — are built and have recipes above (**Defending a release**,
-**Hand limit**), so nothing is currently without one.
+**When to call.** The game screen opens: the deal is the first thing that happens in a match, and it
+is two choreographies in a row, not one. Guard: the whole sequence is armed by a `started` ref —
+StrictMode mounts twice and the intro must play once.
 
-(Git Cherry-pick / Rebase / System Upgrade have **prototype** recipes above; only their rules-complete resolution
-— the #61 open questions — is pending.)
+**Visual result.** The screen assembles itself in a readable order — navigation, the table's own
+ambience, the piles, the players — and only then cards start leaving the deck. The player's five
+gather in an open heap at the centre while each opponent's card sinks straight into their seat; the
+whole heap goes into the fan closed, turns over, and only after that does the player's release zone
+appear.
+
+**Elements / refs.** The page rail; the HUD background layer; the two decks and the discard
+(`Pile`); the opponent seats (`Seat`, one ref each); the turn dock; the release zone; the centre
+(where the heap gathers); the hand. A `useFlyer` for the cards leaving the deck, a `useHandArrival`
+for the heap going into the fan.
+
+**Sequence — 1. the interface arrives.** Every beat is one `play('hudIn', el, …)`, separated by
+`BEAT`. Nothing here measures anything: the blocks are in place, they only fade and shift in.
+1. The rail slides in from its own edge (`dx: 44`, `RAIL_MS`).
+2. The table layer with its grid — a plain fade (`dx/dy: 0`, `BG_MS`). No movement on purpose: the
+   ambience does not arrive from a direction, it is switched on.
+3. The decks from the left (`dx: -34`) and the discard from the right (`dx: 34`), the second one
+   `PILE_STAGGER` behind — they come one after the other, not together.
+4. The seats drop in from above (`dy: -28`), each `SEAT_STAGGER` after the previous, and the dock
+   rises from below (`dy: 30`, `DOCK_DELAY`) in the same beat. The dock stands in its
+   "opponent's turn" state, reading *game start*.
+
+The release zone is **not** in this order — it is the last thing in the whole scene, and only the
+player has one.
+
+**Sequence — 2. the deal.** Round by round, the player first, `DEAL_STEP` between cards and
+`ROUND_GAP` between rounds.
+1. A player's card: `drawToCenter` from the deck's card box to the centre, landing on its own
+   `scatterAt(round)` — and it **stays** there. One scatter drives both the flight and the rest, so
+   the card lies exactly where it landed (the discard heap's own coupling, **I7**).
+2. An opponent's card: `dealToSeat` into `cardBoxIn(seat, from.width * 0.7)` — a card-sized box
+   INSIDE the seat (**I6**; the seat's rect is far wider than a card and the card would inflate to
+   it) — and dissolves into the seat's counter, which IS their hidden hand.
+3. The first round is the Debugger and is dealt **open**; everything after it travels face down.
+4. What landed at the centre is collected into a **local array**, never read back off state: this
+   closure never re-runs, so its `staged` would still be the empty array it was at mount (**I8**).
+5. When all five have landed: `HEAP_HOLD`, then the centre is emptied **in the same commit** that
+   starts the flight, and the whole heap goes into the fan with ONE `useHandArrival` call — each
+   card handed its place in the heap as `from` and its own tilt as `rot`, all still `faceDown`.
+6. `FLIP_HOLD`, then the hand turns over — the `Card`s play `flipCard` themselves off the prop.
+7. `REVEAL_HOLD`, and only now `hudIn` brings in the release zone (`dy: 22`).
+
+**Params & timings.** All in the glossary (§4, "The two ends of a match"): `RAIL_MS` 640 · `BG_MS`
+900 · `PILE_MS` 620 / `PILE_STAGGER` 180 · `SEAT_MS` 560 / `SEAT_STAGGER` 140 / `DOCK_DELAY` 320 ·
+`ZONE_MS` 620 · `BEAT` 320 · `DEAL_LEAD` 420 · `DEAL_STEP` 230 · `ROUND_GAP` 160 · `HEAP_HOLD` 640 ·
+`FLIP_HOLD` 380 · `REVEAL_HOLD` 620.
+
+**Invariants.** **I6** aim inside the seat, not at it · **I7** one scatter for the flight and the
+rest · **I8** the heap is accumulated locally, not read from state after an await · **I10** each
+flyer is raised at the deck's rect and paints there. Plus one local: a `cancelled` flag checked
+after every `wait`, so restarting mid-deal does not leave a half-sequence running.
+
+**End state & cleanup.** Five cards face up in the fan, the counters on the seats carry the
+opponents' hands, the deck is down by what was dealt, the zone is on screen. Restart clears the
+`started` ref, drops every flyer and re-runs the scene by `key`.
+
+**Live reference.** `Game Deal` (interactive group).
+
+---
+
+## Ending a match — the winning release, the poppers, the window
+
+**When to call.** The move that closes the third release slot. Guard: the scene runs once
+(`busy`), and the release is accepted only into its own empty slot.
+
+**Visual result.** The last release settles into the zone, the poppers go off in code symbols out
+of both bottom corners, and the game-over window comes up **while the confetti is still in the
+air** — the celebration is not a screen that replaces the table, it happens over it.
+
+**Elements / refs.** The release zone (`slotRef` per slot); the hand; a `useFlyer` for the card
+leaving the fan; a layer for the volleys; the `GameOver` window.
+
+**Sequence.**
+1. The release is pulled out of the fan and flown into its slot with `playToReleaseZone` (SNAP —
+   every release lands with the same snap). The zone is now closed.
+2. Three volleys are scheduled at `POPPERS` — `[0, 620, 1450]`ms, powers `[1, 0.7, 1.25]`. Each is
+   its **own component**, mounted with its own pieces: the pieces are made once and started once in
+   a **mount effect**. Starting them from a render-time ref callback is what killed the pieces
+   already in the air — the callback re-fires on every render and `play` stacks a second animation
+   on a node mid-flight.
+3. A piece is a code glyph with its own colour token and step of the mono scale, thrown from one of
+   the two bottom corners inward and up; its arc is `play('confettiFly', node, { dx, dy, peak, spin,
+   dur })`. Power drives the count, the reach and the time in the air — that is what makes three
+   volleys three events instead of one repeated.
+4. At `OVER_AT` the `GameOver` window appears over the table, and the confetti keeps flying **over
+   the window**.
+5. Each volley is taken down `CONFETTI_MS` after it went off, by which time its pieces have flown
+   their arcs out.
+
+**Params & timings.** `POPPERS` `[0, 1] [620, 0.7] [1450, 1.25]` · `POP_PER_SIDE` 33 · `OVER_AT`
+2400 · `CONFETTI_MS` 8500 · piece spread/reach/spin randomised per volley (see the glossary).
+
+**Invariants.** **I5** a fresh node per flight · a local one that cost real time: **a volley must
+be started from a mount effect, never from a ref callback** — otherwise every new volley kills the
+previous one.
+
+**In the playground only.** Both layers — the confetti and the window — are `inset: 0` of the
+stage, which begins **below** the technical line: that line belongs to the playground, not to the
+screen.
+
+**Live reference.** `Game End` (interactive group).
+
+---
+
+## Turn dock — the state of the turn changes without the dock moving
+
+**When to call.** The turn passes, the phase changes, a player draws — anything that changes what
+the dock says. It is the one piece of the table that is always on screen, so it is also the one that
+must never twitch.
+
+**Visual result.** The frame stands still. Slots keep their size and place; only what is inside
+them changes, by a plain fade. The key/name slot has **one fixed width** (≈ the widest key plus 18px
+each side), so a longer nickname never resizes it and nothing beside it shifts.
+
+**Sequence.**
+1. Text — phase, key label, nickname — swaps through the `Swap` component: the live layer sits in
+   flow, the outgoing one is absolutely overlaid on top of it, and the two are driven by
+   `play('rollOut')` → `play('rollIn', el, { delay })`. The `delay` is what makes it sequential: the
+   incoming text is held invisible (`fill: 'both'`) until the outgoing one has cleared, so the two
+   never cross-fade into a blur.
+2. **No movement anywhere** — that is the whole point of the pair. The slot is fixed, so the content
+   has nowhere to travel to; a slide here would read as the dock itself moving.
+3. The "drawn" badge appears and leaves through `Reveal`: `play('popIn')` / `play('popOut')`, fade
+   plus scale in reserved space, so its neighbours do not shift when it comes and goes.
+4. The button keeps its frame; only the label swaps (through `Swap`) and the accent morphs by a CSS
+   transition. The ring and the dot stay put — the accent transitions on `stroke` / `--dot`, and the
+   ring fills back to full on a phase change.
+
+**Params & timings.** `rollOut` 220 ms · `rollIn` 300 ms with the delay that waits it out · `popIn`
+260 ms (SNAP) · `popOut` 200 ms.
+
+**Building blocks.** `TurnDock` (`Swap`, `Reveal`), `RingTimer`, `StatusDot` — see
+[`reference.md`](./reference.md#self-animating-components).
+
+**Live reference.** `Table` (the dock on the table screen); every interactive scene that carries a
+dock shows it in context.
+
+---
+
+## What is missing goes to the backlog, not into a recipe
+
+Recipes describe real code, never a plan. **Every animated moment in the playground has a recipe
+above** — so a situation you cannot find here is one of two things, and both have the same address:
+
+- it is **not built**, and a recipe would be a guess dressed as documentation;
+- it is built but something about it is **unresolved** — no module for a movement you need, a value
+  you cannot reach, a rule nobody has decided.
+
+Either way: **do not invent a local solution and move on** — that is how one movement ends up
+written three times in three scenes. Write it into [`backlog.md`](./backlog.md) with what it costs,
+and raise it. A gap that is not written down is indistinguishable from a gap nobody noticed.
+
+The one caveat standing: the Git cards (Cherry-pick / Rebase / System Upgrade) have **prototype**
+recipes — the movements are real and transcribed, only their rules-complete resolution
+([#61](https://github.com/MythHand/ReleaseBoardGameP2P/issues/61)) is pending. That is a rules
+question, not an animation one.
+
+> Keeping this file complete is manual. The preset table in [`reference.md`](./reference.md) is
+> checked by a test (`apps/ui/src/animations/docs.test.ts`); a missing *recipe* has no machine
+> signal — a new scene in the playground means a new recipe here, and nothing but this line will
+> remind you.

@@ -4,7 +4,7 @@ Answers from the game's owner to the twelve questions in [`2026-08-01-git-operat
 
 Numbering matches the questions.
 
-> **The rules file is not current.** Answer 1 states the rules were revised after [`docs/rules-board-game.md`](../rules-board-game.md) was written, and that file has not been touched since commit `1f30cfe`. Every quotation in the questions came from it. Treat it as stale for anything these answers touch, and as unverified elsewhere.
+> **The rules file is not current.** Answer 1 states the rules were revised after [`docs/rules/rules-board-game.md`](../rules/rules-board-game.md) was written, and that file has not been touched since commit `1f30cfe`. Every quotation in the questions came from it. Treat it as stale for anything these answers touch, and as unverified elsewhere.
 
 ## The draw
 

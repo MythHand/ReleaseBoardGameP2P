@@ -1,12 +1,20 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { nextFrames, play, restTransform, type Scatter, scatterAt, wait } from '@/animations'
+import {
+  enterPose,
+  nextFrames,
+  play,
+  restTransform,
+  type Scatter,
+  scatterAt,
+  wait,
+} from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO, cardBoxIn } from '@/primitives/Card'
-import CardPair from '@/primitives/CardPair'
+import CardPair, { PAIR_AUX_POSE } from '@/primitives/CardPair'
 import Pile from '@/primitives/Pile'
 import Typography from '@/primitives/Typography'
 import Hand from '@/table/Hand'
@@ -453,14 +461,6 @@ export default function DefenseReleaseStory() {
     return () => window.removeEventListener('mousedown', onDown)
   }, [defSudo, phase, staged, busy, cancelStaged])
 
-  // transform that places a card sitting at `srcRect` into `boxRect`'s frame —
-  // the entry pose of a card joining a pair (same math as the Combo scene)
-  const enterTransform = (srcRect: Rect | DOMRect, boxRect: DOMRect) => {
-    const dx = srcRect.left + srcRect.width / 2 - (boxRect.left + boxRect.width / 2)
-    const dy = srcRect.top + srcRect.height / 2 - (boxRect.top + boxRect.height / 2)
-    return `translate(${dx}px, ${dy}px) scale(${srcRect.width / boxRect.width})`
-  }
-
   // The defence and the standing Sudo FOLD into a pair: each inner card starts
   // exactly where its real card is on screen and travels to its place in the
   // pair. Nothing is hidden and nothing is re-created — the Sudo the player put
@@ -469,8 +469,8 @@ export default function DefenseReleaseStory() {
     const box = coverRef.current?.getBoundingClientRect()
     const sudoBox = sudoRef.current?.getBoundingClientRect()
     if (!box || !sudoBox) return
-    const enterMain = enterTransform(fromRect, box)
-    const enterAux = enterTransform(sudoBox, box)
+    const enterMain = enterPose(fromRect, box)
+    const enterAux = enterPose(sudoBox, box)
     // the standing Sudo is handed over to the flyer in the SAME commit, so it is
     // never on screen twice and never off screen either
     setDefSudo(null)
@@ -485,24 +485,22 @@ export default function DefenseReleaseStory() {
     const mainEl = el?.querySelector<HTMLElement>('[data-main]')
     const auxEl = el?.querySelector<HTMLElement>('[data-aux]')
     if (!mainEl || !auxEl) return
+    // painted at their entry poses first, so neither half flashes in its final
+    // place before the fold starts
     mainEl.style.transform = enterMain
     auxEl.style.transform = enterAux
     await nextFrames()
-    const a1 = mainEl.animate(
-      [{ transform: enterMain }, { transform: 'translate(0, 0) scale(1)' }],
-      {
-        duration: MERGE_MS,
-        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        fill: 'forwards',
-      },
-    )
+    const a1 = play('foldIntoPair', mainEl, { from: fromRect, box, dur: MERGE_MS })
     // …to exactly CardPair's own resting pose for an aux, so handing the pair to
     // the static slot afterwards changes nothing on screen
-    const a2 = auxEl.animate(
-      [{ transform: enterAux }, { transform: 'translateY(-26%) rotate(-7deg)' }],
-      { duration: MERGE_MS, easing: 'cubic-bezier(0.2, 0.9, 0.1, 1)', fill: 'forwards' },
-    )
-    await Promise.all([a1.finished, a2.finished])
+    const a2 = play('foldIntoPair', auxEl, {
+      from: sudoBox,
+      box,
+      pose: PAIR_AUX_POSE,
+      dur: MERGE_MS,
+      snap: true,
+    })
+    await Promise.all([a1?.finished, a2?.finished])
   }
 
   // a defence covers the attack at the centre: both leave for the discard and

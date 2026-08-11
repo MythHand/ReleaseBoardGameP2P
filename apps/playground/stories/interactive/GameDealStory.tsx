@@ -30,7 +30,7 @@ import { useHandArrival } from './useHandArrival'
 //   2.  the piles: the two decks at the left edge, the discard at the right
 //   3.  the opponents' seats on top, the turn dock at the bottom
 //
-// Step 2 — the deal, by the rules (docs/rules-board-game.md): one Debugger and
+// Step 2 — the deal, by the rules (docs/rules/rules-board-game.md): one Debugger and
 // four random base cards each, five in hand, no trigger among them.
 //   • round by round, and each round starts with the PLAYER — the table is dealt
 //     the way a table is dealt, not player by player;
