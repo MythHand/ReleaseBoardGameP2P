@@ -1,9 +1,9 @@
 import type { Event } from '@release/engine'
-import { toTableOver, toTableState } from '@release/table-adapter'
 import { useTranslation } from '@release/translation'
 import { DEFAULT_SETUP, isCounting, Table } from '@release/ui'
 import { Outlet, useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
+import { toBoardOver, toBoardState } from '~/entities/game/board'
 import { seatsFor } from '~/entities/game/seats'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
@@ -55,7 +55,7 @@ export default function BoardPage() {
   // quietly, so a miss yields no id at all and says so where a developer will
   // see it. The complaint is what catches the next id crossing too.
   const seats = seatsFor(session.state?.peers ?? {})
-  const engineOver = game.view ? toTableOver(game.view) : null
+  const engineOver = game.view ? toBoardOver(game.view) : null
   const winnerSeat = engineOver ? seats.find((s) => s.playerId === engineOver.winnerId) : undefined
   if (engineOver && !winnerSeat && import.meta.env.DEV) {
     console.error(
@@ -68,7 +68,7 @@ export default function BoardPage() {
   // (the draw badge, the elimination suffix), `historyLabels` is one label per
   // member of the engine's Event union for the adapter to map onto.
   const labels = t('historyLabels', { returnObjects: true }) as Record<Event['type'], string>
-  const state = game.view ? toTableState(game.view, game.events, labels) : EMPTY_TABLE
+  const state = game.view ? toBoardState(game.view, game.events, labels) : EMPTY_TABLE
 
   // The clock runs only while the dock actually draws a counting ring, so it is
   // asked from the same predicate the ring is derived from. Restating that rule

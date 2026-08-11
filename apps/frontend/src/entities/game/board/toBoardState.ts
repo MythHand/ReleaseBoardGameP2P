@@ -122,7 +122,7 @@ function toHistoryEntry(e: Event, labels: HistoryLabels): HistoryEntry {
 // clock, no randomness. Total — an unknown card id renders a placeholder
 // rather than throwing (`assetUrl` throws; `cardById` does not, and this
 // function never calls `assetUrl` directly).
-export function toTableState(view: PlayerView, log: Event[], labels: HistoryLabels): TableState {
+export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabels): TableState {
   const visible = log.filter((e) => !e.visibleTo || e.visibleTo.includes(view.self.id))
   const history = visible.map((e) => toHistoryEntry(e, labels)).reverse()
 

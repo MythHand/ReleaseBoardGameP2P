@@ -1,6 +1,6 @@
-import type { HistoryLabels } from '@release/table-adapter'
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
+import type { HistoryLabels } from '~/entities/game/board'
 
 // The board page reads these through i18next's `t()`, which returns `unknown`
 // and is cast to `HistoryLabels` — so a member of the engine's `Event` union
