@@ -34,7 +34,7 @@ const AI: CardInstance = { uid: 'trigger-ai#ai0', id: 'trigger-ai' }
 function fireEvent(base: GameState, eventId: string, player = 'p1') {
   const staged: GameState = {
     ...base,
-    turn: { ...base.turn, player, hasDrawn: false },
+    turn: { ...base.turn, player, drawnFrom: [] },
     decks: {
       ...base.decks,
       main: [[AI, ...base.decks.main[0]], ...base.decks.main.slice(1)],
@@ -162,7 +162,7 @@ describe('phantom AI placements (#71)', () => {
       window: null,
       pending: null,
       drawing: null,
-      turn: { ...placed.state.turn, player: 'p2', hasDrawn: true },
+      turn: { ...placed.state.turn, player: 'p2', drawnFrom: [0] },
       players: {
         ...placed.state.players,
         p2: { ...base.players.p2, hand: [ddos] },

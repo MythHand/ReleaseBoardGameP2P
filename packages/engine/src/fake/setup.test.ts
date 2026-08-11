@@ -117,7 +117,7 @@ it('excludes deck entries the engine does not implement', () => {
 
 it('opens on the first seat with nothing drawn or released', () => {
   const s = createGame(config())
-  expect(s.turn).toEqual({ player: 'p1', index: 0, hasDrawn: false, releasesPlayed: 0 })
+  expect(s.turn).toEqual({ player: 'p1', index: 0, drawnFrom: [], releasesPlayed: 0 })
   expect(s.window).toBeNull()
   expect(s.pending).toBeNull()
   expect(s.over).toBeNull()

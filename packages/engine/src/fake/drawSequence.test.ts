@@ -36,7 +36,7 @@ function goodVibeCoding(top: CardInstance[], events: CardInstance[], hand: CardI
   const base = engine.createGame(config)
   const staged: GameState = {
     ...base,
-    turn: { ...base.turn, player: 'p1', hasDrawn: false },
+    turn: { ...base.turn, player: 'p1', drawnFrom: [] },
     players: { ...base.players, p1: { ...base.players.p1, hand } },
     decks: {
       ...base.decks,

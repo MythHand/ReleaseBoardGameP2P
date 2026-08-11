@@ -24,7 +24,7 @@ function exhausted(discard: string[]): GameState {
   const pile: CardInstance[] = []
   return {
     ...base,
-    turn: { ...base.turn, player: 'p1', hasDrawn: false },
+    turn: { ...base.turn, player: 'p1', drawnFrom: [] },
     decks: {
       ...base.decks,
       main: [pile],
@@ -49,7 +49,7 @@ describe('the last pile running out', () => {
     expect(next.decks.main).toHaveLength(1)
     expect(next.decks.main[0]).toHaveLength(before - 1)
     expect(next.decks.discard).toHaveLength(0)
-    expect(next.turn.hasDrawn).toBe(true)
+    expect(next.turn.drawnFrom).toEqual([0])
     expect(next.players.p1.hand).toHaveLength(state.players.p1.hand.length + 1)
   })
 

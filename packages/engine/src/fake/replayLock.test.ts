@@ -39,7 +39,7 @@ function bugRolledBack(extraP1: CardInstance[] = []) {
   const base = engine.createGame(config)
   const start: GameState = {
     ...base,
-    turn: { ...base.turn, player: 'p2', hasDrawn: true },
+    turn: { ...base.turn, player: 'p2', drawnFrom: [0] },
     players: {
       ...base.players,
       p1: { ...base.players.p1, hand: [BUG, ...extraP1] },
@@ -110,7 +110,7 @@ describe("Rollback's replay lock (#68)", () => {
     const sudo: CardInstance = { uid: 'support-sudo#0', id: 'support-sudo' }
     const start: GameState = {
       ...base,
-      turn: { ...base.turn, player: 'p2', hasDrawn: true },
+      turn: { ...base.turn, player: 'p2', drawnFrom: [0] },
       players: {
         ...base.players,
         p1: { ...base.players.p1, hand: [BUG] },

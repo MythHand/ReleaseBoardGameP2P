@@ -254,7 +254,7 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
 
   // p2 ends their turn (skip drawing — hasDrawn is set directly, as `withTop`-
   // style helpers elsewhere in this file already construct state directly).
-  const p2Done: GameState = { ...bounced.state, turn: { ...bounced.state.turn, hasDrawn: true } }
+  const p2Done: GameState = { ...bounced.state, turn: { ...bounced.state.turn, drawnFrom: [0] } }
   const toP1 = reduce(p2Done, { type: 'PUSH', player: 'p2', at: 1003 })
   expect(toP1.state.turn.player).toBe('p1')
   expect(toP1.state.players.p1.frozen).toContain(placedUid)
@@ -263,12 +263,12 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
   expect(playableFor(toP1.state, 'p1')).not.toContain(placedUid)
 
   // p1 ends this turn — the freeze lifts as their own turn ends.
-  const p1Done: GameState = { ...toP1.state, turn: { ...toP1.state.turn, hasDrawn: true } }
+  const p1Done: GameState = { ...toP1.state, turn: { ...toP1.state.turn, drawnFrom: [0] } }
   const toP2 = reduce(p1Done, { type: 'PUSH', player: 'p1', at: 1004 })
   expect(toP2.state.players.p1.frozen).toEqual([])
 
   // Back to p2, then back to p1: now it must be playable.
-  const p2Done2: GameState = { ...toP2.state, turn: { ...toP2.state.turn, hasDrawn: true } }
+  const p2Done2: GameState = { ...toP2.state, turn: { ...toP2.state.turn, drawnFrom: [0] } }
   const backToP1 = reduce(p2Done2, { type: 'PUSH', player: 'p2', at: 1005 })
   expect(backToP1.state.turn.player).toBe('p1')
   expect(playableFor(backToP1.state, 'p1')).toContain(placedUid)

@@ -294,7 +294,7 @@ it('thaws a frozen card when its owner’s next turn ends', () => {
   const frozen: GameState = {
     ...s,
     players: { ...s.players, p1: { ...s.players.p1, frozen: [FE.uid], hand: [FE] } },
-    turn: { player: 'p1', index: 0, hasDrawn: true, releasesPlayed: 0 },
+    turn: { player: 'p1', index: 0, drawnFrom: [0], releasesPlayed: 0 },
   }
   const r = reduce(frozen, { type: 'PUSH', player: 'p1', at: 1000 })
   expect(r.state.players.p1.frozen).toEqual([])

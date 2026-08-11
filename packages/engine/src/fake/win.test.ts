@@ -138,7 +138,7 @@ describe('a zone completed by something other than a play', () => {
     const release: CardInstance = { uid: 'ai-release-database#e0', id: 'ai-release-database' }
     const staged: GameState = {
       ...base,
-      turn: { ...base.turn, player: 'p1', hasDrawn: false },
+      turn: { ...base.turn, player: 'p1', drawnFrom: [] },
       decks: {
         ...base.decks,
         main: [[ai, ...base.decks.main[0]], ...base.decks.main.slice(1)],
@@ -170,7 +170,7 @@ describe('a zone completed by something other than a play', () => {
     const steal: CardInstance = { uid: 'attack-security-bug#0', id: 'attack-security-bug' }
     const state: GameState = {
       ...s,
-      turn: { ...s.turn, player: 'p2', hasDrawn: true },
+      turn: { ...s.turn, player: 'p2', drawnFrom: [0] },
       players: {
         ...s.players,
         p1: {

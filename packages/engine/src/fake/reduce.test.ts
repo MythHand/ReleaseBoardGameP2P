@@ -59,7 +59,7 @@ it('draws one card and marks the turn as drawn', () => {
   const r = reduce(s, { type: 'DRAW', player: 'p1', at: 1000 })
   expect(r.state.players.p1.hand).toHaveLength(6)
   expect(r.state.decks.main[0]).toHaveLength(before - 1)
-  expect(r.state.turn.hasDrawn).toBe(true)
+  expect(r.state.turn.drawnFrom).toEqual([0])
   expect(r.events.map((e) => e.type)).toEqual(['drawn'])
 })
 
@@ -98,7 +98,7 @@ it('ends the turn on PUSH after drawing and advances the seat', () => {
   const s = withoutTriggers(engine.createGame(config()))
   const drawn = reduce(s, { type: 'DRAW', player: 'p1', at: 1000 })
   const r = reduce(drawn.state, { type: 'PUSH', player: 'p1', at: 1001 })
-  expect(r.state.turn).toEqual({ player: 'p2', index: 1, hasDrawn: false, releasesPlayed: 0 })
+  expect(r.state.turn).toEqual({ player: 'p2', index: 1, drawnFrom: [], releasesPlayed: 0 })
   expect(r.events.map((e) => e.type)).toEqual(['turnEnded', 'turnStarted'])
 })
 

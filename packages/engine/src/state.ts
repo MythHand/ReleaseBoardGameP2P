@@ -120,7 +120,11 @@ export interface GameState {
   turn: {
     player: PlayerId
     index: number
-    hasDrawn: boolean
+    // Which piles this turn has drawn from. A boolean cannot say "two of three
+    // piles are done", and under Base the obligation runs over every pile
+    // (rules decisions answer 1). Whether it is satisfied is a question about
+    // the mode, answered by `drawObligationMet`, not a flag stored here.
+    drawnFrom: number[]
     releasesPlayed: number
   }
 

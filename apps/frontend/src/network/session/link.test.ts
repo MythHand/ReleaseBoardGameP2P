@@ -99,7 +99,7 @@ it('delivers each seat its own view when several links share one session', () =>
 
   linkA.submit({ type: 'DRAW' })
 
-  expect(ref.current.state.turn.hasDrawn).toBe(true)
+  expect(ref.current.state.turn.drawnFrom).not.toEqual([])
   expect(atA).toHaveLength(1)
   expect(atB).toHaveLength(1)
   expect(atA[0].view.self.id).toBe('a')
@@ -143,7 +143,7 @@ it('plays a seat that holds no connection at all', () => {
 
   link.submit({ type: 'DRAW' })
 
-  expect(ref.current.state.turn.hasDrawn).toBe(true)
+  expect(ref.current.state.turn.drawnFrom).not.toEqual([])
   expect(seen).toHaveLength(1)
   expect(seen[0].view.self.id).toBe('a')
 })

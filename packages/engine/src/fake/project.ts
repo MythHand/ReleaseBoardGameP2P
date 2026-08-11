@@ -2,7 +2,7 @@ import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
 import type { PlayerView, ReleasedView, ReleaseView } from '../view'
 import { pendingView } from './attacks'
-import { attackTargets } from './core'
+import { attackTargets, drawObligationMet } from './core'
 import { canAttackWith } from './window'
 
 const releasedView = (r: Released | undefined): ReleasedView | undefined =>
@@ -111,7 +111,9 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
     turn: {
       player: state.turn.player,
       index: state.turn.index,
-      hasDrawn: state.turn.hasDrawn,
+      // The kit asks one question — is a draw still owed — so the answer
+      // crosses as the boolean it always was, not as the raw pile list.
+      hasDrawn: drawObligationMet(state),
     },
     window: state.window && {
       player: state.window.target.player,

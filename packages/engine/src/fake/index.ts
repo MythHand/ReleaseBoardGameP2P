@@ -4,6 +4,10 @@ import { legalTargets, reduce } from './reduce'
 import { createGame } from './setup'
 
 export { botAction, runUntilIdle } from './bots'
+// The keeper's absent-seat fallback needs the same answer the engine gives
+// itself about whether a turn still owes a draw — one predicate, so the
+// keeper and the reducer cannot disagree about when a turn may end.
+export { drawObligationMet } from './core'
 
 // Quantities mirror apps/ui/src/cards/catalogue.ts. Only the ids the fake
 // implements appear — System Upgrade, ai-inside and the rest of the Git

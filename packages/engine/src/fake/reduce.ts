@@ -7,6 +7,7 @@ import { onAttack, onDefend } from './attacks'
 import {
   attackTargets,
   createLog,
+  drawObligationMet,
   endTurn,
   handLimitFor,
   isWellFormedAction,
@@ -95,6 +96,14 @@ export function runDrawSequence(state: GameState, log: Log, at: number): GameSta
       ...filled,
       decks: { ...filled.decks, main },
       drawing: remaining,
+      // A turn's obligation is discharged pile by pile, so each card taken
+      // records its source. Good Vibe-Coding draws twice off pile 0 and the
+      // duplicate is harmless — the obligation asks whether a pile has been
+      // drawn from, not how often.
+      turn:
+        owed.player === filled.turn.player
+          ? { ...filled.turn, drawnFrom: [...filled.turn.drawnFrom, pileIndex] }
+          : filled.turn,
     }
 
     if (rulesFor(card.id)?.kind === 'trigger') {
@@ -124,64 +133,35 @@ export function runDrawSequence(state: GameState, log: Log, at: number): GameSta
   return { ...next, drawing: null, eventSeq: log.seq }
 }
 
+// Which piles this draw covers. Base runs over every pile that has cards in it;
+// Strategic takes one from the pile the action names (rules decisions answer 1).
+// A table with nothing anywhere still yields `[0]`, so the sequence reaches the
+// refill rather than being turned away before it can recycle the discard.
+function drawTargets(state: GameState, chosen: number | undefined): number[] {
+  if (state.setup.gitBranch === 'strategic') return [chosen ?? 0]
+  const stocked = state.decks.main.flatMap((pile, i) => (pile.length > 0 ? [i] : []))
+  return stocked.length > 0 ? stocked : [0]
+}
+
 function onDraw(state: GameState, action: Action & { type: 'DRAW' }): Reduction {
   if (state.over) return reject(state, action, 'game is over')
   if (state.pending) return reject(state, action, 'a decision is pending')
   if (state.window) return reject(state, action, 'a reaction window is open')
   if (state.turn.player !== action.player) return reject(state, action, 'not your turn')
-  if (state.turn.hasDrawn) return reject(state, action, 'already drew this turn')
+  if (drawObligationMet(state)) return reject(state, action, 'already drew this turn')
 
+  const piles = drawTargets(state, action.pile)
+  // Nothing in the named piles and nothing to recycle into them: the draw is
+  // refused rather than silently counting as done.
+  const reachable =
+    piles.some((i) => (state.decks.main[i]?.length ?? 0) > 0) || state.decks.discard.length > 0
+  if (!reachable) return reject(state, action, 'that pile is empty')
+
+  // The sequence does the work — the same runner Good Vibe-Coding uses, so a
+  // trigger drawn from pile 1 of 3 pauses here exactly as it pauses there.
   const log = createLog(state.eventSeq)
-  // Before the emptiness check, so an exhausted table refills and the draw
-  // proceeds in the same action rather than costing the player a turn.
-  const filled = refillFromDiscard(state, log)
-
-  const pileIndex = action.pile ?? 0
-  const pile = filled.decks.main[pileIndex]
-  // `state`, not `filled`: a rejected draw changes nothing, so a refill that
-  // could not satisfy it is discarded along with its event.
-  if (!pile || pile.length === 0) return reject(state, action, 'that pile is empty')
-
-  const card = pile[0]
-  const main = filled.decks.main.map((p, i) => (i === pileIndex ? p.slice(1) : p))
-
-  // A trigger cannot stay private: it is revealed the moment it is drawn, and it
-  // never reaches the drawer's hand.
-  if (rulesFor(card.id)?.kind === 'trigger') {
-    const base: GameState = {
-      ...filled,
-      decks: { ...filled.decks, main },
-      turn: { ...filled.turn, hasDrawn: true },
-    }
-    log.add({
-      type: 'drawn',
-      player: action.player,
-      pile: pileIndex,
-      deckSize: main[pileIndex].length,
-    })
-    return { state: fireTrigger(base, log, action.player, card, action.at), events: log.events }
-  }
-
-  // Identity is private to the drawer.
-  log.add({
-    type: 'drawn',
-    player: action.player,
-    card: card.id,
-    pile: pileIndex,
-    deckSize: main[pileIndex].length,
-    visibleTo: [action.player],
-  })
-
-  const withCard = setHand(filled, action.player, [...filled.players[action.player].hand, card])
-  return {
-    state: {
-      ...withCard,
-      decks: { ...withCard.decks, main },
-      turn: { ...filled.turn, hasDrawn: true },
-      eventSeq: log.seq,
-    },
-    events: log.events,
-  }
+  const started: GameState = { ...state, drawing: { player: action.player, piles } }
+  return { state: runDrawSequence(started, log, action.at), events: log.events }
 }
 
 function onPush(state: GameState, action: Action & { type: 'PUSH' }): Reduction {
@@ -190,7 +170,7 @@ function onPush(state: GameState, action: Action & { type: 'PUSH' }): Reduction 
   if (state.window) return reject(state, action, 'a reaction window is open')
   if (state.turn.player !== action.player) return reject(state, action, 'not your turn')
   // The draw is mandatory, so a turn cannot be passed without it.
-  if (!state.turn.hasDrawn) return reject(state, action, 'you must draw before pushing')
+  if (!drawObligationMet(state)) return reject(state, action, 'you must draw before pushing')
 
   const log = createLog(state.eventSeq)
   return { state: endTurn(state, log), events: log.events }

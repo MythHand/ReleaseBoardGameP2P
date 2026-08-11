@@ -161,6 +161,18 @@ export const bankToDiscard = (state: GameState, cards: CardInstance[]): GameStat
   },
 })
 
+// Whether the turn's draw obligation is discharged. Base owes every pile that
+// has cards in it; Strategic owes one card from a pile of the player's choosing
+// (rules decisions answer 1). `PUSH` legality, `onDraw`'s "already drew this
+// turn" rejection and the dock's draw-or-push state all derive from this, so
+// the three cannot disagree about what a completed draw is.
+export function drawObligationMet(state: GameState): boolean {
+  const drawn = state.turn.drawnFrom
+  if (drawn.length === 0) return false
+  if (state.setup.gitBranch === 'strategic') return true
+  return state.decks.main.every((pile, i) => pile.length === 0 || drawn.includes(i))
+}
+
 // Ends the turn, or holds it open when the hand is over the mode's limit.
 //
 // Lives here (rather than in reduce.ts, its natural home) because triggers.ts's
@@ -185,7 +197,7 @@ export function endTurn(state: GameState, log: Log): GameState {
   return {
     ...state,
     players: { ...state.players, [me]: thawed, [next]: unlocked },
-    turn: { player: next, index: state.turn.index + 1, hasDrawn: false, releasesPlayed: 0 },
+    turn: { player: next, index: state.turn.index + 1, drawnFrom: [], releasesPlayed: 0 },
     pending: null,
     eventSeq: log.seq,
   }

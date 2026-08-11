@@ -137,7 +137,7 @@ it('falls back to DRAW/PUSH when an absent seat holds the turn but its bot sugge
     engine: overreporting,
     state: {
       ...created.state,
-      turn: { ...created.state.turn, player: 'a', hasDrawn: true },
+      turn: { ...created.state.turn, player: 'a', drawnFrom: [0] },
       players: { ...created.state.players, a: { ...created.state.players.a, hand: [release] } },
     },
   }
