@@ -146,5 +146,10 @@ export interface GameState {
   window: ReactionWindow | null
 
   setup: Setup
+  // What the engine could not honour from the config it was handed. Both halves
+  // used to vanish: an unrecognised mode value fell through to Base, and a deck
+  // entry with no rules was filtered out — a caller handing over the full
+  // catalogue got a smaller deck with nothing said about it.
+  ignored: { cards: CardId[]; setup: string[] }
   over: { winner: PlayerId; condition: 'release' | 'lastStanding' } | null
 }
