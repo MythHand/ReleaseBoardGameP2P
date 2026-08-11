@@ -21,17 +21,21 @@ on:
 
 concurrency:
   group: deploy
-  cancel-in-progress: true
+  # A superseded build is worth cancelling, but a deployment that has already
+  # reached GitHub's Pages infrastructure is not — cancelling mid-publish leaves
+  # the deployment wedged rather than rolling it back. Queued runs still collapse
+  # to the latest; only the one actually publishing is left alone.
+  cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy to GitHub Pages
+  build:
+    name: Build
     runs-on: ubuntu-latest
     # A failed Release leaves the tag and the release notes in whatever state it
     # got to, so its head is not something to publish.
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -89,8 +93,24 @@ jobs:
       - name: Stage playground under /playground
         run: cp -r apps/playground/dist apps/frontend/dist/playground
 
-      - name: Deploy
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./apps/frontend/dist
+          path: ./apps/frontend/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      # What actions/deploy-pages needs to publish: `pages` to create the
+      # deployment, `id-token` to mint the OIDC token it authenticates with.
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
