@@ -746,20 +746,26 @@ export function describeEngine(
       it('respects the release cap in a turn under base, and lifts it under fast', () => {
         // Fuzz-driven under two setups: only the cap itself is at stake here,
         // not any deeper decision chain.
+        //
+        // Seed changed from 6262 when #61 slice B added Git Branch and Git
+        // Merge to FAKE_DECK: a longer deck consumes a different amount of the
+        // shuffle's RNG stream, so every fixed seed lands on a new trajectory
+        // and 6262's fast run no longer happens to ship two releases in one
+        // turn. The cap never broke — its witness stopped occurring.
         const engine = make()
         const fastSetup: Setup = { ...BASE_SETUP, releases: 'fast' }
 
-        let base = engine.createGame(configFor(options, 6262))
+        let base = engine.createGame(configFor(options, 6267))
         for (let n = 0; n < 600; n += 1) {
           expect(base.turn.releasesPlayed).toBeLessThanOrEqual(1)
-          base = engine.reduce(base, fuzzAction(base, 6262, n)).state
+          base = engine.reduce(base, fuzzAction(base, 6267, n)).state
         }
 
-        let fast = engine.createGame(configFor(options, 6262, fastSetup))
+        let fast = engine.createGame(configFor(options, 6267, fastSetup))
         let sawMoreThanOne = false
         for (let n = 0; n < 600; n += 1) {
           if (fast.turn.releasesPlayed > 1) sawMoreThanOne = true
-          fast = engine.reduce(fast, fuzzAction(fast, 6262, n)).state
+          fast = engine.reduce(fast, fuzzAction(fast, 6267, n)).state
         }
         // Without this, a cap that silently still applied under 'fast' would
         // pass the assertion above by never being tested against a run that
@@ -831,11 +837,15 @@ export function describeEngine(
         // so a round-2+ window never appears within budget. This is a seed
         // fragility in the test, not an engine defect — openWindow still
         // unconditionally reopens at round+1 after a successful release-window
-        // defend, and a sweep of nearby seeds against the current deck finds
-        // several (6, 17, 19, 23, 24, ...) that reach the scenario well within
-        // 600 steps.
+        // defend.
+        //
+        // Seed 55 now, not 6: #61 slice B added Git Branch and Git Merge to
+        // FAKE_DECK, which moves the main shuffle the same way adding Inside
+        // moved the events one, and every seed the previous sweep found (6, 17,
+        // 19, 23, 24) stopped reaching a defended release window. Swept again
+        // against the current deck.
         const engine = make()
-        let state = engine.createGame(configFor(options, 6))
+        let state = engine.createGame(configFor(options, 55))
         let sawRound1 = false
         let sawLaterRound = false
         for (let n = 0; n < 600 && !state.over; n += 1) {
@@ -906,8 +916,14 @@ export function describeEngine(
         // (see `attackTarget`) might never happen to land a DDoS on a zone
         // target within any bounded run, leaving the positive half of this
         // property untested.
+        //
+        // Seed changed from 7 when #61 slice B lengthened FAKE_DECK: the same
+        // shuffle shift that moved the two tests above moved this one, and 7 no
+        // longer reaches a protected release inside the budget. The negative
+        // half — no non-DDoS attack ever offered a zone target — held on every
+        // seed swept, which is the half that would signal a real defect.
         const engine = make()
-        const result = driveProtectedReleaseAndDdos(engine, options, 7, 1500)
+        const result = driveProtectedReleaseAndDdos(engine, options, 23, 1500)
         expect(
           result.sawNonDdosZoneTarget,
           'a non-DDoS attack was offered a release or Monitoring target',

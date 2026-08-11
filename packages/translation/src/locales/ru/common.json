@@ -658,6 +658,7 @@
     "neutralized": "нейтрализовано",
     "passed": "пас",
     "placed": "выложил",
+    "pilesChanged": "колоды изменены",
     "rejected": "отклонено",
     "releaseDestroyed": "релиз разрушен",
     "releaseReturned": "релиз возвращён",

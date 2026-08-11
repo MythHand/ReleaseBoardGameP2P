@@ -18,6 +18,7 @@ import {
 } from './core'
 import { onPickFromDiscard } from './discard'
 import { onGiveCard, onRequestCard } from './handAttacks'
+import { pruneEmptyPiles } from './piles'
 import { playableFor } from './project'
 import { onDiscardForRelease, onPlay } from './release'
 import { fireTrigger, onNeutralize } from './triggers'
@@ -130,7 +131,9 @@ export function runDrawSequence(state: GameState, log: Log, at: number): GameSta
     // rest of the sequence waits in `drawing` for the resume.
     if (next.pending) return { ...next, eventSeq: log.seq }
   }
-  return { ...next, drawing: null, eventSeq: log.seq }
+  // The sequence is over, so an emptied pile may go now — never mid-sequence,
+  // where removing one would shift the indices still owed behind it.
+  return pruneEmptyPiles({ ...next, drawing: null, eventSeq: log.seq }, log)
 }
 
 // Which piles this draw covers. Base runs over every pile that has cards in it;

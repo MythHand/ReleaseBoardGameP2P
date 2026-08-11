@@ -2,9 +2,18 @@ import type { Action, Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardInstance, CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
-import { attackTargets, checkWin, createLog, type Log, reject, setHand } from './core'
+import {
+  attackTargets,
+  bankToDiscard,
+  checkWin,
+  createLog,
+  type Log,
+  reject,
+  setHand,
+} from './core'
 import { openPickFromDiscard } from './discard'
 import { openHandAttack, resolveDdos } from './handAttacks'
+import { mergePiles, splitPile } from './piles'
 import { playableFor } from './project'
 import { openWindow } from './window'
 
@@ -15,6 +24,15 @@ const sameTarget = (a: Target, b: Target): boolean =>
   ('player' in a ? a.player === (b as { player: string }).player : true) &&
   ('slot' in a ? a.slot === (b as { slot: string }).slot : true) &&
   ('card' in a ? a.card === (b as { card: string }).card : true)
+
+// The operation itself is spent whatever it did — including Git Branch against
+// a pile it could not split, which answer 4 makes a legal play with no effect.
+function discard(state: GameState, log: Log, player: PlayerId, cards: CardInstance[]): GameState {
+  for (const c of cards) {
+    log.add({ type: 'discarded', player, card: c.id, reason: 'effect' })
+  }
+  return { ...bankToDiscard(state, cards), eventSeq: log.seq }
+}
 
 export function placeRelease(
   state: GameState,
@@ -106,11 +124,28 @@ export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Red
   const log = createLog(state.eventSeq)
 
   if (rules.kind === 'operation') {
+    const spentCards = [card, ...(sudoCombo ? [sudoCombo] : [])]
     const withoutCards = setHand(
       state,
       action.player,
       hand.filter((c) => c.uid !== action.card && c.uid !== sudoCombo?.uid),
     )
+
+    // Cherry-pick asks a question; the pile operations just act. Dispatching on
+    // the id rather than on the kind, because `operation` is now three cards
+    // that share only where they are played from.
+    if (card.id === 'operation-git-branch') {
+      // With one pile there is nothing to choose, so an absent target means it.
+      const chosen = action.target?.kind === 'pile' ? action.target.pile : 0
+      const split = splitPile(withoutCards, log, chosen, sudoCombo !== undefined)
+      return { state: discard(split, log, action.player, spentCards), events: log.events }
+    }
+
+    if (card.id === 'operation-git-merge') {
+      const merged = mergePiles(withoutCards, log, sudoCombo !== undefined)
+      return { state: discard(merged, log, action.player, spentCards), events: log.events }
+    }
+
     return {
       state: openPickFromDiscard(withoutCards, log, action.player, card, sudoCombo, false),
       events: log.events,

@@ -30,6 +30,9 @@ export const FAKE_DECK: DeckEntry[] = [
   { id: 'defense-rubber-ducky', qty: 2 },
   { id: 'protection-monitoring', qty: 4 },
   { id: 'protection-debugger', qty: 8 },
+  // Quantities from rules decisions answer 12.
+  { id: 'operation-git-branch', qty: 3 },
+  { id: 'operation-git-merge', qty: 2 },
   { id: 'support-sudo', qty: 5 },
   { id: 'support-code-review', qty: 5 },
   { id: 'trigger-error-503', qty: 7 },

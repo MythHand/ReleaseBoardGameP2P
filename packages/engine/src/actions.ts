@@ -5,6 +5,10 @@ export type Target =
   | { kind: 'release'; player: PlayerId; slot: ReleaseSlot }
   | { kind: 'monitoring'; player: PlayerId }
   | { kind: 'card'; card: CardUid }
+  // The first target that names something on the table rather than something a
+  // player owns: Git Branch splits a pile, and with several out there the
+  // player chooses which (rules decisions answer 3).
+  | { kind: 'pile'; pile: number }
 
 export type Choice =
   | { kind: 'discardForRelease'; card: CardUid }

@@ -121,8 +121,9 @@ describe('Strategic draws from one pile of the player’s choosing', () => {
     const r = reduce(state, { type: 'DRAW', player: 'p1', pile: 1, at: 1000 })
 
     expect(r.state.players.p1.hand.map((x) => x.uid)).toEqual([B.uid])
-    expect(r.state.decks.main[0]).toHaveLength(1)
-    expect(r.state.decks.main[2]).toHaveLength(1)
+    // Pile 1 is spent, so slice B's pruning drops it once the draw is over;
+    // the two it did not touch are still there, holding their cards.
+    expect(r.state.decks.main.map((p) => p.length)).toEqual([1, 1])
   })
 
   it('satisfies the whole obligation with that one card', () => {
