@@ -2,7 +2,7 @@ import type { Action } from '../actions'
 import { RELEASE_ATTACKS } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, ReactionWindow } from '../state'
-import { createLog, type Log, reject } from './core'
+import { checkWin, createLog, type Log, reject } from './core'
 
 // understanding.md §7: the first reaction gets 15s; every later round in the same
 // exchange gets 10s.
@@ -42,11 +42,16 @@ export function openWindow(
   }
 }
 
+// Where a contested release is finally settled, so where the win is decided.
+// Every close funnels through here — expiry, the last responder passing, and an
+// attack resolving — which is what makes this the one place that has to ask.
+// A release still standing when its window shuts has repelled everything thrown
+// at it, and that is exactly the rules' condition for the third one to win.
 export function closeWindow(state: GameState, log: Log): GameState {
   const w = state.window
   if (!w) return { ...state, eventSeq: log.seq }
   log.add({ type: 'windowClosed', player: w.target.player, slot: w.target.slot })
-  return { ...state, window: null, eventSeq: log.seq }
+  return checkWin({ ...state, window: null, eventSeq: log.seq }, log)
 }
 
 export function onPass(state: GameState, action: Action & { type: 'PASS' }): Reduction {
