@@ -108,6 +108,40 @@ it('opens the feed with the deal rather than a blank', () => {
   }
 })
 
+it('reserves the deal`s event ids and starts play right after them', () => {
+  const { session, outgoing } = createSession({
+    gameId: 'g1',
+    keeperId: 'p1',
+    engine: createFakeEngine(),
+    seed: 7,
+    players: [
+      { playerId: 'p1', peerId: 'peer-1', name: 'One' },
+      { playerId: 'p2', peerId: 'peer-2', name: 'Two' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+
+  const opening = outgoing.find((o) => o.message.type === 'SYNC')
+  const dealtIds =
+    opening?.message.type === 'SYNC'
+      ? opening.message.payload.events.filter((e) => e.type === 'dealt').map((e) => e.id)
+      : []
+  // Literal, not re-derived from seating length: this is the exact range the
+  // engine reserved (Task 5's `eventSeq: seating.length`), and the property
+  // under test is that nothing else lands in it and nothing after it repeats.
+  expect(dealtIds).toEqual([1, 2])
+
+  const { outgoing: played } = applyIntent(session, 'peer-1', { type: 'DRAW' }, 1_000)
+  const drawSync = played.find((o) => o.message.type === 'SYNC' && o.to === 'peer-1')
+  const drawnIds =
+    drawSync?.message.type === 'SYNC' ? drawSync.message.payload.events.map((e) => e.id) : []
+  // The reduce feed picks up immediately after the reserved deal range, with
+  // no gap and no overlap.
+  expect(drawnIds).toEqual([3])
+})
+
 it('announces the game and syncs every seat privately', () => {
   const { outgoing } = twoPlayerSession()
 
