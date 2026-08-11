@@ -1,5 +1,6 @@
 import { SUPPORTED } from '../cards'
 import type { DeckEntry, GameConfig } from '../engine'
+import type { Event } from '../events'
 import { shuffle } from '../rng'
 import { normalizeSetup } from '../setup-contract'
 import type { CardId, CardInstance, GameState, PlayerId, PlayerState } from '../state'
@@ -104,4 +105,27 @@ export function createGame(config: GameConfig): GameState {
     ignored: { cards: dropped, setup: normalized.ignored },
     over: null,
   }
+}
+
+// The deal, as events. `createGame` returns a bare GameState — it is called from
+// two dozen places that want only the state — so the opening feed is a separate
+// pure derivation over that state rather than a second return value.
+//
+// Every field here is public: a count is not a secret, and `open` names only
+// what the rules deal face up. The closed four are never identified.
+export function setupEvents(state: GameState): Event[] {
+  return state.seating.map((id, n) => {
+    const hand = state.players[id].hand
+    // The reserved opening Debugger is dealt first (see createGame above), so a
+    // face-up card can only ever be hand[0]. A player who got none — an
+    // under-supplied deck — has nothing open.
+    const open = hand[0]?.id === 'protection-debugger' ? [hand[0].id] : undefined
+    return {
+      id: n + 1,
+      type: 'dealt' as const,
+      player: id,
+      count: hand.length,
+      ...(open ? { open } : {}),
+    }
+  })
 }

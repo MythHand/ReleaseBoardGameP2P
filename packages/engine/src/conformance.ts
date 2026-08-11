@@ -406,6 +406,24 @@ export function describeEngine(
   options: ConformanceOptions,
 ): void {
   describe(`engine conformance: ${name}`, () => {
+    describe('setup', () => {
+      it('deals every seated player an opening hand, and says so', () => {
+        const engine = make()
+        const state = engine.createGame(configFor(options, 4242))
+        const events = engine.setupEvents(state)
+        const dealt = events.filter((e) => e.type === 'dealt')
+        expect(dealt).toHaveLength(state.seating.length)
+        for (const e of dealt) {
+          if (e.type !== 'dealt') continue
+          expect(e.count).toBe(state.players[e.player].hand.length)
+          // `open` may only name cards the player actually holds.
+          for (const id of e.open ?? []) {
+            expect(state.players[e.player].hand.some((c) => c.id === id)).toBe(true)
+          }
+        }
+      })
+    })
+
     describe('determinism', () => {
       it('builds an identical game from an identical config', () => {
         const a = make().createGame(configFor(options, 777))

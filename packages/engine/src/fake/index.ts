@@ -1,7 +1,7 @@
 import type { DeckEntry, Engine } from '../engine'
 import { project } from './project'
 import { legalTargets, reduce } from './reduce'
-import { createGame } from './setup'
+import { createGame, setupEvents } from './setup'
 
 export { botAction, runUntilIdle } from './bots'
 // The keeper's absent-seat fallback needs the same answer the engine gives
@@ -56,5 +56,5 @@ export const FAKE_EVENTS: DeckEntry[] = [
 ]
 
 export function createFakeEngine(): Engine {
-  return { createGame, reduce, project, legalTargets }
+  return { createGame, setupEvents, reduce, project, legalTargets }
 }
