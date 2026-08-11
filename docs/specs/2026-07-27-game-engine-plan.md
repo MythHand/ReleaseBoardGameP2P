@@ -814,7 +814,7 @@ git commit -m "feat(engine): contract types and the card rules table"
 
 ## Task 3: `createGame` — deck build and the deal
 
-Implements the setup rules from [`docs/rules-board-game.md`](../rules-board-game.md) §Подготовка: one Debugger plus four random cards each, with AI and Error 503 returned to the deck and replaced, then a shuffle.
+Implements the setup rules from [`docs/rules/rules-board-game.md`](../rules/rules-board-game.md) §Подготовка: one Debugger plus four random cards each, with AI and Error 503 returned to the deck and replaced, then a shuffle.
 
 **Files:**
 - Create: `packages/engine/src/fake/setup.ts`
@@ -3015,7 +3015,7 @@ git commit -m "feat(engine): reaction window with revocable pass and Code Review
   export function pendingView(state: GameState, viewerId: PlayerId): PendingView | null
   ```
 
-**Rules encoded here** (from [`docs/rules-board-game.md`](../rules-board-game.md)):
+**Rules encoded here** (from [`docs/rules/rules-board-game.md`](../rules/rules-board-game.md)):
 - Cancel-type defences (Hotfix, Rubber Ducky, PR Approved, Rollback) do **not** work against a sudo-boosted attack; Unicorn-type (Not a Bug, Works on my Machine) work even then.
 - Rollback returns the attack card to the attacker's hand; sudo Rollback gives it to the defender instead.
 - Works on my Machine turns the effect back on the attacker.

@@ -3,7 +3,21 @@
 ## Overview
 
 **Release любой ценой** — a P2P web version of the board card game.
-Rules and card mechanics: [`docs/rules-board-game.md`](./docs/rules-board-game.md).
+
+**Rules and card mechanics — [`docs/rules/`](./docs/rules/).** The player-facing rules text is
+canon and lives in the translation catalog (`rulesBlock.text`); `docs/rules/rules-board-game.md` is
+that same text as md. Everything else in the folder is the **technical spec** of the same rules —
+what happens, in what order, under which card id: `general` (frame of a match), `cards` (every card
+with its id, print run, effect, what cancels it), `resolution` (order of resolution — windows,
+priority, when a win is final), `modes` (the five mode axes), `backlog` (disputed and undecided).
+Do not "improve" the rules text from the spec; a disagreement means the text wins and the finding
+goes to `docs/rules/backlog.md`.
+
+**Working on the rules, guessing is forbidden.** Not "by the sense of it", not "obviously", not
+"at a table this is how it goes". Anything that so much as hints at inference becomes an open
+question in `docs/rules/backlog.md` **and** a marker in the spec at the exact paragraph where it
+came up (`> ❓ **Не из правил.**`). A guess written down as a rule stops being a guess: code gets
+written from it, a test pins it, and it becomes the source everyone checks against.
 
 **Design specs live in [`docs/specs/`](./docs/specs/)** (`YYYY-MM-DD-<topic>-design.md`).
 

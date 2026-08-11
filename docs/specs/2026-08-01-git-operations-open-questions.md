@@ -16,7 +16,7 @@ What #61 says correctly: `decks.main` is already `CardInstance[][]`, and `DRAW` 
 
 - [ ] **1. What does the Base mode's draw obligation mean once the deck is split?**
 
-  [Rules :31](../rules-board-game.md) — "Игрок обязан взять одну карту сверху основной колоды… При разделенной колоде добора карта берется из всех колод." [Rules :237-243](../rules-board-game.md) defines Base as "Добор из всех колод" and Strategic as "Добор только из одной колоды". Today [`reduce.ts:40`](../../packages/engine/src/fake/reduce.ts) does `action.pile ?? 0` and ignores the mode entirely.
+  [Rules :31](../rules/rules-board-game.md) — "Игрок обязан взять одну карту сверху основной колоды… При разделенной колоде добора карта берется из всех колод." [Rules :237-243](../rules/rules-board-game.md) defines Base as "Добор из всех колод" and Strategic as "Добор только из одной колоды". Today [`reduce.ts:40`](../../packages/engine/src/fake/reduce.ts) does `action.pile ?? 0` and ignores the mode entirely.
 
   1. One card off the top of *each* pile — Base draws N cards for N piles; Strategic draws one, drawer picks the pile.
   2. Piles are one source — Base lets the drawer pick freely, Strategic pins them to one pile. Draw arity never changes.
@@ -36,7 +36,7 @@ What #61 says correctly: `decks.main` is already `CardInstance[][]`, and `DRAW` 
 
 - [ ] **3. Does Git Branch split an already-split deck?**
 
-  [Rules :138](../rules-board-game.md) — "Разделите одну колоду добора (зелёную) на две." Played twice: 2 piles → 3? Unbounded? Capped?
+  [Rules :138](../rules/rules-board-game.md) — "Разделите одну колоду добора (зелёную) на две." Played twice: 2 piles → 3? Unbounded? Capped?
 
   **Recommendation:** unbounded, N → N+1. It falls out of the rules text and `decks.main` is already an array.
 
@@ -52,7 +52,7 @@ What #61 says correctly: `decks.main` is already `CardInstance[][]`, and `DRAW` 
 
 - [ ] **5. What does sudo Git Branch do?**
 
-  [Rules :138](../rules-board-game.md) — "sudo Git Branch: **и** переверните сброс — он будет использоваться как новая колода добора, не перемешивайте карты." The "и" reads as *in addition to* the split, giving N → N+2 (one from the cut, one from the flipped discard, order preserved and reversed, unshuffled). Confirm that against *instead of* the split.
+  [Rules :138](../rules/rules-board-game.md) — "sudo Git Branch: **и** переверните сброс — он будет использоваться как новая колода добора, не перемешивайте карты." The "и" reads as *in addition to* the split, giving N → N+2 (one from the cut, one from the flipped discard, order preserved and reversed, unshuffled). Confirm that against *instead of* the split.
 
 - [ ] **6. Does Git Merge mid-turn reset a partly-satisfied draw obligation?**
 
@@ -68,7 +68,7 @@ What #61 says correctly: `decks.main` is already `CardInstance[][]`, and `DRAW` 
 
 - [ ] **8. Is the discard pile fully public?**
 
-  `PlayerView.decks` projects `discardTop?: CardId` and `discardCount` ([`view.ts:76`](../../packages/engine/src/view.ts)) — the contents are not projected to anyone. Cherry-pick ([Rules :150](../rules-board-game.md), "выберите одну карту из всего сброса") and `ai-inside` ([Rules :163](../rules-board-game.md), "возьмите одну карту Release из сброса в руку") both need the whole pile visible to the picker.
+  `PlayerView.decks` projects `discardTop?: CardId` and `discardCount` ([`view.ts:76`](../../packages/engine/src/view.ts)) — the contents are not projected to anyone. Cherry-pick ([Rules :150](../rules/rules-board-game.md), "выберите одну карту из всего сброса") and `ai-inside` ([Rules :163](../rules/rules-board-game.md), "возьмите одну карту Release из сброса в руку") both need the whole pile visible to the picker.
 
   1. Project the full discard to everyone, always. It is face-up on a real table, so this is the physical truth.
   2. Project it only to the player holding the pending.
@@ -77,7 +77,7 @@ What #61 says correctly: `decks.main` is already `CardInstance[][]`, and `DRAW` 
 
 - [ ] **9. Does the engine model what a player knows about the deck?**
 
-  Sudo Cherry-pick puts the second card on top of the draw deck "не показывая другим игрокам" ([Rules :150](../rules-board-game.md)) — so that player knows the next card and nobody else does. Projection currently tells nobody anything about deck order. Git Rebase (a later slice) has the same problem, larger.
+  Sudo Cherry-pick puts the second card on top of the draw deck "не показывая другим игрокам" ([Rules :150](../rules/rules-board-game.md)) — so that player knows the next card and nobody else does. Projection currently tells nobody anything about deck order. Git Rebase (a later slice) has the same problem, larger.
 
   1. Model it — per-player deck knowledge in the state, projected so the UI can show "you know what's on top".
   2. Don't. The card lands on top and the placer is trusted to remember, exactly as at a table.

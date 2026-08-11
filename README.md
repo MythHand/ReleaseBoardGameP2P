@@ -8,7 +8,7 @@ The monorepo skeleton, the shared UI component library, the frontend shell, and 
 P2P networking layer (WebRTC via PeerJS, with a self-hosted signaling server) exist
 today. The in-game board screens come in later phases.
 
-Game rules and card mechanics: [`docs/rules-board-game.md`](./docs/rules-board-game.md).
+Game rules and card mechanics: [`docs/rules/rules-board-game.md`](./docs/rules/rules-board-game.md).
 
 ## Monorepo layout
 

@@ -150,7 +150,7 @@ The **current turn player** is mini-authority for their turn. All messages route
 
 ## Rules-driven protocol extensions
 
-Mechanics from [docs/rules-board-game.md](../../rules-board-game.md) beyond the basic turn flow:
+Mechanics from [docs/rules-board-game.md](../rules/rules-board-game.md) beyond the basic turn flow:
 
 **Reveal-on-draw** — AI and Error 503 must be revealed to all the moment they're drawn (they cannot stay private):
 ```
