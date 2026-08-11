@@ -11,9 +11,11 @@ import {
   type Outgoing,
   rebind,
   type SessionRef,
+  seatOfPeer,
   syncAll,
   tick,
 } from './referee'
+import type { StartGate } from './startGate'
 
 // The peer side of the link, plus the two seams a lobby-level caller drives:
 // frames arriving off the transport, and the keeper this link talks to.
@@ -107,6 +109,10 @@ export interface KeeperHandle {
   // attaching its own keeper — belongs to the page/lobby wiring in #18, so
   // nothing calls this yet from production code.
   handover(toPlayerId: PlayerId): void
+  // A seat has finished its opening animation. Takes a peer id, not a
+  // PlayerId, so the keeper's own seat reports through exactly the rule a
+  // remote seat's INTRO_READY takes: the seat is resolved from the connection.
+  introReady(peerId: string): void
   close(): void
 }
 
@@ -116,6 +122,9 @@ export function attachKeeper(args: {
   transport: Transport
   now: () => number
   ticker?: Ticker
+  // Absent, the keeper answers immediately — which is what solo play, the
+  // playground and every test that predates the intro want.
+  gate?: StartGate
 }): KeeperHandle {
   const ticker = args.ticker ?? intervalTicker()
   const listeners = new Set<(sync: Sync) => void>()
@@ -142,11 +151,52 @@ export function attachKeeper(args: {
     args.transport.send(outgoing.to, outgoing.message)
   }
 
+  // Intents that arrived before the gate opened. Buffered rather than rejected:
+  // every peer's input is dead during its own intro, so an intent here can only
+  // come from a peer that skipped ahead — and a rejection would surface to that
+  // player as an error for a click they were entitled to make.
+  const early: { peerId: string; intent: unknown }[] = []
+
+  const applyNow = (peerId: string, intent: unknown) => {
+    commit(args.ref, applyIntent(args.ref.current, peerId, intent, args.now()), deliver)
+  }
+
+  // Stamped at release, not at arrival: the game begins when the gate opens, so
+  // an action cannot carry a timestamp from before the table was live.
+  const flush = () => {
+    const queued = early.splice(0, early.length)
+    for (const e of queued) applyNow(e.peerId, e.intent)
+  }
+
+  const gated = () => args.gate !== undefined && !args.gate.open
+  // Fires straight away for a gate that is already open, so there is no window
+  // in which the buffer is filled and never drained.
+  args.gate?.onOpen(flush)
+
+  const submitted = (peerId: string, intent: unknown) => {
+    if (gated()) {
+      early.push({ peerId, intent })
+      return
+    }
+    applyNow(peerId, intent)
+  }
+
   ticker.start(() => {
+    // The whole reason the gate exists: `driveAbsent` playing an absent seat
+    // mid-animation is the move nobody at the table could see coming.
+    if (gated()) return
     const now = args.now()
     commit(args.ref, tick(args.ref.current, now), deliver)
     commit(args.ref, driveAbsent(args.ref.current, now), deliver)
   })
+
+  // One rule for host and guest: the seat comes from the connection, never from
+  // anything the sender claims, exactly as `applyIntent` resolves it.
+  const reportReady = (peerId: string) => {
+    const seat = seatOfPeer(args.ref.current, peerId)
+    // A peer holding no seat is a spectator; nobody is waiting on it.
+    if (seat) args.gate?.ready(seat.playerId)
+  }
 
   return {
     link: {
@@ -155,11 +205,7 @@ export function attachKeeper(args: {
         // Addressed by the keeper's own peer id, exactly as a remote seat's
         // intent is: `applyIntent` resolves the seat from it and stamps the
         // player, so the keeper gets no privilege from being the keeper.
-        commit(
-          args.ref,
-          applyIntent(args.ref.current, args.transport.id, intent, args.now()),
-          deliver,
-        )
+        submitted(args.transport.id, intent)
       },
       subscribe(listener) {
         listeners.add(listener)
@@ -181,15 +227,17 @@ export function attachKeeper(args: {
     },
     handleMessage(frame) {
       if (!keeping) return
+      if (frame.type === 'INTRO_READY') {
+        // Nothing in the payload is read: `parseEnvelope` never validated it,
+        // and the only thing this frame has to say is already in `from`.
+        reportReady(frame.from)
+        return
+      }
       if (frame.type !== 'INTENT') return
       // The payload is unvalidated JSON (`parseEnvelope` checks type/from/seq
       // and nothing else), so `payload` itself may be missing; `applyIntent`
       // takes it from here as `unknown` and checks the rest.
-      commit(
-        args.ref,
-        applyIntent(args.ref.current, frame.from, frame.payload?.intent, args.now()),
-        deliver,
-      )
+      submitted(frame.from, frame.payload?.intent)
     },
     peerLeft(peerId) {
       if (!keeping) return
@@ -210,10 +258,18 @@ export function attachKeeper(args: {
       // towards it.
       keeping = false
       ticker.stop()
+      // Otherwise a cap still pending here fires `flush` into a session this
+      // keeper no longer owns.
+      args.gate?.cancel()
+    },
+    introReady(peerId) {
+      if (!keeping) return
+      reportReady(peerId)
     },
     close() {
       keeping = false
       ticker.stop()
+      args.gate?.cancel()
       listeners.clear()
     },
   }

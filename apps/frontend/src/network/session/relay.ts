@@ -18,7 +18,12 @@ import type { MessageType } from '../types'
 // chose, including one the keeper went on to reject and therefore emitted no
 // event for at all. Forwarding any of them puts a private payload in front of
 // the whole table, which is the one thing the keeper's per-seat fan-out exists
-// to prevent. KEEPER_CHANGED is not private but is authored by the keeper
+// to prevent. INTRO_READY is addressed to the keeper for exactly the reason
+// INTENT is: it is a game frame one seat sends to the party that answers it,
+// and a relayed copy arrives wearing the host's id — so forwarding it would let
+// one peer report the intro finished on the host's behalf and release the table
+// early, out from under everyone still watching. KEEPER_CHANGED is not
+// private but is authored by the keeper
 // alone, and `keeperId: null` is the death notice that ends the game for
 // everyone: a forwarded peer-originated one is a table-wide kill switch.
 //
@@ -38,6 +43,7 @@ const NEVER_RELAYED: ReadonlySet<MessageType> = new Set<MessageType>([
   'GAME_STARTING',
   'GAME_STARTED',
   'INTENT',
+  'INTRO_READY',
   'SYNC',
   'KEEPER_STATE',
   'KEEPER_CHANGED',

@@ -44,6 +44,10 @@ export type Message =
   | { type: 'GAME_STARTING'; payload: { gameId: string } }
   // --- Game ---
   | { type: 'GAME_STARTED'; payload: { gameId: string; keeperId: PlayerId } }
+  // A seat has finished its opening animation and is ready for the game to
+  // move. Addressed to the keeper, which holds the table until every seat has
+  // said this (or the cap expires) — see session/startGate.ts.
+  | { type: 'INTRO_READY'; payload: { gameId: string } }
   | { type: 'INTENT'; payload: { intent: Intent } }
   // Private, per recipient — one projection plus that viewer's events. Never broadcast.
   | { type: 'SYNC'; payload: { view: PlayerView; events: Event[] } }
