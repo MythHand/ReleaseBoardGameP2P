@@ -54,6 +54,30 @@ const move = (
   return el.animate([start, end], { duration, easing, fill: 'forwards' })
 }
 
+/**
+ * Поза, в которой элемент, стоящий на своём месте, ВЫГЛЯДИТ стоящим в `from`:
+ * смещение центр-в-центр плюс масштаб по ширине. Вход FLIP-полёта — им красят
+ * первый кадр, чтобы карта не мигнула в конечной позе до старта анимации.
+ */
+export const enterPose = (from: Rect, box: Rect): string => {
+  const dx = from.left + from.width / 2 - (box.left + box.width / 2)
+  const dy = from.top + from.height / 2 - (box.top + box.height / 2)
+  return `translate(${dx}px, ${dy}px) scale(${from.width / box.width})`
+}
+
+// ХАРАКТЕР тряски — доли от размаха по кадрам (см. пресет shake). Не сила и не
+// время: сколько раз элемент качнётся и как быстро успокоится. Доли, а не
+// пиксели, поэтому один и тот же характер читается одинаково на любом размахе.
+export const SHAKE_SHAPES = {
+  // затухание: рывок и успокоение — жест поля ввода
+  settle: [0, -1, 6 / 7, -4 / 7, 3 / 7, 0],
+  // упругая: два ПОЛНЫХ размаха, потом два поменьше — крупный элемент, который
+  // вздрогнул всем собой (веер соперника на «нет такой карты»)
+  spring: [0, -1, 1, -2 / 3, 2 / 3, 0],
+} as const
+
+export type ShakeShape = keyof typeof SHAKE_SHAPES
+
 // длительность из params (для travel-пресетов с переменным временем)
 const durationOf = (p?: Record<string, unknown>, fallback = 520): number =>
   typeof p?.duration === 'number' ? p.duration : fallback
@@ -125,6 +149,33 @@ export const PRESETS: Record<string, Preset> = {
   // drawToCenter; move уменьшает по ширине до карточной области колоды.
   returnToDeck: (el: Element, p?: Record<string, unknown>): Animation | null =>
     move(el, p as MoveParams, durationOf(p, 480), EASE),
+
+  // ===== Складывание пары =====
+  // Половина пары приезжает из своего настоящего места на столе в свою позу
+  // ВНУТРИ пары. Вызывается по разу на каждую половину — и тем отличается от
+  // travel-пресетов: карты не летят из rect в rect, а складываются, оставаясь
+  // на месте пары; двигаются только внутренние узлы (data-main / data-aux).
+  //   from — где половина физически сейчас (её rect на экране),
+  //   box  — рамка пары, то есть куда она складывается,
+  //   pose — поза покоя этой половины внутри пары: у основной пусто (она и есть
+  //          рамка), у вспомогательной — PAIR_AUX_POSE из CardPair,
+  //   snap — приземление с отскоком (у подтыкающейся половины).
+  // Финальный кадр совпадает с позой самого CardPair, поэтому передача пары из
+  // флаера в статичный слот не видна на экране.
+  foldIntoPair: (el: Element, p?: Record<string, unknown>): Animation | null => {
+    const {
+      from,
+      box,
+      pose = '',
+      dur = 620,
+      snap = false,
+    } = (p ?? {}) as { from?: Rect; box?: Rect; pose?: string; dur?: number; snap?: boolean }
+    if (!from || !box) return null
+    return el.animate(
+      [{ transform: enterPose(from, box) }, { transform: pose || 'translate(0, 0) scale(1)' }],
+      { duration: dur, easing: snap ? SNAP : EASE, fill: 'forwards' },
+    )
+  },
 
   // ===== Смена содержимого слота (HUD, turn dock) =====
   // Пара out/in для подмены текста/элемента в зарезервированном слоте: старое
@@ -220,19 +271,24 @@ export const PRESETS: Record<string, Preset> = {
     )
   },
 
-  // ===== Фидбек ввода =====
-  // Тряска влево-вправо — «поле не заполнено». Разовый триггер по событию
-  // (как flipCard), с затухающей амплитудой и возвратом в исходную точку.
-  shake: (el: Element): Animation =>
-    el.animate(
-      [
-        { transform: 'translateX(0)' },
-        { transform: 'translateX(-7px)' },
-        { transform: 'translateX(6px)' },
-        { transform: 'translateX(-4px)' },
-        { transform: 'translateX(3px)' },
-        { transform: 'translateX(0)' },
-      ],
-      { duration: 380, easing: EASE },
-    ),
+  // ===== Отказ =====
+  // Тряска влево-вправо — «не годится»: поле не заполнено, карты нет в руке.
+  // Разовый триггер по событию (как flipCard), с возвратом в исходную точку.
+  // Три параметра, и каждый отвечает за своё:
+  //   amp   — размах первого рывка в px (крупный элемент вздрагивает шире),
+  //   dur   — время,
+  //   shape — ХАРАКТЕР тряски, доли размаха по кадрам (SHAKE_SHAPES).
+  // По умолчанию — жест поля ввода: 7px, 380ms, затухание.
+  shake: (el: Element, p?: Record<string, unknown>): Animation => {
+    const {
+      amp = 7,
+      dur = 380,
+      shape = 'settle',
+    } = (p ?? {}) as { amp?: number; dur?: number; shape?: ShakeShape }
+    const steps = SHAKE_SHAPES[shape] ?? SHAKE_SHAPES.settle
+    return el.animate(
+      steps.map((k) => ({ transform: `translateX(${(amp * k).toFixed(2)}px)` })),
+      { duration: dur, easing: EASE },
+    )
+  },
 }

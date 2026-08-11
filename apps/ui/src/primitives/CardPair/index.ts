@@ -1,1 +1,1 @@
-export { default } from './CardPair'
+export { default, PAIR_AUX_POSE } from './CardPair'

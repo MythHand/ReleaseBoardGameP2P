@@ -9,7 +9,9 @@
   inset: 0;
   z-index: 0;
   filter: brightness(0.82);
-  transform: translateY(-26%) rotate(-7deg);
+
+  /* сам наклон — инлайном из PAIR_AUX_POSE (CardPair.tsx): его же читает
+     анимация складывания, и объявление должно быть одно */
   transform-origin: bottom center;
 }
 

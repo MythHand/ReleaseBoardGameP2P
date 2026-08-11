@@ -6,6 +6,7 @@ import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card, { cardBoxIn } from '@/primitives/Card'
+import CardCatalog from '@/table/CardCatalog'
 import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
@@ -176,12 +177,6 @@ export default function OpponentTakesCardStory() {
     }
   }
 
-  const cellClass = (id: string) => {
-    if (phase === 'choose') return styles.cell
-    if (phase === 'picked' && id === wanted?.id) return `${styles.cell} ${styles.chosen}`
-    return `${styles.cell} ${styles.leaving}`
-  }
-
   return (
     <div className={styles.root} ref={rootRef}>
       <div className={styles.bar}>
@@ -232,25 +227,14 @@ export default function OpponentTakesCardStory() {
       {/* the opponent's broadcast catalog (choose which of your cards to take) */}
       {phase !== 'idle' && (
         <div className={styles.grid}>
-          {BASE_TYPES.map((c, i) => (
-            <button
-              key={c.id}
-              type="button"
-              className={cellClass(c.id)}
-              style={{ animationDelay: `${i * 18}ms` }}
-              onClick={phase === 'choose' ? () => pickWanted(c) : undefined}
-            >
-              <Card
-                card={c}
-                interactive={false}
-                width={GRID_W}
-                state={phase === 'choose' && wanted?.id === c.id ? 'selected' : 'idle'}
-                // pick one out of a set — uniform selection colour, not the
-                // per-category accent
-                accent="var(--select-accent)"
-              />
-            </button>
-          ))}
+          <CardCatalog
+            cards={BASE_TYPES}
+            open={phase === 'choose'}
+            selected={wanted?.id}
+            chosen={phase === 'picked' ? wanted?.id : null}
+            onPick={pickWanted}
+            width={GRID_W}
+          />
         </div>
       )}
 
