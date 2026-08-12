@@ -12,7 +12,14 @@ export function isOpening(view: PlayerView): boolean {
   if (view.turn.index !== 0 || view.turn.hasDrawn) return false
   if (view.decks.discardCount > 0) return false
   if (view.pending || view.window) return false
-  const released = (r: PlayerView['self']['release']) => Object.keys(r).length > 0
+  // Values, never keys. The engine builds an empty release as an object whose
+  // slots are present and `undefined`, and a projection reaches the peer that
+  // holds the keeper in memory — keys intact — while every other peer's crosses
+  // a DataChannel, where JSON.stringify drops undefined-valued keys entirely.
+  // Counting keys therefore answered "has this player released anything?" with
+  // yes for the host and no for everyone else, and the host alone was refused
+  // its opening. Two peers, one game, two different object shapes.
+  const released = (r: PlayerView['self']['release']) => Object.values(r).some(Boolean)
   if (released(view.self.release)) return false
   return view.opponents.every((o) => !o.eliminated && !released(o.release))
 }

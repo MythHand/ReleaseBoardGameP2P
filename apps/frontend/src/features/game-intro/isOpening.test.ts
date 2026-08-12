@@ -21,6 +21,44 @@ it('recognises a game that has not been played yet', () => {
   expect(isOpening(opening())).toBe(true)
 })
 
+// The bug this pins, found by playing the real game: the host saw no opening
+// while every other player did.
+//
+// A projection reaches the peer holding the keeper *in memory*, so it arrives
+// exactly as the engine built it — an empty release being an object whose slots
+// are present and `undefined`. Every other peer's projection crosses a
+// DataChannel as JSON, and JSON.stringify drops undefined-valued keys, so the
+// same empty release arrives as `{}`. Judging "has this player released
+// anything?" by counting KEYS therefore answered yes for the host alone, and the
+// host alone was refused its deal.
+//
+// One game, two peers, two object shapes: any predicate over a projection has to
+// survive both, so both are asserted here.
+it('treats an empty release as empty however it reached this peer', () => {
+  // As the keeper holds it, in memory: slots present, values undefined.
+  const local = opening()
+  local.self.release = { frontend: undefined, backend: undefined, database: undefined }
+  local.opponents[0].release = { frontend: undefined, backend: undefined, database: undefined }
+  expect(isOpening(local)).toBe(true)
+
+  // As it survives a round trip over the wire.
+  const wire = JSON.parse(JSON.stringify(local)) as PlayerView
+  expect(wire.self.release).toEqual({})
+  expect(isOpening(wire)).toBe(true)
+})
+
+it('still sees a real release through the in-memory shape', () => {
+  // The other half of the same coin: filled slots must still count, even when
+  // the empty ones sit beside them as explicit undefined.
+  const v = opening()
+  v.self.release = {
+    frontend: { uid: 'release-frontend#0', card: 'release-frontend' },
+    backend: undefined,
+    database: undefined,
+  }
+  expect(isOpening(v)).toBe(false)
+})
+
 it('is not an opening once a turn has advanced', () => {
   const v = opening()
   v.turn.index = 1
