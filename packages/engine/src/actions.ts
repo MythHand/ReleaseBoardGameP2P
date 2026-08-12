@@ -14,7 +14,11 @@ export type Choice =
   | { kind: 'discardForRelease'; card: CardUid }
   // null is an explicit "I could block this and I choose not to".
   // `combo` carries a Sudo played alongside the defence (sudo Rollback).
-  | { kind: 'defend'; card: CardUid | null; combo?: CardUid }
+  // `reflectSlot` is Works on my Machine only: the reflection lands on a
+  // release in the *attacker's* zone and the defender picks which
+  // (resolution.md §3). It rides on the choice they already submit rather than
+  // opening a pending behind a pending.
+  | { kind: 'defend'; card: CardUid | null; combo?: CardUid; reflectSlot?: ReleaseSlot }
   | { kind: 'neutralize503'; method: NeutralizeMethod; card?: CardUid }
   | { kind: 'crush'; method: NeutralizeMethod; card?: CardUid }
   // Security Bug names a card TYPE the opponent might hold — that is the bluff.

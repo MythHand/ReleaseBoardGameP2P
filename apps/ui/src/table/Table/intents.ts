@@ -18,7 +18,7 @@ export type TableTarget =
 
 export type TableChoice =
   | { kind: 'discardForRelease'; card: string }
-  | { kind: 'defend'; card: string | null; combo?: string }
+  | { kind: 'defend'; card: string | null; combo?: string; reflectSlot?: ReleaseSlotId }
   | { kind: 'neutralize503'; method: NeutralizeMethodId; card?: string }
   | { kind: 'crush'; method: NeutralizeMethodId; card?: string }
   | { kind: 'requestCard'; card: string }

@@ -24,6 +24,17 @@ function clearSlot(state: GameState, player: PlayerId, slot: ReleaseSlot): GameS
 // Rollback gives the attack card back, but not the right to use it again this
 // exchange. Only when it actually returns to the attacker: with sudo the
 // defender keeps it, and locking its new owner would invent a rule.
+// Where a reflected attack may land. Code Review makes a release untouchable by
+// bug/out-of-memory/legacy/security-bug "даже с sudo" (resolution.md §4), and a
+// reflected attack is still that attack — so a protected release is no more
+// reachable coming back than it was going out.
+function reflectableSlots(state: GameState, owner: PlayerId): ReleaseSlot[] {
+  return SLOTS.filter((slot) => {
+    const held = state.players[owner].release[slot]
+    return held !== undefined && held.codeReview === undefined
+  })
+}
+
 function lockReplay(state: GameState, player: PlayerId, card: CardUid): GameState {
   const me = state.players[player]
   return {
@@ -302,10 +313,25 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
     if (!sudoDefence) next = lockReplay(next, attacker, attackCard.uid)
     next = discard(next, spentDefence)
   } else if (effect === 'reflect') {
-    // Works on my Machine turns the attack on its author: their own release falls.
+    // Works on my Machine turns the attack on its author — the same effect they
+    // were about to apply, not a generic destruction.
     next = discard(next, [attackCard, ...spentDefence])
-    const victimSlot = SLOTS.find((s) => next.players[attacker].release[s])
-    if (victimSlot) next = takeRelease(next, log, attacker, victimSlot, null)
+    const eligible = reflectableSlots(next, attacker)
+    // The defender chooses ("выбор цели в зоне атакующего делает
+    // защищавшийся"); with one legal slot there is nothing to choose, so an
+    // absent choice is not a refusal. A named slot that is not eligible — empty
+    // or protected — lands nowhere rather than falling through to another.
+    const victimSlot = choice.reflectSlot
+      ? eligible.find((candidate) => candidate === choice.reflectSlot)
+      : eligible.length === 1
+        ? eligible[0]
+        : undefined
+    if (victimSlot) {
+      // Security Bug's own effect is to take, so the reflection takes.
+      // `takeRelease` already discards it when the taker's slot is occupied.
+      const thief = attackCard.id === 'attack-security-bug' ? action.player : null
+      next = takeRelease(next, log, attacker, victimSlot, thief)
+    }
   } else {
     next = discard(next, [attackCard, ...spentDefence])
   }
