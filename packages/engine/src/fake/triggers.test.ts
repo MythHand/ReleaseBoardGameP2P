@@ -116,9 +116,21 @@ it('reveals an AI trigger together with the event it pulls', () => {
   const revealed = r.events.find((e) => e.type === 'aiRevealed')
   expect(revealed).toBeDefined()
   expect(revealed?.visibleTo).toBeUndefined()
-  // The trigger goes to the discard; the event card returns to its own deck.
+  // The trigger goes to the discard; the event card belongs to its own deck.
   expect(r.state.decks.discard.map((c) => c.uid)).toContain(ai.uid)
-  expect(r.state.decks.events).toHaveLength(FAKE_EVENTS.reduce((n, e) => n + e.qty, 0))
+  // "общее число её карт в игре — 21: каждая либо в колоде, либо на столе"
+  // (general.md §6.4). A one-off effect is back in the deck already; one that
+  // stays on the table is counted where it stands, so the total is the
+  // assertion and the deck's own length is not.
+  const onTable = Object.values(r.state.players).flatMap((p) => [
+    ...(p.release.monitoring?.event ? [p.release.monitoring] : []),
+    ...(['frontend', 'backend', 'database'] as const).flatMap((slot) =>
+      p.release[slot]?.card.event ? [p.release[slot]?.card] : [],
+    ),
+  ])
+  expect(r.state.decks.events.length + onTable.length).toBe(
+    FAKE_EVENTS.reduce((n, e) => n + e.qty, 0),
+  )
 })
 
 // --- Review findings: discarded events on every trigger-caused discard ---
@@ -224,8 +236,15 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
   expect(drawn.state.players.p1.release.frontend?.card.id).toBe('release-frontend')
   const placedUid = drawn.state.players.p1.release.frontend?.card.uid as string
 
+  // The AI-placed release is attackable, so it opens a reaction window, and no
+  // turn ends while one is open. Nobody throws anything, so it times out.
+  const settled = reduce(drawn.state, {
+    type: 'WINDOW_EXPIRED',
+    at: drawn.state.window?.deadline ?? 1001,
+  })
+
   // End p1's turn.
-  const p1Pushed = reduce(drawn.state, { type: 'PUSH', player: 'p1', at: 1001 })
+  const p1Pushed = reduce(settled.state, { type: 'PUSH', player: 'p1', at: 1001 })
   expect(p1Pushed.state.turn.player).toBe('p2')
 
   // p2 DDoS's the placed release: it bounces to p1's hand and freezes.
@@ -247,7 +266,7 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
 
   // p2 ends their turn (skip drawing — hasDrawn is set directly, as `withTop`-
   // style helpers elsewhere in this file already construct state directly).
-  const p2Done: GameState = { ...bounced.state, turn: { ...bounced.state.turn, hasDrawn: true } }
+  const p2Done: GameState = { ...bounced.state, turn: { ...bounced.state.turn, drawnFrom: [0] } }
   const toP1 = reduce(p2Done, { type: 'PUSH', player: 'p2', at: 1003 })
   expect(toP1.state.turn.player).toBe('p1')
   expect(toP1.state.players.p1.frozen).toContain(placedUid)
@@ -256,12 +275,12 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
   expect(playableFor(toP1.state, 'p1')).not.toContain(placedUid)
 
   // p1 ends this turn — the freeze lifts as their own turn ends.
-  const p1Done: GameState = { ...toP1.state, turn: { ...toP1.state.turn, hasDrawn: true } }
+  const p1Done: GameState = { ...toP1.state, turn: { ...toP1.state.turn, drawnFrom: [0] } }
   const toP2 = reduce(p1Done, { type: 'PUSH', player: 'p1', at: 1004 })
   expect(toP2.state.players.p1.frozen).toEqual([])
 
   // Back to p2, then back to p1: now it must be playable.
-  const p2Done2: GameState = { ...toP2.state, turn: { ...toP2.state.turn, hasDrawn: true } }
+  const p2Done2: GameState = { ...toP2.state, turn: { ...toP2.state.turn, drawnFrom: [0] } }
   const backToP1 = reduce(p2Done2, { type: 'PUSH', player: 'p2', at: 1005 })
   expect(backToP1.state.turn.player).toBe('p1')
   expect(playableFor(backToP1.state, 'p1')).toContain(placedUid)

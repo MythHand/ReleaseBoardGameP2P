@@ -4,6 +4,7 @@ import type { Reduction } from '../engine'
 import type { Event } from '../events'
 import type {
   CardId,
+  CardInstance,
   CardUid,
   GameState,
   PlayerId,
@@ -44,10 +45,28 @@ export function reject(state: GameState, action: Action, reason: string): Reduct
   return { state, events: log.events }
 }
 
-export const setHand = (state: GameState, id: PlayerId, hand: PlayerState['hand']): GameState => ({
-  ...state,
-  players: { ...state.players, [id]: { ...state.players[id], hand } },
-})
+// Both locks name cards in a hand, so a card that leaves the hand takes its
+// lock with it (#80). Left behind, a stale uid is not merely untidy: `frozen`
+// is projected, so it hands its former owner the identity of a card now sitting
+// in someone else's hand — a leak of exactly the kind the projection exists to
+// prevent. Pruning here rather than at each mover means no future path that
+// moves a card can forget.
+export const setHand = (state: GameState, id: PlayerId, hand: PlayerState['hand']): GameState => {
+  const held = new Set(hand.map((c) => c.uid))
+  const me = state.players[id]
+  return {
+    ...state,
+    players: {
+      ...state.players,
+      [id]: {
+        ...me,
+        hand,
+        frozen: me.frozen.filter((uid) => held.has(uid)),
+        replayLocked: me.replayLocked.filter((uid) => held.has(uid)),
+      },
+    },
+  }
+}
 
 // The TS Action type does not survive JSON deserialization, so an action from a
 // remote peer may be any shape at all. Validating once at the entry point means
@@ -122,6 +141,42 @@ export function checkWin(state: GameState, log: Log): GameState {
   return { ...state, eventSeq: log.seq }
 }
 
+// A card from the events deck never reaches the common discard (general.md
+// §6.4). While `ai-monitoring` or an `ai-release-*` stands on the table it is
+// out of its deck; when it leaves — destroyed, sacrificed, or carried off with
+// an eliminated owner — it goes back there, as the event card it is rather than
+// the plain one it was standing in for.
+//
+// Routed here because this is the one way a card enters the discard, so no
+// caller banking cards its own way can miss the rule.
+export const bankToDiscard = (state: GameState, cards: CardInstance[]): GameState => {
+  const toDiscard = cards.filter((c) => c.event === undefined)
+  const goingHome = cards.filter((c) => c.event !== undefined)
+  return {
+    ...state,
+    decks: {
+      ...state.decks,
+      discard: [...state.decks.discard, ...toDiscard],
+      events: [
+        ...state.decks.events,
+        ...goingHome.map((c) => ({ uid: c.uid, id: c.event as CardId })),
+      ],
+    },
+  }
+}
+
+// Whether the turn's draw obligation is discharged. Base owes every pile that
+// has cards in it; Strategic owes one card from a pile of the player's choosing
+// (rules decisions answer 1). `PUSH` legality, `onDraw`'s "already drew this
+// turn" rejection and the dock's draw-or-push state all derive from this, so
+// the three cannot disagree about what a completed draw is.
+export function drawObligationMet(state: GameState): boolean {
+  const drawn = state.turn.drawnFrom
+  if (drawn.length === 0) return false
+  if (state.setup.gitBranch === 'strategic') return true
+  return state.decks.main.every((pile, i) => pile.length === 0 || drawn.includes(i))
+}
+
 // Ends the turn, or holds it open when the hand is over the mode's limit.
 //
 // Lives here (rather than in reduce.ts, its natural home) because triggers.ts's
@@ -140,10 +195,13 @@ export function endTurn(state: GameState, log: Log): GameState {
   log.add({ type: 'turnStarted', player: next, index: state.turn.index + 1 })
   // A DDoS freeze lasts exactly one round: it lifts as its victim's next turn ends.
   const thawed = { ...state.players[me], frozen: [] }
+  // A replay lock lifts as its holder's next turn *begins*, which is here —
+  // the same moment, seen from the other seat.
+  const unlocked = { ...state.players[next], replayLocked: [] }
   return {
     ...state,
-    players: { ...state.players, [me]: thawed },
-    turn: { player: next, index: state.turn.index + 1, hasDrawn: false, releasesPlayed: 0 },
+    players: { ...state.players, [me]: thawed, [next]: unlocked },
+    turn: { player: next, index: state.turn.index + 1, drawnFrom: [], releasesPlayed: 0 },
     pending: null,
     eventSeq: log.seq,
   }

@@ -1,6 +1,7 @@
 import { SUPPORTED } from '../cards'
 import type { DeckEntry, GameConfig } from '../engine'
 import { shuffle } from '../rng'
+import { normalizeSetup } from '../setup-contract'
 import type { CardId, CardInstance, GameState, PlayerId, PlayerState } from '../state'
 
 // Trigger cards cannot sit in an opening hand: their effect fires on the draw, so
@@ -24,8 +25,15 @@ export function createGame(config: GameConfig): GameState {
   let cursor = 0
 
   // An unsupported id would be an inert card nobody can ever play, so it never
-  // enters the deck.
+  // enters the deck — but which ones went is recorded rather than lost, so a
+  // caller handing over a catalogue the engine only partly implements finds out
+  // here instead of counting cards at the table.
   const supported = config.deck.filter((e) => SUPPORTED.has(e.id))
+  const dropped = [
+    ...config.deck.filter((e) => !SUPPORTED.has(e.id)),
+    ...config.events.filter((e) => !SUPPORTED.has(e.id)),
+  ].map((e) => e.id)
+  const normalized = normalizeSetup(config.setup)
   const first = shuffle(expand(supported), seed, cursor)
   cursor = first.cursor
 
@@ -67,6 +75,7 @@ export function createGame(config: GameConfig): GameState {
       hand,
       release: {},
       frozen: [],
+      replayLocked: [],
     }
   }
 
@@ -86,11 +95,13 @@ export function createGame(config: GameConfig): GameState {
     seating,
     players,
     eliminated: [],
-    turn: { player: seating[0], index: 0, hasDrawn: false, releasesPlayed: 0 },
+    turn: { player: seating[0], index: 0, drawnFrom: [], releasesPlayed: 0 },
     decks: { main: [remaining.items], events: eventDeck.items, discard: [] },
+    drawing: null,
     pending: null,
     window: null,
-    setup: config.setup,
+    setup: normalized.setup,
+    ignored: { cards: dropped, setup: normalized.ignored },
     over: null,
   }
 }

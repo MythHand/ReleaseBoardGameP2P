@@ -64,7 +64,8 @@ function stepTurn(session: Session, at: number): SessionResult {
   // infer a `CardId` from a `CardUid`.
   const release = view.self.playable.find((uid) => uid.startsWith('release-'))
   if (release) return applyIntent(session, peerId, { type: 'PLAY', card: release }, at)
-  if (!session.state.turn.hasDrawn) return applyIntent(session, peerId, { type: 'DRAW' }, at)
+  if (session.state.turn.drawnFrom.length === 0)
+    return applyIntent(session, peerId, { type: 'DRAW' }, at)
   return applyIntent(session, peerId, { type: 'PUSH' }, at)
 }
 

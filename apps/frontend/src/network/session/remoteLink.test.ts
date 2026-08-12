@@ -73,7 +73,7 @@ it('drives the keeper`s own seat through its link, with no connection to itself'
 
   keeper.link.submit({ type: 'DRAW' })
 
-  expect(ref.current.state.turn.hasDrawn).toBe(true)
+  expect(ref.current.state.turn.drawnFrom).not.toEqual([])
   expect(seen).toHaveLength(1)
   expect(seen[0].view.self.id).toBe('a')
 })

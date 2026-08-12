@@ -44,6 +44,10 @@ export type Event = EventBase &
     // is the only detail worth showing — the cards themselves were public on
     // the way in and are secret again on the way out.
     | { type: 'deckReshuffled'; cards: number }
+    // Git Branch, Git Merge, or a pile running out. Carries the resulting pile
+    // sizes because that is the whole visible effect — the cards themselves are
+    // face down before and after.
+    | { type: 'pilesChanged'; piles: number[] }
   )
 
 export type DiscardReason =

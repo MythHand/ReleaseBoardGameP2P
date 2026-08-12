@@ -15,6 +15,12 @@ export type Setup = Record<string, string>
 export interface CardInstance {
   uid: CardUid
   id: CardId
+  // Set when this instance *is* a card from the events deck, standing on the
+  // table. `id` is the plain catalogue card it stands in for, so it reads and
+  // plays as an ordinary Monitoring or Release; `event` is the id it goes back
+  // to the events deck as when it leaves the table (general.md §6.4). While it
+  // stands there the events deck genuinely holds one card fewer.
+  event?: CardId
 }
 
 export interface Released {
@@ -34,8 +40,16 @@ export interface PlayerState {
     // Monitoring / AI Monitoring — in the zone but not a Release.
     monitoring?: CardInstance
   }
-  // DDoS returns a Release to hand and freezes that instance for one round.
+  // DDoS returns a Release to hand and freezes that instance for one round:
+  // "не может быть разыграна в следующем ходу" — it costs the holder their
+  // whole next turn, so this thaws when that turn ends.
   frozen: CardUid[]
+  // An attack card Rollback handed back to whoever threw it. "он не может
+  // сыграть её повторно до своего следующего хода" — barred for the rest of the
+  // exchange, playable again on their next turn, so this thaws when that turn
+  // begins. A separate list precisely because the two thaw at different moments;
+  // one list could only ever be right for one of them.
+  replayLocked: CardUid[]
 }
 
 export interface ReactionWindow {
@@ -78,7 +92,10 @@ export type Pending =
   | { kind: 'crush'; player: PlayerId; slot: ReleaseSlot; methods: NeutralizeMethod[] }
   | { kind: 'requestCard'; player: PlayerId; target: PlayerId }
   | { kind: 'giveCard'; player: PlayerId; requested: CardId; attacker: PlayerId }
-  | { kind: 'handLimit'; player: PlayerId; excess: number }
+  // `endsTurn` false is Bad Vibe-Coding borrowing the prompt without the
+  // consequence: the same "discard N" question, but the seat stays put.
+  // Absent means the ordinary end-of-turn hand limit, which does end the turn.
+  | { kind: 'handLimit'; player: PlayerId; excess: number; endsTurn?: boolean }
   // The options travel on the pending rather than opening the discard globally:
   // only discardTop/discardCount are ever public (project.ts) — the pile's
   // full contents are not — so an effect that reaches into it brings its own
@@ -109,7 +126,11 @@ export interface GameState {
   turn: {
     player: PlayerId
     index: number
-    hasDrawn: boolean
+    // Which piles this turn has drawn from. A boolean cannot say "two of three
+    // piles are done", and under Base the obligation runs over every pile
+    // (rules decisions answer 1). Whether it is satisfied is a question about
+    // the mode, answered by `drawObligationMet`, not a flag stored here.
+    drawnFrom: number[]
     releasesPlayed: number
   }
 
@@ -121,9 +142,24 @@ export interface GameState {
     discard: CardInstance[]
   }
 
+  // A draw in progress, as the remaining pile indices to draw from — one entry
+  // per card still owed. A draw is one action carrying an interruptible
+  // sequence (rules decisions answer 2): a trigger drawn partway through pauses
+  // it, and resolving that trigger resumes it where it stopped.
+  //
+  // Indices rather than a count because the same sequence serves both shapes:
+  // Good Vibe-Coding is two cards off pile 0 (`[0, 0]`), and the multi-pile
+  // draw #61 slice A introduces is one card off each existing pile (`[0, 1, …]`).
+  drawing: { player: PlayerId; piles: number[] } | null
+
   pending: Pending | null
   window: ReactionWindow | null
 
   setup: Setup
+  // What the engine could not honour from the config it was handed. Both halves
+  // used to vanish: an unrecognised mode value fell through to Base, and a deck
+  // entry with no rules was filtered out — a caller handing over the full
+  // catalogue got a smaller deck with nothing said about it.
+  ignored: { cards: CardId[]; setup: string[] }
   over: { winner: PlayerId; condition: 'release' | 'lastStanding' } | null
 }

@@ -19,7 +19,7 @@ function gameWith(discard: string[], hand: string[]): GameState {
   })
   return {
     ...base,
-    turn: { ...base.turn, player: 'p1', hasDrawn: true },
+    turn: { ...base.turn, player: 'p1', drawnFrom: [0] },
     decks: { ...base.decks, discard: discard.map((id, i) => ({ uid: `${id}#d${i}`, id })) },
     players: {
       ...base.players,
@@ -38,7 +38,7 @@ function applyAiInside(state: GameState, player: PlayerId): GameState {
   const inside: CardInstance = { uid: 'ai-inside#e0', id: 'ai-inside' }
   const staged: GameState = {
     ...state,
-    turn: { ...state.turn, player, hasDrawn: false },
+    turn: { ...state.turn, player, drawnFrom: [] },
     decks: {
       ...state.decks,
       main: [[ai, ...state.decks.main[0]], ...state.decks.main.slice(1)],

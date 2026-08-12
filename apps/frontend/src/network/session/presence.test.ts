@@ -137,7 +137,7 @@ it('falls back to DRAW/PUSH when an absent seat holds the turn but its bot sugge
     engine: overreporting,
     state: {
       ...created.state,
-      turn: { ...created.state.turn, player: 'a', hasDrawn: true },
+      turn: { ...created.state.turn, player: 'a', drawnFrom: [0] },
       players: { ...created.state.players, a: { ...created.state.players.a, hand: [release] } },
     },
   }
@@ -154,13 +154,17 @@ it('falls back to DRAW/PUSH when an absent seat holds the turn but its bot sugge
 })
 
 it('drives the absent seat that owes the action even when an earlier absent seat owes nothing', () => {
-  // Rotate the turn from 'a' onto 'c' (a's and b's turns each end with a bare
-  // draw + push, playing nothing) while every seat is still connected.
-  let s = threeSeatSession()
-  s = applyIntent(s, 'peer-a', { type: 'DRAW' }, 100).session
-  s = applyIntent(s, 'peer-a', { type: 'PUSH' }, 101).session
-  s = applyIntent(s, 'peer-b', { type: 'DRAW' }, 102).session
-  s = applyIntent(s, 'peer-b', { type: 'PUSH' }, 103).session
+  // The turn is placed on 'c' rather than rotated there by play. Rotating meant
+  // assuming a's and b's turns each end with a bare draw + push, which is a
+  // fact about whatever those seats happen to draw — a trigger drawn on the way
+  // opens a pending, refuses the push, and the turn never arrives. What this
+  // test is about is which absent seat `driveAbsent` picks, so the turn is set
+  // and the deal left out of it.
+  const rotated = threeSeatSession()
+  let s: typeof rotated = {
+    ...rotated,
+    state: { ...rotated.state, turn: { ...rotated.state.turn, player: 'c', drawnFrom: [] } },
+  }
   expect(s.state.turn.player).toBe('c')
 
   // Seat order is [a, b, c]: 'a' is absent but owes nothing (it is not their

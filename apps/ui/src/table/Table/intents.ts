@@ -12,10 +12,13 @@ export type TableTarget =
   | { kind: 'release'; player: string; slot: ReleaseSlotId }
   | { kind: 'monitoring'; player: string }
   | { kind: 'card'; card: string }
+  // Mirrors the engine's pile target: Git Branch splits one of the draw piles,
+  // and with several on the table the player picks which.
+  | { kind: 'pile'; pile: number }
 
 export type TableChoice =
   | { kind: 'discardForRelease'; card: string }
-  | { kind: 'defend'; card: string | null; combo?: string }
+  | { kind: 'defend'; card: string | null; combo?: string; reflectSlot?: ReleaseSlotId }
   | { kind: 'neutralize503'; method: NeutralizeMethodId; card?: string }
   | { kind: 'crush'; method: NeutralizeMethodId; card?: string }
   | { kind: 'requestCard'; card: string }

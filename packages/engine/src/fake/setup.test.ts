@@ -106,18 +106,18 @@ it('is deterministic for a given seed and divergent across seeds', () => {
 it('excludes deck entries the engine does not implement', () => {
   const s = createGame(
     config({
-      deck: [...DECK, { id: 'operation-git-branch', qty: 3 }],
+      deck: [...DECK, { id: 'operation-system-upgrade', qty: 3 }],
     }),
   )
   const ids = [...s.seating.flatMap((id) => s.players[id].hand), ...s.decks.main.flat()].map(
     (c) => c.id,
   )
-  expect(ids).not.toContain('operation-git-branch')
+  expect(ids).not.toContain('operation-system-upgrade')
 })
 
 it('opens on the first seat with nothing drawn or released', () => {
   const s = createGame(config())
-  expect(s.turn).toEqual({ player: 'p1', index: 0, hasDrawn: false, releasesPlayed: 0 })
+  expect(s.turn).toEqual({ player: 'p1', index: 0, drawnFrom: [], releasesPlayed: 0 })
   expect(s.window).toBeNull()
   expect(s.pending).toBeNull()
   expect(s.over).toBeNull()

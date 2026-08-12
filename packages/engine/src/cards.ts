@@ -50,6 +50,8 @@ export const CARD_RULES: Record<CardId, CardRules> = {
   'support-code-review': { kind: 'support' },
 
   'operation-git-cherry-pick': { kind: 'operation', sudo: true },
+  'operation-git-branch': { kind: 'operation', sudo: true },
+  'operation-git-merge': { kind: 'operation', sudo: true },
 
   'trigger-error-503': { kind: 'trigger' },
   'trigger-ai': { kind: 'trigger' },

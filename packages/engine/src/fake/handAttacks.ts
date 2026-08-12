@@ -2,12 +2,9 @@ import type { Action, Target } from '../actions'
 import type { Reduction } from '../engine'
 import { randomAt } from '../rng'
 import type { CardInstance, GameState, PlayerId } from '../state'
-import { createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
+import { bankToDiscard, createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
 
-const discard = (state: GameState, cards: CardInstance[]): GameState => ({
-  ...state,
-  decks: { ...state.decks, discard: [...state.decks.discard, ...cards] },
-})
+const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
 
 // Opens a hand-scoped defence. The attack card has already left the attacker's
 // hand; a successful defence simply means the theft never happens.

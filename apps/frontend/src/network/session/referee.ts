@@ -1,5 +1,5 @@
 import type { Action, DeckEntry, Engine, Event, GameState, PlayerId, Setup } from '@release/engine'
-import { botAction } from '@release/engine/fake'
+import { botAction, drawObligationMet } from '@release/engine/fake'
 import type { Intent, Message } from '../types'
 import { forViewer, rejectionsIn } from './audience'
 
@@ -205,7 +205,7 @@ export function driveAbsent(session: Session, now: number): SessionResult {
     // fix for the case this net was written against.
     const { turn, pending, window, over } = session.state
     if (turn.player === seat.playerId && !pending && !window && !over) {
-      const fallback: Action = turn.hasDrawn
+      const fallback: Action = drawObligationMet(session.state)
         ? { type: 'PUSH', player: seat.playerId, at: now }
         : { type: 'DRAW', player: seat.playerId, at: now }
       const retried = session.engine.reduce(session.state, fallback)

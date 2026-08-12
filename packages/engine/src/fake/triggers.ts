@@ -1,18 +1,15 @@
 import type { Action, Choice } from '../actions'
-import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { DiscardReason } from '../events'
 import { randomAt } from '../rng'
 import type { CardInstance, GameState, NeutralizeMethod, PlayerId, ReleaseSlot } from '../state'
-import { checkWin, createLog, endTurn, type Log, reject, setHand } from './core'
+import { bankToDiscard, checkWin, createLog, endTurn, type Log, reject, setHand } from './core'
 import { discardOptions } from './discard'
+import { openWindow } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
-const discard = (state: GameState, cards: CardInstance[]): GameState => ({
-  ...state,
-  decks: { ...state.decks, discard: [...state.decks.discard, ...cards] },
-})
+const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
 
 // The order the rules give: Debugger first, Monitoring second, sacrificing a
 // release last — a player answers with the cheapest option they hold.
@@ -103,6 +100,16 @@ function destroySlot(
   }
 }
 
+// Whether an instance is standing in someone's zone right now — the test for
+// "did this event's effect keep the card on the table".
+function standsOnTable(state: GameState, uid: string): boolean {
+  return Object.values(state.players).some((p) => {
+    const mon = p.release.monitoring
+    if (mon?.uid === uid) return true
+    return SLOTS.some((slot) => p.release[slot]?.card.uid === uid)
+  })
+}
+
 // Handles the two trigger ids. Neither card ever reaches the drawer's hand —
 // it is revealed the instant it is drawn.
 export function fireTrigger(
@@ -140,6 +147,10 @@ export function fireTrigger(
     eventSeq: log.seq,
   }
   const resolved = resolveAiEvent(drawn, log, player, event, at)
+  // A one-off effect returns its card straight away; one that stays on the
+  // table keeps it, and the card goes home when it leaves (general.md §6.4).
+  // So the events deck genuinely shrinks while such a card is in play.
+  if (standsOnTable(resolved, event.uid)) return { ...resolved, eventSeq: log.seq }
   return {
     ...resolved,
     decks: { ...resolved.decks, events: [...resolved.decks.events, event] },
@@ -214,6 +225,11 @@ export function resolveAiEvent(
     case 'ai-crush-backend':
     case 'ai-crush-database': {
       const slot = event.id.replace('ai-crush-', '') as ReleaseSlot
+      // Crush destroys "соответствующую карту Release". With that slot empty
+      // there is nothing to destroy, so there is nothing to neutralize either —
+      // opening the prompt made a player burn a Debugger, or sacrifice a
+      // different release, against a threat that had no legal target.
+      if (!state.players[player].release[slot]) return { ...state, eventSeq: log.seq }
       const methods = neutralizeOptions(state, player)
       if (methods.length === 0) return destroySlot(state, log, player, slot)
       return { ...state, pending: { kind: 'crush', player, slot, methods }, eventSeq: log.seq }
@@ -238,25 +254,34 @@ export function resolveAiEvent(
       // which `playableFor` always refuses to play standalone. If this card is
       // later bounced to hand by DDoS and thaws, it must read as an ordinary
       // release or it can never be played again.
+      // The event card itself, standing in for the release it grants: its own
+      // uid so it can go home, the plain catalogue id so it reads and plays as
+      // an ordinary Release if DDoS ever bounces it to a hand.
       const placed: CardInstance = {
-        uid: `ai-event-release-${slot}-${player}`,
+        uid: event.uid,
         id: `release-${slot}`,
+        event: event.id,
       }
       log.add({ type: 'released', player, slot, card: placed.id })
-      // This path never goes through `placeRelease`, so it has to ask about the
-      // win itself — a third release arriving by AI event completed a winning
-      // zone and the game carried on regardless.
-      return checkWin(
-        {
-          ...state,
-          players: {
-            ...state.players,
-            [player]: { ...me, release: { ...me.release, [slot]: { card: placed } } },
-          },
-          eventSeq: log.seq,
+      const zoned: GameState = {
+        ...state,
+        players: {
+          ...state.players,
+          [player]: { ...me, release: { ...me.release, [slot]: { card: placed } } },
         },
-        log,
-      )
+        eventSeq: log.seq,
+      }
+      // "Этот релиз можно атаковать" — the window is the engine's only route to
+      // ATTACK, so a release placed without one is permanently safe, which
+      // makes an AI-granted release strictly better than a shipped one.
+      // No Code Review here, by the same rule, so the window is unconditional.
+      //
+      // Win timing mirrors `placeRelease`: a release that faces a window is
+      // settled when the window closes, and only a placement no window can
+      // follow is settled on the spot.
+      const opened = openWindow(zoned, log, { player, slot, card: placed.uid }, 1, at)
+      if (!opened.window) return checkWin(opened, log)
+      return opened
     }
 
     case 'ai-monitoring': {
@@ -266,8 +291,9 @@ export function resolveAiEvent(
       // the event's own `ai-monitoring` id, so the placed card plays and
       // renders as an ordinary Monitoring if it is ever displaced and returns.
       const placed: CardInstance = {
-        uid: `ai-event-monitoring-${player}`,
+        uid: event.uid,
         id: 'protection-monitoring',
+        event: event.id,
       }
       log.add({ type: 'placed', player, card: placed.id })
       return {
@@ -280,27 +306,30 @@ export function resolveAiEvent(
       }
     }
 
-    case 'ai-good-vibe-coding': {
-      let next = state
-      for (let i = 0; i < 2; i += 1) {
-        const pile = next.decks.main[0]
-        if (!pile || pile.length === 0) continue
-        const top = pile[0]
-        const main = next.decks.main.map((p, idx) => (idx === 0 ? p.slice(1) : p))
-        if (rulesFor(top.id)?.kind === 'trigger') {
-          next = fireTrigger({ ...next, decks: { ...next.decks, main } }, log, player, top, at)
-        } else {
-          next = setHand({ ...next, decks: { ...next.decks, main } }, player, [
-            ...next.players[player].hand,
-            top,
-          ])
-        }
-      }
-      return { ...next, eventSeq: log.seq }
-    }
+    case 'ai-good-vibe-coding':
+      // "доберите 2 карты (карты AI/Error 503 срабатывают как при обычном
+      // доборе)" — two cards off the draw pile, one at a time. Handing the
+      // sequence to `drawing` rather than looping here is what makes the
+      // "срабатывают" half true: a trigger drawn first pauses the sequence and
+      // the second card waits, instead of a second trigger overwriting the
+      // single pending slot and erasing the first threat.
+      //
+      // The reducer runs and resumes the sequence; this only declares it.
+      return { ...state, drawing: { player, piles: [0, 0] }, eventSeq: log.seq }
 
     case 'ai-bad-vibe-coding':
-      return { ...state, pending: { kind: 'handLimit', player, excess: 1 }, eventSeq: log.seq }
+      // "сбросьте одну карту из руки" — nothing about the turn. An empty hand
+      // has nothing to give, and the pending would be unanswerable: `[]` never
+      // matches `excess: 1`, and a pending blocks every action for every
+      // player, so the table stalls for good.
+      if (state.players[player].hand.length === 0) return { ...state, eventSeq: log.seq }
+      // Reuses the handLimit pending for its prompt and resolution, but not its
+      // consequence: `endsTurn` false keeps the seat with its owner.
+      return {
+        ...state,
+        pending: { kind: 'handLimit', player, excess: 1, endsTurn: false },
+        eventSeq: log.seq,
+      }
 
     case 'ai-hallucination':
       return endTurn(state, log)

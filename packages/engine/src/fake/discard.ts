@@ -2,7 +2,7 @@ import type { Action } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardInstance, GameState, PlayerId } from '../state'
-import { createLog, type Log, reject } from './core'
+import { bankToDiscard, createLog, type Log, reject } from './core'
 
 // Cherry-pick offers the whole pile; Inside offers only Releases. Everything
 // else about the two effects is identical, which is why they share a pending.
@@ -11,10 +11,7 @@ export function discardOptions(state: GameState, releasesOnly: boolean): CardIns
   return state.decks.discard.filter((c) => rulesFor(c.id)?.kind === 'release')
 }
 
-const discard = (state: GameState, cards: CardInstance[]): GameState => ({
-  ...state,
-  decks: { ...state.decks, discard: [...state.decks.discard, ...cards] },
-})
+const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
 
 // `card` and `combo` have already left the hand by the time this runs. The
 // discard pile is read *before* either of them lands there, which is what

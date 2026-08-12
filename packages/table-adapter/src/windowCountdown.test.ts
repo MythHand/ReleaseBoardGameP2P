@@ -1,4 +1,4 @@
-import type { Action, Event, GameState } from '@release/engine'
+import type { Action, CardInstance, Event, GameState } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { deriveDock, isCounting } from '@release/ui'
 import { describe, expect, it } from 'vitest'
@@ -42,9 +42,19 @@ function openWindowByPlayingARelease(): { state: GameState; owner: string; respo
     state = next
   }
 
-  step({ type: 'DRAW', player: 'p1', at: T0 })
-  const release = state.players.p1.hand.find((c) => c.id.startsWith('release-'))
-  if (!release) throw new Error('the seeded deal dealt p1 no Release to ship')
+  // A Release put in hand rather than drawn for. Relying on the deal made this
+  // hostage to FAKE_DECK: adding a card shifts every seed's shuffle, and the
+  // test would fail for a reason that has nothing to do with countdowns.
+  const release: CardInstance = { uid: 'release-frontend#w', id: 'release-frontend' }
+  state = {
+    ...state,
+    turn: { ...state.turn, player: 'p1', drawnFrom: [0] },
+    players: {
+      ...state.players,
+      p1: { ...state.players.p1, hand: [release, { uid: 'attack-bug#w', id: 'attack-bug' }] },
+      p2: { ...state.players.p2, hand: [{ uid: 'attack-bug#w2', id: 'attack-bug' }] },
+    },
+  }
   step({ type: 'PLAY', player: 'p1', card: release.uid, at: T0 })
 
   // Shipping a Release costs a discard, and the window only opens once it is

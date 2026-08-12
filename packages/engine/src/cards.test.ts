@@ -30,12 +30,10 @@ it('treats every release attack as a supported attack card', () => {
 })
 
 it('omits the deferred cards', () => {
-  for (const id of [
-    'operation-git-branch',
-    'operation-git-merge',
-    'operation-git-rebase',
-    'operation-system-upgrade',
-  ]) {
+  // Git Branch and Git Merge left this list with #61 slice B. Rebase needs
+  // private deck knowledge and System Upgrade a pending owed to several
+  // players at once, so both are still ahead.
+  for (const id of ['operation-git-rebase', 'operation-system-upgrade']) {
     expect(rulesFor(id), id).toBeUndefined()
   }
 })

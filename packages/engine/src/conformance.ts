@@ -357,6 +357,38 @@ function driveProtectedReleaseAndDdos(
   }
 }
 
+// Every card instance the game is holding, wherever it is: hands, zones, piles,
+// discard, and the events deck.
+//
+// Nothing is excluded any more. Under the phantom model a placement was a
+// second representation of a card that was already back in its deck, so it had
+// to be filtered out or the total would climb legitimately. An event card now
+// *is* the card standing on the table (#93, general.md §6.4), counted once
+// wherever it happens to be.
+function realCardUids(state: GameState): string[] {
+  const uids = [
+    ...state.decks.main.flat(),
+    ...state.decks.discard,
+    ...state.decks.events,
+    ...Object.values(state.players).flatMap((p) => [
+      ...p.hand,
+      // The three release slots hold { card, codeReview? }; `monitoring` holds
+      // the instance itself, so it cannot go through the same branch.
+      ...(['frontend', 'backend', 'database'] as const).flatMap((slot) => {
+        const r = p.release[slot]
+        return r ? [r.card, ...(r.codeReview ? [r.codeReview] : [])] : []
+      }),
+      ...(p.release.monitoring ? [p.release.monitoring] : []),
+    ]),
+  ].map((c) => c.uid)
+  // A thrown attack card is in mid-air while a `defend` is owed: out of the
+  // attacker's hand and not yet anywhere else. It is still very much in the
+  // game, so a stream that simply ends while one is open must not read as a
+  // loss — that is a snapshot artefact, not a leaked card.
+  if (state.pending?.kind === 'defend') uids.push(state.pending.attack)
+  return uids.sort()
+}
+
 function drive(engine: Engine, state: GameState, seed: number, steps: number) {
   let current = state
   const events: Event[] = []
@@ -465,6 +497,32 @@ export function describeEngine(
           (e) => e.type === 'discarded' && e.reason === 'handLimit',
         )
         expect(discardedForHandLimit).toBe(true)
+      })
+
+      it('never creates or loses a card across a long stream', () => {
+        // One property covering the whole class: a deck that grows, a hand card
+        // that evaporates, a release destroyed into nowhere. Each of those is
+        // otherwise invisible until counts drift far enough for someone to
+        // notice at the table, and #61's git operations turn the discard into a
+        // draw pile, which is exactly when a stray instance starts circulating.
+        const engine = make()
+        const start = engine.createGame(configFor(options, 55))
+        const before = realCardUids(start)
+        const { state } = drive(engine, start, 23, 300)
+        expect(realCardUids(state)).toEqual(before)
+      })
+
+      it('never lets a card from the events deck reach the discard', () => {
+        // "Карта события никогда не уходит в общий сброс" (general.md §6.4).
+        // The discard is recycled into a draw pile by the refill and by sudo
+        // Git Merge, so an event card that landed there would start circulating
+        // in the main deck.
+        const engine = make()
+        const start = engine.createGame(configFor(options, 55))
+        const { state } = drive(engine, start, 23, 300)
+        const eventIds = new Set(start.decks.events.map((c) => c.uid))
+        expect(state.decks.discard.filter((c) => eventIds.has(c.uid))).toEqual([])
+        expect(state.decks.main.flat().filter((c) => eventIds.has(c.uid))).toEqual([])
       })
 
       it('numbers every committed event uniquely and monotonically', () => {
@@ -688,20 +746,26 @@ export function describeEngine(
       it('respects the release cap in a turn under base, and lifts it under fast', () => {
         // Fuzz-driven under two setups: only the cap itself is at stake here,
         // not any deeper decision chain.
+        //
+        // Seed changed from 6262 when #61 slice B added Git Branch and Git
+        // Merge to FAKE_DECK: a longer deck consumes a different amount of the
+        // shuffle's RNG stream, so every fixed seed lands on a new trajectory
+        // and 6262's fast run no longer happens to ship two releases in one
+        // turn. The cap never broke — its witness stopped occurring.
         const engine = make()
         const fastSetup: Setup = { ...BASE_SETUP, releases: 'fast' }
 
-        let base = engine.createGame(configFor(options, 6262))
+        let base = engine.createGame(configFor(options, 6267))
         for (let n = 0; n < 600; n += 1) {
           expect(base.turn.releasesPlayed).toBeLessThanOrEqual(1)
-          base = engine.reduce(base, fuzzAction(base, 6262, n)).state
+          base = engine.reduce(base, fuzzAction(base, 6267, n)).state
         }
 
-        let fast = engine.createGame(configFor(options, 6262, fastSetup))
+        let fast = engine.createGame(configFor(options, 6267, fastSetup))
         let sawMoreThanOne = false
         for (let n = 0; n < 600; n += 1) {
           if (fast.turn.releasesPlayed > 1) sawMoreThanOne = true
-          fast = engine.reduce(fast, fuzzAction(fast, 6262, n)).state
+          fast = engine.reduce(fast, fuzzAction(fast, 6267, n)).state
         }
         // Without this, a cap that silently still applied under 'fast' would
         // pass the assertion above by never being tested against a run that
@@ -773,11 +837,15 @@ export function describeEngine(
         // so a round-2+ window never appears within budget. This is a seed
         // fragility in the test, not an engine defect — openWindow still
         // unconditionally reopens at round+1 after a successful release-window
-        // defend, and a sweep of nearby seeds against the current deck finds
-        // several (6, 17, 19, 23, 24, ...) that reach the scenario well within
-        // 600 steps.
+        // defend.
+        //
+        // Seed 55 now, not 6: #61 slice B added Git Branch and Git Merge to
+        // FAKE_DECK, which moves the main shuffle the same way adding Inside
+        // moved the events one, and every seed the previous sweep found (6, 17,
+        // 19, 23, 24) stopped reaching a defended release window. Swept again
+        // against the current deck.
         const engine = make()
-        let state = engine.createGame(configFor(options, 6))
+        let state = engine.createGame(configFor(options, 55))
         let sawRound1 = false
         let sawLaterRound = false
         for (let n = 0; n < 600 && !state.over; n += 1) {
@@ -848,8 +916,14 @@ export function describeEngine(
         // (see `attackTarget`) might never happen to land a DDoS on a zone
         // target within any bounded run, leaving the positive half of this
         // property untested.
+        //
+        // Seed changed from 7 when #61 slice B lengthened FAKE_DECK: the same
+        // shuffle shift that moved the two tests above moved this one, and 7 no
+        // longer reaches a protected release inside the budget. The negative
+        // half — no non-DDoS attack ever offered a zone target — held on every
+        // seed swept, which is the half that would signal a real defect.
         const engine = make()
-        const result = driveProtectedReleaseAndDdos(engine, options, 7, 1500)
+        const result = driveProtectedReleaseAndDdos(engine, options, 23, 1500)
         expect(
           result.sawNonDdosZoneTarget,
           'a non-DDoS attack was offered a release or Monitoring target',

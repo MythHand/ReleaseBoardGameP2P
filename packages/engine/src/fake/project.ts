@@ -2,7 +2,7 @@ import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
 import type { PlayerView, ReleasedView, ReleaseView } from '../view'
 import { pendingView } from './attacks'
-import { attackTargets } from './core'
+import { attackTargets, drawObligationMet } from './core'
 import { canAttackWith } from './window'
 
 const releasedView = (r: Released | undefined): ReleasedView | undefined =>
@@ -27,6 +27,9 @@ export function playableFor(state: GameState, viewerId: PlayerId): CardUid[] {
   // pending view instead.
   if (state.pending) return []
   if (state.window) return []
+  // Answer 2: playing from hand is impossible while a draw is in progress. A
+  // paused sequence is still in progress — the pause is owed to a trigger, not
+  // an opening for the drawer to spend on something else.
   if (state.turn.player !== viewerId) return []
   if (state.eliminated.includes(viewerId)) return []
 
@@ -35,7 +38,7 @@ export function playableFor(state: GameState, viewerId: PlayerId): CardUid[] {
 
   return me.hand
     .filter((c) => {
-      if (me.frozen.includes(c.uid)) return false
+      if (me.frozen.includes(c.uid) || me.replayLocked.includes(c.uid)) return false
       const rules = rulesFor(c.id)
       if (!rules) return false
       switch (rules.kind) {
@@ -108,7 +111,9 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
     turn: {
       player: state.turn.player,
       index: state.turn.index,
-      hasDrawn: state.turn.hasDrawn,
+      // The kit asks one question — is a draw still owed — so the answer
+      // crosses as the boolean it always was, not as the raw pile list.
+      hasDrawn: drawObligationMet(state),
     },
     window: state.window && {
       player: state.window.target.player,

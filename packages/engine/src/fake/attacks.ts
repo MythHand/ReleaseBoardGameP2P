@@ -1,18 +1,15 @@
 import type { Action, Choice } from '../actions'
 import { RELEASE_ATTACKS, rulesFor } from '../cards'
 import type { Reduction } from '../engine'
-import type { CardInstance, GameState, Pending, PlayerId, ReleaseSlot } from '../state'
+import type { CardInstance, CardUid, GameState, Pending, PlayerId, ReleaseSlot } from '../state'
 import type { PendingView } from '../view'
-import { createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
+import { bankToDiscard, createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
 import { stealRandom } from './handAttacks'
-import { closeWindow, openWindow, respondersFor } from './window'
+import { canAttackWith, closeWindow, openWindow, respondersFor } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
-const discard = (state: GameState, cards: CardInstance[]): GameState => ({
-  ...state,
-  decks: { ...state.decks, discard: [...state.decks.discard, ...cards] },
-})
+const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
 
 function clearSlot(state: GameState, player: PlayerId, slot: ReleaseSlot): GameState {
   const zone = { ...state.players[player].release }
@@ -24,6 +21,28 @@ function clearSlot(state: GameState, player: PlayerId, slot: ReleaseSlot): GameS
 }
 
 // Destroy a release, or hand it to `stealer` when the attack was a Security Bug.
+// Rollback gives the attack card back, but not the right to use it again this
+// exchange. Only when it actually returns to the attacker: with sudo the
+// defender keeps it, and locking its new owner would invent a rule.
+// Where a reflected attack may land. Code Review makes a release untouchable by
+// bug/out-of-memory/legacy/security-bug "даже с sudo" (resolution.md §4), and a
+// reflected attack is still that attack — so a protected release is no more
+// reachable coming back than it was going out.
+function reflectableSlots(state: GameState, owner: PlayerId): ReleaseSlot[] {
+  return SLOTS.filter((slot) => {
+    const held = state.players[owner].release[slot]
+    return held !== undefined && held.codeReview === undefined
+  })
+}
+
+function lockReplay(state: GameState, player: PlayerId, card: CardUid): GameState {
+  const me = state.players[player]
+  return {
+    ...state,
+    players: { ...state.players, [player]: { ...me, replayLocked: [...me.replayLocked, card] } },
+  }
+}
+
 function takeRelease(
   state: GameState,
   log: Log,
@@ -79,6 +98,13 @@ export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }):
   if (!card) return reject(state, action, 'you do not hold that card')
   if (!RELEASE_ATTACKS.has(card.id))
     return reject(state, action, 'that card cannot attack a release')
+  // The two checks above give the precise reason; this one is the authority.
+  // `canAttackWith` is what the table is offered, so anything it withholds —
+  // a DDoS freeze, Rollback's replay lock — has to bounce here too, or the
+  // rule holds for the offer and leaks through the action.
+  if (!canAttackWith(state, action.player).includes(action.card)) {
+    return reject(state, action, 'that card cannot be thrown into this window')
+  }
 
   // A Sudo rides along as one action and must actually be held.
   let sudo = false
@@ -197,7 +223,8 @@ function onHandDefend(
     // Rollback hands the attack back; sudo Rollback keeps it for the defender.
     const recipient = sudoDefence ? action.player : attacker
     const returned = setHand(next, recipient, [...next.players[recipient].hand, attackCard])
-    return { state: discard(returned, spentDefence), events: log.events }
+    const locked = sudoDefence ? returned : lockReplay(returned, attacker, attackCard.uid)
+    return { state: discard(locked, spentDefence), events: log.events }
   }
 
   if (effect === 'reflect') {
@@ -283,12 +310,28 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
     // Rollback hands the attack back; sudo Rollback keeps it for the defender.
     const recipient = sudoDefence ? action.player : attacker
     next = setHand(next, recipient, [...next.players[recipient].hand, attackCard])
+    if (!sudoDefence) next = lockReplay(next, attacker, attackCard.uid)
     next = discard(next, spentDefence)
   } else if (effect === 'reflect') {
-    // Works on my Machine turns the attack on its author: their own release falls.
+    // Works on my Machine turns the attack on its author — the same effect they
+    // were about to apply, not a generic destruction.
     next = discard(next, [attackCard, ...spentDefence])
-    const victimSlot = SLOTS.find((s) => next.players[attacker].release[s])
-    if (victimSlot) next = takeRelease(next, log, attacker, victimSlot, null)
+    const eligible = reflectableSlots(next, attacker)
+    // The defender chooses ("выбор цели в зоне атакующего делает
+    // защищавшийся"); with one legal slot there is nothing to choose, so an
+    // absent choice is not a refusal. A named slot that is not eligible — empty
+    // or protected — lands nowhere rather than falling through to another.
+    const victimSlot = choice.reflectSlot
+      ? eligible.find((candidate) => candidate === choice.reflectSlot)
+      : eligible.length === 1
+        ? eligible[0]
+        : undefined
+    if (victimSlot) {
+      // Security Bug's own effect is to take, so the reflection takes.
+      // `takeRelease` already discards it when the taker's slot is occupied.
+      const thief = attackCard.id === 'attack-security-bug' ? action.player : null
+      next = takeRelease(next, log, attacker, victimSlot, thief)
+    }
   } else {
     next = discard(next, [attackCard, ...spentDefence])
   }
