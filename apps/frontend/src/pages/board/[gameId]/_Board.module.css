@@ -1,13 +1,18 @@
-.table {
-  position: relative;
-  block-size: 100%;
-  overflow: hidden; /* без скролла — стол по размеру экрана */
-  background:
-    linear-gradient(0deg, var(--surface-0), var(--surface-0)),
-    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
-    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 28px);
-  isolation: isolate; /* own stacking context so the bg layer sits behind content */
-}
+/* The opening's own layers, and nothing else.
+ *
+ * Everything about where this screen's blocks SIT — position, size, z-order,
+ * spacing — comes from the kit's own stylesheet, which `_Board.tsx` imports
+ * directly (`@/table/Table/Table.module.css`). That is deliberate: the board is
+ * a fork of `@release/ui`'s Table, the playground is where this screen is
+ * designed and approved, and a copied stylesheet would let the two pictures
+ * drift a value at a time with nothing to catch it. Sharing the file makes the
+ * geometry one artefact rather than two.
+ *
+ * What lives here is only what the deal intro adds on top: layers that exist to
+ * be animated, and the centre the cards gather in. If a rule here starts
+ * describing where something sits rather than how it arrives, it belongs in the
+ * kit instead.
+ */
 
 /* The HUD background as one layer, so the opening can bring it in whole (the
    hudIn preset drives its opacity) without touching the table's base fill. */
@@ -26,59 +31,13 @@
   opacity: 0;
 }
 
-/* HUD-фон (нейтральный) — слой над базовым фоном, под контентом (z-index: -1).
-   Селектор специфичнее .bg из HudBackground, иначе его position:relative победит
-   по порядку и слой схлопнется в поток. */
-.table .bgLayer {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border: 0;
-  border-radius: 0;
-}
-
-/* ===== независимые блоки ===== */
-.opponents {
-  position: absolute;
-  inset-block-start: 22px;
-  inset-inline-start: 50%;
-  display: flex;
-  flex-wrap: nowrap; /* всегда один ряд сверху */
-  gap: 18px;
-  justify-content: center;
-  max-inline-size: calc(100% - 80px);
-  transform: translateX(-50%);
-}
-
-.decks {
-  position: absolute;
-  inset-block-start: 50%;
-  inset-inline-start: 26px;
-  transform: translateY(-50%);
-}
-
-/* the decks' column lives on an inner node: the block's own transform holds it
-   centred, and the opening shifts this node instead */
+/* The decks' column lives on an inner node: the kit's own `.decks` holds the
+   block centred, and the opening shifts this node instead. Only the stacking
+   is here; the position stays the kit's. */
 .deckStack {
   display: flex;
   flex-direction: column;
   gap: 22px;
-}
-
-.discard {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: 86px; /* слева от полосы кнопок */
-
-  /* centred by the column, NOT by a transform: a transform would make this a
-     stacking context and trap the pile's counter under the cards flying in */
-  display: flex;
-  align-items: center;
-  pointer-events: none;
-}
-
-.discard > * {
-  pointer-events: auto;
 }
 
 /* the centre of the table — a little ABOVE the geometric middle (42%, not 50%):
@@ -112,128 +71,4 @@
 
 .railLayer > * {
   pointer-events: auto;
-}
-
-/* служебный док хода — нижний-левый угол, под колодами, слева от руки */
-.turnDock {
-  position: absolute;
-  inset-block-end: 20px;
-  inset-inline-start: 26px;
-}
-
-/* unpass — take back an earlier pass on the open window; sits just above the
-   dock so it reads as an amendment to the pass you already made there */
-.unpass {
-  position: absolute;
-  inset-block-end: 100%;
-  inset-inline-start: 0;
-  margin-block-end: 8px;
-}
-
-.you {
-  position: absolute;
-  inset-block-end: 16px;
-
-  /* слева — учитываем половину ширины дока (26 + 300/2 + зазор), справа — правый рейл */
-  inset-inline: 196px 56px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: center;
-}
-
-.handWrap {
-  inline-size: 100%;
-}
-
-/* ты выбыл — карты ушли в сброс; бейдж (Badge size="lg") в нижней зоне
-   (где была рука), приподнят от самого низа */
-.youBadge {
-  margin-block-end: 92px;
-}
-
-/* окно переподключения (Reconnect) и завершения (GameOver) — отдельные
-   компоненты поверх стола, см. @/table/Reconnect и @/table/GameOver */
-
-/* рейл (TabRail) и выезжающая панель (Drawer) — примитивы. Стол лишь задаёт
-   зазор: drawer уезжает за рейл (56px) и в открытом виде стоит слева от него. */
-.drawer {
-  --drawer-offset: 56px;
-}
-
-/* контент, который сам по себе длинный (правила) — скроллится внутри drawer */
-.scrollPanel {
-  min-block-size: 0;
-  overflow-y: auto;
-}
-
-/* служебная панель «настройки»: группы контролов. Между группами — крупный
-   отступ и разделитель; внутри группы — поля. Внутренний отступ даёт сам Drawer
-   (padding 20px) — свой не добавляем. */
-.settings {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-/* группа настроек: опц. заголовок + поля (у не-хоста группа одна — без шапки) */
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.groupHead {
-  padding: 0 4px;
-  opacity: 0.6;
-}
-
-/* поле — единый паттерн для всех настроек: метка сверху, контрол, опц. подсказка
-   снизу. Контрол сам управляет своей шириной (слайдер — через .sliderFull). */
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.fieldLabel {
-  padding: 0 4px;
-  color: var(--white-45);
-}
-
-.fieldHint {
-  padding: 0 4px;
-  color: var(--white-30);
-}
-
-/* слайдер лимита зрителей занимает всю ширину поля */
-.sliderFull {
-  inline-size: 100%;
-}
-
-/* разделитель между группами настроек */
-.divider {
-  block-size: 1px;
-  margin: 4px 0;
-  background: var(--white-10);
-}
-
-/* slot positions — app-only chrome supplied by the consumer (`slots.banner` /
-   `slots.corner`), rendered right after the HUD background layer. */
-.banner {
-  position: absolute;
-  inset-block-start: 16px;
-  inset-inline: 0;
-  z-index: 5;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.corner {
-  position: absolute;
-  inset-block-start: 16px;
-  inset-inline-start: 16px;
-  z-index: 5;
 }

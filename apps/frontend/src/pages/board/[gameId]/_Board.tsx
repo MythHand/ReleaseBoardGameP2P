@@ -46,10 +46,17 @@ import {
 } from '@release/ui'
 import type React from 'react'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+// The screen's geometry is the KIT's stylesheet, imported rather than copied:
+// where every block sits, how big it is, what it overlaps. The board is a fork
+// of @release/ui's Table and the playground is where this screen is designed
+// and approved, so a second copy of those values would drift one at a time with
+// nothing to catch it — a type check cannot see a position. `opening` holds only
+// what the deal adds on top.
+import kit from '@/table/Table/Table.module.css'
 import type { BoardProps, Panel } from '~/entities/game/board/types'
 import type { IntroRefs } from '~/features/game-intro/useDealIntro'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
-import styles from './_Board.module.css'
+import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
@@ -89,9 +96,9 @@ const EMPTY_RELEASE: ReleaseSlots = {
 // two groups (general + host controls) and both are titled to tell them apart.
 function SettingsGroup({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <section className={styles.group}>
+    <section className={kit.group}>
       {title && (
-        <Typography as="div" base="tag" tk="tk-10" className={styles.groupHead}>
+        <Typography as="div" base="tag" tk="tk-10" className={kit.groupHead}>
           {title}
         </Typography>
       )}
@@ -113,15 +120,15 @@ function SettingsField({
   children: ReactNode
 }) {
   return (
-    <div className={styles.field}>
+    <div className={kit.field}>
       {label && (
-        <Typography as="div" variant="metaLabel" className={styles.fieldLabel}>
+        <Typography as="div" variant="metaLabel" className={kit.fieldLabel}>
           {label}
         </Typography>
       )}
       {children}
       {hint && (
-        <Typography as="div" base="mono-xs" className={styles.fieldHint}>
+        <Typography as="div" base="mono-xs" className={kit.fieldHint}>
           {hint}
         </Typography>
       )}
@@ -194,7 +201,7 @@ export default function Board({
     onDone: onIntroDone,
   })
   const entering = intro != null && !introOver
-  const enter = entering ? styles.enter : undefined
+  const enter = entering ? opening.enter : undefined
   // While the deal runs the board renders its shadow of the projection. The
   // shadow's last frame IS the projection, so the handover changes nothing on
   // screen — provided nothing here keys off `introPhase`, and nothing does.
@@ -361,20 +368,20 @@ export default function Board({
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-cancel for an in-flight target selection; the accessible affordance is the Escape handler above
-    <div className={styles.table} onClick={handleTableClick} role="presentation">
+    <div className={kit.table} onClick={handleTableClick} role="presentation">
       {/* the table's own ambience — a layer, so the opening can bring it in
           whole without touching the screen's base fill */}
-      <div className={cls(styles.bgWrap, enter)} ref={bgRef}>
-        <HudBackground tone="neutral" className={styles.bgLayer} />
+      <div className={cls(opening.bgWrap, enter)} ref={bgRef}>
+        <HudBackground tone="neutral" className={kit.bgLayer} />
       </div>
       <Arrow from={arrow.from} to={arrow.to} />
 
-      {slots?.banner && <div className={styles.banner}>{slots.banner}</div>}
-      {slots?.corner && <div className={styles.corner}>{slots.corner}</div>}
+      {slots?.banner && <div className={kit.banner}>{slots.banner}</div>}
+      {slots?.corner && <div className={kit.corner}>{slots.corner}</div>}
 
       {/* the seats: each in its own wrapper, so the opening can drop them in one
           after another and the deal can aim a card at the seat it belongs to */}
-      <div className={styles.opponents} ref={seatsRef}>
+      <div className={kit.opponents} ref={seatsRef}>
         {opponents.map((p) => {
           const eliminated = Boolean(p.eliminated)
           const disconnected = disconnectedIds.has(p.id)
@@ -402,8 +409,8 @@ export default function Board({
         })}
       </div>
 
-      <div className={styles.decks}>
-        <div className={cls(styles.deckStack, enter)} ref={decksRef}>
+      <div className={kit.decks}>
+        <div className={cls(opening.deckStack, enter)} ref={decksRef}>
           <Pile
             label={copy.table.deck}
             deck="base"
@@ -424,7 +431,7 @@ export default function Board({
 
       {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними
           «глубина» стопки, счётчик показывает весь сброс */}
-      <div className={styles.discard}>
+      <div className={kit.discard}>
         <div className={enter} ref={discardRef}>
           <Pile
             label={copy.table.discard}
@@ -442,14 +449,14 @@ export default function Board({
           mounted for the whole of an intro-bearing mount (the sequencer aims at
           it from its first layout effect) and is empty the rest of the time. */}
       {intro && (
-        <div className={styles.centre} ref={centreRef}>
+        <div className={opening.centre} ref={centreRef}>
           {deal.staged.map((s) => {
             const data = cardById(s.card)
             if (!data) return null
             return (
               <div
                 key={s.uid}
-                className={styles.stagedCard}
+                className={opening.stagedCard}
                 style={{ transform: restTransform(s.sc) }}
               >
                 <Card card={data} faceDown={s.faceDown} interactive={false} width="100%" />
@@ -459,9 +466,9 @@ export default function Board({
         </div>
       )}
 
-      <div className={styles.you}>
+      <div className={kit.you}>
         {youEliminated ? (
-          <Badge size="lg" className={styles.youBadge}>
+          <Badge size="lg" className={kit.youBadge}>
             {copy.table.youEliminated}
           </Badge>
         ) : (
@@ -477,7 +484,7 @@ export default function Board({
                 targets={gestures.targets}
               />
             </div>
-            <div className={styles.handWrap} ref={handRef}>
+            <div className={kit.handWrap} ref={handRef}>
               <Hand
                 items={you.hand}
                 // the fan opens room for the arriving heap while it travels
@@ -511,7 +518,7 @@ export default function Board({
       </div>
 
       {/* служебный док хода — низ слева, под колодами, слева от руки */}
-      <div className={styles.turnDock}>
+      <div className={kit.turnDock}>
         <div className={enter} ref={dockRef}>
           <TurnDock
             state={dockView.state}
@@ -529,7 +536,7 @@ export default function Board({
         {/* you already passed on the open window — TurnDock has no notion of
             "unpass", so the affordance to take it back lives here instead */}
         {state.window?.passed.includes(state.selfId) && (
-          <Button variant="tech" className={styles.unpass} onClick={() => actions?.onUnpass?.()}>
+          <Button variant="tech" className={kit.unpass} onClick={() => actions?.onUnpass?.()}>
             {copy.window.unpass}
           </Button>
         )}
@@ -552,14 +559,14 @@ export default function Board({
       {/* `inert` while the opening runs: the layer is faded to nothing but its
           buttons would still take a click and a Tab stop, so a player could open
           a drawer they cannot see. */}
-      <div className={cls(styles.railLayer, enter)} ref={railRef} inert={entering}>
+      <div className={cls(opening.railLayer, enter)} ref={railRef} inert={entering}>
         <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
       </div>
 
       {/* выезжающая панель поверх контента (ширина — per-tab) */}
-      <Drawer open={panel !== null} width={drawerWidth} className={styles.drawer}>
+      <Drawer open={panel !== null} width={drawerWidth} className={kit.drawer}>
         {panel === 'settings' && (
-          <div className={styles.settings}>
+          <div className={kit.settings}>
             {hasUpperSettings && (
               <SettingsGroup title={isHost ? copy.table.generalTitle : undefined}>
                 {lang && onLangChange && (
@@ -587,7 +594,7 @@ export default function Board({
             )}
             {hostControls && (
               <>
-                {hasUpperSettings && <div className={styles.divider} />}
+                {hasUpperSettings && <div className={kit.divider} />}
                 <SettingsGroup title={copy.table.hostTitle}>
                   {canLimitSpectators && (
                     <SettingsField label={copy.table.specLimit}>
@@ -598,7 +605,7 @@ export default function Board({
                         onChange={(n) => onSpectatorLimitChange?.(n)}
                         color={specColorFor(spectatorLimit ?? 0)}
                         fill
-                        className={styles.sliderFull}
+                        className={kit.sliderFull}
                       />
                     </SettingsField>
                   )}
@@ -630,7 +637,7 @@ export default function Board({
           />
         )}
         {panel === 'rules' && (
-          <div className={styles.scrollPanel}>
+          <div className={kit.scrollPanel}>
             <Rules copy={copy.rules} />
           </div>
         )}
