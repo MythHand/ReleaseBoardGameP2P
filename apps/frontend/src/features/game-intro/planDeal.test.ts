@@ -95,3 +95,37 @@ it('handles an uneven deal without inventing flights', () => {
 it('is null when the feed carries no deal', () => {
   expect(planDeal(view(), [])).toBeNull()
 })
+
+// The pile the intro counts down from must land exactly on the pile the
+// projection already holds: the intro shows `deckBefore` and takes one off per
+// flight, then the live count takes over. One flight too many or too few and the
+// number visibly jumps at the handover.
+//
+// Written after a false alarm worth recording: the board showed 89 mid-deal and
+// that was read as wrong against a 94-card deck — but the deck had grown to 99
+// cards in the meantime, and 89 was exactly right. The arithmetic is worth
+// pinning precisely because it cannot be checked by eye against a total that
+// moves.
+it('counts down to exactly the pile the projection reports', () => {
+  const v = view()
+  const plan = planDeal(v, feed())
+  if (!plan) throw new Error('expected a plan for an opening projection')
+  const live = v.decks.piles.reduce((sum, n) => sum + n, 0)
+  expect(plan.deckBefore - plan.flights.length).toBe(live)
+})
+
+it('counts down to the live pile on an uneven deal too', () => {
+  const v = view()
+  v.opponents[1].handCount = 3
+  const plan = planDeal(v, [
+    dealt('p1', 5, ['protection-debugger']),
+    dealt('p2', 5),
+    dealt('p3', 3),
+  ])
+  if (!plan) throw new Error('expected a plan for an opening projection')
+  const live = v.decks.piles.reduce((sum, n) => sum + n, 0)
+  // 13 dealt, 13 flights: a seat dealt fewer cards must not leave the counter
+  // short, and must not invent a flight to make the sum work either.
+  expect(plan.flights).toHaveLength(13)
+  expect(plan.deckBefore - plan.flights.length).toBe(live)
+})
