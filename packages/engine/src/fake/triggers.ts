@@ -100,6 +100,16 @@ function destroySlot(
   }
 }
 
+// Whether an instance is standing in someone's zone right now — the test for
+// "did this event's effect keep the card on the table".
+function standsOnTable(state: GameState, uid: string): boolean {
+  return Object.values(state.players).some((p) => {
+    const mon = p.release.monitoring
+    if (mon?.uid === uid) return true
+    return SLOTS.some((slot) => p.release[slot]?.card.uid === uid)
+  })
+}
+
 // Handles the two trigger ids. Neither card ever reaches the drawer's hand —
 // it is revealed the instant it is drawn.
 export function fireTrigger(
@@ -137,6 +147,10 @@ export function fireTrigger(
     eventSeq: log.seq,
   }
   const resolved = resolveAiEvent(drawn, log, player, event, at)
+  // A one-off effect returns its card straight away; one that stays on the
+  // table keeps it, and the card goes home when it leaves (general.md §6.4).
+  // So the events deck genuinely shrinks while such a card is in play.
+  if (standsOnTable(resolved, event.uid)) return { ...resolved, eventSeq: log.seq }
   return {
     ...resolved,
     decks: { ...resolved.decks, events: [...resolved.decks.events, event] },
@@ -240,9 +254,13 @@ export function resolveAiEvent(
       // which `playableFor` always refuses to play standalone. If this card is
       // later bounced to hand by DDoS and thaws, it must read as an ordinary
       // release or it can never be played again.
+      // The event card itself, standing in for the release it grants: its own
+      // uid so it can go home, the plain catalogue id so it reads and plays as
+      // an ordinary Release if DDoS ever bounces it to a hand.
       const placed: CardInstance = {
-        uid: `ai-event-release-${slot}-${player}`,
+        uid: event.uid,
         id: `release-${slot}`,
+        event: event.id,
       }
       log.add({ type: 'released', player, slot, card: placed.id })
       const zoned: GameState = {
@@ -273,8 +291,9 @@ export function resolveAiEvent(
       // the event's own `ai-monitoring` id, so the placed card plays and
       // renders as an ordinary Monitoring if it is ever displaced and returns.
       const placed: CardInstance = {
-        uid: `ai-event-monitoring-${player}`,
+        uid: event.uid,
         id: 'protection-monitoring',
+        event: event.id,
       }
       log.add({ type: 'placed', player, card: placed.id })
       return {

@@ -15,6 +15,12 @@ export type Setup = Record<string, string>
 export interface CardInstance {
   uid: CardUid
   id: CardId
+  // Set when this instance *is* a card from the events deck, standing on the
+  // table. `id` is the plain catalogue card it stands in for, so it reads and
+  // plays as an ordinary Monitoring or Release; `event` is the id it goes back
+  // to the events deck as when it leaves the table (general.md §6.4). While it
+  // stands there the events deck genuinely holds one card fewer.
+  event?: CardId
 }
 
 export interface Released {

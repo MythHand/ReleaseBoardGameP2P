@@ -141,25 +141,29 @@ export function checkWin(state: GameState, log: Log): GameState {
   return { ...state, eventSeq: log.seq }
 }
 
-// A phantom stands in for an AI event card that has already gone back to the AI
-// deck: `ai-monitoring` and `ai-release-*` mint a fresh instance to hold the
-// board while the real card leaves. One physical card, two representations, on
-// purpose — but only for as long as the phantom is on the board.
+// A card from the events deck never reaches the common discard (general.md
+// §6.4). While `ai-monitoring` or an `ai-release-*` stands on the table it is
+// out of its deck; when it leaves — destroyed, sacrificed, or carried off with
+// an eliminated owner — it goes back there, as the event card it is rather than
+// the plain one it was standing in for.
 //
-// So a phantom that leaves the board evaporates rather than being banked. Let
-// one into the discard and it stops being a representation and becomes a second
-// physical card, which #61's sudo Git Branch then shuffles into a draw pile.
-export const isPhantom = (card: CardInstance): boolean => card.uid.startsWith('ai-event-')
-
-// The one way a card enters the discard, so the phantom rule cannot be missed
-// by a caller that banks cards its own way.
-export const bankToDiscard = (state: GameState, cards: CardInstance[]): GameState => ({
-  ...state,
-  decks: {
-    ...state.decks,
-    discard: [...state.decks.discard, ...cards.filter((c) => !isPhantom(c))],
-  },
-})
+// Routed here because this is the one way a card enters the discard, so no
+// caller banking cards its own way can miss the rule.
+export const bankToDiscard = (state: GameState, cards: CardInstance[]): GameState => {
+  const toDiscard = cards.filter((c) => c.event === undefined)
+  const goingHome = cards.filter((c) => c.event !== undefined)
+  return {
+    ...state,
+    decks: {
+      ...state.decks,
+      discard: [...state.decks.discard, ...toDiscard],
+      events: [
+        ...state.decks.events,
+        ...goingHome.map((c) => ({ uid: c.uid, id: c.event as CardId })),
+      ],
+    },
+  }
+}
 
 // Whether the turn's draw obligation is discharged. Base owes every pile that
 // has cards in it; Strategic owes one card from a pile of the player's choosing

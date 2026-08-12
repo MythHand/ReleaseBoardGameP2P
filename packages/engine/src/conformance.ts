@@ -357,16 +357,14 @@ function driveProtectedReleaseAndDdos(
   }
 }
 
-// Every card instance the game is holding, wherever it is. The AI events deck
-// counts: `fireTrigger` returns an event card to it, so a card that left it and
-// never came back is a leak like any other.
+// Every card instance the game is holding, wherever it is: hands, zones, piles,
+// discard, and the events deck.
 //
-// `ai-event-` uids are excluded on purpose. Those are phantoms — `ai-monitoring`
-// and `ai-release-*` mint a fresh instance to stand on the board while the event
-// card itself goes back to the AI deck, so one physical card is represented
-// twice on purpose. Counting them would make the total climb legitimately and
-// the invariant would say nothing; `phantomsStayOffTheDeck` below is what keeps
-// them honest instead.
+// Nothing is excluded any more. Under the phantom model a placement was a
+// second representation of a card that was already back in its deck, so it had
+// to be filtered out or the total would climb legitimately. An event card now
+// *is* the card standing on the table (#93, general.md §6.4), counted once
+// wherever it happens to be.
 function realCardUids(state: GameState): string[] {
   const uids = [
     ...state.decks.main.flat(),
@@ -388,7 +386,7 @@ function realCardUids(state: GameState): string[] {
   // game, so a stream that simply ends while one is open must not read as a
   // loss — that is a snapshot artefact, not a leaked card.
   if (state.pending?.kind === 'defend') uids.push(state.pending.attack)
-  return uids.filter((uid) => !uid.startsWith('ai-event-')).sort()
+  return uids.sort()
 }
 
 function drive(engine: Engine, state: GameState, seed: number, steps: number) {
@@ -514,15 +512,17 @@ export function describeEngine(
         expect(realCardUids(state)).toEqual(before)
       })
 
-      it('keeps a phantom AI placement off the deck and out of the discard', () => {
-        // A phantom stands in for an event card that is already back in the AI
-        // deck. If one reaches the discard it becomes a real extra copy the
-        // moment the discard is recycled into a draw pile.
+      it('never lets a card from the events deck reach the discard', () => {
+        // "Карта события никогда не уходит в общий сброс" (general.md §6.4).
+        // The discard is recycled into a draw pile by the refill and by sudo
+        // Git Merge, so an event card that landed there would start circulating
+        // in the main deck.
         const engine = make()
         const start = engine.createGame(configFor(options, 55))
         const { state } = drive(engine, start, 23, 300)
-        const loose = [...state.decks.main.flat(), ...state.decks.discard, ...state.decks.events]
-        expect(loose.filter((c) => c.uid.startsWith('ai-event-'))).toEqual([])
+        const eventIds = new Set(start.decks.events.map((c) => c.uid))
+        expect(state.decks.discard.filter((c) => eventIds.has(c.uid))).toEqual([])
+        expect(state.decks.main.flat().filter((c) => eventIds.has(c.uid))).toEqual([])
       })
 
       it('numbers every committed event uniquely and monotonically', () => {

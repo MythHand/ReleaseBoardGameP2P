@@ -116,9 +116,21 @@ it('reveals an AI trigger together with the event it pulls', () => {
   const revealed = r.events.find((e) => e.type === 'aiRevealed')
   expect(revealed).toBeDefined()
   expect(revealed?.visibleTo).toBeUndefined()
-  // The trigger goes to the discard; the event card returns to its own deck.
+  // The trigger goes to the discard; the event card belongs to its own deck.
   expect(r.state.decks.discard.map((c) => c.uid)).toContain(ai.uid)
-  expect(r.state.decks.events).toHaveLength(FAKE_EVENTS.reduce((n, e) => n + e.qty, 0))
+  // "общее число её карт в игре — 21: каждая либо в колоде, либо на столе"
+  // (general.md §6.4). A one-off effect is back in the deck already; one that
+  // stays on the table is counted where it stands, so the total is the
+  // assertion and the deck's own length is not.
+  const onTable = Object.values(r.state.players).flatMap((p) => [
+    ...(p.release.monitoring?.event ? [p.release.monitoring] : []),
+    ...(['frontend', 'backend', 'database'] as const).flatMap((slot) =>
+      p.release[slot]?.card.event ? [p.release[slot]?.card] : [],
+    ),
+  ])
+  expect(r.state.decks.events.length + onTable.length).toBe(
+    FAKE_EVENTS.reduce((n, e) => n + e.qty, 0),
+  )
 })
 
 // --- Review findings: discarded events on every trigger-caused discard ---
