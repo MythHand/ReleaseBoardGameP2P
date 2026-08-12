@@ -1,9 +1,13 @@
 import type { Event, PlayerView } from '@release/engine'
-import type { CardData, HandItem, Rect, Scatter } from '@release/ui'
+import type { CardData, HandItem } from '@release/ui'
 // CARD_W is the fan's own width, taken from the kit rather than restated here:
 // the sibling arrival step already imports it, and a second copy would let the
 // deal's geometry drift from the hand it deals into.
-import { CARD_W, cardBoxIn, cardById, play, scatterAt, wait } from '@release/ui'
+import { CARD_W, cardBoxIn, cardById } from '@release/ui'
+// The movement itself comes from the animation layer, which is a separate entry
+// from the components: a vocabulary and its steps, not a thing to render.
+import type { Rect, Scatter } from '@release/ui/animations'
+import { play, scatterAt, useFlyer, useHandArrival, wait } from '@release/ui/animations'
 import type { ReactNode, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { BoardState } from '~/entities/game/board'
@@ -11,8 +15,6 @@ import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { isOpening } from './isOpening'
 import type { DealPlan } from './planDeal'
 import { planDeal } from './planDeal'
-import { useFlyer } from './useFlyer'
-import { useHandArrival } from './useHandArrival'
 
 // The opening of a match, replayed. The engine dealt before any peer mounted
 // the board, so this reconstructs the pre-deal table and plays forward to the

@@ -1,5 +1,6 @@
 import type React from 'react'
 import { type CSSProperties, useRef, useState } from 'react'
+import { useHandArrival } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
@@ -11,7 +12,6 @@ import TechBar from '../controls/TechBar'
 import { TechButton } from '../controls/TechControls'
 import styles from './PickOpponentCardStory.module.css'
 import { reorderHand } from './reorderHand'
-import { useHandArrival } from './useHandArrival'
 
 // "Take a random card from the opponent's hand" — as if the player across the
 // table extends a fan face-down for you to choose from. The opponent hand (the

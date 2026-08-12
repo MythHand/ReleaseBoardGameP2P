@@ -3,6 +3,7 @@
   "compilerOptions": {
     "types": ["vite/client", "vitest/globals"],
     "paths": {
+      "@release/ui/animations": ["../ui/src/animations/index.ts"],
       "@release/ui": ["../ui/src/index.ts"],
       "@release/engine": ["../../packages/engine/src/index.ts"],
       "@release/engine/fake": ["../../packages/engine/src/fake/index.ts"],

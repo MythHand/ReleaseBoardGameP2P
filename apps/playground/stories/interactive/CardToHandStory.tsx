@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useHandArrival } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
@@ -9,7 +10,6 @@ import TechBar from '../controls/TechBar'
 import { TechButton } from '../controls/TechControls'
 import styles from './CardToHandStory.module.css'
 import { reorderHand } from './reorderHand'
-import { useHandArrival } from './useHandArrival'
 
 // Showcase of the "cards arrive in the hand" step (useHandArrival) — the ONE
 // movement every arrival uses, whatever brings the card: a draw, a card taken from

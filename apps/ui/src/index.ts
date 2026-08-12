@@ -1,17 +1,13 @@
 // Data + logic
-
-export {
-  HEAP_SHOW,
-  nextFrames,
-  PRESETS,
-  play,
-  presetNames,
-  type Rect,
-  restTransform,
-  type Scatter,
-  scatterAt,
-  wait,
-} from './animations'
+//
+// The animation layer is NOT re-exported here. It is a vocabulary and its steps
+// — how a thing moves — rather than a thing to render, so it has its own entry:
+//
+//   import { play, useFlyer } from '@release/ui/animations'
+//
+// Keeping it out of this barrel is what makes that a real boundary rather than
+// a naming convention: a component cannot drift into the animation layer by
+// autocomplete, and the layer's own dependencies stay visible.
 export {
   default as PresetAvatar,
   PRESET_AVATARS,

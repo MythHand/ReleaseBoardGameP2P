@@ -1,5 +1,6 @@
 import type { InputProps } from '@release/ui'
-import { Input, play } from '@release/ui'
+import { Input } from '@release/ui'
+import { play } from '@release/ui/animations'
 import type { FormHTMLAttributes } from 'react'
 import { createContext, useContext, useState } from 'react'
 

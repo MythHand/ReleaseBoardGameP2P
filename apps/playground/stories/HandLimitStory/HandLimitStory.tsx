@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { play, type Scatter, wait } from '@/animations'
+import { play, type Scatter, useFlyer, useHandArrival, wait } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
@@ -15,8 +15,6 @@ import TechBar from '../controls/TechBar'
 import { TechButton } from '../controls/TechControls'
 import { reorderHand } from '../interactive/reorderHand'
 import { useDiscardExit } from '../interactive/useDiscardExit'
-import { useFlyer } from '../interactive/useFlyer'
-import { useHandArrival } from '../interactive/useHandArrival'
 import styles from './HandLimitStory.module.css'
 
 // Hand limit — discarding down to the end-of-turn hand limit (the `handLimit`

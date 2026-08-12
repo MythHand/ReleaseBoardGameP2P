@@ -1,11 +1,11 @@
-import type { CardData as CardType } from '@release/ui'
-import { CARD_W, Card, cardBoxIn, nextFrames, type Rect, slotPlacement, wait } from '@release/ui'
 import type { RefObject } from 'react'
 import { useRef, useState } from 'react'
+import type { Card as CardType } from '@/cards/types'
+import Card, { cardBoxIn } from '@/primitives/Card'
+import { CARD_W, insertPath, slotPlacement } from '@/table/Hand/fan'
+import type { Rect } from './scatter'
+import { nextFrames, wait } from './timing'
 import styles from './useHandArrival.module.css'
-
-// Ported from apps/playground/stories/interactive/useHandArrival.tsx (#89). The
-// playground keeps its copy: it is layout-only and owns no logic of ours.
 
 // THE step "cards arrive in the hand" — one movement, any number of cards.
 //
@@ -16,22 +16,34 @@ import styles from './useHandArrival.module.css'
 // take several at once, neither could take a card that is already on screen.
 //
 // The rule it holds:
-//   • they land in the MIDDLE of the fan, however many there are. That is where
-//     every card arrives, so a draw and an undo read as the same event.
+//   • they land in the MIDDLE of the fan by default, however many there are. That
+//     is where every card ARRIVES — a draw comes from the deck and has no place of
+//     its own, so the middle is the honest answer and a draw and an undo read as
+//     the same event. A scene may name the slot instead (`at`), and exactly one
+//     thing earns that: the player POINTED at a place. Dragging a card back off
+//     the table into the fan is a placement, not an arrival, and putting it in the
+//     middle would ignore what the hand just said.
 //   • the fan opens room for ALL of them WHILE they travel, so they land in ready
 //     space instead of shoving their neighbours aside on arrival.
 //   • each card aims at the slot it will occupy and lands on that slot's bottom-centre
 //     pivot — the fan's own pivot, so tilt and scale match instead of drifting.
 //   • a card resting at a tilt is picked up from where it LOOKS like it is: the pivot
 //     difference is compensated, or the first frame jumps before anything moves.
-//   • it passes OVER the fan and tucks UNDER it at the end — a card goes into the
+//   • it enters the fan by the FAN'S OWN RULE (`insertPath`): round from the left,
+//     along one curve, changing layer partway. Being inserted between two cards is
+//     the same thing whether the card was drawn from the deck or carried back off
+//     the table by hand, so it is the same movement — the shape belongs to the fan,
+//     the clock belongs here.
+//   • it passes OVER the fan and tucks UNDER it partway — a card goes into the
 //     hand, not onto it.
 //   • a card that is already drawn on screen is not copied: the step measures it and
 //     takes it off screen for the flight. It does NOT put it back — the card is in
 //     the hand now; what happens to the empty source is the scene's business.
 
 const START_HIGH_MS = 140 // how long the travel layer is held before tucking under the fan
-const FLIGHT_MS = 480 // = the transition in .arriving
+const FLIGHT_MS = 480
+// = --ease-soft. The animation takes a value, not a custom property.
+const FLIGHT_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
 
 // A card on its way in. Where it starts is given in one of three ways:
 //   `from`          — it stands at this rect (+ `rot` if it rests at a tilt)
@@ -64,7 +76,9 @@ interface Flight {
   card: CardType
   faceDown: boolean
   at: { left: number; top: number; width: number; rot: number }
-  to: string
+  // the whole flight, as the positions the fan handed over (insertPath) turned
+  // into poses — translate along the path, turning and resizing as it goes
+  frames: Keyframe[]
   z: number // the slot's layer, taken once it has tucked under the fan
 }
 
@@ -77,16 +91,15 @@ export function useHandArrival(
   onLanded: (gap: number, landed: Landed[]) => void,
 ) {
   const [flights, setFlights] = useState<Flight[]>([])
-  const [started, setStarted] = useState(false)
   const [tucked, setTucked] = useState(false)
   const [gapAt, setGapAt] = useState<number | null>(null)
   const size = useRef(1)
   const timer = useRef<number | null>(null)
+  const nodes = useRef(new Map<string, HTMLDivElement>())
 
   const reset = () => {
     if (timer.current) window.clearTimeout(timer.current)
     setFlights([])
-    setStarted(false)
     setTucked(false)
     setGapAt(null)
   }
@@ -106,14 +119,15 @@ export function useHandArrival(
     return it.from ? { box: it.from, rot: it.rot ?? 0 } : undefined
   }
 
-  // send any number of cards into a hand of `handLength` cards
-  const arrive = async (items: Arriving[], handLength: number) => {
+  // send any number of cards into a hand of `handLength` cards. `at` names the
+  // slot they open at; without it, the middle.
+  const arrive = async (items: Arriving[], handLength: number, at?: number) => {
     const hr = handRef.current?.getBoundingClientRect()
     if (items.length === 0 || !hr || flights.length > 0) return
-    const gap = Math.round(handLength / 2) // the middle of the fan — the one landing
+    const gap = at == null ? Math.round(handLength / 2) : Math.max(0, Math.min(handLength, at))
     const total = handLength + items.length
     const list = items
-      .map((it, i) => {
+      .map((it, i): Flight | null => {
         const src = boxOf(it)
         if (!src) return null
         // the flight pivots on the slot's bottom centre, a tilted card rests on its
@@ -123,14 +137,27 @@ export function useHandArrival(
         const left = src.box.left - (a === 0 ? 0 : (src.box.height / 2) * Math.sin(a))
         const top = src.box.top - (a === 0 ? 0 : (src.box.height / 2) * (1 - Math.cos(a)))
         const place = slotPlacement(gap + i, total)
-        const dx = hr.left + hr.width / 2 + place.x - (left + src.box.width / 2)
-        const dy = hr.bottom + place.y - (top + src.box.height)
+        // both points are the card's bottom centre — the pivot the flight turns
+        // and scales about, and the point the slot's own placement is given for
+        const fromPt = { x: left + src.box.width / 2, y: top + src.box.height }
+        const toPt = { x: hr.left + hr.width / 2 + place.x, y: hr.bottom + place.y }
+        const path = insertPath(fromPt, toPt, gap + i, total)
+        const lastStep = path.length - 1
+        const scale = CARD_W / src.box.width
         return {
           key: it.key,
           card: it.card,
           faceDown: it.faceDown ?? false,
           at: { left, top, width: src.box.width, rot: src.rot },
-          to: `translate(${dx}px, ${dy}px) rotate(${place.rotate}deg) scale(${CARD_W / src.box.width})`,
+          frames: path.map((p, k) => {
+            const t = k / lastStep
+            return {
+              transform:
+                `translate(${p.x - fromPt.x}px, ${p.y - fromPt.y}px) ` +
+                `rotate(${src.rot + (place.rotate - src.rot) * t}deg) ` +
+                `scale(${1 + (scale - 1) * t})`,
+            }
+          }),
           z: place.z,
         }
       })
@@ -142,10 +169,13 @@ export function useHandArrival(
     size.current = list.length
     setFlights(list)
     setGapAt(gap) // the fan starts opening NOW, while the cards travel
-    setStarted(false)
     setTucked(false)
     await nextFrames() // I2 — let the flyers paint at their source before moving
-    setStarted(true)
+    for (const f of list) {
+      nodes.current
+        .get(f.key)
+        ?.animate(f.frames, { duration: FLIGHT_MS, easing: FLIGHT_EASE, fill: 'forwards' })
+    }
     timer.current = window.setTimeout(() => setTucked(true), START_HIGH_MS)
     await wait(FLIGHT_MS)
     // they land in the slots the gap was holding: closing it and adding the cards is
@@ -160,6 +190,11 @@ export function useHandArrival(
   const overlay = flights.map((f) => (
     <div
       key={f.key}
+      ref={(el) => {
+        // the flight is played ON the node, so the step has to hold it
+        if (el) nodes.current.set(f.key, el)
+        else nodes.current.delete(f.key)
+      }}
       className={styles.arriving}
       style={{
         left: f.at.left,
@@ -167,7 +202,8 @@ export function useHandArrival(
         inlineSize: f.at.width,
         // over the fan while it travels, the slot's own layer once it tucks under it
         zIndex: tucked ? f.z : 'var(--z-flight)',
-        transform: started ? f.to : `rotate(${f.at.rot}deg)`,
+        // the pose it stands in until the flight takes over (I2)
+        transform: `rotate(${f.at.rot}deg)`,
       }}
     >
       <Card card={f.card} faceDown={f.faceDown} width={f.at.width} interactive={false} />

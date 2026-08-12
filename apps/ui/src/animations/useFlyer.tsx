@@ -1,11 +1,10 @@
-import type { CardData as CardType } from '@release/ui'
-import { Card, nextFrames, type Rect, wait } from '@release/ui'
 import type { ReactNode } from 'react'
 import { useCallback, useRef, useState } from 'react'
+import type { Card as CardType } from '@/cards/types'
+import Card from '@/primitives/Card'
+import type { Rect } from './scatter'
+import { nextFrames, wait } from './timing'
 import styles from './useFlyer.module.css'
-
-// Ported from apps/playground/stories/interactive/useFlyer.tsx (#89). The
-// playground keeps its copy: it is layout-only and owns no logic of ours.
 
 // THE carrier of a card in the air — the half of a flight that is NOT the rule.
 //

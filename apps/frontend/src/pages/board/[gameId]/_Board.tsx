@@ -20,7 +20,6 @@ import {
   GameOver,
   GearIcon,
   Hand,
-  HEAP_SHOW,
   HudBackground,
   LangSwitcher,
   LobbyCode,
@@ -33,7 +32,6 @@ import {
   type ReleaseSlots,
   ReleaseZone,
   Rules,
-  restTransform,
   Seat,
   Slider,
   type TableActions,
@@ -44,6 +42,7 @@ import {
   Typography,
   useArrow,
 } from '@release/ui'
+import { HEAP_SHOW, restTransform } from '@release/ui/animations'
 import type React from 'react'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:

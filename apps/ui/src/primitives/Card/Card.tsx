@@ -1,6 +1,10 @@
 import type { CSSProperties } from 'react'
 import { useEffect, useRef } from 'react'
-import { play } from '@/animations'
+// The leaf module, not the barrel: the barrel also carries the flight steps,
+// and those render a Card. Importing it here would close a cycle
+// (animations → useFlyer → Card → animations). The vocabulary is a leaf that
+// components may use; the steps sit above components and compose them.
+import { play } from '@/animations/play'
 import { CATEGORIES } from '@/cards'
 import { useCardMotion } from '@/cards/cardMotion'
 import type { Card as CardType } from '@/cards/types'

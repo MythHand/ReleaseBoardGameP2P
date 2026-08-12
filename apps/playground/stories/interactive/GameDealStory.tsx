@@ -1,7 +1,16 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useEffect, useRef, useState } from 'react'
-import { play, type Rect, restTransform, type Scatter, scatterAt, wait } from '@/animations'
+import {
+  play,
+  type Rect,
+  restTransform,
+  type Scatter,
+  scatterAt,
+  useFlyer,
+  useHandArrival,
+  wait,
+} from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardBoxIn } from '@/primitives/Card'
@@ -19,8 +28,6 @@ import HoverSelect from '../controls/HoverSelect'
 import TechBar from '../controls/TechBar'
 import { TechButton, TechField, TechLabel } from '../controls/TechControls'
 import styles from './GameDealStory.module.css'
-import { useFlyer } from './useFlyer'
-import { useHandArrival } from './useHandArrival'
 
 // The opening of a match — the first thing a player ever sees at this table.
 // It is the move from the lobby INTO the game.

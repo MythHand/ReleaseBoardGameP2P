@@ -34,6 +34,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: [
+      // The animation layer is its own entry: a vocabulary and its steps, not
+      // a component. Must precede the bare '@release/ui' find — these are matched
+      // in order, and the shorter one would swallow the subpath.
+      { find: '@release/ui/animations', replacement: `${uiSrc}/animations/index.ts` },
       { find: '@release/ui/global.css', replacement: `${uiSrc}/design/global.css` },
       { find: '@release/ui/tokens.css', replacement: `${uiSrc}/design/tokens.css` },
       { find: '@release/ui', replacement: `${uiSrc}/index.ts` },
