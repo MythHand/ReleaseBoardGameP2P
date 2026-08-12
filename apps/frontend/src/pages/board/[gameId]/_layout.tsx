@@ -97,7 +97,14 @@ export default function BoardPage() {
         // reports this seat to the host's start gate: until every seat has
         // reported (or the cap fires), no peer's action may reach the engine.
         intro={
-          seated ? { view: game.view, events: game.events, onDone: session.introReady } : undefined
+          seated
+            ? {
+                gameId: session.gameId,
+                view: game.view,
+                events: game.events,
+                onDone: session.introReady,
+              }
+            : undefined
         }
         room={{
           role: session.isHost ? 'host' : 'guest',

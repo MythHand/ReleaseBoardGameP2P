@@ -77,6 +77,10 @@ export function createGame(config: GameConfig): GameState {
       release: {},
       frozen: [],
       replayLocked: [],
+      // Only the reserved Debugger is dealt openly. A seat that got none — an
+      // under-supplied deck — has nothing face up, even if a surplus Debugger
+      // happened to come off `rest` into this hand.
+      openedAtDeal: dbg ? [dbg.uid] : [],
     }
   }
 
@@ -125,11 +129,16 @@ export function createGame(config: GameConfig): GameState {
 // counting from there, so the two feeds are disjoint and mergeable.
 export function setupEvents(state: GameState): Event[] {
   return state.seating.map((id, n) => {
-    const hand = state.players[id].hand
-    // The reserved opening Debugger is dealt first (see createGame above), so a
-    // face-up card can only ever be hand[0]. A player who got none — an
-    // under-supplied deck — has nothing open.
-    const open = hand[0]?.id === 'protection-debugger' ? [hand[0].id] : undefined
+    const { hand, openedAtDeal } = state.players[id]
+    // Read from what was actually dealt openly, never inferred from the hand's
+    // contents: with fewer Debuggers in the deck than players, a seat gets five
+    // random cards and a surplus Debugger can land first among them. Asking "is
+    // hand[0] a Debugger?" would then announce a closed card to the whole table
+    // as face up — the intro would show everyone a card it must not.
+    const openCards = openedAtDeal
+      .map((uid) => hand.find((c) => c.uid === uid)?.id)
+      .filter((cardId): cardId is CardId => cardId !== undefined)
+    const open = openCards.length > 0 ? openCards : undefined
     return {
       id: n + 1,
       type: 'dealt' as const,

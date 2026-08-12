@@ -72,8 +72,11 @@ export function makeBoardProps(over: Partial<BoardProps> = {}): BoardProps {
 // the deal events that produced it. Same shapes as the sequencer's own suite
 // (features/game-intro/__tests__/useDealIntro.test.tsx) — minimal but real, no
 // casts, so drift in PlayerView / Event is a compile error here too.
-export function introFixture(): { view: PlayerView; events: Event[] } {
+export function introFixture(): { gameId: string; view: PlayerView; events: Event[] } {
   return {
+    // The opening plays once per game, so the intro is keyed by the match id
+    // rather than by anything on the projection.
+    gameId: 'g1',
     view: {
       self: {
         id: 'p1',

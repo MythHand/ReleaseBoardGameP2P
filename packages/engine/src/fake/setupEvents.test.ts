@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { DeckEntry, GameConfig } from '../engine'
 import { FAKE_DECK, FAKE_EVENTS } from './index'
 import { createGame, setupEvents } from './setup'
@@ -88,4 +88,48 @@ it('leaves a seat closed when the deck ran short of Debuggers to reserve', () =>
   // The seat the reservation could not reach: open is undefined, not [].
   expect(events[2]).toMatchObject({ type: 'dealt', player: 'p3' })
   expect((events[2] as { open?: unknown }).open).toBeUndefined()
+})
+
+// `open` is read from what the deal recorded as face up, not from what the hand
+// happens to contain. Worth stating why that is a structural choice rather than
+// a bug fix: the two readings cannot currently disagree.
+//
+// `createGame` scans every shuffled card and reserves Debuggers up to
+// `players.length`. So either the deck had enough — every seat gets a reserved
+// one, and the surplus sits in the draw pile behind seats that all have theirs —
+// or it did not, in which case the reservation swallowed every Debugger there
+// was and the pile holds none to deal closed. A seat with no reserved Debugger
+// therefore cannot receive one, and "is hand[0] a Debugger?" answers the same as
+// "was a Debugger dealt to this seat face up?".
+//
+// The identity read was correct, but only via an argument spanning two functions
+// and a cap. Reading the record keeps it true locally, and these tests pin the
+// invariant so that a change to the reservation cannot quietly break it.
+describe('open names what was dealt openly, not what the hand holds', () => {
+  it('agrees with the deal record, seat by seat', () => {
+    const state = createGame({ ...config(4), deck: FAKE_DECK })
+    for (const e of setupEvents(state)) {
+      if (e.type !== 'dealt') continue
+      const player = state.players[e.player]
+      expect((e.open ?? []).length).toBe(player.openedAtDeal.length)
+      for (const id of e.open ?? []) {
+        expect(player.openedAtDeal.some((uid) => uid.startsWith(`${id}#`))).toBe(true)
+      }
+    }
+  })
+
+  it('holds the invariant the identity read leaned on: a short deck leaves no Debugger to deal', () => {
+    // Two Debuggers, three players. p3 gets no reserved one — and the draw pile
+    // must hold none either, or a closed Debugger could reach p3 and the two
+    // readings would part company.
+    const state = createGame({
+      ...config(3),
+      deck: [
+        { id: 'protection-debugger', qty: 2 },
+        { id: 'attack-bug', qty: 20 },
+      ],
+    })
+    expect(state.players.p3.openedAtDeal).toEqual([])
+    expect(state.decks.main.flat().some((c) => c.id === 'protection-debugger')).toBe(false)
+  })
 })

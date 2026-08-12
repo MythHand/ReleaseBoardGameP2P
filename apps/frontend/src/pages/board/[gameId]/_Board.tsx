@@ -187,6 +187,7 @@ export default function Board({
   }, [intro?.onDone])
   const deal = useDealIntro({
     live,
+    gameId: intro?.gameId ?? null,
     view: intro?.view ?? null,
     events: intro?.events ?? [],
     refs: introRefs,

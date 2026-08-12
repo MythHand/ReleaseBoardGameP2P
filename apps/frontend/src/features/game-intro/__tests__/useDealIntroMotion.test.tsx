@@ -81,7 +81,14 @@ const live = (): BoardState => ({
 it('opens on the pre-deal table and keeps the gate shut', () => {
   const onDone = vi.fn()
   const { result, unmount } = renderHook(() =>
-    useDealIntro({ live: live(), view: view(), events: events(), refs: refs(), onDone }),
+    useDealIntro({
+      live: live(),
+      gameId: 'g1',
+      view: view(),
+      events: events(),
+      refs: refs(),
+      onDone,
+    }),
   )
 
   expect(result.current.active).toBe(true)
@@ -105,7 +112,14 @@ it('opens on the pre-deal table and keeps the gate shut', () => {
 it('collapses on a skip, reporting once', () => {
   const onDone = vi.fn()
   const { result } = renderHook(() =>
-    useDealIntro({ live: live(), view: view(), events: events(), refs: refs(), onDone }),
+    useDealIntro({
+      live: live(),
+      gameId: 'g1',
+      view: view(),
+      events: events(),
+      refs: refs(),
+      onDone,
+    }),
   )
   expect(result.current.active).toBe(true)
   result.current.finish()

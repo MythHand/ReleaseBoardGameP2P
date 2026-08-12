@@ -50,6 +50,13 @@ export interface PlayerState {
   // begins. A separate list precisely because the two thaw at different moments;
   // one list could only ever be right for one of them.
   replayLocked: CardUid[]
+  // What this player was dealt FACE UP at setup — by the rules, the reserved
+  // Debugger. Recorded rather than re-derived, because provenance and identity
+  // are not the same question: with a deck holding fewer Debuggers than players
+  // a seat gets five random cards, and a surplus Debugger can land first in that
+  // hand without ever having been dealt openly. Reading "is hand[0] a Debugger?"
+  // would announce that card to the whole table as face up when it is not.
+  openedAtDeal: CardUid[]
 }
 
 export interface ReactionWindow {

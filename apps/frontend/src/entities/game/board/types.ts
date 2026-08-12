@@ -197,6 +197,9 @@ export interface BoardProps {
   // The opening. Present only on a fresh entry; the board renders the intro's
   // shadow of `state` while it runs and the live `state` afterwards.
   intro?: {
+    // Which match this is, so the opening plays once per game rather than once
+    // per peer — a PlayerView carries no game identity, and the route does.
+    gameId: string | null
     view: PlayerView | null
     events: Event[]
     onDone: () => void

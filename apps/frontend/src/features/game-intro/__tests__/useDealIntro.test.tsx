@@ -66,7 +66,14 @@ const live = (): BoardState => ({
 it('under reduced motion it is over at once, and reports it', async () => {
   const onDone = vi.fn()
   const { result } = renderHook(() =>
-    useDealIntro({ live: live(), view: view(), events: events(), refs: refs(), onDone }),
+    useDealIntro({
+      live: live(),
+      gameId: 'g1',
+      view: view(),
+      events: events(),
+      refs: refs(),
+      onDone,
+    }),
   )
   await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
   expect(result.current.active).toBe(false)
@@ -78,7 +85,7 @@ it('does not run for a projection that is not an opening', async () => {
   v.turn.hasDrawn = true
   const onDone = vi.fn()
   const { result } = renderHook(() =>
-    useDealIntro({ live: live(), view: v, events: events(), refs: refs(), onDone }),
+    useDealIntro({ live: live(), gameId: 'g1', view: v, events: events(), refs: refs(), onDone }),
   )
   expect(result.current.active).toBe(false)
   await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
@@ -87,18 +94,49 @@ it('does not run for a projection that is not an opening', async () => {
 it('does not run before the first projection arrives', () => {
   const onDone = vi.fn()
   const { result } = renderHook(() =>
-    useDealIntro({ live: live(), view: null, events: [], refs: refs(), onDone }),
+    useDealIntro({ live: live(), gameId: 'g1', view: null, events: [], refs: refs(), onDone }),
   )
   // Nothing to replay yet, and nothing reported: the gate must keep waiting.
   expect(result.current.active).toBe(false)
   expect(onDone).not.toHaveBeenCalled()
 })
 
+it('deals again for a second match in the same mount', async () => {
+  // The intro used to be keyed on `view.self.id` — this peer's own seat, which
+  // is the same in every game it plays — and the "already reported" latch was
+  // never reset. Together that made it once per PEER: a rematch without a
+  // remount would have shown a table that dealt itself in silence.
+  const onDone = vi.fn()
+  const { rerender } = renderHook(
+    (props: { id: string }) =>
+      useDealIntro({
+        live: live(),
+        gameId: props.id,
+        view: view(),
+        events: events(),
+        refs: refs(),
+        onDone,
+      }),
+    { initialProps: { id: 'g1' } },
+  )
+  await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
+
+  rerender({ id: 'g2' })
+  await waitFor(() => expect(onDone).toHaveBeenCalledTimes(2))
+})
+
 it('reports done exactly once even if the projection updates', async () => {
   const onDone = vi.fn()
   const { rerender } = renderHook(
     (props: { v: PlayerView }) =>
-      useDealIntro({ live: live(), view: props.v, events: events(), refs: refs(), onDone }),
+      useDealIntro({
+        live: live(),
+        gameId: 'g1',
+        view: props.v,
+        events: events(),
+        refs: refs(),
+        onDone,
+      }),
     { initialProps: { v: view() } },
   )
   await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))

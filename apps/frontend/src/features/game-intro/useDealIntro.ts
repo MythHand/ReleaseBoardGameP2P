@@ -118,12 +118,15 @@ const COVER: CardData = {
 
 export function useDealIntro(args: {
   live: BoardState
+  // Which match this is. The intro plays once per game, and this is what says
+  // "per game" — see `gameKey` below for why the projection cannot answer it.
+  gameId: string | null
   view: PlayerView | null
   events: Event[]
   refs: IntroRefs
   onDone: () => void
 }): DealIntro {
-  const { live, view, events, refs } = args
+  const { live, gameId, view, events, refs } = args
   const reduced = useReducedMotion()
 
   const [active, setActive] = useState(false)
@@ -164,15 +167,20 @@ export function useDealIntro(args: {
   // One way out, taken by the skip, by reduced motion, by a missing rect and by
   // a resize. Two implementations of "jump to the end" would drift, and only one
   // of them would be the one anybody tested.
+  //
+  // Idempotent, and deliberately so: the resize listener below outlives the run
+  // it was armed for, so after the intro is over every resize event still calls
+  // this. Without the early return each one would clear an already-empty heap
+  // with a *fresh* array — no Object.is bail-out, a real re-render of the whole
+  // board — for the life of the mount. A window drag is dozens of those.
   const finish = useCallback(() => {
+    if (reported.current) return
+    reported.current = true
     runId.current += 1
     drop()
     setActive(false)
     setStaged([])
-    if (!reported.current) {
-      reported.current = true
-      latest.current.onDone()
-    }
+    latest.current.onDone()
   }, [drop])
   const finishRef = useRef(finish)
   finishRef.current = finish
@@ -182,16 +190,29 @@ export function useDealIntro(args: {
     if (reduced && active) finishRef.current()
   }, [reduced, active])
 
-  // Keyed by the game, not by the mount. A re-render with a fresh projection
-  // object must not re-arm the intro, and React 19 StrictMode's double invoke
-  // must play it once: the first pass is cancelled by its own cleanup before it
-  // can do anything but set the shadow up, and the second pass starts clean.
-  const gameKey = view ? view.self.id : null
+  // Keyed by the game, and by the game alone. A re-render with a fresh
+  // projection object must not re-arm the intro, and React 19 StrictMode's
+  // double invoke must play it once: the first pass is cancelled by its own
+  // cleanup before it can do anything but set the shadow up, and the second
+  // starts clean.
+  //
+  // It is the match id rather than anything off the projection: `view.self.id`
+  // is this peer's own seat, which is the SAME across every game it plays, so
+  // keying on it meant "once per peer" — a rematch without a remount would
+  // never deal again. There is no game identity in a PlayerView to fall back
+  // on; the route knows it, so the route passes it.
+  const gameKey = view ? gameId : null
+  const armedFor = useRef<string | null>(null)
 
   useLayoutEffect(() => {
     // No projection yet: nothing to replay, and nothing to report — the gate
     // this feeds must keep waiting.
     if (gameKey == null) return
+    // A different match than the one that already played: this one has not.
+    if (armedFor.current !== gameKey) {
+      armedFor.current = gameKey
+      reported.current = false
+    }
     // Already over (reduced motion, a skip, or a completed run). A re-render
     // must not start it again.
     if (reported.current) return
@@ -222,7 +243,13 @@ export function useDealIntro(args: {
 
     // The whole choreography is measured against a layout that is no longer
     // there; there is no honest way to re-aim mid-flight, so it collapses.
-    const onResize = () => finishRef.current()
+    // Removes itself on the first fire: once the intro has collapsed there is
+    // nothing left for a later resize to collapse, and a listener that outlives
+    // its run is a wake-up per resize event for the rest of the mount.
+    const onResize = () => {
+      window.removeEventListener('resize', onResize)
+      finishRef.current()
+    }
     window.addEventListener('resize', onResize)
 
     // ===== step 1 — the interface arrives =====
@@ -326,6 +353,11 @@ export function useDealIntro(args: {
           }
           round = f.round
         }
+        // Whether this flight actually left the deck. A self card the catalogue
+        // cannot resolve is skipped, and the pile must not count a card that
+        // never flew — the projection overwrites the number a moment later, but
+        // until then the table would be showing a count that never existed.
+        let left = false
         if (f.to.kind === 'self') {
           const entry = p.hand[f.to.index]
           const data = entry ? cardById(entry.card) : undefined
@@ -337,13 +369,15 @@ export function useDealIntro(args: {
                 placed[i] = pl
               }),
             )
+            left = true
           }
         } else {
           // A closed card of somebody else's is not guessed — it flies as a back.
           const data = (f.card ? cardById(f.card) : undefined) ?? COVER
           flights.push(toSeat(`s${n++}`, f.to.player, data, !f.faceUp))
+          left = true
         }
-        setDeckCount((d) => d - 1)
+        if (left) setDeckCount((d) => d - 1)
         await wait(DEAL_STEP)
         if (halt()) return
       }
