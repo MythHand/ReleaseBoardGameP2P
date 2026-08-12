@@ -11,6 +11,13 @@ import type { BoardOver, BoardState } from './types'
 // BoardState adds `introPhase`, which TableState has no member for, so the
 // assignability that matters is: everything TableState requires, BoardState
 // supplies — and vice versa for the fields the kit reads.
+//
+// The reach of this guard, stated plainly: it catches a required field that is
+// added, removed or retyped on either side. It does NOT catch a future OPTIONAL
+// field added to one and not the other, because `Omit` names only `introPhase`
+// and an absent optional satisfies both directions. Widening it would mean
+// naming every intentional difference, which is the same maintenance by another
+// route — so the limit is documented rather than closed.
 const toKit = (b: BoardState): TableState => b
 const fromKit = (t: TableState): Omit<BoardState, 'introPhase'> => t
 const overToKit = (b: BoardOver): TableOver => b

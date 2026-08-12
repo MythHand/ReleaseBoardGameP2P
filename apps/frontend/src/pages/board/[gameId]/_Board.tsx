@@ -548,7 +548,10 @@ export default function Board({
       {/* вертикальный рейл у правого края — переключает панели drawer. Слой
           нужен только чтобы вести его появление, не трогая его собственный
           transform (the rail is the first thing the opening brings in). */}
-      <div className={cls(styles.railLayer, enter)} ref={railRef}>
+      {/* `inert` while the opening runs: the layer is faded to nothing but its
+          buttons would still take a click and a Tab stop, so a player could open
+          a drawer they cannot see. */}
+      <div className={cls(styles.railLayer, enter)} ref={railRef} inert={entering}>
         <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
       </div>
 

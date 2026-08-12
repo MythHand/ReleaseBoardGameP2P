@@ -324,6 +324,39 @@ it('host builds the game behind a gate covering every seat', async () => {
   expect(syncs()).toBe(2)
 })
 
+it('the opening projection carries the deal to every seat', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+
+  // Asserted on what actually left this peer, not on `createSession`'s return
+  // value: production discards that array and delivers through the keeper, so a
+  // test reading it passed for a fortnight while no peer ever received a deal.
+  const guestSync = sentTo(GUEST).find((m) => m.type === 'SYNC')
+  expect(guestSync).toBeDefined()
+  const dealt = guestSync?.type === 'SYNC' ? guestSync.payload.events : []
+  // One per seat, and public — a hand count is not a secret, so the guest hears
+  // about the host's deal as well as its own.
+  expect(dealt.filter((e) => e.type === 'dealt')).toHaveLength(2)
+  // The ids the engine reserved for the deal (createGame returns
+  // eventSeq: seating.length, so play starts at N+1).
+  expect(dealt.map((e) => e.id)).toEqual([1, 2])
+})
+
+it('gives the local seat its deal too, not only the wire', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+  // The host's own seat is served through its local link rather than a
+  // connection to itself, so it is a separate delivery path and a separate way
+  // for the deal to go missing.
+  const sync = result.current.gameSync
+  expect(sync).toBeTruthy()
+  expect(sync?.events.filter((e) => e.type === 'dealt')).toHaveLength(2)
+})
+
 it('a guest tells the host when its intro is done', async () => {
   const { result } = renderHook(() => useLobby())
   await act(async () => {

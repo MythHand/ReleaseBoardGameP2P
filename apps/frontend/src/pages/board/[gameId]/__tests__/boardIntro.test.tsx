@@ -1,6 +1,4 @@
-// `@testing-library/user-event` is not a dependency of this app — the ported
-// board suite drives the DOM with `fireEvent`, and so does this one.
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import Board from '../_Board'
 import { introFixture, makeBoardProps } from './fixture'
@@ -30,24 +28,42 @@ it('lands on the dealt board when motion is reduced', () => {
   expect(onDone).toHaveBeenCalledTimes(1)
 })
 
-it("holds the player's input while the intro runs", () => {
-  motion.reduced = true
-  const onPlay = vi.fn()
+// What is NOT asserted here, deliberately: that a click on a hand card cannot
+// play it while the intro runs. During the intro the fan is empty — the cards
+// have not landed yet — so there is nothing to click, and the version of this
+// test that clicked one ran under reduced motion, where the intro is already
+// over. It therefore passed with the whole feature deleted. The guarantee it
+// claimed lives one layer down and is properly tested there: the keeper buffers
+// every intent while the gate is shut (session/remoteLink.test.ts), so no seat
+// can act into another's animation whatever the UI allows.
+//
+// What IS assertable at this level is reachability, and it matters on its own:
+// the rail is faded to nothing during the opening, but a faded button still
+// takes a click and still holds a Tab stop.
+it('puts the faded rail out of reach while the intro runs', () => {
+  // Not reduced: the sequencer arms in a layout effect, so the first committed
+  // frame is already the running intro.
+  motion.reduced = false
   const props = makeBoardProps()
-  const { container } = render(
-    <Board
-      {...props}
-      actions={{ ...props.actions, onPlay }}
-      intro={{ ...introFixture(), onDone: () => {} }}
-    />,
-  )
-  const card = slots(container as HTMLElement)[0] as HTMLElement
-  fireEvent.mouseDown(card)
-  fireEvent.mouseUp(card)
-  fireEvent.click(card)
-  // The intro is over under reduced motion, so this asserts the release of the
-  // hold rather than the hold itself: a click selects, it never plays.
-  expect(onPlay).toHaveBeenCalledTimes(0)
+  const { container } = render(<Board {...props} intro={{ ...introFixture(), onDone: () => {} }} />)
+  const rail = container.querySelector('[class*="railLayer"]')
+  expect(rail).toBeTruthy()
+  expect(rail?.hasAttribute('inert')).toBe(true)
+})
+
+it('hands the rail back when the opening is over', () => {
+  motion.reduced = true
+  const props = makeBoardProps()
+  const { container } = render(<Board {...props} intro={{ ...introFixture(), onDone: () => {} }} />)
+  const rail = container.querySelector('[class*="railLayer"]')
+  expect(rail?.hasAttribute('inert')).toBe(false)
+})
+
+it('leaves the rail reachable when there is no intro at all', () => {
+  const props = makeBoardProps()
+  const { container } = render(<Board {...props} />)
+  const rail = container.querySelector('[class*="railLayer"]')
+  expect(rail?.hasAttribute('inert')).toBe(false)
 })
 
 it('names the moment in the dock instead of a player', () => {

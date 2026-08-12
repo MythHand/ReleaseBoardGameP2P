@@ -1,6 +1,9 @@
 import type { Event, PlayerView } from '@release/engine'
 import type { CardData, HandItem, Rect, Scatter } from '@release/ui'
-import { cardBoxIn, cardById, play, scatterAt, wait } from '@release/ui'
+// CARD_W is the fan's own width, taken from the kit rather than restated here:
+// the sibling arrival step already imports it, and a second copy would let the
+// deal's geometry drift from the hand it deals into.
+import { CARD_W, cardBoxIn, cardById, play, scatterAt, wait } from '@release/ui'
 import type { ReactNode, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { BoardState } from '~/entities/game/board'
@@ -46,7 +49,6 @@ const ROUND_GAP = 160 // an extra breath between rounds, so rounds are countable
 const HEAP_HOLD = 640 // the finished heap stands open before it goes to the fan
 const FLIP_HOLD = 380 // it is all in the hand — then it turns over
 const REVEAL_HOLD = 620 // the hand is read, and only then the zone arrives
-const CARD_W = 150 // a card on this table, the deck's own width
 
 export interface IntroRefs {
   rail: RefObject<HTMLDivElement | null>

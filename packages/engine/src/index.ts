@@ -10,7 +10,6 @@ export {
 export { type ConformanceOptions, describeEngine } from './conformance'
 export type { DeckEntry, Engine, GameConfig, Reduction } from './engine'
 export type { DefenceEffect, DiscardReason, Event, EventBase, EventType } from './events'
-export { setupEvents } from './fake/setup'
 export { randomAt, shuffle } from './rng'
 export type {
   CardId,

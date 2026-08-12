@@ -1,4 +1,4 @@
-import type { PlayerId } from '@release/engine'
+import type { Event, PlayerId } from '@release/engine'
 import type { Transport } from '../transport/peer'
 import type { Intent, WireMessage } from '../types'
 import { type GameLink, intervalTicker, type Sync, type Ticker } from './link'
@@ -97,10 +97,16 @@ export interface KeeperHandle {
   // is always undefined, so a self-addressed send is silently dropped), so they
   // go straight into the referee and its own SYNCs come back the same way.
   link: GameLink
-  // Push every seat its current projection. `createSession` returns the opening
-  // deal as `outgoing`, but a caller holding only this handle has nowhere to put
-  // it — so without this nobody sees their hand until they act.
-  resync(): void
+  // Push every seat its current projection, optionally carrying a feed of events
+  // that produced it. `createSession` returns the opening deal as `outgoing`, but
+  // a caller holding only this handle has nowhere to put it — so without this
+  // nobody sees their hand until they act.
+  //
+  // `events` exists because that opening deal is not decoration: the board's
+  // intro replays the deal from it, and the move history opens on it. A caller
+  // that starts a game must hand the deal in here, or every peer receives a
+  // projection with no account of how it came about.
+  resync(events?: Event[]): void
   handleMessage(frame: WireMessage): void
   peerLeft(peerId: string): void
   peerReturned(playerId: PlayerId, peerId: string): void
@@ -215,13 +221,14 @@ export function attachKeeper(args: {
         listeners.clear()
       },
     },
-    resync() {
+    resync(events = []) {
       if (!keeping) return
-      // No events: a statement of where the game stands, not a replay of how it
-      // got there.
+      // Empty by default: a statement of where the game stands, not a replay of
+      // how it got there. A caller starting a game passes the opening deal, which
+      // is the one moment the two are the same thing.
       commit(
         args.ref,
-        { session: args.ref.current, outgoing: syncAll(args.ref.current, []) },
+        { session: args.ref.current, outgoing: syncAll(args.ref.current, events) },
         deliver,
       )
     },

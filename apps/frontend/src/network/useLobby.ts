@@ -553,10 +553,14 @@ export function useLobby(): UseLobby {
     // with the deal. Determinism is what lets every peer replay identically.
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]
 
+    // Held rather than inlined: the opening deal has to be asked of this same
+    // engine below, once the session exists.
+    const engine = createFakeEngine()
+
     const { session } = createSession({
       gameId: id,
       keeperId: mine.playerId,
-      engine: createFakeEngine(),
+      engine,
       seed,
       players: seats,
       setup: current.setup,
@@ -581,7 +585,13 @@ export function useLobby(): UseLobby {
     dispatch([{ to: 'broadcast', message: { type: 'GAME_STARTING', payload: { gameId: id } } }])
     gameIdRef.current = id
     setGameId(id)
-    keeper.resync()
+    // The deal travels with the first projection. `createSession` also returns it
+    // as `outgoing`, but that array is unreachable from here — the keeper owns
+    // delivery — so it is asked of the engine again and handed to the fan-out.
+    // Without it every peer receives a hand with no account of where it came
+    // from: the board's intro has no deal to replay and the move history opens
+    // on a blank.
+    keeper.resync(engine.setupEvents(session.state))
   }, [dispatch])
 
   // The local seat has finished its opening. The host reports into its own
