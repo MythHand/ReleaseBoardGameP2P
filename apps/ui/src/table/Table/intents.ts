@@ -18,7 +18,10 @@ export type TableTarget =
 
 export type TableChoice =
   | { kind: 'discardForRelease'; card: string }
-  | { kind: 'defend'; card: string | null; combo?: string; reflectSlot?: ReleaseSlotId }
+  // No slot: a Works on my Machine reflection returns the effect at the
+  // attacker's release of the very type that was attacked, so the defender has
+  // nothing to pick (mirrors the engine's Choice).
+  | { kind: 'defend'; card: string | null; combo?: string }
   | { kind: 'neutralize503'; method: NeutralizeMethodId; card?: string }
   | { kind: 'crush'; method: NeutralizeMethodId; card?: string }
   | { kind: 'requestCard'; card: string }

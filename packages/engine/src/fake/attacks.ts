@@ -316,19 +316,19 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
     // Works on my Machine turns the attack on its author — the same effect they
     // were about to apply, not a generic destruction.
     next = discard(next, [attackCard, ...spentDefence])
-    const eligible = reflectableSlots(next, attacker)
-    // The defender chooses ("выбор цели в зоне атакующего делает
-    // защищавшийся"); with one legal slot there is nothing to choose, so an
-    // absent choice is not a refusal. A named slot that is not eligible — empty
-    // or protected — lands nowhere rather than falling through to another.
-    const victimSlot = choice.reflectSlot
-      ? eligible.find((candidate) => candidate === choice.reflectSlot)
-      : eligible.length === 1
-        ? eligible[0]
-        : undefined
+    // The effect returns as it was AIMED: the attacker's release of exactly the
+    // type that was attacked. Not the defender's choice, not any other slot —
+    // the mirror reading, which the card supports without an added rule (rules
+    // owner, #92). It lands only where the attacker holds that type and it is
+    // not under Code Review; otherwise the attack is still cancelled and this
+    // second effect simply finds nothing, which is not the same as not firing.
+    const victimSlot = reflectableSlots(next, attacker).includes(slot) ? slot : undefined
     if (victimSlot) {
-      // Security Bug's own effect is to take, so the reflection takes.
-      // `takeRelease` already discards it when the taker's slot is occupied.
+      // Security Bug's own effect is to take, so the reflection takes — and for
+      // a reflected one that always ends in the discard rather than a steal:
+      // it aims at the defender's slot of the attacked type, and that slot is
+      // occupied by the very release being defended, which never left because
+      // the attack was cancelled. `takeRelease` discards on an occupied slot.
       const thief = attackCard.id === 'attack-security-bug' ? action.player : null
       next = takeRelease(next, log, attacker, victimSlot, thief)
     }

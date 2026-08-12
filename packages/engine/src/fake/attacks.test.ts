@@ -179,7 +179,12 @@ it('reflects the effect onto the attacker with Works on my Machine', () => {
       ...s.players,
       p2: {
         ...s.players.p2,
-        release: { backend: { card: { uid: 'release-backend#0', id: 'release-backend' } } },
+        // Both types, so the mirror has something to hit AND something it must
+        // leave alone: p1's FRONTEND is what was attacked.
+        release: {
+          frontend: { card: { uid: 'release-frontend#p2', id: 'release-frontend' } },
+          backend: { card: { uid: 'release-backend#0', id: 'release-backend' } },
+        },
       },
     },
   }
@@ -195,8 +200,12 @@ it('reflects the effect onto the attacker with Works on my Machine', () => {
     choice: { kind: 'defend', card: WOMM.uid },
     at: 1002,
   })
+  // The attack was cancelled, so the defended release never left.
   expect(r.state.players.p1.release.frontend?.card).toEqual(FE)
-  expect(r.state.players.p2.release.backend).toBeUndefined()
+  // The effect returned at the type it was aimed: the attacker's frontend falls…
+  expect(r.state.players.p2.release.frontend).toBeUndefined()
+  // …and their backend is untouched. Reflection mirrors, it does not choose.
+  expect(r.state.players.p2.release.backend).toBeTruthy()
   expect(r.events.some((e) => e.type === 'defended' && e.effect === 'reflect')).toBe(true)
 })
 
