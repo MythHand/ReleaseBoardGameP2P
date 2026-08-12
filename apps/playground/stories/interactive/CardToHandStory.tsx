@@ -5,6 +5,8 @@ import { nextHandUid } from '@/mocks/hand'
 import Card from '@/primitives/Card'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechButton } from '../controls/TechControls'
 import styles from './CardToHandStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useHandArrival } from './useHandArrival'
@@ -83,55 +85,54 @@ export default function CardToHandStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar}>
-        <button type="button" className={styles.btn} onClick={restart}>
-          {pick(lang, { ru: 'рестарт', en: 'restart' })}
-        </button>
-      </div>
+      <TechBar>
+        <TechButton onClick={restart}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
+      </TechBar>
+      <div className={styles.stage}>
+        {/* a pair — both cards arrive at once, into two neighbouring slots */}
+        <div className={styles.pair} style={{ opacity: pairUsed ? 0 : 1 }}>
+          {PAIR.map((card, i) => (
+            <div
+              key={card.id}
+              ref={(el) => {
+                pairRefs.current[i] = el
+              }}
+            >
+              <Card card={card} width={SOURCE_CARD_W} onClick={busy ? undefined : sendPair} />
+            </div>
+          ))}
+        </div>
 
-      {/* a pair — both cards arrive at once, into two neighbouring slots */}
-      <div className={styles.pair} style={{ opacity: pairUsed ? 0 : 1 }}>
-        {PAIR.map((card, i) => (
-          <div
-            key={card.id}
-            ref={(el) => {
-              pairRefs.current[i] = el
-            }}
-          >
-            <Card card={card} width={SOURCE_CARD_W} onClick={busy ? undefined : sendPair} />
-          </div>
-        ))}
-      </div>
+        {/* single cards: pinned in place; a used one fades, the slot holds its spot */}
+        <div className={styles.source}>
+          {SOURCES.map((card, i) => (
+            <div
+              key={card.id}
+              ref={(el) => {
+                sourceRefs.current[i] = el
+              }}
+              className={styles.sourceCard}
+              style={{ opacity: used[i] ? 0 : 1 }}
+            >
+              <Card
+                card={card}
+                width={SOURCE_CARD_W}
+                onClick={busy || used[i] ? undefined : () => sendOne(i)}
+              />
+            </div>
+          ))}
+        </div>
 
-      {/* single cards: pinned in place; a used one fades, the slot holds its spot */}
-      <div className={styles.source}>
-        {SOURCES.map((card, i) => (
-          <div
-            key={card.id}
-            ref={(el) => {
-              sourceRefs.current[i] = el
-            }}
-            className={styles.sourceCard}
-            style={{ opacity: used[i] ? 0 : 1 }}
-          >
-            <Card
-              card={card}
-              width={SOURCE_CARD_W}
-              onClick={busy || used[i] ? undefined : () => sendOne(i)}
-            />
-          </div>
-        ))}
-      </div>
+        {overlay}
 
-      {overlay}
-
-      <div className={styles.handWrap} ref={handRef}>
-        <Hand
-          items={hand}
-          gapAt={gapAt}
-          gapSize={gapSize}
-          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
-        />
+        <div className={styles.handWrap} ref={handRef}>
+          <Hand
+            items={hand}
+            gapAt={gapAt}
+            gapSize={gapSize}
+            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+          />
+        </div>
       </div>
     </div>
   )

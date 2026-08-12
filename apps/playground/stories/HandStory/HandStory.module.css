@@ -2,65 +2,21 @@
   display: flex;
   flex-direction: column;
   block-size: 100%;
-  padding: 28px;
-}
-
-.controls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-block-end: 10px;
 }
 
 .sliderWrap {
   inline-size: 280px;
 }
 
-.check {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-inline-start: 8px;
-  font-size: 13px;
-  cursor: pointer;
-  opacity: 0.85;
-}
-
+/* the live readout — the fan's step and span, right where the controls that
+   change them are */
 .readout {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-55);
-  letter-spacing: 0.04em;
+  margin-inline-start: auto;
 }
 
 .readout b {
   font-weight: 400;
   color: var(--brand-green);
-}
-
-.hint {
-  margin: 6px 0 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-45);
-  letter-spacing: 0.04em;
-}
-
-.reset {
-  padding: 6px 12px;
-  margin-inline-start: 8px;
-  font-size: 12px;
-  color: var(--fg);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.reset:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
 }
 
 .stage {
@@ -69,5 +25,6 @@
   flex: 1;
   align-items: flex-end;
   min-block-size: 360px;
+  padding: 28px;
   padding-block-end: 24px;
 }

@@ -1,0 +1,15 @@
+/* The technical control line of a playground page. It is a ROW of the page, not
+   a layer over the demo: it takes its own height at the top and the demo area
+   below it is what remains. Nothing here ever floats over the scene. */
+.bar {
+  position: relative;
+  z-index: 1000; /* above every scene layer, so HoverSelect menus are never clipped */
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 22px;
+  row-gap: 10px;
+  align-items: center;
+  padding: 12px 16px;
+  border-block-end: 1px solid var(--white-08);
+}

@@ -1,6 +1,16 @@
 .root {
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
+  overflow: hidden;
+}
+
+/* the demo area: the scene lives here and paints nothing outside it. The bar
+   above is a row of the page, so nothing has to know its height. */
+.stage {
   position: relative;
-  min-block-size: 100vh;
+  flex: 1;
+  min-block-size: 0;
   overflow: hidden;
 }
 
@@ -8,52 +18,6 @@
    highlight under the cursor (breaks the game feel) */
 .dragging {
   user-select: none;
-}
-
-/* technical top control line — dev controls (TableStory pattern) */
-.bar {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  z-index: 60;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  padding: 16px 24px;
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  border-block-end: 1px solid var(--white-08);
-}
-
-/* dev toggle chip — off = outline, on = brand-green fill */
-.chip {
-  padding: 8px 14px;
-  color: var(--fg);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.chip[data-on="true"] {
-  color: var(--deep-green);
-  background: var(--brand-green);
-  border-color: var(--brand-green);
-}
-
-.reset {
-  padding: 8px 14px;
-  margin-inline-start: auto;
-  color: var(--fg);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.reset:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
 }
 
 /* ===== table layout — positions mirror @release/ui Table.module.css ===== */
@@ -181,15 +145,13 @@
 
 /* elimination video — an overlay above everything, shown to all players when
    someone is knocked out; fades in on mount, out via data-out.
-   In the GAME this covers the whole screen. Here it covers the DEMO AREA instead —
-   absolute inside the scene root, so it stops at the playground navigation, and its
-   top comes inline from the tech-bar height (as .glowBounds does). The video is
-   centred in the table, not in a window that has a nav rail and a bar the game
-   does not have. */
+   In the GAME this covers the whole screen. Here it covers the DEMO AREA — the
+   stage, which is the window minus the playground navigation and the technical
+   bar. The video is centred in the table, not in a window that has a nav rail
+   and a bar the game does not have. */
 .gifOverlay {
   position: absolute;
-  inset-block-end: 0;
-  inset-inline: 0;
+  inset: 0;
   z-index: var(--z-modal);
   display: flex;
   align-items: center;

@@ -1,6 +1,6 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { jitter, nextFrames, play, type Scatter, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
@@ -15,6 +15,8 @@ import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
+import TechBar from '../controls/TechBar'
+import { TechButton, TechToggle } from '../controls/TechControls'
 import styles from './AiCardsStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
@@ -128,7 +130,6 @@ export default function AiCardsStory() {
   const [insideRevealed, setInsideRevealed] = useState(false) // row shown (after the fly-out)
   const [handPickMode, setHandPickMode] = useState(false) // Bad Vibe: pick a card to discard
 
-  const barRef = useRef<HTMLDivElement>(null)
   const baseDeckRef = useRef<HTMLDivElement>(null)
   const aiDeckRef = useRef<HTMLDivElement>(null)
   const causeRef = useRef<HTMLDivElement>(null) // AI trigger (cause) — left of centre
@@ -150,12 +151,6 @@ export default function AiCardsStory() {
   const handPickResolver = useRef<((uid: string) => void) | null>(null)
   const handPickRect = useRef<DOMRect | null>(null)
   const pickRefs = useRef<Record<number, HTMLElement | null>>({}) // Inside choice row cells
-
-  // the tech-bar height — so the edge glow lives in the TABLE zone (under the bar)
-  const [barH, setBarH] = useState(0)
-  useLayoutEffect(() => {
-    if (barRef.current) setBarH(barRef.current.offsetHeight)
-  }, [])
 
   const {
     gapAt,
@@ -594,24 +589,17 @@ export default function AiCardsStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar} ref={barRef}>
-        <button type="button" className={styles.btn} onClick={reset}>
-          {pick(lang, { ru: 'сброс', en: 'reset' })}
-        </button>
+      <TechBar>
+        <TechButton onClick={reset}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
         <HoverSelect
           label={pick(lang, { ru: 'AI-карта', en: 'AI card' })}
           value={aiChoice}
           options={AI_DECK.map((c) => ({ value: c.id, label: c.name }))}
           onChange={setAiChoice}
         />
-        <button
-          type="button"
-          className={styles.chip}
-          data-on={monitoring}
-          onClick={toggleMonitoring}
-        >
+        <TechToggle on={monitoring} onChange={toggleMonitoring}>
           {pick(lang, { ru: 'мониторинг в зоне', en: 'monitoring in zone' })}
-        </button>
+        </TechToggle>
         {aiChoice === INSIDE && (
           <HoverSelect
             label={pick(lang, { ru: 'релизов в сбросе', en: 'releases in discard' })}
@@ -640,152 +628,157 @@ export default function AiCardsStory() {
             <Card card={previewCard} interactive={false} width={46} />
           </div>
         )}
-      </div>
+      </TechBar>
+      <div className={styles.stage}>
+        {/* AI trigger (cause) — left of the centre, normal size */}
+        <div className={styles.causeSlot} ref={causeRef} aria-hidden={!trigger}>
+          {trigger && <Card card={trigger} interactive={false} width="100%" />}
+        </div>
 
-      {/* AI trigger (cause) — left of the centre, normal size */}
-      <div className={styles.causeSlot} ref={causeRef} aria-hidden={!trigger}>
-        {trigger && <Card card={trigger} interactive={false} width="100%" />}
-      </div>
+        {/* AI effect (main) — at the centre, larger */}
+        <div className={styles.effectSlot} ref={effectRef} aria-hidden={!aiCard}>
+          {aiCard && <Card card={aiCard} interactive={false} width="100%" />}
+        </div>
 
-      {/* AI effect (main) — at the centre, larger */}
-      <div className={styles.effectSlot} ref={effectRef} aria-hidden={!aiCard}>
-        {aiCard && <Card card={aiCard} interactive={false} width="100%" />}
-      </div>
+        {/* Bad Vibe: where the given-up card stands while both are read. Only a place —
+            the card itself is on the carrier until it leaves for the discard. */}
+        <div className={styles.pickedSlot} ref={pickedRef} aria-hidden="true" />
 
-      {/* Bad Vibe: where the given-up card stands while both are read. Only a place —
-          the card itself is on the carrier until it leaves for the discard. */}
-      <div className={styles.pickedSlot} ref={pickedRef} aria-hidden="true" />
+        {/* base draw deck (click — start) + the AI events deck */}
+        <div className={styles.decks}>
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only draw by clicking the deck; sandbox story */}
+          <div
+            ref={baseDeckRef}
+            className={`${styles.deck} ${styles.drawable}`}
+            onMouseDown={start}
+          >
+            <Pile
+              label={pick(lang, { ru: 'колода', en: 'deck' })}
+              deck="base"
+              count={40}
+              width={150}
+              countPos="tl"
+            />
+          </div>
+          <div className={styles.deck} ref={aiDeckRef}>
+            <Pile
+              label={pick(lang, { ru: 'события', en: 'events' })}
+              deck="ai"
+              count={12}
+              width={150}
+              countPos="tl"
+            />
+          </div>
+        </div>
 
-      {/* base draw deck (click — start) + the AI events deck */}
-      <div className={styles.decks}>
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only draw by clicking the deck; sandbox story */}
-        <div ref={baseDeckRef} className={`${styles.deck} ${styles.drawable}`} onMouseDown={start}>
+        {/* the draw affordance — the canonical TurnDock in its 'draw' state, at its
+            canonical spot (bottom-left, under the decks, left of the hand) */}
+        <div className={styles.turnDock}>
+          <TurnDock
+            state={busy ? 'push' : 'draw'}
+            seconds={20}
+            progress={1}
+            copy={turnCopy}
+            onDraw={busy ? undefined : start}
+          />
+        </div>
+
+        {/* discard — on the right; triggers, crushed ordinary releases and Bad Vibe
+            discards land here as a tossed heap */}
+        <div className={styles.discard}>
           <Pile
-            label={pick(lang, { ru: 'колода', en: 'deck' })}
-            deck="base"
-            count={40}
-            width={150}
-            countPos="tl"
+            heap={discard}
+            count={discard.length}
+            width={116}
+            boxRef={discardRef}
+            logoVariant={lang}
+            label={pick(lang, { ru: 'сброс', en: 'discard' })}
           />
         </div>
-        <div className={styles.deck} ref={aiDeckRef}>
-          <Pile
-            label={pick(lang, { ru: 'события', en: 'events' })}
-            deck="ai"
-            count={12}
-            width={150}
-            countPos="tl"
+
+        {/* Inside — releases offered for choice, in an open row at the centre */}
+        {insideCandidates && (
+          <div className={styles.pickRow} data-revealed={insideRevealed}>
+            {insideCandidates.map((e, i) => (
+              <button
+                // biome-ignore lint/suspicious/noArrayIndexKey: candidates are a stable snapshot for this pick
+                key={i}
+                type="button"
+                className={styles.pickCard}
+                ref={(el) => {
+                  pickRefs.current[i] = el
+                }}
+                onClick={() => setInsidePickIdx(i)}
+              >
+                <Card
+                  card={e.card}
+                  interactive={false}
+                  width="100%"
+                  state={insidePickIdx === i ? 'selected' : 'idle'}
+                  // pick one out of a set — uniform selection colour, not the
+                  // per-category accent
+                  accent="var(--select-accent)"
+                />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Error 503 — red edge glow, the full table zone (the stage IS that zone) */}
+        <div className={styles.glowBounds}>
+          <EdgeGlow visible={alert} intensity="strong" />
+        </div>
+
+        {/* player area — release zone above the hand */}
+        <div className={styles.you}>
+          <ReleaseZone
+            release={release}
+            size="100px"
+            slotRef={(key, el) => {
+              releaseSlotRefs.current[key] = el
+            }}
           />
+          <div
+            className={styles.handWrap}
+            ref={handRef}
+            // ignore hand hover during animations (e.g. after Inside's confirm, while
+            // the card settles in) — Bad Vibe's pick keeps the hand interactive
+            style={{ pointerEvents: busy && !handPickMode ? 'none' : undefined }}
+          >
+            <Hand
+              items={hand}
+              gapAt={gapAt}
+              gapSize={gapSize}
+              stateAt={handPickMode ? () => 'playable' : undefined}
+              // Bad Vibe discards ANY card — uniform colour, not the per-category
+              // accent; and it costs a card, so the hue is the loss one
+              accentAt={handPickMode ? () => 'var(--danger-accent)' : undefined}
+              // the discard gesture is the same everywhere: pull the card OUT of
+              // the hand (never a click) — see the Hand limit scene
+              onPlay={handPickMode ? onHandDrop : undefined}
+              onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* the draw affordance — the canonical TurnDock in its 'draw' state, at its
-          canonical spot (bottom-left, under the decks, left of the hand) */}
-      <div className={styles.turnDock}>
-        <TurnDock
-          state={busy ? 'push' : 'draw'}
-          seconds={20}
-          progress={1}
-          copy={turnCopy}
-          onDraw={busy ? undefined : start}
+        {/* every card this scene has in the air — the shared carrier */}
+        {flyerOverlay}
+
+        {/* the "settle into hand" overlay (Inside / Good Vibe draws) */}
+        {overlay}
+
+        {/* Inside — confirm the chosen release (shared slide-up bar) */}
+        <ConfirmAction
+          open={insideCandidates != null}
+          label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
+          caption={pick(lang, {
+            ru: 'выберите релиз из сброса',
+            en: 'pick a release from the discard',
+          })}
+          disabled={insidePickIdx == null}
+          onConfirm={confirmInside}
         />
       </div>
-
-      {/* discard — on the right; triggers, crushed ordinary releases and Bad Vibe
-          discards land here as a tossed heap */}
-      <div className={styles.discard}>
-        <Pile
-          heap={discard}
-          count={discard.length}
-          width={116}
-          boxRef={discardRef}
-          logoVariant={lang}
-          label={pick(lang, { ru: 'сброс', en: 'discard' })}
-        />
-      </div>
-
-      {/* Inside — releases offered for choice, in an open row at the centre */}
-      {insideCandidates && (
-        <div className={styles.pickRow} data-revealed={insideRevealed}>
-          {insideCandidates.map((e, i) => (
-            <button
-              // biome-ignore lint/suspicious/noArrayIndexKey: candidates are a stable snapshot for this pick
-              key={i}
-              type="button"
-              className={styles.pickCard}
-              ref={(el) => {
-                pickRefs.current[i] = el
-              }}
-              onClick={() => setInsidePickIdx(i)}
-            >
-              <Card
-                card={e.card}
-                interactive={false}
-                width="100%"
-                state={insidePickIdx === i ? 'selected' : 'idle'}
-                // pick one out of a set — uniform selection colour, not the
-                // per-category accent
-                accent="var(--select-accent)"
-              />
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Error 503 — red edge glow in the table zone (below the tech bar) */}
-      <div className={styles.glowBounds} style={{ insetBlockStart: barH }}>
-        <EdgeGlow visible={alert} intensity="strong" />
-      </div>
-
-      {/* player area — release zone above the hand */}
-      <div className={styles.you}>
-        <ReleaseZone
-          release={release}
-          size="100px"
-          slotRef={(key, el) => {
-            releaseSlotRefs.current[key] = el
-          }}
-        />
-        <div
-          className={styles.handWrap}
-          ref={handRef}
-          // ignore hand hover during animations (e.g. after Inside's confirm, while
-          // the card settles in) — Bad Vibe's pick keeps the hand interactive
-          style={{ pointerEvents: busy && !handPickMode ? 'none' : undefined }}
-        >
-          <Hand
-            items={hand}
-            gapAt={gapAt}
-            gapSize={gapSize}
-            stateAt={handPickMode ? () => 'playable' : undefined}
-            // Bad Vibe discards ANY card — uniform colour, not the per-category
-            // accent; and it costs a card, so the hue is the loss one
-            accentAt={handPickMode ? () => 'var(--danger-accent)' : undefined}
-            // the discard gesture is the same everywhere: pull the card OUT of
-            // the hand (never a click) — see the Hand limit scene
-            onPlay={handPickMode ? onHandDrop : undefined}
-            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
-          />
-        </div>
-      </div>
-
-      {/* every card this scene has in the air — the shared carrier */}
-      {flyerOverlay}
-
-      {/* the "settle into hand" overlay (Inside / Good Vibe draws) */}
-      {overlay}
-
-      {/* Inside — confirm the chosen release (shared slide-up bar) */}
-      <ConfirmAction
-        open={insideCandidates != null}
-        label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
-        caption={pick(lang, {
-          ru: 'выберите релиз из сброса',
-          en: 'pick a release from the discard',
-        })}
-        disabled={insidePickIdx == null}
-        onConfirm={confirmInside}
-      />
     </div>
   )
 }

@@ -8,7 +8,6 @@ import Card, { cardBoxIn } from '@/primitives/Card'
 import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
 import TabRail from '@/primitives/TabRail'
-import Typography from '@/primitives/Typography'
 import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
@@ -17,6 +16,8 @@ import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
+import TechBar from '../controls/TechBar'
+import { TechButton, TechField, TechLabel } from '../controls/TechControls'
 import styles from './GameDealStory.module.css'
 import { useFlyer } from './useFlyer'
 import { useHandArrival } from './useHandArrival'
@@ -324,27 +325,25 @@ export default function GameDealStory() {
       {/* The technical line is a ROW of the playground, not a layer over the
           screen: it takes its own height, and the stage below owns everything
           left. Nothing inside the stage needs to dodge it. */}
-      <div className={styles.controls}>
-        <button type="button" className={styles.btn} onClick={restart}>
-          <Typography base="label-sm" tk="tk-16">
-            {pick(lang, { ru: 'рестарт', en: 'restart' })}
-          </Typography>
-        </button>
+      <TechBar>
+        <TechButton onClick={restart}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
         {/* how many sit at the table. Changing it replays the whole thing — the
             deal is built round by round around who is seated. */}
-        <HoverSelect
-          label={pick(lang, { ru: 'оппонентов', en: 'opponents' })}
-          value={String(oppCount)}
-          options={OPPONENT_POOL.map((_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
-          onChange={(v) => {
-            setOppCount(Number(v))
-            restart()
-          }}
-        />
-        <span className={styles.total}>
-          {pick(lang, { ru: 'всего', en: 'total' })}: {oppCount + 1}
-        </span>
-      </div>
+        <TechField>
+          <HoverSelect
+            label={pick(lang, { ru: 'оппонентов', en: 'opponents' })}
+            value={String(oppCount)}
+            options={OPPONENT_POOL.map((_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
+            onChange={(v) => {
+              setOppCount(Number(v))
+              restart()
+            }}
+          />
+          <TechLabel>
+            {pick(lang, { ru: 'всего', en: 'total' })}: {oppCount + 1}
+          </TechLabel>
+        </TechField>
+      </TechBar>
 
       <div className={styles.stage}>
         {/* the table's background — the HUD layer, whose own faint grid IS the

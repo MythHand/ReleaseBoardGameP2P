@@ -1,6 +1,6 @@
 import { useState } from 'react'
+import { TechSwitch } from '../../controls/TechControls'
 import CherryPick from './CherryPick'
-import styles from './GitCards.module.css'
 import Rebase from './Rebase'
 import SystemUpgrade from './SystemUpgrade'
 
@@ -20,20 +20,15 @@ export default function GitCardsStory() {
   const [card, setCard] = useState<GitCard>('cherry')
 
   // the shared selector element, handed to the active card so it sits at the
-  // start of that card's own control bar (one row: selector | card controls)
+  // START of that card's own control bar — it is navigation between the git
+  // cards, a level above the scene's own controls, so it sits left of them all,
+  // restart included.
   const selector = (
-    <div className={styles.selector}>
-      {CARDS.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          className={`${styles.selBtn} ${card === c.id ? styles.selOn : ''}`}
-          onClick={() => setCard(c.id)}
-        >
-          {c.label}
-        </button>
-      ))}
-    </div>
+    <TechSwitch
+      options={CARDS.map((c) => ({ value: c.id, label: c.label }))}
+      value={card}
+      onChange={setCard}
+    />
   )
 
   if (card === 'cherry') return <CherryPick selector={selector} />

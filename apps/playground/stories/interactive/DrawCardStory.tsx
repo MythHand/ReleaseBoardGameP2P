@@ -1,6 +1,6 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { jitter, play, type Scatter, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
@@ -14,6 +14,8 @@ import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
+import TechBar from '../controls/TechBar'
+import { TechButton } from '../controls/TechControls'
 import styles from './DrawCardStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
@@ -112,7 +114,6 @@ export default function DrawCardStory() {
   const aiRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
   const handRef = useRef<HTMLDivElement>(null)
-  const barRef = useRef<HTMLDivElement>(null)
   // every card this scene puts in the air — the draw itself ('draw'), the AI effect
   // ('ai') and the two cards leaving on resolution ('trig' / 'eff')
   const { overlay: flyerOverlay, raise, pin, patch, drop, elOf } = useFlyer()
@@ -124,13 +125,6 @@ export default function DrawCardStory() {
   const { send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
     setDiscard((d) => [...d, ...cards]),
   )
-
-  // the tech-bar height — so the edge glow lives in the TABLE zone (under the bar),
-  // not across the whole screen (otherwise table edge = screen edge, ignoring tech elements)
-  const [barH, setBarH] = useState(0)
-  useLayoutEffect(() => {
-    if (barRef.current) setBarH(barRef.current.offsetHeight)
-  }, [])
 
   const {
     gapAt,
@@ -336,10 +330,8 @@ export default function DrawCardStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar} ref={barRef}>
-        <button type="button" className={styles.btn} onClick={reset}>
-          {pick(lang, { ru: 'сброс', en: 'reset' })}
-        </button>
+      <TechBar>
+        <TechButton onClick={reset}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
         <HoverSelect
           label={pick(lang, { ru: 'колод добора', en: 'draw decks' })}
           value={String(deckCount)}
@@ -381,125 +373,130 @@ export default function DrawCardStory() {
             <Card card={nextCard} interactive={false} width={46} />
           </div>
         )}
-      </div>
+      </TechBar>
+      <div className={styles.stage}>
+        {/* opponents — on top, as on the table */}
+        <div className={styles.opponents}>
+          {opponents.map((o) => (
+            <div
+              key={o.id}
+              ref={(el) => {
+                seatRefs.current[o.id] = el
+              }}
+            >
+              <Seat
+                player={{ id: o.id, name: o.name, handCount: o.handCount, release: EMPTY_RELEASE }}
+                copy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
+              />
+            </div>
+          ))}
+        </div>
 
-      {/* opponents — on top, as on the table */}
-      <div className={styles.opponents}>
-        {opponents.map((o) => (
-          <div
-            key={o.id}
-            ref={(el) => {
-              seatRefs.current[o.id] = el
-            }}
-          >
-            <Seat
-              player={{ id: o.id, name: o.name, handCount: o.handCount, release: EMPTY_RELEASE }}
-              copy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
-            />
-          </div>
-        ))}
-      </div>
+        {/* table center — draw staging; Error 503 stays here (for everyone) */}
+        <div className={styles.center} ref={centerRef}>
+          {centerCard && centerCard.id !== AI_TRIGGER && (
+            <Card card={centerCard} interactive={false} width="100%" />
+          )}
+        </div>
 
-      {/* table center — draw staging; Error 503 stays here (for everyone) */}
-      <div className={styles.center} ref={centerRef}>
-        {centerCard && centerCard.id !== AI_TRIGGER && (
-          <Card card={centerCard} interactive={false} width="100%" />
-        )}
-      </div>
+        {/* AI trigger (cause) — left of the center, normal size */}
+        <div
+          className={styles.causeSlot}
+          ref={causeRef}
+          aria-hidden={centerCard?.id !== AI_TRIGGER}
+        >
+          {centerCard?.id === AI_TRIGGER && (
+            <Card card={centerCard} interactive={false} width="100%" />
+          )}
+        </div>
 
-      {/* AI trigger (cause) — left of the center, normal size */}
-      <div className={styles.causeSlot} ref={causeRef} aria-hidden={centerCard?.id !== AI_TRIGGER}>
-        {centerCard?.id === AI_TRIGGER && (
-          <Card card={centerCard} interactive={false} width="100%" />
-        )}
-      </div>
+        {/* AI effect (main) — at the center, larger */}
+        <div className={styles.effectSlot} ref={effectRef} aria-hidden={!aiCard}>
+          {aiCard && <Card card={aiCard} interactive={false} width="100%" />}
+        </div>
 
-      {/* AI effect (main) — at the center, larger */}
-      <div className={styles.effectSlot} ref={effectRef} aria-hidden={!aiCard}>
-        {aiCard && <Card card={aiCard} interactive={false} width="100%" />}
-      </div>
-
-      {/* draw decks (click — draw a card) + the AI events deck */}
-      <div className={styles.decks}>
-        {Array.from({ length: deckCount }, (_, i) => (
-          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only draw by clicking a deck; sandbox story
-          <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: decks are positional scene cells, no stable id
-            key={`deck-${i}`}
-            ref={(el) => {
-              deckRefs.current[i] = el
-            }}
-            className={`${styles.deck} ${styles.drawable}`}
-            onMouseDown={() => draw(i)}
-          >
+        {/* draw decks (click — draw a card) + the AI events deck */}
+        <div className={styles.decks}>
+          {Array.from({ length: deckCount }, (_, i) => (
+            // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only draw by clicking a deck; sandbox story
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: decks are positional scene cells, no stable id
+              key={`deck-${i}`}
+              ref={(el) => {
+                deckRefs.current[i] = el
+              }}
+              className={`${styles.deck} ${styles.drawable}`}
+              onMouseDown={() => draw(i)}
+            >
+              <Pile
+                label={pick(lang, { ru: 'колода', en: 'deck' })}
+                deck="base"
+                count={40}
+                width={150}
+                countPos="tl"
+              />
+            </div>
+          ))}
+          <div className={styles.ai} ref={aiRef}>
             <Pile
-              label={pick(lang, { ru: 'колода', en: 'deck' })}
-              deck="base"
-              count={40}
+              label={pick(lang, { ru: 'события', en: 'events' })}
+              deck="ai"
+              count={12}
               width={150}
               countPos="tl"
             />
           </div>
-        ))}
-        <div className={styles.ai} ref={aiRef}>
-          <Pile
-            label={pick(lang, { ru: 'события', en: 'events' })}
-            deck="ai"
-            count={12}
-            width={150}
-            countPos="tl"
+        </div>
+
+        {/* the draw affordance — the canonical TurnDock in its 'draw' state, at its
+            canonical spot (bottom-left, under the decks, left of the hand) */}
+        <div className={styles.turnDock}>
+          <TurnDock
+            state={busy ? 'push' : 'draw'}
+            seconds={20}
+            progress={1}
+            copy={turnCopy}
+            onDraw={busy ? undefined : drawBatch}
           />
         </div>
-      </div>
 
-      {/* the draw affordance — the canonical TurnDock in its 'draw' state, at its
-          canonical spot (bottom-left, under the decks, left of the hand) */}
-      <div className={styles.turnDock}>
-        <TurnDock
-          state={busy ? 'push' : 'draw'}
-          seconds={20}
-          progress={1}
-          copy={turnCopy}
-          onDraw={busy ? undefined : drawBatch}
-        />
-      </div>
+        {/* discard — on the right; cards land scattered (a tossed heap) */}
+        <div className={styles.discard}>
+          <Pile
+            heap={discard}
+            count={discard.length}
+            width={116}
+            boxRef={discardRef}
+            logoVariant={lang}
+            label={pick(lang, { ru: 'сброс', en: 'discard' })}
+          />
+        </div>
 
-      {/* discard — on the right; cards land scattered (a tossed heap) */}
-      <div className={styles.discard}>
-        <Pile
-          heap={discard}
-          count={discard.length}
-          width={116}
-          boxRef={discardRef}
-          logoVariant={lang}
-          label={pick(lang, { ru: 'сброс', en: 'discard' })}
-        />
-      </div>
+        {/* Error 503, you drew — a large glow UNDER the hand (before the hand in the DOM).
+            The glow fills the table zone, which is exactly the stage. */}
+        <div className={styles.glowBounds}>
+          <EdgeGlow visible={alert === 'self'} intensity="strong" />
+        </div>
 
-      {/* Error 503, you drew — a large glow UNDER the hand (before the hand in the DOM).
-          The glow lives in the TABLE zone (under the bar), not across the whole screen. */}
-      <div className={styles.glowBounds} style={{ insetBlockStart: barH }}>
-        <EdgeGlow visible={alert === 'self'} intensity="strong" />
-      </div>
+        {/* player hand — fanned at the bottom */}
+        <div className={styles.handWrap} ref={handRef}>
+          <Hand
+            items={hand}
+            gapAt={gapAt}
+            gapSize={gapSize}
+            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+          />
+        </div>
 
-      {/* player hand — fanned at the bottom */}
-      <div className={styles.handWrap} ref={handRef}>
-        <Hand
-          items={hand}
-          gapAt={gapAt}
-          gapSize={gapSize}
-          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
-        />
-      </div>
+        {/* Error 503, the opponent drew — a small glow OVER the hand (doesn't block hover) */}
+        <div className={styles.glowBounds}>
+          <EdgeGlow visible={alert === 'other'} intensity="weak" />
+        </div>
 
-      {/* Error 503, the opponent drew — a small glow OVER the hand (doesn't block hover) */}
-      <div className={styles.glowBounds} style={{ insetBlockStart: barH }}>
-        <EdgeGlow visible={alert === 'other'} intensity="weak" />
+        {/* every card this scene has in the air — the shared carrier */}
+        {flyerOverlay}
+        {overlay}
       </div>
-
-      {/* every card this scene has in the air — the shared carrier */}
-      {flyerOverlay}
-      {overlay}
     </div>
   )
 }

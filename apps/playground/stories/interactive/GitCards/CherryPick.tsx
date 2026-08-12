@@ -8,6 +8,8 @@ import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../../Playground/lang'
+import TechBar from '../../controls/TechBar'
+import { TechButton, TechSwitch, TechToggle } from '../../controls/TechControls'
 import { reorderHand } from '../reorderHand'
 import { useDiscardExit } from '../useDiscardExit'
 import { useHandArrival } from '../useHandArrival'
@@ -386,147 +388,138 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
 
   return (
     <div className={styles.root} ref={rootRef}>
-      <div className={styles.bar}>
+      <TechBar>
         {selector}
         <span className={styles.sep} />
-        <label className={styles.toggle}>
-          <input type="checkbox" checked={sudo} onChange={(e) => changeSudo(e.target.checked)} />
+        <TechButton onClick={restart}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
+        <TechToggle on={sudo} onChange={changeSudo}>
           sudo
-        </label>
-        <div className={styles.seg}>
-          {SIZES.map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={`${styles.segBtn} ${size === n ? styles.on : ''}`}
-              onClick={() => changeSize(n)}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-        <span className={styles.miniLabel}>{pick(lang, { ru: 'в сбросе', en: 'in discard' })}</span>
-        <button type="button" className={styles.btn} onClick={restart}>
-          {pick(lang, { ru: 'рестарт', en: 'restart' })}
-        </button>
-      </div>
-
-      {/* draw deck (left) — the sudo target */}
-      <div className={styles.deckPile}>
-        <div ref={deckRef}>
-          <Pile deck="base" count={deckCount} width={DECK_W} countPos="tl" />
-        </div>
-        <span className={styles.pileLabel}>{pick(lang, { ru: 'колода', en: 'deck' })}</span>
-      </div>
-
-      {/* discard (right) — the source; cards deal out of here and return here.
-          Rest state is a tossed heap (top cards tilted), not a neat column. */}
-      <div className={styles.discardPile}>
-        <Pile
-          heap={showGrid ? [] : discard}
-          count={showGrid ? 0 : discard.length}
-          heapShow={HEAP_SHOW}
-          width={PILE_W}
-          boxRef={discardRef}
-          logoVariant={lang}
+        </TechToggle>
+        <TechSwitch
+          label={pick(lang, { ru: 'в сбросе', en: 'in discard' })}
+          options={SIZES.map((n) => ({ value: n, label: String(n) }))}
+          value={size}
+          onChange={changeSize}
         />
-        <span className={styles.pileLabel}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
-      </div>
-
-      {/* idle: the start button in the centre */}
-      {phase === 'idle' && (
-        <div className={styles.controls}>
-          <button type="button" className={styles.callBtn} onClick={start}>
-            git cherry-pick
-          </button>
-        </div>
-      )}
-
-      {/* selection scrim — backing under the picker so it sits above the hand.
-          Only while choosing: during resolve it's gone so the hand insert and the
-          flying cards are fully visible (not dimmed / tucked under it). */}
-      {(phase === 'deal' || phase === 'choose') && <div className={styles.scrim} />}
-
-      {/* the whole discard, face-up, as a grid (scrolls on the 54 case) */}
-      {showGrid && (
-        <div className={styles.gridWrap}>
-          <div className={`${styles.grid} ${phase === 'deal' ? styles.dealing : ''}`}>
-            {discard.map((d) => {
-              const trigger = isTrigger(d.card)
-              const handRole = roles.handUid === d.uid
-              const deckRole = roles.deckUid === d.uid
-              const selected = handRole || deckRole
-              const blocked = phase === 'choose' && !selected && !canSelect(d)
-              return (
-                <button
-                  key={d.uid}
-                  ref={(el) => {
-                    if (el) cellRefs.current.set(d.uid, el)
-                    else cellRefs.current.delete(d.uid)
-                  }}
-                  type="button"
-                  className={`${styles.cell} ${selected ? styles.selected : ''} ${
-                    blocked ? styles.blocked : ''
-                  }`}
-                  onClick={() => pickCard(d)}
-                >
-                  <Card
-                    card={d.card}
-                    interactive={false}
-                    width={GRID_W}
-                    faceDown={flipped.has(d.uid)}
-                    state={phase === 'choose' && selected ? 'selected' : 'idle'}
-                    // pick one out of a set — uniform selection colour, not the
-                    // per-category accent
-                    accent="var(--select-accent)"
-                  />
-                  {phase === 'choose' && trigger && !selected && (
-                    <span className={styles.lockTag}>
-                      {pick(lang, { ru: 'нельзя в руку', en: 'no hand' })}
-                    </span>
-                  )}
-                  {phase === 'choose' && handRole && (
-                    <span className={styles.roleTag}>
-                      {pick(lang, { ru: '→ в руку', en: '→ hand' })}
-                    </span>
-                  )}
-                  {phase === 'choose' && deckRole && (
-                    <span className={styles.roleTag}>
-                      {pick(lang, { ru: '→ на колоду', en: '→ deck' })}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
+      </TechBar>
+      <div className={styles.stage}>
+        {/* draw deck (left) — the sudo target */}
+        <div className={styles.deckPile}>
+          <div ref={deckRef}>
+            <Pile deck="base" count={deckCount} width={DECK_W} countPos="tl" />
           </div>
+          <span className={styles.pileLabel}>{pick(lang, { ru: 'колода', en: 'deck' })}</span>
         </div>
-      )}
 
-      {/* confirm the selection — the shared slide-up bar; the instruction rides
-          in its caption */}
-      <ConfirmAction
-        open={phase === 'choose'}
-        label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
-        caption={hint}
-        disabled={!confirmReady}
-        onConfirm={confirmPick}
-      />
+        {/* discard (right) — the source; cards deal out of here and return here.
+            Rest state is a tossed heap (top cards tilted), not a neat column. */}
+        <div className={styles.discardPile}>
+          <Pile
+            heap={showGrid ? [] : discard}
+            count={showGrid ? 0 : discard.length}
+            heapShow={HEAP_SHOW}
+            width={PILE_W}
+            boxRef={discardRef}
+            logoVariant={lang}
+          />
+          <span className={styles.pileLabel}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
+        </div>
 
-      {overlay}
+        {/* idle: the start button in the centre */}
+        {phase === 'idle' && (
+          <div className={styles.startSlot}>
+            <button type="button" className={styles.callBtn} onClick={start}>
+              git cherry-pick
+            </button>
+          </div>
+        )}
 
-      {/* hover preview off until the round settles — while a card is dealing /
-          flying in, the layout would otherwise trigger the hand's zoom-on-hover */}
-      <div
-        className={styles.handWrap}
-        ref={handRef}
-        style={{ pointerEvents: phase === 'idle' || phase === 'done' ? undefined : 'none' }}
-      >
-        <Hand
-          items={hand}
-          gapAt={gapAt}
-          gapSize={gapSize}
-          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        {/* selection scrim — backing under the picker so it sits above the hand.
+            Only while choosing: during resolve it's gone so the hand insert and the
+            flying cards are fully visible (not dimmed / tucked under it). */}
+        {(phase === 'deal' || phase === 'choose') && <div className={styles.scrim} />}
+
+        {/* the whole discard, face-up, as a grid (scrolls on the 54 case) */}
+        {showGrid && (
+          <div className={styles.gridWrap}>
+            <div className={`${styles.grid} ${phase === 'deal' ? styles.dealing : ''}`}>
+              {discard.map((d) => {
+                const trigger = isTrigger(d.card)
+                const handRole = roles.handUid === d.uid
+                const deckRole = roles.deckUid === d.uid
+                const selected = handRole || deckRole
+                const blocked = phase === 'choose' && !selected && !canSelect(d)
+                return (
+                  <button
+                    key={d.uid}
+                    ref={(el) => {
+                      if (el) cellRefs.current.set(d.uid, el)
+                      else cellRefs.current.delete(d.uid)
+                    }}
+                    type="button"
+                    className={`${styles.cell} ${selected ? styles.selected : ''} ${
+                      blocked ? styles.blocked : ''
+                    }`}
+                    onClick={() => pickCard(d)}
+                  >
+                    <Card
+                      card={d.card}
+                      interactive={false}
+                      width={GRID_W}
+                      faceDown={flipped.has(d.uid)}
+                      state={phase === 'choose' && selected ? 'selected' : 'idle'}
+                      // pick one out of a set — uniform selection colour, not the
+                      // per-category accent
+                      accent="var(--select-accent)"
+                    />
+                    {phase === 'choose' && trigger && !selected && (
+                      <span className={styles.lockTag}>
+                        {pick(lang, { ru: 'нельзя в руку', en: 'no hand' })}
+                      </span>
+                    )}
+                    {phase === 'choose' && handRole && (
+                      <span className={styles.roleTag}>
+                        {pick(lang, { ru: '→ в руку', en: '→ hand' })}
+                      </span>
+                    )}
+                    {phase === 'choose' && deckRole && (
+                      <span className={styles.roleTag}>
+                        {pick(lang, { ru: '→ на колоду', en: '→ deck' })}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* confirm the selection — the shared slide-up bar; the instruction rides
+            in its caption */}
+        <ConfirmAction
+          open={phase === 'choose'}
+          label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
+          caption={hint}
+          disabled={!confirmReady}
+          onConfirm={confirmPick}
         />
+
+        {overlay}
+
+        {/* hover preview off until the round settles — while a card is dealing /
+            flying in, the layout would otherwise trigger the hand's zoom-on-hover */}
+        <div
+          className={styles.handWrap}
+          ref={handRef}
+          style={{ pointerEvents: phase === 'idle' || phase === 'done' ? undefined : 'none' }}
+        >
+          <Hand
+            items={hand}
+            gapAt={gapAt}
+            gapSize={gapSize}
+            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+          />
+        </div>
       </div>
     </div>
   )

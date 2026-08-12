@@ -13,6 +13,8 @@ import type { HandPlayDrop } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import { pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechButton, TechHint } from '../controls/TechControls'
 import styles from './CardPlayStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
@@ -129,69 +131,68 @@ export default function CardPlayStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar}>
-        <button type="button" className={styles.btn} onClick={reset}>
-          {pick(lang, { ru: 'сброс состояния', en: 'reset state' })}
-        </button>
-        <span className={styles.hint}>
+      <TechBar>
+        <TechButton onClick={reset}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
+        <TechHint>
           {pick(lang, {
             ru: 'вытащи карту из руки / клик по сопернику → в центр; клик по карте в центре → в сброс',
             en: 'pull a card out of the hand / click the opponent → to the center; click the card at the center → to the discard',
           })}
-        </span>
+        </TechHint>
+      </TechBar>
+      <div className={styles.stage}>
+        {/* opponent — as on the table (a Seat with a card counter); click = plays */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only opponent play; sandbox story */}
+        <div className={styles.opponent} ref={seatRef} onMouseDown={playFromOpponent}>
+          <Seat
+            player={{
+              id: 'opp',
+              name: pick(lang, { ru: 'соперник', en: 'opponent' }),
+              handCount: oppDeck.length,
+              release: EMPTY_RELEASE,
+            }}
+            copy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
+          />
+        </div>
+
+        {/* table center */}
+        <div className={styles.center} ref={centerRef}>
+          {center ? (
+            // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only send to discard; sandbox story
+            <div className={styles.centerCard} onMouseDown={flyToDiscard}>
+              <Card card={center} interactive={false} width="100%" />
+            </div>
+          ) : (
+            <span className={styles.centerSlot}>{pick(lang, { ru: 'центр', en: 'center' })}</span>
+          )}
+        </div>
+
+        {/* discard — on the right, cards land scattered */}
+        <div className={styles.discard}>
+          <Pile
+            heap={discard}
+            count={discard.length}
+            width={116}
+            boxRef={discardRef}
+            logoVariant={lang}
+            label={pick(lang, { ru: 'сброс', en: 'discard' })}
+          />
+        </div>
+
+        {/* player hand — bottom, the canonical fan */}
+        <div className={styles.hand}>
+          <Hand
+            items={playerHand}
+            onPlay={playFromPlayer}
+            onReorder={(uid, to) => setPlayerHand((h) => reorderHand(h, uid, to))}
+          />
+        </div>
+
+        {discardOverlay}
+
+        {/* the card in the air — the shared carrier */}
+        {flyerOverlay}
       </div>
-
-      {/* opponent — as on the table (a Seat with a card counter); click = plays */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only opponent play; sandbox story */}
-      <div className={styles.opponent} ref={seatRef} onMouseDown={playFromOpponent}>
-        <Seat
-          player={{
-            id: 'opp',
-            name: pick(lang, { ru: 'соперник', en: 'opponent' }),
-            handCount: oppDeck.length,
-            release: EMPTY_RELEASE,
-          }}
-          copy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
-        />
-      </div>
-
-      {/* table center */}
-      <div className={styles.center} ref={centerRef}>
-        {center ? (
-          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only send to discard; sandbox story
-          <div className={styles.centerCard} onMouseDown={flyToDiscard}>
-            <Card card={center} interactive={false} width="100%" />
-          </div>
-        ) : (
-          <span className={styles.centerSlot}>{pick(lang, { ru: 'центр', en: 'center' })}</span>
-        )}
-      </div>
-
-      {/* discard — on the right, cards land scattered */}
-      <div className={styles.discard}>
-        <Pile
-          heap={discard}
-          count={discard.length}
-          width={116}
-          boxRef={discardRef}
-          logoVariant={lang}
-          label={pick(lang, { ru: 'сброс', en: 'discard' })}
-        />
-      </div>
-
-      {/* player hand — bottom, the canonical fan */}
-      <div className={styles.hand}>
-        <Hand
-          items={playerHand}
-          onPlay={playFromPlayer}
-          onReorder={(uid, to) => setPlayerHand((h) => reorderHand(h, uid, to))}
-        />
-      </div>
-
-      {discardOverlay}
-
-      {/* the card in the air — the shared carrier */}
-      {flyerOverlay}
     </div>
   )
 }

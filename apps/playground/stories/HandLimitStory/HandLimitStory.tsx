@@ -9,6 +9,8 @@ import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
+import TechBar from '../controls/TechBar'
+import { TechButton } from '../controls/TechControls'
 import { reorderHand } from '../interactive/reorderHand'
 import { useDiscardExit } from '../interactive/useDiscardExit'
 import { useFlyer } from '../interactive/useFlyer'
@@ -185,7 +187,10 @@ export default function HandLimitStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar}>
+      <TechBar>
+        <TechButton onClick={() => reset(size, limit)}>
+          {pick(lang, { ru: 'рестарт', en: 'restart' })}
+        </TechButton>
         <HoverSelect
           label={pick(lang, { ru: 'лимит руки', en: 'hand limit' })}
           value={String(limit)}
@@ -211,80 +216,81 @@ export default function HandLimitStory() {
             )}
           </Typography>
         </div>
-      </div>
+      </TechBar>
+      <div className={styles.stage}>
+        {/* the open grid at the centre — the turn's discard, laid out for everyone
+            to read; empty cells show the shape that is being filled */}
+        {cells > 0 && (
+          <div
+            className={styles.grid}
+            style={{ gridTemplateColumns: `repeat(${grid.cols}, ${cardW}px)` }}
+          >
+            {Array.from({ length: cells }, (_, i) => {
+              const card = placed.find((p) => p.slot === i)?.card
+              return (
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the cells are a fixed grid, the index IS the slot
+                  key={i}
+                  className={styles.cell}
+                  ref={(el) => {
+                    cellRefs.current[i] = el
+                  }}
+                >
+                  {card ? (
+                    <Card card={card} interactive={false} width="100%" />
+                  ) : (
+                    <span className={styles.cellEmpty} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
-      {/* the open grid at the centre — the turn's discard, laid out for everyone
-          to read; empty cells show the shape that is being filled */}
-      {cells > 0 && (
-        <div
-          className={styles.grid}
-          style={{ gridTemplateColumns: `repeat(${grid.cols}, ${cardW}px)` }}
-        >
-          {Array.from({ length: cells }, (_, i) => {
-            const card = placed.find((p) => p.slot === i)?.card
-            return (
-              <div
-                // biome-ignore lint/suspicious/noArrayIndexKey: the cells are a fixed grid, the index IS the slot
-                key={i}
-                className={styles.cell}
-                ref={(el) => {
-                  cellRefs.current[i] = el
-                }}
-              >
-                {card ? (
-                  <Card card={card} interactive={false} width="100%" />
-                ) : (
-                  <span className={styles.cellEmpty} />
-                )}
-              </div>
-            )
-          })}
+        {/* discard — right of centre; cards land scattered (a tossed heap) */}
+        <div className={styles.discard}>
+          <Pile
+            heap={discard}
+            count={discard.length}
+            width={116}
+            boxRef={discardRef}
+            logoVariant={lang}
+            label={pick(lang, { ru: 'сброс', en: 'discard' })}
+          />
         </div>
-      )}
 
-      {/* discard — right of centre; cards land scattered (a tossed heap) */}
-      <div className={styles.discard}>
-        <Pile
-          heap={discard}
-          count={discard.length}
-          width={116}
-          boxRef={discardRef}
-          logoVariant={lang}
-          label={pick(lang, { ru: 'сброс', en: 'discard' })}
-        />
-      </div>
-
-      {/* hand — bottom-centre; over the limit every card is a valid discard.
-          Never blocked by a flight in progress: the next card can be pulled out
-          while the previous one is still on its way to its cell. */}
-      <div className={styles.you}>
-        <div className={styles.hint}>
-          <Typography base="mono-xs">
-            {excess > 0
-              ? pick(lang, {
-                  ru: 'вытащи карту из руки — она встанет в сетку сброса',
-                  en: 'pull a card out of the hand — it takes a cell in the grid',
-                })
-              : pick(lang, {
-                  ru: 'лимит соблюдён — сбрасывать нечего',
-                  en: 'within the limit — nothing to discard',
-                })}
-          </Typography>
+        {/* hand — bottom-centre; over the limit every card is a valid discard.
+            Never blocked by a flight in progress: the next card can be pulled out
+            while the previous one is still on its way to its cell. */}
+        <div className={styles.you}>
+          <div className={styles.hint}>
+            <Typography base="mono-xs">
+              {excess > 0
+                ? pick(lang, {
+                    ru: 'вытащи карту из руки — она встанет в сетку сброса',
+                    en: 'pull a card out of the hand — it takes a cell in the grid',
+                  })
+                : pick(lang, {
+                    ru: 'лимит соблюдён — сбрасывать нечего',
+                    en: 'within the limit — nothing to discard',
+                  })}
+            </Typography>
+          </div>
+          <Hand
+            items={hand}
+            stateAt={excess > 0 ? () => 'playable' : undefined}
+            // any card is a valid discard — one uniform colour, not the per-category
+            // accent (which would read as "this type is what fits"). The hue is the
+            // context of the move: this pick COSTS a card, so it reads as a loss.
+            accentAt={excess > 0 ? () => 'var(--danger-accent)' : undefined}
+            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+            onPlay={onPlay}
+          />
         </div>
-        <Hand
-          items={hand}
-          stateAt={excess > 0 ? () => 'playable' : undefined}
-          // any card is a valid discard — one uniform colour, not the per-category
-          // accent (which would read as "this type is what fits"). The hue is the
-          // context of the move: this pick COSTS a card, so it reads as a loss.
-          accentAt={excess > 0 ? () => 'var(--danger-accent)' : undefined}
-          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
-          onPlay={onPlay}
-        />
-      </div>
 
-      {/* the cards on their way to a cell — several can be in the air at once */}
-      {flyerOverlay}
+        {/* the cards on their way to a cell — several can be in the air at once */}
+        {flyerOverlay}
+      </div>
     </div>
   )
 }

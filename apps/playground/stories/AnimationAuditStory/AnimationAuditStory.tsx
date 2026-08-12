@@ -486,8 +486,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Тревога Error 503 (краевое свечение)', en: 'Error 503 alarm (edge glow)' },
     from: {
-      ru: 'EdgeGlow внутри контейнера зоны стола (.glowBounds от измеренной высоты тех-бара — край экрана ≠ край стола); своя вытяжка — strong ДО Hand в DOM (ПОД рукой); соперник — weak ПОСЛЕ Hand (НАД рукой) + pointer-events:none, чтобы не глушить ховер-реакцию руки; появление/затухание — CSS-transition opacity.',
-      en: 'EdgeGlow inside the table-zone container (.glowBounds from the measured tech-bar height — screen edge ≠ table edge); own layer — strong BEFORE Hand in the DOM (UNDER the hand); opponent — weak AFTER Hand (OVER the hand) + pointer-events:none so it does not smother the hand hover reaction; fade in/out — CSS-transition opacity.',
+      ru: 'EdgeGlow внутри контейнера зоны стола (.glowBounds — inset:0 области демонстрации: край экрана ≠ край стола, и мерить нечего, потому что зона стола и есть сцена); своя вытяжка — strong ДО Hand в DOM (ПОД рукой); соперник — weak ПОСЛЕ Hand (НАД рукой) + pointer-events:none, чтобы не глушить ховер-реакцию руки; появление/затухание — CSS-transition opacity.',
+      en: 'EdgeGlow inside the table-zone container (.glowBounds — inset: 0 of the demo area: screen edge ≠ table edge, and there is nothing to measure because the table zone IS the stage); own layer — strong BEFORE Hand in the DOM (UNDER the hand); opponent — weak AFTER Hand (OVER the hand) + pointer-events:none so it does not smother the hand hover reaction; fade in/out — CSS-transition opacity.',
     },
     where: 'DrawCard',
   },
@@ -620,6 +620,21 @@ const ISSUES: Issue[] = [
     },
     where: { ru: 'docs/animations/recipes.md', en: 'docs/animations/recipes.md' },
     status: 'open',
+  },
+  {
+    what: {
+      ru: 'Плавающая тех-полоса выпилена — область демонстрации стала настоящей',
+      en: 'The floating tech bar is gone — the demo area is now real',
+    },
+    problem: {
+      ru: 'Было: полоса лежала слоем НАД сценой (position:absolute, z-index 60), и сцена о её высоте не знала. Отсюда три следствия, каждое чинилось на месте: верхние отступы раздувались, чтобы разойтись с полосой (.opponents стояли на 84–96px вместо канонических 22px из Table); три сцены — AI cards, Draw card, Error 503 — мерили полосу в рантайме через barRef/offsetHeight, чтобы краевое свечение и видео выбывания не считали край окна краем стола; а скрим в Git cards затемнял всю страницу. Стало: полоса — строка страницы, .stage под ней и ЕСТЬ область демонстрации, всё поверх сцены — inset:0 от неё. Замеры удалены, отступы вернулись к значениям Table. Правило записано в apps/playground/CLAUDE.md.',
+      en: 'Before: the bar was a LAYER over the scene (position: absolute, z-index 60) and the scene did not know its height. Three consequences followed, each patched locally: top offsets were inflated to clear it (.opponents at 84–96px instead of the canonical 22px from Table); three scenes — AI cards, Draw card, Error 503 — measured the bar at runtime through barRef/offsetHeight so the edge glow and the elimination video would not take the window edge for the table edge; and the Git-cards scrim dimmed the whole page. Now: the bar is a row of the page, the .stage under it IS the demo area, and everything painted over the scene is inset: 0 of it. The measurements are deleted and the offsets are back to Table values. The rule is written down in apps/playground/CLAUDE.md.',
+    },
+    where: {
+      ru: 'stories/controls/, все сцены интерактива',
+      en: 'stories/controls/, every interactive scene',
+    },
+    status: 'ok',
   },
 ]
 

@@ -12,6 +12,8 @@ import Hand from '@/table/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import { pick, useLang } from '../../../Playground/lang'
+import TechBar from '../../controls/TechBar'
+import { TechButton, TechSwitch, TechToggle } from '../../controls/TechControls'
 import { reorderHand } from '../reorderHand'
 import { useDiscardExit } from '../useDiscardExit'
 import { useHandArrival } from '../useHandArrival'
@@ -268,131 +270,120 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
 
   return (
     <div className={styles.root} ref={rootRef}>
-      <div className={styles.bar}>
+      <TechBar>
         {selector}
         <span className={styles.sep} />
-        <label className={styles.toggle}>
-          <input type="checkbox" checked={sudo} onChange={(e) => changeSudo(e.target.checked)} />
+        <TechButton onClick={restart}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
+        <TechToggle on={sudo} onChange={changeSudo}>
           sudo
-        </label>
-        <span className={styles.miniLabel}>
-          {pick(lang, { ru: 'соперников', en: 'opponents' })}
-        </span>
-        <div className={styles.seg}>
-          {OPP_COUNTS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={`${styles.segBtn} ${oppN === n ? styles.on : ''}`}
-              onClick={() => changeOpp(n)}
+        </TechToggle>
+        <TechSwitch
+          label={pick(lang, { ru: 'соперников', en: 'opponents' })}
+          options={OPP_COUNTS.map((n) => ({ value: n, label: String(n) }))}
+          value={oppN}
+          onChange={changeOpp}
+        />
+      </TechBar>
+      <div className={styles.stage}>
+        {/* opponents across the top, as on the table */}
+        <div className={styles.suOpponents}>
+          {opponents.map((o) => (
+            <div
+              key={o.id}
+              ref={(el) => {
+                if (el) seatRefs.current.set(o.id, el)
+                else seatRefs.current.delete(o.id)
+              }}
             >
-              {n}
-            </button>
+              <Seat player={{ ...o, handCount: 6, release: EMPTY_RELEASE }} copy={seatCopy} />
+            </div>
           ))}
         </div>
-        <button type="button" className={styles.btn} onClick={restart}>
-          {pick(lang, { ru: 'рестарт', en: 'restart' })}
-        </button>
-      </div>
 
-      {/* opponents across the top, as on the table */}
-      <div className={styles.suOpponents}>
-        {opponents.map((o) => (
-          <div
-            key={o.id}
-            ref={(el) => {
-              if (el) seatRefs.current.set(o.id, el)
-              else seatRefs.current.delete(o.id)
-            }}
-          >
-            <Seat player={{ ...o, handCount: 6, release: EMPTY_RELEASE }} copy={seatCopy} />
+        {/* discard — right-centre, as on the table; cards land here scattered */}
+        <div className={styles.discardPile}>
+          <Pile
+            heap={discard}
+            count={discard.length}
+            heapShow={HEAP_SHOW}
+            width={PILE_W}
+            boxRef={discardRef}
+            logoVariant={lang}
+          />
+          <span className={styles.pileLabel}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
+        </div>
+
+        {/* idle: start button in the centre */}
+        {phase === 'idle' && (
+          <div className={styles.startSlot}>
+            <button type="button" className={styles.callBtn} onClick={start}>
+              system upgrade
+            </button>
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* discard — right-centre, as on the table; cards land here scattered */}
-      <div className={styles.discardPile}>
-        <Pile
-          heap={discard}
-          count={discard.length}
-          heapShow={HEAP_SHOW}
-          width={PILE_W}
-          boxRef={discardRef}
-          logoVariant={lang}
-        />
-        <span className={styles.pileLabel}>{pick(lang, { ru: 'сброс', en: 'discard' })}</span>
-      </div>
+        {/* sudo choose — dim the rest so the centre cards are the focus */}
+        {phase === 'choose' && <div className={styles.scrim} />}
 
-      {/* idle: start button in the centre */}
-      {phase === 'idle' && (
-        <div className={styles.controls}>
-          <button type="button" className={styles.callBtn} onClick={start}>
-            system upgrade
-          </button>
-        </div>
-      )}
+        {/* the thrown cards, face-up in the centre */}
+        {showCenter && (
+          <div className={styles.suCenter}>
+            {center.map((c) => {
+              const selected = picked === c.uid
+              return (
+                <button
+                  key={c.uid}
+                  ref={(el) => {
+                    if (el) centerRefs.current.set(c.uid, el)
+                    else centerRefs.current.delete(c.uid)
+                  }}
+                  type="button"
+                  className={`${styles.suCard} ${selected ? styles.suSelected : ''}`}
+                  disabled={phase !== 'choose'}
+                  onClick={() => phase === 'choose' && setPicked(c.uid)}
+                >
+                  <Card
+                    card={c.card}
+                    interactive={false}
+                    width={CENTER_W}
+                    state={phase === 'choose' && selected ? 'selected' : 'idle'}
+                    // pick one out of a set — uniform selection colour, not the
+                    // per-category accent
+                    accent="var(--select-accent)"
+                  />
+                </button>
+              )
+            })}
+          </div>
+        )}
 
-      {/* sudo choose — dim the rest so the centre cards are the focus */}
-      {phase === 'choose' && <div className={styles.scrim} />}
-
-      {/* the thrown cards, face-up in the centre */}
-      {showCenter && (
-        <div className={styles.suCenter}>
-          {center.map((c) => {
-            const selected = picked === c.uid
-            return (
-              <button
-                key={c.uid}
-                ref={(el) => {
-                  if (el) centerRefs.current.set(c.uid, el)
-                  else centerRefs.current.delete(c.uid)
-                }}
-                type="button"
-                className={`${styles.suCard} ${selected ? styles.suSelected : ''}`}
-                disabled={phase !== 'choose'}
-                onClick={() => phase === 'choose' && setPicked(c.uid)}
-              >
-                <Card
-                  card={c.card}
-                  interactive={false}
-                  width={CENTER_W}
-                  state={phase === 'choose' && selected ? 'selected' : 'idle'}
-                  // pick one out of a set — uniform selection colour, not the
-                  // per-category accent
-                  accent="var(--select-accent)"
-                />
-              </button>
-            )
+        {/* sudo: confirm the card to take — the shared slide-up bar */}
+        <ConfirmAction
+          open={phase === 'choose'}
+          label={pick(lang, { ru: 'взять в руку', en: 'take to hand' })}
+          caption={pick(lang, {
+            ru: 'выбери сброшенную карту себе в руку',
+            en: 'pick a discarded card to take into your hand',
           })}
-        </div>
-      )}
-
-      {/* sudo: confirm the card to take — the shared slide-up bar */}
-      <ConfirmAction
-        open={phase === 'choose'}
-        label={pick(lang, { ru: 'взять в руку', en: 'take to hand' })}
-        caption={pick(lang, {
-          ru: 'выбери сброшенную карту себе в руку',
-          en: 'pick a discarded card to take into your hand',
-        })}
-        disabled={!picked}
-        onConfirm={() => picked && resolve(picked)}
-      />
-
-      {overlay}
-
-      {/* player hand — bottom */}
-      <div
-        className={styles.handWrap}
-        ref={handRef}
-        style={{ pointerEvents: phase === 'idle' || phase === 'done' ? undefined : 'none' }}
-      >
-        <Hand
-          items={hand}
-          gapAt={gapAt}
-          gapSize={gapSize}
-          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+          disabled={!picked}
+          onConfirm={() => picked && resolve(picked)}
         />
+
+        {overlay}
+
+        {/* player hand — bottom */}
+        <div
+          className={styles.handWrap}
+          ref={handRef}
+          style={{ pointerEvents: phase === 'idle' || phase === 'done' ? undefined : 'none' }}
+        >
+          <Hand
+            items={hand}
+            gapAt={gapAt}
+            gapSize={gapSize}
+            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+          />
+        </div>
       </div>
     </div>
   )

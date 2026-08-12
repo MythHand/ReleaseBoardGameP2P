@@ -3,6 +3,8 @@ import ruCommon from '@release/translation/locales/ru/common.json'
 import { useState } from 'react'
 import Lobby from '@/screens/Lobby'
 import { useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechSwitch } from '../controls/TechControls'
 import styles from './LobbyStory.module.css'
 
 export default function LobbyStory() {
@@ -11,47 +13,25 @@ export default function LobbyStory() {
   const [bg, setBg] = useState<'neutral' | 'positive' | 'problem'>('neutral')
   return (
     <div className={styles.root}>
-      <div className={styles.controls}>
-        <div className={styles.switch}>
-          <button
-            type="button"
-            className={role === 'host' ? styles.on : ''}
-            onClick={() => setRole('host')}
-          >
-            host
-          </button>
-          <button
-            type="button"
-            className={role === 'guest' ? styles.on : ''}
-            onClick={() => setRole('guest')}
-          >
-            guest
-          </button>
-        </div>
-        <div className={styles.switch}>
-          <button
-            type="button"
-            className={bg === 'neutral' ? styles.on : ''}
-            onClick={() => setBg('neutral')}
-          >
-            neutral
-          </button>
-          <button
-            type="button"
-            className={bg === 'positive' ? styles.on : ''}
-            onClick={() => setBg('positive')}
-          >
-            positive
-          </button>
-          <button
-            type="button"
-            className={bg === 'problem' ? styles.on : ''}
-            onClick={() => setBg('problem')}
-          >
-            problem
-          </button>
-        </div>
-      </div>
+      <TechBar>
+        <TechSwitch
+          options={[
+            { value: 'host', label: 'host' },
+            { value: 'guest', label: 'guest' },
+          ]}
+          value={role}
+          onChange={setRole}
+        />
+        <TechSwitch
+          options={[
+            { value: 'neutral', label: 'neutral' },
+            { value: 'positive', label: 'positive' },
+            { value: 'problem', label: 'problem' },
+          ]}
+          value={bg}
+          onChange={setBg}
+        />
+      </TechBar>
       {/* стартовый язык лобби берём из языка плейграунда; дальше им управляет
           встроенный в лобби свитчер. key переинициализирует экран при смене
           языка плейграунда из шапки */}

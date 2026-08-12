@@ -19,6 +19,8 @@ import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechButton, TechHint } from '../controls/TechControls'
 import styles from './GameEndStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useFlyer } from './useFlyer'
@@ -269,21 +271,15 @@ export default function GameEndStory() {
       {/* The technical line is a ROW of the playground, not a layer over the
           screen: it takes its own height, and the table below owns everything
           left — so nothing the scene paints over the table has to dodge it. */}
-      <div className={styles.controls}>
-        <button type="button" className={styles.btn} onClick={restart}>
-          <Typography base="label-sm" tk="tk-16">
-            {pick(lang, { ru: 'рестарт', en: 'restart' })}
-          </Typography>
-        </button>
-        <div className={styles.hint}>
-          <Typography base="mono-xs">
-            {pick(lang, {
-              ru: 'вытяни Database из веера — это последний релиз в партии',
-              en: 'pull Database out of the fan — the last release of the match',
-            })}
-          </Typography>
-        </div>
-      </div>
+      <TechBar>
+        <TechButton onClick={restart}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
+        <TechHint>
+          {pick(lang, {
+            ru: 'вытяни Database из веера — это последний релиз в партии',
+            en: 'pull Database out of the fan — the last release of the match',
+          })}
+        </TechHint>
+      </TechBar>
 
       <div className={styles.stage}>
         {/* the table's own background layer, over the grid the area paints */}

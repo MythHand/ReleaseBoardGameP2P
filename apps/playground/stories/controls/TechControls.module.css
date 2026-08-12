@@ -1,0 +1,76 @@
+/* The control vocabulary of the technical bar. One box for the action button and
+   the toggle (they differ only by the on-state fill), one segmented switch, one
+   label. Text metrics come from <Typography>, never from here. */
+
+.btn,
+.toggle {
+  padding: 8px 14px;
+  color: var(--fg);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--white-15);
+  border-radius: 6px;
+}
+
+.btn:hover,
+.toggle[data-on='false']:hover {
+  color: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+.btn:disabled,
+.toggle:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.btn:disabled:hover {
+  color: var(--fg);
+  border-color: var(--white-15);
+}
+
+.toggle[data-on='true'] {
+  color: var(--deep-green);
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+}
+
+/* segmented switch — the TableStory shape: buttons sit on a filled track with a
+   2px seam between them, the active one is a lighter fill rather than a border */
+.switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--white-08);
+}
+
+.seg {
+  padding: 6px 14px;
+  color: var(--white-55);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.segOn {
+  color: var(--fg);
+  background: var(--white-16);
+}
+
+/* what the scene expects of you right now — a sentence, pushed to the quiet end
+   of the contrast range so the controls stay the loud thing in the bar */
+.hint {
+  color: var(--white-45);
+}
+
+/* a caption inside the bar: what a control counts or what the next one means */
+.label {
+  color: var(--white-45);
+}
+
+/* a caption and its control read as one thing, so they wrap as one thing */
+.field {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}

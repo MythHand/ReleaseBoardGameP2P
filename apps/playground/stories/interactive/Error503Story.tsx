@@ -1,7 +1,7 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import type React from 'react'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { play, type Rect, restTransform, scatterAt, wait } from '@/animations'
 import { CARDS, CATEGORIES, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
@@ -10,13 +10,14 @@ import Card, { cardAreaOf } from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
-import Typography from '@/primitives/Typography'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
 import TurnDock, { type TurnDockState } from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
+import TechBar from '../controls/TechBar'
+import { TechButton, TechToggle } from '../controls/TechControls'
 import styles from './Error503Story.module.css'
 import { reorderHand } from './reorderHand'
 import { type Leaving, useDiscardExit } from './useDiscardExit'
@@ -166,7 +167,6 @@ export default function Error503Story() {
   const dragRef = useRef<HTMLDivElement>(null)
   const youRef = useRef<HTMLDivElement>(null) // the player's own area: zone + hand
   const handWrapRef = useRef<HTMLDivElement>(null)
-  const barRef = useRef<HTMLDivElement>(null)
   const relSlotRefs = useRef<Record<string, HTMLDivElement | null>>({})
   // every card this scene puts in the air: the drawn 503 ('draw') and the cards
   // swept to the discard ('o0', 'o1', …). The dragged defence is NOT one of them —
@@ -226,12 +226,6 @@ export default function Error503Story() {
     gifResolve.current?.()
     gifResolve.current = null
   }
-
-  // tech-bar height → the edge glow lives in the TABLE zone (under the bar)
-  const [barH, setBarH] = useState(0)
-  useLayoutEffect(() => {
-    if (barRef.current) setBarH(barRef.current.offsetHeight)
-  }, [])
 
   // rebuild the scene from the toggles (on mount and on any toggle change)
   // biome-ignore lint/correctness/useExhaustiveDependencies: applyScene reads only the toggle args
@@ -611,7 +605,10 @@ export default function Error503Story() {
 
   return (
     <div className={`${styles.root} ${drag ? styles.dragging : ''}`}>
-      <div className={styles.bar} ref={barRef}>
+      <TechBar>
+        <TechButton onClick={() => applyScene(dbg, rel1, relCR, mon)}>
+          {pick(lang, { ru: 'рестарт', en: 'restart' })}
+        </TechButton>
         {(
           [
             { on: dbg, set: setDbg, label: 'Debugger' },
@@ -620,17 +617,9 @@ export default function Error503Story() {
             { on: mon, set: setMon, label: 'Monitoring' },
           ] as const
         ).map((t) => (
-          <button
-            key={t.label}
-            type="button"
-            className={styles.chip}
-            data-on={t.on}
-            onClick={() => t.set((v) => !v)}
-          >
-            <Typography base="label-sm" tk="tk-16">
-              {t.label}
-            </Typography>
-          </button>
+          <TechToggle key={t.label} on={t.on} onChange={() => t.set((v) => !v)}>
+            {t.label}
+          </TechToggle>
         ))}
         <HoverSelect
           label="gif"
@@ -641,149 +630,141 @@ export default function Error503Story() {
           ]}
           onChange={setGifPick}
         />
-        <button
-          type="button"
-          className={styles.reset}
-          onClick={() => applyScene(dbg, rel1, relCR, mon)}
-        >
-          <Typography base="label-sm" tk="tk-16">
-            {pick(lang, { ru: 'сброс', en: 'reset' })}
-          </Typography>
-        </button>
-      </div>
+      </TechBar>
+      <div className={styles.stage}>
+        {/* draw deck — left-centre */}
+        <div className={styles.decks} ref={deckRef}>
+          <Pile
+            label={pick(lang, { ru: 'колода', en: 'deck' })}
+            deck="base"
+            count={40}
+            width={150}
+            countPos="tl"
+          />
+        </div>
 
-      {/* draw deck — left-centre */}
-      <div className={styles.decks} ref={deckRef}>
-        <Pile
-          label={pick(lang, { ru: 'колода', en: 'deck' })}
-          deck="base"
-          count={40}
-          width={150}
-          countPos="tl"
-        />
-      </div>
+        {/* centre staging — the 503 comes out here; defence covers it here */}
+        <div className={styles.center} ref={centerRef}>
+          {centerCard && (
+            <div className={styles.centerCard}>
+              <Card card={centerCard} interactive={false} width="100%" />
+            </div>
+          )}
+        </div>
 
-      {/* centre staging — the 503 comes out here; defence covers it here */}
-      <div className={styles.center} ref={centerRef}>
-        {centerCard && (
-          <div className={styles.centerCard}>
-            <Card card={centerCard} interactive={false} width="100%" />
+        {/* discard — right of centre; cards land scattered (a tossed heap) */}
+        <div className={styles.discard}>
+          <Pile
+            heap={discard}
+            count={discard.length}
+            width={116}
+            boxRef={discardRef}
+            logoVariant={lang}
+            label={pick(lang, { ru: 'сброс', en: 'discard' })}
+          />
+        </div>
+
+        {/* turn dock — bottom-left */}
+        <div className={styles.turnDock}>
+          <TurnDock
+            state={dock}
+            danger={dock === 'reaction'}
+            seconds={20}
+            progress={1}
+            activePlayer={WAITING_PLAYER}
+            copy={turnCopy}
+            onDraw={dock === 'draw' ? drawFlow : undefined}
+            onPass={pending ? () => eliminate(true) : undefined}
+          />
+        </div>
+
+        {/* the edge glow fills the table zone, which is exactly the stage */}
+        <div className={styles.glowBounds}>
+          <EdgeGlow visible={alert} intensity="strong" />
+        </div>
+
+        {/* release zone + hand — bottom-centre. Cross-fades to the "you are out"
+            badge (release zone gone) when the player is knocked out, as on Table */}
+        <div className={styles.you} ref={youRef}>
+          <div className={styles.playArea} data-hidden={eliminated}>
+            {/* the zone reflects what the scene decided and hands the grab back:
+                a release that can answer the 503 lights in its category accent, and
+                the one being dragged shows its empty place instead of a hole */}
+            <ReleaseZone
+              size="100px"
+              release={Object.fromEntries(SLOTS.map((key) => [key, rel[key]?.main]))}
+              support={Object.fromEntries(SLOTS.map((key) => [key, rel[key]?.aux]))}
+              slotRef={(key, el) => {
+                relSlotRefs.current[key] = el
+              }}
+              accentAt={(key) => {
+                const card = rel[key]?.main
+                return grabbable(key) && card ? CATEGORIES[card.category]?.accent : undefined
+              }}
+              liftedAt={(key) => drag?.kind === 'release' && drag.slot === key}
+              onSlotDown={(key, e) => {
+                if (grabbable(key)) onRelDown(e, key)
+              }}
+            />
+
+            <div className={styles.handWrap} ref={handWrapRef}>
+              <Hand
+                items={handItems}
+                // during the 503 window only the Debugger is playable; the rest grey
+                // out (Hand owns the transitioned dim)
+                stateAt={
+                  pending
+                    ? (i) => (handItems[i]?.card.id === DEBUGGER ? 'playable' : 'disabled')
+                    : undefined
+                }
+                onReorder={
+                  busy ? undefined : (uid, to) => setHandItems((h) => reorderHand(h, uid, to))
+                }
+                onPlay={busy ? undefined : handPlay}
+              />
+            </div>
+          </div>
+
+          <div className={styles.eliminated} data-shown={eliminated} aria-hidden={!eliminated}>
+            <Badge size="lg">{tableCopy.youEliminated}</Badge>
+          </div>
+        </div>
+
+        {/* every card this scene has in the air — the shared carrier, and the
+            discard step's own overlay (it raises its own flyers for a card handed
+            over as a rect rather than as an element) */}
+        {flyerOverlay}
+        {discardOverlay}
+
+        {/* the card being dragged as a defence */}
+        {drag && (
+          <div className={styles.dragFlyer} ref={dragRef} style={{ width: CARD_W }}>
+            {drag.aux ? (
+              <CardPair main={drag.main} aux={drag.aux} width="100%" />
+            ) : (
+              <Card card={drag.main} interactive={false} width="100%" />
+            )}
+          </div>
+        )}
+
+        {/* elimination video — full-screen for everyone; loops for at least
+            ELIM_MIN_MS, then finishes the current loop and fades out */}
+        {gif && (
+          <div className={styles.gifOverlay}>
+            <video
+              // a media element does NOT re-fetch when `src` changes: keyed by the
+              // source, so a different video is a different element (I5)
+              key={gif}
+              className={styles.gifVideo}
+              src={gif}
+              autoPlay
+              muted
+              playsInline
+              onEnded={onGifEnded}
+            />
           </div>
         )}
       </div>
-
-      {/* discard — right of centre; cards land scattered (a tossed heap) */}
-      <div className={styles.discard}>
-        <Pile
-          heap={discard}
-          count={discard.length}
-          width={116}
-          boxRef={discardRef}
-          logoVariant={lang}
-          label={pick(lang, { ru: 'сброс', en: 'discard' })}
-        />
-      </div>
-
-      {/* turn dock — bottom-left */}
-      <div className={styles.turnDock}>
-        <TurnDock
-          state={dock}
-          danger={dock === 'reaction'}
-          seconds={20}
-          progress={1}
-          activePlayer={WAITING_PLAYER}
-          copy={turnCopy}
-          onDraw={dock === 'draw' ? drawFlow : undefined}
-          onPass={pending ? () => eliminate(true) : undefined}
-        />
-      </div>
-
-      {/* the edge glow lives in the table zone (under the tech bar) */}
-      <div className={styles.glowBounds} style={{ insetBlockStart: barH }}>
-        <EdgeGlow visible={alert} intensity="strong" />
-      </div>
-
-      {/* release zone + hand — bottom-centre. Cross-fades to the "you are out"
-          badge (release zone gone) when the player is knocked out, as on Table */}
-      <div className={styles.you} ref={youRef}>
-        <div className={styles.playArea} data-hidden={eliminated}>
-          {/* the zone reflects what the scene decided and hands the grab back:
-              a release that can answer the 503 lights in its category accent, and
-              the one being dragged shows its empty place instead of a hole */}
-          <ReleaseZone
-            size="100px"
-            release={Object.fromEntries(SLOTS.map((key) => [key, rel[key]?.main]))}
-            support={Object.fromEntries(SLOTS.map((key) => [key, rel[key]?.aux]))}
-            slotRef={(key, el) => {
-              relSlotRefs.current[key] = el
-            }}
-            accentAt={(key) => {
-              const card = rel[key]?.main
-              return grabbable(key) && card ? CATEGORIES[card.category]?.accent : undefined
-            }}
-            liftedAt={(key) => drag?.kind === 'release' && drag.slot === key}
-            onSlotDown={(key, e) => {
-              if (grabbable(key)) onRelDown(e, key)
-            }}
-          />
-
-          <div className={styles.handWrap} ref={handWrapRef}>
-            <Hand
-              items={handItems}
-              // during the 503 window only the Debugger is playable; the rest grey
-              // out (Hand owns the transitioned dim)
-              stateAt={
-                pending
-                  ? (i) => (handItems[i]?.card.id === DEBUGGER ? 'playable' : 'disabled')
-                  : undefined
-              }
-              onReorder={
-                busy ? undefined : (uid, to) => setHandItems((h) => reorderHand(h, uid, to))
-              }
-              onPlay={busy ? undefined : handPlay}
-            />
-          </div>
-        </div>
-
-        <div className={styles.eliminated} data-shown={eliminated} aria-hidden={!eliminated}>
-          <Badge size="lg">{tableCopy.youEliminated}</Badge>
-        </div>
-      </div>
-
-      {/* every card this scene has in the air — the shared carrier, and the
-          discard step's own overlay (it raises its own flyers for a card handed
-          over as a rect rather than as an element) */}
-      {flyerOverlay}
-      {discardOverlay}
-
-      {/* the card being dragged as a defence */}
-      {drag && (
-        <div className={styles.dragFlyer} ref={dragRef} style={{ width: CARD_W }}>
-          {drag.aux ? (
-            <CardPair main={drag.main} aux={drag.aux} width="100%" />
-          ) : (
-            <Card card={drag.main} interactive={false} width="100%" />
-          )}
-        </div>
-      )}
-
-      {/* elimination video — full-screen for everyone; loops for at least
-          ELIM_MIN_MS, then finishes the current loop and fades out */}
-      {gif && (
-        <div className={styles.gifOverlay} style={{ insetBlockStart: barH }}>
-          <video
-            // a media element does NOT re-fetch when `src` changes: keyed by the
-            // source, so a different video is a different element (I5)
-            key={gif}
-            className={styles.gifVideo}
-            src={gif}
-            autoPlay
-            muted
-            playsInline
-            onEnded={onGifEnded}
-          />
-        </div>
-      )}
     </div>
   )
 }

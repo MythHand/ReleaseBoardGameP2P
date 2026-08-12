@@ -1,9 +1,10 @@
 import type { CategoryId } from '@release/ui'
-import type React from 'react'
 import { type CSSProperties, useState } from 'react'
 import { CARDS, CATEGORIES } from '@/cards'
 import Card from '@/primitives/Card'
 import { useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechHint, TechSwitch, TechToggle } from '../controls/TechControls'
 import styles from './CardStory.module.css'
 
 type CardState = 'idle' | 'playable' | 'selected' | 'disabled'
@@ -47,50 +48,39 @@ export default function CardStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.controls}>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={tilt}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTilt(e.target.checked)}
-          />
+      <TechBar>
+        <TechToggle on={tilt} onChange={setTilt}>
           {t.tilt}
-        </label>
-        <div className={styles.states}>
-          {STATES.map((s) => (
-            <button
-              type="button"
-              key={s}
-              className={s === state ? styles.on : styles.btn}
-              onClick={() => setState(s)}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
+        </TechToggle>
+        <TechSwitch
+          options={STATES.map((s) => ({ value: s, label: s }))}
+          value={state}
+          onChange={setState}
+        />
+        <TechHint>{t.hint}</TechHint>
+      </TechBar>
 
-      <p className={styles.hint}>{t.hint}</p>
-
-      {groups.map((g) => (
-        <section key={g.cat} className={styles.group}>
-          <h3 className={styles.divider} style={{ '--accent': g.accent } as CSSProperties}>
-            <span className={styles.dividerLabel}>{g.label}</span>
-            <span className={styles.dividerLine} />
-            <span className={styles.count}>{g.cards.length}</span>
-          </h3>
-          <div className={styles.grid}>
-            {g.cards.map((card) => (
-              <div key={card.id} className={styles.cell}>
-                <Card card={card} state={state} tilt={tilt} png />
-                <div className={styles.cap}>
-                  {card.name} · {card.category}
+      <div className={styles.body}>
+        {groups.map((g) => (
+          <section key={g.cat} className={styles.group}>
+            <h3 className={styles.divider} style={{ '--accent': g.accent } as CSSProperties}>
+              <span className={styles.dividerLabel}>{g.label}</span>
+              <span className={styles.dividerLine} />
+              <span className={styles.count}>{g.cards.length}</span>
+            </h3>
+            <div className={styles.grid}>
+              {g.cards.map((card) => (
+                <div key={card.id} className={styles.cell}>
+                  <Card card={card} state={state} tilt={tilt} png />
+                  <div className={styles.cap}>
+                    {card.name} · {card.category}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   )
 }

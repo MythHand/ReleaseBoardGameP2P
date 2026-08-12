@@ -1,5 +1,5 @@
-/* стори-обёртка целого экрана с тех-линией — как TableStory:
-   полноширинная .controls сверху + .stage заполняет остаток. */
+/* whole-screen story with a technical line — the TableStory shell: <TechBar>
+   on top, .stage takes the rest and is the demo area. */
 .root {
   display: flex;
   flex-direction: column;
@@ -7,52 +7,7 @@
   overflow: hidden;
 }
 
-.controls {
-  position: relative;
-  z-index: 1000;
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  gap: 22px;
-  row-gap: 10px;
-  align-items: center;
-  padding: 12px 16px;
-  border-block-end: 1px solid var(--white-08);
-}
-
-.controlsLabel {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--white-45);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-
-/* все варианты доступности в одну линию — как host/guest в TableStory */
-.switch {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  background: var(--white-08);
-}
-
-.switch button {
-  padding: 6px 14px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--white-55);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-}
-
-.switch .on {
-  color: #fff;
-  background: var(--white-16);
-}
-
+/* the demo area — everything the screen paints over itself is inset: 0 of this */
 .stage {
   display: flex;
   flex: 1;

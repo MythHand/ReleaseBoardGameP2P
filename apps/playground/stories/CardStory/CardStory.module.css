@@ -1,56 +1,20 @@
 .root {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+}
+
+.body {
   padding: 28px;
-}
-
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 22px;
-  align-items: center;
-  margin-block-end: 10px;
-}
-
-.check {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 13px;
-  cursor: pointer;
-  opacity: 0.85;
-}
-
-.states {
-  display: flex;
-  gap: 6px;
-}
-
-.btn,
-.on {
-  padding: 6px 12px;
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.on {
-  color: var(--brand-green);
-  background: var(--brand-green-10);
-  border-color: var(--brand-green);
-}
-
-.hint {
-  margin: 0 0 26px;
-  font-size: 12px;
-  opacity: 0.5;
 }
 
 /* сегментация по типам карт — линия-разделитель с подписью и счётчиком */
 .group {
   margin-block-start: 44px;
+}
+
+.group:first-child {
+  margin-block-start: 0;
 }
 
 .divider {
@@ -63,6 +27,12 @@
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.14em;
+}
+
+/* the group's name — never shrinks, so the rule that follows it is what gives
+   way when the row runs out of width */
+.dividerLabel {
+  flex: none;
 }
 
 .dividerLine {
