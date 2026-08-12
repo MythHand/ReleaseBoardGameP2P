@@ -137,9 +137,14 @@ it('reserves the deal`s event ids and starts play right after them', () => {
   const drawSync = played.find((o) => o.message.type === 'SYNC' && o.to === 'peer-1')
   const drawnIds =
     drawSync?.message.type === 'SYNC' ? drawSync.message.payload.events.map((e) => e.id) : []
-  // The reduce feed picks up immediately after the reserved deal range, with
-  // no gap and no overlap.
-  expect(drawnIds).toEqual([3])
+  // The reduce feed picks up immediately after the reserved deal range, with no
+  // gap and no overlap. Asserted on the FIRST id rather than the whole list: how
+  // many events one draw emits is the engine's business and has already changed
+  // once (a sequenced draw emits several), while the boundary is the property
+  // this test exists to hold.
+  expect(drawnIds[0]).toBe(3)
+  // Still contiguous among themselves, so nothing re-uses a reserved id.
+  expect(drawnIds).toEqual(drawnIds.map((_, i) => 3 + i))
 })
 
 it('announces the game and syncs every seat privately', () => {

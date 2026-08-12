@@ -27,6 +27,8 @@ const sameTarget = (a: TableTarget, b: TableTarget): boolean => {
       return b.kind === 'monitoring' && a.player === b.player
     case 'card':
       return b.kind === 'card' && a.card === b.card
+    case 'pile':
+      return b.kind === 'pile' && a.pile === b.pile
   }
 }
 

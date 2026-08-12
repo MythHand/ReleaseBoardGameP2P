@@ -274,7 +274,10 @@ it('releases buffered intents in arrival order', () => {
   keeper.link.submit({ type: 'PUSH' })
   keeper.introReady('peer-a')
   expect(ref.current.state.turn.player).toBe('b')
-  expect(ref.current.state.turn.hasDrawn).toBe(false)
+  // b's turn is fresh — nothing drawn on it. (`drawnFrom` is the state's record
+  // of which piles this turn drew from; the projection derives `hasDrawn` from
+  // it for the UI.)
+  expect(ref.current.state.turn.drawnFrom).toEqual([])
 })
 
 it('stamps a buffered intent with the clock at release, not at arrival', () => {
@@ -296,7 +299,8 @@ it('stamps a buffered intent with the clock at release, not at arrival', () => {
   clock = 9_000
   keeper.introReady('peer-a')
   expect(reads).toEqual([9_000])
-  expect(ref.current.state.turn.hasDrawn).toBe(true)
+  // And the buffered DRAW really was applied on release, not dropped.
+  expect(ref.current.state.turn.drawnFrom.length).toBeGreaterThan(0)
 })
 
 it('does not tick while the gate is shut', () => {
