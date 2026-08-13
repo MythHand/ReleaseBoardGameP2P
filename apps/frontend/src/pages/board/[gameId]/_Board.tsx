@@ -54,6 +54,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import kit from '@/table/Table/Table.module.css'
 import { useBoardAnchors } from '~/entities/game/board'
 import type { BoardProps, Panel } from '~/entities/game/board/types'
+import { useBeats } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
@@ -174,13 +175,29 @@ export default function Board({
     refs: anchors,
     onDone: onIntroDone,
   })
+  // The live queue. It is armed only once the opening is over: until then the
+  // deal owns the table, and the events that produced the board's first
+  // projection are the deal's own — replaying them as discards would fly cards
+  // that never left a hand on screen.
+  const beats = useBeats({
+    live,
+    events: intro?.events ?? [],
+    anchors,
+    enabled: introOver || intro == null,
+  })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined
-  // While the deal runs the board renders its shadow of the projection. The
-  // shadow's last frame IS the projection, so the handover changes nothing on
-  // screen — provided nothing here keys off `introPhase`, and nothing does.
-  const state = deal.shadow ?? live
-  const actions = deal.active ? INERT_ACTIONS : liveActions
+  // While the deal runs the board renders its shadow of the projection, and
+  // afterwards a beat renders its own. The shadow's last frame IS the
+  // projection, so either handover changes nothing on screen — provided nothing
+  // here keys off `introPhase`, and nothing does. The deal wins the tie: it is
+  // the only shadow that exists before the queue is even armed.
+  const state = deal.shadow ?? beats.shadow ?? live
+  // Only the opening freezes the table. A discard is a thing that HAPPENED, not
+  // a thing being decided, so the fan stays live while one flies out
+  // (docs/animations/README.md — "Gating the hand", approach 3); `exclusive` is
+  // the queue's own answer, and today nothing but the opening sets it.
+  const actions = deal.active || beats.exclusive ? INERT_ACTIONS : liveActions
 
   const { you, opponents, decks, turn, history, setup } = state
   const derived = deriveDock(state, state.selfId, now)
@@ -242,8 +259,9 @@ export default function Board({
   // discarding whatever the mousemove listener had followed it to. `you.hand`
   // is still read inside the effect (to resolve the selected uid's slot
   // element), just not watched for changes.
-  // (`anchors.hand` is the same node the deal lands its cards in — the board's
-  // registry, not a ref of this effect's own.)
+  // (The slot comes from `anchors.handSlotAt` — the board's own registry, which
+  // the deal and the beat queue read too, rather than a third copy of the
+  // `[data-hand-slot]` query living in this effect.)
   const arrow = useArrow()
   // biome-ignore lint/correctness/useExhaustiveDependencies: `you.hand` is read to resolve the selected uid's slot element, not watched — see the comment above for why it must stay out of the dependency array
   useEffect(() => {
@@ -252,10 +270,7 @@ export default function Board({
       return
     }
     const index = gestures.selected ? you.hand.findIndex((c) => c.uid === gestures.selected) : -1
-    const slotEl =
-      index >= 0
-        ? anchors.hand.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
-        : undefined
+    const slotEl = index >= 0 ? anchors.handSlotAt(index) : null
     if (slotEl) arrow.aim(centerOf(slotEl))
   }, [gestures.phase, gestures.selected, arrow.aim, arrow.stop])
 
@@ -646,9 +661,11 @@ export default function Board({
         />
       )}
 
-      {/* the cards in the air: the carrier for the deal, and the arrival step
-          for the heap going into the fan. Last, so they fly over everything. */}
+      {/* the cards in the air: the carrier for the deal, the arrival step for
+          the heap going into the fan, and the exit step for a card leaving it
+          for the discard. Last, so they fly over everything. */}
       {deal.overlays}
+      {beats.overlays}
     </div>
   )
 }
