@@ -475,6 +475,31 @@ Tasks 5 and 6 consume `BoardAnchors`. `useDealIntro`'s `refs` parameter changes 
 
 - [ ] **Step 1: Write the failing test**
 
+> **Corrected during execution.** The board-level test below was the step's original
+> RED driver and could not be one: all three assertions query DOM structure that renders
+> identically whether or not the refs are wired, because a `ref` prop is invisible to
+> `querySelector`. It passed on the un-refactored board. The registry's behaviour is its
+> own and is tested directly, at `apps/frontend/src/entities/game/board/anchors.test.tsx`,
+> pinning five claims a plausible wrong implementation would fail:
+>
+> 1. **`handSlotAt(index)` indexes the fan** — `handSlotAt(1)` is the second
+>    `[data-hand-slot]` by identity; an out-of-range index answers `null`.
+> 2. **`releaseSlot` keys by owner AND slot** — every player has a slot called
+>    `frontend`, so a registry keyed on the slot name alone would return another
+>    player's node and fly a card out of the wrong seat. An unbound slot answers `null`.
+> 3. **`seatOf` releases a node on unbind** — React calls a ref callback with `null` on
+>    unmount, so this is the real lifecycle.
+> 4. **`seatBox` trims a seat to a card box (I6)** — with the seat's
+>    `getBoundingClientRect` stubbed wide, the result is `CARD_W` wide and centred on the
+>    seat. This is the whole reason `seatBox` exists: a seat is far wider than a card, and
+>    aiming at the seat rect inflates the card to it.
+> 5. **One identity across renders** — consumers capture the registry into a ref inside
+>    long-running async sequences; a fresh object per render would arm those against a
+>    stale registry, and nothing else would catch it.
+>
+> The board-level file below stays as a render-level smoke test of the board's structure,
+> retitled to say so.
+
 Create `apps/frontend/src/pages/board/[gameId]/__tests__/boardAnchors.test.tsx`:
 
 ```tsx
