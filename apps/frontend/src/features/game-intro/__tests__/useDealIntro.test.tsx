@@ -7,6 +7,9 @@ import { useDealIntro } from '../useDealIntro'
 
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => true }))
 
+// `useDealIntro` now takes the board's full `BoardAnchors` — this test only
+// exercises the members the sequencer itself reads, but the shape must still
+// satisfy the interface, so the rest are stubbed inert.
 const refs = () => ({
   rail: createRef<HTMLDivElement>(),
   bg: createRef<HTMLDivElement>(),
@@ -18,7 +21,13 @@ const refs = () => ({
   deckBox: createRef<HTMLDivElement>(),
   centre: createRef<HTMLDivElement>(),
   hand: createRef<HTMLDivElement>(),
+  discardBox: createRef<HTMLDivElement>(),
   seatOf: () => null,
+  seatBox: () => null,
+  handSlotAt: () => null,
+  releaseSlot: () => null,
+  bindSeat: () => {},
+  bindReleaseSlot: () => {},
 })
 
 // Minimal but real: the shapes the sequencer reads. No `as unknown as` cast —

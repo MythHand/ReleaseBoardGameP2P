@@ -1,3 +1,4 @@
+export { type BoardAnchors, useBoardAnchors } from './anchors'
 export { toAction } from './toAction'
 export { toBoardOver } from './toBoardOver'
 export type { HistoryLabels } from './toBoardState'

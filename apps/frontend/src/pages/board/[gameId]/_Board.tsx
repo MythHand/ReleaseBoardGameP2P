@@ -44,7 +44,7 @@ import {
 } from '@release/ui'
 import { HEAP_SHOW, restTransform } from '@release/ui/animations'
 import type React from 'react'
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:
 // where every block sits, how big it is, what it overlaps. The board is a fork
 // of @release/ui's Table and the playground is where this screen is designed
@@ -52,8 +52,8 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 // nothing to catch it — a type check cannot see a position. `opening` holds only
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
+import { useBoardAnchors } from '~/entities/game/board'
 import type { BoardProps, Panel } from '~/entities/game/board/types'
-import type { IntroRefs } from '~/features/game-intro/useDealIntro'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
@@ -151,37 +151,12 @@ export default function Board({
   intro,
 }: BoardProps) {
   // ===== the opening =====
-  // Every ref the deal aims at. The shift the `hudIn` preset applies rides on
-  // `transform`, so a block whose own transform holds its position (the seats'
-  // row, the decks column) is animated through an INNER node — hence the
-  // wrappers below rather than the positioned blocks themselves.
-  const railRef = useRef<HTMLDivElement>(null)
-  const bgRef = useRef<HTMLDivElement>(null)
-  const decksRef = useRef<HTMLDivElement>(null)
-  const discardRef = useRef<HTMLDivElement>(null)
-  const seatsRef = useRef<HTMLDivElement>(null)
-  const dockRef = useRef<HTMLDivElement>(null)
-  const zoneRef = useRef<HTMLDivElement>(null)
-  const deckBoxRef = useRef<HTMLDivElement>(null)
-  const centreRef = useRef<HTMLDivElement>(null)
-  const handRef = useRef<HTMLDivElement>(null)
-  const seatEls = useRef<Record<string, HTMLElement | null>>({})
-  const introRefs = useMemo<IntroRefs>(
-    () => ({
-      rail: railRef,
-      bg: bgRef,
-      decks: decksRef,
-      discard: discardRef,
-      seats: seatsRef,
-      dock: dockRef,
-      zone: zoneRef,
-      deckBox: deckBoxRef,
-      centre: centreRef,
-      hand: handRef,
-      seatOf: (player: string) => seatEls.current[player] ?? null,
-    }),
-    [],
-  )
+  // Every node a flight aims at or leaves from — the board's own registry, not
+  // just the deal's. The shift the `hudIn` preset applies rides on `transform`,
+  // so a block whose own transform holds its position (the seats' row, the
+  // decks column) is animated through an INNER node — hence the wrappers below
+  // rather than the positioned blocks themselves.
+  const anchors = useBoardAnchors()
 
   // The blocks stay hidden from the FIRST committed frame until the intro is
   // over — not merely while it is `active`. `hudIn` only holds a block down
@@ -196,7 +171,7 @@ export default function Board({
     gameId: intro?.gameId ?? null,
     view: intro?.view ?? null,
     events: intro?.events ?? [],
-    refs: introRefs,
+    refs: anchors,
     onDone: onIntroDone,
   })
   const entering = intro != null && !introOver
@@ -267,8 +242,8 @@ export default function Board({
   // discarding whatever the mousemove listener had followed it to. `you.hand`
   // is still read inside the effect (to resolve the selected uid's slot
   // element), just not watched for changes.
-  // (`handRef` is declared with the intro's refs above — the deal lands its
-  // cards in this very element, so the two must be the same node.)
+  // (`anchors.hand` is the same node the deal lands its cards in — the board's
+  // registry, not a ref of this effect's own.)
   const arrow = useArrow()
   // biome-ignore lint/correctness/useExhaustiveDependencies: `you.hand` is read to resolve the selected uid's slot element, not watched — see the comment above for why it must stay out of the dependency array
   useEffect(() => {
@@ -279,7 +254,7 @@ export default function Board({
     const index = gestures.selected ? you.hand.findIndex((c) => c.uid === gestures.selected) : -1
     const slotEl =
       index >= 0
-        ? handRef.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+        ? anchors.hand.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
         : undefined
     if (slotEl) arrow.aim(centerOf(slotEl))
   }, [gestures.phase, gestures.selected, arrow.aim, arrow.stop])
@@ -370,7 +345,7 @@ export default function Board({
     <div className={kit.table} onClick={handleTableClick} role="presentation">
       {/* the table's own ambience — a layer, so the opening can bring it in
           whole without touching the screen's base fill */}
-      <div className={cls(opening.bgWrap, enter)} ref={bgRef}>
+      <div className={cls(opening.bgWrap, enter)} ref={anchors.bg}>
         <HudBackground tone="neutral" className={kit.bgLayer} />
       </div>
       <Arrow from={arrow.from} to={arrow.to} />
@@ -380,7 +355,7 @@ export default function Board({
 
       {/* the seats: each in its own wrapper, so the opening can drop them in one
           after another and the deal can aim a card at the seat it belongs to */}
-      <div className={kit.opponents} ref={seatsRef}>
+      <div className={kit.opponents} ref={anchors.seats}>
         {opponents.map((p) => {
           const eliminated = Boolean(p.eliminated)
           const disconnected = disconnectedIds.has(p.id)
@@ -391,7 +366,7 @@ export default function Board({
               key={p.id}
               className={enter}
               ref={(el) => {
-                seatEls.current[p.id] = el
+                anchors.bindSeat(p.id, el)
               }}
             >
               <Seat
@@ -400,6 +375,7 @@ export default function Board({
                 eliminated={eliminated}
                 disconnected={disconnected}
                 copy={copy.seat}
+                slotRef={(key, el) => anchors.bindReleaseSlot(p.id, key, el)}
                 onPick={(target) => gestures.onTargetPick(target)}
                 targets={gestures.targets}
               />
@@ -409,14 +385,14 @@ export default function Board({
       </div>
 
       <div className={kit.decks}>
-        <div className={cls(opening.deckStack, enter)} ref={decksRef}>
+        <div className={cls(opening.deckStack, enter)} ref={anchors.decks}>
           <Pile
             label={copy.table.deck}
             deck="base"
             count={decks.main}
             width={150}
             countPos="tl"
-            boxRef={deckBoxRef}
+            boxRef={anchors.deckBox}
           />
           <Pile
             label={copy.table.events}
@@ -431,7 +407,7 @@ export default function Board({
       {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними
           «глубина» стопки, счётчик показывает весь сброс */}
       <div className={kit.discard}>
-        <div className={enter} ref={discardRef}>
+        <div className={enter} ref={anchors.discard}>
           <Pile
             label={copy.table.discard}
             heap={decks.discardHeap}
@@ -439,6 +415,7 @@ export default function Board({
             topCard={decks.discard}
             count={decks.discardCount}
             width={116}
+            boxRef={anchors.discardBox}
           />
         </div>
       </div>
@@ -448,7 +425,7 @@ export default function Board({
           mounted for the whole of an intro-bearing mount (the sequencer aims at
           it from its first layout effect) and is empty the rest of the time. */}
       {intro && (
-        <div className={opening.centre} ref={centreRef}>
+        <div className={opening.centre} ref={anchors.centre}>
           {deal.staged.map((s) => {
             const data = cardById(s.card)
             if (!data) return null
@@ -474,16 +451,17 @@ export default function Board({
           <>
             {/* the zone is the last thing to arrive: it is yours, and it comes
                 once you have a hand to play from */}
-            <div className={enter} ref={zoneRef}>
+            <div className={enter} ref={anchors.zone}>
               <ReleaseZone
                 release={you.release}
                 size="100px"
                 player={state.selfId}
+                slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
                 onPick={(target) => gestures.onTargetPick(target)}
                 targets={gestures.targets}
               />
             </div>
-            <div className={kit.handWrap} ref={handRef}>
+            <div className={kit.handWrap} ref={anchors.hand}>
               <Hand
                 items={you.hand}
                 // the fan opens room for the arriving heap while it travels
@@ -518,7 +496,7 @@ export default function Board({
 
       {/* служебный док хода — низ слева, под колодами, слева от руки */}
       <div className={kit.turnDock}>
-        <div className={enter} ref={dockRef}>
+        <div className={enter} ref={anchors.dock}>
           <TurnDock
             state={dockView.state}
             danger={dockView.danger}
@@ -558,7 +536,7 @@ export default function Board({
       {/* `inert` while the opening runs: the layer is faded to nothing but its
           buttons would still take a click and a Tab stop, so a player could open
           a drawer they cannot see. */}
-      <div className={cls(opening.railLayer, enter)} ref={railRef} inert={entering}>
+      <div className={cls(opening.railLayer, enter)} ref={anchors.rail} inert={entering}>
         <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
       </div>
 

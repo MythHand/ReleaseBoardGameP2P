@@ -8,9 +8,9 @@ import { CARD_W, cardBoxIn, cardById } from '@release/ui'
 // from the components: a vocabulary and its steps, not a thing to render.
 import type { Rect, Scatter } from '@release/ui/animations'
 import { play, scatterAt, useFlyer, useHandArrival, wait } from '@release/ui/animations'
-import type { ReactNode, RefObject } from 'react'
+import type { ReactNode } from 'react'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { BoardState } from '~/entities/game/board'
+import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { isOpening } from './isOpening'
 import type { DealPlan } from './planDeal'
@@ -51,20 +51,6 @@ const ROUND_GAP = 160 // an extra breath between rounds, so rounds are countable
 const HEAP_HOLD = 640 // the finished heap stands open before it goes to the fan
 const FLIP_HOLD = 380 // it is all in the hand — then it turns over
 const REVEAL_HOLD = 620 // the hand is read, and only then the zone arrives
-
-export interface IntroRefs {
-  rail: RefObject<HTMLDivElement | null>
-  bg: RefObject<HTMLDivElement | null>
-  decks: RefObject<HTMLDivElement | null>
-  discard: RefObject<HTMLDivElement | null>
-  seats: RefObject<HTMLDivElement | null>
-  dock: RefObject<HTMLDivElement | null>
-  zone: RefObject<HTMLDivElement | null>
-  deckBox: RefObject<HTMLDivElement | null>
-  centre: RefObject<HTMLDivElement | null>
-  hand: RefObject<HTMLDivElement | null>
-  seatOf: (player: string) => HTMLElement | null
-}
 
 /** A card of the player's own heap at the centre, before it goes into the fan. */
 export interface StagedCard {
@@ -125,7 +111,7 @@ export function useDealIntro(args: {
   gameId: string | null
   view: PlayerView | null
   events: Event[]
-  refs: IntroRefs
+  refs: BoardAnchors
   onDone: () => void
 }): DealIntro {
   const { live, gameId, view, events, refs } = args
