@@ -53,38 +53,6 @@
   opacity: 0;
 }
 
-/* строка технических контролов — своя высота, экран начинается под ней */
-.controls {
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  gap: 22px;
-  row-gap: 10px;
-  align-items: center;
-  padding: 12px 16px;
-  border-block-end: 1px solid var(--white-08);
-}
-
-.btn {
-  padding: 8px 14px;
-  color: var(--fg);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.btn:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
-}
-
-/* «всего: N» рядом с селектом оппонентов — как в TableStory */
-.total {
-  margin-inline-start: -12px;
-  color: var(--white-45);
-}
-
 /* соперники — один ряд сверху по центру, столовый отступ */
 .opponents {
   position: absolute;

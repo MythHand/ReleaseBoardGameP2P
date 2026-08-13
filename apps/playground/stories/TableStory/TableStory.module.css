@@ -5,50 +5,7 @@
   overflow: hidden;
 }
 
-.controls {
-  position: relative;
-  z-index: 1000; /* выше оверлея GameOver (100) и прочих слоёв стола — дропдауны всегда сверху */
-  display: flex;
-  flex: 0 0 auto;
-  flex-wrap: wrap;
-  gap: 22px;
-  row-gap: 10px;
-  align-items: center;
-  padding: 12px 16px;
-  border-block-end: 1px solid var(--white-08);
-}
-
-/* переключатель роли host/guest — только песочница, как в LobbyStory */
-.switch {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  background: var(--white-08);
-}
-
-.switch button {
-  padding: 6px 14px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--white-55);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-}
-
-.switch .on {
-  color: #fff;
-  background: var(--white-16);
-}
-
-.total {
-  margin-inline-start: -12px; /* прижать к селекту «оппонентов» */
-  font-size: 12px;
-  opacity: 0.45;
-}
-
+/* the demo area — everything the scene paints over itself is inset: 0 of this */
 .stage {
   display: flex;
   flex: 1;

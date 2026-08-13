@@ -5,6 +5,8 @@ import { makeTable } from '@/mocks/table'
 import Table from '@/table/Table'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
+import TechBar from '../controls/TechBar'
+import { TechField, TechLabel, TechSwitch } from '../controls/TechControls'
 import styles from './TableStory.module.css'
 
 type GameOverCondition = 'release' | 'lastStanding'
@@ -181,33 +183,27 @@ export default function TableStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.controls}>
-        <div className={styles.switch}>
-          <button
-            type="button"
-            className={role === 'host' ? styles.on : ''}
-            onClick={() => setRole('host')}
-          >
-            host
-          </button>
-          <button
-            type="button"
-            className={role === 'guest' ? styles.on : ''}
-            onClick={() => setRole('guest')}
-          >
-            guest
-          </button>
-        </div>
-
-        <HoverSelect
-          label={pick(lang, { ru: 'оппонентов', en: 'opponents' })}
-          value={String(opps)}
-          options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
-          onChange={(v) => setOpps(Number(v))}
+      <TechBar>
+        <TechSwitch
+          options={[
+            { value: 'host', label: 'host' },
+            { value: 'guest', label: 'guest' },
+          ]}
+          value={role}
+          onChange={setRole}
         />
-        <span className={styles.total}>
-          {pick(lang, { ru: 'всего', en: 'total' })}: {opps + 1}
-        </span>
+
+        <TechField>
+          <HoverSelect
+            label={pick(lang, { ru: 'оппонентов', en: 'opponents' })}
+            value={String(opps)}
+            options={[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))}
+            onChange={(v) => setOpps(Number(v))}
+          />
+          <TechLabel>
+            {pick(lang, { ru: 'всего', en: 'total' })}: {opps + 1}
+          </TechLabel>
+        </TechField>
 
         <HoverSelect
           label={pick(lang, { ru: 'состояние', en: 'state' })}
@@ -235,7 +231,7 @@ export default function TableStory() {
           options={DOCK_STATES.map((d) => ({ value: d.id, label: d.label[lang] }))}
           onChange={(v) => setDock(v as DockDemo)}
         />
-      </div>
+      </TechBar>
       <div className={styles.stage}>
         <Table
           state={storyState}

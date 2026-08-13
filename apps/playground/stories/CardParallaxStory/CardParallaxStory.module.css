@@ -5,30 +5,15 @@
   overflow: hidden;
 }
 
-/* separated technical bar — page-level hint + card count, never over the stage */
-.controls {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 16px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-block-end: 1px solid var(--white-08);
-}
-
-.hint {
-  max-inline-size: 70ch;
-  font-size: 12px;
-  line-height: 1.4;
-  opacity: 0.5;
-}
-
 /* right cluster of the technical bar — nav hint + card count */
+
+/* pushed to the far end of the bar — the page's own count, not a control */
 .meta {
   display: flex;
   flex: 0 0 auto;
   gap: 14px;
   align-items: center;
+  margin-inline-start: auto;
 }
 
 .navHint {

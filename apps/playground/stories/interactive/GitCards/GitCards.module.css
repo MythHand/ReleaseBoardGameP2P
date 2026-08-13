@@ -1,46 +1,17 @@
 .root {
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
+  overflow: hidden;
+}
+
+/* the demo area: the scene lives here and paints nothing outside it. The bar
+   above is a row of the page, so nothing has to know its height. */
+.stage {
   position: relative;
-  min-block-size: 100vh;
+  flex: 1;
+  min-block-size: 0;
   overflow: hidden;
-}
-
-/* technical control bar */
-.bar {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  z-index: 60;
-  display: flex;
-  gap: 20px;
-  align-items: center;
-  padding: 16px 24px;
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  border-block-end: 1px solid var(--white-08);
-}
-
-/* git-card selector — always first (left) in the bar; the card's own controls
-   sit to the right of the divider */
-.selector {
-  display: flex;
-  overflow: hidden;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.selBtn {
-  padding: 8px 16px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-45);
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-}
-
-.selBtn.selOn {
-  color: var(--fg);
-  background: var(--white-08);
 }
 
 .sep {
@@ -48,64 +19,6 @@
   inline-size: 1px;
   margin-inline: 4px;
   background: var(--white-12);
-}
-
-.miniLabel {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--white-45);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.toggle {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--fg);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-}
-
-.seg {
-  display: flex;
-  overflow: hidden;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.segBtn {
-  padding: 8px 14px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--white-45);
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-}
-
-.segBtn.on {
-  color: var(--brand-green);
-  background: var(--white-08);
-}
-
-.btn {
-  padding: 8px 14px;
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: 0.04em;
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.btn:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
 }
 
 /* draw deck (left) and discard (right) — canonical Table placement. Centred by a
@@ -146,7 +59,7 @@
 }
 
 /* idle: start button in the centre */
-.controls {
+.startSlot {
   position: absolute;
   inset-block-start: 46%;
   inset-inline: 0;
@@ -197,7 +110,7 @@
    so the cards run right down to the bar instead of being clipped high above it. */
 .gridWrap {
   position: absolute;
-  inset-block: 92px 150px;
+  inset-block: 27px 150px;
   inset-inline: 210px;
   z-index: 30;
   display: flex;
@@ -338,7 +251,7 @@
    top row stays visible) instead of chewing off the top. */
 .orderWrap {
   position: absolute;
-  inset-block: 72px 150px;
+  inset-block: 8px 150px;
   inset-inline: 0;
   z-index: 30;
   display: flex;

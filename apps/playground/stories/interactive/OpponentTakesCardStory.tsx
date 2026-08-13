@@ -12,6 +12,8 @@ import Hand from '@/table/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
 import { pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechButton } from '../controls/TechControls'
 import styles from './OpponentTakesCardStory.module.css'
 import { reorderHand } from './reorderHand'
 
@@ -178,112 +180,111 @@ export default function OpponentTakesCardStory() {
   }
 
   return (
-    <div className={styles.root} ref={rootRef}>
-      <div className={styles.bar}>
-        <button type="button" className={styles.btn} onClick={restart}>
-          {pick(lang, { ru: 'рестарт', en: 'restart' })}
-        </button>
-      </div>
-
-      {/* opponents — top-centre, as on the table. Their hands are hidden in the
-          seats: the taker's counter is where the taken card ends up. */}
-      <div className={styles.opponents}>
-        {OPPONENTS.map((o) => (
-          <div
-            key={o.id}
-            ref={(el) => {
-              seatRefs.current[o.id] = el
-            }}
-          >
-            <Seat
-              player={{
-                id: o.id,
-                name: o.name,
-                handCount: o.handCount + (o.id === TAKER ? taken : 0),
-                release: EMPTY_RELEASE,
+    <div className={styles.root}>
+      <TechBar>
+        <TechButton onClick={restart}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
+      </TechBar>
+      <div className={styles.stage} ref={rootRef}>
+        {/* opponents — top-centre, as on the table. Their hands are hidden in the
+            seats: the taker's counter is where the taken card ends up. */}
+        <div className={styles.opponents}>
+          {OPPONENTS.map((o) => (
+            <div
+              key={o.id}
+              ref={(el) => {
+                seatRefs.current[o.id] = el
               }}
-              active={o.id === TAKER && phase !== 'idle'}
-              copy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
+            >
+              <Seat
+                player={{
+                  id: o.id,
+                  name: o.name,
+                  handCount: o.handCount + (o.id === TAKER ? taken : 0),
+                  release: EMPTY_RELEASE,
+                }}
+                active={o.id === TAKER && phase !== 'idle'}
+                copy={pick(lang, { ru: ruCommon.seat, en: enCommon.seat })}
+              />
+            </div>
+          ))}
+        </div>
+
+        {phase === 'miss' && (
+          <div className={styles.miss}>
+            {pick(lang, { ru: 'у тебя нет такой карты', en: "you don't have that card" })}
+          </div>
+        )}
+
+        {/* idle: the start button in the centre */}
+        {phase === 'idle' && (
+          <div className={styles.startSlot}>
+            <button type="button" className={styles.callBtn} onClick={start}>
+              {pick(lang, { ru: 'у тебя забирают карту', en: 'an opponent takes your card' })}
+            </button>
+          </div>
+        )}
+
+        {/* the opponent's broadcast catalog (choose which of your cards to take) */}
+        {phase !== 'idle' && (
+          <div className={styles.grid}>
+            <CardCatalog
+              cards={BASE_TYPES}
+              open={phase === 'choose'}
+              selected={wanted?.id}
+              chosen={phase === 'picked' ? wanted?.id : null}
+              onPick={pickWanted}
+              width={GRID_W}
             />
           </div>
-        ))}
-      </div>
+        )}
 
-      {phase === 'miss' && (
-        <div className={styles.miss}>
-          {pick(lang, { ru: 'у тебя нет такой карты', en: "you don't have that card" })}
-        </div>
-      )}
+        {take && (
+          <div
+            className={styles.take}
+            style={
+              {
+                left: take.from.left,
+                top: take.from.top,
+                width: take.from.width,
+                zIndex: 55,
+                // it dissolves as it reaches the seat — the hand there is hidden,
+                // so the card stops being a card the moment it arrives
+                opacity: stage === 'up' ? 0 : 1,
+                transform:
+                  stage === 'from'
+                    ? 'translate(0px, 0px) scale(1) rotate(0deg)'
+                    : stage === 'center'
+                      ? take.center
+                      : take.up,
+              } as CSSProperties
+            }
+            onTransitionEnd={onTakeEnd}
+          >
+            <Card card={take.card} faceDown={flipped} width={take.from.width} interactive={false} />
+          </div>
+        )}
 
-      {/* idle: the start button in the centre */}
-      {phase === 'idle' && (
-        <div className={styles.controls}>
-          <button type="button" className={styles.callBtn} onClick={start}>
-            {pick(lang, { ru: 'у тебя забирают карту', en: 'an opponent takes your card' })}
-          </button>
-        </div>
-      )}
-
-      {/* the opponent's broadcast catalog (choose which of your cards to take) */}
-      {phase !== 'idle' && (
-        <div className={styles.grid}>
-          <CardCatalog
-            cards={BASE_TYPES}
-            open={phase === 'choose'}
-            selected={wanted?.id}
-            chosen={phase === 'picked' ? wanted?.id : null}
-            onPick={pickWanted}
-            width={GRID_W}
-          />
-        </div>
-      )}
-
-      {take && (
+        {/* once the choice is confirmed the scene plays itself out — the fan goes
+            inert for the whole sequence, so moving the cursor off the confirm bar
+            doesn't lift a card and raise its zoom preview into the play. Same guard
+            the other scenes use while they resolve (Combo, AI cards, Cherry-pick). */}
         <div
-          className={styles.take}
-          style={
-            {
-              left: take.from.left,
-              top: take.from.top,
-              width: take.from.width,
-              zIndex: 55,
-              // it dissolves as it reaches the seat — the hand there is hidden,
-              // so the card stops being a card the moment it arrives
-              opacity: stage === 'up' ? 0 : 1,
-              transform:
-                stage === 'from'
-                  ? 'translate(0px, 0px) scale(1) rotate(0deg)'
-                  : stage === 'center'
-                    ? take.center
-                    : take.up,
-            } as CSSProperties
-          }
-          onTransitionEnd={onTakeEnd}
+          className={styles.handWrap}
+          ref={handRef}
+          style={{ pointerEvents: phase === 'idle' || phase === 'choose' ? undefined : 'none' }}
         >
-          <Card card={take.card} faceDown={flipped} width={take.from.width} interactive={false} />
+          <Hand items={hand} onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))} />
         </div>
-      )}
 
-      {/* once the choice is confirmed the scene plays itself out — the fan goes
-          inert for the whole sequence, so moving the cursor off the confirm bar
-          doesn't lift a card and raise its zoom preview into the play. Same guard
-          the other scenes use while they resolve (Combo, AI cards, Cherry-pick). */}
-      <div
-        className={styles.handWrap}
-        ref={handRef}
-        style={{ pointerEvents: phase === 'idle' || phase === 'choose' ? undefined : 'none' }}
-      >
-        <Hand items={hand} onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))} />
+        {/* naming a card is irreversible — confirm it (the shared slide-up bar) */}
+        <ConfirmAction
+          open={phase === 'choose'}
+          label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
+          caption={pick(lang, { ru: 'соперник выбирает карту', en: 'the opponent is choosing' })}
+          disabled={wanted == null}
+          onConfirm={confirmWanted}
+        />
       </div>
-
-      {/* naming a card is irreversible — confirm it (the shared slide-up bar) */}
-      <ConfirmAction
-        open={phase === 'choose'}
-        label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
-        caption={pick(lang, { ru: 'соперник выбирает карту', en: 'the opponent is choosing' })}
-        disabled={wanted == null}
-        onConfirm={confirmWanted}
-      />
     </div>
   )
 }

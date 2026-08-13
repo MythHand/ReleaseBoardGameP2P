@@ -1,38 +1,17 @@
 .root {
-  position: relative;
-  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
   overflow: hidden;
 }
 
-/* техническая верхняя линия — контролы сцены */
-.bar {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  z-index: 60;
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  padding: 12px 24px;
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  border-block-end: 1px solid var(--white-08);
-}
-
-/* кнопка действия — дев-стиль плейграунда */
-.btn {
-  padding: 8px 14px;
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.btn:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
+/* the demo area: the scene lives here and paints nothing outside it. The bar
+   above is a row of the page, so nothing has to know its height. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow: hidden;
 }
 
 /* превью карты, которая точно вытянется */
@@ -54,7 +33,7 @@
 /* соперники — сверху по центру */
 .opponents {
   position: absolute;
-  inset-block-start: 96px;
+  inset-block-start: 22px; /* canonical Table .opponents */
   inset-inline-start: 50%;
   display: flex;
   gap: 28px;
@@ -152,13 +131,11 @@
   z-index: 55;
 }
 
-/* контейнер зоны стола для краевого свечения — ниже тех-панели (inset-block-start
-   задаётся инлайном по высоте бара), чтобы свечение не считало край экрана краем
-   стола; inset-inline:0 — справа на реальном столе тут будет граница навигации */
+/* the table zone for the edge glow — the stage IS that zone, so the glow simply
+   fills it and no one has to measure anything */
 .glowBounds {
   position: absolute;
-  inset-block-end: 0;
-  inset-inline: 0;
+  inset: 0;
   pointer-events: none;
 }
 

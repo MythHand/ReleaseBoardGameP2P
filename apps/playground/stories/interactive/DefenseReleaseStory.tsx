@@ -26,6 +26,8 @@ import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
+import TechBar from '../controls/TechBar'
+import { TechButton, TechHint, TechToggle } from '../controls/TechControls'
 import styles from './DefenseReleaseStory.module.css'
 import { reorderHand } from './reorderHand'
 import { type Leaving, useDiscardExit } from './useDiscardExit'
@@ -801,211 +803,187 @@ export default function DefenseReleaseStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar}>
-        <button type="button" className={styles.btn} onClick={reset}>
-          <Typography base="label-sm" tk="tk-16">
-            {pick(lang, { ru: 'сброс', en: 'reset' })}
-          </Typography>
-        </button>
+      <TechBar>
+        <TechButton onClick={reset}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
         <HoverSelect
           label={pick(lang, { ru: 'карта атаки', en: 'attack card' })}
           value={attackId}
           options={ATTACKS.map((id) => ({ value: id, label: cardById(id)?.name ?? id }))}
           onChange={setAttackId}
         />
-        <button
-          type="button"
-          className={styles.chip}
-          data-on={sudo}
-          onClick={() => setSudo((v) => !v)}
-        >
-          <Typography base="label-sm" tk="tk-16">
-            sudo
-          </Typography>
-        </button>
-        <button
-          type="button"
-          className={styles.btn}
-          onClick={throwAttack}
-          disabled={phase !== 'window' || busy}
-        >
-          <Typography base="label-sm" tk="tk-16">
-            {pick(lang, { ru: 'атаковать', en: 'attack' })}
-          </Typography>
-        </button>
-        <button
-          type="button"
-          className={styles.btn}
-          onClick={passAttacks}
-          disabled={phase !== 'window' || busy}
-        >
-          <Typography base="label-sm" tk="tk-16">
-            {pick(lang, { ru: 'пас атак', en: 'pass attacks' })}
-          </Typography>
-        </button>
+        <TechToggle on={sudo} onChange={setSudo}>
+          sudo
+        </TechToggle>
+        <TechButton onClick={throwAttack} disabled={phase !== 'window' || busy}>
+          {pick(lang, { ru: 'атаковать', en: 'attack' })}
+        </TechButton>
+        <TechButton onClick={passAttacks} disabled={phase !== 'window' || busy}>
+          {pick(lang, { ru: 'пас атак', en: 'pass attacks' })}
+        </TechButton>
         <div className={styles.hint}>
-          <Typography base="mono-xs">{hint}</Typography>
+          <TechHint>{hint}</TechHint>
         </div>
-      </div>
-
-      {/* opponents — top-centre, as on the table; an attack flies out of a seat */}
-      <div className={styles.opponents}>
-        {OPPONENTS.map((o) => (
-          <div
-            key={o.id}
-            ref={(el) => {
-              seatRefs.current[o.id] = el
-            }}
-          >
-            <Seat
-              player={{
-                id: o.id,
-                name: o.name,
-                handCount: o.handCount + (oppHand[o.id] ?? 0),
-                release: oppRelease[o.id] ?? EMPTY_RELEASE,
+      </TechBar>
+      <div className={styles.stage}>
+        {/* opponents — top-centre, as on the table; an attack flies out of a seat */}
+        <div className={styles.opponents}>
+          {OPPONENTS.map((o) => (
+            <div
+              key={o.id}
+              ref={(el) => {
+                seatRefs.current[o.id] = el
               }}
-              copy={seatCopy}
-              slotRef={(key, el) => {
-                oppSlotRefs.current[`${o.id}:${key}`] = el
-              }}
-            />
-          </div>
-        ))}
-      </div>
+            >
+              <Seat
+                player={{
+                  id: o.id,
+                  name: o.name,
+                  handCount: o.handCount + (oppHand[o.id] ?? 0),
+                  release: oppRelease[o.id] ?? EMPTY_RELEASE,
+                }}
+                copy={seatCopy}
+                slotRef={(key, el) => {
+                  oppSlotRefs.current[`${o.id}:${key}`] = el
+                }}
+              />
+            </div>
+          ))}
+        </div>
 
-      {/* the played Release waits here for its cost, which is shown beside it.
-          The ask sits with the cards, not only in the dev bar — a release parked
-          at the centre with no explanation reads as a stuck play. */}
-      <div className={styles.stageSlot} ref={stageRef}>
-        {staged && <Card card={staged} interactive={false} width="100%" />}
-      </div>
-      <div className={styles.costSlot} ref={costRef}>
-        {cost && <Card card={cost} interactive={false} width="100%" />}
-      </div>
+        {/* the played Release waits here for its cost, which is shown beside it.
+            The ask sits with the cards, not only in the dev bar — a release parked
+            at the centre with no explanation reads as a stuck play. */}
+        <div className={styles.stageSlot} ref={stageRef}>
+          {staged && <Card card={staged} interactive={false} width="100%" />}
+        </div>
+        <div className={styles.costSlot} ref={costRef}>
+          {cost && <Card card={cost} interactive={false} width="100%" />}
+        </div>
 
-      {/* the attack stands at the CENTRE, open to the whole table — one card, or
-          one pair when a sudo backs it (a sudo-enhanced attack is one play) */}
-      <div className={styles.centerSlot} ref={centerRef}>
-        {incoming && (
-          <div className={styles.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
-            {incomingSudo && SUDO_CARD ? (
-              <CardPair main={incoming} aux={SUDO_CARD} width="100%" />
-            ) : (
-              <Card card={incoming} interactive={false} width="100%" />
-            )}
-          </div>
-        )}
-      </div>
+        {/* the attack stands at the CENTRE, open to the whole table — one card, or
+            one pair when a sudo backs it (a sudo-enhanced attack is one play) */}
+        <div className={styles.centerSlot} ref={centerRef}>
+          {incoming && (
+            <div className={styles.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+              {incomingSudo && SUDO_CARD ? (
+                <CardPair main={incoming} aux={SUDO_CARD} width="100%" />
+              ) : (
+                <Card card={incoming} interactive={false} width="100%" />
+              )}
+            </div>
+          )}
+        </div>
 
-      {/* the defender's own Sudo waits in its OWN place until a defence is
-          chosen for it — the arrow says what it is aimed at */}
-      <div className={styles.sudoSlot} ref={sudoRef}>
-        {defSudo && !cover && (
-          <div className={styles.pose} style={{ transform: restTransform(SUDO_POSE) }}>
-            <Card card={defSudo} interactive={false} width="100%" />
-          </div>
-        )}
-      </div>
+        {/* the defender's own Sudo waits in its OWN place until a defence is
+            chosen for it — the arrow says what it is aimed at */}
+        <div className={styles.sudoSlot} ref={sudoRef}>
+          {defSudo && !cover && (
+            <div className={styles.pose} style={{ transform: restTransform(SUDO_POSE) }}>
+              <Card card={defSudo} interactive={false} width="100%" />
+            </div>
+          )}
+        </div>
 
-      {/* the defence covering the attack — offset and tilted the other way */}
-      <div className={styles.coverSlot} ref={coverRef}>
-        {cover && (
-          <div className={styles.pose} style={{ transform: restTransform(COVER_POSE) }}>
-            {coverAux ? (
-              <CardPair main={cover} aux={coverAux} width="100%" />
-            ) : (
-              <Card card={cover} interactive={false} width="100%" />
-            )}
-          </div>
-        )}
-      </div>
-      {/* stays mounted so it can fade out as well as in */}
-      <div className={styles.ask} data-shown={phase === 'cost'} aria-hidden={phase !== 'cost'}>
-        <Typography base="label-sm" tk="tk-16">
-          {pick(lang, {
-            ru: 'релиз стоит одной карты — вытащи любую из руки',
-            en: 'a release costs one card — pull any of them out of the hand',
-          })}
-        </Typography>
-      </div>
+        {/* the defence covering the attack — offset and tilted the other way */}
+        <div className={styles.coverSlot} ref={coverRef}>
+          {cover && (
+            <div className={styles.pose} style={{ transform: restTransform(COVER_POSE) }}>
+              {coverAux ? (
+                <CardPair main={cover} aux={coverAux} width="100%" />
+              ) : (
+                <Card card={cover} interactive={false} width="100%" />
+              )}
+            </div>
+          )}
+        </div>
+        {/* stays mounted so it can fade out as well as in */}
+        <div className={styles.ask} data-shown={phase === 'cost'} aria-hidden={phase !== 'cost'}>
+          <Typography base="label-sm" tk="tk-16">
+            {pick(lang, {
+              ru: 'релиз стоит одной карты — вытащи любую из руки',
+              en: 'a release costs one card — pull any of them out of the hand',
+            })}
+          </Typography>
+        </div>
 
-      {/* discard — right of centre; cards lie scattered (a tossed heap) */}
-      <div className={styles.discard}>
-        <Pile
-          heap={discard}
-          count={discard.length}
-          width={116}
-          boxRef={discardRef}
-          logoVariant={lang}
-          label={pick(lang, { ru: 'сброс', en: 'discard' })}
-        />
-      </div>
-
-      {/* Turn dock — the canonical turn-control area, bottom-left. An attack on a
-          release is the AMBER reaction, not the red one: red is reserved for the
-          Error 503 danger reaction. Its PASS key is the answer "I do not defend",
-          so pressing it lets the attack succeed — the dock owns that decision
-          rather than a dev button.
-
-          The reaction lasts the whole window, not just the moment an attack is on
-          the table: it opens when the release lands and holds until the attackers
-          pass. Between two attacks the player is still under the window — the dock
-          must not fall back to "your move". */}
-      <div className={styles.turnDock}>
-        <TurnDock
-          state={
-            phase === 'window' || phase === 'answer'
-              ? 'reaction'
-              : phase === 'idle'
-                ? 'draw'
-                : 'push'
-          }
-          seconds={20}
-          progress={1}
-          activePlayer={OPPONENTS[nextSeat.current % OPPONENTS.length].name}
-          copy={turnCopy}
-          onPass={phase === 'answer' && !busy ? letThrough : undefined}
-        />
-      </div>
-
-      {/* player area — release zone above the hand */}
-      <div className={styles.you}>
-        <ReleaseZone
-          release={release}
-          size="100px"
-          slotRef={(key, el) => {
-            relSlotRefs.current[key] = el
-          }}
-        />
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan doesn't read as a miss and cancel the aim; the Hand owns the real interaction */}
-        <div
-          className={styles.handWrap}
-          ref={handWrapRef}
-          style={{ pointerEvents: busy ? 'none' : undefined }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <Hand
-            items={hand}
-            gapAt={gapAt}
-            gapSize={gapSize}
-            stateAt={stateAt}
-            accentAt={accentAt}
-            onPlay={handPlay}
-            onCardClick={defSudo ? pickEnhanced : undefined}
-            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+        {/* discard — right of centre; cards lie scattered (a tossed heap) */}
+        <div className={styles.discard}>
+          <Pile
+            heap={discard}
+            count={discard.length}
+            width={116}
+            boxRef={discardRef}
+            logoVariant={lang}
+            label={pick(lang, { ru: 'сброс', en: 'discard' })}
           />
         </div>
+
+        {/* Turn dock — the canonical turn-control area, bottom-left. An attack on a
+            release is the AMBER reaction, not the red one: red is reserved for the
+            Error 503 danger reaction. Its PASS key is the answer "I do not defend",
+            so pressing it lets the attack succeed — the dock owns that decision
+            rather than a dev button.
+
+            The reaction lasts the whole window, not just the moment an attack is on
+            the table: it opens when the release lands and holds until the attackers
+            pass. Between two attacks the player is still under the window — the dock
+            must not fall back to "your move". */}
+        <div className={styles.turnDock}>
+          <TurnDock
+            state={
+              phase === 'window' || phase === 'answer'
+                ? 'reaction'
+                : phase === 'idle'
+                  ? 'draw'
+                  : 'push'
+            }
+            seconds={20}
+            progress={1}
+            activePlayer={OPPONENTS[nextSeat.current % OPPONENTS.length].name}
+            copy={turnCopy}
+            onPass={phase === 'answer' && !busy ? letThrough : undefined}
+          />
+        </div>
+
+        {/* player area — release zone above the hand */}
+        <div className={styles.you}>
+          <ReleaseZone
+            release={release}
+            size="100px"
+            slotRef={(key, el) => {
+              relSlotRefs.current[key] = el
+            }}
+          />
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan doesn't read as a miss and cancel the aim; the Hand owns the real interaction */}
+          <div
+            className={styles.handWrap}
+            ref={handWrapRef}
+            style={{ pointerEvents: busy ? 'none' : undefined }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <Hand
+              items={hand}
+              gapAt={gapAt}
+              gapSize={gapSize}
+              stateAt={stateAt}
+              accentAt={accentAt}
+              onPlay={handPlay}
+              onCardClick={defSudo ? pickEnhanced : undefined}
+              onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
+            />
+          </div>
+        </div>
+
+        {aiming && <Arrow from={arrowFrom} to={arrowTo} color="var(--cat-support)" />}
+
+        {/* the travelling card — the shared carrier */}
+        {flyerOverlay}
+
+        {/* the shared steps' own overlays: a card settling into the fan (Rollback
+            under Sudo), and the cards leaving the table for the discard */}
+        {insertOverlay}
+        {discardOverlay}
       </div>
-
-      {aiming && <Arrow from={arrowFrom} to={arrowTo} color="var(--cat-support)" />}
-
-      {/* the travelling card — the shared carrier */}
-      {flyerOverlay}
-
-      {/* the shared steps' own overlays: a card settling into the fan (Rollback
-          under Sudo), and the cards leaving the table for the discard */}
-      {insertOverlay}
-      {discardOverlay}
     </div>
   )
 }

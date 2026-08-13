@@ -1,6 +1,15 @@
 .root {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   block-size: 100vh;
+  overflow: hidden;
+}
+
+/* the page under the technical bar — the demo area of this story */
+.body {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
   padding: 28px;
   overflow: hidden;
 }
@@ -13,33 +22,8 @@
   opacity: 0.65;
 }
 
-.toolbar {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  margin-block-end: 8px;
-}
-
-.reset {
-  padding: 6px 14px;
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.reset:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
-}
-
 .log {
-  font-size: 12px;
   color: var(--brand-green);
-  opacity: 0.85;
 }
 
 /* цели атаки — сверху */

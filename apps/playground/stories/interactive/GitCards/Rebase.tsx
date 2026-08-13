@@ -14,6 +14,8 @@ import Card, { CARD_RATIO, cardAreaOf } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
 import ConfirmAction from '@/table/ConfirmAction'
 import { pick, useLang } from '../../../Playground/lang'
+import TechBar from '../../controls/TechBar'
+import { TechButton, TechSwitch, TechToggle } from '../../controls/TechControls'
 import styles from './GitCards.module.css'
 
 // "Git Rebase" — look at the top 3 cards of a draw deck and reorder them
@@ -323,149 +325,141 @@ export default function Rebase({ selector }: { selector: ReactNode }) {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar}>
+      <TechBar>
         {selector}
         <span className={styles.sep} />
-        <label className={styles.toggle}>
-          <input type="checkbox" checked={sudo} onChange={(e) => changeSudo(e.target.checked)} />
+        <TechButton onClick={restart}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
+        <TechToggle on={sudo} onChange={changeSudo}>
           sudo
-        </label>
-        <span className={styles.miniLabel}>{pick(lang, { ru: 'колод', en: 'decks' })}</span>
-        <div className={styles.seg}>
-          {DECK_COUNTS.map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={`${styles.segBtn} ${decksN === n ? styles.on : ''}`}
-              onClick={() => changeDecks(n)}
+        </TechToggle>
+        <TechSwitch
+          label={pick(lang, { ru: 'колод', en: 'decks' })}
+          options={DECK_COUNTS.map((n) => ({ value: n, label: String(n) }))}
+          value={decksN}
+          onChange={changeDecks}
+        />
+      </TechBar>
+      <div className={styles.stage}>
+        {/* draw decks — same placement/behaviour as the Table screen: a 2-row grid
+            that flows into columns (Git Branch splits grow it rightward), full-size
+            Pile (150). Pickable in the 'pick' phase, dimmed under the overlay. */}
+        <div className={styles.decks}>
+          {decks.map((d) => (
+            // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only deck pick in a sandbox story
+            <div
+              key={d.id}
+              ref={(el) => {
+                if (el) deckRefs.current.set(d.id, el)
+                else deckRefs.current.delete(d.id)
+              }}
+              className={`${styles.deck} ${phase === 'pick' ? styles.deckPickable : ''}`}
+              onMouseDown={phase === 'pick' ? () => pickDeck(d.id) : undefined}
             >
-              {n}
-            </button>
+              <Pile
+                label={decksN > 1 ? `${deckWord} ${d.id + 1}` : deckWord}
+                deck="base"
+                count={d.count}
+                width={DECK_W}
+                countPos="tl"
+                selected={phase === 'pick'}
+              />
+            </div>
           ))}
         </div>
-        <button type="button" className={styles.btn} onClick={restart}>
-          {pick(lang, { ru: 'рестарт', en: 'restart' })}
-        </button>
+
+        {/* idle: the start button in the centre */}
+        {phase === 'idle' && (
+          <div className={styles.startSlot}>
+            <button type="button" className={styles.callBtn} onClick={start}>
+              git rebase
+            </button>
+          </div>
+        )}
+
+        {(phase === 'pick' || showCards) && (
+          <div className={`${styles.scrim} ${showCards ? styles.scrimOver : ''}`} />
+        )}
+
+        {/* the reorder area — the 1-2-3 numbering once on top, then one full-size
+            row per deck. The whole area scrolls when there are too many rows to fit
+            (cards keep full size); the dragged card follows the pointer via
+            transform and glides into its slot on drop. */}
+        {showCards && (
+          <div className={styles.orderWrap}>
+            <div
+              className={`${styles.numHeader} ${phase === 'resolve' ? styles.chromeOut : styles.chromeIn}`}
+              style={{ gap: GAP }}
+            >
+              {[1, 2, 3].map((n) => (
+                <span key={n} className={styles.num} style={{ inlineSize: REORDER_W }}>
+                  {n}
+                </span>
+              ))}
+            </div>
+            <div className={styles.rows} style={{ gap: ROWS_GAP }}>
+              {rows.map((row, ri) => (
+                <div
+                  key={row.deckId}
+                  ref={(el) => {
+                    if (el) rowRefs.current.set(ri, el)
+                    else rowRefs.current.delete(ri)
+                  }}
+                  className={styles.orderRow}
+                  style={{ inlineSize: ROW_W, blockSize: ROW_H }}
+                >
+                  {row.cards.map((c, idx) => {
+                    const dragRow = drag?.row === ri
+                    const isDragged = dragRow && drag?.uid === c.uid
+                    const slot =
+                      dragRow && drag && !isDragged ? previewSlot(row.cards, c, drag) : idx
+                    const style =
+                      isDragged && drag
+                        ? {
+                            inlineSize: REORDER_W,
+                            transform: `translate(${drag.x}px, ${drag.y}px)`,
+                            zIndex: 6,
+                          }
+                        : { inlineSize: REORDER_W, transform: `translate(${slot * STEP}px, 0)` }
+                    return (
+                      <div
+                        key={c.uid}
+                        ref={(el) => {
+                          if (el) cardEls.current.set(c.uid, el)
+                          else cardEls.current.delete(c.uid)
+                        }}
+                        className={`${styles.orderCard} ${isDragged ? styles.dragging : ''}`}
+                        style={style}
+                        onPointerDown={(e) => onCardDown(ri, c.uid, e)}
+                      >
+                        <Card
+                          card={c.card}
+                          faceDown={faceDown}
+                          interactive={false}
+                          width={REORDER_W}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {phase === 'pick' && (
+          <div className={styles.rbHint}>
+            <span className={styles.hint}>{pickHint}</span>
+          </div>
+        )}
+
+        {/* confirm — the shared slide-up bar; the drag hint rides in its caption */}
+        <ConfirmAction
+          open={phase === 'order'}
+          label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
+          caption={orderHint}
+          onConfirm={confirm}
+        />
       </div>
-
-      {/* draw decks — same placement/behaviour as the Table screen: a 2-row grid
-          that flows into columns (Git Branch splits grow it rightward), full-size
-          Pile (150). Pickable in the 'pick' phase, dimmed under the overlay. */}
-      <div className={styles.decks}>
-        {decks.map((d) => (
-          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only deck pick in a sandbox story
-          <div
-            key={d.id}
-            ref={(el) => {
-              if (el) deckRefs.current.set(d.id, el)
-              else deckRefs.current.delete(d.id)
-            }}
-            className={`${styles.deck} ${phase === 'pick' ? styles.deckPickable : ''}`}
-            onMouseDown={phase === 'pick' ? () => pickDeck(d.id) : undefined}
-          >
-            <Pile
-              label={decksN > 1 ? `${deckWord} ${d.id + 1}` : deckWord}
-              deck="base"
-              count={d.count}
-              width={DECK_W}
-              countPos="tl"
-              selected={phase === 'pick'}
-            />
-          </div>
-        ))}
-      </div>
-
-      {/* idle: the start button in the centre */}
-      {phase === 'idle' && (
-        <div className={styles.controls}>
-          <button type="button" className={styles.callBtn} onClick={start}>
-            git rebase
-          </button>
-        </div>
-      )}
-
-      {(phase === 'pick' || showCards) && (
-        <div className={`${styles.scrim} ${showCards ? styles.scrimOver : ''}`} />
-      )}
-
-      {/* the reorder area — the 1-2-3 numbering once on top, then one full-size
-          row per deck. The whole area scrolls when there are too many rows to fit
-          (cards keep full size); the dragged card follows the pointer via
-          transform and glides into its slot on drop. */}
-      {showCards && (
-        <div className={styles.orderWrap}>
-          <div
-            className={`${styles.numHeader} ${phase === 'resolve' ? styles.chromeOut : styles.chromeIn}`}
-            style={{ gap: GAP }}
-          >
-            {[1, 2, 3].map((n) => (
-              <span key={n} className={styles.num} style={{ inlineSize: REORDER_W }}>
-                {n}
-              </span>
-            ))}
-          </div>
-          <div className={styles.rows} style={{ gap: ROWS_GAP }}>
-            {rows.map((row, ri) => (
-              <div
-                key={row.deckId}
-                ref={(el) => {
-                  if (el) rowRefs.current.set(ri, el)
-                  else rowRefs.current.delete(ri)
-                }}
-                className={styles.orderRow}
-                style={{ inlineSize: ROW_W, blockSize: ROW_H }}
-              >
-                {row.cards.map((c, idx) => {
-                  const dragRow = drag?.row === ri
-                  const isDragged = dragRow && drag?.uid === c.uid
-                  const slot = dragRow && drag && !isDragged ? previewSlot(row.cards, c, drag) : idx
-                  const style =
-                    isDragged && drag
-                      ? {
-                          inlineSize: REORDER_W,
-                          transform: `translate(${drag.x}px, ${drag.y}px)`,
-                          zIndex: 6,
-                        }
-                      : { inlineSize: REORDER_W, transform: `translate(${slot * STEP}px, 0)` }
-                  return (
-                    <div
-                      key={c.uid}
-                      ref={(el) => {
-                        if (el) cardEls.current.set(c.uid, el)
-                        else cardEls.current.delete(c.uid)
-                      }}
-                      className={`${styles.orderCard} ${isDragged ? styles.dragging : ''}`}
-                      style={style}
-                      onPointerDown={(e) => onCardDown(ri, c.uid, e)}
-                    >
-                      <Card
-                        card={c.card}
-                        faceDown={faceDown}
-                        interactive={false}
-                        width={REORDER_W}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {phase === 'pick' && (
-        <div className={styles.rbHint}>
-          <span className={styles.hint}>{pickHint}</span>
-        </div>
-      )}
-
-      {/* confirm — the shared slide-up bar; the drag hint rides in its caption */}
-      <ConfirmAction
-        open={phase === 'order'}
-        label={pick(lang, { ru: 'подтвердить', en: 'confirm' })}
-        caption={orderHint}
-        onConfirm={confirm}
-      />
     </div>
   )
 }

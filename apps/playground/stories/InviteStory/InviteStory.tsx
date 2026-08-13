@@ -4,6 +4,8 @@ import { useState } from 'react'
 import type { CodeCheckState, InviteCopy, InviteState, SlotAvailability } from '@/screens/Invite'
 import Invite from '@/screens/Invite'
 import { type Lang, pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechSwitch } from '../controls/TechControls'
 import styles from './InviteStory.module.css'
 
 const COPY: Record<'ru' | 'en', InviteCopy> = {
@@ -115,51 +117,26 @@ export default function InviteStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.controls}>
-        <span className={styles.controlsLabel}>
-          {pick(lang, { ru: 'доступность слота', en: 'slot availability' })}
-        </span>
-        <div className={styles.switch}>
-          {AVAILABILITY.map((a) => (
-            <button
-              key={a.value}
-              type="button"
-              className={availability === a.value ? styles.on : ''}
-              onClick={() => changeAvailability(a.value)}
-            >
-              {a.label[lang]}
-            </button>
-          ))}
-        </div>
-        <span className={styles.controlsLabel}>{pick(lang, { ru: 'состояние', en: 'state' })}</span>
-        <div className={styles.switch}>
-          {stateOptions.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              className={state === s.value ? styles.on : ''}
-              onClick={() => setState(s.value)}
-            >
-              {s.label[lang]}
-            </button>
-          ))}
-        </div>
-        <span className={styles.controlsLabel}>
-          {pick(lang, { ru: 'проверка кода', en: 'code check' })}
-        </span>
-        <div className={styles.switch}>
-          {CODE_CHECK.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              className={codeState === c.value ? styles.on : ''}
-              onClick={() => setCodeState(c.value)}
-            >
-              {c.label[lang]}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TechBar>
+        <TechSwitch
+          label={pick(lang, { ru: 'доступность слота', en: 'slot availability' })}
+          options={AVAILABILITY.map((a) => ({ value: a.value, label: a.label[lang] }))}
+          value={availability}
+          onChange={changeAvailability}
+        />
+        <TechSwitch
+          label={pick(lang, { ru: 'состояние', en: 'state' })}
+          options={stateOptions.map((s) => ({ value: s.value, label: s.label[lang] }))}
+          value={state}
+          onChange={setState}
+        />
+        <TechSwitch
+          label={pick(lang, { ru: 'проверка кода', en: 'code check' })}
+          options={CODE_CHECK.map((c) => ({ value: c.value, label: c.label[lang] }))}
+          value={codeState}
+          onChange={setCodeState}
+        />
+      </TechBar>
       <div className={styles.stage}>
         <Invite
           code="F96-NMT"

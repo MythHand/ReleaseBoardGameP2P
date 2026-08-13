@@ -1,52 +1,21 @@
 .root {
-  position: relative;
-  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
   overflow: hidden;
 }
 
-/* техническая верхняя линия управления */
-.bar {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  z-index: 60;
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  padding: 16px 24px;
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  border-block-end: 1px solid var(--white-08);
-}
-
-.toggle {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-}
-
-.btn {
-  padding: 8px 14px;
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.btn:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
+/* the demo area: the scene lives here and paints nothing outside it. The bar
+   above is a row of the page, so nothing has to know its height. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow: hidden;
 }
 
 /* idle: кнопка старта по центру */
-.controls {
+.startSlot {
   position: absolute;
   inset-block-start: 46%;
   inset-inline: 0;
@@ -78,7 +47,7 @@
    (сверху) и рукой игрока (снизу). Сама сетка и жизнь ячеек — в CardCatalog */
 .grid {
   position: absolute;
-  inset-block: 300px 268px;
+  inset-block: 235px 268px;
   inset-inline: 0;
   padding: 0 32px;
   overflow: visible;
@@ -88,7 +57,7 @@
    разворот на 180° = веер напротив; слайд держит внешний .topHand */
 .topHand {
   position: absolute;
-  inset-block-start: 76px;
+  inset-block-start: 12px;
   inset-inline: 0;
   z-index: 40;
   transition: transform 520ms var(--ease-soft);

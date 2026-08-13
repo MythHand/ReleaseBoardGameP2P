@@ -12,6 +12,8 @@ import {
   handStep,
 } from '@/table/Hand/Hand'
 import { useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechButton, TechHint, TechLabel, TechToggle } from '../controls/TechControls'
 import { reorderHand } from '../interactive/reorderHand'
 import styles from './HandStory.module.css'
 
@@ -33,7 +35,7 @@ const COPY = {
     step: 'шаг между картами',
     fan: 'ширина веера',
     hint: 'перетащи карту внутри руки — переставить',
-    reset: 'сброс',
+    reset: 'рестарт',
   },
   en: {
     cardsInHand: 'cards in hand',
@@ -44,7 +46,7 @@ const COPY = {
     step: 'step between cards',
     fan: 'fan width',
     hint: 'drag a card within the hand to reorder',
-    reset: 'reset',
+    reset: 'restart',
   },
 }
 
@@ -122,43 +124,30 @@ export default function HandStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.controls}>
+      <TechBar>
+        <TechButton onClick={() => setItems(resize(6))}>{t.reset}</TechButton>
         <div className={styles.sliderWrap}>
           <Slider label={t.cardsInHand} value={items.length} min={0} max={20} onChange={setCount} />
         </div>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={faceDown}
-            onChange={(e) => setFaceDown(e.target.checked)}
-          />
+        <TechToggle on={faceDown} onChange={setFaceDown}>
           {t.faceDown}
-        </label>
-        <label className={styles.check}>
-          <input
-            type="checkbox"
-            checked={parallax}
-            onChange={(e) => setParallax(e.target.checked)}
-          />
+        </TechToggle>
+        <TechToggle on={parallax} onChange={setParallax}>
           {t.parallax}
-        </label>
-        <label className={styles.check}>
-          <input type="checkbox" checked={drag} onChange={(e) => setDrag(e.target.checked)} />
+        </TechToggle>
+        <TechToggle on={drag} onChange={setDrag}>
           {t.drag}
-        </label>
-        <label className={styles.check}>
-          <input type="checkbox" checked={states} onChange={(e) => setStates(e.target.checked)} />
+        </TechToggle>
+        <TechToggle on={states} onChange={setStates}>
           {t.states}
-        </label>
-        <button type="button" className={styles.reset} onClick={() => setItems(resize(6))}>
-          {t.reset}
-        </button>
-      </div>
-
-      <p className={styles.readout}>
-        {t.step}: <b>{step}px</b> · {t.fan}: <b>{span}px</b>
-      </p>
-      {drag && <p className={styles.hint}>{t.hint}</p>}
+        </TechToggle>
+        <span className={styles.readout}>
+          <TechLabel>
+            {t.step}: <b>{step}px</b> · {t.fan}: <b>{span}px</b>
+          </TechLabel>
+        </span>
+        {drag && <TechHint>{t.hint}</TechHint>}
+      </TechBar>
 
       <div className={styles.stage}>
         <Hand

@@ -1,44 +1,24 @@
 .root {
-  position: relative;
-  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
   overflow: hidden;
 }
 
-/* техническая верхняя линия */
-.bar {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  z-index: 60;
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  padding: 16px 24px;
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  border-block-end: 1px solid var(--white-08);
-}
-
-.btn {
-  padding: 8px 14px;
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.btn:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
+/* the demo area: the scene lives here and paints nothing outside it. The bar
+   above is a row of the page, so nothing has to know its height. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow: hidden;
 }
 
 /* the pair example — a release with the card laid WITH it, sitting together above
    the single cards. The two are one source: a click on either sends both. */
 .pair {
   position: absolute;
-  inset-block-start: 96px;
+  inset-block-start: 32px; /* was 96 — 64px of it was clearing the floating bar */
   inset-inline: 0;
   display: flex;
   gap: 10px;
@@ -49,7 +29,7 @@
 /* превью: ряд из 5 карт по центру сверху */
 .source {
   position: absolute;
-  inset-block-start: 324px;
+  inset-block-start: 260px;
   inset-inline: 0;
   display: flex;
   gap: 18px;

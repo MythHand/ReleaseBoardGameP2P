@@ -3,7 +3,8 @@
 }
 
 .h {
-  margin: 0 0 20px;
+  margin: 0 0 14px;
+  font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 600;
   text-transform: uppercase;
@@ -115,25 +116,6 @@
   font-family: var(--font-mono);
   font-size: 11px;
   opacity: 0.4;
-}
-
-/* образец стиля текста + технический CSS под ним */
-.sampleRow {
-  display: flex;
-  align-items: center;
-  min-block-size: 40px;
-}
-
-.css {
-  padding: 10px 12px;
-  margin: 14px 0 0;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--white-45);
-  white-space: pre-wrap;
-  background: var(--black-25);
-  border-radius: 6px;
 }
 
 /* ===== шкала текста — таблица именованных стилей ===== */

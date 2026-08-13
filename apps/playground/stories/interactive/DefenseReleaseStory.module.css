@@ -1,64 +1,21 @@
 .root {
-  position: relative;
-  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
   overflow: hidden;
 }
 
-/* technical top control line — dev controls (TableStory pattern) */
-.bar {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline: 0;
-  z-index: 60;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  align-items: center;
-  padding: 16px 24px;
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  border-block-end: 1px solid var(--white-08);
-}
-
-.btn {
-  padding: 8px 14px;
-  font-size: 12px;
-  color: var(--fg);
-  letter-spacing: var(--tracking);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.btn:hover {
-  color: var(--brand-green);
-  border-color: var(--brand-green);
-}
-
-/* dev toggle chip — off = outline, on = brand-green fill */
-.chip {
-  padding: 8px 14px;
-  color: var(--fg);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid var(--white-15);
-  border-radius: 6px;
-}
-
-.chip[data-on="true"] {
-  color: var(--deep-green);
-  background: var(--brand-green);
-  border-color: var(--brand-green);
-}
-
-.btn:disabled {
-  cursor: default;
-  opacity: 0.4;
+/* the demo area: the scene lives here and paints nothing outside it. The bar
+   above is a row of the page, so nothing has to know its height. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow: hidden;
 }
 
 .hint {
   margin-inline-start: auto;
-  color: var(--white-45);
 }
 
 /* ===== table layout — positions mirror @release/ui Table.module.css ===== */
@@ -163,7 +120,7 @@
 /* opponents — top-centre, clear of the tech bar */
 .opponents {
   position: absolute;
-  inset-block-start: 84px;
+  inset-block-start: 22px; /* canonical Table .opponents */
   inset-inline-start: 50%;
   display: flex;
   gap: 18px;

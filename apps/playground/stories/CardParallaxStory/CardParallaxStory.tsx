@@ -5,6 +5,8 @@ import CardParallax, { PARALLAX_CARDS } from '@/cards/CardParallax'
 import type { CardContent } from '@/cards/content'
 import Card from '@/primitives/Card'
 import { pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechHint } from '../controls/TechControls'
 import styles from './CardParallaxStory.module.css'
 
 // Page for developing the composed (parallax) card face. Cards with a built
@@ -103,13 +105,13 @@ export default function CardParallaxStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.controls}>
-        <span className={styles.hint}>{t.hint}</span>
+      <TechBar>
+        <TechHint>{t.hint}</TechHint>
         <span className={styles.meta}>
           <span className={styles.navHint}>{t.navHint}</span>
           <span className={styles.count}>{CARDS.length}</span>
         </span>
-      </div>
+      </TechBar>
 
       <div className={styles.main}>
         <nav className={styles.rail}>

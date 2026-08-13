@@ -3,6 +3,8 @@ import { makeStats } from '@/mocks/stats'
 import Stats from '@/screens/Stats'
 import type { StatsCopy } from '@/screens/Stats/Stats'
 import { pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechSwitch } from '../controls/TechControls'
 import styles from './StatsStory.module.css'
 
 const COPY: Record<'ru' | 'en', StatsCopy> = {
@@ -62,24 +64,16 @@ export default function StatsStory() {
   const data = makeStats()
   return (
     <div className={styles.root}>
-      <div className={styles.controls}>
-        <div className={styles.switch}>
-          <button
-            type="button"
-            className={bg === 'neutral' ? styles.on : ''}
-            onClick={() => setBg('neutral')}
-          >
-            neutral
-          </button>
-          <button
-            type="button"
-            className={bg === 'positive' ? styles.on : ''}
-            onClick={() => setBg('positive')}
-          >
-            positive
-          </button>
-        </div>
-      </div>
+      <TechBar>
+        <TechSwitch
+          options={[
+            { value: 'neutral', label: 'neutral' },
+            { value: 'positive', label: 'positive' },
+          ]}
+          value={bg}
+          onChange={setBg}
+        />
+      </TechBar>
       <div className={styles.stage}>
         <Stats {...data} copy={pick(lang, COPY)} lang={lang} onLangChange={setLang} bgTone={bg} />
       </div>

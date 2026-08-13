@@ -7,6 +7,8 @@ import Card from '@/primitives/Card'
 import Slider from '@/primitives/Slider'
 import Hand from '@/table/Hand'
 import { pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechButton } from '../controls/TechControls'
 import styles from './PickOpponentCardStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useHandArrival } from './useHandArrival'
@@ -142,7 +144,8 @@ export default function PickOpponentCardStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar}>
+      <TechBar>
+        <TechButton onClick={restart}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
         <div className={styles.sliderWrap}>
           <Slider
             label={pick(lang, { ru: 'карт у соперника', en: 'opponent cards' })}
@@ -152,83 +155,81 @@ export default function PickOpponentCardStory() {
             onChange={setCount}
           />
         </div>
-        <button type="button" className={styles.btn} onClick={restart}>
-          {pick(lang, { ru: 'рестарт', en: 'restart' })}
-        </button>
-      </div>
+      </TechBar>
+      <div className={styles.stage}>
+        {phase !== 'idle' && (
+          <div className={styles.topHand} data-in={handIn}>
+            {/* rotated 180° — the opponent across the table extends the fan toward you */}
+            <div className={styles.topHandInner}>
+              <Hand
+                items={oppHand}
+                faceDown
+                onCardClick={phase === 'present' && chosen === null ? pickCard : undefined}
+                renderFace={(item, ctx) =>
+                  item.uid === chosen ? null : (
+                    <Card
+                      card={item.card}
+                      faceDown={ctx.faceDown}
+                      interactive={false}
+                      tilt={ctx.tilt}
+                      width={ctx.width}
+                    />
+                  )
+                }
+              />
+            </div>
+          </div>
+        )}
 
-      {phase !== 'idle' && (
-        <div className={styles.topHand} data-in={handIn}>
-          {/* rotated 180° — the opponent across the table extends the fan toward you */}
-          <div className={styles.topHandInner}>
-            <Hand
-              items={oppHand}
-              faceDown
-              onCardClick={phase === 'present' && chosen === null ? pickCard : undefined}
-              renderFace={(item, ctx) =>
-                item.uid === chosen ? null : (
-                  <Card
-                    card={item.card}
-                    faceDown={ctx.faceDown}
-                    interactive={false}
-                    tilt={ctx.tilt}
-                    width={ctx.width}
-                  />
-                )
-              }
+        {phase === 'idle' && (
+          <div className={styles.startSlot}>
+            <button type="button" className={styles.callBtn} onClick={deal}>
+              {pick(lang, {
+                ru: 'взять случайную карту соперника',
+                en: 'take a random opponent card',
+              })}
+            </button>
+          </div>
+        )}
+
+        {phase === 'present' && chosen === null && (
+          <div className={styles.hint}>{pick(lang, { ru: 'выбери карту', en: 'pick a card' })}</div>
+        )}
+
+        {reveal && (
+          <div
+            ref={revealRef}
+            className={styles.reveal}
+            style={
+              {
+                left: reveal.from.left,
+                top: reveal.from.top,
+                width: reveal.from.width,
+                // starts matching the opponent's 180° orientation, turns upright on the way
+                transform: centered ? reveal.to : 'translate(0px, 0px) scale(1) rotate(180deg)',
+              } as CSSProperties
+            }
+            onTransitionEnd={onRevealEnd}
+          >
+            <Card
+              card={reveal.card}
+              faceDown={!flipped}
+              width={reveal.from.width}
+              interactive={false}
             />
           </div>
-        </div>
-      )}
+        )}
 
-      {phase === 'idle' && (
-        <div className={styles.controls}>
-          <button type="button" className={styles.callBtn} onClick={deal}>
-            {pick(lang, {
-              ru: 'взять случайную карту соперника',
-              en: 'take a random opponent card',
-            })}
-          </button>
-        </div>
-      )}
+        {overlay}
 
-      {phase === 'present' && chosen === null && (
-        <div className={styles.hint}>{pick(lang, { ru: 'выбери карту', en: 'pick a card' })}</div>
-      )}
-
-      {reveal && (
-        <div
-          ref={revealRef}
-          className={styles.reveal}
-          style={
-            {
-              left: reveal.from.left,
-              top: reveal.from.top,
-              width: reveal.from.width,
-              // starts matching the opponent's 180° orientation, turns upright on the way
-              transform: centered ? reveal.to : 'translate(0px, 0px) scale(1) rotate(180deg)',
-            } as CSSProperties
-          }
-          onTransitionEnd={onRevealEnd}
-        >
-          <Card
-            card={reveal.card}
-            faceDown={!flipped}
-            width={reveal.from.width}
-            interactive={false}
+        <div className={styles.handWrap} ref={handRef}>
+          <Hand
+            items={hand}
+            gapAt={gapAt}
+            gapSize={gapSize}
+            onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
           />
         </div>
-      )}
-
-      {overlay}
-
-      <div className={styles.handWrap} ref={handRef}>
-        <Hand
-          items={hand}
-          gapAt={gapAt}
-          gapSize={gapSize}
-          onReorder={(uid, to) => setHand((h) => reorderHand(h, uid, to))}
-        />
       </div>
     </div>
   )

@@ -10,6 +10,8 @@ import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
 import { pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechButton, TechHint } from '../controls/TechControls'
 import styles from './DeckAnimationsStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
@@ -473,125 +475,124 @@ export default function DeckAnimationsStory() {
 
   return (
     <div className={styles.root}>
-      <div className={styles.bar}>
-        <button type="button" className={styles.btn} onClick={reset}>
-          {pick(lang, { ru: 'сброс состояния', en: 'reset state' })}
-        </button>
+      <TechBar>
+        <TechButton onClick={reset}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
         {choosingDeck && (
-          <span className={styles.hint}>
+          <TechHint>
             {pick(lang, { ru: 'выбери колоду для разделения', en: 'pick a deck to split' })}
-          </span>
+          </TechHint>
         )}
         {choosingCard && (
-          <span className={styles.hint}>
+          <TechHint>
             {pick(lang, { ru: 'выбери карту для усиления', en: 'pick a card to enhance' })}
-          </span>
+          </TechHint>
         )}
-      </div>
-
-      <div className={styles.decks}>
-        {decks.map((d) => (
-          // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only deck selection via the arrow; sandbox story
-          <div
-            key={d.id}
-            ref={(el) => {
-              pileRefs.current[d.id] = el
-            }}
-            className={`${styles.deck} ${choosingDeck && !d.hidden ? styles.selectable : ''}`}
-            style={d.hidden ? { opacity: 0 } : undefined}
-            onMouseDown={choosingDeck && !d.hidden ? (e) => pickDeck(e, d.id) : undefined}
-            onMouseEnter={() => choosingDeck && !d.hidden && setHovered(d.id)}
-            onMouseLeave={() => setHovered((h) => (h === d.id ? null : h))}
-          >
-            <Pile
-              label={pick(lang, { ru: 'колода', en: 'deck' })}
-              deck="base"
-              count={d.count}
-              width={150}
-              countPos="tl"
-              pickable={choosingDeck && !d.hidden}
-              selected={choosingDeck && hovered === d.id}
-              accent={OPERATION}
-            />
-          </div>
-        ))}
-        <div className={styles.ai}>
-          <Pile
-            label={pick(lang, { ru: 'события', en: 'events' })}
-            deck="ai"
-            count={12}
-            width={150}
-            countPos="tl"
-          />
-        </div>
-      </div>
-
-      {/* the staging area at the centre — the cards put into this turn stand here,
-          open to the table. An empty slot is the ask: Sudo opens two, so the gap
-          next to it says a second card is expected. */}
-      {stageSize > 0 && (
-        <div className={styles.center} ref={centerRef}>
-          {Array.from({ length: stageSize }, (_, i) => (
+      </TechBar>
+      <div className={styles.stage}>
+        <div className={styles.decks}>
+          {decks.map((d) => (
+            // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only deck selection via the arrow; sandbox story
             <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: the slots are a fixed row, the index IS the slot
-              key={i}
-              className={styles.stageSlot}
+              key={d.id}
               ref={(el) => {
-                stageRefs.current[i] = el
+                pileRefs.current[d.id] = el
               }}
+              className={`${styles.deck} ${choosingDeck && !d.hidden ? styles.selectable : ''}`}
+              style={d.hidden ? { opacity: 0 } : undefined}
+              onMouseDown={choosingDeck && !d.hidden ? (e) => pickDeck(e, d.id) : undefined}
+              onMouseEnter={() => choosingDeck && !d.hidden && setHovered(d.id)}
+              onMouseLeave={() => setHovered((h) => (h === d.id ? null : h))}
             >
-              {staged[i] ? (
-                <Card card={staged[i].card} interactive={false} width="100%" />
-              ) : (
-                // an empty cell is drawn only while the table is ASKING for a card
-                // here — the Sudo's open second slot. A slot whose card is still on
-                // its way is not an ask, and framing it reads as a landing marker.
-                choosingCard && <span className={styles.stageEmpty} />
-              )}
+              <Pile
+                label={pick(lang, { ru: 'колода', en: 'deck' })}
+                deck="base"
+                count={d.count}
+                width={150}
+                countPos="tl"
+                pickable={choosingDeck && !d.hidden}
+                selected={choosingDeck && hovered === d.id}
+                accent={OPERATION}
+              />
             </div>
           ))}
+          <div className={styles.ai}>
+            <Pile
+              label={pick(lang, { ru: 'события', en: 'events' })}
+              deck="ai"
+              count={12}
+              width={150}
+              countPos="tl"
+            />
+          </div>
         </div>
-      )}
 
-      {/* discard — face up, scattered */}
-      <div className={styles.discard}>
-        <Pile
-          heap={discard.cards}
-          count={discard.showCount ? discard.cards.length : 0}
-          gathered={discard.gathered}
-          width={116}
-          boxRef={discardRef}
-          logoVariant={lang}
-          label={pick(lang, { ru: 'сброс', en: 'discard' })}
-        />
+        {/* the staging area at the centre — the cards put into this turn stand here,
+            open to the table. An empty slot is the ask: Sudo opens two, so the gap
+            next to it says a second card is expected. */}
+        {stageSize > 0 && (
+          <div className={styles.center} ref={centerRef}>
+            {Array.from({ length: stageSize }, (_, i) => (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: the slots are a fixed row, the index IS the slot
+                key={i}
+                className={styles.stageSlot}
+                ref={(el) => {
+                  stageRefs.current[i] = el
+                }}
+              >
+                {staged[i] ? (
+                  <Card card={staged[i].card} interactive={false} width="100%" />
+                ) : (
+                  // an empty cell is drawn only while the table is ASKING for a card
+                  // here — the Sudo's open second slot. A slot whose card is still on
+                  // its way is not an ask, and framing it reads as a landing marker.
+                  choosingCard && <span className={styles.stageEmpty} />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* discard — face up, scattered */}
+        <div className={styles.discard}>
+          <Pile
+            heap={discard.cards}
+            count={discard.showCount ? discard.cards.length : 0}
+            gathered={discard.gathered}
+            width={116}
+            boxRef={discardRef}
+            logoVariant={lang}
+            label={pick(lang, { ru: 'сброс', en: 'discard' })}
+          />
+        </div>
+
+        {/* player hand — fanned (Hand); a card is played by pulling it OUT of the
+            fan. A card that still needs a target glides back into its slot and
+            waits there while the arrow aims. */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan doesn't cancel an aim; the Hand owns the real interaction */}
+        <div className={styles.handWrap} ref={handWrapRef} onMouseDown={(e) => e.stopPropagation()}>
+          <Hand
+            items={hand}
+            gapAt={returnGap}
+            gapSize={returnSize}
+            onPlay={handPlay}
+            accentAt={accentAt}
+            // a click answers the staging (choose the card Sudo enhances); a pull
+            // out of the fan puts a card into the turn — the two never collide
+            onCardClick={waiting === 'partner' ? pickPartner : undefined}
+            onReorder={(cardUid, toIndex) => setHand((h) => reorderHand(h, cardUid, toIndex))}
+          />
+        </div>
+
+        {/* every card this scene has in the air — the shared carrier */}
+        {flyerOverlay}
+
+        {returnOverlay}
+
+        {discardOverlay}
+
+        {waiting && <Arrow from={from} to={to} color={armColor} />}
       </div>
-
-      {/* player hand — fanned (Hand); a card is played by pulling it OUT of the
-          fan. A card that still needs a target glides back into its slot and
-          waits there while the arrow aims. */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan doesn't cancel an aim; the Hand owns the real interaction */}
-      <div className={styles.handWrap} ref={handWrapRef} onMouseDown={(e) => e.stopPropagation()}>
-        <Hand
-          items={hand}
-          gapAt={returnGap}
-          gapSize={returnSize}
-          onPlay={handPlay}
-          accentAt={accentAt}
-          // a click answers the staging (choose the card Sudo enhances); a pull
-          // out of the fan puts a card into the turn — the two never collide
-          onCardClick={waiting === 'partner' ? pickPartner : undefined}
-          onReorder={(cardUid, toIndex) => setHand((h) => reorderHand(h, cardUid, toIndex))}
-        />
-      </div>
-
-      {/* every card this scene has in the air — the shared carrier */}
-      {flyerOverlay}
-
-      {returnOverlay}
-
-      {discardOverlay}
-
-      {waiting && <Arrow from={from} to={to} color={armColor} />}
     </div>
   )
 }

@@ -1,3 +1,45 @@
+/* the demo area for a modal. `contain: paint` is what makes it one: it turns
+   this box into the containing block for the modal's position:fixed overlay, so
+   the overlay stops here instead of covering the window and the playground
+   navigation with it. The Modal primitive is untouched — in the game covering
+   the whole screen is exactly right. */
+.stage {
+  position: relative;
+  inline-size: 100%;
+  min-block-size: 440px;
+  contain: paint;
+  overflow: hidden;
+  background: var(--surface-0);
+  border: 1px solid var(--white-08);
+  border-radius: 14px;
+}
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-start;
+
+  /* fill the section width (a flex item in KitShell's .row would otherwise
+     collapse to the width of the controls row, leaving the stage narrow) */
+  inline-size: 100%;
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.filler {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 100%;
+  min-block-size: 440px;
+  color: var(--white-30);
+}
+
 .text {
   margin: 0;
   font-family: var(--font-text);

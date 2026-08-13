@@ -13,6 +13,8 @@ import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
 import { type Lang, pick, useLang } from '../../Playground/lang'
+import TechBar from '../controls/TechBar'
+import { TechButton, TechLabel } from '../controls/TechControls'
 import { reorderHand } from '../interactive/reorderHand'
 import { useDiscardExit } from '../interactive/useDiscardExit'
 import { useFlyer } from '../interactive/useFlyer'
@@ -364,117 +366,120 @@ export default function ComboStory() {
 
   return (
     <div className={styles.root}>
-      <p className={styles.hint}>
-        {lang === 'ru' ? (
-          <>
-            Вытащи <b>Sudo</b> / <b>Code Review</b> из руки — карта встанет в центр стола, а в руке
-            подсветятся карты, с которыми её можно сыграть. Клик по подсвеченной складывает пару;
-            атака добавит стрелку цели. Нажатие мимо возвращает всю сборку в руку.
-          </>
-        ) : (
-          <>
-            Pull <b>Sudo</b> / <b>Code Review</b> out of the hand — it stands at the centre of the
-            table and the cards it can be played with light up in the fan. A click on one folds the
-            pair; an attack adds an arrow to a target. A press on nothing returns the whole staging.
-          </>
-        )}
-      </p>
-      <div className={styles.toolbar}>
-        <button type="button" className={styles.reset} onClick={reset}>
-          {pick(lang, { ru: 'сброс', en: 'reset' })}
-        </button>
+      <TechBar>
+        <TechButton onClick={reset}>{pick(lang, { ru: 'рестарт', en: 'restart' })}</TechButton>
         {log && (
           <span className={styles.log}>
-            {pick(lang, { ru: 'сыграно', en: 'played' })}: {log}
+            <TechLabel>
+              {pick(lang, { ru: 'сыграно', en: 'played' })}: {log}
+            </TechLabel>
           </span>
         )}
-      </div>
+      </TechBar>
+      <div className={styles.body}>
+        <p className={styles.hint}>
+          {lang === 'ru' ? (
+            <>
+              Вытащи <b>Sudo</b> / <b>Code Review</b> из руки — карта встанет в центр стола, а в
+              руке подсветятся карты, с которыми её можно сыграть. Клик по подсвеченной складывает
+              пару; атака добавит стрелку цели. Нажатие мимо возвращает всю сборку в руку.
+            </>
+          ) : (
+            <>
+              Pull <b>Sudo</b> / <b>Code Review</b> out of the hand — it stands at the centre of the
+              table and the cards it can be played with light up in the fan. A click on one folds
+              the pair; an attack adds an arrow to a target. A press on nothing returns the whole
+              staging.
+            </>
+          )}
+        </p>
 
-      <div className={styles.targets}>
-        {TARGETS.map((t) => {
-          // the same rule the hand's highlight follows: the moment the choice is
-          // made the highlight goes out. It also has to go out THEN and not when
-          // the phase finally resets — the staging is already cleared, so the
-          // accent it was lit in no longer exists and it would fall back to the
-          // neutral colour, flashing green while the play is still flying.
-          const lit = phase === 'target' && !playing
-          return (
-            // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only combo target (mousedown to play); sandbox story
-            <div
-              key={t.id}
-              className={`${styles.target} ${lit ? styles.lit : ''}`}
-              style={lit ? ({ '--hl': color } as CSSProperties) : undefined}
-              onMouseDown={(e) => onTargetDown(e, t)}
-            >
-              {t.label[lang]}
-            </div>
-          )
-        })}
-      </div>
+        <div className={styles.targets}>
+          {TARGETS.map((t) => {
+            // the same rule the hand's highlight follows: the moment the choice is
+            // made the highlight goes out. It also has to go out THEN and not when
+            // the phase finally resets — the staging is already cleared, so the
+            // accent it was lit in no longer exists and it would fall back to the
+            // neutral colour, flashing green while the play is still flying.
+            const lit = phase === 'target' && !playing
+            return (
+              // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only combo target (mousedown to play); sandbox story
+              <div
+                key={t.id}
+                className={`${styles.target} ${lit ? styles.lit : ''}`}
+                style={lit ? ({ '--hl': color } as CSSProperties) : undefined}
+                onMouseDown={(e) => onTargetDown(e, t)}
+              >
+                {t.label[lang]}
+              </div>
+            )
+          })}
+        </div>
 
-      {/* the staging area — the source stands here until its partner joins it */}
-      <div className={styles.centerSlot} ref={centerRef}>
-        {/* …unless it is still flying in: the carrier is holding it */}
-        {source && !merged && flyerOverlay.length === 0 && (
-          <Card card={source.card} interactive={false} width="100%" />
-        )}
-      </div>
+        {/* the staging area — the source stands here until its partner joins it */}
+        <div className={styles.centerSlot} ref={centerRef}>
+          {/* …unless it is still flying in: the carrier is holding it */}
+          {source && !merged && flyerOverlay.length === 0 && (
+            <Card card={source.card} interactive={false} width="100%" />
+          )}
+        </div>
 
-      <div className={styles.discard}>
-        <Pile
-          heap={discardPile}
-          count={discardPile.length}
-          width={116}
-          boxRef={discardRef}
-          logoVariant={lang}
-          label={pick(lang, { ru: 'сброс', en: 'discard' })}
-        />
-      </div>
-
-      <div className={styles.bottom}>
-        <ReleaseZone
-          size="100px"
-          release={Object.fromEntries(RELEASE_SLOTS.map((key) => [key, released[key]?.card]))}
-          support={Object.fromEntries(RELEASE_SLOTS.map((key) => [key, released[key]?.aux]))}
-          slotRef={(key, el) => {
-            slotRefs.current[key] = el
-          }}
-        />
-
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan is never read as "pointed at nothing"; the Hand owns the real interaction */}
-        <div
-          className={styles.hand}
-          ref={handWrapRef}
-          // the pair assembles and then waits at the CENTRE — the hand's zoom
-          // preview rises into exactly that space and would cover the play. So
-          // while the cards are on the table the fan goes inert: the overlay case
-          // of the three in docs/animations/README, not the "flight in progress" one.
-          style={{ pointerEvents: merged || playing ? 'none' : undefined }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <Hand
-            items={hand}
-            gapAt={returnGap}
-            gapSize={returnSize}
-            accentAt={accentAt}
-            onPlay={handPlay}
-            onCardClick={phase === 'partner' ? pickPartner : undefined}
-            onReorder={(uid, toIndex) => setHand((h) => reorderHand(h, uid, toIndex))}
+        <div className={styles.discard}>
+          <Pile
+            heap={discardPile}
+            count={discardPile.length}
+            width={116}
+            boxRef={discardRef}
+            logoVariant={lang}
+            label={pick(lang, { ru: 'сброс', en: 'discard' })}
           />
         </div>
-      </div>
 
-      {aiming && <Arrow from={from} to={to} color={color} />}
+        <div className={styles.bottom}>
+          <ReleaseZone
+            size="100px"
+            release={Object.fromEntries(RELEASE_SLOTS.map((key) => [key, released[key]?.card]))}
+            support={Object.fromEntries(RELEASE_SLOTS.map((key) => [key, released[key]?.aux]))}
+            slotRef={(key, el) => {
+              slotRefs.current[key] = el
+            }}
+          />
 
-      {/* the source on its way from the fan to the centre */}
-      {flyerOverlay}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan is never read as "pointed at nothing"; the Hand owns the real interaction */}
+          <div
+            className={styles.hand}
+            ref={handWrapRef}
+            // the pair assembles and then waits at the CENTRE — the hand's zoom
+            // preview rises into exactly that space and would cover the play. So
+            // while the cards are on the table the fan goes inert: the overlay case
+            // of the three in docs/animations/README, not the "flight in progress" one.
+            style={{ pointerEvents: merged || playing ? 'none' : undefined }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <Hand
+              items={hand}
+              gapAt={returnGap}
+              gapSize={returnSize}
+              accentAt={accentAt}
+              onPlay={handPlay}
+              onCardClick={phase === 'partner' ? pickPartner : undefined}
+              onReorder={(uid, toIndex) => setHand((h) => reorderHand(h, uid, toIndex))}
+            />
+          </div>
+        </div>
 
-      {returnOverlay}
+        {aiming && <Arrow from={from} to={to} color={color} />}
 
-      {discardOverlay}
+        {/* the source on its way from the fan to the centre */}
+        {flyerOverlay}
 
-      <div className={styles.flyer} ref={flyRef} aria-hidden="true">
-        {flyPair && <CardPair main={flyPair.main} aux={flyPair.aux} width="100%" />}
+        {returnOverlay}
+
+        {discardOverlay}
+
+        <div className={styles.flyer} ref={flyRef} aria-hidden="true">
+          {flyPair && <CardPair main={flyPair.main} aux={flyPair.aux} width="100%" />}
+        </div>
       </div>
     </div>
   )

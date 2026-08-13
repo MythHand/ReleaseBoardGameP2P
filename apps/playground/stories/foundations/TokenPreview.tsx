@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { TechToggle } from '../controls/TechControls'
 import styles from './TokenPreview.module.css'
 
 // Colour tokens read from the live stylesheet — declared value plus the resolved
@@ -254,18 +255,16 @@ export default function TokenPreview() {
 
   return (
     <section className={styles.root}>
-      <div className={styles.bar}>
-        <h2 className={styles.h}>
-          colors <span className={styles.note}>{`// ${tokens.length}`}</span>
-        </h2>
-        <div className={styles.barRight}>
-          <span className={styles.hint}>
-            click any value to copy · click a ramp step for its token
-          </span>
-          <button type="button" className={styles.toggle} onClick={() => setChecker((c) => !c)}>
-            bg: {checker ? 'checker' : 'surface'}
-          </button>
-        </div>
+      <h2 className={styles.h}>
+        colors <span className={styles.note}>{`// ${tokens.length}`}</span>
+      </h2>
+      <p className={styles.intro}>click any value to copy · click a ramp step for its token</p>
+      {/* Foundations pages carry no technical bar — this belongs to the document,
+          not to a control line the group does not have. */}
+      <div className={styles.pageControls}>
+        <TechToggle on={checker} onChange={setChecker}>
+          checker bg
+        </TechToggle>
       </div>
 
       {/* discrete hues — grouped by role */}
