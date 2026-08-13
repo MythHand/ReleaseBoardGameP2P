@@ -146,6 +146,30 @@ node instead, once the resting card has taken over (Defense Release).
 
 ---
 
+## The board's layer — anchors and the beat queue
+
+These live in `apps/frontend`, not in `@release/ui`: they are how the *board* wires engine events to
+the vocabulary, and the kit has no notion of an engine. Listed here because the vocabulary is
+useless without knowing what calls it.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `BoardAnchors` | `useBoardAnchors()` → the registry | every node a flight aims at or leaves from: the HUD blocks, `deckBox`, `discardBox`, `centre`, `hand`, plus `seatBox(player)` (a card box centred on a seat, **I6**), `handSlotAt(index)` and `releaseSlot(player, slot)`. A DOM registry only — it holds no game state and mirrors none, which is why a hand card is reached by index and not by uid. One identity for the life of the mount |
+| `planBeats` | `planBeats(events, before)` → `BeatPlan[]` | a batch of engine events becomes movements, read against the projection still **on screen** (**I1**). An event with no choreography yields nothing and passes through. All `discarded` of one batch go in ONE beat — the step's own rule, "one by one but all at once" |
+| `useBeats` | `useBeats({ live, events, anchors, enabled, intro })` → `{ shadow, overlays, exclusive }` | the queue: one beat at a time, the board renders `shadow` while one runs, and `shadow` is dropped on drain so the board can never be stranded behind the projection. The single place `prefers-reduced-motion` is checked |
+| `IntroBeat` | `{ key, shadow, run, collapse }` | the opening, handed to the queue as beat zero — the one beat that owns the table (`exclusive`) and the one that publishes its own shadow instead of animating away from a base. `collapse()` is the no-animation path: it exists because the opening must **report** to the host's start gate even when it does not play, or the match never begins |
+
+**The shadow is the projection a beat animates AWAY from**, not the one it produces. By the time the
+queue sees a batch, `live` already has the card out of the hand — so the queue keeps the last
+projection it actually showed and plans against that, and a batch arriving mid-beat waits its turn
+rather than being planned against a state nobody can see.
+
+**One scatter, two readers.** A discard flies on `scatterAt(eventId)` and the heap
+(`toBoardState.toDiscardHeap`) rests it on `scatterAt(eventId)` — the same call on the same id, which
+is what makes the handover invisible (**I7**) across a boundary neither side can see.
+
+---
+
 ## Discard scatter
 
 `apps/ui/src/animations/scatter.ts` — the single source of "how a card lands in and rests in the discard heap".
