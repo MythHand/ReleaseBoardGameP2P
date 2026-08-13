@@ -1,7 +1,8 @@
 import type { Event, PlayerView, ReleaseView } from '@release/engine'
 import { rulesFor } from '@release/engine'
-import type { HistoryEntry } from '@release/ui'
+import type { HeapCard, HistoryEntry } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
+import { HEAP_SHOW, scatterAt } from '@release/ui/animations'
 import type { BoardState } from './types'
 
 // One label per member of the engine's Event union — the adapter maps event
@@ -118,6 +119,40 @@ function toHistoryEntry(e: Event, labels: HistoryLabels): HistoryEntry {
   }
 }
 
+// The discard as it lies on the table. `PlayerView` carries only the top card
+// and a count, so the heap is folded out of the feed: one entry per `discarded`
+// event, its scatter keyed by the event id. Deterministic on purpose — every
+// peer folds the same heap, and the beat that flies a card into it reads the
+// SAME Scatter, so the card lands exactly where it then lies (I7).
+//
+// It runs BEHIND the count, knowingly: a card spent on an attack or a defence
+// reaches the discard through the engine's `bankToDiscard` with no event at all
+// (`attackSpent` / `defenceSpent` are declared in the DiscardReason union and
+// never emitted — docs/animations/backlog.md). Two consequences are handled
+// here rather than hidden: the count stays the projection's own, which is
+// authoritative; and because `Pile` ignores `topCard` the moment a heap is
+// present, a fold that does not end on the projection's top would leave a stale
+// card showing as the top of the discard — so the real top is appended.
+function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): HeapCard[] {
+  const heap: HeapCard[] = []
+  for (const e of log) {
+    if (e.type !== 'discarded') continue
+    // The event id IS the stable integer `scatterAt` asks for — the engine's own
+    // monotonic sequence, identical on every peer. No stringifying: `scatterAt`
+    // hashes the number arithmetically.
+    heap.push({ uid: `d${e.id}`, card: cardOrPlaceholder(e.card), ...scatterAt(e.id) })
+  }
+  if (top && heap.at(-1)?.card.id !== top.id) {
+    // The stand-in for however many cards were banked in silence. Its identity is
+    // the COUNT, not the heap's length: the count is what actually moved when
+    // that happened, so this card keeps one pose for as long as it is really the
+    // top. Its scatter key is negative to put it out of the event ids' range —
+    // those are positive, so a stand-in can never inherit a real card's pose.
+    heap.push({ uid: `top${count}`, card: top, ...scatterAt(-1 - count) })
+  }
+  return heap.slice(-HEAP_SHOW)
+}
+
 // The projection becomes a table: PlayerView + the event log + translated
 // labels -> everything the kit's Table needs to render. Pure — no React, no
 // clock, no randomness. Total — an unknown card id renders a placeholder
@@ -145,6 +180,11 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       main: view.decks.piles.reduce((a, b) => a + b, 0),
       events: view.decks.events,
       discard: view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined,
+      discardHeap: toDiscardHeap(
+        visible,
+        view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined,
+        view.decks.discardCount,
+      ),
       discardCount: view.decks.discardCount,
     },
     turn: view.turn.player,

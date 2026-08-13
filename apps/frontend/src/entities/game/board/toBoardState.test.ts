@@ -1,4 +1,5 @@
 import type { Event, PlayerView } from '@release/engine'
+import { HEAP_SHOW, scatterAt } from '@release/ui/animations'
 import { describe, expect, it } from 'vitest'
 import { type HistoryLabels, toBoardState } from './toBoardState'
 
@@ -32,6 +33,7 @@ const labels = Object.fromEntries([
   ['drawn', 'Draw'],
   ['placed', 'Played'],
   ['eliminated', 'Eliminated'],
+  ['discarded', 'Discarded'],
 ]) as HistoryLabels
 
 describe('toBoardState', () => {
@@ -195,5 +197,80 @@ describe('toBoardState', () => {
     const pending = toBoardState(withPending, [], labels).pending
     expect(pending && 'openedAt' in pending ? pending.openedAt : undefined).toBe(50)
     expect(pending && 'deadline' in pending ? pending.deadline : undefined).toBe(150)
+  })
+})
+
+// The decks are the only slice these assertions vary, so they spread the shared
+// projection rather than restating one — a second full PlayerView here would
+// drift from the one every other test in this file reads.
+const withDecks = (decks: Partial<PlayerView['decks']>): PlayerView => ({
+  ...view,
+  decks: { ...view.decks, ...decks },
+})
+
+const discardedEvent = (id: number, card: string, reason = 'effect'): Event =>
+  ({ id, type: 'discarded', player: 'you', card, reason }) as Event
+
+describe('the discard heap', () => {
+  it('is empty when nothing has been discarded and nothing is on top', () => {
+    const state = toBoardState(withDecks({ discardCount: 0, discardTop: undefined }), [], labels)
+    expect(state.decks.discardHeap).toEqual([])
+  })
+
+  it('gives one entry per discarded event, keyed by the event id', () => {
+    const log = [
+      discardedEvent(7, 'protection-debugger'),
+      discardedEvent(9, 'attack-bug', 'handLimit'),
+    ]
+    const heap =
+      toBoardState(withDecks({ discardCount: 2, discardTop: 'attack-bug' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.uid)).toEqual(['d7', 'd9'])
+    expect(heap.map((c) => c.card.id)).toEqual(['protection-debugger', 'attack-bug'])
+  })
+
+  // The scatter is the whole reason the heap is derived rather than invented per
+  // render: the beat flies the card on scatterAt(e.id) and the heap rests
+  // it on the same value, so the landing frame IS the resting frame (I7).
+  it('scatters a card the same way every time', () => {
+    const log = [discardedEvent(7, 'attack-bug')]
+    const decks = withDecks({ discardCount: 1, discardTop: 'attack-bug' })
+    const first = toBoardState(decks, log, labels).decks.discardHeap ?? []
+    const second = toBoardState(decks, log, labels).decks.discardHeap ?? []
+    expect(first).toEqual(second)
+    expect(first[0]).toMatchObject(scatterAt(7))
+  })
+
+  it('keeps only the cards the pile actually renders', () => {
+    const log = Array.from({ length: HEAP_SHOW + 4 }, (_, i) => discardedEvent(i + 1, 'attack-bug'))
+    const heap =
+      toBoardState(withDecks({ discardCount: log.length, discardTop: 'attack-bug' }), log, labels)
+        .decks.discardHeap ?? []
+    expect(heap).toHaveLength(HEAP_SHOW)
+    expect(heap.at(-1)?.uid).toBe(`d${log.length}`)
+  })
+
+  // The engine banks a spent attack or defence straight into the discard with no
+  // event at all (docs/animations/backlog.md), so the fold runs behind the count.
+  // Pile ignores `topCard` once a heap is present, so without this the board
+  // would show a stale card as the top of the discard.
+  it('appends the projection top when the fold does not end on it', () => {
+    const log = [discardedEvent(7, 'attack-bug')]
+    const heap =
+      toBoardState(withDecks({ discardCount: 4, discardTop: 'attack-ddos' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual(['attack-bug', 'attack-ddos'])
+    expect(heap.at(-1)?.uid).toBe('top4')
+    // Keyed out of the event ids' range, so the stand-in can never take a real
+    // card's pose (see the implementation note on negative keys).
+    expect(heap.at(-1)).toMatchObject(scatterAt(-5))
+  })
+
+  it('does not append a top the fold already ends on', () => {
+    const log = [discardedEvent(7, 'attack-bug')]
+    const heap =
+      toBoardState(withDecks({ discardCount: 1, discardTop: 'attack-bug' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap).toHaveLength(1)
   })
 })
