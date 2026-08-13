@@ -164,7 +164,7 @@ also what makes a `handLimit` discard of three cards read as one gesture rather 
 | reason `destroyed` / `neutralized` | `releaseSlot(player, slot)` |
 | any other player | `seatBox(player)` |
 
-Each card's scatter is `scatterAt(String(e.id))` — deterministic, so the flight and the rest read
+Each card's scatter is `scatterAt(e.id)` — deterministic, so the flight and the rest read
 the same value (**I7**) and every peer's heap agrees. The destination is the discard box; the step
 trims it to the card area itself (`cardAreaOf`, **I6**).
 
@@ -193,7 +193,7 @@ apps/frontend/src/features/game-intro/
 ## 6. The heap, and the hole under it
 
 `toBoardState` grows `discardHeap` by folding the visible `discarded` events in order into
-`{ card, ...scatterAt(String(e.id)) }`, capped at `HEAP_SHOW`. Deterministic by event id, so it is
+`{ card, ...scatterAt(e.id) }`, capped at `HEAP_SHOW`. Deterministic by event id, so it is
 stable across re-renders and identical on every peer — and the same value the beat flies on, which
 is what makes the landing frame the resting frame.
 

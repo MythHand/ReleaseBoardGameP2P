@@ -237,8 +237,18 @@ The projection carries only `discardTop` and `discardCount`, so `_Board.tsx` has
 - Test: `apps/frontend/src/entities/game/board/toBoardState.test.ts`
 
 **Interfaces:**
-- Consumes: `scatterAt(key: string, width?: number) => Scatter` and `HEAP_SHOW: number` from `@release/ui/animations`; `type HeapCard = { card: CardData; rot: number; dx: number; dy: number; uid?: string }` from `@release/ui`.
-- Produces: `BoardState.decks.discardHeap: HeapCard[]`, whose entry for a `discarded` event with id `N` has `uid: \`d${N}\`` and the scatter `scatterAt(String(N))`. Task 5's beat flies each card on that same scatter.
+- Consumes: `scatterAt(key: number, width?: number) => Scatter` and `HEAP_SHOW: number` from `@release/ui/animations`; `type HeapCard = { card: CardData; rot: number; dx: number; dy: number; uid?: string }` from `@release/ui`.
+- Produces: `BoardState.decks.discardHeap: HeapCard[]`, whose entry for a `discarded` event with id `N` has `uid: \`d${N}\`` and the scatter `scatterAt(N)`. Task 5's beat flies each card on that same scatter.
+
+> **`scatterAt` takes a number, not a string.** Its signature is
+> `scatterAt(key: number, width = REF_WIDTH)` and it hashes the key arithmetically
+> (`apps/ui/src/animations/scatter.ts:53`; the docstring says "its heap index, or any
+> stable integer"). An engine event id **is** such an integer — `Event.id` is a number
+> from the engine's own monotonic sequence — so it is passed directly. Do **not** widen
+> `scatterAt` to take strings: that would touch a shared function with two existing
+> callers for no gain, and a naive `Number(key)` widening silently yields `NaN` for any
+> non-numeric key. The `uid` on a `HeapCard` stays a string; only the scatter key is a
+> number, and the two are separate fields.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -275,7 +285,7 @@ describe('the discard heap', () => {
   })
 
   // The scatter is the whole reason the heap is derived rather than invented per
-  // render: the beat flies the card on scatterAt(String(e.id)) and the heap rests
+  // render: the beat flies the card on scatterAt(e.id) and the heap rests
   // it on the same value, so the landing frame IS the resting frame (I7).
   it('scatters a card the same way every time', () => {
     const log = [discardedEvent(7, 'attack-bug')]
@@ -283,7 +293,7 @@ describe('the discard heap', () => {
     const first = toBoardState(decks, log, labels).decks.discardHeap ?? []
     const second = toBoardState(decks, log, labels).decks.discardHeap ?? []
     expect(first).toEqual(second)
-    expect(first[0]).toMatchObject(scatterAt('7'))
+    expect(first[0]).toMatchObject(scatterAt(7))
   })
 
   it('keeps only the cards the pile actually renders', () => {
@@ -308,6 +318,9 @@ describe('the discard heap', () => {
         .discardHeap ?? []
     expect(heap.map((c) => c.card.id)).toEqual(['attack-bug', 'attack-ddos'])
     expect(heap.at(-1)?.uid).toBe('top4')
+    // Keyed out of the event ids' range, so the stand-in can never take a real
+    // card's pose (see the implementation note on negative keys).
+    expect(heap.at(-1)).toMatchObject(scatterAt(-5))
   })
 
   it('does not append a top the fold already ends on', () => {
@@ -364,14 +377,18 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
   const heap: HeapCard[] = []
   for (const e of log) {
     if (e.type !== 'discarded') continue
-    heap.push({ uid: `d${e.id}`, card: cardOrPlaceholder(e.card), ...scatterAt(String(e.id)) })
+    // The event id IS the stable integer `scatterAt` asks for — the engine's own
+    // monotonic sequence, identical on every peer. No stringifying: `scatterAt`
+    // hashes the number arithmetically.
+    heap.push({ uid: `d${e.id}`, card: cardOrPlaceholder(e.card), ...scatterAt(e.id) })
   }
   if (top && heap.at(-1)?.card.id !== top.id) {
-    // Keyed by the count rather than by the heap's length: the count is what
-    // actually changed when a card was banked in silence, so the appended card
-    // keeps one identity and one scatter for as long as it is really the top.
-    const key = `top${count}`
-    heap.push({ uid: key, card: top, ...scatterAt(key) })
+    // The stand-in for however many cards were banked in silence. Its identity is
+    // the COUNT, not the heap's length: the count is what actually moved when
+    // that happened, so this card keeps one pose for as long as it is really the
+    // top. Its scatter key is negative to put it out of the event ids' range —
+    // those are positive, so a stand-in can never inherit a real card's pose.
+    heap.push({ uid: `top${count}`, card: top, ...scatterAt(-1 - count) })
   }
   return heap.slice(-HEAP_SHOW)
 }
@@ -1139,8 +1156,9 @@ it('flies each card on the scatter the heap will rest it on', async () => {
   expect(items).toHaveLength(1)
   expect(items[0].key).toBe('d4')
   // The identity this whole design rests on: the flight ends on the pose the
-  // adapter's heap already holds for this card (I7).
-  expect(items[0].scatter).toEqual(scatterAt(String(discardEvent.id)))
+  // adapter's heap already holds for this card (I7). Task 2 folded the heap with
+  // scatterAt(e.id); this is the same call on the same id.
+  expect(items[0].scatter).toEqual(scatterAt(discardEvent.id))
 })
 
 it('leaves the table open — only the opening is exclusive', () => {
@@ -1259,7 +1277,8 @@ export function useBeats(args: {
       if (!card || !from) return null
       // The SAME Scatter the adapter rests this card on (I7): the flight ends
       // on the pose the heap already holds for it, so nothing moves on handover.
-      return { key: c.key, card, from, scatter: scatterAt(String(c.eventId)) }
+      // Same key, same call — `scatterAt` takes the event id as a number.
+      return { key: c.key, card, from, scatter: scatterAt(c.eventId) }
     },
     [whereFrom],
   )
@@ -1775,7 +1794,7 @@ In `docs/animations/recipes.md`, add a note directly under the "Playing a card �
 > [`backlog.md`](./backlog.md) and the live-board recipe below.
 ```
 
-Then add a new recipe, "A card leaves the hand for the discard (live board)", in the file's established shape: when to call, visual result, elements/refs, sequence, params & timings, invariants, end state, building blocks, live reference. Its content is Tasks 3–5: `planBeats` folds the batch, the shadow is the pre-batch projection, the source is a hand slot / release slot / seat box, the scatter is `scatterAt(String(eventId))` and is shared with the heap (I7), and the whole thing collapses under reduced motion.
+Then add a new recipe, "A card leaves the hand for the discard (live board)", in the file's established shape: when to call, visual result, elements/refs, sequence, params & timings, invariants, end state, building blocks, live reference. Its content is Tasks 3–5: `planBeats` folds the batch, the shadow is the pre-batch projection, the source is a hand slot / release slot / seat box, the scatter is `scatterAt(eventId)` and is shared with the heap (I7), and the whole thing collapses under reduced motion.
 
 - [ ] **Step 5: Add the layer's rows to the reference**
 
@@ -1811,7 +1830,7 @@ git commit -m "docs(animations): the layer's rows, the live discard recipe, and 
 
 **Spec coverage.** §1 → Task 1. §2 → Task 3. §3 → Tasks 4, 5, 6. §4 → Tasks 4, 5. §5 → Tasks 1, 3, 4, 5. §6 → Task 2. §7 → tests inside each task. §8 → Task 7. §9 → Tasks 1 and 7. The already-done bullets → Task 7 Step 1 (`table-adapter`) and the branch's existing history (`useFlyer` / `useHandArrival`).
 
-**Type consistency.** `BoardAnchors` is produced in Task 3 and consumed by name in Tasks 5 and 6. `BeatPlan` / `DiscardCard` / `DiscardSource` are produced in Task 4 and consumed in Task 5. `IntroBeat` is produced in Task 6 and used in the same task only. `scatterAt(String(eventId))` is the key in both Task 2's fold and Task 5's flight — that identity is the point, and it is asserted from both sides.
+**Type consistency.** `BoardAnchors` is produced in Task 3 and consumed by name in Tasks 5 and 6. `BeatPlan` / `DiscardCard` / `DiscardSource` are produced in Task 4 and consumed in Task 5. `IntroBeat` is produced in Task 6 and used in the same task only. `scatterAt(eventId)` is the key in both Task 2's fold and Task 5's flight — that identity is the point, and it is asserted from both sides.
 
 **Known soft spots, called out rather than hidden.**
 - Task 5's tests mock `@release/ui/animations`' `useDiscardExit`. That is deliberate — jsdom has no WAAPI and no layout, so a real flight would assert nothing — but it means the queue's *wiring* is tested and the flight itself is verified in the playground, per the "verify live" rule in `docs/animations/README.md`.
