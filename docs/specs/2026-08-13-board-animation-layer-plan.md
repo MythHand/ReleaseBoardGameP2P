@@ -31,6 +31,7 @@ Three places where writing the code out changed the shape. Each is a simplificat
 1. **`Beat.apply` is dropped.** The design had each beat fold its effect into the shadow. With one beat kind there is never an intermediate state to fold: the shadow is the projection the beat animates *away from*, and the projection it lands on is the live one. So a beat carries `base: BoardState` instead, and `shadow` is simply the running beat's `base`. This also handles the real queueing case exactly — a second sync arriving mid-flight gets its own base. An untested fold hook is the speculative machinery the issue warns against; `apply` arrives with the first beat kind that needs it.
 2. **`handSlot(uid)` becomes `handSlotAt(index)`.** The registry is a DOM registry, not a mirror of state; a uid lookup would make it depend on the hand it is supposed to be independent of. The beat already holds the pre-batch hand and resolves the index itself.
 3. **`useDiscardExit` is given no `onLanded`.** The heap is derived from the same events in `toBoardState` (Task 2), so the cards a beat flew are already in the projection it hands over to. A second set of books here would be a second source for one heap.
+4. **`BoardAnchors` lives in `entities/game/board/`, not in `pages/`.** The design left it beside `_Board.tsx`; that would make `features/game-intro` and `features/board-beats` import from `pages/`, inverting the one-way layer rule in [apps/frontend/CLAUDE.md](../../apps/frontend/CLAUDE.md). The registry is a board fact rather than a page fact — the same argument that already puts `BoardState` in `entities/` — so it goes there and everything imports downward.
 
 ## File Structure
 
@@ -41,7 +42,7 @@ Three places where writing the code out changed the shape. Each is a simplificat
 | `apps/ui/src/animations/index.ts` (modify) | exports `useDiscardExit`, `type Leaving` |
 | `apps/ui/src/animations/docs.test.ts` (modify) | every exported step needs a `reference.md` row |
 | `apps/frontend/src/entities/game/board/toBoardState.ts` (modify) | folds `discarded` events into `decks.discardHeap` |
-| `apps/frontend/src/pages/board/[gameId]/_useBoardAnchors.ts` (create) | `BoardAnchors` — every node a flight aims at or from |
+| `apps/frontend/src/entities/game/board/anchors.ts` (create) | `BoardAnchors` — every node a flight aims at or from |
 | `apps/frontend/src/features/game-intro/useDealIntro.ts` (modify) | takes `BoardAnchors`; publishes itself as beat zero |
 | `apps/frontend/src/features/board-beats/planBeats.ts` (create) | pure: a batch of events → beat plans |
 | `apps/frontend/src/features/board-beats/useBeats.ts` (create) | the queue, the shadow, the reduced-motion policy |
@@ -241,26 +242,34 @@ The projection carries only `discardTop` and `discardCount`, so `_Board.tsx` has
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `apps/frontend/src/entities/game/board/toBoardState.test.ts`. Match the file's existing helpers for building a `PlayerView` and an `Event[]`; the fields below are the ones these assertions read.
+Append to `apps/frontend/src/entities/game/board/toBoardState.test.ts`. The file already has a module-level `const view: PlayerView` (line 9) and `const labels` (line 31) — there is **no** `makeView` factory, so these tests vary the decks by spreading that const. `view` starts with `decks: { piles: [30, 10], events: 8, discardCount: 2, discardTop: 'attack-ddos' }` and `self.id === 'you'`.
 
 ```ts
-describe('the discard heap', () => {
-  const labels = {} as HistoryLabels
+// The decks are the only slice these assertions vary, so they spread the shared
+// projection rather than restating one — a second full PlayerView here would
+// drift from the one every other test in this file reads.
+const withDecks = (decks: Partial<PlayerView['decks']>): PlayerView => ({
+  ...view,
+  decks: { ...view.decks, ...decks },
+})
 
-  it('is empty when nothing has been discarded', () => {
-    const view = makeView({ decks: { piles: [10], events: 5, discardCount: 0 } })
-    expect(toBoardState(view, [], labels).decks.discardHeap).toEqual([])
+const discardedEvent = (id: number, card: string, reason = 'effect'): Event =>
+  ({ id, type: 'discarded', player: 'you', card, reason }) as Event
+
+describe('the discard heap', () => {
+  it('is empty when nothing has been discarded and nothing is on top', () => {
+    const state = toBoardState(withDecks({ discardCount: 0, discardTop: undefined }), [], labels)
+    expect(state.decks.discardHeap).toEqual([])
   })
 
   it('gives one entry per discarded event, keyed by the event id', () => {
-    const view = makeView({
-      decks: { piles: [10], events: 5, discardCount: 2, discardTop: 'attack-bug' },
-    })
-    const log: Event[] = [
-      { id: 7, type: 'discarded', player: 'p1', card: 'protection-debugger', reason: 'effect' },
-      { id: 9, type: 'discarded', player: 'p1', card: 'attack-bug', reason: 'handLimit' },
+    const log = [
+      discardedEvent(7, 'protection-debugger'),
+      discardedEvent(9, 'attack-bug', 'handLimit'),
     ]
-    const heap = toBoardState(view, log, labels).decks.discardHeap ?? []
+    const heap =
+      toBoardState(withDecks({ discardCount: 2, discardTop: 'attack-bug' }), log, labels).decks
+        .discardHeap ?? []
     expect(heap.map((c) => c.uid)).toEqual(['d7', 'd9'])
     expect(heap.map((c) => c.card.id)).toEqual(['protection-debugger', 'attack-bug'])
   })
@@ -269,30 +278,21 @@ describe('the discard heap', () => {
   // render: the beat flies the card on scatterAt(String(e.id)) and the heap rests
   // it on the same value, so the landing frame IS the resting frame (I7).
   it('scatters a card the same way every time', () => {
-    const view = makeView({
-      decks: { piles: [10], events: 5, discardCount: 1, discardTop: 'attack-bug' },
-    })
-    const log: Event[] = [
-      { id: 7, type: 'discarded', player: 'p1', card: 'attack-bug', reason: 'effect' },
-    ]
-    const first = toBoardState(view, log, labels).decks.discardHeap ?? []
-    const second = toBoardState(view, log, labels).decks.discardHeap ?? []
+    const log = [discardedEvent(7, 'attack-bug')]
+    const decks = withDecks({ discardCount: 1, discardTop: 'attack-bug' })
+    const first = toBoardState(decks, log, labels).decks.discardHeap ?? []
+    const second = toBoardState(decks, log, labels).decks.discardHeap ?? []
     expect(first).toEqual(second)
     expect(first[0]).toMatchObject(scatterAt('7'))
   })
 
   it('keeps only the cards the pile actually renders', () => {
-    const log: Event[] = Array.from({ length: HEAP_SHOW + 4 }, (_, i) => ({
-      id: i + 1,
-      type: 'discarded' as const,
-      player: 'p1',
-      card: 'attack-bug',
-      reason: 'effect' as const,
-    }))
-    const view = makeView({
-      decks: { piles: [10], events: 5, discardCount: log.length, discardTop: 'attack-bug' },
-    })
-    const heap = toBoardState(view, log, labels).decks.discardHeap ?? []
+    const log = Array.from({ length: HEAP_SHOW + 4 }, (_, i) =>
+      discardedEvent(i + 1, 'attack-bug'),
+    )
+    const heap =
+      toBoardState(withDecks({ discardCount: log.length, discardTop: 'attack-bug' }), log, labels)
+        .decks.discardHeap ?? []
     expect(heap).toHaveLength(HEAP_SHOW)
     expect(heap.at(-1)?.uid).toBe(`d${log.length}`)
   })
@@ -302,25 +302,19 @@ describe('the discard heap', () => {
   // Pile ignores `topCard` once a heap is present, so without this the board
   // would show a stale card as the top of the discard.
   it('appends the projection top when the fold does not end on it', () => {
-    const view = makeView({
-      decks: { piles: [10], events: 5, discardCount: 4, discardTop: 'attack-ddos' },
-    })
-    const log: Event[] = [
-      { id: 7, type: 'discarded', player: 'p1', card: 'attack-bug', reason: 'effect' },
-    ]
-    const heap = toBoardState(view, log, labels).decks.discardHeap ?? []
+    const log = [discardedEvent(7, 'attack-bug')]
+    const heap =
+      toBoardState(withDecks({ discardCount: 4, discardTop: 'attack-ddos' }), log, labels).decks
+        .discardHeap ?? []
     expect(heap.map((c) => c.card.id)).toEqual(['attack-bug', 'attack-ddos'])
     expect(heap.at(-1)?.uid).toBe('top4')
   })
 
   it('does not append a top the fold already ends on', () => {
-    const view = makeView({
-      decks: { piles: [10], events: 5, discardCount: 1, discardTop: 'attack-bug' },
-    })
-    const log: Event[] = [
-      { id: 7, type: 'discarded', player: 'p1', card: 'attack-bug', reason: 'effect' },
-    ]
-    const heap = toBoardState(view, log, labels).decks.discardHeap ?? []
+    const log = [discardedEvent(7, 'attack-bug')]
+    const heap =
+      toBoardState(withDecks({ discardCount: 1, discardTop: 'attack-bug' }), log, labels).decks
+        .discardHeap ?? []
     expect(heap).toHaveLength(1)
   })
 })
@@ -331,6 +325,13 @@ Add to the file's imports:
 ```ts
 import { HEAP_SHOW, scatterAt } from '@release/ui/animations'
 ```
+
+> `labels` in this file is a partial `HistoryLabels` covering only `drawn` / `placed` /
+> `eliminated`. `discarded` is not among them, so `toHistoryEntry` will put `undefined`
+> in the entry's `kind` for these events — harmless here, since none of these assertions
+> reads `history`. Add `['discarded', 'Discarded']` to that `Object.fromEntries` list
+> anyway: a fixture that quietly produces an undefined label is the kind of thing the
+> next test to touch `history` inherits without noticing.
 
 - [ ] **Step 2: Run them and watch them fail**
 
@@ -414,9 +415,17 @@ git commit -m "feat(web): the discard becomes a heap, folded from the feed (#96)
 `IntroRefs` is already most of what every flight needs. It becomes board-level, gains what a discard aims from and at, and the intro becomes one consumer of it rather than its owner.
 
 **Files:**
-- Create: `apps/frontend/src/pages/board/[gameId]/_useBoardAnchors.ts`
-- Modify: `apps/frontend/src/pages/board/[gameId]/_Board.tsx`, `apps/frontend/src/features/game-intro/useDealIntro.ts`
+- Create: `apps/frontend/src/entities/game/board/anchors.ts`
+- Modify: `apps/frontend/src/entities/game/board/index.ts`, `apps/frontend/src/pages/board/[gameId]/_Board.tsx`, `apps/frontend/src/features/game-intro/useDealIntro.ts`
 - Test: `apps/frontend/src/pages/board/[gameId]/__tests__/boardAnchors.test.tsx` (create)
+
+**Where it lives, and why it is not beside the board.** The registry holds refs to
+nodes `_Board.tsx` renders, so `pages/` looks like the natural home — but two
+`features/` modules consume it, and a `features/` → `pages/` import inverts the
+one-way layer rule in [apps/frontend/CLAUDE.md](../../apps/frontend/CLAUDE.md). It
+is a board fact rather than a page fact, exactly as `BoardState` is, so it sits in
+`entities/game/board/` beside the types it is used with and everything imports
+downward. Export it from that folder's `index.ts` alongside the existing exports.
 
 **Interfaces:**
 - Consumes: `cardBoxIn(rect: Rect, width: number) => Rect` and `CARD_W: number` from `@release/ui`; `type Rect` from `@release/ui/animations`.
@@ -491,7 +500,7 @@ Expected: FAIL on the first assertion — the discard `Pile` in `_Board.tsx` is 
 
 - [ ] **Step 3: Write the registry**
 
-Create `apps/frontend/src/pages/board/[gameId]/_useBoardAnchors.ts`:
+Create `apps/frontend/src/entities/game/board/anchors.ts`:
 
 ```ts
 import { CARD_W, cardBoxIn } from '@release/ui'
@@ -596,10 +605,16 @@ In `apps/frontend/src/pages/board/[gameId]/_Board.tsx`:
   const anchors = useBoardAnchors()
 ```
 
-and add the import:
+and add the import (through the entity's barrel, like the board's other types):
 
 ```ts
-import { useBoardAnchors } from './_useBoardAnchors'
+import { useBoardAnchors } from '~/entities/game/board'
+```
+
+Export it from `apps/frontend/src/entities/game/board/index.ts`:
+
+```ts
+export { type BoardAnchors, useBoardAnchors } from './anchors'
 ```
 
 2. Every `railRef` / `bgRef` / `decksRef` / `discardRef` / `seatsRef` / `dockRef` / `zoneRef` / `deckBoxRef` / `centreRef` / `handRef` reference becomes `anchors.rail` etc. The seat binding becomes:
@@ -661,18 +676,12 @@ import { useBoardAnchors } from './_useBoardAnchors'
 In `apps/frontend/src/features/game-intro/useDealIntro.ts`, delete the `IntroRefs` interface (lines 55–67) and import the registry instead:
 
 ```ts
-import type { BoardAnchors } from '~/pages/board/[gameId]/_useBoardAnchors'
+import type { BoardAnchors } from '~/entities/game/board'
 ```
 
-Change the hook's argument type from `refs: IntroRefs` to `refs: BoardAnchors`. Nothing inside the hook changes: every member it reads (`rail`, `bg`, `decks`, `discard`, `seats`, `dock`, `zone`, `deckBox`, `centre`, `hand`, `seatOf`) is on `BoardAnchors` with the same shape.
+Change the hook's argument type from `refs: IntroRefs` to `refs: BoardAnchors`. Nothing inside the hook changes: every member it reads (`rail`, `bg`, `decks`, `discard`, `seats`, `dock`, `zone`, `deckBox`, `centre`, `hand`, `seatOf`) is on `BoardAnchors` with the same shape. `features/` → `entities/` is the layer rule's own direction, so nothing here needs an exception.
 
-> A `features/` module importing from `pages/` inverts the layer rule in
-> [apps/frontend/CLAUDE.md](../../apps/frontend/CLAUDE.md). If the repo's lint
-> enforces the direction, move `_useBoardAnchors.ts` to
-> `apps/frontend/src/entities/game/board/anchors.ts` and import it from both
-> sides — the registry is a board fact, not a page fact, so `entities/` is a
-> defensible home. Check with `pnpm lint` at Step 7 and take that route if it
-> complains.
+Also delete the now-dangling `import type { IntroRefs }` line in `_Board.tsx` if Step 4 has not already removed it.
 
 - [ ] **Step 6: Run the tests**
 
@@ -990,9 +999,12 @@ Create `apps/frontend/src/features/board-beats/useBeats.test.tsx`:
 
 ```tsx
 import type { Event } from '@release/engine'
+import type { CardData } from '@release/ui'
+import { cardById } from '@release/ui'
+import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
-import type { BoardState } from '~/entities/game/board'
+import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { useBeats } from './useBeats'
 
 const motion = vi.hoisted(() => ({ reduced: true }))
@@ -1012,47 +1024,133 @@ vi.mock('@release/ui/animations', async (importOriginal) => ({
   }),
 }))
 
-// … build `live` / `before` BoardStates and an anchors stub whose handSlotAt,
-// seatBox and releaseSlot all return a fixed rect, then:
+const card = (id: string) => cardById(id) as CardData
 
-function Probe({ live, events, anchors }: { live: BoardState; events: Event[]; anchors: never }) {
+// The board BEFORE the batch: the card is still in the fan. This is what the
+// queue must keep on screen while the beat runs, and what a source rect is
+// measured against.
+const preDiscard = {
+  you: { name: 'You', hand: [{ uid: 'u1', card: card('attack-bug') }], release: {} },
+  opponents: [{ id: 'p2', name: 'Two', handCount: 3, release: {} }],
+  decks: { main: 10, events: 5, discardCount: 0, discardHeap: [] },
+  selfId: 'p1',
+  history: [],
+  setup: {},
+  playable: [],
+  frozen: [],
+} as unknown as BoardState
+
+// …and after: the card is gone from the hand and counted in the discard. The
+// beat's last frame has to equal THIS.
+const afterDiscard = {
+  ...preDiscard,
+  you: { ...preDiscard.you, hand: [] },
+  decks: { ...preDiscard.decks, discardCount: 1 },
+} as unknown as BoardState
+
+const discardEvent = {
+  id: 4,
+  type: 'discarded',
+  player: 'p1',
+  card: 'attack-bug',
+  reason: 'effect',
+} as Event
+
+// jsdom gives every element a zero rect, which is fine: the queue's job is to
+// hand the step a rect, not to be right about layout. What matters is that a
+// node exists for each anchor, because a MISSING one is the branch that drops a
+// card from the flight.
+const node = () => document.createElement('div')
+const stub = {
+  rail: { current: null }, bg: { current: null }, decks: { current: null },
+  discard: { current: null }, seats: { current: null }, dock: { current: null },
+  zone: { current: null }, deckBox: { current: null }, centre: { current: null },
+  hand: { current: null }, discardBox: { current: node() },
+  seatOf: () => node(),
+  seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
+  handSlotAt: () => node(),
+  releaseSlot: () => node(),
+  bindSeat: () => {},
+  bindReleaseSlot: () => {},
+} as unknown as BoardAnchors
+
+function Probe({
+  live,
+  events,
+  anchors,
+}: {
+  live: BoardState
+  events: Event[]
+  anchors: BoardAnchors
+}) {
   const beats = useBeats({ live, events, anchors, enabled: true })
-  return <div data-testid="shadow">{beats.shadow ? 'shadow' : 'live'}</div>
+  return (
+    <>
+      <div data-testid="hand">{(beats.shadow ?? live).you.hand.length}</div>
+      <div data-testid="exclusive">{beats.exclusive ? 'exclusive' : 'open'}</div>
+    </>
+  )
+}
+
+// The probe renders the hand the BOARD would render — shadow if one is up,
+// otherwise live. So "1" means the card is still in the fan and "0" means it has
+// gone: the queue's whole observable behaviour, without asserting on internals.
+//
+// The first render is the pre-batch state (a hand of one), and the batch arrives
+// on the rerender — which is the real sequence, and the only one where `settled`
+// holds a projection the card is still in.
+const mount = () => {
+  const utils = render(<Probe live={preDiscard} events={[]} anchors={stub} />)
+  utils.rerender(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} />)
+  return utils
 }
 
 it('never animates when motion is reduced', async () => {
   motion.reduced = true
   sent.calls = []
-  const { getByTestId } = render(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} />)
+  const { getByTestId } = mount()
+  await act(async () => {})
   expect(sent.calls).toEqual([])
-  expect(getByTestId('shadow').textContent).toBe('live')
+  // Straight to the end state: the card is gone, no beat ever ran.
+  expect(getByTestId('hand').textContent).toBe('0')
 })
 
-it('renders the pre-batch projection while a beat runs', async () => {
+it('keeps the card in the fan while its beat runs', () => {
   motion.reduced = false
   sent.calls = []
-  const { getByTestId } = render(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} />)
-  expect(getByTestId('shadow').textContent).toBe('shadow')
+  const { getByTestId } = mount()
+  expect(getByTestId('hand').textContent).toBe('1')
 })
 
 it('hands the board back to the live projection when the queue drains', async () => {
   motion.reduced = false
-  const { getByTestId } = render(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} />)
+  const { getByTestId } = mount()
   await act(async () => {})
-  expect(getByTestId('shadow').textContent).toBe('live')
+  expect(getByTestId('hand').textContent).toBe('0')
 })
 
 it('flies each card on the scatter the heap will rest it on', async () => {
   motion.reduced = false
   sent.calls = []
-  render(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} />)
+  mount()
   await act(async () => {})
-  const [items] = sent.calls
-  expect((items[0] as { scatter: unknown }).scatter).toEqual(scatterAt(String(discardEvent.id)))
+  expect(sent.calls).toHaveLength(1)
+  const [items] = sent.calls as [{ key: string; scatter: unknown }[]]
+  expect(items).toHaveLength(1)
+  expect(items[0].key).toBe('d4')
+  // The identity this whole design rests on: the flight ends on the pose the
+  // adapter's heap already holds for this card (I7).
+  expect(items[0].scatter).toEqual(scatterAt(String(discardEvent.id)))
+})
+
+it('leaves the table open — only the opening is exclusive', () => {
+  motion.reduced = false
+  const { getByTestId } = mount()
+  expect(getByTestId('exclusive').textContent).toBe('open')
 })
 ```
 
-Fill in `afterDiscard`, `discardEvent` and `stub` from the shapes in Task 4's test — the same `BoardState` builder, plus an anchors stub of the `BoardAnchors` shape whose node-returning members give a detached `document.createElement('div')` and whose `seatBox` returns `{ left: 0, top: 0, width: 150, height: 210 }`.
+Note the `scatterAt` import is the **real** one: the mock above spreads `importOriginal()` and replaces only `useDiscardExit`, so every helper the queue and the adapter share stays the genuine implementation. That is what makes the last assertion meaningful rather than circular.
 
 - [ ] **Step 2: Run them and watch them fail**
 
@@ -1070,8 +1168,7 @@ import type { Leaving, Rect } from '@release/ui/animations'
 import { scatterAt, useDiscardExit } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import type { BoardState } from '~/entities/game/board'
-import type { BoardAnchors } from '~/pages/board/[gameId]/_useBoardAnchors'
+import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import type { BeatPlan, DiscardCard } from './planBeats'
 import { planBeats } from './planBeats'
@@ -1128,6 +1225,10 @@ export function useBeats(args: {
   const { live, events, anchors, enabled } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
+  // The same value as `running`, readable from an effect without listing it as
+  // a dependency — the effect below has to ask "is a beat up?" without being
+  // re-armed by the answer changing.
+  const runningRef = useRef<Beat | null>(null)
 
   // No onLanded: the heap is derived from these same events in toBoardState, so
   // the cards this step flew are already in the projection it hands over to. A
@@ -1183,6 +1284,7 @@ export function useBeats(args: {
     try {
       let next = queue.current.shift()
       while (next) {
+        runningRef.current = next
         setRunning(next)
         // A beat that throws must not hold the board: the shadow is dropped in
         // the finally below regardless, so a failure costs the animation and
@@ -1196,11 +1298,25 @@ export function useBeats(args: {
       }
     } finally {
       draining.current = false
+      runningRef.current = null
       setRunning(null)
     }
   }, [])
 
+  // The last projection the board actually SHOWED. Not `live`: by the time this
+  // effect runs, `live` is already the projection the arriving batch produced —
+  // the card is out of the hand and counted in the discard. The slot it has to
+  // fly from is on the previous one, which is what is still on screen (I1).
+  const settled = useRef(live)
+
   useLayoutEffect(() => {
+    // A beat is up: the board is its shadow, and a batch arriving now waits its
+    // turn rather than being planned against a state nobody can see. `running`
+    // is a dependency so this re-arms the moment the queue drains and picks up
+    // whatever accumulated meanwhile — that IS the queue.
+    if (runningRef.current) return
+    const before = settled.current
+    settled.current = live
     if (!enabled) {
       // Nothing to animate into: keep the watermark level with the feed so a
       // board that becomes enabled later does not replay everything at once.
@@ -1214,12 +1330,9 @@ export function useBeats(args: {
     // the projection the board already holds — so there is nothing to do but
     // let it render. Planned nowhere, run nowhere: one branch, one place.
     if (reduced) return
-    // The base is the board still on screen: the shadow if one is up, otherwise
-    // the projection as it stood before this batch.
-    const base = running?.base ?? latest.current.live
-    for (const plan of planBeats(fresh, base)) queue.current.push(beatOf(plan, base))
+    for (const plan of planBeats(fresh, before)) queue.current.push(beatOf(plan, before))
     void drain()
-  }, [events, enabled, reduced, beatOf, drain, running?.base])
+  }, [events, live, enabled, reduced, beatOf, drain, running])
 
   return {
     // The shadow is the running beat's own base, and nothing else holds it up.
@@ -1242,7 +1355,7 @@ export { useBeats } from './useBeats'
 - [ ] **Step 4: Run the queue tests**
 
 Run: `pnpm --filter @release/web test -- useBeats`
-Expected: PASS, all four.
+Expected: PASS, all five.
 
 - [ ] **Step 5: Mount it on the board**
 
@@ -1280,36 +1393,55 @@ and render the queue's overlays beside the deal's, at the end of the tree:
 Create `apps/frontend/src/pages/board/[gameId]/__tests__/boardDiscard.test.tsx`:
 
 ```tsx
-import type { Event } from '@release/engine'
-import { render } from '@testing-library/react'
+import { fireEvent, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import Board from '../_Board'
 import { makeBoardProps } from './fixture'
 
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => true }))
 
-// Under reduced motion the queue never runs a beat, so what is on screen is the
-// projection itself. That is the assertion worth making at this level: the
-// board's OUTPUT does not depend on whether the animation played.
-it('shows the projection’s own discard whether or not a beat ran', () => {
+// The board without an intro is the live board, and under reduced motion the
+// queue never runs a beat — so what is on screen is the projection itself. That
+// is the assertion worth making at THIS level: the board's output does not
+// depend on whether the animation played. The queue's own behaviour is covered
+// in features/board-beats/useBeats.test.tsx; this suite covers the wiring.
+it('renders the projection’s own discard heap in the pile', () => {
   const props = makeBoardProps()
-  const events: Event[] = [
-    { id: 1, type: 'discarded', player: 'p1', card: 'attack-bug', reason: 'effect' },
+  const heap = [
+    { uid: 'd1', card: props.state.you.hand[0].card, rot: 4, dx: 2, dy: -3 },
+    { uid: 'd2', card: props.state.you.hand[1].card, rot: -6, dx: -1, dy: 5 },
   ]
-  const { container } = render(<Board {...props} intro={undefined} />)
-  expect(container.querySelectorAll('[data-hand-slot]')).toHaveLength(props.state.you.hand.length)
-  expect(events).toHaveLength(1)
+  const withHeap = {
+    ...props,
+    state: { ...props.state, decks: { ...props.state.decks, discardHeap: heap, discardCount: 2 } },
+  }
+  const { container } = render(<Board {...withHeap} />)
+  const discard = container.querySelector('[class*="discard"]')
+  // Two heap cards render, and the count is the projection's own — the number
+  // stays authoritative even when the fold is short (the bankToDiscard gap).
+  expect(discard?.querySelectorAll('[class*="heapCard"]')).toHaveLength(2)
 })
 
-it('leaves the hand playable while a card flies to the discard', () => {
-  // A discard is a thing that HAPPENED, not a thing being decided: freezing the
-  // fan for 420ms every time a card leaves reads as lag, not as safety
-  // (docs/animations/README.md — "Gating the hand", approach 3). Only the
-  // opening is exclusive.
-  const props = makeBoardProps()
-  const { container } = render(<Board {...props} intro={undefined} />)
-  const slot = container.querySelector('[data-hand-slot]')
+it('gives the discard pile a box for a flight to aim at', () => {
+  const { container } = render(<Board {...makeBoardProps()} />)
+  const discard = container.querySelector('[class*="discard"] [class*="stack"]')
+  expect(discard).toBeTruthy()
+})
+
+// A discard is a thing that HAPPENED, not a thing being decided: freezing the
+// fan for 420ms every time a card leaves reads as lag, not as safety
+// (docs/animations/README.md — "Gating the hand", approach 3). Only the opening
+// is exclusive, so on a board with no intro every hand card stays clickable.
+it('leaves the hand live on a board with no opening', () => {
+  const onPlay = vi.fn()
+  const props = makeBoardProps({ actions: { onPlay } })
+  const { container } = render(<Board {...props} />)
+  const slot = container.querySelector<HTMLElement>('[data-hand-slot]')
   expect(slot).toBeTruthy()
+  fireEvent.click(slot as HTMLElement)
+  // The gesture machine received the click: the hand was never held inert.
+  // (What it does with it is _useBoardInteractions' subject, not this suite's.)
+  expect(slot?.closest('[inert]')).toBeNull()
 })
 ```
 
@@ -1351,7 +1483,43 @@ and `useDealIntro` returns `beat: IntroBeat | null` alongside what it already re
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `apps/frontend/src/features/board-beats/useBeats.test.tsx`:
+First extend the existing `Probe` and `mount` from Task 5 to pass an intro through — everything else in that file stays as it is:
+
+```tsx
+import type { IntroBeat } from './useBeats'
+
+// The opening's own shadow: a table with no hand at all, because the cards have
+// not been dealt on screen yet. Distinct from preDiscard (a hand of one) and
+// afterDiscard (a hand of none) so the three are told apart by the same probe.
+const preDeal = {
+  ...preDiscard,
+  you: { ...preDiscard.you, hand: [] },
+  decks: { ...preDiscard.decks, main: 40 },
+} as unknown as BoardState
+
+function Probe({ live, events, anchors, intro }: {
+  live: BoardState
+  events: Event[]
+  anchors: BoardAnchors
+  intro?: IntroBeat | null
+}) {
+  const beats = useBeats({ live, events, anchors, enabled: true, intro })
+  return (
+    <>
+      <div data-testid="hand">{(beats.shadow ?? live).you.hand.length}</div>
+      <div data-testid="exclusive">{beats.exclusive ? 'exclusive' : 'open'}</div>
+    </>
+  )
+}
+
+const mount = (intro?: IntroBeat | null) => {
+  const utils = render(<Probe live={preDiscard} events={[]} anchors={stub} intro={intro} />)
+  utils.rerender(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} intro={intro} />)
+  return utils
+}
+```
+
+Then append the new cases:
 
 ```tsx
 it('runs the intro before anything the wire brings in', async () => {
@@ -1365,31 +1533,41 @@ it('runs the intro before anything the wire brings in', async () => {
     },
   }
   sent.calls = []
-  render(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} intro={intro} />)
+  mount(intro)
   await act(async () => {})
   expect(order).toEqual(['intro'])
   // …and the discard ran after it, not instead of it
   expect(sent.calls).toHaveLength(1)
 })
 
-it('holds the table while the intro runs and hands it back after', async () => {
+it('holds the table while the intro runs', () => {
   motion.reduced = false
+  // A run that never settles: the queue is parked on beat zero for the whole test.
   const intro = { key: 'intro', shadow: preDeal, run: () => new Promise<void>(() => {}) }
-  const { getByTestId } = render(<Probe live={afterDiscard} events={[]} anchors={stub} intro={intro} />)
+  const { getByTestId } = mount(intro)
   expect(getByTestId('exclusive').textContent).toBe('exclusive')
+  // …and the board shows the intro's OWN shadow, not the beat's base — the
+  // opening publishes a whole shape rather than a fold of the projection.
+  expect(getByTestId('hand').textContent).toBe('0')
+})
+
+it('hands the table back once the opening is over', async () => {
+  motion.reduced = false
+  const intro = { key: 'intro', shadow: preDeal, run: async () => {} }
+  const { getByTestId } = mount(intro)
+  await act(async () => {})
+  expect(getByTestId('exclusive').textContent).toBe('open')
 })
 
 it('never runs the intro when motion is reduced', async () => {
   motion.reduced = true
   const order: string[] = []
   const intro = { key: 'intro', shadow: preDeal, run: async () => { order.push('intro') } }
-  render(<Probe live={afterDiscard} events={[]} anchors={stub} intro={intro} />)
+  mount(intro)
   await act(async () => {})
   expect(order).toEqual([])
 })
 ```
-
-Extend `Probe` to take `intro` and render `beats.exclusive ? 'exclusive' : 'open'` in a second `data-testid="exclusive"` node.
 
 - [ ] **Step 2: Run them and watch them fail**
 
@@ -1636,6 +1814,5 @@ git commit -m "docs(animations): the layer's rows, the live discard recipe, and 
 **Type consistency.** `BoardAnchors` is produced in Task 3 and consumed by name in Tasks 5 and 6. `BeatPlan` / `DiscardCard` / `DiscardSource` are produced in Task 4 and consumed in Task 5. `IntroBeat` is produced in Task 6 and used in the same task only. `scatterAt(String(eventId))` is the key in both Task 2's fold and Task 5's flight — that identity is the point, and it is asserted from both sides.
 
 **Known soft spots, called out rather than hidden.**
-- Task 3 Step 5 has `features/` importing from `pages/`, which inverts the frontend's layer rule. The step carries its own fallback (move the registry to `entities/game/board/anchors.ts`) and tells the implementer to take it if `pnpm lint` objects.
 - Task 5's tests mock `@release/ui/animations`' `useDiscardExit`. That is deliberate — jsdom has no WAAPI and no layout, so a real flight would assert nothing — but it means the queue's *wiring* is tested and the flight itself is verified in the playground, per the "verify live" rule in `docs/animations/README.md`.
 - Task 6 is the one task that edits code shipped two commits ago. Its acceptance is the unedited #89 suites passing.
