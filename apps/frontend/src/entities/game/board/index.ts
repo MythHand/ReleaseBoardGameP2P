@@ -11,5 +11,6 @@ export type {
   BoardRoom,
   BoardSlots,
   BoardState,
+  IntroBeat,
   Panel,
 } from './types'

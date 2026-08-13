@@ -4,7 +4,7 @@ import type { Leaving, Rect } from '@release/ui/animations'
 import { scatterAt, useDiscardExit } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import type { BeatPlan, DiscardCard } from './planBeats'
 import { planBeats } from './planBeats'
@@ -57,8 +57,9 @@ export function useBeats(args: {
   events: Event[]
   anchors: BoardAnchors
   enabled: boolean
+  intro?: IntroBeat | null
 }): Beats {
-  const { live, events, anchors, enabled } = args
+  const { live, events, anchors, enabled, intro } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
   // The same answer as `running`, but ahead of it: `drain()` sets this
@@ -143,6 +144,34 @@ export function useBeats(args: {
     }
   }, [])
 
+  // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
+  // fresh object cannot re-arm it, and React 19 StrictMode's double invoke plays
+  // it once — the same guarantee the intro used to keep for itself with
+  // `armedFor`, now kept here because the queue is what starts it.
+  const armed = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    if (!intro || armed.current === intro.key) return
+    armed.current = intro.key
+    // Reduced motion collapses the opening exactly as it collapses every other
+    // beat — `run` is never called. But the opening still has to REPORT, or the
+    // host's start gate never opens and the match never begins, so this is the
+    // one beat the queue tells explicitly to jump to its end state.
+    if (reduced) {
+      intro.collapse()
+      return
+    }
+    queue.current.unshift({
+      key: intro.key,
+      // A placeholder: while an exclusive beat runs the board renders the
+      // intro's OWN published shadow, not this. It is here because a Beat has a
+      // base and this one animates away from the projection at large.
+      base: latest.current.live,
+      exclusive: true,
+      run: intro.run,
+    })
+    void drain()
+  }, [intro, reduced, drain])
+
   // The last projection the board actually SHOWED. Not `live`: by the time this
   // effect runs, `live` is already the projection the arriving batch produced —
   // the card is out of the hand and counted in the discard. The slot it has to
@@ -179,7 +208,11 @@ export function useBeats(args: {
 
   return {
     // The shadow is the running beat's own base, and nothing else holds it up.
-    shadow: running?.base ?? null,
+    // The one exception is the opening, which publishes a whole shape of its own
+    // rather than animating away from a projection — while it runs, that shape
+    // IS the board. It goes null the moment the opening reports done, so the
+    // handover to the live projection is the intro's own last frame.
+    shadow: (running?.exclusive ? intro?.shadow : running?.base) ?? null,
     overlays: overlay,
     exclusive: running?.exclusive ?? false,
   }

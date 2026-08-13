@@ -1,15 +1,20 @@
 import type { Event, PlayerView } from '@release/engine'
-import { renderHook } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { createRef } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
 import { useDealIntro } from '../useDealIntro'
 
-// The counterpart of useDealIntro.test.tsx: there the preference collapses
-// everything, so every case ends in the same place. Here motion is allowed, and
-// the assertions are the ones that would still pass if the sequencer did
-// nothing at all — the first frame of the shadow, and the gate staying shut.
-vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => false }))
+// The counterpart of useDealIntro.test.tsx: there the opening is collapsed and
+// every case ends in the same place. Here it is PLAYED — `beat.run()`, which is
+// what the board's queue calls — and the assertions are the ones that hold on
+// its first frame: the pre-deal table, and the gate staying shut until the
+// choreography reaches its end.
+//
+// No `useReducedMotion` mock any more: the opening does not read the preference
+// (#96 moved that to the queue, so there is one policy in one place), and a mock
+// of something nothing calls is a mock that keeps passing after the behaviour
+// moved out from under it.
 
 // `useDealIntro` now takes the board's full `BoardAnchors` — this test only
 // exercises the members the sequencer itself reads, but the shape must still
@@ -100,6 +105,12 @@ it('opens on the pre-deal table and keeps the gate shut', () => {
     }),
   )
 
+  // The queue starts it; nothing happens until it does.
+  expect(result.current.active).toBe(false)
+  act(() => {
+    void result.current.beat?.run()
+  })
+
   expect(result.current.active).toBe(true)
   const shadow = result.current.shadow
   expect(shadow).not.toBeNull()
@@ -130,8 +141,13 @@ it('collapses on a skip, reporting once', () => {
       onDone,
     }),
   )
+  act(() => {
+    void result.current.beat?.run()
+  })
   expect(result.current.active).toBe(true)
-  result.current.finish()
-  result.current.finish()
+  act(() => {
+    result.current.finish()
+    result.current.finish()
+  })
   expect(onDone).toHaveBeenCalledTimes(1)
 })

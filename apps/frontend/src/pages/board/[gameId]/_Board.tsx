@@ -175,15 +175,20 @@ export default function Board({
     refs: anchors,
     onDone: onIntroDone,
   })
-  // The live queue. It is armed only once the opening is over: until then the
-  // deal owns the table, and the events that produced the board's first
-  // projection are the deal's own — replaying them as discards would fly cards
-  // that never left a hand on screen.
+  // One queue, for everything that moves. The opening goes in as beat zero and
+  // the wire's own beats queue behind it — one place that decides what plays,
+  // in what order, and whether it plays at all under prefers-reduced-motion.
+  //
+  // `enabled` gates only the WIRE's beats, not the opening: until the deal is
+  // over, the events that produced the board's first projection are the deal's
+  // own, and replaying them as discards would fly cards that never left a hand
+  // on screen.
   const beats = useBeats({
     live,
     events: intro?.events ?? [],
     anchors,
     enabled: introOver || intro == null,
+    intro: deal.beat,
   })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined

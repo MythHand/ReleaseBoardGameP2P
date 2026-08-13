@@ -4,7 +4,7 @@ import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
 import { useBeats } from './useBeats'
 
 const motion = vi.hoisted(() => ({ reduced: true }))
@@ -81,19 +81,35 @@ const stub = {
   bindReleaseSlot: () => {},
 } as unknown as BoardAnchors
 
+// The opening's own shadow: a table with no hand at all, because the cards have
+// not been dealt on screen yet. Distinct from preDiscard (a hand of one) and
+// afterDiscard (a hand of none, but a card in the discard), so the probe can
+// tell which of the three the board is showing.
+const preDeal = {
+  ...preDiscard,
+  you: { ...preDiscard.you, hand: [] },
+  decks: { ...preDiscard.decks, main: 40 },
+} as unknown as BoardState
+
 function Probe({
   live,
   events,
   anchors,
+  intro,
 }: {
   live: BoardState
   events: Event[]
   anchors: BoardAnchors
+  intro?: IntroBeat | null
 }) {
-  const beats = useBeats({ live, events, anchors, enabled: true })
+  const beats = useBeats({ live, events, anchors, enabled: true, intro })
   return (
     <>
       <div data-testid="hand">{(beats.shadow ?? live).you.hand.length}</div>
+      {/* The deck tells the three states apart where the hand cannot: preDeal
+          and afterDiscard both have an empty fan, and only the deck count says
+          whether the board is showing the opening's shadow or the projection. */}
+      <div data-testid="deck">{(beats.shadow ?? live).decks.main}</div>
       <div data-testid="exclusive">{beats.exclusive ? 'exclusive' : 'open'}</div>
     </>
   )
@@ -106,11 +122,24 @@ function Probe({
 // The first render is the pre-batch state (a hand of one), and the batch arrives
 // on the rerender — which is the real sequence, and the only one where `settled`
 // holds a projection the card is still in.
-const mount = () => {
-  const utils = render(<Probe live={preDiscard} events={[]} anchors={stub} />)
-  utils.rerender(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} />)
+const mount = (intro?: IntroBeat | null) => {
+  const utils = render(<Probe live={preDiscard} events={[]} anchors={stub} intro={intro} />)
+  utils.rerender(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} intro={intro} />)
   return utils
 }
+
+// An opening that reports when it is told to, so a test can watch the order.
+const introBeat = (log: string[], run?: () => Promise<void>): IntroBeat => ({
+  key: 'g1',
+  shadow: preDeal,
+  run:
+    run ??
+    (() => {
+      log.push('intro')
+      return Promise.resolve()
+    }),
+  collapse: () => log.push('collapse'),
+})
 
 it('never animates when motion is reduced', async () => {
   motion.reduced = true
@@ -155,4 +184,48 @@ it('leaves the table open — only the opening is exclusive', () => {
   motion.reduced = false
   const { getByTestId } = mount()
   expect(getByTestId('exclusive').textContent).toBe('open')
+})
+
+// ===== beat zero — the opening =====
+
+it('runs the opening before anything the wire brought in', async () => {
+  motion.reduced = false
+  const log: string[] = []
+  sent.calls = []
+  mount(introBeat(log))
+  await act(async () => {})
+  // The opening went first, and the discard still happened — queued behind it,
+  // not dropped in favour of it.
+  expect(log).toEqual(['intro'])
+  expect(sent.calls).toHaveLength(1)
+})
+
+it('holds the table and shows the opening’s own shadow while it runs', () => {
+  motion.reduced = false
+  // A run that never settles: the queue is parked on beat zero for this test.
+  const { getByTestId } = mount(introBeat([], () => new Promise<void>(() => {})))
+  expect(getByTestId('exclusive').textContent).toBe('exclusive')
+  // The opening publishes a whole shape rather than animating away from a
+  // projection, so the board shows THAT — a table not yet dealt, deck still at
+  // 40 — and not the beat's base, whose deck is the projection's 10. The hand is
+  // empty in both, which is exactly why this asserts on the deck.
+  expect(getByTestId('deck').textContent).toBe('40')
+})
+
+it('hands the table back once the opening is over', async () => {
+  motion.reduced = false
+  const { getByTestId } = mount(introBeat([]))
+  await act(async () => {})
+  expect(getByTestId('exclusive').textContent).toBe('open')
+})
+
+// The opening is the one beat that owes something when it does NOT play: it
+// reports this seat to the host's start gate, and until every seat has reported
+// no peer may act. Skipping it silently would hold the match shut for everyone.
+it('collapses the opening instead of running it when motion is reduced', async () => {
+  motion.reduced = true
+  const log: string[] = []
+  mount(introBeat(log))
+  await act(async () => {})
+  expect(log).toEqual(['collapse'])
 })

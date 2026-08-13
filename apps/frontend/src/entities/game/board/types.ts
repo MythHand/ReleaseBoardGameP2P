@@ -161,6 +161,34 @@ export interface BoardCopyBundle {
   window: WindowCopy
 }
 
+/**
+ * The opening, handed to the beat queue as one beat. It is not planned from
+ * events like the others — it is a whole shape rather than a fold of the
+ * projection, so it publishes its own `shadow` and the queue renders that. But
+ * it is queued like everything else, ahead of everything else, and it is the one
+ * beat that owns the table while it runs.
+ *
+ * It lives here, not beside either consumer: `features/game-intro` produces it
+ * and `features/board-beats` takes it, and a feature must not import from a
+ * sibling feature. It is a board fact, like `BoardState` and `BoardAnchors`.
+ *
+ * `run` resolves when the opening is OVER — including when a skip cut it short,
+ * not only when it played to the end.
+ *
+ * `collapse` is the no-animation path: jump to the end state and report done.
+ * It exists because the opening owes something no other beat does — it tells the
+ * host's start gate that this seat has finished watching, and until every seat
+ * has, no peer may act. Skipping `run` under reduced motion would skip that
+ * report too, and the match would never begin. The queue still owns the policy;
+ * the opening only says what collapsing means for it.
+ */
+export interface IntroBeat {
+  key: string
+  shadow: BoardState | null
+  run: () => Promise<void>
+  collapse: () => void
+}
+
 export interface BoardSlots {
   // App-only chrome the playground has no equivalent of: navigation out of the
   // match, and the consumer's non-fatal error notice.

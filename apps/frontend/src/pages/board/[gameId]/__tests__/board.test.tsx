@@ -13,8 +13,11 @@ import StatsPage from '../stats'
 // the route, not the choreography, so it takes the reduced-motion path: the
 // intro collapses to its last frame during the first commit and the board this
 // file has always asserted against is the one on screen. Without it every test
-// here runs on top of a live, second-long sequence whose re-renders outlive the
-// file (the kit's Hand arms a 220ms zoom timer it only clears on its next run).
+// here would run on top of a live, second-long sequence.
+//
+// It was also working around the kit's Hand leaking its 220ms zoom timer past
+// unmount. That is fixed at the source now, so this mock is here for the reason
+// above alone.
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => true }))
 
 // The board reads the roster through the session, so every test drives it from
