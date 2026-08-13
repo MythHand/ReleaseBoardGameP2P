@@ -88,11 +88,8 @@ Not everything these docs describe is a shared library module. As of now:
   would trap the badge inside the wrapper. The scenes and the `Table` screen centre `.discard` with
   a full-height flex column (`inset-block: 0; align-items: center`), pointer-transparent so the
   column does not shadow the hand behind it.
-
-**Shared, but living in the playground (`apps/playground/stories/interactive/`):**
-Two **named steps** — one per kind of movement, not one generic flight engine — and one **carrier**
-underneath them. Import them from a story; a step owns its rule and its geometry, the carrier owns
-the node:
+- Two **named steps** — one per kind of movement, not one generic flight engine — and the **carrier**
+  underneath them. A step owns its rule and its geometry; the carrier owns the node:
 - **`useHandArrival`** — *cards arrive in the hand.* Any number, from any kind of source: a rect, a
   card resting at a tilt, an element already on screen, one half of a pair. The fan opens a gap for
   all of them in the MIDDLE and they tuck under it as they land. A draw and the undo of a play are
@@ -119,10 +116,11 @@ you **import**. Only a scene's own orchestration is **reproduced** from its reci
 movement has a step, the recipe says *which step and what to pass it* — the frame-by-frame
 mechanics live inside the step, in one place, and are not restated per scene.
 
-**Where they live:** the steps sit in the playground, not in `@release/ui`, because the playground
-is their only consumer today. They move into the library when something outside it needs them —
-that is the later, game-screen phase, not now. Do **not** assume
-`import { useHandArrival } from '@release/ui'` — it isn't there.
+**Where they live:** all three steps are in `apps/ui/src/animations/`, imported as
+`@release/ui/animations` — its own entry point, separate from the components, because a step is
+how a thing moves rather than a thing to render. They are **not** on the component barrel:
+`import { useHandArrival } from '@release/ui'` does not resolve, and that is deliberate rather
+than an oversight.
 
 > **Решено (было открытым вопросом).** Как готовить переиспользуемую машинерию анимаций.
 > Рассматривались два кандидата — перенести шаг вставки в руку в `@/ui` и спроектировать общий

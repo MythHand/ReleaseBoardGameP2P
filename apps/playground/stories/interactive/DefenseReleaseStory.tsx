@@ -3,11 +3,13 @@ import ruCommon from '@release/translation/locales/ru/common.json'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   enterPose,
+  type Leaving,
   nextFrames,
   play,
   restTransform,
   type Scatter,
   scatterAt,
+  useDiscardExit,
   useFlyer,
   useHandArrival,
   wait,
@@ -33,7 +35,6 @@ import TechBar from '../controls/TechBar'
 import { TechButton, TechHint, TechToggle } from '../controls/TechControls'
 import styles from './DefenseReleaseStory.module.css'
 import { reorderHand } from './reorderHand'
-import { type Leaving, useDiscardExit } from './useDiscardExit'
 
 // Defense Release — playing a Release and defending it.
 //

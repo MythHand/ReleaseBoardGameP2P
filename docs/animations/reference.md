@@ -104,9 +104,11 @@ what it has. Tuning constants are in the glossary.
 `@release/ui/animations` — the animation layer is its own entry point, separate from the components,
 because it is how a thing moves rather than a thing to render. They were moved there when the real
 board needed them too: each had been copied, the playground's scene and the frontend each holding
-one, and nothing kept the copies in step — which is the case the Animations Rule names. The
-remaining step, `useDiscardExit`, is still local to `apps/playground/stories/interactive/`; it has
-one consumer, and it moves the day a second appears.
+one, and nothing kept the copies in step — which is the case the Animations Rule names.
+`useDiscardExit` followed them there in #96. It never had the one consumer this file claimed: ten
+playground scenes imported it out of the story folder, which is what "a movement found in two
+places is a module" describes, ten times over. All three steps now live in
+`apps/ui/src/animations/` and are imported from `@release/ui/animations`.
 
 **Render what you take.** A step that is handed a RECT raises a flyer of its own, and that flyer
 lives in the step's `overlay`. A scene that forgets to render it gets no flight, no error and a card
