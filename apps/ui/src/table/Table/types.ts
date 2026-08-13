@@ -77,6 +77,10 @@ export interface TableRoom {
   onKickSpectator?: (id: string) => void
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
+  // Display preference, not a game fact: whether the card faces follow the
+  // pointer. Local to this player — it is never sent anywhere.
+  parallax?: boolean
+  onParallaxChange?: (on: boolean) => void
   paused?: boolean
   onPauseChange?: (on: boolean) => void
   pausePlayers?: PausePlayer[]
@@ -112,6 +116,12 @@ export interface TableChromeCopy {
   pauseOn?: string
   pauseOff?: string
   pauseHint?: string
+  // поле параллакса карт (опционально — как и пауза, рендерится только вместе
+  // со своим обработчиком): подпись поля, состояние тумблера и пояснение
+  parallax?: string
+  parallaxOn?: string
+  parallaxOff?: string
+  parallaxHint?: string
   // подписи текстовых вкладок рейла
   tabHistory: string
   tabParticipants: string

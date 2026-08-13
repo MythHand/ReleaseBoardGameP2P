@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { useEffect, useRef } from 'react'
 import { play } from '@/animations'
 import { CATEGORIES } from '@/cards'
+import { useCardMotion } from '@/cards/cardMotion'
 import type { Card as CardType } from '@/cards/types'
 import { useCardTilt } from '@/cards/useCardTilt'
 import styles from './Card.module.css'
@@ -55,12 +56,14 @@ export default function Card({
     play('flipCard', flipRef.current, { faceDown })
   }, [faceDown])
 
+  const motion = useCardMotion()
   const disabled = state === 'disabled'
   // controlled-режим (interactive=false) — ховером/подъёмом управляет родитель (напр. Рука)
   const canInteract = interactive && !disabled
   // параллакс: по умолчанию следует за interactive, но Рука включает его точечно
-  // для наведённой (увеличенной) карты — tilt={true}
-  const tiltOn = (tilt ?? interactive) && !disabled
+  // для наведённой (увеличенной) карты — tilt={true}. Экранная настройка
+  // (CardMotionProvider) гасит его поверх всего — это выбор игрока, а не карты.
+  const tiltOn = (tilt ?? interactive) && !disabled && motion
   const accent = accentProp ?? CATEGORIES[card?.category]?.accent ?? 'var(--brand-green)'
 
   // shared tilt engine — Card separates parallax (tiltOn) from hover-lift (canInteract)

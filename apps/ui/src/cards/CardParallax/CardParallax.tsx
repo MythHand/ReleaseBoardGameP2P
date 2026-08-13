@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { useCardMotion } from '../cardMotion'
 import { useCardTilt } from '../useCardTilt'
 import styles from './CardParallax.module.css'
 import ComposedFace, { type CardParallaxContent } from './ComposedFace'
@@ -32,9 +33,11 @@ export default function CardParallax({
   interactive = true,
   lod = false,
 }: CardParallaxProps) {
-  // shared tilt engine — previews tie both parallax and hover-lift to `interactive`
+  // shared tilt engine — previews tie both parallax and hover-lift to `interactive`;
+  // the screen-wide setting can still switch the pointer parallax off on top of it
+  const motion = useCardMotion()
   const { p, transform, onMouseEnter, onMouseMove, onMouseLeave } = useCardTilt({
-    tilt: interactive,
+    tilt: interactive && motion,
     lift: interactive,
   })
 

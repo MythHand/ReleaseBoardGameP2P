@@ -78,6 +78,7 @@ export default function TableStory() {
   const [specLimit, setSpecLimit] = useState(8)
   const [kicked, setKicked] = useState<Set<string>>(() => new Set())
   const [paused, setPaused] = useState(false)
+  const [parallax, setParallax] = useState(true)
   const [ready, setReady] = useState<Set<string>>(() => new Set())
   // Anchor for the reaction demo states' sweep, reset each time either is
   // (re-)selected so switching back into it restarts the countdown. Keyed on
@@ -172,6 +173,15 @@ export default function TableStory() {
       resume: 'continue game',
     },
   })
+  // Card parallax — a display preference of this player, so it sits in the general
+  // group next to the language, not under the host's controls.
+  const parallaxLabel = pick(lang, { ru: 'параллакс карт', en: 'card parallax' })
+  const parallaxOn = pick(lang, { ru: 'включён', en: 'on' })
+  const parallaxOff = pick(lang, { ru: 'выключен', en: 'off' })
+  const parallaxHint = pick(lang, {
+    ru: 'лицо карты следует за курсором',
+    en: 'the card face follows the cursor',
+  })
   const pauseLabel = pick(lang, { ru: 'пауза игры', en: 'pause game' })
   const pauseHint = pick(lang, {
     ru: 'таймер хода замрёт у всех игроков',
@@ -245,6 +255,8 @@ export default function TableStory() {
             onKickSpectator: (id) => setKicked((k) => new Set(k).add(id)),
             lang,
             onLangChange: setLang,
+            parallax,
+            onParallaxChange: setParallax,
             paused,
             onPauseChange: togglePause,
             pausePlayers,
@@ -258,6 +270,10 @@ export default function TableStory() {
             table: {
               ...tableCopy,
               generalTitle,
+              parallax: parallaxLabel,
+              parallaxOn,
+              parallaxOff,
+              parallaxHint,
               pauseGame: pauseLabel,
               pauseOn,
               pauseOff,
