@@ -1,0 +1,14 @@
+/* Reading a card that stands on the table. One fixed place on the right, always
+   the same: the player learns where to look instead of hunting a popup that
+   follows the cursor, and the centre of the table — where everything actually
+   happens — is never covered by it. */
+.preview {
+  position: fixed;
+  inset-block-start: 50%;
+
+  /* clear of the right rail (56px) by the same 26px the decks keep from the left */
+  inset-inline-end: 82px;
+  z-index: var(--z-card-preview);
+  pointer-events: auto;
+  transform: translateY(-50%);
+}

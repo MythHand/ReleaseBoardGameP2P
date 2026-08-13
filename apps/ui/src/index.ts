@@ -82,6 +82,11 @@ export type { StatPlayer, StatsCopy } from './screens/Stats'
 export { default as Stats } from './screens/Stats'
 export type { CardCatalogProps } from './table/CardCatalog'
 export { default as CardCatalog } from './table/CardCatalog'
+export {
+  type CardPreview,
+  type CardPreviewSlotProps,
+  useCardPreview,
+} from './table/CardPreview'
 export type { ConfirmActionProps } from './table/ConfirmAction'
 export { default as ConfirmAction } from './table/ConfirmAction'
 export { default as GameModes } from './table/GameModes'

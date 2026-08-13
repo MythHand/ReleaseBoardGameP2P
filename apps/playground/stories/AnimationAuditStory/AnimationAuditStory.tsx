@@ -368,6 +368,18 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
+    mod: 'useCardPreview',
+    what: {
+      ru: 'Чтение карты, которая стоит НА СТОЛЕ — той, что вышла в центр: 503 из колоды, эффект AI, чужая атака. Превью показывается в ОДНОМ постоянном месте справа, а не у курсора: место, которое игрок запоминает, и которое заведомо не накрывает центр, где всё и происходит. Размер — зум руки в максимуме плюс 15% и минус 10%. Привязка к СЛОТУ, а не к «карте в центре»: у Defense Release таких слотов пять, и каждый читается сам по себе. Закрывается ОДНИМ правилом — курсор сдвинулся туда, где нет ни читаемого слота, ни самого превью. Из этого правила сами собой выпадают два нужных поведения: карта улетела в сброс, пока её читают (слот размонтировался под неподвижным курсором, mouseleave не приходит — превью висит до движения мыши, НАМЕРЕННО наоборот к зуму руки, который обязан уйти вместе с картой), и курсор на самом превью (висит, иначе превью над сбросом мигало бы). Рубашкой вверх не показывается: у чужой закрытой карты нет личности и в проекции. hold() глушит ховер на 450ms после приземления — курсор, который карту бросил, всё ещё на ней.',
+      en: 'Reading a card that stands ON THE TABLE — the one at the centre: a 503 out of the deck, an AI effect, somebody else’s attack. The preview shows at ONE fixed place on the right, never at the cursor: a place the player learns, and one that cannot cover the centre where the game happens. Size — the hand’s hover zoom at its largest, plus 15% and minus 10%. Bound to a SLOT rather than to "the card at the centre": Defense Release has five of them and each reads on its own. ONE rule closes it — the pointer moved somewhere that is neither a readable slot nor the preview. Two needed behaviours fall out of that rule by themselves: the card flies to the discard while being read (its slot unmounts under a still cursor, no mouseleave is fired — the preview stays until the hand moves, DELIBERATELY the opposite of the hand’s zoom, which must leave with its card), and the pointer resting on the preview (it stays, or a preview over the discard would flicker). Face-down shows nothing: somebody else’s closed card has no identity in the projection either. hold() mutes hover for 450ms after a landing — the cursor that dropped the card is still on it.',
+    },
+    where: {
+      ru: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease',
+      en: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease',
+    },
+    status: 'ok',
+  },
+  {
     mod: 'ConfirmAction',
     what: {
       ru: 'Общий слайд-бар подтверждения выбора: заезжает по open, прижат к низу контейнера, опциональная подпись. Презентационный, i18n-agnostic.',

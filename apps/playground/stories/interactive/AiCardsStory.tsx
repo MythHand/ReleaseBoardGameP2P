@@ -7,6 +7,7 @@ import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf } from '@/primitives/Card'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
+import { useCardPreview } from '@/table/CardPreview'
 import ConfirmAction from '@/table/ConfirmAction'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
@@ -142,6 +143,8 @@ export default function AiCardsStory() {
   // every card this scene puts in the air: the pull from a deck ('draw'), the
   // cards leaving on resolution ('trig' / 'eff' / 'crushed') and the Inside row
   const { overlay: flyerOverlay, raise, pin, patch, drop, elOf } = useFlyer()
+  // reading the card that stands at the centre — the shared block from the kit
+  const { slotProps, overlay: previewOverlay } = useCardPreview()
   const releaseSlotRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const handRef = useRef<HTMLDivElement>(null)
   const uidSeq = useRef(0)
@@ -631,12 +634,22 @@ export default function AiCardsStory() {
       </TechBar>
       <div className={styles.stage}>
         {/* AI trigger (cause) — left of the centre, normal size */}
-        <div className={styles.causeSlot} ref={causeRef} aria-hidden={!trigger}>
+        <div
+          className={styles.causeSlot}
+          ref={causeRef}
+          aria-hidden={!trigger}
+          {...slotProps(trigger)}
+        >
           {trigger && <Card card={trigger} interactive={false} width="100%" />}
         </div>
 
         {/* AI effect (main) — at the centre, larger */}
-        <div className={styles.effectSlot} ref={effectRef} aria-hidden={!aiCard}>
+        <div
+          className={styles.effectSlot}
+          ref={effectRef}
+          aria-hidden={!aiCard}
+          {...slotProps(aiCard)}
+        >
           {aiCard && <Card card={aiCard} interactive={false} width="100%" />}
         </div>
 
@@ -725,6 +738,8 @@ export default function AiCardsStory() {
         )}
 
         {/* Error 503 — red edge glow, the full table zone (the stage IS that zone) */}
+        {previewOverlay}
+
         <div className={styles.glowBounds}>
           <EdgeGlow visible={alert} intensity="strong" />
         </div>
