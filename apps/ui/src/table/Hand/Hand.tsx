@@ -1,6 +1,7 @@
 import type React from 'react'
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
+import type { Deflection } from '@/cards/useCardTilt'
 import Card from '@/primitives/Card'
 import { CARD_W, handStep, slotPlacement } from './fan'
 import styles from './Hand.module.css'
@@ -58,6 +59,11 @@ export interface HandFaceContext {
   width: number
   state: FaceState
   accent?: string
+  // set only for the card on the drag layer: the deflection it carried in the
+  // fan. That face is a new instance and would be born flat; handed this, it
+  // straightens out of the tilt it had instead of cutting to flat in one frame.
+  // A custom renderFace that drops it loses the straightening, nothing else.
+  tiltFrom?: Deflection
 }
 
 // Where a played card was released — enough for the consumer to pick the intent
@@ -80,6 +86,7 @@ function defaultFace(item: HandItem, ctx: HandFaceContext): React.ReactNode {
       width={ctx.width}
       state={ctx.state}
       accent={ctx.accent}
+      tiltFrom={ctx.tiltFrom}
     />
   )
 }
@@ -129,6 +136,8 @@ interface HandProps {
 interface DragState {
   uid: string
   card: CardType
+  // deflection the card carried in the fan at the moment it was grabbed
+  tiltFrom?: Deflection
 }
 
 interface ZoomState {
@@ -195,21 +204,36 @@ export default function Hand({
     return hr ? clientY >= hr.top - BAND_PAD : false
   }
 
-  // begin the actual drag (grab point from the press coords, base fan geometry —
-  // so grabbing an enlarged hovered card doesn't offset the pick-up)
+  // begin the actual drag. The grab point is taken from where the card is DRAWN,
+  // not from its slot's base geometry: the card under the cursor is the hovered
+  // one, and hover draws it HOVER_LIFT higher (see the render below). Measuring
+  // from the base would hand the flyer a grab point off by exactly that, and the
+  // card would drop 28px the instant it left the fan — a jump the eye reads as a
+  // teleport, and the reason a card seemed to skip its first movements.
   function beginDrag(i: number, downX: number, downY: number) {
     const item = items[i]
     const hr = handRef.current?.getBoundingClientRect()
     if (!hr) return
     const base = slotPlacement(i, n)
+    // drag is still null here, so hoveredIndex is the value the drawn frame was
+    // laid out with — these are the render's own two conditions, read back
+    const tilted = hoveredIndex === i
+    const lift = tilted && gapAt == null ? HOVER_LIFT : 0
     const cardLeft = hr.left + hr.width / 2 + base.x - CARD_W / 2
-    const cardTop = hr.bottom + base.y - CARD_H
+    const cardTop = hr.bottom + base.y - lift - CARD_H
     grab.current = {
       fracX: clamp((downX - cardLeft) / CARD_W, 0, 1),
       fracY: clamp((downY - cardTop) / CARD_H, 0, 1),
     }
     setHoveredUid(null) // don't let the pick-up's hover linger after the drag ends
-    setDrag({ uid: item.uid, card: item.card })
+    setDrag({
+      uid: item.uid,
+      card: item.card,
+      // the grab fractions ARE the deflection the tilt engine was running on:
+      // both are the cursor's position over the same card box, one as 0…1 and
+      // the other as −0.5…0.5. Nothing to measure, nothing to report upward.
+      tiltFrom: tilted ? { x: grab.current.fracX - 0.5, y: grab.current.fracY - 0.5 } : undefined,
+    })
     setPreview(inBand(downY) ? i : null)
   }
 
@@ -244,9 +268,13 @@ export default function Hand({
   }
 
   // drag lifecycle: the flyer follows the cursor; release inside the hand →
-  // reorder, outside → play
+  // reorder, outside → play.
+  // A LAYOUT effect: the flyer mounts with no left/top of its own, so its first
+  // paint would put it at its static position — the hand's top-left corner, not
+  // the cursor. A passive effect places it only after the browser is free to
+  // paint that frame; this one places it before.
   // biome-ignore lint/correctness/useExhaustiveDependencies: drag is the trigger; handlers use the closures captured when the drag began
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!drag) return
     const place = () => {
       const el = flyerRef.current
@@ -458,7 +486,7 @@ export default function Hand({
         <div className={styles.flyer} ref={flyerRef} style={{ width: CARD_W }}>
           {renderFace(
             { uid: drag.uid, card: drag.card },
-            { faceDown, tilt: false, width: CARD_W, state: 'idle' },
+            { faceDown, tilt: false, width: CARD_W, state: 'idle', tiltFrom: drag.tiltFrom },
           )}
         </div>
       )}

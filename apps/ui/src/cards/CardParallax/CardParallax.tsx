@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { useCardMotion } from '../cardMotion'
-import { useCardTilt } from '../useCardTilt'
+import { type Deflection, useCardTilt } from '../useCardTilt'
 import styles from './CardParallax.module.css'
 import ComposedFace, { type CardParallaxContent } from './ComposedFace'
 import { BASE_W, FRONTEND, type ParallaxCardConfig } from './config'
@@ -24,6 +24,9 @@ interface CardParallaxProps {
   // simplified variant for the release zone: no category / description, larger
   // and lower illustration
   lod?: boolean
+  // the face arrives already deflected and straightens out of it — for a card
+  // that continues on a NEW instance (torn out of the fan onto the drag layer)
+  tiltFrom?: Deflection
 }
 
 export default function CardParallax({
@@ -32,13 +35,15 @@ export default function CardParallax({
   width = BASE_W,
   interactive = true,
   lod = false,
+  tiltFrom,
 }: CardParallaxProps) {
   // shared tilt engine — previews tie both parallax and hover-lift to `interactive`;
   // the screen-wide setting can still switch the pointer parallax off on top of it
   const motion = useCardMotion()
-  const { p, transform, onMouseEnter, onMouseMove, onMouseLeave } = useCardTilt({
+  const { p, transform, tiltRef, onMouseEnter, onMouseMove, onMouseLeave } = useCardTilt({
     tilt: interactive && motion,
     lift: interactive,
+    from: motion ? tiltFrom : undefined,
   })
 
   const rootStyle = { width: `${width}px` } as CSSProperties
@@ -52,7 +57,7 @@ export default function CardParallax({
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
     >
-      <div className={styles.tilt} style={{ transform }}>
+      <div className={styles.tilt} ref={tiltRef} style={{ transform }}>
         <div className={styles.face}>
           <ComposedFace config={config} content={content} p={p} lod={lod} />
         </div>

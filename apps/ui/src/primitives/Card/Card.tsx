@@ -4,7 +4,7 @@ import { play } from '@/animations'
 import { CATEGORIES } from '@/cards'
 import { useCardMotion } from '@/cards/cardMotion'
 import type { Card as CardType } from '@/cards/types'
-import { useCardTilt } from '@/cards/useCardTilt'
+import { type Deflection, useCardTilt } from '@/cards/useCardTilt'
 import styles from './Card.module.css'
 import CardBack from './CardBack'
 import CardFace from './CardFace'
@@ -26,6 +26,9 @@ interface CardProps {
   // something to read in full (a release standing in its zone). The layers stay
   // the same and only their values change, so it animates between the two.
   lod?: boolean
+  // the face arrives already deflected and straightens out of it — for a card
+  // that continues on a NEW instance (torn out of the fan onto the drag layer)
+  tiltFrom?: Deflection
 }
 
 /**
@@ -42,6 +45,7 @@ export default function Card({
   accent: accentProp,
   png,
   lod,
+  tiltFrom,
 }: CardProps) {
   const flipRef = useRef<HTMLDivElement>(null)
   const initialDown = useRef(faceDown)
@@ -66,10 +70,13 @@ export default function Card({
   const tiltOn = (tilt ?? interactive) && !disabled && motion
   const accent = accentProp ?? CATEGORIES[card?.category]?.accent ?? 'var(--brand-green)'
 
-  // shared tilt engine — Card separates parallax (tiltOn) from hover-lift (canInteract)
-  const { p, hover, transform, onMouseEnter, onMouseMove, onMouseLeave } = useCardTilt({
+  // shared tilt engine — Card separates parallax (tiltOn) from hover-lift (canInteract).
+  // An arrival deflection only means something where the pointer parallax runs at
+  // all: with it off screen-wide, the card this one continues was flat too.
+  const { p, hover, transform, tiltRef, onMouseEnter, onMouseMove, onMouseLeave } = useCardTilt({
     tilt: tiltOn,
     lift: canInteract,
+    from: motion ? tiltFrom : undefined,
   })
   const lifted = hover
 
@@ -99,7 +106,7 @@ export default function Card({
       role={onClick ? 'button' : undefined}
       tabIndex={onClick && !disabled ? 0 : undefined}
     >
-      <div className={styles.tilt} style={{ transform }}>
+      <div className={styles.tilt} ref={tiltRef} style={{ transform }}>
         <div
           className={styles.flip}
           ref={flipRef}

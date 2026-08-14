@@ -101,6 +101,7 @@ export default function HandStory() {
               width={ctx.width}
               state={ctx.state}
               accent={ctx.accent}
+              tiltFrom={ctx.tiltFrom}
             />
           )
         }
@@ -115,6 +116,7 @@ export default function HandStory() {
             width={ctx.width}
             // interactive → the pointer parallax tilt (the whole point in the hand)
             interactive
+            tiltFrom={ctx.tiltFrom}
           />
         )
       }
