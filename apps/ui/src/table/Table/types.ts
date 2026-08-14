@@ -39,7 +39,10 @@ export interface TableState {
   }
   opponents: TableOpponent[]
   decks: {
-    main: number
+    // One entry per draw pile, in the engine's own pile order — Git Branch
+    // splits the deck and `drawn.pile` names which of them a card came off, so
+    // a single total could answer neither question.
+    main: number[]
     events: number
     // верх сброса одной картой — запасной вид, когда куча не передана
     discard?: Card | null

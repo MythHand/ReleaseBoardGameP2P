@@ -29,6 +29,7 @@ import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { deriveDock } from './dock'
 import PendingPrompt from './PendingPrompt'
+import { pileWidthFor } from './piles'
 import styles from './Table.module.css'
 import type { Panel, TableProps } from './types'
 import { useTableInteractions } from './useTableInteractions'
@@ -286,7 +287,19 @@ export default function Table({
         </div>
 
         <div className={styles.decks}>
-          <Pile label={copy.table.deck} deck="base" count={decks.main} width={150} countPos="tl" />
+          <div className={styles.pileRow}>
+            {decks.main.map((count, i) => (
+              <Pile
+                // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and the halves of a split stay where the pile was
+                key={i}
+                label={copy.table.deck}
+                deck="base"
+                count={count}
+                width={pileWidthFor(decks.main.length)}
+                countPos="tl"
+              />
+            ))}
+          </div>
           <Pile
             label={copy.table.events}
             deck="ai"

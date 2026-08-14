@@ -195,8 +195,9 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       eliminated: o.eliminated,
     })),
     decks: {
-      // The kit renders one deck; split piles are #61's problem.
-      main: view.decks.piles.reduce((a, b) => a + b, 0),
+      // The projection's own pile list, not a total: `drawn.pile` names one of
+      // these, and a split has to be visible for Git Branch to be aimable.
+      main: view.decks.piles,
       events: view.decks.events,
       discard: view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined,
       discardHeap: toDiscardHeap(

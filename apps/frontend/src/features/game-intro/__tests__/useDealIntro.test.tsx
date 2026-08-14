@@ -30,7 +30,6 @@ const refs = () => ({
   seats: createRef<HTMLDivElement>(),
   dock: createRef<HTMLDivElement>(),
   zone: createRef<HTMLDivElement>(),
-  deckBox: createRef<HTMLDivElement>(),
   centre: createRef<HTMLDivElement>(),
   hand: createRef<HTMLDivElement>(),
   discardBox: createRef<HTMLDivElement>(),
@@ -40,6 +39,8 @@ const refs = () => ({
   releaseSlot: () => null,
   bindSeat: () => {},
   bindReleaseSlot: () => {},
+  pileBox: () => null,
+  bindPile: () => {},
 })
 
 // Minimal but real: the shapes the sequencer reads. No `as unknown as` cast —
@@ -74,7 +75,7 @@ const events = (): Event[] => [
 const live = (): BoardState => ({
   you: { name: 'One', hand: [], release: {} },
   opponents: [{ id: 'p2', name: 'Two', handCount: 2, release: {} }],
-  decks: { main: 100, events: 21, discardCount: 0 },
+  decks: { main: [100], events: 21, discardCount: 0 },
   turn: 'p1',
   hasDrawn: false,
   selfId: 'p1',

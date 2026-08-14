@@ -37,8 +37,11 @@ const labels = Object.fromEntries([
 ]) as HistoryLabels
 
 describe('toBoardState', () => {
-  it('sums the piles into the single deck count the table renders', () => {
-    expect(toBoardState(view, [], labels).decks.main).toBe(40)
+  // The projection has always carried the piles; the adapter used to sum them
+  // because the board could only draw one. It draws them all now, so the shape
+  // travels through untouched.
+  it('carries the pile list through untouched', () => {
+    expect(toBoardState(view, [], labels).decks.main).toEqual([30, 10])
   })
 
   it('carries hand uids through unchanged so animation keys stay stable', () => {
