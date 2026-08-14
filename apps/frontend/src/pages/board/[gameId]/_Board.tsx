@@ -492,9 +492,11 @@ export default function Board({
             <div className={kit.handWrap} ref={anchors.hand}>
               <Hand
                 items={you.hand}
-                // the fan opens room for the arriving heap while it travels
-                gapAt={deal.gapAt}
-                gapSize={deal.gapSize}
+                // the fan opens room for the arriving heap while it travels —
+                // the deal wins the tie, exclusive against every other beat
+                // the same way it already wins the shadow's
+                gapAt={deal.gapAt ?? beats.gapAt}
+                gapSize={deal.gapAt == null ? beats.gapSize : deal.gapSize}
                 // while the deal runs the hand is held: no clicks reach the
                 // gesture machine, and the cards that travelled closed stay
                 // closed until the flip. Both are gone the moment it ends, so
