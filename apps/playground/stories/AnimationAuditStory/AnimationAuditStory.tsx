@@ -648,21 +648,6 @@ const ISSUES: Issue[] = [
     where: { ru: 'эта страница + docs/animations/', en: 'this page + docs/animations/' },
     status: 'open',
   },
-  {
-    what: {
-      ru: 'Шаги полёта разъехались по двум копиям — собраны обратно в модуль',
-      en: 'The flight steps had drifted into two copies — packaged back into a module',
-    },
-    problem: {
-      ru: 'useFlyer и useHandArrival лежали в stories/interactive/ и были скопированы во фронтенд байт в байт, когда настоящий стол получил раздачу. Цена не в лишних строках: носитель держит пять инвариантов (I2, I3, I4, I5, I10), каждый из которых уже ломали хотя бы раз, — и в двух реализациях, которые никто не синхронизирует, они разошлись бы молча. Ровно тот случай, ради которого записано правило: движение, найденное в двух местах, — это модуль. Переехали в apps/ui/src/animations/, обе стороны зовут одну реализацию; импорт — @release/ui/animations, отдельный вход, потому что анимации не компонент. useDiscardExit пока остался в плейграунде: у него один потребитель, переедет, когда появится второй.',
-      en: 'useFlyer and useHandArrival lived in stories/interactive/ and were copied byte-for-byte into the frontend when the real board gained the deal. The cost was never the extra lines: the carrier holds five invariants (I2, I3, I4, I5, I10), each broken at least once already, and in two implementations nothing keeps in step they would have parted company in silence. Exactly the case the rule is written for: a movement found in two places is a module. Moved to apps/ui/src/animations/, both sides now call one implementation; imported as @release/ui/animations, its own entry point, because an animation is not a component. useDiscardExit stays in the playground for now — it has one consumer, and it moves the day a second appears.',
-    },
-    where: {
-      ru: '@release/ui/animations → GameDeal, DrawCard, Combo, CherryPick, борд фронтенда',
-      en: '@release/ui/animations → GameDeal, DrawCard, Combo, CherryPick, the frontend board',
-    },
-    status: 'ok',
-  },
 ]
 
 // Section headings, notes, legend and table headers.
