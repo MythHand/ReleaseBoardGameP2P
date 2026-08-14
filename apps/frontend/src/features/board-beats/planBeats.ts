@@ -217,10 +217,15 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       if (!pileRun) flush()
       pileRun ??= { kind: 'piles', key: `piles:${e.id}`, steps: [] }
       pileRun.steps.push(step)
+      continue
     }
     // Everything else breaks a run and plays nothing. That is the default, not a
     // gap: the board is driven by the projection, and a beat only ever adds a way
-    // of GETTING to the next one.
+    // of GETTING to the next one. A batch can span multiple engine actions
+    // (useBeats.ts), so an unrelated event here — a turn boundary, a pass —
+    // must close whatever run is open, or two draws either side of it would
+    // wrongly read as one gesture.
+    flush()
   }
   flush()
   return plans

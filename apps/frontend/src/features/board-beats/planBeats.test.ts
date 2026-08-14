@@ -226,6 +226,30 @@ describe('planBeats — order', () => {
     const beats = planBeats(events, boardBefore())
     expect(beats.map((b) => b.kind)).toEqual(['discard', 'draw', 'discard'])
   })
+
+  // A batch can span more than one engine action (useBeats.ts) — a run of one
+  // kind must not reach across an unrelated event that carries no choreography
+  // of its own. Two draws either side of a turn boundary are two gestures, not
+  // one just because nothing visible happened in between.
+  it('does not let a draw run swallow one on the far side of an unrelated event', () => {
+    const events: Event[] = [
+      drawn(4),
+      { id: 5, type: 'turnEnded', player: 'p1' } as Event,
+      drawn(6),
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats.map((b) => b.kind)).toEqual(['draw', 'draw'])
+  })
+
+  it('does not let a discard run swallow one on the far side of an unrelated event', () => {
+    const events = [
+      discarded(4),
+      { id: 5, type: 'turnEnded', player: 'p1' } as Event,
+      discarded(6, { card: 'protection-debugger' }),
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats.map((b) => b.kind)).toEqual(['discard', 'discard'])
+  })
 })
 
 describe('classifyPiles', () => {
