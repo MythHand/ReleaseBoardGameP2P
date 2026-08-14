@@ -45,6 +45,10 @@ const ZOOM_TOP_AIR = 32 // min gap from the top edge
 const ZOOM_GAP = 44 // gap between the preview and the hand (sits a touch higher)
 const ZOOM_MIN_H = 240
 const ZOOM_MAX_H = 460
+// How long the preview lingers after the hover ends, so it fades rather than
+// vanishing. Named because it is armed on two separate paths below and a second
+// literal would drift from the first.
+const ZOOM_HIDE_MS = 220
 
 export interface HandItem {
   uid: string
@@ -378,15 +382,24 @@ export default function Hand({
   // hover zoom preview: a separate enlarged card centred above the hand, sized to
   // the free band above it (with air from the top). Hidden while dragging.
   useLayoutEffect(() => {
-    if (zoomHide.current) {
-      clearTimeout(zoomHide.current)
-      zoomHide.current = null
+    // Every path out of this effect returns this, so the hide timer cannot
+    // outlive the effect that armed it. It used to be cleared only at the TOP of
+    // the next run — which never comes on unmount, so the last timer fired into
+    // a torn-down tree and `setZoomView` reached for a `window` that was gone.
+    // Harmless in a browser (React drops a late setState), fatal in jsdom: it
+    // surfaced as an unhandled error that failed CI while every test passed.
+    const clearHide = () => {
+      if (zoomHide.current) {
+        clearTimeout(zoomHide.current)
+        zoomHide.current = null
+      }
     }
+    clearHide()
     // no zoom for a face-down hand (a card back has nothing to read) or mid-drag
     if (faceDown || drag || carrying || !hoveredUid) {
       setZoomShown(false)
-      zoomHide.current = window.setTimeout(() => setZoomView(null), 220)
-      return
+      zoomHide.current = window.setTimeout(() => setZoomView(null), ZOOM_HIDE_MS)
+      return clearHide
     }
     const item = items.find((it) => it.uid === hoveredUid)
     const hr = handRef.current?.getBoundingClientRect()
@@ -396,10 +409,10 @@ export default function Hand({
     if (!item) {
       setHoveredUid(null)
       setZoomShown(false)
-      zoomHide.current = window.setTimeout(() => setZoomView(null), 220)
-      return
+      zoomHide.current = window.setTimeout(() => setZoomView(null), ZOOM_HIDE_MS)
+      return clearHide
     }
-    if (!hr) return
+    if (!hr) return clearHide
     const h = clamp(hr.top - ZOOM_TOP_AIR - ZOOM_GAP, ZOOM_MIN_H, ZOOM_MAX_H)
     const w = h * CARD_WH
     setZoomView({
@@ -410,7 +423,12 @@ export default function Hand({
       width: w,
     })
     const id = requestAnimationFrame(() => setZoomShown(true))
-    return () => cancelAnimationFrame(id)
+    return () => {
+      cancelAnimationFrame(id)
+      clearHide()
+    }
+    // `carrying` is #112's: the preview must re-evaluate while a card is being
+    // carried back into the fan.
   }, [hoveredUid, drag, carrying, items, faceDown])
 
   // placement per uid — with the dragged card lifted out and (in-band) a gap at
