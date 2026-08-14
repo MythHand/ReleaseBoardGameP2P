@@ -112,8 +112,11 @@ export function useBeats(args: {
     [whereFrom],
   )
 
+  // Narrowed to the discard plan only — `planBeats` now returns three other
+  // kinds, and dispatching those is Task 5's job. This scaffolding is what
+  // keeps the tree compiling in between (task-4-brief.md Step 6).
   const beatOf = useCallback(
-    (plan: BeatPlan, base: BoardState): Beat => ({
+    (plan: Extract<BeatPlan, { kind: 'discard' }>, base: BoardState): Beat => ({
       key: plan.key,
       base,
       exclusive: false,
@@ -280,7 +283,9 @@ export function useBeats(args: {
     // the projection the board already holds — so there is nothing to do but
     // let it render. Planned nowhere, run nowhere: one branch, one place.
     if (reduced) return
-    for (const plan of planBeats(fresh, before)) queue.current.push(beatOf(plan, before))
+    for (const plan of planBeats(fresh, before)) {
+      if (plan.kind === 'discard') queue.current.push(beatOf(plan, before))
+    }
     void drain()
   }, [events, live, enabled, reduced, beatOf, drain, running])
 
