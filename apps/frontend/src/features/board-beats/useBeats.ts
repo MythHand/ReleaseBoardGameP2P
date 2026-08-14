@@ -4,6 +4,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useDiscardBeat } from './discardBeat'
+import { useDrawBeat } from './drawBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
 
@@ -73,6 +74,7 @@ export function useBeats(args: {
   const [advanced, setAdvanced] = useState<BoardState | null>(null)
 
   const discards = useDiscardBeat(anchors)
+  const draws = useDrawBeat(anchors)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -101,9 +103,12 @@ export function useBeats(args: {
       if (plan.kind === 'discard') {
         return { key: plan.key, base, exclusive: false, run: (ctx) => discards.run(plan, ctx) }
       }
+      if (plan.kind === 'draw') {
+        return { key: plan.key, base, exclusive: false, run: (ctx) => draws.run(plan, ctx) }
+      }
       return null
     },
-    [discards.run],
+    [discards.run, draws.run],
   )
 
   // The mount is going away: stop starting things. A beat already in flight
@@ -267,10 +272,11 @@ export function useBeats(args: {
     // own last frame.
     shadow:
       (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ?? null,
-    overlays: discards.overlay,
+    overlays: [...discards.overlay, ...draws.overlay],
     exclusive: running?.exclusive ?? false,
-    // The fan opens for cards on their way into it. Nothing does that yet.
-    gapAt: null,
-    gapSize: 1,
+    // The fan opens for a card on its way into it — the draw beat is the one
+    // that grows it (I8); nothing else does yet.
+    gapAt: draws.gapAt,
+    gapSize: draws.gapSize,
   }
 }

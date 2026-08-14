@@ -1,4 +1,5 @@
 export { useDiscardBeat } from './discardBeat'
+export { useDrawBeat } from './drawBeat'
 export type { BeatPlan, DiscardCard, DiscardSource, PileStep, PlannedDraw } from './planBeats'
 export { classifyPiles, planBeats } from './planBeats'
 export type { Beats } from './useBeats'
