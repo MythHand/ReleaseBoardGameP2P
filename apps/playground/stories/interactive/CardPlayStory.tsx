@@ -7,6 +7,7 @@ import { play } from '@/animations'
 import { CARDS } from '@/cards'
 import Card, { cardBoxIn } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
+import { useCardPreview } from '@/table/CardPreview'
 import Hand from '@/table/Hand'
 import { CARD_W } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
@@ -63,6 +64,8 @@ export default function CardPlayStory() {
   const discardRef = useRef<HTMLDivElement>(null)
   // the card on its way to the centre — the shared carrier holds it
   const { overlay: flyerOverlay, raise, drop } = useFlyer()
+  // reading the card that stands at the centre — the shared block from the kit
+  const { slotProps, overlay: previewOverlay } = useCardPreview()
   const { overlay: discardOverlay, send: sendToDiscard } = useDiscardExit(discardRef, (cards) =>
     setDiscard((d) => [...d, ...cards]),
   )
@@ -159,7 +162,7 @@ export default function CardPlayStory() {
         <div className={styles.center} ref={centerRef}>
           {center ? (
             // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only send to discard; sandbox story
-            <div className={styles.centerCard} onMouseDown={flyToDiscard}>
+            <div className={styles.centerCard} onMouseDown={flyToDiscard} {...slotProps(center)}>
               <Card card={center} interactive={false} width="100%" />
             </div>
           ) : (
@@ -187,6 +190,8 @@ export default function CardPlayStory() {
             onReorder={(uid, to) => setPlayerHand((h) => reorderHand(h, uid, to))}
           />
         </div>
+
+        {previewOverlay}
 
         {discardOverlay}
 

@@ -1,3 +1,4 @@
+export { CardMotionProvider, useCardMotion } from './cardMotion'
 export {
   assetUrl,
   CARDS,

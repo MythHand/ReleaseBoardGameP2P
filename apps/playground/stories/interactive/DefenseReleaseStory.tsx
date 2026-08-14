@@ -17,6 +17,7 @@ import Card, { CARD_RATIO, cardBoxIn } from '@/primitives/Card'
 import CardPair, { PAIR_AUX_POSE } from '@/primitives/CardPair'
 import Pile from '@/primitives/Pile'
 import Typography from '@/primitives/Typography'
+import { useCardPreview } from '@/table/CardPreview'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
@@ -193,6 +194,10 @@ export default function DefenseReleaseStory() {
   // table pose, and morphs into its at-a-glance reading mid-flight — so what rides
   // in the node is this scene's own element; the carrier holds the node.
   const { overlay: flyerOverlay, raise, patch, drop, elOf } = useFlyer()
+  // reading a card that stands at the centre — the shared block from the kit.
+  // Five slots here (the release, its cost, the attack, the defender's sudo, the
+  // cover), and each of them reads on its own.
+  const { slotProps, overlay: previewOverlay } = useCardPreview()
   const seatRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const relSlotRefs = useRef<Record<string, HTMLDivElement | null>>({})
   // an opponent's own release slots, keyed `${seatId}:${slot}`
@@ -853,16 +858,16 @@ export default function DefenseReleaseStory() {
         {/* the played Release waits here for its cost, which is shown beside it.
             The ask sits with the cards, not only in the dev bar — a release parked
             at the centre with no explanation reads as a stuck play. */}
-        <div className={styles.stageSlot} ref={stageRef}>
+        <div className={styles.stageSlot} ref={stageRef} {...slotProps(staged)}>
           {staged && <Card card={staged} interactive={false} width="100%" />}
         </div>
-        <div className={styles.costSlot} ref={costRef}>
+        <div className={styles.costSlot} ref={costRef} {...slotProps(cost)}>
           {cost && <Card card={cost} interactive={false} width="100%" />}
         </div>
 
         {/* the attack stands at the CENTRE, open to the whole table — one card, or
             one pair when a sudo backs it (a sudo-enhanced attack is one play) */}
-        <div className={styles.centerSlot} ref={centerRef}>
+        <div className={styles.centerSlot} ref={centerRef} {...slotProps(incoming)}>
           {incoming && (
             <div className={styles.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
               {incomingSudo && SUDO_CARD ? (
@@ -876,7 +881,7 @@ export default function DefenseReleaseStory() {
 
         {/* the defender's own Sudo waits in its OWN place until a defence is
             chosen for it — the arrow says what it is aimed at */}
-        <div className={styles.sudoSlot} ref={sudoRef}>
+        <div className={styles.sudoSlot} ref={sudoRef} {...slotProps(defSudo)}>
           {defSudo && !cover && (
             <div className={styles.pose} style={{ transform: restTransform(SUDO_POSE) }}>
               <Card card={defSudo} interactive={false} width="100%" />
@@ -885,7 +890,7 @@ export default function DefenseReleaseStory() {
         </div>
 
         {/* the defence covering the attack — offset and tilted the other way */}
-        <div className={styles.coverSlot} ref={coverRef}>
+        <div className={styles.coverSlot} ref={coverRef} {...slotProps(cover)}>
           {cover && (
             <div className={styles.pose} style={{ transform: restTransform(COVER_POSE) }}>
               {coverAux ? (
@@ -896,6 +901,8 @@ export default function DefenseReleaseStory() {
             </div>
           )}
         </div>
+        {previewOverlay}
+
         {/* stays mounted so it can fade out as well as in */}
         <div className={styles.ask} data-shown={phase === 'cost'} aria-hidden={phase !== 'cost'}>
           <Typography base="label-sm" tk="tk-16">

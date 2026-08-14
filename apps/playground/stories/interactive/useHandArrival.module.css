@@ -1,10 +1,12 @@
 /* a card on its way into the hand. The pivot is the fan slot's own (bottom centre),
    so the tilt and the scale land exactly on the slot instead of drifting on the last
    frame. The layer is set inline: high while it travels, the slot's own once it
-   tucks under the fan. The duration MUST equal FLIGHT_MS. */
+   tucks under the fan. The flight itself is NOT here — a card enters the fan along
+   the curve the fan hands over (insertPath), which a transition cannot draw, so it
+   is played on the node over FLIGHT_MS. The inline transform is only the pose the
+   card stands in until then. */
 .arriving {
   position: fixed;
   transform-origin: bottom center;
-  transition: transform 480ms var(--ease-soft);
   will-change: transform;
 }

@@ -10,6 +10,7 @@ import Card, { cardAreaOf } from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
 import EdgeGlow from '@/primitives/EdgeGlow'
 import Pile from '@/primitives/Pile'
+import { useCardPreview } from '@/table/CardPreview'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
@@ -172,6 +173,8 @@ export default function Error503Story() {
   // swept to the discard ('o0', 'o1', …). The dragged defence is NOT one of them —
   // it follows the cursor rather than flying, and stays the scene's own.
   const { overlay: flyerOverlay, raise, pin, glide, patch, drop } = useFlyer()
+  // reading the card that stands at the centre — the shared block from the kit
+  const { slotProps, overlay: previewOverlay } = useCardPreview()
   const gifPickRef = useRef('random')
   gifPickRef.current = gifPick
   const eliminating = useRef(false) // one elimination at a time
@@ -644,7 +647,7 @@ export default function Error503Story() {
         </div>
 
         {/* centre staging — the 503 comes out here; defence covers it here */}
-        <div className={styles.center} ref={centerRef}>
+        <div className={styles.center} ref={centerRef} {...slotProps(centerCard)}>
           {centerCard && (
             <div className={styles.centerCard}>
               <Card card={centerCard} interactive={false} width="100%" />
@@ -679,6 +682,8 @@ export default function Error503Story() {
         </div>
 
         {/* the edge glow fills the table zone, which is exactly the stage */}
+        {previewOverlay}
+
         <div className={styles.glowBounds}>
           <EdgeGlow visible={alert} intensity="strong" />
         </div>

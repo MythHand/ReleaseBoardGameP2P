@@ -25,10 +25,22 @@ the **`Animations`** page, where each preset is shown in the form it actually is
 swap, a badge, an arriving block, a volley, a fold) and a preset with no form says so instead of
 faking one. Keep both and these docs in sync on changes.
 
-One part of that is enforced rather than promised: **every preset must have a row in
-[`reference.md`](./reference.md)**, checked by `apps/ui/src/animations/docs.test.ts` against
-`presetNames()`. Seven presets had drifted out of the docs before that test existed. Recipes have no
-such signal — they stay on discipline.
+That sync is enforced rather than promised, in three places, each of them added after the drift it
+now prevents had already happened:
+
+- **every preset has a row in [`reference.md`](./reference.md)** — `apps/ui/src/animations/docs.test.ts`
+  against `presetNames()`. Seven presets had fallen out of the docs before it existed;
+- **every module on the audit page is mentioned in [`reference.md`](./reference.md)** —
+  `apps/playground/stories/docs.test.ts`. `useCardPreview` sat on that page as finished while the
+  reference did not know it existed: a whole block, in the public index, used by four scenes;
+- **every scene in the Cards / Interactive groups is named as a live reference in
+  [`recipes.md`](./recipes.md)** — the same file, reading the playground navigation. Two scenes are
+  exempt there by name, with the reason written next to each.
+
+What none of them can catch is a module written down in NEITHER place — the tests compare two places
+with each other, so something absent from both is invisible to all three. That limit is in
+[`backlog.md`](./backlog.md), and what closes it is a rule rather than a check: a module counts as
+done once it is on the audit page.
 
 ---
 
@@ -51,7 +63,11 @@ Not everything these docs describe is a shared library module. As of now:
   opacity fade), `ConfirmAction` (slide-up confirm bar), `CardCatalog` (the set of face-up cards you
   name one from: staggered entrance, hover growth, the named one holds while the rest leave),
   `TurnDock` (its `Swap` and `Reveal` orchestrate the slot presets), `Input` (shake), `Arrow` (via
-  `useArrow`).
+  `useArrow`), `useCardPreview` (reading a card that stands on the table — a hook and one node, bound
+  to a slot rather than to "the card at the centre").
+  The card face's own motion is one engine, `useCardTilt` (pointer parallax + hover lift, and the
+  `from` handover for a face that continues on a new instance), with `CardMotionProvider` as the
+  screen-wide switch that turns the parallax off for a whole subtree.
   `ReleaseZone` reflects what the consumer decided and hands the gesture back — the same model as
   `Hand`: `slotRef(key, el)` to fly a card into a specific slot, `support` for a release with the
   card laid WITH it (Code Review / Monitoring, shown as a `CardPair`), `accentAt` / `liftedAt` /
@@ -80,7 +96,9 @@ the node:
 - **`useHandArrival`** — *cards arrive in the hand.* Any number, from any kind of source: a rect, a
   card resting at a tilt, an element already on screen, one half of a pair. The fan opens a gap for
   all of them in the MIDDLE and they tuck under it as they land. A draw and the undo of a play are
-  the same movement — that is why this is one step and not two.
+  the same movement — that is why this is one step and not two. The shape of the landing is not its
+  own: it comes into the fan along `insertPath`, the same rule `Hand` lands a dragged card by, since
+  going in between two cards is one situation whatever carried the card there.
 - **`useDiscardExit`** — *cards leave the table for the discard.* Any number: one by one but all
   at once. A pair splits into its two singles; one scatter drives both a card's flight and its
   rest; the table tilt unwinds in flight; the layer a card had decides the order it joins the heap.
@@ -211,10 +229,18 @@ teleports on screen.
   array it is appended to at the destination. Two flyers left on the same `z` fall back to
   document order, which is the order of the array you happened to build — so the card that lay
   underneath paints on top and the stack silently turns over mid-flight. The existing pieces all
-  follow this: the discard heap layers by its own index (`zIndex: i`), and `useHandArrival` /
-  `Hand.settleInto` set the flyer's `z` to the target slot's `z` **before** the flight, so the
-  card tucks into the fan at the right depth instead of riding over it. When a stack lands in the
-  heap, append **bottom-up**: the lowest card has to arrive first, or the heap inverts it.
+  follow this: the discard heap layers by its own index (`zIndex: i`), and a card entering the fan
+  takes the target slot's `z` **during** the flight, so it tucks in at the right depth instead of
+  riding over it. When a stack lands in the heap, append **bottom-up**: the lowest card has to
+  arrive first, or the heap inverts it.
+
+  *When* it takes that `z` is its own decision, and it is not "as early as possible". The switch is
+  indivisible — a card is above another card or it is not — so it hands over the whole strip where
+  the two overlap in one frame. Made on a card that is standing still, that strip (`CARD_W` minus
+  the fan's step: 58px at eight cards, 96px at twenty) simply changes owner, and the eye reads a
+  jump. Both places therefore switch **while the card moves and where the strip is smallest**:
+  `useHandArrival` holds the travel layer for `START_HIGH_MS` of its flight, and `Hand.settleInto`
+  waits for the apex of the sweep `insertPath` takes it round on (`SWITCH_AT`).
 - **I10 — A flyer carries the coordinates it mounts at.** A `position: fixed` node with no
   `left`/`top` paints at its **flow** position — the bottom of the page — for every frame that
   passes before the code gives it one. Setting them imperatively after `nextFrames()` *is* that
@@ -223,6 +249,10 @@ teleports on screen.
   its own job (**I2** — paint at the source before moving). The flash is timing-dependent, so it
   looks intermittent: usually the browser swallows those frames, sometimes it does not. Four
   flyers in the playground carried this bug, each found by eye rather than by the code.
+  What the invariant forbids is a **passive** effect, not imperative placement as such: the hand's
+  drag flyer follows the cursor and has no rect to render until the pointer moves, so it is placed
+  in a **layout** effect instead — before the frame it mounted in is painted. Either way the rule
+  is the same one: nothing may paint the node before it has coordinates.
 
 ---
 

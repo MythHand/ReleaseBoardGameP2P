@@ -74,6 +74,10 @@ The words that flow into a preset as `params`.
 | `SHAKE_SHAPES` | `settle: 1, 6/7, 4/7, 3/7` · `spring: 1, 1, 2/3, 2/3` | `presets.ts` | the character of a shake as fractions of `amp`, out-and-back through zero. `settle` = a jolt that calms down (an input field), `spring` = two full swings then two smaller (a large element that flinched whole) |
 | `--z-flight` | `250` | `tokens.css` | the BASE of the flight band — above the hand and a lifted card, below the arrow and the overlays. Every flyer reads it; `useHandArrival` holds it for `START_HIGH_MS` before dropping to the slot's own layer |
 | flight band offsets | `+n` / `+10` / `+40` | `useDiscardExit`, `Error503Story`, `Pile` | on top of `--z-flight`: `n` = the card's own table layer, so a group keeps its order (**I9**); `+10` = a card held by the cursor, above anything flying on its own; `+40` = the pile counter, clear of the whole band so an arriving card passes under the badge |
+| `--z-card-preview` | `320` | `tokens.css` | reading a card that stands on the table. Above the WHOLE flight band, counter included: a card can fly to the discard while it is being read, and the reading must stay on top of it. Below the arrow — a preview is looking, aiming is playing |
+| `--z-drawer` | `350` | `tokens.css` | a side sheet (`Drawer`). Above the flight band and above the arrow — a panel is open, there is nothing to aim at — and below the reaction window, which is about the run of the game and has to reach through any service panel |
+| `PREVIEW_H` / `PREVIEW_W` | `476` / `340` | `@/table/CardPreview` | the read-across-the-table size: the hand's own hover zoom (`ZOOM_MAX_H = 460`) plus 15%, then back down a tenth — big next to the discard without shouting. The width follows from `CARD_WH` |
+| `GAP_MS` | `90` | `@/table/CardPreview` | how long LEAVING a readable slot waits before the preview closes. Slots stand a few px apart and crossing that gap is two frames; without the wait the preview blinks off and straight back on. Showing is immediate — there is nothing to wait for, the card is already on the table |
 | `CARD_WH` | `368 / 515` (width / height) | `@/table/Hand` | inverse of `CARD_RATIO`; sizes the drag flyer height and the zoom preview |
 | `HOVER_LIFT` / `NEIGHBOR_PUSH` | `28` / `36` | `@/table/Hand` | hover: lift of the hovered card / spread of its neighbours (px) |
 | `BAND_PAD` | `32` | `@/table/Hand` | how far above the fan still counts as "in the hand" (reorder) vs a play |
@@ -81,6 +85,8 @@ The words that flow into a preset as `params`.
 | `ZOOM_TOP_AIR` / `ZOOM_GAP` | `32` / `44` | `@/table/Hand` | zoom preview: min gap from the top edge / gap above the fan |
 | `ZOOM_MIN_H` / `ZOOM_MAX_H` | `240` / `460` | `@/table/Hand` | zoom preview height clamp |
 | `SPREAD_DEG` / `ARC_DROP` | `3.8` / `2.5` | `@/table/Hand/fan` | fan tilt per step (deg) / arc drop across the fan (`handStep` also uses tuned quadratic `STEP_ANCHORS`) |
+| `APPROACH_REACH` / `APPROACH_RISE_DEG` | `1` / `40` | `@/table/Hand/fan` | `insertPath`: how far out the control point stands, in **steps between cards** (the fan's own unit, so the sweep breathes with the hand) / how far up the arc it may ride. A quadratic travels half way to its control point, so a reach of one step bulges half a step — which is how much overlap the layer switch has taken off it |
+| `PATH_STEPS` | `24` | `@/table/Hand/fan` | how many positions `insertPath` is handed over as; straight lines are drawn between them, so it is "often enough that no corner survives a frame" |
 | `REVEAL_W` | `220` | pick / cherry / sysupg | width a card reaches at the centre before the hand-insert |
 | `GRID_W` | `100` (pick) / `150` (cherry) | selection-grid card width |
 | `CENTER_W` / `THROW_SCALE` | `150` / `0.42` | `SystemUpgrade` | thrown-card width at the centre / start scale at the seat |
@@ -99,7 +105,7 @@ playground.
 | Name | Value | Where | Beat |
 |---|---|---|---|
 | `START_HIGH_MS` | `140` | `useHandArrival` | how long the travel layer is held before the card tucks under the fan |
-| `FLIGHT_MS` | `480` | `useHandArrival` | arrival into the fan — **must equal the `.arriving` CSS transition** |
+| `FLIGHT_MS` / `FLIGHT_EASE` | `480` / `cubic-bezier(0.4, 0, 0.2, 1)` | `useHandArrival` | arrival into the fan: the clock the `insertPath` positions are played on. The easing is the literal value of `--ease-soft` — WAAPI takes a value, not a custom property |
 | `FLIGHT_MS` | `420` | `useDiscardExit` | discard flight — matches `centerToDiscard`, so the table tilt finishes unwinding exactly as the card lands |
 | `FLIP_MS` | `420` | `DrawCardStory` | mirror of the `flipCard` preset — JS waits the in-place flip |
 | `SPLIT_MS` | `520` | `DeckAnimationsStory` | the `flyFrom` split fly-out duration |
@@ -114,7 +120,9 @@ playground.
 | `SPLIT_HOLD` | `600` | `DeckAnimationsStory` | pause after split, before touching discard |
 | `CENTER_HOLD` | `420` | `DeckAnimationsStory` | card rests at center before leaving to discard |
 | `STEP_HOLD` | `360` | `DeckAnimationsStory` | standard short beat between deck steps |
-| `SETTLE_MS` | `340` | `@/table/Hand` | reorder / rejected-play glide back into the fan |
+| `SETTLE_MS` | `460` | `@/table/Hand` | reorder / rejected-play landing back in the fan — the whole sweep along `insertPath`, at `SETTLE_EASE` |
+| `SETTLE_EASE` | `cubic-bezier(0.4, 0, 0.2, 1)` | `@/table/Hand` | the speed along that sweep. The literal value of `--ease-soft`: WAAPI takes a value, not a custom property |
+| `SWITCH_AT` | `0.35` | `@/table/Hand` | the fraction of `SETTLE_MS` at which the landing card drops into its slot's layer. Under `SETTLE_EASE` the middle of the PATH plays at `0.35` of the CLOCK, and the middle of the path is the apex of the sweep — the card at its furthest from its right neighbour |
 | `ResizeMs` | `200` | `Error503Story` | dragged defence eases from its source width to `CARD_W` |
 | `ELIM_MIN_MS` | `5000` | `Error503Story` | minimum elimination-video play time before it fades |
 | `COVER_DX` / `COVER_DY` | `16` / `-12` | `Error503Story` | the answer covers the 503 nudged, so both cards are read |

@@ -248,10 +248,13 @@
    ONE constant layout across deal/order/resolve (cards fly straight to their
    final spot — no re-layout between phases). `safe center`: a few rows sit
    centred, but once they overflow it falls back to top-anchored + scroll (the
-   top row stays visible) instead of chewing off the top. */
+   top row stays visible) instead of chewing off the top.
+   Runs to the BOTTOM: ConfirmAction is a slide-up bar with its own surface and
+   is meant to travel over the content, so reserving its height here only left a
+   dead strip under the scrim and cut the scroll area short. */
 .orderWrap {
   position: absolute;
-  inset-block: 8px 150px;
+  inset-block: 8px 0;
   inset-inline: 0;
   z-index: 30;
   display: flex;
@@ -260,6 +263,16 @@
   align-items: center;
   justify-content: safe center;
   overflow-y: auto;
+
+  /* in step with the confirm bar's own slide */
+  transition: padding-block-end 300ms var(--ease-out);
+}
+
+/* the confirm bar travels OVER this area, so while it is out the content grows a
+   trailing gap the height of the bar — an empty line at the end, not a shorter
+   area. With the bar away the rows have the full height back and centre in it. */
+.orderWrap[data-bar="true"] {
+  padding-block-end: 150px;
 }
 
 .numHeader {
@@ -314,6 +327,20 @@
    animates the transform (siblings glide, the dragged card follows the pointer) */
 .orderRow {
   position: relative;
+}
+
+/* which deck the row belongs to — pinned to the LEFT of the row and out of its
+   flow on purpose: the rows are centred as a group and the 1-2-3 header is
+   aligned to them, so a label taking width would shove both sideways the moment
+   it appeared. Reads like the deck's own pile label, because it is the same
+   name for the same thing. */
+.rowLabel {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: calc(100% + 18px);
+  color: var(--white-45);
+  white-space: nowrap;
+  transform: translateY(-50%);
 }
 
 .orderCard {

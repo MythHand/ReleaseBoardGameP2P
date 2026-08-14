@@ -81,6 +81,19 @@
 
 /* a card's pose on the table — its tilt/offset lives on this inner element, so
    the slot itself stays axis-aligned and its rect is the true card box */
+
+/* An EMPTY slot is not a target. .coverSlot sits exactly on top of .centerSlot
+   (both translate(-50%,-50%), z 11 over z 10) and is mounted even with no card
+   in it, so with nothing there it was silently eating every pointer event meant
+   for the attack underneath — the hover on the attacked card never arrived. */
+.stageSlot:empty,
+.costSlot:empty,
+.centerSlot:empty,
+.sudoSlot:empty,
+.coverSlot:empty {
+  pointer-events: none;
+}
+
 .pose {
   block-size: 100%;
 }

@@ -36,7 +36,9 @@
   z-index: 1200;
   pointer-events: none;
   transform-origin: bottom center;
-  will-change: left, top;
+
+  /* left/top while the pointer carries it, transform while it lands */
+  will-change: left, top, transform;
 }
 
 /* hover zoom preview — enlarged card above the hand; never grabbed.

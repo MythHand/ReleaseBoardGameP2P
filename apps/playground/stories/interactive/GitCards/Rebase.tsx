@@ -12,6 +12,7 @@ import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
 import Card, { CARD_RATIO, cardAreaOf } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
+import Typography from '@/primitives/Typography'
 import ConfirmAction from '@/table/ConfirmAction'
 import { pick, useLang } from '../../../Playground/lang'
 import TechBar from '../../controls/TechBar'
@@ -385,7 +386,7 @@ export default function Rebase({ selector }: { selector: ReactNode }) {
             (cards keep full size); the dragged card follows the pointer via
             transform and glides into its slot on drop. */}
         {showCards && (
-          <div className={styles.orderWrap}>
+          <div className={styles.orderWrap} data-bar={phase === 'order'}>
             <div
               className={`${styles.numHeader} ${phase === 'resolve' ? styles.chromeOut : styles.chromeIn}`}
               style={{ gap: GAP }}
@@ -407,6 +408,21 @@ export default function Rebase({ selector }: { selector: ReactNode }) {
                   className={styles.orderRow}
                   style={{ inlineSize: ROW_W, blockSize: ROW_H }}
                 >
+                  {/* which deck this row is. Only with several decks: with one
+                      there is nothing to tell apart. It matters most when a
+                      single deck was PICKED out of several — the row is alone on
+                      screen and otherwise says nothing about which one it is. */}
+                  {decksN > 1 && (
+                    <Typography
+                      base="label-sm"
+                      tk="tk-14"
+                      className={`${styles.rowLabel} ${
+                        phase === 'resolve' ? styles.chromeOut : styles.chromeIn
+                      }`}
+                    >
+                      {`${deckWord} ${row.deckId + 1}`}
+                    </Typography>
+                  )}
                   {row.cards.map((c, idx) => {
                     const dragRow = drag?.row === ri
                     const isDragged = dragRow && drag?.uid === c.uid

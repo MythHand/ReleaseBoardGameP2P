@@ -1,8 +1,9 @@
 import type React from 'react'
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
+import type { Deflection } from '@/cards/useCardTilt'
 import Card from '@/primitives/Card'
-import { CARD_W, handStep, slotPlacement } from './fan'
+import { CARD_W, handStep, insertPath, slotPlacement } from './fan'
 import styles from './Hand.module.css'
 
 // Геометрия веера (наклон/дуга/шаг/ширина) — в едином модуле ./fan.
@@ -24,7 +25,15 @@ const CARD_H = CARD_W / CARD_WH // card height at CARD_W — for the drag flyer
 const BAND_PAD = 32
 // how long a card takes to glide back into the hand (reorder settle / rejected
 // return) — a readable motion, not an instant snap
-const SETTLE_MS = 340
+const SETTLE_MS = 460
+// = --ease-soft. The animation takes a value, not a custom property.
+const SETTLE_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
+// Where along the landing the card drops into its slot's layer. Under that
+// easing the middle of the PATH plays at 0.35 of the CLOCK, and the middle of
+// the path is the apex of the sweep — the card at its furthest from its right
+// neighbour, and so the cheapest moment there is to change which is on top.
+// The shape of that sweep is the fan's rule, not the Hand's: see insertPath.
+const SWITCH_AT = 0.35
 // pointer travel (px) that turns a press into a drag; below it a release is a
 // click (→ onCardClick). Lets click-to-play (arrow flows) and drag coexist.
 const DRAG_THRESHOLD = 6
@@ -58,6 +67,11 @@ export interface HandFaceContext {
   width: number
   state: FaceState
   accent?: string
+  // set only for the card on the drag layer: the deflection it carried in the
+  // fan. That face is a new instance and would be born flat; handed this, it
+  // straightens out of the tilt it had instead of cutting to flat in one frame.
+  // A custom renderFace that drops it loses the straightening, nothing else.
+  tiltFrom?: Deflection
 }
 
 // Where a played card was released — enough for the consumer to pick the intent
@@ -80,6 +94,7 @@ function defaultFace(item: HandItem, ctx: HandFaceContext): React.ReactNode {
       width={ctx.width}
       state={ctx.state}
       accent={ctx.accent}
+      tiltFrom={ctx.tiltFrom}
     />
   )
 }
@@ -114,11 +129,23 @@ interface HandProps {
   onReorder?: (uid: string, toIndex: number) => void
   // переопределение отрисовки лицевой стороны слота (по умолчанию — PNG Card)
   renderFace?: (item: HandItem, ctx: HandFaceContext) => React.ReactNode
+  // A card is being dragged by the pointer OUTSIDE the hand — the scene carrying
+  // it says so. The hand then answers nothing to the cursor: no lift, no parting
+  // neighbours, no zoom preview. A hand reacting to a cursor that is already
+  // holding a card reads as an offer to take a second one.
+  //
+  // Only a pointer CARRYING something counts. Aiming — the combo arrow picking a
+  // target — is a different situation: there the hand must keep answering,
+  // because what the cursor is over is exactly the question being asked. So this
+  // is a prop a scene opts into, not a rule the hand infers.
+  carrying?: boolean
 }
 
 interface DragState {
   uid: string
   card: CardType
+  // deflection the card carried in the fan at the moment it was grabbed
+  tiltFrom?: Deflection
 }
 
 interface ZoomState {
@@ -149,6 +176,7 @@ export default function Hand({
   onPlay,
   onReorder,
   renderFace = defaultFace,
+  carrying = false,
 }: HandProps) {
   // ховер по UID (не по индексу) — при удалении карты индекс «съезжает» на
   // соседа и та вспыхивает фантомом; uid этого не допускает.
@@ -168,8 +196,8 @@ export default function Hand({
 
   const n = items.length
   const dragEnabled = Boolean(onPlay ?? onReorder)
-  // ховер подавлен во время перетаскивания
-  const hovered = drag ? null : hoveredUid
+  // ховер подавлен во время перетаскивания — своего или чужого (carrying)
+  const hovered = drag || carrying ? null : hoveredUid
   const hoveredIndex = hovered ? items.findIndex((it) => it.uid === hovered) : -1
 
   // индекс слота в веере, куда целится курсор (для перестановки)
@@ -184,21 +212,36 @@ export default function Hand({
     return hr ? clientY >= hr.top - BAND_PAD : false
   }
 
-  // begin the actual drag (grab point from the press coords, base fan geometry —
-  // so grabbing an enlarged hovered card doesn't offset the pick-up)
+  // begin the actual drag. The grab point is taken from where the card is DRAWN,
+  // not from its slot's base geometry: the card under the cursor is the hovered
+  // one, and hover draws it HOVER_LIFT higher (see the render below). Measuring
+  // from the base would hand the flyer a grab point off by exactly that, and the
+  // card would drop 28px the instant it left the fan — a jump the eye reads as a
+  // teleport, and the reason a card seemed to skip its first movements.
   function beginDrag(i: number, downX: number, downY: number) {
     const item = items[i]
     const hr = handRef.current?.getBoundingClientRect()
     if (!hr) return
     const base = slotPlacement(i, n)
+    // drag is still null here, so hoveredIndex is the value the drawn frame was
+    // laid out with — these are the render's own two conditions, read back
+    const tilted = hoveredIndex === i
+    const lift = tilted && gapAt == null ? HOVER_LIFT : 0
     const cardLeft = hr.left + hr.width / 2 + base.x - CARD_W / 2
-    const cardTop = hr.bottom + base.y - CARD_H
+    const cardTop = hr.bottom + base.y - lift - CARD_H
     grab.current = {
       fracX: clamp((downX - cardLeft) / CARD_W, 0, 1),
       fracY: clamp((downY - cardTop) / CARD_H, 0, 1),
     }
     setHoveredUid(null) // don't let the pick-up's hover linger after the drag ends
-    setDrag({ uid: item.uid, card: item.card })
+    setDrag({
+      uid: item.uid,
+      card: item.card,
+      // the grab fractions ARE the deflection the tilt engine was running on:
+      // both are the cursor's position over the same card box, one as 0…1 and
+      // the other as −0.5…0.5. Nothing to measure, nothing to report upward.
+      tiltFrom: tilted ? { x: grab.current.fracX - 0.5, y: grab.current.fracY - 0.5 } : undefined,
+    })
     setPreview(inBand(downY) ? i : null)
   }
 
@@ -233,9 +276,13 @@ export default function Hand({
   }
 
   // drag lifecycle: the flyer follows the cursor; release inside the hand →
-  // reorder, outside → play
+  // reorder, outside → play.
+  // A LAYOUT effect: the flyer mounts with no left/top of its own, so its first
+  // paint would put it at its static position — the hand's top-left corner, not
+  // the cursor. A passive effect places it only after the browser is free to
+  // paint that frame; this one places it before.
   // biome-ignore lint/correctness/useExhaustiveDependencies: drag is the trigger; handlers use the closures captured when the drag began
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!drag) return
     const place = () => {
       const el = flyerRef.current
@@ -251,23 +298,44 @@ export default function Hand({
       place()
       setPreview(inBand(e.clientY) ? slotUnderCursor(e.clientX) : null)
     }
-    // glide the flyer into a hand slot, then commit — the "back into the hand"
-    // motion, used both for reordering and for returning a rejected play
+    // Land the flyer in a hand slot, then commit — the "back into the hand"
+    // motion, used both for reordering and for returning a rejected play.
+    //
+    // The shape of the landing is the fan's own rule (insertPath, in ./fan): the
+    // card comes into its slot round from the LEFT, along one curve with no
+    // corner in it. What belongs here is the clock — how long it takes, at what
+    // speed, and the one moment inside it where the card stops being the card on
+    // top and becomes the card between two others.
     const settleInto = (targetIndex: number, commit?: () => void) => {
       setPreview(targetIndex) // hold the gap where it lands
       const hr = handRef.current?.getBoundingClientRect()
       const el = flyerRef.current
-      if (hr && el) {
+      const g = grab.current
+      if (hr && el && g) {
         const base = slotPlacement(targetIndex, n)
-        // drop into the target slot's layer NOW, so it glides back BETWEEN the
-        // cards (tucks under the right neighbours) instead of riding on top
-        el.style.zIndex = `${base.z}`
-        el.style.transition =
-          `left ${SETTLE_MS}ms var(--ease-out), top ${SETTLE_MS}ms var(--ease-out), ` +
-          `transform ${SETTLE_MS}ms var(--ease-out)`
-        el.style.left = `${hr.left + hr.width / 2 + base.x - CARD_W / 2}px`
-        el.style.top = `${hr.bottom + base.y - CARD_H}px`
-        el.style.transform = `rotate(${base.rotate}deg)`
+        const from = {
+          x: cursor.current.x - g.fracX * CARD_W,
+          y: cursor.current.y - g.fracY * CARD_H,
+        }
+        const to = {
+          x: hr.left + hr.width / 2 + base.x - CARD_W / 2,
+          y: hr.bottom + base.y - CARD_H,
+        }
+        // the fan hands over positions; the card is carried through them by a
+        // translation, so it also has to turn to the slot's angle along the way
+        const path = insertPath(from, to, targetIndex, n)
+        const last = path.length - 1
+        const frames: Keyframe[] = path.map((p, i) => ({
+          transform:
+            `translate(${p.x - from.x}px, ${p.y - from.y}px) ` +
+            `rotate(${(base.rotate * i) / last}deg)`,
+        }))
+        el.style.left = `${from.x}px`
+        el.style.top = `${from.y}px`
+        el.animate(frames, { duration: SETTLE_MS, easing: SETTLE_EASE, fill: 'forwards' })
+        window.setTimeout(() => {
+          el.style.zIndex = `${base.z}`
+        }, SETTLE_MS * SWITCH_AT)
       }
       window.setTimeout(() => {
         commit?.()
@@ -315,7 +383,7 @@ export default function Hand({
       zoomHide.current = null
     }
     // no zoom for a face-down hand (a card back has nothing to read) or mid-drag
-    if (faceDown || drag || !hoveredUid) {
+    if (faceDown || drag || carrying || !hoveredUid) {
       setZoomShown(false)
       zoomHide.current = window.setTimeout(() => setZoomView(null), 220)
       return
@@ -343,7 +411,7 @@ export default function Hand({
     })
     const id = requestAnimationFrame(() => setZoomShown(true))
     return () => cancelAnimationFrame(id)
-  }, [hoveredUid, drag, items, faceDown])
+  }, [hoveredUid, drag, carrying, items, faceDown])
 
   // placement per uid — with the dragged card lifted out and (in-band) a gap at
   // `preview`; otherwise the usual layout (with optional insert gapAt).
@@ -376,7 +444,7 @@ export default function Hand({
         // hover: gentle lift + straighten, neighbours part — that's all. No
         // in-place scale, no jump to the top layer (card stays in its fan layer;
         // readability is on the zoom preview).
-        if (hoveredIndex >= 0 && gapAt == null && !drag) {
+        if (hoveredIndex >= 0 && gapAt == null && !drag && !carrying) {
           if (hoveredIndex === i) {
             rotate = 0
             y -= HOVER_LIFT
@@ -447,7 +515,7 @@ export default function Hand({
         <div className={styles.flyer} ref={flyerRef} style={{ width: CARD_W }}>
           {renderFace(
             { uid: drag.uid, card: drag.card },
-            { faceDown, tilt: false, width: CARD_W, state: 'idle' },
+            { faceDown, tilt: false, width: CARD_W, state: 'idle', tiltFrom: drag.tiltFrom },
           )}
         </div>
       )}

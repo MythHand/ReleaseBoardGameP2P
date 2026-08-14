@@ -266,10 +266,10 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
-    mod: 'slotPlacement() / handStep()',
+    mod: 'slotPlacement() / handStep() / insertPath()',
     what: {
-      ru: 'Единый источник геометрии веера руки: наклон, дуга, ширина и шаг-от-кол-ва карт. Раскладка слотов в Hand и приземление вставки считаются по ОДНОЙ формуле — без копий, которые разъезжаются при тюнинге.',
-      en: 'The single source of hand-fan geometry: tilt, arc, width and step-from-card-count. The slot layout in Hand and the insert landing are computed by ONE formula — no copies that drift apart under tuning.',
+      ru: 'Единый источник геометрии веера руки: наклон, дуга, ширина и шаг-от-кол-ва карт. Раскладка слотов в Hand и приземление вставки считаются по ОДНОЙ формуле — без копий, которые разъезжаются при тюнинге. Здесь же правило ВХОДА в веер (insertPath): карта заходит в свой слот в обход СЛЕВА, одной кривой без излома, чтобы смену слоя (карта перестаёт быть верхней и становится зажатой между двумя) можно было сделать на вершине обхода — там, где полоса перекрытия с правой соседкой минимальна, и на движении. Вылет — в шагах веера, место на дуге читается по высоте отпускания. У последнего слота соседа справа нет: заход обращается в ноль, кривая становится прямой.',
+      en: 'The single source of hand-fan geometry: tilt, arc, width and step-from-card-count. The slot layout in Hand and the insert landing are computed by ONE formula — no copies that drift apart under tuning. The rule for ENTERING the fan lives here too (insertPath): a card comes into its slot round from the LEFT, along one curve with no corner in it, so the layer switch (it stops being the top card and becomes one held between two) can be made at the apex — where the strip it overlaps its right neighbour by is smallest, and while it moves. The reach is in fan steps; where on the arc is read off the release height. The last slot has no right neighbour: the reach collapses to zero and the curve is a straight line.',
     },
     where: {
       ru: 'table/Hand/fan → Hand, useHandArrival',
@@ -280,8 +280,8 @@ const MODULES: Module[] = [
   {
     mod: 'useHandArrival()',
     what: {
-      ru: 'Карты ПРИХОДЯТ в руку — одно движение на любое их число. Раньше это были два шага («карта встаёт в руку» и «сборка возвращается»), а на экране движение одно: веер раздвигает зазор в СЕРЕДИНЕ, карта подгоняет размер, садится на нижний центр слота и подтыкается под веер. Источник любой: прямоугольник; карта, лежащая с наклоном (пивот компенсируется, первый кадр не дёргается); уже нарисованный элемент (шаг сам убирает его с экрана); половина пары (по своему якорю, наклонённая рамка обрезается — I6). На приземлении отдаёт НАЗАД то, что прилетело: сцена не читает свою выкладку, которую к тому моменту уже очистила (I8).',
-      en: 'Cards ARRIVE in the hand — one movement for any number of them. It used to be two steps ("a card settles in" and "the staging comes back"), but on screen the movement is one: the fan opens a gap in the MIDDLE, the card matches the size, lands on the slot bottom-centre and tucks under the fan. Any source: a rect; a card resting at a tilt (the pivot is compensated, so the first frame does not jump); an element already drawn (the step takes it off screen itself); one half of a pair (measured off its anchor, the tilted box trimmed — I6). On landing it hands BACK what arrived: the scene does not read its own staging, which it cleared the moment the flight started (I8).',
+      ru: 'Карты ПРИХОДЯТ в руку — одно движение на любое их число. Раньше это были два шага («карта встаёт в руку» и «сборка возвращается»), а на экране движение одно: веер раздвигает зазор в СЕРЕДИНЕ, карта подгоняет размер, садится на нижний центр слота и подтыкается под веер. Источник любой: прямоугольник; карта, лежащая с наклоном (пивот компенсируется, первый кадр не дёргается); уже нарисованный элемент (шаг сам убирает его с экрана); половина пары (по своему якорю, наклонённая рамка обрезается — I6). Форма посадки — не его: карта входит в веер по insertPath, тем же правилом, каким рука кладёт обратно перетащенную, потому что встать между двух карт — одна ситуация, чем бы карту туда ни принесли. На приземлении отдаёт НАЗАД то, что прилетело: сцена не читает свою выкладку, которую к тому моменту уже очистила (I8).',
+      en: 'Cards ARRIVE in the hand — one movement for any number of them. It used to be two steps ("a card settles in" and "the staging comes back"), but on screen the movement is one: the fan opens a gap in the MIDDLE, the card matches the size, lands on the slot bottom-centre and tucks under the fan. Any source: a rect; a card resting at a tilt (the pivot is compensated, so the first frame does not jump); an element already drawn (the step takes it off screen itself); one half of a pair (measured off its anchor, the tilted box trimmed — I6). The shape of the landing is not its own: the card comes into the fan along insertPath, the same rule the hand puts a dragged card back by, because going in between two cards is one situation whatever carried the card there. On landing it hands BACK what arrived: the scene does not read its own staging, which it cleared the moment the flight started (I8).',
     },
     where: {
       ru: 'stories/interactive → 11 сцен: добор, карта соперника (обе сцены выбора), Inside, Cherry-pick, System Upgrade, отмены в Combo и DeckAnimations, Rollback, раздача в GameDeal, CardToHand как витрина самого шага',
@@ -349,8 +349,8 @@ const MODULES: Module[] = [
   {
     mod: 'Hand (canonical)',
     what: {
-      ru: 'Интерактивный веер: ховер (подъём + расступание + отдельный зум-превью), взять-потянуть (наружу — розыгрыш, внутри — перестановка), порог клик/drag, settle-back с transform-origin bottom-center. Всё внутри компонента; наружу — данные и колбэки намерения (onPlay/onReorder/onCardClick/stateAt).',
-      en: 'The interactive fan: hover (lift + spread + a separate zoom preview), pick-up & drag (out → play, inside → reorder), a click/drag threshold, settle-back with transform-origin bottom-center. All internal; the consumer supplies data and intent callbacks (onPlay/onReorder/onCardClick/stateAt).',
+      ru: 'Интерактивный веер: ховер (подъём + расступание + отдельный зум-превью), взять-потянуть (наружу — розыгрыш, внутри — перестановка), порог клик/drag, посадка обратно с transform-origin bottom-center. Карта берётся оттуда, где НАРИСОВАНА (с подъёмом от ховера), и уносит на летящий слой наклон, который на ней был, — иначе она проваливалась бы на высоту подъёма и выпрямлялась в один кадр. Кладётся обратно по insertPath: сам обход — правило веера, руке принадлежат часы (SETTLE_MS, SETTLE_EASE, SWITCH_AT). Всё внутри компонента; наружу — данные и колбэки намерения (onPlay/onReorder/onCardClick/stateAt).',
+      en: 'The interactive fan: hover (lift + spread + a separate zoom preview), pick-up & drag (out → play, inside → reorder), a click/drag threshold, the landing back with transform-origin bottom-center. A card is picked up from where it is DRAWN (hover lift included) and carries the tilt it had onto the drag layer — otherwise it dropped by the height of that lift and cut to flat in one frame. It is put back along insertPath: the sweep belongs to the fan, the clock to the hand (SETTLE_MS, SETTLE_EASE, SWITCH_AT). All internal; the consumer supplies data and intent callbacks (onPlay/onReorder/onCardClick/stateAt).',
     },
     where: { ru: 'table/Hand → все руки', en: 'table/Hand → every hand' },
     status: 'ok',
@@ -364,6 +364,30 @@ const MODULES: Module[] = [
     where: {
       ru: 'table/CardCatalog → PickSpecific, OpponentTakes',
       en: 'table/CardCatalog → PickSpecific, OpponentTakes',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'useCardPreview',
+    what: {
+      ru: 'Чтение карты, которая стоит НА СТОЛЕ — той, что вышла в центр: 503 из колоды, эффект AI, чужая атака. Превью показывается в ОДНОМ постоянном месте справа, а не у курсора: место, которое игрок запоминает, и которое заведомо не накрывает центр, где всё и происходит. Размер — зум руки в максимуме плюс 15% и минус 10%. Привязка к СЛОТУ, а не к «карте в центре»: у Defense Release таких слотов пять, и каждый читается сам по себе. Закрывается ОДНИМ правилом — курсор сдвинулся туда, где нет ни читаемого слота, ни самого превью. Из этого правила сами собой выпадают два нужных поведения: карта улетела в сброс, пока её читают (слот размонтировался под неподвижным курсором, mouseleave не приходит — превью висит до движения мыши, НАМЕРЕННО наоборот к зуму руки, который обязан уйти вместе с картой), и курсор на самом превью (висит, иначе превью над сбросом мигало бы). Рубашкой вверх не показывается: у чужой закрытой карты нет личности и в проекции. Задержка есть только на УХОД со слота (90ms): слоты стоят в нескольких пикселях друг от друга, и без неё превью мигало бы при переходе на соседнюю карту. Глухого периода нет намеренно — иначе наведение на другую карту в центре переставало бы отвечать.',
+      en: 'Reading a card that stands ON THE TABLE — the one at the centre: a 503 out of the deck, an AI effect, somebody else’s attack. The preview shows at ONE fixed place on the right, never at the cursor: a place the player learns, and one that cannot cover the centre where the game happens. Size — the hand’s hover zoom at its largest, plus 15% and minus 10%. Bound to a SLOT rather than to "the card at the centre": Defense Release has five of them and each reads on its own. ONE rule closes it — the pointer moved somewhere that is neither a readable slot nor the preview. Two needed behaviours fall out of that rule by themselves: the card flies to the discard while being read (its slot unmounts under a still cursor, no mouseleave is fired — the preview stays until the hand moves, DELIBERATELY the opposite of the hand’s zoom, which must leave with its card), and the pointer resting on the preview (it stays, or a preview over the discard would flicker). Face-down shows nothing: somebody else’s closed card has no identity in the projection either. The only delay is on LEAVING a slot (90ms): slots stand a few px apart and without it the preview would blink when crossing to the neighbouring card. There is deliberately no blind period — one would stop the centre answering when you move onto another card there.',
+    },
+    where: {
+      ru: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease',
+      en: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'useCardTilt() + CardMotionProvider',
+    what: {
+      ru: 'Наклон лица карты — вся математика в одном месте: курсор → отклонение p (по нему ComposedFace разводит слои), ховер и готовый transform. Обе формы карты берут её отсюда. Параметр from — отклонение, с которым лицо РОЖДАЕТСЯ и из которого выпрямляется: карту, оторванную из веера на слой перетаскивания, рисует НОВЫЙ экземпляр, а новый рождается плоским, и выпрямление, через которое слой проходит по каждому уходу курсора, просто не случается. CardMotionProvider — экранный выключатель параллакса: не проп, а контекст, потому что это решение про весь экран, а не про карту, и проброс флага положил бы настройку отображения в API руки, мест, стопок и зоны релиза. Гасит ТОЛЬКО слежение за курсором: подъём по ховеру остаётся, он отвечает «курсор на этой карте», а это обратная связь, а не украшение.',
+      en: 'The tilt of a card face — the whole math in one place: pointer → deflection p (which ComposedFace shifts each layer by), hover, and the ready transform. Both card shapes take it from here. The `from` parameter is the deflection a face is BORN with and straightens out of: a card torn out of the fan onto the drag layer is drawn by a NEW instance, and a new instance is born flat, so the straightening the layer transitions through on every mouseleave simply never happens. CardMotionProvider is the screen-wide parallax switch: a context and not a prop, because it is a decision about a whole screen rather than about one card, and threading a flag would put a display preference into the APIs of the hand, the seats, the piles and the release zone. It mutes ONLY the pointer tracking: the hover lift stays, since it answers "the cursor is on this card", which is feedback and not decoration.',
+    },
+    where: {
+      ru: 'cards/useCardTilt + cards/cardMotion → Card, CardParallax; выключатель — в настройках экрана Table',
+      en: 'cards/useCardTilt + cards/cardMotion → Card, CardParallax; the switch lives in the Table screen settings',
     },
     status: 'ok',
   },
@@ -613,28 +637,16 @@ const SCENARIOS: Scenario[] = [
 //     are actionable.
 const ISSUES: Issue[] = [
   {
-    what: { ru: 'Сцена ничем не обязана оставить рецепт', en: 'A scene owes no recipe' },
-    problem: {
-      ru: 'Про доку, не про игровую логику. Пресеты проверяются тестом: нет строки в reference.md — падает CI. У сцен такого признака нет, и дока уже отставала на семь пресетов, пока это не вскрылось сплошной сверкой; со сценами выйдет так же. Машинного признака не нашли — сцена это файл истории, а не запись в реестре, — поэтому держится на дисциплине. Правится не сейчас: цена вопроса появится, когда рецептами начнут пользоваться снаружи плейграунда.',
-      en: 'About the docs, not the game logic. Presets are covered by a test: no row in reference.md, no green CI. Scenes have no such signal, and the docs had already fallen seven presets behind before a full sweep caught it; scenes will go the same way. No machine signal was found — a scene is a story file, not a registry entry — so it rests on discipline. Not being fixed now: the cost shows up once recipes are used outside the playground.',
-    },
-    where: { ru: 'docs/animations/recipes.md', en: 'docs/animations/recipes.md' },
-    status: 'open',
-  },
-  {
     what: {
-      ru: 'Плавающая тех-полоса выпилена — область демонстрации стала настоящей',
-      en: 'The floating tech bar is gone — the demo area is now real',
+      ru: 'Модуль, не записанный НИГДЕ, не виден ни одной проверке',
+      en: 'A module written down NOWHERE is invisible to every check',
     },
     problem: {
-      ru: 'Было: полоса лежала слоем НАД сценой (position:absolute, z-index 60), и сцена о её высоте не знала. Отсюда три следствия, каждое чинилось на месте: верхние отступы раздувались, чтобы разойтись с полосой (.opponents стояли на 84–96px вместо канонических 22px из Table); три сцены — AI cards, Draw card, Error 503 — мерили полосу в рантайме через barRef/offsetHeight, чтобы краевое свечение и видео выбывания не считали край окна краем стола; а скрим в Git cards затемнял всю страницу. Стало: полоса — строка страницы, .stage под ней и ЕСТЬ область демонстрации, всё поверх сцены — inset:0 от неё. Замеры удалены, отступы вернулись к значениям Table. Правило записано в apps/playground/CLAUDE.md.',
-      en: 'Before: the bar was a LAYER over the scene (position: absolute, z-index 60) and the scene did not know its height. Three consequences followed, each patched locally: top offsets were inflated to clear it (.opponents at 84–96px instead of the canonical 22px from Table); three scenes — AI cards, Draw card, Error 503 — measured the bar at runtime through barRef/offsetHeight so the edge glow and the elimination video would not take the window edge for the table edge; and the Git-cards scrim dimmed the whole page. Now: the bar is a row of the page, the .stage under it IS the demo area, and everything painted over the scene is inset: 0 of it. The measurements are deleted and the offsets are back to Table values. The rule is written down in apps/playground/CLAUDE.md.',
+      ru: 'Про доку, не про игровую логику. Три вещи обязаны сюда доезжать, и две с половиной проверены машиной: пресет без строки в reference.md роняет тест; модуль, который есть на этой странице, но не упомянут в reference.md, роняет тест; сцена без «живой ссылки» в recipes.md роняет тест. Но все три сверяют ДВЕ точки друг с другом — значит модуль, не дошедший ни до одной, невидим для всех сразу. Так и вышло с экранным выключателем параллакса: написан, работает в настройках стола, не значился ни здесь, ни в доках. Опаснее прочего тем, что тесты при этом зелёные — возникает ложное чувство покрытия. Автоматически не закрывается: отличить модуль от вспомогательной функции может только человек. Закрывает дисциплина на входе — модуль считается сделанным, когда он появился ЗДЕСЬ, дальше его дотянет тест.',
+      en: 'About the docs, not the game logic. Three things are supposed to land here, and two and a half are machine-checked: a preset with no row in reference.md fails a test; a module that is on this page but unmentioned in reference.md fails a test; a scene with no live reference in recipes.md fails a test. But all three compare TWO places with each other — so a module that reached neither is invisible to all of them at once. That is exactly what happened to the screen-wide parallax switch: written, working in the table settings, listed neither here nor in the docs. What makes it worse than an ordinary gap is that the tests stay green, which reads as coverage. It does not close automatically — telling a module from a helper takes a person. What closes it is discipline at the door: a module counts as done once it appears HERE, and the test drags it into the docs from there.',
     },
-    where: {
-      ru: 'stories/controls/, все сцены интерактива',
-      en: 'stories/controls/, every interactive scene',
-    },
-    status: 'ok',
+    where: { ru: 'эта страница + docs/animations/', en: 'this page + docs/animations/' },
+    status: 'open',
   },
 ]
 
