@@ -15,8 +15,13 @@ import styles from './useHandArrival.module.css'
 // take several at once, neither could take a card that is already on screen.
 //
 // The rule it holds:
-//   • they land in the MIDDLE of the fan, however many there are. That is where
-//     every card arrives, so a draw and an undo read as the same event.
+//   • they land in the MIDDLE of the fan by default, however many there are. That
+//     is where every card ARRIVES — a draw comes from the deck and has no place of
+//     its own, so the middle is the honest answer and a draw and an undo read as
+//     the same event. A scene may name the slot instead (`at`), and exactly one
+//     thing earns that: the player POINTED at a place. Dragging a card back off
+//     the table into the fan is a placement, not an arrival, and putting it in the
+//     middle would ignore what the hand just said.
 //   • the fan opens room for ALL of them WHILE they travel, so they land in ready
 //     space instead of shoving their neighbours aside on arrival.
 //   • each card aims at the slot it will occupy and lands on that slot's bottom-centre
@@ -105,11 +110,12 @@ export function useHandArrival(
     return it.from ? { box: it.from, rot: it.rot ?? 0 } : undefined
   }
 
-  // send any number of cards into a hand of `handLength` cards
-  const arrive = async (items: Arriving[], handLength: number) => {
+  // send any number of cards into a hand of `handLength` cards. `at` names the
+  // slot they open at; without it, the middle.
+  const arrive = async (items: Arriving[], handLength: number, at?: number) => {
     const hr = handRef.current?.getBoundingClientRect()
     if (items.length === 0 || !hr || flights.length > 0) return
-    const gap = Math.round(handLength / 2) // the middle of the fan — the one landing
+    const gap = at == null ? Math.round(handLength / 2) : Math.max(0, Math.min(handLength, at))
     const total = handLength + items.length
     const list = items
       .map((it, i) => {

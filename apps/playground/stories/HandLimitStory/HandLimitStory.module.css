@@ -58,6 +58,19 @@
 }
 
 /* a cell still to be filled — shows the shape the discard is taking */
+
+/* a card sitting in the grid can be taken back out — the grid is a decision in
+   progress, not a done deal. Grab-cursor and a small lift say so before the
+   pointer is pressed. */
+.cellCard {
+  cursor: grab;
+  transition: transform 180ms var(--ease-out);
+}
+
+.cellCard:hover {
+  transform: translateY(-6px);
+}
+
 .cellEmpty {
   position: absolute;
   inset: 0;
@@ -92,6 +105,12 @@
   inset-inline: 196px 56px;
 }
 
+/* the fan's own box — measured, so the arrival step knows where the hand is and
+   the carry-back knows when it is over it */
+.handWrap {
+  position: relative;
+}
+
 .hint {
   margin-block-end: 10px;
   color: var(--white-45);
@@ -99,3 +118,12 @@
 }
 
 /* the cards in the air belong to the shared carrier (useFlyer) */
+
+/* the card being carried back out of the grid — rides above everything at the
+   cursor, and never catches the pointer it is following */
+.backFlyer {
+  position: fixed;
+  z-index: calc(var(--z-flight) + 10);
+  pointer-events: none;
+  cursor: grabbing;
+}

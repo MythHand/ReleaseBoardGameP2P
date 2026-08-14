@@ -114,6 +114,16 @@ interface HandProps {
   onReorder?: (uid: string, toIndex: number) => void
   // переопределение отрисовки лицевой стороны слота (по умолчанию — PNG Card)
   renderFace?: (item: HandItem, ctx: HandFaceContext) => React.ReactNode
+  // A card is being dragged by the pointer OUTSIDE the hand — the scene carrying
+  // it says so. The hand then answers nothing to the cursor: no lift, no parting
+  // neighbours, no zoom preview. A hand reacting to a cursor that is already
+  // holding a card reads as an offer to take a second one.
+  //
+  // Only a pointer CARRYING something counts. Aiming — the combo arrow picking a
+  // target — is a different situation: there the hand must keep answering,
+  // because what the cursor is over is exactly the question being asked. So this
+  // is a prop a scene opts into, not a rule the hand infers.
+  carrying?: boolean
 }
 
 interface DragState {
@@ -149,6 +159,7 @@ export default function Hand({
   onPlay,
   onReorder,
   renderFace = defaultFace,
+  carrying = false,
 }: HandProps) {
   // ховер по UID (не по индексу) — при удалении карты индекс «съезжает» на
   // соседа и та вспыхивает фантомом; uid этого не допускает.
@@ -168,8 +179,8 @@ export default function Hand({
 
   const n = items.length
   const dragEnabled = Boolean(onPlay ?? onReorder)
-  // ховер подавлен во время перетаскивания
-  const hovered = drag ? null : hoveredUid
+  // ховер подавлен во время перетаскивания — своего или чужого (carrying)
+  const hovered = drag || carrying ? null : hoveredUid
   const hoveredIndex = hovered ? items.findIndex((it) => it.uid === hovered) : -1
 
   // индекс слота в веере, куда целится курсор (для перестановки)
@@ -315,7 +326,7 @@ export default function Hand({
       zoomHide.current = null
     }
     // no zoom for a face-down hand (a card back has nothing to read) or mid-drag
-    if (faceDown || drag || !hoveredUid) {
+    if (faceDown || drag || carrying || !hoveredUid) {
       setZoomShown(false)
       zoomHide.current = window.setTimeout(() => setZoomView(null), 220)
       return
@@ -343,7 +354,7 @@ export default function Hand({
     })
     const id = requestAnimationFrame(() => setZoomShown(true))
     return () => cancelAnimationFrame(id)
-  }, [hoveredUid, drag, items, faceDown])
+  }, [hoveredUid, drag, carrying, items, faceDown])
 
   // placement per uid — with the dragged card lifted out and (in-band) a gap at
   // `preview`; otherwise the usual layout (with optional insert gapAt).
@@ -376,7 +387,7 @@ export default function Hand({
         // hover: gentle lift + straighten, neighbours part — that's all. No
         // in-place scale, no jump to the top layer (card stays in its fan layer;
         // readability is on the zoom preview).
-        if (hoveredIndex >= 0 && gapAt == null && !drag) {
+        if (hoveredIndex >= 0 && gapAt == null && !drag && !carrying) {
           if (hoveredIndex === i) {
             rotate = 0
             y -= HOVER_LIFT
