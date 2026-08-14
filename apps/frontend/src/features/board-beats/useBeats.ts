@@ -1,12 +1,10 @@
 import type { Event } from '@release/engine'
-import { cardById } from '@release/ui'
-import type { Leaving, Rect } from '@release/ui/animations'
-import { nextFrames, scatterAt, useDiscardExit } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
+import type { BeatRun, BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
-import type { BeatPlan, DiscardCard } from './planBeats'
+import { useDiscardBeat } from './discardBeat'
+import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
 
 // The board's beat queue. `useGame` accumulates engine events off the wire in
@@ -37,19 +35,15 @@ interface Beat {
   base: BoardState
   /** it owns the table: input is dead while it runs */
   exclusive: boolean
-  run: () => Promise<void>
+  run: (ctx: BeatRun) => Promise<void>
 }
 
 export interface Beats {
   shadow: BoardState | null
   overlays: ReactNode[]
   exclusive: boolean
-}
-
-const rectOf = (el: Element | null): Rect | null => {
-  if (!el) return null
-  const r = el.getBoundingClientRect()
-  return { left: r.left, top: r.top, width: r.width, height: r.height }
+  gapAt: number | null
+  gapSize: number
 }
 
 export function useBeats(args: {
@@ -70,13 +64,21 @@ export function useBeats(args: {
   // queue drains. Two readers of one fact, each for what it is good at.
   const runningRef = useRef<Beat | null>(null)
 
-  // No onLanded: the heap is derived from these same events in toBoardState, so
-  // the cards this step flew are already in the projection it hands over to. A
-  // second set of books here would be a second source for one heap.
-  const { overlay, send } = useDiscardExit(anchors.discardBox)
+  // What the RUNNING beat has moved the board to. The opening always published a
+  // shape of its own; this is the same door, opened to every beat, because a
+  // multi-draw grows the fan between its cards (I8) and a split has to render a
+  // pile before it can be measured. It lives and dies with the beat: cleared when
+  // one starts and again when the queue drains, so it can never outlast the run
+  // that produced it.
+  const [advanced, setAdvanced] = useState<BoardState | null>(null)
 
-  const latest = useRef({ live, anchors, send, intro })
-  latest.current = { live, anchors, send, intro }
+  const discards = useDiscardBeat(anchors)
+
+  // `intro` rides along because the arming effect below reads the beat from here
+  // rather than from its own closure: the effect fires on the match key, and the
+  // beat object is rebuilt every time the opening publishes a shadow.
+  const latest = useRef({ live, intro })
+  latest.current = { live, intro }
 
   // How far into the feed the queue has already looked. Event ids are the
   // engine's own monotonic sequence, so this is a watermark and not a count —
@@ -92,53 +94,16 @@ export function useBeats(args: {
   const queue = useRef<Beat[]>([])
   const draining = useRef(false)
 
-  const whereFrom = useCallback((c: DiscardCard): Rect | null => {
-    const a = latest.current.anchors
-    if (c.source.kind === 'hand') return rectOf(a.handSlotAt(c.source.index))
-    if (c.source.kind === 'release') return rectOf(a.releaseSlot(c.source.player, c.source.slot))
-    return a.seatBox(c.source.player)
-  }, [])
-
-  const toLeaving = useCallback(
-    (c: DiscardCard): Leaving | null => {
-      const card = cardById(c.card)
-      const from = whereFrom(c)
-      if (!card || !from) return null
-      // The SAME Scatter the adapter rests this card on (I7): the flight ends
-      // on the pose the heap already holds for it, so nothing moves on handover.
-      // Same key, same call — `scatterAt` takes the event id as a number.
-      return { key: c.key, card, from, scatter: scatterAt(c.eventId) }
-    },
-    [whereFrom],
-  )
-
-  // Narrowed to the discard plan only — `planBeats` now returns three other
-  // kinds, and dispatching those is Task 5's job. This scaffolding is what
-  // keeps the tree compiling in between (task-4-brief.md Step 6).
+  // The queue builds a Beat out of a plan and the runner that plays it. It knows
+  // that a beat HAS a runner; it does not know what any of them do.
   const beatOf = useCallback(
-    (plan: Extract<BeatPlan, { kind: 'discard' }>, base: BoardState): Beat => ({
-      key: plan.key,
-      base,
-      exclusive: false,
-      run: async () => {
-        // WAIT FOR THE SHADOW, THEN MEASURE — in that order, and the order is the
-        // whole point. `drain` starts this from inside a layout effect, so at
-        // entry React has committed the projection that ARRIVED: the card is
-        // already out of the fan and its slot with it. `setRunning` has only been
-        // scheduled — the shadow that puts the slot back is a commit away. Two
-        // frames is how we get to the other side of it (the same reason the
-        // carrier waits, I2), and only then is there anything honest to measure.
-        //
-        // Measuring before this yields `null` for a one-card hand (no flight at
-        // all) and the wrong slot for a larger one — and no test can see it,
-        // because a stub that hands back a detached node measures the same either
-        // way. `useBeats.test.tsx` queries the probe's real DOM for exactly this.
-        await nextFrames()
-        const items = plan.cards.map(toLeaving).filter((it): it is Leaving => it != null)
-        if (items.length > 0) await latest.current.send(items)
-      },
-    }),
-    [toLeaving],
+    (plan: BeatPlan, base: BoardState): Beat | null => {
+      if (plan.kind === 'discard') {
+        return { key: plan.key, base, exclusive: false, run: (ctx) => discards.run(plan, ctx) }
+      }
+      return null
+    },
+    [discards.run],
   )
 
   // The mount is going away: stop starting things. A beat already in flight
@@ -169,11 +134,12 @@ export function useBeats(args: {
       while (next && alive.current) {
         runningRef.current = next
         setRunning(next)
+        setAdvanced(null)
         // A beat that throws must not hold the board: the shadow is dropped in
         // the finally below regardless, so a failure costs the animation and
         // never the state.
         try {
-          await next.run()
+          await next.run({ base: next.base, publish: setAdvanced })
         } catch (err) {
           if (import.meta.env.DEV) console.error('[beats] %s failed', next.key, err)
         }
@@ -183,6 +149,7 @@ export function useBeats(args: {
       draining.current = false
       runningRef.current = null
       setRunning(null)
+      setAdvanced(null)
     }
   }, [])
 
@@ -284,19 +251,26 @@ export function useBeats(args: {
     // let it render. Planned nowhere, run nowhere: one branch, one place.
     if (reduced) return
     for (const plan of planBeats(fresh, before)) {
-      if (plan.kind === 'discard') queue.current.push(beatOf(plan, before))
+      const beat = beatOf(plan, before)
+      if (beat) queue.current.push(beat)
     }
     void drain()
   }, [events, live, enabled, reduced, beatOf, drain, running])
 
   return {
-    // The shadow is the running beat's own base, and nothing else holds it up.
-    // The one exception is the opening, which publishes a whole shape of its own
-    // rather than animating away from a projection — while it runs, that shape
-    // IS the board. It goes null the moment the opening reports done, so the
-    // handover to the live projection is the intro's own last frame.
-    shadow: (running?.exclusive ? intro?.shadow : running?.base) ?? null,
-    overlays: overlay,
+    // The shadow is what the running beat has published, or its own base while
+    // it has published nothing yet. The one exception is the opening, which
+    // publishes a whole shape of its own rather than animating away from a
+    // projection — while it runs, that shape IS the board, until a publish of
+    // its own arrives to take over from it. It all goes null the moment the
+    // beat reports done, so the handover to the live projection is the queue's
+    // own last frame.
+    shadow:
+      (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ?? null,
+    overlays: discards.overlay,
     exclusive: running?.exclusive ?? false,
+    // The fan opens for cards on their way into it. Nothing does that yet.
+    gapAt: null,
+    gapSize: 1,
   }
 }

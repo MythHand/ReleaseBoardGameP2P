@@ -165,6 +165,21 @@ export interface BoardCopyBundle {
 }
 
 /**
+ * What a beat runner is handed: the projection it animates AWAY from, and a
+ * way to move the board while it runs. `IntroBeat` below is the one existing
+ * case of a beat publishing a shape of its own rather than sitting on its
+ * `base` for its whole life; this is that same door, opened to every beat, so
+ * it lives here for the same reason `IntroBeat` does — a fact the queue
+ * (`features/board-beats`) and its runners (also `features/`) both need, which
+ * a type in `features/` cannot be, because a feature must not import from a
+ * sibling feature.
+ */
+export interface BeatRun {
+  base: BoardState
+  publish: (state: BoardState) => void
+}
+
+/**
  * The opening, handed to the beat queue as one beat. It is not planned from
  * events like the others — it is a whole shape rather than a fold of the
  * projection, so it publishes its own `shadow` and the queue renders that. But
@@ -176,7 +191,10 @@ export interface BoardCopyBundle {
  * sibling feature. It is a board fact, like `BoardState` and `BoardAnchors`.
  *
  * `run` resolves when the opening is OVER — including when a skip cut it short,
- * not only when it played to the end.
+ * not only when it played to the end. It takes a `BeatRun` like every other
+ * beat's runner does — the real opening ignores it (a 0-arg function is
+ * assignable here), and only a test that wants to drive the queue's shadow
+ * through the intro slot ever reaches for it.
  *
  * `collapse` is the no-animation path: jump to the end state and report done.
  * It exists because the opening owes something no other beat does — it tells the
@@ -188,7 +206,7 @@ export interface BoardCopyBundle {
 export interface IntroBeat {
   key: string
   shadow: BoardState | null
-  run: () => Promise<void>
+  run: (ctx: BeatRun) => Promise<void>
   collapse: () => void
 }
 

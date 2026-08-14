@@ -85,6 +85,12 @@ const live = (): BoardState => ({
   frozen: [],
 })
 
+// The queue now hands every beat's `run` a `BeatRun` (#97 generalizes the
+// opening's own shadow to the whole queue). The opening ignores it — nothing
+// here asserts on `publish` — so a fresh, inert context is all `run()` needs
+// to be called the way the queue calls it.
+const noopCtx = () => ({ base: live(), publish: () => {} })
+
 // What the queue calls instead of `run` when the player asked for less motion.
 // The opening still has to REPORT — the host's start gate waits on every seat,
 // and a seat that never reports would hold the match shut for everyone — so
@@ -117,7 +123,7 @@ it('does not run for a projection that is not an opening', async () => {
   // The beat exists — there is a match — but playing it finds nothing to replay
   // and hands over at once rather than animating an opening that never happened.
   await act(async () => {
-    await result.current.beat?.run()
+    await result.current.beat?.run(noopCtx())
   })
   expect(result.current.active).toBe(false)
   await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))

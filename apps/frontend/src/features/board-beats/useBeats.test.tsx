@@ -163,6 +163,36 @@ const introBeat = (log: string[], run?: () => Promise<void>): IntroBeat => ({
   collapse: () => log.push('collapse'),
 })
 
+// The intro slot is the queue's own "here is a beat, run it" door. Using it
+// keeps this test about the SHADOW rather than about planning.
+const renderWithBeat = (run: (ctx: { publish: (s: BoardState) => void }) => Promise<void>) =>
+  render(
+    <Probe
+      live={preDiscard}
+      events={[]}
+      anchors={stub}
+      intro={{ key: 'g1', shadow: null, run, collapse: () => {} }}
+    />,
+  )
+
+// The generalization of what the opening already did. A runner that publishes
+// moves the board under itself — which is how the second card of a multi-draw
+// aims at the fan the first one grew (I8), and how a split's new pile exists
+// before it is measured.
+it('renders what a running beat publishes, and drops it when the queue drains', async () => {
+  motion.reduced = false
+  sent.calls = []
+  // A beat that parks after publishing, so the published state can be observed
+  // while it is still up.
+  const published = { ...preDiscard, decks: { ...preDiscard.decks, main: [7] } } as BoardState
+  const { getByTestId } = renderWithBeat((ctx) => {
+    ctx.publish(published)
+    return new Promise<void>(() => {})
+  })
+  await flush()
+  expect(getByTestId('deck').textContent).toBe('7')
+})
+
 it('never animates when motion is reduced', async () => {
   motion.reduced = true
   sent.calls = []
