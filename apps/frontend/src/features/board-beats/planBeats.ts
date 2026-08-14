@@ -1,4 +1,4 @@
-import type { Event } from '@release/engine'
+import type { DiscardReason, Event } from '@release/engine'
 import type { ReleaseSlots } from '@release/ui'
 import type { BoardState } from '~/entities/game/board'
 
@@ -29,9 +29,17 @@ export interface BeatPlan {
   cards: DiscardCard[]
 }
 
-// A card leaving a release slot names the slot it stood in. Reasons other than
-// these two never come out of the zone, so they are not searched for there.
-const FROM_RELEASE = new Set(['destroyed', 'neutralized'])
+// Reasons that CAN take a card out of a release slot — "can", not "always do".
+// Typed against the engine's own union rather than `string`, so renaming a reason
+// there is a compile error here instead of a movement that silently stops playing.
+//
+// `neutralized` is the reason this is a maybe: it has two producers and they are
+// not the same movement. `triggers.ts:211` is the sacrifice — a release and its
+// Code Review leaving the zone. `triggers.ts:184` is a Debugger played out of the
+// HAND to answer a 503, which is the ordinary case and never touches the zone at
+// all. So the zone is tried first and the hand is the fall-through; treating the
+// reason as decisive would have left the commoner of the two never animating.
+const FROM_RELEASE = new Set<DiscardReason>(['destroyed', 'neutralized'])
 
 // `ReleaseSlots` has no string index signature (it names its four keys
 // explicitly), so the lookup takes it by its own type rather than a generic
@@ -50,7 +58,11 @@ function sourceOf(
       ? before.you.release
       : before.opponents.find((o) => o.id === e.player)?.release
     const slot = release ? slotHolding(release, e.card) : null
-    return slot ? { kind: 'release', player: e.player, slot } : null
+    // Found in the zone: it left the zone. Not found: fall through and look
+    // where the card actually was — the reason narrows the search, it does not
+    // decide the answer. A Code Review attached to a destroyed release lives in
+    // `support`, not in `release`, and lands here too.
+    if (slot) return { kind: 'release', player: e.player, slot }
   }
   if (!mine) return { kind: 'seat', player: e.player }
   // `discarded` carries a card id, not a uid, so the slot is found by matching

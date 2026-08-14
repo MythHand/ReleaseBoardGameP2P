@@ -60,6 +60,13 @@ const discardEvent = {
 // hand the step a rect, not to be right about layout. What matters is that a
 // node exists for each anchor, because a MISSING one is the branch that drops a
 // card from the flight.
+//
+// `handSlotAt` deliberately does NOT hand back a detached div. It queries the
+// probe's real fan, exactly as the board's registry queries the real one, so it
+// answers null when the slot is gone. The first version of this stub returned a
+// fresh node on every call — which meant it measured the same whether the card
+// was still on screen or not, and hid a defect where the queue measured the
+// post-batch DOM and the local player's discard never flew at all.
 const node = () => document.createElement('div')
 const stub = {
   rail: { current: null },
@@ -75,7 +82,7 @@ const stub = {
   discardBox: { current: node() },
   seatOf: () => node(),
   seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
-  handSlotAt: () => node(),
+  handSlotAt: (i: number) => document.querySelectorAll<HTMLElement>('[data-hand-slot]')[i] ?? null,
   releaseSlot: () => node(),
   bindSeat: () => {},
   bindReleaseSlot: () => {},
@@ -103,9 +110,17 @@ function Probe({
   intro?: IntroBeat | null
 }) {
   const beats = useBeats({ live, events, anchors, enabled: true, intro })
+  const shown = beats.shadow ?? live
   return (
     <>
-      <div data-testid="hand">{(beats.shadow ?? live).you.hand.length}</div>
+      {/* The fan as the BOARD would render it — one slot per card of whichever
+          state is showing. This is what `handSlotAt` queries, so a queue that
+          measures before the shadow commits finds nothing here and the flight
+          is dropped, which is precisely the failure worth catching. */}
+      {shown.you.hand.map((c) => (
+        <div key={c.uid} data-hand-slot />
+      ))}
+      <div data-testid="hand">{shown.you.hand.length}</div>
       {/* The deck tells the three states apart where the hand cannot: preDeal
           and afterDiscard both have an empty fan, and only the deck count says
           whether the board is showing the opening's shadow or the projection. */}
@@ -128,6 +143,12 @@ const mount = (intro?: IntroBeat | null) => {
   return utils
 }
 
+// Let the queue get all the way through a beat. A beat now waits two animation
+// frames before measuring — that is the fix for measuring against the DOM the
+// batch left behind — and jsdom drives requestAnimationFrame on a real timer, so
+// flushing microtasks alone no longer reaches the other side of it.
+const flush = () => act(async () => void (await new Promise((r) => setTimeout(r, 80))))
+
 // An opening that reports when it is told to, so a test can watch the order.
 const introBeat = (log: string[], run?: () => Promise<void>): IntroBeat => ({
   key: 'g1',
@@ -145,7 +166,7 @@ it('never animates when motion is reduced', async () => {
   motion.reduced = true
   sent.calls = []
   const { getByTestId } = mount()
-  await act(async () => {})
+  await flush()
   expect(sent.calls).toEqual([])
   // Straight to the end state: the card is gone, no beat ever ran.
   expect(getByTestId('hand').textContent).toBe('0')
@@ -161,7 +182,7 @@ it('keeps the card in the fan while its beat runs', () => {
 it('hands the board back to the live projection when the queue drains', async () => {
   motion.reduced = false
   const { getByTestId } = mount()
-  await act(async () => {})
+  await flush()
   expect(getByTestId('hand').textContent).toBe('0')
 })
 
@@ -169,7 +190,7 @@ it('flies each card on the scatter the heap will rest it on', async () => {
   motion.reduced = false
   sent.calls = []
   mount()
-  await act(async () => {})
+  await flush()
   expect(sent.calls).toHaveLength(1)
   const [items] = sent.calls as [{ key: string; scatter: unknown }[]]
   expect(items).toHaveLength(1)
@@ -193,7 +214,14 @@ it('runs the opening before anything the wire brought in', async () => {
   const log: string[] = []
   sent.calls = []
   mount(introBeat(log))
-  await act(async () => {})
+  // Twice, and the reason is the point of the test: these are two beats in
+  // SEQUENCE. The opening drains inside the first window; only then does the
+  // queue re-arm and start the discard, which needs a frame window of its own to
+  // get past its wait-for-the-shadow. One flush would leave the second beat
+  // still standing at the gate — and the assertion below would read that as
+  // "the discard was dropped", which is the very thing it is here to disprove.
+  await flush()
+  await flush()
   // The opening went first, and the discard still happened — queued behind it,
   // not dropped in favour of it.
   expect(log).toEqual(['intro'])
@@ -215,7 +243,7 @@ it('holds the table and shows the opening’s own shadow while it runs', () => {
 it('hands the table back once the opening is over', async () => {
   motion.reduced = false
   const { getByTestId } = mount(introBeat([]))
-  await act(async () => {})
+  await flush()
   expect(getByTestId('exclusive').textContent).toBe('open')
 })
 
@@ -226,6 +254,6 @@ it('collapses the opening instead of running it when motion is reduced', async (
   motion.reduced = true
   const log: string[] = []
   mount(introBeat(log))
-  await act(async () => {})
+  await flush()
   expect(log).toEqual(['collapse'])
 })

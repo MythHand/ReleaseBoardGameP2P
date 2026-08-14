@@ -87,6 +87,19 @@ describe('planBeats', () => {
     expect(beat.cards[0].source).toEqual({ kind: 'release', player: 'p1', slot: 'frontend' })
   })
 
+  // `neutralized` has TWO producers and they are not the same movement: a
+  // sacrifice takes a release out of the zone, but a Debugger answering a 503 is
+  // played from the HAND and never touches the zone — and that is the commoner of
+  // the two. Treating the reason as decisive left it with no source at all, so it
+  // never animated. The reason narrows where to look first; it does not decide.
+  it('falls through to the hand when a neutralized card was never in the zone', () => {
+    const [beat] = planBeats(
+      [discarded(4, { card: 'protection-debugger', reason: 'neutralized' })],
+      boardBefore(),
+    )
+    expect(beat.cards[0].source).toEqual({ kind: 'hand', index: 1 })
+  })
+
   it('flies an opponent’s destroyed release out of their own slot', () => {
     const [beat] = planBeats(
       [discarded(4, { player: 'p2', card: 'release-backend', reason: 'destroyed' })],

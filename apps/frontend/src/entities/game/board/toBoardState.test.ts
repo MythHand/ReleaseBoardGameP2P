@@ -266,6 +266,31 @@ describe('the discard heap', () => {
     expect(heap.at(-1)).toMatchObject(scatterAt(-5))
   })
 
+  // The pile can EMPTY without the feed saying so card by card: refillFromDiscard
+  // recycles the whole discard into the deck and emits only `deckReshuffled`.
+  // The historical `discarded` events stay in the feed forever, so a fold that
+  // trusted them alone would keep drawing a stack over a counter reading zero —
+  // and because Pile renders a non-empty heap INSTEAD of the empty-zone slot, the
+  // "discard is empty" affordance would never come back for the rest of the match.
+  it('empties with the pile when the discard is recycled into the deck', () => {
+    const log = [discardedEvent(7, 'attack-bug'), discardedEvent(9, 'protection-debugger')]
+    const state = toBoardState(withDecks({ discardCount: 0, discardTop: undefined }), log, labels)
+    expect(state.decks.discardHeap).toEqual([])
+  })
+
+  // …and it can shrink without emptying: Cherry-pick takes cards back out.
+  it('never shows more cards than the pile says it holds', () => {
+    const log = [
+      discardedEvent(7, 'attack-bug'),
+      discardedEvent(9, 'protection-debugger'),
+      discardedEvent(11, 'attack-bug'),
+    ]
+    const heap =
+      toBoardState(withDecks({ discardCount: 1, discardTop: 'attack-bug' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap).toHaveLength(1)
+  })
+
   it('does not append a top the fold already ends on', () => {
     const log = [discardedEvent(7, 'attack-bug')]
     const heap =

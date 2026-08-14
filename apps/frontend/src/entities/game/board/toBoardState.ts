@@ -134,6 +134,15 @@ function toHistoryEntry(e: Event, labels: HistoryLabels): HistoryEntry {
 // present, a fold that does not end on the projection's top would leave a stale
 // card showing as the top of the discard — so the real top is appended.
 function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): HeapCard[] {
+  // The pile can EMPTY, and the feed does not say so card by card: a `discarded`
+  // event is never retracted, but `refillFromDiscard` recycles the whole pile
+  // back into the deck (emitting only `deckReshuffled`), and Cherry-pick takes
+  // cards out of it. The count is the projection's own and knows; the fold does
+  // not. Without this the heap would keep drawing cards over a counter reading
+  // zero — and `Pile` renders a non-empty heap INSTEAD of the empty-zone slot
+  // (Pile.tsx:76), so the "discard is empty" affordance would never come back
+  // for the rest of the match.
+  if (count === 0) return []
   const heap: HeapCard[] = []
   for (const e of log) {
     if (e.type !== 'discarded') continue
@@ -150,7 +159,10 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     // those are positive, so a stand-in can never inherit a real card's pose.
     heap.push({ uid: `top${count}`, card: top, ...scatterAt(-1 - count) })
   }
-  return heap.slice(-HEAP_SHOW)
+  // Never more cards than the pile says it holds: after a partial take the fold
+  // still remembers every card that ever went in, and a heap deeper than the
+  // count is a stack drawn over a number that contradicts it.
+  return heap.slice(-Math.min(HEAP_SHOW, count))
 }
 
 // The projection becomes a table: PlayerView + the event log + translated

@@ -1,7 +1,7 @@
 import type { Event } from '@release/engine'
 import { cardById } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
-import { scatterAt, useDiscardExit } from '@release/ui/animations'
+import { nextFrames, scatterAt, useDiscardExit } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
@@ -81,6 +81,13 @@ export function useBeats(args: {
   // How far into the feed the queue has already looked. Event ids are the
   // engine's own monotonic sequence, so this is a watermark and not a count —
   // a batch that arrives while a beat runs is picked up on the next pass.
+  //
+  // Monotonic WITHIN a match, and only within one: the engine seeds `eventSeq`
+  // afresh each game, so game two's ids all sit below game one's mark. The board
+  // is not remounted for a rematch, so without the reset below `fresh` would be
+  // empty for the whole second match and nothing would ever animate again. This
+  // is the same shape as the "once per peer" bug the opening had — a latch that
+  // outlived the thing it was latching.
   const seen = useRef(0)
   const queue = useRef<Beat[]>([])
   const draining = useRef(false)
@@ -111,7 +118,19 @@ export function useBeats(args: {
       base,
       exclusive: false,
       run: async () => {
-        // Measured now, against the shadow that is on screen — not at plan time.
+        // WAIT FOR THE SHADOW, THEN MEASURE — in that order, and the order is the
+        // whole point. `drain` starts this from inside a layout effect, so at
+        // entry React has committed the projection that ARRIVED: the card is
+        // already out of the fan and its slot with it. `setRunning` has only been
+        // scheduled — the shadow that puts the slot back is a commit away. Two
+        // frames is how we get to the other side of it (the same reason the
+        // carrier waits, I2), and only then is there anything honest to measure.
+        //
+        // Measuring before this yields `null` for a one-card hand (no flight at
+        // all) and the wrong slot for a larger one — and no test can see it,
+        // because a stub that hands back a detached node measures the same either
+        // way. `useBeats.test.tsx` queries the probe's real DOM for exactly this.
+        await nextFrames()
         const items = plan.cards.map(toLeaving).filter((it): it is Leaving => it != null)
         if (items.length > 0) await latest.current.send(items)
       },
@@ -119,12 +138,24 @@ export function useBeats(args: {
     [toLeaving],
   )
 
+  // The mount is going away: stop starting things. A beat already in flight
+  // finishes its own await chain — there is no way to pull it out of a wait() —
+  // but nothing after it runs, and nothing reaches for a node that is gone.
+  const alive = useRef(true)
+  useLayoutEffect(
+    () => () => {
+      alive.current = false
+      queue.current = []
+    },
+    [],
+  )
+
   const drain = useCallback(async () => {
     if (draining.current) return
     draining.current = true
     try {
       let next = queue.current.shift()
-      while (next) {
+      while (next && alive.current) {
         runningRef.current = next
         setRunning(next)
         // A beat that throws must not hold the board: the shadow is dropped in
@@ -178,23 +209,44 @@ export function useBeats(args: {
   // fly from is on the previous one, which is what is still on screen (I1).
   const settled = useRef(live)
 
+  // A new match: the feed starts over, so the watermark and the base must too.
+  // Declared BEFORE the batch effect so it runs first on the commit that brings
+  // the new match in — otherwise the batch effect would read a stale mark on the
+  // one pass where it matters most.
+  const playing = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const key = intro?.key ?? null
+    if (key == null || playing.current === key) return
+    playing.current = key
+    seen.current = 0
+    settled.current = live
+    queue.current = []
+  }, [intro?.key, live])
+
   // `running` is a dependency although the body reads the ref instead: it is
   // what re-arms this effect the moment the queue drains, so a batch that
   // arrived mid-beat is picked up on the next pass. That deferral is what makes
   // this a queue rather than a one-slot buffer.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `running` re-arms the effect on drain; the body reads `runningRef` because it must also see a beat this same pass started
   useLayoutEffect(() => {
+    // FIRST, before the running-beat guard: nothing here is to be animated, so
+    // the watermark keeps pace with the feed and `settled` with the projection.
+    // Order matters — the opening is an exclusive beat that occupies the queue
+    // for its whole run, so a guard placed above this would freeze both for the
+    // length of the opening, and the moment it drained the board would plan the
+    // entire accumulated feed against a pre-game table. That is exactly what
+    // this branch exists to prevent, and the start gate's cap makes it reachable
+    // rather than theoretical: a slow peer is released while still watching.
+    if (!enabled) {
+      seen.current = events.at(-1)?.id ?? seen.current
+      settled.current = live
+      return
+    }
     // A beat is up: the board is its shadow, and a batch arriving now waits its
     // turn rather than being planned against a state nobody can see.
     if (runningRef.current) return
     const before = settled.current
     settled.current = live
-    if (!enabled) {
-      // Nothing to animate into: keep the watermark level with the feed so a
-      // board that becomes enabled later does not replay everything at once.
-      seen.current = events.at(-1)?.id ?? seen.current
-      return
-    }
     const fresh = events.filter((e) => e.id > seen.current)
     if (fresh.length === 0) return
     seen.current = fresh.at(-1)?.id ?? seen.current

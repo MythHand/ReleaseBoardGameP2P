@@ -1,4 +1,4 @@
-import { CARD_W } from '@release/ui'
+import { CARD_RATIO, CARD_W } from '@release/ui'
 import { render } from '@testing-library/react'
 import { expect, it } from 'vitest'
 import type { BoardAnchors } from './anchors'
@@ -81,6 +81,12 @@ it('seatBox trims a seat to a centred card box (I6)', () => {
   const box = anchors.seatBox('p2')
   expect(box?.width).toBe(CARD_W)
   expect(box?.left).toBe(100 + (400 - CARD_W) / 2)
+  // BOTH axes, and the height. Asserting only the horizontal half would pass a
+  // seatBox that handed back the seat's own `top` — and a card aimed at that
+  // lands on the seat's upper edge instead of its middle. The height matters for
+  // the same reason: the box a flight scales to is a card, not a seat.
+  expect(box?.height).toBe(CARD_W * CARD_RATIO)
+  expect(box?.top).toBe(50 + (120 - CARD_W * CARD_RATIO) / 2)
   expect(anchors.seatBox('nobody')).toBeNull()
 })
 

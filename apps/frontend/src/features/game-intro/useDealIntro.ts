@@ -9,7 +9,7 @@ import { CARD_W, cardBoxIn, cardById } from '@release/ui'
 import type { Rect, Scatter } from '@release/ui/animations'
 import { play, scatterAt, useFlyer, useHandArrival, wait } from '@release/ui/animations'
 import type { ReactNode } from 'react'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
 import { isOpening } from './isOpening'
 import type { DealPlan } from './planDeal'
@@ -215,6 +215,23 @@ export function useDealIntro(args: {
     armedFor.current = gameKey
     reported.current = false
   }
+
+  // The board is going away mid-opening: cancel. `runId` is what every await in
+  // the sequence checks, so bumping it stops the run at its next beat — no
+  // play() against detached nodes, no setState on an unmounted tree, and no
+  // onDone reporting a seat that is no longer watching.
+  //
+  // This used to be the arming effect's cleanup; the arming effect is gone (the
+  // queue starts the opening now), so the cancellation needs a home of its own.
+  // It does NOT report: a peer leaving the board must not open the start gate.
+  useEffect(
+    () => () => {
+      runId.current += 1
+      drop()
+      settle()
+    },
+    [drop, settle],
+  )
 
   const sequence = useCallback(async () => {
     // Already over — a skip that landed before the queue got here. Nothing to
@@ -480,7 +497,15 @@ export function useDealIntro(args: {
             run: () =>
               new Promise<void>((resolve) => {
                 release.current = resolve
-                void sequence().then(settle)
+                // Settled on BOTH outcomes, deliberately. A rejection here — a
+                // WAAPI promise that rejects, a throw inside a beat — would
+                // otherwise skip the settle, and the queue's await would never
+                // return: the table would stay held, inert, for the life of the
+                // mount. A failure must cost the animation and nothing else.
+                void sequence().then(settle, (err) => {
+                  if (import.meta.env.DEV) console.error('[deal] the opening failed', err)
+                  settle()
+                })
               }),
             collapse: () => finishRef.current(),
           },

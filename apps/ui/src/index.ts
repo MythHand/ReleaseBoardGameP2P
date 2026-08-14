@@ -50,7 +50,9 @@ export { default as Badge } from './primitives/Badge'
 export type { ButtonProps, ButtonVariant, CopyButtonProps } from './primitives/Button'
 export { CopyButton, default as Button } from './primitives/Button'
 // Components (added/uncommented as Task 4 migrates each)
-export { cardBoxIn, default as Card } from './primitives/Card'
+// CARD_RATIO rides along with the box helpers: a consumer that aims a flight at
+// a card box needs the ratio to reason about the box it gets back.
+export { CARD_RATIO, cardBoxIn, default as Card } from './primitives/Card'
 export { default as CardPair } from './primitives/CardPair'
 export { default as Drawer } from './primitives/Drawer'
 export type { DropdownItem } from './primitives/Dropdown'
