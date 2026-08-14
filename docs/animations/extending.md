@@ -80,6 +80,15 @@ would close it — and raise it. A local workaround is invisible; a backlog entr
 - Update the playground **`Interaction audit`** page (the live status map, per the project Animations Rule)
   and add/adjust a story, so the animation has a visual source of truth. The **no-reinterpretation rule**
   requires a live reference — a preset with no on-screen showcase can't be verified.
+- **Three of those asks are enforced, so skipping them turns CI red rather than going unnoticed:** a
+  preset with no row in `reference.md` (`apps/ui/src/animations/docs.test.ts`); a module on the audit
+  page not mentioned in `reference.md`, and a scene in the Cards / Interactive groups not named as a
+  live reference in `recipes.md` (both `apps/playground/stories/docs.test.ts`). A scene that genuinely
+  owes no recipe is exempted **by name, with its reason**, in that file — not by quietly deleting the
+  expectation.
+- The one thing no test can see is a module that reached NEITHER the audit page nor the docs, since
+  every check compares two places with each other. That is why the audit page comes first: put it
+  there and the tests will drag it the rest of the way.
 
 ---
 

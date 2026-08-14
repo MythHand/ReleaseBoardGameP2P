@@ -271,9 +271,12 @@ ride above the fan briefly, then tuck under it and land at their slots' bottom-c
 - `Hand` gets BOTH `gapAt` and `gapSize` — a gap of one is the default, and a two-card arrival into a
   gap of one lands two cards on the same slot.
 
-**Sequence** (`arrive(items, handLength)`, inside the step)
-1. Guard `if (flights.length) return`. `gap = round(handLength / 2)` (the middle of the fan);
+**Sequence** (`arrive(items, handLength, at?)`, inside the step)
+1. Guard `if (flights.length) return`. `gap = at ?? round(handLength / 2)`, clamped to the hand;
    `total = handLength + items.length`; card `i` aims at `slotPlacement(gap + i, total)`.
+   **The middle is for an ARRIVAL, `at` is for a PLACEMENT.** A draw has no place of its own, so the
+   middle is honest and a draw and an undo read as one event. A card the player DRAGGED into the fan
+   has a place — the slot the pointer named — and landing it in the middle throws that away.
 2. Measure the hand rect `hr` — **[I1]**. Each card's source is resolved in one of three ways: its
    `from` rect; the element it IS (`el` — measured, then taken off screen for the flight); or one half
    of a pair (`el` + `anchor`, whose tilted bbox is trimmed with `cardBoxIn` — **[I6]**).
@@ -1257,18 +1260,33 @@ lands does the finished grid leave for the discard.
    slot's card box into that cell. The flight entry carries the source rect (`at`) so the flyer paints
    on the card from its first frame — **[I10]**. Several run **concurrently** — a flight must never
    gate the next drag (discarding is "think, then dump fast").
-3. The grid is held open (`GRID_HOLD`).
-4. The whole grid leaves through **`useDiscardExit`**: one entry per placed card, `node` = its cell
+3. **A card laid out is not yet discarded — it can be carried back.** Press one in the grid and it
+   comes off onto a flyer at the cursor: the cell is released back into the free set and the card
+   leaves `placed`, so the grid does not hold a hole where it was. While it travels the hand parts
+   **at the pointer** — `gapAt` driven from `slotAt(clientX)` whenever the cursor is over the band
+   (`BAND_PAD` above the fan, the same tolerance the hand itself uses), `gapSize` 1 — and the hand
+   is told `carrying`, so it offers nothing else: no lift, no zoom preview.
+   - Released over the band → `arrive([…], hand.length, slot)` with the slot the pointer named
+     (**not** the middle — see the arrivals recipe). Handing the gap from the scene to the step is
+     the same slot, so nothing shifts as one takes over from the other.
+   - Released anywhere else → `playToCenter` back into the cell it came from. It goes home rather
+     than snapping, because snapping reads as the drag having failed.
+4. The grid is held open (`GRID_HOLD`).
+5. The whole grid leaves through **`useDiscardExit`**: one entry per placed card, `node` = its cell
    element, `layer` = its slot, `delay` = `slot × CLEAR_STEP` — one by one, but as one movement.
 
 **Params & timings.** grid card width 150 / 132 / 116 px by row count · `GRID_HOLD` 1500 ms ·
-`CLEAR_STEP` 90 ms · flights `playToCenter` 480 ms.
+`CLEAR_STEP` 90 ms · flights `playToCenter` 480 ms · carry-back band `BAND_PAD` 32 px.
 
 **Invariants.** **I1** measure the cell before it unmounts · **I8** the card, its slot and its source
-rect come in as arguments (the sequence spans several awaits) · **I10** every concurrent flyer carries
-its own mount rect · a `runId` guard drops flights from a previous deal.
+rect come in as arguments (the sequence spans several awaits) — and the carry-back's drop slot is read
+through a **ref**, since its handlers are the closure they began with · **I10** every concurrent flyer
+carries its own mount rect · a `runId` guard drops flights from a previous deal.
 
-**End state & cleanup.** Cells released, `placed` cleared, grid size back to 0, the cards lie in the heap.
+**End state & cleanup.** Cells released, `placed` cleared, grid size back to 0, the cards lie in the
+heap. A carried-back card is in the hand again and its cell is free — the cells are tracked as a
+claimed SET rather than a count, or a card returning to the grid would take the next free cell instead
+of the one it left.
 
 **Live reference.** `Hand limit` (Cards group).
 
@@ -1486,7 +1504,9 @@ recipes — the movements are real and transcribed, only their rules-complete re
 ([#61](https://github.com/MythHand/ReleaseBoardGameP2P/issues/61)) is pending. That is a rules
 question, not an animation one.
 
-> Keeping this file complete is manual. The preset table in [`reference.md`](./reference.md) is
-> checked by a test (`apps/ui/src/animations/docs.test.ts`); a missing *recipe* has no machine
-> signal — a new scene in the playground means a new recipe here, and nothing but this line will
-> remind you.
+> This file no longer runs on memory. `apps/playground/stories/docs.test.ts` reads the playground
+> navigation and requires every scene in the **Cards** and **Interactive** groups to be named here
+> as a live reference, in backticks — the convention every recipe already ends with. Add a scene
+> and the test goes red until it has one. Two scenes are exempt by name, each with its reason next
+> to it: the audit page describes the modules rather than being one, and the `Animations` catalogue
+> is a preset per form, not a game moment.

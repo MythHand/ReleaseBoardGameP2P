@@ -109,7 +109,8 @@ destructure `overlay` and render it.
 
 | Name | Signature | What it does |
 |---|---|---|
-| `useHandArrival` | `useHandArrival(handRef, onLanded)` → `{ overlay, gapAt, gapSize, arrive, reset, busy, FLIGHT_MS }` | `arrive(items, handLength)` opens a gap for **any number** of cards in the MIDDLE of the fan and flies them all in; they ride over the fan and tuck under it at the end. `onLanded(gap, landed)` fires on landing and hands back what arrived — the scene splices its own items at that index |
+| `useHandArrival` | `useHandArrival(handRef, onLanded)` → `{ overlay, gapAt, gapSize, arrive, reset, busy, FLIGHT_MS }` | `arrive(items, handLength, at?)` opens a gap for **any number** of cards and flies them all in along `insertPath`, riding over the fan and tucking under it partway. `onLanded(gap, landed)` fires on landing and hands back what arrived — the scene splices its own items at that index |
+| `at?` | `number` | **which slot the gap opens at.** Without it, the MIDDLE of the fan — that is where a card ARRIVES: a draw comes off the deck with no place of its own, so the middle is the honest answer and a draw and the undo of a play read as the same event. Pass it only when the player POINTED at a place: dragging a card back off the table into the fan is a placement, not an arrival, and the middle would ignore what the hand just said |
 | `Arriving` | `{ key, card, faceDown?, from? \| el?, rot?, anchor? }` | `key` — the card's identity in the scene's hand (its uid), handed back on landing. `faceDown` — which side is up on the way in: a dealt card travels closed and is turned over only once the whole hand is in (Game Deal), a drawn or returned card is already known to its owner and flies open (the default). `from` — where it stands; `rot` — the tilt it rests at (the pivot difference is compensated, so the first frame does not jump); `el` — it IS an element on screen: the step measures it and takes it off screen for the flight; `el` + `anchor: 'main' \| 'aux'` — one half of a pair |
 
 ### Discard-exit — cards leave the table for the discard
@@ -171,7 +172,9 @@ drive any of the motion. Legality is the consumer's (engine's) answer — the Ha
 | `stateAt?` | `(index) => HandCardState` | `'idle' \| 'playable' \| 'selected' \| 'disabled'` — mirrors the engine's `playable`/`frozen`; `disabled` dims via the Hand's own transitioned filter |
 | `onPlay?` | `(uid, drop: HandPlayDrop) => boolean` | card dragged OUT of the hand; return `true` to accept (played), else it glides back |
 | `onReorder?` | `(uid, toIndex) => void` | card dragged WITHIN the hand — local reorder, never networked |
+| `carrying?` | `boolean` | **the pointer is already holding a card, outside the hand** — the scene carrying it says so. The hand then answers nothing to the cursor: no lift, no parting neighbours, no zoom preview. A hand reacting to a cursor that already holds a card reads as an offer to take a second one. Opt-in and not inferred, because AIMING is the opposite case: while the combo arrow picks a target, what the cursor is over is exactly the question being asked and the hand must keep answering. To show the carried card WHERE it would go, drive `gapAt` from the pointer — the same insert gap, so the fan parts while the card is still in the air |
 | `renderFace?` | `(item, ctx: HandFaceContext) => ReactNode` | override the default flat `Card` face |
+| `HandFaceContext` | `{ faceDown, tilt, width, state, accent?, tiltFrom? }` | everything the Hand computed for that slot's face. `tiltFrom` is set only for the card on the drag layer — the deflection it carried in the fan (see `useCardTilt`'s `from`); a custom `renderFace` that drops it loses the straightening and nothing else |
 | `HandPlayDrop` | `{ x, y, rect? }` | where a played card was released |
 
 Drag mode turns on when `onPlay` or `onReorder` is supplied. Tuning constants (`HOVER_LIFT`, `NEIGHBOR_PUSH`,
@@ -205,6 +208,67 @@ switch is made at the middle of that sweep, where the strip is at its smallest a
 - **The last slot goes straight in** — nobody on its right, nothing to tuck under, reach `0`.
 - The caller owns the clock (`Hand` plays the positions over `SETTLE_MS` at `--ease-soft` and switches
   the layer at `SWITCH_AT`) and owns the turn to `slotPlacement(...).rotate` along the way.
+
+---
+
+## Card preview — reading a card that stands on the table
+
+`apps/ui/src/table/CardPreview`. A card at the centre while a 503 comes out of the deck, an AI card
+resolves or somebody attacks you: it is on the table to be read, and it is 150px wide. This opens it
+large. A **block from the start** — eight scenes hold a card at the centre and the real `Table` will
+hold one too, so per scene it would have been the same thing written nine times.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `useCardPreview` | `useCardPreview()` → `{ slotProps, overlay }` | the whole block: a hook and one node |
+| `slotProps` | `slotProps(card, faceDown?)` → props | spread on a slot that holds a **readable** card. Pass `null`/`undefined` or `faceDown` and the slot is inert: a back has nothing to read, and somebody else's closed card has no identity to read even if we wanted one |
+| `overlay` | `ReactNode` | render inside the scene |
+
+- **Bound to a SLOT, not to "the card at the centre".** Defense Release has five — the release, its
+  cost, the attack, the defender's sudo, the cover — and each reads on its own.
+- **One fixed place on the right, never at the cursor.** A place the player learns instead of hunting
+  a popup, and one that cannot cover the centre where the game is happening.
+- **It opens the instant the pointer is on a card.** Nothing to wait for: the card is already on the
+  table and already being looked at. There is deliberately **no fade** — an appearance you wait out
+  is an appearance you read late.
+- **ONE rule closes it:** the pointer moved somewhere that is neither a readable slot nor the preview
+  (a `mousemove` on the window, plus a `closest()` on the two data attributes the block marks them
+  with). Two behaviours fall out of that for free, and both are wanted: a card can fly off to the
+  discard while it is being read and the reading **stays** until the hand moves (deliberately the
+  opposite of the hand's zoom, which must leave WITH its card so it stops covering the table); and
+  the pointer may rest **on the preview itself**, without which a preview standing over the discard
+  would close the moment the pointer reached it and reopen the moment it did.
+- **No hold before showing, and none blocking a neighbour.** Leaving a slot waits `GAP_MS` before
+  closing, because slots stand a few px apart and crossing that gap would blink the preview off and
+  straight back on. That delay is on the LEAVING only, and it is per pointer position — never a
+  blind period, or moving between two cards at the centre would stop answering.
+
+*Live reference:* `Card play`, `AI cards`, `Error 503`, `Defense Release`.
+
+---
+
+## The card face's own motion
+
+Not flights — what a card face does while it sits there. The engine is one, and both card shapes
+consume it (see `apps/ui/CLAUDE.md` for how `Card` and `CardParallax` split).
+
+| Name | Signature | What it does |
+|---|---|---|
+| `useCardTilt` | `useCardTilt({ tilt?, lift?, from? })` → `{ p, hover, transform, tiltRef, … }` | the tilt math in ONE place: pointer → deflection `p` (−0.5…0.5 per axis, which `ComposedFace` shifts each layer by), hover, and the ready `transform`. `tilt` runs the pointer parallax, `lift` the hover lift+scale — `Card` separates them, the previews tie both to `interactive` |
+| `from` | `{ x, y }` | the deflection the face **arrives** with, and straightens out of on mount. For a face that continues on a NEW instance — a card torn out of the fan onto the drag layer — which is otherwise born flat, so the straightening the tilt layer transitions through on every mouseleave never happens and the card cuts to flat in one frame. Attach `tiltRef` to the element the transform goes on: the handover needs a style flush between the two values, or the browser only ever sees the flat one |
+| `tiltFrom` | prop on `Card` / `CardParallax` | passes `from` through. Both ignore it when the screen-wide parallax is off — on such a screen the card this one continues was flat too |
+| `CardMotionProvider` | `<CardMotionProvider value={boolean}>` | **the screen-wide parallax switch.** Wrap a card-bearing subtree; `Card` and `CardParallax` read it. Default `true` — the parallax is the designed behaviour and a card without a provider keeps it |
+| `useCardMotion` | `useCardMotion()` → `boolean` | read it (only the two cards need to) |
+
+**Why a context and not a prop.** Turning the parallax off is a decision about a whole screen, not
+about one card — a player either wants faces to move or does not — and threading a flag through the
+hand, the seats, the piles and the release zone would put a display preference into every one of
+their APIs. It travels the way a card face's language does (`cardLang`), which is the precedent.
+
+**It switches the pointer parallax ONLY.** The hover lift stays: that answers "the cursor is on this
+card", which is feedback, not decoration. The composed face is not touched at all.
+
+*Live reference:* the `Table` screen's settings drawer.
 
 ---
 
