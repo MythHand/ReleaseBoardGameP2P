@@ -122,7 +122,6 @@ export function runDrawSequence(state: GameState, log: Log, at: number): GameSta
         card: card.id,
         pile: pileIndex,
         deckSize: main[pileIndex].length,
-        visibleTo: [owed.player],
       })
       next = setHand(advanced, owed.player, [...advanced.players[owed.player].hand, card])
     }

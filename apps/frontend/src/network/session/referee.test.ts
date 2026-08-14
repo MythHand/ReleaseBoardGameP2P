@@ -259,8 +259,10 @@ it('hides the drawn card from everyone but the drawer', () => {
   const drawnB = eventsB.find((e) => e.type === 'drawn')
 
   expect(drawnA).toBeDefined()
+  expect(drawnA?.type === 'drawn' ? drawnA.card : undefined).toBeDefined()
   // B learns a draw happened and the new deck size, never which card.
-  expect(drawnB).toBeUndefined()
+  expect(drawnB).toBeDefined()
+  expect(drawnB?.type === 'drawn' ? drawnB.card : undefined).toBeUndefined()
 })
 
 it('stamps the keeper`s clock, ignoring any time the peer supplies', () => {
