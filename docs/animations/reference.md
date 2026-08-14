@@ -185,7 +185,26 @@ The single source of fan geometry; `Hand` and `useHandArrival` compute slots fro
 |---|---|---|
 | `slotPlacement` | `slotPlacement(slot, total)` → `{ x, y, rotate, z }` | a slot's offset/tilt/z in a fan of `total` cards |
 | `handStep` | `handStep(n)` → `number` | horizontal pitch between cards for a hand of `n` (also re-exported from `@/table/Hand`) |
+| `insertPath` | `insertPath(from, to, slot, total)` → `Point[]` | the path a card takes INTO the fan: 25 positions evenly spaced along one curve, from where the card is to where the slot is. Both points are the **same reference point** of the card — `Hand` passes its top-left, `useHandArrival` passes the bottom-centre pivot it turns and scales about |
 | `CARD_W` | `150` | the canonical hand-card width |
+
+**`insertPath` is the fan's rule for being entered, not a nicety.** A card in the fan is drawn over its
+left neighbour and under its right one; a card on the cursor is over all of them. Landing between two
+cards therefore means one indivisible switch from "above the right neighbour" to "below" it, and made
+where the card stands still it hands over the whole overlap strip (`CARD_W` minus the step — 58px at
+eight cards, 96px at twenty) in a single frame. So the card comes round from the **left** and the
+switch is made at the middle of that sweep, where the strip is at its smallest and the card is moving.
+
+- **One curve, no waypoint.** A quadratic pulled toward a control point one step out to the left. A
+  waypoint would put a corner in the path and the card would stop dead mid-landing; a curve travels
+  half way to its control point, so one step of reach bulges half a step — the offset the switch wants.
+- **Where on the arc is read off the release height** (level with the slot → up to `40°` above it), so
+  releasing high and releasing level take visibly different lines in. Off the height *alone*: a rule
+  that also read which side of the slot the pointer was on would swing the whole curve on one pixel
+  of travel.
+- **The last slot goes straight in** — nobody on its right, nothing to tuck under, reach `0`.
+- The caller owns the clock (`Hand` plays the positions over `SETTLE_MS` at `--ease-soft` and switches
+  the layer at `SWITCH_AT`) and owns the turn to `slotPlacement(...).rotate` along the way.
 
 ---
 

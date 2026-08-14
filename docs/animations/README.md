@@ -80,7 +80,9 @@ the node:
 - **`useHandArrival`** — *cards arrive in the hand.* Any number, from any kind of source: a rect, a
   card resting at a tilt, an element already on screen, one half of a pair. The fan opens a gap for
   all of them in the MIDDLE and they tuck under it as they land. A draw and the undo of a play are
-  the same movement — that is why this is one step and not two.
+  the same movement — that is why this is one step and not two. The shape of the landing is not its
+  own: it comes into the fan along `insertPath`, the same rule `Hand` lands a dragged card by, since
+  going in between two cards is one situation whatever carried the card there.
 - **`useDiscardExit`** — *cards leave the table for the discard.* Any number: one by one but all
   at once. A pair splits into its two singles; one scatter drives both a card's flight and its
   rest; the table tilt unwinds in flight; the layer a card had decides the order it joins the heap.
@@ -211,10 +213,18 @@ teleports on screen.
   array it is appended to at the destination. Two flyers left on the same `z` fall back to
   document order, which is the order of the array you happened to build — so the card that lay
   underneath paints on top and the stack silently turns over mid-flight. The existing pieces all
-  follow this: the discard heap layers by its own index (`zIndex: i`), and `useHandArrival` /
-  `Hand.settleInto` set the flyer's `z` to the target slot's `z` **before** the flight, so the
-  card tucks into the fan at the right depth instead of riding over it. When a stack lands in the
-  heap, append **bottom-up**: the lowest card has to arrive first, or the heap inverts it.
+  follow this: the discard heap layers by its own index (`zIndex: i`), and a card entering the fan
+  takes the target slot's `z` **during** the flight, so it tucks in at the right depth instead of
+  riding over it. When a stack lands in the heap, append **bottom-up**: the lowest card has to
+  arrive first, or the heap inverts it.
+
+  *When* it takes that `z` is its own decision, and it is not "as early as possible". The switch is
+  indivisible — a card is above another card or it is not — so it hands over the whole strip where
+  the two overlap in one frame. Made on a card that is standing still, that strip (`CARD_W` minus
+  the fan's step: 58px at eight cards, 96px at twenty) simply changes owner, and the eye reads a
+  jump. Both places therefore switch **while the card moves and where the strip is smallest**:
+  `useHandArrival` holds the travel layer for `START_HIGH_MS` of its flight, and `Hand.settleInto`
+  waits for the apex of the sweep `insertPath` takes it round on (`SWITCH_AT`).
 - **I10 — A flyer carries the coordinates it mounts at.** A `position: fixed` node with no
   `left`/`top` paints at its **flow** position — the bottom of the page — for every frame that
   passes before the code gives it one. Setting them imperatively after `nextFrames()` *is* that

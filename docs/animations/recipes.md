@@ -280,10 +280,15 @@ ride above the fan briefly, then tuck under it and land at their slots' bottom-c
 3. A source resting at a tilt (`rot`) is mounted with the pivot difference compensated: the slot
    pivots on its bottom centre, a tilted card rests on its own centre, and without the shift the very
    first frame jumps by ~`h/2·sin(rot)`.
-4. `setFlights(list)`; `setGapAt(gap)` — the fan starts opening WHILE the cards travel; **double-rAF**
-   — **[I2]** → `started = true`; a `START_HIGH_MS` timer → `tucked = true`.
-5. Each overlay div: `zIndex = tucked ? place.z : 'var(--z-flight)'`; the move is a CSS transition on
-   `.arriving` (`FLIGHT_MS`).
+4. The flight is built from `insertPath(fromPt, toPt, gap + i, total)` (reference) — the fan's own rule
+   for being entered, so a card drawn from the deck and a card carried back off the table come into
+   the fan the same way. Both points are the card's **bottom centre** (the pivot it turns and scales
+   about); each position becomes a pose — translate along the path, `rot → place.rotate`, `scale 1 →
+   CARD_W / source.width`.
+5. `setFlights(list)`; `setGapAt(gap)` — the fan starts opening WHILE the cards travel; **double-rAF**
+   — **[I2]** → the poses are played on each flyer node (`FLIGHT_MS`, `FLIGHT_EASE`, `fill: forwards`);
+   a `START_HIGH_MS` timer → `tucked = true`, and each overlay div's
+   `zIndex = tucked ? place.z : 'var(--z-flight)'`.
 6. After `FLIGHT_MS`: `onLanded(gap, landed)` — the step hands back WHAT arrived (each entry's `key`
    is the card's uid), the scene splices its own items at `gap` — then `reset()`. Closing the gap and
    adding the cards is the same layout, so nothing shifts on the last frame.
@@ -291,7 +296,7 @@ ride above the fan briefly, then tuck under it and land at their slots' bottom-c
 **Params & timings**
 | Aspect | Value |
 |---|---|
-| flight | CSS transition on `.arriving`, `FLIGHT_MS = 480` |
+| flight | the `insertPath` positions played on the flyer node, `FLIGHT_MS = 480` at `FLIGHT_EASE` (= `--ease-soft`) |
 | travel-layer hold | `START_HIGH_MS = 140` (then z drops from `var(--z-flight)` to the slot's z) |
 | target size | `scale = CARD_W / source.width` (`CARD_W = 150`, the fan's card width) |
 | slot | `slotPlacement(gap + i, handLength + items.length)` from `@/table/Hand/fan` |
@@ -301,8 +306,11 @@ ride above the fan briefly, then tuck under it and land at their slots' bottom-c
   `started`, or the overlay jumps from its origin. **I6** a tilted half is trimmed to a card box.
 - **I8** do not read the scene's staging on landing — it is cleared the moment the flight starts (or
   the cards would be drawn twice); that is why the step hands back what arrived.
-- Local: this is **CSS-transition based, not a `play()` preset**. The gap and the flight are one
-  coordinated move — the fan must render `handLength + items.length` slots so the landing slots exist.
+- Local: this is **not a `play()` preset** — the flight is WAAPI keyframes built from `insertPath`,
+  because a curve is not something a transition can draw. The gap and the flight are one coordinated
+  move — the fan must render `handLength + items.length` slots so the landing slots exist.
+- A card enters the fan **by the fan's rule**, not by this step's own: being inserted between two
+  cards is one situation, whether the card came off the deck or out of the player's hand.
 
 **End state & cleanup**
 - `onLanded` splices the cards into `hand` at `gap`; the step resets (`gapAt = null`, flights cleared).
@@ -310,8 +318,8 @@ ride above the fan briefly, then tuck under it and land at their slots' bottom-c
 
 **Building blocks**
 [`useHandArrival`](./reference.md#hand-arrival--cards-arrive-in-the-hand) (**playground-local** — see
-the README "Current state" note) · `@/table/Hand/fan` (`slotPlacement`, `CARD_W`) · `Hand` (renders
-`gapAt` + `gapSize`).
+the README "Current state" note) · `@/table/Hand/fan` (`slotPlacement`, `insertPath`, `CARD_W`) ·
+`Hand` (renders `gapAt` + `gapSize`).
 
 **Live reference.** `Card to Hand` — a single card, and a Release with the Code Review laid with it
 arriving together.
@@ -750,16 +758,25 @@ the hand.
 1. `onSlotDown(i, el, e)`: without `dragEnabled` → `onCardClick` immediately. Else `e.preventDefault()` and arm
    window `mousemove`/`mouseup`: move past `DRAG_THRESHOLD` → `beginDrag(i, downX, downY)`; release before →
    `onCardClick` (a click).
-2. `beginDrag`: grab point from the **base fan** (`slotPlacement(i, n)`, not the enlarged hover pose, so pick-up
-   does not offset); `setHoveredUid(null)`; `setDrag`; `setPreview(inBand(downY) ? i : null)`.
-3. Drag effect (keyed on `drag`): `place()` sets the flyer `left/top` to `cursor - frac*CARD_W/H` on each
-   `mousemove`; `preview = inBand ? slotUnderCursor(x) : null`. The lifted card renders `null` in the fan; the
-   rest lay out with a gap at `preview`.
+2. `beginDrag`: grab point from where the card is **drawn**, not from its base slot — `slotPlacement(i, n)` less
+   `HOVER_LIFT`, since the card under the cursor is the hovered one and hover draws it that much higher.
+   Measured from the base, the card drops by exactly that the instant it leaves the fan. The grab fractions
+   double as the deflection the tilt engine was running on (`frac − 0.5`: the same cursor over the same card
+   box, one expressed as `0…1` and the other as `−0.5…0.5`), so they go into `drag.tiltFrom` and the flyer's
+   face straightens out of the tilt it had instead of being born flat. Then `setHoveredUid(null)`; `setDrag`;
+   `setPreview(inBand(downY) ? i : null)`.
+3. Drag effect (a **layout** effect keyed on `drag` — **I10**: the flyer mounts with no `left/top` of its own,
+   and a passive effect would place it only after the browser was free to paint that frame): `place()` sets the
+   flyer `left/top` to `cursor - frac*CARD_W/H` on each `mousemove`; `preview = inBand ? slotUnderCursor(x) :
+   null`. The lifted card renders `null` in the fan; the rest lay out with a gap at `preview`.
 4. On `mouseup`: inBand → `settleInto(slotUnderCursor(x), () => onReorder(uid, to))`; out of band →
    `onPlay(uid, {x, y, rect})` — `true` = played (gone), else `settleInto(originalIndex)` (never vanishes).
-5. `settleInto(target, commit?)`: hold the gap at `target`; drop the flyer's `zIndex` to the slot's `base.z` (so
-   it tucks BETWEEN cards); transition `left/top/transform` over `SETTLE_MS`, landing at the slot bottom-center
-   with `rotate(base.rotate)`; after `SETTLE_MS` run `commit`, clear `drag`/`preview`.
+5. `settleInto(target, commit?)`: hold the gap at `target`; take the shape of the landing from the fan —
+   `insertPath(from, to, target, n)` (reference), the card coming into its slot **round from the left** along
+   one curve with no corner in it. Play those positions as WAAPI keyframes over `SETTLE_MS` at `SETTLE_EASE`,
+   turning to `rotate(base.rotate)` along the way, `fill: 'forwards'`. At `SWITCH_AT` of that clock — the apex
+   of the sweep — drop the flyer's `zIndex` to the slot's `base.z`, so it goes UNDER its right neighbour where
+   the two overlap least and while it is moving. After `SETTLE_MS` run `commit`, clear `drag`/`preview`.
 6. Hover (no drag, `gapAt == null`): hovered slot `rotate → 0`, `y -= HOVER_LIFT`; neighbours `x += dir *
    NEIGHBOR_PUSH / distance`. No in-place scale, no top-layer jump.
 7. Zoom preview (layout effect on `hoveredUid`): skipped when `faceDown || drag || !hoveredUid`. Else size a card
@@ -771,7 +788,7 @@ the hand.
 |---|---|
 | drag threshold | `DRAG_THRESHOLD = 6` px |
 | hover lift / neighbour push | `HOVER_LIFT = 28` / `NEIGHBOR_PUSH = 36` px |
-| reorder / return glide | `SETTLE_MS = 340` ms, `var(--ease-out)` |
+| reorder / return landing | `SETTLE_MS = 460` ms at `SETTLE_EASE` (= `--ease-soft`), along `insertPath`; layer switch at `SWITCH_AT = 0.35` |
 | band tolerance above hand | `BAND_PAD = 32` px |
 | card width | `CARD_W = 150` (`CARD_WH = 368 / 515`) |
 | zoom clamp / air / gap | `ZOOM_MIN_H = 240` … `ZOOM_MAX_H = 460`; `ZOOM_TOP_AIR = 32`, `ZOOM_GAP = 44` |
@@ -783,7 +800,11 @@ the hand.
 - **The flyer's `transform-origin` is `bottom center`, matching `.slot`** — the settle rotation pivots exactly
   where the resting card does; otherwise the card micro-jumps on the last frame (worst off-centre).
 - Hover keyed by **uid**, not index — a removed card does not hand its hover to whatever slid into its index.
-- Pick-up geometry comes from the **base fan**, not the enlarged hover pose.
+- Pick-up geometry comes from where the card is **drawn** (hover lift included), so it does not move on being
+  grabbed; the tilt it carried goes with it and eases out, because the flyer's face is a NEW instance and a new
+  instance is born flat.
+- A card enters the fan **from the left** and changes layer at the apex of that sweep — see `insertPath`
+  (reference) for why an instant switch reads as a jump.
 - A rejected play returns via `settleInto` — the card never disappears into nothing.
 
 **End state & cleanup**
@@ -791,8 +812,9 @@ the hand.
   back in its original slot. `drag`/`preview` cleared; hover suppressed during drag.
 
 **Building blocks**
-`table/Hand/fan` (`slotPlacement`, `handStep`) · `@keyframes zoom-rise` (Hand.module.css). No `play()` preset —
-the flight is a CSS transition on the flyer.
+`table/Hand/fan` (`slotPlacement`, `handStep`, `insertPath`) · `useCardTilt`'s `from` (the tilt handover onto the
+flyer's face) · `@keyframes zoom-rise` (Hand.module.css). No `play()` preset — the landing is WAAPI keyframes
+built from `insertPath`, and the drag itself is inline `left/top` on the flyer.
 
 **Live reference**
 `Hand` — `apps/playground/stories/HandStory/HandStory.tsx` (and every interactive story that renders a hand).

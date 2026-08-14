@@ -3,7 +3,7 @@ import { Fragment, useLayoutEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import type { Deflection } from '@/cards/useCardTilt'
 import Card from '@/primitives/Card'
-import { CARD_W, handStep, slotPlacement } from './fan'
+import { CARD_W, handStep, insertPath, slotPlacement } from './fan'
 import styles from './Hand.module.css'
 
 // Геометрия веера (наклон/дуга/шаг/ширина) — в едином модуле ./fan.
@@ -25,7 +25,15 @@ const CARD_H = CARD_W / CARD_WH // card height at CARD_W — for the drag flyer
 const BAND_PAD = 32
 // how long a card takes to glide back into the hand (reorder settle / rejected
 // return) — a readable motion, not an instant snap
-const SETTLE_MS = 340
+const SETTLE_MS = 460
+// = --ease-soft. The animation takes a value, not a custom property.
+const SETTLE_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
+// Where along the landing the card drops into its slot's layer. Under that
+// easing the middle of the PATH plays at 0.35 of the CLOCK, and the middle of
+// the path is the apex of the sweep — the card at its furthest from its right
+// neighbour, and so the cheapest moment there is to change which is on top.
+// The shape of that sweep is the fan's rule, not the Hand's: see insertPath.
+const SWITCH_AT = 0.35
 // pointer travel (px) that turns a press into a drag; below it a release is a
 // click (→ onCardClick). Lets click-to-play (arrow flows) and drag coexist.
 const DRAG_THRESHOLD = 6
@@ -290,23 +298,44 @@ export default function Hand({
       place()
       setPreview(inBand(e.clientY) ? slotUnderCursor(e.clientX) : null)
     }
-    // glide the flyer into a hand slot, then commit — the "back into the hand"
-    // motion, used both for reordering and for returning a rejected play
+    // Land the flyer in a hand slot, then commit — the "back into the hand"
+    // motion, used both for reordering and for returning a rejected play.
+    //
+    // The shape of the landing is the fan's own rule (insertPath, in ./fan): the
+    // card comes into its slot round from the LEFT, along one curve with no
+    // corner in it. What belongs here is the clock — how long it takes, at what
+    // speed, and the one moment inside it where the card stops being the card on
+    // top and becomes the card between two others.
     const settleInto = (targetIndex: number, commit?: () => void) => {
       setPreview(targetIndex) // hold the gap where it lands
       const hr = handRef.current?.getBoundingClientRect()
       const el = flyerRef.current
-      if (hr && el) {
+      const g = grab.current
+      if (hr && el && g) {
         const base = slotPlacement(targetIndex, n)
-        // drop into the target slot's layer NOW, so it glides back BETWEEN the
-        // cards (tucks under the right neighbours) instead of riding on top
-        el.style.zIndex = `${base.z}`
-        el.style.transition =
-          `left ${SETTLE_MS}ms var(--ease-out), top ${SETTLE_MS}ms var(--ease-out), ` +
-          `transform ${SETTLE_MS}ms var(--ease-out)`
-        el.style.left = `${hr.left + hr.width / 2 + base.x - CARD_W / 2}px`
-        el.style.top = `${hr.bottom + base.y - CARD_H}px`
-        el.style.transform = `rotate(${base.rotate}deg)`
+        const from = {
+          x: cursor.current.x - g.fracX * CARD_W,
+          y: cursor.current.y - g.fracY * CARD_H,
+        }
+        const to = {
+          x: hr.left + hr.width / 2 + base.x - CARD_W / 2,
+          y: hr.bottom + base.y - CARD_H,
+        }
+        // the fan hands over positions; the card is carried through them by a
+        // translation, so it also has to turn to the slot's angle along the way
+        const path = insertPath(from, to, targetIndex, n)
+        const last = path.length - 1
+        const frames: Keyframe[] = path.map((p, i) => ({
+          transform:
+            `translate(${p.x - from.x}px, ${p.y - from.y}px) ` +
+            `rotate(${(base.rotate * i) / last}deg)`,
+        }))
+        el.style.left = `${from.x}px`
+        el.style.top = `${from.y}px`
+        el.animate(frames, { duration: SETTLE_MS, easing: SETTLE_EASE, fill: 'forwards' })
+        window.setTimeout(() => {
+          el.style.zIndex = `${base.z}`
+        }, SETTLE_MS * SWITCH_AT)
       }
       window.setTimeout(() => {
         commit?.()
