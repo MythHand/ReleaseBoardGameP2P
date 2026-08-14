@@ -447,13 +447,15 @@ export default function Board({
         </div>
       </div>
 
-      {/* the centre: the player's own cards gather here before they go into the
-          fan, each at its own scatter — a small heap, not a neat stack. It is
-          mounted for the whole of an intro-bearing mount (the sequencer aims at
-          it from its first layout effect) and is empty the rest of the time. */}
-      {intro && (
-        <div className={opening.centre} ref={anchors.centre}>
-          {deal.staged.map((s) => {
+      {/* the centre: where cards stand while the table is looking at them — the
+          player's own cards gather here during the opening, and every drawn card
+          stages here for the rest of the match. Mounted for the whole life of
+          the board, because a flight cannot aim at a node that is not there yet.
+          pointer-events: none — outside a beat it is an empty box and must not
+          catch clicks meant for the table. */}
+      <div className={opening.centre} data-board-centre ref={anchors.centre}>
+        {intro &&
+          deal.staged.map((s) => {
             const data = cardById(s.card)
             if (!data) return null
             return (
@@ -466,8 +468,7 @@ export default function Board({
               </div>
             )
           })}
-        </div>
-      )}
+      </div>
 
       <div className={kit.you}>
         {youEliminated ? (
