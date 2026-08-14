@@ -12,8 +12,13 @@ export interface EventBase {
 }
 
 export type Event = EventBase &
+  // `open` names the cards dealt face up — by the rules the Debugger is dealt
+  // openly, so it is public information, and the projection would otherwise
+  // drop it. Absent or empty means the whole hand travelled closed (a deck
+  // under-supplied with Debuggers deals some players five random cards; see
+  // fake/setup.ts).
   (
-    | { type: 'dealt'; player: PlayerId; count: number }
+    | { type: 'dealt'; player: PlayerId; count: number; open?: CardId[] }
     | { type: 'drawn'; player: PlayerId; card?: CardId; pile: number; deckSize: number }
     | { type: 'released'; player: PlayerId; slot: ReleaseSlot; card: CardId; codeReview?: CardId }
     | { type: 'placed'; player: PlayerId; card: CardId }

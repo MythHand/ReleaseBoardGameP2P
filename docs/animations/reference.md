@@ -96,9 +96,17 @@ card (not at a wider cell/seat) — invariant **I6**. The `CARD_RATIO` value is 
 
 ## The movement steps, and the carrier under them
 
-`apps/playground/stories/interactive/` — one step per **kind of movement**, not one generic flight
-engine. Each owns its rule and its geometry; under all of them sits one carrier that owns the node.
-A scene calls a step and passes what it has. Tuning constants are in the glossary.
+One step per **kind of movement**, not one generic flight engine. Each owns its rule and its
+geometry; under all of them sits one carrier that owns the node. A scene calls a step and passes
+what it has. Tuning constants are in the glossary.
+
+**Where they live.** `useHandArrival` and `useFlyer` are in `apps/ui/src/animations/`, imported as
+`@release/ui/animations` — the animation layer is its own entry point, separate from the components,
+because it is how a thing moves rather than a thing to render. They were moved there when the real
+board needed them too: each had been copied, the playground's scene and the frontend each holding
+one, and nothing kept the copies in step — which is the case the Animations Rule names. The
+remaining step, `useDiscardExit`, is still local to `apps/playground/stories/interactive/`; it has
+one consumer, and it moves the day a second appears.
 
 **Render what you take.** A step that is handed a RECT raises a flyer of its own, and that flyer
 lives in the step's `overlay`. A scene that forgets to render it gets no flight, no error and a card

@@ -122,7 +122,9 @@ it('opens on the first seat with nothing drawn or released', () => {
   expect(s.pending).toBeNull()
   expect(s.over).toBeNull()
   expect(s.eliminated).toEqual([])
-  expect(s.eventSeq).toBe(0)
+  // The deal reserves one event id per seated player (see createGame), so the
+  // counter starts past them, not at 0.
+  expect(s.eventSeq).toBe(s.seating.length)
 })
 
 it('leaves every release zone empty', () => {

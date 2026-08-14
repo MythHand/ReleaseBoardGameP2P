@@ -1,7 +1,7 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
-import { HEAP_SHOW, scatterAt } from '@/animations'
+import { HEAP_SHOW, scatterAt, useHandArrival } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
@@ -16,7 +16,6 @@ import TechBar from '../../controls/TechBar'
 import { TechButton, TechSwitch, TechToggle } from '../../controls/TechControls'
 import { reorderHand } from '../reorderHand'
 import { useDiscardExit } from '../useDiscardExit'
-import { useHandArrival } from '../useHandArrival'
 import styles from './GitCards.module.css'
 
 // "System Upgrade" — every OTHER player discards one card (their choice) to the

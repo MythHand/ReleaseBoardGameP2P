@@ -1,7 +1,7 @@
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { jitter, nextFrames, play, wait } from '@/animations'
+import { jitter, nextFrames, play, useFlyer, useHandArrival, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO } from '@/primitives/Card'
@@ -15,8 +15,6 @@ import { TechButton, TechHint } from '../controls/TechControls'
 import styles from './DeckAnimationsStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
-import { useFlyer } from './useFlyer'
-import { useHandArrival } from './useHandArrival'
 
 // A scene of deck operations. Triggers — playing cards from the hand (the Hand fan):
 // Git Branch — split; Git Branch + Sudo — split + the discard becomes a deck;

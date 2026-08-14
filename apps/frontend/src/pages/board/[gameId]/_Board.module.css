@@ -1,0 +1,74 @@
+/* The opening's own layers, and nothing else.
+ *
+ * Everything about where this screen's blocks SIT — position, size, z-order,
+ * spacing — comes from the kit's own stylesheet, which `_Board.tsx` imports
+ * directly (`@/table/Table/Table.module.css`). That is deliberate: the board is
+ * a fork of `@release/ui`'s Table, the playground is where this screen is
+ * designed and approved, and a copied stylesheet would let the two pictures
+ * drift a value at a time with nothing to catch it. Sharing the file makes the
+ * geometry one artefact rather than two.
+ *
+ * What lives here is only what the deal intro adds on top: layers that exist to
+ * be animated, and the centre the cards gather in. If a rule here starts
+ * describing where something sits rather than how it arrives, it belongs in the
+ * kit instead.
+ */
+
+/* The HUD background as one layer, so the opening can bring it in whole (the
+   hudIn preset drives its opacity) without touching the table's base fill. */
+.bgWrap {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+/* A block of the interface before its beat — not shown. From here the hudIn
+   preset carries it (fill: both holds both the wait before its turn and the
+   end state). The shift rides on an INNER node: on the blocks themselves
+   transform holds the positioning. The class is on only while the opening
+   plays — outside it the markup is exactly the same. */
+.enter {
+  opacity: 0;
+}
+
+/* The decks' column lives on an inner node: the kit's own `.decks` holds the
+   block centred, and the opening shifts this node instead. Only the stacking
+   is here; the position stays the kit's. */
+.deckStack {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* the centre of the table — a little ABOVE the geometric middle (42%, not 50%):
+   there it does not argue with the hand, nor with the preview that rises out of
+   it. The same value in every scene. Here the player's own cards gather in it
+   before they go into the fan. pointer-events: none — outside the deal it is an
+   empty box and must not catch clicks meant for the table. */
+.centre {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* a card of that heap — the same box, its own scatter (as in the discard) */
+.stagedCard {
+  position: absolute;
+  inset: 0;
+}
+
+/* the right-hand nav's layer: TabRail positions itself against the edge, and
+   this layer exists only to lead its arrival without touching that transform */
+.railLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.railLayer > * {
+  pointer-events: auto;
+}

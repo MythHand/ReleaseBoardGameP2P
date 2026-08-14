@@ -83,6 +83,70 @@ function openWindowFixture(start: Session): Session {
   return session
 }
 
+it('opens the feed with the deal rather than a blank', () => {
+  const { outgoing } = createSession({
+    gameId: 'g1',
+    keeperId: 'p1',
+    engine: createFakeEngine(),
+    seed: 7,
+    players: [
+      { playerId: 'p1', peerId: 'peer-1', name: 'One' },
+      { playerId: 'p2', peerId: 'peer-2', name: 'Two' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+
+  const syncs = outgoing.filter((o) => o.message.type === 'SYNC')
+  expect(syncs).toHaveLength(2)
+  for (const s of syncs) {
+    if (s.message.type !== 'SYNC') continue
+    const dealt = s.message.payload.events.filter((e) => e.type === 'dealt')
+    // The deal is public, so every seat hears about every seat's hand size.
+    expect(dealt).toHaveLength(2)
+  }
+})
+
+it('reserves the deal`s event ids and starts play right after them', () => {
+  const { session, outgoing } = createSession({
+    gameId: 'g1',
+    keeperId: 'p1',
+    engine: createFakeEngine(),
+    seed: 7,
+    players: [
+      { playerId: 'p1', peerId: 'peer-1', name: 'One' },
+      { playerId: 'p2', peerId: 'peer-2', name: 'Two' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+
+  const opening = outgoing.find((o) => o.message.type === 'SYNC')
+  const dealtIds =
+    opening?.message.type === 'SYNC'
+      ? opening.message.payload.events.filter((e) => e.type === 'dealt').map((e) => e.id)
+      : []
+  // Literal, not re-derived from seating length: this is the exact range the
+  // engine reserved (Task 5's `eventSeq: seating.length`), and the property
+  // under test is that nothing else lands in it and nothing after it repeats.
+  expect(dealtIds).toEqual([1, 2])
+
+  const { outgoing: played } = applyIntent(session, 'peer-1', { type: 'DRAW' }, 1_000)
+  const drawSync = played.find((o) => o.message.type === 'SYNC' && o.to === 'peer-1')
+  const drawnIds =
+    drawSync?.message.type === 'SYNC' ? drawSync.message.payload.events.map((e) => e.id) : []
+  // The reduce feed picks up immediately after the reserved deal range, with no
+  // gap and no overlap. Asserted on the FIRST id rather than the whole list: how
+  // many events one draw emits is the engine's business and has already changed
+  // once (a sequenced draw emits several), while the boundary is the property
+  // this test exists to hold.
+  expect(drawnIds[0]).toBe(3)
+  // Still contiguous among themselves, so nothing re-uses a reserved id.
+  expect(drawnIds).toEqual(drawnIds.map((_, i) => 3 + i))
+})
+
 it('announces the game and syncs every seat privately', () => {
   const { outgoing } = twoPlayerSession()
 

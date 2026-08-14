@@ -2,7 +2,7 @@ import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import type React from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { play, type Rect, restTransform, scatterAt, wait } from '@/animations'
+import { play, type Rect, restTransform, scatterAt, useFlyer, wait } from '@/animations'
 import { CARDS, CATEGORIES, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Badge from '@/primitives/Badge'
@@ -22,7 +22,6 @@ import { TechButton, TechToggle } from '../controls/TechControls'
 import styles from './Error503Story.module.css'
 import { reorderHand } from './reorderHand'
 import { type Leaving, useDiscardExit } from './useDiscardExit'
-import { useFlyer } from './useFlyer'
 
 // Error 503 — the player-turn story. From TurnDock 'draw' (no timer wired): the
 // player draws, Error 503 comes out of the deck to the centre and reveals to

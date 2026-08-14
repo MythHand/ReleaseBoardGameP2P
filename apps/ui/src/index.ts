@@ -1,6 +1,13 @@
 // Data + logic
-
-export { PRESETS, play, presetNames } from './animations'
+//
+// The animation layer is NOT re-exported here. It is a vocabulary and its steps
+// — how a thing moves — rather than a thing to render, so it has its own entry:
+//
+//   import { play, useFlyer } from '@release/ui/animations'
+//
+// Keeping it out of this barrel is what makes that a real boundary rather than
+// a naming convention: a component cannot drift into the animation layer by
+// autocomplete, and the layer's own dependencies stay visible.
 export {
   default as PresetAvatar,
   PRESET_AVATARS,
@@ -34,6 +41,7 @@ export type { Card as CardData, CardTag, Category, CategoryId } from './cards/ty
 export type { GameMode, GameModeCopy, GameModesCopy, Setup } from './game/modes'
 export { DEFAULT_SETUP, GAME_MODES } from './game/modes'
 export { NICKNAMES, randomNickname, sanitizeNickname } from './game/nicknames'
+export { default as GearIcon } from './icons/GearIcon'
 export type { Point } from './primitives/Arrow'
 export { centerOf, default as Arrow, useArrow } from './primitives/Arrow'
 export { default as Avatar } from './primitives/Avatar'
@@ -42,7 +50,7 @@ export { default as Badge } from './primitives/Badge'
 export type { ButtonProps, ButtonVariant, CopyButtonProps } from './primitives/Button'
 export { CopyButton, default as Button } from './primitives/Button'
 // Components (added/uncommented as Task 4 migrates each)
-export { default as Card } from './primitives/Card'
+export { cardBoxIn, default as Card } from './primitives/Card'
 export { default as CardPair } from './primitives/CardPair'
 export { default as Drawer } from './primitives/Drawer'
 export type { DropdownItem } from './primitives/Dropdown'
@@ -93,6 +101,8 @@ export { default as GameModes } from './table/GameModes'
 export { default as GameOver } from './table/GameOver'
 export type { GameOverCondition, GameOverCopy } from './table/GameOver/GameOver'
 export { default as Hand } from './table/Hand'
+export { CARD_W, type SlotPlacement, slotPlacement } from './table/Hand/fan'
+export type { HandItem } from './table/Hand/Hand'
 export { default as MoveHistory } from './table/MoveHistory'
 export type { HistoryEntry, MoveHistoryCopy } from './table/MoveHistory/MoveHistory'
 export { default as Participants } from './table/Participants'
@@ -102,6 +112,7 @@ export type { PauseGameCopy, PausePlayer } from './table/PauseGame/PauseGame'
 export type { ReconnectCopy } from './table/Reconnect'
 export { default as Reconnect } from './table/Reconnect'
 export { default as ReleaseZone } from './table/ReleaseZone'
+export type { ReleaseSlots } from './table/ReleaseZone/ReleaseZone'
 export { default as Seat } from './table/Seat'
 export type { SeatCopy } from './table/Seat/Seat'
 export { default as Table } from './table/Table'
@@ -114,9 +125,17 @@ export type {
   TableTarget,
   TableWindow,
 } from './table/Table/intents'
+export {
+  default as PendingPrompt,
+  type PendingPromptCopy,
+  type PendingPromptProps,
+  type WindowCopy,
+} from './table/Table/PendingPrompt'
 export type {
+  Panel,
   TableChromeCopy as TableCopy,
   TableCopyBundle,
+  TableOpponent,
   TableOver,
   TableProps,
   TableRoom,

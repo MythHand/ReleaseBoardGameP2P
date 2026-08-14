@@ -1,9 +1,10 @@
 import type { RefObject } from 'react'
 import { useRef, useState } from 'react'
-import { nextFrames, type Rect, wait } from '@/animations'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardBoxIn } from '@/primitives/Card'
 import { CARD_W, insertPath, slotPlacement } from '@/table/Hand/fan'
+import type { Rect } from './scatter'
+import { nextFrames, wait } from './timing'
 import styles from './useHandArrival.module.css'
 
 // THE step "cards arrive in the hand" — one movement, any number of cards.

@@ -18,6 +18,7 @@ export default defineConfig({
   plugins: [react(), svgr()],
   resolve: {
     alias: [
+      { find: '@release/ui/animations', replacement: `${uiSrc}/animations/index.ts` },
       { find: '@release/ui', replacement: `${uiSrc}/index.ts` },
       { find: '@release/translation', replacement: translationSrc },
       { find: '@', replacement: uiSrc },

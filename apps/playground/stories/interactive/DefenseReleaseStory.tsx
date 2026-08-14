@@ -8,6 +8,8 @@ import {
   restTransform,
   type Scatter,
   scatterAt,
+  useFlyer,
+  useHandArrival,
   wait,
 } from '@/animations'
 import { CARDS, cardById } from '@/cards'
@@ -32,8 +34,6 @@ import { TechButton, TechHint, TechToggle } from '../controls/TechControls'
 import styles from './DefenseReleaseStory.module.css'
 import { reorderHand } from './reorderHand'
 import { type Leaving, useDiscardExit } from './useDiscardExit'
-import { useFlyer } from './useFlyer'
-import { useHandArrival } from './useHandArrival'
 
 // Defense Release — playing a Release and defending it.
 //

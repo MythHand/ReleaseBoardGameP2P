@@ -220,7 +220,8 @@
     "pass": "pass",
     "drawn": "draw ✓",
     "locked": "PUSH after draw",
-    "canDefend": "you can defend"
+    "canDefend": "you can defend",
+    "gameStart": "game start"
   },
   "pending": {
     "confirm": "confirm",

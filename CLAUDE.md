@@ -49,7 +49,8 @@ additive to this one — read the relevant one before editing inside that app.
 - TypeScript, React 19 (peer dep)
 - CSS Modules for component styles
 - Design tokens as CSS custom properties (`src/design/tokens.css`, `src/design/global.css`)
-- Exports: `@release/ui` → `src/index.ts`, `@release/ui/tokens.css`, `@release/ui/global.css`
+- Exports: `@release/ui` → `src/index.ts`, `@release/ui/animations` → `src/animations/index.ts`, `@release/ui/tokens.css`, `@release/ui/global.css`
+- **The animation layer is a separate entry point.** `@release/ui` is things to render; `@release/ui/animations` is how a thing moves — the preset vocabulary, the timing/scatter helpers, and the flight steps (`useFlyer`, `useHandArrival`). It is deliberately NOT re-exported from the component barrel, so the boundary is real rather than a naming convention. Inside `apps/ui`, a component reaches for a leaf module (`@/animations/play`) rather than the barrel: the barrel carries the steps, and the steps render components.
 - No i18n dependency — all copy is received via props
 
 ### `@release/playground`
@@ -185,6 +186,7 @@ Both `@release/web` and `@release/playground` import `@release/ui` directly from
 | Import | Resolves to |
 |---|---|
 | `@release/ui` | `apps/ui/src/index.ts` |
+| `@release/ui/animations` | `apps/ui/src/animations/index.ts` |
 | `@release/ui/global.css` | `apps/ui/src/design/global.css` |
 | `@release/ui/tokens.css` | `apps/ui/src/design/tokens.css` |
 

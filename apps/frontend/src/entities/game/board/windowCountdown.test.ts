@@ -2,7 +2,7 @@ import type { Action, CardInstance, Event, GameState } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { deriveDock, isCounting } from '@release/ui'
 import { describe, expect, it } from 'vitest'
-import { type HistoryLabels, toTableState } from './toTableState'
+import { type HistoryLabels, toBoardState } from './toBoardState'
 
 // Every other test in this chain builds its reaction window by hand, so the
 // shape the kit is asserted against is the shape someone believed the engine
@@ -76,7 +76,7 @@ describe('a reaction window the engine actually opened', () => {
     const view = createFakeEngine().project(state, responder)
     expect(view.window).toBeTruthy()
 
-    const table = toTableState(view, [] as Event[], labels)
+    const table = toBoardState(view, [] as Event[], labels)
 
     // The adapter passes `window` straight through, so nothing here would fail
     // to compile if a bound went missing — and a missing bound is silent, since
@@ -88,7 +88,7 @@ describe('a reaction window the engine actually opened', () => {
   it('offers the responder something to throw, so a ring is drawn at all', () => {
     const { state, responder } = openWindowByPlayingARelease()
     const view = createFakeEngine().project(state, responder)
-    const table = toTableState(view, [] as Event[], labels)
+    const table = toBoardState(view, [] as Event[], labels)
 
     // deriveDock ignores a window with an empty `canAttackWith`, which is a real
     // state — a responder holding none of the four release attacks is owed a
@@ -101,7 +101,7 @@ describe('a reaction window the engine actually opened', () => {
   it('counts down from the clock it is given', () => {
     const { state, responder } = openWindowByPlayingARelease()
     const view = createFakeEngine().project(state, responder)
-    const table = toTableState(view, [] as Event[], labels)
+    const table = toBoardState(view, [] as Event[], labels)
 
     // Exact rather than approximate: the clock is a parameter, so no wall-clock
     // slack enters and the arithmetic is pinned to the engine's own bounds.
@@ -113,7 +113,7 @@ describe('a reaction window the engine actually opened', () => {
   it('reads zero once the deadline passes, which is not the same as no clock', () => {
     const { state, responder } = openWindowByPlayingARelease()
     const view = createFakeEngine().project(state, responder)
-    const table = toTableState(view, [] as Event[], labels)
+    const table = toBoardState(view, [] as Event[], labels)
 
     // An expired window still has a clock, so 0 here is a real reading and the
     // ring shows it. Absence is reserved for states that carry no deadline —

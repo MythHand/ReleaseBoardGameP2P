@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { useCallback, useRef, useState } from 'react'
-import { nextFrames, type Rect, wait } from '@/animations'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
+import type { Rect } from './scatter'
+import { nextFrames, wait } from './timing'
 import styles from './useFlyer.module.css'
 
 // THE carrier of a card in the air — the half of a flight that is NOT the rule.

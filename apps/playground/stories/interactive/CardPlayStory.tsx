@@ -3,7 +3,7 @@ import ruCommon from '@release/translation/locales/ru/common.json'
 import type { CardData } from '@release/ui'
 import type React from 'react'
 import { useRef, useState } from 'react'
-import { play } from '@/animations'
+import { play, useFlyer } from '@/animations'
 import { CARDS } from '@/cards'
 import Card, { cardBoxIn } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
@@ -19,7 +19,6 @@ import { TechButton, TechHint } from '../controls/TechControls'
 import styles from './CardPlayStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
-import { useFlyer } from './useFlyer'
 
 // Showcase of two reusable card-play presets:
 //   part 1 — hand/opponent → table center (the playToCenter preset),

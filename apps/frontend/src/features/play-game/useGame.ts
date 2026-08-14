@@ -51,9 +51,25 @@ export function useGame(): Game {
   // the connection it arrived on, so a peer cannot act for another seat.
   const submit = (intent: Intent) => link?.submit(intent)
 
+  // `events` is one commit behind `view`: the effect above folds a sync into the
+  // running feed only after the render that first saw it. The board's deal intro
+  // arms in a *layout* effect, which runs before that — so on the very commit the
+  // opening projection arrives it would read an empty feed, conclude there was no
+  // deal, and finish before a card ever flew. Folding the unseen sync in here
+  // makes the feed and the projection describe the same moment.
+  //
+  // No double-count: once the effect has run, `seenSync` holds this sync and its
+  // events are already in `events`, so nothing is pending.
+  const pending = sync && sync !== seenSync.current ? sync.events : []
+  // `events` is likewise cleared by an effect, so for one commit after a new game
+  // starts it still holds the last one's feed. Read as empty here rather than
+  // handing the new game a history it did not have — the seat ids repeat between
+  // games, so a stale `dealt` would otherwise be taken for this game's deal.
+  const carried = seenGame.current === gameId ? events : []
+
   return {
     view: sync?.view ?? null,
-    events,
+    events: pending.length > 0 ? [...carried, ...pending] : carried,
     play: (card, target, combo) => submit({ type: 'PLAY', card, target, combo }),
     draw: (pile) => submit({ type: 'DRAW', pile }),
     push: () => submit({ type: 'PUSH' }),

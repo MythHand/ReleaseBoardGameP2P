@@ -1,7 +1,7 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useEffect, useRef, useState } from 'react'
-import { play, scatterAt } from '@/animations'
+import { play, scatterAt, useFlyer } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
@@ -23,7 +23,6 @@ import TechBar from '../controls/TechBar'
 import { TechButton, TechHint } from '../controls/TechControls'
 import styles from './GameEndStory.module.css'
 import { reorderHand } from './reorderHand'
-import { useFlyer } from './useFlyer'
 
 // The last move of a match. Two of the player's three slots are closed, the
 // third release is in hand — pull it out of the fan and the game is over:

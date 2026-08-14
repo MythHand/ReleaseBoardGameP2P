@@ -1,7 +1,7 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useMemo, useRef, useState } from 'react'
-import { jitter, play, type Scatter, wait } from '@/animations'
+import { jitter, play, type Scatter, useFlyer, useHandArrival, wait } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf, cardBoxIn } from '@/primitives/Card'
@@ -19,8 +19,6 @@ import { TechButton } from '../controls/TechControls'
 import styles from './DrawCardStory.module.css'
 import { reorderHand } from './reorderHand'
 import { useDiscardExit } from './useDiscardExit'
-import { useFlyer } from './useFlyer'
-import { useHandArrival } from './useHandArrival'
 
 type Loc = Record<Lang, string>
 

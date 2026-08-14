@@ -1,12 +1,13 @@
 import type { Event } from '@release/engine'
-import { toTableOver, toTableState } from '@release/table-adapter'
 import { useTranslation } from '@release/translation'
-import { DEFAULT_SETUP, isCounting, Table } from '@release/ui'
+import { DEFAULT_SETUP, isCounting } from '@release/ui'
 import { Outlet, useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
+import { toBoardOver, toBoardState } from '~/entities/game/board'
 import { seatsFor } from '~/entities/game/seats'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
+import Board from './_Board'
 import styles from './_layout.module.css'
 
 // What the table shows before the first projection arrives — a beat on a live
@@ -42,6 +43,16 @@ export default function BoardPage() {
   const participants = peers.filter((p) => p.role === 'host' || p.role === 'player')
   const spectators = peers.filter((p) => p.role === 'guest')
 
+  // Whether this peer holds a seat — the same split, asked about ourselves.
+  // Only a seated peer is ever projected to, so only a seated peer gets the
+  // opening: a spectator's `game.view` is null for the whole match, the intro
+  // could never report done, and the board would sit behind its entering state
+  // (every block at opacity 0) for good. The question has to be asked HERE and
+  // not inside the board off `view`: a seated peer's first frame has no
+  // projection either, and unhiding on that would flash the table open and shut
+  // at every real game start.
+  const seated = participants.some((p) => p.id === session.state?.selfId)
+
   // `toTableOver` renames the engine's `over.winner` — a playerId minted as
   // p1..pN (see ~/entities/game/seats) — but Table.tsx resolves `over.winnerId`
   // against `room.participants`, which are peers keyed by *peer* id. PlayerId
@@ -55,7 +66,7 @@ export default function BoardPage() {
   // quietly, so a miss yields no id at all and says so where a developer will
   // see it. The complaint is what catches the next id crossing too.
   const seats = seatsFor(session.state?.peers ?? {})
-  const engineOver = game.view ? toTableOver(game.view) : null
+  const engineOver = game.view ? toBoardOver(game.view) : null
   const winnerSeat = engineOver ? seats.find((s) => s.playerId === engineOver.winnerId) : undefined
   if (engineOver && !winnerSeat && import.meta.env.DEV) {
     console.error(
@@ -68,7 +79,7 @@ export default function BoardPage() {
   // (the draw badge, the elimination suffix), `historyLabels` is one label per
   // member of the engine's Event union for the adapter to map onto.
   const labels = t('historyLabels', { returnObjects: true }) as Record<Event['type'], string>
-  const state = game.view ? toTableState(game.view, game.events, labels) : EMPTY_TABLE
+  const state = game.view ? toBoardState(game.view, game.events, labels) : EMPTY_TABLE
 
   // The clock runs only while the dock actually draws a counting ring, so it is
   // asked from the same predicate the ring is derived from. Restating that rule
@@ -78,10 +89,23 @@ export default function BoardPage() {
 
   return (
     <div className={styles.page} data-testid="board-page">
-      <Table
+      <Board
         state={state}
         over={over}
         now={now}
+        // The opening — for a seated peer only (see `seated` above). `onDone`
+        // reports this seat to the host's start gate: until every seat has
+        // reported (or the cap fires), no peer's action may reach the engine.
+        intro={
+          seated
+            ? {
+                gameId: session.gameId,
+                view: game.view,
+                events: game.events,
+                onDone: session.introReady,
+              }
+            : undefined
+        }
         room={{
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,

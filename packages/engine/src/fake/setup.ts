@@ -1,5 +1,6 @@
 import { SUPPORTED } from '../cards'
 import type { DeckEntry, GameConfig } from '../engine'
+import type { Event } from '../events'
 import { shuffle } from '../rng'
 import { normalizeSetup } from '../setup-contract'
 import type { CardId, CardInstance, GameState, PlayerId, PlayerState } from '../state'
@@ -76,6 +77,10 @@ export function createGame(config: GameConfig): GameState {
       release: {},
       frozen: [],
       replayLocked: [],
+      // Only the reserved Debugger is dealt openly. A seat that got none — an
+      // under-supplied deck — has nothing face up, even if a surplus Debugger
+      // happened to come off `rest` into this hand.
+      openedAtDeal: dbg ? [dbg.uid] : [],
     }
   }
 
@@ -91,7 +96,13 @@ export function createGame(config: GameConfig): GameState {
     gameId: config.gameId,
     seed,
     rngCursor: cursor,
-    eventSeq: 0,
+    // The deal genuinely consumes the first `seating.length` event ids — one
+    // `dealt` per player, numbered 1..N by `setupEvents` below — so the
+    // returned state's counter starts past them. Without this, `reduce`'s
+    // first committed event (via `createLog(state.eventSeq)`) would reuse id 1
+    // and collide with the deal's own id 1, which breaks once both feeds are
+    // merged into one history (the `parent` field is an event id).
+    eventSeq: seating.length,
     seating,
     players,
     eliminated: [],
@@ -104,4 +115,36 @@ export function createGame(config: GameConfig): GameState {
     ignored: { cards: dropped, setup: normalized.ignored },
     over: null,
   }
+}
+
+// The deal, as events. `createGame` returns a bare GameState — it is called from
+// two dozen places that want only the state — so the opening feed is a separate
+// pure derivation over that state rather than a second return value.
+//
+// Every field here is public: a count is not a secret, and `open` names only
+// what the rules deal face up. The closed four are never identified.
+//
+// Ids 1..seating.length: `createGame` reserves exactly this many ids for the
+// deal (see its `eventSeq` above) before `reduce`'s own `createLog` starts
+// counting from there, so the two feeds are disjoint and mergeable.
+export function setupEvents(state: GameState): Event[] {
+  return state.seating.map((id, n) => {
+    const { hand, openedAtDeal } = state.players[id]
+    // Read from what was actually dealt openly, never inferred from the hand's
+    // contents: with fewer Debuggers in the deck than players, a seat gets five
+    // random cards and a surplus Debugger can land first among them. Asking "is
+    // hand[0] a Debugger?" would then announce a closed card to the whole table
+    // as face up — the intro would show everyone a card it must not.
+    const openCards = openedAtDeal
+      .map((uid) => hand.find((c) => c.uid === uid)?.id)
+      .filter((cardId): cardId is CardId => cardId !== undefined)
+    const open = openCards.length > 0 ? openCards : undefined
+    return {
+      id: n + 1,
+      type: 'dealt' as const,
+      player: id,
+      count: hand.length,
+      ...(open ? { open } : {}),
+    }
+  })
 }

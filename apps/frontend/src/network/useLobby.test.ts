@@ -1,7 +1,8 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, vi } from 'vitest'
-import type { WireMessage } from './types'
-import { formatRoomCode, makeRoomCode, parseRoomCode, useLobby } from './useLobby'
+import { INTRO_CAP_MS } from './session/startGate'
+import type { Message, WireMessage } from './types'
+import { formatRoomCode, makeRoomCode, parseRoomCode, type UseLobby, useLobby } from './useLobby'
 
 // Every fake transport createTransport hands out, with the callbacks useLobby
 // passed in — so a test can fire an error or a disconnect by hand.
@@ -9,6 +10,7 @@ interface FakeTransport {
   id: string
   close: ReturnType<typeof vi.fn>
   broadcast: ReturnType<typeof vi.fn>
+  send: ReturnType<typeof vi.fn>
   onError?: (err: { type?: string; message: string }) => void
   onConnection?: (peerId: string) => void
   onDisconnect?: (peerId: string) => void
@@ -246,4 +248,176 @@ it('forgets the game id when the session is torn down', async () => {
   })
   // A stale id would bounce the player straight back to the board they left.
   expect(result.current.gameId).toBeNull()
+})
+
+// --- reporting the opening deal is done ---
+
+// Every frame the hook addressed to a single peer, in order.
+function sentTo(peerId: string): Message[] {
+  return transports[0].send.mock.calls
+    .filter((call) => call[0] === peerId)
+    .map((call) => call[1] as Message)
+}
+
+// Everything that left this peer at all — targeted or broadcast.
+function sentAll(): Message[] {
+  const t = transports[0]
+  if (!t) return []
+  return [
+    ...t.send.mock.calls.map((call) => call[1] as Message),
+    ...t.broadcast.mock.calls.map((call) => call[0] as Message),
+  ]
+}
+
+// A hosted lobby with one other seated player. The guest's peer id sorts after
+// the host's ('peer0'), so the host takes seat p1 and holds the opening turn —
+// otherwise the intent below would be rejected for being out of turn and prove
+// nothing about the gate.
+const GUEST = 'zguest'
+
+async function hostWithGuest(): Promise<ReturnType<typeof renderHook<UseLobby, unknown>>> {
+  const rendered = renderHook(() => useLobby())
+  await act(async () => {
+    await rendered.result.current.createRoom('Dimbo', 6)
+  })
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo' },
+      from: GUEST,
+    } as WireMessage)
+  })
+  return rendered
+}
+
+it('host builds the game behind a gate covering every seat', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+  const syncs = () => sentTo(GUEST).filter((m) => m.type === 'SYNC').length
+  // The deal's own projection, and nothing else yet.
+  expect(syncs()).toBe(1)
+
+  // A legitimate action from the host's own seat: buffered, not applied, because
+  // the table is still watching its cards fly.
+  act(() => {
+    result.current.gameLink?.submit({ type: 'DRAW' })
+  })
+  expect(syncs()).toBe(1)
+
+  // The host's own seat reports — it is in the gate's expect list like any
+  // other, so the table does not move for it alone.
+  act(() => {
+    result.current.introReady()
+  })
+  expect(syncs()).toBe(1)
+
+  // The last seat reports, off the wire, and the buffered action lands.
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'INTRO_READY',
+      payload: { gameId: result.current.gameId },
+      from: GUEST,
+    } as WireMessage)
+  })
+  expect(syncs()).toBe(2)
+})
+
+it('the opening projection carries the deal to every seat', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+
+  // Asserted on what actually left this peer, not on `createSession`'s return
+  // value: production discards that array and delivers through the keeper, so a
+  // test reading it passed for a fortnight while no peer ever received a deal.
+  const guestSync = sentTo(GUEST).find((m) => m.type === 'SYNC')
+  expect(guestSync).toBeDefined()
+  const dealt = guestSync?.type === 'SYNC' ? guestSync.payload.events : []
+  // One per seat, and public — a hand count is not a secret, so the guest hears
+  // about the host's deal as well as its own.
+  expect(dealt.filter((e) => e.type === 'dealt')).toHaveLength(2)
+  // The ids the engine reserved for the deal (createGame returns
+  // eventSeq: seating.length, so play starts at N+1).
+  expect(dealt.map((e) => e.id)).toEqual([1, 2])
+})
+
+it('gives the local seat its deal too, not only the wire', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+  // The host's own seat is served through its local link rather than a
+  // connection to itself, so it is a separate delivery path and a separate way
+  // for the deal to go missing.
+  const sync = result.current.gameSync
+  expect(sync).toBeTruthy()
+  expect(sync?.events.filter((e) => e.type === 'dealt')).toHaveLength(2)
+})
+
+it('a guest tells the host when its intro is done', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: hostId },
+      from: hostId,
+    } as WireMessage)
+  })
+
+  act(() => {
+    result.current.introReady()
+  })
+
+  expect(sentTo(hostId)).toContainEqual({ type: 'INTRO_READY', payload: { gameId: hostId } })
+})
+
+it('reporting ready outside a game is a no-op', async () => {
+  // In a lobby, with a live transport and a host to address: only the absence of
+  // a game keeps the frame from being sent.
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const before = sentAll().length
+
+  act(() => {
+    result.current.introReady()
+  })
+
+  expect(sentAll()).toHaveLength(before)
+  expect(sentAll().some((m) => m.type === 'INTRO_READY')).toBe(false)
+})
+
+it('cancels the start gate when the session is torn down', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    act(() => {
+      result.current.startGame()
+    })
+    // Buffered behind the gate: the cap firing is what would later play it.
+    act(() => {
+      result.current.gameLink?.submit({ type: 'DRAW' })
+    })
+    act(() => {
+      result.current.leaveSession()
+    })
+
+    // The cap is the only thing that unfreezes a table whose peer never
+    // reports — but after a teardown there is no table left for it to open, and
+    // a pending one would deal a card into a session the player has left.
+    act(() => {
+      vi.advanceTimersByTime(INTRO_CAP_MS + 1)
+    })
+    expect(sentTo(GUEST).filter((m) => m.type === 'SYNC')).toHaveLength(1)
+  } finally {
+    vi.useRealTimers()
+  }
 })

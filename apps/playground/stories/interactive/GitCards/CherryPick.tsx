@@ -1,5 +1,5 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
-import { HEAP_SHOW, play, scatterAt } from '@/animations'
+import { HEAP_SHOW, play, scatterAt, useHandArrival } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
@@ -12,7 +12,6 @@ import TechBar from '../../controls/TechBar'
 import { TechButton, TechSwitch, TechToggle } from '../../controls/TechControls'
 import { reorderHand } from '../reorderHand'
 import { useDiscardExit } from '../useDiscardExit'
-import { useHandArrival } from '../useHandArrival'
 import styles from './GitCards.module.css'
 
 // "Git Cherry-pick" — pick a card out of the whole discard.

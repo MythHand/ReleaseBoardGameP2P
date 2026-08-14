@@ -1,6 +1,6 @@
 import type React from 'react'
 import { type CSSProperties, useRef, useState } from 'react'
-import { play } from '@/animations'
+import { play, useHandArrival } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
@@ -13,7 +13,6 @@ import TechBar from '../controls/TechBar'
 import { TechButton, TechToggle } from '../controls/TechControls'
 import styles from './PickSpecificCardStory.module.css'
 import { reorderHand } from './reorderHand'
-import { useHandArrival } from './useHandArrival'
 
 // "Take a SPECIFIC card from the opponent's hand" — every logical node is shown:
 //  idle:    a start button in the centre;

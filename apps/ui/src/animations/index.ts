@@ -10,3 +10,11 @@ export {
   toDiscardParams,
 } from './scatter'
 export { nextFrames, wait } from './timing'
+export { type Raise, useFlyer } from './useFlyer'
+// The two flight STEPS. They live here rather than beside a scene because a
+// movement found in two places is a module (root CLAUDE.md, Animations Rule):
+// the carrier holds five invariants that were each broken at least once before
+// they were written down, and the arrival step holds the fan's own geometry.
+// Both had been copied — the playground's scene and the real board each had
+// one — and nothing kept the copies in step.
+export { type Arriving, type Landed, useHandArrival } from './useHandArrival'

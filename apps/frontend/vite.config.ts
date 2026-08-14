@@ -7,9 +7,6 @@ import svgr from 'vite-plugin-svgr'
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 const appSrc = fileURLToPath(new URL('./src', import.meta.url))
 const engineSrc = fileURLToPath(new URL('../../packages/engine/src', import.meta.url))
-const adapterSrc = fileURLToPath(
-  new URL('../../packages/table-adapter/src/index.ts', import.meta.url),
-)
 const translationSrc = fileURLToPath(
   new URL('../../packages/translation/src/index.ts', import.meta.url),
 )
@@ -37,12 +34,15 @@ export default defineConfig({
   ],
   resolve: {
     alias: [
+      // The animation layer is its own entry: a vocabulary and its steps, not
+      // a component. Must precede the bare '@release/ui' find — these are matched
+      // in order, and the shorter one would swallow the subpath.
+      { find: '@release/ui/animations', replacement: `${uiSrc}/animations/index.ts` },
       { find: '@release/ui/global.css', replacement: `${uiSrc}/design/global.css` },
       { find: '@release/ui/tokens.css', replacement: `${uiSrc}/design/tokens.css` },
       { find: '@release/ui', replacement: `${uiSrc}/index.ts` },
       { find: '@release/engine/fake', replacement: `${engineSrc}/fake/index.ts` },
       { find: '@release/engine', replacement: `${engineSrc}/index.ts` },
-      { find: '@release/table-adapter', replacement: adapterSrc },
       { find: '@release/translation', replacement: translationSrc },
       { find: '~', replacement: appSrc },
       { find: '@', replacement: uiSrc },

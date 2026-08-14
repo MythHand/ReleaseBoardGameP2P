@@ -144,11 +144,14 @@ it('rejects a hand-limit discard of the wrong size', () => {
 
 it('numbers events monotonically across reductions', () => {
   const s = withoutTriggers(engine.createGame(config()))
+  // createGame reserves one event id per seated player for the deal (3
+  // here), so reduce's own numbering picks up right after that reservation.
+  const start = s.eventSeq
   const a = reduce(s, { type: 'DRAW', player: 'p1', at: 1000 })
   const b = reduce(a.state, { type: 'PUSH', player: 'p1', at: 1001 })
-  expect(a.events.map((e) => e.id)).toEqual([1])
-  expect(b.events.map((e) => e.id)).toEqual([2, 3])
-  expect(b.state.eventSeq).toBe(3)
+  expect(a.events.map((e) => e.id)).toEqual([start + 1])
+  expect(b.events.map((e) => e.id)).toEqual([start + 2, start + 3])
+  expect(b.state.eventSeq).toBe(start + 3)
 })
 
 it('rejects an unknown action without throwing', () => {

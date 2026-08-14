@@ -70,6 +70,7 @@ it('does not hang when the policy cannot make progress', () => {
   const stuck = { ...s, turn: { ...s.turn, player: 'p2' } }
   const stub: Engine = {
     createGame: engine.createGame,
+    setupEvents: engine.setupEvents,
     // Every action is accepted but changes nothing: the table can never
     // advance toward p1's turn or a finished game.
     reduce: (state) => ({ state, events: [] }),

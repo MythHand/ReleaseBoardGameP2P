@@ -17,6 +17,11 @@ it('never forwards a frame addressed to one party, because forwarding is broadca
   expect(isRelayable('KEEPER_STATE')).toBe(false)
 })
 
+it('never relays a seat`s intro report', () => {
+  // It is addressed to the keeper, like every other game frame.
+  expect(isRelayable('INTRO_READY')).toBe(false)
+})
+
 it('never forwards the keeper`s own announcements', () => {
   // Authored by the keeper alone, and `KEEPER_CHANGED` with `keeperId: null` is
   // the death notice — forwarding a peer-originated one is a kill switch any

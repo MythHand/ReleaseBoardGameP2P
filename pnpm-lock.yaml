@@ -35,9 +35,6 @@ importers:
       '@release/engine':
         specifier: workspace:*
         version: link:../../packages/engine
-      '@release/table-adapter':
-        specifier: workspace:*
-        version: link:../../packages/table-adapter
       '@release/translation':
         specifier: workspace:*
         version: link:../../packages/translation
@@ -215,19 +212,6 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
-
-  packages/table-adapter:
-    dependencies:
-      '@release/engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@release/ui':
-        specifier: workspace:*
-        version: link:../../apps/ui
-    devDependencies:
-      '@release/lint':
-        specifier: workspace:*
-        version: link:../lint
 
   packages/translation:
     dependencies:

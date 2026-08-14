@@ -28,6 +28,9 @@ export interface Reduction {
 
 export interface Engine {
   createGame(config: GameConfig): GameState
+  // The opening deal as events. Pure over the state `createGame` returned —
+  // separate from it because most callers want only the state.
+  setupEvents(state: GameState): Event[]
   // Total: never throws. An illegal action returns the state unchanged plus a
   // `rejected` event.
   reduce(state: GameState, action: Action): Reduction
