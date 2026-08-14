@@ -22,7 +22,6 @@ export interface BoardAnchors {
   seats: RefObject<HTMLDivElement | null>
   dock: RefObject<HTMLDivElement | null>
   zone: RefObject<HTMLDivElement | null>
-  deckBox: RefObject<HTMLDivElement | null>
   centre: RefObject<HTMLDivElement | null>
   hand: RefObject<HTMLDivElement | null>
   /** the discard's CARD box — what a flight into the heap aims at */
@@ -34,6 +33,9 @@ export interface BoardAnchors {
   releaseSlot: (player: string, slot: string) => HTMLElement | null
   bindSeat: (player: string, el: HTMLElement | null) => void
   bindReleaseSlot: (player: string, slot: string, el: HTMLElement | null) => void
+  /** a draw pile's CARD box, by the index the engine names in `drawn.pile` */
+  pileBox: (index: number) => HTMLElement | null
+  bindPile: (index: number, el: HTMLDivElement | null) => void
 }
 
 export function useBoardAnchors(): BoardAnchors {
@@ -44,12 +46,12 @@ export function useBoardAnchors(): BoardAnchors {
   const seats = useRef<HTMLDivElement>(null)
   const dock = useRef<HTMLDivElement>(null)
   const zone = useRef<HTMLDivElement>(null)
-  const deckBox = useRef<HTMLDivElement>(null)
   const centre = useRef<HTMLDivElement>(null)
   const hand = useRef<HTMLDivElement>(null)
   const discardBox = useRef<HTMLDivElement>(null)
   const seatEls = useRef<Record<string, HTMLElement | null>>({})
   const slotEls = useRef<Record<string, HTMLElement | null>>({})
+  const pileEls = useRef<Record<number, HTMLDivElement | null>>({})
 
   const seatOf = useCallback((player: string) => seatEls.current[player] ?? null, [])
   const bindSeat = useCallback((player: string, el: HTMLElement | null) => {
@@ -73,6 +75,13 @@ export function useBoardAnchors(): BoardAnchors {
       hand.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index] ?? null,
     [],
   )
+  const pileBox = useCallback((index: number) => pileEls.current[index] ?? null, [])
+  // A merge takes piles off the table, so an unbound index must answer null
+  // rather than keep a node that is no longer rendered.
+  const bindPile = useCallback((index: number, el: HTMLDivElement | null) => {
+    if (el) pileEls.current[index] = el
+    else delete pileEls.current[index]
+  }, [])
 
   // One identity for the life of the mount: every consumer takes this through a
   // ref into a long-running sequence, and a fresh object per render would arm
@@ -86,7 +95,6 @@ export function useBoardAnchors(): BoardAnchors {
       seats,
       dock,
       zone,
-      deckBox,
       centre,
       hand,
       discardBox,
@@ -96,7 +104,9 @@ export function useBoardAnchors(): BoardAnchors {
       releaseSlot,
       bindSeat,
       bindReleaseSlot,
+      pileBox,
+      bindPile,
     }),
-    [seatOf, seatBox, handSlotAt, releaseSlot, bindSeat, bindReleaseSlot],
+    [seatOf, seatBox, handSlotAt, releaseSlot, bindSeat, bindReleaseSlot, pileBox, bindPile],
   )
 }

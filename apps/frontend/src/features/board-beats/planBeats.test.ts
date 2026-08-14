@@ -20,7 +20,7 @@ const boardBefore = (over: Partial<BoardState> = {}): BoardState =>
     opponents: [
       { id: 'p2', name: 'Two', handCount: 3, release: { backend: card('release-backend') } },
     ],
-    decks: { main: 10, events: 5, discardCount: 0 },
+    decks: { main: [10], events: 5, discardCount: 0 },
     selfId: 'p1',
     history: [],
     setup: {},

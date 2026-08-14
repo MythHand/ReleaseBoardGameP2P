@@ -31,3 +31,16 @@ it('still renders a release zone for the player and for every opponent', () => {
   const zones = container.querySelectorAll('[class*="zone"], [class*="releaseZone"]')
   expect(zones.length).toBeGreaterThanOrEqual(1 + props.state.opponents.length)
 })
+
+it('draws one pile per entry in the projection', () => {
+  const props = makeBoardProps()
+  const { getAllByText } = render(
+    <Board
+      {...props}
+      state={{ ...props.state, decks: { ...props.state.decks, main: [12, 12] } }}
+    />,
+  )
+  // The deck label appears once per pile — a split is two decks on the table,
+  // not one deck showing a bigger number.
+  expect(getAllByText(props.copy.table.deck)).toHaveLength(2)
+})

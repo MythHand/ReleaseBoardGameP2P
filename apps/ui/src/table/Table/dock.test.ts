@@ -7,7 +7,7 @@ import type { TableState } from './types'
 const base: Omit<TableState, 'turn' | 'hasDrawn'> = {
   you: { name: 'you', hand: [], release: {} },
   opponents: [{ id: 'p2', name: 'kernel_panic', handCount: 5, release: {} }],
-  decks: { main: 40, events: 12, discardCount: 0 },
+  decks: { main: [40], events: 12, discardCount: 0 },
   history: [],
   setup: {},
   selfId: 'you',

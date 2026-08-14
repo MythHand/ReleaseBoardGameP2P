@@ -32,7 +32,7 @@ const card = (id: string) => cardById(id) as CardData
 const preDiscard = {
   you: { name: 'You', hand: [{ uid: 'u1', card: card('attack-bug') }], release: {} },
   opponents: [{ id: 'p2', name: 'Two', handCount: 3, release: {} }],
-  decks: { main: 10, events: 5, discardCount: 0, discardHeap: [] },
+  decks: { main: [10], events: 5, discardCount: 0, discardHeap: [] },
   selfId: 'p1',
   history: [],
   setup: {},
@@ -76,7 +76,6 @@ const stub = {
   seats: { current: null },
   dock: { current: null },
   zone: { current: null },
-  deckBox: { current: null },
   centre: { current: null },
   hand: { current: null },
   discardBox: { current: node() },
@@ -86,6 +85,8 @@ const stub = {
   releaseSlot: () => node(),
   bindSeat: () => {},
   bindReleaseSlot: () => {},
+  pileBox: () => null,
+  bindPile: () => {},
 } as unknown as BoardAnchors
 
 // The opening's own shadow: a table with no hand at all, because the cards have
@@ -95,7 +96,7 @@ const stub = {
 const preDeal = {
   ...preDiscard,
   you: { ...preDiscard.you, hand: [] },
-  decks: { ...preDiscard.decks, main: 40 },
+  decks: { ...preDiscard.decks, main: [40] },
 } as unknown as BoardState
 
 function Probe({
@@ -124,7 +125,7 @@ function Probe({
       {/* The deck tells the three states apart where the hand cannot: preDeal
           and afterDiscard both have an empty fan, and only the deck count says
           whether the board is showing the opening's shadow or the projection. */}
-      <div data-testid="deck">{(beats.shadow ?? live).decks.main}</div>
+      <div data-testid="deck">{(beats.shadow ?? live).decks.main.join(',')}</div>
       <div data-testid="exclusive">{beats.exclusive ? 'exclusive' : 'open'}</div>
     </>
   )

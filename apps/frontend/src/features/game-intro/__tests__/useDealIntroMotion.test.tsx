@@ -27,7 +27,6 @@ const refs = () => ({
   seats: createRef<HTMLDivElement>(),
   dock: createRef<HTMLDivElement>(),
   zone: createRef<HTMLDivElement>(),
-  deckBox: createRef<HTMLDivElement>(),
   centre: createRef<HTMLDivElement>(),
   hand: createRef<HTMLDivElement>(),
   discardBox: createRef<HTMLDivElement>(),
@@ -37,6 +36,8 @@ const refs = () => ({
   releaseSlot: () => null,
   bindSeat: () => {},
   bindReleaseSlot: () => {},
+  pileBox: () => null,
+  bindPile: () => {},
 })
 
 const view = (): PlayerView => ({
@@ -82,7 +83,7 @@ const live = (): BoardState => ({
     },
   },
   opponents: [{ id: 'p2', name: 'Two', handCount: 2, release: {} }],
-  decks: { main: 100, events: 21, discardCount: 0 },
+  decks: { main: [100], events: 21, discardCount: 0 },
   turn: 'p1',
   hasDrawn: false,
   selfId: 'p1',
@@ -116,7 +117,7 @@ it('opens on the pre-deal table and keeps the gate shut', () => {
   expect(shadow).not.toBeNull()
   // The table as it stood BEFORE the deal: the whole base pile (what is left
   // plus the four that went out), nobody holding anything, no release zone yet.
-  expect(shadow?.decks.main).toBe(104)
+  expect(shadow?.decks.main).toEqual([104])
   expect(shadow?.you.hand).toEqual([])
   expect(shadow?.you.release).toEqual({})
   expect(shadow?.opponents[0].handCount).toBe(0)

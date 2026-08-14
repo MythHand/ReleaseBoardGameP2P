@@ -28,6 +28,7 @@ import {
   PauseGame,
   PendingPrompt,
   Pile,
+  pileWidthFor,
   Reconnect,
   type ReleaseSlots,
   ReleaseZone,
@@ -406,14 +407,20 @@ export default function Board({
 
       <div className={kit.decks}>
         <div className={cls(opening.deckStack, enter)} ref={anchors.decks}>
-          <Pile
-            label={copy.table.deck}
-            deck="base"
-            count={decks.main}
-            width={150}
-            countPos="tl"
-            boxRef={anchors.deckBox}
-          />
+          <div className={opening.pileRow}>
+            {decks.main.map((count, i) => (
+              <Pile
+                // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
+                key={i}
+                label={copy.table.deck}
+                deck="base"
+                count={count}
+                width={pileWidthFor(decks.main.length)}
+                countPos="tl"
+                boxRef={(el) => anchors.bindPile(i, el)}
+              />
+            ))}
+          </div>
           <Pile
             label={copy.table.events}
             deck="ai"

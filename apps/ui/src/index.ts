@@ -52,7 +52,7 @@ export { CopyButton, default as Button } from './primitives/Button'
 // Components (added/uncommented as Task 4 migrates each)
 // CARD_RATIO rides along with the box helpers: a consumer that aims a flight at
 // a card box needs the ratio to reason about the box it gets back.
-export { CARD_RATIO, cardBoxIn, default as Card } from './primitives/Card'
+export { CARD_RATIO, cardAreaOf, cardBoxIn, default as Card } from './primitives/Card'
 export { default as CardPair } from './primitives/CardPair'
 export { default as Drawer } from './primitives/Drawer'
 export type { DropdownItem } from './primitives/Dropdown'
@@ -133,6 +133,7 @@ export {
   type PendingPromptProps,
   type WindowCopy,
 } from './table/Table/PendingPrompt'
+export { pileWidthFor } from './table/Table/piles'
 export type {
   Panel,
   TableChromeCopy as TableCopy,

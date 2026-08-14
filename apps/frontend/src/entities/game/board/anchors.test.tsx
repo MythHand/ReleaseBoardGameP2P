@@ -98,3 +98,21 @@ it('keeps one identity across renders', () => {
   // sequence; a fresh object per render would arm those against a stale one.
   expect(Object.is(seen[0], seen[1])).toBe(true)
 })
+
+it('pileBox keys by index — a draw aims at the pile its event names', () => {
+  const { seen } = mount()
+  const anchors = seen[0]
+  const a = document.createElement('div')
+  const b = document.createElement('div')
+  anchors.bindPile(0, a)
+  anchors.bindPile(1, b)
+  expect(anchors.pileBox(0)).toBe(a)
+  expect(anchors.pileBox(1)).toBe(b)
+  // A pile that is not on the table answers null rather than falling back to
+  // pile 0 — aiming a flight at the wrong deck is worse than not flying it.
+  expect(anchors.pileBox(2)).toBeNull()
+  // React calls a ref callback with null on unmount; a merged-away pile must
+  // not linger in the registry.
+  anchors.bindPile(1, null)
+  expect(anchors.pileBox(1)).toBeNull()
+})

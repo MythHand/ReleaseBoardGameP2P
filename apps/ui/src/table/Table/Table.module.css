@@ -43,6 +43,14 @@
   transform: translateY(-50%);
 }
 
+/* the draw piles sit side by side: a split can put three of them out, and a
+   column would run off the top and bottom of a vertically-centred block */
+.pileRow {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
 .discard {
   position: absolute;
   inset-block: 0;
