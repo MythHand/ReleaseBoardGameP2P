@@ -32,6 +32,15 @@ it('still renders a release zone for the player and for every opponent', () => {
   expect(zones.length).toBeGreaterThanOrEqual(1 + props.state.opponents.length)
 })
 
+// Every draw stages at the centre, on every turn — so it cannot be a node that
+// exists only while the opening runs. A board rendered with no `intro` at all
+// (the case every test in this file already renders) is exactly the case that
+// used to have nowhere to aim.
+it('keeps the table centre mounted after the opening is gone', () => {
+  const { container } = render(<Board {...makeBoardProps()} />)
+  expect(container.querySelector('[data-board-centre]')).not.toBeNull()
+})
+
 it('draws one pile per entry in the projection', () => {
   const props = makeBoardProps()
   const { getAllByText } = render(
