@@ -93,6 +93,12 @@ const live = (): BoardState => ({
   frozen: [],
 })
 
+// The queue now hands every beat's `run` a `BeatRun` (#97 generalizes the
+// opening's own shadow to the whole queue). The opening ignores it — nothing
+// here asserts on `publish` — so a fresh, inert context is all `run()` needs
+// to be called the way the queue calls it.
+const noopCtx = () => ({ base: live(), publish: () => {} })
+
 it('opens on the pre-deal table and keeps the gate shut', () => {
   const onDone = vi.fn()
   const { result, unmount } = renderHook(() =>
@@ -109,7 +115,7 @@ it('opens on the pre-deal table and keeps the gate shut', () => {
   // The queue starts it; nothing happens until it does.
   expect(result.current.active).toBe(false)
   act(() => {
-    void result.current.beat?.run()
+    void result.current.beat?.run(noopCtx())
   })
 
   expect(result.current.active).toBe(true)
@@ -152,7 +158,7 @@ it('counts down pile 0 only — every other pile passes through untouched', () =
     }),
   )
   act(() => {
-    void result.current.beat?.run()
+    void result.current.beat?.run(noopCtx())
   })
   const shadow = result.current.shadow
   // Pile 0 is the one the deal counts down: deckBefore (planDeal.ts) is the
@@ -177,7 +183,7 @@ it('collapses on a skip, reporting once', () => {
     }),
   )
   act(() => {
-    void result.current.beat?.run()
+    void result.current.beat?.run(noopCtx())
   })
   expect(result.current.active).toBe(true)
   act(() => {

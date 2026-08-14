@@ -4,6 +4,7 @@ export { toBoardOver } from './toBoardOver'
 export type { HistoryLabels } from './toBoardState'
 export { toBoardState } from './toBoardState'
 export type {
+  BeatRun,
   BoardCopyBundle,
   BoardOpponent,
   BoardOver,
