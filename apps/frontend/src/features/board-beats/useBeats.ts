@@ -75,8 +75,8 @@ export function useBeats(args: {
   // second set of books here would be a second source for one heap.
   const { overlay, send } = useDiscardExit(anchors.discardBox)
 
-  const latest = useRef({ live, anchors, send })
-  latest.current = { live, anchors, send }
+  const latest = useRef({ live, anchors, send, intro })
+  latest.current = { live, anchors, send, intro }
 
   // How far into the feed the queue has already looked. Event ids are the
   // engine's own monotonic sequence, so this is a watermark and not a count —
@@ -141,14 +141,22 @@ export function useBeats(args: {
   // The mount is going away: stop starting things. A beat already in flight
   // finishes its own await chain — there is no way to pull it out of a wait() —
   // but nothing after it runs, and nothing reaches for a node that is gone.
+  //
+  // It is armed on the way IN as well as disarmed on the way out, and the
+  // asymmetry it replaces cost the whole screen: a teardown that only ever set
+  // this to false left it false for the life of the next mount, and `drain`'s
+  // `while (next && alive.current)` then shifted every beat off the queue
+  // without running one of them. StrictMode performs that teardown on every
+  // mount in development, so the opening never played, never reported, and the
+  // board held every block at opacity 0 with the start gate still waiting.
   const alive = useRef(true)
-  useLayoutEffect(
-    () => () => {
+  useLayoutEffect(() => {
+    alive.current = true
+    return () => {
       alive.current = false
       queue.current = []
-    },
-    [],
-  )
+    }
+  }, [])
 
   const drain = useCallback(async () => {
     if (draining.current) return
@@ -179,29 +187,47 @@ export function useBeats(args: {
   // fresh object cannot re-arm it, and React 19 StrictMode's double invoke plays
   // it once — the same guarantee the intro used to keep for itself with
   // `armedFor`, now kept here because the queue is what starts it.
+  // It depends on the KEY, not on the beat: `useDealIntro` rebuilds that object
+  // every time its shadow moves, which is many times per opening, and an effect
+  // watching the object would tear down and re-arm on each one. The key changes
+  // once per match, which is exactly how often this should fire. The body reads
+  // the beat through `latest`, so it still starts the current one.
   const armed = useRef<string | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `intro?.key` is the trigger, not a value the body reads — a new match must re-arm this, and the beat itself comes from `latest` precisely so the effect does NOT re-run on every shadow it publishes
   useLayoutEffect(() => {
-    if (!intro || armed.current === intro.key) return
-    armed.current = intro.key
+    const beat = latest.current.intro
+    if (!beat || armed.current === beat.key) return
+    armed.current = beat.key
     // Reduced motion collapses the opening exactly as it collapses every other
     // beat — `run` is never called. But the opening still has to REPORT, or the
     // host's start gate never opens and the match never begins, so this is the
     // one beat the queue tells explicitly to jump to its end state.
     if (reduced) {
-      intro.collapse()
+      beat.collapse()
       return
     }
     queue.current.unshift({
-      key: intro.key,
+      key: beat.key,
       // A placeholder: while an exclusive beat runs the board renders the
       // intro's OWN published shadow, not this. It is here because a Beat has a
       // base and this one animates away from the projection at large.
       base: latest.current.live,
       exclusive: true,
-      run: intro.run,
+      run: beat.run,
     })
     void drain()
-  }, [intro, reduced, drain])
+    // The teardown releases the arm, and it has to: `useDealIntro`'s own cleanup
+    // CANCELS the run in flight on the same teardown, by bumping the id every
+    // await in the sequence checks. An arm that outlived that cancel would tell
+    // the next mount the opening had already played, while the run it referred
+    // to had been killed mid-step — so nothing would report, the board would
+    // hold every block at opacity 0 for the life of the mount, and the host's
+    // start gate would wait on a seat that had stopped watching. StrictMode does
+    // exactly this teardown on every mount in development.
+    return () => {
+      armed.current = null
+    }
+  }, [intro?.key, reduced, drain])
 
   // The last projection the board actually SHOWED. Not `live`: by the time this
   // effect runs, `live` is already the projection the arriving batch produced —

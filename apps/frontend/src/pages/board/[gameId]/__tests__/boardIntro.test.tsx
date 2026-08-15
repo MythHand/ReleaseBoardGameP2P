@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { expect, it, vi } from 'vitest'
 import Board from '../_Board'
 import { introFixture, makeBoardProps } from './fixture'
@@ -50,6 +51,35 @@ it('puts the faded rail out of reach while the intro runs', () => {
   expect(rail).toBeTruthy()
   expect(rail?.hasAttribute('inert')).toBe(true)
 })
+
+// StrictMode mounts, tears down, and mounts again — and the teardown is not a
+// formality: `useDealIntro`'s cleanup cancels the run in flight by bumping the
+// id that every `await` in the sequence checks. So the arm that says "this
+// opening has already been queued" outlives the teardown that cancelled what it
+// armed. The second mount declines to queue anything, the first run halts at its
+// next check, and nothing ever reports.
+//
+// The cost is the entire screen. The board holds every block at `opacity: 0`
+// until the opening says it is done, and the host's start gate waits on the same
+// word — so a silent non-report is a permanently black table AND a match that
+// never begins. It reproduced in the browser on the first two-peer run and in no
+// test, because jsdom renders these suites without StrictMode's double invoke.
+it('still reports the opening when StrictMode mounts the board twice', async () => {
+  motion.reduced = false
+  const onDone = vi.fn()
+  const props = makeBoardProps()
+  render(
+    <StrictMode>
+      <Board {...props} intro={{ ...introFixture(), onDone }} />
+    </StrictMode>,
+  )
+  // The whole choreography, on jsdom's real timers — the sequence is seconds
+  // long and every leg of it is a wait() the run has to get through.
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 9000))
+  })
+  expect(onDone).toHaveBeenCalledTimes(1)
+}, 20000)
 
 it('hands the rail back when the opening is over', () => {
   motion.reduced = true
