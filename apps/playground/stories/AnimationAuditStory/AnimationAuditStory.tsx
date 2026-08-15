@@ -486,34 +486,34 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Разделение колоды', en: 'Splitting the deck' },
     from: {
-      ru: 'FLIP-вылет flyFrom: половина уже в новом DOM-месте, анимируем «из» прошлого rect (getBoundingClientRect до→после ремаунта) в текущую позицию.',
-      en: 'FLIP fly-in flyFrom: half is already in its new DOM place, we animate "from" the previous rect (getBoundingClientRect before→after remount) to the current position.',
+      ru: 'FLIP-вылет flyFrom: половина уже в новом DOM-месте, анимируем «из» прошлого rect (getBoundingClientRect до→после ремаунта) в текущую позицию. То же движение теперь играется на живом борде из pilesChanged (deckBeat, «The deck is rebuilt, split, merged (live board)» в recipes.md) — какая стопка разделилась, там не называется событием, а выводится позиционно (classifyPiles, docs/animations/backlog.md).',
+      en: 'FLIP fly-in flyFrom: half is already in its new DOM place, we animate "from" the previous rect (getBoundingClientRect before→after remount) to the current position. The same movement now also runs on the live board off pilesChanged (deckBeat, "The deck is rebuilt, split, merged (live board)" in recipes.md) — which pile split is not named by the event, it is derived positionally (classifyPiles, docs/animations/backlog.md).',
     },
-    where: 'DeckAnimations',
+    where: 'DeckAnimations + frontend: board-beats/deckBeat',
   },
   {
     name: { ru: 'Слияние колод (+ сброс)', en: 'Merging decks (+ discard)' },
     from: {
-      ru: 'все стопки и сброс — параллельные absorbToDeck (move + fade) в один rect первой колоды; цель измеряется однажды, расходятся только источники.',
-      en: 'all piles and the discard — parallel absorbToDeck (move + fade) into the single rect of the first deck; the target is measured once, only the sources differ.',
+      ru: 'все стопки и сброс — параллельные absorbToDeck (move + fade) в один rect первой колоды; цель измеряется однажды, расходятся только источники. То же движение играется на живом борде из pilesChanged (deckBeat) — теперь на РЯД стопок (decks.main: number[]), а не на одну.',
+      en: 'all piles and the discard — parallel absorbToDeck (move + fade) into the single rect of the first deck; the target is measured once, only the sources differ. The same movement now also runs on the live board off pilesChanged (deckBeat) — over a ROW of piles (decks.main: number[]) rather than one.',
     },
-    where: 'DeckAnimations',
+    where: 'DeckAnimations + frontend: board-beats/deckBeat',
   },
   {
     name: { ru: 'Сброс → новая колода', en: 'Discard → new deck' },
     from: {
-      ru: 'собрать разбросанный сброс в стопку → gatherToDeck (move, центр-в-центр) к месту колоды → flipCard рубашкой вверх по приземлении.',
-      en: 'gather the scattered discard into a pile → gatherToDeck (move, center-to-center) to the deck spot → flipCard back-up on landing.',
+      ru: 'собрать разбросанный сброс в стопку → gatherToDeck (move, центр-в-центр) к месту колоды → flipCard рубашкой вверх по приземлении. То же движение играется на живом борде дважды: как deckReshuffled (обычный ребилд на пилу 0) и как второй шаг Git Branch + Sudo внутри pilesChanged (fromDiscard, на индекс, который назвал сплит) — обе ветки через один и тот же discardOntoPile в deckBeat.',
+      en: "gather the scattered discard into a pile → gatherToDeck (move, center-to-center) to the deck spot → flipCard back-up on landing. The same movement now also runs on the live board twice: as deckReshuffled (an ordinary rebuild onto pile 0) and as Git Branch + Sudo's second step inside pilesChanged (fromDiscard, onto the index the split just named) — both branches through the same discardOntoPile in deckBeat.",
     },
-    where: 'DeckAnimations',
+    where: 'DeckAnimations + frontend: board-beats/deckBeat',
   },
   {
     name: { ru: 'Добор карты (одиночный)', en: 'Drawing a card (single)' },
     from: {
-      ru: 'drawToCenter (move 480) колода→центр рубашкой вверх; ветвление по карте: игрок — flipCard + useHandArrival.insert (садится в слот руки); соперник — dealToSeat (move + fade) в card-area места ×0.7, без скейла вверх; триггер/AI — flipCard в центре (reveal для всех), AI ещё добирает эффект из AI-колоды рядом (flyer с key={seq}, чтобы Card не переиспользовалась и не крутилась).',
-      en: 'drawToCenter (move 480) deck→center back-up; branch by card: player — flipCard + useHandArrival.insert (sits into a hand slot); opponent — dealToSeat (move + fade) into the seat card-area ×0.7, no upward scale; trigger/AI — flipCard at the center (reveal for all), AI also draws an effect from the nearby AI deck (flyer with key={seq} so the Card is not reused and does not spin).',
+      ru: 'drawToCenter (move 480) колода→центр рубашкой вверх; ветвление по карте: игрок — flipCard + useHandArrival.insert (садится в слот руки); соперник — dealToSeat (move + fade) в card-area места ×0.7, без скейла вверх; триггер/AI — flipCard в центре (reveal для всех), AI ещё добирает эффект из AI-колоды рядом (flyer с key={seq}, чтобы Card не переиспользовалась и не крутилась). Три ветки — свой / чужой / триггер — теперь играются и на живом борде от настоящих drawn/revealed событий (drawBeat, «A card is drawn (live board)» в recipes.md); AI-ветка там не участвует (#106).',
+      en: 'drawToCenter (move 480) deck→center back-up; branch by card: player — flipCard + useHandArrival.insert (sits into a hand slot); opponent — dealToSeat (move + fade) into the seat card-area ×0.7, no upward scale; trigger/AI — flipCard at the center (reveal for all), AI also draws an effect from the nearby AI deck (flyer with key={seq} so the Card is not reused and does not spin). The mine/opponent/trigger branches now also run on the live board off real drawn/revealed events (drawBeat, "A card is drawn (live board)" in recipes.md); the AI branch is not part of that (#106).',
     },
-    where: 'DrawCard',
+    where: 'DrawCard + frontend: board-beats/drawBeat',
   },
   {
     name: { ru: 'Мультидобор (по кнопке)', en: 'Multi-draw (by button)' },
@@ -682,6 +682,66 @@ const ISSUES: Issue[] = [
     },
     where: { ru: 'эта страница + docs/animations/', en: 'this page + docs/animations/' },
     status: 'open',
+  },
+  {
+    what: {
+      ru: '`drawn` был приватным, добор соперника было нечем анимировать',
+      en: '`drawn` was private, an opponent’s draw had nothing to animate',
+    },
+    problem: {
+      ru: 'Issue #97 утверждал, что `drawn` уже опускает `card` для чужого добора и проекция уже нужной формы — это было неверно: движок ставил `visibleTo: [drawer]` на обычный добор, и сеть роняла всё событие целиком у всех, кроме доборщика (`network/session/audience.ts`), так что соперник не получал ничего, кроме тика счётчика руки. Решено этой задачей: `reduce.ts` больше не ставит `visibleTo`, событие публично для всех, а секретность личности карты вынесена в `@release/engine`.`redactFor(event, viewerId)` — она вырезает `card` из чужого `drawn`, и `forViewer` фильтрует по `visibleTo` как раньше, затем прогоняет уцелевшее через неё. Запись держится тут намеренно даже решённой: исходный текст issue продолжает утверждать обратное.',
+      en: 'Issue #97 claimed `drawn` already omitted `card` for an opponent’s draw and the projection was already the right shape — that was wrong: the engine set `visibleTo: [drawer]` on an ordinary draw, and the network dropped the whole event for everyone but the drawer (`network/session/audience.ts`), so an opponent got nothing but a tick of the hand counter. Resolved by this task: `reduce.ts` no longer sets `visibleTo`, the event is public to everyone, and the card’s identity secrecy moved into `@release/engine`’s `redactFor(event, viewerId)` — it strips `card` from someone else’s `drawn`; `forViewer` filters by `visibleTo` as before, then runs the survivors through it. The entry stays here on purpose even though it is solved: the original issue text still states the opposite.',
+    },
+    where: {
+      ru: 'packages/engine (redactFor) + network/session/audience.ts (forViewer)',
+      en: 'packages/engine (redactFor) + network/session/audience.ts (forViewer)',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
+      ru: '`pilesChanged` не называет ни операцию, ни индекс разделения',
+      en: '`pilesChanged` names neither its operation nor the split index',
+    },
+    problem: {
+      ru: 'Событие несёт только счётчики (`piles: number[]`), ни какая операция произошла, ни какая стопка в ней участвовала — без вывода нечем решить, `flyFrom` целится в какой индекс или `absorbToDeck` во что. `classifyPiles` (`planBeats.ts`) выводит это позиционно: длина + сумма стопок до/после, с вычерпыванием, проверяемым раньше мёрджа (обе формы дают одну длину результата). Вычерпывание (prune) при этом не заводит отдельный вид `PileStep` — пустой пропавшей стопке нечего анимировать, и функция просто возвращает `null`.',
+      en: 'The event carries only counts (`piles: number[]`) — neither which operation ran nor which pile it touched, so nothing tells `flyFrom` which index to aim at or `absorbToDeck` what to absorb into. `classifyPiles` (`planBeats.ts`) derives it positionally instead — length and sum of the pile counts before/after, with the prune case checked ahead of merge (both shapes yield the same result length). A prune does not get its own `PileStep` variant either — an empty pile that ceased to exist has nothing on screen to animate, so the function just returns `null`.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/planBeats.ts (classifyPiles)',
+      en: 'frontend: features/board-beats/planBeats.ts (classifyPiles)',
+    },
+    status: 'rework',
+  },
+  {
+    what: {
+      ru: 'Сколько триггер стоит в центре — значения нет',
+      en: 'How long a revealed trigger stands at the centre — no approved value',
+    },
+    problem: {
+      ru: 'Такт добора держит вскрытый триггер на столе `REVEAL_HOLD = 900` перед уходом в сброс. `DrawCardStory` держит `AI_HOLD = 4000`, но это пауза AI-ветки (стол читает эффект), не обычного вскрытия — а для голого reveal подтверждённого значения нет вовсе. `REVEAL_HOLD = 900` — число этой задачи, ничем не подтверждённое.',
+      en: 'The draw beat holds a revealed trigger at the centre for `REVEAL_HOLD = 900` before it leaves for the discard. `DrawCardStory` has `AI_HOLD = 4000`, but that is the AI branch’s pause (the table reads the effect), not a plain reveal’s — and a plain reveal has no approved value at all. `REVEAL_HOLD = 900` is this task’s own number, unconfirmed by anything.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/drawBeat.tsx (REVEAL_HOLD)',
+      en: 'frontend: features/board-beats/drawBeat.tsx (REVEAL_HOLD)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Ширина стопки при нескольких колодах не утверждена',
+      en: 'The pile-width ramp above one pile has no approved value',
+    },
+    problem: {
+      ru: '`pileWidthFor` держит 150px при одной стопке добора, 120 при двух, 100 при трёх и более — рамп придуман для этой задачи, не утверждён. `DeckAnimationsStory` кладёт стопки в ряд, которому никогда не приходится делить стол с рукой и доком, поэтому её фиксированные 150 ничего не подтверждают для борда: ряд из трёх (Git Branch + Sudo) может налезть на руку на узких экранах.',
+      en: '`pileWidthFor` holds a draw pile at 150px at one, 120 at two, 100 at three or more — a ramp invented for this task, not approved. `DeckAnimationsStory` lays its piles out in a row that never has to share the table with the hand and the dock, so its fixed 150 confirms nothing for the board: a row of three (Git Branch + Sudo) can crowd the hand on a narrow screen.',
+    },
+    where: {
+      ru: 'apps/ui/src/table/Table/piles.ts (pileWidthFor)',
+      en: 'apps/ui/src/table/Table/piles.ts (pileWidthFor)',
+    },
+    status: 'reuse',
   },
 ]
 

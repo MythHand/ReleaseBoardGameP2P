@@ -91,6 +91,7 @@ card (not at a wider cell/seat) — invariant **I6**. The `CARD_RATIO` value is 
 |---|---|---|
 | `cardAreaOf` | `cardAreaOf(cell)` → `Rect` | trim a Pile cell to its **top** card box (keep left/top/width, height = width·`CARD_RATIO`) |
 | `cardBoxIn` | `cardBoxIn(rect, width)` → `Rect` | a card box of `width`, **centered** in `rect` (e.g. a Seat). Pass a width measured from the real card element where possible. |
+| `pileWidthFor` | `pileWidthFor(count)` → `number` (`apps/ui/src/table/Table/piles.ts`) | how wide a draw pile is drawn given how many sit on the table — 150 at one, 120 at two, 100 at three or more. One function, shared by the kit's `Table` and the board's fork of it, so the ramp cannot drift between the two. The ramp above one pile has no approved value yet (`docs/animations/backlog.md`). |
 
 ---
 
@@ -163,6 +164,21 @@ useless without knowing what calls it.
 queue sees a batch, `live` already has the card out of the hand — so the queue keeps the last
 projection it actually showed and plans against that, and a batch arriving mid-beat waits its turn
 rather than being planned against a state nobody can see.
+
+**Beat kinds.** `planBeats` returns a union of plans; `useBeats.beatOf` wires each `kind` to the
+runner that plays it. One new module per kind at most (#88's rule) — `discardBeat.tsx` is today's
+runner lifted out of `useBeats` unchanged, `drawBeat.tsx` and `deckBeat.tsx` are new.
+
+| Kind | Runner | Planned from | Presets it plays |
+|---|---|---|---|
+| `draw` | `features/board-beats/drawBeat.tsx` | `drawn` — mine / an opponent's / a trigger's, the last also consuming the `revealed`/`aiRevealed` and `discarded` that follow it in the same batch | `drawToCenter`, `flipCard` (via `Card`), `dealToSeat`, the discard-exit step |
+| `discard` | `features/board-beats/discardBeat.tsx` | `discarded`, coalesced per batch | the discard-exit step |
+| `reshuffle` | `features/board-beats/deckBeat.tsx` (`runReshuffle`) | `deckReshuffled` | `gatherToDeck`, `flipCard` (via `patch`) |
+| `piles` | `features/board-beats/deckBeat.tsx` (`runPiles`/`step`) | `pilesChanged`, classified by `classifyPiles` (`planBeats.ts`) against the running pile counts — the event itself names neither the operation nor the split index | `flyFrom` (split), `absorbToDeck` (merge), `gatherToDeck` (fromDiscard) |
+
+See [`recipes.md`](./recipes.md#a-card-is-drawn-live-board) and
+[`recipes.md`](./recipes.md#the-deck-is-rebuilt-split-merged-live-board) for the sequences; the
+classification table for `piles` is written out there, not repeated here.
 
 **One scatter, two readers.** A discard flies on `scatterAt(eventId)` and the heap
 (`toBoardState.toDiscardHeap`) rests it on `scatterAt(eventId)` — the same call on the same id, which
