@@ -183,10 +183,13 @@ it('lands the discard as a further pile at the end of the row (fromDiscard)', as
 })
 
 // "Git Branch + Sudo" — the one real in-game batch that emits TWO pile steps
-// at once: a split, then the discard landing as a further pile. `advance()`
-// exists specifically so the second step runs against the table the FIRST
-// one left, not the one the batch started with. The published SEQUENCE (not
-// just the final state) is what tells a fresh re-read apart from a stale one.
+// at once: a split, then the discard landing as a further pile. Both steps
+// arrive from planBeats already resolved — their own `at`/`piles` — so there
+// is no data dependency between them for `advance()`'s write-back to bridge
+// here (that write-back only matters for the merge branch, which reads
+// `ctx.base.decks.main` back out; see docs/animations/backlog.md). What this
+// test actually pins: `runPiles` runs its steps and PUBLISHES them in order —
+// the split's row first, then that same row with the discard appended.
 it('runs the fromDiscard half of a split+fromDiscard batch against the split’s own result', async () => {
   played.names = []
   timeline.events = []
