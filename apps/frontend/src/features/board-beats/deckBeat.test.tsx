@@ -45,21 +45,59 @@ const base = {
 } as unknown as BoardState
 
 const node = () => document.createElement('div')
-const anchors = {
-  hand: { current: node() },
-  centre: { current: node() },
-  discardBox: { current: node() },
-  pileBox: () => node(),
-  seatBox: () => null,
-  seatOf: () => null,
-  handSlotAt: () => null,
-  releaseSlot: () => null,
-  bindPile: () => {},
-  bindSeat: () => {},
-  bindReleaseSlot: () => {},
-} as unknown as BoardAnchors
 
-function harness() {
+// The row of piles the DOM is actually holding, plus the commit of lag before
+// it catches up with a state change — the board's own two facts about a pile,
+// and the only ones a deck flight depends on.
+//
+// `at()` answers null outside that row on purpose. A pile that is not in the
+// rendered row has unmounted and `bindPile(i, null)` has dropped it from the
+// board's registry, so null is what the real anchors return. The first version
+// of this stub handed back a fresh detached div for every index, which measured
+// exactly the same whether the pile was on screen or not — and hid a merge that
+// looked for its sources in the post-batch DOM, found none, and animated
+// nothing at all while the counts snapped over.
+function pileDom(initial: number[]) {
+  let row = initial
+  const nodes = new Map<number, HTMLElement>()
+  return {
+    /** a new row reaches the DOM a frame later, never in the same tick */
+    commit(next: number[]) {
+      requestAnimationFrame(() => {
+        row = next
+      })
+    },
+    at(i: number): HTMLElement | null {
+      if (i < 0 || i >= row.length) return null
+      const held = nodes.get(i)
+      if (held) return held
+      const made = node()
+      nodes.set(i, made)
+      return made
+    },
+  }
+}
+
+// `live` is the row the BATCH left — what the board is holding when the runner
+// is called. It defaults to the beat's own row, for the tests where the two are
+// the same; the merge is where they differ, and where that difference is the
+// whole defect.
+function harness(opts: { base?: BoardState; live?: number[] } = {}) {
+  const state = opts.base ?? base
+  const dom = pileDom(opts.live ?? state.decks.main)
+  const anchors = {
+    hand: { current: node() },
+    centre: { current: node() },
+    discardBox: { current: node() },
+    pileBox: (i: number) => dom.at(i),
+    seatBox: () => null,
+    seatOf: () => null,
+    handSlotAt: () => null,
+    releaseSlot: () => null,
+    bindPile: () => {},
+    bindSeat: () => {},
+    bindReleaseSlot: () => {},
+  } as unknown as BoardAnchors
   const published: BoardState[] = []
   const api: { beat?: ReturnType<typeof useDeckBeat> } = {}
   function Probe() {
@@ -68,13 +106,16 @@ function harness() {
   }
   render(<Probe />)
   const ctx = {
-    base,
+    base: state,
     publish: (s: BoardState) => {
       published.push(s)
       timeline.events.push('publish')
+      // A publish is a render: the new row is on screen a commit later, which is
+      // what the beat's own wait is for.
+      dom.commit(s.decks.main)
     },
   }
-  return { published, api, ctx }
+  return { published, api, ctx, dom }
 }
 
 // `drawBeat.test.tsx`'s established pattern: a runner that spans real `wait()`
@@ -153,17 +194,32 @@ it('publishes the new pile before it animates the split', async () => {
   expect(flyFromIndex).toBeGreaterThan(publishIndex)
 })
 
+// Git Merge, played against the board as it really stands when the runner is
+// called: `pilesChanged [8,8,8] -> [24]` has ALREADY collapsed the row on
+// screen, so the two absorbed piles have unmounted and the registry answers
+// null for both. The sources this flight needs exist only on the shadow, which
+// is a commit away — measure before waiting for it and the loop finds nothing,
+// `Promise.all([])` resolves at once, and the merge plays nothing while the
+// counts snap over.
 it('absorbs every other pile into the survivor on a merge', async () => {
   played.names = []
-  const { api, ctx } = harness()
+  const merging = { ...base, decks: { ...base.decks, main: [8, 8, 8] } } as BoardState
+  const { api, ctx, dom } = harness({ base: merging, live: [24] })
   const plan = {
     kind: 'piles',
     key: 'piles:5',
     steps: [{ kind: 'merge', withDiscard: false, piles: [24] }],
   } as Extract<BeatPlan, { kind: 'piles' }>
-  const mergeCtx = { ...ctx, base: { ...base, decks: { ...base.decks, main: [12, 12] } } }
-  await drive(() => api.beat?.runPiles(plan, mergeCtx))
-  expect(played.names).toContain('absorbToDeck')
+  await drive(() => {
+    // The board's own order: the queue starts the beat while the post-batch row
+    // is still up, and the shadow that puts the three piles back lands a commit
+    // later.
+    dom.commit(merging.decks.main)
+    return api.beat?.runPiles(plan, ctx)
+  })
+  // Both absorbed piles flew — not zero (measured too early: nothing to find)
+  // and not three (the survivor is not absorbed into itself).
+  expect(played.names.filter((n) => n === 'absorbToDeck')).toHaveLength(2)
 })
 
 it('lands the discard as a further pile at the end of the row (fromDiscard)', async () => {

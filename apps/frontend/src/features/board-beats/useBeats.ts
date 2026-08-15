@@ -25,6 +25,10 @@ import { planBeats } from './planBeats'
 //     lifetime is the queue's: when the queue drains it is dropped and live
 //     wins, whatever happened inside a beat. There is no path where a thrown
 //     run, a missing rect or a bad plan leaves an old state on the table.
+//   • The handover holds BETWEEN the beats of a batch too, not only at its end.
+//     A beat may move the board under itself, so the one behind it starts from
+//     where that one finished rather than from where the batch began (`after`
+//     on Beat) — otherwise a batch would rewind itself once per beat.
 //
 // One policy, one place: prefers-reduced-motion is read HERE. `play()` in
 // @release/ui drives WAAPI directly and does not check it, so every consumer
@@ -33,8 +37,36 @@ import { planBeats } from './planBeats'
 
 interface Beat {
   key: string
-  /** the projection this beat animates AWAY from — the board while it runs */
+  /**
+   * The projection this beat animates AWAY from — the board while it runs.
+   * Resolved when the beat STARTS rather than when it is planned; see `after`.
+   */
   base: BoardState
+  /**
+   * The beat this one follows inside its own batch. A batch is planned in one
+   * pass against one projection, so without this every beat of it would animate
+   * away from the state the batch STARTED at — and a batch that publishes would
+   * be rolled back by the beat behind it. `[drawn(mine), pilesChanged]` is the
+   * real case: the draw grows the fan to N+1 and publishes it, then the pile
+   * beat renders its own base at N and the card pops out of the hand and back
+   * in when the queue drains.
+   *
+   * A link and not a captured state, because the value is not knowable at plan
+   * time: what a beat leaves on the table exists only once it has run. It is
+   * read at start-of-beat instead, off `ended` below.
+   *
+   * The opening carries none. It is unshifted AHEAD of whatever is queued, it
+   * publishes a shape of its own rather than a fold of the projection, and the
+   * batch behind it was planned against the live board — chaining the deal into
+   * it would hand a beat a base nothing planned it against.
+   */
+  after?: Beat
+  /**
+   * What this beat left on the table: its last publish, or — when it published
+   * nothing — the very base it was handed, passed on untouched. Written when
+   * the beat is over, read by the beat that follows it.
+   */
+  ended?: BoardState
   /** it owns the table: input is dead while it runs */
   exclusive: boolean
   run: (ctx: BeatRun) => Promise<void>
@@ -150,17 +182,37 @@ export function useBeats(args: {
     try {
       let next = queue.current.shift()
       while (next && alive.current) {
+        // The handover between two beats of one batch, resolved HERE because
+        // here is the first moment it exists: the board this beat animates away
+        // from is the board the beat in front of it left. Writing it onto the
+        // beat rather than keeping it beside the beat is what makes the shadow
+        // (`advanced ?? running.base`) show it too — a base resolved into a
+        // local would move the first frame of the run and leave the render
+        // behind on the planned one, which is the very flicker this closes.
+        next.base = next.after?.ended ?? next.base
         runningRef.current = next
         setRunning(next)
         setAdvanced(null)
+        // Where the beat ends up, tracked as it publishes. It starts at the
+        // base, so a beat that publishes nothing hands its own board on
+        // unchanged and the chain neither breaks nor invents a step.
+        let ended = next.base
+        const publish = (state: BoardState) => {
+          ended = state
+          setAdvanced(state)
+        }
         // A beat that throws must not hold the board: the shadow is dropped in
         // the finally below regardless, so a failure costs the animation and
         // never the state.
         try {
-          await next.run({ base: next.base, publish: setAdvanced })
+          await next.run({ base: next.base, publish })
         } catch (err) {
           if (import.meta.env.DEV) console.error('[beats] %s failed', next.key, err)
         }
+        // Even after a throw: whatever it managed to publish IS on screen, and
+        // the beat behind it has to animate away from that and not from a board
+        // two states back.
+        next.ended = ended
         next = queue.current.shift()
       }
     } finally {
@@ -276,9 +328,18 @@ export function useBeats(args: {
     // the projection the board already holds — so there is nothing to do but
     // let it render. Planned nowhere, run nowhere: one branch, one place.
     if (reduced) return
+    // Every beat of the batch is planned against ONE projection — the board
+    // still on screen (I1) — and then chained, so that a beat which moves the
+    // board hands it on instead of having it taken back. Planning cannot do the
+    // chaining itself: a plan is a fold of events, and where a beat ends is only
+    // known once it has run.
+    let previous: Beat | undefined
     for (const plan of planBeats(fresh, before)) {
       const beat = beatOf(plan, before)
-      if (beat) queue.current.push(beat)
+      if (!beat) continue
+      beat.after = previous
+      previous = beat
+      queue.current.push(beat)
     }
     void drain()
   }, [events, live, enabled, reduced, beatOf, drain, running])

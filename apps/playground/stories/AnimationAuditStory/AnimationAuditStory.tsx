@@ -741,7 +741,9 @@ const ISSUES: Issue[] = [
       ru: 'apps/ui/src/table/Table/piles.ts (pileWidthFor)',
       en: 'apps/ui/src/table/Table/piles.ts (pileWidthFor)',
     },
-    status: 'reuse',
+    // `open`, not `reuse`: the module is applied in both the kit and the board.
+    // What is missing is an approved source for the ramp — a decision.
+    status: 'open',
   },
 ]
 

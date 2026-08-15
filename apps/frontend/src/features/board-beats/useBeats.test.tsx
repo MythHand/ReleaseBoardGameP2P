@@ -114,14 +114,27 @@ function Probe({
   events,
   anchors,
   intro,
+  shadows,
 }: {
   live: BoardState
   events: Event[]
   anchors: BoardAnchors
   intro?: IntroBeat | null
+  shadows?: string[]
 }) {
   const beats = useBeats({ live, events, anchors, enabled: true, intro })
   const shown = beats.shadow ?? live
+  // Every DISTINCT board the SHADOW has shown, in order. A final-state
+  // assertion cannot see a rollback: the board can go A → B → A → B and end
+  // exactly where it should while the table visibly jumps on the way, so only
+  // the sequence says whether anything was taken back. Consecutive duplicates
+  // are dropped — a re-render that changes nothing is not a frame anybody could
+  // see — and the live projection is not recorded at all, because between two
+  // beats it is not what the board is showing.
+  if (beats.shadow) {
+    const row = beats.shadow.decks.main.join(',')
+    if (shadows && shadows.at(-1) !== row) shadows.push(row)
+  }
   return (
     <>
       {/* The fan as the BOARD would render it — one slot per card of whichever
@@ -201,6 +214,64 @@ it('renders what a running beat publishes, and drops it when the queue drains', 
   })
   await flush()
   expect(getByTestId('deck').textContent).toBe('7')
+})
+
+// Git Branch landing in the same sync as a discard: two beats out of one batch,
+// and the first of them moves the board. `[drawn(mine), …, discarded]` through
+// `resolveAiEvent` is the same shape with a fan instead of a row.
+const splitEvent = { id: 3, type: 'pilesChanged', piles: [4, 6] } as Event
+
+// The projection the WHOLE batch produces — the row split and the card filed.
+const afterBatch = {
+  ...afterDiscard,
+  decks: { ...afterDiscard.decks, main: [4, 6] },
+} as unknown as BoardState
+
+// A batch is planned in one pass against one projection, so every beat of it is
+// handed the same base. That is right for the FIRST beat and wrong for every
+// one after it the moment a beat moves the board under itself: the pile beat
+// publishes the split row, and the beat behind it would render the row the
+// batch started from. On a `[drawn(mine), pilesChanged]` batch that is the
+// drawn card popping out of the fan and back into it — and the final state is
+// correct the whole time, which is why this asserts the sequence.
+it('does not let the next beat of a batch take back what the last one published', async () => {
+  motion.reduced = false
+  sent.calls = []
+  // The discard beat parks in its flight instead of finishing, so the board it
+  // starts from is a state that can be looked at rather than one that flickers
+  // past inside a single act() window. `release` is deliberately never called —
+  // this test wants the beat held for good — so `hang` is put back below, or the
+  // parking would leak into the next test.
+  sent.hang = true
+  const shadows: string[] = []
+  const utils = render(<Probe live={preDiscard} events={[]} anchors={stub} shadows={shadows} />)
+  utils.rerender(
+    <Probe
+      live={afterBatch}
+      events={[splitEvent, discardEvent]}
+      anchors={stub}
+      shadows={shadows}
+    />,
+  )
+  // One window per step rather than one long one: React holds every update
+  // queued inside a single async act() scope until that scope settles, so a
+  // 700ms window would render the end state and nothing before it — and this
+  // test is entirely about what came before it. Enough windows to cover both
+  // beats: the pile beat spans a STEP_HOLD after its publish, and the discard
+  // beat behind it needs a frame window of its own to get past its
+  // wait-for-the-shadow.
+  for (let i = 0; i < 10; i++) await flush()
+  // The second beat really did start — without this the sequence below would
+  // also be satisfied by a queue that dropped it.
+  expect(sent.calls).toHaveLength(1)
+  // The row the batch started from, then the split row the first beat
+  // published — and nothing after it, because the second beat animates away
+  // from the board the first one left. A third entry of '10' here is the
+  // rollback: the fan (or, here, the row) snapping back mid-batch.
+  expect(shadows).toEqual(['10', '4,6'])
+  // The held beat is this test's alone: every test after it sends normally.
+  sent.hang = false
+  sent.release?.()
 })
 
 it('never animates when motion is reduced', async () => {
