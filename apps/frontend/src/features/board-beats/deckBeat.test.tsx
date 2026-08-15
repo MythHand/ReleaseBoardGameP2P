@@ -181,3 +181,35 @@ it('lands the discard as a further pile at the end of the row (fromDiscard)', as
   // read out of `ctx.base` while it still had one.
   expect(played.names).toContain('gatherToDeck')
 })
+
+// "Git Branch + Sudo" — the one real in-game batch that emits TWO pile steps
+// at once: a split, then the discard landing as a further pile. `advance()`
+// exists specifically so the second step runs against the table the FIRST
+// one left, not the one the batch started with. The published SEQUENCE (not
+// just the final state) is what tells a fresh re-read apart from a stale one.
+it('runs the fromDiscard half of a split+fromDiscard batch against the split’s own result', async () => {
+  played.names = []
+  timeline.events = []
+  const { api, ctx, published } = harness()
+  const plan = {
+    kind: 'piles',
+    key: 'piles:9',
+    steps: [
+      { kind: 'split', at: 0, piles: [12, 12] },
+      { kind: 'fromDiscard', at: 2, piles: [12, 12, 6] },
+    ],
+  } as Extract<BeatPlan, { kind: 'piles' }>
+  await drive(() => api.beat?.runPiles(plan, ctx))
+  // Two publishes, in order: the split's own row first, then that SAME row
+  // with the discard appended — not the pre-batch row with a pile invented on
+  // top of it.
+  expect(published.map((s) => s.decks.main)).toEqual([
+    [12, 12],
+    [12, 12, 6],
+  ])
+  // The split's flight, then the discard's landing on the pile it just grew.
+  const flyFromIndex = timeline.events.indexOf('play:flyFrom')
+  const gatherIndex = timeline.events.indexOf('play:gatherToDeck')
+  expect(flyFromIndex).toBeGreaterThanOrEqual(0)
+  expect(gatherIndex).toBeGreaterThan(flyFromIndex)
+})
