@@ -745,6 +745,36 @@ const ISSUES: Issue[] = [
     // What is missing is an approved source for the ramp — a decision.
     status: 'open',
   },
+  {
+    what: {
+      ru: '`drawBeat` меряет якоря без `nextFrames` — мёрдж в том же батче уронит добор',
+      en: '`drawBeat` measures anchors without `nextFrames` — a same-batch merge would drop the draw',
+    },
+    problem: {
+      ru: '`toCentre` в `drawBeat.tsx` меряет `pileBox`/`centre` на входе такта без `await nextFrames()`, хотя `discardBeat`/`deckBeat` уже платят этот вызов за ровно тот же layout-эффект. Сходит с рук только потому, что добор не убирает стопку; `[drawn(pile 2), pilesChanged → merge]` вернёт `pileBox(2) === null` и уронит добор целиком — недостижимо до #108 (Git Branch/Merge с борда). Стаб анкоров в тесте тоже не переработан, в отличие от `deckBeat.test.tsx`.',
+      en: '`toCentre` in `drawBeat.tsx` measures `pileBox`/`centre` at beat entry with no `await nextFrames()`, though `discardBeat`/`deckBeat` already pay that call against the same layout-effect hazard. It gets away with it only because a draw never removes a pile; `[drawn(pile 2), pilesChanged → merge]` would return `pileBox(2) === null` and drop the draw entirely — unreachable until #108 (Git Branch/Merge from the board). The test’s anchors stub is not reworked either, unlike `deckBeat.test.tsx`.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/drawBeat.tsx (toCentre)',
+      en: 'frontend: features/board-beats/drawBeat.tsx (toCentre)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Сброс после `[drawn(mine), discarded]` может целиться в слот, соседний с верным',
+      en: 'A discard after `[drawn(mine), discarded]` can aim next to the right hand slot',
+    },
+    problem: {
+      ru: '`planBeats` резолвит `source.index` сброса против `before`, но очередь тактов передаёт дальше опубликованное состояние такта добора как базу такта сброса, а `useHandArrival` вставляет прилетевшую карту в середину веера — сброс на индексе на месте вставки или после неё летит из соседнего слота. Косметика, лучше отката веера, который был до передачи базы между тактами; честный фикс меняет, как `planBeats` и очередь делят резолвинг индексов.',
+      en: '`planBeats` resolves the discard’s `source.index` against `before`, but the beat queue now chains the draw beat’s published state forward as the discard beat’s base, and `useHandArrival` inserts the arriving card into the middle of the fan — a discard at or after that index flies from the neighbouring slot. Cosmetic, better than the whole-fan rollback that preceded chaining bases between beats; the honest fix changes how `planBeats` and the queue split index resolution.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/planBeats.ts (source.index)',
+      en: 'frontend: features/board-beats/planBeats.ts (source.index)',
+    },
+    status: 'open',
+  },
 ]
 
 // Section headings, notes, legend and table headers.
