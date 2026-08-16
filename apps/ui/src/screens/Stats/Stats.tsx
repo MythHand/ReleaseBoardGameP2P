@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import { cardById } from '@/cards'
 import Avatar from '@/primitives/Avatar'
@@ -105,19 +106,62 @@ const ACHIEVEMENTS: Achievement[] = [
   },
 ]
 
-// Кегль имени на плашке — функция его длины. Ник ограничен 20 символами и
-// пробелов в нём не бывает (sanitizeNickname пропускает только A-Za-z0-9_.-),
-// значит перенести его по словам нельзя: длинное имя либо режется, либо
-// уменьшается. Режется — нельзя, экран целиком про «кто». Шрифт моноширинный,
-// поэтому число символов и есть ширина — шаг выбирается по ней одной формулой.
-const HOLDER_STEPS: { max: number; base: TypographyBase }[] = [
-  { max: 12, base: 'code' }, // 26px — герой плашки
-  { max: 16, base: 'mono-xl' }, // 17px
-  { max: Number.POSITIVE_INFINITY, base: 'mono-lg' }, // 15px — предел ника (20)
-]
+// Шаги кегля имени, от героя вниз. Что за строка придёт — экран не знает:
+// поле ввода в Start чистит ник и режет по 20 символам, но сюда имя приходит
+// пропсом — от пира по сети, из сохранённого состояния, от любого консьюмера.
+// Поэтому никаких допущений о длине и составе: длинное имя либо режется, либо
+// уменьшается, а режется — нельзя, экран целиком про «кто».
+const HOLDER_STEPS: TypographyBase[] = ['code', 'mono-xl', 'mono-lg']
+const LAST_STEP = HOLDER_STEPS.length - 1
 
-const holderBase = (name: string): TypographyBase =>
-  HOLDER_STEPS.find((s) => name.length <= s.max)?.base ?? 'mono-lg'
+// Какой шаг взять — решает МЕСТО, а не длина имени. Ширина плашки плавает:
+// колонок три, паддинг экрана — clamp(40px, 8vw, 120px), так что «12 символов»
+// в одном окне влезают крупным кеглем, а в другом нет. Поэтому имя ставится
+// самым крупным шагом и уменьшается на шаг, пока не влезет в свою строку —
+// мерит браузер, а не формула из продублированных значений шкалы.
+// На последнем шаге, если не влезло и оно, включается перенос: лучше две
+// строки, чем молча обрезанный край.
+function HolderName({ name }: { name: string }) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const textRef = useRef<HTMLSpanElement>(null)
+  const [step, setStep] = useState(0)
+
+  // изменилось ДОСТУПНОЕ место (окно, раскладка) — тоже с начала. Высота бокса
+  // меняется от самой смены кегля, поэтому реагируем только на ширину.
+  useLayoutEffect(() => {
+    const el = boxRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let width = el.clientWidth
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth === width) return
+      width = el.clientWidth
+      setStep(0)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // замер после каждой отрисовки: натуральная ширина имени против ширины
+  // коробки. Не влезло и есть куда мельчить — шаг вниз. Сходится максимум за
+  // длину шкалы и до кадра, так что мигания нет.
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const text = textRef.current
+    if (!box || !text || step >= LAST_STEP) return
+    if (text.getBoundingClientRect().width > box.clientWidth) setStep(step + 1)
+  })
+
+  const wrap = step === LAST_STEP
+  return (
+    <div ref={boxRef} className={styles.achHolderBox}>
+      <span ref={textRef} className={`${styles.achHolderText} ${wrap ? styles.achHolderWrap : ''}`}>
+        <Typography base={HOLDER_STEPS[step] ?? 'mono-lg'} tk="tk-02" className={styles.achHolder}>
+          {name}
+        </Typography>
+      </span>
+    </div>
+  )
+}
 
 const TONE_CLASS: Record<AchTone, string> = {
   attack: styles.toneAttack,
@@ -240,9 +284,8 @@ export default function Stats({
                 </div>
                 <div className={styles.achBody}>
                   <div className={styles.achName}>
-                    <Typography base={holderBase(top.name)} tk="tk-02" className={styles.achHolder}>
-                      {top.name}
-                    </Typography>
+                    {/* key — сброс подобранного шага: другое имя меряется заново */}
+                    <HolderName key={top.name} name={top.name} />
                     {selfMark(top.id)}
                   </div>
                   <Typography base="heading-7" tk="tk-04" className={styles.achTitle}>
