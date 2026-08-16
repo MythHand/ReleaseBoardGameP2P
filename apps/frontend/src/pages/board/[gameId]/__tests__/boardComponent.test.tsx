@@ -36,7 +36,7 @@ it('renders the participants roster from room, not state', () => {
   fireEvent.click(getByText(props.copy.table.tabParticipants))
 
   // a participant and a spectator, both sourced from `room`, must render
-  expect(getByText('you')).toBeTruthy()
+  expect(getByText('deadlock')).toBeTruthy()
   expect(getByText('oracle')).toBeTruthy()
 
   // remove that spectator from `room.spectators` and re-render with the same

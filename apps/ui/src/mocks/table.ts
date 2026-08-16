@@ -110,7 +110,7 @@ export function makeTable(opponentCount = 3): TableState {
 
   return {
     you: {
-      name: 'you',
+      name: 'deadlock',
       hand: makeHand(6),
       release: {
         frontend: cardById('release-frontend'),
@@ -131,7 +131,7 @@ export function makeTable(opponentCount = 3): TableState {
     // Полный состав: игроки (в игре / выбыл / нет связи) + зрители.
     // i===0: в игре, но потеряна связь (красный); i===1: выбыл и без связи (серый)
     participants: [
-      { id: 'you', name: 'you', eliminated: false, connected: true },
+      { id: 'you', name: 'deadlock', eliminated: false, connected: true },
       ...opponents.map((o, i) => ({
         id: o.id,
         name: o.name,

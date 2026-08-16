@@ -13,6 +13,7 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
     subtitle: 'Партия завершена',
     winnerLabel: 'победитель',
     winnerTag: 'winner',
+    selfTag: 'вы',
     colName: 'игрок',
     colLoc: 'где сейчас',
     colAttack: 'атакующих',
@@ -37,6 +38,7 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
     subtitle: 'Match over',
     winnerLabel: 'winner',
     winnerTag: 'winner',
+    selfTag: 'you',
     colName: 'player',
     colLoc: 'location',
     colAttack: 'attack',
@@ -58,10 +60,34 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
   },
 }
 
+// Ник ограничен 20 символами и пробелов в нём не бывает, поэтому длина —
+// отдельный кейс раскладки, а не мелочь: имя ведёт и строку таблицы, и плашку
+// ачивки. По умолчанию мок уже отдаёт РАЗНЫЕ длины (8 / 14 / 20), так что все
+// три шага кегля видны на одном экране; два других набора — это стресс, когда
+// длинные ники у всех сразу. Взяты из настоящего пула кнопки «рандомный ник»
+// (`long`) и добиты до предела поля (`max`).
+type NameSet = 'mixed' | 'long' | 'max'
+
+const NAMES: Record<NameSet, string[] | null> = {
+  mixed: null, // как в моке: deadlock 8, TabsOverSpaces 14, SyntaxSeagull_9000_x 20, null_ptr 8
+  long: ['TabsOverSpaces', 'CtrlAltDefeat', 'BugWhisperer', 'MergeGremlin'],
+  max: [
+    'SyntaxSeagull_9000_x',
+    'QuantumYak_Overflow9',
+    'RubberDuck_Debugger1',
+    'HeapHopper_Kernel_88',
+  ],
+}
+
 export default function StatsStory() {
   const { lang, setLang } = useLang()
   const [bg, setBg] = useState<'neutral' | 'positive'>('neutral')
+  const [names, setNames] = useState<NameSet>('mixed')
   const data = makeStats()
+  const swap = NAMES[names]
+  const players = swap
+    ? data.players.map((p, i) => ({ ...p, name: swap[i] ?? p.name }))
+    : data.players
   return (
     <div className={styles.root}>
       <TechBar>
@@ -73,9 +99,26 @@ export default function StatsStory() {
           value={bg}
           onChange={setBg}
         />
+        <TechSwitch
+          label="nickname"
+          options={[
+            { value: 'mixed', label: 'mixed' },
+            { value: 'long', label: 'long' },
+            { value: 'max', label: 'max 20' },
+          ]}
+          value={names}
+          onChange={setNames}
+        />
       </TechBar>
       <div className={styles.stage}>
-        <Stats {...data} copy={pick(lang, COPY)} lang={lang} onLangChange={setLang} bgTone={bg} />
+        <Stats
+          {...data}
+          players={players}
+          copy={pick(lang, COPY)}
+          lang={lang}
+          onLangChange={setLang}
+          bgTone={bg}
+        />
       </div>
     </div>
   )
