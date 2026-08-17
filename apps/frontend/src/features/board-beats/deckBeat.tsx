@@ -176,7 +176,12 @@ export function useDeckBeat(anchors: BoardAnchors) {
     [step],
   )
 
-  return { overlay, runReshuffle, runPiles }
+  // A new match cancels what is in the air: the only carrier this beat ever
+  // raises is the one flyer `discardOntoPile` puts up (the gathered discard, or
+  // the recycled pile), so dropping it is the whole of it.
+  const reset = useCallback(() => drop(), [drop])
+
+  return { overlay, runReshuffle, runPiles, reset }
 }
 
 // The board with a different row of piles — published to the queue AND written

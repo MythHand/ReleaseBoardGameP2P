@@ -62,6 +62,7 @@ export function useDrawBeat(anchors: BoardAnchors) {
     gapAt,
     gapSize,
     arrive,
+    reset: resetArrival,
   } = useHandArrival(anchors.hand, (gap, landed) => {
     const c = ctx.current
     if (!c) return
@@ -185,5 +186,18 @@ export function useDrawBeat(anchors: BoardAnchors) {
     [toCentre, patch, drop, elOf],
   )
 
-  return { overlay: [...flyerOverlay, ...handOverlay, ...exit.overlay], gapAt, gapSize, run }
+  // A new match cancels what is in the air: every carrier this beat can leave
+  // mid-flight, dropped. `drop()` with no key takes down every flyer this run
+  // raised (the centre card, a closed card on its way to a seat); the arrival
+  // and the exit are the SAME shared steps `discardBeat` resets for the same
+  // reason, reached through here because a draw can end in either of them (a
+  // trigger leaves through `exit`, a card of the drawer's own through
+  // `arrive`).
+  const reset = useCallback(() => {
+    drop()
+    resetArrival()
+    exit.reset()
+  }, [drop, resetArrival, exit])
+
+  return { overlay: [...flyerOverlay, ...handOverlay, ...exit.overlay], gapAt, gapSize, run, reset }
 }

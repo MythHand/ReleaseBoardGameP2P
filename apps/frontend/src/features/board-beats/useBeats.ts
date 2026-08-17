@@ -242,6 +242,7 @@ export function useBeats(args: {
   // the arm also keeps it before the BATCH effect, which must not read a stale
   // watermark on the one pass where it matters most.)
   const playing = useRef<string | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws` and `decks` are read for the CURRENT render's runners on purpose, not added to the deps below — their own `reset` are unmemoized (a fresh function every render), so listing them would fire this on every render instead of once per match key
   useLayoutEffect(() => {
     const key = intro?.key ?? null
     if (key == null || playing.current === key) return
@@ -249,6 +250,18 @@ export function useBeats(args: {
     seen.current = 0
     settled.current = live
     queue.current = []
+    // A new match cancels what is in the air. The wipe just above takes the
+    // RECORD of the work still queued — it does nothing for a beat already
+    // shifted out and running, because that beat is not in the queue any more.
+    // Its own carriers (a flyer mid-flight, a parked hand-arrival, a parked
+    // discard exit) belong to the runner, not to the queue, and they outlive
+    // the dead match unless told otherwise: a card from it would keep crossing
+    // the board of the NEW one, flying to a discard pile — or a hand — that no
+    // longer exists. So every runner's own reset() runs here too, beside the
+    // wipe, for the same match-boundary reason.
+    discards.reset()
+    draws.reset()
+    decks.reset()
   }, [intro?.key, live])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a

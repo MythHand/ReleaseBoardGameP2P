@@ -20,7 +20,7 @@ const rectOf = (el: Element | null): Rect | null => {
 }
 
 export function useDiscardBeat(anchors: BoardAnchors) {
-  const { overlay, send } = useDiscardExit(anchors.discardBox)
+  const { overlay, send, reset } = useDiscardExit(anchors.discardBox)
   const latest = useRef({ anchors, send })
   latest.current = { anchors, send }
 
@@ -63,5 +63,5 @@ export function useDiscardBeat(anchors: BoardAnchors) {
     [toLeaving],
   )
 
-  return { overlay, run }
+  return { overlay, run, reset }
 }

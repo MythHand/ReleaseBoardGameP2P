@@ -18,21 +18,36 @@ const sent = vi.hoisted(() => ({
   hang: false,
   release: null as (() => void) | null,
 }))
-vi.mock('@release/ui/animations', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@release/ui/animations')>()),
-  useDiscardExit: () => ({
-    overlay: [],
-    send: (items: unknown[]) => {
-      sent.calls.push(items)
-      if (!sent.hang) return Promise.resolve()
-      return new Promise<void>((r) => {
-        sent.release = r
-      })
+vi.mock('@release/ui/animations', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@release/ui/animations')>()
+  const { useState } = await import('react')
+  return {
+    ...actual,
+    // A stateful stand-in, not a fixed `overlay: []`: the rematch test needs to
+    // tell "a flyer is mounted" from "reset() cleared it", and a hardcoded empty
+    // overlay can't distinguish those — it would pass whether or not the fix
+    // that clears it on a new match exists at all.
+    useDiscardExit: () => {
+      const [flying, setFlying] = useState(false)
+      return {
+        overlay: flying ? ['flight'] : [],
+        send: (items: unknown[]) => {
+          sent.calls.push(items)
+          if (!sent.hang) return Promise.resolve()
+          setFlying(true)
+          return new Promise<void>((r) => {
+            sent.release = () => {
+              setFlying(false)
+              r()
+            }
+          })
+        },
+        reset: () => setFlying(false),
+        FLIGHT_MS: 420,
+      }
     },
-    reset: () => {},
-    FLIGHT_MS: 420,
-  }),
-}))
+  }
+})
 
 const card = (id: string) => cardById(id) as CardData
 
@@ -150,6 +165,9 @@ function Probe({
           whether the board is showing the opening's shadow or the projection. */}
       <div data-testid="deck">{(beats.shadow ?? live).decks.main.join(',')}</div>
       <div data-testid="exclusive">{beats.exclusive ? 'exclusive' : 'open'}</div>
+      {/* How many flyers are mounted right now — a dead match's in-flight card
+          shows up here until its runner's own reset() clears it. */}
+      <div data-testid="overlay">{beats.overlays.length}</div>
     </>
   )
 }
@@ -403,6 +421,14 @@ it('keeps the rematch’s opening when it lands while a beat is in flight', asyn
     collapse: () => log.push('collapse2'),
   }
   utils.rerender(<Probe live={preDiscard} events={[]} anchors={stub} intro={second} />)
+  // A new match cancels what is in the air: the dead match's flight is still
+  // "sent" — its promise is deliberately left unresolved by this test — but the
+  // reset effect runs synchronously in the same commit as the rematch, so by
+  // the time rerender() returns the runner's own reset() has already cleared
+  // its overlay. Asserting on the overlay at this exact instant says which of
+  // the two the branch chose: keep flying a card into a discard pile that
+  // belongs to a match that no longer exists, or drop it.
+  expect(utils.getByTestId('overlay').textContent).toBe('0')
   // The flight lands; the queue must still hold the second opening.
   sent.hang = false
   await act(async () => {
