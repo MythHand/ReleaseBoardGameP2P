@@ -102,6 +102,12 @@ export interface BoardStaging {
   onCardClick: (index: number) => void // the partner pick — the fold
   onTargetPick: (target: TableTarget) => void
   cancel: () => void
+  // The combo beat's own clear (#100, Task 11): once a dispatched play's
+  // `attackPlaced`/`releasePlaced` beat has taken the staged node over — it is
+  // already standing exactly where the pending render (or the release zone)
+  // wants it — the beat calls this instead of `cancel()`, which would start a
+  // return flight for a play that is not coming back.
+  release: () => void
 }
 
 export interface Options {
@@ -494,6 +500,13 @@ export function useBoardStaging({
     }
   }, [events, cancel])
 
+  // the combo beat's own clear (#100) — no flight, just done. Unguarded, unlike
+  // `cancel()`: the beat only ever calls this once ITS OWN read of the handoff
+  // says the staged node is the one standing at the centre, so there is
+  // nothing here left to double-check.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  const release = useCallback(() => commitStaged(null), [])
+
   return {
     staged,
     dispatched: staged?.phase === 'dispatched',
@@ -509,5 +522,6 @@ export function useBoardStaging({
     onCardClick,
     onTargetPick,
     cancel,
+    release,
   }
 }

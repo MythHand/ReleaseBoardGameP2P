@@ -271,3 +271,34 @@ it('a pending attack stands at the centre for every viewer', () => {
   const { getByTestId } = render(<Board {...props} />)
   expect(getByTestId('board-centre-pending')).toBeTruthy()
 })
+
+// #100, Task 11: a sudo defence pending stands the PAIR at the centre — the
+// combo beat's fold lands on `CardPair`'s own inline pose (`PAIR_AUX_POSE`),
+// so this is what makes that handover invisible. `data-pending-play` itself is
+// what the combo beat's `pairToDiscard` runner measures to split the pair back
+// out (comboBeat.test.tsx) — pinned here from the other side: the attribute
+// carries the pair, not just a lone card, whenever the pending says sudo.
+it('stands the pair at the centre for a sudo defence pending', () => {
+  const base = makeBoardProps()
+  const props = makeBoardProps({
+    state: {
+      ...base.state,
+      pending: {
+        kind: 'defend',
+        player: 'p2',
+        attacker: 'p1',
+        attackCard: 'attack-bug',
+        sudo: true,
+        options: [],
+        openedAt: 0,
+        deadline: 15000,
+        scope: 'hand',
+      },
+    },
+  })
+  const { getByTestId } = render(<Board {...props} />)
+  const pending = getByTestId('board-centre-pending')
+  expect(pending.hasAttribute('data-pending-play')).toBe(true)
+  expect(pending.querySelector('[data-main]')).toBeTruthy()
+  expect(pending.querySelector('[data-aux]')).toBeTruthy()
+})

@@ -195,6 +195,29 @@ export interface BeatRun {
 }
 
 /**
+ * The staging → beat handoff (#100, Task 11). `_useBoardStaging.ts` stands a
+ * pulled play — solo or a folded pair — at the centre and, once the engine
+ * accepts it, holds it there rather than clearing it: the centre pending
+ * render (or the release zone) is about to take over the exact same spot, and
+ * clearing early would drop a frame between the two. The combo beat is the
+ * one that knows when that handover actually happens, so it is the one that
+ * clears it — through `release()`, once its own fold has nothing left to do
+ * (the actor's own play is already standing where the projection wants it).
+ *
+ * A ref, not state: the beat reads it once at run start and `release()` is a
+ * plain clear, not a re-render the beat would have to wait on. It lives here,
+ * not in `features/`, for the same reason `BeatRun` does — a feature must not
+ * import from a sibling feature, and both the page (`pages/board`) and the
+ * beat queue (`features/board-beats`) need this same shape.
+ */
+export interface StagedHandoff {
+  mainUid: string
+  supportUid?: string
+  el: HTMLElement | null // the staged node at the centre (pair flyer or single-card node)
+  release: () => void // clears the page's staging state
+}
+
+/**
  * The opening, handed to the beat queue as one beat. It is not planned from
  * events like the others — it is a whole shape rather than a fold of the
  * projection, so it publishes its own `shadow` and the queue renders that. But

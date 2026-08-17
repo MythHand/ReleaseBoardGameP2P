@@ -14,4 +14,5 @@ export type {
   BoardState,
   IntroBeat,
   Panel,
+  StagedHandoff,
 } from './types'
