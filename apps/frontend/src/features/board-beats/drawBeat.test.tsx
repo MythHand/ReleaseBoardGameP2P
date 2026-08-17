@@ -12,7 +12,10 @@ const played = vi.hoisted(() => ({ names: [] as string[] }))
 // FIRST card actually grew to, not the length the batch started with; the
 // resulting hand's LENGTH can't tell the two apart (splice always inserts one
 // item regardless of `gap`), so the test needs this sequence, not the count.
-const arrivals = vi.hoisted(() => ({ handLengths: [] as number[] }))
+const arrivals = vi.hoisted(() => ({
+  handLengths: [] as number[],
+  ats: [] as (number | undefined)[],
+}))
 // What the discard exit step actually received — not just that it was called.
 const exits = vi.hoisted(() => ({ items: [] as Leaving[] }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
@@ -53,6 +56,11 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
         ...step,
         arrive: (items: Parameters<typeof step.arrive>[0], handLength: number, at?: number) => {
           arrivals.handLengths.push(handLength)
+          // `at` is the SLOT the card lands in, and it is recorded separately
+          // because it is a different claim from how big the fan was: the fan
+          // can be right while the landing place is wrong, which is exactly the
+          // defect the landing test below pins.
+          arrivals.ats.push(at)
           return step.arrive(items, handLength, at)
         },
       }
@@ -174,6 +182,27 @@ it('grows the fan between the cards of a multi-draw (I8)', async () => {
   // with (0 again). A stale read of the run's ORIGINAL base passes [0, 0]
   // here instead — same final count, wrong slot for the second card.
   expect(arrivals.handLengths).toEqual([0, 1])
+})
+
+// Where the card LANDS, which is a different claim from how big the fan was.
+// `useHandArrival` puts an arrival in the middle of the fan by default, and for
+// a playground scene that is right — the scene owns its hand array and can put
+// the card wherever it just animated it to. The board cannot: the projection
+// owns the hand, and the engine APPENDS a drawn card (fake/reduce.ts:126) in an
+// order `toBoardState` passes straight through. So the slot has to be the end,
+// or the beat's last frame disagrees with the projection it hands to and the
+// card jumps from mid-fan to the end the moment the shadow drops.
+it('lands a drawn card at the end of the fan, where the projection puts it', async () => {
+  arrivals.handLengths = []
+  arrivals.ats = []
+  const { published, go } = run([draw(), draw({ key: 'w5', eventId: 5, card: 'attack-ddos' })])
+  await go()
+  // Each card aims at the slot after everything already in the fan — never the
+  // middle, which for the second card here would be slot 0 (round(1/2)).
+  expect(arrivals.ats).toEqual([0, 1])
+  // And the published hand agrees, in order: the card the beat flew second is
+  // the one the fan holds last.
+  expect(published.at(-1)?.you.hand.map((h) => h.card.id)).toEqual(['attack-bug', 'attack-ddos'])
 })
 
 it('reveals a trigger at the centre and files it in the discard itself', async () => {
