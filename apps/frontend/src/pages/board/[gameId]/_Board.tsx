@@ -12,7 +12,6 @@ import {
   Button,
   Card,
   cardById,
-  centerOf,
   type DockView,
   Drawer,
   deriveDock,
@@ -44,7 +43,6 @@ import {
   useArrow,
 } from '@release/ui'
 import { HEAP_SHOW, restTransform } from '@release/ui/animations'
-import type React from 'react'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:
 // where every block sits, how big it is, what it overlaps. The board is a fork
@@ -236,61 +234,17 @@ export default function Board({
   const controlled = panelProp !== undefined
   const panel = controlled ? panelProp : ownPanel
 
-  // gesture machine (Tasks 6–7): turns clicks into completed intents. Legality
-  // is always the engine's answer (state.playable / actions.legalTargets) —
-  // Table only renders what the hook decided, never re-derives it.
-  const gestures = useBoardInteractions({
-    state,
-    actions,
-    comboOptions: (card) => state.comboOptions?.[card] ?? [],
-  })
+  // gesture machine: turns clicks into completed intents. Legality is always
+  // the engine's answer (state.playable / state.targets) — Table only renders
+  // what the hook decided, never re-derives it.
+  const gestures = useBoardInteractions({ state, actions })
 
-  // targeting arrow: origin is the SOURCE card's slot — `gestures.selected`,
-  // resolved through `data-hand-slot` — not whatever was clicked most
-  // recently. `selected` stays the source through the whole combo-then-target
-  // sequence (the partner click only sets `combo`), so re-deriving the origin
-  // from it on every phase change keeps the arrow anchored to the source even
-  // when a combo partner is picked afterwards. The tip follows the cursor via
-  // the mousemove listener inside useArrow, which is only mounted while
-  // `active` is true — kept in lockstep with `phase === 'selected'` here, so
-  // it comes down on every exit from that phase, including unmount.
-  //
-  // The effect is keyed on `phase`/`selected` only — NOT on `you.hand` — on
-  // purpose: it arms once per selection, not once per render. `you.hand` is a
-  // fresh array on every projection update (Milestone 3's `toTableState`
-  // rebuilds `TableState` from scratch each time), and `Table` re-renders on
-  // the turn clock; if `you.hand` were a dependency, every such re-render
-  // while a target is pending would re-run `arrow.aim(origin)`, which sets
-  // `to = origin` and snaps the tracked cursor position back to the source —
-  // discarding whatever the mousemove listener had followed it to. `you.hand`
-  // is still read inside the effect (to resolve the selected uid's slot
-  // element), just not watched for changes.
-  // (The slot comes from `anchors.handSlotAt` — the board's own registry, which
-  // the deal and the beat queue read too, rather than a third copy of the
-  // `[data-hand-slot]` query living in this effect.)
+  // Transitional: the targeting arrow (Task 3 rewires it to the staging
+  // gesture) and the Escape-to-cancel binding (Task 3 restores it) both need a
+  // live selection to aim or cancel, and this hook no longer carries one — so
+  // both are gone from here for this commit. `useArrow()` and `<Arrow …/>`
+  // stay mounted; only the effect that armed the former is removed.
   const arrow = useArrow()
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `you.hand` is read to resolve the selected uid's slot element, not watched — see the comment above for why it must stay out of the dependency array
-  useEffect(() => {
-    if (gestures.phase !== 'selected') {
-      arrow.stop()
-      return
-    }
-    const index = gestures.selected ? you.hand.findIndex((c) => c.uid === gestures.selected) : -1
-    const slotEl = index >= 0 ? anchors.handSlotAt(index) : null
-    if (slotEl) arrow.aim(centerOf(slotEl))
-  }, [gestures.phase, gestures.selected, arrow.aim, arrow.stop])
-
-  // Escape cancels an in-flight target selection. Bound to the window (not a
-  // React onKeyDown) so it fires regardless of what currently has focus, and
-  // — like the arrow's mousemove — only while there is something to cancel.
-  useEffect(() => {
-    if (gestures.phase !== 'selected') return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') gestures.cancel()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [gestures.phase, gestures.cancel])
 
   // Escape skips the opening. Same window binding and the same reason as the
   // cancel above; `finish` is idempotent, so a second press is a no-op.
@@ -304,20 +258,12 @@ export default function Board({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [deal.active, dealFinish])
 
-  // A click that lands outside any hand slot while a target is pending reads
-  // as "changed my mind" — cancel. Clicks that land on a legal target already
-  // resolve (and reset) through onTargetPick before bubbling here, so this is
-  // a no-op in that case, not a race.
-  const handleTableClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // …and anywhere on the table while the opening plays, it skips it.
-    if (deal.active) {
-      dealFinish()
-      return
-    }
-    if (gestures.phase !== 'selected') return
-    const target = e.target as HTMLElement
-    if (target.closest('[data-hand-slot]')) return
-    gestures.cancel()
+  // Transitional: this used to also cancel an in-flight target selection on a
+  // backdrop click — gone with `gestures.phase`/`gestures.cancel` above, Task 3
+  // restores it through the staging gesture. What's left: anywhere on the
+  // table while the opening plays, a click skips it.
+  const handleTableClick = () => {
+    if (deal.active) dealFinish()
   }
 
   const isHost = role === 'host'
@@ -362,7 +308,7 @@ export default function Board({
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-cancel for an in-flight target selection; the accessible affordance is the Escape handler above
+    // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening; the accessible affordance is the Escape-skips-the-opening handler below
     <div className={kit.table} onClick={handleTableClick} role="presentation">
       {/* the table's own ambience — a layer, so the opening can bring it in
           whole without touching the screen's base fill */}
@@ -397,8 +343,9 @@ export default function Board({
                 disconnected={disconnected}
                 copy={copy.seat}
                 slotRef={(key, el) => anchors.bindReleaseSlot(p.id, key, el)}
-                onPick={(target) => gestures.onTargetPick(target)}
-                targets={gestures.targets}
+                // Transitional: inert until Task 3 wires the staging gesture.
+                onPick={() => {}}
+                targets={[]}
               />
             </div>
           )
@@ -485,8 +432,9 @@ export default function Board({
                 size="100px"
                 player={state.selfId}
                 slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
-                onPick={(target) => gestures.onTargetPick(target)}
-                targets={gestures.targets}
+                // Transitional: inert until Task 3 wires the staging gesture.
+                onPick={() => {}}
+                targets={[]}
               />
             </div>
             <div className={kit.handWrap} ref={anchors.hand}>
@@ -502,7 +450,6 @@ export default function Board({
                 // closed until the flip. Both are gone the moment it ends, so
                 // the released hand is the plain one this board always drew.
                 onCardClick={deal.active ? undefined : (i) => gestures.onCardClick(i)}
-                accentAt={gestures.accentAt}
                 renderFace={
                   deal.active
                     ? (item, ctx) => (

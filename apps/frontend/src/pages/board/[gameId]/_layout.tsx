@@ -25,6 +25,7 @@ const EMPTY_TABLE = {
   setup: DEFAULT_SETUP,
   playable: [],
   frozen: [],
+  targets: {},
 }
 
 export default function BoardPage() {
