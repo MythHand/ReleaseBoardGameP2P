@@ -16,8 +16,8 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
     selfTag: 'вы',
     colName: 'игрок',
     colLoc: 'где сейчас',
-    colAttack: 'атакующих',
-    colDefense: 'защитных',
+    colAttack: 'атак',
+    colDefense: 'защит',
     toLobby: 'в лобби',
     location: {
       game: 'в игре',

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import { cardById } from '@/cards'
 import Avatar from '@/primitives/Avatar'
@@ -7,6 +7,7 @@ import Button from '@/primitives/Button'
 import Card from '@/primitives/Card'
 import HudBackground, { type HudBackgroundTone } from '@/primitives/HudBackground'
 import HudSurface from '@/primitives/HudSurface'
+import ScrollArea from '@/primitives/ScrollArea'
 import Typography, { type TypographyBase } from '@/primitives/Typography'
 import styles from './Stats.module.css'
 
@@ -65,6 +66,9 @@ interface StatsProps {
   onLangChange?: (lang: SwitchLang) => void
   // HUD-фон экрана (переключается снаружи — напр. из техстроки песочницы)
   bgTone?: HudBackgroundTone
+  // слот переписки, а не её данные: экран даёт ей место у правого края, а чем
+  // это место занять — решает консьюмер. Без слота экран прежний, во всю ширину.
+  chat?: ReactNode
 }
 
 // Accent of a plate — the whole HUD scheme of the achievement hangs on it:
@@ -79,17 +83,16 @@ interface Achievement {
 }
 
 // Структура ачивок: какой показатель, каким акцентом горит плашка и какие
-// карты-превью. Тексты — из copy. Порядок задаёт раскладку: 3 равных в ряд,
-// затем 1 обычной ширины и широкий «Забагованный» (на 2 карточки) со всеми
-// картами атаки + Error 503.
+// карты-превью. Тексты — из copy. Порядок — порядок показа: первым идёт широкий
+// «Забагованный» (со всеми картами атаки + Error 503), он занимает строку
+// целиком, дальше обычные парами.
+// Порядок — единственное, что раскладка знает наверняка: сколько плашек дойдёт
+// до экрана, решает `leader` (ничья не достаётся никому), так что ряд обычных
+// может оборваться на середине — и это нормальный вид, а не сломанный.
 // Акцент = категория карты, о которой ачивка (attack / operation / ai). Оба
 // триггера цвета категории не имеют (`--cat-trigger` технически белый), поэтому
 // Error 503 берёт `--danger-accent` — токен, который именно за 503 и закреплён.
 const ACHIEVEMENTS: Achievement[] = [
-  { key: 'ddos', tone: 'attack', cards: ['attack-ddos'] },
-  { key: 'ai', tone: 'ai', cards: ['trigger-ai'] },
-  { key: 'err503', tone: 'danger', cards: ['trigger-error-503'] },
-  { key: 'cherryPick', tone: 'operation', cards: ['operation-git-cherry-pick'] },
   {
     key: 'attackedInto',
     tone: 'attack',
@@ -104,6 +107,10 @@ const ACHIEVEMENTS: Achievement[] = [
       'attack-bug',
     ],
   },
+  { key: 'ai', tone: 'ai', cards: ['trigger-ai'] },
+  { key: 'cherryPick', tone: 'operation', cards: ['operation-git-cherry-pick'] },
+  { key: 'err503', tone: 'danger', cards: ['trigger-error-503'] },
+  { key: 'ddos', tone: 'attack', cards: ['attack-ddos'] },
 ]
 
 // Шаги кегля имени, от героя вниз. Что за строка придёт — экран не знает:
@@ -144,11 +151,16 @@ function HolderName({ name }: { name: string }) {
   // замер после каждой отрисовки: натуральная ширина имени против ширины
   // коробки. Не влезло и есть куда мельчить — шаг вниз. Сходится максимум за
   // длину шкалы и до кадра, так что мигания нет.
+  // Обе ширины берём одинаково — дробными, из rect: clientWidth округлён, и на
+  // строке, которая заполняет коробку впритык, шаг решала бы доля пикселя.
+  // Порог в 1px — про то же: «не влезло» должно быть видно, а не вычислено.
   useLayoutEffect(() => {
     const box = boxRef.current
     const text = textRef.current
     if (!box || !text || step >= LAST_STEP) return
-    if (text.getBoundingClientRect().width > box.clientWidth) setStep(step + 1)
+    if (text.getBoundingClientRect().width > box.getBoundingClientRect().width + 1) {
+      setStep(step + 1)
+    }
   })
 
   const wrap = step === LAST_STEP
@@ -178,6 +190,7 @@ export default function Stats({
   lang,
   onLangChange,
   bgTone = 'neutral',
+  chat,
 }: StatsProps) {
   const winner = players.find((p) => p.id === winnerId)
   // «это ты» — один и тот же элемент везде, где экран называет игрока: блок
@@ -188,17 +201,20 @@ export default function Stats({
         {copy.selfTag}
       </Badge>
     ) : null
+  // Достаётся ли ачивка кому-то вообще. Двух причин, по которым нет, две:
+  // показателя не случилось ни у кого (максимум — ноль), и показатель разделён
+  // поровну. Ничья не разрешается ни в чью пользу: плашка называет ОДНОГО, и
+  // назвать первого попавшегося из равных — значит соврать. Поэтому ачивок не
+  // всегда пять, и раскладка обязана переживать неполный ряд.
   const leader = (key: MetricKey): StatPlayer | undefined => {
     if (players.length === 0) return undefined
-    const top = players.reduce((best, p) => (p[key] > best[key] ? p : best))
-    // Skip the achievement when nobody actually triggered the metric (max is 0),
-    // otherwise a player who never did it is shown as the leader.
-    return top[key] > 0 ? top : undefined
+    const best = players.reduce((top, p) => (p[key] > top[key] ? p : top))
+    if (best[key] === 0) return undefined
+    return players.filter((p) => p[key] === best[key]).length === 1 ? best : undefined
   }
 
-  return (
-    <div className={styles.stats}>
-      <HudBackground tone={bgTone} className={styles.bgLayer} />
+  const body = (
+    <>
       <header className={styles.head}>
         <div>
           <h1 className={styles.title}>{copy.title}</h1>
@@ -305,6 +321,28 @@ export default function Stats({
           )
         })}
       </div>
+    </>
+  )
+
+  // Без чата экран длинный и прокручивается снаружи — как и был. С чатом место у
+  // правого края занимает панель, которая никуда не едет, поэтому прокрутка
+  // переезжает внутрь: экран ростом в своё окно, итоги едут в своём вьюпорте.
+  if (chat == null) {
+    return (
+      <div className={styles.stats}>
+        <HudBackground tone={bgTone} className={styles.bgLayer} />
+        {body}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`${styles.stats} ${styles.chatMode}`}>
+      <HudBackground tone={bgTone} className={styles.bgLayer} />
+      <ScrollArea className={styles.main} contentClassName={styles.mainInner}>
+        {body}
+      </ScrollArea>
+      <aside className={styles.chatDock}>{chat}</aside>
     </div>
   )
 }
