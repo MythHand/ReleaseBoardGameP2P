@@ -265,6 +265,11 @@
     "actions": "actions",
     "kick": "kick"
   },
+  "chat": {
+    "placeholder": "message",
+    "send": "send",
+    "empty": "quiet so far"
+  },
   "reconnect": {
     "label": "reconnecting…",
     "retry": "reconnect",
@@ -617,6 +622,7 @@
     "modesLockedHint": "set by host",
     "players": "Players",
     "capacity": "Capacity",
+    "chat": "chat",
     "spectators": "Spectators",
     "specLimit": "Limit",
     "freeSlot": "free slot",

@@ -265,6 +265,11 @@
     "actions": "действия",
     "kick": "исключить"
   },
+  "chat": {
+    "placeholder": "сообщение",
+    "send": "отправить",
+    "empty": "пока тихо"
+  },
   "reconnect": {
     "label": "переподключение…",
     "retry": "переподключиться",
@@ -617,6 +622,7 @@
     "modesLockedHint": "настраивает host",
     "players": "Игроки",
     "capacity": "Вместимость",
+    "chat": "чат",
     "spectators": "Зрители",
     "specLimit": "Лимит",
     "freeSlot": "свободный слот",

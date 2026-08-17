@@ -1,0 +1,18 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
+  overflow: hidden;
+}
+
+/* the demo area — everything the screen paints over itself is inset: 0 of this */
+.stage {
+  display: flex;
+  flex: 1;
+  min-block-size: 0;
+}
+
+.stage > * {
+  flex: 1;
+}
+

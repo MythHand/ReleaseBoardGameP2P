@@ -1,0 +1,55 @@
+/* Многострочное поле — визуально то же, что Input: те же паддинги, та же
+   заливка и рамка. Отличия только в том, что делает многострочность:
+   перенос, автовысота и своя прокрутка после потолка. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  composes: label-sm tk-16 from '../../design/typography.module.css';
+  opacity: 0.55;
+}
+
+.area {
+  composes: body-sm from '../../design/typography.module.css';
+
+  /* Высота одной строки — РОВНО 40px, и это считается, а не подгоняется:
+     18 (строка) + 10 + 10 (паддинги) + 2 (рамки). Паддинги симметричны, поэтому
+     первая строка стоит по центру поля. Дальше каждая новая строка добавляет
+     свои 18px, и на них же считается потолок роста. */
+  min-block-size: 40px;
+  padding: 10px 14px;
+  overflow-y: auto;
+
+  /* интерлиньяж в px, а не множителем: от него зависит и высота поля, и потолок
+     роста — computed-значение обязано быть точным числом */
+  line-height: 18px;
+  color: var(--fg);
+  resize: none; /* высоту ведёт содержимое, а не уголок-ручка */
+  outline: none;
+  background: var(--white-05);
+  border: 1px solid var(--white-18);
+}
+
+.area:focus {
+  outline-color: var(--brand-green);
+}
+
+.area[aria-invalid="true"] {
+  border-color: var(--cat-attack);
+}
+
+/* row: поле тянется, trailing прижат к нижнему краю — кнопка остаётся у
+   последней строки, когда поле выросло */
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.row .area {
+  flex: 1;
+  min-inline-size: 0;
+}

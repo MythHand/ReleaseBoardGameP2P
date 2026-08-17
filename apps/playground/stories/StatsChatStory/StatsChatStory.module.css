@@ -1,0 +1,14 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
+  overflow: hidden;
+}
+
+/* the demo area; stats is a long page, so it scrolls inside it */
+.stage {
+  flex: 1;
+  min-block-size: 0;
+  overflow: auto;
+}
+
