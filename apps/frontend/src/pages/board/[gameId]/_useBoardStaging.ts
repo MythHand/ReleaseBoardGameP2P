@@ -385,32 +385,43 @@ export function useBoardStaging({
         return
       }
       void (async () => {
-        await nextFrames() // the CardPair React just mounted has painted (I2)
-        if (!el) return
-        for (const anim of el.getAnimations?.({ subtree: true }) ?? []) anim.cancel() // I3
-        el.style.left = `${cRect.left}px`
-        el.style.top = `${cRect.top}px`
-        el.style.width = `${cRect.width}px`
-        el.style.transform = 'none'
-        const mainEl = el.querySelector<HTMLElement>('[data-main]')
-        const auxEl = el.querySelector<HTMLElement>('[data-aux]')
-        if (!mainEl || !auxEl) return
-        mainEl.style.transform = enterPose(mainHand, cRect)
-        auxEl.style.transform = enterPose(cRect, cRect)
-        el.style.opacity = '1'
-        await nextFrames()
+        try {
+          await nextFrames() // the CardPair React just mounted has painted (I2)
+          if (!el) return
+          for (const anim of el.getAnimations?.({ subtree: true }) ?? []) anim.cancel() // I3
+          el.style.left = `${cRect.left}px`
+          el.style.top = `${cRect.top}px`
+          el.style.width = `${cRect.width}px`
+          el.style.transform = 'none'
+          const mainEl = el.querySelector<HTMLElement>('[data-main]')
+          const auxEl = el.querySelector<HTMLElement>('[data-aux]')
+          if (!mainEl || !auxEl) return
+          mainEl.style.transform = enterPose(mainHand, cRect)
+          auxEl.style.transform = enterPose(cRect, cRect)
+          el.style.opacity = '1'
+          await nextFrames()
 
-        // MERGING AT THE CENTRE — the partner arrives and the pair folds together
-        const a1 = play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: MERGE_MS })
-        const a2 = play('foldIntoPair', auxEl, {
-          from: cRect,
-          box: cRect,
-          pose: PAIR_AUX_POSE,
-          dur: MERGE_MS,
-          snap: true,
-        })
-        await Promise.all([a1?.finished, a2?.finished])
-        finish()
+          // MERGING AT THE CENTRE — the partner arrives and the pair folds together
+          const a1 = play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: MERGE_MS })
+          const a2 = play('foldIntoPair', auxEl, {
+            from: cRect,
+            box: cRect,
+            pose: PAIR_AUX_POSE,
+            dur: MERGE_MS,
+            snap: true,
+          })
+          await Promise.all([a1?.finished, a2?.finished])
+          finish()
+        } finally {
+          // every exit clears the lock — the early returns above (`pairRef`
+          // gone, the CardPair's own markers missing) and a rejecting
+          // `.finished` all bypass `finish()` entirely, and `finish()`'s own
+          // clear only covers the success path. `finish()` already cleared it
+          // by the time this runs there, so the second write here is a
+          // harmless no-op (a boolean set to the value it already holds) —
+          // it exists for the OTHER exits, not that one.
+          foldingRef.current = false
+        }
       })()
     },
     [

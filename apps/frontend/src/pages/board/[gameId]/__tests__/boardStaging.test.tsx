@@ -491,6 +491,43 @@ it('Escape mid-fold does not cancel — the fold is irrevocable and dispatches n
   expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`).length).toBe(0)
 })
 
+// Fix round 2 (post-re-review): `foldingRef` was cleared exclusively inside
+// `finish()`, so the fold's OTHER exits — the pair flyer's own `[data-main]`/
+// `[data-aux]` markers missing, `pairRef` gone, a rejecting `.finished` —
+// bypassed it and left the lock stuck forever (worse than pre-fix: those
+// conditions used to leave a recoverable stall). Of the three, only the
+// "markers missing" bail is honestly reachable here: `pairRef.current` is a
+// permanently-mounted node with no test-facing way to null it, and jsdom's
+// own WAAPI stub (test-setup.ts) always resolves `.finished`, never rejects
+// it. This one bail simulates the same condition `if (!mainEl || !auxEl)
+// return` checks, by shadowing the pair flyer's OWN `querySelector` (an
+// instance override — nothing else in the suite's shared jsdom document is
+// touched) rather than fabricating an unrelated failure.
+it('a fold whose pair-flyer markers go missing still clears the lock — Escape cancels normally after', async () => {
+  const onPlay = vi.fn()
+  comboOut = []
+  render(
+    comboBoardWith(
+      { comboOptions: { 'support-code-review#0': ['release-frontend#0'] } },
+      { onPlay },
+    ),
+  )
+  const pairFlyer = document.querySelector<HTMLElement>('[data-testid="board-pair-staged"]')
+  if (!pairFlyer) throw new Error('pair flyer node not found')
+  const qs = vi.spyOn(pairFlyer, 'querySelector').mockReturnValue(null)
+  await pullFromComboFan('support-code-review#0')
+  await clickComboFanCard('release-frontend#0') // bails at `if (!mainEl || !auxEl) return` — finish() never runs
+  expect(onPlay).not.toHaveBeenCalled()
+  qs.mockRestore() // back to the real DOM before asserting through it below
+  // the lock still cleared despite the bail — a plain cancel works normally
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await waitFor(() => {
+    const uids = comboFanUids()
+    expect(uids).toContain('support-code-review#0')
+    expect(uids).toContain('release-frontend#0')
+  })
+})
+
 it('a support with no partners cannot be pulled', async () => {
   comboOut = []
   render(comboBoardWith({ comboOptions: {} }))
