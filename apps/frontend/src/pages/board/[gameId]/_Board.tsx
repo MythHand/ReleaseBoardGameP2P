@@ -373,6 +373,7 @@ export default function Board({
                 eliminated={eliminated}
                 disconnected={disconnected}
                 copy={copy.seat}
+                support={p.support}
                 slotRef={(key, el) => anchors.bindReleaseSlot(p.id, key, el)}
                 onPick={(t) => staging.onTargetPick(t)}
                 targets={staging.targets}
@@ -481,6 +482,7 @@ export default function Board({
             <div className={enter} ref={anchors.zone}>
               <ReleaseZone
                 release={you.release}
+                support={you.support}
                 size="100px"
                 player={state.selfId}
                 slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}

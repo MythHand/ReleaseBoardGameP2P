@@ -24,6 +24,7 @@ import type {
   PendingPromptCopy,
   ReconnectCopy,
   ReleaseSlots,
+  ReleaseSupport,
   RulesCopy,
   SeatCopy,
   Setup,
@@ -45,6 +46,8 @@ export interface BoardOpponent {
   name: string
   handCount: number
   release: ReleaseSlots
+  // A played Code Review lying under the release it protects.
+  support?: ReleaseSupport
   eliminated?: boolean
 }
 
@@ -55,6 +58,8 @@ export interface BoardState {
     name: string
     hand: HandItem[]
     release: ReleaseSlots
+    // A played Code Review lying under the release it protects.
+    support?: ReleaseSupport
     eliminated?: boolean
   }
   opponents: BoardOpponent[]
