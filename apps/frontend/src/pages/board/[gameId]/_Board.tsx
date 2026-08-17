@@ -44,7 +44,15 @@ import {
 } from '@release/ui'
 import { HEAP_SHOW, restTransform } from '@release/ui/animations'
 import type React from 'react'
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:
 // where every block sits, how big it is, what it overlaps. The board is a fork
 // of @release/ui's Table and the playground is where this screen is designed
@@ -56,6 +64,7 @@ import { useBoardAnchors } from '~/entities/game/board'
 import type { BoardProps, Panel, StagedHandoff } from '~/entities/game/board/types'
 import { useBeats } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
+import { useHandOrder } from '~/features/hand-order/useHandOrder'
 import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
 import { useBoardStaging } from './_useBoardStaging'
@@ -140,7 +149,7 @@ function SettingsField({
 // Стол = активное состояние игры. Каждый блок позиционируется независимо
 // (абсолютно), без жёсткой сетки. Заполняет экран без скролла.
 export default function Board({
-  state: live,
+  state: liveRaw,
   room,
   copy,
   slots,
@@ -159,6 +168,14 @@ export default function Board({
   // decks column) is animated through an INNER node — hence the wrappers below
   // rather than the positioned blocks themselves.
   const anchors = useBoardAnchors()
+
+  // The player's own sort of their fan, applied to the projection BEFORE the
+  // intro, the queue or the staging gesture see it — so every shadow a beat
+  // publishes and every rect a flight measures already agrees with the fan on
+  // screen. The engine has no hand order (it is a private, presentation fact),
+  // which is why the overlay lives here and not in an action.
+  const handOrder = useHandOrder(intro?.gameId ?? null)
+  const live = useMemo(() => handOrder.arrange(liveRaw), [handOrder, liveRaw])
 
   // The blocks stay hidden from the FIRST committed frame until the intro is
   // over — not merely while it is `active`. `hudIn` only holds a block down
@@ -583,6 +600,15 @@ export default function Board({
                 // fan (the staging gesture), not clicked. Off during the deal,
                 // same as the click gesture above.
                 onPlay={deal.active ? undefined : staging.onHandPlay}
+                // the reorder gesture's commit — without it the kit settles the
+                // card into its new slot and the next projection render snaps
+                // it back. `to` indexes the fan AS RENDERED (minus any staged
+                // card), which is exactly what the commit expects.
+                onReorder={
+                  deal.active
+                    ? undefined
+                    : (uid, to) => handOrder.commit(you.hand, staging.handItems, uid, to)
+                }
                 renderFace={
                   deal.active
                     ? (item, ctx) => (
