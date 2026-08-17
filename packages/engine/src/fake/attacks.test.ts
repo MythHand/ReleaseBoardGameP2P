@@ -185,6 +185,35 @@ it('banks both halves with attackSpent when the hit is taken', () => {
   expect(r.state.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO]))
 })
 
+it('banks a sudo-comboed attack’s both halves, then the cancelling defence, when it is repelled', () => {
+  // Not a Bug is the only cancel-effect card `defencesFor` still offers against
+  // a sudo attack (it is 'unicorn' kind, exempt from the sudo block that
+  // 'cancel' kind cards like Hotfix hit) — the one way to reach this shape.
+  const attacked = reduce(staged([BUG, SUDO], [NOTABUG]), {
+    type: 'ATTACK',
+    player: 'p2',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    at: 1001,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: NOTABUG.uid },
+    at: 1002,
+  })
+  const discards = r.events.filter((e) => e.type === 'discarded')
+  // Order: the attack card banks before its sudo half, both before the defence.
+  expect(discards).toMatchObject([
+    { card: BUG.id, reason: 'attackSpent', player: 'p2' },
+    { card: SUDO.id, reason: 'attackSpent', player: 'p2' },
+    { card: NOTABUG.id, reason: 'defenceSpent', player: 'p1' },
+  ])
+  const defended = r.events.find((e) => e.type === 'defended')
+  for (const d of discards) expect(d.parent).toBe(defended?.id)
+  expect(r.state.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO, NOTABUG]))
+})
+
 it('banks the defence with defenceSpent and the cancelled attack with attackSpent', () => {
   const attacked = reduce(staged([BUG], [HOTFIX]), {
     type: 'ATTACK',
