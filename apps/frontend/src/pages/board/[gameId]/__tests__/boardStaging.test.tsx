@@ -70,10 +70,16 @@ async function pullCardFromFan(uid: string) {
 }
 
 // A press on an opponent's seat — Seat's own targetable div, plain onClick.
+// Seat does not stop propagation for a `player`-kind target, so this click
+// also bubbles to the table's own onClick in the same tick `onTargetPick`
+// runs in — waits past `useHandArrival`'s FLIGHT_MS (480ms) so that IF the
+// bubble incorrectly triggered a cancel (the race `_useBoardStaging`'s
+// synchronous `dispatchedRef` write guards against), its return flight would
+// have already finished and be observable by the caller.
 async function pressSeat(player: string) {
   fireEvent.click(screen.getByTestId(`seat-${player}`))
   await act(async () => {
-    await Promise.resolve()
+    await new Promise((r) => setTimeout(r, 700))
   })
 }
 
@@ -97,6 +103,11 @@ it('a pulled attack stages at the centre, aims, and a press on the seat dispatch
   // the seat is lit and a press on it dispatches
   await pressSeat('p2')
   expect(onPlay).toHaveBeenCalledWith('attack-bug#0', { kind: 'player', player: 'p2' }, undefined)
+  // the dispatch stands: the same click bubbling to the table's own cancel
+  // must NOT have sent the card flying back to the fan (the seat-propagation
+  // race `_useBoardStaging`'s synchronous `dispatchedRef` write guards against)
+  expect(screen.getByTestId('board-centre-staged')).toBeTruthy()
+  expect(fanUids()).not.toContain('attack-bug#0')
 })
 
 it('a pull of a no-target card is refused and the fan keeps it', async () => {
