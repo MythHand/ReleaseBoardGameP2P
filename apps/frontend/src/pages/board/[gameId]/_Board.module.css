@@ -69,6 +69,15 @@
   inset: 0;
 }
 
+/* the pulled card once it stands at the centre — the same box as the deal's
+   own staged cards above, filled rather than scattered: there is only ever
+   one at a time, so it takes the whole of `.centre` (its 150px, not a number
+   of its own). */
+.centreCard {
+  position: absolute;
+  inset: 0;
+}
+
 /* the right-hand nav's layer: TabRail positions itself against the edge, and
    this layer exists only to lead its arrival without touching that transform */
 .railLayer {

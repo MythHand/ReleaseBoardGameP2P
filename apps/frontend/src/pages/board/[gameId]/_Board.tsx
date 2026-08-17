@@ -40,9 +40,9 @@ import {
   Toggle,
   TurnDock,
   Typography,
-  useArrow,
 } from '@release/ui'
 import { HEAP_SHOW, restTransform } from '@release/ui/animations'
+import type React from 'react'
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:
 // where every block sits, how big it is, what it overlaps. The board is a fork
@@ -57,6 +57,7 @@ import { useBeats } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
+import { useBoardStaging } from './_useBoardStaging'
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
 // 0–8 зелёный, 9–18 жёлтый, 19–28 красный
@@ -239,12 +240,17 @@ export default function Board({
   // what the hook decided, never re-derives it.
   const gestures = useBoardInteractions({ state, actions })
 
-  // Transitional: the targeting arrow (Task 3 rewires it to the staging
-  // gesture) and the Escape-to-cancel binding (Task 3 restores it) both need a
-  // live selection to aim or cancel, and this hook no longer carries one — so
-  // both are gone from here for this commit. `useArrow()` and `<Arrow …/>`
-  // stay mounted; only the effect that armed the former is removed.
-  const arrow = useArrow()
+  // the staging gesture: pulling a card that needs a target out of the fan —
+  // stands it at the centre, aims the arrow, dispatches on a lit target. Inert
+  // under the same gate the click actions already have: the deal or an
+  // exclusive beat owns the table.
+  const staging = useBoardStaging({
+    state,
+    anchors,
+    actions,
+    events: intro?.events ?? [],
+    enabled: !(deal.active || beats.exclusive),
+  })
 
   // Escape skips the opening. Same window binding and the same reason as the
   // cancel above; `finish` is idempotent, so a second press is a no-op.
@@ -258,12 +264,32 @@ export default function Board({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [deal.active, dealFinish])
 
-  // Transitional: this used to also cancel an in-flight target selection on a
-  // backdrop click — gone with `gestures.phase`/`gestures.cancel` above, Task 3
-  // restores it through the staging gesture. What's left: anywhere on the
-  // table while the opening plays, a click skips it.
-  const handleTableClick = () => {
-    if (deal.active) dealFinish()
+  // Escape cancels a staged card the same way a miss on the table does —
+  // armed only while there is something to cancel (I8: a press after the play
+  // already dispatched must not turn into a return flight).
+  useEffect(() => {
+    if (!staging.staged || staging.dispatched) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') staging.cancel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [staging.staged, staging.dispatched, staging.cancel])
+
+  // A click that lands outside any hand slot while a card is staged reads as
+  // "changed my mind" — cancel. Clicks that land on a lit target already
+  // resolve through onTargetPick before bubbling here (I8's own guard in
+  // `useBoardStaging` makes that safe even where the target itself does not
+  // stop propagation); clicks inside the hand are the fan's own business.
+  const handleTableClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (deal.active) {
+      dealFinish()
+      return
+    }
+    if (!staging.staged || staging.dispatched) return
+    const target = e.target as HTMLElement
+    if (target.closest('[data-hand-slot]')) return
+    staging.cancel()
   }
 
   const isHost = role === 'host'
@@ -315,7 +341,7 @@ export default function Board({
       <div className={cls(opening.bgWrap, enter)} ref={anchors.bg}>
         <HudBackground tone="neutral" className={kit.bgLayer} />
       </div>
-      <Arrow from={arrow.from} to={arrow.to} />
+      <Arrow from={staging.arrow.from} to={staging.arrow.to} />
 
       {slots?.banner && <div className={kit.banner}>{slots.banner}</div>}
       {slots?.corner && <div className={kit.corner}>{slots.corner}</div>}
@@ -343,9 +369,8 @@ export default function Board({
                 disconnected={disconnected}
                 copy={copy.seat}
                 slotRef={(key, el) => anchors.bindReleaseSlot(p.id, key, el)}
-                // Transitional: inert until Task 3 wires the staging gesture.
-                onPick={() => {}}
-                targets={[]}
+                onPick={(t) => staging.onTargetPick(t)}
+                targets={staging.targets}
               />
             </div>
           )
@@ -415,6 +440,14 @@ export default function Board({
               </div>
             )
           })}
+        {/* the pulled card stands here once the flyer has dropped it — while
+            the carrier or a return flight still holds it, the static render
+            would double it (ComboStory.tsx's own guard on this) */}
+        {staging.staged && staging.overlay.length === 0 && (
+          <div className={opening.centreCard} data-testid="board-centre-staged">
+            <Card card={staging.staged.card} interactive={false} width="100%" />
+          </div>
+        )}
       </div>
 
       <div className={kit.you}>
@@ -432,24 +465,35 @@ export default function Board({
                 size="100px"
                 player={state.selfId}
                 slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
-                // Transitional: inert until Task 3 wires the staging gesture.
-                onPick={() => {}}
-                targets={[]}
+                onPick={(t) => staging.onTargetPick(t)}
+                targets={staging.targets}
               />
             </div>
             <div className={kit.handWrap} ref={anchors.hand}>
               <Hand
-                items={you.hand}
+                items={staging.handItems}
                 // the fan opens room for the arriving heap while it travels —
-                // the deal wins the tie, exclusive against every other beat
-                // the same way it already wins the shadow's
-                gapAt={deal.gapAt ?? beats.gapAt}
-                gapSize={deal.gapAt == null ? beats.gapSize : deal.gapSize}
+                // the deal wins the tie against every other beat the same way
+                // it already wins the shadow's, and the staging gesture's own
+                // return-flight gap is last: it opens only once nothing else
+                // owns the fan.
+                gapAt={deal.gapAt ?? beats.gapAt ?? staging.gapAt}
+                gapSize={
+                  deal.gapAt == null
+                    ? beats.gapAt == null
+                      ? staging.gapSize
+                      : beats.gapSize
+                    : deal.gapSize
+                }
                 // while the deal runs the hand is held: no clicks reach the
                 // gesture machine, and the cards that travelled closed stay
                 // closed until the flip. Both are gone the moment it ends, so
                 // the released hand is the plain one this board always drew.
                 onCardClick={deal.active ? undefined : (i) => gestures.onCardClick(i)}
+                // drag-mode: a card that needs a target is pulled out of the
+                // fan (the staging gesture), not clicked. Off during the deal,
+                // same as the click gesture above.
+                onPlay={deal.active ? undefined : staging.onHandPlay}
                 renderFace={
                   deal.active
                     ? (item, ctx) => (
@@ -628,6 +672,7 @@ export default function Board({
           for the discard. Last, so they fly over everything. */}
       {deal.overlays}
       {beats.overlays}
+      {staging.overlay}
     </div>
   )
 }

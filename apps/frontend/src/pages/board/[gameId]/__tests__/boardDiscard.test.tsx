@@ -52,9 +52,11 @@ it('leaves the hand live on a board with no opening', () => {
   const { container } = render(<Board {...props} />)
   const slot = container.querySelector<HTMLElement>('[data-hand-slot]')
   expect(slot).toBeTruthy()
-  // The board gives Hand `onCardClick` and no drag intents, so drag mode is off
-  // and the press IS the click (Hand.onSlotDown). A `click` event alone never
-  // reaches it — the slot listens on mousedown.
+  // The board always wires Hand's `onPlay` now (#99's staging gesture), so
+  // drag mode is on — but this card needs no target, so the staging gesture
+  // refuses the pull and the press falls back to a plain click: down and up
+  // with no movement between them, under Hand's own drag threshold.
   fireEvent.mouseDown(slot as HTMLElement)
+  fireEvent.mouseUp(slot as HTMLElement)
   expect(onPlay).toHaveBeenCalledWith(uid, undefined, undefined)
 })
