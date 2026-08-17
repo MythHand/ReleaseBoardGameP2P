@@ -271,7 +271,7 @@ export function useBeats(args: {
   // the arm also keeps it before the BATCH effect, which must not read a stale
   // watermark on the one pass where it matters most.)
   const playing = useRef<string | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws` and `decks` are read for the CURRENT render's runners on purpose, not added to the deps below — their own `reset` are unmemoized (a fresh function every render), so listing them would fire this on every render instead of once per match key
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks` and `combo` are read for the CURRENT render's runners on purpose, not added to the deps below — discardBeat/drawBeat/comboBeat's own `reset` are unmemoized (each depends on `useDiscardExit`'s or `useHandArrival`'s own `reset`, neither wrapped in `useCallback`), so listing any of them would fire this on every render instead of once per match key. `deckBeat`'s `reset` happens to be stable (its one dependency, `useFlyer`'s `drop`, IS memoized) — excluded here too, for one uniform list rather than a one-off exception for the runner that doesn't need it
   useLayoutEffect(() => {
     const key = intro?.key ?? null
     if (key == null || playing.current === key) return
@@ -291,6 +291,7 @@ export function useBeats(args: {
     discards.reset()
     draws.reset()
     decks.reset()
+    combo.reset()
   }, [intro?.key, live])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a

@@ -17,24 +17,43 @@ const played = vi.hoisted(() => ({ names: [] as string[] }))
 // and useBeats.test.tsx hit the same wall and stub the whole hook instead of
 // the leaf it calls internally; this does the same.
 const exits = vi.hoisted(() => ({ items: [] as Leaving[] }))
+// `hang`/`release` — the same "park a flight mid-air" convention
+// `useBeats.test.tsx` uses for the discard exit: `send()` stores its resolver
+// instead of resolving, so a test can hold the pair-out beat in flight and
+// choose the moment it lands.
+const hang = vi.hoisted(() => ({ on: false, release: null as (() => void) | null }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
+  const { useState } = await import('react')
   return {
     ...real,
     play: (name: string) => {
       played.names.push(name)
       return { finished: Promise.resolve() } as unknown as Animation
     },
-    useDiscardExit: () => ({
-      overlay: [],
-      send: (items: Leaving[]) => {
-        played.names.push('centerToDiscard')
-        exits.items.push(...items)
-        return Promise.resolve()
-      },
-      reset: () => {},
-      FLIGHT_MS: 420,
-    }),
+    // A stateful stand-in, not a fixed `overlay: []`: the reset() test needs
+    // to tell "a flyer is mounted" from "reset() cleared it," and a hardcoded
+    // empty overlay can't distinguish those.
+    useDiscardExit: () => {
+      const [flying, setFlying] = useState(false)
+      return {
+        overlay: flying ? ['flight'] : [],
+        send: (items: Leaving[]) => {
+          played.names.push('centerToDiscard')
+          exits.items.push(...items)
+          if (!hang.on) return Promise.resolve()
+          setFlying(true)
+          return new Promise<void>((r) => {
+            hang.release = () => {
+              setFlying(false)
+              r()
+            }
+          })
+        },
+        reset: () => setFlying(false),
+        FLIGHT_MS: 420,
+      }
+    },
   }
 })
 
@@ -286,4 +305,52 @@ it('sends nothing when the pending node cannot be measured', async () => {
   }
   await drive(() => api.beat?.runPairOut(plan, ctx))
   expect(exits.items).toHaveLength(0)
+})
+
+// ===== reset =====
+
+// A new match cancels what is in the air (fix 1, #97) — mirrored here for the
+// combo runner's own two carriers: the fold's own flyer (`useFlyer`) and the
+// pair-out's discard exit (`useDiscardExit`, shared with `discardBeat`).
+//
+// This parks the pair-out half, the same `hang`/`release` mechanism
+// `useBeats.test.tsx`'s rematch test uses for the discard beat's own exit, so
+// the assertion is on the REAL carrier `send()` mounted — not a mock whose
+// overlay was empty either way. The fold's own flyer half (`flyer.drop()`) is
+// the same one-line combinator already shipped and typechecked for
+// `deckBeat`'s `reset`; parking a *second*, independent carrier (a fold at the
+// centre, which needs its own hung `play()`) for the same assertion would
+// double the harness's mocking surface for no additional branch coverage —
+// `reset()` is one function, and this proves it actually runs and has an
+// effect, not that its two lines exist.
+it('reset() drops a pair-out flight parked mid-air', async () => {
+  played.names = []
+  exits.items = []
+  const { api, Probe, centre } = harness()
+  const pending = node()
+  pending.setAttribute('data-pending-play', '')
+  centre.appendChild(pending)
+  render(<Probe />)
+  const plan: Extract<BeatPlan, { kind: 'pairToDiscard' }> = {
+    kind: 'pairToDiscard',
+    key: 'pairOut:10',
+    main: { eventId: 10, card: 'attack-bug' },
+    aux: { eventId: 11, card: 'support-sudo' },
+  }
+  hang.on = true
+  const running = api.beat?.runPairOut(plan, ctx)
+  // Past `runPairOut`'s own `nextFrames()` wait and into the hung `send()` —
+  // the same real-timer flush `useBeats.test.tsx`'s `flush()` uses for the
+  // same wait.
+  await act(async () => void (await new Promise((r) => setTimeout(r, 80))))
+  expect(api.beat?.overlay.length).toBeGreaterThan(0)
+  act(() => {
+    api.beat?.reset()
+  })
+  expect(api.beat?.overlay.length).toBe(0)
+  // Release the hang so the parked call resolves and doesn't leak into a
+  // later test.
+  hang.on = false
+  hang.release?.()
+  await running
 })
