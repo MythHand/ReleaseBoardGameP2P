@@ -453,6 +453,20 @@ export default function Board({
             <Card card={staging.staged.card} interactive={false} width="100%" />
           </div>
         )}
+        {!staging.staged &&
+          state.pending?.kind === 'defend' &&
+          (() => {
+            const data = cardById(state.pending.attackCard)
+            return data ? (
+              <div
+                className={opening.centreCard}
+                data-testid="board-centre-pending"
+                data-pending-play
+              >
+                <Card card={data} interactive={false} width="100%" />
+              </div>
+            ) : null
+          })()}
       </div>
 
       <div className={kit.you}>
