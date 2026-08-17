@@ -268,7 +268,27 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // so a sudo Rollback (which banks ONLY this half; the attack card
       // returns to its owner's hand instead) still gets a beat: the match here
       // does not require `pairOut` to already exist, only the other one does.
-      if (p?.kind === 'defend' && p.sudo && e.card === 'support-sudo' && !pairOut?.aux) {
+      //
+      // `e.reason === 'attackSpent'` is load-bearing, not decoration: Rollback
+      // is itself sudo-capable (fake/attacks.ts's `onHandDefend`), so a
+      // defender can combo THEIR OWN `support-sudo` onto a Rollback. That
+      // banks the defender's group (`defenceSpent`: the Rollback card, then
+      // their sudo) BEFORE the attacker's group (`attackSpent`: their own
+      // sudo alone) — the reverse of every other resolution, where the
+      // attacker's cards are banked first. Without the reason check, the
+      // defender's `defenceSpent` sudo discard (which arrives FIRST here)
+      // would wrongly claim `pairOut.aux`, and the attacker's own
+      // `attackSpent` sudo discard — the pending's REAL other half — would
+      // then fail `!pairOut?.aux`, fall to `sourceOf`, find nothing (its card
+      // left the attacker's hand back when the attack was thrown, long before
+      // this batch), and silently vanish instead of animating.
+      if (
+        p?.kind === 'defend' &&
+        p.sudo &&
+        e.reason === 'attackSpent' &&
+        e.card === 'support-sudo' &&
+        !pairOut?.aux
+      ) {
         if (!pairOut) {
           flush()
           pairOut = { kind: 'pairToDiscard', key: `pairOut:${e.id}` }
@@ -281,8 +301,17 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // zone). The engine banks it before the sudo half (fake/attacks.ts's
       // `bankSpent`), and only one exchange can be pending at a time, so a
       // second `attackCard` match in one batch cannot happen today — the
-      // `!pairOut` guard is what would make it fall through safely if it ever did.
-      if (p?.kind === 'defend' && e.card === p.attackCard && !pairOut) {
+      // `!pairOut` guard is what would make it fall through safely if it ever
+      // did. `e.reason === 'attackSpent'` is a no-op today (the attack card is
+      // never discarded under any other reason — a Rollback returns it to
+      // hand instead of discarding it) but keeps this branch's own invariant
+      // explicit and symmetric with the sudo branch above.
+      if (
+        p?.kind === 'defend' &&
+        e.reason === 'attackSpent' &&
+        e.card === p.attackCard &&
+        !pairOut
+      ) {
         flush()
         pairOut = {
           kind: 'pairToDiscard',

@@ -384,6 +384,46 @@ describe('planBeats — the combo pair (#100)', () => {
       { kind: 'pairToDiscard', key: 'pairOut:10', aux: { eventId: 10, card: 'support-sudo' } },
     ])
   })
+
+  // Rollback is itself sudo-capable: a DEFENDER can combo their OWN
+  // `support-sudo` onto a Rollback defence. The engine banks that group
+  // (`defenceSpent`) BEFORE the attacker's group (`attackSpent`) — the
+  // reverse of every other resolution — so the batch carries TWO
+  // `support-sudo` discards with different reasons and players. Only the
+  // `attackSpent` one (the attacker's own combo, the pending's real other
+  // half) may ride the pair exit; the defender's `defenceSpent` one is an
+  // ordinary discard, same as their Rollback card.
+  it('a defender’s own sudo combo on a Rollback does not steal the pending pair’s aux slot', () => {
+    // The LOCAL player (p1) is the attacker here — its sudo card left its own
+    // hand back when the attack was thrown, so `sourceOf` finds nothing for
+    // it if this ever falls through to the ordinary discard path (the
+    // silent-vanish failure mode this test pins).
+    const withPending = boardBefore({
+      pending: defendPending({ player: 'p2', attacker: 'p1' }),
+    } as Partial<BoardState>)
+    const events = [
+      discarded(9, { player: 'p2', card: 'defense-rollback', reason: 'defenceSpent' }),
+      discarded(10, { player: 'p2', card: 'support-sudo', reason: 'defenceSpent' }),
+      discarded(11, { player: 'p1', card: 'support-sudo', reason: 'attackSpent' }),
+    ]
+    const plans = planBeats(events, withPending)
+    expect(plans).toEqual([
+      {
+        kind: 'discard',
+        key: 'discard:9',
+        cards: [
+          {
+            key: 'd9',
+            eventId: 9,
+            card: 'defense-rollback',
+            source: { kind: 'seat', player: 'p2' },
+          },
+          { key: 'd10', eventId: 10, card: 'support-sudo', source: { kind: 'seat', player: 'p2' } },
+        ],
+      },
+      { kind: 'pairToDiscard', key: 'pairOut:11', aux: { eventId: 11, card: 'support-sudo' } },
+    ])
+  })
 })
 
 describe('classifyPiles', () => {
