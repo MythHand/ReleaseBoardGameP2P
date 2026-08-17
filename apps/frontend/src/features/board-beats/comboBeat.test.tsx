@@ -1,6 +1,7 @@
 import type { CardData } from '@release/ui'
 import { cardById } from '@release/ui'
 import type { Leaving } from '@release/ui/animations'
+import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
 import { expect, it, vi } from 'vitest'
@@ -240,6 +241,10 @@ it('splits the pending pair at the centre into two singles for the discard', asy
     key: 'p10',
     card: expect.objectContaining({ id: 'attack-bug' }),
     aux: expect.objectContaining({ id: 'support-sudo' }),
+    // the aux's OWN scatter (I7) — without it, `useDiscardExit`'s pair-split
+    // has no way to learn the aux's discard event id and flies it on a random
+    // `jitter()` instead (useDiscardExit.test.tsx pins the consuming side).
+    auxScatter: scatterAt(11),
   })
 })
 

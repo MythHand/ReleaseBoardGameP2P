@@ -91,9 +91,27 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
 
   // attackPlaced: the play reaches the centre. Local staging → it is ALREADY
   // there: adopt and release. No staging → fold/fly in from where it came.
+  //
+  // The handoff is read HERE, synchronously, before the first `await` — not
+  // after `nextFrames()` as the fold that follows needs it (I2). `useBeats`'s
+  // watching effect and `_useBoardStaging.ts`'s own hand-watching effect both
+  // react to the SAME prop update (the batch that carries this event also
+  // updates `live`, per `useBeats.ts`'s own "I1" note), and on the very FIRST
+  // render of that update `beats.shadow` is still null — so `state` is
+  // briefly `live` (the card ALREADY out of the hand) before this beat's own
+  // `running` state exists to pin it back to `before`. `_useBoardStaging`'s
+  // effect sees that empty hand and clears `staged` (believing the play was
+  // simply accepted, its usual case) — a passive effect, so it can only fire
+  // once this synchronous render burst is done. Reading the handoff HERE,
+  // still inside that same synchronous burst (`drain()` calls this beat
+  // before yielding), wins the race: the value is captured before the clear
+  // ever has a chance to happen. Reading it one line later, after
+  // `nextFrames()`, loses it — the clear beats the read, `handoff` comes back
+  // null, and the actor's own play gets folded in a second time from a hand
+  // slot it already left. (found empirically: apps/frontend/src/pages/board/
+  // [gameId]/__tests__/comboHandoff.test.tsx pins this.)
   const runAttack = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'attackPlaced' }>, ctx: BeatRun) => {
-      await nextFrames() // the shadow that renders `before` has committed (I2)
       const { staging: s } = latest.current
       const handoff = s?.current
       if (handoff?.mainUid && plan.attacker === ctx.base.selfId) {
@@ -102,6 +120,7 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
         handoff.release()
         return
       }
+      await nextFrames() // the shadow that renders `before` has committed (I2)
       // everyone else (and a local click-thrown window attack, which staged
       // nothing): the halves fold in from the actor's side — seat for an
       // opponent, the hand slot the card left for the local thrower (found by
@@ -113,12 +132,16 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
   )
 
   // releasePlaced: the pair flies into the owner's slot; the zone's static
-  // support render (Task 9) is the landing pose.
+  // support render (Task 9) is the landing pose. The handoff is captured
+  // BEFORE `nextFrames()` — same race, same fix, as `runAttack` above; only
+  // the CAPTURE has to happen early, since `handoff` here is a local holding
+  // the object reference, not a second read of the ref.
   const runRelease = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'releasePlaced' }>, ctx: BeatRun) => {
-      await nextFrames()
-      const { anchors: a, staging: s } = latest.current
+      const { staging: s } = latest.current
       const handoff = s?.current
+      await nextFrames()
+      const { anchors: a } = latest.current
       const cRect = rectOf(a.centre.current)
       const toRect = rectOf(a.releaseSlot(plan.player, plan.slot))
       if (!cRect || !toRect) {
@@ -151,7 +174,12 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
       const main = mainRef ? cardById(mainRef.card) : null
       const aux = auxRef ? cardById(auxRef.card) : null
       // note the pair split lands on scatterAt(eventId) of each half's own
-      // `discarded` event — the same Scatter toDiscardHeap rests them on (I7)
+      // `discarded` event — the same Scatter toDiscardHeap rests them on (I7).
+      // `auxScatter` is what carries that for the AUX half specifically:
+      // `useDiscardExit`'s own pair-split (`expand()`) has no other way to
+      // learn the aux's discard event id, and without it the aux would fly to
+      // a random `jitter()` and snap to its real rest the instant the heap
+      // takes over.
       const items: Leaving[] =
         main && mainRef
           ? [
@@ -163,6 +191,7 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
                 from,
                 layer: 0,
                 scatter: scatterAt(mainRef.eventId),
+                auxScatter: auxRef ? scatterAt(auxRef.eventId) : undefined,
               },
             ]
           : aux && auxRef
