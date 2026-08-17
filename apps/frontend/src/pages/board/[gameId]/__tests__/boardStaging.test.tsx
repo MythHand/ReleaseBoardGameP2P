@@ -531,6 +531,49 @@ it('Escape mid-fold does not cancel — the fold is irrevocable and dispatches n
   expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`).length).toBe(0)
 })
 
+// Final review, round 1: `targets` lights a seat the instant a partner is
+// picked (`main` set, `phase` still 'partner') — for the WHOLE fold, not only
+// once it settles into 'target'. A press landing there used to dispatch
+// legitimately through `onTargetPick` and then get clobbered: the fold's own
+// `finish()` kept running regardless and unconditionally re-committed
+// `phase: 'target'` over the play the engine was already processing,
+// re-arming the arrow for a pair no longer awaiting one.
+it('a target press mid-fold is refused; the same seat still dispatches once the fold settles', async () => {
+  const onPlay = vi.fn()
+  comboOut = []
+  render(
+    comboBoardWith(
+      { comboOptions: { 'support-sudo#0': ['attack-bug#0'] }, targets: BUG_SEAT_TARGET },
+      { onPlay },
+    ),
+  )
+  await pullFromComboFan('support-sudo#0')
+  const index = comboFanUids().indexOf('attack-bug#0')
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  comboOut = [...comboOut, 'attack-bug#0']
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 }) // the fold commits — merged: true, still mid-animation
+  // the seat is ALREADY lit — press it in the same tick the fold committed
+  // in, no wait in between
+  fireEvent.click(screen.getByTestId('seat-p2'))
+  expect(onPlay).not.toHaveBeenCalled() // refused — the fold owns this window exclusively
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  expect(onPlay).not.toHaveBeenCalled() // the immediate press was dropped, not queued for later
+  // a fresh press on the still-lit seat dispatches cleanly, exactly once
+  fireEvent.click(screen.getByTestId('seat-p2'))
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  expect(onPlay).toHaveBeenCalledTimes(1)
+  expect(onPlay).toHaveBeenCalledWith(
+    'attack-bug#0',
+    { kind: 'player', player: 'p2' },
+    'support-sudo#0',
+  )
+})
+
 // Fix round 2 (post-re-review): `foldingRef` was cleared exclusively inside
 // `finish()`, so the fold's OTHER exits — the pair flyer's own `[data-main]`/
 // `[data-aux]` markers missing, `pairRef` gone, a rejecting `.finished` —

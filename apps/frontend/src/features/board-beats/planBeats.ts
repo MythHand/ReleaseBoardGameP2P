@@ -286,6 +286,9 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         p?.kind === 'defend' &&
         p.sudo &&
         e.reason === 'attackSpent' &&
+        // Assumes 'support-sudo' is the only sudo-capable support card in the
+        // catalogue — silently wrong (this discard falls through to `sourceOf`
+        // instead) if a second one is ever added.
         e.card === 'support-sudo' &&
         !pairOut?.aux
       ) {
