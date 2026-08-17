@@ -335,7 +335,12 @@ export default function Board({
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening; the accessible affordance is the Escape-skips-the-opening handler below
-    <div className={kit.table} onClick={handleTableClick} role="presentation">
+    <div
+      className={kit.table}
+      onClick={handleTableClick}
+      role="presentation"
+      data-testid="board-table"
+    >
       {/* the table's own ambience — a layer, so the opening can bring it in
           whole without touching the screen's base fill */}
       <div className={cls(opening.bgWrap, enter)} ref={anchors.bg}>
