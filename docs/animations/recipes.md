@@ -31,6 +31,14 @@ splitting a pair — lives inside the step and is described there, once.
 
 ## Playing a card — hand/opponent → center → discard
 
+> **The engine does not emit this pair.** `placed` is a Monitoring protection landing in the
+> release zone (`fake/release.ts:177`, `fake/triggers.ts:298`) and staying there, and a card spent
+> on an attack reaches the discard through `bankToDiscard` with **no event at all**. There is no
+> table centre in `PlayerView` either. This recipe stays as the description of the *movement*,
+> which is real and shown in `CardPlayStory` — what it is **not** is a mapping from engine events.
+> Both findings are in [`backlog.md`](./backlog.md); for the live board, see
+> "A card leaves the hand for the discard" below.
+
 The card is played to the table center (visible to everyone), rests there during its effect,
 then leaves to the discard. Two independent triggers: **A** (to center) and **B** (to discard).
 
@@ -115,6 +123,79 @@ _Phase B — center → discard (separate trigger):_ this is the shared step, no
 
 **Live reference**
 `Card play` — `apps/playground/stories/interactive/CardPlayStory.tsx`.
+
+---
+
+## A card leaves the hand for the discard (live board)
+
+The first choreography driven by real engine events rather than by a scene's own clicks. A
+`discarded` event arrives off the wire; the card flies from wherever it stood into the discard heap
+and stays there. This is the game-layer counterpart of the scene recipe above — same step, but the
+trigger, the source and the timing all come from the projection.
+
+**When to call**
+Never directly. The board's queue (`useBeats`) plans it from the batch and runs it. What a caller
+controls is `enabled` — the queue is armed only once the opening is over.
+
+**Visual result**
+The card lifts from its slot in the fan (or from an opponent's seat, or out of a release slot) and
+settles into the discard at its own tilt and offset, among the cards already there.
+
+**Elements / refs** — all from `BoardAnchors`, owned by `_Board.tsx`
+- `handSlotAt(index)` — the player's own card, matched by card id against the hand **still on
+  screen** (`discarded` carries a card id, not a uid).
+- `seatBox(player)` — an opponent's, as a card-sized box centred on the seat (**I6**).
+- `releaseSlot(player, slot)` — reasons `destroyed` / `neutralized` only; the card leaves the zone
+  it stood in, and the slot is always looked up under its owner (every player has a `frontend`).
+- `discardBox` — the target, trimmed to the card area by the step itself.
+
+**Sequence**
+1. A batch arrives. `planBeats(events, before)` folds every `discarded` in it into **one** beat —
+   one by one but all at once, so a hand-limit discard of three reads as one gesture.
+2. `before` is the projection the board is still showing, not the one that just arrived: `live`
+   already has the card out of the hand, and its slot with it (**I1**).
+3. The queue renders that projection as the `shadow` while the beat runs, so the source slot is
+   there to measure.
+4. Each card becomes a `Leaving { key, card, from, scatter: scatterAt(eventId) }`; a card whose
+   source cannot be found is **not flown at all** (see the backlog — that rule is undecided).
+5. `send(items)` — the shared step owns the flight, the tilt unwind and the landing pose.
+6. The queue drains, the shadow is dropped, and the live projection takes over.
+
+**Params & timings**
+
+| Step | Preset | Duration | Extra |
+|---|---|---|---|
+| slot/seat/zone → discard | `useDiscardExit` | `FLIGHT_MS = 420` | the step owns the preset and the scatter |
+| scatter key | — | — | `scatterAt(eventId)` — the event id is the stable integer, and the heap uses the same call |
+
+**Invariants**
+- **I1** — planned against the projection still on screen, never the one that just arrived.
+- **I6** — a seat and a pile are both wider than a card; both are trimmed to a card box.
+- **I7** — the flight's scatter and the heap's resting scatter are one value read twice, so the
+  handover from shadow to projection changes nothing on screen. This is the property the whole
+  design turns on, and it holds across a boundary neither side can see.
+
+**End state & cleanup**
+The queue drains, `shadow` goes null, and the board renders the projection — which already contains
+the card in `decks.discardHeap`, at the pose it just landed on. Nothing to clean up: the beat owns
+no state that outlives it.
+
+**Gating**
+None. A discard is a thing that *happened*, not a thing being decided, so the fan stays live
+(README, "Gating the hand", approach 3). Only the opening is `exclusive`.
+
+**Under `prefers-reduced-motion`**
+The beat is never planned and never runs; the board renders the projection it already holds. One
+check, in `useBeats`, because `play()` does not make it.
+
+**Building blocks**
+[`useDiscardExit`](./reference.md#the-movement-steps-and-the-carrier-under-them) ·
+[`planBeats` / `useBeats` / `BoardAnchors`](./reference.md#the-boards-layer--anchors-and-the-beat-queue) ·
+[`scatterAt`](./reference.md#discard-scatter).
+
+**Live reference**
+Not a playground scene — this one runs on the real board (`apps/frontend/src/features/board-beats/`).
+The movement's own showcase is `Card play`, part B.
 
 ---
 

@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev:p2p"],
       "port": 5173
+    },
+    {
+      "name": "playground",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:playground"],
+      "port": 5180
     }
   ]
 }

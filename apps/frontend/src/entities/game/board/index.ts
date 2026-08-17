@@ -1,3 +1,4 @@
+export { type BoardAnchors, useBoardAnchors } from './anchors'
 export { toAction } from './toAction'
 export { toBoardOver } from './toBoardOver'
 export type { HistoryLabels } from './toBoardState'
@@ -10,5 +11,6 @@ export type {
   BoardRoom,
   BoardSlots,
   BoardState,
+  IntroBeat,
   Panel,
 } from './types'

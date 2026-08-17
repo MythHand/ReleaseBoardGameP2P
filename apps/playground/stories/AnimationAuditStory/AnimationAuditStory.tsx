@@ -296,8 +296,32 @@ const MODULES: Module[] = [
       en: 'Cards leave the table for the discard: one by one but ALL AT ONCE — the simultaneity is what reads as "the pile went to the discard". A pair splits into two singles, each flying from where it actually stands. One scatter per card drives both its flight and its rest (I7). The table tilt unwinds IN FLIGHT. The layer a card had travels with it and decides the order it joins the heap — bottom-up (I9). Supports: a card\'s own scatter (going back to its place), fading (sinking under the visible top), a stagger, and flying an element that already exists instead of raising a flyer.',
     },
     where: {
-      ru: 'stories/interactive → все 10 сцен со сбросом',
-      en: 'stories/interactive → all 10 scenes with a discard',
+      ru: '@release/ui/animations → все 10 сцен со сбросом + борд фронтенда',
+      en: '@release/ui/animations → all 10 scenes with a discard + the frontend board',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'BoardAnchors',
+    what: {
+      ru: 'Реестр узлов борда: во что целится полёт и откуда стартует. Блоки HUD, deckBox, discardBox, centre, hand, плюс seatBox(player) — карточная коробка по центру сидушки (I6, сидушка сильно шире карты), handSlotAt(index) и releaseSlot(player, slot). Только DOM: своего состояния не держит и чужое не зеркалит — потому карта в руке достаётся по индексу, а не по uid (иначе реестр зависел бы от той самой руки, от которой должен быть независим). Слот релиза всегда ищется под владельцем: frontend есть у каждого игрока. Одна идентичность на всю жизнь монтирования — потребители забирают реестр в ref внутрь долгих последовательностей.',
+      en: "The board's registry of nodes: what a flight aims at and where it starts. The HUD blocks, deckBox, discardBox, centre, hand, plus seatBox(player) — a card box centred on a seat (I6, a seat is far wider than a card), handSlotAt(index) and releaseSlot(player, slot). DOM only: it holds no game state and mirrors none, which is why a hand card is reached by index rather than by uid (a uid lookup would make the registry depend on the very hand it must be independent of). A release slot is always looked up under its owner: every player has a frontend. One identity for the life of the mount — consumers capture it into a ref inside long-running sequences.",
+    },
+    where: {
+      ru: 'frontend: entities/game/board/anchors.ts → раздача, очередь тактов',
+      en: 'frontend: entities/game/board/anchors.ts → the deal, the beat queue',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'planBeats() + useBeats()',
+    what: {
+      ru: 'Очередь тактов борда. События приходят с провода ПАЧКАМИ — за один синк может приехать несколько ходов, — поэтому борд, который анимировал бы на рендер, играл бы их поверх друг друга или ронял все, кроме последней. Такт играет по одному; пока он идёт, борд рисует ТЕНЬ — ту проекцию, ОТ которой такт уходит, а не ту, к которой приходит (к моменту эффекта live уже без карты, вместе с её слотом — I1). Пачка, приехавшая посреди такта, ждёт своей очереди, а не планируется против состояния, которого никто не видел. Событие без хореографии не даёт такта и проходит насквозь. Тень живёт ровно столько, сколько очередь: на опустошении она снимается и живая проекция побеждает всегда — даже если такт упал. Здесь же единственная проверка prefers-reduced-motion: play() её не делает.',
+      en: "The board's beat queue. Events arrive off the wire in BATCHES — several moves can land in one sync — so a board that animated on render would play them on top of each other or drop all but the last. One beat at a time; while it runs the board draws a SHADOW — the projection the beat moves AWAY from, not the one it arrives at (by effect time `live` is already without the card, and without its slot — I1). A batch arriving mid-beat waits its turn rather than being planned against a state nobody saw. An event with no choreography yields no beat and passes through. The shadow lives exactly as long as the queue: on drain it is dropped and the live projection always wins — even if a beat threw. This is also the single prefers-reduced-motion check, because play() does not make one.",
+    },
+    where: {
+      ru: 'frontend: features/board-beats/ → уход карты в сброс; раздача как такт ноль',
+      en: 'frontend: features/board-beats/ → a card leaving for the discard; the deal as beat zero',
     },
     status: 'ok',
   },
@@ -621,6 +645,17 @@ const SCENARIOS: Scenario[] = [
       en: "the last release is pulled out of the fan and settles into its slot (playToReleaseZone, SNAP) — the zone is closed. Then the poppers: THREE independent bangs (0 / 620 / 1450ms), each with its own power — it drives the piece count, the reach and the time in the air, so they are three events and not one repeat. A volley is its own component: the pieces are made once and started once in a mount effect (starting from a render-time ref callback killed the pieces already in the air: the callback re-fires on every render and play stacks a second animation on a node mid-flight). Every piece its own code symbol, colour token and step of the mono scale; the arc is play('confettiFly'). The GameOver window comes up at 2.4s WHILE the confetti is still flying, and the confetti flies over it. In the playground both layers start below the technical line — it belongs to the playground, not the screen.",
     },
     where: 'GameEnd',
+  },
+  {
+    name: {
+      ru: 'Карта уходит из руки в сброс (живой борд)',
+      en: 'A card leaves the hand for the discard (live board)',
+    },
+    from: {
+      ru: 'Первая хореография, которую ведут настоящие события движка, а не клики сцены. Приходит батч, planBeats сворачивает ВСЕ discarded этого батча в ОДИН такт (по одной, но все сразу — сброс по лимиту руки читается одним жестом, а не тремя). Планируется против проекции, которая ещё на экране: в живой карта уже вынута из руки вместе со слотом, из которого лететь (I1). Источник — свой слот веера (карта ищется по id: событие несёт id, а не uid), карточная коробка на сидушке соперника, либо слот зоны релиза для destroyed/neutralized. Разброс — scatterAt(id события), тот же вызов, которым куча в toBoardState кладёт карту на покой: одно значение, два читателя, поэтому передача от тени к проекции не двигает ни пикселя (I7). Рука при этом не блокируется: сброс — то, что СЛУЧИЛОСЬ, а не то, что решается. Раздача встала в ту же очередь тактом ноль — единственный такт, который держит стол и публикует свою тень вместо базы.',
+      en: "The first choreography driven by real engine events rather than a scene's clicks. A batch arrives; planBeats folds EVERY discarded in it into ONE beat (one by one but all at once — a hand-limit discard reads as one gesture, not three). It is planned against the projection still on screen: in the live one the card is already out of the hand, and with it the slot to fly from (I1). The source is its own slot in the fan (found by card id — the event carries an id, not a uid), a card box on an opponent's seat, or a release-zone slot for destroyed/neutralized. The scatter is scatterAt(event id) — the same call the heap in toBoardState uses to rest the card: one value, two readers, so the handover from shadow to projection does not move a pixel (I7). The hand is never blocked: a discard is a thing that HAPPENED, not a thing being decided. The deal joined the same queue as beat zero — the one beat that holds the table and publishes its own shadow instead of a base.",
+    },
+    where: 'frontend: board-beats',
   },
 ]
 

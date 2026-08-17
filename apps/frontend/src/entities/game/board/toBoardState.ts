@@ -1,7 +1,8 @@
 import type { Event, PlayerView, ReleaseView } from '@release/engine'
 import { rulesFor } from '@release/engine'
-import type { HistoryEntry } from '@release/ui'
+import type { HeapCard, HistoryEntry } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
+import { HEAP_SHOW, scatterAt } from '@release/ui/animations'
 import type { BoardState } from './types'
 
 // One label per member of the engine's Event union — the adapter maps event
@@ -118,6 +119,59 @@ function toHistoryEntry(e: Event, labels: HistoryLabels): HistoryEntry {
   }
 }
 
+// The discard as it lies on the table. `PlayerView` carries only the top card
+// and a count, so the heap is folded out of the feed: one entry per `discarded`
+// event, its scatter keyed by the event id. Deterministic on purpose — every
+// peer folds the same heap, and the beat that flies a card into it reads the
+// SAME Scatter, so the card lands exactly where it then lies (I7).
+//
+// It runs BEHIND the count, knowingly: a card spent on an attack or a defence
+// reaches the discard through the engine's `bankToDiscard` with no event at all
+// (`attackSpent` / `defenceSpent` are declared in the DiscardReason union and
+// never emitted — docs/animations/backlog.md). Two consequences are handled
+// here rather than hidden: the count stays the projection's own, which is
+// authoritative; and because `Pile` ignores `topCard` the moment a heap is
+// present, a fold that does not end on the projection's top would leave a stale
+// card showing as the top of the discard — so the real top is appended.
+function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): HeapCard[] {
+  // The pile can EMPTY, and the feed does not say so card by card: a `discarded`
+  // event is never retracted, but `refillFromDiscard` recycles the whole pile
+  // back into the deck (emitting only `deckReshuffled`), and Cherry-pick takes
+  // cards out of it. The count is the projection's own and knows; the fold does
+  // not. Without this the heap would keep drawing cards over a counter reading
+  // zero — and `Pile` renders a non-empty heap INSTEAD of the empty-zone slot
+  // (Pile.tsx:76), so the "discard is empty" affordance would never come back
+  // for the rest of the match.
+  if (count === 0) return []
+  const heap: HeapCard[] = []
+  for (const e of log) {
+    if (e.type !== 'discarded') continue
+    // The event id IS the stable integer `scatterAt` asks for — the engine's own
+    // monotonic sequence, identical on every peer. No stringifying: `scatterAt`
+    // hashes the number arithmetically.
+    heap.push({ uid: `d${e.id}`, card: cardOrPlaceholder(e.card), ...scatterAt(e.id) })
+  }
+  if (top && heap.at(-1)?.card.id !== top.id) {
+    // The stand-in for however many cards were banked in silence. Its identity is
+    // the COUNT, not the heap's length: the count is what actually moved when
+    // that happened, so this card keeps one pose for as long as it is really the
+    // top. Its scatter key is negative to put it out of the event ids' range —
+    // those are positive, so a stand-in can never inherit a real card's pose.
+    //
+    // And only as long as it is the top: the moment an event-carrying discard
+    // lands above it, the fold ends on the real top again, this branch stops
+    // firing, and the banked card leaves the heap while the count still counts
+    // it. Accepted rather than fixed — the feed carries no event for a banked
+    // card (backlog.md), so once buried there is nothing to draw in its place,
+    // and past HEAP_SHOW the missing card is invisible anyway.
+    heap.push({ uid: `top${count}`, card: top, ...scatterAt(-1 - count) })
+  }
+  // Never more cards than the pile says it holds: after a partial take the fold
+  // still remembers every card that ever went in, and a heap deeper than the
+  // count is a stack drawn over a number that contradicts it.
+  return heap.slice(-Math.min(HEAP_SHOW, count))
+}
+
 // The projection becomes a table: PlayerView + the event log + translated
 // labels -> everything the kit's Table needs to render. Pure — no React, no
 // clock, no randomness. Total — an unknown card id renders a placeholder
@@ -145,6 +199,11 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       main: view.decks.piles.reduce((a, b) => a + b, 0),
       events: view.decks.events,
       discard: view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined,
+      discardHeap: toDiscardHeap(
+        visible,
+        view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined,
+        view.decks.discardCount,
+      ),
       discardCount: view.decks.discardCount,
     },
     turn: view.turn.player,

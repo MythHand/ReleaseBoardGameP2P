@@ -8,10 +8,9 @@ import { CARD_W, cardBoxIn, cardById } from '@release/ui'
 // from the components: a vocabulary and its steps, not a thing to render.
 import type { Rect, Scatter } from '@release/ui/animations'
 import { play, scatterAt, useFlyer, useHandArrival, wait } from '@release/ui/animations'
-import type { ReactNode, RefObject } from 'react'
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { BoardState } from '~/entities/game/board'
-import { useReducedMotion } from '~/shared/lib/useReducedMotion'
+import type { ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
 import { isOpening } from './isOpening'
 import type { DealPlan } from './planDeal'
 import { planDeal } from './planDeal'
@@ -52,20 +51,6 @@ const HEAP_HOLD = 640 // the finished heap stands open before it goes to the fan
 const FLIP_HOLD = 380 // it is all in the hand — then it turns over
 const REVEAL_HOLD = 620 // the hand is read, and only then the zone arrives
 
-export interface IntroRefs {
-  rail: RefObject<HTMLDivElement | null>
-  bg: RefObject<HTMLDivElement | null>
-  decks: RefObject<HTMLDivElement | null>
-  discard: RefObject<HTMLDivElement | null>
-  seats: RefObject<HTMLDivElement | null>
-  dock: RefObject<HTMLDivElement | null>
-  zone: RefObject<HTMLDivElement | null>
-  deckBox: RefObject<HTMLDivElement | null>
-  centre: RefObject<HTMLDivElement | null>
-  hand: RefObject<HTMLDivElement | null>
-  seatOf: (player: string) => HTMLElement | null
-}
-
 /** A card of the player's own heap at the centre, before it goes into the fan. */
 export interface StagedCard {
   uid: string
@@ -76,6 +61,10 @@ export interface StagedCard {
 
 export interface DealIntro {
   active: boolean
+  // The opening as one beat, for the board's queue to start. Null when there is
+  // no match to open. The queue owns WHEN it plays and whether it plays at all
+  // (prefers-reduced-motion collapses it); this hook owns what it does.
+  beat: IntroBeat | null
   // The board's state while the intro runs — the projection, shadowed. Null
   // once the intro is over: the board renders the live projection again.
   shadow: BoardState | null
@@ -125,11 +114,10 @@ export function useDealIntro(args: {
   gameId: string | null
   view: PlayerView | null
   events: Event[]
-  refs: IntroRefs
+  refs: BoardAnchors
   onDone: () => void
 }): DealIntro {
   const { live, gameId, view, events, refs } = args
-  const reduced = useReducedMotion()
 
   const [active, setActive] = useState(false)
   const [phase, setPhase] = useState<'setup' | 'dealing' | 'settling'>('setup')
@@ -158,13 +146,25 @@ export function useDealIntro(args: {
 
   // Everything the long-running sequence reads is taken through a ref: it is
   // started once and must not resume against a stale render's values.
-  const latest = useRef({ live, view, plan, refs, arrive, onDone: args.onDone, reduced })
-  latest.current = { live, view, plan, refs, arrive, onDone: args.onDone, reduced }
+  const latest = useRef({ live, view, plan, refs, arrive, onDone: args.onDone })
+  latest.current = { live, view, plan, refs, arrive, onDone: args.onDone }
 
   // Bumped to invalidate the running sequence. Every await in the run checks it,
   // so a cancelled run stops at its next beat and never touches state again.
   const runId = useRef(0)
   const reported = useRef(false)
+
+  // Settles the promise `run` hands the queue. The opening can end two ways — it
+  // plays out, or `finish` cuts it short (a skip, a resize, a missing rect) — and
+  // the queue must be released either way, or the table stays held for the rest
+  // of a beat nobody is watching.
+  const release = useRef<(() => void) | null>(null)
+  // Stable: it touches a ref and nothing else, so the callbacks that depend on
+  // it are not rebuilt every render.
+  const settle = useCallback(() => {
+    release.current?.()
+    release.current = null
+  }, [])
 
   // One way out, taken by the skip, by reduced motion, by a missing rect and by
   // a resize. Two implementations of "jump to the end" would drift, and only one
@@ -183,49 +183,64 @@ export function useDealIntro(args: {
     setActive(false)
     setStaged([])
     latest.current.onDone()
-  }, [drop])
+    // …and release the queue. The choreography may still be sitting in a wait()
+    // it cannot be pulled out of, but the opening is over the moment this runs,
+    // and the table should not stay held for the remainder of a beat nobody is
+    // watching any more.
+    settle()
+  }, [drop, settle])
   const finishRef = useRef(finish)
   finishRef.current = finish
 
-  // The preference is live: turning it on mid-flight collapses the intro.
-  useLayoutEffect(() => {
-    if (reduced && active) finishRef.current()
-  }, [reduced, active])
-
-  // Keyed by the game, and by the game alone. A re-render with a fresh
-  // projection object must not re-arm the intro, and React 19 StrictMode's
-  // double invoke must play it once: the first pass is cancelled by its own
-  // cleanup before it can do anything but set the shadow up, and the second
-  // starts clean.
+  // Keyed by the game, and by the game alone. It is the match id rather than
+  // anything off the projection: `view.self.id` is this peer's own seat, which
+  // is the SAME across every game it plays, so keying on it meant "once per
+  // peer" — a rematch without a remount would never deal again. There is no game
+  // identity in a PlayerView to fall back on; the route knows it, so the route
+  // passes it.
   //
-  // It is the match id rather than anything off the projection: `view.self.id`
-  // is this peer's own seat, which is the SAME across every game it plays, so
-  // keying on it meant "once per peer" — a rematch without a remount would
-  // never deal again. There is no game identity in a PlayerView to fall back
-  // on; the route knows it, so the route passes it.
+  // The queue arms this key once (`armed` in useBeats), which is also what makes
+  // React 19 StrictMode's double invoke play the opening exactly once — a ref
+  // survives the second pass, so the second pass finds the key already armed.
   const gameKey = view ? gameId : null
-  const armedFor = useRef<string | null>(null)
 
-  useLayoutEffect(() => {
-    // No projection yet: nothing to replay, and nothing to report — the gate
-    // this feeds must keep waiting.
-    if (gameKey == null) return
-    // A different match than the one that already played: this one has not.
-    if (armedFor.current !== gameKey) {
-      armedFor.current = gameKey
-      reported.current = false
-    }
-    // Already over (reduced motion, a skip, or a completed run). A re-render
-    // must not start it again.
+  // A different match than the one that already played: this one has not, so the
+  // "already reported" latch resets with the key. It is done HERE rather than
+  // inside `run` because `collapse` needs the same reset and gets no other
+  // chance at it — under reduced motion a rematch never calls `run`, and a latch
+  // left standing would make the second opening report nothing at all. The gate
+  // waits on every seat, so one silent seat holds the match shut for everyone.
+  const armedFor = useRef<string | null>(null)
+  if (gameKey != null && armedFor.current !== gameKey) {
+    armedFor.current = gameKey
+    reported.current = false
+  }
+
+  // The board is going away mid-opening: cancel. `runId` is what every await in
+  // the sequence checks, so bumping it stops the run at its next beat — no
+  // play() against detached nodes, no setState on an unmounted tree, and no
+  // onDone reporting a seat that is no longer watching.
+  //
+  // This used to be the arming effect's cleanup; the arming effect is gone (the
+  // queue starts the opening now), so the cancellation needs a home of its own.
+  // It does NOT report: a peer leaving the board must not open the start gate.
+  useEffect(
+    () => () => {
+      runId.current += 1
+      drop()
+      settle()
+    },
+    [drop, settle],
+  )
+
+  const sequence = useCallback(async () => {
+    // Already over — a skip that landed before the queue got here. Nothing to
+    // play, and `finish` has already reported.
     if (reported.current) return
 
     const { view: v, plan: p } = latest.current
     // Not an opening, or no deal to replay: hand over at once, and say so.
     if (!v || !isOpening(v) || !p || p.flights.length === 0) {
-      finishRef.current()
-      return
-    }
-    if (latest.current.reduced) {
       finishRef.current()
       return
     }
@@ -439,22 +454,17 @@ export function useDealIntro(args: {
       finishRef.current()
     }
 
-    const runAll = async () => {
+    try {
       await intro()
       if (halt()) return
       await deal()
-    }
-    void runAll()
-
-    return () => {
-      // Cancel, drop what is in the air — but do NOT report. Under StrictMode
-      // this cleanup runs between the two invocations, and an onDone here would
-      // open the gate before a single card had flown.
-      runId.current += 1
+    } finally {
+      // Whatever ended it — the last beat, a skip, a halt — the listener goes.
+      // One that outlives its run is a wake-up per resize event for the rest of
+      // the mount.
       window.removeEventListener('resize', onResize)
-      drop()
     }
-  }, [gameKey, drop, raise])
+  }, [drop, raise])
 
   // One state, shadowed. The board renders this instead of the projection while
   // the intro runs; its last frame is the projection's own values, in the
@@ -469,6 +479,39 @@ export function useDealIntro(args: {
       }
     : null
 
+  // The opening as the queue takes it: one beat, played once, that owns the
+  // table while it runs. Built here rather than beside the sequence because it
+  // publishes `shadow`, and the shadow is derived from the state the sequence
+  // sets — the beat has to see the current frame, not the one it was armed with.
+  //
+  // `run`'s promise resolves when the opening is OVER, not when the choreography
+  // returns: `finish` settles it too (see `settle` above), so a skip hands the
+  // table back at once instead of at the end of a beat nobody is watching.
+  const beat = useMemo<IntroBeat | null>(
+    () =>
+      gameKey == null
+        ? null
+        : {
+            key: gameKey,
+            shadow,
+            run: () =>
+              new Promise<void>((resolve) => {
+                release.current = resolve
+                // Settled on BOTH outcomes, deliberately. A rejection here — a
+                // WAAPI promise that rejects, a throw inside a beat — would
+                // otherwise skip the settle, and the queue's await would never
+                // return: the table would stay held, inert, for the life of the
+                // mount. A failure must cost the animation and nothing else.
+                void sequence().then(settle, (err) => {
+                  if (import.meta.env.DEV) console.error('[deal] the opening failed', err)
+                  settle()
+                })
+              }),
+            collapse: () => finishRef.current(),
+          },
+    [gameKey, shadow, sequence, settle],
+  )
+
   const closedSet = useMemo(() => new Set(closed), [closed])
   const faceDown = useCallback(
     (uid: string) => active && !revealed && closedSet.has(uid),
@@ -477,6 +520,7 @@ export function useDealIntro(args: {
 
   return {
     active,
+    beat,
     shadow,
     staged,
     overlays: [...flyerOverlay, ...arrivalOverlay],
