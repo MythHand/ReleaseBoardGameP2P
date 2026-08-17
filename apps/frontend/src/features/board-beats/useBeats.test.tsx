@@ -164,6 +164,7 @@ function Probe({
           and afterDiscard both have an empty fan, and only the deck count says
           whether the board is showing the opening's shadow or the projection. */}
       <div data-testid="deck">{(beats.shadow ?? live).decks.main.join(',')}</div>
+      <div data-testid="discardCount">{shown.decks.discardCount}</div>
       <div data-testid="exclusive">{beats.exclusive ? 'exclusive' : 'open'}</div>
       {/* How many flyers are mounted right now — a dead match's in-flight card
           shows up here until its runner's own reset() clears it. */}
@@ -314,6 +315,31 @@ it('hands the board back to the live projection when the queue drains', async ()
   const { getByTestId } = mount()
   await flush()
   expect(getByTestId('hand').textContent).toBe('0')
+})
+
+// The shadow's lifetime scopes PER END. Mid-flight, the fan has already let go
+// of the card — it left the table the moment its slot was measured, at takeoff
+// — but the discard end still holds the pre-batch heap, because the card has
+// not visually arrived yet. Both readings come from the SAME shadow, so this
+// is the one test that can tell "released too early" (discard already at 1)
+// from "released too late" (still in the fan) from the fix (fan empty, heap
+// still at 0).
+it('the shadow releases the flown card from the fan at takeoff, and holds the discard end until it lands', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = true
+  const { getByTestId } = mount()
+  await flush()
+  expect(getByTestId('hand').textContent).toBe('0')
+  expect(getByTestId('discardCount').textContent).toBe('0')
+  // Landing: live wins, exactly as it does with no flight held at all.
+  sent.hang = false
+  await act(async () => {
+    sent.release?.()
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(getByTestId('hand').textContent).toBe('0')
+  expect(getByTestId('discardCount').textContent).toBe('1')
 })
 
 it('flies each card on the scatter the heap will rest it on', async () => {

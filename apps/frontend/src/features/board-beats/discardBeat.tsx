@@ -1,8 +1,9 @@
+import type { ReleaseSlots } from '@release/ui'
 import { cardById } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import { nextFrames, scatterAt, useDiscardExit } from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
-import type { BeatRun, BoardAnchors } from '~/entities/game/board'
+import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { BeatPlan, DiscardCard } from './planBeats'
 
 // A card leaves the table for the discard. The movement itself belongs to the
@@ -17,6 +18,58 @@ const rectOf = (el: Element | null): Rect | null => {
   if (!el) return null
   const r = el.getBoundingClientRect()
   return { left: r.left, top: r.top, width: r.width, height: r.height }
+}
+
+// The shadow's lifetime scopes PER END, not per beat. The hand goes live the
+// moment a card's slot has been measured — it leaves the fan as it takes off,
+// which is what the playground's own drag-out does too — while the discard end
+// keeps the pre-batch projection until the card actually lands, or the heap
+// would show it before it arrives. `run` publishes exactly this: `ctx.base`
+// with every flying card gone from wherever it stood, and `decks` untouched.
+// Pure, so the beat only has to call it and hand the result to `ctx.publish`.
+function withoutFlown(base: BoardState, flown: DiscardCard[]): BoardState {
+  const handIndexes = new Set<number>()
+  const clearedSlots = new Map<string, Set<keyof ReleaseSlots>>()
+  const seatDrops = new Map<string, number>()
+
+  for (const { source } of flown) {
+    if (source.kind === 'hand') {
+      handIndexes.add(source.index)
+    } else if (source.kind === 'release') {
+      const slots = clearedSlots.get(source.player) ?? new Set<keyof ReleaseSlots>()
+      slots.add(source.slot as keyof ReleaseSlots)
+      clearedSlots.set(source.player, slots)
+    } else {
+      seatDrops.set(source.player, (seatDrops.get(source.player) ?? 0) + 1)
+    }
+  }
+
+  const withoutSlots = (release: ReleaseSlots, slots?: Set<keyof ReleaseSlots>): ReleaseSlots => {
+    if (!slots) return release
+    const next = { ...release }
+    for (const slot of slots) next[slot] = null
+    return next
+  }
+
+  return {
+    ...base,
+    you: {
+      ...base.you,
+      hand:
+        handIndexes.size > 0 ? base.you.hand.filter((_, i) => !handIndexes.has(i)) : base.you.hand,
+      release: withoutSlots(base.you.release, clearedSlots.get(base.selfId)),
+    },
+    opponents: base.opponents.map((o) => {
+      const drop = seatDrops.get(o.id)
+      const slots = clearedSlots.get(o.id)
+      if (!drop && !slots) return o
+      return {
+        ...o,
+        handCount: drop ? o.handCount - drop : o.handCount,
+        release: withoutSlots(o.release, slots),
+      }
+    }),
+  }
 }
 
 export function useDiscardBeat(anchors: BoardAnchors) {
@@ -44,7 +97,7 @@ export function useDiscardBeat(anchors: BoardAnchors) {
   )
 
   const run = useCallback(
-    async (plan: Extract<BeatPlan, { kind: 'discard' }>, _ctx: BeatRun) => {
+    async (plan: Extract<BeatPlan, { kind: 'discard' }>, ctx: BeatRun) => {
       // WAIT FOR THE SHADOW, THEN MEASURE — in that order, and the order is the
       // whole point. The queue starts this from inside a layout effect, so at
       // entry React has committed the projection that ARRIVED: the card is
@@ -57,8 +110,23 @@ export function useDiscardBeat(anchors: BoardAnchors) {
       // because a stub that hands back a detached node measures the same either
       // way. `useBeats.test.tsx` queries the probe's real DOM for exactly this.
       await nextFrames()
-      const items = plan.cards.map(toLeaving).filter((it): it is Leaving => it != null)
-      if (items.length > 0) await latest.current.send(items)
+      const items: Leaving[] = []
+      const flown: DiscardCard[] = []
+      for (const c of plan.cards) {
+        const leaving = toLeaving(c)
+        if (leaving) {
+          items.push(leaving)
+          flown.push(c)
+        }
+      }
+      if (items.length === 0) return
+      // TAKEOFF: the fan has already let go of these cards — publish now, before
+      // the flight itself, or the board would show the card twice for as long as
+      // the flight lasts (once mid-air, once still sitting in its slot). The
+      // discard end is deliberately left at `ctx.base`'s own — see
+      // `withoutFlown`'s comment for why.
+      ctx.publish(withoutFlown(ctx.base, flown))
+      await latest.current.send(items)
     },
     [toLeaving],
   )
