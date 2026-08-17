@@ -95,6 +95,40 @@ export function targetsFor(state: GameState, viewerId: PlayerId): Record<CardUid
   return result
 }
 
+// Which pairs a support card in hand may legally start right now, keyed by
+// the support card's own uid (support-first staging: Tasks 9-10 stage the
+// support first, then look up its partners). Sudo rides with a sudo-carrier
+// that is playable on the turn or throwable into an open window; Code Review
+// rides with a release, but only when a third card is left to pay its cost
+// (release.ts:268 rejects a pair that leaves nothing to pay with, unless the
+// mode waives the cost). Mirrors `playableFor`/`canAttackWith`: no window, no
+// pending, no turn — no combos either.
+export function combosFor(state: GameState, viewerId: PlayerId): Record<CardUid, CardUid[]> {
+  const me = state.players[viewerId]
+  const result: Record<CardUid, CardUid[]> = {}
+  const playable = new Set(playableFor(state, viewerId))
+  const throwable = new Set(canAttackWith(state, viewerId))
+  for (const s of me.hand) {
+    if (s.id !== 'support-sudo' && s.id !== 'support-code-review') continue
+    const partners = me.hand
+      .filter((c) => {
+        if (c.uid === s.uid) return false
+        const rules = rulesFor(c.id)
+        if (s.id === 'support-sudo') {
+          if (rules?.sudo !== true) return false
+          return playable.has(c.uid) || throwable.has(c.uid)
+        }
+        // Code Review rides a release being PLAYED — and the pair must leave a
+        // card to pay the cost (release.ts:268), unless the mode waives it.
+        if (rules?.kind !== 'release' || !playable.has(c.uid)) return false
+        return state.setup.releaseCond === 'easy' || me.hand.length >= 3
+      })
+      .map((c) => c.uid)
+    if (partners.length > 0) result[s.uid] = partners
+  }
+  return result
+}
+
 export function project(state: GameState, viewerId: PlayerId): PlayerView {
   const me = state.players[viewerId]
   const top = state.decks.discard[state.decks.discard.length - 1]
@@ -107,6 +141,7 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       release: releaseView(state, viewerId),
       playable: playableFor(state, viewerId),
       targets: targetsFor(state, viewerId),
+      combos: combosFor(state, viewerId),
       frozen: [...me.frozen],
     },
     opponents: state.seating

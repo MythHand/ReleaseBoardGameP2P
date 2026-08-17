@@ -87,6 +87,11 @@ export interface PlayerView {
     // for a card that needs one. A playable card with no entry plays without a
     // target. Same authority as `playable`: attackTargets is what onPlay checks.
     targets: Record<CardUid, Target[]>
+    // For each support card in hand: the partner uids it may legally start a
+    // pair with right now (support-first staging). Turn context pairs Sudo with
+    // playable sudo-carriers and Code Review with a payable release; a reaction
+    // window pairs Sudo with canAttackWith. Absent key: no pair possible.
+    combos: Record<CardUid, CardUid[]>
     frozen: CardUid[]
   }
   opponents: OpponentView[]
