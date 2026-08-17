@@ -249,3 +249,25 @@ it('shows no countdown readout for a pending that carries no deadline', () => {
   render(<Board {...props} />)
   expect(screen.queryByTestId('ring-value')).toBeNull()
 })
+
+it('a pending attack stands at the centre for every viewer', () => {
+  const base = makeBoardProps()
+  const props = makeBoardProps({
+    state: {
+      ...base.state,
+      pending: {
+        kind: 'defend',
+        player: 'p2',
+        attacker: 'p1',
+        attackCard: 'attack-bug',
+        sudo: false,
+        options: [],
+        openedAt: 0,
+        deadline: 15000,
+        scope: 'hand',
+      },
+    },
+  })
+  const { getByTestId } = render(<Board {...props} />)
+  expect(getByTestId('board-centre-pending')).toBeTruthy()
+})
