@@ -796,8 +796,8 @@ const ISSUES: Issue[] = [
       en: 'A Rollback return on a sudo attack has no movement on the board',
     },
     problem: {
-      ru: 'Судо-Rollback банкует только Sudo-половину пары — атакующая карта по правилам возвращается в руку атакующего без единого `discarded`, и такт это не изобретает: `pairToDiscard` расщепляет в сброс ТОЛЬКО судо-половину, а куда делась атакующая карта, не показывает никак — она просто оказывается в руке. Не ошибка проекции, дыра в хореографии до тех пор, пока #101 не даст обменной хореографии возврата.',
-      en: "A sudo Rollback banks only the Sudo half of the pair — the attack card returns to the attacker's own hand with no `discarded` event, and the beat does not invent one: `pairToDiscard` splits ONLY the sudo half into the discard, and the attack card is not shown going anywhere — it simply turns up in the hand. Not a projection bug, a choreography gap until #101 supplies the return's own exchange choreography.",
+      ru: 'Судо-Rollback банкует только Sudo-половину пары — атакующая карта по правилам возвращается в руку (в чью именно — зависит от `sudoDefence`, docs/animations/backlog.md) без единого `discarded`, и такт это не изобретает: `pairToDiscard` расщепляет в сброс ТОЛЬКО судо-половину, а куда делась атакующая карта, не показывает никак — она просто оказывается в руке. Не ошибка проекции, дыра в хореографии до тех пор, пока #101 не даст обменной хореографии возврата.',
+      en: "A sudo Rollback banks only the Sudo half of the pair — the attack card returns to a hand (whose depends on `sudoDefence`, see docs/animations/backlog.md) with no `discarded` event, and the beat does not invent one: `pairToDiscard` splits ONLY the sudo half into the discard, and the attack card is not shown going anywhere — it simply turns up in the hand. Not a projection bug, a choreography gap until #101 supplies the return's own exchange choreography.",
     },
     where: {
       ru: 'frontend: features/board-beats/comboBeat.tsx (runPairOut) + planBeats.ts (pairToDiscard)',
