@@ -81,6 +81,11 @@ export interface TableRoom {
   // pointer. Local to this player — it is never sent anywhere.
   parallax?: boolean
   onParallaxChange?: (on: boolean) => void
+  // Всплывают ли новые реплики чата в углу, пока панель закрыта. Тоже
+  // предпочтение показа, а не факт комнаты: живёт у этого игрока и никуда не
+  // уезжает. Без обработчика поле в настройках не рисуется, а тосты идут.
+  chatToasts?: boolean
+  onChatToastsChange?: (on: boolean) => void
   paused?: boolean
   onPauseChange?: (on: boolean) => void
   pausePlayers?: PausePlayer[]
@@ -122,6 +127,12 @@ export interface TableChromeCopy {
   parallaxOn?: string
   parallaxOff?: string
   parallaxHint?: string
+  // поле уведомлений чата — как параллакс: подпись, состояния тумблера и
+  // пояснение; рендерится только вместе со своим обработчиком
+  chatToasts?: string
+  chatToastsOn?: string
+  chatToastsOff?: string
+  chatToastsHint?: string
   // подписи текстовых вкладок рейла
   tabHistory: string
   tabParticipants: string

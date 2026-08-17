@@ -132,6 +132,7 @@ export default function TableChatStory() {
       ]
     })
   const [parallax, setParallax] = useState(true)
+  const [chatToasts, setChatToasts] = useState(true)
   const [ready, setReady] = useState<Set<string>>(() => new Set())
   // Anchor for the reaction demo states' sweep, reset each time either is
   // (re-)selected so switching back into it restarts the countdown. Keyed on
@@ -229,20 +230,30 @@ export default function TableChatStory() {
   // Card parallax — a display preference of this player, so it sits in the general
   // group next to the language, not under the host's controls.
   const parallaxLabel = pick(lang, { ru: 'параллакс карт', en: 'card parallax' })
-  const parallaxOn = pick(lang, { ru: 'включён', en: 'on' })
-  const parallaxOff = pick(lang, { ru: 'выключен', en: 'off' })
+  const parallaxOn = pick(lang, { ru: 'Вкл', en: 'On' })
+  const parallaxOff = pick(lang, { ru: 'Выкл', en: 'Off' })
   const parallaxHint = pick(lang, {
-    ru: 'лицо карты следует за курсором',
+    ru: 'лицо карты следует за курсором',
     en: 'the card face follows the cursor',
+  })
+  // Уведомления чата — там же, в общих: это предпочтение показа этого игрока.
+  const chatToastsLabel = pick(lang, { ru: 'уведомления чата', en: 'chat notifications' })
+  const chatToastsOn = pick(lang, { ru: 'Вкл', en: 'On' })
+  const chatToastsOff = pick(lang, { ru: 'Выкл', en: 'Off' })
+  const chatToastsHint = pick(lang, {
+    ru: 'новые сообщения всплывают в углу, пока чат закрыт',
+    en: 'new messages surface in the corner while the chat is closed',
   })
   const pauseLabel = pick(lang, { ru: 'пауза игры', en: 'pause game' })
   const pauseHint = pick(lang, {
-    ru: 'таймер хода замрёт у всех игроков',
+    ru: 'таймер хода замрёт у всех игроков',
     en: 'freezes the turn timer for everyone',
   })
   const generalTitle = pick(lang, { ru: 'общие', en: 'general' })
-  const pauseOn = pick(lang, { ru: 'включена', en: 'on' })
-  const pauseOff = pick(lang, { ru: 'выключена', en: 'off' })
+  // одно слово в обоих состояниях: включённость несёт сам тумблер цветом,
+  // а кнопка называет действие
+  const pauseOn = pick(lang, { ru: 'Пауза', en: 'Pause' })
+  const pauseOff = pick(lang, { ru: 'Пауза', en: 'Pause' })
 
   return (
     <div className={styles.root}>
@@ -313,6 +324,8 @@ export default function TableChatStory() {
             onLangChange: setLang,
             parallax,
             onParallaxChange: setParallax,
+            chatToasts,
+            onChatToastsChange: setChatToasts,
             paused,
             onPauseChange: togglePause,
             pausePlayers,
@@ -330,6 +343,10 @@ export default function TableChatStory() {
               parallaxOn,
               parallaxOff,
               parallaxHint,
+              chatToasts: chatToastsLabel,
+              chatToastsOn,
+              chatToastsOff,
+              chatToastsHint,
               pauseGame: pauseLabel,
               pauseOn,
               pauseOff,
