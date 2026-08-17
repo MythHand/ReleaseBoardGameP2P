@@ -1,3 +1,4 @@
+import type { Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
 import type { PlayerView, ReleasedView, ReleaseView } from '../view'
@@ -80,6 +81,20 @@ export function playableFor(state: GameState, viewerId: PlayerId): CardUid[] {
     .map((c) => c.uid)
 }
 
+// An entry only for the playable cards that need a target — the same
+// `attackTargets` the reducer itself validates against, so the offer and the
+// acceptance cannot drift.
+export function targetsFor(state: GameState, viewerId: PlayerId): Record<CardUid, Target[]> {
+  const result: Record<CardUid, Target[]> = {}
+  const hand = state.players[viewerId].hand
+  for (const uid of playableFor(state, viewerId)) {
+    const card = hand.find((c) => c.uid === uid)
+    if (!card || rulesFor(card.id)?.kind !== 'attack') continue
+    result[uid] = attackTargets(state, viewerId, card.id)
+  }
+  return result
+}
+
 export function project(state: GameState, viewerId: PlayerId): PlayerView {
   const me = state.players[viewerId]
   const top = state.decks.discard[state.decks.discard.length - 1]
@@ -91,6 +106,7 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       hand: me.hand.map((c) => ({ ...c })),
       release: releaseView(state, viewerId),
       playable: playableFor(state, viewerId),
+      targets: targetsFor(state, viewerId),
       frozen: [...me.frozen],
     },
     opponents: state.seating
