@@ -19,6 +19,8 @@
     "react-dom": "^19.2.7"
   },
   "devDependencies": {
+    "@release/lint": "workspace:*",
+    "@release/translation": "workspace:*",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -27,8 +29,10 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "vite": "^8.0.16",
-    "vite-plugin-svgr": "^5.2.0",
-    "@release/lint": "workspace:*",
-    "@release/translation": "workspace:*"
+    "vite-plugin-svgr": "^5.2.0"
+  },
+  "dependencies": {
+    "overlayscrollbars": "^2.16.0",
+    "overlayscrollbars-react": "^0.5.6"
   }
 }

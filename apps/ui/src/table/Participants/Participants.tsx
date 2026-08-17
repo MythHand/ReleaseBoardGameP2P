@@ -1,6 +1,7 @@
 import Avatar from '@/primitives/Avatar'
 import Badge, { type BadgeTone } from '@/primitives/Badge'
 import Dropdown from '@/primitives/Dropdown'
+import ScrollArea from '@/primitives/ScrollArea'
 import styles from './Participants.module.css'
 
 export interface Participant {
@@ -48,7 +49,7 @@ export default function Participants({
 }: ParticipantsProps) {
   return (
     <div className={styles.box}>
-      <div className={styles.scroll}>
+      <ScrollArea className={styles.scroll} contentClassName={styles.scrollFlow}>
         <section className={styles.section}>
           <div className={styles.head}>
             {copy.players} <span className={styles.count}>{players.length}</span>
@@ -97,7 +98,7 @@ export default function Participants({
             {spectators.length === 0 && <li className={styles.empty}>{copy.noSpectators}</li>}
           </ul>
         </section>
-      </div>
+      </ScrollArea>
     </div>
   )
 }

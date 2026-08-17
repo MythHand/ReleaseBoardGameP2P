@@ -48,3 +48,24 @@ button {
   color: var(--fg);
   background: color-mix(in srgb, var(--brand-green) 30%, transparent);
 }
+
+/* Тема полосы прокрутки (OverlayScrollbars, примитив ScrollArea). Живёт здесь, а
+   не в модуле: класс темы библиотека ставит строкой, а модульный CSS хеширует
+   имена — из модуля этот селектор был бы недостижим.
+   Полосы у нас нигде не показаны постоянно: она лежит НАД содержимым, поэтому
+   не отнимает ширину и не двигает раскладку, и её не видно, пока не прокручивают
+   (autoHide: 'scroll' в примитиве). Дорожки нет вовсе — только сам ползунок. */
+.os-theme-release {
+  --os-size: 10px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 2px;
+  --os-track-bg: transparent;
+  --os-track-bg-hover: transparent;
+  --os-track-bg-active: transparent;
+  --os-track-border-radius: 0;
+  --os-handle-border-radius: 5px;
+  --os-handle-bg: var(--white-20);
+  --os-handle-bg-hover: var(--white-35);
+  --os-handle-bg-active: var(--white-45);
+  --os-handle-min-size: 32px;
+}

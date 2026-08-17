@@ -4,11 +4,16 @@
   min-block-size: 0;
 }
 
+/* область прокрутки — только место; полосу над содержимым ведёт ScrollArea */
 .scroll {
+  min-block-size: 0;
+}
+
+/* поток внутри области: секции игроков и зрителей колонкой */
+.scrollFlow {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  overflow-y: auto;
 }
 
 .section {

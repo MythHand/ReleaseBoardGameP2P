@@ -12,6 +12,7 @@ import Button from '@/primitives/Button'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
+import ScrollArea from '@/primitives/ScrollArea'
 import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
 import Toggle from '@/primitives/Toggle'
@@ -453,9 +454,9 @@ export default function Table({
             />
           )}
           {panel === 'rules' && (
-            <div className={styles.scrollPanel}>
+            <ScrollArea className={styles.scrollPanel}>
               <Rules copy={copy.rules} />
-            </div>
+            </ScrollArea>
           )}
           {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
         </Drawer>
