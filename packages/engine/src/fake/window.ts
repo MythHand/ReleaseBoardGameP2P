@@ -109,11 +109,14 @@ export function onWindowExpired(
   // An attack thrown into this very window can leave a defend pending on it —
   // the window stays open underneath while that plays out (release-scope
   // onDefend reopens it a round later). Expiring the window out from under an
-  // undecided pending would close the one thing that pending needs back, and
-  // strand it there permanently. The exchange decides the window's fate first;
-  // expiry gets its turn again once the pending resolves, same clock, same
-  // deadline — the same ordering onPass, onDraw and onPush already hold to.
-  if (state.pending) return reject(state, action, 'a decision is pending')
+  // undecided defend would close the one thing that pending needs back, and
+  // strand it there permanently, so the exchange decides the window's fate
+  // first; expiry gets its turn again once the defend resolves, same clock,
+  // same deadline. Narrow to `defend` and only `defend`: it always carries its
+  // own deadline and is the one pending kind with any bearing on this window
+  // at all — a `handLimit` or any other kind sharing the moment has no stake
+  // in it and nothing else would ever close the window on its behalf.
+  if (state.pending?.kind === 'defend') return reject(state, action, 'a defence is pending')
   // The deadline is authoritative, not the caller's say-so: an early expiry would
   // let one peer cut everyone else's reaction time short.
   if (action.at < w.deadline) return reject(state, action, 'the window has not expired')
