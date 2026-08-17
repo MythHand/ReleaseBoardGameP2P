@@ -38,8 +38,8 @@
 
 import type { Event, PlayerId } from '@release/engine'
 import type { CardData, TableTarget } from '@release/ui'
-import { cardById } from '@release/ui'
-import { act, render } from '@testing-library/react'
+import { Card, CardPair, cardById, ReleaseZone } from '@release/ui'
+import { act, render, screen } from '@testing-library/react'
 import { useLayoutEffect, useRef } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BoardState, StagedHandoff } from '~/entities/game/board'
@@ -108,6 +108,7 @@ const after: BoardState = {
 const api: {
   staging?: ReturnType<typeof useBoardStaging>
   handoffRef?: React.RefObject<StagedHandoff | null>
+  anchors?: ReturnType<typeof useBoardAnchors>
 } = {}
 
 // The load-bearing subset of `_Board.tsx`'s own wiring: `useBeats` gets the
@@ -120,6 +121,7 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
   const handoffRef = useRef<StagedHandoff | null>(null)
   const soloStagedRef = useRef<HTMLDivElement>(null)
   api.handoffRef = handoffRef
+  api.anchors = anchors
 
   const beats = useBeats({ live, events, anchors, enabled: true, staging: handoffRef })
   const state = beats.shadow ?? live
@@ -156,12 +158,55 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
         {soloStaged && staging.overlay.length === 0 && (
           <div ref={soloStagedRef} data-testid="solo-staged" />
         )}
-        {!staging.staged && state.pending?.kind === 'defend' && (
-          <div data-pending-play data-testid="pending" />
+        {/* mirrors `_Board.tsx`'s own centre-pending block verbatim (the
+            sudo/CardPair branch included) — the resolution/opponent-sudo
+            tests below need the same pair the real board would render. */}
+        {!staging.staged &&
+          state.pending?.kind === 'defend' &&
+          (() => {
+            const data = cardById(state.pending.attackCard)
+            if (!data) return null
+            const aux = state.pending.sudo ? cardById('support-sudo') : null
+            return (
+              <div data-pending-play data-testid="pending">
+                {aux ? (
+                  <CardPair main={data} aux={aux} width="100%" />
+                ) : (
+                  <Card card={data} interactive={false} width="100%" />
+                )}
+              </div>
+            )
+          })()}
+      </div>
+      {/* the opponent seat `foldIn` folds an opponent's own play in from
+          (`anchors.seatBox`) — every fixture in this file that throws a play
+          from the far side uses 'p2', so one bound seat covers all of them. */}
+      <div ref={(el) => anchors.bindSeat('p2', el)} />
+      <div ref={anchors.discardBox} />
+      {/* a lean proxy for `_Board.tsx`'s own `<Pile heap={decks.discardHeap}>`
+          — `Pile`'s own rendering of a heap is already pinned elsewhere
+          (boardDiscard.test.tsx); what this harness needs is only that the
+          projection's own heap is what's on screen once the queue hands over. */}
+      <div data-testid="discard-heap">
+        {(state.decks.discardHeap ?? []).map((h) => (
+          <span key={h.uid} data-card={h.card.id} />
+        ))}
+      </div>
+      <ReleaseZone
+        release={state.you.release}
+        support={state.you.support}
+        player={state.selfId}
+        slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
+      />
+      <div ref={staging.pairRef} data-testid="pair-flyer">
+        {staging.staged?.merged && staging.staged.support && staging.staged.main && (
+          <CardPair
+            main={staging.staged.main.card}
+            aux={staging.staged.support.card}
+            width="100%"
+          />
         )}
       </div>
-      <div ref={anchors.discardBox} />
-      <div ref={staging.pairRef} data-testid="pair-flyer" />
       {staging.overlay}
       {beats.overlays}
     </div>
@@ -215,4 +260,239 @@ it('hands the table back without re-folding when the local player’s own attack
   // via `release()`, not via the OTHER (premature) path this test pins shut.
   expect(api.handoffRef?.current).toBeNull()
   expect(api.staging?.staged).toBeNull()
+})
+
+// ===== Task 12 (#100): the wire-driven scenarios this harness is built to
+// answer, beyond the handoff race above. `planBeats.test.ts` already pins the
+// EVENT → PLAN classification for both of these, and `comboBeat.test.tsx`
+// already pins `runAttack`/`runRelease`/`runPairOut`'s own mechanics against a
+// fake anchor registry; what neither exercises is the REAL `useBeats` queue —
+// plan → run → shadow → drain → handover — landing on the render the actual
+// hooks (not a stand-in) would produce.
+
+const opponentSudoBefore: BoardState = {
+  you: { name: 'You', hand: [], release: {} },
+  opponents: [{ id: 'p2', name: 'Two', handCount: 4, release: {} }],
+  decks: { main: [10], events: 5, discardCount: 0, discardHeap: [] },
+  turn: 'p2' as PlayerId,
+  selfId: 'p1',
+  history: [],
+  setup: {},
+  playable: [],
+  frozen: [],
+} as unknown as BoardState
+
+const opponentSudoAttacked: Event = {
+  id: 1,
+  type: 'attacked',
+  attacker: 'p2',
+  card: 'attack-bug',
+  sudo: true,
+  target: 'p1',
+}
+
+const opponentSudoAfter: BoardState = {
+  ...opponentSudoBefore,
+  opponents: [{ id: 'p2', name: 'Two', handCount: 3, release: {} }],
+  pending: {
+    kind: 'defend',
+    player: 'p1',
+    attacker: 'p2',
+    attackCard: 'attack-bug',
+    sudo: true,
+    options: [],
+    openedAt: 0,
+    deadline: 15000,
+    scope: 'hand',
+  },
+} as unknown as BoardState
+
+// The mutation-check: drop the `plan.attacker === ctx.base.selfId` guard (or
+// the sudo aux) in `runAttack` and this fails two different ways — either the
+// opponent's own throw would go looking for a local handoff that was never
+// there (nothing folds, no pending renders), or only one half would fold and
+// the CardPair assertion below would find a lone Card instead.
+it('an opponent’s sudo attack plans the full fold — no local staging involved at any point', async () => {
+  played.names = []
+  const { rerender } = render(<Harness live={opponentSudoBefore} events={[]} />)
+  expect(api.staging?.staged).toBeNull()
+  expect(api.handoffRef?.current).toBeNull()
+
+  await drive(() => rerender(<Harness live={opponentSudoAfter} events={[opponentSudoAttacked]} />))
+
+  // both halves fold in from the attacker’s own seat
+  expect(played.names.filter((n) => n === 'foldIntoPair')).toHaveLength(2)
+  // the local player never staged anything — an opponent’s play never reads
+  // or writes the handoff at all
+  expect(api.handoffRef?.current).toBeNull()
+  expect(api.staging?.staged).toBeNull()
+  // the projection the beat hands over to: the pair, not a lone card
+  const pending = screen.getByTestId('pending')
+  expect(pending.querySelector('[data-main]')).toBeTruthy()
+  expect(pending.querySelector('[data-aux]')).toBeTruthy()
+})
+
+const resolutionBefore: BoardState = {
+  you: { name: 'You', hand: [], release: {} },
+  opponents: [{ id: 'p2', name: 'Two', handCount: 3, release: {} }],
+  decks: { main: [10], events: 5, discardCount: 0, discardHeap: [] },
+  turn: 'p2' as PlayerId,
+  selfId: 'p1',
+  history: [],
+  setup: {},
+  playable: [],
+  frozen: [],
+  pending: {
+    kind: 'defend',
+    player: 'p1',
+    attacker: 'p2',
+    attackCard: 'attack-bug',
+    sudo: true,
+    options: [],
+    openedAt: 0,
+    deadline: 15000,
+    scope: 'hand',
+  },
+} as unknown as BoardState
+
+const resolutionEvents: Event[] = [
+  { id: 10, type: 'tookHit', player: 'p1' } as Event,
+  { id: 11, type: 'discarded', player: 'p2', card: 'attack-bug', reason: 'attackSpent' } as Event,
+  { id: 12, type: 'discarded', player: 'p2', card: 'support-sudo', reason: 'attackSpent' } as Event,
+]
+
+// `runPairOut` never calls `ctx.publish` (comboBeat.tsx's own header) — the
+// projection handed over to IS the state this literal already carries, same
+// as `boardDiscard.test.tsx` builds a heap. What is under test here is only
+// that the real queue gets there: the beat measures the pending pair,
+// completes without stranding the shadow, and the handover lands on it.
+const resolutionAfter: BoardState = {
+  ...resolutionBefore,
+  pending: undefined,
+  decks: {
+    ...resolutionBefore.decks,
+    discardHeap: [
+      { uid: 'h11', card: card('attack-bug'), rot: 4, dx: 2, dy: -3 },
+      { uid: 'h12', card: card('support-sudo'), rot: -6, dx: -1, dy: 5 },
+    ],
+    discardCount: 2,
+  },
+} as unknown as BoardState
+
+it('the resolution splits the pending pair into the discard heap', async () => {
+  const { rerender } = render(<Harness live={resolutionBefore} events={[]} />)
+  expect(screen.getByTestId('pending').hasAttribute('data-pending-play')).toBe(true)
+
+  await drive(() => rerender(<Harness live={resolutionAfter} events={resolutionEvents} />))
+
+  expect(screen.queryByTestId('pending')).toBeNull()
+  const heap = screen.getByTestId('discard-heap').querySelectorAll('[data-card]')
+  expect(Array.from(heap).map((el) => el.getAttribute('data-card'))).toEqual([
+    'attack-bug',
+    'support-sudo',
+  ])
+})
+
+// The carried requirement beyond the brief's four tests (#100, Task 11 review
+// — a disclosed gap): the release path's own version of the attack test
+// above. Pulling Code Review and folding a release partner IN (the gesture,
+// `_useBoardStaging.ts`'s own `onCardClick`) stands the merged pair at the
+// centre; `released` landing with the SAME actor recognises that staged pair
+// via the handoff and flies it to the slot instead of folding a second one in
+// from a hand it never left (this repo, per `comboBeat.tsx`'s `runRelease`).
+const releaseBefore: BoardState = {
+  you: {
+    name: 'You',
+    hand: [
+      { uid: 'support-code-review#0', card: card('support-code-review') },
+      { uid: 'release-frontend#0', card: card('release-frontend') },
+    ],
+    release: {},
+  },
+  opponents: [{ id: 'p2', name: 'Two', handCount: 3, release: {} }],
+  decks: { main: [10], events: 5, discardCount: 0, discardHeap: [] },
+  turn: 'p1' as PlayerId,
+  hasDrawn: true,
+  selfId: 'p1',
+  history: [],
+  setup: {},
+  playable: ['support-code-review#0', 'release-frontend#0'],
+  frozen: [],
+  targets: {},
+  comboOptions: { 'support-code-review#0': ['release-frontend#0'] },
+} as unknown as BoardState
+
+const releasedEvent: Event = {
+  id: 1,
+  type: 'released',
+  player: 'p1',
+  slot: 'frontend',
+  card: 'release-frontend',
+  codeReview: 'support-code-review',
+}
+
+const releaseAfter: BoardState = {
+  ...releaseBefore,
+  you: {
+    ...releaseBefore.you,
+    hand: [],
+    release: { frontend: card('release-frontend') },
+    support: { frontend: card('support-code-review') },
+  },
+  playable: [],
+  comboOptions: {},
+} as unknown as BoardState
+
+it('adopts the actor’s own staged release pair into the zone instead of re-folding it', async () => {
+  played.names = []
+  const { rerender } = render(<Harness live={releaseBefore} events={[]} />)
+
+  // the real fold: pull Code Review, then a click on its only partner —
+  // no target and no open window, so `onCardClick`'s own fold dispatches at
+  // once once it settles (boardStaging.test.tsx's "a release partner
+  // dispatches without a target" drives the identical pair through the DOM;
+  // this reaches through the hook directly, same as the attack test above).
+  // Real timers, not `drive`'s fake ones: the fold's own MERGE_MS animation is
+  // `_useBoardStaging.ts`'s concern, not the beat's — `drive` itself exists to
+  // keep the two clocks apart. The click is its OWN (synchronous) `act()`,
+  // separate from the wait that follows: `onCardClick`'s fold reads its own
+  // `[data-main]`/`[data-aux]` markers off a CardPair React only just
+  // committed via `commitStaged` — bundling the click into the SAME async
+  // `act()` as the wait (as `fireEvent`'s callers never do — every one of
+  // them already fires as its own act(), same as this) risks that commit not
+  // having landed yet when the fold's own `nextFrames()` goes to read it.
+  act(() => {
+    api.staging?.onHandPlay('support-code-review#0', { x: 0, y: 0 })
+  })
+  act(() => {
+    api.staging?.onCardClick(0) // handItems, with the support pulled, is just [release-frontend#0]
+  })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700)) // past MERGE_MS (620ms)
+  })
+  expect(api.staging?.staged?.phase).toBe('dispatched')
+  expect(api.handoffRef?.current?.mainUid).toBe('release-frontend#0')
+  expect(api.handoffRef?.current?.supportUid).toBe('support-code-review#0')
+  // the LOCAL fold above is `_useBoardStaging.ts`'s own `onCardClick` — it
+  // plays 'foldIntoPair' too (the same mocked `play`), so the slate has to be
+  // wiped here: what the assertion below pins is that the BEAT does not fold
+  // a second time, not that the array is empty outright.
+  played.names = []
+
+  // the engine answers: the release landed with the same Code Review combo.
+  // `useBeats` picks up `releasePlaced` from the new event — same I1 timing
+  // as the attack test above.
+  await drive(() => rerender(<Harness live={releaseAfter} events={[releasedEvent]} />))
+
+  // adopted, not re-folded: the pair was already standing where the flight
+  // to the release slot starts from.
+  expect(played.names).toContain('playToReleaseZone')
+  expect(played.names).not.toContain('foldIntoPair')
+  expect(api.handoffRef?.current).toBeNull()
+  expect(api.staging?.staged).toBeNull()
+  // lands in the release slot with the zone's own support render — the same
+  // node `runRelease` itself measured as `toRect` (`anchors.releaseSlot`)
+  const slot = api.anchors?.releaseSlot('p1', 'frontend')
+  expect(slot?.querySelector('[data-main]')).toBeTruthy()
+  expect(slot?.querySelector('[data-aux]')).toBeTruthy()
 })
