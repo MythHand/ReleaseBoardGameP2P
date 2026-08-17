@@ -32,6 +32,40 @@ const boardBefore = (over: Partial<BoardState> = {}): BoardState =>
 const discarded = (id: number, over: Partial<Extract<Event, { type: 'discarded' }>> = {}): Event =>
   ({ id, type: 'discarded', player: 'p1', card: 'attack-bug', reason: 'effect', ...over }) as Event
 
+const attacked = (over: Partial<Extract<Event, { type: 'attacked' }>> & { id: number }): Event =>
+  ({
+    type: 'attacked',
+    attacker: 'p1',
+    card: 'attack-bug',
+    sudo: false,
+    target: 'p2',
+    ...over,
+  }) as Event
+
+const released = (over: Partial<Extract<Event, { type: 'released' }>> & { id: number }): Event =>
+  ({ type: 'released', player: 'p1', slot: 'frontend', card: 'release-frontend', ...over }) as Event
+
+const tookHit = (over: Partial<Extract<Event, { type: 'tookHit' }>> & { id: number }): Event =>
+  ({ type: 'tookHit', player: 'p1', ...over }) as Event
+
+// The pending a resolving `defended`/`tookHit` sees on screen: `before` still
+// carries it, because the resolution hasn't happened yet as far as the board
+// shown before this batch is concerned (I1).
+type DefendPending = Extract<NonNullable<BoardState['pending']>, { kind: 'defend' }>
+const defendPending = (over: Partial<DefendPending> = {}): DefendPending =>
+  ({
+    kind: 'defend',
+    player: 'p1',
+    attacker: 'p2',
+    attackCard: 'attack-bug',
+    sudo: true,
+    options: [],
+    openedAt: 0,
+    deadline: 0,
+    scope: 'hand',
+    ...over,
+  }) as DefendPending
+
 describe('planBeats', () => {
   it('yields nothing for a batch with no choreography', () => {
     const events: Event[] = [
@@ -249,6 +283,106 @@ describe('planBeats — order', () => {
     ]
     const beats = planBeats(events, boardBefore())
     expect(beats.map((b) => b.kind)).toEqual(['discard', 'discard'])
+  })
+})
+
+describe('planBeats — the combo pair (#100)', () => {
+  it('an attacked event plans an attackPlaced beat, sudo or not', () => {
+    const plans = planBeats(
+      [attacked({ id: 5, attacker: 'p2', card: 'attack-bug', sudo: true, target: 'p1' })],
+      boardBefore(),
+    )
+    expect(plans).toEqual([
+      {
+        kind: 'attackPlaced',
+        key: 'attack:5',
+        eventId: 5,
+        attacker: 'p2',
+        card: 'attack-bug',
+        sudo: true,
+      },
+    ])
+  })
+
+  it('a released with codeReview plans a releasePlaced beat; a plain released plans nothing', () => {
+    const withReview = planBeats(
+      [
+        released({
+          id: 7,
+          player: 'p1',
+          slot: 'frontend',
+          card: 'release-frontend',
+          codeReview: 'support-code-review',
+        }),
+      ],
+      boardBefore(),
+    )
+    expect(withReview).toEqual([
+      {
+        kind: 'releasePlaced',
+        key: 'release:7',
+        eventId: 7,
+        player: 'p1',
+        slot: 'frontend',
+        card: 'release-frontend',
+        codeReview: 'support-code-review',
+      },
+    ])
+    const plain = planBeats(
+      [released({ id: 8, player: 'p1', slot: 'frontend', card: 'release-frontend' })],
+      boardBefore(),
+    )
+    expect(plain).toEqual([])
+  })
+
+  it('resolution discards of the pending pair take the pair exit, others keep the discard beat', () => {
+    const withPending = boardBefore({ pending: defendPending() } as Partial<BoardState>)
+    const events = [
+      tookHit({ id: 9 }),
+      discarded(10, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+      discarded(11, { player: 'p2', card: 'support-sudo', reason: 'attackSpent' }),
+    ]
+    const plans = planBeats(events, withPending)
+    expect(plans).toEqual([
+      {
+        kind: 'pairToDiscard',
+        key: 'pairOut:10',
+        main: { eventId: 10, card: 'attack-bug' },
+        aux: { eventId: 11, card: 'support-sudo' },
+      },
+    ])
+  })
+
+  // sudo:false → pending carries no sudo half at all, so there is only ONE
+  // discard to route — and it still goes through pairToDiscard, not the
+  // ordinary discard beat: the centre card is what flies, and sourceOf could
+  // never find it (it is in no hand and no zone).
+  it('a plain attack resolution routes its one discard through pairToDiscard too', () => {
+    const withPending = boardBefore({
+      pending: defendPending({ sudo: false }),
+    } as Partial<BoardState>)
+    const events = [
+      tookHit({ id: 9 }),
+      discarded(10, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+    ]
+    const plans = planBeats(events, withPending)
+    expect(plans).toEqual([
+      { kind: 'pairToDiscard', key: 'pairOut:10', main: { eventId: 10, card: 'attack-bug' } },
+    ])
+  })
+
+  // Rollback gives the attack card back to the attacker's hand instead of
+  // discarding it (fake/attacks.ts's `effect === 'return'` branch), so only
+  // the sudo half is banked — the pending still names `attackCard`, but no
+  // `discarded` for it ever arrives. The sudo match must not require a
+  // `pairToDiscard` to already exist, or this half would have nothing to join.
+  it('rollback return: only the sudo half flies out', () => {
+    const withPending = boardBefore({ pending: defendPending() } as Partial<BoardState>)
+    const events = [discarded(10, { player: 'p2', card: 'support-sudo', reason: 'attackSpent' })]
+    const plans = planBeats(events, withPending)
+    expect(plans).toEqual([
+      { kind: 'pairToDiscard', key: 'pairOut:10', aux: { eventId: 10, card: 'support-sudo' } },
+    ])
   })
 })
 

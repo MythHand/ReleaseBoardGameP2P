@@ -44,7 +44,7 @@ import {
 } from '@release/ui'
 import { HEAP_SHOW, restTransform } from '@release/ui/animations'
 import type React from 'react'
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:
 // where every block sits, how big it is, what it overlaps. The board is a fork
 // of @release/ui's Table and the playground is where this screen is designed
@@ -53,7 +53,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
 import { useBoardAnchors } from '~/entities/game/board'
-import type { BoardProps, Panel } from '~/entities/game/board/types'
+import type { BoardProps, Panel, StagedHandoff } from '~/entities/game/board/types'
 import { useBeats } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import opening from './_Board.module.css'
@@ -176,6 +176,13 @@ export default function Board({
     refs: anchors,
     onDone: onIntroDone,
   })
+  // The staging → beat handoff (#100): a ref because the combo beat reads it
+  // once at run start (I8), not a render's worth of state it would have to
+  // wait on. Built below, once `useBoardStaging` exists to build it FROM — but
+  // declared here, ahead of `useBeats`, because the ref's IDENTITY is all the
+  // queue needs at this point; the layout effect that keeps `.current` current
+  // runs after every hook regardless of where it sits in the function.
+  const handoffRef = useRef<StagedHandoff | null>(null)
   // One queue, for everything that moves. The opening goes in as beat zero and
   // the wire's own beats queue behind it — one place that decides what plays,
   // in what order, and whether it plays at all under prefers-reduced-motion.
@@ -190,6 +197,7 @@ export default function Board({
     anchors,
     enabled: introOver || intro == null,
     intro: deal.beat,
+    staging: handoffRef,
   })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined
@@ -259,6 +267,28 @@ export default function Board({
     staging.staged && !staging.staged.merged
       ? (staging.staged.support ?? staging.staged.main)
       : null
+  // its own node, for the staging → beat handoff below — a plain aim/support
+  // never merges, so it never gets the pair flyer's persistent node instead.
+  const soloStagedRef = useRef<HTMLDivElement>(null)
+
+  // The staging → beat handoff (#100): kept current in a layout effect,
+  // because `el` has to be the DOM node as THIS render actually committed it —
+  // the pair flyer once a partner has folded in, the solo staged node
+  // otherwise. `release` is the hook's own no-flight clear; the combo beat
+  // calls it once its own read of this says the staged play is the one
+  // standing where it is about to fold one in (I8).
+  useLayoutEffect(() => {
+    const s = staging.staged
+    handoffRef.current =
+      s?.phase === 'dispatched' && s.main
+        ? {
+            mainUid: s.main.uid,
+            supportUid: s.support?.uid,
+            el: s.merged ? staging.pairRef.current : soloStagedRef.current,
+            release: staging.release,
+          }
+        : null
+  }, [staging.staged, staging.pairRef, staging.release])
 
   // Escape skips the opening. Same window binding and the same reason as the
   // cancel above; `finish` is idempotent, so a second press is a no-op.
@@ -459,7 +489,7 @@ export default function Board({
             would double it (ComboStory.tsx's own guard on this). Once a
             partner folds in, the pair flyer below owns the centre instead. */}
         {soloStaged && staging.overlay.length === 0 && (
-          <div className={opening.centreCard} data-testid="board-centre-staged">
+          <div ref={soloStagedRef} className={opening.centreCard} data-testid="board-centre-staged">
             <Card card={soloStaged.card} interactive={false} width="100%" />
           </div>
         )}
@@ -467,15 +497,22 @@ export default function Board({
           state.pending?.kind === 'defend' &&
           (() => {
             const data = cardById(state.pending.attackCard)
-            return data ? (
+            if (!data) return null
+            // sudo stands the pair; a plain hit stands the one card, as before.
+            const aux = state.pending.sudo ? cardById('support-sudo') : null
+            return (
               <div
                 className={opening.centreCard}
                 data-testid="board-centre-pending"
                 data-pending-play
               >
-                <Card card={data} interactive={false} width="100%" />
+                {aux ? (
+                  <CardPair main={data} aux={aux} width="100%" />
+                ) : (
+                  <Card card={data} interactive={false} width="100%" />
+                )}
               </div>
-            ) : null
+            )
           })()}
       </div>
 
