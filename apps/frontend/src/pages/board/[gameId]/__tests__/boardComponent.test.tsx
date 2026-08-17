@@ -142,7 +142,12 @@ it('plays a targetless card straight from the hand', () => {
       actions={{ onPlay, legalTargets: () => [] }}
     />,
   )
-  fireEvent.mouseDown(container.querySelectorAll('[data-hand-slot]')[0])
+  // Hand is always in drag mode now (#99 wires `onPlay` unconditionally outside
+  // the deal), so a press this short — no movement between down and up — is a
+  // CLICK, not a drag: Hand's own threshold (Hand.tsx, DRAG_THRESHOLD) decides.
+  const slot = container.querySelectorAll('[data-hand-slot]')[0]
+  fireEvent.mouseDown(slot)
+  fireEvent.mouseUp(slot)
   expect(onPlay).toHaveBeenCalledWith(uid, undefined, undefined)
 })
 
