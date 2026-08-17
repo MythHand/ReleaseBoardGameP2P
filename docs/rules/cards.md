@@ -225,7 +225,7 @@ Monitoring**.
 `attack-security-bug`, `defense-rollback`, все пять `operation-*`.
 **Ключ правил.** `c.sudo`
 
-> ❓ **Не из правил.** Не решено, блокирует ли заморозка (`ai-crush-*`, DDoS) или replay-lock
+> ❓ **Не из правил.** Не решено, блокирует ли заморозка DDoS'ом или replay-lock
 > (`defense-rollback`) саму карту Sudo от участия в комбо, если разыгрывается она.
 > → [backlog](./backlog.md)
 
