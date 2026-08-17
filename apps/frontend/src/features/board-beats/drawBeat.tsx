@@ -137,13 +137,20 @@ export function useDrawBeat(anchors: BoardAnchors) {
           const card = cardById(d.card)
           const at = rectOf(elOf('draw'))
           drop('draw')
-          // The step measures the fan itself; what it needs from here is how
-          // many cards are already in it — the fan this beat has grown so far.
-          // The fan this beat has grown SO FAR — `ctx.current.base`, not the
-          // one the batch started with (I8).
+          // How many cards the fan holds RIGHT NOW — `ctx.current.base`, not the
+          // projection the batch started with, so every card after the first
+          // aims at the fan the one before it grew (I8).
           const grown = ctx.current?.base.you.hand.length ?? 0
+          // …and it lands at the END of that fan, not in its middle. The step
+          // defaults to the middle because a drawn card has no place of its own
+          // in a scene that owns its hand array — but on the board the
+          // projection owns it, and the engine APPENDS what it drew
+          // (fake/reduce.ts:126), an order `toBoardState` passes through
+          // untouched. Landing anywhere else makes the last frame of this beat
+          // disagree with the projection it hands over to, and the card visibly
+          // jumps from the middle of the fan to its end on the handover.
           if (card && at)
-            await latest.current.arrive([{ key: `h${d.eventId}`, card, from: at }], grown)
+            await latest.current.arrive([{ key: `h${d.eventId}`, card, from: at }], grown, grown)
           continue
         }
 
