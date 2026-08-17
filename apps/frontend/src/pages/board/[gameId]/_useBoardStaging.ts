@@ -143,6 +143,16 @@ export function useBoardStaging({
   const stagedRef = useRef(staged)
   const cancellingRef = useRef(cancelling)
   cancellingRef.current = cancelling
+  // ComboStory's own `playing` (its `pickPartner` guard, `cancelStage`'s
+  // `cancellable`): true from the moment a partner is picked until the fold's
+  // `finish()` runs.
+  // The fold is IRREVOCABLE once committed — merged/phase stay 'partner' for
+  // the whole ~620ms `foldIntoPair` animation, so without this a cancel landing
+  // mid-fold starts a return flight for a play that dispatches anyway a moment
+  // later (the fold's own async closure keeps running to its `finish()`
+  // regardless of what `cancel()` does), and a second click on another
+  // candidate could start an overlapping second fold on top of the first.
+  const foldingRef = useRef(false)
 
   const commitStaged = (next: StagedPlay | null) => {
     stagedRef.current = next
@@ -208,7 +218,7 @@ export function useBoardStaging({
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const cancel = useCallback(() => {
     const s = stagedRef.current
-    if (!s || s.phase === 'dispatched' || cancellingRef.current) return
+    if (!s || s.phase === 'dispatched' || cancellingRef.current || foldingRef.current) return
     arrowCtl.stop()
     const cRect = anchors.centre.current?.getBoundingClientRect()
     if (reduced || !cRect) {
@@ -318,7 +328,7 @@ export function useBoardStaging({
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const onCardClick = useCallback(
     (index: number) => {
-      if (!enabled || cancellingRef.current) return
+      if (!enabled || cancellingRef.current || foldingRef.current) return
       const s = stagedRef.current
       if (s?.phase !== 'partner' || !s.support) return
       const item = handItems[index]
@@ -335,11 +345,16 @@ export function useBoardStaging({
       const mainIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
       const main: StagedCard = { uid: item.uid, card: item.card, index: mainIndex }
       commitStaged({ support, main, phase: 'partner', merged: true })
+      // the fold is committed — irrevocable until `finish()` runs (ComboStory's
+      // own `playing`); `cancel()` and a second click both refuse while this is
+      // true, so nothing can race the automatic dispatch that follows the fold.
+      foldingRef.current = true
 
       // after the fold: a window covering the partner dispatches onAttack at
       // once; a partner with its own targets waits at the centre for one;
       // anything else (a release) plays straight through.
       const finish = () => {
+        foldingRef.current = false
         const windowOpen = Boolean(state.window?.canAttackWith?.includes(main.uid))
         if (windowOpen) {
           commitStaged({ support, main, phase: 'dispatched', merged: true })
