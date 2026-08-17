@@ -32,6 +32,7 @@ const MON: CardInstance = { uid: 'protection-monitoring#0', id: 'protection-moni
 const FE: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
 const CR: CardInstance = { uid: 'support-code-review#0', id: 'support-code-review' }
 const HOTFIX: CardInstance = { uid: 'defense-hotfix#0', id: 'defense-hotfix' }
+const NOTABUG: CardInstance = { uid: 'defense-not-a-bug#0', id: 'defense-not-a-bug' }
 const ROLLBACK: CardInstance = { uid: 'defense-rollback#0', id: 'defense-rollback' }
 const WORKS: CardInstance = {
   uid: 'defense-works-on-my-machine#0',
@@ -184,6 +185,36 @@ it('banks both halves with attackSpent when a hand-attack hit is taken', () => {
   const hit = r.events.find((e) => e.type === 'tookHit')
   for (const d of discards) expect(d.parent).toBe(hit?.id)
   expect(r.state.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO]))
+})
+
+it('banks a sudo-comboed hand attack’s both halves, then the cancelling defence, when it is repelled', () => {
+  // Not a Bug is the only cancel-effect card `defencesFor` still offers against
+  // a sudo attack (it is 'unicorn' kind, exempt from the sudo block that
+  // 'cancel' kind cards like Hotfix hit) — the one way to reach this shape.
+  const attacked = reduce(table([BUG, SUDO], [NOTABUG]), {
+    type: 'PLAY',
+    player: 'p1',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    target: { kind: 'player', player: 'p2' },
+    at: 1000,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'defend', card: NOTABUG.uid },
+    at: 1001,
+  })
+  const discards = r.events.filter((e) => e.type === 'discarded')
+  // Order: the attack card banks before its sudo half, both before the defence.
+  expect(discards).toMatchObject([
+    { card: BUG.id, reason: 'attackSpent', player: 'p1' },
+    { card: SUDO.id, reason: 'attackSpent', player: 'p1' },
+    { card: NOTABUG.id, reason: 'defenceSpent', player: 'p2' },
+  ])
+  const defended = r.events.find((e) => e.type === 'defended')
+  for (const d of discards) expect(d.parent).toBe(defended?.id)
+  expect(r.state.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO, NOTABUG]))
 })
 
 it('reflects a random-steal attack: the defender steals from the attacker instead', () => {
