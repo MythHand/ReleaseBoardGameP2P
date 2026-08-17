@@ -624,3 +624,28 @@ it('reduced motion folds a pair without flights', () => {
   expect(document.querySelector('[data-testid="board-pair-staged"] [data-main]')).toBeTruthy()
   mm.mockRestore()
 })
+
+// Task 12 (#100): once a pair reaches `phase: 'dispatched'`, `staged` lives in
+// `_useBoardStaging.ts`'s own React state — untouched by a prop's identity —
+// but the pair flyer's CardPair is a fresh element every render
+// (`_Board.tsx`'s own `{staging.staged?.merged && … && <CardPair .../>}`).
+// A "projection tick" — the kind of re-render a P2P sync produces on every
+// batch even when nothing about THIS play changed — has to leave the pair
+// exactly as it stood: not remounted, not doubled, not dropped.
+it('a dispatched pair survives a projection tick without flicker', async () => {
+  const onPlay = vi.fn()
+  comboOut = []
+  const overrides = { comboOptions: { 'support-code-review#0': ['release-frontend#0'] } }
+  const { rerender } = render(comboBoardWith(overrides, { onPlay }))
+  await pullFromComboFan('support-code-review#0')
+  await clickComboFanCard('release-frontend#0') // dispatches at once — no target, no window
+  expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, 'support-code-review#0')
+  expect(document.querySelectorAll('[data-testid="board-pair-staged"] [data-main]').length).toBe(1)
+
+  // the projection tick: a fresh render built from scratch (`comboBoardWith`
+  // calls `makeBoardProps()` anew), while `COMBO_HAND` — and so the dispatched
+  // play itself — stays byte-for-byte the array it already was.
+  rerender(comboBoardWith(overrides, { onPlay }))
+  expect(document.querySelectorAll('[data-testid="board-pair-staged"] [data-main]').length).toBe(1)
+  expect(document.querySelectorAll('[data-testid="board-pair-staged"] [data-aux]').length).toBe(1)
+})
