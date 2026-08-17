@@ -478,10 +478,10 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Адресная атака стрелкой', en: 'Targeted arrow attack' },
     from: {
-      ru: 'useArrow строит from/to по centerOf карты и цели, слежение за курсором (mousemove), старт/стоп по фазе розыгрыша.',
-      en: 'useArrow builds from/to from centerOf the card and the target, cursor tracking (mousemove), start/stop by the play phase.',
+      ru: 'useArrow строит from/to по centerOf карты и цели, слежение за курсором (mousemove), старт/стоп по фазе розыгрыша. То же теперь играется и на живом борде (#99): цели — `self.targets` проекции, та же `attackTargets`, которую проверяет редьюсер (`packages/engine/src/fake/project.ts`), в `TableTarget` переходят структурным приведением типа, не пересчётом (`toBoardState.ts`). Жест — `_useBoardStaging`: вытягивание из веера карты с целями ставит её в центр (playToCenter, продолжение от HandPlayDrop.rect), стрелка встаёт от центра и целится, нажатие на освещённую цель диспатчит PLAY. Промах или Escape возвращают карту в свой слот веера (useHandArrival), цели гаснут синхронно; `rejected` после диспатча — тем же путём. Клик по карте с целями больше не работает: клик остался только для атаки из окна и розыгрыша без цели (`_useBoardInteractions`). Что стоит в центре после диспатча — статичный рендер (`data-pending-play`), шов, на который встанет такт #100. Жест на сенсорном экране не решён (реестр ниже, docs/animations/backlog.md).',
+      en: "useArrow builds from/to from centerOf the card and the target, cursor tracking (mousemove), start/stop by the play phase. The same movement now also runs on the live board (#99): targets come off the projection's `self.targets` — the same `attackTargets` the reducer itself validates (`packages/engine/src/fake/project.ts`) — and reach `TableTarget` by a structural type cast, not a recompute (`toBoardState.ts`). The gesture is `_useBoardStaging`: pulling a card with targets out of the fan stages it at the centre (playToCenter, continuing from HandPlayDrop.rect), the arrow arms from the centre and aims, a press on a lit target dispatches PLAY. A miss or Escape returns the card to its own fan slot (useHandArrival), targets going dark synchronously; a `rejected` after dispatch takes the same path back. Clicking a card with targets no longer works — the click keeps only the window attack and the no-target play (`_useBoardInteractions`). What stands at the centre after dispatch renders statically (`data-pending-play`) — the seam #100's beat builds on. The gesture on a touchscreen is undecided (register below, docs/animations/backlog.md).",
     },
-    where: 'Arrow, Combo',
+    where: 'Arrow, Combo + frontend: board (_useBoardStaging)',
   },
   {
     name: { ru: 'Разделение колоды', en: 'Splitting the deck' },
@@ -772,6 +772,21 @@ const ISSUES: Issue[] = [
     where: {
       ru: 'frontend: features/board-beats/planBeats.ts (source.index)',
       en: 'frontend: features/board-beats/planBeats.ts (source.index)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Жест прицеливания на сенсорном экране не решён',
+      en: 'An aim gesture on a touchscreen is undecided',
+    },
+    problem: {
+      ru: 'Стрелка (#99) целится курсором: `useArrow` следит за `mousemove`, а вся стадия жеста — `_useBoardStaging` — устроена вокруг мыши, вплоть до порога клик/drag в `Hand`, которым продолжается полёт в центр. Ни здесь, ни где-либо ещё в проекте touch-эквивалент не решён — на сенсорном экране карту нечем даже поставить в центр стола, постановка ломается раньше прицела.',
+      en: 'The arrow (#99) aims off the cursor: `useArrow` tracks `mousemove`, and the whole staging gesture — `_useBoardStaging` — is built around a mouse, down to the click/drag threshold in `Hand` that the flight to the centre continues from. No touch equivalent is decided here or anywhere else in the project — on a touchscreen there is nothing to even stage a card with, so staging fails before aiming does.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useBoardStaging.ts + ui: table/Hand',
+      en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts + ui: table/Hand',
     },
     status: 'open',
   },
