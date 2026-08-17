@@ -225,6 +225,10 @@ Monitoring**.
 `attack-security-bug`, `defense-rollback`, все пять `operation-*`.
 **Ключ правил.** `c.sudo`
 
+> ❓ **Не из правил.** Не решено, блокирует ли заморозка (`ai-crush-*`, DDoS) или replay-lock
+> (`defense-rollback`) саму карту Sudo от участия в комбо, если разыгрывается она.
+> → [backlog](./backlog.md)
+
 ### Code Review · `support-code-review` · тираж 5 · `combo-source`
 
 **Когда.** Одновременно с картой Release. **К уже выложенному релизу не применяется.**

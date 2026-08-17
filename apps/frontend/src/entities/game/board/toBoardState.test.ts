@@ -15,6 +15,7 @@ const view: PlayerView = {
     release: {},
     playable: ['c1'],
     targets: {},
+    combos: {},
     frozen: [],
   },
   opponents: [{ id: 'p2', name: 'bot', handCount: 3, release: {}, eliminated: false }],
