@@ -372,7 +372,7 @@ export default function Board({
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening; the accessible affordance is the Escape-skips-the-opening handler below
+    // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening AND click-anywhere-cancels-staging (handleTableClick owns both); the accessible affordance for each is its own Escape handler above
     <div
       className={kit.table}
       onClick={handleTableClick}

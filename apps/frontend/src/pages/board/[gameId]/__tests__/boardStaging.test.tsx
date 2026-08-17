@@ -186,6 +186,45 @@ it('a rejected action returns the staged card', async () => {
   await waitFor(() => expect(fanUids()).toContain('attack-bug#0'))
 })
 
+// Final review, round 1: `useGame` accumulates events for the whole match
+// (never trims), so an unwatermarked scan of the whole feed keeps finding a
+// card's OWN past rejection forever. A fresh re-dispatch of the same card
+// must not read that stale entry as ITS OWN rejection the moment anything
+// else lands in the feed — the watermark discipline `useBeats` already
+// applies to this same array (there keyed by event id across the whole
+// match; here by length, captured fresh at every dispatch).
+it('a stale rejection for a returned card does not cancel its fresh re-dispatch', async () => {
+  const onPlay = vi.fn()
+  const { rerender } = render(boardWith({ targets: BUG_TARGETS }, { onPlay }))
+  await pullCardFromFan('attack-bug#0')
+  await pressSeat('p2')
+  expect(onPlay).toHaveBeenCalledTimes(1)
+  // first attempt rejected — the card returns to the fan (as above)
+  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [rejectedEvent('attack-bug#0')]))
+  await waitFor(() => expect(fanUids()).toContain('attack-bug#0'))
+
+  // a second, legitimate dispatch of the SAME card
+  await pullCardFromFan('attack-bug#0')
+  await pressSeat('p2')
+  expect(onPlay).toHaveBeenCalledTimes(2)
+
+  // an unrelated event lands (any sync between this dispatch and its
+  // acceptance) — the feed still carries the FIRST attempt's own rejection,
+  // since it only ever grows. Without a watermark this would be misread as
+  // THIS dispatch's own rejection and cancel it right back to the fan.
+  rerender(
+    boardWith({ targets: BUG_TARGETS }, { onPlay }, [
+      rejectedEvent('attack-bug#0'),
+      { id: 2, type: 'turnEnded', player: 'p2' },
+    ]),
+  )
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  expect(screen.getByTestId('board-centre-staged')).toBeTruthy()
+  expect(fanUids()).not.toContain('attack-bug#0')
+})
+
 it('the staged card must not be cancellable after dispatch', async () => {
   render(boardWith({ targets: BUG_TARGETS }))
   await pullCardFromFan('attack-bug#0')
@@ -489,6 +528,49 @@ it('Escape mid-fold does not cancel — the fold is irrevocable and dispatches n
   // the fold ran to completion and dispatched normally — the Escape changed nothing
   expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, 'support-code-review#0')
   expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`).length).toBe(0)
+})
+
+// Final review, round 1: `targets` lights a seat the instant a partner is
+// picked (`main` set, `phase` still 'partner') — for the WHOLE fold, not only
+// once it settles into 'target'. A press landing there used to dispatch
+// legitimately through `onTargetPick` and then get clobbered: the fold's own
+// `finish()` kept running regardless and unconditionally re-committed
+// `phase: 'target'` over the play the engine was already processing,
+// re-arming the arrow for a pair no longer awaiting one.
+it('a target press mid-fold is refused; the same seat still dispatches once the fold settles', async () => {
+  const onPlay = vi.fn()
+  comboOut = []
+  render(
+    comboBoardWith(
+      { comboOptions: { 'support-sudo#0': ['attack-bug#0'] }, targets: BUG_SEAT_TARGET },
+      { onPlay },
+    ),
+  )
+  await pullFromComboFan('support-sudo#0')
+  const index = comboFanUids().indexOf('attack-bug#0')
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  comboOut = [...comboOut, 'attack-bug#0']
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 }) // the fold commits — merged: true, still mid-animation
+  // the seat is ALREADY lit — press it in the same tick the fold committed
+  // in, no wait in between
+  fireEvent.click(screen.getByTestId('seat-p2'))
+  expect(onPlay).not.toHaveBeenCalled() // refused — the fold owns this window exclusively
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  expect(onPlay).not.toHaveBeenCalled() // the immediate press was dropped, not queued for later
+  // a fresh press on the still-lit seat dispatches cleanly, exactly once
+  fireEvent.click(screen.getByTestId('seat-p2'))
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  expect(onPlay).toHaveBeenCalledTimes(1)
+  expect(onPlay).toHaveBeenCalledWith(
+    'attack-bug#0',
+    { kind: 'player', player: 'p2' },
+    'support-sudo#0',
+  )
 })
 
 // Fix round 2 (post-re-review): `foldingRef` was cleared exclusively inside

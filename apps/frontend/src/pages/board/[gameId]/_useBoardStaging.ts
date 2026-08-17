@@ -17,9 +17,6 @@
 // to know which door a play came in through, and `dispatched` (the Task 3
 // return) is now derived from `phase` rather than tracked separately, so the
 // two can never disagree.
-//
-// Same render harness as boardComponent.test.tsx (forked from apps/ui's own
-// Table suite) — see that file's header for why.
 
 import type { Event } from '@release/engine'
 import type {
@@ -149,6 +146,21 @@ export function useBoardStaging({
   const stagedRef = useRef(staged)
   const cancellingRef = useRef(cancelling)
   cancellingRef.current = cancelling
+  // the feed as of THIS render — read for its `.length`, never scanned
+  // directly outside the rejected-watcher effect below (which has its own,
+  // fresher closure over `events` since it re-runs whenever the array does).
+  const eventsRef = useRef(events)
+  eventsRef.current = events
+  // How far into the feed a dispatch had already looked, captured the instant
+  // it committed `phase: 'dispatched'` (`onTargetPick`, both dispatching arms
+  // of `onCardClick`'s `finish()`) — `useGame` accumulates events for the
+  // whole match and the rejected-watcher below only reads what came AFTER
+  // this point. Without it, a card rejected once and later re-dispatched
+  // reads its own OLD rejection off the feed the moment anything else syncs
+  // in between — the same watermark discipline `useBeats` applies to this
+  // same array, keyed there by event id; here by length, since it is captured
+  // fresh at every dispatch rather than held for a whole match.
+  const dispatchWatermarkRef = useRef(0)
   // ComboStory's own `playing` (its `pickPartner` guard, `cancelStage`'s
   // `cancellable`): true from the moment a partner is picked until the fold's
   // `finish()` runs.
@@ -361,15 +373,25 @@ export function useBoardStaging({
       // anything else (a release) plays straight through.
       const finish = () => {
         foldingRef.current = false
+        // Defense in depth, same reason `onTargetPick`'s own `foldingRef`
+        // check exists: a press on a lit seat mid-fold is meant to be refused
+        // by that guard, but this re-reads `stagedRef.current` rather than
+        // trusting it was — so a dispatch that landed here by ANY route (this
+        // guard is the one thing every route funnels through before ever
+        // touching `staged` again) is never clobbered by this closure's own,
+        // now-stale idea of the outcome.
+        if (stagedRef.current?.phase === 'dispatched') return
         const windowOpen = Boolean(state.window?.canAttackWith?.includes(main.uid))
         if (windowOpen) {
           commitStaged({ support, main, phase: 'dispatched', merged: true })
+          dispatchWatermarkRef.current = eventsRef.current.length
           actions?.onAttack?.(main.uid, support.uid)
         } else if ((state.targets?.[main.uid] ?? []).length > 0) {
           commitStaged({ support, main, phase: 'target', merged: true })
           aimFromCentre()
         } else {
           commitStaged({ support, main, phase: 'dispatched', merged: true })
+          dispatchWatermarkRef.current = eventsRef.current.length
           actions?.onPlay?.(main.uid, undefined, support.uid)
         }
       }
@@ -450,7 +472,14 @@ export function useBoardStaging({
   const onTargetPick = useCallback(
     (target: TableTarget) => {
       const s = stagedRef.current
-      if (!s?.main || s.phase === 'dispatched' || cancellingRef.current) return
+      // `foldingRef`: the `targets` memo lights a seat the instant a partner is
+      // picked (`main` set, `phase` still 'partner') — for the whole fold, not
+      // only once it settles into 'target'. Without this, a press landing in
+      // that window dispatches legitimately here and the fold's own `finish()`
+      // — still running regardless, unaware anything beat it to the punch —
+      // clobbers the commit this line just made with its own stale 'target'.
+      if (!s?.main || s.phase === 'dispatched' || cancellingRef.current || foldingRef.current)
+        return
       if (!targets.some((t) => sameTarget(t, target))) return
       arrowCtl.stop()
       // Set synchronously, ahead of the state update: Seat's own click handler
@@ -461,6 +490,7 @@ export function useBoardStaging({
       // tick, not next render's, or the card it just dispatched would fly
       // straight back to the fan.
       commitStaged({ ...s, phase: 'dispatched' })
+      dispatchWatermarkRef.current = eventsRef.current.length
       actions?.onPlay?.(s.main.uid, target, s.support?.uid)
     },
     [targets, actions, arrowCtl.stop],
@@ -477,12 +507,17 @@ export function useBoardStaging({
 
   // the engine said no: the staged play returns to the fan. ATTACK's own
   // rejection carries both halves (`card` the main, `combo` the support), so
-  // either naming ours is enough.
+  // either naming ours is enough. Scoped to what arrived AFTER this dispatch
+  // (`dispatchWatermarkRef`) — `events` accumulates for the whole match, so an
+  // unwatermarked scan would keep finding this SAME card's own past rejection
+  // (from an earlier, already-resolved attempt) and wrongly cancel a fresh
+  // re-dispatch of it the moment anything else in the feed changes.
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   useEffect(() => {
     const s = stagedRef.current
     if (s?.phase !== 'dispatched') return
-    const rejectedOurs = events.some((e) => {
+    const fresh = events.slice(dispatchWatermarkRef.current)
+    const rejectedOurs = fresh.some((e) => {
       if (e.type !== 'rejected' || !('card' in e.action)) return false
       return (
         (s.main && e.action.card === s.main.uid) || (s.support && e.action.combo === s.support.uid)
