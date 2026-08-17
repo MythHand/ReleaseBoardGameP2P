@@ -31,6 +31,7 @@ const config = (): GameConfig => ({
 const FE: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
 const CR: CardInstance = { uid: 'support-code-review#0', id: 'support-code-review' }
 const BUG: CardInstance = { uid: 'attack-bug#0', id: 'attack-bug' }
+const SUDO: CardInstance = { uid: 'support-sudo#0', id: 'support-sudo' }
 
 // p1 releases; p2 holds a Bug, p3 holds nothing useful.
 const released = (extra: Partial<Record<'p1' | 'p2' | 'p3', CardInstance[]>> = {}): GameState => {
@@ -100,6 +101,38 @@ it('closes on expiry only once the deadline has passed', () => {
   const late = reduce(s, { type: 'WINDOW_EXPIRED', at: 1000 + WINDOW_FIRST_MS })
   expect(late.state.window).toBeNull()
   expect(late.events.map((e) => e.type)).toEqual(['windowClosed'])
+})
+
+it('rejects an expiring window while the defend it opened is still pending, and resolving still closes it', () => {
+  const s = released({ p2: [BUG, SUDO] })
+  const attacked = reduce(s, {
+    type: 'ATTACK',
+    player: 'p2',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    at: 1001,
+  })
+  expect(attacked.state.pending).toMatchObject({ kind: 'defend' })
+
+  // The window's own deadline (1000 + WINDOW_FIRST_MS) has arrived, but the
+  // defend it opened has not been decided — closing the window here would
+  // strand that pending: release-scope onDefend needs `state.window` back to
+  // reopen the next round, and nothing else can ever supply it again.
+  const expired = reduce(attacked.state, { type: 'WINDOW_EXPIRED', at: 1000 + WINDOW_FIRST_MS })
+  expect(expired.state).toBe(attacked.state)
+  expect(expired.events[0].type).toBe('rejected')
+
+  // The exchange still resolves normally — and the window closes through that
+  // resolution, not through expiry.
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: null },
+    at: 1000 + WINDOW_FIRST_MS + 1,
+  })
+  expect(r.state.pending).toBeNull()
+  expect(r.state.window).toBeNull()
+  expect(r.state.players.p1.release.frontend).toBeUndefined()
 })
 
 it('blocks the turn owner from acting while a window is open', () => {
