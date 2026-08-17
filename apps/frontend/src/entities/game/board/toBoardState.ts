@@ -1,6 +1,5 @@
 import type { Event, PlayerView, ReleaseView } from '@release/engine'
-import { rulesFor } from '@release/engine'
-import type { HeapCard, HistoryEntry } from '@release/ui'
+import type { HeapCard, HistoryEntry, ReleaseSupport } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
 import { HEAP_SHOW, scatterAt } from '@release/ui/animations'
 import type { BoardState } from './types'
@@ -27,8 +26,9 @@ const PLACEHOLDER_CARD: CardData = {
 const cardOrPlaceholder = (id: string): CardData => cardById(id) ?? PLACEHOLDER_CARD
 
 // ReleaseView's slots carry uid + card id (+ codeReview); the kit's release
-// zone renders full Card objects and has no slot for either uid or a combo'd
-// Code Review — both are dropped here, not hidden by the kit.
+// zone renders full Card objects and has no slot for uid — that half is
+// dropped here, not hidden by the kit. The codeReview half rides separately,
+// as the slot's support (see `toReleaseSupport`).
 function toReleaseSlots(release: ReleaseView) {
   return {
     frontend: release.frontend ? cardOrPlaceholder(release.frontend.card) : undefined,
@@ -38,25 +38,20 @@ function toReleaseSlots(release: ReleaseView) {
   }
 }
 
-// Derivation, not a projected field: `PlayerView` carries no `comboOptions` —
-// the engine only exposes the sudo flag (`rulesFor(id)?.sudo`) and the
-// `support-sudo` card id, not a precomputed pairing table. Every sudo-capable
-// card in hand is mapped to the uids of every `support-sudo` card also in
-// hand; a hand with no `support-sudo` yields an empty partner list for each
-// sudo-capable card (not an absent entry), and a card that is not
-// sudo-capable gets no entry at all. If the engine ever changes how sudo
-// pairing works (e.g. gains a per-card cap or a used/consumed flag), this
-// derivation must be revisited alongside it — it is not sourced from the
-// engine's own answer, only from its rules table.
-function toComboOptions(hand: PlayerView['self']['hand']): Record<string, string[]> {
-  const supportSudoUids = hand.filter((c) => c.id === 'support-sudo').map((c) => c.uid)
-  const options: Record<string, string[]> = {}
-  for (const c of hand) {
-    if (rulesFor(c.id)?.sudo === true) {
-      options[c.uid] = supportSudoUids
-    }
+// The aux lying under a release — a played Code Review. ReleaseZone renders it
+// tucked under via its `support` prop (the ComboStory zone already does).
+function toReleaseSupport(release: ReleaseView): ReleaseSupport {
+  return {
+    frontend: release.frontend?.codeReview
+      ? cardOrPlaceholder(release.frontend.codeReview)
+      : undefined,
+    backend: release.backend?.codeReview
+      ? cardOrPlaceholder(release.backend.codeReview)
+      : undefined,
+    database: release.database?.codeReview
+      ? cardOrPlaceholder(release.database.codeReview)
+      : undefined,
   }
-  return options
 }
 
 // Who the event happened to/because of. Most variants carry `player`; the few
@@ -186,12 +181,14 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       name: view.self.name,
       hand: view.self.hand.map((c) => ({ uid: c.uid, card: cardOrPlaceholder(c.id) })),
       release: toReleaseSlots(view.self.release),
+      support: toReleaseSupport(view.self.release),
     },
     opponents: view.opponents.map((o) => ({
       id: o.id,
       name: o.name,
       handCount: o.handCount,
       release: toReleaseSlots(o.release),
+      support: toReleaseSupport(o.release),
       eliminated: o.eliminated,
     })),
     decks: {
@@ -221,9 +218,9 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
     // contract.test-d.ts. Both carry openedAt alongside deadline already.
     pending: view.pending,
     window: view.window,
-    // Derived, not passed through — see toComboOptions for why and its
-    // maintenance caveat. participants/spectators are room facts and are
+    // Structural passthrough — the engine's own answer to which pairs a
+    // support may start. participants/spectators are room facts and are
     // never produced here (Decision 7 / the constraint on this task).
-    comboOptions: toComboOptions(view.self.hand),
+    comboOptions: view.self.combos,
   }
 }

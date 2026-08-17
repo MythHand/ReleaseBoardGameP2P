@@ -146,52 +146,28 @@ describe('toBoardState', () => {
     })
   })
 
-  describe('comboOptions', () => {
-    // A sudo-capable attack, a support-sudo, and an unrelated card — uids and
-    // catalogue ids are all visibly different strings so a uid/id swap in the
-    // derivation would fail loudly rather than passing by coincidence.
-    const comboView: PlayerView = {
+  it('feeds comboOptions from the projection, not the rules table', () => {
+    const withCombos: PlayerView = {
+      ...view,
+      self: { ...view.self, combos: { 'support-sudo#0': ['attack-bug#0'] } },
+    }
+    expect(toBoardState(withCombos, [], labels).comboOptions).toEqual({
+      'support-sudo#0': ['attack-bug#0'],
+    })
+  })
+
+  it('carries a released Code Review as the slot support', () => {
+    const withReleaseSupport: PlayerView = {
       ...view,
       self: {
         ...view.self,
-        hand: [
-          { uid: 'h-7', id: 'attack-bug' }, // sudo-capable (rulesFor('attack-bug').sudo === true)
-          { uid: 'h-9', id: 'support-sudo' },
-          { uid: 'h-3', id: 'release-frontend' }, // not sudo-capable
-        ],
+        release: {
+          frontend: { uid: 'r#0', card: 'release-frontend', codeReview: 'support-code-review' },
+        },
       },
     }
-
-    it('maps a sudo-capable card to exactly the support-sudo uids in hand', () => {
-      const combo = toBoardState(comboView, [], labels).comboOptions
-      expect(combo?.['h-7']).toEqual(['h-9'])
-    })
-
-    it('gives an unrelated card no entry at all', () => {
-      const combo = toBoardState(comboView, [], labels).comboOptions
-      expect(combo?.['h-3']).toBeUndefined()
-    })
-
-    it('gives a sudo-capable card an empty partner list when hand has no support-sudo', () => {
-      const noSupport: PlayerView = {
-        ...comboView,
-        self: { ...comboView.self, hand: [{ uid: 'h-7', id: 'attack-bug' }] },
-      }
-      const combo = toBoardState(noSupport, [], labels).comboOptions
-      expect(combo?.['h-7']).toEqual([])
-    })
-
-    it('collects every support-sudo uid in hand as a partner', () => {
-      const twoSupports: PlayerView = {
-        ...comboView,
-        self: {
-          ...comboView.self,
-          hand: [...comboView.self.hand, { uid: 'h-11', id: 'support-sudo' }],
-        },
-      }
-      const combo = toBoardState(twoSupports, [], labels).comboOptions
-      expect(combo?.['h-7']).toEqual(['h-9', 'h-11'])
-    })
+    const state = toBoardState(withReleaseSupport, [], labels)
+    expect(state.you.support?.frontend?.id).toBe('support-code-review')
   })
 
   it('carries a defend pending openedAt through unchanged, alongside deadline', () => {
