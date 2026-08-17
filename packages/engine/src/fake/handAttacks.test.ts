@@ -147,6 +147,45 @@ it('sudo Rollback keeps the attack card with the defender instead of the attacke
   expect(r.state.players.p1.hand).toEqual([])
 })
 
+it('holds the sudo half on a hand-attack pending, not in the discard', () => {
+  const r = reduce(table([BUG, SUDO], []), {
+    type: 'PLAY',
+    player: 'p1',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    target: { kind: 'player', player: 'p2' },
+    at: 1000,
+  })
+  expect(r.state.decks.discard).not.toContainEqual(SUDO)
+  expect(r.state.pending).toMatchObject({ kind: 'defend', combo: SUDO })
+  expect(r.events.map((e) => e.type)).toEqual(['attacked'])
+})
+
+it('banks both halves with attackSpent when a hand-attack hit is taken', () => {
+  const attacked = reduce(table([BUG, SUDO], []), {
+    type: 'PLAY',
+    player: 'p1',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    target: { kind: 'player', player: 'p2' },
+    at: 1000,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'defend', card: null },
+    at: 1001,
+  })
+  const discards = r.events.filter((e) => e.type === 'discarded')
+  expect(discards).toMatchObject([
+    { card: BUG.id, reason: 'attackSpent', player: 'p1' },
+    { card: SUDO.id, reason: 'attackSpent', player: 'p1' },
+  ])
+  const hit = r.events.find((e) => e.type === 'tookHit')
+  for (const d of discards) expect(d.parent).toBe(hit?.id)
+  expect(r.state.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO]))
+})
+
 it('reflects a random-steal attack: the defender steals from the attacker instead', () => {
   // SPARE is the only card left in the attacker's hand once BUG is thrown, so
   // it is the one thing the reflected steal could possibly take.

@@ -39,6 +39,8 @@ const WOMM: CardInstance = {
   uid: 'defense-works-on-my-machine#0',
   id: 'defense-works-on-my-machine',
 }
+const DDOS: CardInstance = { uid: 'attack-ddos#0', id: 'attack-ddos' }
+const MON: CardInstance = { uid: 'protection-monitoring#0', id: 'protection-monitoring' }
 
 // p1 releases Frontend; p1 then holds `defence`, p2 holds `attack`.
 const staged = (attack: CardInstance[], defence: CardInstance[]): GameState => {
@@ -88,7 +90,14 @@ it('destroys the release when the owner takes the hit', () => {
   expect(r.state.players.p1.release.frontend).toBeUndefined()
   expect(r.state.window).toBeNull()
   expect(r.state.decks.discard.map((c) => c.uid)).toContain(FE.uid)
-  expect(r.events.map((e) => e.type)).toEqual(['tookHit', 'releaseDestroyed', 'windowClosed'])
+  // The attack card is now banked (and says so) at resolution, between the hit
+  // and the release it destroyed — Task 8 (#100).
+  expect(r.events.map((e) => e.type)).toEqual([
+    'tookHit',
+    'discarded',
+    'releaseDestroyed',
+    'windowClosed',
+  ])
 })
 
 it('reopens the window a round later when the attack is cancelled', () => {
@@ -136,6 +145,125 @@ it('denies a Cancel defence against a sudo attack but allows a Unicorn', () => {
     at: 1002,
   })
   expect(held.state.players.p1.release.frontend?.card).toEqual(FE)
+})
+
+it('holds the sudo half on the pending, not in the discard', () => {
+  const r = reduce(staged([BUG, SUDO], [NOTABUG]), {
+    type: 'ATTACK',
+    player: 'p2',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    at: 1001,
+  })
+  expect(r.state.decks.discard).not.toContainEqual(SUDO)
+  expect(r.state.pending).toMatchObject({ kind: 'defend', combo: SUDO })
+  expect(r.events.map((e) => e.type)).toEqual(['attacked']) // unchanged at attack time
+})
+
+it('banks both halves with attackSpent when the hit is taken', () => {
+  const attacked = reduce(staged([BUG, SUDO], []), {
+    type: 'ATTACK',
+    player: 'p2',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    at: 1001,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: null },
+    at: 1002,
+  })
+  const discards = r.events.filter((e) => e.type === 'discarded')
+  expect(discards).toMatchObject([
+    { card: BUG.id, reason: 'attackSpent', player: 'p2' },
+    { card: SUDO.id, reason: 'attackSpent', player: 'p2' },
+  ])
+  // parent: both discards hang off the tookHit event
+  const hit = r.events.find((e) => e.type === 'tookHit')
+  for (const d of discards) expect(d.parent).toBe(hit?.id)
+  expect(r.state.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO]))
+})
+
+it('banks the defence with defenceSpent and the cancelled attack with attackSpent', () => {
+  const attacked = reduce(staged([BUG], [HOTFIX]), {
+    type: 'ATTACK',
+    player: 'p2',
+    card: BUG.uid,
+    at: 1001,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: HOTFIX.uid },
+    at: 1002,
+  })
+  const discards = r.events.filter((e) => e.type === 'discarded')
+  expect(discards).toMatchObject([
+    { card: BUG.id, reason: 'attackSpent', player: 'p2' },
+    { card: HOTFIX.id, reason: 'defenceSpent', player: 'p1' },
+  ])
+  const defended = r.events.find((e) => e.type === 'defended')
+  for (const d of discards) expect(d.parent).toBe(defended?.id)
+  expect(r.state.decks.discard).toEqual(expect.arrayContaining([BUG, HOTFIX]))
+})
+
+it('on Rollback return only the defence is banked — the attack goes to a hand', () => {
+  const attacked = reduce(staged([BUG], [ROLLBACK]), {
+    type: 'ATTACK',
+    player: 'p2',
+    card: BUG.uid,
+    at: 1001,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: ROLLBACK.uid },
+    at: 1002,
+  })
+  const discards = r.events.filter((e) => e.type === 'discarded')
+  expect(discards).toMatchObject([{ card: ROLLBACK.id, reason: 'defenceSpent', player: 'p1' }])
+  expect(r.state.players.p2.hand.map((c) => c.uid)).toContain(BUG.uid)
+})
+
+it('DDoS emits attackSpent for what it consumed', () => {
+  const s = engine.createGame(config())
+  const primed: GameState = {
+    ...s,
+    players: {
+      ...s.players,
+      p1: { ...s.players.p1, hand: [DDOS] },
+      p2: { ...s.players.p2, release: { monitoring: MON } },
+    },
+  }
+  const r = reduce(primed, {
+    type: 'PLAY',
+    player: 'p1',
+    card: DDOS.uid,
+    target: { kind: 'monitoring', player: 'p2' },
+    at: 1000,
+  })
+  expect(r.events).toContainEqual(
+    expect.objectContaining({
+      type: 'discarded',
+      player: 'p1',
+      card: DDOS.id,
+      reason: 'attackSpent',
+    }),
+  )
+})
+
+it('rejects a DRAW while a sudo attack pending is open, keeping the withheld half out of reach', () => {
+  const attacked = reduce(staged([BUG, SUDO], [NOTABUG]), {
+    type: 'ATTACK',
+    player: 'p2',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    at: 1001,
+  })
+  const r = reduce(attacked.state, { type: 'DRAW', player: 'p1', at: 1002 })
+  expect(r.state).toBe(attacked.state)
+  expect(r.events[0].type).toBe('rejected')
 })
 
 it('returns the attack to the attacker’s hand on Rollback', () => {

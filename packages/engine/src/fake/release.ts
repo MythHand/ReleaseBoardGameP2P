@@ -220,30 +220,34 @@ export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Red
       hand.filter((c) => !spentCards.includes(c)),
     )
 
-    // DDoS resolves immediately: it is not answerable by a defence card.
+    // DDoS resolves immediately: it is not answerable by a defence card, so
+    // banking it happens right here rather than at a later resolution — it
+    // was always the right moment, it just used to do it silently.
     if (card.id === 'attack-ddos') {
+      for (const c of spentCards) {
+        log.add({ type: 'discarded', player: action.player, card: c.id, reason: 'attackSpent' })
+      }
       const banked = {
         ...spent,
         decks: { ...spent.decks, discard: [...spent.decks.discard, ...spentCards] },
+        eventSeq: log.seq,
       }
       return { state: resolveDdos(banked, log, action.player, action.target), events: log.events }
     }
 
     if (action.target.kind !== 'player') return reject(state, action, 'illegal target')
 
-    const sudoOnly = spentCards.filter((c) => c.uid === action.combo)
-    const withSudoSpent = {
-      ...spent,
-      decks: { ...spent.decks, discard: [...spent.decks.discard, ...sudoOnly] },
-    }
+    // The sudo half rides on the pending like the attack card itself, and is
+    // banked at resolution alongside it — not spent silently here.
     return {
       state: openHandAttack(
-        withSudoSpent,
+        spent,
         log,
         action.player,
         card,
         action.target.player,
         sudo,
+        sudoCombo,
         action.at,
       ),
       events: log.events,
