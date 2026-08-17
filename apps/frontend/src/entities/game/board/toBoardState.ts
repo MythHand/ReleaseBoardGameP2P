@@ -157,6 +157,13 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     // that happened, so this card keeps one pose for as long as it is really the
     // top. Its scatter key is negative to put it out of the event ids' range —
     // those are positive, so a stand-in can never inherit a real card's pose.
+    //
+    // And only as long as it is the top: the moment an event-carrying discard
+    // lands above it, the fold ends on the real top again, this branch stops
+    // firing, and the banked card leaves the heap while the count still counts
+    // it. Accepted rather than fixed — the feed carries no event for a banked
+    // card (backlog.md), so once buried there is nothing to draw in its place,
+    // and past HEAP_SHOW the missing card is invisible anyway.
     heap.push({ uid: `top${count}`, card: top, ...scatterAt(-1 - count) })
   }
   // Never more cards than the pile says it holds: after a partial take the fold
