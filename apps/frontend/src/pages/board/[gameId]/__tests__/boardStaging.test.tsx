@@ -493,6 +493,44 @@ it('cancel returns both halves to the fan', async () => {
   })
 })
 
+// Fix round 1 (post-review): the fold is IRREVOCABLE once a partner is
+// picked, same as ComboStory's own `playing` (pickPartner/cancellable,
+// ComboStory.tsx:136,287). Before this, `merged`/`phase: 'partner'` held for
+// the whole ~620ms `foldIntoPair` animation with nothing blocking `cancel()`
+// — a press landing mid-fold would start a return flight for a play whose own
+// `finish()` was still going to fire moments later regardless, dispatching a
+// "cancelled" play and (for a target-needing partner) re-arming the aim arrow
+// for a pair no longer standing there.
+it('Escape mid-fold does not cancel — the fold is irrevocable and dispatches normally', async () => {
+  const onPlay = vi.fn()
+  comboOut = []
+  render(
+    comboBoardWith(
+      { comboOptions: { 'support-code-review#0': ['release-frontend#0'] } },
+      { onPlay },
+    ),
+  )
+  await pullFromComboFan('support-code-review#0')
+  const index = comboFanUids().indexOf('release-frontend#0')
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  comboOut = [...comboOut, 'release-frontend#0']
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 }) // the fold commits — merged: true, still mid-animation
+  // Escape lands in the SAME tick the fold committed in — no wait in between,
+  // so this is squarely inside the window the fold owns exclusively.
+  fireEvent.keyDown(window, { key: 'Escape' })
+  // refused outright: no return flight ever starts. `arrival.arrive`'s own
+  // geometry pass runs synchronously, in the same tick as the call that
+  // starts it, so if `cancel()` had gone through this would already be 2.
+  expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`).length).toBe(0)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  // the fold ran to completion and dispatched normally — the Escape changed nothing
+  expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, 'support-code-review#0')
+  expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`).length).toBe(0)
+})
+
 it('a support with no partners cannot be pulled', async () => {
   comboOut = []
   render(comboBoardWith({ comboOptions: {} }))
