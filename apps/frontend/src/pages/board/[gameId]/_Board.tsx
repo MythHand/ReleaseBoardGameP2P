@@ -11,6 +11,7 @@ import {
   Badge,
   Button,
   Card,
+  CardPair,
   cardById,
   type DockView,
   Drawer,
@@ -251,6 +252,13 @@ export default function Board({
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
   })
+  // the ONE card standing at the centre before a partner folds in — a plain
+  // aim (`main`) or a support awaiting one (`support`). Once merged the pair
+  // flyer owns the centre instead (see `opening.pairFlyer` below).
+  const soloStaged =
+    staging.staged && !staging.staged.merged
+      ? (staging.staged.support ?? staging.staged.main)
+      : null
 
   // Escape skips the opening. Same window binding and the same reason as the
   // cancel above; `finish` is idempotent, so a second press is a no-op.
@@ -448,10 +456,11 @@ export default function Board({
           })}
         {/* the pulled card stands here once the flyer has dropped it — while
             the carrier or a return flight still holds it, the static render
-            would double it (ComboStory.tsx's own guard on this) */}
-        {staging.staged && staging.overlay.length === 0 && (
+            would double it (ComboStory.tsx's own guard on this). Once a
+            partner folds in, the pair flyer below owns the centre instead. */}
+        {soloStaged && staging.overlay.length === 0 && (
           <div className={opening.centreCard} data-testid="board-centre-staged">
-            <Card card={staging.staged.card} interactive={false} width="100%" />
+            <Card card={soloStaged.card} interactive={false} width="100%" />
           </div>
         )}
         {!staging.staged &&
@@ -490,7 +499,18 @@ export default function Board({
                 targets={staging.targets}
               />
             </div>
-            <div className={kit.handWrap} ref={anchors.hand}>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan is never read as "pointed at nothing" while a pair stands merged; the Hand owns the real interaction (ComboStory's own hand wrapper carries the same guard) */}
+            <div
+              className={kit.handWrap}
+              ref={anchors.hand}
+              // the pair assembles and then waits at the CENTRE — the hand's
+              // zoom preview rises into exactly that space and would cover it
+              // (ComboStory's own reason). So while a pair stands merged the
+              // fan goes inert, and a press inside it must not read as the
+              // miss `handleTableClick` cancels on.
+              style={{ pointerEvents: staging.staged?.merged ? 'none' : undefined }}
+              onMouseDown={staging.staged?.merged ? (e) => e.stopPropagation() : undefined}
+            >
               <Hand
                 items={staging.handItems}
                 // the fan opens room for the arriving heap while it travels —
@@ -506,11 +526,22 @@ export default function Board({
                       : beats.gapSize
                     : deal.gapSize
                 }
-                // while the deal runs the hand is held: no clicks reach the
+                // a support awaiting a partner lights the hand cards it can
+                // fold with — off outside that phase (Hand ignores undefined).
+                accentAt={staging.accentAt}
+                // while the deal runs the hand is held: no clicks reach either
                 // gesture machine, and the cards that travelled closed stay
                 // closed until the flip. Both are gone the moment it ends, so
                 // the released hand is the plain one this board always drew.
-                onCardClick={deal.active ? undefined : (i) => gestures.onCardClick(i)}
+                // A partner pick is a click too, not a pull — it routes here
+                // while the staging gesture is waiting for one.
+                onCardClick={
+                  deal.active
+                    ? undefined
+                    : staging.staged?.phase === 'partner'
+                      ? (i) => staging.onCardClick(i)
+                      : (i) => gestures.onCardClick(i)
+                }
                 // drag-mode: a card that needs a target is pulled out of the
                 // fan (the staging gesture), not clicked. Off during the deal,
                 // same as the click gesture above.
@@ -694,6 +725,26 @@ export default function Board({
       {deal.overlays}
       {beats.overlays}
       {staging.overlay}
+
+      {/* the pair flyer — a persistent node (I10: position: fixed against the
+          viewport, no containing block above it, same as every other flight
+          carrier). The fold paints frame by frame directly on its
+          [data-main]/[data-aux] children; the CardPair mount just needs to
+          exist for that to have something to grab. */}
+      <div
+        className={opening.pairFlyer}
+        ref={staging.pairRef}
+        aria-hidden="true"
+        data-testid="board-pair-staged"
+      >
+        {staging.staged?.merged && staging.staged.support && staging.staged.main && (
+          <CardPair
+            main={staging.staged.main.card}
+            aux={staging.staged.support.card}
+            width="100%"
+          />
+        )}
+      </div>
     </div>
   )
 }

@@ -8,10 +8,14 @@
 // file's header for why.
 
 import type { Event } from '@release/engine'
-import type { CardData, TableActions, TableTarget } from '@release/ui'
+import type { CardData, TableActions, TableTarget, TableWindow } from '@release/ui'
 import { cardById } from '@release/ui'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
+// same reach, for the return-flight step's own overlay node — pins that a
+// merged cancel carries BOTH halves as one flight, not one arriving node with
+// the other uid merely reappearing once `staged` clears.
+import handArrivalStyles from '@/animations/useHandArrival.module.css'
 // Arrow's CSS Module classnames are not part of `@release/ui`'s public barrel
 // — reached into the same way `boardComponent.test.tsx` does.
 import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
@@ -259,4 +263,289 @@ it('anchors the targeting arrow at the centre it stands in, not the hand slot it
   expect(origin).toBeTruthy()
   expect(origin?.getAttribute('cx')).toBe('310') // centre(300,200,20,20) → 300+10
   expect(origin?.getAttribute('cy')).toBe('210')
+})
+
+// ===== Combo pairing (#100): pulling a support (Sudo / Code Review) stands IT
+// at the centre instead of a plain aim, and waits for a partner clicked in the
+// hand. A separate hand fixture: `HAND` above has no combo cards, and giving
+// it any would break `fanUids()`'s own "at most one card ever leaves" reading
+// — these tests get their own small hand and their own pull/click/read helpers
+// instead, sized for a PAIR leaving the fan together.
+// biome-ignore lint/style/noNonNullAssertion: both ids are known catalogue entries
+const sudo = cardById('support-sudo')!
+// biome-ignore lint/style/noNonNullAssertion: both ids are known catalogue entries
+const codeReview = cardById('support-code-review')!
+const COMBO_HAND: { uid: string; card: CardData }[] = [
+  { uid: 'support-sudo#0', card: sudo },
+  { uid: 'attack-bug#0', card: bug },
+  { uid: 'support-code-review#0', card: codeReview },
+  { uid: 'release-frontend#0', card: frontend },
+]
+
+function comboBoardWith(
+  overrides: {
+    targets?: Record<string, TableTarget[]>
+    comboOptions?: Record<string, string[]>
+    window?: TableWindow
+  },
+  actions: TableActions = {},
+) {
+  const props = makeBoardProps({
+    state: {
+      ...makeBoardProps().state,
+      you: { ...makeBoardProps().state.you, hand: COMBO_HAND },
+      turn: makeBoardProps().state.selfId,
+      hasDrawn: true,
+      playable: COMBO_HAND.map((c) => c.uid),
+      targets: overrides.targets ?? {},
+      comboOptions: overrides.comboOptions ?? {},
+      window: overrides.window ?? null,
+    },
+    actions,
+  })
+  return <Board {...props} />
+}
+
+// which uids the most recent combo pull/fold sent out of the fan — the same
+// role `lastPulled` plays above, sized for a pair. `comboFanUids` still falls
+// back to the full hand whenever the DOM shows every slot, exactly as
+// `fanUids` does, so a REFUSED pull never needs this cleared first.
+let comboOut: string[] = []
+
+function comboFanUids(): string[] {
+  const rendered = document.querySelectorAll('[data-hand-slot]').length
+  if (rendered === COMBO_HAND.length) return COMBO_HAND.map((c) => c.uid)
+  return COMBO_HAND.filter((c) => !comboOut.includes(c.uid)).map((c) => c.uid)
+}
+
+// drags a card out of the combo fan — same drag contract as `pullCardFromFan`
+// above, against the combo hand's own current render order.
+async function pullFromComboFan(uid: string) {
+  const index = comboFanUids().indexOf(uid)
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  comboOut = [uid]
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 600))
+  })
+}
+
+// clicks a card in the combo fan (mousedown + mouseup with no movement — a
+// click, not a drag; Hand's own contract, see boardStaging's `pullCardFromFan`
+// header). The fold if `uid` is a valid partner, a miss (cancel) otherwise.
+// Waits past MERGE_MS (620ms) so both `foldIntoPair` flights have settled.
+async function clickComboFanCard(uid: string) {
+  const index = comboFanUids().indexOf(uid)
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  comboOut = [...comboOut, uid]
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+}
+
+// the support's own category accent, read off the lit card's `--accent`
+// custom property — null unless `data-state="selected"` actually lit it
+// (Card.tsx), so the card's own default category colour can't false-positive.
+// Both Hand's own `faceWrap` wrapper and Card's root carry `data-state`
+// (Hand.tsx / Card.tsx) — the innermost (last) match is Card's own root,
+// the one that actually carries `--accent`.
+function comboAccentOf(uid: string): string | null {
+  const index = comboFanUids().indexOf(uid)
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  const matches = slot?.querySelectorAll<HTMLElement>('[data-state="selected"]') ?? []
+  const lit = matches[matches.length - 1]
+  return lit ? lit.style.getPropertyValue('--accent') : null
+}
+
+const BUG_SEAT_TARGET: Record<string, TableTarget[]> = {
+  'attack-bug#0': [{ kind: 'player', player: 'p2' }],
+}
+
+const OPEN_WINDOW: TableWindow = {
+  player: 'you',
+  slot: 'frontend',
+  round: 1,
+  openedAt: 0,
+  deadline: 1000,
+  passed: [],
+  canAttackWith: ['attack-bug#0'],
+}
+
+it('a pulled support lights its partners and a click folds the pair', async () => {
+  const onPlay = vi.fn()
+  comboOut = []
+  render(
+    comboBoardWith(
+      { comboOptions: { 'support-sudo#0': ['attack-bug#0'] }, targets: BUG_SEAT_TARGET },
+      { onPlay },
+    ),
+  )
+  await pullFromComboFan('support-sudo#0')
+  expect(comboAccentOf('attack-bug#0')).toBe('var(--cat-support)') // partner lit
+  await clickComboFanCard('attack-bug#0') // fold
+  await pressSeat('p2') // aim resolved
+  expect(onPlay).toHaveBeenCalledWith(
+    'attack-bug#0',
+    { kind: 'player', player: 'p2' },
+    'support-sudo#0',
+  )
+})
+
+it('a release partner dispatches without a target', async () => {
+  const onPlay = vi.fn()
+  comboOut = []
+  render(
+    comboBoardWith(
+      { comboOptions: { 'support-code-review#0': ['release-frontend#0'] } },
+      { onPlay },
+    ),
+  )
+  await pullFromComboFan('support-code-review#0')
+  await clickComboFanCard('release-frontend#0')
+  expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, 'support-code-review#0')
+})
+
+it('a window pair dispatches onAttack straight from the fold', async () => {
+  const onAttack = vi.fn()
+  const onPlay = vi.fn()
+  comboOut = []
+  render(
+    comboBoardWith(
+      { comboOptions: { 'support-sudo#0': ['attack-bug#0'] }, window: OPEN_WINDOW },
+      { onAttack, onPlay },
+    ),
+  )
+  await pullFromComboFan('support-sudo#0')
+  await clickComboFanCard('attack-bug#0')
+  expect(onAttack).toHaveBeenCalledWith('attack-bug#0', 'support-sudo#0')
+  expect(onPlay).not.toHaveBeenCalled() // no target phase — the window dispatches straight from the fold
+})
+
+it('cancel returns both halves to the fan', async () => {
+  comboOut = []
+  render(
+    comboBoardWith({
+      comboOptions: { 'support-sudo#0': ['attack-bug#0'] },
+      targets: BUG_SEAT_TARGET,
+    }),
+  )
+  await pullFromComboFan('support-sudo#0')
+  await clickComboFanCard('attack-bug#0') // folds, then waits at the centre for a target
+  fireEvent.keyDown(window, { key: 'Escape' })
+  // both halves fly back TOGETHER, as one flight — mid-flight (well before
+  // useHandArrival's own 480ms FLIGHT_MS lands) there are two arrival nodes,
+  // not one. Pins the merged branch specifically: a return that only carried
+  // `support` and left `main` to simply reappear once `staged` cleared would
+  // still pass the end-state assertion below, but would show only one node
+  // here.
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 50))
+  })
+  expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`).length).toBe(2)
+  await waitFor(() => {
+    const uids = comboFanUids()
+    expect(uids).toContain('support-sudo#0')
+    expect(uids).toContain('attack-bug#0')
+  })
+})
+
+it('a support with no partners cannot be pulled', async () => {
+  comboOut = []
+  render(comboBoardWith({ comboOptions: {} }))
+  await pullFromComboFan('support-sudo#0')
+  expect(comboFanUids()).toContain('support-sudo#0')
+})
+
+// Carried from #99's review (task-10-brief.md): `onTargetPick`'s own
+// `cancellingRef` guard was unreachable defense-in-depth through the
+// single-card UI. This flow's new press surface — a hand click routed to
+// `staging.onCardClick` for the whole span `phase === 'partner'` covers,
+// including a single-card cancel's own ~480ms return flight (`staged` isn't
+// cleared until the flight LANDS, in `useHandArrival`'s own `onLanded`) —
+// makes `onCardClick`'s OWN `cancellingRef` check load-bearing instead: a
+// click on a still-valid partner candidate, fired while the support is
+// already flying back to the fan, must not start a second fold.
+it('a click during a cancel-in-flight does not start a new fold', async () => {
+  const onPlay = vi.fn()
+  const onAttack = vi.fn()
+  comboOut = []
+  render(
+    comboBoardWith(
+      { comboOptions: { 'support-sudo#0': ['attack-bug#0'] }, targets: BUG_SEAT_TARGET },
+      { onPlay, onAttack },
+    ),
+  )
+  await pullFromComboFan('support-sudo#0')
+  fireEvent.keyDown(window, { key: 'Escape' }) // starts the single-card return flight
+  // immediately — no wait for the ~480ms flight to land — click the partner
+  // candidate that is still sitting in the fan
+  const index = comboFanUids().indexOf('attack-bug#0')
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  // check WHILE the original cancel is still in flight — its own `onLanded`
+  // unconditionally clears `staged` a moment later, which would mask a second
+  // (bogus) fold by wiping it out along with the legitimate one. Caught here
+  // instead: a click that got through would have mounted the pair flyer's
+  // CardPair by now (a couple of rAF frames, well under 480ms).
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 50))
+  })
+  expect(document.querySelector('[data-testid="board-pair-staged"] [data-main]')).toBeNull()
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  expect(onPlay).not.toHaveBeenCalled()
+  expect(onAttack).not.toHaveBeenCalled()
+  await waitFor(() => {
+    expect(document.querySelectorAll('[data-hand-slot]').length).toBe(COMBO_HAND.length)
+  })
+})
+
+it('reduced motion folds a pair without flights', () => {
+  const mm = vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query: string) =>
+      ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  )
+  const onPlay = vi.fn()
+  comboOut = []
+  render(
+    comboBoardWith(
+      { comboOptions: { 'support-code-review#0': ['release-frontend#0'] } },
+      { onPlay },
+    ),
+  )
+  // the pull, inlined rather than through `pullFromComboFan`: that helper
+  // waits 600ms for a flight reduced motion never plays.
+  const pullIndex = comboFanUids().indexOf('support-code-review#0')
+  const pullSlot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[pullIndex]
+  comboOut = ['support-code-review#0']
+  fireEvent.mouseDown(pullSlot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  expect(screen.getByTestId('board-centre-staged')).toBeTruthy() // the support stands at the centre already
+  // the fold: a click, same inlined reasoning (no 620ms MERGE_MS to wait out)
+  const foldIndex = comboFanUids().indexOf('release-frontend#0')
+  const foldSlot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[foldIndex]
+  comboOut = [...comboOut, 'release-frontend#0']
+  fireEvent.mouseDown(foldSlot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  // release has no target and no open window — dispatches at once, same phase
+  // outcome the animated path reaches after its own flights settle
+  expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, 'support-code-review#0')
+  expect(document.querySelector('[data-testid="board-pair-staged"] [data-main]')).toBeTruthy()
+  mm.mockRestore()
 })

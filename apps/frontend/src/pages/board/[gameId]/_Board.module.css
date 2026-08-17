@@ -78,6 +78,23 @@
   inset: 0;
 }
 
+/* the pair flyer (#100) — the persistent node the support-fold gesture paints
+   on directly (`_useBoardStaging.ts`'s `onCardClick`). `position: fixed`
+   against the viewport, same as every other flight carrier
+   (`useFlyer`/`useHandArrival`/`useDiscardExit`/`Arrow`) — it flies by
+   coordinates read from `getBoundingClientRect`, so nothing between here and
+   the viewport may become a containing block (a `transform`/`filter`/
+   `contain` anywhere above would shift every fold by that ancestor's own
+   offset). Hidden by default; the gesture pins it to the centre rect and
+   raises its opacity once the pair is actually there. */
+.pairFlyer {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
 /* the right-hand nav's layer: TabRail positions itself against the edge, and
    this layer exists only to lead its arrival without touching that transform */
 .railLayer {
