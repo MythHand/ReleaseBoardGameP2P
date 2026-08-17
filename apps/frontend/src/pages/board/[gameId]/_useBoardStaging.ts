@@ -77,10 +77,15 @@ export function useBoardStaging({
 }: Options): BoardStaging {
   const [staged, setStaged] = useState<StagedCard | null>(null)
   const [dispatched, setDispatched] = useState(false)
+  // True from the moment a cancel is ACCEPTED until its return flight lands —
+  // not the same span as `!staged`. `staged` only clears in `onLanded`, ~480ms
+  // into the flight (useHandArrival's FLIGHT_MS), so without this a press on
+  // the seat the card was aimed at stays live for that whole glide and
+  // dispatches a play for a card that is already on its way back to the fan.
+  const [cancelling, setCancelling] = useState(false)
   const reduced = useReducedMotion()
   const arrowCtl = useArrow()
   const flyer = useFlyer()
-  const arrival = useHandArrival(anchors.hand, () => setStaged(null))
 
   // handlers below run after an await (or after the SAME click bubbles past a
   // target that did not stop propagation — Seat's own onClick does not) —
@@ -90,10 +95,22 @@ export function useBoardStaging({
   stagedRef.current = staged
   const dispatchedRef = useRef(dispatched)
   dispatchedRef.current = dispatched
+  const cancellingRef = useRef(cancelling)
+  cancellingRef.current = cancelling
+
+  const arrival = useHandArrival(anchors.hand, () => {
+    // The return flight landed: the cancel is over. Synchronous, same reason
+    // as `onTargetPick`'s own `dispatchedRef` write below — a press landing in
+    // THIS tick must see the cancel as already resolved, not wait for the
+    // render this `setCancelling(false)` schedules.
+    cancellingRef.current = false
+    setCancelling(false)
+    setStaged(null)
+  })
 
   const targets = useMemo(
-    () => (staged && !dispatched ? (state.targets?.[staged.uid] ?? []) : []),
-    [staged, dispatched, state.targets],
+    () => (staged && !dispatched && !cancelling ? (state.targets?.[staged.uid] ?? []) : []),
+    [staged, dispatched, cancelling, state.targets],
   )
 
   const aimFromCentre = useCallback(() => {
@@ -135,7 +152,7 @@ export function useBoardStaging({
   const onTargetPick = useCallback(
     (target: TableTarget) => {
       const s = stagedRef.current
-      if (!s || dispatchedRef.current) return
+      if (!s || dispatchedRef.current || cancellingRef.current) return
       if (!targets.some((t) => sameTarget(t, target))) return
       arrowCtl.stop()
       // Set synchronously, ahead of the state update: Seat's own click handler
@@ -154,14 +171,22 @@ export function useBoardStaging({
 
   const cancel = useCallback(() => {
     const s = stagedRef.current
-    if (!s || dispatchedRef.current) return
+    if (!s || dispatchedRef.current || cancellingRef.current) return
     arrowCtl.stop()
     const cRect = anchors.centre.current?.getBoundingClientRect()
     if (reduced || !cRect) {
       setStaged(null)
       return
     }
+    // Set synchronously, ahead of the state update — same reason as
+    // `onTargetPick`'s own `dispatchedRef` write: a press on the seat this
+    // card was aimed at can land in THIS tick, before React commits
+    // `cancelling`'s first render, and both the guard above and the `targets`
+    // memo have to already read the return flight as "nothing staged."
+    cancellingRef.current = true
+    setCancelling(true)
     // back into the fan at the slot it came from; onLanded clears `staged`
+    // and `cancelling` together
     void arrival.arrive(
       [{ key: s.uid, card: s.card, from: cRect }],
       state.you.hand.length - 1,
