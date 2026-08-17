@@ -55,11 +55,6 @@
   box-shadow: -24px 0 48px var(--black-55);
 }
 
-.chatDock > :only-child {
-  flex: 1;
-  min-block-size: 0;
-}
-
 /* ===== шапка ===== заголовок слева, свитчер языка по правой линии контента */
 .head {
   display: flex;

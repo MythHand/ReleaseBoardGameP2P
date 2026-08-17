@@ -48,6 +48,14 @@
   align-items: flex-start;
 }
 
+/* пример во всю ширину страницы: своя строка в ряду и растянутое тело. Селектор
+   в два класса — чтобы перебить align-items ячейки независимо от того, в каком
+   порядке модули лягут в бандл */
+.cell.cellWide {
+  flex: 1 0 100%;
+  align-items: stretch;
+}
+
 .cellBody {
   display: flex;
   align-items: center;

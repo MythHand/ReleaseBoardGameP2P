@@ -1,12 +1,17 @@
 import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useEffect, useMemo, useState } from 'react'
+import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
+import { ToastStack } from '@/blocks/Toast'
+import { CHAT_SELF, makeChat } from '@/mocks/chat'
 import { makeTable } from '@/mocks/table'
+import Message from '@/primitives/Message'
 import Table from '@/table/Table'
+import type { Panel } from '@/table/Table/types'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import TechBar from '../controls/TechBar'
-import { TechField, TechLabel, TechSwitch } from '../controls/TechControls'
+import { TechButton, TechField, TechLabel, TechSwitch } from '../controls/TechControls'
 import styles from './TableChatStory.module.css'
 
 type GameOverCondition = 'release' | 'lastStanding'
@@ -68,6 +73,26 @@ const DOCK_STATES: { id: DockDemo; label: Loc }[] = [
   { id: 'reaction503', label: { ru: 'error 503', en: 'error 503' } },
 ]
 
+// Чужие реплики для технической кнопки «чат»: разные авторы, разные роли и
+// разная длина — стопка тостов проверяется именно этим, а не одной строкой.
+const INCOMING: { who: string; role: ChatRole; text: Loc }[] = [
+  {
+    who: 'TabsOverSpaces',
+    role: 'host',
+    text: { ru: 'вот сейчас будет больно', en: 'this is going to hurt' },
+  },
+  {
+    who: 'SyntaxSeagull_9000_x',
+    role: 'player',
+    text: {
+      ru: 'подожди, у него же ещё Unicorn на руке — я бы на твоём месте не лез сейчас в атаку',
+      en: 'hold on, they still have a Unicorn in hand — I would not attack right now if I were you',
+    },
+  },
+  { who: 'null_ptr', role: 'player', text: { ru: 'ну и пасьянс', en: 'what a mess' } },
+  { who: 'oracle', role: 'spectator', text: { ru: 'смотрю, не мешаю', en: 'just watching' } },
+]
+
 export default function TableChatStory() {
   const { lang, setLang } = useLang()
   const [opps, setOpps] = useState(3)
@@ -78,6 +103,34 @@ export default function TableChatStory() {
   const [specLimit, setSpecLimit] = useState(8)
   const [kicked, setKicked] = useState<Set<string>>(() => new Set())
   const [paused, setPaused] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>(makeChat)
+  // панель под управлением сцены: клик по всплывшей плашке открывает чат
+  const [panel, setPanel] = useState<Panel | null>(null)
+  // Тостами всплывает только чужая речь: свою отправку себе показывать незачем,
+  // а техническим записям место в истории, а не в углу экрана.
+  const toasts = useMemo(
+    () =>
+      messages
+        .filter((m) => !m.system && m.who && m.who !== CHAT_SELF)
+        .map((m) => ({
+          id: m.id,
+          node: <Message text={m.text} who={m.who} time={m.time} authorRole={m.role} />,
+        })),
+    [messages],
+  )
+  // Реплика со стороны — единственный способ увидеть тост: своя отправка в них
+  // по правилу не попадает. Реплики идут по кругу и от разных авторов, чтобы
+  // стопка из четырёх была стопкой разных плашек, а не одной, размноженной
+  // четырежды.
+  const incoming = () =>
+    setMessages((prev) => {
+      const one = INCOMING[prev.length % INCOMING.length]
+      if (!one) return prev
+      return [
+        ...prev,
+        { id: `in-${prev.length}`, ...one, text: pick(lang, one.text), time: '20:42' },
+      ]
+    })
   const [parallax, setParallax] = useState(true)
   const [ready, setReady] = useState<Set<string>>(() => new Set())
   // Anchor for the reaction demo states' sweep, reset each time either is
@@ -203,6 +256,9 @@ export default function TableChatStory() {
           onChange={setRole}
         />
 
+        {/* технический вызов тостов: чужая реплика приходит в комнату */}
+        <TechButton onClick={incoming}>чат</TechButton>
+
         <TechField>
           <HoverSelect
             label={pick(lang, { ru: 'оппонентов', en: 'opponents' })}
@@ -292,6 +348,38 @@ export default function TableChatStory() {
             window: pick(lang, { ru: ruCommon.window, en: enCommon.window }),
             pause: pauseCopy,
           }}
+          slots={{
+            chat: (
+              <Chat
+                messages={messages}
+                copy={pick(lang, { ru: ruCommon.chat, en: enCommon.chat })}
+                selfName={CHAT_SELF}
+                // отправка локальная: стол переписку не ведёт, он даёт ей место.
+                // Своя роль в ленте — та же, что за столом: хост или игрок.
+                onSend={(text) =>
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: `local-${prev.length}`,
+                      who: CHAT_SELF,
+                      role: role === 'host' ? 'host' : 'player',
+                      text,
+                      time: '20:41',
+                    },
+                  ])
+                }
+              />
+            ),
+            toasts: (
+              <ToastStack
+                items={toasts}
+                copy={pick(lang, { ru: ruCommon.toasts, en: enCommon.toasts })}
+                onOpen={() => setPanel('chat')}
+              />
+            ),
+          }}
+          panel={panel}
+          onPanelChange={setPanel}
           over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
           actions={{ onOverContinue: () => setEnd(null) }}
           now={now}

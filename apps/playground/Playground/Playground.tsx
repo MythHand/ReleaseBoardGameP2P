@@ -20,6 +20,7 @@ import ReconnectBlock from '../stories/blocks/ReconnectBlock'
 import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
 import RulesBlock from '../stories/blocks/RulesBlock'
 import SeatBlock from '../stories/blocks/SeatBlock'
+import ToastBlock from '../stories/blocks/ToastBlock'
 import TurnDockBlock from '../stories/blocks/TurnDockBlock'
 import CardParallaxStory from '../stories/CardParallaxStory'
 import CardStory from '../stories/CardStory'
@@ -238,6 +239,7 @@ const groups: Group[] = [
       { id: 'block-confirm-action', title: 'Confirm action', render: () => <ConfirmActionBlock /> },
       { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },
       { id: 'block-chat', title: 'Chat', render: () => <ChatBlock /> },
+      { id: 'block-toast', title: 'Toast', render: () => <ToastBlock /> },
       { id: 'block-player-slot', title: 'Player slot', render: () => <PlayerSlotBlock /> },
       { id: 'block-lobby-code', title: 'Lobby code', render: () => <LobbyCodeBlock /> },
       { id: 'block-lang-switcher', title: 'Lang switcher', render: () => <LangSwitcherBlock /> },

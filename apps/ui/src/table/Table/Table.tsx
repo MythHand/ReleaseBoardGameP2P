@@ -50,6 +50,7 @@ const DRAWER_WIDTH: Record<Panel, number> = {
   participants: 420, // участники — как история
   modes: 680, // режимы — как правила
   rules: 680, // правила — сильно шире
+  chat: 420, // переписка — как история
 }
 
 const EMPTY_RELEASE: ReleaseSlots = {
@@ -220,12 +221,18 @@ export default function Table({
   const hasUpperSettings =
     Boolean(lang && onLangChange) || Boolean(code) || Boolean(onParallaxChange)
 
-  // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
+  // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку.
+  // Чат стоит последним, то есть у нижнего края: это не панель про партию, а
+  // разговор рядом с ней, и он не должен вклиниваться между её вкладками.
+  const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
   const textTabs: TabRailItem[] = [
     { id: 'history', label: copy.table.tabHistory },
     { id: 'participants', label: copy.table.tabParticipants },
     { id: 'rules', label: copy.table.tabRules },
     { id: 'modes', label: copy.table.tabModes },
+    // высота фиксированная: чат в общий ряд не встаёт по смыслу, и делить полосу
+    // поровну с панелями партии ему незачем
+    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '', height: 155 }] : []),
   ]
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
@@ -369,6 +376,10 @@ export default function Table({
           />
         )}
 
+        {/* всплывающие плашки — правый нижний угол, с отступом на рейл. При
+            открытой панели чата их нет: лента и так перед глазами */}
+        {slots?.toasts && panel !== 'chat' && <div className={styles.toasts}>{slots.toasts}</div>}
+
         {/* вертикальный рейл у правого края — переключает панели drawer */}
         <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
 
@@ -459,6 +470,7 @@ export default function Table({
             </ScrollArea>
           )}
           {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
+          {panel === 'chat' && <div className={styles.chatPanel}>{slots?.chat}</div>}
         </Drawer>
 
         {/* pause window — over the play area, below the right-hand nav (its own

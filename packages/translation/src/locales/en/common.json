@@ -270,6 +270,9 @@
     "send": "send",
     "empty": "quiet so far"
   },
+  "toasts": {
+    "hide": "hide"
+  },
   "reconnect": {
     "label": "reconnecting…",
     "retry": "reconnect",
@@ -291,7 +294,8 @@
     "tabHistory": "history",
     "tabParticipants": "participants",
     "tabRules": "rules",
-    "tabModes": "game mode"
+    "tabModes": "game mode",
+    "tabChat": "chat"
   },
   "lobbyCode": {
     "label": "game code",

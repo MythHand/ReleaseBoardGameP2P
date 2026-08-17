@@ -622,6 +622,14 @@ const SCENARIOS: Scenario[] = [
     },
     where: 'GameEnd',
   },
+  {
+    name: { ru: 'Стопка тостов чата', en: 'The chat toast stack' },
+    from: {
+      ru: "новых пресетов не потребовалось — вся хореография собрана из трёх готовых. Приход плашки — play('hudIn', { dy: 18, dur: 260 }) на монтировании: тот же «блок приходит на своё место», только снизу и коротко. Уход — play('popOut'), и снять плашку со сцены имеет право лишь она сама: очередь ставит ей leaving, плашка дожидается anim.finished и зовёт onLeft — снятие по таймеру оборвало бы анимацию на середине. Сдвиг соседей — FLIP через play('flyFrom', { from: прошлый rect, duration: 240 }): плашки РАЗНОЙ высоты (внутри чужая реплика, две строки или двенадцать), поэтому ехать «на шаг» нечем — rect меряется до и после коммита в useLayoutEffect, дельта у каждой своя. Новая плашка в этот замер не попадает: прошлого места у неё нет, у неё свой приход. Колонка прижата нижним краем и растёт вверх, поэтому уход самой старой (сверху) соседей не двигает вовсе, а уход средней опускает те, что над ней.",
+      en: "no new presets were needed — the whole choreography is assembled from three existing ones. A plate arrives with play('hudIn', { dy: 18, dur: 260 }) on mount: the same «a block arrives at its place», only from below and short. It leaves with play('popOut'), and only the plate itself may take itself off the stage: the queue sets leaving, the plate awaits anim.finished and calls onLeft — dropping it on a timer would cut the animation in half. Neighbours shift by FLIP through play('flyFrom', { from: the previous rect, duration: 240 }): the plates are of DIFFERENT heights (someone else's reply inside, two lines or twelve), so there is no «one step» to move by — the rect is measured before and after the commit in useLayoutEffect and every delta is its own. A newly arrived plate is not in that measurement: it has no previous place, it has its own arrival. The column is pinned to the bottom and grows upward, so the oldest leaving (from the top) moves no neighbours at all, while a middle one leaving lowers those above it.",
+    },
+    where: 'blocks/Toast (ToastStack), Table + chat',
+  },
 ]
 
 // ===== 3. Needs rework — THE register of findings =====

@@ -270,6 +270,9 @@
     "send": "отправить",
     "empty": "пока тихо"
   },
+  "toasts": {
+    "hide": "скрыть"
+  },
   "reconnect": {
     "label": "переподключение…",
     "retry": "переподключиться",
@@ -291,7 +294,8 @@
     "tabHistory": "история",
     "tabParticipants": "участники",
     "tabRules": "правила",
-    "tabModes": "игровой режим"
+    "tabModes": "игровой режим",
+    "tabChat": "чат"
   },
   "lobbyCode": {
     "label": "код игры",

@@ -30,9 +30,19 @@ export function KitSection({ title, children }: { title: string; children: React
   )
 }
 
-export function KitCell({ caption, children }: { caption: string; children: ReactNode }) {
+// `wide` — пример, которому узкая колонка ряда не годится: он занимает строку
+// целиком и тянет своё тело на всю ширину страницы (сцена в углу, широкий стол).
+export function KitCell({
+  caption,
+  wide = false,
+  children,
+}: {
+  caption: string
+  wide?: boolean
+  children: ReactNode
+}) {
   return (
-    <div className={styles.cell}>
+    <div className={`${styles.cell} ${wide ? styles.cellWide : ''}`}>
       <div className={styles.cellBody}>{children}</div>
       <span className={styles.caption}>{caption}</span>
     </div>

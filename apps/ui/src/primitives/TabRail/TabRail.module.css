@@ -46,6 +46,12 @@
   writing-mode: horizontal-tb;
 }
 
+/* вкладка своей высоты (item.height): не тянется вместе с остальными и не
+   сжимается — высоту ей ставит консьюмер инлайном */
+.fixed {
+  flex: none;
+}
+
 .tab:last-child {
   border-block-end: none;
 }

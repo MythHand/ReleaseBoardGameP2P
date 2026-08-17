@@ -135,17 +135,10 @@
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) 320px;
 }
 
-
-/* ===== колонка чата ===== */
+/* ===== колонка чата ===== высоту колонки чат занимает сам (см. blocks/Chat) */
 .chatCol {
   display: flex;
   flex-direction: column;
-  min-block-size: 0;
-}
-
-/* сам чат тянется на всю высоту колонки — что бы в слот ни положили */
-.chatCol > :last-child {
-  flex: 1;
   min-block-size: 0;
 }
 

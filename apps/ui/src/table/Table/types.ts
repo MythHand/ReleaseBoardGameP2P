@@ -18,7 +18,7 @@ import type { DockView } from './dock'
 import type { TableActions, TablePending, TableWindow } from './intents'
 import type { PendingPromptCopy, WindowCopy } from './PendingPrompt'
 
-export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes'
+export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'chat'
 
 export interface TableOpponent {
   id: string
@@ -127,6 +127,9 @@ export interface TableChromeCopy {
   tabParticipants: string
   tabRules: string
   tabModes: string
+  // подпись вкладки чата — необязательна, как и сам чат: вкладка появляется
+  // только вместе со слотом `slots.chat`, а без него подписывать нечего
+  tabChat?: string
 }
 
 export interface TableCopyBundle {
@@ -150,6 +153,14 @@ export interface TableSlots {
   // match, and the consumer's non-fatal error notice.
   corner?: ReactNode
   banner?: ReactNode
+  // Переписка комнаты — слот, а не данные: стол даёт ей вкладку рейла и
+  // выезжающую панель, а кто ведёт ленту (P2P, мок) он не знает. Нет слота —
+  // нет ни вкладки, ни панели.
+  chat?: ReactNode
+  // Всплывающие плашки в правом нижнем углу. Стол даёт им угол, ширину и слой;
+  // что всплывает — дело потребителя. Одно правило стол берёт на себя: при
+  // открытой панели чата плашек нет вовсе — лента и так на экране.
+  toasts?: ReactNode
 }
 
 export interface TableOver {
