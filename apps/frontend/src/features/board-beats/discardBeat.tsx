@@ -65,7 +65,7 @@ function withoutFlown(base: BoardState, flown: DiscardCard[]): BoardState {
       if (!drop && !slots) return o
       return {
         ...o,
-        handCount: drop ? o.handCount - drop : o.handCount,
+        handCount: drop ? Math.max(0, o.handCount - drop) : o.handCount,
         release: withoutSlots(o.release, slots),
       }
     }),

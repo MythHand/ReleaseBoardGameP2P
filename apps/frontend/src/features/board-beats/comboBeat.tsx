@@ -31,7 +31,7 @@ const rectOf = (el: Element | null): Rect | null => {
 }
 
 export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHandoff | null>) {
-  const { overlay: exitOverlay, send } = useDiscardExit(anchors.discardBox)
+  const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
   const latest = useRef({ anchors, staging, send })
   latest.current = { anchors, staging, send }
@@ -202,5 +202,16 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
     [],
   )
 
-  return { overlay: [...exitOverlay, ...flyer.overlay], runAttack, runRelease, runPairOut }
+  // A new match cancels what is in the air, same reason and same idiom as
+  // discardBeat/drawBeat/deckBeat: this runner's two carriers are the fold's
+  // own flyer (a pair standing at the centre, halfway across the table) and
+  // the pair-out's discard exit (shared with `discardBeat`, dropped for the
+  // same reason it is there) — both belong to the runner, not the queue, so
+  // both are cleared here.
+  const reset = useCallback(() => {
+    flyer.drop()
+    resetExit()
+  }, [flyer.drop, resetExit])
+
+  return { overlay: [...exitOverlay, ...flyer.overlay], runAttack, runRelease, runPairOut, reset }
 }
