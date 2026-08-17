@@ -166,7 +166,10 @@ it('draws from the dock, once its mount lockout clears', () => {
   vi.useRealTimers()
 })
 
-it('anchors the targeting arrow to the selected source card, not the last-clicked combo partner', () => {
+// Click-select is gone from `_useBoardInteractions` (#99) — Task 4 revives this
+// scenario through the staging gesture.
+// biome-ignore lint/suspicious/noSkippedTests: intentional, see comment above
+it.skip('anchors the targeting arrow to the selected source card, not the last-clicked combo partner', () => {
   const base = makeBoardProps()
   const sourceUid = base.state.you.hand[0].uid
   const partnerUid = base.state.you.hand[1].uid
@@ -220,7 +223,10 @@ it('anchors the targeting arrow to the selected source card, not the last-clicke
   expect(origin?.getAttribute('cy')).toBe('5')
 })
 
-it('keeps the tracked cursor when a fresh-but-equivalent hand array re-renders mid-selection', () => {
+// Click-select is gone from `_useBoardInteractions` (#99) — Task 4 revives this
+// scenario through the staging gesture.
+// biome-ignore lint/suspicious/noSkippedTests: intentional, see comment above
+it.skip('keeps the tracked cursor when a fresh-but-equivalent hand array re-renders mid-selection', () => {
   const base = makeBoardProps()
   const sourceUid = base.state.you.hand[0].uid
   const targetPlayer = base.state.opponents[0].id

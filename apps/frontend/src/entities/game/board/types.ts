@@ -31,6 +31,7 @@ import type {
   SwitchLang,
   TableActions,
   TablePending,
+  TableTarget,
   TableWindow,
   TurnDockCopy,
   WindowCopy,
@@ -80,6 +81,10 @@ export interface BoardState {
   setup: Setup
   playable: string[]
   frozen: string[]
+  // Legal targets per playable card — the projection's answer (PlayerView.self.targets),
+  // engine Target and TableTarget being one structural shape. An entry only for a
+  // card that needs a target.
+  targets?: Record<string, TableTarget[]>
   pending?: TablePending | null
   window?: TableWindow | null
   // Keyed by card uid — the projection's answer to "what may pair with this",

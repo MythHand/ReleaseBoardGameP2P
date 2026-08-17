@@ -214,6 +214,9 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
     setup: view.setup,
     playable: view.self.playable,
     frozen: view.self.frozen,
+    // Structural passthrough — Target and TableTarget are one shape; licensed
+    // the same way `pending`/`window` are by contract.test-d.ts.
+    targets: view.self.targets as BoardState['targets'],
     // Structural passthrough — licensed by the Exact<> assertions in
     // contract.test-d.ts. Both carry openedAt alongside deadline already.
     pending: view.pending,

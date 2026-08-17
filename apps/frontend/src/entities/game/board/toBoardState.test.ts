@@ -135,6 +135,16 @@ describe('toBoardState', () => {
     expect(window?.deadline).toBe(200)
   })
 
+  it('passes the projection targets through as table targets', () => {
+    const withTargets: PlayerView = {
+      ...view,
+      self: { ...view.self, targets: { 'attack-bug#0': [{ kind: 'player', player: 'p2' }] } },
+    }
+    expect(toBoardState(withTargets, [], labels).targets).toEqual({
+      'attack-bug#0': [{ kind: 'player', player: 'p2' }],
+    })
+  })
+
   describe('comboOptions', () => {
     // A sudo-capable attack, a support-sudo, and an unrelated card — uids and
     // catalogue ids are all visibly different strings so a uid/id swap in the
