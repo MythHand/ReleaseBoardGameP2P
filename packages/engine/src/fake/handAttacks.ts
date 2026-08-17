@@ -15,6 +15,7 @@ export function openHandAttack(
   attack: CardInstance,
   target: PlayerId,
   sudo: boolean,
+  combo: CardInstance | undefined,
   at: number,
 ): GameState {
   log.add({ type: 'attacked', attacker, card: attack.id, sudo, target })
@@ -27,6 +28,7 @@ export function openHandAttack(
       attack: attack.uid,
       attackId: attack.id,
       sudo,
+      ...(combo ? { combo } : {}),
       canDefendWith: defencesFor(state, target, sudo),
       openedAt: at,
       deadline: at + DEFEND_MS,
