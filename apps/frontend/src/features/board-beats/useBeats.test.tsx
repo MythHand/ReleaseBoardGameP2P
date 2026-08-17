@@ -10,14 +10,24 @@ import { useBeats } from './useBeats'
 const motion = vi.hoisted(() => ({ reduced: true }))
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => motion.reduced }))
 
-const sent = vi.hoisted(() => ({ calls: [] as unknown[][] }))
+// `hang` parks the next flight mid-air: send() stores its resolver instead of
+// resolving, so a test can hold a beat in flight — `draining` stays true — and
+// choose the moment it lands. `release` is that moment.
+const sent = vi.hoisted(() => ({
+  calls: [] as unknown[][],
+  hang: false,
+  release: null as (() => void) | null,
+}))
 vi.mock('@release/ui/animations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@release/ui/animations')>()),
   useDiscardExit: () => ({
     overlay: [],
     send: (items: unknown[]) => {
       sent.calls.push(items)
-      return Promise.resolve()
+      if (!sent.hang) return Promise.resolve()
+      return new Promise<void>((r) => {
+        sent.release = r
+      })
     },
     reset: () => {},
     FLIGHT_MS: 420,
@@ -256,4 +266,46 @@ it('collapses the opening instead of running it when motion is reduced', async (
   mount(introBeat(log))
   await flush()
   expect(log).toEqual(['collapse'])
+})
+
+// The end of a match is exactly when discards fly, so the rematch's commit can
+// land while a beat is still in the air. On that commit the arm effect unshifts
+// the new opening and calls drain() — which returns at its `draining` guard
+// instead of shifting the beat out synchronously — and the new-match reset then
+// wipes the queue. If the reset runs AFTER the arm, it takes the opening with
+// it, and `armed` already holds the new key so nothing ever re-arms: the
+// opening never reports and the host's start gate never opens. The from-rest
+// rematch path cannot see this — there drain() empties the queue before the
+// reset lands — so this test parks a beat mid-flight first.
+it('keeps the rematch’s opening when it lands while a beat is in flight', async () => {
+  motion.reduced = false
+  sent.calls = []
+  const log: string[] = []
+  const first = introBeat(log)
+  // Match one: the opening plays out from rest…
+  const utils = render(<Probe live={preDiscard} events={[]} anchors={stub} intro={first} />)
+  await flush()
+  // …then a discard beat takes off and is held mid-flight.
+  sent.hang = true
+  utils.rerender(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} intro={first} />)
+  await flush()
+  expect(sent.calls).toHaveLength(1)
+  // The rematch arrives while the card is still in the air.
+  const second: IntroBeat = {
+    key: 'g2',
+    shadow: preDeal,
+    run: () => {
+      log.push('intro2')
+      return Promise.resolve()
+    },
+    collapse: () => log.push('collapse2'),
+  }
+  utils.rerender(<Probe live={preDiscard} events={[]} anchors={stub} intro={second} />)
+  // The flight lands; the queue must still hold the second opening.
+  sent.hang = false
+  await act(async () => {
+    sent.release?.()
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(log).toEqual(['intro', 'intro2'])
 })

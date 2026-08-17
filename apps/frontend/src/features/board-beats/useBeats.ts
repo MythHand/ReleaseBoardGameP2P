@@ -183,6 +183,34 @@ export function useBeats(args: {
     }
   }, [])
 
+  // The last projection the board actually SHOWED. Not `live`: by the time the
+  // batch effect runs, `live` is already the projection the arriving batch
+  // produced — the card is out of the hand and counted in the discard. The slot
+  // it has to fly from is on the previous one, which is what is still on
+  // screen (I1).
+  const settled = useRef(live)
+
+  // A new match: the feed starts over, so the watermark, the base and the queue
+  // must too. Declared BEFORE the arm effect, and the order is load-bearing:
+  // the wipe takes whatever the dead match left in the queue, and the arm then
+  // unshifts the new opening into the emptied one. The other order loses the
+  // opening whenever a beat is still in flight — the end of a match is exactly
+  // when discards fly — because the arm's drain() returns at its `draining`
+  // guard instead of shifting the beat out synchronously, the wipe then takes
+  // it, and `armed` already holds the new key so nothing re-arms it: the
+  // opening never reports and the host's start gate never opens. (Being before
+  // the arm also keeps it before the BATCH effect, which must not read a stale
+  // watermark on the one pass where it matters most.)
+  const playing = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const key = intro?.key ?? null
+    if (key == null || playing.current === key) return
+    playing.current = key
+    seen.current = 0
+    settled.current = live
+    queue.current = []
+  }, [intro?.key, live])
+
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
   // fresh object cannot re-arm it, and React 19 StrictMode's double invoke plays
   // it once — the same guarantee the intro used to keep for itself with
@@ -228,26 +256,6 @@ export function useBeats(args: {
       armed.current = null
     }
   }, [intro?.key, reduced, drain])
-
-  // The last projection the board actually SHOWED. Not `live`: by the time this
-  // effect runs, `live` is already the projection the arriving batch produced —
-  // the card is out of the hand and counted in the discard. The slot it has to
-  // fly from is on the previous one, which is what is still on screen (I1).
-  const settled = useRef(live)
-
-  // A new match: the feed starts over, so the watermark and the base must too.
-  // Declared BEFORE the batch effect so it runs first on the commit that brings
-  // the new match in — otherwise the batch effect would read a stale mark on the
-  // one pass where it matters most.
-  const playing = useRef<string | null>(null)
-  useLayoutEffect(() => {
-    const key = intro?.key ?? null
-    if (key == null || playing.current === key) return
-    playing.current = key
-    seen.current = 0
-    settled.current = live
-    queue.current = []
-  }, [intro?.key, live])
 
   // `running` is a dependency although the body reads the ref instead: it is
   // what re-arms this effect the moment the queue drains, so a batch that
