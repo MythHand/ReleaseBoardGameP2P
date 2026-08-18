@@ -90,11 +90,19 @@ the defender keeps the card when a `defenceSpent` discard of `support-sudo` acco
 who is `pending.attacker` in the *before* projection. The derivation is sound today and is what
 this scene ships.
 
-It is still a gap: a movement with no event behind it is one rename away from silently stopping.
-**It goes to `docs/animations/backlog.md` and the audit register** with the fix named (the engine
-emits `handTransfer` for the return, and the plan reads it instead of inferring), so the choice is
-recorded rather than rediscovered. Making that engine change is not in this scene's scope —
-deriving is consistent with the code around it, and widening the event surface mid-wave would land
+**This gap is already on record, and it names this task as its closer.**
+`docs/animations/backlog.md` carries "Возврат Rollback'ом судо-атаки — на борде для него нет
+движения" (status `открыто`, *"Что закроет: обменная хореография возврата — Wave 3, #101"*), and
+the audit page's register carries the same finding in one line. Both describe exactly the movement
+this scene supplies. So the scene **retires** them: per the backlog's own rule a resolved entry
+does not stay as a trophy — its content moves into `recipes.md` and the entry goes, with the audit
+register's line going the same way.
+
+What remains after that is narrower and stays written down: the recipient is *derived* rather than
+read from an event. A movement with no event behind it is one rename away from silently stopping,
+so the retiring edit leaves that noted with the fix named — the engine emits `handTransfer` for the
+return and the plan reads it instead of inferring. Making that engine change is not in this scene's
+scope: deriving matches the code around it, and widening the event surface mid-wave would land
 untested in a PR about animation.
 
 ### CardPreview was never tracked
@@ -236,8 +244,10 @@ through the Wave 0 layer's policy.
 ## Documentation
 
 Same PR as the code it describes: the audit page's scenario status for Defense Release plus any
-findings into its register **and** `docs/animations/backlog.md` — the Rollback-return event gap
-above is one such entry, written with what it costs and what would close it; `recipes.md` touched only where
+**new** findings into its register **and** `docs/animations/backlog.md`. Two existing records are
+**retired** by this scene rather than added to — the backlog's "Возврат Rollback'ом судо-атаки"
+entry and its one-line twin in the audit register, both of which name #101 as their closer; their
+content moves into `recipes.md` and the entries go. `recipes.md` is otherwise touched only where
 board reality diverges from the story; a new preset (only if the LOD morph cannot be a mid-flight
 content swap) gets its `reference.md` line or `apps/ui/src/animations/docs.test.ts` goes red. All
 new user-visible copy through `@release/translation`, keys in **both** `en` and `ru`. PR 0 closes
