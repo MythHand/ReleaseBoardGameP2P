@@ -385,5 +385,62 @@ export function tick(session: Session, now: number): SessionResult {
     )
   }
 
+  // The turn's inactivity clock. The engine stamps it on every commit that
+  // leaves the table idling on the player on turn (reduce's post-step), but
+  // the FIRST turn has no committed action behind it — createGame carries no
+  // timestamp — so the keeper starts that one clock itself, on its first tick.
+  // The ticker only runs once the start gate opens (remoteLink), which is what
+  // makes "first tick" mean "the table went live", not "cards still flying".
+  const { turn, drawing, over } = session.state
+  if (!window && !pending && !drawing && !over) {
+    if (turn.deadline === undefined) {
+      const { state, events } = session.engine.reduce(session.state, {
+        type: 'CLOCK_STARTED',
+        at: now,
+      })
+      if (state === session.state) return { session, outgoing: [] }
+      const next: Session = { ...session, state }
+      return { session: next, outgoing: syncAll(next, events) }
+    }
+
+    if (now >= turn.deadline) {
+      // The same rule as the stalled defence above: a deadline never fires
+      // against a seat with nobody in it — driveAbsent's grace period owns a
+      // disconnected seat's forward progress.
+      const seat = session.seats.find((s) => s.playerId === turn.player)
+      if (!seat?.peerId) return { session, outgoing: [] }
+
+      // The idle player's whole obligation resolves on one expiry — the
+      // mandatory draw, then the push — per the dock's design notes
+      // (playground TurnDockBlock): a timed-out turn ends, it does not win a
+      // fresh 30s per forced action. A draw that raises a pending (Error 503)
+      // or ends the turn itself (Hallucination) stops the push half; the
+      // pending's own flow takes over from there.
+      let state = session.state
+      let events: Event[] = []
+      if (!drawObligationMet(state)) {
+        const drawn = session.engine.reduce(state, { type: 'DRAW', player: turn.player, at: now })
+        state = drawn.state
+        events = drawn.events
+      }
+      if (
+        state.turn.player === turn.player &&
+        !state.pending &&
+        !state.window &&
+        !state.over &&
+        drawObligationMet(state)
+      ) {
+        const pushed = session.engine.reduce(state, { type: 'PUSH', player: turn.player, at: now })
+        if (pushed.state !== state) {
+          events = [...events, ...pushed.events]
+          state = pushed.state
+        }
+      }
+      if (state === session.state) return { session, outgoing: [] }
+      const next: Session = { ...session, state }
+      return { session: next, outgoing: syncAll(next, events) }
+    }
+  }
+
   return { session, outgoing: [] }
 }

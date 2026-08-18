@@ -1,4 +1,4 @@
-import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
+import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, TURN_ACTION_MS } from '@release/engine/fake'
 import {
   ABSENT_GRACE_MS,
   applyIntent,
@@ -314,11 +314,77 @@ it('ignores an intent from a peer bound to no seat', () => {
   expect(result.outgoing).toEqual([])
 })
 
-it('does nothing while no deadline has passed', () => {
+it('starts the first turn`s inactivity clock on its first tick', () => {
   const { session } = twoPlayerSession()
+  // createGame carries no timestamp, so the first turn has no clock until the
+  // keeper's ticker goes live — which only happens once the start gate opens.
+  expect(session.state.turn.deadline).toBeUndefined()
+
   const result = tick(session, 1_000)
 
-  expect(result.session).toBe(session)
+  expect(result.session.state.turn.openedAt).toBe(1_000)
+  expect(result.session.state.turn.deadline).toBe(1_000 + TURN_ACTION_MS)
+  // The stamp travels like any other commit: one private SYNC per seat.
+  expect(result.outgoing.map((o) => o.to)).toEqual(['peer-a', 'peer-b'])
+})
+
+it('does nothing while no deadline has passed', () => {
+  const { session } = twoPlayerSession()
+  const started = tick(session, 1_000).session
+  const result = tick(started, 2_000)
+
+  expect(result.session).toBe(started)
+  expect(result.outgoing).toEqual([])
+})
+
+it('auto-resolves a minimal turn once the inactivity clock expires', () => {
+  const { session } = twoPlayerSession()
+  const started = tick(session, 1_000).session
+  const deadline = started.state.turn.deadline ?? 0
+  const handBefore = started.state.players.a.hand.length
+
+  const result = tick(started, deadline + 1)
+
+  // The idle player's whole obligation resolves in one expiry — the mandatory
+  // draw, then the push — rather than one action per fresh 30s window.
+  expect(result.session.state.players.a.hand.length).toBe(handBefore + 1)
+  expect(result.session.state.turn.player).toBe('b')
+  // Both halves land in ONE sync per seat — the feed reads as one beat.
+  const sync = result.outgoing.find((o) => o.to === 'peer-b')
+  const types = sync?.message.type === 'SYNC' ? sync.message.payload.events.map((e) => e.type) : []
+  expect(types).toContain('drawn')
+  expect(types).toContain('turnEnded')
+  expect(types).toContain('turnStarted')
+  expect(result.session.state.turn.openedAt).toBe(deadline + 1)
+})
+
+it('only pushes on expiry when the draw obligation is already met', () => {
+  const { session } = twoPlayerSession()
+  const drawn = applyIntent(session, 'peer-a', { type: 'DRAW' }, 1_000).session
+  const deadline = drawn.state.turn.deadline ?? 0
+  const handBefore = drawn.state.players.a.hand.length
+
+  const result = tick(drawn, deadline + 1)
+
+  expect(result.session.state.players.a.hand.length).toBe(handBefore)
+  expect(result.session.state.turn.player).toBe('b')
+})
+
+it('leaves an expired turn to driveAbsent when its seat is disconnected', () => {
+  const { session } = twoPlayerSession()
+  const started = tick(session, 1_000).session
+  const gone: Session = {
+    ...started,
+    seats: started.seats.map((s) => (s.playerId === 'a' ? { ...s, peerId: null } : s)),
+  }
+  const deadline = gone.state.turn.deadline ?? 0
+
+  const result = tick(gone, deadline + 1)
+
+  // The same rule as a stalled defence: a deadline never fires against a seat
+  // with nobody in it — the absence grace period owns that seat's forward
+  // progress instead.
+  expect(result.session).toBe(gone)
   expect(result.outgoing).toEqual([])
 })
 

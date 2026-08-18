@@ -5,9 +5,12 @@ import type { Action, Event, GameState, PlayerId, PlayerView, Setup } from '@rel
 // a peer may not act as another seat, nor claim what time it is.
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 
-// WINDOW_EXPIRED is excluded, not stripped: it carries no player identity and
-// is fired by the keeper's own deadline timer, never submitted by a peer.
-export type Intent = DistributiveOmit<Exclude<Action, { type: 'WINDOW_EXPIRED' }>, 'player' | 'at'>
+// WINDOW_EXPIRED and CLOCK_STARTED are excluded, not stripped: they carry no
+// player identity and are fired by the keeper's own clock, never by a peer.
+export type Intent = DistributiveOmit<
+  Exclude<Action, { type: 'WINDOW_EXPIRED' } | { type: 'CLOCK_STARTED' }>,
+  'player' | 'at'
+>
 
 // Opaque key→value map for game mode settings (handLimit, releases, etc.).
 // The engine's own, re-exported rather than redeclared: the lobby's setup is
