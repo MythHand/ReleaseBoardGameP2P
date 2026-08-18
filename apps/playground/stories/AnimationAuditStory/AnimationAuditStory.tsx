@@ -32,7 +32,16 @@ interface Module {
 interface Scenario {
   name: Loc
   from: Loc
+  // Сторона кита: сцена или компонент, где движение показано и отлаживается.
   where: string
+  // Сторона борда: модуль фронтенда, который играет эту хореографию от настоящих
+  // событий движка. Пусто — значит хореография живёт только в плейграунде.
+  // Поле обязано быть отдельным, а не строкой внутри описания: «доехало ли до
+  // доски» — это состояние работы, то самое, ради которого страница и заведена,
+  // и молчание в общем тексте читается тремя разными способами сразу («ещё нет»,
+  // «есть, но не записали», «туда и не поедет»). Путь проверяется тестом
+  // (stories/docs.test.ts) — иначе он устареет первым же переносом файла.
+  board?: string
 }
 interface Issue {
   what: Loc
@@ -466,6 +475,7 @@ const SCENARIOS: Scenario[] = [
       en: 'one fixed frame, slots never move. Key/name — ONE fixed width (≈ the «добор» key + 18px each side), never resizes or jumps. Text (phase, key label, nick) — a plain opacity fade rollOut→rollIn via Swap, no movement. The button frame stays, only the label + accent change (CSS transition on --btn-accent). The opponent name (first entry and successive nick changes alike) appears the same way: it waits for the previous to clear (delayIn), then fades in. The “drawn” badge — popIn/popOut (Reveal). Ring and dot stay put: only the accent morphs (transition on stroke/--dot) + the ring fills back to full (progress→1 on a phase change).',
     },
     where: 'TurnDock (Swap, Reveal), RingTimer, StatusDot, Button hud',
+    board: 'pages/board/[gameId]/_Board.tsx',
   },
   {
     name: { ru: 'Розыгрыш комбо (пара)', en: 'Playing a combo (pair)' },
@@ -481,7 +491,8 @@ const SCENARIOS: Scenario[] = [
       ru: 'useArrow строит from/to по centerOf карты и цели, слежение за курсором (mousemove), старт/стоп по фазе розыгрыша. То же теперь играется и на живом борде (#99): цели — `self.targets` проекции, та же `attackTargets`, которую проверяет редьюсер (`packages/engine/src/fake/project.ts`), в `TableTarget` переходят структурным приведением типа, не пересчётом (`toBoardState.ts`). Жест — `_useBoardStaging`: вытягивание из веера карты с целями ставит её в центр (playToCenter, продолжение от HandPlayDrop.rect), стрелка встаёт от центра и целится, нажатие на освещённую цель диспатчит PLAY. Промах или Escape возвращают карту в свой слот веера (useHandArrival), цели гаснут синхронно; `rejected` после диспатча — тем же путём. Клик по карте с целями больше не работает: клик остался только для атаки из окна и розыгрыша без цели (`_useBoardInteractions`). Что стоит в центре после диспатча — статичный рендер (`data-pending-play`), шов, на который встанет такт #100. Жест на сенсорном экране не решён (реестр ниже, docs/animations/backlog.md).',
       en: "useArrow builds from/to from centerOf the card and the target, cursor tracking (mousemove), start/stop by the play phase. The same movement now also runs on the live board (#99): targets come off the projection's `self.targets` — the same `attackTargets` the reducer itself validates (`packages/engine/src/fake/project.ts`) — and reach `TableTarget` by a structural type cast, not a recompute (`toBoardState.ts`). The gesture is `_useBoardStaging`: pulling a card with targets out of the fan stages it at the centre (playToCenter, continuing from HandPlayDrop.rect), the arrow arms from the centre and aims, a press on a lit target dispatches PLAY. A miss or Escape returns the card to its own fan slot (useHandArrival), targets going dark synchronously; a `rejected` after dispatch takes the same path back. Clicking a card with targets no longer works — the click keeps only the window attack and the no-target play (`_useBoardInteractions`). What stands at the centre after dispatch renders statically (`data-pending-play`) — the seam #100's beat builds on. The gesture on a touchscreen is undecided (register below, docs/animations/backlog.md).",
     },
-    where: 'Arrow, Combo + frontend: board (_useBoardStaging)',
+    where: 'Arrow, Combo',
+    board: 'pages/board/[gameId]/_useBoardStaging.ts',
   },
   {
     name: { ru: 'Разделение колоды', en: 'Splitting the deck' },
@@ -489,7 +500,8 @@ const SCENARIOS: Scenario[] = [
       ru: 'FLIP-вылет flyFrom: половина уже в новом DOM-месте, анимируем «из» прошлого rect (getBoundingClientRect до→после ремаунта) в текущую позицию. То же движение теперь играется на живом борде из pilesChanged (deckBeat, «The deck is rebuilt, split, merged (live board)» в recipes.md) — какая стопка разделилась, там не называется событием, а выводится позиционно (classifyPiles, docs/animations/backlog.md).',
       en: 'FLIP fly-in flyFrom: half is already in its new DOM place, we animate "from" the previous rect (getBoundingClientRect before→after remount) to the current position. The same movement now also runs on the live board off pilesChanged (deckBeat, "The deck is rebuilt, split, merged (live board)" in recipes.md) — which pile split is not named by the event, it is derived positionally (classifyPiles, docs/animations/backlog.md).',
     },
-    where: 'DeckAnimations + frontend: board-beats/deckBeat',
+    where: 'DeckAnimations',
+    board: 'features/board-beats/deckBeat.tsx',
   },
   {
     name: { ru: 'Слияние колод (+ сброс)', en: 'Merging decks (+ discard)' },
@@ -497,7 +509,8 @@ const SCENARIOS: Scenario[] = [
       ru: 'все стопки и сброс — параллельные absorbToDeck (move + fade) в один rect первой колоды; цель измеряется однажды, расходятся только источники. То же движение играется на живом борде из pilesChanged (deckBeat) — теперь на РЯД стопок (decks.main: number[]), а не на одну.',
       en: 'all piles and the discard — parallel absorbToDeck (move + fade) into the single rect of the first deck; the target is measured once, only the sources differ. The same movement now also runs on the live board off pilesChanged (deckBeat) — over a ROW of piles (decks.main: number[]) rather than one.',
     },
-    where: 'DeckAnimations + frontend: board-beats/deckBeat',
+    where: 'DeckAnimations',
+    board: 'features/board-beats/deckBeat.tsx',
   },
   {
     name: { ru: 'Сброс → новая колода', en: 'Discard → new deck' },
@@ -505,7 +518,8 @@ const SCENARIOS: Scenario[] = [
       ru: 'собрать разбросанный сброс в стопку → gatherToDeck (move, центр-в-центр) к месту колоды → flipCard рубашкой вверх по приземлении. То же движение играется на живом борде дважды: как deckReshuffled (обычный ребилд на пилу 0) и как второй шаг Git Branch + Sudo внутри pilesChanged (fromDiscard, на индекс, который назвал сплит) — обе ветки через один и тот же discardOntoPile в deckBeat.',
       en: "gather the scattered discard into a pile → gatherToDeck (move, center-to-center) to the deck spot → flipCard back-up on landing. The same movement now also runs on the live board twice: as deckReshuffled (an ordinary rebuild onto pile 0) and as Git Branch + Sudo's second step inside pilesChanged (fromDiscard, onto the index the split just named) — both branches through the same discardOntoPile in deckBeat.",
     },
-    where: 'DeckAnimations + frontend: board-beats/deckBeat',
+    where: 'DeckAnimations',
+    board: 'features/board-beats/deckBeat.tsx',
   },
   {
     name: { ru: 'Добор карты (одиночный)', en: 'Drawing a card (single)' },
@@ -513,7 +527,8 @@ const SCENARIOS: Scenario[] = [
       ru: 'drawToCenter (move 480) колода→центр рубашкой вверх; ветвление по карте: игрок — flipCard + useHandArrival.insert (садится в слот руки); соперник — dealToSeat (move + fade) в card-area места ×0.7, без скейла вверх; триггер/AI — flipCard в центре (reveal для всех), AI ещё добирает эффект из AI-колоды рядом (flyer с key={seq}, чтобы Card не переиспользовалась и не крутилась). Три ветки — свой / чужой / триггер — теперь играются и на живом борде от настоящих drawn/revealed событий (drawBeat, «A card is drawn (live board)» в recipes.md); AI-ветка там не участвует (#106).',
       en: 'drawToCenter (move 480) deck→center back-up; branch by card: player — flipCard + useHandArrival.insert (sits into a hand slot); opponent — dealToSeat (move + fade) into the seat card-area ×0.7, no upward scale; trigger/AI — flipCard at the center (reveal for all), AI also draws an effect from the nearby AI deck (flyer with key={seq} so the Card is not reused and does not spin). The mine/opponent/trigger branches now also run on the live board off real drawn/revealed events (drawBeat, "A card is drawn (live board)" in recipes.md); the AI branch is not part of that (#106).',
     },
-    where: 'DrawCard + frontend: board-beats/drawBeat',
+    where: 'DrawCard',
+    board: 'features/board-beats/drawBeat.tsx',
   },
   {
     name: { ru: 'Мультидобор (по кнопке)', en: 'Multi-draw (by button)' },
@@ -554,6 +569,7 @@ const SCENARIOS: Scenario[] = [
       en: 'pick a card with the mouse and drag: out of the hand → play (onPlay), inside the hand → reorder (onReorder, local). A DRAG_THRESHOLD tells a click from a drag — a click (onCardClick) coexists. The flyer is a fixed node following the cursor (rAF); on release settleInto glides it into the slot (rotate to the slot angle, z tucked under the neighbours). The flyer’s transform-origin: bottom center matches the slot pivot — no end-of-glide jump. Hover: lift + neighbours part (no in-place scale, no jump to the top layer); readability comes from a separate zoom preview above the hand (one-shot appear via @keyframes zoom-rise, exit is opacity only).',
     },
     where: 'Hand (fan), HandStory',
+    board: 'pages/board/[gameId]/_useBoardStaging.ts',
   },
   {
     name: { ru: 'Error 503 — ход игрока и защита', en: 'Error 503 — player turn & defence' },
@@ -637,6 +653,7 @@ const SCENARIOS: Scenario[] = [
       en: "two choreographies in a row. THE FIRST — the interface arriving, all of it on play('hudIn') with a BEAT between steps: the page rail slides in from its own edge (dx: 44), then the table layer with its grid as a plain fade (dx/dy: 0), then the decks from the left (dx: -34) and the discard from the right (dx: 34) offset by PILE_STAGGER — one after the other, not together; last the opponent seats drop in from above one by one (dy: -28, SEAT_STAGGER) and in the same beat the dock rises from below (dy: 30, DOCK_DELAY) — in its «opponent's turn» state but reading «game start». The release zone is NOT in this order. THE SECOND — the deal, round by round starting with the player, DEAL_STEP between cards and ROUND_GAP between rounds: the player's card goes drawToCenter to the centre and STAYS there at its own scatterAt (one scatter drives both flight and rest — the discard's own coupling), an opponent's card leaves dealToSeat into cardBoxIn of their seat ×0.7 and dissolves into the counter. The first round is the Debugger, dealt open; everything else face down. What landed at the centre is collected in a local array instead of read back off staged: the closure never re-runs, so staged in it stays the empty array it was (I8). When all five have landed — HEAP_HOLD, the centre empties in the same commit that starts the flight, and the whole heap goes into the fan with ONE useHandArrival (from = the card's place in the heap, rot its own) — still face down. FLIP_HOLD — the hand turns over (Card plays flipCard itself, off faceDown). And only after REVEAL_HOLD does hudIn bring in the player's release zone (dy: 22) — his alone, the opponents have none. The scene is armed with a started ref (StrictMode mounts twice); restart clears it and re-runs everything by key.",
     },
     where: 'GameDeal',
+    board: 'features/game-intro/useDealIntro.ts',
   },
   {
     name: { ru: 'Конец партии', en: 'The end of a match' },
@@ -655,7 +672,8 @@ const SCENARIOS: Scenario[] = [
       ru: 'Первая хореография, которую ведут настоящие события движка, а не клики сцены. Приходит батч, planBeats сворачивает ВСЕ discarded этого батча в ОДИН такт (по одной, но все сразу — сброс по лимиту руки читается одним жестом, а не тремя). Планируется против проекции, которая ещё на экране: в живой карта уже вынута из руки вместе со слотом, из которого лететь (I1). Источник — свой слот веера (карта ищется по id: событие несёт id, а не uid), карточная коробка на сидушке соперника, либо слот зоны релиза для destroyed/neutralized. Разброс — scatterAt(id события), тот же вызов, которым куча в toBoardState кладёт карту на покой: одно значение, два читателя, поэтому передача от тени к проекции не двигает ни пикселя (I7). Рука при этом не блокируется: сброс — то, что СЛУЧИЛОСЬ, а не то, что решается. Раздача встала в ту же очередь тактом ноль — единственный такт, который держит стол и публикует свою тень вместо базы.',
       en: "The first choreography driven by real engine events rather than a scene's clicks. A batch arrives; planBeats folds EVERY discarded in it into ONE beat (one by one but all at once — a hand-limit discard reads as one gesture, not three). It is planned against the projection still on screen: in the live one the card is already out of the hand, and with it the slot to fly from (I1). The source is its own slot in the fan (found by card id — the event carries an id, not a uid), a card box on an opponent's seat, or a release-zone slot for destroyed/neutralized. The scatter is scatterAt(event id) — the same call the heap in toBoardState uses to rest the card: one value, two readers, so the handover from shadow to projection does not move a pixel (I7). The hand is never blocked: a discard is a thing that HAPPENED, not a thing being decided. The deal joined the same queue as beat zero — the one beat that holds the table and publishes its own shadow instead of a base.",
     },
-    where: 'frontend: board-beats',
+    where: 'Card play (часть B)',
+    board: 'features/board-beats/discardBeat.tsx',
   },
   {
     name: { ru: 'Стопка тостов чата', en: 'The chat toast stack' },
@@ -827,7 +845,9 @@ const UI = {
     colStatus: 'статус',
     colScenario: 'сценарий',
     colImpl: 'реализация · модули и ключевые моменты',
-    colWhere: 'где',
+    colWhere: 'кит · где показано',
+    colBoard: 'борд · взято в реализацию',
+    boardOnly: 'только плейграунд',
     colWhatShort: 'что',
     colProblem: 'проблема',
     copy: 'копировать',
@@ -856,7 +876,9 @@ const UI = {
     colStatus: 'status',
     colScenario: 'scenario',
     colImpl: 'implementation · modules and key points',
-    colWhere: 'where',
+    colWhere: 'kit · where it is shown',
+    colBoard: 'board · taken into implementation',
+    boardOnly: 'playground only',
     colWhatShort: 'what',
     colProblem: 'problem',
     copy: 'copy',
@@ -945,6 +967,7 @@ function ScenarioTable({ rows }: { rows: Scenario[] }) {
           <th>{ui.colScenario}</th>
           <th>{ui.colImpl}</th>
           <th>{ui.colWhere}</th>
+          <th>{ui.colBoard}</th>
         </tr>
       </thead>
       <tbody>
@@ -953,6 +976,9 @@ function ScenarioTable({ rows }: { rows: Scenario[] }) {
             <td className={styles.mod}>{r.name[lang]}</td>
             <td className={styles.what}>{r.from[lang]}</td>
             <td className={styles.where}>{r.where}</td>
+            <td className={styles.where}>
+              {r.board ?? <span className={styles.playgroundOnly}>{ui.boardOnly}</span>}
+            </td>
           </tr>
         ))}
       </tbody>
