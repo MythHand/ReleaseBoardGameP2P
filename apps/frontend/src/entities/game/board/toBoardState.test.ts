@@ -37,8 +37,11 @@ const labels = Object.fromEntries([
 ]) as HistoryLabels
 
 describe('toBoardState', () => {
-  it('sums the piles into the single deck count the table renders', () => {
-    expect(toBoardState(view, [], labels).decks.main).toBe(40)
+  // The projection has always carried the piles; the adapter used to sum them
+  // because the board could only draw one. It draws them all now, so the shape
+  // travels through untouched.
+  it('carries the pile list through untouched', () => {
+    expect(toBoardState(view, [], labels).decks.main).toEqual([30, 10])
   })
 
   it('carries hand uids through unchanged so animation keys stay stable', () => {
@@ -56,6 +59,17 @@ describe('toBoardState', () => {
     }
     expect(() => toBoardState(unknown, [], labels)).not.toThrow()
     expect(toBoardState(unknown, [], labels).you.hand[0].card).toBeTruthy()
+  })
+
+  it('folds the turn clock into one optional pair the dock can sweep', () => {
+    const timed: PlayerView = {
+      ...view,
+      turn: { ...view.turn, openedAt: 1_000, deadline: 31_000 },
+    }
+    expect(toBoardState(timed, [], labels).turnClock).toEqual({ openedAt: 1_000, deadline: 31_000 })
+    // No clock (a window/pending owns the wait, or the keeper has not started
+    // the first turn's) folds to null, never to a half-formed pair.
+    expect(toBoardState(view, [], labels).turnClock).toBeNull()
   })
 
   it('marks an eliminated opponent', () => {

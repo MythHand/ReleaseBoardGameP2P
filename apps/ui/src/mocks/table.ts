@@ -48,7 +48,7 @@ interface TableState {
   }
   opponents: Opponent[]
   decks: {
-    main: number
+    main: number[]
     events: number
     discard: Card | undefined
     discardHeap: HeapCard[]
@@ -120,7 +120,7 @@ export function makeTable(opponentCount = 3): TableState {
     },
     opponents,
     decks: {
-      main: 78,
+      main: [78],
       events: 21,
       discard: cardById('attack-security-bug'),
       discardHeap: makeDiscardHeap(DISCARD_N),

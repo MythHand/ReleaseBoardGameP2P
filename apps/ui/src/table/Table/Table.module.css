@@ -2,6 +2,14 @@
   position: relative;
   block-size: 100%;
   overflow: hidden; /* без скролла — стол по размеру экрана */
+
+  /* The table is dragged, not read: a card is played by pulling it out of the
+     fan, and a pointer drag over text selects it instead — the hand lights up
+     blue mid-gesture and the selection survives the drop. Nothing on the table
+     surface is copy-worthy (the room code has its own copy button), so the whole
+     surface opts out. The drawer's panels opt back IN below, because rules and
+     move history ARE read, and are worth being able to copy. */
+  user-select: none;
   background:
     linear-gradient(0deg, var(--surface-0), var(--surface-0)),
     repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 28px),
@@ -41,6 +49,14 @@
   flex-direction: column;
   gap: 22px;
   transform: translateY(-50%);
+}
+
+/* the draw piles sit side by side: a split can put three of them out, and a
+   column would run off the top and bottom of a vertically-centred block */
+.pileRow {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
 }
 
 .discard {
@@ -104,6 +120,11 @@
    зазор: drawer уезжает за рейл (56px) и в открытом виде стоит слева от него. */
 .drawer {
   --drawer-offset: 56px;
+
+  /* …and text comes back here. The drawer is the one part of the table meant to
+     be READ — rules, move history, the participant list — and nothing in it is
+     dragged, so the reason the surface opts out does not apply. */
+  user-select: text;
 }
 
 /* контент, который сам по себе длинный (правила) — скроллится внутри drawer */

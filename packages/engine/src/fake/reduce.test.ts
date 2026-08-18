@@ -63,11 +63,15 @@ it('draws one card and marks the turn as drawn', () => {
   expect(r.events.map((e) => e.type)).toEqual(['drawn'])
 })
 
-it('keeps a drawn card private to the drawer', () => {
+// The draw is a public fact — everyone at the table sees a card taken. Its
+// IDENTITY is not, and that is redacted per viewer (`redactFor`) rather than
+// hidden by dropping the event. Pinned here because an animation on every peer
+// now depends on this event arriving at all.
+it('announces the draw to the table and carries the card for the drawer', () => {
   const s = withoutTriggers(engine.createGame(config()))
   const r = reduce(s, { type: 'DRAW', player: 'p1', at: 1000 })
   const drawn = r.events[0]
-  expect(drawn.visibleTo).toEqual(['p1'])
+  expect(drawn.visibleTo).toBeUndefined()
   expect(drawn.type === 'drawn' && drawn.card).toBeDefined()
 })
 
@@ -98,7 +102,15 @@ it('ends the turn on PUSH after drawing and advances the seat', () => {
   const s = withoutTriggers(engine.createGame(config()))
   const drawn = reduce(s, { type: 'DRAW', player: 'p1', at: 1000 })
   const r = reduce(drawn.state, { type: 'PUSH', player: 'p1', at: 1001 })
-  expect(r.state.turn).toEqual({ player: 'p2', index: 1, drawnFrom: [], releasesPlayed: 0 })
+  expect(r.state.turn).toEqual({
+    player: 'p2',
+    index: 1,
+    drawnFrom: [],
+    releasesPlayed: 0,
+    // The seat change hands the next player a fresh inactivity clock.
+    openedAt: 1001,
+    deadline: 1001 + 30_000,
+  })
   expect(r.events.map((e) => e.type)).toEqual(['turnEnded', 'turnStarted'])
 })
 

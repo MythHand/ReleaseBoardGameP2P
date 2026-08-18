@@ -18,21 +18,36 @@ const sent = vi.hoisted(() => ({
   hang: false,
   release: null as (() => void) | null,
 }))
-vi.mock('@release/ui/animations', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@release/ui/animations')>()),
-  useDiscardExit: () => ({
-    overlay: [],
-    send: (items: unknown[]) => {
-      sent.calls.push(items)
-      if (!sent.hang) return Promise.resolve()
-      return new Promise<void>((r) => {
-        sent.release = r
-      })
+vi.mock('@release/ui/animations', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@release/ui/animations')>()
+  const { useState } = await import('react')
+  return {
+    ...actual,
+    // A stateful stand-in, not a fixed `overlay: []`: the rematch test needs to
+    // tell "a flyer is mounted" from "reset() cleared it", and a hardcoded empty
+    // overlay can't distinguish those — it would pass whether or not the fix
+    // that clears it on a new match exists at all.
+    useDiscardExit: () => {
+      const [flying, setFlying] = useState(false)
+      return {
+        overlay: flying ? ['flight'] : [],
+        send: (items: unknown[]) => {
+          sent.calls.push(items)
+          if (!sent.hang) return Promise.resolve()
+          setFlying(true)
+          return new Promise<void>((r) => {
+            sent.release = () => {
+              setFlying(false)
+              r()
+            }
+          })
+        },
+        reset: () => setFlying(false),
+        FLIGHT_MS: 420,
+      }
     },
-    reset: () => {},
-    FLIGHT_MS: 420,
-  }),
-}))
+  }
+})
 
 const card = (id: string) => cardById(id) as CardData
 
@@ -42,7 +57,7 @@ const card = (id: string) => cardById(id) as CardData
 const preDiscard = {
   you: { name: 'You', hand: [{ uid: 'u1', card: card('attack-bug') }], release: {} },
   opponents: [{ id: 'p2', name: 'Two', handCount: 3, release: {} }],
-  decks: { main: 10, events: 5, discardCount: 0, discardHeap: [] },
+  decks: { main: [10], events: 5, discardCount: 0, discardHeap: [] },
   selfId: 'p1',
   history: [],
   setup: {},
@@ -86,7 +101,6 @@ const stub = {
   seats: { current: null },
   dock: { current: null },
   zone: { current: null },
-  deckBox: { current: null },
   centre: { current: null },
   hand: { current: null },
   discardBox: { current: node() },
@@ -96,6 +110,8 @@ const stub = {
   releaseSlot: () => node(),
   bindSeat: () => {},
   bindReleaseSlot: () => {},
+  pileBox: () => null,
+  bindPile: () => {},
 } as unknown as BoardAnchors
 
 // The opening's own shadow: a table with no hand at all, because the cards have
@@ -105,7 +121,7 @@ const stub = {
 const preDeal = {
   ...preDiscard,
   you: { ...preDiscard.you, hand: [] },
-  decks: { ...preDiscard.decks, main: 40 },
+  decks: { ...preDiscard.decks, main: [40] },
 } as unknown as BoardState
 
 function Probe({
@@ -113,14 +129,27 @@ function Probe({
   events,
   anchors,
   intro,
+  shadows,
 }: {
   live: BoardState
   events: Event[]
   anchors: BoardAnchors
   intro?: IntroBeat | null
+  shadows?: string[]
 }) {
   const beats = useBeats({ live, events, anchors, enabled: true, intro })
   const shown = beats.shadow ?? live
+  // Every DISTINCT board the SHADOW has shown, in order. A final-state
+  // assertion cannot see a rollback: the board can go A → B → A → B and end
+  // exactly where it should while the table visibly jumps on the way, so only
+  // the sequence says whether anything was taken back. Consecutive duplicates
+  // are dropped — a re-render that changes nothing is not a frame anybody could
+  // see — and the live projection is not recorded at all, because between two
+  // beats it is not what the board is showing.
+  if (beats.shadow) {
+    const row = beats.shadow.decks.main.join(',')
+    if (shadows && shadows.at(-1) !== row) shadows.push(row)
+  }
   return (
     <>
       {/* The fan as the BOARD would render it — one slot per card of whichever
@@ -134,8 +163,12 @@ function Probe({
       {/* The deck tells the three states apart where the hand cannot: preDeal
           and afterDiscard both have an empty fan, and only the deck count says
           whether the board is showing the opening's shadow or the projection. */}
-      <div data-testid="deck">{(beats.shadow ?? live).decks.main}</div>
+      <div data-testid="deck">{(beats.shadow ?? live).decks.main.join(',')}</div>
+      <div data-testid="discardCount">{shown.decks.discardCount}</div>
       <div data-testid="exclusive">{beats.exclusive ? 'exclusive' : 'open'}</div>
+      {/* How many flyers are mounted right now — a dead match's in-flight card
+          shows up here until its runner's own reset() clears it. */}
+      <div data-testid="overlay">{beats.overlays.length}</div>
     </>
   )
 }
@@ -172,6 +205,94 @@ const introBeat = (log: string[], run?: () => Promise<void>): IntroBeat => ({
   collapse: () => log.push('collapse'),
 })
 
+// The intro slot is the queue's own "here is a beat, run it" door. Using it
+// keeps this test about the SHADOW rather than about planning.
+const renderWithBeat = (run: (ctx: { publish: (s: BoardState) => void }) => Promise<void>) =>
+  render(
+    <Probe
+      live={preDiscard}
+      events={[]}
+      anchors={stub}
+      intro={{ key: 'g1', shadow: null, run, collapse: () => {} }}
+    />,
+  )
+
+// The generalization of what the opening already did. A runner that publishes
+// moves the board under itself — which is how the second card of a multi-draw
+// aims at the fan the first one grew (I8), and how a split's new pile exists
+// before it is measured.
+it('renders what a running beat publishes, and drops it when the queue drains', async () => {
+  motion.reduced = false
+  sent.calls = []
+  // A beat that parks after publishing, so the published state can be observed
+  // while it is still up.
+  const published = { ...preDiscard, decks: { ...preDiscard.decks, main: [7] } } as BoardState
+  const { getByTestId } = renderWithBeat((ctx) => {
+    ctx.publish(published)
+    return new Promise<void>(() => {})
+  })
+  await flush()
+  expect(getByTestId('deck').textContent).toBe('7')
+})
+
+// Git Branch landing in the same sync as a discard: two beats out of one batch,
+// and the first of them moves the board. `[drawn(mine), …, discarded]` through
+// `resolveAiEvent` is the same shape with a fan instead of a row.
+const splitEvent = { id: 3, type: 'pilesChanged', piles: [4, 6] } as Event
+
+// The projection the WHOLE batch produces — the row split and the card filed.
+const afterBatch = {
+  ...afterDiscard,
+  decks: { ...afterDiscard.decks, main: [4, 6] },
+} as unknown as BoardState
+
+// A batch is planned in one pass against one projection, so every beat of it is
+// handed the same base. That is right for the FIRST beat and wrong for every
+// one after it the moment a beat moves the board under itself: the pile beat
+// publishes the split row, and the beat behind it would render the row the
+// batch started from. On a `[drawn(mine), pilesChanged]` batch that is the
+// drawn card popping out of the fan and back into it — and the final state is
+// correct the whole time, which is why this asserts the sequence.
+it('does not let the next beat of a batch take back what the last one published', async () => {
+  motion.reduced = false
+  sent.calls = []
+  // The discard beat parks in its flight instead of finishing, so the board it
+  // starts from is a state that can be looked at rather than one that flickers
+  // past inside a single act() window. `release` is deliberately never called —
+  // this test wants the beat held for good — so `hang` is put back below, or the
+  // parking would leak into the next test.
+  sent.hang = true
+  const shadows: string[] = []
+  const utils = render(<Probe live={preDiscard} events={[]} anchors={stub} shadows={shadows} />)
+  utils.rerender(
+    <Probe
+      live={afterBatch}
+      events={[splitEvent, discardEvent]}
+      anchors={stub}
+      shadows={shadows}
+    />,
+  )
+  // One window per step rather than one long one: React holds every update
+  // queued inside a single async act() scope until that scope settles, so a
+  // 700ms window would render the end state and nothing before it — and this
+  // test is entirely about what came before it. Enough windows to cover both
+  // beats: the pile beat spans a STEP_HOLD after its publish, and the discard
+  // beat behind it needs a frame window of its own to get past its
+  // wait-for-the-shadow.
+  for (let i = 0; i < 10; i++) await flush()
+  // The second beat really did start — without this the sequence below would
+  // also be satisfied by a queue that dropped it.
+  expect(sent.calls).toHaveLength(1)
+  // The row the batch started from, then the split row the first beat
+  // published — and nothing after it, because the second beat animates away
+  // from the board the first one left. A third entry of '10' here is the
+  // rollback: the fan (or, here, the row) snapping back mid-batch.
+  expect(shadows).toEqual(['10', '4,6'])
+  // The held beat is this test's alone: every test after it sends normally.
+  sent.hang = false
+  sent.release?.()
+})
+
 it('never animates when motion is reduced', async () => {
   motion.reduced = true
   sent.calls = []
@@ -194,6 +315,31 @@ it('hands the board back to the live projection when the queue drains', async ()
   const { getByTestId } = mount()
   await flush()
   expect(getByTestId('hand').textContent).toBe('0')
+})
+
+// The shadow's lifetime scopes PER END. Mid-flight, the fan has already let go
+// of the card — it left the table the moment its slot was measured, at takeoff
+// — but the discard end still holds the pre-batch heap, because the card has
+// not visually arrived yet. Both readings come from the SAME shadow, so this
+// is the one test that can tell "released too early" (discard already at 1)
+// from "released too late" (still in the fan) from the fix (fan empty, heap
+// still at 0).
+it('the shadow releases the flown card from the fan at takeoff, and holds the discard end until it lands', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = true
+  const { getByTestId } = mount()
+  await flush()
+  expect(getByTestId('hand').textContent).toBe('0')
+  expect(getByTestId('discardCount').textContent).toBe('0')
+  // Landing: live wins, exactly as it does with no flight held at all.
+  sent.hang = false
+  await act(async () => {
+    sent.release?.()
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(getByTestId('hand').textContent).toBe('0')
+  expect(getByTestId('discardCount').textContent).toBe('1')
 })
 
 it('flies each card on the scatter the heap will rest it on', async () => {
@@ -301,6 +447,14 @@ it('keeps the rematch’s opening when it lands while a beat is in flight', asyn
     collapse: () => log.push('collapse2'),
   }
   utils.rerender(<Probe live={preDiscard} events={[]} anchors={stub} intro={second} />)
+  // A new match cancels what is in the air: the dead match's flight is still
+  // "sent" — its promise is deliberately left unresolved by this test — but the
+  // reset effect runs synchronously in the same commit as the rematch, so by
+  // the time rerender() returns the runner's own reset() has already cleared
+  // its overlay. Asserting on the overlay at this exact instant says which of
+  // the two the branch chose: keep flying a card into a discard pile that
+  // belongs to a match that no longer exists, or drop it.
+  expect(utils.getByTestId('overlay').textContent).toBe('0')
   // The flight lands; the queue must still hold the second opening.
   sent.hang = false
   await act(async () => {

@@ -302,7 +302,7 @@ export function useDealIntro(args: {
     // scatter — the heap the player's hand will be lifted out of
     const toCentre = async (index: number, uid: string, card: CardData, down: boolean) => {
       const r = latest.current.refs
-      const from = rectOf(r.deckBox.current)
+      const from = rectOf(r.pileBox(0))
       const to = rectOf(r.centre.current)
       if (!from || !to) {
         finishRef.current()
@@ -327,7 +327,7 @@ export function useDealIntro(args: {
     // hidden there — the counter on the seat is that hand
     const toSeat = async (key: string, player: string, card: CardData, down: boolean) => {
       const r = latest.current.refs
-      const from = rectOf(r.deckBox.current)
+      const from = rectOf(r.pileBox(0))
       const seat = rectOf(r.seatOf(player))
       if (!from || !seat) {
         finishRef.current()
@@ -407,7 +407,7 @@ export function useDealIntro(args: {
       // minus what we counted". This is the half of the invisible handover that
       // does not depend on the arithmetic above being right.
       const l = latest.current.live
-      setDeckCount(l.decks.main)
+      setDeckCount(l.decks.main[0] ?? 0)
       setDealtTo(Object.fromEntries(l.opponents.map((o) => [o.id, o.handCount])))
       setClosed(travelledClosed)
 
@@ -474,7 +474,9 @@ export function useDealIntro(args: {
         ...live,
         you: { ...live.you, hand: landed, release: zoneIn ? live.you.release : {} },
         opponents: live.opponents.map((o) => ({ ...o, handCount: dealtTo[o.id] ?? 0 })),
-        decks: { ...live.decks, main: deckCount },
+        // Only pile 0 counts down: the opening deals from the single pile a
+        // fresh game starts with, and any others are left exactly as they are.
+        decks: { ...live.decks, main: [deckCount, ...live.decks.main.slice(1)] },
         introPhase: phase,
       }
     : null

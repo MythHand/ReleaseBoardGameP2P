@@ -43,6 +43,10 @@ export type Action =
   | { type: 'PASS'; player: PlayerId; at: number }
   | { type: 'UNPASS'; player: PlayerId; at: number }
   | { type: 'WINDOW_EXPIRED'; at: number }
+  // Keeper-only, like WINDOW_EXPIRED: starts the turn's inactivity clock when
+  // no committed action has stamped one — in practice exactly once, for the
+  // first turn, because createGame carries no timestamp to stamp it from.
+  | { type: 'CLOCK_STARTED'; at: number }
   | { type: 'RESOLVE'; player: PlayerId; choice: Choice; at: number }
 
 export type ActionType = Action['type']

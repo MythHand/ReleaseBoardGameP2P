@@ -28,6 +28,7 @@ import {
   PauseGame,
   PendingPrompt,
   Pile,
+  pileWidthFor,
   Reconnect,
   type ReleaseSlots,
   ReleaseZone,
@@ -406,14 +407,20 @@ export default function Board({
 
       <div className={kit.decks}>
         <div className={cls(opening.deckStack, enter)} ref={anchors.decks}>
-          <Pile
-            label={copy.table.deck}
-            deck="base"
-            count={decks.main}
-            width={150}
-            countPos="tl"
-            boxRef={anchors.deckBox}
-          />
+          <div className={opening.pileRow}>
+            {decks.main.map((count, i) => (
+              <Pile
+                // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
+                key={i}
+                label={copy.table.deck}
+                deck="base"
+                count={count}
+                width={pileWidthFor(decks.main.length)}
+                countPos="tl"
+                boxRef={(el) => anchors.bindPile(i, el)}
+              />
+            ))}
+          </div>
           <Pile
             label={copy.table.events}
             deck="ai"
@@ -440,13 +447,15 @@ export default function Board({
         </div>
       </div>
 
-      {/* the centre: the player's own cards gather here before they go into the
-          fan, each at its own scatter — a small heap, not a neat stack. It is
-          mounted for the whole of an intro-bearing mount (the sequencer aims at
-          it from its first layout effect) and is empty the rest of the time. */}
-      {intro && (
-        <div className={opening.centre} ref={anchors.centre}>
-          {deal.staged.map((s) => {
+      {/* the centre: where cards stand while the table is looking at them — the
+          player's own cards gather here during the opening, and every drawn card
+          stages here for the rest of the match. Mounted for the whole life of
+          the board, because a flight cannot aim at a node that is not there yet.
+          pointer-events: none — outside a beat it is an empty box and must not
+          catch clicks meant for the table. */}
+      <div className={opening.centre} data-board-centre ref={anchors.centre}>
+        {intro &&
+          deal.staged.map((s) => {
             const data = cardById(s.card)
             if (!data) return null
             return (
@@ -459,8 +468,7 @@ export default function Board({
               </div>
             )
           })}
-        </div>
-      )}
+      </div>
 
       <div className={kit.you}>
         {youEliminated ? (
@@ -484,9 +492,11 @@ export default function Board({
             <div className={kit.handWrap} ref={anchors.hand}>
               <Hand
                 items={you.hand}
-                // the fan opens room for the arriving heap while it travels
-                gapAt={deal.gapAt}
-                gapSize={deal.gapSize}
+                // the fan opens room for the arriving heap while it travels —
+                // the deal wins the tie, exclusive against every other beat
+                // the same way it already wins the shadow's
+                gapAt={deal.gapAt ?? beats.gapAt}
+                gapSize={deal.gapAt == null ? beats.gapSize : deal.gapSize}
                 // while the deal runs the hand is held: no clicks reach the
                 // gesture machine, and the cards that travelled closed stay
                 // closed until the flip. Both are gone the moment it ends, so

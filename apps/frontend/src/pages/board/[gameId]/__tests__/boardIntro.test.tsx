@@ -80,6 +80,49 @@ it('still reports the opening when StrictMode mounts the board twice', async () 
   })
   expect(onDone).toHaveBeenCalledTimes(1)
 }, 20000)
+// The regression this guards: before #97's centre refactor, the whole wrapper
+// div was itself gated by `{intro && …}`, so any test that rendered with an
+// intro at least proved the staged-card map inside it had mounted. Now the
+// wrapper is unconditional and only the map is still gated — its presence
+// proves nothing about whether `deal.staged` (useDealIntro.ts:321) actually
+// produces a card. This drives the real sequence far enough into the deal for
+// the first card to leave the pile and land at the centre, and checks a real
+// `.stagedCard` element is there — not a count, an element `cardById` could
+// silently have failed to resolve.
+//
+// Fake timers stand in for wall-clock time: `wait()` (@release/ui/animations)
+// is plain `setTimeout`, and the choreography's own beats sum to several real
+// seconds before a card ever lands. `play()` is a no-op here regardless
+// (jsdom has no `Element.animate`), so nothing but `wait()` gates the timing.
+it('stages a real card at the centre while the deal is running', async () => {
+  vi.useFakeTimers()
+  try {
+    motion.reduced = false
+    const props = makeBoardProps()
+    const { container } = render(
+      <Board {...props} intro={{ ...introFixture(), onDone: () => {} }} />,
+    )
+
+    // Advance in small steps rather than one lump: the exact moment the first
+    // card lands is an implementation detail of the choreography's own beat
+    // timings, and the centre empties again once the whole heap has moved on
+    // to the fan. Checking after every step catches the card inside that
+    // window, however long it turns out to be, without pinning this test to
+    // the beat constants themselves.
+    let staged: Element | null = null
+    for (let elapsed = 0; elapsed < 10_000 && !staged; elapsed += 50) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50)
+      })
+      staged = container.querySelector('[data-board-centre] [class*="stagedCard"]')
+    }
+
+    expect(staged).not.toBeNull()
+  } finally {
+    vi.useRealTimers()
+    motion.reduced = true
+  }
+})
 
 it('hands the rail back when the opening is over', () => {
   motion.reduced = true

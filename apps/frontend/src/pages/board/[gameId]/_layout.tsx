@@ -17,7 +17,7 @@ import styles from './_layout.module.css'
 const EMPTY_TABLE = {
   you: { name: '', hand: [], release: {} },
   opponents: [],
-  decks: { main: 0, events: 0, discard: null, discardCount: 0 },
+  decks: { main: [], events: 0, discard: null, discardCount: 0 },
   turn: undefined,
   hasDrawn: false,
   selfId: '',

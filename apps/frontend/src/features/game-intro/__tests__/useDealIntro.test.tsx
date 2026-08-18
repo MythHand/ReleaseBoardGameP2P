@@ -30,7 +30,6 @@ const refs = () => ({
   seats: createRef<HTMLDivElement>(),
   dock: createRef<HTMLDivElement>(),
   zone: createRef<HTMLDivElement>(),
-  deckBox: createRef<HTMLDivElement>(),
   centre: createRef<HTMLDivElement>(),
   hand: createRef<HTMLDivElement>(),
   discardBox: createRef<HTMLDivElement>(),
@@ -40,6 +39,8 @@ const refs = () => ({
   releaseSlot: () => null,
   bindSeat: () => {},
   bindReleaseSlot: () => {},
+  pileBox: () => null,
+  bindPile: () => {},
 })
 
 // Minimal but real: the shapes the sequencer reads. No `as unknown as` cast —
@@ -74,7 +75,7 @@ const events = (): Event[] => [
 const live = (): BoardState => ({
   you: { name: 'One', hand: [], release: {} },
   opponents: [{ id: 'p2', name: 'Two', handCount: 2, release: {} }],
-  decks: { main: 100, events: 21, discardCount: 0 },
+  decks: { main: [100], events: 21, discardCount: 0 },
   turn: 'p1',
   hasDrawn: false,
   selfId: 'p1',
@@ -83,6 +84,12 @@ const live = (): BoardState => ({
   playable: [],
   frozen: [],
 })
+
+// The queue now hands every beat's `run` a `BeatRun` (#97 generalizes the
+// opening's own shadow to the whole queue). The opening ignores it — nothing
+// here asserts on `publish` — so a fresh, inert context is all `run()` needs
+// to be called the way the queue calls it.
+const noopCtx = () => ({ base: live(), publish: () => {} })
 
 // What the queue calls instead of `run` when the player asked for less motion.
 // The opening still has to REPORT — the host's start gate waits on every seat,
@@ -116,7 +123,7 @@ it('does not run for a projection that is not an opening', async () => {
   // The beat exists — there is a match — but playing it finds nothing to replay
   // and hands over at once rather than animating an opening that never happened.
   await act(async () => {
-    await result.current.beat?.run()
+    await result.current.beat?.run(noopCtx())
   })
   expect(result.current.active).toBe(false)
   await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))

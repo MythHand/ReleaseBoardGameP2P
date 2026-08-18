@@ -2,7 +2,7 @@ import type { Event } from '@release/engine'
 import { cardById } from '@release/ui'
 import { describe, expect, it } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
-import { planBeats } from './planBeats'
+import { classifyPiles, planBeats } from './planBeats'
 
 const card = (id: string) =>
   cardById(id) ?? { id, name: id, category: 'attack', deck: 'base', art: '', tags: [], qty: 0 }
@@ -20,7 +20,7 @@ const boardBefore = (over: Partial<BoardState> = {}): BoardState =>
     opponents: [
       { id: 'p2', name: 'Two', handCount: 3, release: { backend: card('release-backend') } },
     ],
-    decks: { main: 10, events: 5, discardCount: 0 },
+    decks: { main: [10], events: 5, discardCount: 0 },
     selfId: 'p1',
     history: [],
     setup: {},
@@ -43,7 +43,7 @@ describe('planBeats', () => {
 
   it('flies the player’s own discard from its slot in the fan', () => {
     const [beat] = planBeats([discarded(4)], boardBefore())
-    expect(beat.cards).toEqual([
+    expect(beat.kind === 'discard' && beat.cards).toEqual([
       { key: 'd4', eventId: 4, card: 'attack-bug', source: { kind: 'hand', index: 0 } },
     ])
   })
@@ -57,8 +57,9 @@ describe('planBeats', () => {
     ]
     const beats = planBeats(events, boardBefore())
     expect(beats).toHaveLength(1)
-    expect(beats[0].cards.map((c) => c.key)).toEqual(['d4', 'd5'])
-    expect(beats[0].key).toBe('discard:4')
+    const [beat] = beats
+    expect(beat.kind === 'discard' && beat.cards.map((c) => c.key)).toEqual(['d4', 'd5'])
+    expect(beat.key).toBe('discard:4')
   })
 
   it('claims each hand slot once when two copies of a card go out together', () => {
@@ -73,7 +74,7 @@ describe('planBeats', () => {
       },
     } as Partial<BoardState>)
     const [beat] = planBeats([discarded(4), discarded(5)], state)
-    expect(beat.cards.map((c) => c.source)).toEqual([
+    expect(beat.kind === 'discard' && beat.cards.map((c) => c.source)).toEqual([
       { kind: 'hand', index: 0 },
       { kind: 'hand', index: 1 },
     ])
@@ -84,7 +85,11 @@ describe('planBeats', () => {
       [discarded(4, { card: 'release-frontend', reason: 'destroyed' })],
       boardBefore(),
     )
-    expect(beat.cards[0].source).toEqual({ kind: 'release', player: 'p1', slot: 'frontend' })
+    expect(beat.kind === 'discard' && beat.cards[0].source).toEqual({
+      kind: 'release',
+      player: 'p1',
+      slot: 'frontend',
+    })
   })
 
   // `neutralized` has TWO producers and they are not the same movement: a
@@ -97,7 +102,7 @@ describe('planBeats', () => {
       [discarded(4, { card: 'protection-debugger', reason: 'neutralized' })],
       boardBefore(),
     )
-    expect(beat.cards[0].source).toEqual({ kind: 'hand', index: 1 })
+    expect(beat.kind === 'discard' && beat.cards[0].source).toEqual({ kind: 'hand', index: 1 })
   })
 
   it('flies an opponent’s destroyed release out of their own slot', () => {
@@ -105,12 +110,16 @@ describe('planBeats', () => {
       [discarded(4, { player: 'p2', card: 'release-backend', reason: 'destroyed' })],
       boardBefore(),
     )
-    expect(beat.cards[0].source).toEqual({ kind: 'release', player: 'p2', slot: 'backend' })
+    expect(beat.kind === 'discard' && beat.cards[0].source).toEqual({
+      kind: 'release',
+      player: 'p2',
+      slot: 'backend',
+    })
   })
 
   it('flies an opponent’s hand discard from their seat', () => {
     const [beat] = planBeats([discarded(4, { player: 'p2' })], boardBefore())
-    expect(beat.cards[0].source).toEqual({ kind: 'seat', player: 'p2' })
+    expect(beat.kind === 'discard' && beat.cards[0].source).toEqual({ kind: 'seat', player: 'p2' })
   })
 
   // THE UNDECIDED CASE. The rule for a beat whose target is already gone is not
@@ -128,6 +137,157 @@ describe('planBeats', () => {
       [discarded(4, { card: 'attack-ddos' }), discarded(5, { card: 'attack-bug' })],
       boardBefore(),
     )
-    expect(beat.cards.map((c) => c.key)).toEqual(['d5'])
+    expect(beat.kind === 'discard' && beat.cards.map((c) => c.key)).toEqual(['d5'])
+  })
+})
+
+const drawn = (id: number, over: Partial<Extract<Event, { type: 'drawn' }>> = {}): Event =>
+  ({ id, type: 'drawn', player: 'p1', card: 'attack-bug', pile: 0, deckSize: 39, ...over }) as Event
+
+describe('planBeats — the draw', () => {
+  it('reads my own draw off the card the event still carries', () => {
+    const [beat] = planBeats([drawn(4)], boardBefore())
+    expect(beat).toMatchObject({ kind: 'draw' })
+    expect(beat.kind === 'draw' && beat.draws[0]).toMatchObject({
+      eventId: 4,
+      pile: 0,
+      mine: true,
+      card: 'attack-bug',
+    })
+  })
+
+  // The redaction leaves the event and takes the card. That, and only that, is
+  // what tells an onlooker's draw apart from a trigger.
+  it('reads an opponent’s draw as a face-down flight to their seat', () => {
+    const [beat] = planBeats([drawn(4, { player: 'p2', card: undefined })], boardBefore())
+    expect(beat.kind === 'draw' && beat.draws[0]).toMatchObject({
+      player: 'p2',
+      mine: false,
+      card: undefined,
+      reveal: undefined,
+    })
+  })
+
+  it('names a trigger from the reveal that follows it', () => {
+    const events: Event[] = [
+      drawn(4, { card: undefined }),
+      { id: 5, type: 'revealed', player: 'p1', card: 'trigger-error-503' } as Event,
+      discarded(6, { card: 'trigger-error-503', reason: 'trigger' }),
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats).toHaveLength(1)
+    expect(beats[0].kind === 'draw' && beats[0].draws[0].reveal).toEqual({
+      card: 'trigger-error-503',
+      discardId: 6,
+    })
+  })
+
+  // The trigger's card is at the CENTRE when it is filed, not in a hand or a
+  // zone. The draw beat flies it out from where it stands, so the discard
+  // planner must not also claim it — that would be two flights for one card.
+  it('leaves the trigger’s own discard to the draw that revealed it', () => {
+    const events: Event[] = [
+      drawn(4, { card: undefined }),
+      { id: 5, type: 'aiRevealed', player: 'p1', aiCard: 'trigger-ai', eventCard: 'ai-x' } as Event,
+      discarded(6, { card: 'trigger-ai', reason: 'trigger' }),
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats.map((b) => b.kind)).toEqual(['draw'])
+  })
+
+  it('puts a multi-draw in one beat, in the order it was drawn', () => {
+    const beats = planBeats([drawn(4), drawn(5, { pile: 1 })], boardBefore())
+    expect(beats).toHaveLength(1)
+    expect(beats[0].kind === 'draw' && beats[0].draws.map((d) => d.pile)).toEqual([0, 1])
+  })
+})
+
+describe('planBeats — order', () => {
+  // The refill happens INSIDE the draw sequence, before the card is taken
+  // (fake/reduce.ts:88). A queue that played these the other way round would
+  // show a card drawn from a pile that has not been rebuilt yet.
+  it('rebuilds the deck before the draw it made possible', () => {
+    const events: Event[] = [
+      { id: 3, type: 'deckReshuffled', cards: 12 } as Event,
+      drawn(4),
+      { id: 5, type: 'pilesChanged', piles: [11] } as Event,
+    ]
+    const beats = planBeats(
+      events,
+      boardBefore({ decks: { main: [0], events: 5, discardCount: 12 } } as Partial<BoardState>),
+    )
+    expect(beats.map((b) => b.kind)).toEqual(['reshuffle', 'draw'])
+  })
+
+  // A run coalesces; it does not reach across something else. Two discards on
+  // either side of a draw are two gestures, because that is what happened.
+  it('does not let a discard run swallow one on the far side of a draw', () => {
+    const events = [discarded(4), drawn(5), discarded(6, { card: 'protection-debugger' })]
+    const beats = planBeats(events, boardBefore())
+    expect(beats.map((b) => b.kind)).toEqual(['discard', 'draw', 'discard'])
+  })
+
+  // A batch can span more than one engine action (useBeats.ts) — a run of one
+  // kind must not reach across an unrelated event that carries no choreography
+  // of its own. Two draws either side of a turn boundary are two gestures, not
+  // one just because nothing visible happened in between.
+  it('does not let a draw run swallow one on the far side of an unrelated event', () => {
+    const events: Event[] = [
+      drawn(4),
+      { id: 5, type: 'turnEnded', player: 'p1' } as Event,
+      drawn(6),
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats.map((b) => b.kind)).toEqual(['draw', 'draw'])
+  })
+
+  it('does not let a discard run swallow one on the far side of an unrelated event', () => {
+    const events = [
+      discarded(4),
+      { id: 5, type: 'turnEnded', player: 'p1' } as Event,
+      discarded(6, { card: 'protection-debugger' }),
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats.map((b) => b.kind)).toEqual(['discard', 'discard'])
+  })
+})
+
+describe('classifyPiles', () => {
+  // The event carries counts and nothing else — not the operation, not the
+  // index. Recovering it positionally is a derivation, not a guess: a split
+  // leaves the halves where the pile was, so one index accounts for two.
+  it('reads a split from the pile that became two', () => {
+    expect(classifyPiles([24], [12, 12])).toEqual({ kind: 'split', at: 0, piles: [12, 12] })
+    expect(classifyPiles([10, 20, 30], [10, 10, 10, 30])).toEqual({
+      kind: 'split',
+      at: 1,
+      piles: [10, 10, 10, 30],
+    })
+  })
+
+  it('reads a merge, and whether the discard came with it', () => {
+    expect(classifyPiles([4, 6], [10])).toEqual({ kind: 'merge', withDiscard: false, piles: [10] })
+    // Sudo gathers the discard in too, so the survivor holds more than the
+    // piles did — which is the only signal that the discard flew.
+    expect(classifyPiles([4, 6], [15])).toEqual({ kind: 'merge', withDiscard: true, piles: [15] })
+  })
+
+  it('reads Git Branch + Sudo’s second step as the discard becoming a pile', () => {
+    expect(classifyPiles([12, 12], [12, 12, 6])).toEqual({
+      kind: 'fromDiscard',
+      at: 2,
+      piles: [12, 12, 6],
+    })
+  })
+
+  // A pile that runs out ceases to exist. Nothing moves — the cards were face
+  // down before and there are none after — so there is no beat to play.
+  it('plays nothing for a pruned empty pile', () => {
+    expect(classifyPiles([0, 10], [10])).toBeNull()
+  })
+
+  it('plays nothing when the counts say nothing happened', () => {
+    expect(classifyPiles([10], [10])).toBeNull()
+    expect(classifyPiles([0, 0], [0])).toBeNull()
   })
 })

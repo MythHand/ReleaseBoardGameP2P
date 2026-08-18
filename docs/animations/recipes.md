@@ -199,6 +199,208 @@ The movement's own showcase is `Card play`, part B.
 
 ---
 
+## A card is drawn (live board)
+
+Driven by `drawn`, planned by `planBeats` and run by `drawBeat` (`useDrawBeat`). One flight to the
+centre for every draw in the batch, then a branch on who drew it and what it turned out to be — the
+scene is `DrawCardStory`, the trigger here is a real engine event instead of a click on a deck.
+
+**When to call**
+Never directly. `useBeats` plans a `draw` beat from every `drawn` in an arriving batch and runs it
+through `drawBeat.run`.
+
+**Visual result**
+A face-down card lifts from the pile the event names and flies to the table centre. Then: the
+drawer's own card flips and settles into their fan; an opponent's stays closed and sinks into their
+seat as a back; a trigger flips face up, stands revealed at the centre for a hold, then leaves for
+the discard on its own.
+
+**Elements / refs** — all from `BoardAnchors`
+- `pileBox(d.pile)` — the source, the pile the event names (not "the deck": `pileBox` is keyed by
+  the index `drawn.pile` carries).
+- `centre` — where every draw stages, mounted for the whole match (not only during the deal).
+- `hand` — the drawer's own fan, via the shared step `useHandArrival`.
+- `seatBox(player)` — an opponent's seat, trimmed to a card box (**I6**).
+- `discardBox` — the trigger's own exit, via the shared step `useDiscardExit`.
+
+**Sequence** (`toCentre(d)`, then a branch per `PlannedDraw`)
+1. `toCentre`: measure the source cell (`cardAreaOf(pileBox(d.pile))`) and the centre; raise a flyer
+   face down — its face is `d.card ?? d.reveal?.card` when known, else a generic cover (an opponent's
+   closed card carries no identity to guess at); `play('drawToCenter', …)`; `pin('draw', centre)` —
+   **[I4]**, so every branch below starts from where the card visibly stands.
+2. Branch decided by what the `PlannedDraw` carries, not by any extra lookup — **the card's
+   presence, and the reveal that follows it**:
+   - **`d.card` present, `d.mine`** → the drawer's own card. `wait(BEFORE_FLIP)` → `patch('draw', {
+     faceDown: false })` (the `Card` plays its own `flipCard`) → `wait(AFTER_FLIP)` → measure the
+     flyer, `drop('draw')`, `arrive([...], grown)` — `useHandArrival`, where `grown` is read off
+     `ctx.current.base.you.hand.length`, the fan **this beat has grown so far** (**I8**).
+   - **`d.card` absent, no `d.reveal`** → somebody else's, closed. Straight from the centre:
+     `play('dealToSeat', { from: centre, to: cardBoxIn(seatBox(d.player), CARD_W * SEAT_SHRINK) })`,
+     no flip, `drop('draw')`, and the shadow's `handCount` for that opponent is bumped and published.
+   - **`d.reveal` present** → a trigger, turned up for the whole table. `wait(BEFORE_FLIP)` →
+     `patch('draw', { faceDown: false })` → `wait(AFTER_FLIP)` → `wait(REVEAL_HOLD)` → the flyer
+     itself (not a copy) is handed to `useDiscardExit.send`, with `node: elOf('draw')` and
+     `scatter: scatterAt(d.reveal.discardId)` — the same scatter the heap rests the card on (**I7**)
+     — then `drop('draw')`.
+3. The loop is serial, one `PlannedDraw` after another; each fully resolves (including a trigger's
+   reveal and exit) before the next card starts its own flight to the centre.
+
+**Params & timings**
+| Step | Preset / wait | Duration |
+|---|---|---|
+| pile → centre | `drawToCenter` | 480 ms |
+| stand before flipping | `wait(BEFORE_FLIP)` | 220 ms |
+| flip settle | `wait(AFTER_FLIP)` | 560 ms |
+| a trigger's stand at the centre | `wait(REVEAL_HOLD)` | 900 ms — this task's own value, no approved source (`docs/animations/backlog.md`, #84) |
+| own card → hand | `useHandArrival` | `FLIGHT_MS = 480` |
+| trigger → discard | `useDiscardExit` | `FLIGHT_MS = 420`, on `scatterAt(discardId)` |
+| opponent's card → seat | `dealToSeat` | 460 ms, `to = cardBoxIn(seat, CARD_W * 0.7)` |
+
+**Invariants**
+- **I1** — `planBeats` reads `before`, the projection still on screen, so the source pile's slot is
+  there to measure.
+- **I2** — the carrier paints the flyer at its source before the flight starts.
+- **I4** — the flyer is pinned at the centre after `drawToCenter`; every branch (flip, hold, seat
+  flight, discard exit) leaves from where it visibly stands rather than from a re-measured rect.
+- **I7** — the trigger's exit uses `scatterAt(discardId)`, the same call the heap rests the card on:
+  the handover from flyer to heap changes nothing on screen.
+- **I8** — the fan grows inside the batch. `useHandArrival`'s `onLanded` callback writes the new hand
+  back into `ctx.base` and publishes it, so the next card in the same batch aims at the fan the
+  previous one actually grew, not the one the batch started with.
+
+**End state & cleanup**
+Own card: spliced into the hand at the arrival gap. Opponent's: `handCount + 1`, published. Trigger:
+gone from the centre, resting in the discard heap at `scatterAt(discardId)`. The flyer is dropped in
+every branch; nothing outlives the beat.
+
+**Gating**
+None beyond the queue's own exclusivity. A draw is not a decision waiting on the player — the fan
+stays live and the beat simply runs its course.
+
+**Under `prefers-reduced-motion`**
+The beat is never planned and never runs; `useBeats` renders the projection it already holds.
+
+**Building blocks**
+[`drawToCenter`](./reference.md#presets) · [`dealToSeat`](./reference.md#presets) · `flipCard` (auto,
+via `Card`) · [`useHandArrival`](./reference.md#hand-arrival--cards-arrive-in-the-hand) ·
+[`useDiscardExit`](./reference.md#the-movement-steps-and-the-carrier-under-them) ·
+[`useFlyer`](./reference.md#the-movement-steps-and-the-carrier-under-them) ·
+[`cardAreaOf`/`cardBoxIn`](./reference.md#card-geometry-helpers) · [`scatterAt`](./reference.md#discard-scatter).
+
+**Live reference**
+`Draw card` — `apps/playground/stories/interactive/DrawCardStory.tsx`. Not a playground scene itself
+— this beat runs on the real board (`apps/frontend/src/features/board-beats/drawBeat.tsx`).
+
+---
+
+## The deck is rebuilt, split, merged (live board)
+
+Driven by `deckReshuffled` and `pilesChanged`, planned by `planBeats` and run by `deckBeat`
+(`useDeckBeat`). What happens to the draw piles themselves — none of it carries a card whose face
+anybody sees, because a pile is face down before and after: what moves is the pile.
+
+**When to call**
+Never directly. `useBeats` plans a `reshuffle` beat from a `deckReshuffled` event, and a `piles` beat
+carrying a list of `PileStep`s from the `pilesChanged` events in a batch — Git Branch + Sudo emits
+**two** in one batch, and each is classified against the pile counts as they stand after the previous
+one, not against `before`.
+
+**Visual result**
+The scattered discard gathers into a pile and flies onto a draw pile, flipping face down on landing
+(`deckReshuffled`, and the discard-becomes-a-pile half of Git Branch + Sudo). A pile splits — a new
+pile slides out from the source pile's spot to its own place (`flyFrom` FLIP). Piles merge — every
+pile but the survivor (and, with Sudo, the gathered discard) flies into it and dissolves
+(`absorbToDeck`).
+
+**Elements / refs** — all from `BoardAnchors`
+- `pileBox(index)` — a draw pile's card box, both as a flight's source and its target.
+- `discardBox` — the discard's own spot, source of the reshuffle/fromDiscard movement.
+
+**Sequence**
+1. **`deckReshuffled` → `runReshuffle`**: `discardOntoPile(0, ctx.base.decks.discard)` — the recycled
+   discard always lands on pile 0 (`refillFromDiscard` only runs when every pile is empty and
+   replaces `main` with a single one). Raise a flyer at the discard's top card, `wait(GATHER_MS)`,
+   `play('gatherToDeck', …, { duration: 560 })` to the pile, `wait(STEP_HOLD)`, `patch('pile', {
+   faceDown: true })`, `wait(TURN_MS)`, `drop('pile')`.
+2. **`pilesChanged` → `runPiles`**: for each `PileStep` in order, run `step(s, ctx)` then
+   `wait(STEP_HOLD)` before the next.
+   - **`merge`**: measure the survivor's rect (`pileBox(0)`) once; every other pile in
+     `ctx.base.decks.main`, and the discard if `s.withDiscard`, plays `absorbToDeck` in parallel from
+     its own rect into the survivor's; `await Promise.all(…)`; **then** `advance(ctx, s.piles)` —
+     the shadow only updates once the flights have actually landed.
+   - **`split`**: measure the source pile's rect (`pileBox(s.at)`) **before** anything moves;
+     `advance(ctx, s.piles)` publishes the grown row immediately (I1 — mount before measure-from);
+     `await nextFrames()`; `play('flyFrom', pileBox(s.at + 1), { from, duration: SPLIT_MS })` — the
+     new pile is already in its final DOM place and animates *from* the source's old rect.
+   - **`fromDiscard`**: read the discard's top card **before** publishing (`ctx.base.decks.discard`);
+     `advance(ctx, s.piles)`; `await nextFrames()`; `discardOntoPile(s.at, top)` — the same movement
+     `deckReshuffled` uses, aimed at the new pile's index instead of 0.
+
+**What the classification derives** (`classifyPiles`, `planBeats.ts` — the engine's own event names
+none of this; see `docs/animations/backlog.md`):
+
+| before → after | operation | movement |
+|---|---|---|
+| `before[i] === after[i] + after[i+1]`, length +1 | split at `i` | `flyFrom` FLIP: the new pile is already in its DOM place and animates *from* the source pile's rect |
+| `after.length === 1`, sum preserved | merge | every other pile runs `absorbToDeck` in parallel into the survivor's rect, measured once |
+| a pile appended at the end, discard emptied | Git Branch + Sudo's second step | the reshuffle movement, into the new pile's spot |
+| `after` is `before` minus its zeros | prune | nothing plays — an empty pile ceasing to exist has nothing to move |
+
+**The implemented classifier never returns a `prune` step.** `classifyPiles` returns `null` for that
+row — a pile that ran out has nothing on screen to animate away, so there is no `PileStep` variant
+for it at all; the running pile count still advances past it (`planBeats` keeps classifying the
+*next* `pilesChanged` against the table as it now stands), but nothing is queued to play. This is a
+design choice made in code, not a gap: the table above documents the shape of the derivation, the
+implementation only emits a `PileStep` where there is something to fly.
+
+**`advance()`'s write-back is load-bearing only for `merge`.** It sets `ctx.base.decks.main` and
+publishes it, and the `merge` branch reads `ctx.base.decks.main.length` back out to know how many
+piles to absorb. For `split` and `fromDiscard` the `PileStep` already carries its own resolved
+`piles`/`at` — `classifyPiles` did that work up front in `planBeats`, against its own running
+counter, independent of what `deckBeat` publishes — so the write-back there only drives what renders
+on screen, never what the next step does.
+
+**Params & timings**
+| Step | Preset / wait | Duration |
+|---|---|---|
+| gather the scatter | `wait(GATHER_MS)` | 360 ms |
+| discard → pile (reshuffle / fromDiscard) | `gatherToDeck` | 560 ms (explicit) |
+| flip back-up on landing | `wait(TURN_MS)` | 460 ms |
+| new pile fly-out (split) | `flyFrom` | `SPLIT_MS = 520` |
+| every pile → survivor (merge) | `absorbToDeck` | `MERGE_MS = 520` |
+| between deck steps | `wait(STEP_HOLD)` | 360 ms |
+
+**Invariants**
+- **I1** — `split` measures the source pile's rect before `advance()` publishes the grown row, and
+  only flies `flyFrom` after `nextFrames()` lets the new pile paint at its final place.
+- **I2** — `nextFrames()` before both `split`'s and `fromDiscard`'s flights, so the newly published
+  pile has a frame to exist in before anything measures or animates it.
+- Local — a `piles` beat can carry more than one step (Git Branch + Sudo): each is run and settled
+  (`wait(STEP_HOLD)`) before the next, against the table the previous one actually left.
+
+**End state & cleanup**
+The published `decks.main` matches `e.piles` for every step that ran; the discard is emptied by
+whichever movement carried it. No state outlives the beat — every flyer is dropped inside the step
+that raised it.
+
+**Gating**
+None. Like a discard, a deck change is a thing that *happened* on the projection already; only the
+opening is `exclusive`.
+
+**Under `prefers-reduced-motion`**
+The beat is never planned and never runs; `useBeats` renders the projection it already holds.
+
+**Building blocks**
+[`gatherToDeck`](./reference.md#presets) · [`flyFrom`](./reference.md#presets) ·
+[`absorbToDeck`](./reference.md#presets) · [`useFlyer`](./reference.md#the-movement-steps-and-the-carrier-under-them) ·
+[`nextFrames`/`wait`](./reference.md#travel-and-timing-helpers).
+
+**Live reference**
+`Deck animations` — `apps/playground/stories/interactive/DeckAnimationsStory.tsx`. Not a playground
+scene itself — this beat runs on the real board (`apps/frontend/src/features/board-beats/deckBeat.tsx`).
+
+---
+
 ## Playing a combo (pair) — two hand cards → merge at center → release zone or discard
 
 **When to call**

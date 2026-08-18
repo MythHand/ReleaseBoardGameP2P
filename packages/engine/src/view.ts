@@ -91,7 +91,17 @@ export interface PlayerView {
     discardTop?: CardId
     discardCount: number
   }
-  turn: { player: PlayerId; index: number; hasDrawn: boolean }
+  turn: {
+    player: PlayerId
+    index: number
+    hasDrawn: boolean
+    // The turn's inactivity clock — public, every viewer sees whose turn it is
+    // and how long is left. Absent while a window, a pending or a running draw
+    // owns the wait (and before the keeper starts the first turn's clock).
+    // Both ends of the span, so a countdown is exact rather than assumed.
+    openedAt?: number
+    deadline?: number
+  }
   window: WindowView | null
   pending: PendingView | null
   setup: Setup

@@ -1,12 +1,12 @@
 import type { Event } from '@release/engine'
-import { cardById } from '@release/ui'
-import type { Leaving, Rect } from '@release/ui/animations'
-import { nextFrames, scatterAt, useDiscardExit } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
+import type { BeatRun, BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
-import type { BeatPlan, DiscardCard } from './planBeats'
+import { useDeckBeat } from './deckBeat'
+import { useDiscardBeat } from './discardBeat'
+import { useDrawBeat } from './drawBeat'
+import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
 
 // The board's beat queue. `useGame` accumulates engine events off the wire in
@@ -25,6 +25,10 @@ import { planBeats } from './planBeats'
 //     lifetime is the queue's: when the queue drains it is dropped and live
 //     wins, whatever happened inside a beat. There is no path where a thrown
 //     run, a missing rect or a bad plan leaves an old state on the table.
+//   • The handover holds BETWEEN the beats of a batch too, not only at its end.
+//     A beat may move the board under itself, so the one behind it starts from
+//     where that one finished rather than from where the batch began (`after`
+//     on Beat) — otherwise a batch would rewind itself once per beat.
 //
 // One policy, one place: prefers-reduced-motion is read HERE. `play()` in
 // @release/ui drives WAAPI directly and does not check it, so every consumer
@@ -33,23 +37,47 @@ import { planBeats } from './planBeats'
 
 interface Beat {
   key: string
-  /** the projection this beat animates AWAY from — the board while it runs */
+  /**
+   * The projection this beat animates AWAY from — the board while it runs.
+   * Resolved when the beat STARTS rather than when it is planned; see `after`.
+   */
   base: BoardState
+  /**
+   * The beat this one follows inside its own batch. A batch is planned in one
+   * pass against one projection, so without this every beat of it would animate
+   * away from the state the batch STARTED at — and a batch that publishes would
+   * be rolled back by the beat behind it. `[drawn(mine), pilesChanged]` is the
+   * real case: the draw grows the fan to N+1 and publishes it, then the pile
+   * beat renders its own base at N and the card pops out of the hand and back
+   * in when the queue drains.
+   *
+   * A link and not a captured state, because the value is not knowable at plan
+   * time: what a beat leaves on the table exists only once it has run. It is
+   * read at start-of-beat instead, off `ended` below.
+   *
+   * The opening carries none. It is unshifted AHEAD of whatever is queued, it
+   * publishes a shape of its own rather than a fold of the projection, and the
+   * batch behind it was planned against the live board — chaining the deal into
+   * it would hand a beat a base nothing planned it against.
+   */
+  after?: Beat
+  /**
+   * What this beat left on the table: its last publish, or — when it published
+   * nothing — the very base it was handed, passed on untouched. Written when
+   * the beat is over, read by the beat that follows it.
+   */
+  ended?: BoardState
   /** it owns the table: input is dead while it runs */
   exclusive: boolean
-  run: () => Promise<void>
+  run: (ctx: BeatRun) => Promise<void>
 }
 
 export interface Beats {
   shadow: BoardState | null
   overlays: ReactNode[]
   exclusive: boolean
-}
-
-const rectOf = (el: Element | null): Rect | null => {
-  if (!el) return null
-  const r = el.getBoundingClientRect()
-  return { left: r.left, top: r.top, width: r.width, height: r.height }
+  gapAt: number | null
+  gapSize: number
 }
 
 export function useBeats(args: {
@@ -70,13 +98,23 @@ export function useBeats(args: {
   // queue drains. Two readers of one fact, each for what it is good at.
   const runningRef = useRef<Beat | null>(null)
 
-  // No onLanded: the heap is derived from these same events in toBoardState, so
-  // the cards this step flew are already in the projection it hands over to. A
-  // second set of books here would be a second source for one heap.
-  const { overlay, send } = useDiscardExit(anchors.discardBox)
+  // What the RUNNING beat has moved the board to. The opening always published a
+  // shape of its own; this is the same door, opened to every beat, because a
+  // multi-draw grows the fan between its cards (I8) and a split has to render a
+  // pile before it can be measured. It lives and dies with the beat: cleared when
+  // one starts and again when the queue drains, so it can never outlast the run
+  // that produced it.
+  const [advanced, setAdvanced] = useState<BoardState | null>(null)
 
-  const latest = useRef({ live, anchors, send, intro })
-  latest.current = { live, anchors, send, intro }
+  const discards = useDiscardBeat(anchors)
+  const draws = useDrawBeat(anchors)
+  const decks = useDeckBeat(anchors)
+
+  // `intro` rides along because the arming effect below reads the beat from here
+  // rather than from its own closure: the effect fires on the match key, and the
+  // beat object is rebuilt every time the opening publishes a shadow.
+  const latest = useRef({ live, intro })
+  latest.current = { live, intro }
 
   // How far into the feed the queue has already looked. Event ids are the
   // engine's own monotonic sequence, so this is a watermark and not a count —
@@ -92,50 +130,30 @@ export function useBeats(args: {
   const queue = useRef<Beat[]>([])
   const draining = useRef(false)
 
-  const whereFrom = useCallback((c: DiscardCard): Rect | null => {
-    const a = latest.current.anchors
-    if (c.source.kind === 'hand') return rectOf(a.handSlotAt(c.source.index))
-    if (c.source.kind === 'release') return rectOf(a.releaseSlot(c.source.player, c.source.slot))
-    return a.seatBox(c.source.player)
-  }, [])
-
-  const toLeaving = useCallback(
-    (c: DiscardCard): Leaving | null => {
-      const card = cardById(c.card)
-      const from = whereFrom(c)
-      if (!card || !from) return null
-      // The SAME Scatter the adapter rests this card on (I7): the flight ends
-      // on the pose the heap already holds for it, so nothing moves on handover.
-      // Same key, same call — `scatterAt` takes the event id as a number.
-      return { key: c.key, card, from, scatter: scatterAt(c.eventId) }
-    },
-    [whereFrom],
-  )
-
+  // The queue builds a Beat out of a plan and the runner that plays it. It knows
+  // that a beat HAS a runner; it does not know what any of them do.
   const beatOf = useCallback(
-    (plan: BeatPlan, base: BoardState): Beat => ({
-      key: plan.key,
-      base,
-      exclusive: false,
-      run: async () => {
-        // WAIT FOR THE SHADOW, THEN MEASURE — in that order, and the order is the
-        // whole point. `drain` starts this from inside a layout effect, so at
-        // entry React has committed the projection that ARRIVED: the card is
-        // already out of the fan and its slot with it. `setRunning` has only been
-        // scheduled — the shadow that puts the slot back is a commit away. Two
-        // frames is how we get to the other side of it (the same reason the
-        // carrier waits, I2), and only then is there anything honest to measure.
-        //
-        // Measuring before this yields `null` for a one-card hand (no flight at
-        // all) and the wrong slot for a larger one — and no test can see it,
-        // because a stub that hands back a detached node measures the same either
-        // way. `useBeats.test.tsx` queries the probe's real DOM for exactly this.
-        await nextFrames()
-        const items = plan.cards.map(toLeaving).filter((it): it is Leaving => it != null)
-        if (items.length > 0) await latest.current.send(items)
-      },
-    }),
-    [toLeaving],
+    (plan: BeatPlan, base: BoardState): Beat | null => {
+      if (plan.kind === 'discard') {
+        return { key: plan.key, base, exclusive: false, run: (ctx) => discards.run(plan, ctx) }
+      }
+      if (plan.kind === 'draw') {
+        return { key: plan.key, base, exclusive: false, run: (ctx) => draws.run(plan, ctx) }
+      }
+      if (plan.kind === 'reshuffle') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          run: (ctx) => decks.runReshuffle(plan, ctx),
+        }
+      }
+      if (plan.kind === 'piles') {
+        return { key: plan.key, base, exclusive: false, run: (ctx) => decks.runPiles(plan, ctx) }
+      }
+      return null
+    },
+    [discards.run, draws.run, decks.runReshuffle, decks.runPiles],
   )
 
   // The mount is going away: stop starting things. A beat already in flight
@@ -164,22 +182,44 @@ export function useBeats(args: {
     try {
       let next = queue.current.shift()
       while (next && alive.current) {
+        // The handover between two beats of one batch, resolved HERE because
+        // here is the first moment it exists: the board this beat animates away
+        // from is the board the beat in front of it left. Writing it onto the
+        // beat rather than keeping it beside the beat is what makes the shadow
+        // (`advanced ?? running.base`) show it too — a base resolved into a
+        // local would move the first frame of the run and leave the render
+        // behind on the planned one, which is the very flicker this closes.
+        next.base = next.after?.ended ?? next.base
         runningRef.current = next
         setRunning(next)
+        setAdvanced(null)
+        // Where the beat ends up, tracked as it publishes. It starts at the
+        // base, so a beat that publishes nothing hands its own board on
+        // unchanged and the chain neither breaks nor invents a step.
+        let ended = next.base
+        const publish = (state: BoardState) => {
+          ended = state
+          setAdvanced(state)
+        }
         // A beat that throws must not hold the board: the shadow is dropped in
         // the finally below regardless, so a failure costs the animation and
         // never the state.
         try {
-          await next.run()
+          await next.run({ base: next.base, publish })
         } catch (err) {
           if (import.meta.env.DEV) console.error('[beats] %s failed', next.key, err)
         }
+        // Even after a throw: whatever it managed to publish IS on screen, and
+        // the beat behind it has to animate away from that and not from a board
+        // two states back.
+        next.ended = ended
         next = queue.current.shift()
       }
     } finally {
       draining.current = false
       runningRef.current = null
       setRunning(null)
+      setAdvanced(null)
     }
   }, [])
 
@@ -202,6 +242,7 @@ export function useBeats(args: {
   // the arm also keeps it before the BATCH effect, which must not read a stale
   // watermark on the one pass where it matters most.)
   const playing = useRef<string | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws` and `decks` are read for the CURRENT render's runners on purpose, not added to the deps below — their own `reset` are unmemoized (a fresh function every render), so listing them would fire this on every render instead of once per match key
   useLayoutEffect(() => {
     const key = intro?.key ?? null
     if (key == null || playing.current === key) return
@@ -209,6 +250,18 @@ export function useBeats(args: {
     seen.current = 0
     settled.current = live
     queue.current = []
+    // A new match cancels what is in the air. The wipe just above takes the
+    // RECORD of the work still queued — it does nothing for a beat already
+    // shifted out and running, because that beat is not in the queue any more.
+    // Its own carriers (a flyer mid-flight, a parked hand-arrival, a parked
+    // discard exit) belong to the runner, not to the queue, and they outlive
+    // the dead match unless told otherwise: a card from it would keep crossing
+    // the board of the NEW one, flying to a discard pile — or a hand — that no
+    // longer exists. So every runner's own reset() runs here too, beside the
+    // wipe, for the same match-boundary reason.
+    discards.reset()
+    draws.reset()
+    decks.reset()
   }, [intro?.key, live])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
@@ -288,18 +341,37 @@ export function useBeats(args: {
     // the projection the board already holds — so there is nothing to do but
     // let it render. Planned nowhere, run nowhere: one branch, one place.
     if (reduced) return
-    for (const plan of planBeats(fresh, before)) queue.current.push(beatOf(plan, before))
+    // Every beat of the batch is planned against ONE projection — the board
+    // still on screen (I1) — and then chained, so that a beat which moves the
+    // board hands it on instead of having it taken back. Planning cannot do the
+    // chaining itself: a plan is a fold of events, and where a beat ends is only
+    // known once it has run.
+    let previous: Beat | undefined
+    for (const plan of planBeats(fresh, before)) {
+      const beat = beatOf(plan, before)
+      if (!beat) continue
+      beat.after = previous
+      previous = beat
+      queue.current.push(beat)
+    }
     void drain()
   }, [events, live, enabled, reduced, beatOf, drain, running])
 
   return {
-    // The shadow is the running beat's own base, and nothing else holds it up.
-    // The one exception is the opening, which publishes a whole shape of its own
-    // rather than animating away from a projection — while it runs, that shape
-    // IS the board. It goes null the moment the opening reports done, so the
-    // handover to the live projection is the intro's own last frame.
-    shadow: (running?.exclusive ? intro?.shadow : running?.base) ?? null,
-    overlays: overlay,
+    // The shadow is what the running beat has published, or its own base while
+    // it has published nothing yet. The one exception is the opening, which
+    // publishes a whole shape of its own rather than animating away from a
+    // projection — while it runs, that shape IS the board, until a publish of
+    // its own arrives to take over from it. It all goes null the moment the
+    // beat reports done, so the handover to the live projection is the queue's
+    // own last frame.
+    shadow:
+      (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ?? null,
+    overlays: [...discards.overlay, ...draws.overlay, ...decks.overlay],
     exclusive: running?.exclusive ?? false,
+    // The fan opens for a card on its way into it — the draw beat is the one
+    // that grows it (I8); nothing else does yet.
+    gapAt: draws.gapAt,
+    gapSize: draws.gapSize,
   }
 }

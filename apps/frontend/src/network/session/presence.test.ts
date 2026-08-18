@@ -43,7 +43,7 @@ it('stops syncing a disconnected seat', () => {
 
 it('restores the seat on reconnect with one fresh SYNC', () => {
   const dropped = disconnect(session(), 'peer-b', 1_000).session
-  const { session: back, outgoing } = rebind(dropped, 'b', 'peer-b-2')
+  const { session: back, outgoing } = rebind(dropped, 'b', 'peer-b-2', 1_000)
   const seat = back.seats.find((s) => s.playerId === 'b')
   const sync = outgoing[0]
 
@@ -60,7 +60,7 @@ it('refuses to rebind a seat that is still connected', () => {
   // a live seat, receive its full projection (hand included) in the catch-up
   // SYNC, and leave the player still holding it hearing nothing at all.
   const live = session()
-  const result = rebind(live, 'b', 'peer-attacker')
+  const result = rebind(live, 'b', 'peer-attacker', 1_000)
 
   expect(result.session).toBe(live)
   expect(result.outgoing).toEqual([])
