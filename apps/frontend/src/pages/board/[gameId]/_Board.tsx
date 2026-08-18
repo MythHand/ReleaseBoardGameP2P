@@ -11,6 +11,7 @@ import {
   Badge,
   Button,
   Card,
+  CardPair,
   cardById,
   type DockView,
   Drawer,
@@ -43,7 +44,15 @@ import {
 } from '@release/ui'
 import { HEAP_SHOW, restTransform } from '@release/ui/animations'
 import type React from 'react'
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:
 // where every block sits, how big it is, what it overlaps. The board is a fork
 // of @release/ui's Table and the playground is where this screen is designed
@@ -52,9 +61,10 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
 import { useBoardAnchors } from '~/entities/game/board'
-import type { BoardProps, Panel } from '~/entities/game/board/types'
+import type { BoardProps, Panel, StagedHandoff } from '~/entities/game/board/types'
 import { useBeats } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
+import { useHandOrder } from '~/features/hand-order/useHandOrder'
 import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
 import { useBoardStaging } from './_useBoardStaging'
@@ -139,7 +149,7 @@ function SettingsField({
 // Стол = активное состояние игры. Каждый блок позиционируется независимо
 // (абсолютно), без жёсткой сетки. Заполняет экран без скролла.
 export default function Board({
-  state: live,
+  state: liveRaw,
   room,
   copy,
   slots,
@@ -159,6 +169,14 @@ export default function Board({
   // rather than the positioned blocks themselves.
   const anchors = useBoardAnchors()
 
+  // The player's own sort of their fan, applied to the projection BEFORE the
+  // intro, the queue or the staging gesture see it — so every shadow a beat
+  // publishes and every rect a flight measures already agrees with the fan on
+  // screen. The engine has no hand order (it is a private, presentation fact),
+  // which is why the overlay lives here and not in an action.
+  const handOrder = useHandOrder(intro?.gameId ?? null)
+  const live = useMemo(() => handOrder.arrange(liveRaw), [handOrder, liveRaw])
+
   // The blocks stay hidden from the FIRST committed frame until the intro is
   // over — not merely while it is `active`. `hudIn` only holds a block down
   // once its own animation exists, and the last of them is armed seconds in.
@@ -175,6 +193,13 @@ export default function Board({
     refs: anchors,
     onDone: onIntroDone,
   })
+  // The staging → beat handoff (#100): a ref because the combo beat reads it
+  // once at run start (I8), not a render's worth of state it would have to
+  // wait on. Built below, once `useBoardStaging` exists to build it FROM — but
+  // declared here, ahead of `useBeats`, because the ref's IDENTITY is all the
+  // queue needs at this point; the layout effect that keeps `.current` current
+  // runs after every hook regardless of where it sits in the function.
+  const handoffRef = useRef<StagedHandoff | null>(null)
   // One queue, for everything that moves. The opening goes in as beat zero and
   // the wire's own beats queue behind it — one place that decides what plays,
   // in what order, and whether it plays at all under prefers-reduced-motion.
@@ -189,6 +214,7 @@ export default function Board({
     anchors,
     enabled: introOver || intro == null,
     intro: deal.beat,
+    staging: handoffRef,
   })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined
@@ -251,6 +277,35 @@ export default function Board({
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
   })
+  // the ONE card standing at the centre before a partner folds in — a plain
+  // aim (`main`) or a support awaiting one (`support`). Once merged the pair
+  // flyer owns the centre instead (see `opening.pairFlyer` below).
+  const soloStaged =
+    staging.staged && !staging.staged.merged
+      ? (staging.staged.support ?? staging.staged.main)
+      : null
+  // its own node, for the staging → beat handoff below — a plain aim/support
+  // never merges, so it never gets the pair flyer's persistent node instead.
+  const soloStagedRef = useRef<HTMLDivElement>(null)
+
+  // The staging → beat handoff (#100): kept current in a layout effect,
+  // because `el` has to be the DOM node as THIS render actually committed it —
+  // the pair flyer once a partner has folded in, the solo staged node
+  // otherwise. `release` is the hook's own no-flight clear; the combo beat
+  // calls it once its own read of this says the staged play is the one
+  // standing where it is about to fold one in (I8).
+  useLayoutEffect(() => {
+    const s = staging.staged
+    handoffRef.current =
+      s?.phase === 'dispatched' && s.main
+        ? {
+            mainUid: s.main.uid,
+            supportUid: s.support?.uid,
+            el: s.merged ? staging.pairRef.current : soloStagedRef.current,
+            release: staging.release,
+          }
+        : null
+  }, [staging.staged, staging.pairRef, staging.release])
 
   // Escape skips the opening. Same window binding and the same reason as the
   // cancel above; `finish` is idempotent, so a second press is a no-op.
@@ -334,7 +389,7 @@ export default function Board({
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening; the accessible affordance is the Escape-skips-the-opening handler below
+    // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening AND click-anywhere-cancels-staging (handleTableClick owns both); the accessible affordance for each is its own Escape handler above
     <div
       className={kit.table}
       onClick={handleTableClick}
@@ -373,6 +428,7 @@ export default function Board({
                 eliminated={eliminated}
                 disconnected={disconnected}
                 copy={copy.seat}
+                support={p.support}
                 slotRef={(key, el) => anchors.bindReleaseSlot(p.id, key, el)}
                 onPick={(t) => staging.onTargetPick(t)}
                 targets={staging.targets}
@@ -447,25 +503,33 @@ export default function Board({
           })}
         {/* the pulled card stands here once the flyer has dropped it — while
             the carrier or a return flight still holds it, the static render
-            would double it (ComboStory.tsx's own guard on this) */}
-        {staging.staged && staging.overlay.length === 0 && (
-          <div className={opening.centreCard} data-testid="board-centre-staged">
-            <Card card={staging.staged.card} interactive={false} width="100%" />
+            would double it (ComboStory.tsx's own guard on this). Once a
+            partner folds in, the pair flyer below owns the centre instead. */}
+        {soloStaged && staging.overlay.length === 0 && (
+          <div ref={soloStagedRef} className={opening.centreCard} data-testid="board-centre-staged">
+            <Card card={soloStaged.card} interactive={false} width="100%" />
           </div>
         )}
         {!staging.staged &&
           state.pending?.kind === 'defend' &&
           (() => {
             const data = cardById(state.pending.attackCard)
-            return data ? (
+            if (!data) return null
+            // sudo stands the pair; a plain hit stands the one card, as before.
+            const aux = state.pending.sudo ? cardById('support-sudo') : null
+            return (
               <div
                 className={opening.centreCard}
                 data-testid="board-centre-pending"
                 data-pending-play
               >
-                <Card card={data} interactive={false} width="100%" />
+                {aux ? (
+                  <CardPair main={data} aux={aux} width="100%" />
+                ) : (
+                  <Card card={data} interactive={false} width="100%" />
+                )}
               </div>
-            ) : null
+            )
           })()}
       </div>
 
@@ -481,6 +545,7 @@ export default function Board({
             <div className={enter} ref={anchors.zone}>
               <ReleaseZone
                 release={you.release}
+                support={you.support}
                 size="100px"
                 player={state.selfId}
                 slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
@@ -488,7 +553,18 @@ export default function Board({
                 targets={staging.targets}
               />
             </div>
-            <div className={kit.handWrap} ref={anchors.hand}>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan is never read as "pointed at nothing" while a pair stands merged; the Hand owns the real interaction (ComboStory's own hand wrapper carries the same guard) */}
+            <div
+              className={kit.handWrap}
+              ref={anchors.hand}
+              // the pair assembles and then waits at the CENTRE — the hand's
+              // zoom preview rises into exactly that space and would cover it
+              // (ComboStory's own reason). So while a pair stands merged the
+              // fan goes inert, and a press inside it must not read as the
+              // miss `handleTableClick` cancels on.
+              style={{ pointerEvents: staging.staged?.merged ? 'none' : undefined }}
+              onMouseDown={staging.staged?.merged ? (e) => e.stopPropagation() : undefined}
+            >
               <Hand
                 items={staging.handItems}
                 // the fan opens room for the arriving heap while it travels —
@@ -504,15 +580,35 @@ export default function Board({
                       : beats.gapSize
                     : deal.gapSize
                 }
-                // while the deal runs the hand is held: no clicks reach the
+                // a support awaiting a partner lights the hand cards it can
+                // fold with — off outside that phase (Hand ignores undefined).
+                accentAt={staging.accentAt}
+                // while the deal runs the hand is held: no clicks reach either
                 // gesture machine, and the cards that travelled closed stay
                 // closed until the flip. Both are gone the moment it ends, so
                 // the released hand is the plain one this board always drew.
-                onCardClick={deal.active ? undefined : (i) => gestures.onCardClick(i)}
+                // A partner pick is a click too, not a pull — it routes here
+                // while the staging gesture is waiting for one.
+                onCardClick={
+                  deal.active
+                    ? undefined
+                    : staging.staged?.phase === 'partner'
+                      ? (i) => staging.onCardClick(i)
+                      : (i) => gestures.onCardClick(i)
+                }
                 // drag-mode: a card that needs a target is pulled out of the
                 // fan (the staging gesture), not clicked. Off during the deal,
                 // same as the click gesture above.
                 onPlay={deal.active ? undefined : staging.onHandPlay}
+                // the reorder gesture's commit — without it the kit settles the
+                // card into its new slot and the next projection render snaps
+                // it back. `to` indexes the fan AS RENDERED (minus any staged
+                // card), which is exactly what the commit expects.
+                onReorder={
+                  deal.active
+                    ? undefined
+                    : (uid, to) => handOrder.commit(you.hand, staging.handItems, uid, to)
+                }
                 renderFace={
                   deal.active
                     ? (item, ctx) => (
@@ -692,6 +788,26 @@ export default function Board({
       {deal.overlays}
       {beats.overlays}
       {staging.overlay}
+
+      {/* the pair flyer — a persistent node (I10: position: fixed against the
+          viewport, no containing block above it, same as every other flight
+          carrier). The fold paints frame by frame directly on its
+          [data-main]/[data-aux] children; the CardPair mount just needs to
+          exist for that to have something to grab. */}
+      <div
+        className={opening.pairFlyer}
+        ref={staging.pairRef}
+        aria-hidden="true"
+        data-testid="board-pair-staged"
+      >
+        {staging.staged?.merged && staging.staged.support && staging.staged.main && (
+          <CardPair
+            main={staging.staged.main.card}
+            aux={staging.staged.support.card}
+            width="100%"
+          />
+        )}
+      </div>
     </div>
   )
 }

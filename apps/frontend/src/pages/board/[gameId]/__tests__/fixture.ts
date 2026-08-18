@@ -88,6 +88,7 @@ export function introFixture(): { gameId: string; view: PlayerView; events: Even
         release: {},
         playable: [],
         targets: {},
+        combos: {},
         frozen: [],
       },
       opponents: [{ id: 'p2', name: 'Two', handCount: 2, release: {}, eliminated: false }],

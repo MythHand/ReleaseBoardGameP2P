@@ -463,18 +463,20 @@ describe('playableFor legality rules', () => {
   })
 })
 
-describe('self.targets', () => {
-  // Builds a state with only the named players' hands replaced — everything
-  // else (deck, turn, releases) comes from a fresh default game.
-  const primed = (hands: Record<string, CardInstance[]>): GameState => {
-    const s = createGame(config())
-    let players = s.players
-    for (const [id, hand] of Object.entries(hands)) {
-      players = { ...players, [id]: { ...players[id], hand } }
-    }
-    return { ...s, players }
+// Builds a state with only the named players' hands replaced — everything
+// else (deck, turn, releases) comes from a fresh default game. Shared by
+// `self.targets` and `self.combos`, both of which prime a hand and read the
+// projection back.
+const primed = (hands: Record<string, CardInstance[]>): GameState => {
+  const s = createGame(config())
+  let players = s.players
+  for (const [id, hand] of Object.entries(hands)) {
+    players = { ...players, [id]: { ...players[id], hand } }
   }
+  return { ...s, players }
+}
 
+describe('self.targets', () => {
   it('projects legal targets for playable attacks and nothing else', () => {
     // prime: it is p1's turn (default), p1 holds an attack, a release, and a defence
     const s = primed({
@@ -529,5 +531,99 @@ describe('self.targets', () => {
       },
     }
     expect(project(windowOpen, 'p2').self.targets).toEqual({})
+  })
+})
+
+describe('self.combos', () => {
+  it('pairs Sudo with playable sudo-carriers on the holder turn', () => {
+    // p1's turn; hand: support-sudo#0, attack-bug#0 (targets exist), defense-rollback#0
+    const s = primed({
+      p1: [inst('support-sudo', 0), inst('attack-bug', 0), inst('defense-rollback', 0)],
+    })
+    const view = project(s, 'p1')
+    // rollback is a defence — not playable on your own turn, so not pairable here
+    expect(view.self.combos['support-sudo#0']).toEqual(['attack-bug#0'])
+  })
+
+  it('pairs Sudo with canAttackWith cards inside a reaction window', () => {
+    // p1 stands a Frontend release; window open on it; p2 holds the sudo pair
+    const s = primed({ p2: [inst('support-sudo', 0), inst('attack-bug', 0)] })
+    const windowOpen: GameState = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1,
+          release: { ...s.players.p1.release, frontend: { card: inst('release-frontend', 9) } },
+        },
+      },
+      window: {
+        target: { player: 'p1', slot: 'frontend' as const, card: 'attack-bug#0' },
+        round: 1,
+        openedAt: 0,
+        deadline: 0,
+        passed: [],
+      },
+    }
+    expect(project(windowOpen, 'p2').self.combos['support-sudo#0']).toEqual(['attack-bug#0'])
+  })
+
+  it('pairs Code Review with a playable release only when a third card can pay', () => {
+    // releaseCond: base; hand of exactly [release-frontend#0, support-code-review#0] —
+    // the pair would leave nothing to pay the cost, so release.ts:268 rejects it,
+    // and the offer must too
+    const twoCardHand = primed({
+      p1: [inst('release-frontend', 0), inst('support-code-review', 0)],
+    })
+    expect(project(twoCardHand, 'p1').self.combos['support-code-review#0']).toBeUndefined()
+
+    // a third card in hand is what pays the cost, so the pairing appears
+    const threeCardHand = primed({
+      p1: [
+        inst('release-frontend', 0),
+        inst('support-code-review', 0),
+        inst('protection-debugger', 0),
+      ],
+    })
+    expect(project(threeCardHand, 'p1').self.combos['support-code-review#0']).toEqual([
+      'release-frontend#0',
+    ])
+  })
+
+  it('pairs Code Review with a two-card hand under releaseCond: easy, where there is no cost', () => {
+    const s = createGame({ ...config(), setup: { ...config().setup, releaseCond: 'easy' } })
+    const easyTwoCardHand = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1,
+          hand: [inst('release-frontend', 0), inst('support-code-review', 0)],
+        },
+      },
+    }
+    expect(project(easyTwoCardHand, 'p1').self.combos['support-code-review#0']).toEqual([
+      'release-frontend#0',
+    ])
+  })
+
+  it('offers no combos while a defence pending suspends play', () => {
+    const s = primed({ p2: [inst('support-sudo', 0), inst('attack-bug', 0)] })
+    const pendingDefend: GameState = {
+      ...s,
+      pending: {
+        kind: 'defend' as const,
+        player: 'p2',
+        attacker: 'p1',
+        attack: 'attack-bug#1',
+        attackId: 'attack-bug',
+        sudo: false,
+        canDefendWith: [],
+        openedAt: 0,
+        deadline: 1000,
+        scope: 'hand' as const,
+      },
+    }
+    expect(project(pendingDefend, 'p2').self.combos).toEqual({})
   })
 })

@@ -52,6 +52,38 @@ export type BeatPlan =
   | { kind: 'discard'; key: string; cards: DiscardCard[] }
   | { kind: 'reshuffle'; key: string; cards: number }
   | { kind: 'piles'; key: string; steps: PileStep[] }
+  // A window attack reaches the centre — the pair, if it threw with a Sudo,
+  // or a lone card if not. `target` is not carried: the pair settles at the
+  // centre, not at a seat, so nowhere in the beat needs it.
+  | {
+      kind: 'attackPlaced'
+      key: string
+      eventId: number
+      attacker: string
+      card: string
+      sudo: boolean
+    }
+  // Only a Code Review combo gets a beat of its own — a plain release has
+  // nowhere to fold FROM (see the walk below).
+  | {
+      kind: 'releasePlaced'
+      key: string
+      eventId: number
+      player: string
+      slot: string
+      card: string
+      codeReview: string
+    }
+  // The pending pair splitting back into two singles for the discard. `main`
+  // is optional, not `aux`: a sudo Rollback banks only the sudo half (the
+  // attack card returns to its owner's hand instead), so the pair this beat
+  // flies can be down to one card.
+  | {
+      kind: 'pairToDiscard'
+      key: string
+      main?: { eventId: number; card: string }
+      aux?: { eventId: number; card: string }
+    }
 
 // Reasons that CAN take a card out of a release slot — "can", not "always do".
 // Typed against the engine's own union rather than `string`, so renaming a reason
@@ -162,15 +194,24 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   let draw: Extract<BeatPlan, { kind: 'draw' }> | null = null
   let discard: Extract<BeatPlan, { kind: 'discard' }> | null = null
   let pileRun: Extract<BeatPlan, { kind: 'piles' }> | null = null
+  // The pending pair's own exit — the two `discarded` events that resolve a
+  // `defend` pending, claimed here instead of by `sourceOf` below (the centre
+  // card is in no hand and no zone; `sourceOf` could never find it). Coalesces
+  // like the others, but is never open for more than the one resolution that
+  // created it: `before.pending` cannot change mid-walk, and only one
+  // exchange can be pending at a time.
+  let pairOut: Extract<BeatPlan, { kind: 'pairToDiscard' }> | null = null
   const flush = () => {
     if (draw) plans.push(draw)
     // A discard beat with nothing aimable is not a beat: every card in the run
     // failed to find a source, which the projection still resolves on its own.
     if (discard && discard.cards.length > 0) plans.push(discard)
     if (pileRun) plans.push(pileRun)
+    if (pairOut) plans.push(pairOut)
     draw = null
     discard = null
     pileRun = null
+    pairOut = null
   }
 
   for (let i = 0; i < events.length; i++) {
@@ -191,8 +232,97 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       })
       continue
     }
+    if (e.type === 'attacked') {
+      // One event, one beat — the pair (or the lone card) reaches the centre
+      // as a single gesture, never coalesced with what came before or after.
+      flush()
+      plans.push({
+        kind: 'attackPlaced',
+        key: `attack:${e.id}`,
+        eventId: e.id,
+        attacker: e.attacker,
+        card: e.card,
+        sudo: e.sudo,
+      })
+      continue
+    }
+    if (e.type === 'released' && e.codeReview) {
+      // A plain release falls through to the default below, unchanged: it has
+      // nowhere to fold FROM — the beat is only for the Code Review combo.
+      flush()
+      plans.push({
+        kind: 'releasePlaced',
+        key: `release:${e.id}`,
+        eventId: e.id,
+        player: e.player,
+        slot: e.slot,
+        card: e.card,
+        codeReview: e.codeReview,
+      })
+      continue
+    }
     if (e.type === 'discarded') {
       if (owned.has(e.id)) continue
+      const p = before.pending
+      // The sudo half of a resolving pair — checked ahead of the attack card
+      // so a sudo Rollback (which banks ONLY this half; the attack card
+      // returns to its owner's hand instead) still gets a beat: the match here
+      // does not require `pairOut` to already exist, only the other one does.
+      //
+      // `e.reason === 'attackSpent'` is load-bearing, not decoration: Rollback
+      // is itself sudo-capable (fake/attacks.ts's `onHandDefend`), so a
+      // defender can combo THEIR OWN `support-sudo` onto a Rollback. That
+      // banks the defender's group (`defenceSpent`: the Rollback card, then
+      // their sudo) BEFORE the attacker's group (`attackSpent`: their own
+      // sudo alone) — the reverse of every other resolution, where the
+      // attacker's cards are banked first. Without the reason check, the
+      // defender's `defenceSpent` sudo discard (which arrives FIRST here)
+      // would wrongly claim `pairOut.aux`, and the attacker's own
+      // `attackSpent` sudo discard — the pending's REAL other half — would
+      // then fail `!pairOut?.aux`, fall to `sourceOf`, find nothing (its card
+      // left the attacker's hand back when the attack was thrown, long before
+      // this batch), and silently vanish instead of animating.
+      if (
+        p?.kind === 'defend' &&
+        p.sudo &&
+        e.reason === 'attackSpent' &&
+        // Assumes 'support-sudo' is the only sudo-capable support card in the
+        // catalogue — silently wrong (this discard falls through to `sourceOf`
+        // instead) if a second one is ever added.
+        e.card === 'support-sudo' &&
+        !pairOut?.aux
+      ) {
+        if (!pairOut) {
+          flush()
+          pairOut = { kind: 'pairToDiscard', key: `pairOut:${e.id}` }
+        }
+        pairOut.aux = { eventId: e.id, card: e.card }
+        continue
+      }
+      // The attack card itself, claimed ahead of `sourceOf`: the centre is
+      // where it stands, and `sourceOf` would never find it there (no hand, no
+      // zone). The engine banks it before the sudo half (fake/attacks.ts's
+      // `bankSpent`), and only one exchange can be pending at a time, so a
+      // second `attackCard` match in one batch cannot happen today — the
+      // `!pairOut` guard is what would make it fall through safely if it ever
+      // did. `e.reason === 'attackSpent'` is a no-op today (the attack card is
+      // never discarded under any other reason — a Rollback returns it to
+      // hand instead of discarding it) but keeps this branch's own invariant
+      // explicit and symmetric with the sudo branch above.
+      if (
+        p?.kind === 'defend' &&
+        e.reason === 'attackSpent' &&
+        e.card === p.attackCard &&
+        !pairOut
+      ) {
+        flush()
+        pairOut = {
+          kind: 'pairToDiscard',
+          key: `pairOut:${e.id}`,
+          main: { eventId: e.id, card: e.card },
+        }
+        continue
+      }
       const source = sourceOf(e, before, claimed)
       // No source means the card is not where the board can see it — a case the
       // rules have not settled (docs/animations/backlog.md). Nothing is invented:

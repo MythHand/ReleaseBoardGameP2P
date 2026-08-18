@@ -11,6 +11,20 @@ const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
 const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
 
+// Bank cards and say so — every spent card leaves a `discarded` the board can
+// plan a movement from (the reasons existed unemitted; see the design doc).
+function bankSpent(
+  state: GameState,
+  log: Log,
+  player: PlayerId,
+  cards: CardInstance[],
+  reason: 'attackSpent' | 'defenceSpent',
+  parent?: number,
+): GameState {
+  for (const c of cards) log.add({ type: 'discarded', player, card: c.id, reason }, parent)
+  return { ...discard(state, cards), eventSeq: log.seq }
+}
+
 function clearSlot(state: GameState, player: PlayerId, slot: ReleaseSlot): GameState {
   const zone = { ...state.players[player].release }
   delete zone[slot]
@@ -136,7 +150,7 @@ export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }):
 
   return {
     state: {
-      ...(sudoCard ? discard(spent, [sudoCard]) : spent),
+      ...spent,
       pending: {
         kind: 'defend',
         player: w.target.player,
@@ -144,6 +158,7 @@ export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }):
         attack: card.uid,
         attackId: card.id,
         sudo,
+        ...(sudoCard ? { combo: sudoCard } : {}),
         canDefendWith: defencesFor(state, w.target.player, sudo),
         openedAt: action.at,
         deadline: action.at + DEFEND_MS,
@@ -169,10 +184,18 @@ function onHandDefend(
   const log = createLog(state.eventSeq)
   const attacker = pending.attacker
   const attackCard: CardInstance = { uid: pending.attack, id: pending.attackId }
+  const combo = pending.combo ? [pending.combo] : []
 
   if (choice.card === null) {
-    log.add({ type: 'tookHit', player: action.player })
-    const spent = discard({ ...state, pending: null }, [attackCard])
+    const hitId = log.add({ type: 'tookHit', player: action.player })
+    const spent = bankSpent(
+      { ...state, pending: null },
+      log,
+      attacker,
+      [attackCard, ...combo],
+      'attackSpent',
+      hitId,
+    )
     if (attackCard.id === 'attack-security-bug') {
       return {
         state: {
@@ -208,7 +231,7 @@ function onHandDefend(
       : defence.id === 'defense-works-on-my-machine'
         ? 'reflect'
         : 'cancel'
-  log.add({ type: 'defended', player: action.player, card: defence.id, effect })
+  const defendedId = log.add({ type: 'defended', player: action.player, card: defence.id, effect })
 
   const spentHand = setHand(
     state,
@@ -217,20 +240,23 @@ function onHandDefend(
   )
   const sudoCard = choice.combo ? hand.find((c) => c.uid === choice.combo) : undefined
   const spentDefence = [defence, ...(sudoCard ? [sudoCard] : [])]
-  const next: GameState = { ...spentHand, pending: null, eventSeq: log.seq }
+  let next: GameState = { ...spentHand, pending: null, eventSeq: log.seq }
 
   if (effect === 'return') {
     // Rollback hands the attack back; sudo Rollback keeps it for the defender.
     const recipient = sudoDefence ? action.player : attacker
     const returned = setHand(next, recipient, [...next.players[recipient].hand, attackCard])
     const locked = sudoDefence ? returned : lockReplay(returned, attacker, attackCard.uid)
-    return { state: discard(locked, spentDefence), events: log.events }
+    next = bankSpent(locked, log, action.player, spentDefence, 'defenceSpent', defendedId)
+    next = bankSpent(next, log, attacker, combo, 'attackSpent', defendedId)
+    return { state: next, events: log.events }
   }
 
   if (effect === 'reflect') {
     // Works on my Machine turns the attack back on its author: the roles swap,
     // so the original target becomes the taker and the attacker the victim.
-    const swapped = discard(next, [attackCard, ...spentDefence])
+    let swapped = bankSpent(next, log, attacker, [attackCard, ...combo], 'attackSpent', defendedId)
+    swapped = bankSpent(swapped, log, action.player, spentDefence, 'defenceSpent', defendedId)
     if (attackCard.id === 'attack-security-bug') {
       return {
         state: {
@@ -243,7 +269,9 @@ function onHandDefend(
     return { state: stealRandom(swapped, log, attacker, action.player), events: log.events }
   }
 
-  return { state: discard(next, [attackCard, ...spentDefence]), events: log.events }
+  next = bankSpent(next, log, attacker, [attackCard, ...combo], 'attackSpent', defendedId)
+  next = bankSpent(next, log, action.player, spentDefence, 'defenceSpent', defendedId)
+  return { state: next, events: log.events }
 }
 
 export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
@@ -264,11 +292,19 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
   // The attack card was removed from the attacker's hand when it was thrown.
   const attackCard: CardInstance = { uid: pending.attack, id: pending.attackId }
   const stealer = attackCard.id === 'attack-security-bug' ? attacker : null
+  const combo = pending.combo ? [pending.combo] : []
 
   // Take the hit.
   if (choice.card === null) {
-    log.add({ type: 'tookHit', player: action.player })
-    const spent = discard({ ...state, pending: null }, [attackCard])
+    const hitId = log.add({ type: 'tookHit', player: action.player })
+    const spent = bankSpent(
+      { ...state, pending: null },
+      log,
+      attacker,
+      [attackCard, ...combo],
+      'attackSpent',
+      hitId,
+    )
     const hit = takeRelease(spent, log, action.player, slot, stealer)
     return { state: closeWindow(hit, log), events: log.events }
   }
@@ -295,7 +331,7 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
       : defence.id === 'defense-works-on-my-machine'
         ? 'reflect'
         : 'cancel'
-  log.add({ type: 'defended', player: action.player, card: defence.id, effect })
+  const defendedId = log.add({ type: 'defended', player: action.player, card: defence.id, effect })
 
   const spentHand = setHand(
     state,
@@ -311,11 +347,13 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
     const recipient = sudoDefence ? action.player : attacker
     next = setHand(next, recipient, [...next.players[recipient].hand, attackCard])
     if (!sudoDefence) next = lockReplay(next, attacker, attackCard.uid)
-    next = discard(next, spentDefence)
+    next = bankSpent(next, log, action.player, spentDefence, 'defenceSpent', defendedId)
+    next = bankSpent(next, log, attacker, combo, 'attackSpent', defendedId)
   } else if (effect === 'reflect') {
     // Works on my Machine turns the attack on its author — the same effect they
     // were about to apply, not a generic destruction.
-    next = discard(next, [attackCard, ...spentDefence])
+    next = bankSpent(next, log, attacker, [attackCard, ...combo], 'attackSpent', defendedId)
+    next = bankSpent(next, log, action.player, spentDefence, 'defenceSpent', defendedId)
     // The effect returns as it was AIMED: the attacker's release of exactly the
     // type that was attacked. Not the defender's choice, not any other slot —
     // the mirror reading, which the card supports without an added rule (rules
@@ -333,7 +371,8 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
       next = takeRelease(next, log, attacker, victimSlot, thief)
     }
   } else {
-    next = discard(next, [attackCard, ...spentDefence])
+    next = bankSpent(next, log, attacker, [attackCard, ...combo], 'attackSpent', defendedId)
+    next = bankSpent(next, log, action.player, spentDefence, 'defenceSpent', defendedId)
   }
 
   // The release survived, so the exchange continues in a fresh, shorter window.

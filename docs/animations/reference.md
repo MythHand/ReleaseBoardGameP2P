@@ -129,7 +129,7 @@ destructure `overlay` and render it.
 | Name | Signature | What it does |
 |---|---|---|
 | `useDiscardExit` | `useDiscardExit(boxRef, onLanded?)` → `{ overlay, send, reset, FLIGHT_MS }` | `send(items)` flies **any number** of cards out at once and resolves when they land; `onLanded(cards)` gets them bottom-up for the heap. Omit `onLanded` when the scene keeps its own books on the heap |
-| `Leaving` | `{ key, card, from? \| node?, aux?, el?, pose?, layer?, scatter?, fade?, delay? }` | `from` — it stands in a slot, the step raises its own flyer; `node` — it IS an element already on screen, that element flies. `aux` + `el` — a pair: split into two singles, the aux measured off `[data-aux]`, its tilt unwound in flight. `layer` — its layer on the table (decides the heap order). `scatter` — bring your own (a card going back to its place). `fade` — it sinks below the visible top. `delay` — a stagger |
+| `Leaving` | `{ key, card, from? \| node?, aux?, el?, pose?, layer?, scatter?, auxScatter?, fade?, delay? }` | `from` — it stands in a slot, the step raises its own flyer; `node` — it IS an element already on screen, that element flies. `aux` + `el` — a pair: split into two singles, the aux measured off `[data-aux]`, its tilt unwound in flight. `layer` — its layer on the table (decides the heap order). `scatter` — bring your own (a card going back to its place), for the MAIN half. `auxScatter` — the same, for the AUX half specifically; omitted, it lands on a fresh `jitter()` instead of `scatter`'s value. `fade` — it sinks below the visible top. `delay` — a stagger |
 
 ### The carrier — a card in the air
 

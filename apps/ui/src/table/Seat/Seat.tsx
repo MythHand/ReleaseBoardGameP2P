@@ -1,7 +1,7 @@
 import Badge from '@/primitives/Badge'
 import StatusDot from '@/primitives/StatusDot'
 import ReleaseZone from '@/table/ReleaseZone'
-import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
+import type { ReleaseSlots, ReleaseSupport } from '@/table/ReleaseZone/ReleaseZone'
 import type { TableTarget } from '@/table/Table/intents'
 import styles from './Seat.module.css'
 
@@ -25,6 +25,9 @@ interface SeatProps {
   eliminated?: boolean
   disconnected?: boolean
   copy: SeatCopy
+  // карта поддержки (Code Review), лежащая под релизом — Seat лишь пробрасывает
+  // её своей зоне релиза, которая и остаётся рендерером (см. ReleaseZone).
+  support?: ReleaseSupport
   // проброс до слотов мини-зоны релиза: потребителю нужен DOM-узел конкретного
   // слота, чтобы прицелить в него полёт карты (Security Bug забирает чужой
   // релиз в СВОЮ зону). Чисто позиционный хук, на вид не влияет.
@@ -43,6 +46,7 @@ export default function Seat({
   eliminated = false,
   disconnected = false,
   copy,
+  support,
   slotRef,
   onPick,
   targets = [],
@@ -104,6 +108,7 @@ export default function Seat({
           остаётся полной (её включает сам экран, а не этот компонент) */}
       <ReleaseZone
         release={player.release}
+        support={support}
         size="72px"
         variant="compact"
         slotRef={slotRef}

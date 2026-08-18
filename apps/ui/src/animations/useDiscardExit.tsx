@@ -55,6 +55,13 @@ export interface Leaving {
   // the scatter it must land on. Omitted → a fresh one. Given when the card has a
   // place of its own in the heap already (it was taken out of it and goes back).
   scatter?: Scatter
+  // the AUX half's own landing scatter — same reason as `scatter` above, just
+  // for the other card `aux` produces. Omitted → a fresh one, same as `scatter`.
+  // A caller that already knows both halves' own discard events (the pair
+  // split, comboBeat.tsx) has to give this explicitly, or the aux lands on a
+  // random `jitter()` instead of the one the heap already rests it on (I7) —
+  // `scatter` alone only ever reached the main card.
+  auxScatter?: Scatter
   // it will sink below the visible top of the heap — dissolve on the way instead
   // of vanishing on arrival
   fade?: boolean
@@ -123,7 +130,11 @@ export function useDiscardExit(
         // its place is already in `from`; only the tilt CardPair gives it —
         // taken from the pair's own pose, so the two cannot drift apart
         pose: poseOf({ rot: (it.pose?.rot ?? 0) + PAIR_AUX.rot, dx: 0, dy: 0 }),
-        scatter: jitter(),
+        // I7: the aux lands on ITS OWN discard event's scatter when the
+        // caller knows it (the pair split, comboBeat.tsx) — a bare `jitter()`
+        // here would fly it to a random rest and then snap to its real one
+        // the instant the heap takes over.
+        scatter: it.auxScatter ?? jitter(),
         fade: main.fade,
         delay: main.delay,
         z: layer,

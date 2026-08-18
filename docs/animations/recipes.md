@@ -401,91 +401,171 @@ scene itself — this beat runs on the real board (`apps/frontend/src/features/b
 
 ---
 
-## Playing a combo (pair) — two hand cards → merge at center → release zone or discard
+## Playing a combo (pair) — support pulled, partner folds in, then the board's own beat
+
+> **Shipped shape (#100).** The gesture below is the ported, engine-fed form of ComboStory's own
+> `pickPartner`/`cancelStage` (`_useBoardStaging.ts`) — `state.comboOptions` (the projection's
+> `PlayerView.self.combos`) stands in for ComboStory's mocked `validComboTarget`, and the fan's own
+> geometry stands in for its local `refs`. The **beat** ("The beat", below) is new: a separate,
+> event-driven runner (`features/board-beats/comboBeat.tsx`) that plays the same fold for an
+> opponent's combo, and splits the pending pair back to the discard at resolution.
 
 **When to call**
-Phases `idle → partner → target` (`onCardDown`, guard `if (playing) return`):
-- **idle:** if `isComboSource(item.card)` → `setSource`, `aim(centerOf(ref), { x, y })`, `setPhase('partner')`.
-- **partner:** pick a 2nd card; if `item.uid !== source.uid && validComboTarget(source.card, item.card)` →
-  if `cardCanTarget(item.card)` → `setPartner`, `aim(...)`, `setPhase('target')`; else `runPlay(src, item)` now.
-  Otherwise `cancel()`.
-- **target:** click a target zone → `runPlay(source, partner, label)`.
-A `window` mousedown while `active` cancels the aim.
+- **Pull** (`onHandPlay`, guard `if (!enabled || staged) return false`): a card with a target of its
+  own stages a plain aim (see "Targeted arrow attack") — a card with NO target of its own but a
+  non-empty `state.comboOptions[uid]` stages the pair's first half instead: `support` set, `phase:
+  'partner'`, the arrow armed from the centre exactly as a plain aim's is (`aimFromCentre`), and
+  every partner still in the fan lit in the support's own category colour (`accentAt` — ComboStory's
+  "the TYPE is the message").
+- **Pick a partner** (`onCardClick`, guard `phase === 'partner'`, refused while a cancel or a fold is
+  already in flight): not in `state.comboOptions[support.uid]` → `cancel()`, the whole staging
+  returns to the fan. A hit commits the fold (`merged: true`) and sets `foldingRef.current = true` —
+  irrevocable from here (ComboStory's own `playing`): neither `cancel()` nor a second click on
+  another candidate is honoured again until the fold's own `finish()` (or one of its early bails)
+  clears the flag.
+- **After the fold** (`finish()`), by partner kind: a window already covers it →
+  `onAttack(main.uid, support.uid)` at once; the partner still needs a target → `phase: 'target'`,
+  re-aim; else (a release) → `onPlay(main.uid, undefined, support.uid)`.
 
 **Visual result**
-An arrow points from the source card; on play both cards fly from their hand spots to the table
-center and fold into a pair (helper tucked under the main at an angle), the pair holds at the
-center, then a **release** flies into its zone slot, or **anything else** splits into two singles
-that scatter into the discard.
+Pulling the support stands it alone at the centre and arms the arrow; every legal partner lights in
+the support's own category colour. Clicking one folds the two together — the partner travels in
+from its own fan slot, the support stays put — and the merged pair immediately either dispatches
+into an open window, aims for a target, or plays straight through to a release slot. From there the
+beat takes the pair the rest of the way: resting as the pending exchange at the centre, or settling
+into the release zone.
 
 **Elements / refs**
-- `refs[uid]` — hand-card spots (source/partner measured here).
-- `centerRef` — merge target; `slotRefs[key]` — release-zone slots (`key = prt.card.name.toLowerCase()`).
-- `discardRef` — discard slot.
-- `flyRef` — the **persistent** flyer div (opacity-toggled, not unmounted) holding a `CardPair` with
-  `[data-main]` / `[data-aux]` children.
-- State: `phase`, `source`, `partner`, `flyPair`, `released`, `discardPile`, `playing`; `useArrow()`.
+- `anchors.centre` — the merge target, the same node the plain-aim recipe stages onto.
+- `state.comboOptions[uid]` — the engine's own legal-partner list (`PlayerView.self.combos`, keyed
+  support-first), replacing ComboStory's mocked `validComboTarget` (`mockLegality.ts`, its functions
+  retired from the board, kept only to run the playground story).
+- `slotBox(index, total)` — the partner's own FAN geometry, not a slot's rotated bounding rect
+  (**I6**) — `anchors.hand`'s rect + `slotPlacement`, standing in for ComboStory's `refs[uid]`.
+- `pairRef` — the persistent pair-flyer node `_Board.tsx` mounts (`data-testid="board-pair-staged"`);
+  `CardPair` renders inside it only once `staged.merged`, painted frame by frame on its
+  `[data-main]` / `[data-aux]` children — the same idiom as ComboStory's own `flyRef`.
+- `foldingRef` — true from the click that commits the fold until `finish()` (or an early bail)
+  clears it in a `finally`; `cancel()` and a second `onCardClick` both refuse while it holds.
+- `StagedHandoff` (`entities/game/board/types.ts`) — the seam to the beat: `mainUid`, `supportUid?`,
+  the DOM node the staged play already stands on (`pairRef` once merged, else the solo staged node),
+  and `release()` — the hook's own no-flight clear.
 
-**Sequence** (`runPlay(src, prt, targetLabel?)`)
-1. `setPlaying(true)`; `cancel()` (drops the arrow).
-2. Measure — **[I1]**: `mainHand = refs[prt.uid]`, `auxHand = refs[src.uid]`, `cRect = centerRef`.
-3. `setHand(remove src & prt)`.
-4. `setFlyPair({ main: prt.card, aux: src.card })`; `await nextFrames()` — **[I2]**.
-5. `el = flyRef`. **Cancel all subtree animations**: `for (const a of el.getAnimations({ subtree: true })) a.cancel()`
-   — **[I3]** (the flyer node is reused; a leftover `fill:forwards` would overwrite the new transforms).
-6. Pin the flyer to the center: `el.style.left/top/width = cRect`; `el.style.transform = 'none'`.
-7. `mainEl = el.querySelector('[data-main]')`, `auxEl = '[data-aux]'`. Compute
-   `enterMain = enterTransform(mainHand, cRect)` and `enterAux = enterTransform(auxHand, cRect)`
-   (translate-by-centers + scale-by-width placing each card at its hand spot in the center's coord
-   system). Set `mainEl/auxEl.style.transform = enter*`; `el.style.opacity = '1'`; `await nextFrames()` — **[I2]**.
-8. **Merge at the center** — bespoke inline `animate()`, **not a preset**:
-   - `mainEl`: `[enterMain → 'translate(0,0) scale(1)']`, **620 ms**, EASE, `fill:'forwards'`.
-   - `auxEl`: `[enterAux → 'translateY(-26%) rotate(-7deg)']`, **620 ms**, SNAP, `fill:'forwards'`.
-   - `await Promise.all([a1.finished, a2.finished])`.
-9. `await wait(2100)` — hold the assembled pair at the center (visible to all).
-10. Branch on `prt.card.category`:
-    - **release** → `toRect = slotRefs[key]`; `play('playToReleaseZone', el, { from: cRect, to: toRect })`
-      (the whole pair, SNAP); await; `setReleased(key → { card: prt.card, aux: src.card })`;
-      `await nextFrames()`; `hideFlyer()`.
-    - **else (discard)** → hand the pair to **`useDiscardExit`** — one entry with `aux` + `el` (the
-      flyer), and it becomes **two** singles, each flying from where that half actually stands.
-      **Order matters:** call the step **first**, while the pair is still on screen (it measures both
-      halves as it starts), and only then clear the staging and hide the flyer — the centre slot
-      renders the source whenever the pair is gone, so hiding first puts the source card back on the
-      table for the whole flight.
-11. `setLog(...)`; `setPlaying(false)`.
+**Sequence** (`onCardClick`, once a support already stands at the centre)
+1. Validate the click against `state.comboOptions[support.uid]`; a miss calls `cancel()` and stops.
+2. Measure — **[I1]**: `mainHand = slotBox(index, handItems.length)`, `cRect = anchors.centre`.
+3. `arrowCtl.stop()` — the choice is made; commit `{ support, main, phase: 'partner', merged: true }`;
+   `foldingRef.current = true`.
+4. Reduced motion (or no fan geometry to fold from): pin `pairRef`'s `left/top/width/opacity` to
+   `cRect` directly and call `finish()` at once — `CardPair`'s own inline pose (main identity, aux
+   `PAIR_AUX_POSE`) already IS the pair at rest, nothing to paint frame by frame.
+5. Otherwise: `await nextFrames()` — **[I2]**, the just-mounted `CardPair` has painted. Cancel
+   leftover animations on `pairRef` (`getAnimations({ subtree: true })`) — **[I3]**. Pin `pairRef` to
+   `cRect`; paint the first frame with `enterPose(mainHand, cRect)` on `[data-main]` and
+   `enterPose(cRect, cRect)` on `[data-aux]` — the support's own entry pose is the degenerate
+   identity case (it is already at the centre), no separate branch. `await nextFrames()` again.
+6. **The fold** — `play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: 620 })` and
+   `play('foldIntoPair', auxEl, { from: cRect, box: cRect, pose: PAIR_AUX_POSE, dur: 620, snap: true })`
+   in parallel; `await Promise.all([a1?.finished, a2?.finished])`.
+7. `finish()` — wrapped in `try`/`finally` so every exit clears `foldingRef`, not only this one —
+   branches on the partner: a window names it → `phase: 'dispatched'`, `onAttack(main.uid,
+   support.uid)`; it still has its own targets → `phase: 'target'`, re-aim from the centre; else (a
+   release) → `phase: 'dispatched'`, `onPlay(main.uid, undefined, support.uid)`.
+
+Staging's own job ends here — there is no `PAIR_HOLD`-style wait the way ComboStory holds the
+assembled pair for 2100 ms; the beat owns everything from the dispatch onward.
+
+**Cancel, at any stage before the fold commits**
+A lone support (`phase: 'partner'`, not yet merged) returns the single-card way the plain-aim recipe
+already does. A committed pair returns as ComboStory's `cancelStage` does: both halves fly off
+`pairRef` in one `useHandArrival.arrive` call (`anchor: 'aux' | 'main'`), landing at the support's
+own pull-time index sized for both — one group, the fan settling to projection order once `staged`
+clears.
+
+**The beat — `attacked` / `released(codeReview)` / the resolution split (`features/board-beats/comboBeat.tsx`)**
+What happens once the engine answers is a separate, event-driven beat — it also plays an opponent's
+combo, or a local window attack that staged nothing at all.
+- **`attackPlaced`**, planned from every `attacked` (sudo or not — a plain attack is this same
+  runner's aux-less degenerate case, no separate branch): `runAttack` reads the staging→beat handoff
+  SYNCHRONOUSLY, before its first `await` — the actor's OWN play is already standing exactly where
+  the pending render takes over, so nothing moves; it calls `handoff.release()` and hands the table
+  back. Anyone else's attack folds the pair in fresh via `foldIn` — a second, beat-side
+  implementation of the same steps as the gesture's own fold above (raise a carrier at the centre via
+  `useFlyer`, paint both halves at their source with `enterPose`, `await nextFrames()` — **I2** —
+  then `foldIntoPair` per half from the actor's seat or the hand slot a local thrower's card left) —
+  and settles at the centre pending, `[data-pending-play]`, upgraded from a lone card to a `CardPair`
+  under `pending.sudo`.
+- **`releasePlaced`**, planned from a `released` carrying `codeReview` (a plain release has nowhere
+  to fold FROM and keeps its existing behaviour): `runRelease` reads the same handoff; the actor's
+  own staged pair flies `playToReleaseZone` straight from the centre to the slot; anyone else's folds
+  in first via `foldIn`, then flies. The landing pose is `ReleaseZone`'s own static `CardPair` render
+  — the beat's last frame IS the projection.
+- **`pairToDiscard`**, planned from the resolution's `discarded` pair: `planBeats` matches the
+  pending exchange's two halves — sudo-first, since a sudo Rollback banks only the sudo half — ahead
+  of the ordinary discard routing (the centre is in no hand and no zone, so `sourceOf` would never
+  find it there). `runPairOut` measures `[data-pending-play]` and hands `useDiscardExit` one
+  `Leaving` with `aux` set: the pair splits into two singles, the aux riding its own `auxScatter`
+  (`scatterAt` of its own `discarded` event — **I7** — the main's `scatter` alone only ever reached
+  the main card; without this the aux would fly to a random `jitter()` and snap to its true rest the
+  instant the heap took over).
 
 **Params & timings**
 | Step | Preset / animation | Duration | Easing |
 |---|---|---|---|
-| merge — main | inline `animate()` | 620 ms | EASE → `translate(0,0) scale(1)` |
-| merge — aux (tuck) | inline `animate()` | 620 ms | SNAP → `translateY(-26%) rotate(-7deg)` |
-| hold assembled pair | `wait(2100)` | 2100 ms | — |
+| fold — main half | `foldIntoPair` | 620 ms | EASE → its `enterPose` origin to identity |
+| fold — aux half | `foldIntoPair` (`snap`) | 620 ms | SNAP → `PAIR_AUX_POSE` |
 | release → zone | `playToReleaseZone` | 480 ms | SNAP |
-| discard (per card) | `useDiscardExit` | 420 ms | EASE + its own scatter |
+| discard (per half) | `useDiscardExit` | 420 ms | EASE + `scatterAt` / `auxScatter` |
 
 **Invariants**
-- **I1** measure the three rects before mutating the hand. **I2** `nextFrames()` after mounting the
-  pair and before the merge. **I3** cancel subtree animations on the reused flyer before
-  repositioning. **I7** is the step's job now — one scatter per card, flight and rest from the same value.
-- Local: the flyer is a **persistent opacity-toggled** node with one `CardPair` (not mounted per
-  flight) — hence the mandatory **[I3]** and `hideFlyer()` (opacity → 0) instead of unmount.
-- The discard holds **singles**: a pair reaches it as **two** entries — the step splits it.
-- Cancel goes through **`useHandArrival`**: the whole staging back into the middle of the fan at once
-  (a lone card from the centre slot, a merged pair by its two anchors).
+- **I1** measure the fan slot and the centre before mutating anything, in both the gesture's fold and
+  the beat's `foldIn`. **I2** `nextFrames()` after mounting/painting the pair's first frame, in both
+  places too. **I3** cancel subtree animations on the reused `pairRef` node before repositioning it.
+  **I6** the partner's box comes from the fan's own geometry (`slotBox`), not a rotated slot rect.
+  **I7** the aux half's discard flight and the heap's own rest for it share one scatter
+  (`auxScatter`), never a fresh `jitter()`. **I8** the staging→beat handoff is read synchronously,
+  before the beat's first `await` — reading it one line later, after `nextFrames()`, loses a race
+  against `_useBoardStaging`'s own passive hand-watching effect, which would otherwise fold the
+  actor's own play in a SECOND time from a hand slot it already left (found empirically; pinned by
+  `comboHandoff.test.tsx`).
+- The pair flyer (`pairRef`) is a **persistent** node, opacity/position toggled rather than remounted
+  per fold — the same reason `foldIntoPair` is a per-half call, not a move of the whole pair.
+- The discard holds **singles**: the pending pair reaches it as **two** entries, split by
+  `runPairOut`.
 
 **End state & cleanup**
-- Release: `released[key] = { card, aux }`; flyer hidden. Discard: two `DiscardEntry` appended;
-  flyer hidden. `playing = false`; `log` set.
+Dispatched and adopted by the board: `staged` clears via `handoff.release()`, no flight at all.
+Folded in from elsewhere: the pair rests at `[data-pending-play]` (an attack) or in the
+`ReleaseZone`'s support slot (a release) — the beat's last frame is the projection either way.
+Resolved: two `DiscardEntry`s land in the heap; `[data-pending-play]` is gone.
+
+**Under `prefers-reduced-motion`**
+The gesture places the standing card(s) instantly (step 4 above). The beat is never planned and
+never runs (`useBeats`'s own blanket `if (reduced) return`); the board renders the projection it
+already holds.
+
+**Not yet right, and recorded**
+A sudo Rollback returns the attack card to a hand with no movement on the board at all, while the
+pending pair's own exit still sends the sudo half to the discard as if the whole pair had resolved
+that way — the return's own exchange choreography is Wave 3 (#101). A cancelled pair also returns
+both halves through one fan gap at the support's own index rather than two independent ones —
+ComboStory's own middle-return acceptance, kept as-is unless it reads badly on the live board. Both
+findings are in [`backlog.md`](./backlog.md) and the audit page's register.
 
 **Building blocks**
-[`playToReleaseZone`](./reference.md#presets) · [`centerToDiscard`](./reference.md#presets) ·
-[`jitter()`](./reference.md#travel-and-timing-helpers) · [`nextFrames()`](./reference.md#travel-and-timing-helpers) ·
-[`wait()`](./reference.md#travel-and-timing-helpers) · [`useArrow`/`centerOf`](./reference.md#arrow-toolkit) ·
-`CardPair`. The merge is a **bespoke inline `animate()`**, not a registered preset.
+[`foldIntoPair`](./reference.md#presets) · [`playToReleaseZone`](./reference.md#presets) ·
+[`enterPose`](./reference.md#presets) ·
+[`useDiscardExit`](./reference.md#the-movement-steps-and-the-carrier-under-them) ·
+[`scatterAt`](./reference.md#discard-scatter) ·
+[`planBeats`/`useBeats`/`BoardAnchors`](./reference.md#the-boards-layer--anchors-and-the-beat-queue) ·
+[`nextFrames()`](./reference.md#travel-and-timing-helpers) ·
+[`useArrow`/`centerOf`](./reference.md#arrow-toolkit) · `CardPair`, `PAIR_AUX_POSE`.
 
 **Live reference**
-`Combo` — `apps/playground/stories/ComboStory/ComboStory.tsx`.
+`Combo` — `apps/playground/stories/ComboStory/ComboStory.tsx`, the design-exploration scene the fold
+was ported from verbatim — no engine behind it. The shipped gesture and beat run on the real board:
+`apps/frontend/src/pages/board/[gameId]/_useBoardStaging.ts` (the pull/fold) and
+`apps/frontend/src/features/board-beats/comboBeat.tsx` (the beat).
 
 ---
 

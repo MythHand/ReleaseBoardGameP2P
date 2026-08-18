@@ -352,8 +352,17 @@ export default function Hand({
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
       if (inBand(e.clientY)) {
-        const to = slotUnderCursor(e.clientX)
-        settleInto(to, () => onReorder?.(drag.uid, to))
+        // Only with a consumer commit: the settle into a NEW slot is a promise
+        // that the order changed, and with no `onReorder` to keep it the next
+        // render snaps the card straight back — an animation that lies. A
+        // drag-enabled hand without the commit returns the card to its own
+        // slot instead, the same glide a rejected play takes.
+        if (onReorder) {
+          const to = slotUnderCursor(e.clientX)
+          settleInto(to, () => onReorder(drag.uid, to))
+        } else {
+          settleInto(items.findIndex((it) => it.uid === drag.uid))
+        }
         return
       }
       // out of the hand → play, but only if the consumer accepts the drop;
