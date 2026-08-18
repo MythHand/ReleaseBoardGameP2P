@@ -182,6 +182,46 @@ it('a rejected action returns the staged card', async () => {
   await waitFor(() => expect(fanUids()).toContain('attack-bug#0'))
 })
 
+// Backported from #117's bdf037f (#116 review, point 3): `useGame` accumulates
+// events for the whole match (never trims), so an unwatermarked scan of the
+// whole feed keeps finding a card's OWN past rejection forever. A fresh
+// re-dispatch of the same card must not read that stale entry as ITS OWN
+// rejection the moment anything else lands in the feed — the watermark
+// discipline `useBeats` already applies to this same array (there keyed by
+// event id across the whole match; here by length, captured fresh at every
+// dispatch).
+it('a stale rejection for a returned card does not cancel its fresh re-dispatch', async () => {
+  const onPlay = vi.fn()
+  const { rerender } = render(boardWith({ targets: BUG_TARGETS }, { onPlay }))
+  await pullCardFromFan('attack-bug#0')
+  await pressSeat('p2')
+  expect(onPlay).toHaveBeenCalledTimes(1)
+  // first attempt rejected — the card returns to the fan (as above)
+  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [rejectedEvent('attack-bug#0')]))
+  await waitFor(() => expect(fanUids()).toContain('attack-bug#0'))
+
+  // a second, legitimate dispatch of the SAME card
+  await pullCardFromFan('attack-bug#0')
+  await pressSeat('p2')
+  expect(onPlay).toHaveBeenCalledTimes(2)
+
+  // an unrelated event lands (any sync between this dispatch and its
+  // acceptance) — the feed still carries the FIRST attempt's own rejection,
+  // since it only ever grows. Without a watermark this would be misread as
+  // THIS dispatch's own rejection and cancel it right back to the fan.
+  rerender(
+    boardWith({ targets: BUG_TARGETS }, { onPlay }, [
+      rejectedEvent('attack-bug#0'),
+      { id: 2, type: 'turnEnded', player: 'p2' },
+    ]),
+  )
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  expect(screen.getByTestId('board-centre-staged')).toBeTruthy()
+  expect(fanUids()).not.toContain('attack-bug#0')
+})
+
 it('the staged card must not be cancellable after dispatch', async () => {
   render(boardWith({ targets: BUG_TARGETS }))
   await pullCardFromFan('attack-bug#0')

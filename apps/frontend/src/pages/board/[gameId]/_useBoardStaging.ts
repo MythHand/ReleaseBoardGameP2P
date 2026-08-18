@@ -97,6 +97,20 @@ export function useBoardStaging({
   dispatchedRef.current = dispatched
   const cancellingRef = useRef(cancelling)
   cancellingRef.current = cancelling
+  // the feed as of THIS render — read for its `.length`, never scanned
+  // directly outside the rejected-watcher effect below (which has its own,
+  // fresher closure over `events` since it re-runs whenever the array does).
+  const eventsRef = useRef(events)
+  eventsRef.current = events
+  // How far into the feed a dispatch had already looked, captured the instant
+  // `onTargetPick` committed it — `useGame` accumulates events for the whole
+  // match and the rejected-watcher below only reads what came AFTER this
+  // point. Without it, a card rejected once and later re-dispatched reads its
+  // own OLD rejection off the feed the moment anything else syncs in between
+  // — the same watermark discipline `useBeats` applies to this same array,
+  // keyed there by event id; here by length, since it is captured fresh at
+  // every dispatch rather than held for a whole match.
+  const dispatchWatermarkRef = useRef(0)
 
   const arrival = useHandArrival(anchors.hand, () => {
     // The return flight landed: the cancel is over. Synchronous, same reason
@@ -164,6 +178,7 @@ export function useBoardStaging({
       // straight back to the fan.
       dispatchedRef.current = true
       setDispatched(true)
+      dispatchWatermarkRef.current = eventsRef.current.length
       actions?.onPlay?.(s.uid, target, undefined)
     },
     [targets, actions, arrowCtl.stop],
@@ -205,11 +220,17 @@ export function useBoardStaging({
     }
   }, [state.you.hand])
 
-  // the engine said no: the staged card returns to the fan
+  // the engine said no: the staged card returns to the fan. Scoped to what
+  // arrived AFTER this dispatch (`dispatchWatermarkRef`) — `events`
+  // accumulates for the whole match, so an unwatermarked scan would keep
+  // finding this SAME card's own past rejection (from an earlier,
+  // already-resolved attempt) and wrongly cancel a fresh re-dispatch of it
+  // the moment anything else in the feed changes.
   useEffect(() => {
     const s = stagedRef.current
     if (!s || !dispatchedRef.current) return
-    const rejectedOurs = events.some(
+    const fresh = events.slice(dispatchWatermarkRef.current)
+    const rejectedOurs = fresh.some(
       (e) => e.type === 'rejected' && 'card' in e.action && e.action.card === s.uid,
     )
     if (rejectedOurs) {
