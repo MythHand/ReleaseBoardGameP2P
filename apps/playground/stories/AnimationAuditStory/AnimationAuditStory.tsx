@@ -35,7 +35,11 @@ interface Scenario {
   // Сторона кита: сцена или компонент, где движение показано и отлаживается.
   where: string
   // Сторона борда: модуль фронтенда, который играет эту хореографию от настоящих
-  // событий движка. Пусто — значит хореография живёт только в плейграунде.
+  // событий движка; несколько — через запятую, как и на стороне кита (у дока
+  // там четыре компонента в одном поле). Сценарий здесь — игровая СИТУАЦИЯ, а
+  // не модуль: если фронтенд разложил её на два файла, это факт про раскладку
+  // файлов, а не повод разделить запись. Пусто — значит хореография живёт
+  // только в плейграунде.
   // Поле обязано быть отдельным, а не строкой внутри описания: «доехало ли до
   // доски» — это состояние работы, то самое, ради которого страница и заведена,
   // и молчание в общем тексте читается тремя разными способами сразу («ещё нет»,
@@ -570,7 +574,7 @@ const SCENARIOS: Scenario[] = [
       en: 'pick a card with the mouse and drag: out of the hand → play (onPlay), inside the hand → reorder (onReorder, local). A DRAG_THRESHOLD tells a click from a drag — a click (onCardClick) coexists. The flyer is a fixed node following the cursor (rAF); on release settleInto glides it into the slot (rotate to the slot angle, z tucked under the neighbours). The flyer’s transform-origin: bottom center matches the slot pivot — no end-of-glide jump. Hover: lift + neighbours part (no in-place scale, no jump to the top layer); readability comes from a separate zoom preview above the hand (one-shot appear via @keyframes zoom-rise, exit is opacity only).',
     },
     where: 'Hand (fan), HandStory',
-    board: 'pages/board/[gameId]/_useBoardStaging.ts',
+    board: 'pages/board/[gameId]/_useBoardStaging.ts, features/hand-order/useHandOrder.ts',
   },
   {
     name: { ru: 'Error 503 — ход игрока и защита', en: 'Error 503 — player turn & defence' },

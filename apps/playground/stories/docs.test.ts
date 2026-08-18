@@ -24,8 +24,10 @@ import audit from './AnimationAuditStory/AnimationAuditStory.tsx?raw'
 
 const MODULE_NAMES = /^\s{4}mod: '(.+)',$/gm
 
-// the board side of a scenario: a path relative to apps/frontend/src
-const BOARD_PATHS = /^\s{4}board: '(.+)',$/gm
+// The board side of a scenario: one or more paths relative to apps/frontend/src,
+// comma-separated. A long value wraps onto its own line, so the value is matched
+// after the key rather than on the same line as it.
+const BOARD_PATHS = /^\s{4}board:\s*\n?\s*'(.+)',$/gm
 
 // every module the frontend actually has, keyed by the same relative path the
 // audit page writes — the glob is lazy, so nothing here loads the frontend
@@ -95,7 +97,9 @@ describe('the animation docs and what they describe', () => {
   // no longer exists, and it would assert it silently, which is the exact failure
   // mode the presets/reference test was written for.
   it('points every board path at a module that exists', () => {
-    const paths = [...audit.matchAll(BOARD_PATHS)].map((m) => m[1])
+    const paths = [...audit.matchAll(BOARD_PATHS)].flatMap((m) =>
+      m[1].split(',').map((one) => one.trim()),
+    )
     expect(paths.length).toBeGreaterThan(5) // the page was parsed, not just matched
     // Vite's own glob rather than node:fs: this package keeps a browser-only
     // type surface (no @types/node), and the glob is resolved at build time
