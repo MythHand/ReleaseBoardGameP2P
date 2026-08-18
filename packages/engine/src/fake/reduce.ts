@@ -232,7 +232,13 @@ function onClockStarted(state: GameState, action: Action & { type: 'CLOCK_STARTE
   if (state.pending) return reject(state, action, 'a decision is pending')
   if (state.window) return reject(state, action, 'a reaction window is open')
   if (state.drawing) return reject(state, action, 'a draw is in progress')
-  if (state.turn.deadline !== undefined) {
+  // A LIVE clock may not be restarted — that would be an extension. An expired
+  // one may: the keeper's tick refuses to fire a deadline against an empty
+  // seat, so a player who dropped mid-turn returns to a clock that ran out
+  // with nobody able to act on it. Restarting it is the deferred expiry being
+  // handed back to its owner, and the keeper is the only party who can ask
+  // (CLOCK_STARTED is not a peer intent — session/referee.ts).
+  if (state.turn.deadline !== undefined && action.at < state.turn.deadline) {
     return reject(state, action, 'the turn clock is already running')
   }
   return {

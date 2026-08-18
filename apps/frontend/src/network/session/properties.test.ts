@@ -376,7 +376,7 @@ it('restores a reconnecting peer to exactly its projection', () => {
   expect(session.state.window).not.toBeNull()
 
   const dropped = disconnect(session, 'peer-b', 9_000).session
-  const { outgoing } = rebind(dropped, 'b', 'peer-b-2')
+  const { outgoing } = rebind(dropped, 'b', 'peer-b-2', 9_000)
   const sync = outgoing[0]
 
   expect(sync.message.type).toBe('SYNC')

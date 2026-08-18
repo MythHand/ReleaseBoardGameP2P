@@ -3,7 +3,9 @@ import {
   ABSENT_GRACE_MS,
   applyIntent,
   createSession,
+  disconnect,
   driveAbsent,
+  rebind,
   type Session,
   type SessionResult,
   tick,
@@ -506,4 +508,60 @@ it('leaves a stalled defence for a disconnected seat to resolve on reconnection'
   // to make for an absent player.
   expect(result.session).toBe(disconnected)
   expect(result.outgoing).toEqual([])
+})
+
+// The reviewer's scenario on #113, decided as: the absence shield hands the
+// turn BACK on return, it does not spend it. The deadline expires while the
+// seat is empty (tick refuses to fire it — driveAbsent's grace owns absence),
+// and the player comes back inside the grace window. Without the re-stamp the
+// very next tick would see a seated player and an expired clock, and auto-play
+// their whole turn before they get a single frame to act in.
+it('hands a returning player a fresh clock instead of playing them out', () => {
+  const { session } = twoPlayerSession()
+  const started = tick(session, 1_000).session
+  const deadline = started.state.turn.deadline ?? 0
+  const player = started.state.turn.player
+  const seat = started.seats.find((s) => s.playerId === player)
+  const handBefore = started.state.players[player].hand.length
+
+  // They drop before the deadline; the expiry then fires into an empty seat
+  // and is deferred, exactly as tick's own comment promises.
+  const dropped = disconnect(started, seat?.peerId ?? '', deadline - 5_000).session
+  const deferred = tick(dropped, deadline + 1)
+  expect(deferred.session).toBe(dropped)
+
+  // Back inside the absence grace. The rebind restores the seat AND the turn:
+  // a fresh clock, stamped at the return.
+  const returned = rebind(dropped, player, 'peer-back', deadline + 10_000)
+  expect(returned.session.state.turn.deadline).toBe(deadline + 10_000 + TURN_ACTION_MS)
+  // The re-stamp is a state change every seat renders (the dock's ring), so it
+  // travels to everyone, not only the rejoiner.
+  expect(returned.outgoing.map((o) => o.to).sort()).toEqual(
+    returned.session.seats
+      .map((s) => s.peerId)
+      .filter((p): p is string => p !== null)
+      .sort(),
+  )
+
+  // The moment that used to lose the turn: the next tick. Nothing fires.
+  const after = tick(returned.session, deadline + 10_001)
+  expect(after.session).toBe(returned.session)
+  expect(returned.session.state.turn.player).toBe(player)
+  expect(returned.session.state.players[player].hand.length).toBe(handBefore)
+})
+
+it('leaves a live clock alone when its owner reconnects — no extension', () => {
+  const { session } = twoPlayerSession()
+  const started = tick(session, 1_000).session
+  const deadline = started.state.turn.deadline ?? 0
+  const player = started.state.turn.player
+  const seat = started.seats.find((s) => s.playerId === player)
+
+  const dropped = disconnect(started, seat?.peerId ?? '', 2_000).session
+  // Back BEFORE the deadline: the remaining time stands — blinking the
+  // connection buys nothing.
+  const returned = rebind(dropped, player, 'peer-back', deadline - 1_000)
+  expect(returned.session.state.turn.deadline).toBe(deadline)
+  expect(returned.outgoing).toHaveLength(1)
+  expect(returned.outgoing[0].to).toBe('peer-back')
 })

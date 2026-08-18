@@ -133,7 +133,12 @@ export function disconnect(session: Session, peerId: string, now: number): Sessi
   return { session: { ...session, seats }, outgoing: [] }
 }
 
-export function rebind(session: Session, playerId: PlayerId, peerId: string): SessionResult {
+export function rebind(
+  session: Session,
+  playerId: PlayerId,
+  peerId: string,
+  now: number,
+): SessionResult {
   const seat = session.seats.find((s) => s.playerId === playerId)
   if (!seat) return { session, outgoing: [] }
 
@@ -150,6 +155,28 @@ export function rebind(session: Session, playerId: PlayerId, peerId: string): Se
     s.playerId === playerId ? { ...s, peerId, absentSince: null } : s,
   )
   const next: Session = { ...session, seats }
+
+  // A turn deadline that expired while this seat was EMPTY was deferred, not
+  // spent: `tick` refuses to fire a deadline against a seat with nobody in it,
+  // and says the absence grace owns a disconnected seat's forward progress. So
+  // the shield has to end by handing the turn back, not by forfeiting it — a
+  // returning player who found their clock expired gets a fresh one, or the
+  // very next tick would auto-play their whole turn before their board even
+  // painted. Only an EXPIRED clock: a live one keeps its remaining time, so
+  // blinking the connection extends nothing. The first clock stays the
+  // ticker's to start — an undefined deadline is not an expired one.
+  const { turn } = next.state
+  if (turn.player === playerId && turn.deadline !== undefined && now >= turn.deadline) {
+    const { state, events } = next.engine.reduce(next.state, { type: 'CLOCK_STARTED', at: now })
+    if (state !== next.state) {
+      const restamped: Session = { ...next, state }
+      // The new clock is a state change every seat renders (the dock's ring
+      // ticks on it), so it travels to everyone — the rejoiner's catch-up
+      // projection rides in the same fan-out.
+      return { session: restamped, outgoing: syncAll(restamped, events) }
+    }
+  }
+
   // Catch-up is one projection, not a replay: a peer's state was never a fold
   // over deltas it might have missed.
   return { session: next, outgoing: [{ to: peerId, message: syncMessage(next, playerId, []) }] }

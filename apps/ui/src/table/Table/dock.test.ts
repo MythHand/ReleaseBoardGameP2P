@@ -149,4 +149,25 @@ it('ticks the clock in exactly the states that draw a counting ring', () => {
   expect(
     isCounting({ ...base, turn: 'p2', pending: { ...defendPending, player: 'p2' } }, 'you'),
   ).toBe(true)
+  // ELIMINATED, but the window is on your own release: deriveDock still draws
+  // the hold ring with a live clock (the owner branch never asks who is
+  // alive), so the tick rule must say true here too — a false freezes the ring
+  // mid-count, the one defect this function exists to prevent. Likely
+  // unreachable today (elimination discards your releases), but the invariant
+  // is written as total, so the mirror is kept total.
+  expect(
+    isCounting({ ...base, you: { ...base.you, eliminated: true }, turn: 'you', window }, 'you'),
+  ).toBe(true)
+  // …while an eliminated WATCHER of someone else's window gets no ring at all.
+  expect(
+    isCounting(
+      {
+        ...base,
+        you: { ...base.you, eliminated: true },
+        turn: 'p2',
+        window: { ...window, player: 'p2' },
+      },
+      'you',
+    ),
+  ).toBe(false)
 })

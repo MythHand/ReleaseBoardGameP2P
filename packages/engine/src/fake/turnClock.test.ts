@@ -121,3 +121,23 @@ it('rejects CLOCK_STARTED once the game is over', () => {
   const r = reduce(done, { type: 'CLOCK_STARTED', at: 5000 })
   expect(r.state).toBe(done)
 })
+
+// A deadline can outlive its own expiry unacted: the keeper's tick refuses to
+// fire it against an empty seat, so a player who drops mid-turn comes back to a
+// clock that ran out while nobody could act on it. Restarting THAT clock is
+// legal — it is the deferred-expiry handover, not an extension of a live turn.
+it('restarts the clock when the old deadline has already expired unacted', () => {
+  const started = reduce(primed(), { type: 'CLOCK_STARTED', at: 5000 })
+  const at = 5000 + TURN_ACTION_MS + 9000 // well past the deadline
+  const r = reduce(started.state, { type: 'CLOCK_STARTED', at })
+  expect(r.state).not.toBe(started.state)
+  expect(r.state.turn.openedAt).toBe(at)
+  expect(r.state.turn.deadline).toBe(at + TURN_ACTION_MS)
+})
+
+it('still rejects a restart while the clock is live — no extensions', () => {
+  const started = reduce(primed(), { type: 'CLOCK_STARTED', at: 5000 })
+  const r = reduce(started.state, { type: 'CLOCK_STARTED', at: 5000 + TURN_ACTION_MS - 1 })
+  expect(r.state).toBe(started.state)
+  expect(r.events[0]?.type).toBe('rejected')
+})

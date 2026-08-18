@@ -36,7 +36,10 @@ function clock(
 // this is it — each branch mirrors the matching `deriveDock` branch below.
 export function isCounting(state: TableState, selfId: string): boolean {
   if (state.pending) return 'deadline' in state.pending
-  if (state.window) return !state.you.eliminated
+  // Mirrors the window branch below exactly: the window's OWNER gets the hold
+  // ring with a live clock whoever they are — elimination only silences a
+  // would-be responder, whose branch is the guarded one.
+  if (state.window) return state.window.player === selfId || !state.you.eliminated
   return state.turn === selfId && state.turnClock != null
 }
 
