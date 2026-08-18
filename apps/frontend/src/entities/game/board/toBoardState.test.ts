@@ -1,4 +1,5 @@
 import type { Event, PlayerView } from '@release/engine'
+import { HEAP_SHOW, scatterAt } from '@release/ui/animations'
 import { describe, expect, it } from 'vitest'
 import { type HistoryLabels, toBoardState } from './toBoardState'
 
@@ -13,6 +14,7 @@ const view: PlayerView = {
     hand: [{ uid: 'c1', id: 'attack-bug' }],
     release: {},
     playable: ['c1'],
+    targets: {},
     frozen: [],
   },
   opponents: [{ id: 'p2', name: 'bot', handCount: 3, release: {}, eliminated: false }],
@@ -32,11 +34,15 @@ const labels = Object.fromEntries([
   ['drawn', 'Draw'],
   ['placed', 'Played'],
   ['eliminated', 'Eliminated'],
+  ['discarded', 'Discarded'],
 ]) as HistoryLabels
 
 describe('toBoardState', () => {
-  it('sums the piles into the single deck count the table renders', () => {
-    expect(toBoardState(view, [], labels).decks.main).toBe(40)
+  // The projection has always carried the piles; the adapter used to sum them
+  // because the board could only draw one. It draws them all now, so the shape
+  // travels through untouched.
+  it('carries the pile list through untouched', () => {
+    expect(toBoardState(view, [], labels).decks.main).toEqual([30, 10])
   })
 
   it('carries hand uids through unchanged so animation keys stay stable', () => {
@@ -54,6 +60,17 @@ describe('toBoardState', () => {
     }
     expect(() => toBoardState(unknown, [], labels)).not.toThrow()
     expect(toBoardState(unknown, [], labels).you.hand[0].card).toBeTruthy()
+  })
+
+  it('folds the turn clock into one optional pair the dock can sweep', () => {
+    const timed: PlayerView = {
+      ...view,
+      turn: { ...view.turn, openedAt: 1_000, deadline: 31_000 },
+    }
+    expect(toBoardState(timed, [], labels).turnClock).toEqual({ openedAt: 1_000, deadline: 31_000 })
+    // No clock (a window/pending owns the wait, or the keeper has not started
+    // the first turn's) folds to null, never to a half-formed pair.
+    expect(toBoardState(view, [], labels).turnClock).toBeNull()
   })
 
   it('marks an eliminated opponent', () => {
@@ -129,6 +146,16 @@ describe('toBoardState', () => {
     expect(window?.deadline).toBe(200)
   })
 
+  it('passes the projection targets through as table targets', () => {
+    const withTargets: PlayerView = {
+      ...view,
+      self: { ...view.self, targets: { 'attack-bug#0': [{ kind: 'player', player: 'p2' }] } },
+    }
+    expect(toBoardState(withTargets, [], labels).targets).toEqual({
+      'attack-bug#0': [{ kind: 'player', player: 'p2' }],
+    })
+  })
+
   describe('comboOptions', () => {
     // A sudo-capable attack, a support-sudo, and an unrelated card — uids and
     // catalogue ids are all visibly different strings so a uid/id swap in the
@@ -195,5 +222,105 @@ describe('toBoardState', () => {
     const pending = toBoardState(withPending, [], labels).pending
     expect(pending && 'openedAt' in pending ? pending.openedAt : undefined).toBe(50)
     expect(pending && 'deadline' in pending ? pending.deadline : undefined).toBe(150)
+  })
+})
+
+// The decks are the only slice these assertions vary, so they spread the shared
+// projection rather than restating one — a second full PlayerView here would
+// drift from the one every other test in this file reads.
+const withDecks = (decks: Partial<PlayerView['decks']>): PlayerView => ({
+  ...view,
+  decks: { ...view.decks, ...decks },
+})
+
+const discardedEvent = (id: number, card: string, reason = 'effect'): Event =>
+  ({ id, type: 'discarded', player: 'you', card, reason }) as Event
+
+describe('the discard heap', () => {
+  it('is empty when nothing has been discarded and nothing is on top', () => {
+    const state = toBoardState(withDecks({ discardCount: 0, discardTop: undefined }), [], labels)
+    expect(state.decks.discardHeap).toEqual([])
+  })
+
+  it('gives one entry per discarded event, keyed by the event id', () => {
+    const log = [
+      discardedEvent(7, 'protection-debugger'),
+      discardedEvent(9, 'attack-bug', 'handLimit'),
+    ]
+    const heap =
+      toBoardState(withDecks({ discardCount: 2, discardTop: 'attack-bug' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.uid)).toEqual(['d7', 'd9'])
+    expect(heap.map((c) => c.card.id)).toEqual(['protection-debugger', 'attack-bug'])
+  })
+
+  // The scatter is the whole reason the heap is derived rather than invented per
+  // render: the beat flies the card on scatterAt(e.id) and the heap rests
+  // it on the same value, so the landing frame IS the resting frame (I7).
+  it('scatters a card the same way every time', () => {
+    const log = [discardedEvent(7, 'attack-bug')]
+    const decks = withDecks({ discardCount: 1, discardTop: 'attack-bug' })
+    const first = toBoardState(decks, log, labels).decks.discardHeap ?? []
+    const second = toBoardState(decks, log, labels).decks.discardHeap ?? []
+    expect(first).toEqual(second)
+    expect(first[0]).toMatchObject(scatterAt(7))
+  })
+
+  it('keeps only the cards the pile actually renders', () => {
+    const log = Array.from({ length: HEAP_SHOW + 4 }, (_, i) => discardedEvent(i + 1, 'attack-bug'))
+    const heap =
+      toBoardState(withDecks({ discardCount: log.length, discardTop: 'attack-bug' }), log, labels)
+        .decks.discardHeap ?? []
+    expect(heap).toHaveLength(HEAP_SHOW)
+    expect(heap.at(-1)?.uid).toBe(`d${log.length}`)
+  })
+
+  // The engine banks a spent attack or defence straight into the discard with no
+  // event at all (docs/animations/backlog.md), so the fold runs behind the count.
+  // Pile ignores `topCard` once a heap is present, so without this the board
+  // would show a stale card as the top of the discard.
+  it('appends the projection top when the fold does not end on it', () => {
+    const log = [discardedEvent(7, 'attack-bug')]
+    const heap =
+      toBoardState(withDecks({ discardCount: 4, discardTop: 'attack-ddos' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual(['attack-bug', 'attack-ddos'])
+    expect(heap.at(-1)?.uid).toBe('top4')
+    // Keyed out of the event ids' range, so the stand-in can never take a real
+    // card's pose (see the implementation note on negative keys).
+    expect(heap.at(-1)).toMatchObject(scatterAt(-5))
+  })
+
+  // The pile can EMPTY without the feed saying so card by card: refillFromDiscard
+  // recycles the whole discard into the deck and emits only `deckReshuffled`.
+  // The historical `discarded` events stay in the feed forever, so a fold that
+  // trusted them alone would keep drawing a stack over a counter reading zero —
+  // and because Pile renders a non-empty heap INSTEAD of the empty-zone slot, the
+  // "discard is empty" affordance would never come back for the rest of the match.
+  it('empties with the pile when the discard is recycled into the deck', () => {
+    const log = [discardedEvent(7, 'attack-bug'), discardedEvent(9, 'protection-debugger')]
+    const state = toBoardState(withDecks({ discardCount: 0, discardTop: undefined }), log, labels)
+    expect(state.decks.discardHeap).toEqual([])
+  })
+
+  // …and it can shrink without emptying: Cherry-pick takes cards back out.
+  it('never shows more cards than the pile says it holds', () => {
+    const log = [
+      discardedEvent(7, 'attack-bug'),
+      discardedEvent(9, 'protection-debugger'),
+      discardedEvent(11, 'attack-bug'),
+    ]
+    const heap =
+      toBoardState(withDecks({ discardCount: 1, discardTop: 'attack-bug' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap).toHaveLength(1)
+  })
+
+  it('does not append a top the fold already ends on', () => {
+    const log = [discardedEvent(7, 'attack-bug')]
+    const heap =
+      toBoardState(withDecks({ discardCount: 1, discardTop: 'attack-bug' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap).toHaveLength(1)
   })
 })

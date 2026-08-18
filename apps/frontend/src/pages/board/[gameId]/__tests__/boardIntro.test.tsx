@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { expect, it, vi } from 'vitest'
 import Board from '../_Board'
 import { introFixture, makeBoardProps } from './fixture'
@@ -49,6 +50,78 @@ it('puts the faded rail out of reach while the intro runs', () => {
   const rail = container.querySelector('[class*="railLayer"]')
   expect(rail).toBeTruthy()
   expect(rail?.hasAttribute('inert')).toBe(true)
+})
+
+// StrictMode mounts, tears down, and mounts again — and the teardown is not a
+// formality: `useDealIntro`'s cleanup cancels the run in flight by bumping the
+// id that every `await` in the sequence checks. So the arm that says "this
+// opening has already been queued" outlives the teardown that cancelled what it
+// armed. The second mount declines to queue anything, the first run halts at its
+// next check, and nothing ever reports.
+//
+// The cost is the entire screen. The board holds every block at `opacity: 0`
+// until the opening says it is done, and the host's start gate waits on the same
+// word — so a silent non-report is a permanently black table AND a match that
+// never begins. It reproduced in the browser on the first two-peer run and in no
+// test, because jsdom renders these suites without StrictMode's double invoke.
+it('still reports the opening when StrictMode mounts the board twice', async () => {
+  motion.reduced = false
+  const onDone = vi.fn()
+  const props = makeBoardProps()
+  render(
+    <StrictMode>
+      <Board {...props} intro={{ ...introFixture(), onDone }} />
+    </StrictMode>,
+  )
+  // The whole choreography, on jsdom's real timers — the sequence is seconds
+  // long and every leg of it is a wait() the run has to get through.
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 9000))
+  })
+  expect(onDone).toHaveBeenCalledTimes(1)
+}, 20000)
+// The regression this guards: before #97's centre refactor, the whole wrapper
+// div was itself gated by `{intro && …}`, so any test that rendered with an
+// intro at least proved the staged-card map inside it had mounted. Now the
+// wrapper is unconditional and only the map is still gated — its presence
+// proves nothing about whether `deal.staged` (useDealIntro.ts:321) actually
+// produces a card. This drives the real sequence far enough into the deal for
+// the first card to leave the pile and land at the centre, and checks a real
+// `.stagedCard` element is there — not a count, an element `cardById` could
+// silently have failed to resolve.
+//
+// Fake timers stand in for wall-clock time: `wait()` (@release/ui/animations)
+// is plain `setTimeout`, and the choreography's own beats sum to several real
+// seconds before a card ever lands. `play()` is a no-op here regardless
+// (jsdom has no `Element.animate`), so nothing but `wait()` gates the timing.
+it('stages a real card at the centre while the deal is running', async () => {
+  vi.useFakeTimers()
+  try {
+    motion.reduced = false
+    const props = makeBoardProps()
+    const { container } = render(
+      <Board {...props} intro={{ ...introFixture(), onDone: () => {} }} />,
+    )
+
+    // Advance in small steps rather than one lump: the exact moment the first
+    // card lands is an implementation detail of the choreography's own beat
+    // timings, and the centre empties again once the whole heap has moved on
+    // to the fan. Checking after every step catches the card inside that
+    // window, however long it turns out to be, without pinning this test to
+    // the beat constants themselves.
+    let staged: Element | null = null
+    for (let elapsed = 0; elapsed < 10_000 && !staged; elapsed += 50) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50)
+      })
+      staged = container.querySelector('[data-board-centre] [class*="stagedCard"]')
+    }
+
+    expect(staged).not.toBeNull()
+  } finally {
+    vi.useRealTimers()
+    motion.reduced = true
+  }
 })
 
 it('hands the rail back when the opening is over', () => {

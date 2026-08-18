@@ -139,6 +139,14 @@ export interface GameState {
     // the mode, answered by `drawObligationMet`, not a flag stored here.
     drawnFrom: number[]
     releasesPlayed: number
+    // The inactivity clock on the player on turn — app timing, not a rule
+    // (docs/rules/README.md, "Что правилом НЕ является"). Restarted by every
+    // committed action while the table idles on that player, absent while a
+    // window, a pending or a running draw owns the wait — and before the
+    // keeper's first CLOCK_STARTED, because createGame has no timestamp.
+    // Both ends of the span, like the window's, so a countdown is exact.
+    openedAt?: number
+    deadline?: number
   }
 
   decks: {

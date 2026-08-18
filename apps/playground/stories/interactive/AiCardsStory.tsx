@@ -6,6 +6,7 @@ import {
   nextFrames,
   play,
   type Scatter,
+  useDiscardExit,
   useFlyer,
   useHandArrival,
   wait,
@@ -28,7 +29,6 @@ import TechBar from '../controls/TechBar'
 import { TechButton, TechToggle } from '../controls/TechControls'
 import styles from './AiCardsStory.module.css'
 import { reorderHand } from './reorderHand'
-import { useDiscardExit } from './useDiscardExit'
 
 type Loc = Record<Lang, string>
 

@@ -91,6 +91,7 @@ card (not at a wider cell/seat) — invariant **I6**. The `CARD_RATIO` value is 
 |---|---|---|
 | `cardAreaOf` | `cardAreaOf(cell)` → `Rect` | trim a Pile cell to its **top** card box (keep left/top/width, height = width·`CARD_RATIO`) |
 | `cardBoxIn` | `cardBoxIn(rect, width)` → `Rect` | a card box of `width`, **centered** in `rect` (e.g. a Seat). Pass a width measured from the real card element where possible. |
+| `pileWidthFor` | `pileWidthFor(count)` → `number` (`apps/ui/src/table/Table/piles.ts`) | how wide a draw pile is drawn given how many sit on the table — 150 at one, 120 at two, 100 at three or more. One function, shared by the kit's `Table` and the board's fork of it, so the ramp cannot drift between the two. The ramp above one pile has no approved value yet (`docs/animations/backlog.md`). |
 
 ---
 
@@ -104,9 +105,11 @@ what it has. Tuning constants are in the glossary.
 `@release/ui/animations` — the animation layer is its own entry point, separate from the components,
 because it is how a thing moves rather than a thing to render. They were moved there when the real
 board needed them too: each had been copied, the playground's scene and the frontend each holding
-one, and nothing kept the copies in step — which is the case the Animations Rule names. The
-remaining step, `useDiscardExit`, is still local to `apps/playground/stories/interactive/`; it has
-one consumer, and it moves the day a second appears.
+one, and nothing kept the copies in step — which is the case the Animations Rule names.
+`useDiscardExit` followed them there in #96. It never had the one consumer this file claimed: ten
+playground scenes imported it out of the story folder, which is what "a movement found in two
+places is a module" describes, ten times over. All three steps now live in
+`apps/ui/src/animations/` and are imported from `@release/ui/animations`.
 
 **Render what you take.** A step that is handed a RECT raises a flyer of its own, and that flyer
 lives in the step's `overlay`. A scene that forgets to render it gets no flight, no error and a card
@@ -141,6 +144,45 @@ so no scene writes them again. It does not know where to fly or which preset.
 **I4 is the one a scene may decline.** A flight whose landing pose lives in the filled WAAPI
 animation must NOT be pinned — pinning cancels it and the card straightens for a frame. Drop the
 node instead, once the resting card has taken over (Defense Release).
+
+---
+
+## The board's layer — anchors and the beat queue
+
+These live in `apps/frontend`, not in `@release/ui`: they are how the *board* wires engine events to
+the vocabulary, and the kit has no notion of an engine. Listed here because the vocabulary is
+useless without knowing what calls it.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `BoardAnchors` | `useBoardAnchors()` → the registry | every node a flight aims at or leaves from: the HUD blocks, `discardBox`, `centre`, `hand`, plus `seatBox(player)` (a card box centred on a seat, **I6**), `pileBox(index)`/`bindPile(index, el)` (a draw pile's card box, keyed by the index the engine names in `drawn.pile`), `handSlotAt(index)` and `releaseSlot(player, slot)`. A DOM registry only — it holds no game state and mirrors none, which is why a hand card is reached by index and not by uid. One identity for the life of the mount |
+| `planBeats` | `planBeats(events, before)` → `BeatPlan[]` | a batch of engine events becomes movements, read against the projection still **on screen** (**I1**). An event with no choreography yields nothing and passes through. All `discarded` of one batch go in ONE beat — the step's own rule, "one by one but all at once" |
+| `useBeats` | `useBeats({ live, events, anchors, enabled, intro })` → `{ shadow, overlays, exclusive }` | the queue: one beat at a time, the board renders `shadow` while one runs, and `shadow` is dropped on drain so the board can never be stranded behind the projection. The single place `prefers-reduced-motion` is checked |
+| `IntroBeat` | `{ key, shadow, run, collapse }` | the opening, handed to the queue as beat zero — the one beat that owns the table (`exclusive`) and the one that publishes its own shadow instead of animating away from a base. `collapse()` is the no-animation path: it exists because the opening must **report** to the host's start gate even when it does not play, or the match never begins |
+
+**The shadow is the projection a beat animates AWAY from**, not the one it produces. By the time the
+queue sees a batch, `live` already has the card out of the hand — so the queue keeps the last
+projection it actually showed and plans against that, and a batch arriving mid-beat waits its turn
+rather than being planned against a state nobody can see.
+
+**Beat kinds.** `planBeats` returns a union of plans; `useBeats.beatOf` wires each `kind` to the
+runner that plays it. One new module per kind at most (#88's rule) — `discardBeat.tsx` is today's
+runner lifted out of `useBeats` unchanged, `drawBeat.tsx` and `deckBeat.tsx` are new.
+
+| Kind | Runner | Planned from | Presets it plays |
+|---|---|---|---|
+| `draw` | `features/board-beats/drawBeat.tsx` | `drawn` — mine / an opponent's / a trigger's, the last also consuming the `revealed`/`aiRevealed` and `discarded` that follow it in the same batch | `drawToCenter`, `flipCard` (via `Card`), `dealToSeat`, the discard-exit step |
+| `discard` | `features/board-beats/discardBeat.tsx` | `discarded`, coalesced per batch | the discard-exit step |
+| `reshuffle` | `features/board-beats/deckBeat.tsx` (`runReshuffle`) | `deckReshuffled` | `gatherToDeck`, `flipCard` (via `patch`) |
+| `piles` | `features/board-beats/deckBeat.tsx` (`runPiles`/`step`) | `pilesChanged`, classified by `classifyPiles` (`planBeats.ts`) against the running pile counts — the event itself names neither the operation nor the split index | `flyFrom` (split), `absorbToDeck` (merge), `gatherToDeck` (fromDiscard) |
+
+See [`recipes.md`](./recipes.md#a-card-is-drawn-live-board) and
+[`recipes.md`](./recipes.md#the-deck-is-rebuilt-split-merged-live-board) for the sequences; the
+classification table for `piles` is written out there, not repeated here.
+
+**One scatter, two readers.** A discard flies on `scatterAt(eventId)` and the heap
+(`toBoardState.toDiscardHeap`) rests it on `scatterAt(eventId)` — the same call on the same id, which
+is what makes the handover invisible (**I7**) across a boundary neither side can see.
 
 ---
 

@@ -15,6 +15,7 @@ import {
   nextSeat,
   reject,
   setHand,
+  TURN_ACTION_MS,
 } from './core'
 import { onPickFromDiscard } from './discard'
 import { onGiveCard, onRequestCard } from './handAttacks'
@@ -122,7 +123,6 @@ export function runDrawSequence(state: GameState, log: Log, at: number): GameSta
         card: card.id,
         pile: pileIndex,
         deckSize: main[pileIndex].length,
-        visibleTo: [owed.player],
       })
       next = setHand(advanced, owed.player, [...advanced.players[owed.player].hand, card])
     }
@@ -224,6 +224,46 @@ function onHandLimit(state: GameState, action: Action & { type: 'RESOLVE' }): Re
   return { state: endTurn(withDiscard, log), events: log.events }
 }
 
+// Keeper-only, like WINDOW_EXPIRED. Everything after the first turn is stamped
+// by the post-commit step in `reduce` below; this exists because the first turn
+// has no committed action behind it — createGame carries no timestamp.
+function onClockStarted(state: GameState, action: Action & { type: 'CLOCK_STARTED' }): Reduction {
+  if (state.over) return reject(state, action, 'game is over')
+  if (state.pending) return reject(state, action, 'a decision is pending')
+  if (state.window) return reject(state, action, 'a reaction window is open')
+  if (state.drawing) return reject(state, action, 'a draw is in progress')
+  // A LIVE clock may not be restarted — that would be an extension. An expired
+  // one may: the keeper's tick refuses to fire a deadline against an empty
+  // seat, so a player who dropped mid-turn returns to a clock that ran out
+  // with nobody able to act on it. Restarting it is the deferred expiry being
+  // handed back to its owner, and the keeper is the only party who can ask
+  // (CLOCK_STARTED is not a peer intent — session/referee.ts).
+  if (state.turn.deadline !== undefined && action.at < state.turn.deadline) {
+    return reject(state, action, 'the turn clock is already running')
+  }
+  return {
+    state: {
+      ...state,
+      turn: { ...state.turn, openedAt: action.at, deadline: action.at + TURN_ACTION_MS },
+    },
+    events: [],
+  }
+}
+
+// The turn's inactivity clock, restarted by every committed action while the
+// table idles on the player on turn and suspended while a window, a pending or
+// a running draw owns the wait. One shared step after every commit, so no
+// handler — present or future — can forget it; a rejected action never reaches
+// here, which is what keeps `reject`'s state-identity contract intact.
+function stampTurnClock(state: GameState, at: number): GameState {
+  const idle = !state.over && !state.pending && !state.window && !state.drawing
+  if (!idle) {
+    if (state.turn.deadline === undefined && state.turn.openedAt === undefined) return state
+    return { ...state, turn: { ...state.turn, openedAt: undefined, deadline: undefined } }
+  }
+  return { ...state, turn: { ...state.turn, openedAt: at, deadline: at + TURN_ACTION_MS } }
+}
+
 function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
   switch (action.choice.kind) {
     case 'handLimit':
@@ -259,18 +299,23 @@ export function reduce(state: GameState, action: Action): Reduction {
     return reject(state, action, 'malformed action')
   }
 
-  const result = dispatch(state, action)
+  const at = 'at' in action && typeof action.at === 'number' ? action.at : 0
+  let result = dispatch(state, action)
   // A paused draw resumes the moment nothing is owed ahead of it, inside the
   // same reduction that cleared the way. Doing it here rather than in each
   // resolution path means every way a pending can end — answered, declined,
   // fatal — resumes identically, and no future one can forget to.
-  if (!result.state.drawing || result.state.pending) return result
-  const log = createLog(result.state.eventSeq)
-  const at = 'at' in action && typeof action.at === 'number' ? action.at : 0
-  return {
-    state: runDrawSequence(result.state, log, at),
-    events: [...result.events, ...log.events],
+  if (result.state.drawing && !result.state.pending) {
+    const log = createLog(result.state.eventSeq)
+    result = {
+      state: runDrawSequence(result.state, log, at),
+      events: [...result.events, ...log.events],
+    }
   }
+  // A rejected action hands back the identical state object, and must keep
+  // doing so — the clock only moves on a commit.
+  if (result.state === state) return result
+  return { state: stampTurnClock(result.state, at), events: result.events }
 }
 
 function dispatch(state: GameState, action: Action): Reduction {
@@ -289,6 +334,8 @@ function dispatch(state: GameState, action: Action): Reduction {
       return onUnpass(state, action)
     case 'WINDOW_EXPIRED':
       return onWindowExpired(state, action)
+    case 'CLOCK_STARTED':
+      return onClockStarted(state, action)
     case 'ATTACK':
       return onAttack(state, action)
     default:

@@ -40,6 +40,14 @@
   gap: 22px;
 }
 
+/* the draw piles sit side by side — see the kit's own `.pileRow`. This one is
+   the board's because the opening animates the stack around it. */
+.pileRow {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
 /* the centre of the table — a little ABOVE the geometric middle (42%, not 50%):
    there it does not argue with the hand, nor with the preview that rises out of
    it. The same value in every scene. Here the player's own cards gather in it
@@ -57,6 +65,15 @@
 
 /* a card of that heap — the same box, its own scatter (as in the discard) */
 .stagedCard {
+  position: absolute;
+  inset: 0;
+}
+
+/* the pulled card once it stands at the centre — the same box as the deal's
+   own staged cards above, filled rather than scattered: there is only ever
+   one at a time, so it takes the whole of `.centre` (its 150px, not a number
+   of its own). */
+.centreCard {
   position: absolute;
   inset: 0;
 }

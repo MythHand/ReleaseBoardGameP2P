@@ -86,6 +86,10 @@ export function isWellFormedAction(action: unknown): action is Action {
 // A stalled defence blocks everyone, so it carries a deadline like the window.
 export const DEFEND_MS = 15_000
 
+// The turn's inactivity clock: 30s per action, app timing rather than a rule
+// (docs/rules/README.md, "Что правилом НЕ является" — the value the docs name).
+export const TURN_ACTION_MS = 30_000
+
 // Cancel-type defences fail against a sudo attack; Unicorn-type never do.
 // Lives here rather than in attacks.ts or handAttacks.ts, both of which need it
 // and would otherwise import each other — see this module's own note above

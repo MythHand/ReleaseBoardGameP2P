@@ -221,6 +221,7 @@
     "drawn": "draw ✓",
     "locked": "PUSH after draw",
     "canDefend": "you can defend",
+    "underAttack": "your release is exposed",
     "gameStart": "game start"
   },
   "pending": {

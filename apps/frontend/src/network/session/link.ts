@@ -76,7 +76,10 @@ export function createLocalLink(args: {
   // one (a keeper that is also a player, driving its own seat through a local
   // link) keeps it.
   if (args.ref.current.seats.some((s) => s.playerId === args.me && s.peerId === null)) {
-    args.ref.current = rebind(args.ref.current, args.me, localAddress(args.me)).session
+    // `0` for the clock: this is the startup self-bind, before the table is
+    // live — no deadline exists yet, so the re-stamp branch cannot fire, and
+    // the first clock stays the ticker's to start.
+    args.ref.current = rebind(args.ref.current, args.me, localAddress(args.me), 0).session
   }
 
   const receive = (outgoing: Outgoing) => {

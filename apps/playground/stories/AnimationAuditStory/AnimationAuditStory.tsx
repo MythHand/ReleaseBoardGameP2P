@@ -296,8 +296,32 @@ const MODULES: Module[] = [
       en: 'Cards leave the table for the discard: one by one but ALL AT ONCE — the simultaneity is what reads as "the pile went to the discard". A pair splits into two singles, each flying from where it actually stands. One scatter per card drives both its flight and its rest (I7). The table tilt unwinds IN FLIGHT. The layer a card had travels with it and decides the order it joins the heap — bottom-up (I9). Supports: a card\'s own scatter (going back to its place), fading (sinking under the visible top), a stagger, and flying an element that already exists instead of raising a flyer.',
     },
     where: {
-      ru: 'stories/interactive → все 10 сцен со сбросом',
-      en: 'stories/interactive → all 10 scenes with a discard',
+      ru: '@release/ui/animations → все 10 сцен со сбросом + борд фронтенда',
+      en: '@release/ui/animations → all 10 scenes with a discard + the frontend board',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'BoardAnchors',
+    what: {
+      ru: 'Реестр узлов борда: во что целится полёт и откуда стартует. Блоки HUD, discardBox, centre, hand, плюс seatBox(player) — карточная коробка по центру сидушки (I6, сидушка сильно шире карты), pileBox(index)/bindPile(index, el) — коробка стопки добора по индексу, которым движок называет её в `drawn.pile`, handSlotAt(index) и releaseSlot(player, slot). Только DOM: своего состояния не держит и чужое не зеркалит — потому карта в руке достаётся по индексу, а не по uid (иначе реестр зависел бы от той самой руки, от которой должен быть независим). Слот релиза всегда ищется под владельцем: frontend есть у каждого игрока. Одна идентичность на всю жизнь монтирования — потребители забирают реестр в ref внутрь долгих последовательностей.',
+      en: "The board's registry of nodes: what a flight aims at and where it starts. The HUD blocks, discardBox, centre, hand, plus seatBox(player) — a card box centred on a seat (I6, a seat is far wider than a card), pileBox(index)/bindPile(index, el) — a draw pile's card box, keyed by the index the engine names in `drawn.pile`, handSlotAt(index) and releaseSlot(player, slot). DOM only: it holds no game state and mirrors none, which is why a hand card is reached by index rather than by uid (a uid lookup would make the registry depend on the very hand it must be independent of). A release slot is always looked up under its owner: every player has a frontend. One identity for the life of the mount — consumers capture it into a ref inside long-running sequences.",
+    },
+    where: {
+      ru: 'frontend: entities/game/board/anchors.ts → раздача, очередь тактов',
+      en: 'frontend: entities/game/board/anchors.ts → the deal, the beat queue',
+    },
+    status: 'ok',
+  },
+  {
+    mod: 'planBeats() + useBeats()',
+    what: {
+      ru: 'Очередь тактов борда. События приходят с провода ПАЧКАМИ — за один синк может приехать несколько ходов, — поэтому борд, который анимировал бы на рендер, играл бы их поверх друг друга или ронял все, кроме последней. Такт играет по одному; пока он идёт, борд рисует ТЕНЬ — ту проекцию, ОТ которой такт уходит, а не ту, к которой приходит (к моменту эффекта live уже без карты, вместе с её слотом — I1). Пачка, приехавшая посреди такта, ждёт своей очереди, а не планируется против состояния, которого никто не видел. Событие без хореографии не даёт такта и проходит насквозь. Тень живёт ровно столько, сколько очередь: на опустошении она снимается и живая проекция побеждает всегда — даже если такт упал. Здесь же единственная проверка prefers-reduced-motion: play() её не делает.',
+      en: "The board's beat queue. Events arrive off the wire in BATCHES — several moves can land in one sync — so a board that animated on render would play them on top of each other or drop all but the last. One beat at a time; while it runs the board draws a SHADOW — the projection the beat moves AWAY from, not the one it arrives at (by effect time `live` is already without the card, and without its slot — I1). A batch arriving mid-beat waits its turn rather than being planned against a state nobody saw. An event with no choreography yields no beat and passes through. The shadow lives exactly as long as the queue: on drain it is dropped and the live projection always wins — even if a beat threw. This is also the single prefers-reduced-motion check, because play() does not make one.",
+    },
+    where: {
+      ru: 'frontend: features/board-beats/ → уход карты в сброс; раздача как такт ноль',
+      en: 'frontend: features/board-beats/ → a card leaving for the discard; the deal as beat zero',
     },
     status: 'ok',
   },
@@ -454,42 +478,42 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Адресная атака стрелкой', en: 'Targeted arrow attack' },
     from: {
-      ru: 'useArrow строит from/to по centerOf карты и цели, слежение за курсором (mousemove), старт/стоп по фазе розыгрыша.',
-      en: 'useArrow builds from/to from centerOf the card and the target, cursor tracking (mousemove), start/stop by the play phase.',
+      ru: 'useArrow строит from/to по centerOf карты и цели, слежение за курсором (mousemove), старт/стоп по фазе розыгрыша. То же теперь играется и на живом борде (#99): цели — `self.targets` проекции, та же `attackTargets`, которую проверяет редьюсер (`packages/engine/src/fake/project.ts`), в `TableTarget` переходят структурным приведением типа, не пересчётом (`toBoardState.ts`). Жест — `_useBoardStaging`: вытягивание из веера карты с целями ставит её в центр (playToCenter, продолжение от HandPlayDrop.rect), стрелка встаёт от центра и целится, нажатие на освещённую цель диспатчит PLAY. Промах или Escape возвращают карту в свой слот веера (useHandArrival), цели гаснут синхронно; `rejected` после диспатча — тем же путём. Клик по карте с целями больше не работает: клик остался только для атаки из окна и розыгрыша без цели (`_useBoardInteractions`). Что стоит в центре после диспатча — статичный рендер (`data-pending-play`), шов, на который встанет такт #100. Жест на сенсорном экране не решён (реестр ниже, docs/animations/backlog.md).',
+      en: "useArrow builds from/to from centerOf the card and the target, cursor tracking (mousemove), start/stop by the play phase. The same movement now also runs on the live board (#99): targets come off the projection's `self.targets` — the same `attackTargets` the reducer itself validates (`packages/engine/src/fake/project.ts`) — and reach `TableTarget` by a structural type cast, not a recompute (`toBoardState.ts`). The gesture is `_useBoardStaging`: pulling a card with targets out of the fan stages it at the centre (playToCenter, continuing from HandPlayDrop.rect), the arrow arms from the centre and aims, a press on a lit target dispatches PLAY. A miss or Escape returns the card to its own fan slot (useHandArrival), targets going dark synchronously; a `rejected` after dispatch takes the same path back. Clicking a card with targets no longer works — the click keeps only the window attack and the no-target play (`_useBoardInteractions`). What stands at the centre after dispatch renders statically (`data-pending-play`) — the seam #100's beat builds on. The gesture on a touchscreen is undecided (register below, docs/animations/backlog.md).",
     },
-    where: 'Arrow, Combo',
+    where: 'Arrow, Combo + frontend: board (_useBoardStaging)',
   },
   {
     name: { ru: 'Разделение колоды', en: 'Splitting the deck' },
     from: {
-      ru: 'FLIP-вылет flyFrom: половина уже в новом DOM-месте, анимируем «из» прошлого rect (getBoundingClientRect до→после ремаунта) в текущую позицию.',
-      en: 'FLIP fly-in flyFrom: half is already in its new DOM place, we animate "from" the previous rect (getBoundingClientRect before→after remount) to the current position.',
+      ru: 'FLIP-вылет flyFrom: половина уже в новом DOM-месте, анимируем «из» прошлого rect (getBoundingClientRect до→после ремаунта) в текущую позицию. То же движение теперь играется на живом борде из pilesChanged (deckBeat, «The deck is rebuilt, split, merged (live board)» в recipes.md) — какая стопка разделилась, там не называется событием, а выводится позиционно (classifyPiles, docs/animations/backlog.md).',
+      en: 'FLIP fly-in flyFrom: half is already in its new DOM place, we animate "from" the previous rect (getBoundingClientRect before→after remount) to the current position. The same movement now also runs on the live board off pilesChanged (deckBeat, "The deck is rebuilt, split, merged (live board)" in recipes.md) — which pile split is not named by the event, it is derived positionally (classifyPiles, docs/animations/backlog.md).',
     },
-    where: 'DeckAnimations',
+    where: 'DeckAnimations + frontend: board-beats/deckBeat',
   },
   {
     name: { ru: 'Слияние колод (+ сброс)', en: 'Merging decks (+ discard)' },
     from: {
-      ru: 'все стопки и сброс — параллельные absorbToDeck (move + fade) в один rect первой колоды; цель измеряется однажды, расходятся только источники.',
-      en: 'all piles and the discard — parallel absorbToDeck (move + fade) into the single rect of the first deck; the target is measured once, only the sources differ.',
+      ru: 'все стопки и сброс — параллельные absorbToDeck (move + fade) в один rect первой колоды; цель измеряется однажды, расходятся только источники. То же движение играется на живом борде из pilesChanged (deckBeat) — теперь на РЯД стопок (decks.main: number[]), а не на одну.',
+      en: 'all piles and the discard — parallel absorbToDeck (move + fade) into the single rect of the first deck; the target is measured once, only the sources differ. The same movement now also runs on the live board off pilesChanged (deckBeat) — over a ROW of piles (decks.main: number[]) rather than one.',
     },
-    where: 'DeckAnimations',
+    where: 'DeckAnimations + frontend: board-beats/deckBeat',
   },
   {
     name: { ru: 'Сброс → новая колода', en: 'Discard → new deck' },
     from: {
-      ru: 'собрать разбросанный сброс в стопку → gatherToDeck (move, центр-в-центр) к месту колоды → flipCard рубашкой вверх по приземлении.',
-      en: 'gather the scattered discard into a pile → gatherToDeck (move, center-to-center) to the deck spot → flipCard back-up on landing.',
+      ru: 'собрать разбросанный сброс в стопку → gatherToDeck (move, центр-в-центр) к месту колоды → flipCard рубашкой вверх по приземлении. То же движение играется на живом борде дважды: как deckReshuffled (обычный ребилд на пилу 0) и как второй шаг Git Branch + Sudo внутри pilesChanged (fromDiscard, на индекс, который назвал сплит) — обе ветки через один и тот же discardOntoPile в deckBeat.',
+      en: "gather the scattered discard into a pile → gatherToDeck (move, center-to-center) to the deck spot → flipCard back-up on landing. The same movement now also runs on the live board twice: as deckReshuffled (an ordinary rebuild onto pile 0) and as Git Branch + Sudo's second step inside pilesChanged (fromDiscard, onto the index the split just named) — both branches through the same discardOntoPile in deckBeat.",
     },
-    where: 'DeckAnimations',
+    where: 'DeckAnimations + frontend: board-beats/deckBeat',
   },
   {
     name: { ru: 'Добор карты (одиночный)', en: 'Drawing a card (single)' },
     from: {
-      ru: 'drawToCenter (move 480) колода→центр рубашкой вверх; ветвление по карте: игрок — flipCard + useHandArrival.insert (садится в слот руки); соперник — dealToSeat (move + fade) в card-area места ×0.7, без скейла вверх; триггер/AI — flipCard в центре (reveal для всех), AI ещё добирает эффект из AI-колоды рядом (flyer с key={seq}, чтобы Card не переиспользовалась и не крутилась).',
-      en: 'drawToCenter (move 480) deck→center back-up; branch by card: player — flipCard + useHandArrival.insert (sits into a hand slot); opponent — dealToSeat (move + fade) into the seat card-area ×0.7, no upward scale; trigger/AI — flipCard at the center (reveal for all), AI also draws an effect from the nearby AI deck (flyer with key={seq} so the Card is not reused and does not spin).',
+      ru: 'drawToCenter (move 480) колода→центр рубашкой вверх; ветвление по карте: игрок — flipCard + useHandArrival.insert (садится в слот руки); соперник — dealToSeat (move + fade) в card-area места ×0.7, без скейла вверх; триггер/AI — flipCard в центре (reveal для всех), AI ещё добирает эффект из AI-колоды рядом (flyer с key={seq}, чтобы Card не переиспользовалась и не крутилась). Три ветки — свой / чужой / триггер — теперь играются и на живом борде от настоящих drawn/revealed событий (drawBeat, «A card is drawn (live board)» в recipes.md); AI-ветка там не участвует (#106).',
+      en: 'drawToCenter (move 480) deck→center back-up; branch by card: player — flipCard + useHandArrival.insert (sits into a hand slot); opponent — dealToSeat (move + fade) into the seat card-area ×0.7, no upward scale; trigger/AI — flipCard at the center (reveal for all), AI also draws an effect from the nearby AI deck (flyer with key={seq} so the Card is not reused and does not spin). The mine/opponent/trigger branches now also run on the live board off real drawn/revealed events (drawBeat, "A card is drawn (live board)" in recipes.md); the AI branch is not part of that (#106).',
     },
-    where: 'DrawCard',
+    where: 'DrawCard + frontend: board-beats/drawBeat',
   },
   {
     name: { ru: 'Мультидобор (по кнопке)', en: 'Multi-draw (by button)' },
@@ -623,6 +647,17 @@ const SCENARIOS: Scenario[] = [
     where: 'GameEnd',
   },
   {
+    name: {
+      ru: 'Карта уходит из руки в сброс (живой борд)',
+      en: 'A card leaves the hand for the discard (live board)',
+    },
+    from: {
+      ru: 'Первая хореография, которую ведут настоящие события движка, а не клики сцены. Приходит батч, planBeats сворачивает ВСЕ discarded этого батча в ОДИН такт (по одной, но все сразу — сброс по лимиту руки читается одним жестом, а не тремя). Планируется против проекции, которая ещё на экране: в живой карта уже вынута из руки вместе со слотом, из которого лететь (I1). Источник — свой слот веера (карта ищется по id: событие несёт id, а не uid), карточная коробка на сидушке соперника, либо слот зоны релиза для destroyed/neutralized. Разброс — scatterAt(id события), тот же вызов, которым куча в toBoardState кладёт карту на покой: одно значение, два читателя, поэтому передача от тени к проекции не двигает ни пикселя (I7). Рука при этом не блокируется: сброс — то, что СЛУЧИЛОСЬ, а не то, что решается. Раздача встала в ту же очередь тактом ноль — единственный такт, который держит стол и публикует свою тень вместо базы.',
+      en: "The first choreography driven by real engine events rather than a scene's clicks. A batch arrives; planBeats folds EVERY discarded in it into ONE beat (one by one but all at once — a hand-limit discard reads as one gesture, not three). It is planned against the projection still on screen: in the live one the card is already out of the hand, and with it the slot to fly from (I1). The source is its own slot in the fan (found by card id — the event carries an id, not a uid), a card box on an opponent's seat, or a release-zone slot for destroyed/neutralized. The scatter is scatterAt(event id) — the same call the heap in toBoardState uses to rest the card: one value, two readers, so the handover from shadow to projection does not move a pixel (I7). The hand is never blocked: a discard is a thing that HAPPENED, not a thing being decided. The deal joined the same queue as beat zero — the one beat that holds the table and publishes its own shadow instead of a base.",
+    },
+    where: 'frontend: board-beats',
+  },
+  {
     name: { ru: 'Стопка тостов чата', en: 'The chat toast stack' },
     from: {
       ru: "новых пресетов не потребовалось — вся хореография собрана из трёх готовых. Приход плашки — play('hudIn', { dy: 18, dur: 260 }) на монтировании: тот же «блок приходит на своё место», только снизу и коротко. Уход — play('popOut'), и снять плашку со сцены имеет право лишь она сама: очередь ставит ей leaving, плашка дожидается anim.finished и зовёт onLeft — снятие по таймеру оборвало бы анимацию на середине. Сдвиг соседей — FLIP через play('flyFrom', { from: прошлый rect, duration: 240 }): плашки РАЗНОЙ высоты (внутри чужая реплика, две строки или двенадцать), поэтому ехать «на шаг» нечем — rect меряется до и после коммита в useLayoutEffect, дельта у каждой своя. Новая плашка в этот замер не попадает: прошлого места у неё нет, у неё свой приход. Колонка прижата нижним краем и растёт вверх, поэтому уход самой старой (сверху) соседей не двигает вовсе, а уход средней опускает те, что над ней.",
@@ -654,6 +689,113 @@ const ISSUES: Issue[] = [
       en: 'About the docs, not the game logic. Three things are supposed to land here, and two and a half are machine-checked: a preset with no row in reference.md fails a test; a module that is on this page but unmentioned in reference.md fails a test; a scene with no live reference in recipes.md fails a test. But all three compare TWO places with each other — so a module that reached neither is invisible to all of them at once. That is exactly what happened to the screen-wide parallax switch: written, working in the table settings, listed neither here nor in the docs. What makes it worse than an ordinary gap is that the tests stay green, which reads as coverage. It does not close automatically — telling a module from a helper takes a person. What closes it is discipline at the door: a module counts as done once it appears HERE, and the test drags it into the docs from there.',
     },
     where: { ru: 'эта страница + docs/animations/', en: 'this page + docs/animations/' },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: '`drawn` был приватным, добор соперника было нечем анимировать',
+      en: '`drawn` was private, an opponent’s draw had nothing to animate',
+    },
+    problem: {
+      ru: 'Issue #97 утверждал, что `drawn` уже опускает `card` для чужого добора и проекция уже нужной формы — это было неверно: движок ставил `visibleTo: [drawer]` на обычный добор, и сеть роняла всё событие целиком у всех, кроме доборщика (`network/session/audience.ts`), так что соперник не получал ничего, кроме тика счётчика руки. Решено этой задачей: `reduce.ts` больше не ставит `visibleTo`, событие публично для всех, а секретность личности карты вынесена в `@release/engine`.`redactFor(event, viewerId)` — она вырезает `card` из чужого `drawn`, и `forViewer` фильтрует по `visibleTo` как раньше, затем прогоняет уцелевшее через неё. Запись держится тут намеренно даже решённой: исходный текст issue продолжает утверждать обратное.',
+      en: 'Issue #97 claimed `drawn` already omitted `card` for an opponent’s draw and the projection was already the right shape — that was wrong: the engine set `visibleTo: [drawer]` on an ordinary draw, and the network dropped the whole event for everyone but the drawer (`network/session/audience.ts`), so an opponent got nothing but a tick of the hand counter. Resolved by this task: `reduce.ts` no longer sets `visibleTo`, the event is public to everyone, and the card’s identity secrecy moved into `@release/engine`’s `redactFor(event, viewerId)` — it strips `card` from someone else’s `drawn`; `forViewer` filters by `visibleTo` as before, then runs the survivors through it. The entry stays here on purpose even though it is solved: the original issue text still states the opposite.',
+    },
+    where: {
+      ru: 'packages/engine (redactFor) + network/session/audience.ts (forViewer)',
+      en: 'packages/engine (redactFor) + network/session/audience.ts (forViewer)',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
+      ru: '`pilesChanged` не называет ни операцию, ни индекс разделения',
+      en: '`pilesChanged` names neither its operation nor the split index',
+    },
+    problem: {
+      ru: 'Событие несёт только счётчики (`piles: number[]`), ни какая операция произошла, ни какая стопка в ней участвовала — без вывода нечем решить, `flyFrom` целится в какой индекс или `absorbToDeck` во что. `classifyPiles` (`planBeats.ts`) выводит это позиционно: длина + сумма стопок до/после, с вычерпыванием, проверяемым раньше мёрджа (обе формы дают одну длину результата). Вычерпывание (prune) при этом не заводит отдельный вид `PileStep` — пустой пропавшей стопке нечего анимировать, и функция просто возвращает `null`.',
+      en: 'The event carries only counts (`piles: number[]`) — neither which operation ran nor which pile it touched, so nothing tells `flyFrom` which index to aim at or `absorbToDeck` what to absorb into. `classifyPiles` (`planBeats.ts`) derives it positionally instead — length and sum of the pile counts before/after, with the prune case checked ahead of merge (both shapes yield the same result length). A prune does not get its own `PileStep` variant either — an empty pile that ceased to exist has nothing on screen to animate, so the function just returns `null`.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/planBeats.ts (classifyPiles)',
+      en: 'frontend: features/board-beats/planBeats.ts (classifyPiles)',
+    },
+    status: 'rework',
+  },
+  {
+    what: {
+      ru: 'Сколько триггер стоит в центре — значения нет',
+      en: 'How long a revealed trigger stands at the centre — no approved value',
+    },
+    problem: {
+      ru: 'Такт добора держит вскрытый триггер на столе `REVEAL_HOLD = 900` перед уходом в сброс. `DrawCardStory` держит `AI_HOLD = 4000`, но это пауза AI-ветки (стол читает эффект), не обычного вскрытия — а для голого reveal подтверждённого значения нет вовсе. `REVEAL_HOLD = 900` — число этой задачи, ничем не подтверждённое.',
+      en: 'The draw beat holds a revealed trigger at the centre for `REVEAL_HOLD = 900` before it leaves for the discard. `DrawCardStory` has `AI_HOLD = 4000`, but that is the AI branch’s pause (the table reads the effect), not a plain reveal’s — and a plain reveal has no approved value at all. `REVEAL_HOLD = 900` is this task’s own number, unconfirmed by anything.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/drawBeat.tsx (REVEAL_HOLD)',
+      en: 'frontend: features/board-beats/drawBeat.tsx (REVEAL_HOLD)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Ширина стопки при нескольких колодах не утверждена',
+      en: 'The pile-width ramp above one pile has no approved value',
+    },
+    problem: {
+      ru: '`pileWidthFor` держит 150px при одной стопке добора, 120 при двух, 100 при трёх и более — рамп придуман для этой задачи, не утверждён. `DeckAnimationsStory` кладёт стопки в ряд, которому никогда не приходится делить стол с рукой и доком, поэтому её фиксированные 150 ничего не подтверждают для борда: ряд из трёх (Git Branch + Sudo) может налезть на руку на узких экранах.',
+      en: '`pileWidthFor` holds a draw pile at 150px at one, 120 at two, 100 at three or more — a ramp invented for this task, not approved. `DeckAnimationsStory` lays its piles out in a row that never has to share the table with the hand and the dock, so its fixed 150 confirms nothing for the board: a row of three (Git Branch + Sudo) can crowd the hand on a narrow screen.',
+    },
+    where: {
+      ru: 'apps/ui/src/table/Table/piles.ts (pileWidthFor)',
+      en: 'apps/ui/src/table/Table/piles.ts (pileWidthFor)',
+    },
+    // `open`, not `reuse`: the module is applied in both the kit and the board.
+    // What is missing is an approved source for the ramp — a decision.
+    status: 'open',
+  },
+  {
+    what: {
+      ru: '`drawBeat` меряет якоря без `nextFrames` — мёрдж в том же батче уронит добор',
+      en: '`drawBeat` measures anchors without `nextFrames` — a same-batch merge would drop the draw',
+    },
+    problem: {
+      ru: '`toCentre` в `drawBeat.tsx` меряет `pileBox`/`centre` на входе такта без `await nextFrames()`, хотя `discardBeat`/`deckBeat` уже платят этот вызов за ровно тот же layout-эффект. Сходит с рук только потому, что добор не убирает стопку; `[drawn(pile 2), pilesChanged → merge]` вернёт `pileBox(2) === null` и уронит добор целиком — недостижимо до #108 (Git Branch/Merge с борда). Стаб анкоров в тесте тоже не переработан, в отличие от `deckBeat.test.tsx`.',
+      en: '`toCentre` in `drawBeat.tsx` measures `pileBox`/`centre` at beat entry with no `await nextFrames()`, though `discardBeat`/`deckBeat` already pay that call against the same layout-effect hazard. It gets away with it only because a draw never removes a pile; `[drawn(pile 2), pilesChanged → merge]` would return `pileBox(2) === null` and drop the draw entirely — unreachable until #108 (Git Branch/Merge from the board). The test’s anchors stub is not reworked either, unlike `deckBeat.test.tsx`.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/drawBeat.tsx (toCentre)',
+      en: 'frontend: features/board-beats/drawBeat.tsx (toCentre)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Сброс после `[drawn(mine), discarded]` может целиться в слот, соседний с верным',
+      en: 'A discard after `[drawn(mine), discarded]` can aim next to the right hand slot',
+    },
+    problem: {
+      ru: '`planBeats` резолвит `source.index` сброса против `before`, но очередь тактов передаёт дальше опубликованное состояние такта добора как базу такта сброса, а `useHandArrival` вставляет прилетевшую карту в середину веера — сброс на индексе на месте вставки или после неё летит из соседнего слота. Косметика, лучше отката веера, который был до передачи базы между тактами; честный фикс меняет, как `planBeats` и очередь делят резолвинг индексов.',
+      en: '`planBeats` resolves the discard’s `source.index` against `before`, but the beat queue now chains the draw beat’s published state forward as the discard beat’s base, and `useHandArrival` inserts the arriving card into the middle of the fan — a discard at or after that index flies from the neighbouring slot. Cosmetic, better than the whole-fan rollback that preceded chaining bases between beats; the honest fix changes how `planBeats` and the queue split index resolution.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/planBeats.ts (source.index)',
+      en: 'frontend: features/board-beats/planBeats.ts (source.index)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Жест прицеливания на сенсорном экране не решён',
+      en: 'An aim gesture on a touchscreen is undecided',
+    },
+    problem: {
+      ru: 'Стрелка (#99) целится курсором: `useArrow` следит за `mousemove`, а вся стадия жеста — `_useBoardStaging` — устроена вокруг мыши, вплоть до порога клик/drag в `Hand`, которым продолжается полёт в центр. Ни здесь, ни где-либо ещё в проекте touch-эквивалент не решён — на сенсорном экране карту нечем даже поставить в центр стола, постановка ломается раньше прицела.',
+      en: 'The arrow (#99) aims off the cursor: `useArrow` tracks `mousemove`, and the whole staging gesture — `_useBoardStaging` — is built around a mouse, down to the click/drag threshold in `Hand` that the flight to the centre continues from. No touch equivalent is decided here or anywhere else in the project — on a touchscreen there is nothing to even stage a card with, so staging fails before aiming does.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useBoardStaging.ts + ui: table/Hand',
+      en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts + ui: table/Hand',
+    },
     status: 'open',
   },
 ]

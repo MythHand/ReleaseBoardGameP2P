@@ -10,6 +10,10 @@ export {
   toDiscardParams,
 } from './scatter'
 export { nextFrames, wait } from './timing'
+// The third step, and the one the audit page lists under all ten scenes with a
+// discard. It stayed in the playground on the claim that it had one consumer;
+// it had ten, and the frontend's board is the eleventh.
+export { type Leaving, useDiscardExit } from './useDiscardExit'
 export { type Raise, useFlyer } from './useFlyer'
 // The two flight STEPS. They live here rather than beside a scene because a
 // movement found in two places is a module (root CLAUDE.md, Animations Rule):

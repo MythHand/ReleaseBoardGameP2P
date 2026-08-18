@@ -133,7 +133,12 @@ export function disconnect(session: Session, peerId: string, now: number): Sessi
   return { session: { ...session, seats }, outgoing: [] }
 }
 
-export function rebind(session: Session, playerId: PlayerId, peerId: string): SessionResult {
+export function rebind(
+  session: Session,
+  playerId: PlayerId,
+  peerId: string,
+  now: number,
+): SessionResult {
   const seat = session.seats.find((s) => s.playerId === playerId)
   if (!seat) return { session, outgoing: [] }
 
@@ -150,6 +155,28 @@ export function rebind(session: Session, playerId: PlayerId, peerId: string): Se
     s.playerId === playerId ? { ...s, peerId, absentSince: null } : s,
   )
   const next: Session = { ...session, seats }
+
+  // A turn deadline that expired while this seat was EMPTY was deferred, not
+  // spent: `tick` refuses to fire a deadline against a seat with nobody in it,
+  // and says the absence grace owns a disconnected seat's forward progress. So
+  // the shield has to end by handing the turn back, not by forfeiting it — a
+  // returning player who found their clock expired gets a fresh one, or the
+  // very next tick would auto-play their whole turn before their board even
+  // painted. Only an EXPIRED clock: a live one keeps its remaining time, so
+  // blinking the connection extends nothing. The first clock stays the
+  // ticker's to start — an undefined deadline is not an expired one.
+  const { turn } = next.state
+  if (turn.player === playerId && turn.deadline !== undefined && now >= turn.deadline) {
+    const { state, events } = next.engine.reduce(next.state, { type: 'CLOCK_STARTED', at: now })
+    if (state !== next.state) {
+      const restamped: Session = { ...next, state }
+      // The new clock is a state change every seat renders (the dock's ring
+      // ticks on it), so it travels to everyone — the rejoiner's catch-up
+      // projection rides in the same fan-out.
+      return { session: restamped, outgoing: syncAll(restamped, events) }
+    }
+  }
+
   // Catch-up is one projection, not a replay: a peer's state was never a fold
   // over deltas it might have missed.
   return { session: next, outgoing: [{ to: peerId, message: syncMessage(next, playerId, []) }] }
@@ -383,6 +410,63 @@ export function tick(session: Session, now: number): SessionResult {
       { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
       now,
     )
+  }
+
+  // The turn's inactivity clock. The engine stamps it on every commit that
+  // leaves the table idling on the player on turn (reduce's post-step), but
+  // the FIRST turn has no committed action behind it — createGame carries no
+  // timestamp — so the keeper starts that one clock itself, on its first tick.
+  // The ticker only runs once the start gate opens (remoteLink), which is what
+  // makes "first tick" mean "the table went live", not "cards still flying".
+  const { turn, drawing, over } = session.state
+  if (!window && !pending && !drawing && !over) {
+    if (turn.deadline === undefined) {
+      const { state, events } = session.engine.reduce(session.state, {
+        type: 'CLOCK_STARTED',
+        at: now,
+      })
+      if (state === session.state) return { session, outgoing: [] }
+      const next: Session = { ...session, state }
+      return { session: next, outgoing: syncAll(next, events) }
+    }
+
+    if (now >= turn.deadline) {
+      // The same rule as the stalled defence above: a deadline never fires
+      // against a seat with nobody in it — driveAbsent's grace period owns a
+      // disconnected seat's forward progress.
+      const seat = session.seats.find((s) => s.playerId === turn.player)
+      if (!seat?.peerId) return { session, outgoing: [] }
+
+      // The idle player's whole obligation resolves on one expiry — the
+      // mandatory draw, then the push — per the dock's design notes
+      // (playground TurnDockBlock): a timed-out turn ends, it does not win a
+      // fresh 30s per forced action. A draw that raises a pending (Error 503)
+      // or ends the turn itself (Hallucination) stops the push half; the
+      // pending's own flow takes over from there.
+      let state = session.state
+      let events: Event[] = []
+      if (!drawObligationMet(state)) {
+        const drawn = session.engine.reduce(state, { type: 'DRAW', player: turn.player, at: now })
+        state = drawn.state
+        events = drawn.events
+      }
+      if (
+        state.turn.player === turn.player &&
+        !state.pending &&
+        !state.window &&
+        !state.over &&
+        drawObligationMet(state)
+      ) {
+        const pushed = session.engine.reduce(state, { type: 'PUSH', player: turn.player, at: now })
+        if (pushed.state !== state) {
+          events = [...events, ...pushed.events]
+          state = pushed.state
+        }
+      }
+      if (state === session.state) return { session, outgoing: [] }
+      const next: Session = { ...session, state }
+      return { session: next, outgoing: syncAll(next, events) }
+    }
   }
 
   return { session, outgoing: [] }

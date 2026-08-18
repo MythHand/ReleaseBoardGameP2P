@@ -12,7 +12,6 @@ import {
   Button,
   Card,
   cardById,
-  centerOf,
   type DockView,
   Drawer,
   deriveDock,
@@ -28,6 +27,7 @@ import {
   PauseGame,
   PendingPrompt,
   Pile,
+  pileWidthFor,
   Reconnect,
   type ReleaseSlots,
   ReleaseZone,
@@ -40,11 +40,10 @@ import {
   Toggle,
   TurnDock,
   Typography,
-  useArrow,
 } from '@release/ui'
 import { HEAP_SHOW, restTransform } from '@release/ui/animations'
 import type React from 'react'
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:
 // where every block sits, how big it is, what it overlaps. The board is a fork
 // of @release/ui's Table and the playground is where this screen is designed
@@ -52,11 +51,13 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 // nothing to catch it — a type check cannot see a position. `opening` holds only
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
+import { useBoardAnchors } from '~/entities/game/board'
 import type { BoardProps, Panel } from '~/entities/game/board/types'
-import type { IntroRefs } from '~/features/game-intro/useDealIntro'
+import { useBeats } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
+import { useBoardStaging } from './_useBoardStaging'
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
 // 0–8 зелёный, 9–18 жёлтый, 19–28 красный
@@ -151,37 +152,12 @@ export default function Board({
   intro,
 }: BoardProps) {
   // ===== the opening =====
-  // Every ref the deal aims at. The shift the `hudIn` preset applies rides on
-  // `transform`, so a block whose own transform holds its position (the seats'
-  // row, the decks column) is animated through an INNER node — hence the
-  // wrappers below rather than the positioned blocks themselves.
-  const railRef = useRef<HTMLDivElement>(null)
-  const bgRef = useRef<HTMLDivElement>(null)
-  const decksRef = useRef<HTMLDivElement>(null)
-  const discardRef = useRef<HTMLDivElement>(null)
-  const seatsRef = useRef<HTMLDivElement>(null)
-  const dockRef = useRef<HTMLDivElement>(null)
-  const zoneRef = useRef<HTMLDivElement>(null)
-  const deckBoxRef = useRef<HTMLDivElement>(null)
-  const centreRef = useRef<HTMLDivElement>(null)
-  const handRef = useRef<HTMLDivElement>(null)
-  const seatEls = useRef<Record<string, HTMLElement | null>>({})
-  const introRefs = useMemo<IntroRefs>(
-    () => ({
-      rail: railRef,
-      bg: bgRef,
-      decks: decksRef,
-      discard: discardRef,
-      seats: seatsRef,
-      dock: dockRef,
-      zone: zoneRef,
-      deckBox: deckBoxRef,
-      centre: centreRef,
-      hand: handRef,
-      seatOf: (player: string) => seatEls.current[player] ?? null,
-    }),
-    [],
-  )
+  // Every node a flight aims at or leaves from — the board's own registry, not
+  // just the deal's. The shift the `hudIn` preset applies rides on `transform`,
+  // so a block whose own transform holds its position (the seats' row, the
+  // decks column) is animated through an INNER node — hence the wrappers below
+  // rather than the positioned blocks themselves.
+  const anchors = useBoardAnchors()
 
   // The blocks stay hidden from the FIRST committed frame until the intro is
   // over — not merely while it is `active`. `hudIn` only holds a block down
@@ -196,16 +172,37 @@ export default function Board({
     gameId: intro?.gameId ?? null,
     view: intro?.view ?? null,
     events: intro?.events ?? [],
-    refs: introRefs,
+    refs: anchors,
     onDone: onIntroDone,
+  })
+  // One queue, for everything that moves. The opening goes in as beat zero and
+  // the wire's own beats queue behind it — one place that decides what plays,
+  // in what order, and whether it plays at all under prefers-reduced-motion.
+  //
+  // `enabled` gates only the WIRE's beats, not the opening: until the deal is
+  // over, the events that produced the board's first projection are the deal's
+  // own, and replaying them as discards would fly cards that never left a hand
+  // on screen.
+  const beats = useBeats({
+    live,
+    events: intro?.events ?? [],
+    anchors,
+    enabled: introOver || intro == null,
+    intro: deal.beat,
   })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined
-  // While the deal runs the board renders its shadow of the projection. The
-  // shadow's last frame IS the projection, so the handover changes nothing on
-  // screen — provided nothing here keys off `introPhase`, and nothing does.
-  const state = deal.shadow ?? live
-  const actions = deal.active ? INERT_ACTIONS : liveActions
+  // While the deal runs the board renders its shadow of the projection, and
+  // afterwards a beat renders its own. The shadow's last frame IS the
+  // projection, so either handover changes nothing on screen — provided nothing
+  // here keys off `introPhase`, and nothing does. The deal wins the tie: it is
+  // the only shadow that exists before the queue is even armed.
+  const state = deal.shadow ?? beats.shadow ?? live
+  // Only the opening freezes the table. A discard is a thing that HAPPENED, not
+  // a thing being decided, so the fan stays live while one flies out
+  // (docs/animations/README.md — "Gating the hand", approach 3); `exclusive` is
+  // the queue's own answer, and today nothing but the opening sets it.
+  const actions = deal.active || beats.exclusive ? INERT_ACTIONS : liveActions
 
   const { you, opponents, decks, turn, history, setup } = state
   const derived = deriveDock(state, state.selfId, now)
@@ -238,63 +235,22 @@ export default function Board({
   const controlled = panelProp !== undefined
   const panel = controlled ? panelProp : ownPanel
 
-  // gesture machine (Tasks 6–7): turns clicks into completed intents. Legality
-  // is always the engine's answer (state.playable / actions.legalTargets) —
-  // Table only renders what the hook decided, never re-derives it.
-  const gestures = useBoardInteractions({
+  // gesture machine: turns clicks into completed intents. Legality is always
+  // the engine's answer (state.playable / state.targets) — Table only renders
+  // what the hook decided, never re-derives it.
+  const gestures = useBoardInteractions({ state, actions })
+
+  // the staging gesture: pulling a card that needs a target out of the fan —
+  // stands it at the centre, aims the arrow, dispatches on a lit target. Inert
+  // under the same gate the click actions already have: the deal or an
+  // exclusive beat owns the table.
+  const staging = useBoardStaging({
     state,
+    anchors,
     actions,
-    comboOptions: (card) => state.comboOptions?.[card] ?? [],
+    events: intro?.events ?? [],
+    enabled: !(deal.active || beats.exclusive),
   })
-
-  // targeting arrow: origin is the SOURCE card's slot — `gestures.selected`,
-  // resolved through `data-hand-slot` — not whatever was clicked most
-  // recently. `selected` stays the source through the whole combo-then-target
-  // sequence (the partner click only sets `combo`), so re-deriving the origin
-  // from it on every phase change keeps the arrow anchored to the source even
-  // when a combo partner is picked afterwards. The tip follows the cursor via
-  // the mousemove listener inside useArrow, which is only mounted while
-  // `active` is true — kept in lockstep with `phase === 'selected'` here, so
-  // it comes down on every exit from that phase, including unmount.
-  //
-  // The effect is keyed on `phase`/`selected` only — NOT on `you.hand` — on
-  // purpose: it arms once per selection, not once per render. `you.hand` is a
-  // fresh array on every projection update (Milestone 3's `toTableState`
-  // rebuilds `TableState` from scratch each time), and `Table` re-renders on
-  // the turn clock; if `you.hand` were a dependency, every such re-render
-  // while a target is pending would re-run `arrow.aim(origin)`, which sets
-  // `to = origin` and snaps the tracked cursor position back to the source —
-  // discarding whatever the mousemove listener had followed it to. `you.hand`
-  // is still read inside the effect (to resolve the selected uid's slot
-  // element), just not watched for changes.
-  // (`handRef` is declared with the intro's refs above — the deal lands its
-  // cards in this very element, so the two must be the same node.)
-  const arrow = useArrow()
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `you.hand` is read to resolve the selected uid's slot element, not watched — see the comment above for why it must stay out of the dependency array
-  useEffect(() => {
-    if (gestures.phase !== 'selected') {
-      arrow.stop()
-      return
-    }
-    const index = gestures.selected ? you.hand.findIndex((c) => c.uid === gestures.selected) : -1
-    const slotEl =
-      index >= 0
-        ? handRef.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
-        : undefined
-    if (slotEl) arrow.aim(centerOf(slotEl))
-  }, [gestures.phase, gestures.selected, arrow.aim, arrow.stop])
-
-  // Escape cancels an in-flight target selection. Bound to the window (not a
-  // React onKeyDown) so it fires regardless of what currently has focus, and
-  // — like the arrow's mousemove — only while there is something to cancel.
-  useEffect(() => {
-    if (gestures.phase !== 'selected') return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') gestures.cancel()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [gestures.phase, gestures.cancel])
 
   // Escape skips the opening. Same window binding and the same reason as the
   // cancel above; `finish` is idempotent, so a second press is a no-op.
@@ -308,20 +264,32 @@ export default function Board({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [deal.active, dealFinish])
 
-  // A click that lands outside any hand slot while a target is pending reads
-  // as "changed my mind" — cancel. Clicks that land on a legal target already
-  // resolve (and reset) through onTargetPick before bubbling here, so this is
-  // a no-op in that case, not a race.
+  // Escape cancels a staged card the same way a miss on the table does —
+  // armed only while there is something to cancel (I8: a press after the play
+  // already dispatched must not turn into a return flight).
+  useEffect(() => {
+    if (!staging.staged || staging.dispatched) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') staging.cancel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [staging.staged, staging.dispatched, staging.cancel])
+
+  // A click that lands outside any hand slot while a card is staged reads as
+  // "changed my mind" — cancel. Clicks that land on a lit target already
+  // resolve through onTargetPick before bubbling here (I8's own guard in
+  // `useBoardStaging` makes that safe even where the target itself does not
+  // stop propagation); clicks inside the hand are the fan's own business.
   const handleTableClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // …and anywhere on the table while the opening plays, it skips it.
     if (deal.active) {
       dealFinish()
       return
     }
-    if (gestures.phase !== 'selected') return
+    if (!staging.staged || staging.dispatched) return
     const target = e.target as HTMLElement
     if (target.closest('[data-hand-slot]')) return
-    gestures.cancel()
+    staging.cancel()
   }
 
   const isHost = role === 'host'
@@ -366,21 +334,26 @@ export default function Board({
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-cancel for an in-flight target selection; the accessible affordance is the Escape handler above
-    <div className={kit.table} onClick={handleTableClick} role="presentation">
+    // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening; the accessible affordance is the Escape-skips-the-opening handler below
+    <div
+      className={kit.table}
+      onClick={handleTableClick}
+      role="presentation"
+      data-testid="board-table"
+    >
       {/* the table's own ambience — a layer, so the opening can bring it in
           whole without touching the screen's base fill */}
-      <div className={cls(opening.bgWrap, enter)} ref={bgRef}>
+      <div className={cls(opening.bgWrap, enter)} ref={anchors.bg}>
         <HudBackground tone="neutral" className={kit.bgLayer} />
       </div>
-      <Arrow from={arrow.from} to={arrow.to} />
+      <Arrow from={staging.arrow.from} to={staging.arrow.to} />
 
       {slots?.banner && <div className={kit.banner}>{slots.banner}</div>}
       {slots?.corner && <div className={kit.corner}>{slots.corner}</div>}
 
       {/* the seats: each in its own wrapper, so the opening can drop them in one
           after another and the deal can aim a card at the seat it belongs to */}
-      <div className={kit.opponents} ref={seatsRef}>
+      <div className={kit.opponents} ref={anchors.seats}>
         {opponents.map((p) => {
           const eliminated = Boolean(p.eliminated)
           const disconnected = disconnectedIds.has(p.id)
@@ -391,7 +364,7 @@ export default function Board({
               key={p.id}
               className={enter}
               ref={(el) => {
-                seatEls.current[p.id] = el
+                anchors.bindSeat(p.id, el)
               }}
             >
               <Seat
@@ -400,8 +373,9 @@ export default function Board({
                 eliminated={eliminated}
                 disconnected={disconnected}
                 copy={copy.seat}
-                onPick={(target) => gestures.onTargetPick(target)}
-                targets={gestures.targets}
+                slotRef={(key, el) => anchors.bindReleaseSlot(p.id, key, el)}
+                onPick={(t) => staging.onTargetPick(t)}
+                targets={staging.targets}
               />
             </div>
           )
@@ -409,15 +383,21 @@ export default function Board({
       </div>
 
       <div className={kit.decks}>
-        <div className={cls(opening.deckStack, enter)} ref={decksRef}>
-          <Pile
-            label={copy.table.deck}
-            deck="base"
-            count={decks.main}
-            width={150}
-            countPos="tl"
-            boxRef={deckBoxRef}
-          />
+        <div className={cls(opening.deckStack, enter)} ref={anchors.decks}>
+          <div className={opening.pileRow}>
+            {decks.main.map((count, i) => (
+              <Pile
+                // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
+                key={i}
+                label={copy.table.deck}
+                deck="base"
+                count={count}
+                width={pileWidthFor(decks.main.length)}
+                countPos="tl"
+                boxRef={(el) => anchors.bindPile(i, el)}
+              />
+            ))}
+          </div>
           <Pile
             label={copy.table.events}
             deck="ai"
@@ -431,7 +411,7 @@ export default function Board({
       {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними
           «глубина» стопки, счётчик показывает весь сброс */}
       <div className={kit.discard}>
-        <div className={enter} ref={discardRef}>
+        <div className={enter} ref={anchors.discard}>
           <Pile
             label={copy.table.discard}
             heap={decks.discardHeap}
@@ -439,17 +419,20 @@ export default function Board({
             topCard={decks.discard}
             count={decks.discardCount}
             width={116}
+            boxRef={anchors.discardBox}
           />
         </div>
       </div>
 
-      {/* the centre: the player's own cards gather here before they go into the
-          fan, each at its own scatter — a small heap, not a neat stack. It is
-          mounted for the whole of an intro-bearing mount (the sequencer aims at
-          it from its first layout effect) and is empty the rest of the time. */}
-      {intro && (
-        <div className={opening.centre} ref={centreRef}>
-          {deal.staged.map((s) => {
+      {/* the centre: where cards stand while the table is looking at them — the
+          player's own cards gather here during the opening, and every drawn card
+          stages here for the rest of the match. Mounted for the whole life of
+          the board, because a flight cannot aim at a node that is not there yet.
+          pointer-events: none — outside a beat it is an empty box and must not
+          catch clicks meant for the table. */}
+      <div className={opening.centre} data-board-centre ref={anchors.centre}>
+        {intro &&
+          deal.staged.map((s) => {
             const data = cardById(s.card)
             if (!data) return null
             return (
@@ -462,8 +445,29 @@ export default function Board({
               </div>
             )
           })}
-        </div>
-      )}
+        {/* the pulled card stands here once the flyer has dropped it — while
+            the carrier or a return flight still holds it, the static render
+            would double it (ComboStory.tsx's own guard on this) */}
+        {staging.staged && staging.overlay.length === 0 && (
+          <div className={opening.centreCard} data-testid="board-centre-staged">
+            <Card card={staging.staged.card} interactive={false} width="100%" />
+          </div>
+        )}
+        {!staging.staged &&
+          state.pending?.kind === 'defend' &&
+          (() => {
+            const data = cardById(state.pending.attackCard)
+            return data ? (
+              <div
+                className={opening.centreCard}
+                data-testid="board-centre-pending"
+                data-pending-play
+              >
+                <Card card={data} interactive={false} width="100%" />
+              </div>
+            ) : null
+          })()}
+      </div>
 
       <div className={kit.you}>
         {youEliminated ? (
@@ -474,27 +478,41 @@ export default function Board({
           <>
             {/* the zone is the last thing to arrive: it is yours, and it comes
                 once you have a hand to play from */}
-            <div className={enter} ref={zoneRef}>
+            <div className={enter} ref={anchors.zone}>
               <ReleaseZone
                 release={you.release}
                 size="100px"
                 player={state.selfId}
-                onPick={(target) => gestures.onTargetPick(target)}
-                targets={gestures.targets}
+                slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
+                onPick={(t) => staging.onTargetPick(t)}
+                targets={staging.targets}
               />
             </div>
-            <div className={kit.handWrap} ref={handRef}>
+            <div className={kit.handWrap} ref={anchors.hand}>
               <Hand
-                items={you.hand}
-                // the fan opens room for the arriving heap while it travels
-                gapAt={deal.gapAt}
-                gapSize={deal.gapSize}
+                items={staging.handItems}
+                // the fan opens room for the arriving heap while it travels —
+                // the deal wins the tie against every other beat the same way
+                // it already wins the shadow's, and the staging gesture's own
+                // return-flight gap is last: it opens only once nothing else
+                // owns the fan.
+                gapAt={deal.gapAt ?? beats.gapAt ?? staging.gapAt}
+                gapSize={
+                  deal.gapAt == null
+                    ? beats.gapAt == null
+                      ? staging.gapSize
+                      : beats.gapSize
+                    : deal.gapSize
+                }
                 // while the deal runs the hand is held: no clicks reach the
                 // gesture machine, and the cards that travelled closed stay
                 // closed until the flip. Both are gone the moment it ends, so
                 // the released hand is the plain one this board always drew.
                 onCardClick={deal.active ? undefined : (i) => gestures.onCardClick(i)}
-                accentAt={gestures.accentAt}
+                // drag-mode: a card that needs a target is pulled out of the
+                // fan (the staging gesture), not clicked. Off during the deal,
+                // same as the click gesture above.
+                onPlay={deal.active ? undefined : staging.onHandPlay}
                 renderFace={
                   deal.active
                     ? (item, ctx) => (
@@ -518,7 +536,7 @@ export default function Board({
 
       {/* служебный док хода — низ слева, под колодами, слева от руки */}
       <div className={kit.turnDock}>
-        <div className={enter} ref={dockRef}>
+        <div className={enter} ref={anchors.dock}>
           <TurnDock
             state={dockView.state}
             danger={dockView.danger}
@@ -558,7 +576,7 @@ export default function Board({
       {/* `inert` while the opening runs: the layer is faded to nothing but its
           buttons would still take a click and a Tab stop, so a player could open
           a drawer they cannot see. */}
-      <div className={cls(opening.railLayer, enter)} ref={railRef} inert={entering}>
+      <div className={cls(opening.railLayer, enter)} ref={anchors.rail} inert={entering}>
         <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
       </div>
 
@@ -668,9 +686,12 @@ export default function Board({
         />
       )}
 
-      {/* the cards in the air: the carrier for the deal, and the arrival step
-          for the heap going into the fan. Last, so they fly over everything. */}
+      {/* the cards in the air: the carrier for the deal, the arrival step for
+          the heap going into the fan, and the exit step for a card leaving it
+          for the discard. Last, so they fly over everything. */}
       {deal.overlays}
+      {beats.overlays}
+      {staging.overlay}
     </div>
   )
 }

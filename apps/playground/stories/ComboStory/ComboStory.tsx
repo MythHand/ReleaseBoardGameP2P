@@ -2,7 +2,15 @@ import type { CardData } from '@release/ui'
 import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { enterPose, nextFrames, play, useFlyer, useHandArrival, wait } from '@/animations'
+import {
+  enterPose,
+  nextFrames,
+  play,
+  useDiscardExit,
+  useFlyer,
+  useHandArrival,
+  wait,
+} from '@/animations'
 import { cardById } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO } from '@/primitives/Card'
@@ -16,7 +24,6 @@ import { type Lang, pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechButton, TechLabel } from '../controls/TechControls'
 import { reorderHand } from '../interactive/reorderHand'
-import { useDiscardExit } from '../interactive/useDiscardExit'
 import styles from './ComboStory.module.css'
 import { cardCanTarget, isComboSource, validComboTarget } from './mockLegality'
 

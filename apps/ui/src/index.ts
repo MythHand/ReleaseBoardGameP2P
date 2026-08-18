@@ -52,7 +52,9 @@ export { default as Badge } from './primitives/Badge'
 export type { ButtonProps, ButtonVariant, CopyButtonProps } from './primitives/Button'
 export { CopyButton, default as Button } from './primitives/Button'
 // Components (added/uncommented as Task 4 migrates each)
-export { cardBoxIn, default as Card } from './primitives/Card'
+// CARD_RATIO rides along with the box helpers: a consumer that aims a flight at
+// a card box needs the ratio to reason about the box it gets back.
+export { CARD_RATIO, cardAreaOf, cardBoxIn, default as Card } from './primitives/Card'
 export { default as CardPair } from './primitives/CardPair'
 export { default as Drawer } from './primitives/Drawer'
 export type { DropdownItem } from './primitives/Dropdown'
@@ -110,7 +112,7 @@ export { default as GameOver } from './table/GameOver'
 export type { GameOverCondition, GameOverCopy } from './table/GameOver/GameOver'
 export { default as Hand } from './table/Hand'
 export { CARD_W, type SlotPlacement, slotPlacement } from './table/Hand/fan'
-export type { HandItem } from './table/Hand/Hand'
+export type { HandItem, HandPlayDrop } from './table/Hand/Hand'
 export { default as MoveHistory } from './table/MoveHistory'
 export type { HistoryEntry, MoveHistoryCopy } from './table/MoveHistory/MoveHistory'
 export { default as Participants } from './table/Participants'
@@ -139,6 +141,7 @@ export {
   type PendingPromptProps,
   type WindowCopy,
 } from './table/Table/PendingPrompt'
+export { pileWidthFor } from './table/Table/piles'
 export type {
   Panel,
   TableChromeCopy as TableCopy,

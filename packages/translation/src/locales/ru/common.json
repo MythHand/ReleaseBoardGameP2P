@@ -221,6 +221,7 @@
     "drawn": "добор ✓",
     "locked": "PUSH после добора",
     "canDefend": "можно отбить",
+    "underAttack": "релиз под ударом",
     "gameStart": "старт игры"
   },
   "pending": {

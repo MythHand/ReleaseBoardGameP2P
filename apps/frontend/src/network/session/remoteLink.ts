@@ -252,7 +252,7 @@ export function attachKeeper(args: {
     },
     peerReturned(playerId, peerId) {
       if (!keeping) return
-      commit(args.ref, rebind(args.ref.current, playerId, peerId), deliver)
+      commit(args.ref, rebind(args.ref.current, playerId, peerId, args.now()), deliver)
     },
     handover(toPlayerId) {
       if (!keeping) return

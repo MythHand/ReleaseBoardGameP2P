@@ -1,18 +1,12 @@
 import type { RefObject } from 'react'
 import { useRef, useState } from 'react'
-import {
-  jitter,
-  nextFrames,
-  play,
-  type Rect,
-  type Scatter,
-  toDiscardParams,
-  wait,
-} from '@/animations'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf, cardBoxIn } from '@/primitives/Card'
 import { PAIR_AUX } from '@/primitives/CardPair'
 import type { HeapCard } from '@/primitives/Pile/Pile'
+import { play } from './play'
+import { jitter, type Rect, type Scatter, toDiscardParams } from './scatter'
+import { nextFrames, wait } from './timing'
 import styles from './useDiscardExit.module.css'
 
 // THE step "cards leave the table for the discard" — the discard counterpart of
