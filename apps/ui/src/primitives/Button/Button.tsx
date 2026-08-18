@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import Typography, { type TypographyBase, type TypographyTk } from '../Typography'
 import styles from './Button.module.css'
 
-export type ButtonVariant = 'primary' | 'tech' | 'danger' | 'dangerGhost' | 'icon' | 'hud'
+export type ButtonVariant = 'primary' | 'tech' | 'danger' | 'dangerGhost' | 'icon' | 'hud' | 'bare'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
@@ -12,7 +12,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 // Label typography per variant. icon = a glyph / SVG sized in CSS, so it has no
-// Typography wrapper; the rest set their text through the component.
+// Typography wrapper; `bare` has none either — there the content brought its own
+// look, which is the whole point of the variant; the rest set their text through
+// the component.
 const LABEL_TYPO: Record<ButtonVariant, { base: TypographyBase; tk: TypographyTk } | null> = {
   primary: { base: 'button', tk: 'tk-18' },
   tech: { base: 'label-sm', tk: 'tk-18' },
@@ -20,6 +22,7 @@ const LABEL_TYPO: Record<ButtonVariant, { base: TypographyBase; tk: TypographyTk
   dangerGhost: { base: 'label-sm', tk: 'tk-18' },
   icon: null,
   hud: { base: 'value-lg', tk: 'tk-16' },
+  bare: null,
 }
 
 export default function Button({

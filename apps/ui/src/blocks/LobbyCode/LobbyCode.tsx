@@ -1,4 +1,5 @@
 import { CopyButton } from '@/primitives/Button'
+import Typography from '@/primitives/Typography'
 import styles from './LobbyCode.module.css'
 
 // Текст блока приходит пропсом (компонент i18n-agnostic). Дефолт — русский.
@@ -25,6 +26,9 @@ interface LobbyCodeProps {
   align?: 'start' | 'end'
   // порядок в ряду: false — кнопка слева + код (лобби); true — код + кнопка справа
   reverse?: boolean
+  // Кнопки нет вовсе: копирует клик по САМОМУ коду. Кегль там на ступень ниже —
+  // такой код стоит в строке настроек, где он значение, а не герой шапки.
+  copyOnCode?: boolean
 }
 
 // Блок «код игры»: метка сверху, ниже — кнопка(и) копирования и сам код.
@@ -38,7 +42,31 @@ export default function LobbyCode({
   showLabel = true,
   align = 'end',
   reverse = false,
+  copyOnCode = false,
 }: LobbyCodeProps) {
+  // Код и есть кнопка: буфер и «скопировано» несёт CopyButton, вид — сам код,
+  // а `bare` ровно затем и существует, чтобы кнопка его не переодевала.
+  if (copyOnCode) {
+    return (
+      <div className={`${styles.box} ${align === 'start' ? styles.start : ''}`}>
+        {showLabel && <span className={styles.label}>{copy.label}</span>}
+        <CopyButton
+          variant="bare"
+          copyValue={code}
+          copiedChildren={
+            <Typography base="value-lg" tk="tk-20">
+              {copy.copied}
+            </Typography>
+          }
+        >
+          <Typography base="value-lg" tk="tk-20" className={styles.codeBtn}>
+            {code}
+          </Typography>
+        </CopyButton>
+      </div>
+    )
+  }
+
   const codeBtn = (
     <CopyButton variant="tech" copyValue={code} copiedChildren={copy.copied}>
       {link ? (copy.copyCode ?? copy.copy) : copy.copy}

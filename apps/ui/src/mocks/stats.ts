@@ -2,19 +2,26 @@ import type { StatPlayer } from '@/screens/Stats'
 
 export interface StatsData {
   winnerId: string
+  selfId: string
   players: StatPlayer[]
 }
 
 // Мок итогов партии. location — где участник сейчас в пост-игровом флоу:
 // 'game' (на столе) | 'stats' (на статистике) | 'lobby' (в лобби) | 'offline' (нет связи).
+// Локальный игрок носит такой же ник, как все — «это ты» несёт отдельная
+// отметка (selfId), а не подменённое имя.
+// Длины ников РАЗНЫЕ намеренно: 8 / 14 / 20 символов при пределе поля в 20.
+// Лидеры показателей — you, p2 и p3, поэтому каждый из трёх шагов кегля имени
+// попадает на свою плашку ачивки, и раскладка видна на одном экране.
 export function makeStats(): StatsData {
   return {
     winnerId: 'you',
+    selfId: 'you',
     players: [
       // attack — сыграно атакующих (красные); defense — защитных (синие+фиолетовые)
       {
         id: 'you',
-        name: 'you',
+        name: 'deadlock',
         location: 'stats',
         attack: 5,
         defense: 3,
@@ -26,7 +33,7 @@ export function makeStats(): StatsData {
       },
       {
         id: 'p2',
-        name: 'kernel_panic',
+        name: 'TabsOverSpaces',
         location: 'lobby',
         attack: 8,
         defense: 2,
@@ -38,7 +45,7 @@ export function makeStats(): StatsData {
       },
       {
         id: 'p3',
-        name: 'segfault',
+        name: 'SyntaxSeagull_9000_x',
         location: 'game',
         attack: 3,
         defense: 4,

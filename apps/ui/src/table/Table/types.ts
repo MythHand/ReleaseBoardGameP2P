@@ -18,7 +18,7 @@ import type { DockView } from './dock'
 import type { TableActions, TablePending, TableWindow } from './intents'
 import type { PendingPromptCopy, WindowCopy } from './PendingPrompt'
 
-export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes'
+export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'chat'
 
 export interface TableOpponent {
   id: string
@@ -89,6 +89,11 @@ export interface TableRoom {
   // pointer. Local to this player — it is never sent anywhere.
   parallax?: boolean
   onParallaxChange?: (on: boolean) => void
+  // Всплывают ли новые реплики чата в углу, пока панель закрыта. Тоже
+  // предпочтение показа, а не факт комнаты: живёт у этого игрока и никуда не
+  // уезжает. Без обработчика поле в настройках не рисуется, а тосты идут.
+  chatToasts?: boolean
+  onChatToastsChange?: (on: boolean) => void
   paused?: boolean
   onPauseChange?: (on: boolean) => void
   pausePlayers?: PausePlayer[]
@@ -130,11 +135,20 @@ export interface TableChromeCopy {
   parallaxOn?: string
   parallaxOff?: string
   parallaxHint?: string
+  // поле уведомлений чата — как параллакс: подпись, состояния тумблера и
+  // пояснение; рендерится только вместе со своим обработчиком
+  chatToasts?: string
+  chatToastsOn?: string
+  chatToastsOff?: string
+  chatToastsHint?: string
   // подписи текстовых вкладок рейла
   tabHistory: string
   tabParticipants: string
   tabRules: string
   tabModes: string
+  // подпись вкладки чата — необязательна, как и сам чат: вкладка появляется
+  // только вместе со слотом `slots.chat`, а без него подписывать нечего
+  tabChat?: string
 }
 
 export interface TableCopyBundle {
@@ -158,6 +172,14 @@ export interface TableSlots {
   // match, and the consumer's non-fatal error notice.
   corner?: ReactNode
   banner?: ReactNode
+  // Переписка комнаты — слот, а не данные: стол даёт ей вкладку рейла и
+  // выезжающую панель, а кто ведёт ленту (P2P, мок) он не знает. Нет слота —
+  // нет ни вкладки, ни панели.
+  chat?: ReactNode
+  // Всплывающие плашки в правом нижнем углу. Стол даёт им угол, ширину и слой;
+  // что всплывает — дело потребителя. Одно правило стол берёт на себя: при
+  // открытой панели чата плашек нет вовсе — лента и так на экране.
+  toasts?: ReactNode
 }
 
 export interface TableOver {

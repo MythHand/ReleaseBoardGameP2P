@@ -3,6 +3,7 @@ import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Button from '@/primitives/Button'
 import Card from '@/primitives/Card'
+import ScrollArea from '@/primitives/ScrollArea'
 import Typography from '@/primitives/Typography'
 import type { ConfirmActionProps } from '@/table/ConfirmAction'
 import ConfirmAction from '@/table/ConfirmAction'
@@ -394,11 +395,14 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
         <Typography as="div" base="label-md" tk="tk-10" className={styles.heading}>
           {kindCopy.prompt}
         </Typography>
-        <div
-          className={`${styles.options} ${pending.kind === 'requestCard' ? styles.optionsScroll : ''}`}
-        >
-          {options}
-        </div>
+        {/* только requestCard не влезает плоско — он один и прокручивается */}
+        {pending.kind === 'requestCard' ? (
+          <ScrollArea className={styles.optionsScroll} contentClassName={styles.options}>
+            {options}
+          </ScrollArea>
+        ) : (
+          <div className={styles.options}>{options}</div>
+        )}
       </div>
 
       {pending.kind === 'defend' && (

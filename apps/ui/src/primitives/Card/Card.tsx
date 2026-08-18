@@ -87,7 +87,7 @@ export default function Card({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: mouse handlers drive decorative hover-lift/parallax only; actionable cards (onClick) get role=button + onKeyDown + tabIndex below
     <div
-      className={styles.root}
+      className={`${styles.root} ${canInteract ? styles.interactive : ''}`}
       data-state={state}
       style={
         {

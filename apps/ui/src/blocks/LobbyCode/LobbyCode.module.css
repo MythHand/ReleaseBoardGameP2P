@@ -32,3 +32,8 @@
   composes: code tk-20 from '../../design/typography.module.css';
   color: var(--mint);
 }
+
+/* код в роли кнопки — цвет тот же, кегль ставит сам компонент (ступень ниже) */
+.codeBtn {
+  color: var(--mint);
+}

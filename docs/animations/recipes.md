@@ -1849,6 +1849,42 @@ dock shows it in context.
 
 ---
 
+## Chat toasts — a reply surfaces in the corner, the column moves up
+
+**When to call.** Somebody else says something while the chat panel is closed. Your own sends never
+toast (you just wrote them) and neither do the feed's technical notes (their place is the history).
+While the chat panel is open there are no toasts at all — the log is already in front of you.
+
+**Visual result.** A plate appears at the bottom of the right-hand corner, lifting the plates
+already there. Up to four stand at once; a fifth pushes the oldest out of the top. Each holds for
+six seconds unless a pointer is over the stack, in which case nothing expires. Plates are of
+different heights — the reply inside is shown whole, never clipped.
+
+**Sequence.**
+1. Arrival — `play('hudIn', el, { dy: 18, dur: 260 })` on mount. The same "a block arrives at its
+   place", only short and from below.
+2. Departure — `play('popOut')`, and **the plate takes itself off the stage**: the queue only marks
+   it `leaving`, the plate awaits `anim.finished` and calls back. Dropping it on the timer instead
+   would cut the animation in half.
+3. Neighbours shift — FLIP through `play('flyFrom', el, { from: previousRect, duration: 240 })`. The
+   plates have no common step to travel by, so their boxes are measured before and after the commit
+   in `useLayoutEffect` and each moves by its own delta. A plate that has just arrived is skipped
+   here: it has no previous place, it has its own arrival.
+4. The column is pinned to its bottom edge, so the geometry falls out by itself — the oldest leaving
+   from the top moves nobody, a middle one leaving lowers those above it.
+
+**Params & timings.** `hudIn` 260 ms (dy 18) · `popOut` 200 ms · the shift 240 ms · the hold 6000 ms
+· at most 4 plates · the column 280px wide.
+
+**Building blocks.** `blocks/Toast` — the plate with its own arrival and departure, and `ToastStack`,
+the queue that owns what is shown, for how long and in what order. The plate never knows what is
+inside it: the reply is rendered by `Message` and handed in.
+
+**Live reference.** The `Toast` page in Blocks (a live stack in its own corner), and the
+`Table + chat` screen — the `incoming` button in the technical bar.
+
+---
+
 ## What is missing goes to the backlog, not into a recipe
 
 Recipes describe real code, never a plan. **Every animated moment in the playground has a recipe

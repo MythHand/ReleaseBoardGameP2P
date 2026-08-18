@@ -9,6 +9,7 @@ import RefreshIcon from '@/icons/RefreshIcon'
 import Button from '@/primitives/Button'
 import HudBackground from '@/primitives/HudBackground'
 import Input from '@/primitives/Input'
+import ScrollArea from '@/primitives/ScrollArea'
 import Spinner from '@/primitives/Spinner'
 import Typography from '@/primitives/Typography'
 import styles from './Invite.module.css'
@@ -172,7 +173,7 @@ export default function Invite({
         </>
       )}
 
-      <div className={styles.content}>
+      <ScrollArea className={styles.content} contentClassName={styles.contentFlow}>
         <div className={styles.col}>
           {/* область 1 — описание игры (как на стартовом экране) */}
           <section className={styles.about}>
@@ -323,7 +324,7 @@ export default function Invite({
             <Button onClick={() => onHome?.()}>{copy.homePage}</Button>
           </section>
         </div>
-      </div>
+      </ScrollArea>
 
       {/* печатная версия — готовый блок @release/ui со своим копирайтом; правый
           нижний угол (как на Start). Язык — по тому же сигналу, что у логотипа

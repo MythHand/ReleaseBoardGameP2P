@@ -6,6 +6,10 @@ export interface TabRailItem {
   label: string
   // если задана — вкладка рендерит иконку (квадратная), а не вертикальный текст
   icon?: ReactNode
+  // фиксированная высота вкладки в px. Без неё вкладки делят полосу поровну;
+  // с ней вкладка занимает ровно своё, а остаток делят прочие. Нужна тем, кто
+  // в общий ряд не встаёт по смыслу, — их размер задаёт консьюмер, а не рейл.
+  height?: number
 }
 
 interface TabRailProps {
@@ -33,8 +37,12 @@ export default function TabRail({
           key={it.id}
           type="button"
           className={`${styles.tab} ${it.icon ? styles.square : ''} ${
-            active === it.id ? styles.tabOn : ''
-          }`}
+            it.height ? styles.fixed : ''
+          } ${active === it.id ? styles.tabOn : ''}`}
+          // высота — физическая, и это осознанно: у текстовой вкладки
+          // writing-mode вертикальный, а значит её block-size идёт ПОПЕРЁК
+          // полосы. Логическое свойство здесь задало бы ширину вместо высоты.
+          style={it.height ? { height: `${it.height}px` } : undefined}
           aria-label={it.icon ? it.label : undefined}
           onClick={() => onSelect(it.id)}
         >

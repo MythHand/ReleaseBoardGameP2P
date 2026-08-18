@@ -2,9 +2,17 @@
   position: relative;
   aspect-ratio: var(--card-aspect);
   container-type: inline-size; /* чтобы радиус масштабировался (cqw) */
-  cursor: pointer;
+  cursor: default;
   user-select: none;
   perspective: 1100px;
+}
+
+/* курсор обещает действие — значит его ставит только карта, с которой можно
+   взаимодействовать. В controlled-режиме (interactive={false}) курсор — забота
+   родителя: рука ставит себе grab, каталог — pointer, а карта-иллюстрация
+   (Stats, превью) не меняет курсор вообще. */
+.interactive {
+  cursor: pointer;
 }
 
 .tilt {
@@ -67,10 +75,6 @@
   box-shadow: 0 0 0 2px var(--accent),
     0 0 22px 2px color-mix(in srgb, var(--accent) 50%, transparent);
   opacity: 1;
-}
-
-.root[data-state="disabled"] {
-  cursor: default;
 }
 
 .root[data-state="disabled"] .tilt {

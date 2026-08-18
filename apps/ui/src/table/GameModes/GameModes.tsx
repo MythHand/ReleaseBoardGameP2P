@@ -1,5 +1,6 @@
 import GameSettings from '@/blocks/GameSettings'
 import type { GameModesCopy, Setup } from '@/game/modes'
+import ScrollArea from '@/primitives/ScrollArea'
 import styles from './GameModes.module.css'
 
 interface GameModesProps {
@@ -13,9 +14,9 @@ interface GameModesProps {
 export default function GameModes({ setup = {}, copy }: GameModesProps) {
   return (
     <div className={styles.box}>
-      <div className={styles.list}>
+      <ScrollArea className={styles.list} contentClassName={styles.listFlow}>
         <GameSettings setup={setup} readOnly copy={copy} />
-      </div>
+      </ScrollArea>
     </div>
   )
 }

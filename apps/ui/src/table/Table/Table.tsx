@@ -12,6 +12,7 @@ import Button from '@/primitives/Button'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
+import ScrollArea from '@/primitives/ScrollArea'
 import Slider from '@/primitives/Slider'
 import TabRail, { type TabRailItem } from '@/primitives/TabRail'
 import Toggle from '@/primitives/Toggle'
@@ -50,6 +51,7 @@ const DRAWER_WIDTH: Record<Panel, number> = {
   participants: 420, // участники — как история
   modes: 680, // режимы — как правила
   rules: 680, // правила — сильно шире
+  chat: 420, // переписка — как история
 }
 
 const EMPTY_RELEASE: ReleaseSlots = {
@@ -75,31 +77,55 @@ function SettingsGroup({ title, children }: { title?: string; children: ReactNod
   )
 }
 
-// One settings unit — the single pattern shared by every control: a caption on
-// top, the control, and an optional hint below. The control owns its own width
-// (the spectator slider fills via .sliderFull).
+// One settings unit — the single pattern shared by every control: a caption, the
+// control, and an optional hint below.
+// `inline` puts the control on the caption's line, at the right edge — the shape
+// every compact control takes, so the panel reads as one column of switches
+// instead of a ladder of differently sized things. Stacked is what is left for a
+// control that needs the full width (the spectator slider).
 function SettingsField({
   label,
   hint,
+  inline = false,
   children,
 }: {
   label?: string
   hint?: string
+  inline?: boolean
   children: ReactNode
 }) {
+  const labelEl = label && (
+    <Typography as="div" variant="metaLabel" className={styles.fieldLabel}>
+      {label}
+    </Typography>
+  )
+  const hintEl = hint && (
+    <Typography as="div" base="mono-xs" className={styles.fieldHint}>
+      {hint}
+    </Typography>
+  )
+
+  // Строка из двух частей: справа контрол своей шириной, слева — всё остальное,
+  // подпись вместе с пояснением. Ни одна из частей не фиксирована: контрол берёт
+  // ровно своё, текст занимает остаток и переносится внутри него.
+  if (inline) {
+    return (
+      <div className={styles.fieldInline}>
+        <div className={styles.fieldText}>
+          {labelEl}
+          {hintEl}
+        </div>
+        {children}
+      </div>
+    )
+  }
+
+  // Столбиком — то, чему нужна вся ширина: подпись, контрол, пояснение.
   return (
     <div className={styles.field}>
-      {label && (
-        <Typography as="div" variant="metaLabel" className={styles.fieldLabel}>
-          {label}
-        </Typography>
-      )}
+      {labelEl}
       {children}
-      {hint && (
-        <Typography as="div" base="mono-xs" className={styles.fieldHint}>
-          {hint}
-        </Typography>
-      )}
+      {hintEl}
     </div>
   )
 }
@@ -133,6 +159,8 @@ export default function Table({
     onLangChange,
     parallax = true,
     onParallaxChange,
+    chatToasts = true,
+    onChatToastsChange,
     paused = false,
     onPauseChange,
     pausePlayers = [],
@@ -217,21 +245,34 @@ export default function Table({
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
   const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
   const hostControls = canLimitSpectators || canPause
+  // есть ли на столе переписка вообще: от этого зависит и вкладка рейла, и
+  // настройка её уведомлений — управлять тем, чего на экране нет, незачем
+  const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
+  const canChatToasts = hasChat && Boolean(onChatToastsChange) && Boolean(copy.table.chatToasts)
   const hasUpperSettings =
-    Boolean(lang && onLangChange) || Boolean(code) || Boolean(onParallaxChange)
+    Boolean(lang && onLangChange) || Boolean(code) || Boolean(onParallaxChange) || canChatToasts
 
-  // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
+  // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку.
+  // Чат стоит последним, то есть у нижнего края: это не панель про партию, а
+  // разговор рядом с ней, и он не должен вклиниваться между её вкладками.
   const textTabs: TabRailItem[] = [
     { id: 'history', label: copy.table.tabHistory },
     { id: 'participants', label: copy.table.tabParticipants },
     { id: 'rules', label: copy.table.tabRules },
     { id: 'modes', label: copy.table.tabModes },
+    // высота фиксированная: чат в общий ряд не встаёт по смыслу, и делить полосу
+    // поровну с панелями партии ему незачем
+    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '', height: 155 }] : []),
   ]
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
   // (свитчер языка и/или код игры); служебный слот под визуальные опции
   const hasSettings =
-    Boolean(onLangChange) || Boolean(code) || Boolean(onParallaxChange) || Boolean(hostControls)
+    Boolean(onLangChange) ||
+    Boolean(code) ||
+    Boolean(onParallaxChange) ||
+    canChatToasts ||
+    Boolean(hostControls)
   const railItems: TabRailItem[] = hasSettings
     ? [{ id: 'settings', label: copy.table.settings, icon: <GearIcon /> }, ...textTabs]
     : textTabs
@@ -381,6 +422,14 @@ export default function Table({
           />
         )}
 
+        {/* всплывающие плашки — правый нижний угол, с отступом на рейл. Их нет
+            при открытой панели чата (лента и так перед глазами) и когда игрок
+            выключил их в настройках — оба правила про то, видно ли ленту, и
+            потому оба здесь, а не у того, кто плашки поставляет */}
+        {slots?.toasts && panel !== 'chat' && chatToasts && (
+          <div className={styles.toasts}>{slots.toasts}</div>
+        )}
+
         {/* вертикальный рейл у правого края — переключает панели drawer */}
         <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
 
@@ -391,7 +440,7 @@ export default function Table({
               {hasUpperSettings && (
                 <SettingsGroup title={isHost ? copy.table.generalTitle : undefined}>
                   {lang && onLangChange && (
-                    <SettingsField label={copy.table.langTitle}>
+                    <SettingsField label={copy.table.langTitle} inline>
                       <LangSwitcher
                         value={lang}
                         onChange={onLangChange}
@@ -401,21 +450,41 @@ export default function Table({
                     </SettingsField>
                   )}
                   {code && (
-                    <SettingsField label={copy.table.codeTitle}>
-                      <LobbyCode
-                        code={code}
-                        copy={copy.lobbyCode}
-                        align="start"
-                        reverse
-                        showLabel={false}
-                      />
+                    <SettingsField label={copy.table.codeTitle} inline>
+                      {/* копирует клик по самому коду — отдельной кнопке в
+                          строке настроек делать нечего */}
+                      <LobbyCode code={code} copy={copy.lobbyCode} copyOnCode showLabel={false} />
                     </SettingsField>
                   )}
                   {onParallaxChange && copy.table.parallax && (
-                    <SettingsField label={copy.table.parallax} hint={copy.table.parallaxHint}>
-                      <Toggle on={parallax} onChange={onParallaxChange}>
+                    <SettingsField
+                      label={copy.table.parallax}
+                      hint={copy.table.parallaxHint}
+                      inline
+                    >
+                      <Toggle
+                        on={parallax}
+                        onChange={onParallaxChange}
+                        className={styles.settingToggle}
+                      >
                         {(parallax ? copy.table.parallaxOn : copy.table.parallaxOff) ??
                           copy.table.parallax}
+                      </Toggle>
+                    </SettingsField>
+                  )}
+                  {canChatToasts && (
+                    <SettingsField
+                      label={copy.table.chatToasts}
+                      hint={copy.table.chatToastsHint}
+                      inline
+                    >
+                      <Toggle
+                        on={chatToasts}
+                        onChange={(on) => onChatToastsChange?.(on)}
+                        className={styles.settingToggle}
+                      >
+                        {(chatToasts ? copy.table.chatToastsOn : copy.table.chatToastsOff) ??
+                          copy.table.chatToasts}
                       </Toggle>
                     </SettingsField>
                   )}
@@ -439,8 +508,16 @@ export default function Table({
                       </SettingsField>
                     )}
                     {canPause && (
-                      <SettingsField label={copy.table.pauseGame} hint={copy.table.pauseHint}>
-                        <Toggle on={paused} onChange={(on) => onPauseChange?.(on)}>
+                      <SettingsField
+                        label={copy.table.pauseGame}
+                        hint={copy.table.pauseHint}
+                        inline
+                      >
+                        <Toggle
+                          on={paused}
+                          onChange={(on) => onPauseChange?.(on)}
+                          className={styles.settingToggle}
+                        >
                           {(paused ? copy.table.pauseOn : copy.table.pauseOff) ??
                             copy.table.pauseGame}
                         </Toggle>
@@ -466,11 +543,12 @@ export default function Table({
             />
           )}
           {panel === 'rules' && (
-            <div className={styles.scrollPanel}>
+            <ScrollArea className={styles.scrollPanel}>
               <Rules copy={copy.rules} />
-            </div>
+            </ScrollArea>
           )}
           {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
+          {panel === 'chat' && <div className={styles.chatPanel}>{slots?.chat}</div>}
         </Drawer>
 
         {/* pause window — over the play area, below the right-hand nav (its own

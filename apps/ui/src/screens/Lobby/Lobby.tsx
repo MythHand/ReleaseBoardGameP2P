@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
@@ -10,6 +10,7 @@ import Badge from '@/primitives/Badge'
 import Button from '@/primitives/Button'
 import HudBackground, { type HudBackgroundTone } from '@/primitives/HudBackground'
 import Modal from '@/primitives/Modal'
+import ScrollArea from '@/primitives/ScrollArea'
 import Slider from '@/primitives/Slider'
 import Toggle from '@/primitives/Toggle'
 import styles from './Lobby.module.css'
@@ -45,6 +46,10 @@ interface LobbyProps {
   rulesBlockCopy: { ru: RulesCopy; en: RulesCopy }
   // собственный текст экрана лобби обоими языками — выбирается по внутреннему lang
   lobbyScreenCopy: { ru: LobbyCopy; en: LobbyCopy }
+  // чат третьей, самой правой колонкой. Слот, а не данные: экран не знает ни
+  // откуда берутся сообщения, ни как они устроены — он только даёт им место.
+  // Без слота колонки нет и сетка остаётся из двух, как была.
+  chat?: ReactNode
 }
 
 // Весь видимый текст лобби приходит из набора по языку — экран сам переключает
@@ -60,6 +65,8 @@ export interface LobbyCopy {
   modesLockedHint: string
   players: string
   capacity: string
+  // заголовок колонки чата — сам блок чата своего заголовка не имеет
+  chat: string
   spectators: string
   specLimit: string
   freeSlot: string
@@ -118,6 +125,7 @@ export default function Lobby({
   gameModesCopy,
   rulesBlockCopy,
   lobbyScreenCopy,
+  chat,
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
@@ -207,7 +215,7 @@ export default function Lobby({
         </div>
       </header>
 
-      <div className={styles.grid}>
+      <div className={`${styles.grid} ${chat == null ? '' : styles.gridChat}`}>
         {/* слева — режимы */}
         <section className={styles.modes}>
           <h2 className={styles.h}>
@@ -217,14 +225,14 @@ export default function Lobby({
               {copy.rules}
             </Button>
           </h2>
-          <div className={styles.modeList}>
+          <ScrollArea className={styles.modeList} contentClassName={styles.modeListFlow}>
             <GameSettings setup={setup} onChange={setMode} readOnly={!isHost} copy={modesCopy} />
-          </div>
+          </ScrollArea>
         </section>
 
         {/* справа — игроки, зрители, управление лобби */}
         <section className={styles.players}>
-          <div className={styles.scrollArea}>
+          <ScrollArea className={styles.scrollArea}>
             <h2 className={styles.h}>
               {copy.players}
               <span className={styles.count}>
@@ -327,7 +335,7 @@ export default function Lobby({
               ))}
               {spectators.length === 0 && <EmptySlot>{copy.noSpectators}</EmptySlot>}
             </div>
-          </div>
+          </ScrollArea>
 
           <div className={styles.actions}>
             {isHost ? (
@@ -337,6 +345,14 @@ export default function Lobby({
             )}
           </div>
         </section>
+
+        {/* самая правая — чат, если его дали */}
+        {chat != null && (
+          <section className={styles.chatCol}>
+            <h2 className={styles.h}>{copy.chat}</h2>
+            {chat}
+          </section>
+        )}
       </div>
 
       <Modal open={rulesOpen} onClose={() => setRulesOpen(false)} title={copy.rulesTitle} wide>

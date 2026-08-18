@@ -5,13 +5,17 @@
   min-block-size: 0;
 }
 
+/* область прокрутки — только место; полосу над содержимым ведёт ScrollArea */
 .list {
-  display: flex;
   flex: 1;
+  min-block-size: 0;
+}
+
+/* поток записей внутри области */
+.listFlow {
+  display: flex;
   flex-direction: column;
   gap: 3px;
-  min-block-size: 0;
-  overflow-y: auto;
 }
 
 .row {

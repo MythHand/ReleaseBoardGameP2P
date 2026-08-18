@@ -6,10 +6,11 @@ import { pick, useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from '../kit/KitShell'
 import styles from './PauseGameBlock.module.css'
 
-// mocked table — the local player is 'you'; everyone starts not-ready (red)
+// mocked table — the local player is 'you' by id and carries a nickname like
+// everyone else; being you is a mark, not a name. All start not-ready (red).
 const SELF = 'you'
 const INITIAL: PausePlayer[] = [
-  { id: 'you', name: 'you', ready: false },
+  { id: 'you', name: 'deadlock', ready: false },
   { id: 'p2', name: 'kernel_panic', ready: false },
   { id: 'p3', name: 'segfault', ready: false },
   { id: 'p4', name: 'null_ptr', ready: false },

@@ -4,9 +4,14 @@
   min-block-size: 0;
 }
 
+/* область прокрутки — только место; полосу над содержимым ведёт ScrollArea */
 .list {
+  min-block-size: 0;
+}
+
+/* поток групп настроек внутри области */
+.listFlow {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  overflow-y: auto;
 }

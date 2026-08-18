@@ -1,0 +1,95 @@
+/* Цвет роли — на самой реплике: по нему красится имя и подложка своих
+   сообщений, так что роль задаётся один раз и расходится по обоим местам. */
+.msg {
+  --msg-role: var(--white-80);
+
+  display: flex;
+  gap: 10px;
+  padding: 3px 8px;
+}
+
+.roleHost {
+  --msg-role: var(--brand-green);
+}
+
+.rolePlayer {
+  --msg-role: var(--periwinkle);
+}
+
+.roleSpectator {
+  --msg-role: var(--white-80);
+}
+
+/* Первая реплика автора отбивается от предыдущей записи, склеенная идёт
+   вплотную: разрыв между авторами больше, чем внутри одной их очереди, и одно
+   сообщение читается цельным, а не строками-абзацами. */
+.msg:not(.grouped) {
+  margin-block-start: 14px;
+}
+
+.grouped {
+  padding-block-start: 0;
+}
+
+/* Своя реплика — подсветкой слева, а не отдельным пузырём справа: экран говорит
+   на языке HUD, где принадлежность несёт акцент, а не форма облака. Цвет
+   подложки — цвет своей роли. */
+.self {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--msg-role) 12%, transparent),
+    transparent 70%
+  );
+}
+
+/* колонка под аватар держит ширину и когда аватара нет (склеенная реплика) —
+   иначе текст прыгал бы влево на каждой второй строке */
+.gutter {
+  flex: none;
+  inline-size: 26px;
+}
+
+.body {
+  min-inline-size: 0;
+}
+
+.meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-block-end: 5px;
+}
+
+.who {
+  color: var(--msg-role);
+}
+
+/* автор вышел — имя гаснет, текст остаётся читаемым */
+.gone .who {
+  opacity: 0.4;
+}
+
+.time {
+  color: var(--white-35);
+}
+
+/* Интерлиньяж внутри реплики плотный: многострочное сообщение должно читаться
+   одним куском, а не строками-абзацами. И переносы, которые автор поставил сам,
+   сохраняются — иначе браузер склеил бы их в одну строку. */
+.text {
+  margin: 0;
+  line-height: 1.25;
+  color: var(--white-80);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* техническая запись — не реплика, а событие: без автора и аватара, во всю
+   ширину, светлой подсветкой */
+.note {
+  padding: 6px 10px;
+  margin-block: 4px;
+  color: var(--white-60);
+  text-align: center;
+  background: var(--white-06);
+}

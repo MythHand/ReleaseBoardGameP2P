@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import ScrollArea from '@/primitives/ScrollArea'
 import styles from './MoveHistory.module.css'
 
 export interface HistoryTarget {
@@ -186,11 +187,11 @@ interface MoveHistoryProps {
 export default function MoveHistory({ entries = [], copy }: MoveHistoryProps) {
   return (
     <div className={styles.box}>
-      <div className={styles.list}>
+      <ScrollArea className={styles.list} contentClassName={styles.listFlow}>
         {entries.map((e) => (
           <Row key={e.id} e={e} copy={copy} />
         ))}
-      </div>
+      </ScrollArea>
     </div>
   )
 }

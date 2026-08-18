@@ -1,7 +1,9 @@
 import type { CSSProperties } from 'react'
 import DiceIcon from '@/icons/DiceIcon'
 import Button, { CopyButton } from '@/primitives/Button'
+import Typography from '@/primitives/Typography'
 import { useLang } from '../../Playground/lang'
+import styles from './ButtonsKit.module.css'
 import { KitCell, KitPage, KitSection } from './KitShell'
 
 // The real Button primitive in every variation.
@@ -23,6 +25,8 @@ const COPY = {
     copy: 'Copy — клик копирует, подпись на миг меняется',
     copied: 'скопировано',
     copyBtn: 'копировать',
+    bare: 'Bare — вида нет, кликабельно само содержимое',
+    bareCap: 'код игры: клик кладёт его в буфер',
   },
   en: {
     primary: 'Primary — brackets [ TEXT ]',
@@ -41,6 +45,8 @@ const COPY = {
     copy: 'Copy — click copies, label flips briefly',
     copied: 'copied',
     copyBtn: 'copy',
+    bare: 'Bare — no look of its own, the content is the click target',
+    bareCap: 'the game code: a click puts it on the clipboard',
   },
 }
 
@@ -114,6 +120,24 @@ export default function ButtonsKit() {
         <KitCell caption="copyValue + copiedChildren">
           <CopyButton variant="tech" copyValue="RLS-7F3K" copiedChildren={t.copied}>
             {t.copyBtn}
+          </CopyButton>
+        </KitCell>
+      </KitSection>
+
+      <KitSection title={t.bare}>
+        <KitCell caption={t.bareCap}>
+          <CopyButton
+            variant="bare"
+            copyValue="RLS-7F3K"
+            copiedChildren={
+              <Typography base="value-lg" tk="tk-20">
+                {t.copied}
+              </Typography>
+            }
+          >
+            <Typography base="value-lg" tk="tk-20" className={styles.bareCode}>
+              RLS-7F3K
+            </Typography>
           </CopyButton>
         </KitCell>
       </KitSection>

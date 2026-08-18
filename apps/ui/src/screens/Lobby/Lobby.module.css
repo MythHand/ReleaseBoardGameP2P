@@ -115,12 +115,31 @@
   min-block-size: 0;
 }
 
+/* область прокрутки — только место; полосу над содержимым ведёт ScrollArea.
+   Отбивка справа остаётся: ползунок лежит над содержимым и не должен ложиться
+   на текст. */
 .modeList {
+  min-block-size: 0;
+  padding-inline-end: 8px;
+}
+
+/* поток групп настроек внутри области */
+.modeListFlow {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  padding-inline-end: 8px;
-  overflow-y: auto;
+}
+
+/* с чатом сетка становится из трёх; третья колонка — 320px */
+.gridChat {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) 320px;
+}
+
+/* ===== колонка чата ===== высоту колонки чат занимает сам (см. blocks/Chat) */
+.chatCol {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
 }
 
 /* ===== колонка игроков ===== */
@@ -130,12 +149,24 @@
   min-block-size: 0;
 }
 
-/* игроки + зрители скроллятся вместе, действия остаются внизу */
+/* До низа экрана доходит ТОЛЬКО левая колонка: она вылезает за нижнюю границу
+   сетки на всё, что под ней, — 32px отбивки самой сетки плюс 48px паддинга
+   экрана. Колонки игроков и чата остаются там же, где были. */
+.gridChat .modes {
+  margin-block-end: -80px;
+}
+
+/* пустое место в конце прокрутки режимов: докрутив донизу, содержимое не должно
+   выглядеть прилипшим к краю экрана */
+.gridChat .modeListFlow {
+  padding-block-end: 64px;
+}
+
+/* игроки + зрители прокручиваются вместе, действия остаются внизу */
 .scrollArea {
   flex: 1;
   min-block-size: 0;
   padding-inline-end: 8px;
-  overflow-y: auto;
 }
 
 .hSpectators {

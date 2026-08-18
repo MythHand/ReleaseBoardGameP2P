@@ -4,6 +4,7 @@ import { CardLangProvider } from '@/cards/cardLang'
 import AnimationAuditStory from '../stories/AnimationAuditStory'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
+import ChatBlock from '../stories/blocks/ChatBlock'
 import ConfirmActionBlock from '../stories/blocks/ConfirmActionBlock'
 import GameOverBlock from '../stories/blocks/GameOverBlock'
 import GameSettingsBlock from '../stories/blocks/GameSettingsBlock'
@@ -19,6 +20,7 @@ import ReconnectBlock from '../stories/blocks/ReconnectBlock'
 import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
 import RulesBlock from '../stories/blocks/RulesBlock'
 import SeatBlock from '../stories/blocks/SeatBlock'
+import ToastBlock from '../stories/blocks/ToastBlock'
 import TurnDockBlock from '../stories/blocks/TurnDockBlock'
 import CardParallaxStory from '../stories/CardParallaxStory'
 import CardStory from '../stories/CardStory'
@@ -51,6 +53,7 @@ import EdgeGlowKit from '../stories/kit/EdgeGlowKit'
 import HudBackgroundKit from '../stories/kit/HudBackgroundKit'
 import HudSurfaceKit from '../stories/kit/HudSurfaceKit'
 import InputsKit from '../stories/kit/InputsKit'
+import MessageKit from '../stories/kit/MessageKit'
 import ModalsKit from '../stories/kit/ModalsKit'
 import ModeSelectKit from '../stories/kit/ModeSelectKit'
 import OverlayKit from '../stories/kit/OverlayKit'
@@ -60,12 +63,16 @@ import SlidersKit from '../stories/kit/SlidersKit'
 import SpinnerKit from '../stories/kit/SpinnerKit'
 import StatusDotKit from '../stories/kit/StatusDotKit'
 import TabRailKit from '../stories/kit/TabRailKit'
+import TextareaKit from '../stories/kit/TextareaKit'
 import TogglesKit from '../stories/kit/TogglesKit'
 import VideoPlayerKit from '../stories/kit/VideoPlayerKit'
 import LoaderStory from '../stories/LoaderStory'
+import LobbyChatStory from '../stories/LobbyChatStory'
 import LobbyStory from '../stories/LobbyStory'
 import StartStory from '../stories/StartStory'
+import StatsChatStory from '../stories/StatsChatStory'
 import StatsStory from '../stories/StatsStory'
+import TableChatStory from '../stories/TableChatStory'
 import TableStory from '../stories/TableStory'
 import WelcomeStory from '../stories/WelcomeStory'
 import { type Lang, LangContext, pick } from './lang'
@@ -101,6 +108,11 @@ const groups: Group[] = [
       { id: 'lobby', title: 'Lobby', render: () => <LobbyStory /> },
       { id: 'table', title: 'Table', render: () => <TableStory /> },
       { id: 'stats', title: 'Stats', render: () => <StatsStory /> },
+      // copies of the three screens, to grow voice and text chat on without
+      // disturbing the originals. Today they are identical by design.
+      { id: 'lobby-chat', title: 'Lobby + chat', render: () => <LobbyChatStory /> },
+      { id: 'table-chat', title: 'Table + chat', render: () => <TableChatStory /> },
+      { id: 'stats-chat', title: 'Stats + chat', render: () => <StatsChatStory /> },
     ],
   },
   {
@@ -170,6 +182,8 @@ const groups: Group[] = [
     items: [
       { id: 'kit-buttons', title: 'Buttons', render: () => <ButtonsKit /> },
       { id: 'kit-inputs', title: 'Inputs', render: () => <InputsKit /> },
+      { id: 'kit-textarea', title: 'Textarea', render: () => <TextareaKit /> },
+      { id: 'kit-message', title: 'Message', render: () => <MessageKit /> },
       { id: 'kit-toggles', title: 'Toggles', render: () => <TogglesKit /> },
       { id: 'kit-sliders', title: 'Sliders', render: () => <SlidersKit /> },
       { id: 'kit-dropdown', title: 'Dropdown', render: () => <DropdownKit /> },
@@ -224,6 +238,8 @@ const groups: Group[] = [
       { id: 'block-pause-game', title: 'Pause game', render: () => <PauseGameBlock /> },
       { id: 'block-confirm-action', title: 'Confirm action', render: () => <ConfirmActionBlock /> },
       { id: 'block-participants', title: 'Participants', render: () => <ParticipantsBlock /> },
+      { id: 'block-chat', title: 'Chat', render: () => <ChatBlock /> },
+      { id: 'block-toast', title: 'Toast', render: () => <ToastBlock /> },
       { id: 'block-player-slot', title: 'Player slot', render: () => <PlayerSlotBlock /> },
       { id: 'block-lobby-code', title: 'Lobby code', render: () => <LobbyCodeBlock /> },
       { id: 'block-lang-switcher', title: 'Lang switcher', render: () => <LangSwitcherBlock /> },

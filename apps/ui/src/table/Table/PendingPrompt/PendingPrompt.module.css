@@ -40,11 +40,11 @@
 
 /* requestCard's guess space is the full catalogue (37 distinct card types) —
    too tall to fit flat, so it scrolls inside a capped box instead of pushing
-   the confirm bar off-screen. */
+   the confirm bar off-screen. Прокрутку и полосу над содержимым ведёт
+   ScrollArea; здесь только потолок площади. */
 .optionsScroll {
   max-inline-size: 560px;
   max-block-size: 260px;
-  overflow-y: auto;
 }
 
 .option {

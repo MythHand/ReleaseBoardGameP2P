@@ -57,8 +57,8 @@
     "winnerTag": "winner",
     "colName": "игрок",
     "colLoc": "где сейчас",
-    "colAttack": "атакующих",
-    "colDefense": "защитных",
+    "colAttack": "атак",
+    "colDefense": "защит",
     "toLobby": "в лобби",
     "location": {
       "game": "в игре",
@@ -266,6 +266,14 @@
     "actions": "действия",
     "kick": "исключить"
   },
+  "chat": {
+    "placeholder": "сообщение",
+    "send": "отправить",
+    "empty": "пока тихо"
+  },
+  "toasts": {
+    "hide": "скрыть"
+  },
   "reconnect": {
     "label": "переподключение…",
     "retry": "переподключиться",
@@ -287,7 +295,8 @@
     "tabHistory": "история",
     "tabParticipants": "участники",
     "tabRules": "правила",
-    "tabModes": "игровой режим"
+    "tabModes": "игровой режим",
+    "tabChat": "чат"
   },
   "lobbyCode": {
     "label": "код игры",
@@ -618,6 +627,7 @@
     "modesLockedHint": "настраивает host",
     "players": "Игроки",
     "capacity": "Вместимость",
+    "chat": "чат",
     "spectators": "Зрители",
     "specLimit": "Лимит",
     "freeSlot": "свободный слот",

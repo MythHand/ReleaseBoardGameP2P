@@ -1,0 +1,29 @@
+/* одиночная плашка — в своей ширине со стола (280px) */
+.one {
+  inline-size: 280px;
+}
+
+/* технический вызов — своей строкой в ряду секции, под заголовком */
+.controls {
+  flex: 1 0 100%;
+}
+
+/* сцена под живую стопку: во всю ширину страницы, чтобы угол был настоящим
+   углом, а не краем узкой колонки. Плашки ведут себя как на столе —
+   прижимаются к низу правого края и растут вверх, а не идут по потоку */
+.stage {
+  position: relative;
+  inline-size: 100%;
+  block-size: 420px;
+  background: var(--surface-0);
+  border: 1px solid var(--white-08);
+}
+
+.corner {
+  position: absolute;
+  inset-block-end: 16px;
+  inset-inline-end: 16px;
+  display: flex;
+  flex-direction: column;
+  inline-size: 280px;
+}

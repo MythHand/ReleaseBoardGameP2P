@@ -24,6 +24,15 @@ import audit from './AnimationAuditStory/AnimationAuditStory.tsx?raw'
 
 const MODULE_NAMES = /^\s{4}mod: '(.+)',$/gm
 
+// The board side of a scenario: one or more paths relative to apps/frontend/src,
+// comma-separated. A long value wraps onto its own line, so the value is matched
+// after the key rather than on the same line as it.
+const BOARD_PATHS = /^\s{4}board:\s*\n?\s*'(.+)',$/gm
+
+// every module the frontend actually has, keyed by the same relative path the
+// audit page writes — the glob is lazy, so nothing here loads the frontend
+const FRONTEND_FILES = import.meta.glob('../../frontend/src/**/*.{ts,tsx}')
+
 // A name is a heading, not code: `move()`, `wait(ms)`, `Hand (canonical)`,
 // `useCardTilt() + CardMotionProvider`. Reduce it to the identifiers the docs
 // would actually write; an entry naming several things owes all of them.
@@ -79,5 +88,24 @@ describe('the animation docs and what they describe', () => {
       .filter((s) => !recipes.includes(`\`${s.title}\``))
       .map((s) => s.title)
     expect(uncovered).toEqual([])
+  })
+
+  // The board side of a scenario is a PATH into another app, written by hand.
+  // Nothing in the playground imports `apps/frontend`, so the only thing that can
+  // keep this column honest is checking the file is still there: the first rename
+  // on the frontend side would otherwise leave the page asserting a module that
+  // no longer exists, and it would assert it silently, which is the exact failure
+  // mode the presets/reference test was written for.
+  it('points every board path at a module that exists', () => {
+    const paths = [...audit.matchAll(BOARD_PATHS)].flatMap((m) =>
+      m[1].split(',').map((one) => one.trim()),
+    )
+    expect(paths.length).toBeGreaterThan(5) // the page was parsed, not just matched
+    // Vite's own glob rather than node:fs: this package keeps a browser-only
+    // type surface (no @types/node), and the glob is resolved at build time
+    // against the real tree, which is exactly the fact being asserted.
+    const onDisk = new Set(Object.keys(FRONTEND_FILES))
+    const missing = paths.filter((rel) => !onDisk.has(`../../frontend/src/${rel}`))
+    expect(missing).toEqual([])
   })
 })

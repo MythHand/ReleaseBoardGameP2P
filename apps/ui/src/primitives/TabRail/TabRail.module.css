@@ -3,7 +3,7 @@
 .rail {
   position: absolute;
   inset-block: 0;
-  z-index: 60;
+  z-index: var(--z-rail);
   display: flex;
   flex-direction: column;
   inline-size: 56px;
@@ -44,6 +44,12 @@
   flex: none;
   block-size: 56px;
   writing-mode: horizontal-tb;
+}
+
+/* вкладка своей высоты (item.height): не тянется вместе с остальными и не
+   сжимается — высоту ей ставит консьюмер инлайном */
+.fixed {
+  flex: none;
 }
 
 .tab:last-child {

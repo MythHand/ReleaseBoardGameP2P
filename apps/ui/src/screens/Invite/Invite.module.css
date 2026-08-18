@@ -63,15 +63,20 @@
   z-index: 3;
 }
 
+/* область прокрутки содержимого экрана. Прокрутку и полосу над содержимым ведёт
+   ScrollArea; сама раскладка (флекс) живёт внутри — до детей display самой
+   области не доходит, они уезжают в её viewport. */
 .content {
   position: relative;
   z-index: 2;
-  display: flex;
-  align-items: flex-start;
   block-size: 100%;
   padding-block: 64px;
   padding-inline-start: 76px;
-  overflow-y: auto;
+}
+
+.contentFlow {
+  display: flex;
+  align-items: flex-start;
 }
 
 .col {

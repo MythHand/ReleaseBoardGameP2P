@@ -19,6 +19,42 @@
   border-radius: 0;
 }
 
+/* ===== экран с чатом ===== переписка стоит панелью у правого края и никуда не
+   уезжает, поэтому прокрутка страницы переезжает внутрь экрана: сам экран ростом
+   в отведённое окно, а итоги едут в своём вьюпорте рядом с панелью. Отступы
+   контента уезжают с ним же — на внутренний слой прокрутки. */
+.chatMode {
+  display: flex;
+  block-size: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.mainInner {
+  padding: 56px clamp(40px, 8vw, 120px);
+}
+
+/* Панель — та же поверхность, что у выезжающей панели стола (Drawer): тот же
+   фон, та же линия и тень у края. Разница одна и она смысловая: тут переписка
+   не выезжает по требованию, а стоит всё время, поэтому это не Drawer, а место
+   в раскладке экрана. Ширина — колонка лобби (320) плюс 100. */
+.chatDock {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  inline-size: 420px;
+  padding: 20px;
+  background: color-mix(in srgb, var(--surface-1) 92%, var(--bg));
+  border-inline-start: 1px solid var(--white-10);
+  box-shadow: -24px 0 48px var(--black-55);
+}
+
 /* ===== шапка ===== заголовок слева, свитчер языка по правой линии контента */
 .head {
   display: flex;
@@ -64,6 +100,9 @@
 
 .winnerName {
   composes: heading-4 tk-02 from '../../design/typography.module.css';
+  display: flex;
+  gap: 12px;
+  align-items: center;
   margin-block-start: 4px;
 }
 
@@ -151,71 +190,239 @@
   margin: 88px 0;
 }
 
-/* ===== ачивки ===== */
+/* ===== ачивки =====
+   Каждая ачивка — HUD-плашка (HudSurface: глубокая база, техно-сетка, акцентная
+   рамка и блум в углу). Весь цвет плашки идёт от одной переменной --ach: её
+   задаёт tone-класс, дальше рамка, блум, рейка, свечение имени и чип счётчика
+   берут её через color-mix. Ни один цвет не приезжает литералом из TSX. */
 .achievements {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
+.toneAttack {
+  --ach: var(--cat-attack);
+}
+
+.toneAi {
+  --ach: var(--cat-ai);
+}
+
+.toneDanger {
+  --ach: var(--danger-accent);
+}
+
+.toneOperation {
+  --ach: var(--cat-operation);
+}
+
+/* плашка: прямые углы — как таблица и блок победителя выше; скругление
+   HudSurface здесь снимаем, иначе итоги разъезжаются на два разных языка */
 .ach {
-  display: flex;
-  gap: 22px;
-  align-items: center;
-  padding: 22px 24px;
-  background: var(--white-04);
-  border: 1px solid var(--white-08);
+  position: relative;
+  padding: 24px 26px;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--ach) 30%, var(--white-08));
+  border-radius: 0;
 }
 
 .achWide {
   grid-column: span 2;
 }
 
-/* арт карт(ы) */
+/* С чатом у итогов колонка уже, и три плашки в ряд встают слишком тесно — колонок
+   становится две: широкая плашка идёт первой во всю строку, обычные за ней
+   парами. Ширину «во всю» даёт тот же span 2, просто колонок теперь две.
+   Сколько обычных дойдёт до экрана — не фиксировано (ничья ачивку не отдаёт),
+   поэтому последний ряд может остаться половинным: сетка это переживает сама. */
+.chatMode .achievements {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* «полоса редкости» — акцент вдоль верхней кромки, с затуханием вправо */
+.ach::before {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: 2;
+  block-size: 2px;
+  content: "";
+  background: linear-gradient(
+    90deg,
+    var(--ach) 0%,
+    color-mix(in srgb, var(--ach) 30%, transparent) 40%,
+    transparent 78%
+  );
+  box-shadow: 0 0 14px color-mix(in srgb, var(--ach) 45%, transparent);
+}
+
+/* угловая засечка HUD — правый нижний угол */
+.ach::after {
+  position: absolute;
+  inset-block-end: 12px;
+  inset-inline-end: 12px;
+  z-index: 2;
+  inline-size: 14px;
+  block-size: 14px;
+  content: "";
+  border-block-end: 1px solid color-mix(in srgb, var(--ach) 55%, transparent);
+  border-inline-end: 1px solid color-mix(in srgb, var(--ach) 55%, transparent);
+}
+
+.achInner {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  block-size: 100%;
+}
+
+/* арт карт(ы) — светится в цвет ачивки */
 .achArt {
   display: flex;
   flex: none;
   align-items: center;
+  filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--ach) 45%, transparent));
 }
 
-/* «веер» из 6 карт у Забагованного — внахлёст */
+/* одиночная карта стоит с наклоном — трофей, а не иллюстрация в строке */
+.achArt > :only-child {
+  transform: rotate(-6deg);
+}
+
+/* «веер» из 6 карт у Забагованного — внахлёст и по дуге. Сам веер остаётся как
+   есть; шире становится ЗОНА под ним: плашка широкая на две колонки, и лишнюю
+   ширину забирает арт, а не воздух справа. Веер стоит в этой зоне по центру. */
+.achFan {
+  justify-content: center;
+  min-inline-size: 290px;
+}
+
+.achFan > * {
+  transform-origin: 50% 120%;
+}
+
 .achFan > * + * {
   margin-inline-start: -36px;
 }
 
+.achFan > :nth-child(1) {
+  transform: rotate(-14deg);
+}
+
+.achFan > :nth-child(2) {
+  transform: rotate(-8deg);
+}
+
+.achFan > :nth-child(3) {
+  transform: rotate(-3deg);
+}
+
+.achFan > :nth-child(4) {
+  transform: rotate(3deg);
+}
+
+.achFan > :nth-child(5) {
+  transform: rotate(8deg);
+}
+
+.achFan > :nth-child(6) {
+  transform: rotate(14deg);
+}
+
+/* flex: 1 здесь — не выравнивание, а условие работы подбора кегля. Без него
+   колонка сжата по содержимому: её ширину задаёт САМО имя, замер сравнивает
+   строку с ней же самой, и шаг выбирается не по месту, а по округлению долей
+   пикселя. Заняв всю оставшуюся ширину плашки, колонка становится тем самым
+   «доступным местом», против которого имя и меряется. */
 .achBody {
+  position: relative;
   display: flex;
+  flex: 1;
   flex-direction: column;
+  min-inline-size: 0;
+  padding-inline-start: 20px;
+}
+
+/* акцентная рейка вдоль текста — держит блок и красит его в цвет ачивки */
+.achBody::before {
+  position: absolute;
+  inset-block: 2px;
+  inset-inline-start: 0;
+  inline-size: 2px;
+  content: "";
+  background: linear-gradient(
+    180deg,
+    var(--ach) 0%,
+    color-mix(in srgb, var(--ach) 12%, transparent) 100%
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ach) 55%, transparent);
+}
+
+/* имя + отметка «это ты» — одна строка, отметка отдельным элементом */
+.achName {
+  display: flex;
+  gap: 10px;
+  align-items: center;
   min-inline-size: 0;
 }
 
-/* имя игрока — сверху */
+/* коробка, по ширине которой имя и подбирает себе кегль: она занимает всё
+   место, что осталось в строке после отметки «это ты» */
+.achHolderBox {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* имя в одну строку — тогда его натуральная ширина честно больше коробки и
+   замер это видит. Ширину не ограничиваем: зажатая строка врала бы замеру */
+.achHolderText {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* последний шаг шкалы: мельчить больше некуда — распускаем строку. Есть в нике
+   пробел — перенос встанет по нему сам; нет — рвём внутри слова (anywhere).
+   Две строки в любом случае лучше, чем молча обрезанный краем плашки хвост */
+.achHolderWrap {
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* имя игрока — герой плашки: крупный моно с акцентным свечением */
 .achHolder {
-  composes: mono tk-04 from '../../design/typography.module.css';
-  color: var(--white-60);
-}
-
-.achTitle {
-  composes: heading-7 tk-02 from '../../design/typography.module.css';
-  margin-block-start: 6px;
   color: var(--fg);
+  text-shadow: 0 0 20px color-mix(in srgb, var(--ach) 60%, transparent);
 }
 
-/* цифра + подпись на одной линии текста */
+/* отметка «это ты» не сжимается и не уезжает за край из-за длинного имени */
+.selfTag {
+  flex: none;
+}
+
+/* титул-эпитет под именем — в цвет ачивки, подмешан белый ради читаемости */
+.achTitle {
+  margin-block-start: 6px;
+  color: color-mix(in srgb, var(--ach) 85%, var(--fg));
+}
+
+/* счётчик — чип, а не крупная цифра: находится глазом, но не перебивает имя */
 .achStat {
   display: flex;
   gap: 12px;
-  align-items: baseline;
-  margin-block-start: 14px;
+  align-items: center;
+  margin-block-start: 18px;
 }
 
 .achValue {
-  composes: numeric-xl tk-0 from '../../design/typography.module.css';
-  line-height: 0.95; /* плотная посадка крупного числа на одной линии с подписью */
+  padding: 3px 11px;
   color: var(--fg);
+  background: color-mix(in srgb, var(--ach) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ach) 45%, transparent);
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--ach) 14%, transparent);
 }
 
 .achUnit {
-  composes: label-sm tk-12 from '../../design/typography.module.css';
-  color: var(--white-45);
+  color: var(--white-70);
 }
