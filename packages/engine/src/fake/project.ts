@@ -114,6 +114,8 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       // The kit asks one question — is a draw still owed — so the answer
       // crosses as the boolean it always was, not as the raw pile list.
       hasDrawn: drawObligationMet(state),
+      openedAt: state.turn.openedAt,
+      deadline: state.turn.deadline,
     },
     window: state.window && {
       player: state.window.target.player,

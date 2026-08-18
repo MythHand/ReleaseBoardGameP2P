@@ -102,7 +102,15 @@ it('ends the turn on PUSH after drawing and advances the seat', () => {
   const s = withoutTriggers(engine.createGame(config()))
   const drawn = reduce(s, { type: 'DRAW', player: 'p1', at: 1000 })
   const r = reduce(drawn.state, { type: 'PUSH', player: 'p1', at: 1001 })
-  expect(r.state.turn).toEqual({ player: 'p2', index: 1, drawnFrom: [], releasesPlayed: 0 })
+  expect(r.state.turn).toEqual({
+    player: 'p2',
+    index: 1,
+    drawnFrom: [],
+    releasesPlayed: 0,
+    // The seat change hands the next player a fresh inactivity clock.
+    openedAt: 1001,
+    deadline: 1001 + 30_000,
+  })
   expect(r.events.map((e) => e.type)).toEqual(['turnEnded', 'turnStarted'])
 })
 
