@@ -29,17 +29,20 @@ const config = (): GameConfig => ({
 
 const FE: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
 const BUG: CardInstance = { uid: 'attack-bug#0', id: 'attack-bug' }
+const SUDO: CardInstance = { uid: 'support-sudo#0', id: 'support-sudo' }
+const NOTABUG: CardInstance = { uid: 'defense-not-a-bug#0', id: 'defense-not-a-bug' }
+const HOTFIX: CardInstance = { uid: 'defense-hotfix#0', id: 'defense-hotfix' }
 
 // p1 on turn holding a release; p2 holds a Bug so a window has a live responder.
-const primed = (): GameState => {
+const primed = (hands?: Partial<Record<'p1' | 'p2' | 'p3', CardInstance[]>>): GameState => {
   const s = engine.createGame(config())
   return {
     ...s,
     players: {
       ...s.players,
-      p1: { ...s.players.p1, hand: [FE] },
-      p2: { ...s.players.p2, hand: [BUG] },
-      p3: { ...s.players.p3, hand: [] },
+      p1: { ...s.players.p1, hand: hands?.p1 ?? [FE] },
+      p2: { ...s.players.p2, hand: hands?.p2 ?? [BUG] },
+      p3: { ...s.players.p3, hand: hands?.p3 ?? [] },
     },
   }
 }
@@ -140,4 +143,101 @@ it('still rejects a restart while the clock is live — no extensions', () => {
   const r = reduce(started.state, { type: 'CLOCK_STARTED', at: 5000 + TURN_ACTION_MS - 1 })
   expect(r.state).toBe(started.state)
   expect(r.events[0]?.type).toBe('rejected')
+})
+
+// #116 review on the #117 rebase: pair banking at resolution (#100) and the
+// turn clock's post-commit stamp (#98) meet in `reduce` for the first time
+// here, and nothing had exercised them together — a resolution that banks a
+// pair is ALSO a commit that re-stamps (or deliberately withholds) the turn's
+// clock. These three pin both facts of each such commit at once.
+
+it('a resolution that banks a spent pair also re-stamps the clock it idles into', () => {
+  // p2 throws a sudo-comboed Bug into p1's window; p1 takes the hit. One
+  // commit: both halves bank, the release dies, the window closes — and the
+  // post-step hands p1's continuing turn a fresh clock, at the RESOLVE's `at`.
+  const s = reduce(primed({ p2: [BUG, SUDO] }), { type: 'CLOCK_STARTED', at: 5000 }).state
+  const windowed = reduce(s, { type: 'PLAY', player: 'p1', card: FE.uid, at: 9000 }).state
+  const attacked = reduce(windowed, {
+    type: 'ATTACK',
+    player: 'p2',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    at: 10_000,
+  }).state
+  // the defend pending owns the wait — no turn clock while it stands
+  expect(attacked.turn.deadline).toBeUndefined()
+
+  const r = reduce(attacked, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: null },
+    at: 12_000,
+  }).state
+  expect(r.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO]))
+  expect(r.window).toBeNull()
+  expect(r.pending).toBeNull()
+  expect(r.turn.player).toBe('p1')
+  expect(r.turn.openedAt).toBe(12_000)
+  expect(r.turn.deadline).toBe(12_000 + TURN_ACTION_MS)
+})
+
+it('a banking resolution that reopens the window withholds the clock — the window owns the wait', () => {
+  // Same throw, but p1 repels it with Not a Bug (the one cancel a sudo attack
+  // still allows). One commit: all three cards bank AND the window reopens at
+  // round 2 — so the turn clock must stay off, not restart under the window.
+  const s = reduce(primed({ p1: [FE, NOTABUG], p2: [BUG, SUDO] }), {
+    type: 'CLOCK_STARTED',
+    at: 5000,
+  }).state
+  const windowed = reduce(s, { type: 'PLAY', player: 'p1', card: FE.uid, at: 9000 }).state
+  const attacked = reduce(windowed, {
+    type: 'ATTACK',
+    player: 'p2',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    at: 10_000,
+  }).state
+
+  const r = reduce(attacked, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: NOTABUG.uid },
+    at: 12_000,
+  }).state
+  expect(r.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO, NOTABUG]))
+  expect(r.window).toMatchObject({ round: 2 })
+  expect(r.turn.openedAt).toBeUndefined()
+  expect(r.turn.deadline).toBeUndefined()
+})
+
+it('a hand-scope pair banks on the attacker`s own turn, and their clock restarts with it', () => {
+  // No window at all: p1 sudo-combos a Bug at p2's hand on their own turn.
+  // p2 takes the hit — the pair banks, the steal happens, and the same commit
+  // returns the idle wait (and the clock) to p1, whose turn never left.
+  const s = reduce(primed({ p1: [BUG, SUDO], p2: [HOTFIX] }), {
+    type: 'CLOCK_STARTED',
+    at: 5000,
+  }).state
+  const thrown = reduce(s, {
+    type: 'PLAY',
+    player: 'p1',
+    card: BUG.uid,
+    combo: SUDO.uid,
+    target: { kind: 'player', player: 'p2' },
+    at: 9000,
+  }).state
+  expect(thrown.pending).toMatchObject({ kind: 'defend', scope: 'hand' })
+  expect(thrown.turn.deadline).toBeUndefined()
+
+  const r = reduce(thrown, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'defend', card: null },
+    at: 12_000,
+  }).state
+  expect(r.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO]))
+  expect(r.pending).toBeNull()
+  expect(r.turn.player).toBe('p1')
+  expect(r.turn.openedAt).toBe(12_000)
+  expect(r.turn.deadline).toBe(12_000 + TURN_ACTION_MS)
 })
