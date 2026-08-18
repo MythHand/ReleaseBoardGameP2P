@@ -176,20 +176,22 @@ export default function TableStory() {
   // Card parallax — a display preference of this player, so it sits in the general
   // group next to the language, not under the host's controls.
   const parallaxLabel = pick(lang, { ru: 'параллакс карт', en: 'card parallax' })
-  const parallaxOn = pick(lang, { ru: 'включён', en: 'on' })
-  const parallaxOff = pick(lang, { ru: 'выключен', en: 'off' })
+  const parallaxOn = pick(lang, { ru: 'Вкл', en: 'On' })
+  const parallaxOff = pick(lang, { ru: 'Выкл', en: 'Off' })
   const parallaxHint = pick(lang, {
-    ru: 'лицо карты следует за курсором',
+    ru: 'лицо карты следует за курсором',
     en: 'the card face follows the cursor',
   })
   const pauseLabel = pick(lang, { ru: 'пауза игры', en: 'pause game' })
   const pauseHint = pick(lang, {
-    ru: 'таймер хода замрёт у всех игроков',
+    ru: 'таймер хода замрёт у всех игроков',
     en: 'freezes the turn timer for everyone',
   })
   const generalTitle = pick(lang, { ru: 'общие', en: 'general' })
-  const pauseOn = pick(lang, { ru: 'включена', en: 'on' })
-  const pauseOff = pick(lang, { ru: 'выключена', en: 'off' })
+  // одно слово в обоих состояниях: включённость несёт сам тумблер цветом,
+  // а кнопка называет действие
+  const pauseOn = pick(lang, { ru: 'Пауза', en: 'Pause' })
+  const pauseOff = pick(lang, { ru: 'Пауза', en: 'Pause' })
 
   return (
     <div className={styles.root}>
