@@ -209,6 +209,12 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
     },
     turn: view.turn.player,
     hasDrawn: view.turn.hasDrawn,
+    // One pair or nothing — a half-formed clock would sweep the ring against
+    // a bound that does not exist.
+    turnClock:
+      view.turn.openedAt !== undefined && view.turn.deadline !== undefined
+        ? { openedAt: view.turn.openedAt, deadline: view.turn.deadline }
+        : null,
     selfId: view.self.id,
     history,
     setup: view.setup,

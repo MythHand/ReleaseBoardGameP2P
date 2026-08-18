@@ -38,7 +38,11 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 //  - 'push'     my turn, already drawn      → PUSH key + "drawn" badge
 //  - 'waiting'  an opponent's turn          → active player in the key's slot
 //  - 'reaction' reaction window on a release → PASS key (amber, or red danger)
-export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction'
+//  - 'hold'     the table waits on something not mine to press — my own release
+//               under the window (caption says so), or someone else's decision
+//               (their name in the key's slot). Reaction accent, live ring, no
+//               key: everything a key could offer is illegal right now.
+export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction' | 'hold'
 
 export interface TurnDockCopy {
   yourTurn: string
@@ -51,6 +55,8 @@ export interface TurnDockCopy {
   drawn: string
   locked: string
   canDefend: string
+  // 'hold' with no activePlayer: your own release is the window's target
+  underAttack: string
 }
 
 interface TurnDockProps {
@@ -82,10 +88,13 @@ const PHASE_KEY: Record<TurnDockState, keyof TurnDockCopy> = {
   push: 'yourTurn',
   waiting: 'turnOf',
   reaction: 'reaction',
+  hold: 'reaction',
 }
 
 function accentFor(state: TurnDockState, danger: boolean): string {
-  if (state === 'reaction') return danger ? 'var(--danger-accent)' : 'var(--reaction-accent)'
+  if (state === 'reaction' || state === 'hold') {
+    return danger ? 'var(--danger-accent)' : 'var(--reaction-accent)'
+  }
   if (state === 'waiting') return 'var(--idle-accent)'
   return 'var(--turn-accent)'
 }
@@ -108,7 +117,16 @@ export default function TurnDock({
   const accent = accentFor(state, danger)
   const accentStyle = { '--btn-accent': accent } as CSSProperties
 
-  const caption = state === 'draw' ? copy.locked : state === 'reaction' ? copy.canDefend : null
+  // 'hold' splits by what fills the key's slot: a named decider says enough on
+  // its own; an empty slot (your own release under the window) gets the why.
+  const caption =
+    state === 'draw'
+      ? copy.locked
+      : state === 'reaction'
+        ? copy.canDefend
+        : state === 'hold' && !activePlayer
+          ? copy.underAttack
+          : null
 
   // key/label states share one Button frame (draw / push / reaction); 'waiting'
   // shows the active player's name instead.
@@ -141,7 +159,7 @@ export default function TurnDock({
   // widest known value per text slot — reserves a fixed box (no reflow)
   const phaseSizer = longest(copy.yourTurn, copy.turnOf, copy.reaction, copy.reactionDanger)
   const labelSizer = longest(copy.draw, copy.push, copy.pass)
-  const captionSizer = longest(copy.locked, copy.canDefend)
+  const captionSizer = longest(copy.locked, copy.canDefend, copy.underAttack)
 
   return (
     <HudSurface accent={accent} className={`${styles.dock} ${paused ? styles.paused : ''}`}>

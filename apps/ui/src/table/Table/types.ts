@@ -55,6 +55,11 @@ export interface TableState {
   // whether the player on turn has already drawn this turn — drives the dock
   // between its 'draw' and 'push' phases
   hasDrawn?: boolean
+  // the turn's inactivity clock, as the projection stamps it — both ends of
+  // the span, like the window's, so the dock's countdown is exact. Absent
+  // while a window/pending owns the wait, and before the keeper starts the
+  // first turn's clock.
+  turnClock?: { openedAt: number; deadline: number } | null
   // the local player's id, as the projection names it (`PlayerView.self.id`)
   selfId: string
   history: HistoryEntry[]

@@ -61,6 +61,17 @@ describe('toBoardState', () => {
     expect(toBoardState(unknown, [], labels).you.hand[0].card).toBeTruthy()
   })
 
+  it('folds the turn clock into one optional pair the dock can sweep', () => {
+    const timed: PlayerView = {
+      ...view,
+      turn: { ...view.turn, openedAt: 1_000, deadline: 31_000 },
+    }
+    expect(toBoardState(timed, [], labels).turnClock).toEqual({ openedAt: 1_000, deadline: 31_000 })
+    // No clock (a window/pending owns the wait, or the keeper has not started
+    // the first turn's) folds to null, never to a half-formed pair.
+    expect(toBoardState(view, [], labels).turnClock).toBeNull()
+  })
+
   it('marks an eliminated opponent', () => {
     const out: PlayerView = {
       ...view,
