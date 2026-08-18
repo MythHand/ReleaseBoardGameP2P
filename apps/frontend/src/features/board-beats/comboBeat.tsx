@@ -55,6 +55,9 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
       const aux = auxId ? cardById(auxId) : null
       if (!cRect || !main) return null
       const mine = actor === ctx.base.selfId
+      // By id, first match — two copies of one card in hand fold from the
+      // FIRST slot (the same simplification `sourceOf` makes). Invisible on
+      // screen; noted so it is not rediscovered as a bug.
       const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === cardId) : -1
       const fromRect =
         (mine && handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ?? a.seatBox(actor)
@@ -114,6 +117,10 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
     async (plan: Extract<BeatPlan, { kind: 'attackPlaced' }>, ctx: BeatRun) => {
       const { staging: s } = latest.current
       const handoff = s?.current
+      // Adopted without comparing cards, and structurally so: the event names
+      // a card ID, the handoff holds a UID, and nothing can translate between
+      // them here — the adoption leans instead on `handoffRef` being non-null
+      // only while a dispatched play stands, so nothing stale is adoptable.
       if (handoff?.mainUid && plan.attacker === ctx.base.selfId) {
         // the actor's own play: the staged node stands exactly where the
         // pending render takes over — nothing to move, hand the table back

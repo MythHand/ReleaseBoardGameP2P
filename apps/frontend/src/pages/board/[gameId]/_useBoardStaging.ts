@@ -376,10 +376,19 @@ export function useBoardStaging({
         // Defense in depth, same reason `onTargetPick`'s own `foldingRef`
         // check exists: a press on a lit seat mid-fold is meant to be refused
         // by that guard, but this re-reads `stagedRef.current` rather than
-        // trusting it was — so a dispatch that landed here by ANY route (this
-        // guard is the one thing every route funnels through before ever
-        // touching `staged` again) is never clobbered by this closure's own,
-        // now-stale idea of the outcome.
+        // trusting it was — so a dispatch that landed here by ANY route is
+        // never clobbered by this closure's own, now-stale idea of the outcome.
+        //
+        // UNPROVEN, on record rather than inferred (#117 review): every route
+        // that can commit a dispatch today funnels through `onTargetPick`,
+        // which `foldingRef` already refuses for the whole fold — so no test
+        // can currently make this line's removal fail, and mutation-testing
+        // confirmed it (all 21 staging tests stay green without it; the one
+        // full-run casualty is an unrelated intro test, by accident). It
+        // guards the route that does not exist yet — the one place every
+        // future dispatcher funnels through before `staged` is touched again
+        // — which is exactly why a green suite after deleting it proves
+        // nothing. Do not remove it on that evidence.
         if (stagedRef.current?.phase === 'dispatched') return
         const windowOpen = Boolean(state.window?.canAttackWith?.includes(main.uid))
         if (windowOpen) {
