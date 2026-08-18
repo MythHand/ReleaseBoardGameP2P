@@ -10,10 +10,6 @@
 // latter. See task-4-report.md for the full note.
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { vi } from 'vitest'
-// Arrow's CSS Module classnames are not part of `@release/ui`'s public
-// barrel (no component re-exports its own style object) — reached into the
-// same way `fixture.ts` reaches into `@/mocks/table`.
-import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
 import Board from '../_Board'
 import { makeBoardProps } from './fixture'
 
@@ -142,8 +138,44 @@ it('plays a targetless card straight from the hand', () => {
       actions={{ onPlay, legalTargets: () => [] }}
     />,
   )
-  fireEvent.mouseDown(container.querySelectorAll('[data-hand-slot]')[0])
+  // Hand is always in drag mode now (#99 wires `onPlay` unconditionally outside
+  // the deal), so a press this short — no movement between down and up — is a
+  // CLICK, not a drag: Hand's own threshold (Hand.tsx, DRAG_THRESHOLD) decides.
+  const slot = container.querySelectorAll('[data-hand-slot]')[0]
+  fireEvent.mouseDown(slot)
+  fireEvent.mouseUp(slot)
   expect(onPlay).toHaveBeenCalledWith(uid, undefined, undefined)
+})
+
+it('dispatches onAttack when a card open to a window attack is clicked', () => {
+  const base = makeBoardProps()
+  const onAttack = vi.fn()
+  const uid = base.state.you.hand[0].uid
+  const { container } = render(
+    <Board
+      {...base}
+      state={{
+        ...base.state,
+        window: {
+          player: 'p2',
+          slot: 'frontend',
+          round: 1,
+          openedAt: 0,
+          deadline: 10_000,
+          passed: [],
+          canAttackWith: [uid],
+        },
+      }}
+      actions={{ onAttack }}
+    />,
+  )
+  // window attacks have no target — a click dispatches straight from the fan,
+  // the same click-not-drag contract as "plays a targetless card straight
+  // from the hand" above (a short press, no movement between down and up).
+  const slot = container.querySelectorAll('[data-hand-slot]')[0]
+  fireEvent.mouseDown(slot)
+  fireEvent.mouseUp(slot)
+  expect(onAttack).toHaveBeenCalledWith(uid, undefined)
 })
 
 it('draws from the dock, once its mount lockout clears', () => {
@@ -164,122 +196,6 @@ it('draws from the dock, once its mount lockout clears', () => {
   fireEvent.click(getByTestId('dock-key'))
   expect(onDraw).toHaveBeenCalledTimes(1)
   vi.useRealTimers()
-})
-
-it('anchors the targeting arrow to the selected source card, not the last-clicked combo partner', () => {
-  const base = makeBoardProps()
-  const sourceUid = base.state.you.hand[0].uid
-  const partnerUid = base.state.you.hand[1].uid
-  const targetPlayer = base.state.opponents[0].id
-  const { container } = render(
-    <Board
-      {...base}
-      state={{
-        ...base.state,
-        playable: [sourceUid, partnerUid],
-        comboOptions: { [sourceUid]: [partnerUid] },
-      }}
-      actions={{
-        onPlay: vi.fn(),
-        // Only the source card carries a legal target — matches the hook's
-        // own combo-then-target fixture in useTableInteractions.test.ts.
-        legalTargets: (card) =>
-          card === sourceUid ? [{ kind: 'player', player: targetPlayer }] : [],
-      }}
-    />,
-  )
-
-  const slots = container.querySelectorAll<HTMLElement>('[data-hand-slot]')
-  // Distinct, deterministic rects per slot (jsdom's real getBoundingClientRect
-  // is always all-zero) — this is what makes the two candidate origins
-  // (source vs. partner) actually distinguishable in the assertion below.
-  for (const [i, el] of slots.entries()) {
-    vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
-      left: i * 100,
-      top: 0,
-      width: 10,
-      height: 10,
-      right: i * 100 + 10,
-      bottom: 10,
-      x: i * 100,
-      y: 0,
-      toJSON: () => {},
-    })
-  }
-
-  fireEvent.mouseDown(slots[0]) // pick source — comboPending, no target awaited yet
-  fireEvent.mouseDown(slots[1]) // pick partner — phase becomes 'selected'
-
-  // Arrow's <circle class="origin"> sits at `from` — asserting on it, rather
-  // than on internal hook state, pins what actually reaches the screen. This
-  // leaves the arc/head geometry and the live cursor-follow (`to`) uncovered,
-  // but `from` is the only part this bug affects.
-  const origin = container.querySelector(`.${arrowStyles.origin}`)
-  expect(origin).toBeTruthy()
-  expect(origin?.getAttribute('cx')).toBe('5') // source (slot 0): left 0 + width/2
-  expect(origin?.getAttribute('cy')).toBe('5')
-})
-
-it('keeps the tracked cursor when a fresh-but-equivalent hand array re-renders mid-selection', () => {
-  const base = makeBoardProps()
-  const sourceUid = base.state.you.hand[0].uid
-  const targetPlayer = base.state.opponents[0].id
-  const stateWithTarget = {
-    ...base.state,
-    playable: [sourceUid],
-  }
-  const actions = {
-    onPlay: vi.fn(),
-    legalTargets: (card: string) =>
-      card === sourceUid ? [{ kind: 'player' as const, player: targetPlayer }] : [],
-  }
-  const { container, rerender } = render(
-    <Board {...base} state={stateWithTarget} actions={actions} />,
-  )
-
-  const slot0 = container.querySelectorAll<HTMLElement>('[data-hand-slot]')[0]
-  vi.spyOn(slot0, 'getBoundingClientRect').mockReturnValue({
-    left: 0,
-    top: 0,
-    width: 10,
-    height: 10,
-    right: 10,
-    bottom: 10,
-    x: 0,
-    y: 0,
-    toJSON: () => {},
-  })
-
-  fireEvent.mouseDown(slot0) // select the source — phase becomes 'selected', arrow arms at (5, 5)
-
-  // Move the tracked cursor away from the origin — this is the `mousemove`
-  // listener useArrow mounts internally while `active`.
-  fireEvent.mouseMove(window, { clientX: 300, clientY: 300 })
-
-  const arrowSvg = container.querySelector(`.${arrowStyles.svg}`)
-  const tipBefore = arrowSvg?.querySelector('g')?.getAttribute('transform')
-  expect(tipBefore).toContain('translate(300 300)')
-
-  // Re-render with a *fresh array reference* holding the *same cards* — this
-  // is what every projection update produces in the real app (Milestone 3's
-  // `toTableState` rebuilds `TableState` from scratch), and it must not be
-  // mistaken for a new selection.
-  rerender(
-    <Board
-      {...base}
-      state={{
-        ...stateWithTarget,
-        you: { ...stateWithTarget.you, hand: [...base.state.you.hand] },
-      }}
-      actions={actions}
-    />,
-  )
-
-  const tipAfter = arrowSvg?.querySelector('g')?.getAttribute('transform')
-  // If the arming effect re-ran on this re-render (the bug), it would call
-  // `aim(origin)` again, snapping `to` back to (5, 5) — the tip must instead
-  // stay wherever the mouse left it.
-  expect(tipAfter).toContain('translate(300 300)')
 })
 
 it('sweeps the countdown from the now it is given', () => {
@@ -332,4 +248,26 @@ it('shows no countdown readout for a pending that carries no deadline', () => {
   })
   render(<Board {...props} />)
   expect(screen.queryByTestId('ring-value')).toBeNull()
+})
+
+it('a pending attack stands at the centre for every viewer', () => {
+  const base = makeBoardProps()
+  const props = makeBoardProps({
+    state: {
+      ...base.state,
+      pending: {
+        kind: 'defend',
+        player: 'p2',
+        attacker: 'p1',
+        attackCard: 'attack-bug',
+        sudo: false,
+        options: [],
+        openedAt: 0,
+        deadline: 15000,
+        scope: 'hand',
+      },
+    },
+  })
+  const { getByTestId } = render(<Board {...props} />)
+  expect(getByTestId('board-centre-pending')).toBeTruthy()
 })

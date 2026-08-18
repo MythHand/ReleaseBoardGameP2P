@@ -55,6 +55,7 @@ const view = (): PlayerView => ({
     ],
     release: {},
     playable: [],
+    targets: {},
     frozen: [],
   },
   opponents: [{ id: 'p2', name: 'Two', handCount: 2, release: {}, eliminated: false }],

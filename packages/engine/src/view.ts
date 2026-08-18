@@ -1,3 +1,4 @@
+import type { Target } from './actions'
 import type {
   CardId,
   CardInstance,
@@ -82,6 +83,10 @@ export interface PlayerView {
     release: ReleaseView
     // Legality is the engine's answer, never the UI's.
     playable: CardUid[]
+    // Legal targets per playable card, the engine's own answer — an entry only
+    // for a card that needs one. A playable card with no entry plays without a
+    // target. Same authority as `playable`: attackTargets is what onPlay checks.
+    targets: Record<CardUid, Target[]>
     frozen: CardUid[]
   }
   opponents: OpponentView[]

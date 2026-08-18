@@ -1,6 +1,6 @@
 import { rulesFor } from '../cards'
 import type { GameConfig } from '../engine'
-import type { CardInstance } from '../state'
+import type { CardInstance, GameState } from '../state'
 import { playableFor, project } from './project'
 import { createGame } from './setup'
 
@@ -460,5 +460,74 @@ describe('playableFor legality rules', () => {
     expect(playable).not.toContain(triggerCard.uid)
     // Attack card should be playable
     expect(playable).toContain(attackCard.uid)
+  })
+})
+
+describe('self.targets', () => {
+  // Builds a state with only the named players' hands replaced — everything
+  // else (deck, turn, releases) comes from a fresh default game.
+  const primed = (hands: Record<string, CardInstance[]>): GameState => {
+    const s = createGame(config())
+    let players = s.players
+    for (const [id, hand] of Object.entries(hands)) {
+      players = { ...players, [id]: { ...players[id], hand } }
+    }
+    return { ...s, players }
+  }
+
+  it('projects legal targets for playable attacks and nothing else', () => {
+    // prime: it is p1's turn (default), p1 holds an attack, a release, and a defence
+    const s = primed({
+      p1: [inst('attack-bug', 0), inst('release-frontend', 0), inst('defense-hotfix', 0)],
+    })
+    const view = project(s, 'p1')
+    // the attack targets every living opponent's seat
+    expect(view.self.targets['attack-bug#0']).toEqual([{ kind: 'player', player: 'p2' }])
+    // a release needs no target: no entry, not an empty one
+    expect(view.self.targets['release-frontend#0']).toBeUndefined()
+    // an unplayable card (defence on your own turn) has no entry either
+    expect(view.self.targets['defense-hotfix#0']).toBeUndefined()
+  })
+
+  it('projects release and monitoring targets for DDoS', () => {
+    // p2 stands a Frontend release and a Monitoring; p1 holds attack-ddos
+    const s = primed({ p1: [inst('attack-ddos', 0)] })
+    const sWithP2Release: GameState = {
+      ...s,
+      players: {
+        ...s.players,
+        p2: {
+          ...s.players.p2,
+          release: {
+            ...s.players.p2.release,
+            frontend: { card: inst('release-frontend', 9) },
+            monitoring: inst('protection-monitoring', 9),
+          },
+        },
+      },
+    }
+    const view = project(sWithP2Release, 'p1')
+    expect(view.self.targets['attack-ddos#0']).toEqual(
+      expect.arrayContaining([
+        { kind: 'monitoring', player: 'p2' },
+        { kind: 'release', player: 'p2', slot: 'frontend' },
+      ]),
+    )
+  })
+
+  it('projects no targets while a window or pending suspends play', () => {
+    // any state where playableFor returns [] — e.g. a window is open
+    const s = createGame(config())
+    const windowOpen: GameState = {
+      ...s,
+      window: {
+        target: { player: 'p1', slot: 'frontend' as const, card: 'attack-bug#0' },
+        round: 1,
+        openedAt: 0,
+        deadline: 0,
+        passed: [],
+      },
+    }
+    expect(project(windowOpen, 'p2').self.targets).toEqual({})
   })
 })
