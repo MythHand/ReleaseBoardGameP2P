@@ -1,8 +1,15 @@
 import type { Event } from '@release/engine'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import type { BeatRun, BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
+import type {
+  BeatRun,
+  BoardAnchors,
+  BoardState,
+  IntroBeat,
+  StagedHandoff,
+} from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
+import { useComboBeat } from './comboBeat'
 import { useDeckBeat } from './deckBeat'
 import { useDiscardBeat } from './discardBeat'
 import { useDrawBeat } from './drawBeat'
@@ -86,8 +93,12 @@ export function useBeats(args: {
   anchors: BoardAnchors
   enabled: boolean
   intro?: IntroBeat | null
+  // The staging → beat handoff (#100): the page's staged play, read once at
+  // the start of `attackPlaced`/`releasePlaced` and cleared through its own
+  // `release()` when that play turns out to be the local actor's.
+  staging?: RefObject<StagedHandoff | null>
 }): Beats {
-  const { live, events, anchors, enabled, intro } = args
+  const { live, events, anchors, enabled, intro, staging } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
   // The same answer as `running`, but ahead of it: `drain()` sets this
@@ -109,6 +120,7 @@ export function useBeats(args: {
   const discards = useDiscardBeat(anchors)
   const draws = useDrawBeat(anchors)
   const decks = useDeckBeat(anchors)
+  const combo = useComboBeat(anchors, staging)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -151,9 +163,26 @@ export function useBeats(args: {
       if (plan.kind === 'piles') {
         return { key: plan.key, base, exclusive: false, run: (ctx) => decks.runPiles(plan, ctx) }
       }
+      if (plan.kind === 'attackPlaced') {
+        return { key: plan.key, base, exclusive: false, run: (ctx) => combo.runAttack(plan, ctx) }
+      }
+      if (plan.kind === 'releasePlaced') {
+        return { key: plan.key, base, exclusive: false, run: (ctx) => combo.runRelease(plan, ctx) }
+      }
+      if (plan.kind === 'pairToDiscard') {
+        return { key: plan.key, base, exclusive: false, run: (ctx) => combo.runPairOut(plan, ctx) }
+      }
       return null
     },
-    [discards.run, draws.run, decks.runReshuffle, decks.runPiles],
+    [
+      discards.run,
+      draws.run,
+      decks.runReshuffle,
+      decks.runPiles,
+      combo.runAttack,
+      combo.runRelease,
+      combo.runPairOut,
+    ],
   )
 
   // The mount is going away: stop starting things. A beat already in flight
@@ -242,7 +271,7 @@ export function useBeats(args: {
   // the arm also keeps it before the BATCH effect, which must not read a stale
   // watermark on the one pass where it matters most.)
   const playing = useRef<string | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws` and `decks` are read for the CURRENT render's runners on purpose, not added to the deps below — their own `reset` are unmemoized (a fresh function every render), so listing them would fire this on every render instead of once per match key
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks` and `combo` are read for the CURRENT render's runners on purpose, not added to the deps below — discardBeat/drawBeat/comboBeat's own `reset` are unmemoized (each depends on `useDiscardExit`'s or `useHandArrival`'s own `reset`, neither wrapped in `useCallback`), so listing any of them would fire this on every render instead of once per match key. `deckBeat`'s `reset` happens to be stable (its one dependency, `useFlyer`'s `drop`, IS memoized) — excluded here too, for one uniform list rather than a one-off exception for the runner that doesn't need it
   useLayoutEffect(() => {
     const key = intro?.key ?? null
     if (key == null || playing.current === key) return
@@ -262,6 +291,7 @@ export function useBeats(args: {
     discards.reset()
     draws.reset()
     decks.reset()
+    combo.reset()
   }, [intro?.key, live])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
@@ -367,7 +397,7 @@ export function useBeats(args: {
     // own last frame.
     shadow:
       (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ?? null,
-    overlays: [...discards.overlay, ...draws.overlay, ...decks.overlay],
+    overlays: [...discards.overlay, ...draws.overlay, ...decks.overlay, ...combo.overlay],
     exclusive: running?.exclusive ?? false,
     // The fan opens for a card on its way into it — the draw beat is the one
     // that grows it (I8); nothing else does yet.

@@ -5,7 +5,16 @@ import { isOpening } from './isOpening'
 // No `as unknown as PlayerView` cast: the fixture satisfies the real shape, so a
 // drift in the projection becomes a compile error here rather than a silent lie.
 const opening = (): PlayerView => ({
-  self: { id: 'p1', name: 'One', hand: [], release: {}, playable: [], targets: {}, frozen: [] },
+  self: {
+    id: 'p1',
+    name: 'One',
+    hand: [],
+    release: {},
+    playable: [],
+    targets: {},
+    combos: {},
+    frozen: [],
+  },
   opponents: [{ id: 'p2', name: 'Two', handCount: 5, release: {}, eliminated: false }],
   decks: { piles: [89], events: 21, discardCount: 0 },
   turn: { player: 'p1', index: 0, hasDrawn: false },

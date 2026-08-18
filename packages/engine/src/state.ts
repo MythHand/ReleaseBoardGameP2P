@@ -84,6 +84,11 @@ export type Pending =
       // the uid — nothing should depend on the uid's internal format.
       attackId: CardId
       sudo: boolean
+      // The Sudo that rode the attack. Held HERE while the exchange is open —
+      // like the attack card itself, which lives only on this pending — and
+      // banked at resolution, so the discard pile never shows a half of a pair
+      // the table still sees standing at the centre.
+      combo?: CardInstance
       canDefendWith: CardUid[]
       // The `at` of the action that opened this pending — the other end of the
       // deadline span, so a countdown can be exact rather than assumed.

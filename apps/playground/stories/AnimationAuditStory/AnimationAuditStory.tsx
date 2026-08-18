@@ -480,10 +480,10 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Розыгрыш комбо (пара)', en: 'Playing a combo (pair)' },
     from: {
-      ru: 'useArrow + centerOf ведёт прицел; совмещение — foldIntoPair по разу на половину (первый кадр красится enterPose, иначе половины мигнут в конечной позе; вспомогательная приземляется в PAIR_AUX_POSE самого CardPair, поэтому передача пары в статичный слот не видна). Здесь у неё вырожденный случай: вторая карта УЖЕ стоит в центре, и это выражено как enterPose(box, box) — та же формула даёт identity, отдельной ветки нет. Релиз → playToReleaseZone (move 480, SNAP-приземление); в сброс — через useDiscardExit (пара распадается на 2 одиночки, каждая от своего якоря); отмена — через useHandArrival (сборка возвращается в середину веера разом).',
-      en: 'useArrow + centerOf drives the aim; the pairing — foldIntoPair once per half (the first frame painted with enterPose, else the halves flash in their final pose; the aux lands on CardPair’s own PAIR_AUX_POSE, so handing the pair to a static slot is invisible). Here it has the degenerate case: the second card is ALREADY at the centre, expressed as enterPose(box, box) — the same formula yields identity, no separate branch. Release → playToReleaseZone (move 480, SNAP landing); to the discard — via useDiscardExit (the pair splits into 2 singles, each from its own anchor); cancel — via useHandArrival (the staging returns to the middle of the fan at once).',
+      ru: 'useArrow + centerOf ведёт прицел; совмещение — foldIntoPair по разу на половину (первый кадр красится enterPose, иначе половины мигнут в конечной позе; вспомогательная приземляется в PAIR_AUX_POSE самого CardPair, поэтому передача пары в статичный слот не видна). Здесь у неё вырожденный случай: вторая карта УЖЕ стоит в центре, и это выражено как enterPose(box, box) — та же формула даёт identity, отдельной ветки нет. Релиз → playToReleaseZone (move 480, SNAP-приземление); в сброс — через useDiscardExit (пара распадается на 2 одиночки, каждая от своего якоря); отмена — через useHandArrival (сборка возвращается в середину веера разом). То же теперь играется и на живом борде (#100): партнёра называет `state.comboOptions` проекции (`PlayerView.self.combos`, `packages/engine/src/fake/project.ts`), вытягивание опоры из веера и клик по партнёру — `_useBoardStaging.ts` (`onHandPlay`/`onCardClick`, фолд портирован из `pickPartner` дословно), а что происходит после ответа движка — отдельный такт `features/board-beats/comboBeat.tsx`: `attackPlaced`/`releasePlaced` заводят пару с чужой стороны либо отдают стол назад, если она уже стоит там, где нужно (передача `StagedHandoff`), `pairToDiscard` расщепляет ожидающую пару в сброс по резолюции. Два открытых пункта — реестр ниже и docs/animations/backlog.md.',
+      en: "useArrow + centerOf drives the aim; the pairing — foldIntoPair once per half (the first frame painted with enterPose, else the halves flash in their final pose; the aux lands on CardPair’s own PAIR_AUX_POSE, so handing the pair to a static slot is invisible). Here it has the degenerate case: the second card is ALREADY at the centre, expressed as enterPose(box, box) — the same formula yields identity, no separate branch. Release → playToReleaseZone (move 480, SNAP landing); to the discard — via useDiscardExit (the pair splits into 2 singles, each from its own anchor); cancel — via useHandArrival (the staging returns to the middle of the fan at once). The same movement now also runs on the live board (#100): the projection's own `state.comboOptions` (`PlayerView.self.combos`, `packages/engine/src/fake/project.ts`) names the partner, pulling the support out of the fan and clicking one is `_useBoardStaging.ts` (`onHandPlay`/`onCardClick`, the fold ported from `pickPartner` verbatim), and what happens once the engine answers is a separate beat, `features/board-beats/comboBeat.tsx`: `attackPlaced`/`releasePlaced` fold the pair in from elsewhere or hand the table back if it is already standing where it needs to be (the `StagedHandoff` seam), `pairToDiscard` splits the pending pair into the discard at resolution. Two open findings — register below and docs/animations/backlog.md.",
     },
-    where: 'Combo',
+    where: 'Combo + frontend: board (_useBoardStaging, board-beats/comboBeat)',
   },
   {
     name: { ru: 'Адресная атака стрелкой', en: 'Targeted arrow attack' },
@@ -813,6 +813,36 @@ const ISSUES: Issue[] = [
     where: {
       ru: 'frontend: pages/board/[gameId]/_useBoardStaging.ts + ui: table/Hand',
       en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts + ui: table/Hand',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: "Возврат Rollback'ом судо-атаки — на борде для него нет движения",
+      en: 'A Rollback return on a sudo attack has no movement on the board',
+    },
+    problem: {
+      ru: 'Судо-Rollback банкует только Sudo-половину пары — атакующая карта по правилам возвращается в руку (в чью именно — зависит от `sudoDefence`, docs/animations/backlog.md) без единого `discarded`, и такт это не изобретает: `pairToDiscard` расщепляет в сброс ТОЛЬКО судо-половину, а куда делась атакующая карта, не показывает никак — она просто оказывается в руке. Не ошибка проекции, дыра в хореографии до тех пор, пока #101 не даст обменной хореографии возврата.',
+      en: "A sudo Rollback banks only the Sudo half of the pair — the attack card returns to a hand (whose depends on `sudoDefence`, see docs/animations/backlog.md) with no `discarded` event, and the beat does not invent one: `pairToDiscard` splits ONLY the sudo half into the discard, and the attack card is not shown going anywhere — it simply turns up in the hand. Not a projection bug, a choreography gap until #101 supplies the return's own exchange choreography.",
+    },
+    where: {
+      ru: 'frontend: features/board-beats/comboBeat.tsx (runPairOut) + planBeats.ts (pairToDiscard)',
+      en: 'frontend: features/board-beats/comboBeat.tsx (runPairOut) + planBeats.ts (pairToDiscard)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Отмена пары возвращается в одну щель веера, а не в две',
+      en: 'A cancelled pair returns through one fan gap, not two',
+    },
+    problem: {
+      ru: '`cancel()` возвращает обе половины сложенной пары одним `useHandArrival.arrive` на индекс, где опора стояла при вытягивании, — общая щель на двоих. Так же устроен `cancelStage` в ComboStory, откуда это портировано без изменений. Принятое поведение сцены-источника, не самостоятельная борд-придумка; пересмотреть стоит, только если возврат станет плохо читаться на живом борде.',
+      en: "`cancel()` returns both halves of a folded pair through one `useHandArrival.arrive` call, at the index the support stood at when it was pulled — one shared gap for both. ComboStory's own `cancelStage`, which this is ported from unchanged, does the same. The source scene's own accepted behaviour, not a board-specific invention; worth revisiting only if the return reads badly on the live board.",
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useBoardStaging.ts (cancel)',
+      en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts (cancel)',
     },
     status: 'open',
   },
