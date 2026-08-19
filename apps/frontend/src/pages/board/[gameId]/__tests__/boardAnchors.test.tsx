@@ -61,15 +61,18 @@ it('mounts the five centre slots, each axis-aligned and each its own box', () =>
   }
 })
 
-it('an empty centre slot catches no pointer events', () => {
-  // `.coverSlot` sits exactly on top of the attack slot and is mounted even
-  // with nothing in it — without this it silently eats every press and hover
-  // meant for the attack underneath (the story's own hard-won `:empty` rule).
-  // jsdom does not load the CSS-module stylesheet, so `:empty` cannot be
-  // observed through getComputedStyle here — this asserts the contract
-  // structurally instead: an empty slot renders no children, which is what
-  // makes `_Board.module.css`'s `.coverSlot:empty { pointer-events: none }`
-  // (see the comment naming this test there) apply at all.
+it('renders an empty centre slot with no stray children', () => {
+  // This pins the structural half only: an empty slot must render nothing, so
+  // there is no child of its own that could catch a pointer event regardless
+  // of any CSS rule. It does NOT guard `_Board.module.css`'s
+  // `:empty { pointer-events: none }` rule itself — this assertion would stay
+  // green even if that rule were deleted outright. Vitest's default CSS
+  // handling stubs a `.module.css` import to an empty value even with `?raw`
+  // or `?inline` appended (confirmed: both resolve to `{}` / `""` here, unlike
+  // a plain-text asset such as a `.md` file, where `?raw` returns real
+  // content — see apps/ui/src/animations/docs.test.ts), so there is currently
+  // no way to read the stylesheet's actual text from a test in this app. This
+  // structural assertion is the best available check until that changes.
   render(<Board {...makeBoardProps()} />)
   const cover = document.querySelector('[data-centre-slot="cover"]') as HTMLElement
   expect(cover.children).toHaveLength(0)

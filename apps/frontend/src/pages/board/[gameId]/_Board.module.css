@@ -109,10 +109,15 @@
    old blanket `pointer-events: none`, which was correct only while the centre
    was never a target of anything.
 
-   jsdom does not load this stylesheet, so `boardAnchors.test.tsx`'s "an empty
-   centre slot catches no pointer events" test cannot observe this rule
-   directly — it instead asserts the structural half of the same contract, that
-   an empty slot renders no children. */
+   This rule itself is NOT covered by an automated test: jsdom does not load
+   this stylesheet, and Vitest's default CSS handling stubs a `.module.css`
+   import to an empty value in this app even with `?raw`/`?inline` appended,
+   so nothing here can read the stylesheet's real text from a test. The
+   closest automated check is `boardAnchors.test.tsx`'s "renders an empty
+   centre slot with no stray children" — a DIFFERENT, narrower guarantee (no
+   child of its own to catch a pointer event) that would stay green even if
+   this rule were deleted. Verify this rule by manual walkthrough when it
+   changes. */
 .centre:empty,
 .stageSlot:empty,
 .costSlot:empty,
