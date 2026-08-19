@@ -336,11 +336,20 @@ export default function Board({
   // release to this slot still holds it until ITS OWN flight lands, and
   // rendering the static card any earlier — even off the projection, which
   // can arrive mid-flight on a fast connection — would double it, the same
-  // reason `soloStaged` below is gated on `staging.overlay`.
-  const stagedRelease = staging.stageLanded
-    ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
-      stagedReleaseLocal)
-    : undefined
+  // reason `soloStaged` below is gated on `staging.overlay`. `releaseReturning`
+  // (Task 9, fix round 1) is the SAME class of guard for the opposite
+  // direction: a cancel's own return flight carries this exact card away, and
+  // `costPending`/`stagedReleaseLocal` stay exactly as they were for the whole
+  // flight (the projection is a round trip behind), so without it the static
+  // render would double against THAT carrier instead. Deliberately NOT folded
+  // into `staging.overlay.length === 0` the way `soloStaged` is — `overlay`
+  // also carries the cost-payment flyer, which legitimately coexists with a
+  // visible standing release.
+  const stagedRelease =
+    staging.stageLanded && !staging.releaseReturning
+      ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
+        stagedReleaseLocal)
+      : undefined
 
   // The staging → beat handoff (#100): kept current in a layout effect,
   // because `el` has to be the DOM node as THIS render actually committed it —

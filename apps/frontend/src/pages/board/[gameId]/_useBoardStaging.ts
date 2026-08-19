@@ -110,6 +110,15 @@ export interface BoardStaging {
   /** the card that paid a staged release's cost, once its own flight has
    * landed — held open beside the release until a later task moves it on */
   paidCost: { uid: string; card: CardData } | null
+  /** true while a CANCELLED release's own return flight is airborne (Task 9,
+   * fix round 1) — `_Board.tsx`'s static stage-slot render must hide for this
+   * span too, alongside `stageLanded`, or the return flight and the static
+   * card it is carrying away are both on screen at once for as long as the
+   * projected pending takes to catch up (a full round trip). Distinct from
+   * `stageLanded`: that one answers whether the INCOMING flight landed, this
+   * one whether an OUTGOING one has started — conflating them would hide the
+   * release during the unrelated cost-payment flight too. */
+  releaseReturning: boolean
   // The combo beat's own clear (#100, Task 11): once a dispatched play's
   // `attackPlaced`/`releasePlaced` beat has taken the staged node over — it is
   // already standing exactly where the pending render (or the release zone)
@@ -196,6 +205,12 @@ export function useBoardStaging({
     cancellingRef.current = false
     setCancelling(false)
     commitStaged(null)
+    // Unconditional, same reason `commitStaged(null)` above is: this callback
+    // fires for EVERY arrival landing, whichever cancel started it (a plain
+    // aim/pair's own single-card cancel never touches this flag, so clearing
+    // it here is a harmless no-op for that path — see `releaseReturning`'s own
+    // declaration below for what it guards).
+    setReleaseReturning(false)
   })
 
   const targets = useMemo(
@@ -236,6 +251,22 @@ export function useBoardStaging({
   // spot, and moving it on from there is a later task's job (see `onCostPick`).
   const [stageLanded, setStageLanded] = useState(false)
   const [paidCost, setPaidCost] = useState<{ uid: string; card: CardData } | null>(null)
+  // `releaseReturning` — a THIRD, deliberately separate flag (Task 9, fix round
+  // 1): true from the moment a cancel starts the release's animated return
+  // flight until that flight lands. It is not folded into `stageLanded` above,
+  // even though both gate the same static render — `stageLanded` answers "has
+  // the INCOMING flight finished", this answers "is an OUTGOING one airborne
+  // right now", and conflating the two would make `_Board.tsx`'s guard read as
+  // one concern when it is actually two. Without it: `state.pending` is a
+  // network round trip away from clearing (essentially always slower than a
+  // single animation frame), so the projected `discardForRelease` pending —
+  // and so `stagedRelease`'s other two inputs, `costPending`/`stagedReleaseLocal`
+  // — stays exactly as it was for the whole return flight, and a static render
+  // keyed only off THOSE would stand the release at the stage slot a SECOND
+  // time, on top of the return flight carrying the very same card away. Never
+  // set on the reduced-motion path (there is no flight to guard), which is
+  // already correct without it: `cost` itself clears on the very next render.
+  const [releaseReturning, setReleaseReturning] = useState(false)
 
   const handItems = useMemo(() => {
     const out = new Set(
@@ -298,6 +329,15 @@ export function useBoardStaging({
       const held = state.you.hand.find((c) => c.uid === cost.release)
       const from = anchors.stage.current?.getBoundingClientRect()
       if (!reduced && from && held) {
+        // Fix round 1 (post-review): `state.pending` is a network round trip
+        // away from clearing — essentially always slower than a single
+        // animation frame — so `_Board.tsx`'s static stage-slot render (still
+        // keyed off that same, not-yet-cleared pending) would otherwise stand
+        // the release at the slot a second time, on top of this very flight
+        // carrying it away. Set only on this animated branch: under reduced
+        // motion there is no flight to guard, and `cost` itself clears on the
+        // very next render regardless.
+        setReleaseReturning(true)
         void arrival.arrive([{ key: held.uid, card: held.card, from }], handItems.length)
       }
       return
@@ -769,5 +809,6 @@ export function useBoardStaging({
     onCostPick,
     stageLanded,
     paidCost,
+    releaseReturning,
   }
 }

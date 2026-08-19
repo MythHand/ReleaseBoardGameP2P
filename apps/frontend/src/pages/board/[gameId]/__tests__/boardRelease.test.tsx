@@ -259,3 +259,64 @@ it('a press inside the fan is not a miss', async () => {
   })
   expect(onResolve).not.toHaveBeenCalledWith({ kind: 'cancelRelease' })
 })
+
+// Fix round 1 (post-review — the cancel above renders the release TWICE):
+// `_Board.tsx`'s `stagedRelease` is gated on `staging.stageLanded` plus
+// `costPending`/`stagedReleaseLocal`, and the cancel above touches none of
+// those — so from the moment the return flight starts until the referee's
+// answer (clearing `state.pending`) actually arrives, the static stage-slot
+// render and the return flight's own overlay are BOTH on screen. A real P2P
+// round trip is essentially always slower than one animation frame, so this
+// is not a one-frame flicker — it is the steady state for the whole flight.
+// `useHandArrival`'s own `arrive()` lands on a plain timer (`FLIGHT_MS`,
+// 480ms — see `useHandArrival.tsx`), not on `Element.prototype.animate`'s own
+// `.finished`, so this is observed the same way `boardStaging.test.tsx`
+// observes an in-flight cancel elsewhere: a short wait well inside that
+// window, no `animate` mock required.
+it('does not double-render the release while its own return flight is still carrying it home', async () => {
+  const onResolve = vi.fn()
+  const { rerender } = render(releaseBoard({}, { onResolve }))
+  await pullCardFromFan('release-frontend#0')
+  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
+  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+  expect(stage.querySelector('[data-card]')).toBeTruthy() // standing, before the cancel
+
+  // a press on nothing valid — the return flight starts, but THIS rerender
+  // still carries the very same cost-pending props throughout the flight
+  fireEvent.mouseDown(document.querySelector('[data-board-centre]')?.parentElement as HTMLElement)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 50)) // well inside FLIGHT_MS (480ms) — still airborne
+  })
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
+  // the return flight is still up…
+  const flyer = document.querySelector<HTMLElement>('[class*="arriving"]')
+  expect(flyer).toBeTruthy()
+  // …and the stage slot must not ALSO show a static copy of the same card
+  expect(stage.querySelector('[data-card]')).toBeNull()
+})
+
+// Fix round 1: the guard for the finding above must not blank the stage slot
+// during the COST-PAYMENT flight instead — the release is legitimately still
+// standing there while its cost travels to pay for it (Task 8's own scene).
+// Nothing pinned this before; pinning it now alongside the fix, since the
+// reviewer flagged it as the exact case a careless fix breaks.
+it('the standing release stays visible while its own cost is still flying to pay for it', async () => {
+  const { rerender } = render(releaseBoard({}, {}))
+  await pullCardFromFan('release-frontend#0')
+  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+  expect(stage.querySelector('[data-card]')).toBeTruthy() // standing, before paying
+
+  const animateSpy = vi.spyOn(Element.prototype, 'animate').mockImplementation(
+    () =>
+      ({
+        cancel: () => {},
+        finished: new Promise<void>(() => {}), // the cost flight held open mid-flight
+      }) as unknown as Animation,
+  )
+  await clickFanCard('attack-bug#0')
+  // the cost card is still flying to its own slot — the release itself must
+  // still be standing at the stage slot throughout
+  expect(stage.querySelector('[data-card]')).toBeTruthy()
+  animateSpy.mockRestore()
+})
