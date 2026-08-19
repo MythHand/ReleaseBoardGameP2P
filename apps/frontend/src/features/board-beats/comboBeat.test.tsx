@@ -299,6 +299,78 @@ it('lands a release with no cost without an exit', async () => {
   expect(played.names).toContain('playToReleaseZone')
 })
 
+// Fix round 1 (post-review): a PAIRED release (Code Review combo) can ALSO
+// carry a cost — the rules charge one regardless of the combo, and
+// `planBeats` treats `cost`/`codeReview` as independent optional fields — so
+// this combination is real, and it is the one the cost leg's placement
+// (AFTER the synchronous `handoff` capture, not before) exists to protect.
+//
+// A STATIC `staging` ref (as every other test in this file uses) cannot pin
+// the ordering: nothing here ever mutates `.current` mid-run, so the beat
+// would read the same value whether the capture sits before or after the
+// cost leg — a reorder would pass this test either way, which is exactly
+// the "passed for the wrong reason" risk flagged in review. So this test
+// SIMULATES the real race instead of relying on one: `_useBoardStaging.ts`'s
+// own passive effect clears the handoff the instant the synchronous render
+// burst that started this beat is done (`runAttack`'s own comment above
+// explains why) — a microtask scheduled right before `drive()` fires at
+// exactly that boundary, before ANY of this beat's own `await`s (including
+// the cost leg's `wait(SHOW_HOLD)`) have had a chance to resolve. Reading
+// `handoff` synchronously, at the top, already holds the real value before
+// this runs; reading it after the cost leg's own awaits (the regression this
+// guards against) reads the ALREADY-CLEARED ref instead.
+//
+// The mutation-check `not.toContain('foldIntoPair')` is the discriminating
+// assertion (same idiom as "hands the table back without folding" above): if
+// the cost leg is ever moved back ahead of the capture, `handoff` comes back
+// null, this beat falls to `foldIn` — which DOES call `foldIntoPair` — and
+// this assertion goes red. Verified empirically (not just by this comment):
+// temporarily moving the capture to after the cost leg turns this test red;
+// restoring the order turns it green again — see the task report.
+it('honours the actor’s own paired handoff even when its release also carries a cost', async () => {
+  played.names = []
+  exits.items = []
+  const { api, Probe } = harness()
+  const release = vi.fn()
+  const staging: { current: StagedHandoff | null } = {
+    current: { mainUid: 'u1', el: node(), release } as StagedHandoff,
+  }
+  render(<Probe staging={staging} />)
+  const plan: Extract<BeatPlan, { kind: 'releasePlaced' }> = {
+    kind: 'releasePlaced',
+    key: 'release:7',
+    eventId: 7,
+    player: 'p1',
+    slot: 'frontend',
+    card: 'release-frontend',
+    codeReview: 'support-code-review',
+    cost: { eventId: 6, card: 'attack-bug' },
+  }
+  // the simulated clear — scheduled now, fires at the first microtask
+  // checkpoint after `drive()` below starts the beat, i.e. right after its
+  // OWN synchronous prefix yields at its first `await`
+  void Promise.resolve().then(() => {
+    staging.current = null
+  })
+  await drive(() => api.beat?.runRelease(plan, ctx))
+  // the handoff is honoured: the actor's own staged pair is ADOPTED, not
+  // re-folded
+  expect(release).toHaveBeenCalledTimes(1)
+  expect(played.names).not.toContain('foldIntoPair')
+  // the cost still leaves through the discard exit…
+  expect(exits.items).toHaveLength(1)
+  expect(exits.items[0]).toMatchObject({
+    key: 'c6',
+    card: expect.objectContaining({ id: 'attack-bug' }),
+    scatter: scatterAt(6),
+  })
+  // …and still before the release flies
+  expect(played.names).toContain('playToReleaseZone')
+  expect(played.names.indexOf('centerToDiscard')).toBeLessThan(
+    played.names.indexOf('playToReleaseZone'),
+  )
+})
+
 // ===== pairToDiscard =====
 
 it('splits the pending pair at the centre into two singles for the discard', async () => {
