@@ -37,6 +37,13 @@ const hang = vi.hoisted(() => ({ on: false, release: null as (() => void) | null
 const arrivals = vi.hoisted(() => ({
   handLengths: [] as number[],
   ats: [] as (number | undefined)[],
+  // Incremented only once the REAL `arrive()` promise settles — after its
+  // own `nextFrames()` + `wait(FLIGHT_MS)` + landing callback, not when it is
+  // merely CALLED. `handLengths`/`ats` above are pushed synchronously at the
+  // call, so they cannot tell "the runner awaited the flight" from "the
+  // runner fired it and moved on" — this can, checked once the runner's own
+  // promise has settled.
+  landed: 0,
 }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
@@ -55,7 +62,9 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
         arrive: (items: Parameters<typeof step.arrive>[0], handLength: number, at?: number) => {
           arrivals.handLengths.push(handLength)
           arrivals.ats.push(at)
-          return step.arrive(items, handLength, at)
+          return step.arrive(items, handLength, at).then(() => {
+            arrivals.landed += 1
+          })
         },
       }
     },
@@ -328,6 +337,7 @@ it('flies a plain Rollback’s attack back to the seat that threw it', async () 
 it('brings a sudo Rollback’s attack into our own fan', async () => {
   arrivals.handLengths = []
   arrivals.ats = []
+  arrivals.landed = 0
   const { api, Probe } = harness()
   render(<Probe />)
   // base.selfId is 'p1', so returnTo: 'p1' is us
@@ -340,6 +350,14 @@ it('brings a sudo Rollback’s attack into our own fan', async () => {
   expect(arrivals.handLengths).toHaveLength(1)
   // the gap opens in the MIDDLE of the fan: no index is passed
   expect(arrivals.ats[0]).toBeUndefined()
+  // The load-bearing assertion for "one moment, not two": by the time
+  // `runCovered` itself has resolved, the flight must actually have LANDED —
+  // not merely been kicked off. A runner that fires `arrive()` and races a
+  // same-duration `wait()` alongside it (instead of awaiting the real thing)
+  // resolves ~2 frames before `arrive()`'s own promise does (it spends those
+  // frames on `nextFrames()` before its own timer starts), so this would
+  // still read 0 here if that regressed.
+  expect(arrivals.landed).toBe(1)
 })
 
 // Deliberately the actor's OWN defence (`defender: ctx.base.selfId`, with a

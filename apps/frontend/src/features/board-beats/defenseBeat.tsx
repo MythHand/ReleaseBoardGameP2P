@@ -133,12 +133,18 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
               if (plan.returnTo === ctx.base.selfId) {
                 // into our own fan, through the shared insert every other
                 // "card settles into the hand" motion uses. No index: the gap
-                // opens in the middle of the fan.
-                void latest.current.arrival.arrive(
+                // opens in the middle of the fan. Awaited for real (not a
+                // fixed `wait(FLIGHT_MS)` run alongside it): `arrive()` spends
+                // a couple of frames on `nextFrames()` before its own timer
+                // even starts, so a parallel clock of the same length resolves
+                // early — invisible for a single Rollback (the overlay stays
+                // mounted until the hook's own reset), but a second `arrive()`
+                // landing in that window would hit `flights.length > 0` and
+                // silently no-op.
+                await latest.current.arrival.arrive(
                   [{ key: `back${plan.eventId}`, card: attackCard, from: attackBox }],
                   ctx.base.you.hand.length,
                 )
-                await wait(latest.current.arrival.FLIGHT_MS)
                 return
               }
               // `anchors.seatBox` resolves null for the LOCAL player — never
