@@ -7,7 +7,16 @@ import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entitie
 import { useDefenseBeat } from './defenseBeat'
 import type { BeatPlan } from './planBeats'
 
-const played = vi.hoisted(() => ({ names: [] as string[] }))
+const played = vi.hoisted(() => ({
+  names: [] as string[],
+  // the full call, not just the name — `runCovered`'s own `play('playToCenter', …)`
+  // is called straight through this mocked barrel (unlike `useDiscardExit`'s
+  // internal `play`, which goes through a sibling import the mock never sees),
+  // so the params reaching it — the cover's own tilt/offset (COVER_POSE) — are
+  // observable here and worth pinning: a fly with no pose reads as a neat
+  // stack, not a second play lying over the attack.
+  calls: [] as { name: string; params: Record<string, unknown> }[],
+}))
 // What `useDiscardExit`'s `send` actually received — not just that it was
 // called. `useDiscardExit`'s own `send` calls `play` through a SIBLING import
 // (apps/ui/src/animations/useDiscardExit.tsx imports `./play` directly, not
@@ -25,8 +34,9 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
   const { useState } = await import('react')
   return {
     ...real,
-    play: (name: string) => {
+    play: (name: string, _el: unknown, params: Record<string, unknown> = {}) => {
       played.names.push(name)
+      played.calls.push({ name, params })
       return { finished: Promise.resolve() } as unknown as Animation
     },
     // A stateful stand-in, not a fixed `overlay: []`: the reset() test needs
@@ -143,18 +153,28 @@ const cancelPlan = (): Extract<BeatPlan, { kind: 'covered' }> => ({
 
 it('lays the defence over the attack and sends the whole exchange out together', async () => {
   played.names = []
+  played.calls = []
   exits.items = []
   const { api, Probe } = harness()
   render(<Probe />)
   await drive(() => api.beat?.runCovered(cancelPlan(), ctx))
+  // THE COVER — an opponent's defence (no local handoff standing at the
+  // slot), so this exercises the fly itself, not just the exit that follows
+  // it. Pinned on the PARAMS reaching `play`, not just its name: the whole
+  // point is the offset-and-opposite-tilt (COVER_POSE) that makes the
+  // defence read as a second play lying over the attack, not a neat stack —
+  // a fly with no pose at all would still satisfy a name-only assertion.
+  const cover = played.calls.find((c) => c.name === 'playToCenter')
+  expect(cover).toBeDefined()
+  expect(cover?.params).toMatchObject({ rotate: 6, dx: 16, dy: -12 })
   // ONE send: the attack and the cover leave as one exchange, not two gestures
   expect(exits.items).toHaveLength(2)
-  const [attack, cover] = exits.items
+  const [attackExit, coverExit] = exits.items
   // each carries its own layer, so the heap keeps the order they lay in on
   // the table (I9) — the attack was UNDER the cover and lands under it in the
   // heap too
-  expect(attack).toMatchObject({ layer: 0, scatter: scatterAt(13) })
-  expect(cover).toMatchObject({ layer: 1, scatter: scatterAt(14) })
+  expect(attackExit).toMatchObject({ layer: 0, scatter: scatterAt(13) })
+  expect(coverExit).toMatchObject({ layer: 1, scatter: scatterAt(14) })
 })
 
 // The discriminating case for `spentOf`'s reason guard: `support-sudo` is
@@ -165,6 +185,7 @@ it('lays the defence over the attack and sends the whole exchange out together',
 // ambiguity the brief calls out.
 it('keeps the attacker’s own sudo and the defender’s own sudo apart when both sides carry one', async () => {
   played.names = []
+  played.calls = []
   exits.items = []
   const { api, Probe } = harness()
   render(<Probe />)
@@ -210,6 +231,7 @@ it('keeps the attacker’s own sudo and the defender’s own sudo apart when bot
 
 it('carries the attack’s own sudo out with it as the pair it was', async () => {
   played.names = []
+  played.calls = []
   exits.items = []
   const { api, Probe } = harness()
   render(<Probe />)
@@ -260,6 +282,7 @@ it('carries the attack’s own sudo out with it as the pair it was', async () =>
 // advanced past it, not `comboBeat.test.tsx`'s 80ms real-timer flush.
 it('reset() drops an exchange parked mid-air', async () => {
   played.names = []
+  played.calls = []
   exits.items = []
   const { api, Probe } = harness()
   const release = vi.fn()
