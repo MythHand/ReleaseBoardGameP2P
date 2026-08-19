@@ -9,7 +9,14 @@ import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entitie
 import { useComboBeat } from './comboBeat'
 import type { BeatPlan } from './planBeats'
 
-const played = vi.hoisted(() => ({ names: [] as string[] }))
+// `names` is the ORDER of movements; `params` is what each of them was aimed
+// with, index-aligned with it. The second array is what tells "the release
+// flew" from "the release flew FROM THE RIGHT PLACE" — the whole of Defect 1
+// (#101, Fix A) was a flight that happened, from the wrong origin.
+const played = vi.hoisted(() => ({
+  names: [] as string[],
+  params: [] as (Record<string, unknown> | undefined)[],
+}))
 // What `useDiscardExit`'s `send` actually received — not just that it was
 // called. `useDiscardExit`'s own `send` calls `play` through a SIBLING import
 // (apps/ui/src/animations/useDiscardExit.tsx imports `./play` directly, not
@@ -27,8 +34,9 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
   const { useState } = await import('react')
   return {
     ...real,
-    play: (name: string) => {
+    play: (name: string, _el: Element, params?: Record<string, unknown>) => {
       played.names.push(name)
+      played.params.push(params)
       return { finished: Promise.resolve() } as unknown as Animation
     },
     // A stateful stand-in, not a fixed `overlay: []`: the reset() test needs
@@ -74,18 +82,37 @@ const base = {
 
 const node = () => document.createElement('div')
 
+// A node that answers a KNOWN box. jsdom measures everything as zeros, so a
+// flight's origin is unassertable without this — and the origin is exactly
+// what Defect 1 (#101, Fix A) got wrong.
+const boxed = (left: number, top: number) => {
+  const el = node()
+  const rect = { left, top, width: 150, height: 210, right: left + 150, bottom: top + 210 }
+  el.getBoundingClientRect = () => ({ ...rect, x: left, y: top, toJSON: () => rect }) as DOMRect
+  return el
+}
+
+const CENTRE_BOX = { left: 400, top: 300, width: 150, height: 210 }
+const STAGE_BOX = { left: 200, top: 300, width: 150, height: 210 }
+
 function harness() {
-  const centre = node()
+  const centre = boxed(CENTRE_BOX.left, CENTRE_BOX.top)
+  const stage = boxed(STAGE_BOX.left, STAGE_BOX.top)
   const handSlot = node()
   const releaseSlot = node()
   const anchors = {
     hand: { current: node() },
     centre: { current: centre },
-    stage: { current: node() },
+    stage: { current: stage },
     cost: { current: node() },
     discardBox: { current: node() },
     pileBox: () => null,
-    seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
+    // Only OPPONENTS' seats are bound on the real board (`_Board.tsx` renders
+    // no seat for the local player), so `seatBox` answers null for 'p1' — the
+    // asymmetry `foldIn`'s own fallback runs into, and half of why a local
+    // release used to fly from nowhere at all.
+    seatBox: (player: string) =>
+      player === 'p1' ? null : { left: 0, top: 0, width: 150, height: 210 },
     seatOf: () => node(),
     handSlotAt: (i: number) => (i === 0 ? handSlot : null),
     releaseSlot: () => releaseSlot,
@@ -94,11 +121,17 @@ function harness() {
     bindReleaseSlot: () => {},
   } as unknown as BoardAnchors
   const api: { beat?: ReturnType<typeof useComboBeat> } = {}
-  function Probe({ staging }: { staging?: RefObject<StagedHandoff | null> }) {
-    api.beat = useComboBeat(anchors, staging)
+  function Probe({
+    staging,
+    takeStagedRelease,
+  }: {
+    staging?: RefObject<StagedHandoff | null>
+    takeStagedRelease?: RefObject<(() => void) | null>
+  }) {
+    api.beat = useComboBeat(anchors, staging, undefined, takeStagedRelease)
     return <>{api.beat.overlay}</>
   }
-  return { anchors, api, centre, Probe }
+  return { anchors, api, centre, stage, Probe }
 }
 
 // `drawBeat.test.tsx`/`deckBeat.test.tsx`'s established pattern: a runner that
@@ -221,6 +254,60 @@ it('flies the actor’s own staged pair straight to the release slot', async () 
   await drive(() => api.beat?.runRelease(plan, ctx))
   expect(played.names).toEqual(['playToReleaseZone'])
   expect(release).toHaveBeenCalledTimes(1)
+})
+
+// Defect 1 (#101, Fix A) — the commonest action in the game, and the one case
+// this suite never had: the LOCAL player's own plain release. It stands at the
+// STAGE slot from the moment it was pulled (`_useBoardStaging.ts`), so there is
+// nothing to fold in — it flies from there, once, and the static render that
+// was standing there is let go in the same beat.
+//
+// The base hand below is the real shape of that moment: the release has NOT
+// left `you.hand` (the engine's release path emits nothing and touches no
+// hand while the cost pending is open) but the fan does not render it, so
+// `foldIn`'s hand-index lookup — the branch this beat used to fall into —
+// aims at a fan slot that belongs to a different card, or at none at all.
+const soloReleaseCtx: BeatRun = {
+  base: {
+    ...base,
+    you: {
+      ...base.you,
+      hand: [
+        { uid: 'u1', card: card('attack-bug') },
+        { uid: 'u2', card: card('release-frontend') },
+      ],
+    },
+  } as unknown as BoardState,
+  publish: () => {},
+}
+
+it('flies the actor’s own plain release from the stage slot, once, and lets its standing render go first', async () => {
+  played.names = []
+  played.params = []
+  const { api, Probe } = harness()
+  // the seam's own marker, pushed into the SAME array as the flights so the
+  // ORDER is assertable: the static render must be released in the commit the
+  // carrier goes up, never after the flight (the approved scene's own
+  // `setStaged(null)` + `raise` in one commit)
+  const take = vi.fn(() => {
+    played.names.push('takeStagedRelease')
+  })
+  render(<Probe takeStagedRelease={{ current: take }} />)
+  const plan: Extract<BeatPlan, { kind: 'releasePlaced' }> = {
+    kind: 'releasePlaced',
+    key: 'release:7',
+    eventId: 7,
+    player: 'p1',
+    slot: 'frontend',
+    card: 'release-frontend',
+  }
+  await drive(() => api.beat?.runRelease(plan, soloReleaseCtx))
+  // one flight, and the fold never happens
+  expect(played.names).toEqual(['takeStagedRelease', 'playToReleaseZone'])
+  expect(take).toHaveBeenCalledTimes(1)
+  // and it starts at the STAGE slot — not the attack centre, which is where
+  // the beat used to measure from
+  expect(played.params[0]).toMatchObject({ from: STAGE_BOX })
 })
 
 it('folds an opponent’s Code Review combo in and flies it to their slot', async () => {

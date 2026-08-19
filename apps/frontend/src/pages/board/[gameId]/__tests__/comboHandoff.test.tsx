@@ -135,6 +135,9 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
   // `played.names` array from here gives an equivalent, observable ordering
   // signal without needing to intercept that unreachable call.
   const clearPaidCostRef = useRef<(() => void) | null>(() => played.names.push('clearPaidCost'))
+  // The placement beat's own seam into the staging hook (#101, Fix A), kept
+  // current below exactly the way `_Board.tsx` keeps it.
+  const takeStagedReleaseRef = useRef<(() => void) | null>(null)
   const beats = useBeats({
     live,
     events,
@@ -142,11 +145,13 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
     enabled: true,
     staging: handoffRef,
     clearPaidCost: clearPaidCostRef,
+    takeStagedRelease: takeStagedReleaseRef,
   })
   const state = beats.shadow ?? live
 
   const staging = useBoardStaging({ state, anchors, actions: {}, events, enabled: true })
   api.staging = staging
+  takeStagedReleaseRef.current = staging.takeStagedRelease
 
   useLayoutEffect(() => {
     const s = staging.staged
@@ -162,16 +167,44 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
   }, [staging.staged, staging.pairRef, staging.release])
 
   const soloStaged =
-    staging.staged && !staging.staged.merged
+    staging.staged && !staging.staged.merged && staging.staged.main?.card.category !== 'release'
       ? (staging.staged.support ?? staging.staged.main)
       : null
 
+  // `_Board.tsx`'s own `stagedRelease`, mirrored here for the same reason the
+  // handoff effect above is: it is load-bearing wiring for the seam under
+  // test. A solo release stands at the STAGE slot rather than the centre, and
+  // the third of its three guards (`releasePlacing`) is what the placement
+  // beat flips so the flight it starts is not doubled by this render (#101,
+  // Fix A, Defect 1).
+  const costPending =
+    state.pending?.kind === 'discardForRelease' && state.pending.player === state.selfId
+      ? state.pending
+      : null
+  const stagedReleaseLocal =
+    staging.staged?.phase === 'dispatched' &&
+    !staging.staged.support &&
+    staging.staged.main?.card.category === 'release'
+      ? staging.staged.main
+      : undefined
+  const stagedRelease =
+    staging.stageLanded && !staging.releaseReturning && !staging.releasePlacing
+      ? ((costPending ? state.you.hand.find((c) => c.uid === costPending.release) : undefined) ??
+        stagedReleaseLocal)
+      : undefined
+
   return (
     <div>
+      {/* the fan renders `handItems`, not `you.hand` — one card shorter for as
+          long as a release is staged, which is precisely the mismatch
+          `foldIn`'s hand-index lookup used to walk into */}
       <div ref={anchors.hand}>
-        {state.you.hand.map((c) => (
+        {staging.handItems.map((c) => (
           <div key={c.uid} data-hand-slot />
         ))}
+      </div>
+      <div ref={anchors.stage} data-testid="stage-slot">
+        {stagedRelease && <Card card={stagedRelease.card} interactive={false} width="100%" />}
       </div>
       <div ref={anchors.centre} data-board-centre>
         {soloStaged && staging.overlay.length === 0 && (
@@ -524,6 +557,195 @@ it('adopts the actor’s own staged release pair into the zone instead of re-fol
   const slot = api.anchors?.releaseSlot('p1', 'frontend')
   expect(slot?.querySelector('[data-main]')).toBeTruthy()
   expect(slot?.querySelector('[data-aux]')).toBeTruthy()
+})
+
+// ===== Fix A (#101), Defect 1: the actor's own PLAIN release =====
+//
+// The commonest action in the game, and the case this file (and
+// comboBeat.test.tsx) never had: every `releasePlaced` test before these two
+// was either a remote player's or a Code Review combo. A plain release is
+// nothing like either — it never merges, so it never gets the pair flyer's
+// node, and `_Board.tsx`'s `soloStaged` excludes a release on purpose, so
+// `handoffRef.el` is null for it even before the catch-up effect clears the
+// handoff outright when the cost pending echoes back. Both of those are
+// deliberate; what was missing is that the beat then fell through to `foldIn`,
+// which measures `you.hand` — where the release still IS — against a fan that
+// no longer renders it.
+//
+// The hand below puts the release LAST on purpose: that is the shape where the
+// old fallback produced no flight at all rather than a wrong one
+// (`handSlotAt(1)` past the end of a one-slot fan → null → `seatBox('p1')`,
+// which is never bound for the local player → `foldIn` returns null).
+const soloReleaseBefore: BoardState = {
+  you: {
+    name: 'You',
+    hand: [
+      { uid: 'attack-bug#0', card: card('attack-bug') },
+      { uid: 'release-frontend#0', card: card('release-frontend') },
+    ],
+    release: {},
+  },
+  opponents: [{ id: 'p2', name: 'Two', handCount: 3, release: {} }],
+  decks: { main: [10], events: 5, discardCount: 0, discardHeap: [] },
+  turn: 'p1' as PlayerId,
+  hasDrawn: true,
+  selfId: 'p1',
+  history: [],
+  setup: {},
+  playable: ['release-frontend#0'],
+  frozen: [],
+  targets: {},
+  comboOptions: {},
+} as unknown as BoardState
+
+// The engine's answer to the play: it emits NOTHING and holds a pending
+// instead, so the release is still in the hand and only the pending moved.
+const soloReleasePending: BoardState = {
+  ...soloReleaseBefore,
+  playable: [],
+  pending: {
+    kind: 'discardForRelease',
+    player: 'p1',
+    release: 'release-frontend#0',
+    options: ['attack-bug#0'],
+  },
+} as unknown as BoardState
+
+const soloReleaseAfter: BoardState = {
+  ...soloReleaseBefore,
+  you: {
+    ...soloReleaseBefore.you,
+    hand: [],
+    release: { frontend: card('release-frontend') },
+  },
+  playable: [],
+  pending: undefined,
+} as unknown as BoardState
+
+const soloReleasedEvent: Event = {
+  id: 2,
+  type: 'released',
+  player: 'p1',
+  slot: 'frontend',
+  card: 'release-frontend',
+}
+
+// Pulls the release out of the fan for real and walks the projection up to the
+// moment the cost pending is standing, exactly as a round trip would.
+async function standTheRelease(rerender: (ui: React.ReactElement) => void) {
+  act(() => {
+    api.staging?.onHandPlay('release-frontend#0', { x: 0, y: 0 })
+  })
+  // `onHandPlay`'s own async tail (no `drop.rect` here, so no flight — it goes
+  // straight to `setStageLanded(true)`)
+  await act(async () => {
+    await Promise.resolve()
+  })
+  rerender(<Harness live={soloReleasePending} events={[]} />)
+}
+
+it('flies the actor’s own plain release out of the stage slot, not out of the fan', async () => {
+  played.names = []
+  const { rerender } = render(<Harness live={soloReleaseBefore} events={[]} />)
+  await standTheRelease(rerender)
+  // standing, and out of the fan — the two facts the old fallback tripped over
+  expect(screen.getByTestId('stage-slot').querySelector('[data-card]')).toBeTruthy()
+  expect(document.querySelectorAll('[data-hand-slot]')).toHaveLength(1)
+  played.names = []
+
+  // the engine answers: the cost is paid and the release lands. `costBefore`
+  // (planBeats.ts) reads the `discarded(releaseCost)` immediately ahead of
+  // `released` as this release's own cost.
+  const costDiscardEvent: Event = {
+    id: 1,
+    type: 'discarded',
+    player: 'p1',
+    card: 'attack-bug',
+    reason: 'releaseCost',
+  } as Event
+  await drive(
+    () =>
+      rerender(<Harness live={soloReleaseAfter} events={[costDiscardEvent, soloReleasedEvent]} />),
+    // past the cost leg's own `wait(SHOW_HOLD)` (1.2s under these fake timers)
+    90,
+  )
+
+  // it flew, once, and it never folded in from a hand slot
+  expect(played.names).toContain('playToReleaseZone')
+  expect(played.names).not.toContain('foldIntoPair')
+  expect(played.names.filter((n) => n === 'playToReleaseZone')).toHaveLength(1)
+  // and it landed where the projection puts it
+  const slot = api.anchors?.releaseSlot('p1', 'frontend')
+  expect(slot?.querySelector('[data-card="release-frontend"]')).toBeTruthy()
+
+  // the placement guard is a per-release cycle, not a one-way latch: the NEXT
+  // release pulled this match has to stand at the stage slot the same as the
+  // first one did. `_useBoardStaging.ts` clears it on the pull, beside
+  // `stageLanded`/`paidCost` — drop that line and this goes red while every
+  // assertion above stays green.
+  rerender(
+    <Harness
+      live={
+        {
+          ...soloReleaseAfter,
+          you: {
+            ...soloReleaseAfter.you,
+            hand: [{ uid: 'release-backend#0', card: card('release-backend') }],
+          },
+          playable: ['release-backend#0'],
+        } as unknown as BoardState
+      }
+      events={[costDiscardEvent, soloReleasedEvent]}
+    />,
+  )
+  act(() => {
+    api.staging?.onHandPlay('release-backend#0', { x: 0, y: 0 })
+  })
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(screen.getByTestId('stage-slot').querySelector('[data-card]')).toBeTruthy()
+})
+
+// The other half of Defect 1: while that flight is in the air the static
+// stage-slot render must be GONE. The shadow the beat renders still carries
+// the `discardForRelease` pending (that is what `base` is), so
+// `costPending`/`stageLanded` are both exactly as they were — nothing but the
+// placement guard can empty the slot, which makes this a clean discriminator.
+//
+// The flight is held open on purpose (the same `animate` stub
+// boardRelease.test.tsx uses): jsdom resolves `.finished` on the next
+// microtask, so there is no other way to observe "mid-flight". The cost is
+// left off this one so the hold lands on the release's own flight rather than
+// on the cost's discard exit — the cost leg is already pinned by the test
+// above and by comboBeat.test.tsx.
+it('does not leave the release standing at the stage slot while it is being flown to the zone', async () => {
+  played.names = []
+  const { rerender } = render(<Harness live={soloReleaseBefore} events={[]} />)
+  await standTheRelease(rerender)
+  const stage = screen.getByTestId('stage-slot')
+  expect(stage.querySelector('[data-card]')).toBeTruthy()
+
+  const animateSpy = vi.spyOn(Element.prototype, 'animate').mockImplementation(
+    () =>
+      ({
+        cancel: () => {},
+        finished: new Promise<void>(() => {}), // never settles — the flight stays in the air
+      }) as unknown as Animation,
+  )
+  try {
+    await drive(() => rerender(<Harness live={soloReleaseAfter} events={[soloReleasedEvent]} />))
+
+    // the carrier is up, holding the release…
+    expect(document.querySelector('[class*="flyer"] [data-card="release-frontend"]')).toBeTruthy()
+    // …and the stage slot it left is empty, so the card is not on screen twice
+    expect(stage.querySelector('[data-card]')).toBeNull()
+  } finally {
+    // in a `finally`, not after the assertions: a failing expectation throws,
+    // and a stub of `animate` that outlived this test would silently park
+    // every fold in the file behind it
+    animateSpy.mockRestore()
+  }
 })
 
 // Fix round 1 (post-review, corrected): the same paired-release adoption as

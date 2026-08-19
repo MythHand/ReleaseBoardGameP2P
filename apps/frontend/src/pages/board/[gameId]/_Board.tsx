@@ -61,7 +61,7 @@ import {
 // nothing to catch it — a type check cannot see a position. `opening` holds only
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
-import { COVER_POSE, SUDO_POSE, useBoardAnchors } from '~/entities/game/board'
+import { ATTACK_POSE, COVER_POSE, SUDO_POSE, useBoardAnchors } from '~/entities/game/board'
 import type { BoardProps, Panel, StagedHandoff } from '~/entities/game/board/types'
 import { useBeats } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
@@ -213,6 +213,12 @@ export default function Board({
   // `useBeats`, kept current by the layout effect further down once `staging`
   // exists to read it FROM.
   const clearPaidCostRef = useRef<(() => void) | null>(null)
+  // The same seam's third fact (#101, Fix A): a stable ref to
+  // `useBoardStaging`'s own `takeStagedRelease`, for the same reason the two
+  // above are refs. The placement beat calls it the instant it picks the
+  // standing release up out of the stage slot, so the static render lets go in
+  // the same commit its carrier goes up.
+  const takeStagedReleaseRef = useRef<(() => void) | null>(null)
   // One queue, for everything that moves. The opening goes in as beat zero and
   // the wire's own beats queue behind it — one place that decides what plays,
   // in what order, and whether it plays at all under prefers-reduced-motion.
@@ -229,6 +235,7 @@ export default function Board({
     intro: deal.beat,
     staging: handoffRef,
     clearPaidCost: clearPaidCostRef,
+    takeStagedRelease: takeStagedReleaseRef,
   })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined
@@ -417,8 +424,18 @@ export default function Board({
   // into `staging.overlay.length === 0` the way `soloStaged` is — `overlay`
   // also carries the cost-payment flyer, which legitimately coexists with a
   // visible standing release.
+  //
+  // `releasePlacing` (#101, Fix A) is the THIRD guard of that same family, and
+  // it is here for the same reason `releaseReturning` is: a carrier is flying
+  // this exact card AWAY while the `before` projection still holds the pending
+  // that put it here. The two differ only in where it is going — the fan on a
+  // cancel, the release zone on a placement — which is why they are separate
+  // flags rather than one, on the same reasoning that keeps `releaseReturning`
+  // out of `staging.overlay.length === 0`. The placement beat sets it (that
+  // beat is the only thing that knows the moment), and `_useBoardStaging.ts`
+  // clears it on the next release's own pull.
   const stagedRelease =
-    staging.stageLanded && !staging.releaseReturning
+    staging.stageLanded && !staging.releaseReturning && !staging.releasePlacing
       ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
         stagedReleaseLocal)
       : undefined
@@ -492,6 +509,13 @@ export default function Board({
   useLayoutEffect(() => {
     clearPaidCostRef.current = staging.clearPaidCost
   }, [staging.clearPaidCost])
+
+  // …and the third (#101, Fix A), for exactly the same structural reason:
+  // `staging.takeStagedRelease` is stable for the life of the mount, so this
+  // fires once.
+  useLayoutEffect(() => {
+    takeStagedReleaseRef.current = staging.takeStagedRelease
+  }, [staging.takeStagedRelease])
 
   // Escape skips the opening. Same window binding and the same reason as the
   // cancel above; `finish` is idempotent, so a second press is a no-op.
@@ -937,11 +961,27 @@ export default function Board({
                 data-testid="board-centre-pending"
                 data-pending-play
               >
-                {aux ? (
-                  <CardPair main={data} aux={aux} width="100%" />
-                ) : (
-                  <Card card={data} interactive={false} width="100%" />
-                )}
+                {/* the attack RESTS at its own tilt (#101, Fix A, Defect 2),
+                    the way the cover already does — the approved scene's whole
+                    point is that the two read as two separate plays at
+                    contrasting tilts, and the exit hands `pose: ATTACK_POSE`
+                    to `useDiscardExit`, which documents it as "the table tilt
+                    it STARTS from": resting at 0° made the card pop to −4° on
+                    the exit's first frame. The tilt lives on this INNER
+                    element and not on the node above it, which is what
+                    `comboBeat.runPairOut` measures — a rotated node's bounding
+                    rect is the box AROUND the tilted card (I6). Same shape as
+                    the cover and sudo slots.
+                    The ARRIVAL still does not carry the tilt: `foldIn` is
+                    translate+scale only, so the rest pose is what supplies it
+                    — recorded in docs/animations/backlog.md. */}
+                <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+                  {aux ? (
+                    <CardPair main={data} aux={aux} width="100%" />
+                  ) : (
+                    <Card card={data} interactive={false} width="100%" />
+                  )}
+                </div>
               </div>
             )
           })()}

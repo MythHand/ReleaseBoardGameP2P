@@ -130,6 +130,23 @@ export interface BoardStaging {
    * one whether an OUTGOING one has started — conflating them would hide the
    * release during the unrelated cost-payment flight too. */
   releaseReturning: boolean
+  /** true from the moment the placement beat picks the standing release up
+   * until that beat is over (#101, Fix A). The THIRD member of the same family
+   * as `stageLanded`/`releaseReturning`, and for the same reason they are
+   * three flags rather than one: `stageLanded` answers "has the INCOMING
+   * flight finished", `releaseReturning` "is a CANCEL's flight airborne", and
+   * this one "has the PLACEMENT beat taken the card over". The shadow the beat
+   * renders still carries the `discardForRelease` pending for its whole run —
+   * that is what `base` IS — so `costPending`/`stagedReleaseLocal` are exactly
+   * as they were, and without this the static stage-slot render and the
+   * carrier flying the very same card into the zone are both on screen for the
+   * whole flight. */
+  releasePlacing: boolean
+  /** the placement beat's own setter for the flag above (#101, Fix A), called
+   * in the same synchronous burst as the carrier's own `raise` so the two swap
+   * in ONE commit — see `comboBeat.tsx`'s `runRelease`. Threaded through a ref
+   * the same way `clearPaidCost` is, and for the same reason. */
+  takeStagedRelease: () => void
   // The combo beat's own clear (#100, Task 11): once a dispatched play's
   // `attackPlaced`/`releasePlaced` beat has taken the staged node over — it is
   // already standing exactly where the pending render (or the release zone)
@@ -278,6 +295,15 @@ export function useBoardStaging({
   // set on the reduced-motion path (there is no flight to guard), which is
   // already correct without it: `cost` itself clears on the very next render.
   const [releaseReturning, setReleaseReturning] = useState(false)
+  // `releasePlacing` — the third of them (#101, Fix A), set by the placement
+  // beat rather than by anything in this hook, because the beat is the only
+  // thing that knows the moment the release actually leaves the stage slot.
+  // Cleared on the next release's own pull below (`onHandPlay`), the same
+  // fresh-cycle discipline `stageLanded`/`paidCost` already keep — never
+  // cleared at the end of the beat, because by then the queue has drained and
+  // `costPending`/`stagedReleaseLocal` have both gone with the shadow, so
+  // there is nothing left for this flag to gate either way.
+  const [releasePlacing, setReleasePlacing] = useState(false)
 
   const handItems = useMemo(() => {
     const out = new Set(
@@ -515,6 +541,7 @@ export function useBoardStaging({
         // false again: the flight below has not carried this card yet.
         setStageLanded(false)
         setPaidCost(null)
+        setReleasePlacing(false)
         actions?.onPlay?.(uid, undefined, undefined)
       }
       void (async () => {
@@ -861,6 +888,12 @@ export function useBoardStaging({
   // own clear rather than a ride on `release()`'s.
   const clearPaidCost = useCallback(() => setPaidCost(null), [])
 
+  // the placement beat's own take of the standing release (#101, Fix A) — the
+  // same shape and the same seam as `clearPaidCost` above, for a different
+  // card at a different moment: the cost leaves ~SHOW_HOLD before the release
+  // itself does, so one call cannot serve both.
+  const takeStagedRelease = useCallback(() => setReleasePlacing(true), [])
+
   return {
     staged,
     dispatched: staged?.phase === 'dispatched',
@@ -884,5 +917,7 @@ export function useBoardStaging({
     paidCost,
     clearPaidCost,
     releaseReturning,
+    releasePlacing,
+    takeStagedRelease,
   }
 }

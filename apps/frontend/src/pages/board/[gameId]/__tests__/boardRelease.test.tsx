@@ -14,6 +14,31 @@ import Board from '../_Board'
 import { useBoardStaging } from '../_useBoardStaging'
 import { makeBoardProps } from './fixture'
 
+// The one thing about the standing release that only `<Board>` itself can be
+// asked (#101, Fix A): whether its render actually reads
+// `staging.releasePlacing`. That flag is set by the placement beat, and no
+// beat can run inside `<Board>` in a test — the queue is fed from
+// `intro.events`, and with an `intro` present the queue is gated on the deal
+// reporting done (comboHandoff.test.tsx's own header explains why that harness
+// exists instead). Mutation-checked: without this, deleting `!releasePlacing`
+// from `_Board.tsx` leaves the whole suite green, because the only other place
+// the expression exists is comboHandoff's mirror of it.
+//
+// The real hook runs untouched; the toggle below overrides exactly one field,
+// and only while a test turns it on — so every other test in this file (and
+// the `renderHook` on the real hook further down) is unaffected.
+const placing = vi.hoisted(() => ({ on: false }))
+vi.mock('../_useBoardStaging', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../_useBoardStaging')>()
+  return {
+    ...real,
+    useBoardStaging: (opts: Parameters<typeof real.useBoardStaging>[0]) => {
+      const staging = real.useBoardStaging(opts)
+      return placing.on ? { ...staging, releasePlacing: true } : staging
+    },
+  }
+})
+
 // biome-ignore lint/style/noNonNullAssertion: both ids are known catalogue entries
 const frontend = cardById('release-frontend')!
 // biome-ignore lint/style/noNonNullAssertion: both ids are known catalogue entries
@@ -409,6 +434,32 @@ it('does not double-render the release while its own return flight is still carr
   expect(stage.querySelector('[data-card]')).toBeNull()
 })
 
+// #101, Fix A (Defect 1, the doubling half): while the placement beat carries
+// the release out of the stage slot and into the zone, the static render must
+// be gone. The `before` projection the beat renders still holds the cost
+// pending for its whole run — that is what a beat's `base` IS — so
+// `costPending` and `stageLanded` are both exactly as they were here, and
+// nothing but this guard can empty the slot. Same class as the two guards
+// beside it (`stageLanded`, `releaseReturning`), and pinned the same way they
+// are: the static card must not coexist with a carrier holding it.
+it('does not keep the release standing while the placement beat is flying it to the zone', async () => {
+  const { rerender } = render(releaseBoard({}, {}))
+  await pullCardFromFan('release-frontend#0')
+  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+  expect(stage.querySelector('[data-card]')).toBeTruthy() // standing, before the beat
+
+  // the beat picks it up — the props do not move, because the projection is a
+  // whole round trip behind and the shadow renders the pending regardless
+  placing.on = true
+  try {
+    rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+    expect(stage.querySelector('[data-card]')).toBeNull()
+  } finally {
+    placing.on = false
+  }
+})
+
 // Fix round 1: the guard for the finding above must not blank the stage slot
 // during the COST-PAYMENT flight instead — the release is legitimately still
 // standing there while its cost travels to pay for it (Task 8's own scene).
@@ -470,5 +521,45 @@ it('reduced motion clears the paid cost once the pending resolves, with no beat 
   // settled — no beat ever ran to clear `paidCost` for us
   rerender(releaseBoard({}, {}))
   expect(cost.querySelector('[data-card]')).toBeNull()
+  // and the same end state for the release itself (#101, Fix A): the stage
+  // slot empties with the pending that put it there. The placement beat's own
+  // `releasePlacing` guard is never set under reduced motion — `useBeats` runs
+  // no beat at all — so the stage slot must reach "empty" on the projection
+  // alone, exactly as it did before that guard existed.
+  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+  expect(stage.querySelector('[data-card]')).toBeNull()
+  mm.mockRestore()
+})
+
+// A guard, not evidence: this passes with or without Fix A. It is here so the
+// placement guard (#101, Fix A) can never be "simplified" into something that
+// hides the standing release for good — the flag is set by a beat, and under
+// reduced motion `useBeats` runs no beat at all, so nothing here ever sets or
+// unsets it. The release must stand, and then stop standing, on the
+// projection alone.
+it('reduced motion stands the release and settles it with no beat involved', async () => {
+  const mm = vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query: string) =>
+      ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  )
+  const { rerender } = render(releaseBoard({}, {}))
+  await pullCardFromFan('release-frontend#0')
+  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+  expect(stage.querySelector('[data-card]')).toBeTruthy()
+
+  // the referee's answer clears the pending: the release is in its slot now,
+  // and the stage slot empties with no flight and nothing to unset
+  rerender(releaseBoard({}, {}))
+  expect(stage.querySelector('[data-card]')).toBeNull()
   mm.mockRestore()
 })

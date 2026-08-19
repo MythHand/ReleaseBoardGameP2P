@@ -102,8 +102,12 @@ export function useBeats(args: {
   // `_useBoardStaging.ts`'s own `clearPaidCost`, called once `releasePlaced`'s
   // own cost leg hands the paid card to the discard exit.
   clearPaidCost?: RefObject<(() => void) | null>
+  // The same seam's third fact (#101, Fix A): a stable ref to
+  // `_useBoardStaging.ts`'s own `takeStagedRelease`, called once
+  // `releasePlaced` picks the standing release up out of the stage slot.
+  takeStagedRelease?: RefObject<(() => void) | null>
 }): Beats {
-  const { live, events, anchors, enabled, intro, staging, clearPaidCost } = args
+  const { live, events, anchors, enabled, intro, staging, clearPaidCost, takeStagedRelease } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
   // The same answer as `running`, but ahead of it: `drain()` sets this
@@ -125,7 +129,7 @@ export function useBeats(args: {
   const discards = useDiscardBeat(anchors)
   const draws = useDrawBeat(anchors)
   const decks = useDeckBeat(anchors)
-  const combo = useComboBeat(anchors, staging, clearPaidCost)
+  const combo = useComboBeat(anchors, staging, clearPaidCost, takeStagedRelease)
   const defense = useDefenseBeat(anchors, staging)
 
   // `intro` rides along because the arming effect below reads the beat from here

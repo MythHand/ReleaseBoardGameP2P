@@ -197,7 +197,17 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       const [el] = await flyer.raise([
         { key: 'steal', at: from, content: <Card card={card} interactive={false} width="100%" /> },
       ])
-      if (!el) return
+      if (!el) {
+        // `drop` unconditionally, the same idiom `runCovered`'s rollback leg
+        // and its own tail already keep (#101, Task 15 review). Not a leak
+        // being closed: `raise()` only answers null after adding the key to
+        // `held` if a match reset landed mid-await, and `reset()` wipes the
+        // flyer's state first — so this call is a no-op on the one path that
+        // reaches it. It is here for the consistency of the idiom, which is
+        // why there is no test for it: the path is unreachable by design.
+        flyer.drop('steal')
+        return
+      }
       // A release stolen INTO OUR OWN zone (the reflected case, and any
       // future one) is read in full, not as LOD — only a crossing into an
       // OPPONENT's zone gets the at-a-glance reading. The flip happens on

@@ -49,11 +49,17 @@ export function useComboBeat(
   // node is spoken for (often well before the cost is even paid), while
   // `paidCost` outlives that and needs its own, independently-timed clear.
   clearPaidCost?: RefObject<(() => void) | null>,
+  // The same seam's THIRD fact (#101, Fix A): `_useBoardStaging.ts`'s own
+  // `takeStagedRelease`, which hides the static stage-slot render of a
+  // standing release. Its own ref rather than a ride on `clearPaidCost`
+  // because the two fire ~SHOW_HOLD apart and for different cards — the cost
+  // leaves first, the release itself last.
+  takeStagedRelease?: RefObject<(() => void) | null>,
 ) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
-  const latest = useRef({ anchors, staging, send, clearPaidCost })
-  latest.current = { anchors, staging, send, clearPaidCost }
+  const latest = useRef({ anchors, staging, send, clearPaidCost, takeStagedRelease })
+  latest.current = { anchors, staging, send, clearPaidCost, takeStagedRelease }
 
   // The full fold: raise a carrier at the centre, paint both halves standing
   // at the source, fold them into the pair's pose. The aux is the same
@@ -230,14 +236,63 @@ export function useComboBeat(
       const { anchors: a } = latest.current
       const cRect = rectOf(a.centre.current)
       const toRect = rectOf(a.releaseSlot(plan.player, plan.slot))
-      if (!cRect || !toRect) {
+      // `releaseSlot` resolves for EVERY seat, our own included (`_Board.tsx`
+      // binds one through `ReleaseZone`'s fixed SLOTS array, occupied or not)
+      // — unlike `seatBox`, which is null for the local player. Nothing
+      // measurable here means the projection resolves it unaided.
+      if (!toRect) {
         handoff?.release()
         return
       }
-      if (handoff && plan.player === ctx.base.selfId && handoff.el) {
-        // the actor's staged pair is at the centre: fly THAT node to the slot
+      if (handoff && plan.player === ctx.base.selfId && handoff.el && cRect) {
+        // the actor's staged PAIR is at the centre: fly THAT node to the slot.
+        // Only a merged pair ever gets here — `_Board.tsx`'s `soloStaged`
+        // excludes a release on purpose, so `handoff.el` is null for a plain
+        // one (see below).
         await play('playToReleaseZone', handoff.el, { from: cRect, to: toRect })?.finished
         handoff.release()
+        return
+      }
+      // THE ACTOR'S OWN PLAIN RELEASE — it is already standing at the STAGE
+      // slot, where `_useBoardStaging.ts` flew it when it was pulled and where
+      // it waited out its own cost. There is nothing to fold: measure that
+      // slot and carry it home from there.
+      //
+      // Not through the handoff, and deliberately so. A plain release never
+      // merges, so it never gets the pair flyer's persistent node, and
+      // `soloStaged` excludes a release from the centre render on purpose (it
+      // belongs at the stage slot, and `stagedRelease` puts it there off the
+      // projection's own pending) — so `handoff.el` is null for it even before
+      // the catch-up effect clears the handoff outright when that pending
+      // echoes back. The handoff is simply the wrong mechanism here; the stage
+      // slot's rect is what this needs, and `anchors.stage` gives it directly.
+      //
+      // `foldIn` is wrong for it too, which is what this replaces: the release
+      // is still in `you.hand` during the pending (the engine's release path
+      // emits nothing and touches no hand) but the fan does NOT render it, so
+      // a hand-index lookup aims at another card's slot — or, when the release
+      // was last in hand, at no slot at all, and `seatBox` is null for us.
+      const stageRect =
+        plan.player === ctx.base.selfId && !plan.codeReview ? rectOf(a.stage.current) : null
+      const standing = cardById(plan.card)
+      if (stageRect && standing) {
+        // The static render is let go in the SAME commit the carrier goes up:
+        // `takeStagedRelease` and `raise`'s own `setHeld` both run before
+        // `raise` awaits anything, so React batches them into one render and
+        // the card is never on screen twice — nor missing for a frame. The
+        // approved scene's own `setStaged(null)` + `raise` idiom, and the same
+        // one the cost leg above already uses for `clearPaidCost`.
+        latest.current.takeStagedRelease?.current?.()
+        const [el] = await flyer.raise([{ key: 'release', at: stageRect, card: standing }])
+        if (el) await play('playToReleaseZone', el, { from: stageRect, to: toRect })?.finished
+        // dropped as the beat ends, so the carrier and the projection's own
+        // zone render swap in one commit (`useBeats`'s drain does the rest of
+        // that batch synchronously)
+        flyer.drop('release')
+        return
+      }
+      if (!cRect) {
+        handoff?.release()
         return
       }
       const el = await foldIn(plan.player, plan.card, plan.codeReview, ctx)
@@ -289,11 +344,12 @@ export function useComboBeat(
   )
 
   // A new match cancels what is in the air, same reason and same idiom as
-  // discardBeat/drawBeat/deckBeat: this runner's two carriers are the fold's
-  // own flyer (a pair standing at the centre, halfway across the table) and
-  // the pair-out's discard exit (shared with `discardBeat`, dropped for the
-  // same reason it is there) — both belong to the runner, not the queue, so
-  // both are cleared here.
+  // discardBeat/drawBeat/deckBeat: this runner's carriers are its own flyer
+  // (a pair halfway across the table under 'fold', a cost under 'cost', a
+  // release on its way to the zone under 'release' — `drop()` with no key
+  // takes all of them) and the pair-out's discard exit (shared with
+  // `discardBeat`, dropped for the same reason it is there). All of them
+  // belong to the runner, not the queue, so all of them are cleared here.
   const reset = useCallback(() => {
     flyer.drop()
     resetExit()
