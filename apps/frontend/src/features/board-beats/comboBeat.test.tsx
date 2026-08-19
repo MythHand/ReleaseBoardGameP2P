@@ -9,14 +9,33 @@ import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entitie
 import { useComboBeat } from './comboBeat'
 import type { BeatPlan } from './planBeats'
 
-// `names` is the ORDER of movements; `params` is what each of them was aimed
-// with, index-aligned with it. The second array is what tells "the release
-// flew" from "the release flew FROM THE RIGHT PLACE" — the whole of Defect 1
-// (#101, Fix A) was a flight that happened, from the wrong origin.
+// Two arrays, and they are deliberately NOT index-aligned — read the second
+// sentence before using them.
+//
+// `names` is the ORDER of everything this suite observes: every `play()` the
+// runner makes, plus markers pushed by things that are not flights at all —
+// the mocked discard exit's own `'centerToDiscard'` below, and a test's own
+// marker for a seam call (the placement test's `takeStagedRelease`). `params`
+// holds the arguments of the `play()` calls ONLY, in their own order. So
+// `params[i]` is the i-th FLIGHT, not the entry at `names[i]`; indexing one by
+// the other is wrong the moment any marker precedes the flight you meant.
+//
+// `params` is what tells "the release flew" from "the release flew FROM THE
+// RIGHT PLACE" — the whole of Defect 1 (#101, Fix A) was a flight that
+// happened, from the wrong origin.
 const played = vi.hoisted(() => ({
   names: [] as string[],
   params: [] as (Record<string, unknown> | undefined)[],
 }))
+
+// Both arrays, always together: `params` accumulating across a file whose
+// tests only ever cleared `names` is a trap for the next test that asserts on
+// it (#101, Fix A, fix round 1 — review finding 3).
+const resetPlayed = () => {
+  played.names = []
+  played.params = []
+}
+
 // What `useDiscardExit`'s `send` actually received — not just that it was
 // called. `useDiscardExit`'s own `send` calls `play` through a SIBLING import
 // (apps/ui/src/animations/useDiscardExit.tsx imports `./play` directly, not
@@ -165,7 +184,7 @@ const ctx: BeatRun = { base, publish: () => {} }
 // back — which is exactly what the `not.toContain('foldIntoPair')` below
 // would catch.
 it('hands the table back without folding when the actor’s own staged play arrives', async () => {
-  played.names = []
+  resetPlayed()
   const { api, Probe } = harness()
   const release = vi.fn()
   const staging = { current: { mainUid: 'u1', el: node(), release } as StagedHandoff }
@@ -184,7 +203,7 @@ it('hands the table back without folding when the actor’s own staged play arri
 })
 
 it('folds an opponent’s attack in from their seat', async () => {
-  played.names = []
+  resetPlayed()
   const { api, Probe } = harness()
   render(<Probe />)
   const plan: Extract<BeatPlan, { kind: 'attackPlaced' }> = {
@@ -200,7 +219,7 @@ it('folds an opponent’s attack in from their seat', async () => {
 })
 
 it('folds both halves of a sudo pair in from the attacker’s seat', async () => {
-  played.names = []
+  resetPlayed()
   const { api, Probe } = harness()
   render(<Probe />)
   const plan: Extract<BeatPlan, { kind: 'attackPlaced' }> = {
@@ -219,7 +238,7 @@ it('folds both halves of a sudo pair in from the attacker’s seat', async () =>
 // at all — the handoff stays null, and the card is still findable by id in
 // the local hand, same as `sourceOf` does for a discard.
 it('folds the local player’s own click-thrown attack in from its hand slot when nothing was staged', async () => {
-  played.names = []
+  resetPlayed()
   const { api, Probe } = harness()
   render(<Probe />)
   const plan: Extract<BeatPlan, { kind: 'attackPlaced' }> = {
@@ -237,7 +256,7 @@ it('folds the local player’s own click-thrown attack in from its hand slot whe
 // ===== releasePlaced =====
 
 it('flies the actor’s own staged pair straight to the release slot', async () => {
-  played.names = []
+  resetPlayed()
   const { api, Probe } = harness()
   const release = vi.fn()
   const staging = { current: { mainUid: 'u1', el: node(), release } as StagedHandoff }
@@ -282,8 +301,7 @@ const soloReleaseCtx: BeatRun = {
 }
 
 it('flies the actor’s own plain release from the stage slot, once, and lets its standing render go first', async () => {
-  played.names = []
-  played.params = []
+  resetPlayed()
   const { api, Probe } = harness()
   // the seam's own marker, pushed into the SAME array as the flights so the
   // ORDER is assertable: the static render must be released in the commit the
@@ -311,7 +329,7 @@ it('flies the actor’s own plain release from the stage slot, once, and lets it
 })
 
 it('folds an opponent’s Code Review combo in and flies it to their slot', async () => {
-  played.names = []
+  resetPlayed()
   const { api, Probe } = harness()
   render(<Probe />)
   const plan: Extract<BeatPlan, { kind: 'releasePlaced' }> = {
@@ -334,7 +352,7 @@ it('folds an opponent’s Code Review combo in and flies it to their slot', asyn
 // this beat's own flyer carries it in from their seat, holds it, and only
 // then does it leave through the shared discard exit.
 it('shows the cost open, sends it to the discard, then lands the release', async () => {
-  played.names = []
+  resetPlayed()
   exits.items = []
   const { api, Probe } = harness()
   render(<Probe />)
@@ -365,7 +383,7 @@ it('shows the cost open, sends it to the discard, then lands the release', async
 })
 
 it('lands a release with no cost without an exit', async () => {
-  played.names = []
+  resetPlayed()
   exits.items = []
   const { api, Probe } = harness()
   render(<Probe />)
@@ -415,7 +433,7 @@ it('lands a release with no cost without an exit', async () => {
 // temporarily moving the capture to after the cost leg turns this test red;
 // restoring the order turns it green again — see the task report.
 it('honours the actor’s own paired handoff even when its release also carries a cost', async () => {
-  played.names = []
+  resetPlayed()
   exits.items = []
   const { api, Probe } = harness()
   const release = vi.fn()
@@ -543,7 +561,7 @@ it('sends nothing when the pending node cannot be measured', async () => {
 // `reset()` is one function, and this proves it actually runs and has an
 // effect, not that its two lines exist.
 it('reset() drops a pair-out flight parked mid-air', async () => {
-  played.names = []
+  resetPlayed()
   exits.items = []
   const { api, Probe, centre } = harness()
   const pending = node()

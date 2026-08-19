@@ -27,14 +27,48 @@ import { makeBoardProps } from './fixture'
 // The real hook runs untouched; the toggle below overrides exactly one field,
 // and only while a test turns it on — so every other test in this file (and
 // the `renderHook` on the real hook further down) is unaffected.
-const placing = vi.hoisted(() => ({ on: false }))
+const placing = vi.hoisted(() => ({
+  on: false,
+  // what the real hook returned on the last render — the other end of the
+  // wiring pinned below
+  staging: null as ReturnType<typeof useBoardStaging> | null,
+}))
 vi.mock('../_useBoardStaging', async (importOriginal) => {
   const real = await importOriginal<typeof import('../_useBoardStaging')>()
   return {
     ...real,
     useBoardStaging: (opts: Parameters<typeof real.useBoardStaging>[0]) => {
       const staging = real.useBoardStaging(opts)
+      placing.staging = staging
       return placing.on ? { ...staging, releasePlacing: true } : staging
+    },
+  }
+})
+
+// The OTHER end of the same seam (#101, Fix A, fix round 1 — review finding
+// 1). `_Board.tsx` has two lines whose only job is to hand the placement beat
+// its way back into the staging hook: the `takeStagedRelease: takeStagedReleaseRef`
+// argument to `useBeats`, and the layout effect that fills that ref. Both are
+// invisible to every other test in the repo — `comboHandoff.test.tsx` drives
+// the real `useBeats`/`useComboBeat` but wires the ref itself, so it pins
+// `useBeats.ts`'s half and not `_Board.tsx`'s. Deleting either line left all
+// 503 tests green while breaking the feature in the app.
+//
+// That is the same defect class this whole round exists to repair — a
+// production line no test can kill — so the two lines get a pin of their own
+// rather than inheriting the precedent `handoffRef`/`clearPaidCostRef` set.
+// Same shape as the staging wrapper above: the real `useBeats` runs, its args
+// are captured on the way past.
+const beatsArgs = vi.hoisted(() => ({
+  last: null as { takeStagedRelease?: { current: (() => void) | null } } | null,
+}))
+vi.mock('~/features/board-beats', async (importOriginal) => {
+  const real = await importOriginal<typeof import('~/features/board-beats')>()
+  return {
+    ...real,
+    useBeats: (args: Parameters<typeof real.useBeats>[0]) => {
+      beatsArgs.last = args as typeof beatsArgs.last
+      return real.useBeats(args)
     },
   }
 })
@@ -107,6 +141,45 @@ async function clickFanCard(uid: string) {
   })
 }
 
+// The two spies this file installs, each in ONE place (#101, Fix A, fix round
+// 1 — review finding 4). Both used to be pasted per test with their restore as
+// the last statement of the body, which is a trap rather than a style problem:
+// a failing `expect` throws, the restore never runs, and the spy leaks into
+// every test after it in the file. For `matchMedia` that turns the whole rest
+// of the file reduced-motion; for `animate` it parks every subsequent flight
+// on a promise that never settles. Either reads as "one unrelated test in this
+// file failed", only when something upstream flakes first — which is exactly
+// the shape of the one unexplained web failure this round disclosed. Every
+// call site below now restores in a `finally`.
+function mockReducedMotion() {
+  return vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query: string) =>
+      ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  )
+}
+
+// jsdom's WAAPI stub (test-setup.ts) resolves `.finished` on the very next
+// microtask regardless of the preset's own duration, so a flight has to be
+// held open ON PURPOSE to observe the moment it is still in the air.
+function holdFlightsOpen() {
+  return vi.spyOn(Element.prototype, 'animate').mockImplementation(
+    () =>
+      ({
+        cancel: () => {},
+        finished: new Promise<void>(() => {}), // never settles — the flight stays in the air
+      }) as unknown as Animation,
+  )
+}
+
 it('stands the release at the centre and does not land it until the cost is paid', async () => {
   const onPlay = vi.fn()
   const onResolve = vi.fn()
@@ -175,32 +248,32 @@ it('the standing release never renders at the plain centre-staged slot', () => {
 // connection (the host peer's own round trip can be near-instant) the
 // referee's answer can land squarely inside it.
 it('does not double-render the release while its own stage flight is still carrying it', async () => {
-  const animateSpy = vi.spyOn(Element.prototype, 'animate').mockImplementation(
-    () =>
-      ({
-        cancel: () => {},
-        finished: new Promise<void>(() => {}), // never settles — the flight stays "in the air"
-      }) as unknown as Animation,
-  )
-  const { rerender } = render(releaseBoard({}, {}))
-  const index = HAND.findIndex((c) => c.uid === 'release-frontend#0')
-  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
-  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
-  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
-  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 50))
-  })
-  // the carrier is still up — the flight it started never got to finish
-  const flyer = document.querySelector<HTMLElement>('[class*="flyer"]')
-  expect(flyer).toBeTruthy()
+  // in a real browser this is the ~480ms `playToCenter` window, and on a fast
+  // connection (the host peer's own round trip can be near-instant) the
+  // referee's answer can land squarely inside it
+  const animateSpy = holdFlightsOpen()
+  try {
+    const { rerender } = render(releaseBoard({}, {}))
+    const index = HAND.findIndex((c) => c.uid === 'release-frontend#0')
+    const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+    fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+    fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+    fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    // the carrier is still up — the flight it started never got to finish
+    const flyer = document.querySelector<HTMLElement>('[class*="flyer"]')
+    expect(flyer).toBeTruthy()
 
-  // the referee answers early, before that flight has landed
-  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
-  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
-  // the carrier still holds it — a static render here would double it
-  expect(stage.querySelector('[data-card]')).toBeNull()
-  animateSpy.mockRestore()
+    // the referee answers early, before that flight has landed
+    rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+    const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+    // the carrier still holds it — a static render here would double it
+    expect(stage.querySelector('[data-card]')).toBeNull()
+  } finally {
+    animateSpy.mockRestore()
+  }
 })
 
 // Fix round 1 (post-review, finding 1 — "the cost flight starts from a slot
@@ -215,19 +288,16 @@ it('does not double-render the release while its own stage flight is still carry
 // `slotPlacement(1, 2)`, its position in the UN-filtered `you.hand` — would
 // land 68px across at `left: -7px`.
 it('the cost flight originates from the fan slot the card actually occupies', async () => {
-  const animateSpy = vi.spyOn(Element.prototype, 'animate').mockImplementation(
-    () =>
-      ({
-        cancel: () => {},
-        finished: new Promise<void>(() => {}), // held open — inspected mid-flight
-      }) as unknown as Animation,
-  )
-  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
-  await clickFanCard('attack-bug#0')
-  const flyer = document.querySelector<HTMLElement>('[class*="flyer"]')
-  if (!flyer) throw new Error('cost flyer not mounted')
-  expect(flyer.style.left).toBe('-75px')
-  animateSpy.mockRestore()
+  const animateSpy = holdFlightsOpen()
+  try {
+    render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+    await clickFanCard('attack-bug#0')
+    const flyer = document.querySelector<HTMLElement>('[class*="flyer"]')
+    if (!flyer) throw new Error('cost flyer not mounted')
+    expect(flyer.style.left).toBe('-75px')
+  } finally {
+    animateSpy.mockRestore()
+  }
 })
 
 it('does not raise the pending panel for a cost — the table asks instead', () => {
@@ -460,6 +530,20 @@ it('does not keep the release standing while the placement beat is flying it to 
   }
 })
 
+// The wiring itself, both lines of it: the ref reaches `useBeats` at all, and
+// it actually carries the staging hook's own callback rather than staying
+// null. One assertion per deletable line — dropping the argument makes the
+// first fail, dropping the layout effect makes the second.
+it('hands the beat queue the staging hook’s own take of the standing release', () => {
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  expect(beatsArgs.last?.takeStagedRelease).toBeDefined()
+  // identity, not merely "something callable": the beat has to reach THIS
+  // mount's hook, and `takeStagedRelease` is a `useCallback` with no deps, so
+  // it is the same function for the life of the mount
+  expect(beatsArgs.last?.takeStagedRelease?.current).toBe(placing.staging?.takeStagedRelease)
+  expect(typeof placing.staging?.takeStagedRelease).toBe('function')
+})
+
 // Fix round 1: the guard for the finding above must not blank the stage slot
 // during the COST-PAYMENT flight instead — the release is legitimately still
 // standing there while its cost travels to pay for it (Task 8's own scene).
@@ -472,18 +556,15 @@ it('the standing release stays visible while its own cost is still flying to pay
   const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
   expect(stage.querySelector('[data-card]')).toBeTruthy() // standing, before paying
 
-  const animateSpy = vi.spyOn(Element.prototype, 'animate').mockImplementation(
-    () =>
-      ({
-        cancel: () => {},
-        finished: new Promise<void>(() => {}), // the cost flight held open mid-flight
-      }) as unknown as Animation,
-  )
-  await clickFanCard('attack-bug#0')
-  // the cost card is still flying to its own slot — the release itself must
-  // still be standing at the stage slot throughout
-  expect(stage.querySelector('[data-card]')).toBeTruthy()
-  animateSpy.mockRestore()
+  const animateSpy = holdFlightsOpen()
+  try {
+    await clickFanCard('attack-bug#0')
+    // the cost card is still flying to its own slot — the release itself must
+    // still be standing at the stage slot throughout
+    expect(stage.querySelector('[data-card]')).toBeTruthy()
+  } finally {
+    animateSpy.mockRestore()
+  }
 })
 
 // Reduced motion's own safety net (#101, Task 11): `useBeats.ts` never runs a
@@ -497,38 +578,29 @@ it('the standing release stays visible while its own cost is still flying to pay
 // rerender that clears the pending is what a real referee's answer would
 // look like arriving.
 it('reduced motion clears the paid cost once the pending resolves, with no beat to do it', async () => {
-  const mm = vi.spyOn(window, 'matchMedia').mockImplementation(
-    (query: string) =>
-      ({
-        matches: query === '(prefers-reduced-motion: reduce)',
-        media: query,
-        onchange: null,
-        addListener: () => {},
-        removeListener: () => {},
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        dispatchEvent: () => false,
-      }) as MediaQueryList,
-  )
-  const { rerender } = render(releaseBoard({}, {}))
-  await pullCardFromFan('release-frontend#0')
-  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
-  await clickFanCard('attack-bug#0')
-  const cost = document.querySelector('[data-centre-slot="cost"]') as HTMLElement
-  expect(cost.querySelector('[data-card="attack-bug"]')).toBeTruthy() // shown, same as always
+  const mm = mockReducedMotion()
+  try {
+    const { rerender } = render(releaseBoard({}, {}))
+    await pullCardFromFan('release-frontend#0')
+    rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+    await clickFanCard('attack-bug#0')
+    const cost = document.querySelector('[data-centre-slot="cost"]') as HTMLElement
+    expect(cost.querySelector('[data-card="attack-bug"]')).toBeTruthy() // shown, same as always
 
-  // the referee's answer: the cost pending is gone, the release now stands
-  // settled — no beat ever ran to clear `paidCost` for us
-  rerender(releaseBoard({}, {}))
-  expect(cost.querySelector('[data-card]')).toBeNull()
-  // and the same end state for the release itself (#101, Fix A): the stage
-  // slot empties with the pending that put it there. The placement beat's own
-  // `releasePlacing` guard is never set under reduced motion — `useBeats` runs
-  // no beat at all — so the stage slot must reach "empty" on the projection
-  // alone, exactly as it did before that guard existed.
-  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
-  expect(stage.querySelector('[data-card]')).toBeNull()
-  mm.mockRestore()
+    // the referee's answer: the cost pending is gone, the release now stands
+    // settled — no beat ever ran to clear `paidCost` for us
+    rerender(releaseBoard({}, {}))
+    expect(cost.querySelector('[data-card]')).toBeNull()
+    // and the same end state for the release itself (#101, Fix A): the stage
+    // slot empties with the pending that put it there. The placement beat's own
+    // `releasePlacing` guard is never set under reduced motion — `useBeats` runs
+    // no beat at all — so the stage slot must reach "empty" on the projection
+    // alone, exactly as it did before that guard existed.
+    const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+    expect(stage.querySelector('[data-card]')).toBeNull()
+  } finally {
+    mm.mockRestore()
+  }
 })
 
 // A guard, not evidence: this passes with or without Fix A. It is here so the
@@ -538,28 +610,19 @@ it('reduced motion clears the paid cost once the pending resolves, with no beat 
 // unsets it. The release must stand, and then stop standing, on the
 // projection alone.
 it('reduced motion stands the release and settles it with no beat involved', async () => {
-  const mm = vi.spyOn(window, 'matchMedia').mockImplementation(
-    (query: string) =>
-      ({
-        matches: query === '(prefers-reduced-motion: reduce)',
-        media: query,
-        onchange: null,
-        addListener: () => {},
-        removeListener: () => {},
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        dispatchEvent: () => false,
-      }) as MediaQueryList,
-  )
-  const { rerender } = render(releaseBoard({}, {}))
-  await pullCardFromFan('release-frontend#0')
-  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
-  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
-  expect(stage.querySelector('[data-card]')).toBeTruthy()
+  const mm = mockReducedMotion()
+  try {
+    const { rerender } = render(releaseBoard({}, {}))
+    await pullCardFromFan('release-frontend#0')
+    rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+    const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+    expect(stage.querySelector('[data-card]')).toBeTruthy()
 
-  // the referee's answer clears the pending: the release is in its slot now,
-  // and the stage slot empties with no flight and nothing to unset
-  rerender(releaseBoard({}, {}))
-  expect(stage.querySelector('[data-card]')).toBeNull()
-  mm.mockRestore()
+    // the referee's answer clears the pending: the release is in its slot now,
+    // and the stage slot empties with no flight and nothing to unset
+    rerender(releaseBoard({}, {}))
+    expect(stage.querySelector('[data-card]')).toBeNull()
+  } finally {
+    mm.mockRestore()
+  }
 })

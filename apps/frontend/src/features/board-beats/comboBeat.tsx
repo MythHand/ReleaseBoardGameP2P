@@ -289,6 +289,16 @@ export function useComboBeat(
         // zone render swap in one commit (`useBeats`'s drain does the rest of
         // that batch synchronously)
         flyer.drop('release')
+        // Unconditionally, before returning: this branch now shadows the
+        // `if (!cRect)` line below that used to be the only thing releasing a
+        // handoff on the way past. A non-null handoff here would have to be a
+        // dispatched play with a null `el` — unreachable on every path traced
+        // (a solo release's handoff is cleared by the catch-up effect long
+        // before this beat runs), but leaving `staged` uncleared costs a
+        // permanently hidden fan card, and calling it costs nothing: the
+        // handoff is non-null only while a dispatched play stands, and the
+        // release that just landed IS that play.
+        handoff?.release()
         return
       }
       if (!cRect) {
