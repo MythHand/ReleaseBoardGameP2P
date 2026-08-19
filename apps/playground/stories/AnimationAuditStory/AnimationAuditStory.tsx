@@ -643,10 +643,12 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Защита релиза (полный ход)', en: 'Defending a release (a whole turn)' },
     from: {
-      ru: 'релиз из веера встаёт в центр и НЕ приземляется — по правилам он стоит одной карты, оплата показывается рядом открыто; только после этого релиз садится в свой слот зоны (playToReleaseZone) и открывается окно атак. Атака летит с места соперника в центр (cardBoxIn — прицел по карточной коробке, не по всей сидушке) и ложится под своим наклоном. Ответ: защита накрывает атаку, обе уходят в сброс одним обменом (useDiscardExit, слои сохраняются). Своё судо встаёт в СВОЙ слот со стрелкой и складывается с выбранной защитой в пару через foldIntoPair — без дублей и телепортов: судо со стола передаётся флаеру тем же коммитом, поэтому оно ни на кадр не оказывается на экране дважды. Security Bug не жжёт релиз, а забирает его в зону атакующего — карта морфит в LOD прямо В ПОЛЁТЕ. Rollback возвращает атаку: без судо — в руку атакующего, с судо — в свою через useHandArrival. Промах мимо цели отменяет выложенное.',
-      en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence via foldIntoPair — no duplicates and no teleports: the standing Sudo is handed to the flyer in the same commit, so it is never on screen twice for even a frame. Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandArrival. A press on nothing valid takes a staged play back.",
+      ru: 'релиз из веера встаёт в центр и НЕ приземляется — по правилам он стоит одной карты, оплата показывается рядом открыто; только после этого релиз садится в свой слот зоны (playToReleaseZone) и открывается окно атак. Атака летит с места соперника в центр (cardBoxIn — прицел по карточной коробке, не по всей сидушке) и ложится под своим наклоном. Ответ: защита накрывает атаку, обе уходят в сброс одним обменом (useDiscardExit, слои сохраняются). Своё судо встаёт в СВОЙ слот со стрелкой и складывается с выбранной защитой в пару через foldIntoPair — без дублей и телепортов: судо со стола передаётся флаеру тем же коммитом, поэтому оно ни на кадр не оказывается на экране дважды. Security Bug не жжёт релиз, а забирает его в зону атакующего — карта морфит в LOD прямо В ПОЛЁТЕ. Rollback возвращает атаку: без судо — в руку атакующего, с судо — в свою через useHandArrival. Промах мимо цели отменяет выложенное. То же теперь играется и на живом борде (#101): постановка релиза, оплата из веера и отмена — `_useBoardStaging.ts`, ответ на атаку (плейн или со своим судо) — `_useDefenseStaging.tsx`; что происходит дальше — `features/board-beats/defenseBeat.tsx` (`runCovered`, обмен) и `features/board-beats/comboBeat.tsx` (`runRelease`, оплата и постановка релиза — теперь для любого релиза, не только с Code Review).',
+      en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence via foldIntoPair — no duplicates and no teleports: the standing Sudo is handed to the flyer in the same commit, so it is never on screen twice for even a frame. Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandArrival. A press on nothing valid takes a staged play back. The same now also runs on the live board (#101): staging a Release, paying its cost out of the fan and cancelling it — `_useBoardStaging.ts`; answering an attack (plain or with the defender's own Sudo) — `_useDefenseStaging.tsx`; what happens once the engine answers — `features/board-beats/defenseBeat.tsx` (`runCovered`, the exchange) and `features/board-beats/comboBeat.tsx` (`runRelease`, the cost and placement — now for every Release, not only a Code-Review-paired one).",
     },
     where: 'DefenseRelease',
+    board:
+      'pages/board/[gameId]/_useBoardStaging.ts, pages/board/[gameId]/_useDefenseStaging.tsx, features/board-beats/defenseBeat.tsx, features/board-beats/comboBeat.tsx',
   },
   {
     name: {
@@ -823,18 +825,18 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
-      ru: "Возврат Rollback'ом судо-атаки — на борде для него нет движения",
-      en: 'A Rollback return on a sudo attack has no movement on the board',
+      ru: 'Кому Rollback вернул атаку — выводится, а не читается',
+      en: 'Who Rollback returns an attack to — derived, not read',
     },
     problem: {
-      ru: 'Судо-Rollback банкует только Sudo-половину пары — атакующая карта по правилам возвращается в руку (в чью именно — зависит от `sudoDefence`, docs/animations/backlog.md) без единого `discarded`, и такт это не изобретает: `pairToDiscard` расщепляет в сброс ТОЛЬКО судо-половину, а куда делась атакующая карта, не показывает никак — она просто оказывается в руке. Не ошибка проекции, дыра в хореографии до тех пор, пока #101 не даст обменной хореографии возврата.',
-      en: "A sudo Rollback banks only the Sudo half of the pair — the attack card returns to a hand (whose depends on `sudoDefence`, see docs/animations/backlog.md) with no `discarded` event, and the beat does not invent one: `pairToDiscard` splits ONLY the sudo half into the discard, and the attack card is not shown going anywhere — it simply turns up in the hand. Not a projection bug, a choreography gap until #101 supplies the return's own exchange choreography.",
+      ru: '`attacks.ts:245-252` кладёт атакующую карту в руку прямой записью и не шлёт ни одного события — `handTransfer` объявлен в `events.ts:37` и здесь не используется. Такт (`defenseBeat.runCovered`) выводит получателя: защитник, если в этой же резолюции есть `discarded(support-sudo, defenceSpent)`, иначе атакующий. Вывод покрыт тестами (`planBeats.test.ts`, `defenseBeat.test.tsx`), но ломается молча при переименовании причины сброса или втором sudo-способном support в каталоге.',
+      en: '`attacks.ts:245-252` puts the attack card into a hand by a direct write and sends no event for it — `handTransfer` is declared at `events.ts:37` and unused here. The beat (`defenseBeat.runCovered`) derives the recipient: the defender if this same resolution carries a `discarded(support-sudo, defenceSpent)`, else the attacker. The derivation is covered by tests (`planBeats.test.ts`, `defenseBeat.test.tsx`), but breaks silently if the discard reason is renamed or a second sudo-capable support joins the catalogue.',
     },
     where: {
-      ru: 'frontend: features/board-beats/comboBeat.tsx (runPairOut) + planBeats.ts (pairToDiscard)',
-      en: 'frontend: features/board-beats/comboBeat.tsx (runPairOut) + planBeats.ts (pairToDiscard)',
+      ru: 'packages/engine: fake/attacks.ts (setHand) + frontend: features/board-beats/planBeats.ts, defenseBeat.tsx',
+      en: 'packages/engine: fake/attacks.ts (setHand) + frontend: features/board-beats/planBeats.ts, defenseBeat.tsx',
     },
-    status: 'open',
+    status: 'rework',
   },
   {
     what: {
@@ -850,6 +852,21 @@ const ISSUES: Issue[] = [
       en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts (cancel)',
     },
     status: 'open',
+  },
+  {
+    what: {
+      ru: 'Фолд карты и судо в пару написан четыре раза, не как модуль',
+      en: 'The card-and-sudo fold into a pair is written four times, not as a module',
+    },
+    problem: {
+      ru: 'Один и тот же ход — измерить обе половины, покрасить входные позы enterPose, nextFrames, затем параллельный foldIntoPair на каждую половину — существует отдельным кодом в DefenseReleaseStory.tsx (mergeIntoPair), comboBeat.tsx (foldIn) и _useDefenseStaging.tsx (onCardClick), все три на флаере с CardPair как content, и ещё раз в _useBoardStaging.ts — тем же ходом, но на персистентном узле вместо флаера (оттого и без вспышки в позе покоя, которую флаерная форма даёт на первый кадр-другой, пока raise дожидается nextFrames). Правка тайминга или порядка кадров в одной копии не долетит до трёх остальных сама.',
+      en: 'The same move — measure both halves, paint their entry poses with enterPose, nextFrames, then a parallel foldIntoPair per half — exists as separate code in DefenseReleaseStory.tsx (mergeIntoPair), comboBeat.tsx (foldIn) and _useDefenseStaging.tsx (onCardClick), all three on a flyer carrying a CardPair as content, and once more in _useBoardStaging.ts — the same move, but on a persistent node instead of a flyer (which is also why it skips the flash of the rest pose the flyer form shows for a frame or two while raise awaits nextFrames). A timing or frame-order fix in one copy will not reach the other three on its own.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useBoardStaging.ts, _useDefenseStaging.tsx, features/board-beats/comboBeat.tsx + playground: interactive/DefenseReleaseStory.tsx',
+      en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts, _useDefenseStaging.tsx, features/board-beats/comboBeat.tsx + playground: interactive/DefenseReleaseStory.tsx',
+    },
+    status: 'rework',
   },
 ]
 

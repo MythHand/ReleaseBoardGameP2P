@@ -495,11 +495,13 @@ combo, or a local window attack that staged nothing at all.
   then `foldIntoPair` per half from the actor's seat or the hand slot a local thrower's card left) —
   and settles at the centre pending, `[data-pending-play]`, upgraded from a lone card to a `CardPair`
   under `pending.sudo`.
-- **`releasePlaced`**, planned from a `released` carrying `codeReview` (a plain release has nowhere
-  to fold FROM and keeps its existing behaviour): `runRelease` reads the same handoff; the actor's
-  own staged pair flies `playToReleaseZone` straight from the centre to the slot; anyone else's folds
-  in first via `foldIn`, then flies. The landing pose is `ReleaseZone`'s own static `CardPair` render
-  — the beat's last frame IS the projection.
+- **`releasePlaced`**, planned from every `released` event — widened from `codeReview`-only (Task 11,
+  #101): a plain release now runs the same beat, `foldIn`'s no-aux case standing in for its fold, and
+  the beat also carries the release's own cost leg (see "Defending a release" below for the cost,
+  board-side). `runRelease` reads the same handoff; the actor's own staged pair (or solo card) flies
+  `playToReleaseZone` straight from the centre to the slot; anyone else's folds in first via
+  `foldIn`, then flies. The landing pose is `ReleaseZone`'s own static `CardPair` render — the beat's
+  last frame IS the projection.
 - **`pairToDiscard`**, planned from the resolution's `discarded` pair: `planBeats` matches the
   pending exchange's two halves — sudo-first, since a sudo Rollback banks only the sudo half — ahead
   of the ordinary discard routing (the centre is in no hand and no zone, so `sourceOf` would never
@@ -545,12 +547,13 @@ never runs (`useBeats`'s own blanket `if (reduced) return`); the board renders t
 already holds.
 
 **Not yet right, and recorded**
-A sudo Rollback returns the attack card to a hand with no movement on the board at all, while the
-pending pair's own exit still sends the sudo half to the discard as if the whole pair had resolved
-that way — the return's own exchange choreography is Wave 3 (#101). A cancelled pair also returns
-both halves through one fan gap at the support's own index rather than two independent ones —
-ComboStory's own middle-return acceptance, kept as-is unless it reads badly on the live board. Both
-findings are in [`backlog.md`](./backlog.md) and the audit page's register.
+A cancelled pair returns both halves through one fan gap at the support's own index rather than two
+independent ones — ComboStory's own middle-return acceptance, kept as-is unless it reads badly on
+the live board. This finding is in [`backlog.md`](./backlog.md) and the audit page's register.
+
+(The sudo-Rollback return this section used to flag as having no movement on the board at all — Wave
+3, #101 — is now built: see "Defending a release" below for the exchange itself, and `backlog.md` for
+the one gap that survives it — the return's recipient is derived rather than read off an event.)
 
 **Building blocks**
 [`foldIntoPair`](./reference.md#presets) · [`playToReleaseZone`](./reference.md#presets) ·
@@ -1673,6 +1676,16 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
    (see *cancel* below).
 2. **Cost** — any hand card pays: it flies to the cost slot, is held open, then leaves via
    **`useDiscardExit`**. Only now does the Release fly into its zone slot (`playToReleaseZone`, SNAP).
+
+   **On the board** this is the acting player's own view — the cost is picked out of the fan by a
+   click, never a bar control (`_useBoardStaging.ts`'s `onCostPick`), and stays held open as the
+   static `paidCost` render until the same runner that places the Release flies it out. Anyone else
+   at the table sees it differently, because the engine pays the cost and places the Release in
+   **one** reduction and emits nothing in between — no `released` preceded by a cost event of its
+   own: the cost card flies in from the actor's own seat, holds (`SHOW_HOLD`), and leaves; only then
+   does the Release itself fold in from that same seat and fly on into its zone slot. One runner
+   behind both views — `comboBeat.tsx`'s `runRelease` — and, since Task 11 widened it, behind every
+   Release's cost leg, not only a Code-Review-paired one's.
 3. **Attack** — thrown from a seat: aimed with `cardBoxIn` at a card-sized box inside the seat, not at
    the whole cell (**I6**), landing already at its table tilt (**I7**). A sudo-backed attack travels as
    one `CardPair`.
@@ -1686,7 +1699,11 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
    - **Rollback** sends the attack back — plain to the thrower's hand, under Sudo into your own via
      `useHandArrival`; the sudo that backed it is spent and leaves normally.
 5. **Cancel** — a press on nothing valid takes back whatever is staged (the Release awaiting its cost,
-   or the Sudo awaiting its defence) through `useHandArrival`, into the middle of the fan.
+   or the Sudo awaiting its defence) through `useHandArrival`, into the middle of the fan. **On the
+   board**, taking back a Release still waiting on its cost is not a local undo: `_useBoardStaging.ts`'s
+   `cancel` dispatches the engine's own `cancelRelease` choice first — this pending is the one
+   dispatched play the engine has told nobody else about yet, so the table is safe to ask — and only
+   once that resolves does the card fly home from the stage slot.
 
 **Params & timings.** `SHOW_HOLD` 1200 ms · `LAND_HOLD` 700 ms · `MERGE_MS` 620 ms · poses: attack
 `rot −4`, cover `rot 6, dx 16, dy −12`, sudo `rot −7`.
@@ -1700,7 +1717,11 @@ one's attack window to close — the dock's green state is that moment. The atta
 Release played **this** turn. The player's Sudo is only offered when the hand actually holds a defence
 it can enhance that also works against this attack — under a sudo-backed attack it can enhance nothing.
 
-**Live reference.** `Defense Release` (interactive group).
+**Live reference.** `Defense Release` (interactive group). On the board: `_useBoardStaging.ts` and
+`_useDefenseStaging.tsx` (`apps/frontend/src/pages/board/[gameId]/`) for the two gestures — playing,
+costing and cancelling a Release, and answering an attack — and `features/board-beats/comboBeat.tsx`
+(`runRelease`) with `features/board-beats/defenseBeat.tsx` (`runCovered`) for what runs once the
+engine has answered.
 
 ---
 
