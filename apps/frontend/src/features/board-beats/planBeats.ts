@@ -88,6 +88,34 @@ export type BeatPlan =
       main?: { eventId: number; card: string }
       aux?: { eventId: number; card: string }
     }
+  // A defence answers the attack standing at the centre. `effect` decides what
+  // happens next, and the plan carries everything the runner needs to play it
+  // without going back to the projection: the exchange's own cards and, for a
+  // Rollback, who gets the attack card back.
+  | {
+      kind: 'covered'
+      key: string
+      eventId: number
+      defender: string
+      card: string
+      /** the defender's own Sudo, when they comboed one onto the defence */
+      sudo?: string
+      effect: 'cancel' | 'return' | 'reflect' | 'take'
+      attacker: string
+      attackCard: string
+      /** the Sudo the ATTACK was thrown with */
+      attackSudo: boolean
+      /**
+       * The cards banked by this resolution, each with its own discard event.
+       * `reason` is carried, not dropped: `support-sudo` can appear on BOTH
+       * sides of one exchange (a sudo-backed attack answered by a sudo-backed
+       * defence), and the reason is the only thing that tells the two apart —
+       * `attackSpent` is the attacker's, `defenceSpent` the defender's.
+       */
+      spent: { eventId: number; card: string; reason: 'attackSpent' | 'defenceSpent' }[]
+      /** Rollback only: whose hand the attack card goes back to */
+      returnTo?: string
+    }
 
 // Reasons that CAN take a card out of a release slot — "can", not "always do".
 // Typed against the engine's own union rather than `string`, so renaming a reason
@@ -274,6 +302,54 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         ...(e.codeReview ? { codeReview: e.codeReview } : {}),
         ...(cost ? { cost } : {}),
       })
+      continue
+    }
+    if (e.type === 'defended') {
+      flush()
+      const p = before.pending
+      if (p?.kind !== 'defend') continue // nothing on screen to answer — never stranded
+      // Everything banked by THIS resolution, in the order the engine banked it.
+      // The walk continues forward from here rather than scanning: a resolution's
+      // discards are contiguous, and the next non-discard event ends them.
+      const spent: { eventId: number; card: string; reason: 'attackSpent' | 'defenceSpent' }[] = []
+      let j = i + 1
+      while (j < events.length) {
+        const d = events[j]
+        if (d.type !== 'discarded') break
+        if (d.reason !== 'attackSpent' && d.reason !== 'defenceSpent') break
+        spent.push({ eventId: d.id, card: d.card, reason: d.reason })
+        owned.add(d.id)
+        j++
+      }
+      // Rollback keeps nobody's attack card: the engine puts it straight back
+      // into a hand and emits NOTHING for it (attacks.ts:245-252). Whose hand is
+      // derivable and only derivable: the defender's when they comboed their own
+      // Sudo onto the defence, the attacker's otherwise. Recorded as a gap in
+      // docs/animations/backlog.md, with `handTransfer` named as what would end
+      // the inference.
+      // matched on the REASON as well as the card: a sudo-backed attack answered
+      // by a plain Rollback must still return the attack to the ATTACKER, and
+      // matching on the card alone would read the attacker's own sudo as ours
+      //
+      // Assumes 'support-sudo' is the only sudo-capable support card in the
+      // catalogue — silently wrong (falls through to `attacker` below) if a
+      // second one is ever added.
+      const ownSudo = spent.find((s) => s.card === 'support-sudo' && s.reason === 'defenceSpent')
+      plans.push({
+        kind: 'covered',
+        key: `covered:${e.id}`,
+        eventId: e.id,
+        defender: e.player,
+        card: e.card,
+        sudo: ownSudo?.card,
+        effect: e.effect,
+        attacker: p.attacker,
+        attackCard: p.attackCard,
+        attackSudo: p.sudo,
+        spent,
+        ...(e.effect === 'return' ? { returnTo: ownSudo ? e.player : p.attacker } : {}),
+      })
+      i = j - 1 // the discards this plan claimed are consumed
       continue
     }
     if (e.type === 'discarded') {
