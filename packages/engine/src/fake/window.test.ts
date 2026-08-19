@@ -3,7 +3,7 @@ import type { CardInstance, GameState, Setup } from '../state'
 import { createLog } from './core'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
 import { reduce } from './reduce'
-import { openWindow, WINDOW_FIRST_MS, WINDOW_NEXT_MS } from './window'
+import { handOverWindow, openWindow, WINDOW_FIRST_MS, WINDOW_NEXT_MS } from './window'
 
 const engine = createFakeEngine()
 
@@ -29,6 +29,8 @@ const config = (): GameConfig => ({
 })
 
 const FE: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
+const BE: CardInstance = { uid: 'release-backend#0', id: 'release-backend' }
+const DB: CardInstance = { uid: 'release-database#0', id: 'release-database' }
 const CR: CardInstance = { uid: 'support-code-review#0', id: 'support-code-review' }
 const BUG: CardInstance = { uid: 'attack-bug#0', id: 'attack-bug' }
 const SUDO: CardInstance = { uid: 'support-sudo#0', id: 'support-sudo' }
@@ -188,4 +190,79 @@ it('opens a 10s window for a later round', () => {
     passed: [],
   })
   expect(log.events.map((e) => e.type)).toEqual(['windowOpened'])
+})
+
+describe('handOverWindow', () => {
+  it('closes the standing window and opens a fresh one for the new release', () => {
+    const s = engine.createGame(config())
+    const log = createLog(s.eventSeq)
+    const open = openWindow(s, log, { player: 'p1', slot: 'frontend', card: 'fe#0' }, 1, 1000)
+    const log2 = createLog(open.eventSeq)
+    const next = handOverWindow(open, log2, { player: 'p2', slot: 'database', card: 'db#0' }, 2000)
+    expect(log2.events.map((e) => e.type)).toEqual(['windowClosed', 'windowOpened'])
+    expect(next.window).toMatchObject({
+      target: { player: 'p2', slot: 'database', card: 'db#0' },
+      round: 1,
+      openedAt: 2000,
+      deadline: 2000 + WINDOW_FIRST_MS,
+      passed: [],
+    })
+  })
+
+  it('does not settle the win on the close it performs', () => {
+    // The whole point: the release that just arrived has not faced its window
+    // yet, so the game must not end at this close. `closeWindow` would.
+    const s = engine.createGame(config())
+    const primed: GameState = {
+      ...s,
+      players: {
+        ...s.players,
+        p2: {
+          ...s.players.p2,
+          release: {
+            frontend: { card: FE },
+            backend: { card: BE },
+            database: { card: DB },
+          },
+        },
+      },
+    }
+    const log = createLog(primed.eventSeq)
+    const open = openWindow(primed, log, { player: 'p1', slot: 'frontend', card: 'fe#9' }, 1, 1000)
+    const log2 = createLog(open.eventSeq)
+    const next = handOverWindow(open, log2, { player: 'p2', slot: 'database', card: DB.uid }, 2000)
+    expect(next.over).toBeNull()
+    expect(log2.events.some((e) => e.type === 'gameOver')).toBe(false)
+  })
+
+  it('settles the win immediately when nobody is left to answer the new window', () => {
+    // `openWindow` declines with no living responders. Nothing would ever
+    // close a window that never opened, so the win has to be decided here instead —
+    // the same fallback `placeRelease` already carries.
+    const s = engine.createGame(config())
+    const primed: GameState = {
+      ...s,
+      eliminated: s.seating.filter((id) => id !== 'p1'),
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1,
+          release: {
+            frontend: { card: FE },
+            backend: { card: BE },
+            database: { card: DB },
+          },
+        },
+      },
+    }
+    const log = createLog(primed.eventSeq)
+    const next = handOverWindow(
+      { ...primed, window: null },
+      log,
+      { player: 'p1', slot: 'database', card: DB.uid },
+      2000,
+    )
+    expect(next.window).toBeNull()
+    expect(next.over).toEqual({ winner: 'p1', condition: 'release' })
+  })
 })

@@ -62,6 +62,35 @@ export function closeWindow(state: GameState, log: Log): GameState {
   return checkWin({ ...state, window: null, eventSeq: log.seq }, log)
 }
 
+// Close the standing window WITHOUT settling the win, because another window is
+// opening in its place for a release that has only just arrived.
+//
+// `closeWindow` is deliberately the one place a win is decided — a release still
+// standing when its window shuts has repelled everything thrown at it. A stolen
+// release has repelled nothing yet: `resolution.md` §1 gives attack time to every
+// fresh release in a zone "как бы она туда ни попала", so the steal hands the
+// window over rather than ending the exchange. The win is then settled by the
+// close of the window opened here, exactly as it is for a played release (#67).
+//
+// One window exists at a time (`state.window` is a single slot), so the close and
+// the open are one step rather than two overlapping ones — §1's "пока это время
+// идёт, в игре не происходит ничего другого" leaves no room for two.
+export function handOverWindow(
+  state: GameState,
+  log: Log,
+  target: ReactionWindow['target'],
+  at: number,
+): GameState {
+  const w = state.window
+  if (w) log.add({ type: 'windowClosed', player: w.target.player, slot: w.target.slot })
+  const opened = openWindow({ ...state, window: null }, log, target, 1, at)
+  // `openWindow` declines when nobody is alive to respond. Nothing will ever
+  // close a window that never opened, so the win is settled now rather than
+  // leaving the game hanging — the same fallback `placeRelease` carries.
+  if (!opened.window) return checkWin(opened, log)
+  return opened
+}
+
 export function onPass(state: GameState, action: Action & { type: 'PASS' }): Reduction {
   const w = state.window
   if (!w) return reject(state, action, 'no reaction window is open')
