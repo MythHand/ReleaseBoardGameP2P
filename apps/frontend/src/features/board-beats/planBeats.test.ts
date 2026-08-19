@@ -615,6 +615,52 @@ describe('planBeats — the answer to an attack (#101)', () => {
     )
     expect(plans.map((p) => p.kind)).toEqual(['pairToDiscard'])
   })
+
+  // Security Bug: the release beaten by the attack is not destroyed — it is
+  // TAKEN, into the attacker's own zone. `attacks.test.ts`'s own
+  // "opens a fresh window on the stolen release" pins the real event order —
+  // `tookHit`, `discarded(attackSpent)`, `releaseStolen`, `windowClosed`,
+  // `windowOpened` — so this reaches through the whole batch, not just the
+  // one event, to pin that the pair's own exit still gets its beat AND the
+  // crossing gets its own, one event apiece.
+  it('plans the steal as a crossing between two zones', () => {
+    const plans = planBeats(
+      [
+        tookHit({ id: 9 }),
+        discarded(10, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+        {
+          id: 20,
+          type: 'releaseStolen',
+          from: 'p1',
+          to: 'p2',
+          slot: 'frontend',
+          card: 'release-frontend',
+        } as Event,
+        { id: 21, type: 'windowClosed', player: 'p2', slot: 'frontend' } as Event,
+        {
+          id: 22,
+          type: 'windowOpened',
+          player: 'p2',
+          slot: 'frontend',
+          round: 1,
+          deadline: 0,
+        } as Event,
+      ],
+      boardBefore({ pending: defendPending({ scope: 'release' }) } as Partial<BoardState>),
+    )
+    expect(plans).toEqual([
+      { kind: 'pairToDiscard', key: 'pairOut:10', main: { eventId: 10, card: 'attack-bug' } },
+      {
+        kind: 'stolen',
+        key: 'stolen:20',
+        eventId: 20,
+        from: 'p1',
+        to: 'p2',
+        slot: 'frontend',
+        card: 'release-frontend',
+      },
+    ])
+  })
 })
 
 describe('classifyPiles', () => {

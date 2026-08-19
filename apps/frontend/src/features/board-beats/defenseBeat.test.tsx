@@ -45,6 +45,13 @@ const arrivals = vi.hoisted(() => ({
   // promise has settled.
   landed: 0,
 }))
+// What the runner's own `patch()` call actually carried — the steal's morph
+// (Task 15) is a content swap on the flyer, not a flag, so the only way to
+// observe "it turned LOD" is to read the `lod` prop off the React element
+// `patch` was handed. Real `useFlyer` underneath (pass-through, same idiom as
+// `useHandArrival` above): the morph's correctness is WHEN patch is called
+// relative to the flight starting, and a fully faked flyer cannot show that.
+const patched = vi.hoisted(() => ({ lod: undefined as boolean | undefined }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
   const { useState } = await import('react')
@@ -54,6 +61,19 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
       played.names.push(name)
       played.calls.push({ name, params })
       return { finished: Promise.resolve() } as unknown as Animation
+    },
+    useFlyer: (...args: Parameters<typeof real.useFlyer>) => {
+      const flyer = real.useFlyer(...args)
+      return {
+        ...flyer,
+        patch: (key: string, next: Parameters<typeof flyer.patch>[1]) => {
+          const content = next.content as { props?: { lod?: boolean } } | undefined
+          if (content && typeof content === 'object' && 'props' in content) {
+            patched.lod = content.props?.lod
+          }
+          return flyer.patch(key, next)
+        },
+      }
     },
     useHandArrival: (...args: Parameters<typeof real.useHandArrival>) => {
       const step = real.useHandArrival(...args)
@@ -442,4 +462,60 @@ it('reset() drops an exchange parked mid-air', async () => {
   } finally {
     vi.useRealTimers()
   }
+})
+
+// ===== stolen — Security Bug takes the release across the table (#101) =====
+
+it('flies the stolen release from the robbed zone into the thief’s', async () => {
+  played.names = []
+  patched.lod = undefined
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.runStolen(
+      {
+        kind: 'stolen',
+        key: 'stolen:20',
+        eventId: 20,
+        from: 'p1',
+        to: 'p2',
+        slot: 'frontend',
+        card: 'release-frontend',
+      },
+      ctx,
+    ),
+  )
+  expect(played.names).toContain('playToCenter')
+  // it reads as LOD by the time it lands — the morph happens IN FLIGHT, not on
+  // arrival, so `patch` was called with the LOD face while the card travelled.
+  // base.selfId is 'p1', so 'p2' is an opponent's zone.
+  expect(patched.lod).toBe(true)
+})
+
+// The guard that keeps the morph from firing unconditionally: a release
+// stolen INTO OUR OWN zone (the reflected case, and any future one) is read
+// in full, same as any other card lying in our own zone — never as LOD. If
+// the guard were dropped and `patch` always carried `lod: true`, this would
+// go red the moment it does.
+it('reads a release stolen into our own zone in full, never as LOD', async () => {
+  played.names = []
+  patched.lod = undefined
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.runStolen(
+      {
+        kind: 'stolen',
+        key: 'stolen:21',
+        eventId: 21,
+        from: 'p2',
+        to: 'p1',
+        slot: 'frontend',
+        card: 'release-frontend',
+      },
+      ctx,
+    ),
+  )
+  expect(played.names).toContain('playToCenter')
+  expect(patched.lod).toBeUndefined()
 })

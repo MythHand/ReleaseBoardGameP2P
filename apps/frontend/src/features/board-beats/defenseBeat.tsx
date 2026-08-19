@@ -1,4 +1,4 @@
-import { CardPair, cardById } from '@release/ui'
+import { Card, CardPair, cardById } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import {
   nextFrames,
@@ -173,10 +173,44 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
     [flyer.raise, flyer.drop],
   )
 
-  // Task 15 fills this in — the steal's zone-to-zone flight.
+  // Security Bug (#101, Task 15): the release the attack beat is not burned —
+  // it crosses from the victim's zone into the thief's. It is entering an
+  // OPPONENT's zone, where a release is read as LOD (at a glance, not in
+  // full) — so it morphs on the way instead of being swapped on landing. The
+  // morph is not a preset: it is a content swap on the flyer, one frame after
+  // it mounts (`raise`'s own `nextFrames()`, I2), and the face's own layers
+  // ease to their LOD values over the CSS transitions already on them while
+  // the flight carries the card across (`ComposedFace`'s own coupling).
   const runStolen = useCallback(
-    async (_plan: Extract<BeatPlan, { kind: 'stolen' }>, _ctx: BeatRun) => {},
-    [],
+    async (plan: Extract<BeatPlan, { kind: 'stolen' }>, ctx: BeatRun) => {
+      await nextFrames() // the shadow that renders `before` has committed (I2)
+      const a = latest.current.anchors
+      // `from` is the victim's slot as it stood BEFORE this batch (I1 — the
+      // beat runs against `base`, and the shadow still renders it); `to` is
+      // the thief's, which the live projection has already created. Both
+      // resolve for every seat, including our own (`_Board.tsx` binds a
+      // release slot for the local player too, unlike `seatBox`).
+      const from = rectOf(a.releaseSlot(plan.from, plan.slot))
+      const to = rectOf(a.releaseSlot(plan.to, plan.slot))
+      const card = cardById(plan.card)
+      if (!from || !to || !card) return // nothing measurable: the projection resolves it
+      const [el] = await flyer.raise([
+        { key: 'steal', at: from, content: <Card card={card} interactive={false} width="100%" /> },
+      ])
+      if (!el) return
+      // A release stolen INTO OUR OWN zone (the reflected case, and any
+      // future one) is read in full, not as LOD — only a crossing into an
+      // OPPONENT's zone gets the at-a-glance reading. The flip happens on
+      // the same frame the travel starts, so nothing is swapped on arrival.
+      if (plan.to !== ctx.base.selfId) {
+        flyer.patch('steal', {
+          content: <Card card={card} interactive={false} width="100%" lod />,
+        })
+      }
+      await play('playToCenter', el, { from, to })?.finished
+      flyer.drop('steal')
+    },
+    [flyer.raise, flyer.patch, flyer.drop],
   )
 
   // A new match cancels what is in the air — same reason and same idiom as

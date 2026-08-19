@@ -186,6 +186,14 @@ export function useBeats(args: {
           run: (ctx) => defense.runCovered(plan, ctx),
         }
       }
+      if (plan.kind === 'stolen') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          run: (ctx) => defense.runStolen(plan, ctx),
+        }
+      }
       return null
     },
     [
@@ -197,6 +205,7 @@ export function useBeats(args: {
       combo.runRelease,
       combo.runPairOut,
       defense.runCovered,
+      defense.runStolen,
     ],
   )
 

@@ -116,6 +116,18 @@ export type BeatPlan =
       /** Rollback only: whose hand the attack card goes back to */
       returnTo?: string
     }
+  // Security Bug does not burn the release it beats — it takes it. The card crosses from
+  // the victim's zone into the thief's and morphs into its LOD reading IN
+  // FLIGHT: an opponent's zone reads at a glance, not in full.
+  | {
+      kind: 'stolen'
+      key: string
+      eventId: number
+      from: string
+      to: string
+      slot: string
+      card: string
+    }
 
 // Reasons that CAN take a card out of a release slot — "can", not "always do".
 // Typed against the engine's own union rather than `string`, so renaming a reason
@@ -350,6 +362,22 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         ...(e.effect === 'return' ? { returnTo: ownSudo ? e.player : p.attacker } : {}),
       })
       i = j - 1 // the discards this plan claimed are consumed
+      continue
+    }
+    if (e.type === 'releaseStolen') {
+      // One event, one beat — the crossing is its own gesture, never coalesced
+      // with the exchange it followed (the attack's own exit already took the
+      // pair route above, when it applies) or anything after it.
+      flush()
+      plans.push({
+        kind: 'stolen',
+        key: `stolen:${e.id}`,
+        eventId: e.id,
+        from: e.from,
+        to: e.to,
+        slot: e.slot,
+        card: e.card,
+      })
       continue
     }
     if (e.type === 'discarded') {
