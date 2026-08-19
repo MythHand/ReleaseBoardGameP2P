@@ -1,6 +1,14 @@
 import { CardPair, cardById } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
-import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
+import {
+  nextFrames,
+  play,
+  scatterAt,
+  useDiscardExit,
+  useFlyer,
+  useHandArrival,
+  wait,
+} from '@release/ui/animations'
 import type { RefObject } from 'react'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
@@ -24,8 +32,14 @@ const rectOf = (el: Element | null): Rect | null => {
 export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<StagedHandoff | null>) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
-  const latest = useRef({ anchors, staging, send })
-  latest.current = { anchors, staging, send }
+  // ROLLBACK's own destination, when the returned attack lands in the local
+  // player's fan rather than an opponent's seat. No `onLanded` work to do:
+  // unlike a draw (drawBeat.tsx), the engine already put the card into the
+  // hand by mutating state (see the comment at `returning` below), so the
+  // NEXT projection already carries it — this beat only has to fly it there.
+  const arrival = useHandArrival(anchors.hand, () => {})
+  const latest = useRef({ anchors, staging, send, arrival })
+  latest.current = { anchors, staging, send, arrival }
 
   const runCovered = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'covered' }>, ctx: BeatRun) => {
@@ -109,7 +123,37 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
           ...(defenceAux ? { auxScatter: scatterAt(defenceAux.eventId) } : {}),
         })
       }
-      if (items.length > 0) await latest.current.send(items)
+      // ROLLBACK — the attack is not burned, it is sent back. The engine puts
+      // it into a hand by mutating state and emits NOTHING for it
+      // (attacks.ts:245-252), so `returnTo` is derived rather than read; the
+      // gap and what would close it are in docs/animations/backlog.md.
+      const returning =
+        plan.effect === 'return' && plan.returnTo && attackBox && attackCard
+          ? (async () => {
+              if (plan.returnTo === ctx.base.selfId) {
+                // into our own fan, through the shared insert every other
+                // "card settles into the hand" motion uses. No index: the gap
+                // opens in the middle of the fan.
+                void latest.current.arrival.arrive(
+                  [{ key: `back${plan.eventId}`, card: attackCard, from: attackBox }],
+                  ctx.base.you.hand.length,
+                )
+                await wait(latest.current.arrival.FLIGHT_MS)
+                return
+              }
+              // `anchors.seatBox` resolves null for the LOCAL player — never
+              // reached here, since that case took the fan branch above.
+              const to = a.seatBox(plan.returnTo as string)
+              if (!to) return
+              const [el] = await flyer.raise([{ key: 'back', at: attackBox, card: attackCard }])
+              if (el) await play('playToCenter', el, { from: attackBox, to })?.finished
+              flyer.drop('back')
+            })()
+          : undefined
+
+      // Together, not in sequence: the exchange leaving for the discard and
+      // the attack leaving for its hand are one moment, not two gestures.
+      await Promise.all([items.length > 0 ? latest.current.send(items) : undefined, returning])
       flyer.drop('cover')
     },
     [flyer.raise, flyer.drop],
@@ -126,7 +170,13 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
   const reset = useCallback(() => {
     flyer.drop()
     resetExit()
-  }, [flyer.drop, resetExit])
+    arrival.reset()
+  }, [flyer.drop, resetExit, arrival.reset])
 
-  return { overlay: [...exitOverlay, ...flyer.overlay], runCovered, runStolen, reset }
+  return {
+    overlay: [...exitOverlay, ...flyer.overlay, ...arrival.overlay],
+    runCovered,
+    runStolen,
+    reset,
+  }
 }

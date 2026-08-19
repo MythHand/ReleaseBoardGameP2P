@@ -29,6 +29,15 @@ const exits = vi.hoisted(() => ({ items: [] as Leaving[] }))
 // instead of resolving, so a test can hold the beat in flight and choose the
 // moment it lands.
 const hang = vi.hoisted(() => ({ on: false, release: null as (() => void) | null }))
+// What each real `arrive()` call was aimed at — `drawBeat.test.tsx`'s own
+// pass-through wrapper idiom: the fan itself stays real (it is what the
+// Rollback return actually has to land in), but the call is recorded so a
+// test can tell "landed in our own fan" from "flew to a seat instead" without
+// re-deriving it from DOM state.
+const arrivals = vi.hoisted(() => ({
+  handLengths: [] as number[],
+  ats: [] as (number | undefined)[],
+}))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
   const { useState } = await import('react')
@@ -38,6 +47,17 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
       played.names.push(name)
       played.calls.push({ name, params })
       return { finished: Promise.resolve() } as unknown as Animation
+    },
+    useHandArrival: (...args: Parameters<typeof real.useHandArrival>) => {
+      const step = real.useHandArrival(...args)
+      return {
+        ...step,
+        arrive: (items: Parameters<typeof step.arrive>[0], handLength: number, at?: number) => {
+          arrivals.handLengths.push(handLength)
+          arrivals.ats.push(at)
+          return step.arrive(items, handLength, at)
+        },
+      }
     },
     // A stateful stand-in, not a fixed `overlay: []`: the reset() test needs
     // to tell "a flyer is mounted" from "reset() cleared it," and a hardcoded
@@ -147,6 +167,27 @@ const cancelPlan = (): Extract<BeatPlan, { kind: 'covered' }> => ({
     { eventId: 13, card: 'attack-bug', reason: 'attackSpent' },
     { eventId: 14, card: 'defense-hotfix', reason: 'defenceSpent' },
   ],
+})
+
+// The local player (`base.selfId`) is `p1`, so the default here is "I defend
+// against p2's attack" — the same convention `planBeats.test.ts`'s own
+// Rollback fixtures use (`defended({ player: 'p1', ... })` against
+// `defendPending()`'s default `attacker: 'p2'`), so a plain Rollback's
+// `returnTo` naturally lands on the attacker, p2 — a seat.
+const rollbackPlan = (
+  over: Partial<Extract<BeatPlan, { kind: 'covered' }>> = {},
+): Extract<BeatPlan, { kind: 'covered' }> => ({
+  kind: 'covered',
+  key: 'covered:30',
+  eventId: 30,
+  defender: 'p1',
+  card: 'defense-rollback',
+  effect: 'return',
+  attacker: 'p2',
+  attackCard: 'attack-bug',
+  attackSudo: false,
+  spent: [{ eventId: 31, card: 'defense-rollback', reason: 'defenceSpent' }],
+  ...over,
 })
 
 // ===== covered =====
@@ -261,6 +302,44 @@ it('carries the attack’s own sudo out with it as the pair it was', async () =>
     aux: expect.objectContaining({ id: 'support-sudo' }),
     auxScatter: scatterAt(14),
   })
+})
+
+// ===== rollback returns the attack, instead of banking it =====
+
+it('flies a plain Rollback’s attack back to the seat that threw it', async () => {
+  played.names = []
+  played.calls = []
+  arrivals.handLengths = []
+  exits.items = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() => api.beat?.runCovered(rollbackPlan({ returnTo: 'p2' }), ctx))
+  // it went to a seat, not into our fan
+  expect(arrivals.handLengths).toHaveLength(0)
+  // TWO playToCenters: the cover lying over the attack, AND the attack's own
+  // return flight — `toContain` alone would already be satisfied by the
+  // cover's, which fires regardless of the return leg this test is actually
+  // about, so the count is what makes this discriminating.
+  expect(played.calls.filter((c) => c.name === 'playToCenter')).toHaveLength(2)
+  // and it was never banked: only the defence left for the discard
+  expect(exits.items.map((i) => i.card.id)).toEqual(['defense-rollback'])
+})
+
+it('brings a sudo Rollback’s attack into our own fan', async () => {
+  arrivals.handLengths = []
+  arrivals.ats = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  // base.selfId is 'p1', so returnTo: 'p1' is us
+  await drive(() =>
+    api.beat?.runCovered(
+      rollbackPlan({ returnTo: 'p1', defender: 'p1', sudo: 'support-sudo' }),
+      ctx,
+    ),
+  )
+  expect(arrivals.handLengths).toHaveLength(1)
+  // the gap opens in the MIDDLE of the fan: no index is passed
+  expect(arrivals.ats[0]).toBeUndefined()
 })
 
 // Deliberately the actor's OWN defence (`defender: ctx.base.selfId`, with a
