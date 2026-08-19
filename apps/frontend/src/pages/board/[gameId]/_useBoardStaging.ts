@@ -103,6 +103,13 @@ export interface BoardStaging {
   costOptions: string[]
   /** a click in the fan pays the cost and dispatches the RESOLVE */
   onCostPick: (uid: string) => void
+  /** true once a pulled release's own flight to the stage slot has landed —
+   * gates `_Board.tsx`'s static stage-slot render against the carrier that is
+   * still flying it there */
+  stageLanded: boolean
+  /** the card that paid a staged release's cost, once its own flight has
+   * landed — held open beside the release until a later task moves it on */
+  paidCost: { uid: string; card: CardData } | null
   // The combo beat's own clear (#100, Task 11): once a dispatched play's
   // `attackPlaced`/`releasePlaced` beat has taken the staged node over — it is
   // already standing exactly where the pending render (or the release zone)
@@ -208,6 +215,27 @@ export function useBoardStaging({
       ? state.pending
       : null
   const costOptions = useMemo(() => cost?.options ?? [], [cost])
+
+  // Two pieces of local, purely-visual state a release's own cost cycle needs
+  // that neither `staged`'s phase machine nor the projection can supply:
+  //
+  // `stageLanded` — true once the LOCAL flight that carries a pulled release
+  // from the fan to the stage slot has actually finished (or at once, under
+  // reduced motion). `_Board.tsx`'s static stage-slot render is gated on this:
+  // without it, on a fast connection (the host peer's own round trip can be
+  // near-instant) the projected `discardForRelease` pending can arrive WHILE
+  // that flight is still in the air, and a static render keyed only off the
+  // pending would stand the release at the slot a SECOND time, on top of the
+  // carrier still flying it there.
+  //
+  // `paidCost` — the card that paid the cost, once ITS OWN flight (below,
+  // `onCostPick`) has landed. The engine never says which uid was spent — only
+  // the resolver knows, since it is the resolver's own click that named it —
+  // so this is the one place that can hold it. It is not cleared once set: by
+  // the rules the cost is shown open beside the release, not discarded on the
+  // spot, and moving it on from there is a later task's job (see `onCostPick`).
+  const [stageLanded, setStageLanded] = useState(false)
+  const [paidCost, setPaidCost] = useState<{ uid: string; card: CardData } | null>(null)
 
   const handItems = useMemo(() => {
     const out = new Set(
@@ -364,6 +392,11 @@ export function useBoardStaging({
       )
       if (soloRelease) {
         dispatchWatermarkRef.current = eventsRef.current.length
+        // fresh play, fresh cycle — a stale `paidCost` from an earlier release
+        // this match must not bleed into this one, and `stageLanded` starts
+        // false again: the flight below has not carried this card yet.
+        setStageLanded(false)
+        setPaidCost(null)
         actions?.onPlay?.(uid, undefined, undefined)
       }
       void (async () => {
@@ -375,7 +408,11 @@ export function useBoardStaging({
           if (el) await play('playToCenter', el, { from: drop.rect, to })?.finished
           flyer.drop('stage')
         }
-        if (!soloRelease) aimFromCentre()
+        // the carrier has dropped it (or, under reduced motion, there was
+        // never one) — `_Board.tsx`'s static render may take over now, not a
+        // moment before (see `stageLanded`'s own comment above).
+        if (soloRelease) setStageLanded(true)
+        else aimFromCentre()
       })()
       return true
     },
@@ -397,30 +434,48 @@ export function useBoardStaging({
 
   // The cost flies out of the fan and is held OPEN beside the release: by the
   // rules a release costs a card, and the cost is shown to the table rather
-  // than vanishing into the discard on its way past. The beat
-  // (`comboBeat.runRelease`) takes it from here once the engine answers — this
-  // gesture only gets it to the slot and dispatches.
+  // than vanishing into the discard on its way past. `_Board.tsx` owns the
+  // static render of it (`paidCost`, set below the moment this flight lands) —
+  // a later task flies it on to the discard once the release itself settles;
+  // it will measure the slot, not adopt this flyer.
   const onCostPick = useCallback(
     (uid: string) => {
       if (!enabled || !costOptions.includes(uid)) return
-      const index = state.you.hand.findIndex((c) => c.uid === uid)
-      const item = state.you.hand[index]
+      // measured against `handItems` — the array the fan actually RENDERS
+      // (the staged release is already excluded from it) — not `you.hand`,
+      // which still carries it and so is one slot short of what is on screen:
+      // `slotPlacement`'s x/y/rotation are a function of (index, total), and
+      // both would be wrong against the wrong array (I6 — a flight that
+      // starts where the card never was jumps on its first frame).
+      const index = handItems.findIndex((c) => c.uid === uid)
+      const item = handItems[index]
       if (!item) return
       void (async () => {
         const to = anchors.cost.current?.getBoundingClientRect()
-        const from = reduced ? undefined : slotBox(index, state.you.hand.length)
+        const from = reduced ? undefined : slotBox(index, handItems.length)
         if (!reduced && from && to) {
           const [el] = await flyer.raise([{ key: 'cost', card: item.card, at: from }])
           if (el) await play('playToCenter', el, { from, to })?.finished
         }
-        // the flyer is NOT dropped here: the beat's own cost render takes over
-        // when the engine's `discarded(releaseCost)` arrives, and dropping now
-        // would leave a bare frame at the slot. `release()`-style handoff is
-        // Task 11's job.
+        // the swap from carrier to static render happens in the SAME commit —
+        // the approved source's own `payCost` idiom (`setCost` / `drop('fly')`
+        // together) — so there is never a frame with neither on screen.
+        setPaidCost({ uid, card: item.card })
+        flyer.drop('cost')
         actions?.onResolve?.({ kind: 'discardForRelease', card: uid })
       })()
     },
-    [enabled, costOptions, state.you.hand, reduced, slotBox, anchors.cost, flyer.raise, actions],
+    [
+      enabled,
+      costOptions,
+      handItems,
+      reduced,
+      slotBox,
+      anchors.cost,
+      flyer.raise,
+      flyer.drop,
+      actions,
+    ],
   )
 
   // the fold — ported from ComboStory's `pickPartner`. The support is ALREADY
@@ -679,5 +734,7 @@ export function useBoardStaging({
     release,
     costOptions,
     onCostPick,
+    stageLanded,
+    paidCost,
   }
 }

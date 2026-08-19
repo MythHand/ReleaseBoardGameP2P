@@ -307,15 +307,39 @@ export default function Board({
   const pendingDefend = !staging.staged && state.pending?.kind === 'defend' ? state.pending : null
 
   // the release standing at the stage slot while its cost is unpaid — read
-  // ONCE, same reason as `pendingDefend` above. Driven by the PROJECTION's own
-  // `discardForRelease.release` (redacted to its owner), not by anything
-  // `useBoardStaging` tracks locally: the engine emits nothing until the cost
-  // lands, so this is the only thing that can tell the stage slot which card
-  // is standing there, and it stays true across a remount or a peer resync
-  // that local staging state would not survive.
-  const costPending = state.pending?.kind === 'discardForRelease' ? state.pending : null
-  const stagedRelease = costPending
-    ? you.hand.find((c) => c.uid === costPending.release)
+  // ONCE, same reason as `pendingDefend` above, and its OWNERSHIP stated here
+  // explicitly rather than leaned on the engine's own redaction of `.release`
+  // the way the pre-fix render did: without the `player` check, an opponent's
+  // own `discardForRelease` would still assign to this const (with `.release`
+  // simply absent), which happens to resolve to nothing below only because
+  // the redaction is doing that work silently — the same two-readers-drift
+  // class already fixed once on this branch (see `pendingDefend`'s own note).
+  const costPending =
+    state.pending?.kind === 'discardForRelease' && state.pending.player === state.selfId
+      ? state.pending
+      : null
+  // The staging gesture's OWN idea of the standing release — the same card
+  // `onHandPlay` committed the instant it was pulled, kept (in `staging`)
+  // until the projected pending arrives. `costPending` above is the canonical
+  // source once it exists, but it is a network round trip away: on a fast
+  // connection (the host peer's own can be near-instant) it can lag behind
+  // the LOCAL flight that carries the release here, and on a slow one it can
+  // arrive well after that flight has already landed — without this fallback
+  // the slot would show nothing for that whole gap.
+  const stagedReleaseLocal =
+    staging.staged?.phase === 'dispatched' &&
+    !staging.staged.support &&
+    staging.staged.main?.card.category === 'release'
+      ? staging.staged.main
+      : undefined
+  // `stageLanded` gates BOTH sources at once: the carrier that flew the
+  // release to this slot still holds it until ITS OWN flight lands, and
+  // rendering the static card any earlier — even off the projection, which
+  // can arrive mid-flight on a fast connection — would double it, the same
+  // reason `soloStaged` below is gated on `staging.overlay`.
+  const stagedRelease = staging.stageLanded
+    ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
+      stagedReleaseLocal)
     : undefined
 
   // The staging → beat handoff (#100): kept current in a layout effect,
@@ -525,8 +549,12 @@ export default function Board({
         className={opening.costSlot}
         data-centre-slot="cost"
         ref={anchors.cost}
-        {...previewProps(null)}
-      />
+        {...previewProps(staging.paidCost?.card ?? null)}
+      >
+        {/* the card that paid the release's cost — held open here, not
+            discarded on the spot, until a later task flies it on */}
+        {staging.paidCost && <Card card={staging.paidCost.card} interactive={false} width="100%" />}
+      </div>
       {/* the defender's own Sudo waits in its OWN place until a defence is
           chosen for it — the arrow says what it is aimed at */}
       <div

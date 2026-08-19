@@ -86,6 +86,18 @@ it('stands the release at the centre and does not land it until the cost is paid
   const { rerender } = render(releaseBoard({}, { onPlay, onResolve }))
   await pullCardFromFan('release-frontend#0')
   expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, undefined)
+  // the release left the fan — it must not be pickable a second time there
+  expect(document.querySelectorAll('[data-hand-slot]').length).toBe(HAND.length - 1)
+  // and it does NOT render at the plain aim/support centre slot — that render
+  // is `soloStaged`'s, which excludes a release on purpose (it belongs at the
+  // stage slot instead, asserted below)
+  expect(screen.queryByTestId('board-centre-staged')).toBeNull()
+  // the projected pending has not arrived yet (this render still passes
+  // `pending: null`) — the stage slot's card is standing there anyway, off
+  // staging's OWN local state (Fix round 1: without that fallback the slot
+  // would show nothing for as long as the referee's answer is in flight)
+  const stageBefore = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+  expect(stageBefore.querySelector('[data-card]')).toBeTruthy()
 
   // the engine answers with the cost pending — and the release is standing at
   // the stage slot, NOT in its zone slot
@@ -99,6 +111,96 @@ it('stands the release at the centre and does not land it until the cost is paid
     kind: 'discardForRelease',
     card: 'attack-bug#0',
   })
+  // the paid cost stays open at its own slot — held there, not discarded on
+  // the spot (a later task moves it on)
+  const cost = document.querySelector('[data-centre-slot="cost"]') as HTMLElement
+  expect(cost.querySelector('[data-card="attack-bug"]')).toBeTruthy()
+})
+
+// Fix round 1 (post-review): `_useBoardStaging.ts`'s own `handItems` is what
+// the fan actually renders — one shorter than `you.hand` for as long as a
+// cost is owed, since the staged release is excluded from it. A regression
+// that stopped excluding it (e.g. deleting `cost?.release` from that memo)
+// would leave every other assertion in this file green — `clickFanCard` finds
+// its target by catalogue id, not slot position — so this pins the exclusion
+// directly.
+it('the fan is one card shorter than the hand while a cost is owed', () => {
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  expect(document.querySelectorAll('[data-hand-slot]').length).toBe(HAND.length - 1)
+})
+
+// Fix round 1: the release standing at the stage slot must not ALSO appear at
+// the plain centre-staged slot (`soloStaged`'s own render, for a plain
+// aim/support) — the two would double the same card on screen if the
+// category-release exclusion in `_Board.tsx`'s `soloStaged` were ever lost.
+it('the standing release never renders at the plain centre-staged slot', () => {
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  expect(screen.queryByTestId('board-centre-staged')).toBeNull()
+})
+
+// Fix round 1 (post-review, finding 2 — "the release is on screen twice, or
+// nowhere"): a stage flyer that has not finished carrying the release to the
+// stage slot must not ALSO be shadowed by a static render of the same card —
+// jsdom's WAAPI stub (test-setup.ts) resolves `.finished` on the very next
+// microtask regardless of the preset's own duration, so the flight has to be
+// held open ON PURPOSE here to observe the moment it is still "in the air" —
+// in a real browser this is the ~480ms `playToCenter` window, and on a fast
+// connection (the host peer's own round trip can be near-instant) the
+// referee's answer can land squarely inside it.
+it('does not double-render the release while its own stage flight is still carrying it', async () => {
+  const animateSpy = vi.spyOn(Element.prototype, 'animate').mockImplementation(
+    () =>
+      ({
+        cancel: () => {},
+        finished: new Promise<void>(() => {}), // never settles — the flight stays "in the air"
+      }) as unknown as Animation,
+  )
+  const { rerender } = render(releaseBoard({}, {}))
+  const index = HAND.findIndex((c) => c.uid === 'release-frontend#0')
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 50))
+  })
+  // the carrier is still up — the flight it started never got to finish
+  const flyer = document.querySelector<HTMLElement>('[class*="flyer"]')
+  expect(flyer).toBeTruthy()
+
+  // the referee answers early, before that flight has landed
+  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+  // the carrier still holds it — a static render here would double it
+  expect(stage.querySelector('[data-card]')).toBeNull()
+  animateSpy.mockRestore()
+})
+
+// Fix round 1 (post-review, finding 1 — "the cost flight starts from a slot
+// the card never occupied"): `onCostPick` used to measure the flight's origin
+// against `you.hand`, which still carries BOTH cards while a cost is owed —
+// one slot short of the fan `handItems` actually renders (the staged release
+// is excluded from it). `slotPlacement(slot, total)` derives both x and
+// rotation from `slot - (total-1)/2`, so both arguments being wrong moves the
+// origin, not just its label. Pinned directly: with jsdom's default all-zero
+// hand-wrap rect, the ONE eligible card sitting at `slotPlacement(0, 1)` (dead
+// centre) lands at `left: -75px`; the same card measured the old, wrong way —
+// `slotPlacement(1, 2)`, its position in the UN-filtered `you.hand` — would
+// land 68px across at `left: -7px`.
+it('the cost flight originates from the fan slot the card actually occupies', async () => {
+  const animateSpy = vi.spyOn(Element.prototype, 'animate').mockImplementation(
+    () =>
+      ({
+        cancel: () => {},
+        finished: new Promise<void>(() => {}), // held open — inspected mid-flight
+      }) as unknown as Animation,
+  )
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  await clickFanCard('attack-bug#0')
+  const flyer = document.querySelector<HTMLElement>('[class*="flyer"]')
+  if (!flyer) throw new Error('cost flyer not mounted')
+  expect(flyer.style.left).toBe('-75px')
+  animateSpy.mockRestore()
 })
 
 it('does not raise the pending panel for a cost — the table asks instead', () => {
