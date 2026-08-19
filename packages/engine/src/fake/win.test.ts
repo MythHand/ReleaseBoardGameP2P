@@ -159,13 +159,13 @@ describe('a zone completed by something other than a play', () => {
     expect(settled.state.over).toEqual({ winner: 'p1', condition: 'release' })
   })
 
-  it('wins when the third release arrives by Security Bug steal', () => {
-    // `checkWin` only ever ran from `placeRelease`, so a stolen third release
-    // sat in a winning zone and the game carried on until someone happened to
-    // play a release, at which point the win surfaced retroactively.
-    //
-    // Security Bug is thrown into the window a fresh release opens, not played
-    // at a release target — so p2 ships the third slot and p1 takes it away.
+  // `checkWin` only ever ran from `placeRelease`, so a stolen third release sat
+  // in a winning zone and the game carried on until someone happened to play a
+  // release, at which point the win surfaced retroactively.
+  //
+  // Security Bug is thrown into the window a fresh release opens, not played
+  // at a release target — so p2 ships the third slot and p1 takes it away.
+  function stolenThirdRelease(): GameState {
     const s = engine.createGame(config())
     const steal: CardInstance = { uid: 'attack-security-bug#0', id: 'attack-security-bug' }
     const state: GameState = {
@@ -183,8 +183,6 @@ describe('a zone completed by something other than a play', () => {
     }
 
     const played = reduce(state, { type: 'PLAY', player: 'p2', card: DB.uid, at: 1000 })
-    expect(played.state.window).toBeTruthy()
-
     const thrown = reduce(played.state, {
       type: 'ATTACK',
       player: 'p1',
@@ -194,22 +192,38 @@ describe('a zone completed by something other than a play', () => {
     // p2 holds no defence, so the steal resolves — into a FRESH window on p1's
     // zone rather than an instant win, the same as the AI-placed release above:
     // a stolen release has repelled nothing yet either (`resolution.md` §1, #95).
-    const resolved = thrown.state.pending
+    return thrown.state.pending
       ? reduce(thrown.state, {
           type: 'RESOLVE',
           player: 'p2',
           choice: { kind: 'defend', card: null },
           at: 1200,
-        })
-      : thrown
+        }).state
+      : thrown.state
+  }
 
-    expect(resolved.state.players.p1.release.database).toBeTruthy()
-    expect(resolved.state.over).toBeNull()
-    expect(resolved.state.window).toMatchObject({ target: { player: 'p1', slot: 'database' } })
+  it('does not win the moment a third release is stolen — it faces its window first', () => {
+    const resolved = stolenThirdRelease()
 
-    const settled = reduce(resolved.state, {
+    // The zone is complete, but the release is not: it arrived this instant and
+    // owes the thief's opponents the attack time every fresh release owes
+    // (resolution.md §1, §6).
+    expect(resolved.players.p1.release.database).toBeTruthy()
+    expect(resolved.over).toBeNull()
+    expect(resolved.window).toMatchObject({
+      target: { player: 'p1', slot: 'database' },
+      round: 1,
+    })
+  })
+
+  it('wins by a steal once the stolen release survives its window', () => {
+    const resolved = stolenThirdRelease()
+
+    // p2 has nothing to throw, so the window runs out — and THAT is the moment
+    // three completed releases become a win.
+    const settled = reduce(resolved, {
       type: 'WINDOW_EXPIRED',
-      at: resolved.state.window?.deadline ?? 2000,
+      at: resolved.window?.deadline ?? 2000,
     })
     expect(settled.state.over).toEqual({ winner: 'p1', condition: 'release' })
   })
