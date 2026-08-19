@@ -33,7 +33,14 @@ export type TableChoice =
   | { kind: 'cancelRelease' }
 
 export type TablePending =
-  | { kind: 'discardForRelease'; player: string; options: string[] }
+  | {
+      kind: 'discardForRelease'
+      player: string
+      // The owner's own staged card, redacted for everyone else exactly as
+      // `options` is — mirrors the engine's PendingView (Decision 7).
+      release?: string
+      options: string[]
+    }
   | {
       kind: 'defend'
       player: string

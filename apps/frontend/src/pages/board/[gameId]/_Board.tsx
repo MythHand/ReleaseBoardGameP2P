@@ -285,9 +285,13 @@ export default function Board({
   })
   // the ONE card standing at the centre before a partner folds in — a plain
   // aim (`main`) or a support awaiting one (`support`). Once merged the pair
-  // flyer owns the centre instead (see `opening.pairFlyer` below).
+  // flyer owns the centre instead (see `opening.pairFlyer` below). A solo
+  // release is excluded on purpose: `_useBoardStaging` stages it too (so the
+  // fan hides it and a rejection returns it, the same as any other pull), but
+  // it belongs at the STAGE slot, not here — `stagedRelease` below renders it
+  // there, off the projection's own pending rather than off `staged`.
   const soloStaged =
-    staging.staged && !staging.staged.merged
+    staging.staged && !staging.staged.merged && staging.staged.main?.card.category !== 'release'
       ? (staging.staged.support ?? staging.staged.main)
       : null
   // its own node, for the staging → beat handoff below — a plain aim/support
@@ -301,6 +305,18 @@ export default function Board({
   // and the layout effect below collapsing it, and both readers now resolve
   // that tie the same way because they read the same value.
   const pendingDefend = !staging.staged && state.pending?.kind === 'defend' ? state.pending : null
+
+  // the release standing at the stage slot while its cost is unpaid — read
+  // ONCE, same reason as `pendingDefend` above. Driven by the PROJECTION's own
+  // `discardForRelease.release` (redacted to its owner), not by anything
+  // `useBoardStaging` tracks locally: the engine emits nothing until the cost
+  // lands, so this is the only thing that can tell the stage slot which card
+  // is standing there, and it stays true across a remount or a peer resync
+  // that local staging state would not survive.
+  const costPending = state.pending?.kind === 'discardForRelease' ? state.pending : null
+  const stagedRelease = costPending
+    ? you.hand.find((c) => c.uid === costPending.release)
+    : undefined
 
   // The staging → beat handoff (#100): kept current in a layout effect,
   // because `el` has to be the DOM node as THIS render actually committed it —
@@ -501,8 +517,10 @@ export default function Board({
         className={opening.stageSlot}
         data-centre-slot="stage"
         ref={anchors.stage}
-        {...previewProps(null)}
-      />
+        {...previewProps(stagedRelease?.card ?? null)}
+      >
+        {stagedRelease && <Card card={stagedRelease.card} interactive={false} width="100%" />}
+      </div>
       <div
         className={opening.costSlot}
         data-centre-slot="cost"
@@ -639,11 +657,14 @@ export default function Board({
                 // closed until the flip. Both are gone the moment it ends, so
                 // the released hand is the plain one this board always drew.
                 // A partner pick is a click too, not a pull — it routes here
-                // while the staging gesture is waiting for one.
+                // while the staging gesture is waiting for one. A release's
+                // cost is a click as well: routed by which gesture is live
+                // (`costOptions.length > 0`) rather than a second handler —
+                // `staging.onCardClick` itself checks that first.
                 onCardClick={
                   deal.active
                     ? undefined
-                    : staging.staged?.phase === 'partner'
+                    : staging.staged?.phase === 'partner' || staging.costOptions.length > 0
                       ? (i) => staging.onCardClick(i)
                       : (i) => gestures.onCardClick(i)
                 }
@@ -707,8 +728,11 @@ export default function Board({
       </div>
 
       {/* the engine is waiting on a decision from you — a pending owed to you
-          always renders, regardless of whose turn the projection says it is */}
-      {state.pending?.player === state.selfId && (
+          always renders, regardless of whose turn the projection says it is.
+          A release's own cost is the one exception: the cards on the table
+          (the fan, via `staging.onCostPick`) ask for it instead, and a panel
+          on top would be a second asker for the same decision. */}
+      {state.pending?.player === state.selfId && state.pending.kind !== 'discardForRelease' && (
         <PendingPrompt
           pending={state.pending}
           hand={you.hand}

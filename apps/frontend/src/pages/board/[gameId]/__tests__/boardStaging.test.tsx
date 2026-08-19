@@ -149,8 +149,12 @@ it('a pulled attack stages at the centre, aims, and a press on the seat dispatch
 
 it('a pull of a no-target card is refused and the fan keeps it', async () => {
   render(boardWith({ targets: {} }))
-  await pullCardFromFan('release-frontend#0')
-  expect(fanUids()).toContain('release-frontend#0')
+  // attack-bug#0, not release-frontend#0: #101 (Task 8) gives a lone release
+  // its own staging (it stands at the centre for its cost, same as a target
+  // aim or a combo fold), so it is no longer this test's example of a card
+  // this gesture refuses outright. An attack forced targetless still is.
+  await pullCardFromFan('attack-bug#0')
+  expect(fanUids()).toContain('attack-bug#0')
 })
 
 it('a press on nothing valid returns the staged card to the fan', async () => {

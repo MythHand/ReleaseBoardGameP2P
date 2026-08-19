@@ -390,7 +390,7 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
   }
 
   return (
-    <div className={styles.prompt}>
+    <div className={styles.prompt} data-testid="pending-prompt">
       <div className={styles.panel}>
         <Typography as="div" base="label-md" tk="tk-10" className={styles.heading}>
           {kindCopy.prompt}

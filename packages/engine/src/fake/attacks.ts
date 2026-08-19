@@ -421,6 +421,11 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
       return {
         kind: 'discardForRelease',
         player: p.player,
+        // the owner's own staged card: they need to know which of their cards
+        // is standing at the centre. Redacted for everyone else, exactly as
+        // `options` is — see the open rules question this leaves in
+        // docs/rules/backlog.md.
+        ...(mine ? { release: p.release } : {}),
         options: mine
           ? state.players[p.player].hand
               .filter((c) => c.uid !== p.release && c.uid !== p.codeReview)

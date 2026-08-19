@@ -44,6 +44,24 @@ it('asks for the discard cost before the release lands', () => {
   expect(r.state.players.p1.hand).toHaveLength(2)
 })
 
+// The board needs to know WHICH card is standing at the centre while its cost
+// is unpaid, to render it there — but only the owner: the engine emits no
+// event until the cost lands, so nobody else has been told this play even
+// happened. `release` on the projected pending follows the same redaction
+// `options` already has (fake/attacks.ts's `pendingView`).
+it('projects the staged release only to its owner', () => {
+  const asked = reduce(handed([FE, BUG]), { type: 'PLAY', player: 'p1', card: FE.uid, at: 1000 })
+  const mine = engine.project(asked.state, 'p1').pending
+  expect(mine).toMatchObject({ kind: 'discardForRelease', release: FE.uid })
+
+  const theirs = engine.project(asked.state, 'p2').pending
+  expect(theirs?.kind).toBe('discardForRelease')
+  // the key is absent entirely, not merely undefined — same redaction as
+  // `options`, which p2 sees as `[]` rather than missing (the two fields
+  // differ in HOW they redact; both refuse to name the release either way)
+  expect(theirs && 'release' in theirs).toBe(false)
+})
+
 it('places the release once the cost is paid', () => {
   const asked = reduce(handed([FE, BUG]), { type: 'PLAY', player: 'p1', card: FE.uid, at: 1000 })
   const r = reduce(asked.state, {

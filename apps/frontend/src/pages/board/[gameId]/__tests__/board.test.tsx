@@ -156,9 +156,14 @@ it('renders the pending prompt from the real catalog when a decision is owed', a
   const projected = engine.project(state, 'p1')
   const view = {
     ...projected,
+    // `discardForRelease` used to be this test's own example — #101 (Task 8)
+    // gives it its own table gesture instead (the fan pays the cost directly)
+    // and suppresses the generic panel for that one kind, so it can no longer
+    // stand in here. `handLimit` exercises the same binding just as plainly.
     pending: {
-      kind: 'discardForRelease' as const,
+      kind: 'handLimit' as const,
       player: 'p1',
+      excess: 1,
       options: projected.self.hand.map((c) => c.uid),
     },
   }
@@ -173,7 +178,7 @@ it('renders the pending prompt from the real catalog when a decision is owed', a
   // `kindCopy.prompt`; `copy.confirm` is a ConfirmAction label and reaching it
   // would test that component's affordance rather than this binding.
   const heading = await screen.findByText(
-    /^(discard a card to ship this release|сбросьте карту, чтобы выложить релиз)$/i,
+    /^(your hand is over the limit|на руке слишком много карт)$/i,
   )
   expect(heading).toBeTruthy()
 })

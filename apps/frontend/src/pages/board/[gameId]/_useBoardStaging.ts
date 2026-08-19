@@ -99,6 +99,10 @@ export interface BoardStaging {
   onCardClick: (index: number) => void // the partner pick — the fold
   onTargetPick: (target: TableTarget) => void
   cancel: () => void
+  /** the hand uids that may pay a staged release's cost — [] when none is owed */
+  costOptions: string[]
+  /** a click in the fan pays the cost and dispatches the RESOLVE */
+  onCostPick: (uid: string) => void
   // The combo beat's own clear (#100, Task 11): once a dispatched play's
   // `attackPlaced`/`releasePlaced` beat has taken the staged node over — it is
   // already standing exactly where the pending render (or the release zone)
@@ -195,13 +199,25 @@ export function useBoardStaging({
     [staged, cancelling, state.targets],
   )
 
+  // The engine holds a `discardForRelease` while the release stands at the
+  // centre, and names in `options` exactly which cards may pay (neither the
+  // release itself nor a comboed Code Review can). Read, never re-derived —
+  // legality is always the engine's answer.
+  const cost =
+    state.pending?.kind === 'discardForRelease' && state.pending.player === state.selfId
+      ? state.pending
+      : null
+  const costOptions = useMemo(() => cost?.options ?? [], [cost])
+
   const handItems = useMemo(() => {
-    if (!staged) return state.you.hand
     const out = new Set(
-      [staged.support?.uid, staged.main?.uid].filter((uid): uid is string => Boolean(uid)),
+      [staged?.support?.uid, staged?.main?.uid, cost?.release].filter((uid): uid is string =>
+        Boolean(uid),
+      ),
     )
+    if (out.size === 0) return state.you.hand
     return state.you.hand.filter((c) => !out.has(c.uid))
-  }, [state.you.hand, staged])
+  }, [state.you.hand, staged, cost])
 
   const aimFromCentre = useCallback(() => {
     const el = anchors.centre.current
@@ -299,6 +315,22 @@ export function useBoardStaging({
   // the pair's first half instead (`support` set, `phase: 'partner'`) — the
   // arrow is armed from the centre either way (ComboStory's `handPlay` always
   // arms it, whether or not the standing card itself can be aimed).
+  //
+  // A release with no Code Review to pair has neither: no target to aim, no
+  // partner to fold with. By the rules it still stands at the centre while
+  // its cost is paid (#101, Task 8) — the solo half of the same allowance the
+  // combo fold's own `finish()` already gives a release ("anything else…
+  // plays straight through"), so it stages and dispatches AT ONCE, the same
+  // way `onTargetPick`/`finish()` commit `phase: 'dispatched'` synchronously
+  // alongside their own dispatch. Staging it (rather than leaving `staged`
+  // untouched) is what gets it the rest of this hook's machinery for free:
+  // `handItems` hides it from the fan the INSTANT this returns — not once a
+  // network round-trip echoes the pending back — and a rejection (the
+  // watcher below) sends it back to the fan exactly like any other refused
+  // play. `_Board.tsx` still renders it from the projection's own
+  // `discardForRelease.release`, never from `staged` — see the clearing
+  // effect further down for why `staged` does not linger once that pending
+  // lands.
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const onHandPlay = useCallback(
     (uid: string, drop: HandPlayDrop): boolean => {
@@ -308,21 +340,42 @@ export function useBoardStaging({
       if (!item) return false
       const hasTarget = (state.targets?.[uid] ?? []).length > 0
       const partners = state.comboOptions?.[uid] ?? []
-      if (!hasTarget && partners.length === 0) return false // pull only what plays alone or with a partner
+      // `hasTarget`/`partners` already gate the other two branches on
+      // playability for free: `state.targets`/`state.comboOptions` only carry
+      // an entry for a card the projection already counts as playable
+      // (targetsFor/combosFor, packages/engine/src/fake/project.ts). A release
+      // has neither to lean on, so its own playability — the slot open, the
+      // cap not hit, a card left to pay with — is checked here explicitly;
+      // skipping it would let an unaffordable release fly to the centre only
+      // to have the engine reject it a beat later.
+      const soloRelease =
+        !hasTarget &&
+        partners.length === 0 &&
+        item.card.category === 'release' &&
+        state.playable.includes(uid)
+      if (!hasTarget && partners.length === 0 && !soloRelease) return false // pull only what plays alone, with a partner, or a release
       const card: StagedCard = { uid, card: item.card, index }
       commitStaged(
         hasTarget
           ? { support: null, main: card, phase: 'aim', merged: false }
-          : { support: card, main: null, phase: 'partner', merged: false },
+          : soloRelease
+            ? { support: null, main: card, phase: 'dispatched', merged: false }
+            : { support: card, main: null, phase: 'partner', merged: false },
       )
+      if (soloRelease) {
+        dispatchWatermarkRef.current = eventsRef.current.length
+        actions?.onPlay?.(uid, undefined, undefined)
+      }
       void (async () => {
-        const cRect = anchors.centre.current?.getBoundingClientRect()
-        if (!reduced && drop.rect && cRect) {
+        // a solo release flies to the STAGE slot, where it is meant to stand;
+        // every other pull still flies to the plain attack/aim centre
+        const to = (soloRelease ? anchors.stage : anchors.centre).current?.getBoundingClientRect()
+        if (!reduced && drop.rect && to) {
           const [el] = await flyer.raise([{ key: 'stage', card: item.card, at: drop.rect }])
-          if (el) await play('playToCenter', el, { from: drop.rect, to: cRect })?.finished
+          if (el) await play('playToCenter', el, { from: drop.rect, to })?.finished
           flyer.drop('stage')
         }
-        aimFromCentre()
+        if (!soloRelease) aimFromCentre()
       })()
       return true
     },
@@ -331,12 +384,43 @@ export function useBoardStaging({
       state.you.hand,
       state.targets,
       state.comboOptions,
+      state.playable,
       reduced,
       aimFromCentre,
       flyer.raise,
       flyer.drop,
       anchors.centre,
+      anchors.stage,
+      actions,
     ],
+  )
+
+  // The cost flies out of the fan and is held OPEN beside the release: by the
+  // rules a release costs a card, and the cost is shown to the table rather
+  // than vanishing into the discard on its way past. The beat
+  // (`comboBeat.runRelease`) takes it from here once the engine answers — this
+  // gesture only gets it to the slot and dispatches.
+  const onCostPick = useCallback(
+    (uid: string) => {
+      if (!enabled || !costOptions.includes(uid)) return
+      const index = state.you.hand.findIndex((c) => c.uid === uid)
+      const item = state.you.hand[index]
+      if (!item) return
+      void (async () => {
+        const to = anchors.cost.current?.getBoundingClientRect()
+        const from = reduced ? undefined : slotBox(index, state.you.hand.length)
+        if (!reduced && from && to) {
+          const [el] = await flyer.raise([{ key: 'cost', card: item.card, at: from }])
+          if (el) await play('playToCenter', el, { from, to })?.finished
+        }
+        // the flyer is NOT dropped here: the beat's own cost render takes over
+        // when the engine's `discarded(releaseCost)` arrives, and dropping now
+        // would leave a bare frame at the slot. `release()`-style handoff is
+        // Task 11's job.
+        actions?.onResolve?.({ kind: 'discardForRelease', card: uid })
+      })()
+    },
+    [enabled, costOptions, state.you.hand, reduced, slotBox, anchors.cost, flyer.raise, actions],
   )
 
   // the fold — ported from ComboStory's `pickPartner`. The support is ALREADY
@@ -347,6 +431,15 @@ export function useBoardStaging({
   const onCardClick = useCallback(
     (index: number) => {
       if (!enabled || cancellingRef.current || foldingRef.current) return
+      // A cost owed routes here too (Board wires the same click through
+      // whichever gesture is live, rather than a second handler): the click
+      // names a fan card by INDEX, resolved against `handItems` — the same
+      // rendered order `onCostPick`'s own caller expects a uid from.
+      if (costOptions.length > 0) {
+        const item = handItems[index]
+        if (item) onCostPick(item.uid)
+        return
+      }
       const s = stagedRef.current
       if (s?.phase !== 'partner' || !s.support) return
       const item = handItems[index]
@@ -474,6 +567,8 @@ export function useBoardStaging({
       aimFromCentre,
       actions,
       cancel,
+      costOptions,
+      onCostPick,
     ],
   )
 
@@ -513,6 +608,21 @@ export function useBoardStaging({
     if (s?.phase !== 'dispatched' || !s.main) return
     if (!state.you.hand.some((c) => c.uid === s.main?.uid)) commitStaged(null)
   }, [state.you.hand])
+
+  // A solo release's own projection catch-up: `discardForRelease` pauses on a
+  // decision rather than removing anything, so the hand never loses the card
+  // and the effect just above never fires for it. Once the pending shows up
+  // for us, `_Board.tsx`'s `stagedRelease` (sourced from that SAME pending)
+  // renders it identically — holding the local stage any longer only risks
+  // outliving that render for no reason, so it clears here instead.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  useEffect(() => {
+    const s = stagedRef.current
+    if (s?.phase !== 'dispatched' || s.support || s.main?.card.category !== 'release') return
+    if (state.pending?.kind === 'discardForRelease' && state.pending.player === state.selfId) {
+      commitStaged(null)
+    }
+  }, [state.pending, state.selfId])
 
   // the engine said no: the staged play returns to the fan. ATTACK's own
   // rejection carries both halves (`card` the main, `combo` the support), so
@@ -567,5 +677,7 @@ export function useBoardStaging({
     onTargetPick,
     cancel,
     release,
+    costOptions,
+    onCostPick,
   }
 }
