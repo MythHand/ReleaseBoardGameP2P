@@ -41,6 +41,7 @@ import {
   Toggle,
   TurnDock,
   Typography,
+  useCardPreview,
 } from '@release/ui'
 import { HEAP_SHOW, restTransform } from '@release/ui/animations'
 import type React from 'react'
@@ -168,6 +169,11 @@ export default function Board({
   // decks column) is animated through an INNER node — hence the wrappers below
   // rather than the positioned blocks themselves.
   const anchors = useBoardAnchors()
+
+  // reading a card that stands at the centre — the shared block from the kit.
+  // Five slots here (the release, its cost, the attack, the defender's sudo,
+  // the cover), and each of them reads on its own.
+  const { slotProps: previewProps, overlay: previewOverlay } = useCardPreview()
 
   // The player's own sort of their fan, applied to the projection BEFORE the
   // intro, the queue or the staging gesture see it — so every shadow a beat
@@ -483,13 +489,33 @@ export default function Board({
       {/* the release stands here and does NOT land — by the rules it costs one
           card, and the cost is shown open beside it. Only then does it settle
           into its zone slot and the attack window opens. */}
-      <div className={opening.stageSlot} data-centre-slot="stage" ref={anchors.stage} />
-      <div className={opening.costSlot} data-centre-slot="cost" ref={anchors.cost} />
+      <div
+        className={opening.stageSlot}
+        data-centre-slot="stage"
+        ref={anchors.stage}
+        {...previewProps(null)}
+      />
+      <div
+        className={opening.costSlot}
+        data-centre-slot="cost"
+        ref={anchors.cost}
+        {...previewProps(null)}
+      />
       {/* the defender's own Sudo waits in its OWN place until a defence is
           chosen for it — the arrow says what it is aimed at */}
-      <div className={opening.sudoSlot} data-centre-slot="sudo" ref={anchors.sudo} />
+      <div
+        className={opening.sudoSlot}
+        data-centre-slot="sudo"
+        ref={anchors.sudo}
+        {...previewProps(null)}
+      />
       {/* the defence covering the attack — offset and tilted the other way */}
-      <div className={opening.coverSlot} data-centre-slot="cover" ref={anchors.cover} />
+      <div
+        className={opening.coverSlot}
+        data-centre-slot="cover"
+        ref={anchors.cover}
+        {...previewProps(null)}
+      />
 
       {/* the attack slot — where cards stand while the table is looking at them:
           the player's own cards gather here during the opening, and every drawn
@@ -503,6 +529,9 @@ export default function Board({
         data-board-centre
         data-centre-slot="attack"
         ref={anchors.centre}
+        {...previewProps(
+          state.pending?.kind === 'defend' ? cardById(state.pending.attackCard) : null,
+        )}
       >
         {intro &&
           deal.staged.map((s) => {
@@ -805,6 +834,7 @@ export default function Board({
       {deal.overlays}
       {beats.overlays}
       {staging.overlay}
+      {previewOverlay}
 
       {/* the pair flyer — a persistent node (I10: position: fixed against the
           viewport, no containing block above it, same as every other flight

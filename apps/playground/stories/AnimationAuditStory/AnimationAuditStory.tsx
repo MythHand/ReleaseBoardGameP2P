@@ -411,8 +411,8 @@ const MODULES: Module[] = [
       en: 'Reading a card that stands ON THE TABLE — the one at the centre: a 503 out of the deck, an AI effect, somebody else’s attack. The preview shows at ONE fixed place on the right, never at the cursor: a place the player learns, and one that cannot cover the centre where the game happens. Size — the hand’s hover zoom at its largest, plus 15% and minus 10%. Bound to a SLOT rather than to "the card at the centre": Defense Release has five of them and each reads on its own. ONE rule closes it — the pointer moved somewhere that is neither a readable slot nor the preview. Two needed behaviours fall out of that rule by themselves: the card flies to the discard while being read (its slot unmounts under a still cursor, no mouseleave is fired — the preview stays until the hand moves, DELIBERATELY the opposite of the hand’s zoom, which must leave with its card), and the pointer resting on the preview (it stays, or a preview over the discard would flicker). Face-down shows nothing: somebody else’s closed card has no identity in the projection either. The only delay is on LEAVING a slot (90ms): slots stand a few px apart and without it the preview would blink when crossing to the neighbouring card. There is deliberately no blind period — one would stop the centre answering when you move onto another card there.',
     },
     where: {
-      ru: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease',
-      en: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease',
+      ru: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease, Board',
+      en: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease, Board',
     },
     status: 'ok',
   },

@@ -89,6 +89,7 @@ export default function Card({
     <div
       className={`${styles.root} ${canInteract ? styles.interactive : ''}`}
       data-state={state}
+      data-card={card?.id}
       style={
         {
           '--accent': accent,
