@@ -42,13 +42,22 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 //               under the window (caption says so), or someone else's decision
 //               (their name in the key's slot). Reaction accent, live ring, no
 //               key: everything a key could offer is illegal right now.
-export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction' | 'hold'
+//  - 'cost'     my own release is standing and its price is unpaid. Named
+//               apart from 'reaction' because it is not a reaction to anything
+//               (#101): the cards on the table answer it, and PASS — the only
+//               key 'reaction' would show — rejects outright while any
+//               decision is open. Carries the loss accent, the same hue the
+//               eligible cards in the fan light with.
+export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction' | 'hold' | 'cost'
 
 export interface TurnDockCopy {
   yourTurn: string
   turnOf: string
   reaction: string
   reactionDanger: string
+  // 'cost' — your own release stands unpaid; the phase word and its caption
+  cost: string
+  payCost: string
   draw: string
   push: string
   pass: string
@@ -89,12 +98,17 @@ const PHASE_KEY: Record<TurnDockState, keyof TurnDockCopy> = {
   waiting: 'turnOf',
   reaction: 'reaction',
   hold: 'reaction',
+  cost: 'cost',
 }
 
 function accentFor(state: TurnDockState, danger: boolean): string {
   if (state === 'reaction' || state === 'hold') {
     return danger ? 'var(--danger-accent)' : 'var(--reaction-accent)'
   }
+  // paying a release's price costs you a card — the token's own meaning
+  // (tokens.css: "a pick that COSTS you a card"), and the same hue the fan
+  // lights the eligible cards with, so dock and cards read as one ask.
+  if (state === 'cost') return 'var(--danger-accent)'
   if (state === 'waiting') return 'var(--idle-accent)'
   return 'var(--turn-accent)'
 }
@@ -124,9 +138,11 @@ export default function TurnDock({
       ? copy.locked
       : state === 'reaction'
         ? copy.canDefend
-        : state === 'hold' && !activePlayer
-          ? copy.underAttack
-          : null
+        : state === 'cost'
+          ? copy.payCost
+          : state === 'hold' && !activePlayer
+            ? copy.underAttack
+            : null
 
   // key/label states share one Button frame (draw / push / reaction); 'waiting'
   // shows the active player's name instead.
@@ -157,9 +173,15 @@ export default function TurnDock({
   const idleRing = state === 'waiting'
 
   // widest known value per text slot — reserves a fixed box (no reflow)
-  const phaseSizer = longest(copy.yourTurn, copy.turnOf, copy.reaction, copy.reactionDanger)
+  const phaseSizer = longest(
+    copy.yourTurn,
+    copy.turnOf,
+    copy.reaction,
+    copy.reactionDanger,
+    copy.cost,
+  )
   const labelSizer = longest(copy.draw, copy.push, copy.pass)
-  const captionSizer = longest(copy.locked, copy.canDefend, copy.underAttack)
+  const captionSizer = longest(copy.locked, copy.canDefend, copy.underAttack, copy.payCost)
 
   return (
     <HudSurface accent={accent} className={`${styles.dock} ${paused ? styles.paused : ''}`}>

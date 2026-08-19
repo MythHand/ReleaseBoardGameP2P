@@ -11,14 +11,16 @@ import styles from './TurnDockBlock.module.css'
 type Copy = typeof enCommon.turnDock
 
 // per-phase clock length (s); danger reaction runs the shorter 10s window.
-// `hold` exists only to keep this Record total over TurnDockState — the
-// showcase does not demo it.
+// `hold` and `cost` exist only to keep this Record total over TurnDockState —
+// the showcase does not demo either (both are untimed: `cost` carries no
+// deadline at all, so its ring is flat).
 const TOTAL: Record<TurnDockState, number> = {
   draw: 30,
   push: 30,
   waiting: 25,
   reaction: 15,
   hold: 15,
+  cost: 0,
 }
 
 interface Step {

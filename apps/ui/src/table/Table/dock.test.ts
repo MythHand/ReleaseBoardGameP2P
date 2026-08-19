@@ -55,6 +55,31 @@ it('is a danger reaction while a defence is pending against you', () => {
   expect(d.danger).toBe(true)
 })
 
+// #101 (Fix B, Defect 4): every pending owed to you used to read as `reaction`
+// — the phase word "reaction", the caption "you can defend", and an amber PASS
+// key the engine refuses outright while any decision is open (`window.ts`'s
+// `onPass`). A release's own cost is not a reaction to anything: it is the
+// price of the card you just played, and the cards on the table are what
+// answer it. It gets its own phase, with no key.
+it('names the release’s own cost rather than a reaction', () => {
+  const pending: TablePending = {
+    kind: 'discardForRelease',
+    player: 'you',
+    release: 'release-frontend#0',
+    options: ['c1'],
+  }
+  const d = deriveDock({ ...base, turn: 'you', hasDrawn: true, pending }, 'you', 0)
+  expect(d.state).toBe('cost')
+  expect(d.danger).toBe(false)
+  // untimed by the engine — a flat ring, not a countdown stuck at zero
+  expect(d.seconds).toBeUndefined()
+})
+
+it('leaves every other pending owed to you a reaction', () => {
+  const d = deriveDock({ ...base, turn: 'p2', pending: defendPending }, 'you', 0)
+  expect(d.state).toBe('reaction')
+})
+
 it('sweeps the ring across the window’s own span, not a constant', () => {
   const window: TableWindow = {
     player: 'p2',

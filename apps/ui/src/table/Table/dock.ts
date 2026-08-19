@@ -56,10 +56,17 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
   const pending = state.pending
 
   // A pending owed by you outranks everything — the engine is waiting on your
-  // decision. The PendingPrompt carries the choice; the dock narrates the
-  // phase and counts its clock down.
+  // decision. The choice itself lives on the table or in the PendingPrompt;
+  // the dock narrates the phase and counts its clock down.
   if (pending && pending.player === selfId) {
     const timed = 'deadline' in pending ? pending : undefined
+    // A release's own price is not a reaction to anything (#101): it is what
+    // the card you just played costs, the cards on the table answer it, and
+    // the PASS key `reaction` would show rejects outright while any decision
+    // is open (`window.ts`'s `onPass`). Its own phase — named, with no key.
+    if (pending.kind === 'discardForRelease') {
+      return { state: 'cost', danger: false, ...clock(timed?.openedAt, timed?.deadline, now) }
+    }
     return {
       state: 'reaction',
       danger: pending.kind === 'defend' || pending.kind === 'neutralize503',
