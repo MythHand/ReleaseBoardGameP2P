@@ -81,6 +81,8 @@ function harness() {
   const anchors = {
     hand: { current: node() },
     centre: { current: centre },
+    stage: { current: node() },
+    cost: { current: node() },
     discardBox: { current: node() },
     pileBox: () => null,
     seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
@@ -236,6 +238,64 @@ it('folds an opponent’s Code Review combo in and flies it to their slot', asyn
   }
   await drive(() => api.beat?.runRelease(plan, ctx))
   expect(played.names.filter((n) => n === 'foldIntoPair')).toHaveLength(2)
+  expect(played.names).toContain('playToReleaseZone')
+})
+
+// The cost leg (#101, Task 11): by the rules a release costs one card, and
+// the cost is shown to the table in the open before it goes. `player: 'p2'`
+// here (not the local `ctx.base.selfId`, 'p1') — a remote player's cost, so
+// this beat's own flyer carries it in from their seat, holds it, and only
+// then does it leave through the shared discard exit.
+it('shows the cost open, sends it to the discard, then lands the release', async () => {
+  played.names = []
+  exits.items = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const plan: Extract<BeatPlan, { kind: 'releasePlaced' }> = {
+    kind: 'releasePlaced',
+    key: 'release:7',
+    eventId: 7,
+    player: 'p2',
+    slot: 'frontend',
+    card: 'release-frontend',
+    cost: { eventId: 6, card: 'attack-bug' },
+  }
+  await drive(() => api.beat?.runRelease(plan, ctx))
+  // the cost left through the shared discard exit, on its own event's scatter
+  expect(exits.items).toHaveLength(1)
+  expect(exits.items[0]).toMatchObject({
+    key: 'c6',
+    card: expect.objectContaining({ id: 'attack-bug' }),
+    scatter: scatterAt(6),
+  })
+  // and the release landed with the snap every release lands with
+  expect(played.names).toContain('playToReleaseZone')
+  // the cost is shown BEFORE the release moves: the discard exit is recorded
+  // ahead of the zone flight
+  expect(played.names.indexOf('centerToDiscard')).toBeLessThan(
+    played.names.indexOf('playToReleaseZone'),
+  )
+})
+
+it('lands a release with no cost without an exit', async () => {
+  played.names = []
+  exits.items = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.runRelease(
+      {
+        kind: 'releasePlaced',
+        key: 'release:7',
+        eventId: 7,
+        player: 'p2',
+        slot: 'frontend',
+        card: 'release-frontend',
+      },
+      ctx,
+    ),
+  )
+  expect(exits.items).toHaveLength(0)
   expect(played.names).toContain('playToReleaseZone')
 })
 

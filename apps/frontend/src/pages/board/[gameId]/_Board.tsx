@@ -206,6 +206,12 @@ export default function Board({
   // queue needs at this point; the layout effect that keeps `.current` current
   // runs after every hook regardless of where it sits in the function.
   const handoffRef = useRef<StagedHandoff | null>(null)
+  // The same seam's second fact (#101, Task 11): a stable ref to
+  // `useBoardStaging`'s own `clearPaidCost`, for the same reason `handoffRef`
+  // above is a ref rather than a direct value — declared here, ahead of
+  // `useBeats`, kept current by the layout effect further down once `staging`
+  // exists to read it FROM.
+  const clearPaidCostRef = useRef<(() => void) | null>(null)
   // One queue, for everything that moves. The opening goes in as beat zero and
   // the wire's own beats queue behind it — one place that decides what plays,
   // in what order, and whether it plays at all under prefers-reduced-motion.
@@ -221,6 +227,7 @@ export default function Board({
     enabled: introOver || intro == null,
     intro: deal.beat,
     staging: handoffRef,
+    clearPaidCost: clearPaidCostRef,
   })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined
@@ -369,6 +376,16 @@ export default function Board({
           }
         : null
   }, [staging.staged, staging.pairRef, staging.release])
+
+  // The same seam's second fact (#101, Task 11): `clearPaidCostRef` kept
+  // current the same way `handoffRef` above is. `staging.clearPaidCost` is
+  // stable for the life of the mount (a `useCallback` with no deps), so this
+  // effect fires once and never again in practice — it exists for the same
+  // structural reason `handoffRef`'s does, not because the value actually
+  // changes.
+  useLayoutEffect(() => {
+    clearPaidCostRef.current = staging.clearPaidCost
+  }, [staging.clearPaidCost])
 
   // Escape skips the opening. Same window binding and the same reason as the
   // cancel above; `finish` is idempotent, so a second press is a no-op.
@@ -587,7 +604,9 @@ export default function Board({
         {...previewProps(staging.paidCost?.card ?? null)}
       >
         {/* the card that paid the release's cost — held open here, not
-            discarded on the spot, until a later task flies it on */}
+            discarded on the spot, until the combo beat's own cost leg flies it
+            on and clears `paidCost` in the same commit (#101, Task 11:
+            comboBeat.tsx's `runRelease`) */}
         {staging.paidCost && <Card card={staging.paidCost.card} interactive={false} width="100%" />}
       </div>
       {/* the defender's own Sudo waits in its OWN place until a defence is

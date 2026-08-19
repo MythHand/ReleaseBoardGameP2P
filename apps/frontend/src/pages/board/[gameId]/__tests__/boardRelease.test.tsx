@@ -320,3 +320,41 @@ it('the standing release stays visible while its own cost is still flying to pay
   expect(stage.querySelector('[data-card]')).toBeTruthy()
   animateSpy.mockRestore()
 })
+
+// Reduced motion's own safety net (#101, Task 11): `useBeats.ts` never runs a
+// beat at all under reduced motion, so the combo beat's own clear of
+// `paidCost` (comboBeat.tsx's `runRelease`) never fires either — without
+// `_useBoardStaging.ts`'s own reduced-motion effect, the paid cost would
+// stand at its slot for the rest of the match, the exact permanent-artifact
+// defect Task 8's review caught, recurring on the one path that fix cannot
+// reach. Driven entirely through props (this suite's own convention, not a
+// simulated engine round trip): paying the cost sets it, and the SAME
+// rerender that clears the pending is what a real referee's answer would
+// look like arriving.
+it('reduced motion clears the paid cost once the pending resolves, with no beat to do it', async () => {
+  const mm = vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query: string) =>
+      ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  )
+  const { rerender } = render(releaseBoard({}, {}))
+  await pullCardFromFan('release-frontend#0')
+  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  await clickFanCard('attack-bug#0')
+  const cost = document.querySelector('[data-centre-slot="cost"]') as HTMLElement
+  expect(cost.querySelector('[data-card="attack-bug"]')).toBeTruthy() // shown, same as always
+
+  // the referee's answer: the cost pending is gone, the release now stands
+  // settled — no beat ever ran to clear `paidCost` for us
+  rerender(releaseBoard({}, {}))
+  expect(cost.querySelector('[data-card]')).toBeNull()
+  mm.mockRestore()
+})

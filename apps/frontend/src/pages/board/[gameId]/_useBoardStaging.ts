@@ -108,8 +108,14 @@ export interface BoardStaging {
    * still flying it there */
   stageLanded: boolean
   /** the card that paid a staged release's cost, once its own flight has
-   * landed — held open beside the release until a later task moves it on */
+   * landed — held open beside the release until `clearPaidCost` below moves
+   * it on (the combo beat's own job, #101 Task 11) */
   paidCost: { uid: string; card: CardData } | null
+  /** the combo beat's own clear of `paidCost` (#101, Task 11), called once
+   * its own discard-exit flight takes the cost over — see comboBeat.tsx's
+   * `runRelease`. Also fired here directly under reduced motion, where no
+   * beat ever runs to call it (see the effect below). */
+  clearPaidCost: () => void
   /** true while a CANCELLED release's own return flight is airborne (Task 9,
    * fix round 1) — `_Board.tsx`'s static stage-slot render must hide for this
    * span too, alongside `stageLanded`, or the return flight and the static
@@ -509,8 +515,10 @@ export function useBoardStaging({
   // rules a release costs a card, and the cost is shown to the table rather
   // than vanishing into the discard on its way past. `_Board.tsx` owns the
   // static render of it (`paidCost`, set below the moment this flight lands) —
-  // a later task flies it on to the discard once the release itself settles;
-  // it will measure the slot, not adopt this flyer.
+  // the combo beat flies it on to the discard once the release itself settles
+  // (#101, Task 11: comboBeat.tsx's `runRelease`), measuring the slot rather
+  // than adopting this flyer (this hook's own flyer is gone by then anyway —
+  // `drop('cost')` two lines below).
   const onCostPick = useCallback(
     (uid: string) => {
       if (!enabled || !costOptions.includes(uid)) return
@@ -752,6 +760,23 @@ export function useBoardStaging({
     }
   }, [state.pending, state.selfId])
 
+  // Reduced motion's own safety net for `paidCost` (#101, Task 11): the
+  // ordinary clear is the combo beat's own, timed against its discard-exit
+  // flight (comboBeat.tsx's `runRelease`) — but `useBeats.ts` never runs a
+  // beat at all under reduced motion, so that clear never fires either, and
+  // without this `paidCost` would stand at the cost slot for the rest of the
+  // match: the exact permanent-artifact defect Task 8's review caught,
+  // recurring on the one path that fix cannot reach. There is no hold to time
+  // this against under reduced motion — nothing here holds for anything, the
+  // static render is the whole story — so the moment the pending that asked
+  // for this cost resolves is the moment it is safe to drop it. A harmless
+  // no-op the rest of the time: `cost` is null before any release is ever
+  // played, and this never runs at all once `reduced` is false.
+  useEffect(() => {
+    if (!reduced || cost) return
+    setPaidCost(null)
+  }, [reduced, cost])
+
   // the engine said no: the staged play returns to the fan. ATTACK's own
   // rejection carries both halves (`card` the main, `combo` the support), so
   // either naming ours is enough. Scoped to what arrived AFTER this dispatch
@@ -789,6 +814,14 @@ export function useBoardStaging({
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const release = useCallback(() => commitStaged(null), [])
 
+  // the combo beat's own clear of `paidCost` (#101, Task 11) — same shape as
+  // `release` above (no flight, just done), but a DIFFERENT piece of state:
+  // `staged`'s lifecycle ends the instant the pending echoes back (long
+  // before the cost is even paid, for a solo release — see the catch-up
+  // effect above), while `paidCost` outlives it on purpose, so it needs its
+  // own clear rather than a ride on `release()`'s.
+  const clearPaidCost = useCallback(() => setPaidCost(null), [])
+
   return {
     staged,
     dispatched: staged?.phase === 'dispatched',
@@ -809,6 +842,7 @@ export function useBoardStaging({
     onCostPick,
     stageLanded,
     paidCost,
+    clearPaidCost,
     releaseReturning,
   }
 }

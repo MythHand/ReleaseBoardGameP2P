@@ -7,10 +7,16 @@ import {
   scatterAt,
   useDiscardExit,
   useFlyer,
+  wait,
 } from '@release/ui/animations'
 import type { RefObject } from 'react'
 import { useCallback, useRef } from 'react'
-import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
+import {
+  type BeatRun,
+  type BoardAnchors,
+  SHOW_HOLD,
+  type StagedHandoff,
+} from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
 
 // The event-driven half of the combo pair (#100): an `attacked`/`released`
@@ -30,11 +36,24 @@ const rectOf = (el: Element | null): Rect | null => {
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
-export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHandoff | null>) {
+export function useComboBeat(
+  anchors: BoardAnchors,
+  staging?: RefObject<StagedHandoff | null>,
+  // The staging → beat seam, reused for a second fact (#101, Task 11): a
+  // stable ref to `_useBoardStaging.ts`'s own `clearPaidCost`, kept current by
+  // `_Board.tsx` the same way `staging` above is — a ref because its IDENTITY
+  // is all this hook needs at construction time (`_Board.tsx` builds it before
+  // `useBoardStaging` even runs), and a ref rather than folding it INTO
+  // `StagedHandoff` because the two clear different state on different
+  // lifecycles: `StagedHandoff` goes null the instant a dispatch's own staged
+  // node is spoken for (often well before the cost is even paid), while
+  // `paidCost` outlives that and needs its own, independently-timed clear.
+  clearPaidCost?: RefObject<(() => void) | null>,
+) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
-  const latest = useRef({ anchors, staging, send })
-  latest.current = { anchors, staging, send }
+  const latest = useRef({ anchors, staging, send, clearPaidCost })
+  latest.current = { anchors, staging, send, clearPaidCost }
 
   // The full fold: raise a carrier at the centre, paint both halves standing
   // at the source, fold them into the pair's pose. The aux is the same
@@ -143,10 +162,70 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
   // BEFORE `nextFrames()` — same race, same fix, as `runAttack` above; only
   // the CAPTURE has to happen early, since `handoff` here is a local holding
   // the object reference, not a second read of the ref.
+  //
+  // THE COST leg (#101, Task 11) sits right after that capture, ahead of
+  // `nextFrames()` and everything that follows — not, as an earlier draft of
+  // this had it, ahead of the capture itself. `handoff` must be read
+  // synchronously, before this beat's first `await`, to win the exact race
+  // the comment above describes; the cost leg below holds for real spans (up
+  // to `SHOW_HOLD`, ~1.2s) across several `await`s of its own; a combo
+  // release ALSO carries a cost (the rules charge one regardless of a Code
+  // Review combo), so for that path `handoff` would already have been raced
+  // away by the time those awaits let go, and the actor's own standing pair
+  // would blink out from under `foldIn`'s own re-entry. Capturing first and
+  // spending the cost leg's time AFTER keeps the exact same protection this
+  // function already had.
   const runRelease = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'releasePlaced' }>, ctx: BeatRun) => {
       const { staging: s } = latest.current
       const handoff = s?.current
+
+      // THE COST — by the rules a release costs one card, and the cost is
+      // shown to the table in the open before it goes. The actor's own is
+      // already standing at the cost slot (the staging gesture put it there
+      // and left it, Task 8) — for everyone else it arrives from the seat
+      // now, holds, and then leaves. Either way it leaves through the shared
+      // discard exit, on its own `discarded` event's scatter (I7).
+      if (plan.cost) {
+        const a = latest.current.anchors
+        const costBox = rectOf(a.cost.current)
+        const costCard = cardById(plan.cost.card)
+        if (costBox && costCard) {
+          if (plan.player !== ctx.base.selfId) {
+            const from = a.seatBox(plan.player)
+            if (from) {
+              const [el] = await flyer.raise([{ key: 'cost', at: from, card: costCard }])
+              if (el) await play('playToCenter', el, { from, to: costBox })?.finished
+            }
+          }
+          await wait(SHOW_HOLD)
+          // Whatever was standing at the cost slot — the actor's static
+          // `paidCost` render, or (a remote player) this beat's own 'cost'
+          // flyer, motionless at `costBox` since its own `playToCenter`
+          // landed — and this exit's own flyer swap in the SAME commit:
+          // `clearPaidCost`, `drop('cost')` and `send`'s own `setFlights`
+          // (useDiscardExit.tsx) all run before any of them awaits anything,
+          // so React batches them into one render. Order matters for the
+          // remote path specifically — dropping the 'cost' flyer AFTER
+          // `send()` resolves would leave a stationary, identical copy of the
+          // card sitting at the slot for the whole ~420ms `centerToDiscard`
+          // flight, doubled against the one actually travelling to the
+          // discard. Each call is a no-op for the path that does not apply —
+          // `clearPaidCost` for a remote player's cost, `drop('cost')` for
+          // the actor's (nothing was ever raised under that key).
+          latest.current.clearPaidCost?.current?.()
+          flyer.drop('cost')
+          await latest.current.send([
+            {
+              key: `c${plan.cost.eventId}`,
+              card: costCard,
+              from: costBox,
+              scatter: scatterAt(plan.cost.eventId),
+            },
+          ])
+        }
+      }
+
       await nextFrames()
       const { anchors: a } = latest.current
       const cRect = rectOf(a.centre.current)
@@ -165,7 +244,7 @@ export function useComboBeat(anchors: BoardAnchors, staging?: RefObject<StagedHa
       if (el) await play('playToReleaseZone', el, { from: cRect, to: toRect })?.finished
       flyer.drop('fold')
     },
-    [foldIn, flyer.drop],
+    [foldIn, flyer.drop, flyer.raise],
   )
 
   // pairToDiscard: the pending pair at the centre splits into two singles.

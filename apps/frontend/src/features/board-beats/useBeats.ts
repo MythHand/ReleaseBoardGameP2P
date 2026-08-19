@@ -97,8 +97,12 @@ export function useBeats(args: {
   // the start of `attackPlaced`/`releasePlaced` and cleared through its own
   // `release()` when that play turns out to be the local actor's.
   staging?: RefObject<StagedHandoff | null>
+  // The same seam's second fact (#101, Task 11): a stable ref to
+  // `_useBoardStaging.ts`'s own `clearPaidCost`, called once `releasePlaced`'s
+  // own cost leg hands the paid card to the discard exit.
+  clearPaidCost?: RefObject<(() => void) | null>
 }): Beats {
-  const { live, events, anchors, enabled, intro, staging } = args
+  const { live, events, anchors, enabled, intro, staging, clearPaidCost } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
   // The same answer as `running`, but ahead of it: `drain()` sets this
@@ -120,7 +124,7 @@ export function useBeats(args: {
   const discards = useDiscardBeat(anchors)
   const draws = useDrawBeat(anchors)
   const decks = useDeckBeat(anchors)
-  const combo = useComboBeat(anchors, staging)
+  const combo = useComboBeat(anchors, staging, clearPaidCost)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
