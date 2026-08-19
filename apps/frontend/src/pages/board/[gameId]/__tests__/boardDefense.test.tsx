@@ -327,11 +327,20 @@ it('takes the decline away once a defence has already answered', async () => {
 })
 
 // A waiting Sudo has dispatched NOTHING, so declining there is still legal —
-// and it already works: the partner-phase mousedown listener sends the Sudo
-// home on the same press that fires the decline. Keeping it is the same
-// "offered where it is legal" rule as the test above, read the other way, and
-// this pins that the L1 gate did not overreach into the phase before dispatch.
-it('keeps the decline while the Sudo is still only waiting', async () => {
+// which is why the L1 gate (the test above) excludes `phase: 'partner'` rather
+// than every staged state. What makes that safe rather than merely legal is an
+// ORDERING: the partner-phase `mousedown` listener in `_Board.tsx` sends the
+// Sudo home on the very press that goes on to fire this button's `onClick`, so
+// one press both retracts the Sudo and lets the attack through — the card is
+// never stranded on the table.
+//
+// Fix round 2: this test used to call `fireEvent.click` alone and assert only
+// the dispatch. `fireEvent.click` dispatches NO `mousedown`, so the listener
+// this comment rests on never ran — the comment claimed a mechanism the test
+// never fired, and the ordering was held up by code review alone. The real
+// press sequence is fired now (down → up → click, the browser's own order),
+// and the Sudo's return is asserted, so breaking either half goes red.
+it('takes the waiting Sudo home on the same press that declines', async () => {
   const onResolve = vi.fn()
   render(
     defenceBoard(
@@ -340,8 +349,25 @@ it('keeps the decline while the Sudo is still only waiting', async () => {
     ),
   )
   await pullFromFan('support-sudo#0')
-  fireEvent.click(screen.getByTestId('board-decline'))
+  // proves the pull actually did something — without it, a Sudo that never
+  // left the fan would satisfy the return assertion below just as well
+  expect(fanUids()).not.toContain('support-sudo#0')
+
+  const decline = screen.getByTestId('board-decline')
+  fireEvent.mouseDown(decline, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(decline, { clientX: 0, clientY: 0 })
+  fireEvent.click(decline)
+
+  // the attack is let through…
   expect(onResolve).toHaveBeenCalledWith({ kind: 'defend', card: null })
+  // …and the Sudo is not left standing: the same press started its return
+  // flight home (waited out, as `a press on nothing valid` does)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  expect(fanUids()).toContain('support-sudo#0')
+  const sudoSlot = document.querySelector('[data-centre-slot="sudo"]') as HTMLElement
+  expect(sudoSlot.querySelector('[data-card]')).toBeNull()
 })
 
 // Fix B (#101), Defect 2 — `_Board.tsx` passed `accentAt` and never `stateAt`,
