@@ -14,10 +14,12 @@
 import type { Event } from '@release/engine'
 import type { CardData, TableActions } from '@release/ui'
 import { cardById } from '@release/ui'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
+import { useBoardAnchors } from '~/entities/game/board'
 import Board from '../_Board'
+import { useDefenseStaging } from '../_useDefenseStaging'
 import { makeBoardProps } from './fixture'
 
 // biome-ignore lint/style/noNonNullAssertion: a known catalogue entry
@@ -285,6 +287,63 @@ it('says what the attack is waiting for', () => {
   expect(ask.textContent).toContain(copy.table.askDefend)
 })
 
+// Fix B, fix round 1 (M1): the ask was gated on `answering` alone, so a Sudo
+// standing at its own slot still read "pull one out of the hand" — while the
+// only gesture that answers there is a CLICK, and a pull is refused outright
+// (`resolveLegal`/`resolveSudo` both bail on `stagedRef.current`, so the card
+// flops straight back into the fan). That is the exact failure Defect 3 was
+// written to prevent, one step further in, and this round is what newly lights
+// that state. It gets its own words rather than silence: the step is waiting
+// on the fan, and a waiting step that says nothing is Defect 3 itself.
+it('names the click, not the pull, once the Sudo stands waiting', async () => {
+  const { copy } = makeBoardProps()
+  render(
+    defenceBoard({
+      options: ['defense-hotfix#0'],
+      combos: { 'support-sudo#0': ['defense-hotfix#0'] },
+    }),
+  )
+  await pullFromFan('support-sudo#0')
+  const ask = screen.getByTestId('board-ask')
+  expect(ask.getAttribute('data-shown')).toBe('true')
+  expect(ask.textContent).toContain(copy.table.askPartner)
+  // the pull instruction is gone — naming it here names the one gesture that
+  // does nothing
+  expect(ask.textContent).not.toContain(copy.table.askDefend)
+})
+
+// Fix B, fix round 1 (L1): the decline was gated on `answering` alone too, so
+// it stayed live between a defence's dispatch and the projection clearing the
+// pending — a second RESOLVE the engine silently rejects. The codebase's own
+// standard is `dock.ts`'s: "a key is only ever offered where the action behind
+// it is legal RIGHT NOW", the same standard that stripped the dead PASS key.
+it('takes the decline away once a defence has already answered', async () => {
+  render(defenceBoard({ options: ['defense-hotfix#0'] }))
+  expect(screen.getByTestId('board-decline')).toBeTruthy()
+  await pullCardFromFan('defense-hotfix#0')
+  expect(screen.queryByTestId('board-decline')).toBeNull()
+  // …and the ask goes quiet with it: the decision is no longer ours to make
+  expect(screen.getByTestId('board-ask').getAttribute('data-shown')).toBe('false')
+})
+
+// A waiting Sudo has dispatched NOTHING, so declining there is still legal —
+// and it already works: the partner-phase mousedown listener sends the Sudo
+// home on the same press that fires the decline. Keeping it is the same
+// "offered where it is legal" rule as the test above, read the other way, and
+// this pins that the L1 gate did not overreach into the phase before dispatch.
+it('keeps the decline while the Sudo is still only waiting', async () => {
+  const onResolve = vi.fn()
+  render(
+    defenceBoard(
+      { options: ['defense-hotfix#0'], combos: { 'support-sudo#0': ['defense-hotfix#0'] } },
+      { onResolve },
+    ),
+  )
+  await pullFromFan('support-sudo#0')
+  fireEvent.click(screen.getByTestId('board-decline'))
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'defend', card: null })
+})
+
 // Fix B (#101), Defect 2 — `_Board.tsx` passed `accentAt` and never `stateAt`,
 // and both `accentAt` implementations answer only for a combo partner, so the
 // fan could not light for a defend at all. `defenceOptions` was computed by
@@ -310,6 +369,54 @@ it('leaves the Sudo dark when the projection offers it nothing to enhance', () =
   render(defenceBoard({ options: ['defense-hotfix#0'] }))
   expect(litState('defense-hotfix#0')).toBe('playable')
   expect(litState('support-sudo#0')).toBe('idle')
+})
+
+// Fix B, fix round 1 (L2): `stateAt` decided what to light from the pending
+// alone, while every path that ACCEPTS an answer (`resolveLegal`,
+// `resolveSudo`) additionally requires `enabled` — false while the opening
+// owns the table. In that window (a rejoin replaying the opening into a
+// pending already owed to you) the fan glowed on cards the hook would refuse,
+// which is the exact "lit with nothing that answers it" reading this round
+// exists to end.
+//
+// Driven through the hook rather than <Board>, on purpose: the only producer
+// of `enabled === false` is the opening beat, whose harness is the suite's one
+// known-flaky file (a real 9-second setTimeout). `renderHook` is an
+// established pattern here (features/hand-order, features/game-intro), and it
+// pins the gate itself instead of the machinery that happens to set it.
+function defenceStateAt(enabled: boolean): (i: number) => string {
+  const base = makeBoardProps()
+  const { result } = renderHook(() =>
+    useDefenseStaging({
+      state: {
+        ...base.state,
+        you: { ...base.state.you, hand: HAND },
+        playable: [],
+        pending: {
+          kind: 'defend',
+          player: base.state.selfId,
+          attacker: 'p2',
+          attackCard: 'attack-bug',
+          sudo: false,
+          options: ['defense-hotfix#0'],
+          openedAt: 0,
+          deadline: 15_000,
+          scope: 'release',
+        },
+      },
+      anchors: useBoardAnchors(),
+      events: [],
+      enabled,
+    }),
+  )
+  return (i: number) => result.current.stateAt(i)
+}
+
+it('lights nothing the opening would refuse', () => {
+  // the same hand, the same pending — only the gate differs, so a green here
+  // cannot come from the fixture being unlit in the first place
+  expect(defenceStateAt(true)(0)).toBe('playable')
+  expect(defenceStateAt(false)(0)).toBe('idle')
 })
 
 // Fix B (#101), Defect 5 — the hue says what kind of card is aiming. The

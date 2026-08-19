@@ -444,10 +444,15 @@ export function useBoardStaging({
     (index: number): HandCardState => {
       const item = handItems[index]
       if (!item) return 'idle'
+      // The same gate `onCostPick` opens with: while the opening owns the
+      // table the click is refused, so the card must not look clickable.
+      // Reachable on a rejoin that replays the opening into a pending already
+      // owed to us (fix round 1, L2).
+      if (!enabled) return 'idle'
       if (costOptions.length > 0) return costOptions.includes(item.uid) ? 'playable' : 'idle'
       return accentAt(index) ? 'selected' : 'idle'
     },
-    [handItems, costOptions, accentAt],
+    [enabled, handItems, costOptions, accentAt],
   )
 
   // GESTURE — pulling a card out of the fan puts it on the table. A card with

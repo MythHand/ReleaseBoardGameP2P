@@ -621,7 +621,30 @@ export default function Board({
   // them out of the hand", and a pull is impossible here — the engine returns
   // no playable cards while a pending is open, so the pull finds no target
   // and the card flops back into the fan. On the board the cost is a click.
-  const ask = answering ? copy.table.askDefend : costPending ? copy.table.askCost : null
+  //
+  // A defend is not ONE step, which the first cut of this missed (fix round 1,
+  // M1): a Sudo standing at its own slot is answered by CLICKING the defence
+  // it will enhance, and a pull there is refused outright (`resolveLegal` and
+  // `resolveSudo` both bail while anything is staged). So the phase picks the
+  // words — same discipline as not porting the scene's cost line, applied to
+  // a state this round is what newly lights. Silence was the other option and
+  // is the wrong one: a step waiting on the fan with nothing saying so is
+  // Defect 3 itself, one level in.
+  //
+  // `undefined` here means we are not answering at all; `null` means we are
+  // and nothing is staged yet.
+  const defencePhase = answering ? (defenseStaging.staged?.phase ?? null) : undefined
+  // Still ours to decide. A dispatched defence (or one in the instant between
+  // a rejection and its return flight) has already answered, so nothing is
+  // being asked and nothing may be offered — the standard `dock.ts` states for
+  // its own keys: offered only where the action behind it is legal RIGHT NOW.
+  const unanswered = answering && defencePhase !== 'dispatched' && defencePhase !== 'rejected'
+  let ask: string | null = null
+  if (unanswered) {
+    ask = defencePhase === 'partner' ? copy.table.askPartner : copy.table.askDefend
+  } else if (costPending) {
+    ask = copy.table.askCost
+  }
   // The line keeps the words it faded IN with while it fades back OUT — an
   // empty pill mid-fade reads as a flicker. Written during render on purpose:
   // it is a pure carry-forward of this render's own value, so a StrictMode
@@ -633,6 +656,14 @@ export default function Board({
   // thing `PendingPrompt` did for a `defend` that the fan does not do, so it
   // is the only thing that outlived it here. A real button, so it is the one
   // affordance in this exchange a keyboard can reach.
+  //
+  // Offered exactly while `unanswered` (fix round 1, L1) — the panel had no
+  // such gate and neither did the first cut of this, so between a defence's
+  // dispatch and the projection clearing the pending it could fire a second
+  // RESOLVE onto a decision that is already closing. A waiting Sudo is NOT
+  // excluded: nothing has been dispatched there, so declining is legal, and
+  // it already does the right thing — the partner-phase mousedown listener
+  // above sends the Sudo home on the very press that fires this.
   const declineAttack = () => actions?.onResolve?.({ kind: 'defend', card: null })
 
   const isHost = role === 'host'
@@ -1094,11 +1125,14 @@ export default function Board({
         )}
 
       {/* what the table is waiting for, under the cards it is waiting on.
-          Always mounted, so it can fade OUT as well as in — `inert` while it
-          says nothing, so the decline inside it never takes a click or a Tab
-          stop the player cannot see. Under prefers-reduced-motion the module
-          CSS drops the transition and it simply appears; there is no `play()`
-          here to gate. */}
+          Always mounted, so it can fade OUT as well as in — and `inert` while
+          it says nothing, which keeps the fading-out line out of the
+          accessibility tree rather than guarding the decline: the decline
+          renders only under `unanswered`, and `unanswered` implies the line
+          says something, so there is never a button inside to protect (fix
+          round 1, L4 — the first version of this comment claimed otherwise).
+          Under prefers-reduced-motion the module CSS drops the transition and
+          it simply appears; there is no `play()` here to gate. */}
       <div
         className={opening.ask}
         data-shown={ask != null}
@@ -1108,7 +1142,7 @@ export default function Board({
         <Typography as="div" base="label-sm" tk="tk-16" className={opening.askLine}>
           {lastAsk.current}
         </Typography>
-        {answering && (
+        {unanswered && (
           <Button
             variant="tech"
             className={opening.askDecline}

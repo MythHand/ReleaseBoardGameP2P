@@ -7,9 +7,11 @@
 
 import type { CardData, TableActions, TablePending } from '@release/ui'
 import { cardById } from '@release/ui'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
+import { useBoardAnchors } from '~/entities/game/board'
 import Board from '../_Board'
+import { useBoardStaging } from '../_useBoardStaging'
 import { makeBoardProps } from './fixture'
 
 // biome-ignore lint/style/noNonNullAssertion: both ids are known catalogue entries
@@ -257,6 +259,38 @@ it('lights exactly the cards that may pay the cost, in the loss hue', () => {
   // the card the engine did not offer stays dark: legality is its answer
   const other = faceOf('defense-hotfix')
   expect(other?.getAttribute('data-state')).toBe('idle')
+})
+
+// Fix B, fix round 1 (L2): the turn side's own half of the same gate.
+// `onCostPick` refuses while `enabled` is false (the opening owns the table),
+// but `stateAt` lit the payable cards anyway. Driven through the hook for the
+// reason boardDefense.test.tsx's twin states: the only producer of
+// `enabled === false` is the opening beat, and its harness is the suite's one
+// known-flaky file.
+function costStateAt(enabled: boolean): (i: number) => string {
+  const base = makeBoardProps()
+  const { result } = renderHook(() =>
+    useBoardStaging({
+      state: {
+        ...base.state,
+        you: { ...base.state.you, hand: HAND },
+        turn: base.state.selfId,
+        hasDrawn: true,
+        playable: [],
+        pending: costPending(['attack-bug#0']),
+      },
+      anchors: useBoardAnchors(),
+      events: [],
+      enabled,
+    }),
+  )
+  // index 0 of `handItems`, which already excludes the standing release
+  return (i: number) => result.current.stateAt(i)
+}
+
+it('lights no payer the opening would refuse', () => {
+  expect(costStateAt(true)(0)).toBe('playable')
+  expect(costStateAt(false)(0)).toBe('idle')
 })
 
 // A guard, not evidence: this passed before the fix too (nothing lit at all).

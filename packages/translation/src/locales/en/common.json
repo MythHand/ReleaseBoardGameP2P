@@ -296,6 +296,7 @@
     "specLimit": "spectator limit",
     "askCost": "a release costs one card — click one in the hand",
     "askDefend": "answer with a defence — pull one out of the hand",
+    "askPartner": "click the defence the sudo will enhance",
     "tabHistory": "history",
     "tabParticipants": "participants",
     "tabRules": "rules",

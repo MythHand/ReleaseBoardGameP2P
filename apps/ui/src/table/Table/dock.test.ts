@@ -75,8 +75,16 @@ it('names the release’s own cost rather than a reaction', () => {
   expect(d.seconds).toBeUndefined()
 })
 
-it('leaves every other pending owed to you a reaction', () => {
-  const d = deriveDock({ ...base, turn: 'p2', pending: defendPending }, 'you', 0)
+// The narrowness of that branch, not the branch itself: `cost` is for the one
+// pending the cards on the table answer, and every OTHER decision owed to you
+// still raises its panel and still reads as a reaction. `handLimit` is the
+// subject on purpose — the `defend` case four lines up already covers itself,
+// so pointing this at `defend` too would be the same call with fewer
+// assertions and would guard nothing. Widen the `cost` branch past
+// `discardForRelease` and this is what fails.
+it('gives the cost phase to that one decision only, not to every pending of yours', () => {
+  const pending: TablePending = { kind: 'handLimit', player: 'you', excess: 1, options: ['c1'] }
+  const d = deriveDock({ ...base, turn: 'you', hasDrawn: true, pending }, 'you', 0)
   expect(d.state).toBe('reaction')
 })
 
