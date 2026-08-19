@@ -868,6 +868,21 @@ const ISSUES: Issue[] = [
     },
     status: 'rework',
   },
+  {
+    what: {
+      ru: 'Строка-подсказка под центром стола написана дважды',
+      en: 'The ask line under the centre of the table is written twice',
+    },
+    problem: {
+      ru: 'Всегда смонтированная плашка «чего стол ждёт», проявляющаяся и гаснущая переходом (opacity + сдвиг 132px → 146px за 260ms --ease-out), написана отдельным CSS два раза: .ask в DefenseReleaseStory.module.css (одобренный источник) и .ask в _Board.module.css — борд получил её в #101 (Fix B) вместе с отменой панели на defend. Значения совпадают до пикселя только потому, что вторая копия процитирована с первой. Это переход CSS, а не play(), поэтому словарь animations/ его и не покрывал: там полёты по координатам, а не состояние смонтированного элемента, — модуля под «поверхность, которая проявляется на месте» в проекте нет вовсе. Отдельно разошлось prefers-reduced-motion: у копии борда переход погашен, у копии сцены нет. Закроет либо класс-утилита рядом с токенами, либо (если таких поверхностей наберётся больше одной) маленький шаг в apps/ui со своей строкой в reference.md — но раньше кода стоит решение, считается ли поверхность на месте частью словаря «полётов».',
+      en: 'The always-mounted "what the table is waiting for" line, fading in and out by transition (opacity + a 132px → 146px shift over 260ms --ease-out), is written as separate CSS twice: `.ask` in DefenseReleaseStory.module.css (the approved source) and `.ask` in _Board.module.css — the board got it in #101 (Fix B) along with dropping the panel for a defend. The values match to the pixel only because the second copy was quoted off the first. It is a CSS transition rather than a play(), which is why the animations/ vocabulary never covered it: that vocabulary is flights by coordinates, not the state of a mounted element — there is no module for "a surface that appears in place" at all. prefers-reduced-motion has already diverged too: the board copy kills the transition, the scene copy does not. What closes it is either a utility class beside the tokens or, if more than one such surface turns up, a small step in apps/ui with its own row in reference.md — but ahead of the code sits the decision whether an in-place surface belongs to a vocabulary of flights.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_Board.module.css (.ask) + playground: interactive/DefenseReleaseStory.module.css (.ask)',
+      en: 'frontend: pages/board/[gameId]/_Board.module.css (.ask) + playground: interactive/DefenseReleaseStory.module.css (.ask)',
+    },
+    status: 'rework',
+  },
 ]
 
 // Section headings, notes, legend and table headers.

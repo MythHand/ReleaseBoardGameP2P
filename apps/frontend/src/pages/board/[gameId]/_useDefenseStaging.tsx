@@ -44,7 +44,14 @@
 // in both motion modes, not a flyer that a reduced-motion path never raises.
 
 import type { Event } from '@release/engine'
-import type { CardData, HandItem, HandPlayDrop, Point, TableActions } from '@release/ui'
+import type {
+  CardData,
+  HandCardState,
+  HandItem,
+  HandPlayDrop,
+  Point,
+  TableActions,
+} from '@release/ui'
 import { CardPair, PAIR_AUX_POSE, useArrow } from '@release/ui'
 import {
   enterPose,
@@ -101,20 +108,15 @@ export interface DefenseStaging {
   // the arrow armed from the waiting Sudo's own slot, following the cursor —
   // `_Board.tsx` renders it in place of `staging.arrow` while `answering`.
   arrow: { from: Point | null; to: Point | null; active: boolean }
-  defenceOptions: string[]
   // the hand cards a waiting Sudo may fold with light with its own category
   // accent — mirrors `_useBoardStaging`'s own `accentAt`. Undefined outside
   // `phase: 'partner'`.
   accentAt: (index: number) => string | undefined
+  /** what a fan slot reads as while this hook owns the fan — 'playable' on
+   * every card that answers the open `defend`, 'selected' on a waiting Sudo's
+   * own partners, 'idle' everywhere else (#101, Fix B). */
+  stateAt: (index: number) => HandCardState
   onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
-  /** the SAME commit + flight + dispatch `onHandPlay` runs, for a card chosen
-   * through `PendingPrompt`'s own card list rather than dragged out of the
-   * fan (#101, Fix round 1) — the panel is a second door onto the same
-   * `defend` decision, and this is what keeps both doors producing the same
-   * result: the card flies from its OWN hand slot (found via
-   * `anchors.handSlotAt`, the same lookup `comboBeat.tsx`'s `foldIn` uses for
-   * a local click-thrown play) rather than a drag's own drop point. */
-  answerWith: (uid: string) => boolean
   /** the partner pick — a click in the hand while a Sudo waits, per
    * `state.comboOptions[sudoUid]`. A miss cancels the whole staging, same as
    * `_useBoardStaging`'s own `onCardClick`. */
@@ -189,6 +191,12 @@ export function useDefenseStaging({
   // (options, dispatch, the static render) agrees on the same instant of it.
   const pending =
     state.pending?.kind === 'defend' && state.pending.player === state.selfId ? state.pending : null
+  // Which cards may answer it — the projection's own answer, read never
+  // re-derived. Two readers: `resolveLegal`, which decides whether a pull is
+  // legal, and `stateAt`, which lights exactly that set in the fan (#101,
+  // Fix B). Deliberately NOT exported any more: it used to be, with no
+  // consumer anywhere, which is how the board ended up computing what to
+  // light and then lighting nothing.
   const defenceOptions = useMemo(() => pending?.options ?? [], [pending])
 
   const handItems = useMemo(() => {
@@ -212,6 +220,32 @@ export function useDefenseStaging({
       return partners.includes(item.uid) ? `var(--cat-${support.card.category})` : undefined
     },
     [staged, handItems, state.comboOptions],
+  )
+
+  // Which cards answer the open attack, as the fan draws them (#101, Fix B).
+  // The rule is the approved scene's: the fan lights only while a step is
+  // waiting on a choice FROM it, and only on the cards that answer that step —
+  // nothing at rest, because a glow with nothing asked reads as "already
+  // selected" rather than "available". The set is the projection's throughout:
+  // `pending.options` for a plain defence, `state.comboOptions[uid]` for the
+  // Sudo (both the "is it pullable at all" answer `resolveSudo` gates on and,
+  // once it stands, the narrowed "which defence may it enhance").
+  //
+  // Once anything IS staged the ask has been answered — a dispatched or
+  // rejected play has nothing left to choose — so only the waiting-Sudo phase
+  // keeps a lit set, and it keeps it through `accentAt`'s own 'selected'
+  // reading rather than a second one of its own.
+  const stateAt = useCallback(
+    (index: number): HandCardState => {
+      const item = handItems[index]
+      if (!item) return 'idle'
+      if (accentAt(index)) return 'selected'
+      if (!pending || staged) return 'idle'
+      if (defenceOptions.includes(item.uid)) return 'playable'
+      const partners = state.comboOptions?.[item.uid] ?? []
+      return item.card.id === 'support-sudo' && partners.length > 0 ? 'playable' : 'idle'
+    },
+    [handItems, accentAt, pending, staged, defenceOptions, state.comboOptions],
   )
 
   // The shared guard + lookup both entry points below open with: is this uid
@@ -246,13 +280,16 @@ export function useDefenseStaging({
     [enabled, pending, state.you.hand, state.comboOptions],
   )
 
-  // The shared half of both plain entry points below: commit the dispatched
-  // play, fire the RESOLVE, and fly the card to the cover slot from wherever
-  // it came FROM — a drag's own drop point (`onHandPlay`) or the hand slot it
-  // still sits in (`answerWith`, the pending panel's own card list). Neither
-  // entry point calls `flyer.raise` itself, so there is exactly one place
-  // that can leave the fly-in half-built (#101, Fix round 1: PendingPrompt
-  // used to bypass this whole path, reopening Carry #2 through its own door).
+  // The plain path's own half: commit the dispatched play, fire the RESOLVE,
+  // and fly the card to the cover slot from the drag's own drop point. Kept a
+  // step of its own rather than inlined into `onHandPlay`, so there stays
+  // exactly one place that can leave the fly-in half-built — the lesson of
+  // fix round 1, where `PendingPrompt`'s card list bypassed this whole path
+  // and reopened Carry #2 through its own door. That second door is gone
+  // (#101, Fix B): the panel no longer renders for a `defend` at all, because
+  // it covered the very attack it was asking about and asked a second time
+  // for what the fan already answers. The board's decline is the only thing
+  // that survived it, and it carries no card to fly.
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const commitAndFly = useCallback(
     (uid: string, card: CardData, index: number, from: Rect | undefined) => {
@@ -362,29 +399,6 @@ export function useDefenseStaging({
       return false
     },
     [resolveLegal, commitAndFly, resolveSudo, stageDefSudo],
-  )
-
-  // The pending panel's own answer (#101, Fix round 1): `PendingPrompt`'s
-  // card list + confirm button choose a uid without ever touching the fan —
-  // there is no drop point to fly from, so the origin is the hand slot the
-  // card still stands in, found the same way `comboBeat.tsx`'s `foldIn` finds
-  // one for a local click-thrown play (`anchors.handSlotAt`, read BEFORE
-  // `commitAndFly` changes `handItems` and reflows the fan out from under it).
-  // The panel offers no Sudo enhancement — it is `pending.options` only, same
-  // as Task 16 — so this stays the plain path exclusively.
-  const answerWith = useCallback(
-    (uid: string): boolean => {
-      const legal = resolveLegal(uid)
-      if (!legal) return false
-      commitAndFly(
-        uid,
-        legal.item,
-        legal.index,
-        rectOf(anchors.handSlotAt(legal.index)) ?? undefined,
-      )
-      return true
-    },
-    [resolveLegal, anchors.handSlotAt, commitAndFly],
   )
 
   // cancel — a miss, Escape, or an invalid partner pick sends whatever is
@@ -668,9 +682,8 @@ export function useDefenseStaging({
     handItems,
     arrow: arrowCtl,
     accentAt,
-    defenceOptions,
+    stateAt,
     onHandPlay,
-    answerWith,
     onCardClick,
     cancel,
     release,

@@ -210,6 +210,86 @@ it('does not raise the pending panel for a cost — the table asks instead', () 
   expect(screen.queryByTestId('pending-prompt')).toBeNull()
 })
 
+// ===== Fix B (#101) — what the table tells the player during the cost step =====
+//
+// The panel is suppressed for this one kind (above), the fan is the picker,
+// and until this round NOTHING said so: `_Board.tsx` passed `accentAt` to
+// `<Hand>` and never `stateAt`, `accentAt` answered only for a combo partner,
+// there was no line of copy anywhere, and the dock — the only voice left —
+// said "reaction / you can defend" over an amber PASS key the engine rejects
+// outright while a decision is open (`window.ts`'s `onPass`).
+
+// biome-ignore lint/style/noNonNullAssertion: a known catalogue entry
+const hotfix = cardById('defense-hotfix')!
+
+// A cost step with a THIRD card in hand the engine did not offer — the whole
+// point of the assertion below is that the eligible set is `pending.options`
+// and not "the whole fan". With only the payer in hand, lighting everything
+// and lighting the offered set are indistinguishable.
+function costLitBoard(options: string[]) {
+  const base = makeBoardProps()
+  const props = makeBoardProps({
+    state: {
+      ...base.state,
+      you: { ...base.state.you, hand: [...HAND, { uid: 'defense-hotfix#0', card: hotfix }] },
+      turn: base.state.selfId,
+      hasDrawn: true,
+      playable: [], // a pending suspends normal play — `playableFor`'s own first check
+      pending: costPending(options),
+    },
+  })
+  return <Board {...props} />
+}
+
+// The Card primitive's own identity + state hooks (`data-card` / `data-state`)
+// and its accent custom property, read off the face inside a fan slot.
+function faceOf(cardId: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(`[data-hand-slot] [data-card="${cardId}"]`)
+}
+
+it('lights exactly the cards that may pay the cost, in the loss hue', () => {
+  render(costLitBoard(['attack-bug#0']))
+  const payer = faceOf('attack-bug')
+  expect(payer?.getAttribute('data-state')).toBe('playable')
+  // --danger-accent is the token for "a pick that COSTS you a card"
+  // (tokens.css) — the exception is the colour, not the rule
+  expect(payer?.style.getPropertyValue('--accent')).toBe('var(--danger-accent)')
+  // the card the engine did not offer stays dark: legality is its answer
+  const other = faceOf('defense-hotfix')
+  expect(other?.getAttribute('data-state')).toBe('idle')
+})
+
+// A guard, not evidence: this passed before the fix too (nothing lit at all).
+// It is here so a later "just light the whole fan" cannot land quietly.
+it('lights nothing while no step is waiting on the fan', () => {
+  render(releaseBoard({}))
+  for (const face of document.querySelectorAll<HTMLElement>('[data-hand-slot] [data-card]')) {
+    expect(face.getAttribute('data-state')).toBe('idle')
+  }
+})
+
+it('says on the table that the release costs a card', () => {
+  const { copy } = makeBoardProps()
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  const ask = screen.getByTestId('board-ask')
+  expect(ask.getAttribute('data-shown')).toBe('true')
+  expect(ask.textContent).toContain(copy.table.askCost)
+})
+
+it('says nothing when nothing is owed', () => {
+  render(releaseBoard({}, {}))
+  expect(screen.getByTestId('board-ask').getAttribute('data-shown')).toBe('false')
+})
+
+it('the dock names the cost step, and offers no key the engine would refuse', () => {
+  const { copy } = makeBoardProps()
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  expect(screen.getAllByText(copy.turnDock.cost).length).toBeGreaterThan(0)
+  expect(screen.queryByText(copy.turnDock.canDefend)).toBeNull()
+  // PASS rejects while any decision is open, so the dock offers no key at all
+  expect(screen.queryByTestId('dock-key')).toBeNull()
+})
+
 // `hasTarget`/`state.comboOptions` already gate the aim/partner branches on
 // playability for free — the projection only ever populates those for a card
 // it already counts playable. A release has neither to lean on, so its own

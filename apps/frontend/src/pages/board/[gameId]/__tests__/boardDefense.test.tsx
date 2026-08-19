@@ -248,36 +248,83 @@ it('reduced motion stages without a flight', () => {
   mm.mockRestore()
 })
 
-// Fix round 1 (Important 1): `PendingPrompt` is a SECOND door onto the same
-// `defend` decision — its own card list + confirm button call `onResolve`
-// directly, bypassing `_useDefenseStaging` entirely. Before this fix that
-// left `defenseStaging.staged` (and so `handoffRef`) untouched, reopening
-// Carry #2 through this door: `defenseBeat.runCovered` would find no handoff
-// and fall back to `a.seatBox(plan.defender)`, null for the local player —
-// nothing at the cover slot for the whole exchange. The property to hold is
-// that BOTH doors produce the identical result.
-it('a defence chosen through the pending panel also covers the attack', async () => {
+// Fix B (#101), Defect 1 — the panel used to render for a `defend` too: a
+// fully opaque surface at z 92, centred on the table, over centre slots at
+// z 9–11. It covered the very attack it was asking about, and a card flying
+// to or from the cover slot (a carrier at z 250) disappeared the instant it
+// landed behind it. It was also a SECOND picker for a decision the fan now
+// answers (Task 16's own drag gesture), so the board stops raising it for
+// this one kind and asks with the cards instead. The one thing only the panel
+// could do — declining — moves to the board's own affordance, pinned below.
+//
+// This REPLACES fix round 1's "a defence chosen through the pending panel
+// also covers the attack": that door no longer exists, so the hook's
+// `answerWith` (its only caller) went with it.
+it('raises no panel over the attack — the fan is the picker', () => {
+  render(defenceBoard({ options: ['defense-hotfix#0'] }))
+  expect(screen.queryByTestId('pending-prompt')).toBeNull()
+  // …and the attack is standing at the centre with nothing over it
+  expect(screen.getByTestId('board-centre-pending')).toBeTruthy()
+})
+
+it('lets the attack through from the board’s own decline', () => {
   const onResolve = vi.fn()
-  const { copy } = makeBoardProps()
   render(defenceBoard({ options: ['defense-hotfix#0'] }, { onResolve }))
-  const prompt = screen.getByTestId('pending-prompt')
-  const option = prompt.querySelector<HTMLElement>('[role="option"]')
-  if (!option) throw new Error('no card option rendered in the pending panel')
-  fireEvent.click(option)
-  const confirmBtn = screen.getByText(copy.pending.confirm).closest('button')
-  if (!confirmBtn) throw new Error('confirm button not found')
-  fireEvent.click(confirmBtn)
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 600))
-  })
-  expect(onResolve).toHaveBeenCalledWith({
-    kind: 'defend',
-    card: 'defense-hotfix#0',
-    combo: undefined,
-  })
-  // the same visual the drag path produces — not the panel's own confirm
-  // alone, which the pre-fix code already satisfied
-  expect(screen.getByTestId('board-cover-staged')).toBeTruthy()
+  fireEvent.click(screen.getByTestId('board-decline'))
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'defend', card: null })
+})
+
+// Fix B (#101), Defect 3 — the ask sits with the cards. With no panel and no
+// line of copy, an attack stands at the centre with nothing saying what is
+// owed for it.
+it('says what the attack is waiting for', () => {
+  const { copy } = makeBoardProps()
+  render(defenceBoard({ options: ['defense-hotfix#0'] }))
+  const ask = screen.getByTestId('board-ask')
+  expect(ask.getAttribute('data-shown')).toBe('true')
+  expect(ask.textContent).toContain(copy.table.askDefend)
+})
+
+// Fix B (#101), Defect 2 — `_Board.tsx` passed `accentAt` and never `stateAt`,
+// and both `accentAt` implementations answer only for a combo partner, so the
+// fan could not light for a defend at all. `defenceOptions` was computed by
+// this hook and had no consumer whatsoever.
+function litState(uid: string): string | null {
+  const index = fanUids().indexOf(uid)
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  return slot?.querySelector<HTMLElement>('[data-card]')?.getAttribute('data-state') ?? null
+}
+
+it('lights the defences the projection offers, and the Sudo that may back one', () => {
+  render(
+    defenceBoard({
+      options: ['defense-hotfix#0'],
+      combos: { 'support-sudo#0': ['defense-hotfix#0'] },
+    }),
+  )
+  expect(litState('defense-hotfix#0')).toBe('playable')
+  expect(litState('support-sudo#0')).toBe('playable')
+})
+
+it('leaves the Sudo dark when the projection offers it nothing to enhance', () => {
+  render(defenceBoard({ options: ['defense-hotfix#0'] }))
+  expect(litState('defense-hotfix#0')).toBe('playable')
+  expect(litState('support-sudo#0')).toBe('idle')
+})
+
+// Fix B (#101), Defect 5 — the hue says what kind of card is aiming. The
+// approved scene passes `color="var(--cat-support)"` to `<Arrow>`; the board
+// passed none and fell back to brand green.
+it('aims the Sudo’s arrow in the support hue', async () => {
+  render(
+    defenceBoard({
+      options: ['defense-hotfix#0'],
+      combos: { 'support-sudo#0': ['defense-hotfix#0'] },
+    }),
+  )
+  await pullFromFan('support-sudo#0')
+  const svg = document.querySelector<SVGElement>(`.${arrowStyles.svg}`)
+  expect(svg?.style.getPropertyValue('--arrow')).toBe('var(--cat-support)')
 })
 
 // Task 17 (#101): the defender's own Sudo takes its own slot, then folds into

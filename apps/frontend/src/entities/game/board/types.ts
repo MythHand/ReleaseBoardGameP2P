@@ -147,6 +147,11 @@ export interface BoardChromeCopy {
   // заголовок группы управления хоста + подпись поля лимита зрителей
   hostTitle: string
   specLimit: string
+  // The ask under the centre of the table (#101) — one line per step that
+  // waits on a card from the fan and has no panel to speak for it: the
+  // standing release's own price, and an attack owed an answer.
+  askCost: string
+  askDefend: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
   pauseGame?: string

@@ -126,6 +126,66 @@
   pointer-events: none;
 }
 
+/* What the table is waiting for — UNDER the staged cards, so the ask is where
+   the play is rather than on top of it. Quoted from the playground's
+   DefenseReleaseStory (`.ask`), the approved visual source, including its
+   offsets: the slots above are 150px wide at `--card-aspect`, so their bottom
+   edge sits ~105px below the 42% line and this lands clear of it by ~41px. Its
+   own surface, or the line dissolves into the table; mounted always so it can
+   fade OUT as well as in.
+
+   z 12 puts it over the cover slot (11) and the attack (10) — it never
+   overlaps either, and the flight carriers (`--z-flight`, 250) still pass over
+   everything here. The layer itself is transparent to the pointer: only the
+   decline inside it takes a click. */
+.ask {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  z-index: 12;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 132px);
+  transition:
+    opacity 260ms var(--ease-out),
+    transform 260ms var(--ease-out);
+}
+
+.ask[data-shown="true"] {
+  opacity: 1;
+  transform: translate(-50%, 146px);
+}
+
+/* the words themselves — a pill, so the line reads against whatever the table
+   happens to be painting behind it */
+.askLine {
+  padding-block: 10px;
+  padding-inline: 18px;
+  color: var(--fg);
+  text-align: center;
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  border: 1px solid var(--white-20);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px var(--black-45);
+}
+
+/* the one thing in the ask that is pressed rather than read */
+.askDecline {
+  pointer-events: auto;
+}
+
+/* the same end state, with no travel — the ask appears and disappears rather
+   than sliding, since nothing here depends on the motion to be understood */
+@media (prefers-reduced-motion: reduce) {
+  .ask {
+    transform: translate(-50%, 146px);
+    transition: none;
+  }
+}
+
 /* a card's pose on the table — its tilt/offset lives on this inner element */
 .pose {
   block-size: 100%;

@@ -21,6 +21,7 @@
 import type { Event } from '@release/engine'
 import type {
   CardData,
+  HandCardState,
   HandItem,
   HandPlayDrop,
   Point,
@@ -94,6 +95,10 @@ export interface BoardStaging {
   gapSize: number
   handItems: HandItem[] // you.hand minus the staged card(s)
   accentAt: (index: number) => string | undefined // partner lighting while a support awaits one
+  /** what a fan slot reads as — 'playable' for the cards that answer the step
+   * the turn side is actually waiting on (today: a standing release's cost),
+   * 'selected' for a waiting support's own partners, 'idle' at rest */
+  stateAt: (index: number) => HandCardState
   pairRef: RefObject<HTMLDivElement | null> // the persistent pair-flyer node _Board mounts
   onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
   onCardClick: (index: number) => void // the partner pick — the fold
@@ -405,15 +410,44 @@ export function useBoardStaging({
   // is the message). Goes out the moment a partner is picked: the clicked
   // card is no longer in `handItems`, so there is nothing left to light
   // regardless of any candidates still technically eligible.
+  //
+  // A standing release's own price is the one step whose hue is NOT the card's
+  // type (#101, Fix B): every card that may pay lights in the loss hue
+  // (`--danger-accent`, whose token comment is literally "a pick that COSTS
+  // you a card"). The approved scene calls this "the exception in colour, not
+  // in rule" — what is lit is still exactly what answers the open step, and
+  // that set is the engine's (`pending.options`), never the whole fan.
   const accentAt = useCallback(
     (index: number) => {
+      const item = handItems[index]
+      if (!item) return undefined
+      if (costOptions.length > 0) {
+        return costOptions.includes(item.uid) ? 'var(--danger-accent)' : undefined
+      }
       const support = staged?.phase === 'partner' ? staged.support : null
-      const item = support ? handItems[index] : undefined
-      if (!support || !item) return undefined
+      if (!support) return undefined
       const partners = state.comboOptions?.[support.uid] ?? []
       return partners.includes(item.uid) ? `var(--cat-${support.card.category})` : undefined
     },
-    [staged, handItems, state.comboOptions],
+    [staged, handItems, costOptions, state.comboOptions],
+  )
+
+  // What each fan slot READS as — the half `accentAt` alone cannot say, since
+  // `Hand`'s own fallback turns any accent into 'selected' and nothing else
+  // into 'idle' (Hand.tsx: `stateAt?.(i) ?? (accentAt?.(i) ? 'selected' : 'idle')`).
+  // The rule, from the approved scene: the fan lights only while a step is
+  // actually waiting on a choice FROM it, and only on the cards that answer
+  // that step — a glow with nothing asked reads as "already selected", not as
+  // "available". Nothing is lit at rest, and the fallback for a waiting
+  // support is reproduced verbatim so #100's own combo reading is untouched.
+  const stateAt = useCallback(
+    (index: number): HandCardState => {
+      const item = handItems[index]
+      if (!item) return 'idle'
+      if (costOptions.length > 0) return costOptions.includes(item.uid) ? 'playable' : 'idle'
+      return accentAt(index) ? 'selected' : 'idle'
+    },
+    [handItems, costOptions, accentAt],
   )
 
   // GESTURE — pulling a card out of the fan puts it on the table. A card with
@@ -832,6 +866,7 @@ export function useBoardStaging({
     gapSize: arrival.gapSize,
     handItems,
     accentAt,
+    stateAt,
     pairRef,
     onHandPlay,
     onCardClick,

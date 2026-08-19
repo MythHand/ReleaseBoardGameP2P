@@ -36,7 +36,6 @@ import {
   Seat,
   Slider,
   type TableActions,
-  type TableChoice,
   TabRail,
   type TabRailItem,
   Toggle,
@@ -361,6 +360,16 @@ export default function Board({
   // never merges, so it never gets the pair flyer's persistent node instead.
   const soloStagedRef = useRef<HTMLDivElement>(null)
 
+  // The card the arrow leaves FROM, whichever hook armed it — a waiting
+  // support if there is one, the aimed card otherwise. Its category is the
+  // arrow's hue (#101, Fix B, Defect 5): the defence side only ever aims with
+  // the Sudo, which is how it comes out as the scene's own `--cat-support`
+  // without naming that token here.
+  const aimingCard = answering
+    ? defenseStaging.staged?.support?.card
+    : (staging.staged?.support ?? staging.staged?.main)?.card
+  const arrowColor = aimingCard ? `var(--cat-${aimingCard.category})` : undefined
+
   // the pending "defend" the attack slot answers for — read ONCE so the hover
   // preview below and the paint further down can never drift on what counts
   // as "occupying" the slot. `staging.staged` wins over a pending: the two can
@@ -599,24 +608,32 @@ export default function Board({
     staging.cancel()
   }
 
-  // `PendingPrompt` is a second door onto the same `defend` decision the drag
-  // gesture answers (#101, Fix round 1 — Important 1): its own card list and
-  // decline button used to call `actions.onResolve` directly, never touching
-  // `defenseStaging` — so a player who confirmed a card through the panel
-  // left `defenseStaging.staged` (and so `handoffRef`) untouched, and
-  // `defenseBeat.runCovered` fell back to `a.seatBox(plan.defender)` — null
-  // for the local player — leaving the cover slot blank for the whole
-  // exchange. Routed here instead, so both doors produce the identical
-  // commit + flight + dispatch. The decline branch (`card: null`) carries no
-  // card to fly and dispatches straight through, same as every other pending
-  // kind this component answers.
-  const handlePendingResolve = (choice: TableChoice) => {
-    if (choice.kind === 'defend' && choice.card != null) {
-      defenseStaging.answerWith(choice.card)
-      return
-    }
-    actions?.onResolve?.(choice)
-  }
+  // What the table is waiting on, in words, and where the words go (#101,
+  // Fix B). Two steps ask the fan for a card and neither had a voice: the
+  // release's cost, whose panel is suppressed on purpose (a panel would be a
+  // second asker), and — from this round — the `defend`, whose panel used to
+  // cover the very attack it was asking about. The ask is its own line under
+  // the centre instead, quoting the approved scene's own placement: "the ask
+  // sits with the cards, not only in the dev bar — a release parked at the
+  // centre with no explanation reads as a stuck play."
+  //
+  // The scene's own COPY is deliberately not ported: it says "pull any of
+  // them out of the hand", and a pull is impossible here — the engine returns
+  // no playable cards while a pending is open, so the pull finds no target
+  // and the card flops back into the fan. On the board the cost is a click.
+  const ask = answering ? copy.table.askDefend : costPending ? copy.table.askCost : null
+  // The line keeps the words it faded IN with while it fades back OUT — an
+  // empty pill mid-fade reads as a flicker. Written during render on purpose:
+  // it is a pure carry-forward of this render's own value, so a StrictMode
+  // double render produces the identical result.
+  const lastAsk = useRef<string | null>(null)
+  if (ask) lastAsk.current = ask
+
+  // Declining an attack — "I could block this and I choose not to". The only
+  // thing `PendingPrompt` did for a `defend` that the fan does not do, so it
+  // is the only thing that outlived it here. A real button, so it is the one
+  // affordance in this exchange a keyboard can reach.
+  const declineAttack = () => actions?.onResolve?.({ kind: 'defend', card: null })
 
   const isHost = role === 'host'
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
@@ -675,10 +692,18 @@ export default function Board({
       {/* one arrow, whichever hook is live (#101, Task 17) — `answering` picks
           the source the same way every other call site in this file does; the
           turn hook's own arrow stays wherever it last pointed while a defend
-          pending suspends it, unread while `answering` is true. */}
+          pending suspends it, unread while `answering` is true.
+
+          Its hue says what KIND of card is aiming (#101, Fix B) — the same
+          thing the approved scene says with a literal
+          `color="var(--cat-support)"`, read off the card actually standing
+          rather than hardcoded, since the turn side aims with every category
+          there is. No card standing means no arrow to colour, and Arrow's own
+          default takes over. */}
       <Arrow
         from={answering ? defenseStaging.arrow.from : staging.arrow.from}
         to={answering ? defenseStaging.arrow.to : staging.arrow.to}
+        color={arrowColor}
       />
 
       {slots?.banner && <div className={kit.banner}>{slots.banner}</div>}
@@ -942,8 +967,15 @@ export default function Board({
                       : beats.gapSize
                     : deal.gapSize
                 }
-                // a support awaiting a partner lights the hand cards it can
-                // fold with — off outside that phase (Hand ignores undefined).
+                // What lights, and in what hue — from whichever hook owns the
+                // fan (#101, Fix B). `stateAt` is what says a card is
+                // AVAILABLE; `accentAt` only says what colour, and without
+                // the pair of them the fan could never light for a step that
+                // is not a combo partner pick — which is every step this
+                // scene is about. Both hooks keep the one rule: lit only
+                // while a step is waiting on a choice from the fan, and only
+                // on the cards that answer it.
+                stateAt={answering ? defenseStaging.stateAt : staging.stateAt}
                 accentAt={answering ? defenseStaging.accentAt : staging.accentAt}
                 // while the deal runs the hand is held: no clicks reach either
                 // gesture machine, and the cards that travelled closed stay
@@ -1037,17 +1069,56 @@ export default function Board({
 
       {/* the engine is waiting on a decision from you — a pending owed to you
           always renders, regardless of whose turn the projection says it is.
-          A release's own cost is the one exception: the cards on the table
-          (the fan, via `staging.onCostPick`) ask for it instead, and a panel
-          on top would be a second asker for the same decision. */}
-      {state.pending?.player === state.selfId && state.pending.kind !== 'discardForRelease' && (
-        <PendingPrompt
-          pending={state.pending}
-          hand={you.hand}
-          copy={copy.pending}
-          onResolve={handlePendingResolve}
-        />
-      )}
+          Two kinds are the exception, both for the same reason: the cards on
+          the table already ask for them, so a panel would be a second asker
+          for the same decision. A release's own cost is answered by the fan
+          (`staging.onCostPick`); a `defend` is answered by pulling a defence
+          out of it (`defenseStaging.onHandPlay`).
+
+          For the `defend` the panel was worse than redundant (#101, Fix B):
+          `.prompt` is `inset: 0` at z-index 92 with a fully opaque `.panel`
+          centred inside it, and the centre slots it covered sit at z 9–11 —
+          so the attack being asked about was behind the question, and a card
+          flying to or from the cover slot (a carrier at `--z-flight`, 250)
+          vanished the instant it landed. What only the panel could do —
+          decline — is the board's own affordance now, in the ask below. */}
+      {state.pending?.player === state.selfId &&
+        state.pending.kind !== 'discardForRelease' &&
+        state.pending.kind !== 'defend' && (
+          <PendingPrompt
+            pending={state.pending}
+            hand={you.hand}
+            copy={copy.pending}
+            onResolve={(choice) => actions?.onResolve?.(choice)}
+          />
+        )}
+
+      {/* what the table is waiting for, under the cards it is waiting on.
+          Always mounted, so it can fade OUT as well as in — `inert` while it
+          says nothing, so the decline inside it never takes a click or a Tab
+          stop the player cannot see. Under prefers-reduced-motion the module
+          CSS drops the transition and it simply appears; there is no `play()`
+          here to gate. */}
+      <div
+        className={opening.ask}
+        data-shown={ask != null}
+        data-testid="board-ask"
+        inert={ask == null}
+      >
+        <Typography as="div" base="label-sm" tk="tk-16" className={opening.askLine}>
+          {lastAsk.current}
+        </Typography>
+        {answering && (
+          <Button
+            variant="tech"
+            className={opening.askDecline}
+            data-testid="board-decline"
+            onClick={declineAttack}
+          >
+            {copy.pending.decline}
+          </Button>
+        )}
+      </div>
 
       {/* вертикальный рейл у правого края — переключает панели drawer. Слой
           нужен только чтобы вести его появление, не трогая его собственный
