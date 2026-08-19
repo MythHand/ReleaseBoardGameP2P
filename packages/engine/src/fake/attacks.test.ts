@@ -433,7 +433,7 @@ it('opens a fresh window on the stolen release in the thief’s zone', () => {
   // window belongs to p2's slot and p1 is the one who may answer.
   expect(r.state.players.p2.release.frontend?.card).toEqual(FE)
   expect(r.state.window).toMatchObject({
-    target: { player: 'p2', slot: 'frontend' },
+    target: { player: 'p2', slot: 'frontend', card: FE.uid },
     round: 1,
     passed: [],
   })

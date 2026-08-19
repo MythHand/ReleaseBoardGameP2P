@@ -218,6 +218,10 @@ describe('a zone completed by something other than a play', () => {
 
   it('wins by a steal once the stolen release survives its window', () => {
     const resolved = stolenThirdRelease()
+    // Pinned separately from the previous test: this test must fail on its own
+    // if the steal ever wins on arrival again, without relying on another test
+    // in the file to have already caught it.
+    expect(resolved.over).toBeNull()
 
     // p2 has nothing to throw, so the window runs out — and THAT is the moment
     // three completed releases become a win.
@@ -226,5 +230,8 @@ describe('a zone completed by something other than a play', () => {
       at: resolved.window?.deadline ?? 2000,
     })
     expect(settled.state.over).toEqual({ winner: 'p1', condition: 'release' })
+    // The sharper pin: the win event fires at THIS close, not earlier — the
+    // whole point being tested is "won on close", not "won on arrival".
+    expect(settled.events.some((e) => e.type === 'gameOver')).toBe(true)
   })
 })
