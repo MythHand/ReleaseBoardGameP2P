@@ -1701,9 +1701,10 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
 5. **Cancel** — a press on nothing valid takes back whatever is staged (the Release awaiting its cost,
    or the Sudo awaiting its defence) through `useHandArrival`, into the middle of the fan. **On the
    board**, taking back a Release still waiting on its cost is not a local undo: `_useBoardStaging.ts`'s
-   `cancel` dispatches the engine's own `cancelRelease` choice first — this pending is the one
-   dispatched play the engine has told nobody else about yet, so the table is safe to ask — and only
-   once that resolves does the card fly home from the stage slot.
+   `cancel` dispatches the engine's own `cancelRelease` choice, and — in the same call, no `await` in
+   between — the card flies home from the stage slot right away, optimistically: a rejection cannot
+   strand it, since the projection puts the card back in the fan either way, whether the pending
+   clears or not.
 
 **Params & timings.** `SHOW_HOLD` 1200 ms · `LAND_HOLD` 700 ms · `MERGE_MS` 620 ms · poses: attack
 `rot −4`, cover `rot 6, dx 16, dy −12`, sudo `rot −7`.
