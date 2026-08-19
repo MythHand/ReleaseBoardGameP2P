@@ -480,13 +480,30 @@ export default function Board({
         </div>
       </div>
 
-      {/* the centre: where cards stand while the table is looking at them — the
-          player's own cards gather here during the opening, and every drawn card
-          stages here for the rest of the match. Mounted for the whole life of
-          the board, because a flight cannot aim at a node that is not there yet.
-          pointer-events: none — outside a beat it is an empty box and must not
-          catch clicks meant for the table. */}
-      <div className={opening.centre} data-board-centre ref={anchors.centre}>
+      {/* the release stands here and does NOT land — by the rules it costs one
+          card, and the cost is shown open beside it. Only then does it settle
+          into its zone slot and the attack window opens. */}
+      <div className={opening.stageSlot} data-centre-slot="stage" ref={anchors.stage} />
+      <div className={opening.costSlot} data-centre-slot="cost" ref={anchors.cost} />
+      {/* the defender's own Sudo waits in its OWN place until a defence is
+          chosen for it — the arrow says what it is aimed at */}
+      <div className={opening.sudoSlot} data-centre-slot="sudo" ref={anchors.sudo} />
+      {/* the defence covering the attack — offset and tilted the other way */}
+      <div className={opening.coverSlot} data-centre-slot="cover" ref={anchors.cover} />
+
+      {/* the attack slot — where cards stand while the table is looking at them:
+          the player's own cards gather here during the opening, and every drawn
+          card stages here for the rest of the match. Mounted for the whole life
+          of the board, because a flight cannot aim at a node that is not there
+          yet. Empty, it must not catch clicks meant for the table underneath —
+          `.centre:empty` in `_Board.module.css` owns that, now that the cover
+          slot sits on top of it too. */}
+      <div
+        className={opening.centre}
+        data-board-centre
+        data-centre-slot="attack"
+        ref={anchors.centre}
+      >
         {intro &&
           deal.staged.map((s) => {
             const data = cardById(s.card)

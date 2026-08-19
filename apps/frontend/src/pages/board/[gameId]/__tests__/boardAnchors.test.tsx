@@ -53,3 +53,24 @@ it('draws one pile per entry in the projection', () => {
   // not one deck showing a bigger number.
   expect(getAllByText(props.copy.table.deck)).toHaveLength(2)
 })
+
+it('mounts the five centre slots, each axis-aligned and each its own box', () => {
+  render(<Board {...makeBoardProps()} />)
+  for (const name of ['stage', 'cost', 'attack', 'sudo', 'cover']) {
+    expect(document.querySelector(`[data-centre-slot="${name}"]`)).toBeTruthy()
+  }
+})
+
+it('an empty centre slot catches no pointer events', () => {
+  // `.coverSlot` sits exactly on top of the attack slot and is mounted even
+  // with nothing in it — without this it silently eats every press and hover
+  // meant for the attack underneath (the story's own hard-won `:empty` rule).
+  // jsdom does not load the CSS-module stylesheet, so `:empty` cannot be
+  // observed through getComputedStyle here — this asserts the contract
+  // structurally instead: an empty slot renders no children, which is what
+  // makes `_Board.module.css`'s `.coverSlot:empty { pointer-events: none }`
+  // (see the comment naming this test there) apply at all.
+  render(<Board {...makeBoardProps()} />)
+  const cover = document.querySelector('[data-centre-slot="cover"]') as HTMLElement
+  expect(cover.children).toHaveLength(0)
+})

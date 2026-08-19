@@ -57,10 +57,73 @@
   position: absolute;
   inset-block-start: 42%;
   inset-inline-start: 50%;
+  z-index: 10;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  pointer-events: none;
   transform: translate(-50%, -50%);
+}
+
+/* The five slots the centre of the table is made of, all sharing one box and
+   differing only by where they sit and what lies over what. Quoted from the
+   playground's DefenseReleaseStory — the approved visual source.
+
+   Each slot stays AXIS-ALIGNED and the card's tilt lives on an inner `.pose`
+   element, so a slot's rect is the true card box a flight can aim at (I6). A
+   rotated slot's bounding rect is the box AROUND the tilted card, and aiming
+   at it makes a flight jump on its first frame. */
+.stageSlot,
+.costSlot,
+.sudoSlot,
+.coverSlot {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+}
+
+.stageSlot {
+  transform: translate(calc(-50% - 92px), -50%);
+}
+
+.costSlot {
+  transform: translate(calc(-50% + 92px), -50%);
+}
+
+.sudoSlot {
+  z-index: 9;
+  transform: translate(calc(-50% - 180px), -50%);
+}
+
+/* over the attack: the defence covers it, so it must lie on top */
+.coverSlot {
+  z-index: 11;
+  transform: translate(-50%, -50%);
+}
+
+/* An EMPTY slot is not a target. `.coverSlot` sits exactly on top of `.centre`
+   (both translate(-50%, -50%), z 11 over z 10) and is mounted even with no card
+   in it, so with nothing there it would silently eat every pointer event meant
+   for the attack underneath — the hover on the attacked card would never
+   arrive, and neither would a defence dropped on it. This replaces `.centre`'s
+   old blanket `pointer-events: none`, which was correct only while the centre
+   was never a target of anything.
+
+   jsdom does not load this stylesheet, so `boardAnchors.test.tsx`'s "an empty
+   centre slot catches no pointer events" test cannot observe this rule
+   directly — it instead asserts the structural half of the same contract, that
+   an empty slot renders no children. */
+.centre:empty,
+.stageSlot:empty,
+.costSlot:empty,
+.sudoSlot:empty,
+.coverSlot:empty {
+  pointer-events: none;
+}
+
+/* a card's pose on the table — its tilt/offset lives on this inner element */
+.pose {
+  block-size: 100%;
 }
 
 /* a card of that heap — the same box, its own scatter (as in the discard) */
