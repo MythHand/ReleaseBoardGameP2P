@@ -294,6 +294,14 @@ export default function Board({
   // never merges, so it never gets the pair flyer's persistent node instead.
   const soloStagedRef = useRef<HTMLDivElement>(null)
 
+  // the pending "defend" the attack slot answers for — read ONCE so the hover
+  // preview below and the paint further down can never drift on what counts
+  // as "occupying" the slot. `staging.staged` wins over a pending: the two can
+  // only coincide for the instant between the local attacker's own dispatch
+  // and the layout effect below collapsing it, and both readers now resolve
+  // that tie the same way because they read the same value.
+  const pendingDefend = !staging.staged && state.pending?.kind === 'defend' ? state.pending : null
+
   // The staging → beat handoff (#100): kept current in a layout effect,
   // because `el` has to be the DOM node as THIS render actually committed it —
   // the pair flyer once a partner has folded in, the solo staged node
@@ -529,9 +537,7 @@ export default function Board({
         data-board-centre
         data-centre-slot="attack"
         ref={anchors.centre}
-        {...previewProps(
-          state.pending?.kind === 'defend' ? cardById(state.pending.attackCard) : null,
-        )}
+        {...previewProps(pendingDefend ? cardById(pendingDefend.attackCard) : null)}
       >
         {intro &&
           deal.staged.map((s) => {
@@ -556,13 +562,12 @@ export default function Board({
             <Card card={soloStaged.card} interactive={false} width="100%" />
           </div>
         )}
-        {!staging.staged &&
-          state.pending?.kind === 'defend' &&
+        {pendingDefend &&
           (() => {
-            const data = cardById(state.pending.attackCard)
+            const data = cardById(pendingDefend.attackCard)
             if (!data) return null
             // sudo stands the pair; a plain hit stands the one card, as before.
-            const aux = state.pending.sudo ? cardById('support-sudo') : null
+            const aux = pendingDefend.sudo ? cardById('support-sudo') : null
             return (
               <div
                 className={opening.centreCard}

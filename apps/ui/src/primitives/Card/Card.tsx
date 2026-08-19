@@ -89,6 +89,9 @@ export default function Card({
     <div
       className={`${styles.root} ${canInteract ? styles.interactive : ''}`}
       data-state={state}
+      // a stable identity hook — nothing else in the rendered face names the
+      // card by id; the preview and any test that needs to know WHICH card is
+      // on screen reads this rather than matching on localized display text.
       data-card={card?.id}
       style={
         {
