@@ -374,6 +374,43 @@ it('brings a sudo Rollback’s attack into our own fan', async () => {
 // the task report). Isolating the exit is what makes the assertion actually
 // about `resetExit()`, not just `flyer.drop()`.
 //
+// Fix round 1 (Important 2): `release()` used to run BEFORE `wait(SHOW_HOLD)`
+// — invisible while the handoff was always null for a local defender (the
+// bug Carry #2 named), but once that carried a real `.el` (Task 16's fix),
+// calling `release()` this early cleared the local defender's own static
+// cover render at once, leaving the cover slot blank for the whole ~1.2s
+// hold before the exit flight ever raised anything to replace it. `release()`
+// now waits until the hold is over, immediately ahead of the exit — the same
+// "drop right before the replacement mounts" ordering `comboBeat.tsx`'s own
+// `runRelease` cost leg already uses for the identical class of bug.
+it('keeps the local defender’s own handoff standing through the whole hold', async () => {
+  played.names = []
+  played.calls = []
+  exits.items = []
+  const { api, Probe } = harness()
+  const release = vi.fn()
+  const staging = { current: { mainUid: 'u1', el: node(), release } as StagedHandoff }
+  render(<Probe staging={staging} />)
+  vi.useFakeTimers()
+  try {
+    hang.on = false
+    const running = api.beat?.runCovered({ ...cancelPlan(), defender: 'p1' }, ctx)
+    // past `nextFrames()`, comfortably inside the 1.2s `SHOW_HOLD` span
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200)
+    })
+    expect(release).not.toHaveBeenCalled()
+    // past the whole hold and the exit flight (send() resolves at once — `hang.on` is false)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+    expect(release).toHaveBeenCalledTimes(1)
+    await running
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 // `wait(SHOW_HOLD)` is a REAL ~1.2s delay, unlike `runPairOut`'s single
 // `nextFrames()` — so getting INTO the hung `send()` needs fake timers
 // advanced past it, not `comboBeat.test.tsx`'s 80ms real-timer flush.

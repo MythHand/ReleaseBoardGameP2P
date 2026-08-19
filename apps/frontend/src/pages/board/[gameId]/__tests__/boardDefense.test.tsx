@@ -181,3 +181,35 @@ it('reduced motion stages without a flight', () => {
   expect(screen.getByTestId('board-cover-staged')).toBeTruthy()
   mm.mockRestore()
 })
+
+// Fix round 1 (Important 1): `PendingPrompt` is a SECOND door onto the same
+// `defend` decision — its own card list + confirm button call `onResolve`
+// directly, bypassing `_useDefenseStaging` entirely. Before this fix that
+// left `defenseStaging.staged` (and so `handoffRef`) untouched, reopening
+// Carry #2 through this door: `defenseBeat.runCovered` would find no handoff
+// and fall back to `a.seatBox(plan.defender)`, null for the local player —
+// nothing at the cover slot for the whole exchange. The property to hold is
+// that BOTH doors produce the identical result.
+it('a defence chosen through the pending panel also covers the attack', async () => {
+  const onResolve = vi.fn()
+  const { copy } = makeBoardProps()
+  render(defenceBoard({ options: ['defense-hotfix#0'] }, { onResolve }))
+  const prompt = screen.getByTestId('pending-prompt')
+  const option = prompt.querySelector<HTMLElement>('[role="option"]')
+  if (!option) throw new Error('no card option rendered in the pending panel')
+  fireEvent.click(option)
+  const confirmBtn = screen.getByText(copy.pending.confirm).closest('button')
+  if (!confirmBtn) throw new Error('confirm button not found')
+  fireEvent.click(confirmBtn)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 600))
+  })
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'defend',
+    card: 'defense-hotfix#0',
+    combo: undefined,
+  })
+  // the same visual the drag path produces — not the panel's own confirm
+  // alone, which the pre-fix code already satisfied
+  expect(screen.getByTestId('board-cover-staged')).toBeTruthy()
+})

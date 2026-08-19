@@ -24,7 +24,7 @@
 
 import type { Event } from '@release/engine'
 import type { CardData, HandItem, HandPlayDrop, TableActions } from '@release/ui'
-import { play, useFlyer, useHandArrival } from '@release/ui/animations'
+import { play, type Rect, useFlyer, useHandArrival } from '@release/ui/animations'
 import {
   type ReactNode,
   type RefObject,
@@ -37,6 +37,14 @@ import {
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { COVER_POSE } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
+
+// same 5-line helper comboBeat.tsx/defenseBeat.tsx each keep privately — copy
+// it, don't import across runners.
+const rectOf = (el: Element | null): Rect | null => {
+  if (!el) return null
+  const r = el.getBoundingClientRect()
+  return { left: r.left, top: r.top, width: r.width, height: r.height }
+}
 
 export interface DefenseStagedCard {
   uid: string
@@ -69,6 +77,14 @@ export interface DefenseStaging {
   // whichever hook is live without a branch
   pairRef: RefObject<HTMLDivElement | null>
   onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
+  /** the SAME commit + flight + dispatch `onHandPlay` runs, for a card chosen
+   * through `PendingPrompt`'s own card list rather than dragged out of the
+   * fan (#101, Fix round 1) — the panel is a second door onto the same
+   * `defend` decision, and this is what keeps both doors producing the same
+   * result: the card flies from its OWN hand slot (found via
+   * `anchors.handSlotAt`, the same lookup `comboBeat.tsx`'s `foldIn` uses for
+   * a local click-thrown play) rather than a drag's own drop point. */
+  answerWith: (uid: string) => boolean
   // reserved for Task 17 (the sudo-partner click) — a no-op on this task's
   // plain path, kept for interface parity with `_useBoardStaging`'s own
   onCardClick: (index: number) => void
@@ -142,29 +158,41 @@ export function useDefenseStaging({
   // accent on this task's plain path.
   const accentAt = useCallback((_index: number) => undefined, [])
 
-  // GESTURE — pulling a legal defence out of the fan commits and dispatches
-  // at once (no aim, no partner): the plain-defence half of the allowance
-  // `_useBoardStaging.ts`'s own solo release already takes for a release with
-  // no Code Review to pair.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
-  const onHandPlay = useCallback(
-    (uid: string, drop: HandPlayDrop): boolean => {
-      if (!enabled || !pending || stagedRef.current) return false
-      if (!defenceOptions.includes(uid)) return false
+  // The shared guard + lookup both entry points below open with: is this uid
+  // actually pullable right now, and if so where does it sit in `you.hand`.
+  // Neither dispatches nor flies anything — just answers "legal, and where".
+  const resolveLegal = useCallback(
+    (uid: string): { item: CardData; index: number } | null => {
+      if (!enabled || !pending || stagedRef.current) return null
+      if (!defenceOptions.includes(uid)) return null
       const index = state.you.hand.findIndex((c) => c.uid === uid)
       const item = state.you.hand[index]
-      if (!item) return false
-      commitStaged({ main: { uid, card: item.card, index }, support: null, phase: 'dispatched' })
+      return item ? { item: item.card, index } : null
+    },
+    [enabled, pending, defenceOptions, state.you.hand],
+  )
+
+  // The shared half of both entry points below: commit the dispatched play,
+  // fire the RESOLVE, and fly the card to the cover slot from wherever it
+  // came FROM — a drag's own drop point (`onHandPlay`) or the hand slot it
+  // still sits in (`answerWith`, the pending panel's own card list). Neither
+  // entry point calls `flyer.raise` itself, so there is exactly one place
+  // that can leave the fly-in half-built (#101, Fix round 1: PendingPrompt
+  // used to bypass this whole path, reopening Carry #2 through its own door).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  const commitAndFly = useCallback(
+    (uid: string, card: CardData, index: number, from: Rect | undefined) => {
+      commitStaged({ main: { uid, card, index }, support: null, phase: 'dispatched' })
       dispatchWatermarkRef.current = eventsRef.current.length
       setLanded(false) // fresh cycle — the flight below has not carried this card yet
       actions?.onResolve?.({ kind: 'defend', card: uid, combo: undefined })
       void (async () => {
         const to = anchors.cover.current?.getBoundingClientRect()
-        if (!reduced && drop.rect && to) {
-          const [el] = await flyer.raise([{ key: 'cover', card: item.card, at: drop.rect }])
+        if (!reduced && from && to) {
+          const [el] = await flyer.raise([{ key: 'cover', card, at: from }])
           if (el) {
             await play('playToCenter', el, {
-              from: drop.rect,
+              from,
               to,
               rotate: COVER_POSE.rot,
               dx: COVER_POSE.dx,
@@ -178,19 +206,43 @@ export function useDefenseStaging({
         // not a moment before (see `landed`'s own comment above).
         setLanded(true)
       })()
+    },
+    [reduced, anchors.cover, actions, flyer.raise, flyer.drop],
+  )
+
+  // GESTURE — pulling a legal defence out of the fan commits and dispatches
+  // at once (no aim, no partner): the plain-defence half of the allowance
+  // `_useBoardStaging.ts`'s own solo release already takes for a release with
+  // no Code Review to pair.
+  const onHandPlay = useCallback(
+    (uid: string, drop: HandPlayDrop): boolean => {
+      const legal = resolveLegal(uid)
+      if (!legal) return false
+      commitAndFly(uid, legal.item, legal.index, drop.rect)
       return true
     },
-    [
-      enabled,
-      pending,
-      defenceOptions,
-      state.you.hand,
-      reduced,
-      anchors.cover,
-      actions,
-      flyer.raise,
-      flyer.drop,
-    ],
+    [resolveLegal, commitAndFly],
+  )
+
+  // The pending panel's own answer (#101, Fix round 1): `PendingPrompt`'s
+  // card list + confirm button choose a uid without ever touching the fan —
+  // there is no drop point to fly from, so the origin is the hand slot the
+  // card still stands in, found the same way `comboBeat.tsx`'s `foldIn` finds
+  // one for a local click-thrown play (`anchors.handSlotAt`, read BEFORE
+  // `commitAndFly` changes `handItems` and reflows the fan out from under it).
+  const answerWith = useCallback(
+    (uid: string): boolean => {
+      const legal = resolveLegal(uid)
+      if (!legal) return false
+      commitAndFly(
+        uid,
+        legal.item,
+        legal.index,
+        rectOf(anchors.handSlotAt(legal.index)) ?? undefined,
+      )
+      return true
+    },
+    [resolveLegal, anchors.handSlotAt, commitAndFly],
   )
 
   // reserved for Task 17 (the sudo-partner click) — nothing on this task's
@@ -281,6 +333,7 @@ export function useDefenseStaging({
     defenceOptions,
     pairRef,
     onHandPlay,
+    answerWith,
     onCardClick,
     cancel,
     release,

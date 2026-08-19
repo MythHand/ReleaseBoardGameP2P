@@ -78,10 +78,18 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
           }
         }
       }
-      // the actor's own answer is already standing where the cover goes —
-      // nothing to move, hand the table back
-      if (mine && handoff) handoff.release()
       await wait(SHOW_HOLD)
+
+      // the actor's own answer was already standing where the cover goes —
+      // nothing to move, hand the table back. Released HERE, immediately
+      // ahead of the exit rather than before the hold above (Fix round 1,
+      // Important 2): `release()` clears the local defender's own static
+      // cover render at once, and `_useDefenseStaging.ts`'s `landed` gate has
+      // nothing else backing that slot — releasing before the hold left it
+      // blank for the whole ~1.2s span. The same "drop right before the
+      // replacement takes over" ordering `comboBeat.tsx`'s own `runRelease`
+      // cost leg already uses for the identical class of bug.
+      if (mine && handoff) handoff.release()
 
       // THE EXIT — one exchange, one send. Each card carries its layer, so the
       // heap keeps the order they lay in on the table (I9), and each lands on

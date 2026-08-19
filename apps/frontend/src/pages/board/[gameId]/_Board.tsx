@@ -36,6 +36,7 @@ import {
   Seat,
   Slider,
   type TableActions,
+  type TableChoice,
   TabRail,
   type TabRailItem,
   Toggle,
@@ -555,6 +556,25 @@ export default function Board({
     staging.cancel()
   }
 
+  // `PendingPrompt` is a second door onto the same `defend` decision the drag
+  // gesture answers (#101, Fix round 1 — Important 1): its own card list and
+  // decline button used to call `actions.onResolve` directly, never touching
+  // `defenseStaging` — so a player who confirmed a card through the panel
+  // left `defenseStaging.staged` (and so `handoffRef`) untouched, and
+  // `defenseBeat.runCovered` fell back to `a.seatBox(plan.defender)` — null
+  // for the local player — leaving the cover slot blank for the whole
+  // exchange. Routed here instead, so both doors produce the identical
+  // commit + flight + dispatch. The decline branch (`card: null`) carries no
+  // card to fly and dispatches straight through, same as every other pending
+  // kind this component answers.
+  const handlePendingResolve = (choice: TableChoice) => {
+    if (choice.kind === 'defend' && choice.card != null) {
+      defenseStaging.answerWith(choice.card)
+      return
+    }
+    actions?.onResolve?.(choice)
+  }
+
   const isHost = role === 'host'
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
@@ -959,7 +979,7 @@ export default function Board({
           pending={state.pending}
           hand={you.hand}
           copy={copy.pending}
-          onResolve={(choice) => actions?.onResolve?.(choice)}
+          onResolve={handlePendingResolve}
         />
       )}
 
