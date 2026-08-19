@@ -123,7 +123,26 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
   api.handoffRef = handoffRef
   api.anchors = anchors
 
-  const beats = useBeats({ live, events, anchors, enabled: true, staging: handoffRef })
+  // A marker for the cost-carrying release test below, not a real staging
+  // hook's clear (this harness has no `paidCost` state to clear at all — it
+  // never wires `useBoardStaging`'s own `clearPaidCost` in here). `play`'s own
+  // mock below cannot see `runRelease`'s cost leg hand off to the discard
+  // exit: `useDiscardExit.tsx` calls `play('centerToDiscard', ...)` through a
+  // SIBLING import, not the `@release/ui/animations` barrel this file mocks
+  // (the same gotcha `comboBeat.test.tsx`'s own header documents). `runRelease`
+  // calls `clearPaidCost` at the EXACT same synchronous point it calls
+  // `send()` (comboBeat.tsx's own `runRelease`), so pushing into the SAME
+  // `played.names` array from here gives an equivalent, observable ordering
+  // signal without needing to intercept that unreachable call.
+  const clearPaidCostRef = useRef<(() => void) | null>(() => played.names.push('clearPaidCost'))
+  const beats = useBeats({
+    live,
+    events,
+    anchors,
+    enabled: true,
+    staging: handoffRef,
+    clearPaidCost: clearPaidCostRef,
+  })
   const state = beats.shadow ?? live
 
   const staging = useBoardStaging({ state, anchors, actions: {}, events, enabled: true })
@@ -182,6 +201,10 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
           (`anchors.seatBox`) — every fixture in this file that throws a play
           from the far side uses 'p2', so one bound seat covers all of them. */}
       <div ref={(el) => anchors.bindSeat('p2', el)} />
+      {/* the cost slot — only the paired-release-with-cost test below needs
+          it (`runRelease`'s cost leg measures it regardless of actor/remote),
+          but binding it unconditionally costs nothing for the other tests */}
+      <div ref={anchors.cost} />
       <div ref={anchors.discardBox} />
       {/* a lean proxy for `_Board.tsx`'s own `<Pile heap={decks.discardHeap}>`
           — `Pile`'s own rendering of a heap is already pinned elsewhere
@@ -219,11 +242,17 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
 // `requestAnimationFrame` the instant the beat starts, and a real (unfaked)
 // rAF registered before `vi.useFakeTimers()` runs on a clock
 // `advanceTimersByTimeAsync` never touches, so the beat would hang forever.
-async function drive(run: () => void) {
+//
+// `steps` defaults to the original budget (30 × 20ms = 600ms) every existing
+// call site here relies on — long enough for a fold's own MERGE_MS/620ms-ish
+// animations. The cost-carrying release test below needs more: its own
+// `wait(SHOW_HOLD)` (1.2s, a real `setTimeout` under these fake timers) alone
+// exceeds the default budget, so that one call passes a larger `steps`.
+async function drive(run: () => void, steps = 30) {
   vi.useFakeTimers()
   try {
     run()
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < steps; i++) {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(20)
       })
@@ -495,4 +524,80 @@ it('adopts the actor’s own staged release pair into the zone instead of re-fol
   const slot = api.anchors?.releaseSlot('p1', 'frontend')
   expect(slot?.querySelector('[data-main]')).toBeTruthy()
   expect(slot?.querySelector('[data-aux]')).toBeTruthy()
+})
+
+// Fix round 1 (post-review, corrected): the same paired-release adoption as
+// above, but this release ALSO carries a cost — the rules charge one
+// regardless of the Code Review combo, and `planBeats.ts`'s `costBefore`
+// treats `cost`/`codeReview` as independent optional fields, so this
+// combination is real. This is the test the review asked for, and the ONLY
+// one in the suite that can actually pin `runRelease`'s ordering requirement
+// (the header comment on `runRelease` in comboBeat.tsx): `comboBeat.test.tsx`'s
+// own harness hands the beat a STATIC `staging` ref that nothing ever mutates
+// mid-test, so moving the cost leg there — before or after the synchronous
+// `handoff` capture — changes nothing observable. The real race is between
+// `_useBoardStaging.ts`'s own passive effect (which clears `staged` once the
+// release card leaves `you.hand`, the SAME mechanism `runAttack`'s header
+// comment describes) and `useBeats`'s layout-effect-driven `drain()`, and only
+// THIS harness wires both hooks for real — the fold above is the actor's OWN
+// staged pair, standing at the centre exactly where a REAL `_useBoardStaging`
+// would leave it.
+it('adopts the actor’s own staged release pair into the zone even when its release also carries a cost', async () => {
+  played.names = []
+  const { rerender } = render(<Harness live={releaseBefore} events={[]} />)
+
+  // the real fold — identical to the no-cost test above
+  act(() => {
+    api.staging?.onHandPlay('support-code-review#0', { x: 0, y: 0 })
+  })
+  act(() => {
+    api.staging?.onCardClick(0)
+  })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700)) // past MERGE_MS (620ms)
+  })
+  expect(api.staging?.staged?.phase).toBe('dispatched')
+  expect(api.handoffRef?.current?.mainUid).toBe('release-frontend#0')
+  played.names = []
+
+  // the engine answers with BOTH halves of the reduction `costBefore` expects:
+  // the cost's own `discarded(releaseCost)` immediately before `released`
+  // (fake/release.ts's `placeRelease`, per planBeats.ts's own comment).
+  const costDiscardEvent: Event = {
+    id: 1,
+    type: 'discarded',
+    player: 'p1',
+    card: 'attack-bug',
+    reason: 'releaseCost',
+  } as Event
+  const releasedEventWithCost: Event = {
+    id: 2,
+    type: 'released',
+    player: 'p1',
+    slot: 'frontend',
+    card: 'release-frontend',
+    codeReview: 'support-code-review',
+  }
+  await drive(
+    () =>
+      rerender(<Harness live={releaseAfter} events={[costDiscardEvent, releasedEventWithCost]} />),
+    // past the cost leg's own `wait(SHOW_HOLD)` (1.2s, a real `setTimeout`
+    // under these fake timers) — the other tests' 600ms budget is not enough.
+    90,
+  )
+
+  // the fast path still engages: adopted, not re-folded
+  expect(played.names).toContain('playToReleaseZone')
+  expect(played.names).not.toContain('foldIntoPair')
+  expect(api.handoffRef?.current).toBeNull()
+  expect(api.staging?.staged).toBeNull()
+  // the cost still hands off to the discard exit — `'clearPaidCost'` is the
+  // Harness's own marker for that hand-off (see its comment: `play`'s mock
+  // cannot observe `useDiscardExit`'s internal `centerToDiscard` call at all,
+  // sibling-import bypass)…
+  expect(played.names).toContain('clearPaidCost')
+  // …and still before the release lands
+  expect(played.names.indexOf('clearPaidCost')).toBeLessThan(
+    played.names.indexOf('playToReleaseZone'),
+  )
 })
