@@ -233,3 +233,29 @@ it('a release the hand cannot pay for is refused, not staged', async () => {
   expect(onPlay).not.toHaveBeenCalled()
   expect(document.querySelectorAll('[data-hand-slot]').length).toBe(1)
 })
+
+// Task 9 (#101): a press on nothing valid takes the staged release back to the
+// fan — the same "changed my mind" rule every other staged play already gets.
+// `cancelRelease` (#101, Task 7) is owner-only, clears the pending, and emits
+// nothing — safe precisely because the release play emitted nothing either.
+it('a press on nothing valid takes the staged release back to the fan', async () => {
+  const onResolve = vi.fn()
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
+  // a press on the table, away from the fan and away from any lit target
+  fireEvent.mouseDown(document.querySelector('[data-board-centre]')?.parentElement as HTMLElement)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 600))
+  })
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
+})
+
+it('a press inside the fan is not a miss', async () => {
+  const onResolve = vi.fn()
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[0]
+  fireEvent.mouseDown(slot)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 100))
+  })
+  expect(onResolve).not.toHaveBeenCalledWith({ kind: 'cancelRelease' })
+})

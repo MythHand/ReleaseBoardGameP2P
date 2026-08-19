@@ -279,6 +279,29 @@ export function useBoardStaging({
   // group; the fan settles to projection order once `staged` clears).
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const cancel = useCallback(() => {
+    // The release awaiting its cost is the one dispatched play that CAN be
+    // taken back: the engine holds it as a pending and has emitted nothing, so
+    // nobody else has seen it. The engine is told first and the card flies
+    // home on its own — a rejection cannot strand it, because the pending
+    // either clears or it does not, and the projection is what puts the card
+    // back in the fan either way. This sits AHEAD of the `dispatched` guard
+    // below: `staging.staged` is already null by the time `cost` exists (the
+    // catch-up effect above clears it the moment the pending echoes back), so
+    // this branch cannot be folded into the `s`-based cancel that follows.
+    if (cost) {
+      arrowCtl.stop()
+      actions?.onResolve?.({ kind: 'cancelRelease' })
+      // The release is still in `you.hand` — the engine never took it out
+      // (only `placeRelease` filters the hand, and that runs after the cost is
+      // paid), so the card to fly home is found there by the uid the pending
+      // names.
+      const held = state.you.hand.find((c) => c.uid === cost.release)
+      const from = anchors.stage.current?.getBoundingClientRect()
+      if (!reduced && from && held) {
+        void arrival.arrive([{ key: held.uid, card: held.card, from }], handItems.length)
+      }
+      return
+    }
     const s = stagedRef.current
     if (!s || s.phase === 'dispatched' || cancellingRef.current || foldingRef.current) return
     arrowCtl.stop()
@@ -319,7 +342,17 @@ export function useBoardStaging({
       handItems.length,
       only.index,
     )
-  }, [reduced, handItems.length, arrival.arrive, anchors.centre, arrowCtl.stop])
+  }, [
+    reduced,
+    handItems.length,
+    arrival.arrive,
+    anchors.centre,
+    anchors.stage,
+    arrowCtl.stop,
+    cost,
+    state.you.hand,
+    actions,
+  ])
 
   // While a support waits for a partner, the cards it can fold with keep
   // their own category accent — the support's own, per ComboStory (the TYPE

@@ -375,15 +375,41 @@ export default function Board({
 
   // Escape cancels a staged card the same way a miss on the table does —
   // armed only while there is something to cancel (I8: a press after the play
-  // already dispatched must not turn into a return flight).
+  // already dispatched must not turn into a return flight). Widened to a
+  // release awaiting its cost too (#101, Task 9): `staging.staged` is already
+  // null by the time `staging.costOptions` is populated — the catch-up effect
+  // in `_useBoardStaging.ts` clears it the moment the pending echoes back —
+  // so the release's own window has nothing else to key its arming off.
   useEffect(() => {
-    if (!staging.staged || staging.dispatched) return
+    const armed = staging.staged ?? staging.costOptions.length > 0
+    if (!armed || staging.dispatched) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') staging.cancel()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [staging.staged, staging.dispatched, staging.cancel])
+  }, [staging.staged, staging.dispatched, staging.costOptions.length, staging.cancel])
+
+  // A release awaiting its cost has no `staging.staged` to key a click-based
+  // miss off (see the Escape effect above) — so its own "changed my mind" is a
+  // dedicated `mousedown` listener instead, ported from the approved source
+  // (`DefenseReleaseStory`'s own `cancelStaged`/mousedown effect): the fan's
+  // own pull gesture starts on mousedown too, so the press this has to ignore
+  // is the SAME event a drag begins on, not the click that follows it. Kept
+  // separate from `handleTableClick` below (rather than widened into it) so a
+  // single physical press cannot fire `staging.cancel()` twice over — once
+  // from this listener, once from the click that follows the same press —
+  // and race `onResolve`/`arrival.arrive` against themselves.
+  useEffect(() => {
+    if (staging.costOptions.length === 0) return
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('[data-hand-slot]')) return
+      staging.cancel()
+    }
+    window.addEventListener('mousedown', onMouseDown)
+    return () => window.removeEventListener('mousedown', onMouseDown)
+  }, [staging.costOptions.length, staging.cancel])
 
   // A click that lands outside any hand slot while a card is staged reads as
   // "changed my mind" — cancel. Clicks that land on a lit target already
