@@ -416,6 +416,112 @@ it('discards the stolen release instead of stealing it when the attacker’s slo
   expect(r.events.some((e) => e.type === 'releaseDestroyed')).toBe(true)
 })
 
+it('opens a fresh window on the stolen release in the thief’s zone', () => {
+  const attacked = reduce(staged([SEC], []), {
+    type: 'ATTACK',
+    player: 'p2',
+    card: SEC.uid,
+    at: 1001,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: null },
+    at: 1002,
+  })
+  // The release moved, and it is fresh where it landed: p2 owns it now, so the
+  // window belongs to p2's slot and p1 is the one who may answer.
+  expect(r.state.players.p2.release.frontend?.card).toEqual(FE)
+  expect(r.state.window).toMatchObject({
+    target: { player: 'p2', slot: 'frontend' },
+    round: 1,
+    passed: [],
+  })
+  expect(r.events.map((e) => e.type)).toEqual([
+    'tookHit',
+    'discarded',
+    'releaseStolen',
+    'windowClosed',
+    'windowOpened',
+  ])
+})
+
+it('does not open a window when the steal fell through to a discard', () => {
+  // The attacker's matching slot is occupied, so `takeRelease` discards the
+  // release instead of stealing it. Nothing fresh arrived in anyone's zone, so
+  // the exchange simply ends.
+  const s = staged([SEC], [])
+  const withAttackerRelease: GameState = {
+    ...s,
+    players: { ...s.players, p2: { ...s.players.p2, release: { frontend: { card: FE2 } } } },
+  }
+  const attacked = reduce(withAttackerRelease, {
+    type: 'ATTACK',
+    player: 'p2',
+    card: SEC.uid,
+    at: 1001,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: null },
+    at: 1002,
+  })
+  expect(r.state.window).toBeNull()
+  expect(r.events.map((e) => e.type)).toEqual([
+    'tookHit',
+    'discarded',
+    'releaseDestroyed',
+    'windowClosed',
+  ])
+})
+
+it('lets the robbed player attack the release that was taken from them', () => {
+  // The point of the window: the victim is a responder now, because responders
+  // are everyone alive except the release's OWNER, and the owner changed.
+  const attacked = reduce(staged([SEC], [BUG]), {
+    type: 'ATTACK',
+    player: 'p2',
+    card: SEC.uid,
+    at: 1001,
+  })
+  const stolen = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: null },
+    at: 1002,
+  })
+  const answer = reduce(stolen.state, {
+    type: 'ATTACK',
+    player: 'p1',
+    card: BUG.uid,
+    at: 1003,
+  })
+  expect(answer.events.some((e) => e.type === 'rejected')).toBe(false)
+  expect(answer.events.some((e) => e.type === 'attacked')).toBe(true)
+})
+
+it('never opens a window for a reflected Security Bug, because it never steals', () => {
+  // The reflection aims at the defender's slot of the attacked type, and that
+  // slot holds the very release being defended — it never left, the attack was
+  // cancelled. `takeRelease` discards on an occupied slot, so no steal, no
+  // window handover; the exchange reopens the ORIGINAL window at round + 1.
+  const attacked = reduce(staged([SEC], [WOMM]), {
+    type: 'ATTACK',
+    player: 'p2',
+    card: SEC.uid,
+    at: 1001,
+  })
+  const r = reduce(attacked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'defend', card: WOMM.uid },
+    at: 1002,
+  })
+  expect(r.events.some((e) => e.type === 'releaseStolen')).toBe(false)
+  expect(r.state.window).toMatchObject({ target: { player: 'p1', slot: 'frontend' }, round: 2 })
+})
+
 it('rejects an attack from someone who cannot respond', () => {
   // p1 owns the target release (frontend) and genuinely holds an attack card
   // (BUG2), so only the responders guard — not "you do not hold that card" —

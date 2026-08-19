@@ -191,7 +191,9 @@ describe('a zone completed by something other than a play', () => {
       card: steal.uid,
       at: 1100,
     })
-    // p2 holds no defence, so the steal resolves and the window closes with it.
+    // p2 holds no defence, so the steal resolves — into a FRESH window on p1's
+    // zone rather than an instant win, the same as the AI-placed release above:
+    // a stolen release has repelled nothing yet either (`resolution.md` §1, #95).
     const resolved = thrown.state.pending
       ? reduce(thrown.state, {
           type: 'RESOLVE',
@@ -202,6 +204,13 @@ describe('a zone completed by something other than a play', () => {
       : thrown
 
     expect(resolved.state.players.p1.release.database).toBeTruthy()
-    expect(resolved.state.over).toEqual({ winner: 'p1', condition: 'release' })
+    expect(resolved.state.over).toBeNull()
+    expect(resolved.state.window).toMatchObject({ target: { player: 'p1', slot: 'database' } })
+
+    const settled = reduce(resolved.state, {
+      type: 'WINDOW_EXPIRED',
+      at: resolved.state.window?.deadline ?? 2000,
+    })
+    expect(settled.state.over).toEqual({ winner: 'p1', condition: 'release' })
   })
 })

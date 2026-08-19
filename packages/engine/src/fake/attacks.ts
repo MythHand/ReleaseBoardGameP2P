@@ -5,7 +5,7 @@ import type { CardInstance, CardUid, GameState, Pending, PlayerId, ReleaseSlot }
 import type { PendingView } from '../view'
 import { bankToDiscard, createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
 import { stealRandom } from './handAttacks'
-import { canAttackWith, closeWindow, openWindow, respondersFor } from './window'
+import { canAttackWith, closeWindow, handOverWindow, openWindow, respondersFor } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
@@ -306,6 +306,24 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
       hitId,
     )
     const hit = takeRelease(spent, log, action.player, slot, stealer)
+    // A steal puts a FRESH release in the thief's zone, and by the rules every
+    // fresh release gets its own attack time however it got there
+    // (`resolution.md` §1) — so the window is handed over rather than closed on
+    // a win. `takeRelease` reports nothing, and it does not always steal: an
+    // occupied slot in the thief's zone sends the release to the discard
+    // instead, leaving whatever the thief already held there untouched — so
+    // this checks that the card now in the thief's slot IS the one just
+    // attacked, rather than trusting `stealer` to mean a steal happened or the
+    // slot's mere occupancy (which a pre-existing release also satisfies) to
+    // mean this release just arrived.
+    const thief = stealer
+    const taken = thief ? hit.players[thief].release[slot] : undefined
+    if (thief && taken && taken.card.uid === w.target.card) {
+      return {
+        state: handOverWindow(hit, log, { player: thief, slot, card: taken.card.uid }, action.at),
+        events: log.events,
+      }
+    }
     return { state: closeWindow(hit, log), events: log.events }
   }
 
