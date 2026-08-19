@@ -196,10 +196,108 @@ it('hands the table back without folding when the actor’s own staged play arri
     attacker: 'p1',
     card: 'attack-bug',
     sudo: false,
+    target: 'p2',
   }
   await drive(() => api.beat?.runAttack(plan, ctx))
   expect(release).toHaveBeenCalledTimes(1)
   expect(played.names).not.toContain('foldIntoPair')
+})
+
+// ===== Fix C, finding 4 — the attack the cover is about to cover =====
+//
+// Dropping the fold's carrier is only safe because the centre's static pending
+// render takes the card over on the same commit. When the throw and its answer
+// arrive in ONE sync flush — the ordinary case for every peer that is neither
+// attacker nor defender, in a star topology — `base` predates the batch and
+// carries no pending, so nothing takes over: the attack blinks out, and the
+// `covered` beat behind it holds a defence over an empty slot for SHOW_HOLD.
+// The beat publishes the table it just made instead.
+it('publishes the attack it just folded in, so the cover has something to cover', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  const published: BoardState[] = []
+  render(<Probe />)
+  const plan: Extract<BeatPlan, { kind: 'attackPlaced' }> = {
+    kind: 'attackPlaced',
+    key: 'attack:5',
+    eventId: 5,
+    attacker: 'p2',
+    card: 'attack-bug',
+    sudo: false,
+    target: 'p3', // neither us nor the thrower: we are watching
+  }
+  // `base` has no pending — this peer is seeing the throw for the first time
+  await drive(() => api.beat?.runAttack(plan, { base, publish: (s) => published.push(s) }))
+  expect(published).toHaveLength(1)
+  expect(published[0].pending).toMatchObject({
+    kind: 'defend',
+    player: 'p3',
+    attacker: 'p2',
+    attackCard: 'attack-bug',
+    sudo: false,
+  })
+})
+
+// The one peer this must never do it for. `options` is redacted for everyone
+// but the pending's owner, so an empty one published onto OUR OWN board would
+// say a defence is owed and offer no legal card to give it. Unreachable in
+// practice — a peer who answered has necessarily seen the attack in an earlier
+// batch — but the guard is what makes that a fact rather than a hope.
+it('never tells us a defence is owed when the answer would be ours', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  const published: BoardState[] = []
+  render(<Probe />)
+  const plan: Extract<BeatPlan, { kind: 'attackPlaced' }> = {
+    kind: 'attackPlaced',
+    key: 'attack:5',
+    eventId: 5,
+    attacker: 'p2',
+    card: 'attack-bug',
+    sudo: false,
+    target: 'p1', // us
+  }
+  await drive(() => api.beat?.runAttack(plan, { base, publish: (s) => published.push(s) }))
+  expect(published).toHaveLength(0)
+})
+
+// And it stays out of the way in the ordinary case: the pending was already on
+// screen before this batch, so the static render is already there to take over
+// and there is nothing to publish.
+it('publishes nothing when the attack was already standing before this batch', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  const published: BoardState[] = []
+  render(<Probe />)
+  const standing = {
+    ...base,
+    pending: {
+      kind: 'defend',
+      player: 'p3',
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      sudo: false,
+      options: [],
+      openedAt: 0,
+      deadline: 0,
+      scope: 'hand',
+    },
+  } as unknown as BoardState
+  await drive(() =>
+    api.beat?.runAttack(
+      {
+        kind: 'attackPlaced',
+        key: 'attack:5',
+        eventId: 5,
+        attacker: 'p2',
+        card: 'attack-bug',
+        sudo: false,
+        target: 'p3',
+      },
+      { base: standing, publish: (s) => published.push(s) },
+    ),
+  )
+  expect(published).toHaveLength(0)
 })
 
 it('folds an opponent’s attack in from their seat', async () => {
@@ -213,6 +311,7 @@ it('folds an opponent’s attack in from their seat', async () => {
     attacker: 'p2',
     card: 'attack-bug',
     sudo: false,
+    target: 'p2',
   }
   await drive(() => api.beat?.runAttack(plan, ctx))
   expect(played.names).toEqual(['foldIntoPair'])
@@ -229,6 +328,7 @@ it('folds both halves of a sudo pair in from the attacker’s seat', async () =>
     attacker: 'p2',
     card: 'attack-bug',
     sudo: true,
+    target: 'p2',
   }
   await drive(() => api.beat?.runAttack(plan, ctx))
   expect(played.names.filter((n) => n === 'foldIntoPair')).toHaveLength(2)
@@ -248,6 +348,7 @@ it('folds the local player’s own click-thrown attack in from its hand slot whe
     attacker: 'p1',
     card: 'attack-bug',
     sudo: false,
+    target: 'p1',
   }
   await drive(() => api.beat?.runAttack(plan, ctx))
   expect(played.names).toEqual(['foldIntoPair'])

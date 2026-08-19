@@ -495,6 +495,14 @@ combo, or a local window attack that staged nothing at all.
   then `foldIntoPair` per half from the actor's seat or the hand slot a local thrower's card left) —
   and settles at the centre pending, `[data-pending-play]`, upgraded from a lone card to a `CardPair`
   under `pending.sudo`.
+
+  Dropping the fold's carrier is safe only because that static render takes the card over on the
+  same commit. When the throw and its answer arrive in ONE sync flush, `base` predates the batch and
+  carries no pending, so there is nothing to take over — so the beat **publishes** the table it just
+  made (`pending: defend`), which `useBeats` renders as the shadow and hands on as the next beat's
+  base. Never published when the answer is ours to give: `options` is redacted for everyone but the
+  owner, so an empty one would tell our own board a defence is owed with no legal card to give it.
+  The corner that leaves is in [`backlog.md`](./backlog.md) and the audit page's register.
 - **`releasePlaced`**, planned from every `released` event — widened from `codeReview`-only (Task 11,
   #101): a plain release now runs the same beat, and the beat also carries the release's own cost leg
   (see "Defending a release" below for the cost, board-side). Three origins, because a release has
@@ -520,6 +528,13 @@ combo, or a local window attack that staged nothing at all.
   renders still carries the cost pending, so without it the card would be on screen twice for the
   whole flight. The landing pose is `ReleaseZone`'s own static render — the beat's last frame IS the
   projection.
+  What "the pending exchange" MEANS to the planner is the attack as the WALK sees it, not as the
+  board saw it before the batch: `planBeats` carries an `openAttack` that starts at `before.pending`
+  and that every `attacked` moves on — the same shape `piles` has always had for the deck counts.
+  Without it a one-flush batch built no `covered` and no `pairToDiscard` at all, and the exchange's
+  cards fell through to the ordinary discard routing, flying out of the attacker's SEAT instead of
+  off the centre. In a star topology that batch is the ordinary case for every watching peer.
+
 - **`pairToDiscard`**, planned from the resolution's `discarded` pair: `planBeats` matches the
   pending exchange's two halves — sudo-first, since a sudo Rollback banks only the sudo half — ahead
   of the ordinary discard routing (the centre is in no hand and no zone, so `sourceOf` would never
@@ -1717,7 +1732,11 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
    the attack popped from 0° to −4° on the exit's first frame (#101, Fix A, Defect 2). The gap
    between the two arrivals is in [`backlog.md`](./backlog.md) and the audit page's register.
 4. **Answer** — a defence covers the attack; both leave as **one exchange** through `useDiscardExit`,
-   each carrying its table layer so the heap keeps the order they lay in (**I9**).
+   each carrying its table layer so the heap keeps the order they lay in (**I9**). The cover's own
+   source is resolved in the order `foldIn` resolves one — the fan slot the card left, then the
+   defender's seat — with the cover slot itself as the last resort: `seatBox` is null for the LOCAL
+   player, so our own defence on a REJOIN (no handoff to inherit) used to neither fly nor stand, and
+   the exit then started from an empty box.
    - The player's own **Sudo** takes its **own** slot with an arrow pointing out of it, then folds with
      the chosen defence into a pair — a frame-by-frame merge of the two elements already on screen, no
      duplicate and no teleport.
@@ -1729,9 +1748,20 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
    or the Sudo awaiting its defence) through `useHandArrival`, into the middle of the fan. **On the
    board**, taking back a Release still waiting on its cost is not a local undo: `_useBoardStaging.ts`'s
    `cancel` dispatches the engine's own `cancelRelease` choice, and — in the same call, no `await` in
-   between — the card flies home from the stage slot right away, optimistically: a rejection cannot
-   strand it, since the projection puts the card back in the fan either way, whether the pending
-   clears or not.
+   between — the card flies home right away, optimistically: a rejection cannot strand it, since the
+   projection puts the card back in the fan either way, whether the pending clears or not. **From
+   where it actually stands**: a solo Release from the stage slot, a Code-Review pair from the
+   CENTRE, both halves off the pair flyer (#101, Fix C). The press lands on the table root rather
+   than on `window`, so nothing portalled above the board can cancel a card the player never touched.
+
+**A COMBO Release's cost step is the same step, with one difference the board has to respect.** The
+engine raises the identical `discardForRelease` pending (`codeReview` merely rides along), but
+`PendingView` carries `release` and NOT `codeReview` — so `staged` is the only thing that knows the
+pair, and unlike a solo Release it is deliberately not cleared when the pending echoes back. The
+pair therefore stays `merged` for the whole step, and the fan's merged-pair pointer guard has to
+yield to it: the fan is that step's only picker (the panel is suppressed for this pending, and
+`Hand` has no keyboard path), so an inert fan made the cost unpayable by any input at all. See
+`backlog.md` for the keyboard half, which is still open.
 
 **Params & timings.** `SHOW_HOLD` 1200 ms · `LAND_HOLD` 700 ms · `MERGE_MS` 620 ms · poses: attack
 `rot −4`, cover `rot 6, dx 16, dy −12`, sudo `rot −7`.
@@ -1739,6 +1769,13 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
 **Invariants.** **I1** measure every slot before the state clears · **I6** aim at card boxes, never at
 rotated slot rects · **I8** the sequences span many awaits — refs, not closures · **I9** each card
 carries its layer into the heap.
+
+**Across a match.** `<Board>` is not remounted for a rematch (`_layout.tsx` gives it no `key`), so
+both gestures take a `matchKey` and wipe themselves on it — the same boundary `useBeats` already
+resets on. Without it a rematch that interrupted a cost step left the paid card lying on the new
+table for good. Within a match, where the actor's own Release is relative to the stage slot is ONE
+`StageState` (`none` / `flying` / `standing` / `leaving`) that every play sets, rather than three
+booleans a play could inherit from the one before it.
 
 **Rules encoded.** Two Releases are playable, one per zone slot, and the next waits for the current
 one's attack window to close — the dock's green state is that moment. The attack always answers the

@@ -4,6 +4,7 @@ import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
+import { COVER_POSE } from '~/entities/game/board'
 import { useDefenseBeat } from './defenseBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -142,7 +143,12 @@ function harness() {
     cover: { current: cover },
     discardBox: { current: node() },
     pileBox: () => null,
-    seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
+    // Only OPPONENTS' seats are bound on the real board — `_Board.tsx` renders
+    // no seat for the local player — so `seatBox` answers null for 'p1'. That
+    // asymmetry is what finding 6 (#101, Fix C) runs into: on a rejoin our own
+    // defence has no handoff to inherit AND no seat to fly from.
+    seatBox: (player: string) =>
+      player === 'p1' ? null : { left: 0, top: 0, width: 150, height: 210 },
     seatOf: () => node(),
     handSlotAt: () => null,
     releaseSlot: () => node(),
@@ -331,6 +337,40 @@ it('carries the attack’s own sudo out with it as the pair it was', async () =>
     aux: expect.objectContaining({ id: 'support-sudo' }),
     auxScatter: scatterAt(14),
   })
+})
+
+// ===== Fix C, finding 6 — the cover on a rejoin =====
+//
+// The cover branch runs for OUR OWN defence whenever there is no handoff to
+// inherit — a rejoin, or a replay, where the gesture that would have staged it
+// never happened on this peer. It then asked `seatBox` for a source, and
+// `seatBox` is null for the local player (only opponents' seats are bound), so
+// it fell out of the branch having done nothing: the cover never flew AND
+// never stood, and the exit that follows started from an empty box.
+//
+// A source it can always answer, in the same order `comboBeat`'s own `foldIn`
+// resolves one: the fan slot the card left, then the actor's seat, and — when
+// neither exists, which is exactly the rejoin — the cover slot itself, so the
+// card at least stands where it belongs instead of vanishing.
+it('stands our own cover even with no handoff and no seat to fly from', async () => {
+  played.names = []
+  played.calls = []
+  exits.items = []
+  const { api, Probe, cover } = harness()
+  render(<Probe />) // no `staging` — nothing to inherit, as on a rejoin
+  await drive(() => api.beat?.runCovered({ ...cancelPlan(), defender: 'p1', attacker: 'p2' }, ctx))
+  const flights = played.calls.filter((c) => c.name === 'playToCenter')
+  expect(flights).toHaveLength(1)
+  // it lands at the cover slot, in the cover's own pose — the same end state
+  // the flight from a seat reaches
+  const box = cover.getBoundingClientRect()
+  expect(flights[0].params).toMatchObject({
+    from: { left: box.left, top: box.top, width: box.width, height: box.height },
+    to: { left: box.left, top: box.top, width: box.width, height: box.height },
+    rotate: COVER_POSE.rot,
+  })
+  // and the exchange still leaves from a real box, not an empty one
+  expect(exits.items.map((i) => i.card.id)).toContain('defense-hotfix')
 })
 
 // ===== rollback returns the attack, instead of banking it =====

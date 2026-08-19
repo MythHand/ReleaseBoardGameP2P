@@ -42,6 +42,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -78,6 +79,10 @@ export interface StagedCard {
   index: number // index in you.hand at pull time — where a cancel returns it
 }
 
+/** Where the actor's own release is, relative to the stage slot — see the
+ *  `stage` state below for the whole reasoning. */
+export type StageState = 'none' | 'flying' | 'standing' | 'leaving'
+
 export interface StagedPlay {
   support: StagedCard | null // the pulled Sudo / Code Review — null for a plain aim
   main: StagedCard | null // the partner once picked, or the plain pulled card
@@ -108,10 +113,11 @@ export interface BoardStaging {
   costOptions: string[]
   /** a click in the fan pays the cost and dispatches the RESOLVE */
   onCostPick: (uid: string) => void
-  /** true once a pulled release's own flight to the stage slot has landed —
-   * gates `_Board.tsx`'s static stage-slot render against the carrier that is
-   * still flying it there */
-  stageLanded: boolean
+  /** true exactly while the actor's own release is STANDING at the stage slot
+   * — the one thing `_Board.tsx`'s static stage-slot render needs to know.
+   * Derived from `StageState` below, so the render asks one question instead
+   * of three. */
+  stageStanding: boolean
   /** the card that paid a staged release's cost, once its own flight has
    * landed — held open beside the release until `clearPaidCost` below moves
    * it on (the combo beat's own job, #101 Task 11) */
@@ -121,31 +127,11 @@ export interface BoardStaging {
    * `runRelease`. Also fired here directly under reduced motion, where no
    * beat ever runs to call it (see the effect below). */
   clearPaidCost: () => void
-  /** true while a CANCELLED release's own return flight is airborne (Task 9,
-   * fix round 1) — `_Board.tsx`'s static stage-slot render must hide for this
-   * span too, alongside `stageLanded`, or the return flight and the static
-   * card it is carrying away are both on screen at once for as long as the
-   * projected pending takes to catch up (a full round trip). Distinct from
-   * `stageLanded`: that one answers whether the INCOMING flight landed, this
-   * one whether an OUTGOING one has started — conflating them would hide the
-   * release during the unrelated cost-payment flight too. */
-  releaseReturning: boolean
-  /** true from the moment the placement beat picks the standing release up
-   * until that beat is over (#101, Fix A). The THIRD member of the same family
-   * as `stageLanded`/`releaseReturning`, and for the same reason they are
-   * three flags rather than one: `stageLanded` answers "has the INCOMING
-   * flight finished", `releaseReturning` "is a CANCEL's flight airborne", and
-   * this one "has the PLACEMENT beat taken the card over". The shadow the beat
-   * renders still carries the `discardForRelease` pending for its whole run —
-   * that is what `base` IS — so `costPending`/`stagedReleaseLocal` are exactly
-   * as they were, and without this the static stage-slot render and the
-   * carrier flying the very same card into the zone are both on screen for the
-   * whole flight. */
-  releasePlacing: boolean
-  /** the placement beat's own setter for the flag above (#101, Fix A), called
-   * in the same synchronous burst as the carrier's own `raise` so the two swap
-   * in ONE commit — see `comboBeat.tsx`'s `runRelease`. Threaded through a ref
-   * the same way `clearPaidCost` is, and for the same reason. */
+  /** the placement beat's own hand-off (#101, Fix A): the beat calls this in
+   * the same synchronous burst as its carrier's own `raise`, so the static
+   * render and the carrier swap in ONE commit — see `comboBeat.tsx`'s
+   * `runRelease`. Threaded through a ref the same way `clearPaidCost` is, and
+   * for the same reason. It moves the stage machine to `'leaving'`. */
   takeStagedRelease: () => void
   // The combo beat's own clear (#100, Task 11): once a dispatched play's
   // `attackPlaced`/`releasePlaced` beat has taken the staged node over — it is
@@ -161,6 +147,18 @@ export interface Options {
   actions?: TableActions
   events: Event[] // the feed — watched for `rejected` after dispatch
   enabled: boolean // false while the deal or an exclusive beat owns the table
+  /**
+   * The match this staging belongs to (#101, Fix C, finding 3). The board is
+   * NOT remounted for a rematch — `_layout.tsx` gives `<Board>` no `key`, so
+   * one component instance serves every match of a session — and everything
+   * this hook holds is per-match: a pair standing at the centre, a release at
+   * the stage slot, the card that paid its cost. `useBeats` already resets
+   * itself on this same boundary (`intro.key`); nothing reset the gestures, so
+   * a rematch that interrupted a cost step left the paid card lying on the new
+   * table for good, and the new match's first beat called `clearPaidCost` /
+   * `takeStagedRelease` against state belonging to a match that had ended.
+   */
+  matchKey?: string | null
 }
 
 export function useBoardStaging({
@@ -169,6 +167,7 @@ export function useBoardStaging({
   actions,
   events,
   enabled,
+  matchKey = null,
 }: Options): BoardStaging {
   const [staged, setStaged] = useState<StagedPlay | null>(null)
   // True from the moment a cancel is ACCEPTED until its return flight lands —
@@ -233,12 +232,14 @@ export function useBoardStaging({
     cancellingRef.current = false
     setCancelling(false)
     commitStaged(null)
-    // Unconditional, same reason `commitStaged(null)` above is: this callback
-    // fires for EVERY arrival landing, whichever cancel started it (a plain
-    // aim/pair's own single-card cancel never touches this flag, so clearing
-    // it here is a harmless no-op for that path — see `releaseReturning`'s own
-    // declaration below for what it guards).
-    setReleaseReturning(false)
+    // The outgoing flight this callback belongs to has landed, so a release
+    // that was `leaving` is now simply gone. Conditional, unlike the clears
+    // above: this fires for EVERY arrival landing, and a plain aim's own
+    // cancel must not knock a legitimately `standing` release out of its slot
+    // (nothing can produce that overlap today — a release standing means no
+    // other play is staged — but a machine that cannot be corrupted by an
+    // unrelated caller is worth more than a comment saying it isn't).
+    setStage((s) => (s === 'leaving' ? 'none' : s))
   })
 
   const targets = useMemo(
@@ -259,51 +260,46 @@ export function useBoardStaging({
       : null
   const costOptions = useMemo(() => cost?.options ?? [], [cost])
 
-  // Two pieces of local, purely-visual state a release's own cost cycle needs
-  // that neither `staged`'s phase machine nor the projection can supply:
+  // WHERE THE ACTOR'S OWN STANDING RELEASE IS — one value, not three booleans
+  // (#101, Fix C, finding 5).
   //
-  // `stageLanded` — true once the LOCAL flight that carries a pulled release
-  // from the fan to the stage slot has actually finished (or at once, under
-  // reduced motion). `_Board.tsx`'s static stage-slot render is gated on this:
-  // without it, on a fast connection (the host peer's own round trip can be
-  // near-instant) the projected `discardForRelease` pending can arrive WHILE
-  // that flight is still in the air, and a static render keyed only off the
-  // pending would stand the release at the slot a SECOND time, on top of the
-  // carrier still flying it there.
+  // This used to be `stageLanded` + `releaseReturning` + `releasePlacing`, each
+  // added by a different round for a different flight, and `_Board.tsx` asked
+  // all three at once (`stageLanded && !releaseReturning && !releasePlacing`).
+  // Three independent booleans describing one card's whereabouts can disagree,
+  // and they did: they were reset only inside `onHandPlay`'s `soloRelease` arm,
+  // so a release played a DIFFERENT way afterwards — a Code Review combo, which
+  // stands its release at the centre rather than here — inherited whatever the
+  // previous one left behind. Play a solo release, have it rejected, then play
+  // a combo one, and the combo's release rendered at the stage slot as well as
+  // in the pair: the same card on screen twice, decided by what you happened to
+  // play first.
   //
+  // As one machine the question does not arise. Every play sets it (see
+  // `onHandPlay` and `onCardClick`'s `finish` below), so nothing can carry
+  // over, and `_Board.tsx` asks one thing: is it standing?
+  //
+  //   none      nothing of ours is at the stage slot — including a COMBO
+  //             release, which stands at the centre as half of its pair
+  //   flying    a carrier is bringing it there (the pull's own flight)
+  //   standing  it is there; the static render is the board's to draw
+  //   leaving   a carrier is taking it away — home on a cancel, or into the
+  //             zone once the placement beat takes it over
+  //
+  // `standing` is the only state that renders. `flying` and `leaving` are both
+  // "a carrier holds this card", which is why neither may: the projected
+  // `discardForRelease` pending is a network round trip behind, so a render
+  // keyed on the pending alone would stand a second copy of the card under a
+  // carrier already carrying it — the doubling bug this family was grown to
+  // prevent, once per direction.
+  const [stage, setStage] = useState<StageState>('none')
   // `paidCost` — the card that paid the cost, once ITS OWN flight (below,
   // `onCostPick`) has landed. The engine never says which uid was spent — only
   // the resolver knows, since it is the resolver's own click that named it —
-  // so this is the one place that can hold it. It is not cleared once set: by
-  // the rules the cost is shown open beside the release, not discarded on the
-  // spot, and moving it on from there is a later task's job (see `onCostPick`).
-  const [stageLanded, setStageLanded] = useState(false)
+  // so this is the one place that can hold it. By the rules the cost is shown
+  // open beside the release rather than discarded on the spot; the combo beat
+  // moves it on (`clearPaidCost`).
   const [paidCost, setPaidCost] = useState<{ uid: string; card: CardData } | null>(null)
-  // `releaseReturning` — a THIRD, deliberately separate flag (Task 9, fix round
-  // 1): true from the moment a cancel starts the release's animated return
-  // flight until that flight lands. It is not folded into `stageLanded` above,
-  // even though both gate the same static render — `stageLanded` answers "has
-  // the INCOMING flight finished", this answers "is an OUTGOING one airborne
-  // right now", and conflating the two would make `_Board.tsx`'s guard read as
-  // one concern when it is actually two. Without it: `state.pending` is a
-  // network round trip away from clearing (essentially always slower than a
-  // single animation frame), so the projected `discardForRelease` pending —
-  // and so `stagedRelease`'s other two inputs, `costPending`/`stagedReleaseLocal`
-  // — stays exactly as it was for the whole return flight, and a static render
-  // keyed only off THOSE would stand the release at the stage slot a SECOND
-  // time, on top of the return flight carrying the very same card away. Never
-  // set on the reduced-motion path (there is no flight to guard), which is
-  // already correct without it: `cost` itself clears on the very next render.
-  const [releaseReturning, setReleaseReturning] = useState(false)
-  // `releasePlacing` — the third of them (#101, Fix A), set by the placement
-  // beat rather than by anything in this hook, because the beat is the only
-  // thing that knows the moment the release actually leaves the stage slot.
-  // Cleared on the next release's own pull below (`onHandPlay`), the same
-  // fresh-cycle discipline `stageLanded`/`paidCost` already keep — never
-  // cleared at the end of the beat, because by then the queue has drained and
-  // `costPending`/`stagedReleaseLocal` have both gone with the shadow, so
-  // there is nothing left for this flag to gate either way.
-  const [releasePlacing, setReleasePlacing] = useState(false)
 
   const handItems = useMemo(() => {
     const out = new Set(
@@ -359,24 +355,76 @@ export function useBoardStaging({
     if (cost) {
       arrowCtl.stop()
       actions?.onResolve?.({ kind: 'cancelRelease' })
-      // The release is still in `you.hand` — the engine never took it out
-      // (only `placeRelease` filters the hand, and that runs after the cost is
-      // paid), so the card to fly home is found there by the uid the pending
-      // names.
+      // A COMBO release is still staged at this point and a solo one is not,
+      // and that asymmetry is deliberate on both sides (#101, Fix C): the
+      // catch-up effect below clears `staged` for a solo release because
+      // `_Board.tsx` can rebuild its render from the projection's own pending,
+      // and leaves it for a combo because it cannot — `pendingView` carries
+      // `release` but not `codeReview`, so `staged` is the ONLY thing that
+      // knows the pair. Which means the pair is standing at the CENTRE, on the
+      // pair flyer, and both halves have to go home from there. The earlier
+      // version of this branch was written for the solo case alone: it flew
+      // one card home from the stage slot — empty, for a combo — left the Code
+      // Review behind, and never cleared `staged`, so the fan stayed inert.
+      const merged = stagedRef.current
+      if (merged?.merged && merged.support && merged.main) {
+        const cRect = anchors.centre.current?.getBoundingClientRect()
+        const el = pairRef.current
+        if (reduced || !cRect) {
+          // no flight, so nothing will land to clear this later — the machine
+          // has to be put back by hand, or the fan never becomes live again
+          if (el) el.style.opacity = '0'
+          commitStaged(null)
+          return
+        }
+        cancellingRef.current = true
+        setCancelling(true)
+        void arrival.arrive(
+          [
+            {
+              key: merged.support.uid,
+              card: merged.support.card,
+              el,
+              anchor: 'aux' as const,
+              from: cRect,
+            },
+            {
+              key: merged.main.uid,
+              card: merged.main.card,
+              el,
+              anchor: 'main' as const,
+              from: cRect,
+            },
+          ],
+          handItems.length,
+          merged.support.index,
+        )
+        // measured while it was still visible, hidden now — ComboStory's own
+        // `hideFlyer`, and the same order the plain merged cancel below uses.
+        // `staged` itself is cleared by the arrival's own landing, which is
+        // what keeps both halves out of the fan for the whole flight.
+        if (el) el.style.opacity = '0'
+        return
+      }
+      // A SOLO release: `staged` is already null, and the card is standing at
+      // the stage slot. It is still in `you.hand` — the engine never took it
+      // out (only `placeRelease` filters the hand, and that runs after the
+      // cost is paid) — so it is found there by the uid the pending names.
       const held = state.you.hand.find((c) => c.uid === cost.release)
       const from = anchors.stage.current?.getBoundingClientRect()
       if (!reduced && from && held) {
-        // Fix round 1 (post-review): `state.pending` is a network round trip
-        // away from clearing — essentially always slower than a single
-        // animation frame — so `_Board.tsx`'s static stage-slot render (still
-        // keyed off that same, not-yet-cleared pending) would otherwise stand
-        // the release at the slot a second time, on top of this very flight
-        // carrying it away. Set only on this animated branch: under reduced
-        // motion there is no flight to guard, and `cost` itself clears on the
-        // very next render regardless.
-        setReleaseReturning(true)
+        // `state.pending` is a network round trip away from clearing —
+        // essentially always slower than a single animation frame — so
+        // `_Board.tsx`'s static stage-slot render (still keyed off that same,
+        // not-yet-cleared pending) would otherwise stand the release at the
+        // slot a second time, on top of this very flight carrying it away.
+        setStage('leaving')
         void arrival.arrive([{ key: held.uid, card: held.card, from }], handItems.length)
+        return
       }
+      // Reduced motion, or nothing measurable: there is no flight to guard
+      // against and none to land, so the machine goes back at once.
+      setStage('none')
       return
     }
     const s = stagedRef.current
@@ -534,14 +582,17 @@ export function useBoardStaging({
             ? { support: null, main: card, phase: 'dispatched', merged: false }
             : { support: card, main: null, phase: 'partner', merged: false },
       )
+      // EVERY pull sets the stage machine, not only a release's — that is what
+      // stops one play inheriting the last one's whereabouts (#101, Fix C,
+      // finding 5). A solo release is on its way to the stage slot; anything
+      // else leaves that slot empty, and says so. Placed after the guards
+      // above on purpose: a refused pull touches no state at all.
+      setStage(soloRelease ? 'flying' : 'none')
       if (soloRelease) {
         dispatchWatermarkRef.current = eventsRef.current.length
         // fresh play, fresh cycle — a stale `paidCost` from an earlier release
-        // this match must not bleed into this one, and `stageLanded` starts
-        // false again: the flight below has not carried this card yet.
-        setStageLanded(false)
+        // this match must not bleed into this one
         setPaidCost(null)
-        setReleasePlacing(false)
         actions?.onPlay?.(uid, undefined, undefined)
       }
       void (async () => {
@@ -555,8 +606,10 @@ export function useBoardStaging({
         }
         // the carrier has dropped it (or, under reduced motion, there was
         // never one) — `_Board.tsx`'s static render may take over now, not a
-        // moment before (see `stageLanded`'s own comment above).
-        if (soloRelease) setStageLanded(true)
+        // moment before. Guarded on `flying` rather than written outright: a
+        // cancel or a rejection can land inside this flight's own span, and
+        // the release must not come back to `standing` after it has left.
+        if (soloRelease) setStage((s) => (s === 'flying' ? 'standing' : s))
         else aimFromCentre()
       })()
       return true
@@ -696,6 +749,17 @@ export function useBoardStaging({
         } else {
           commitStaged({ support, main, phase: 'dispatched', merged: true })
           dispatchWatermarkRef.current = eventsRef.current.length
+          // A COMBO release — the other way a release reaches the table, and
+          // the one the stage machine must be told about explicitly (#101,
+          // Fix C, finding 5). Its release stands at the CENTRE as half of the
+          // pair, so the stage slot is empty and must render nothing; without
+          // this, whatever an earlier solo release left the machine at would
+          // decide, and a leftover `standing` would draw this release at the
+          // stage slot as well as in the pair. `paidCost` is cleared here for
+          // the same fresh-cycle reason `onHandPlay` clears it: this release
+          // carries a cost too, and the last one's must not stand beside it.
+          setStage('none')
+          setPaidCost(null)
           actions?.onPlay?.(main.uid, undefined, support.uid)
         }
       }
@@ -873,6 +937,40 @@ export function useBoardStaging({
     }
   }, [events, cancel])
 
+  // A NEW MATCH wipes the gesture (#101, Fix C, finding 3) — same boundary,
+  // same idiom and the same reason as `useBeats`'s own reset: the board is not
+  // remounted for a rematch, so without this everything below outlives the
+  // match it belonged to. A card standing at the centre keeps standing on the
+  // new table; a paid cost keeps lying beside it (`_Board.tsx` renders
+  // `paidCost` ungated); the stage machine keeps a `standing` nobody can see,
+  // which the first release of the NEW match would then inherit — finding 5's
+  // ordering bug, one level up, where its own "unobservable within a match"
+  // reasoning no longer holds.
+  //
+  // `useLayoutEffect`, not `useEffect`: `useBeats` arms the new match's queue
+  // in a layout effect too, and a beat must never run against a gesture the
+  // dead match left behind. Keyed on the match, so it fires once per rematch
+  // and never on an ordinary render.
+  //
+  // The carriers go with it for the same reason the runners' own do: a flyer
+  // mid-flight, a parked hand-arrival and an armed arrow all belong to the
+  // gesture, not to the queue, and they would otherwise keep crossing a table
+  // that no longer has the hand they were flying to.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `matchKey` is the boundary; everything the body touches is a stable setter, a ref or a memoized reset, and listing them would fire this on renders that are not a rematch
+  useLayoutEffect(() => {
+    commitStaged(null)
+    cancellingRef.current = false
+    foldingRef.current = false
+    dispatchWatermarkRef.current = 0
+    setCancelling(false)
+    setStage('none')
+    setPaidCost(null)
+    if (pairRef.current) pairRef.current.style.opacity = '0'
+    arrowCtl.stop()
+    flyer.drop()
+    arrival.reset()
+  }, [matchKey])
+
   // the combo beat's own clear (#100) — no flight, just done. Unguarded, unlike
   // `cancel()`: the beat only ever calls this once ITS OWN read of the handoff
   // says the staged node is the one standing at the centre, so there is
@@ -892,7 +990,14 @@ export function useBoardStaging({
   // same shape and the same seam as `clearPaidCost` above, for a different
   // card at a different moment: the cost leaves ~SHOW_HOLD before the release
   // itself does, so one call cannot serve both.
-  const takeStagedRelease = useCallback(() => setReleasePlacing(true), [])
+  // Guarded on `standing` for the same reason the pull's own landing is
+  // guarded on `flying`: the beat is the only caller, but it fires from an
+  // async run that a cancel or a match reset can overtake, and a release that
+  // has already gone home must not be dragged back into `leaving`.
+  const takeStagedRelease = useCallback(
+    () => setStage((s) => (s === 'standing' ? 'leaving' : s)),
+    [],
+  )
 
   return {
     staged,
@@ -913,11 +1018,9 @@ export function useBoardStaging({
     release,
     costOptions,
     onCostPick,
-    stageLanded,
+    stageStanding: stage === 'standing',
     paidCost,
     clearPaidCost,
-    releaseReturning,
-    releasePlacing,
     takeStagedRelease,
   }
 }

@@ -53,8 +53,10 @@ export type BeatPlan =
   | { kind: 'reshuffle'; key: string; cards: number }
   | { kind: 'piles'; key: string; steps: PileStep[] }
   // A window attack reaches the centre — the pair, if it threw with a Sudo,
-  // or a lone card if not. `target` is not carried: the pair settles at the
-  // centre, not at a seat, so nowhere in the beat needs it.
+  // or a lone card if not. The pair settles at the centre and not at a seat, so
+  // `target` is not a destination; it is carried because the runner has to know
+  // whether the answer is OURS to give before it may publish a shadow that says
+  // one is owed (#101, Fix C, finding 4 — see `comboBeat.runAttack`).
   | {
       kind: 'attackPlaced'
       key: string
@@ -62,6 +64,7 @@ export type BeatPlan =
       attacker: string
       card: string
       sudo: boolean
+      target: string
     }
   // Every release flies into its slot. `codeReview` rides along when the play
   // was a combo; `cost` when the rules made it pay for itself — the card is
@@ -235,6 +238,25 @@ function costBefore(events: Event[], i: number): { eventId: number; card: string
   return { eventId: prev.id, card: prev.card }
 }
 
+// What is standing at the centre awaiting an answer, as the WALK sees it —
+// not as the board saw it before the batch (#101, Fix C, finding 4).
+//
+// The three things a resolution needs to know about the attack it resolves.
+// It starts from `before.pending`, because usually the attack was thrown in an
+// earlier batch and is already on screen; but a batch can carry the throw AND
+// its answer, and then `before.pending` is null and every branch keyed off it
+// silently declined to plan. In a star topology that batch is the ordinary
+// case rather than an edge one: every peer that is neither attacker nor
+// defender receives both events in one relayed sync.
+//
+// Tracked exactly the way `piles` below already tracks the deck counts through
+// the same walk — one local that the events move on as they are read.
+interface OpenAttack {
+  attacker: string
+  attackCard: string
+  sudo: boolean
+}
+
 export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   const claimed = new Set<number>()
   // discards the draw beat has taken over — a revealed trigger leaves from the
@@ -242,6 +264,14 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   const owned = new Set<number>()
   const plans: BeatPlan[] = []
   let piles = before.decks.main
+  let openAttack: OpenAttack | null =
+    before.pending?.kind === 'defend'
+      ? {
+          attacker: before.pending.attacker,
+          attackCard: before.pending.attackCard,
+          sudo: before.pending.sudo,
+        }
+      : null
 
   // A run of one kind coalesces into one beat; anything else closes it. That is
   // what makes a hand-limit discard of three read as one gesture while a discard
@@ -291,10 +321,14 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // One event, one beat — the pair (or the lone card) reaches the centre
       // as a single gesture, never coalesced with what came before or after.
       flush()
+      // it is standing at the centre from here on, for whatever in THIS batch
+      // resolves it (#101, Fix C, finding 4)
+      openAttack = { attacker: e.attacker, attackCard: e.card, sudo: e.sudo }
       plans.push({
         kind: 'attackPlaced',
         key: `attack:${e.id}`,
         eventId: e.id,
+        target: e.target,
         attacker: e.attacker,
         card: e.card,
         sudo: e.sudo,
@@ -318,8 +352,8 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
     }
     if (e.type === 'defended') {
       flush()
-      const p = before.pending
-      if (p?.kind !== 'defend') continue // nothing on screen to answer — never stranded
+      const p = openAttack
+      if (!p) continue // nothing on the table to answer — never stranded
       // Everything banked by THIS resolution, in the order the engine banked it.
       // The walk continues forward from here rather than scanning: a resolution's
       // discards are contiguous, and the next non-discard event ends them.
@@ -361,6 +395,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         spent,
         ...(e.effect === 'return' ? { returnTo: ownSudo ? e.player : p.attacker } : {}),
       })
+      openAttack = null // answered — nothing is standing at the centre now
       i = j - 1 // the discards this plan claimed are consumed
       continue
     }
@@ -385,7 +420,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // the release's own cost — claimed by the `releasePlaced` beat that
       // follows it in this same batch, where it is shown open before it leaves
       if (e.reason === 'releaseCost') continue
-      const p = before.pending
+      const p = openAttack
       // The sudo half of a resolving pair — checked ahead of the attack card
       // so a sudo Rollback (which banks ONLY this half; the attack card
       // returns to its owner's hand instead) still gets a beat: the match here
@@ -405,8 +440,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // left the attacker's hand back when the attack was thrown, long before
       // this batch), and silently vanish instead of animating.
       if (
-        p?.kind === 'defend' &&
-        p.sudo &&
+        p?.sudo &&
         e.reason === 'attackSpent' &&
         // Assumes 'support-sudo' is the only sudo-capable support card in the
         // catalogue — silently wrong (this discard falls through to `sourceOf`
@@ -431,12 +465,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // never discarded under any other reason — a Rollback returns it to
       // hand instead of discarding it) but keeps this branch's own invariant
       // explicit and symmetric with the sudo branch above.
-      if (
-        p?.kind === 'defend' &&
-        e.reason === 'attackSpent' &&
-        e.card === p.attackCard &&
-        !pairOut
-      ) {
+      if (p && e.reason === 'attackSpent' && e.card === p.attackCard && !pairOut) {
         flush()
         pairOut = {
           kind: 'pairToDiscard',

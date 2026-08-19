@@ -57,25 +57,43 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       // THE COVER — the defence lies over the attack, offset and tilted the
       // other way, so the two read as two plays and not one tidy stack.
       if (coverBox && defence && !(mine && handoff?.el)) {
-        const from = a.seatBox(plan.defender)
-        if (from) {
-          const [el] = await flyer.raise([
-            {
-              key: 'cover',
-              at: from,
-              content: ownSudo ? <CardPair main={defence} aux={ownSudo} width="100%" /> : undefined,
-              card: ownSudo ? undefined : defence,
-            },
-          ])
-          if (el) {
-            await play('playToCenter', el, {
-              from,
-              to: coverBox,
-              rotate: COVER_POSE.rot,
-              dx: COVER_POSE.dx,
-              dy: COVER_POSE.dy,
-            })?.finished
-          }
+        // WHERE IT COMES FROM — resolved in the same order `comboBeat`'s own
+        // `foldIn` resolves a source, with one more step on the end.
+        //
+        // The fan slot the card left, for our own defence: this branch runs
+        // for us whenever there is no handoff to inherit, which is a rejoin or
+        // a replay — the gesture that would have staged it never happened on
+        // this peer. Then the actor's seat, for everyone else.
+        //
+        // And finally the cover slot itself. `seatBox` is null for the LOCAL
+        // player — only opponents' seats are bound — so before #101, Fix C
+        // (finding 6) our own rejoined defence fell out of this branch having
+        // done nothing at all: it neither flew nor stood, and the exit that
+        // follows then started from an empty box. A no-travel raise at the
+        // destination is the honest answer to "it is here and I cannot say
+        // where it came from": the card stands, in its own pose, and the
+        // exchange leaves from something real.
+        const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.card) : -1
+        const from =
+          (mine && handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
+          a.seatBox(plan.defender) ??
+          coverBox
+        const [el] = await flyer.raise([
+          {
+            key: 'cover',
+            at: from,
+            content: ownSudo ? <CardPair main={defence} aux={ownSudo} width="100%" /> : undefined,
+            card: ownSudo ? undefined : defence,
+          },
+        ])
+        if (el) {
+          await play('playToCenter', el, {
+            from,
+            to: coverBox,
+            rotate: COVER_POSE.rot,
+            dx: COVER_POSE.dx,
+            dy: COVER_POSE.dy,
+          })?.finished
         }
       }
       await wait(SHOW_HOLD)

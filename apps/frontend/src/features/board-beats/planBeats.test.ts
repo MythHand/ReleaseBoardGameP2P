@@ -303,6 +303,9 @@ describe('planBeats — the combo pair (#100)', () => {
         attacker: 'p2',
         card: 'attack-bug',
         sudo: true,
+        // carried since #101, Fix C: the runner needs to know whether the
+        // answer is ours before it may publish a shadow saying one is owed
+        target: 'p1',
       },
     ])
   })
@@ -521,6 +524,70 @@ describe('planBeats — the answer to an attack (#101)', () => {
         { eventId: 13, card: 'attack-bug' },
         { eventId: 14, card: 'defense-hotfix' },
       ],
+    })
+  })
+
+  // ===== MISSING FIXTURE 3 (#101, Fix C, finding 4) — ONE SYNC FLUSH =====
+  //
+  // Nothing in the suite ever planned a batch in which the attack and its
+  // answer arrive together, so nothing noticed that `before.pending` — the
+  // board as it stood BEFORE the batch — is the only thing this planner asks
+  // about what is standing at the centre. In a star topology that batch is
+  // the NORM rather than an edge case: every peer that is neither attacker
+  // nor defender gets both events in one relayed sync, so the defence
+  // animation this branch exists to build was missing for spectators, which
+  // is most of the table in a 3+ player game. The spent cards simply appeared
+  // in the heap with no cover ever shown.
+  //
+  // The planner already tracks a table fact through a batch this way: `piles`
+  // starts at `before.decks.main` and every `pilesChanged` moves it on. The
+  // attack standing at the centre is the same kind of fact.
+  it('plans the exchange when the attack and its answer arrive in one batch', () => {
+    const plans = planBeats(
+      [
+        attacked({ id: 11, attacker: 'p2', card: 'attack-bug', sudo: false, target: 'p1' }),
+        defended({ id: 12, player: 'p1', card: 'defense-hotfix', effect: 'cancel' }),
+        discarded(13, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+        discarded(14, { player: 'p1', card: 'defense-hotfix', reason: 'defenceSpent' }),
+      ],
+      // no pending on screen yet — this peer is seeing the attack for the
+      // first time in the same flush that resolves it
+      boardBefore(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['attackPlaced', 'covered'])
+    expect(plans[1]).toMatchObject({
+      kind: 'covered',
+      key: 'covered:12',
+      defender: 'p1',
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      attackSudo: false,
+      spent: [
+        { eventId: 13, card: 'attack-bug' },
+        { eventId: 14, card: 'defense-hotfix' },
+      ],
+    })
+  })
+
+  // The same flush, the other resolution: nobody defends. The attack card and
+  // the sudo that backed it leave the CENTRE as a pair — `sourceOf` could
+  // never find them (no hand, no zone), so `pairToDiscard` is the only thing
+  // that flies them, and it too was keyed off `before.pending`.
+  it('splits the pending pair when the attack and the hit arrive in one batch', () => {
+    const plans = planBeats(
+      [
+        attacked({ id: 11, attacker: 'p2', card: 'attack-bug', sudo: true, target: 'p1' }),
+        tookHit({ id: 12, player: 'p1' }),
+        discarded(13, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+        discarded(14, { player: 'p2', card: 'support-sudo', reason: 'attackSpent' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['attackPlaced', 'pairToDiscard'])
+    expect(plans[1]).toMatchObject({
+      kind: 'pairToDiscard',
+      main: { eventId: 13, card: 'attack-bug' },
+      aux: { eventId: 14, card: 'support-sudo' },
     })
   })
 

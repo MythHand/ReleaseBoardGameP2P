@@ -158,7 +158,50 @@ export function useComboBeat(
       // opponent, the hand slot the card left for the local thrower (found by
       // id, as sourceOf does)
       const el = await foldIn(plan.attacker, plan.card, plan.sudo ? 'support-sudo' : undefined, ctx)
-      if (el) flyer.drop('fold') // the centre pending render takes over (last frame = projection)
+      if (!el) return
+      // WHAT THE CARRIER HANDS OVER TO. Dropping the fold's carrier is only
+      // safe because the centre's static pending render takes the card over on
+      // the very same commit — its last frame IS the projection. That holds
+      // whenever the `defend` pending was already on screen before this batch,
+      // which is the ordinary case.
+      //
+      // It does NOT hold when the throw and its answer arrive in one sync
+      // flush (#101, Fix C, finding 4): `base` is the board from before the
+      // batch, so it carries no pending, so there is no static render, so the
+      // attack would blink out the moment the fold lands — and the `covered`
+      // beat behind it would then fly a defence over an empty slot and hold it
+      // there for SHOW_HOLD, covering nothing. In a star topology that flush is
+      // the ordinary case for every peer that is neither attacker nor defender.
+      //
+      // So the beat publishes the table it just made: the attack is standing,
+      // and an answer is owed. `useBeats` renders that as the shadow for the
+      // rest of this beat and hands it on as the next beat's `base`, which is
+      // exactly what the publish channel is for.
+      //
+      // Never published when the answer is OURS to give. `options` is not
+      // derivable here — the engine redacts it for everyone but the owner — so
+      // an empty one would tell our own board a defence is owed and offer no
+      // legal card to give it. A peer who is answering has seen the attack in
+      // an earlier batch anyway, which is the only way they could have answered
+      // it, so this branch is unreachable for them by construction.
+      if (ctx.base.pending?.kind !== 'defend' && plan.target !== ctx.base.selfId) {
+        ctx.publish({
+          ...ctx.base,
+          pending: {
+            kind: 'defend',
+            player: plan.target,
+            attacker: plan.attacker,
+            attackCard: plan.card,
+            sudo: plan.sudo,
+            // redacted for anyone but the owner, which here is never us
+            options: [],
+            openedAt: 0,
+            deadline: 0,
+            scope: 'hand',
+          },
+        })
+      }
+      flyer.drop('fold') // the centre pending render takes over (last frame = projection)
     },
     [foldIn, flyer.drop],
   )

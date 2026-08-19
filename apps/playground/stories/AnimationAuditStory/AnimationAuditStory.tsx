@@ -855,6 +855,21 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
+      ru: 'Один sync-флаш: тень публикуется всем, кроме того, кто сам отвечает',
+      en: 'One sync flush: the shadow is published to everyone except the peer who answers',
+    },
+    problem: {
+      ru: 'Когда бросок и ответ приезжают ОДНИМ батчем (в звезде — норма для всех, кто не атакующий и не защищающийся), `planBeats` ведёт `openAttack` по ходу разбора, как уже вёл `piles`, и такт `covered` строится. Вторая половина: атака должна быть на экране, пока над ней держат защиту, а `runAttack` снимает флаер сразу после фолда, рассчитывая на статичный рендер центра — которого в таком батче нет (`base` старше батча). Поэтому `runAttack` публикует тень с `pending: defend`. Не публикует, когда отвечать должны МЫ: `options` тут не вывести (движок редактирует их для всех, кроме владельца), а пустой список сказал бы нашему борду «с тебя защита» без единой легальной карты. Безопасность этой ветки — вывод, а не факт: пир, который ответил, обязан был увидеть атаку раньше. Закроет поле/событие, из которого `options` выводится на месте, или отдельная не-`pending` форма «на столе лежит атака», которую центр умеет рисовать, а `answering` не читает.',
+      en: 'When a throw and its answer arrive in ONE batch — the norm in a star for every peer who is neither attacker nor defender — `planBeats` now tracks `openAttack` through the walk, the way it already tracked `piles`, and the `covered` beat is built. The other half: the attack has to be ON SCREEN while the cover is held over it, and `runAttack` drops its carrier right after the fold, counting on the centre’s static render — which such a batch does not have (`base` predates it). So `runAttack` publishes a `pending: defend` shadow. It does not publish when the answer is OURS: `options` cannot be derived here (the engine redacts them for everyone but the owner), and an empty list would tell our own board a defence is owed with no legal card to give it. That branch’s safety is an inference rather than a fact from the events: a peer who answered must have seen the attack earlier. Closed by a field/event that makes `options` derivable on the spot, or by a separate non-`pending` "an attack is lying on the table" shape the centre can draw and `answering` never reads.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/planBeats.ts (openAttack), comboBeat.tsx (runAttack)',
+      en: 'frontend: features/board-beats/planBeats.ts (openAttack), comboBeat.tsx (runAttack)',
+    },
+    status: 'rework',
+  },
+  {
+    what: {
       ru: 'Атака на борде прилетает без наклона — его даёт поза покоя',
       en: 'On the board an attack lands untilted — the rest pose supplies the tilt',
     },

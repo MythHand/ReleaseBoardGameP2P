@@ -187,11 +187,10 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
     staging.staged.main?.card.category === 'release'
       ? staging.staged.main
       : undefined
-  const stagedRelease =
-    staging.stageLanded && !staging.releaseReturning && !staging.releasePlacing
-      ? ((costPending ? state.you.hand.find((c) => c.uid === costPending.release) : undefined) ??
-        stagedReleaseLocal)
-      : undefined
+  const stagedRelease = staging.stageStanding
+    ? ((costPending ? state.you.hand.find((c) => c.uid === costPending.release) : undefined) ??
+      stagedReleaseLocal)
+    : undefined
 
   return (
     <div>
@@ -238,6 +237,10 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
           it (`runRelease`'s cost leg measures it regardless of actor/remote),
           but binding it unconditionally costs nothing for the other tests */}
       <div ref={anchors.cost} />
+      {/* the cover slot — only the one-flush exchange below needs it
+          (`defenseBeat.runCovered` measures it), but binding it costs the
+          other tests nothing */}
+      <div ref={anchors.cover} data-testid="cover-slot" />
       <div ref={anchors.discardBox} />
       {/* a lean proxy for `_Board.tsx`'s own `<Pile heap={decks.discardHeap}>`
           — `Pile`'s own rendering of a heap is already pinned elsewhere
@@ -822,4 +825,93 @@ it('adopts the actor’s own staged release pair into the zone even when its rel
   expect(played.names.indexOf('clearPaidCost')).toBeLessThan(
     played.names.indexOf('playToReleaseZone'),
   )
+})
+
+// ===== MISSING FIXTURE 3 (#101, Fix C, finding 4) — ONE SYNC FLUSH =====
+//
+// `planBeats.test.ts` pins that the PLAN is built when the throw and its
+// answer arrive together. This pins that the board actually plays it, through
+// the real queue: two chained beats, the shadow each one hands the next, and
+// the render in between.
+//
+// It is the spectator's view, and in a star topology that is most of the
+// table: every peer who is neither attacker nor defender receives both events
+// in one relayed batch. Before this round the `covered` plan was never built
+// for them at all — the exchange's cards simply appeared in the discard — and
+// once it was, the attack still blinked out the instant its fold landed,
+// leaving the cover to be held over an empty slot for SHOW_HOLD.
+const watchingBefore: BoardState = {
+  you: { name: 'You', hand: [], release: {} },
+  opponents: [
+    { id: 'p2', name: 'Two', handCount: 3, release: {} },
+    { id: 'p3', name: 'Three', handCount: 3, release: {} },
+  ],
+  decks: { main: [10], events: 5, discardCount: 0, discardHeap: [] },
+  turn: 'p2' as PlayerId,
+  selfId: 'p1',
+  history: [],
+  setup: {},
+  playable: [],
+  frozen: [],
+} as unknown as BoardState
+
+const oneFlush: Event[] = [
+  { id: 20, type: 'attacked', attacker: 'p2', card: 'attack-bug', sudo: false, target: 'p3' },
+  { id: 21, type: 'defended', player: 'p3', card: 'defense-hotfix', effect: 'cancel' } as Event,
+  { id: 22, type: 'discarded', player: 'p2', card: 'attack-bug', reason: 'attackSpent' } as Event,
+  {
+    id: 23,
+    type: 'discarded',
+    player: 'p3',
+    card: 'defense-hotfix',
+    reason: 'defenceSpent',
+  } as Event,
+]
+
+const watchingAfter: BoardState = {
+  ...watchingBefore,
+  decks: {
+    ...watchingBefore.decks,
+    discardHeap: [
+      { uid: 'h22', card: card('attack-bug'), rot: 4, dx: 2, dy: -3 },
+      { uid: 'h23', card: card('defense-hotfix'), rot: -6, dx: -1, dy: 5 },
+    ],
+    discardCount: 2,
+  },
+} as unknown as BoardState
+
+it('plays the whole exchange for a watching peer that gets both events at once', async () => {
+  played.names = []
+  const { rerender } = render(<Harness live={watchingBefore} events={[]} />)
+  expect(screen.queryByTestId('pending')).toBeNull()
+
+  await drive(() => rerender(<Harness live={watchingAfter} events={oneFlush} />), 120)
+
+  // the attack folded in, and the defence flew over it — two movements, not
+  // one, and the second is the one that used to be missing entirely
+  expect(played.names).toContain('foldIntoPair')
+  expect(played.names).toContain('playToCenter')
+  // the fold happened first: the cover covers something that is already there
+  expect(played.names.indexOf('foldIntoPair')).toBeLessThan(played.names.indexOf('playToCenter'))
+  // and the exchange reached the heap, in the order it lay on the table
+  const heap = screen.getByTestId('discard-heap').querySelectorAll('[data-card]')
+  expect(Array.from(heap).map((el) => el.getAttribute('data-card'))).toEqual([
+    'attack-bug',
+    'defense-hotfix',
+  ])
+})
+
+// The attack has to be ON SCREEN while the cover is held over it. `runAttack`
+// drops its carrier the moment the fold lands, on the understanding that the
+// centre's static pending render takes the card over in the same commit — and
+// in a one-flush batch there is no such render unless the beat publishes one,
+// because `base` predates the batch. Observed mid-beat, since that is the
+// whole span in question.
+it('keeps the attack standing at the centre while the cover is held over it', async () => {
+  played.names = []
+  const { rerender } = render(<Harness live={watchingBefore} events={[]} />)
+  // far enough in for the fold to have landed and the cover's own hold to be
+  // running (SHOW_HOLD is 1.2s), nowhere near the exit
+  await drive(() => rerender(<Harness live={watchingAfter} events={oneFlush} />), 45)
+  expect(screen.queryByTestId('pending')).toBeTruthy()
 })

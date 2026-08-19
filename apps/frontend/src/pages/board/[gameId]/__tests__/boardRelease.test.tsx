@@ -15,14 +15,14 @@ import { useBoardStaging } from '../_useBoardStaging'
 import { makeBoardProps } from './fixture'
 
 // The one thing about the standing release that only `<Board>` itself can be
-// asked (#101, Fix A): whether its render actually reads
-// `staging.releasePlacing`. That flag is set by the placement beat, and no
-// beat can run inside `<Board>` in a test — the queue is fed from
+// asked (#101, Fix A): whether its render actually reads `stageStanding`. The
+// stage machine leaves `'standing'` when the placement beat takes the card
+// over, and no beat can run inside `<Board>` in a test — the queue is fed from
 // `intro.events`, and with an `intro` present the queue is gated on the deal
 // reporting done (comboHandoff.test.tsx's own header explains why that harness
-// exists instead). Mutation-checked: without this, deleting `!releasePlacing`
-// from `_Board.tsx` leaves the whole suite green, because the only other place
-// the expression exists is comboHandoff's mirror of it.
+// exists instead). Mutation-checked: without this, dropping the guard from
+// `_Board.tsx` leaves the whole suite green, because the only other place the
+// expression exists is comboHandoff's mirror of it.
 //
 // The real hook runs untouched; the toggle below overrides exactly one field,
 // and only while a test turns it on — so every other test in this file (and
@@ -33,14 +33,20 @@ const placing = vi.hoisted(() => ({
   // wiring pinned below
   staging: null as ReturnType<typeof useBoardStaging> | null,
 }))
+// what `<Board>` asked the hook FOR — the match-boundary wiring's own pin
+// (#101, Fix C, finding 3)
+const stagingOpts = vi.hoisted(() => ({
+  last: null as { matchKey?: string | null } | null,
+}))
 vi.mock('../_useBoardStaging', async (importOriginal) => {
   const real = await importOriginal<typeof import('../_useBoardStaging')>()
   return {
     ...real,
     useBoardStaging: (opts: Parameters<typeof real.useBoardStaging>[0]) => {
+      stagingOpts.last = opts
       const staging = real.useBoardStaging(opts)
       placing.staging = staging
-      return placing.on ? { ...staging, releasePlacing: true } : staging
+      return placing.on ? { ...staging, stageStanding: false } : staging
     },
   }
 })
@@ -108,6 +114,88 @@ function releaseBoard(overrides: { pending?: TablePending }, actions: TableActio
     actions,
   })
   return <Board {...props} />
+}
+
+// ===== MISSING FIXTURE 1 (#101, Fix C) — a COMBO release's cost step =====
+//
+// Nothing in 504 tests ever built this state, which is why the softlock the
+// whole-branch review found survived every scoped review. A Code Review combo
+// that ships a release raises the SAME `discardForRelease` pending a solo one
+// does (`fake/release.ts`'s release branch — `codeReview` merely rides along),
+// so from the engine's side there is no second kind of release at all. The
+// board treated it as one anyway.
+//
+// The fixture drives the real gesture end to end: pull the Code Review, click
+// its only partner, let the fold settle, then let the engine's answer arrive.
+// biome-ignore lint/style/noNonNullAssertion: a known catalogue entry
+const review = cardById('support-code-review')!
+
+const COMBO_HAND: { uid: string; card: CardData }[] = [
+  { uid: 'support-code-review#0', card: review },
+  { uid: 'release-frontend#0', card: frontend },
+  { uid: 'attack-bug#0', card: bug },
+]
+
+// The pending as the OWNER sees it for a combo: `options` excludes both halves
+// of the play (`fake/attacks.ts`'s `pendingView` filters `p.release` and
+// `p.codeReview`), so the spare is the only thing that can pay.
+function comboCostPending(): TablePending {
+  return {
+    kind: 'discardForRelease',
+    player: 'you',
+    release: 'release-frontend#0',
+    options: ['attack-bug#0'],
+  }
+}
+
+function comboReleaseBoard(overrides: { pending?: TablePending }, actions: TableActions = {}) {
+  const base = makeBoardProps()
+  const props = makeBoardProps({
+    state: {
+      ...base.state,
+      you: { ...base.state.you, hand: COMBO_HAND },
+      turn: base.state.selfId,
+      hasDrawn: true,
+      // a pending suspends normal play — `playableFor`'s own first check
+      playable: overrides.pending ? [] : COMBO_HAND.map((c) => c.uid),
+      comboOptions: overrides.pending ? {} : { 'support-code-review#0': ['release-frontend#0'] },
+      pending: overrides.pending ?? null,
+    },
+    actions,
+  })
+  return <Board {...props} />
+}
+
+// The fold, through the DOM: pull the support, then click its partner. Both
+// halves leave the fan, the pair stands merged at the centre, and the play
+// dispatches at once (a release has no target to aim at).
+async function foldTheComboRelease() {
+  const slots = () => Array.from(document.querySelectorAll<HTMLElement>('[data-hand-slot]'))
+  const faceIndex = (cardId: string) =>
+    slots().findIndex((el) => el.querySelector(`[data-card="${cardId}"]`))
+  const support = slots()[faceIndex('support-code-review')]
+  fireEvent.mouseDown(support, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 600))
+  })
+  const partner = slots()[faceIndex('release-frontend')]
+  fireEvent.mouseDown(partner, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700)) // past MERGE_MS (620ms)
+  })
+}
+
+// The fan's own wrapper — the element that carries the merged-pair pointer
+// guard. jsdom does NOT hit-test `pointer-events`, so a `fireEvent` click
+// lands whether or not the guard is on: this style read is the load-bearing
+// assertion, and the click assertions beside it pin the routing.
+function handWrapStyle(): string {
+  const wrap = document.querySelector<HTMLElement>('[class*="handWrap"]')
+  if (!wrap) throw new Error('hand wrapper not rendered')
+  return wrap.style.pointerEvents
 }
 
 // Drags a card out of the fan the way a real pointer does — the Hand's own
@@ -383,6 +471,135 @@ function costStateAt(enabled: boolean): (i: number) => string {
   return (i: number) => result.current.stateAt(i)
 }
 
+// ===== Fix C, finding 5 — the stage slot must not carry over between plays ==
+//
+// Driven through the hook rather than `<Board>`, because the state that
+// exposes it is only reachable through a route `<Board>` cannot be fed in a
+// test: a release stands, its play is REJECTED (the watcher's own `cancel()`
+// takes the `staged`-based branch, which never touched the old flags), or it
+// is placed under reduced motion (where no beat runs to call
+// `takeStagedRelease`). Either way the old code left `stageLanded` true with
+// nothing standing, and the NEXT release — a Code Review combo, which stands
+// its release at the CENTRE — would then draw that release at the stage slot
+// too. The same card on screen twice, decided by what you happened to play
+// first.
+//
+// One `StageState` that every play sets removes the question. The pull below
+// is the transition that fires first; `onCardClick`'s own `finish` sets it a
+// second time for the same reason, belt and braces.
+it('a release standing at the stage slot does not survive the next play', async () => {
+  const base = makeBoardProps()
+  const hand = [
+    { uid: 'release-frontend#0', card: frontend },
+    { uid: 'support-code-review#0', card: review },
+    { uid: 'attack-bug#0', card: bug },
+  ]
+  const { result } = renderHook(() =>
+    useBoardStaging({
+      state: {
+        ...base.state,
+        you: { ...base.state.you, hand },
+        turn: base.state.selfId,
+        hasDrawn: true,
+        playable: hand.map((c) => c.uid),
+        comboOptions: { 'support-code-review#0': ['release-frontend#0'] },
+        pending: null,
+      } as typeof base.state,
+      anchors: useBoardAnchors(),
+      events: [],
+      enabled: true,
+    }),
+  )
+  // a solo release: it flies to the stage slot and stands there
+  await act(async () => {
+    result.current.onHandPlay('release-frontend#0', { x: 0, y: 0 })
+    await new Promise((r) => setTimeout(r, 50))
+  })
+  expect(result.current.stageStanding).toBe(true)
+
+  // the beat adopts it and hands the table back (`release()` is that clear —
+  // no flight, just done), so the fan is free again
+  act(() => {
+    result.current.release()
+  })
+  expect(result.current.staged).toBeNull()
+
+  // now a COMBO: pulling the Code Review starts a play whose release will
+  // stand at the CENTRE, so the stage slot must be empty for it
+  act(() => {
+    result.current.onHandPlay('support-code-review#0', { x: 0, y: 0 })
+  })
+  expect(result.current.staged?.phase).toBe('partner')
+  expect(result.current.stageStanding).toBe(false)
+})
+
+// ===== MISSING FIXTURE 2 (#101, Fix C, finding 3) — a MATCH BOUNDARY =====
+//
+// Nothing in the suite ever crossed one for the staging hooks, which is why
+// nothing noticed they never reset. `<Board>` has no `key` (`_layout.tsx`), so
+// one component instance serves every match of a session; `useBeats` wipes
+// itself on `intro.key`, and the gestures did not. A rematch that interrupted
+// a cost step therefore left the paid card lying on the NEW table for good,
+// and the new match's first beat called `clearPaidCost`/`takeStagedRelease`
+// against state belonging to a match that had ended.
+//
+// Driven through the hook, because the boundary is a prop change and `<Board>`
+// cannot be driven through a cost step with an `intro` attached (the deal gate
+// holds every gesture inert until it reports done). The wiring that carries
+// the key from `<Board>` into the hook is pinned separately, below.
+function stagingAt(matchKey: string | null) {
+  const base = makeBoardProps()
+  return renderHook(
+    ({ key }: { key: string | null }) =>
+      useBoardStaging({
+        state: {
+          ...base.state,
+          you: { ...base.state.you, hand: HAND },
+          turn: base.state.selfId,
+          hasDrawn: true,
+          playable: HAND.map((c) => c.uid),
+          pending: null,
+        },
+        anchors: useBoardAnchors(),
+        events: [],
+        enabled: true,
+        matchKey: key,
+      }),
+    { initialProps: { key: matchKey } },
+  )
+}
+
+it('a new match takes the last one’s standing release and paid cost off the table', async () => {
+  const { result, rerender } = stagingAt('g1')
+  // a release is standing, and a card has been picked to pay for it
+  await act(async () => {
+    result.current.onHandPlay('release-frontend#0', { x: 0, y: 0 })
+    await new Promise((r) => setTimeout(r, 50))
+  })
+  expect(result.current.stageStanding).toBe(true)
+  expect(result.current.staged?.phase).toBe('dispatched')
+
+  // the rematch arrives mid-step
+  rerender({ key: 'g2' })
+  expect(result.current.stageStanding).toBe(false)
+  expect(result.current.staged).toBeNull()
+  expect(result.current.paidCost).toBeNull()
+  // and the fan is whole again — nothing of the dead match is still hidden
+  expect(result.current.handItems).toHaveLength(HAND.length)
+})
+
+// The wiring, pinned the same way Fix A's own was: dropping `matchKey` from
+// `_Board.tsx`'s call leaves the hook's reset correct and unreachable.
+it('hands the staging gesture the match it belongs to', () => {
+  const base = makeBoardProps()
+  const props = makeBoardProps({
+    state: { ...base.state, you: { ...base.state.you, hand: HAND } },
+    intro: { gameId: 'g7', view: null, events: [], onDone: () => {} },
+  } as unknown as Parameters<typeof makeBoardProps>[0])
+  render(<Board {...props} />)
+  expect(stagingOpts.last?.matchKey).toBe('g7')
+})
+
 it('lights no payer the opening would refuse', () => {
   expect(costStateAt(true)(0)).toBe('playable')
   expect(costStateAt(false)(0)).toBe('idle')
@@ -458,6 +675,26 @@ it('a press on nothing valid takes the staged release back to the fan', async ()
   expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
 })
 
+// #101, Fix C, finding 7: the miss has to land ON the board. Bound to
+// `window`, this listener also fired for anything portalled ABOVE the board —
+// a dialog, an overlay, a future toast — and cancelled the staged release
+// behind it, which the player never touched.
+it('a press outside the table is not a miss', async () => {
+  const onResolve = vi.fn()
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
+  const outside = document.createElement('div')
+  document.body.appendChild(outside)
+  try {
+    fireEvent.mouseDown(outside)
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100))
+    })
+    expect(onResolve).not.toHaveBeenCalled()
+  } finally {
+    outside.remove()
+  }
+})
+
 it('a press inside the fan is not a miss', async () => {
   const onResolve = vi.fn()
   render(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
@@ -508,10 +745,9 @@ it('does not double-render the release while its own return flight is still carr
 // the release out of the stage slot and into the zone, the static render must
 // be gone. The `before` projection the beat renders still holds the cost
 // pending for its whole run — that is what a beat's `base` IS — so
-// `costPending` and `stageLanded` are both exactly as they were here, and
-// nothing but this guard can empty the slot. Same class as the two guards
-// beside it (`stageLanded`, `releaseReturning`), and pinned the same way they
-// are: the static card must not coexist with a carrier holding it.
+// `costPending` is exactly as it was here, and nothing but the stage machine
+// leaving `'standing'` can empty the slot. The static card must not coexist
+// with a carrier holding it, in either direction.
 it('does not keep the release standing while the placement beat is flying it to the zone', async () => {
   const { rerender } = render(releaseBoard({}, {}))
   await pullCardFromFan('release-frontend#0')
@@ -542,6 +778,127 @@ it('hands the beat queue the staging hook’s own take of the standing release',
   // it is the same function for the life of the mount
   expect(beatsArgs.last?.takeStagedRelease?.current).toBe(placing.staging?.takeStagedRelease)
   expect(typeof placing.staging?.takeStagedRelease).toBe('function')
+})
+
+// ===== Fix C, finding 1 (BLOCKER) — a combo release must be payable =====
+//
+// #100 made the fan inert while a pair stands merged, so a combo cannot be
+// disturbed mid-fold. #101 suppressed `PendingPrompt` for `discardForRelease`,
+// because the cards on the table ask for the cost instead. Both correct, and
+// neither task could see the other: for a COMBO release the catch-up effect
+// that would have cleared `staged` bails on `s.support`, so `merged` stays
+// true through the whole cost step — the fan is inert, no panel offers the
+// choice, and `Hand` has no keyboard path. The cost becomes unpayable by any
+// input while the ask line tells the player to click a card.
+it('lets a combo release’s cost be paid out of the fan', async () => {
+  const onResolve = vi.fn()
+  const { rerender } = render(comboReleaseBoard({}, {}))
+  await foldTheComboRelease()
+  // the pair is standing, and the fan is inert — #100's guard, doing its job
+  expect(handWrapStyle()).toBe('none')
+
+  // the engine answers with the ordinary cost pending, `codeReview` riding
+  // along invisibly (`pendingView` does not carry it)
+  rerender(comboReleaseBoard({ pending: comboCostPending() }, { onResolve }))
+  // …and NOW the fan must be live again: it is the only picker there is
+  expect(handWrapStyle()).not.toBe('none')
+  // the spare is offered, and lit
+  const payer = document.querySelector<HTMLElement>('[data-hand-slot] [data-card="attack-bug"]')
+  expect(payer?.getAttribute('data-state')).toBe('playable')
+  await clickFanCard('attack-bug#0')
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'discardForRelease', card: 'attack-bug#0' })
+})
+
+// The pair itself must not be disturbed by unlocking the fan: both halves stay
+// out of the fan and standing at the centre while the cost is asked for, which
+// is what makes `runRelease`'s own combo adoption still work (Fix A's case 2).
+it('keeps the combo pair standing at the centre while its cost is owed', async () => {
+  const { rerender } = render(comboReleaseBoard({}, {}))
+  await foldTheComboRelease()
+  rerender(comboReleaseBoard({ pending: comboCostPending() }, {}))
+  // only the spare is in the fan — both halves of the play are on the table
+  const faces = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-hand-slot] [data-card]'),
+  ).map((el) => el.getAttribute('data-card'))
+  expect(faces).toEqual(['attack-bug'])
+  const pair = screen.getByTestId('board-pair-staged')
+  expect(pair.querySelector('[data-card="release-frontend"]')).toBeTruthy()
+  expect(pair.querySelector('[data-card="support-code-review"]')).toBeTruthy()
+  // and it does NOT also stand at the stage slot — that slot is for a release
+  // standing alone (Fix C, finding 5: the stage machine must not carry over
+  // from an earlier release)
+  const stage = document.querySelector('[data-centre-slot="stage"]') as HTMLElement
+  expect(stage.querySelector('[data-card]')).toBeNull()
+})
+
+// ===== Fix C, finding 2 (HIGH) — the escape hatch must actually escape =====
+//
+// `cancel()`'s cost branch fires in the softlocked state above, but it was
+// written for a SOLO release: it flies one card home from the `.stageSlot`,
+// which for a combo is empty — the pair is standing at `.centre` — and it
+// leaves the Code Review behind entirely. Both halves have to go home, from
+// where they actually are.
+//
+// A press cancel takes both halves back. Observed mid-flight, because that is
+// where the difference lives: today exactly one card is in the air, and it
+// started from the wrong box.
+it('takes BOTH halves of a combo release home from the centre', async () => {
+  const onResolve = vi.fn()
+  const { rerender } = render(comboReleaseBoard({}, {}))
+  await foldTheComboRelease()
+  rerender(comboReleaseBoard({ pending: comboCostPending() }, { onResolve }))
+
+  // a press on the table, away from the fan and away from anything lit
+  fireEvent.mouseDown(document.querySelector('[data-board-centre]')?.parentElement as HTMLElement)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 60)) // well inside the flight (480ms)
+  })
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
+  const flying = Array.from(
+    document.querySelectorAll<HTMLElement>('[class*="arriving"] [data-card]'),
+  ).map((el) => el.getAttribute('data-card'))
+  expect(flying).toHaveLength(2)
+  expect(flying).toContain('release-frontend')
+  expect(flying).toContain('support-code-review')
+})
+
+// The permanent brick, and the one place it is actually permanent. The brief
+// for this round read `cancel()`'s cost branch as leaving the fan inert for
+// the rest of the match in every case; it does not, because `useHandArrival`'s
+// own `onLanded` calls `commitStaged(null)` unconditionally ~480ms later, so
+// the ANIMATED path recovers by accident. Under `prefers-reduced-motion` there
+// is no flight, so nothing ever lands, so nothing ever clears `staged` — and
+// THERE the fan really does stay inert until reload. That is the case worth
+// pinning, and it is also the case a player who needs reduced motion is stuck
+// in.
+it('hands the fan back after a reduced-motion cancel, with no flight to do it', async () => {
+  const mm = mockReducedMotion()
+  try {
+    const onResolve = vi.fn()
+    const { rerender } = render(comboReleaseBoard({}, {}))
+    await foldTheComboRelease()
+    rerender(comboReleaseBoard({ pending: comboCostPending() }, { onResolve }))
+
+    fireEvent.mouseDown(document.querySelector('[data-board-centre]')?.parentElement as HTMLElement)
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
+    // no flight was raised, and the fan is usable again anyway
+    expect(document.querySelector('[class*="arriving"]')).toBeNull()
+    expect(handWrapStyle()).not.toBe('none')
+
+    // the referee's answer puts both halves back: neither is still hidden
+    rerender(comboReleaseBoard({}, { onResolve }))
+    const faces = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-hand-slot] [data-card]'),
+    ).map((el) => el.getAttribute('data-card'))
+    expect(faces).toHaveLength(COMBO_HAND.length)
+    expect(faces).toContain('support-code-review')
+    expect(faces).toContain('release-frontend')
+  } finally {
+    mm.mockRestore()
+  }
 })
 
 // Fix round 1: the guard for the finding above must not blank the stage slot

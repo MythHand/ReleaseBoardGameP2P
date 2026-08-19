@@ -62,7 +62,15 @@ import {
   useFlyer,
   useHandArrival,
 } from '@release/ui/animations'
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { COVER_POSE, MERGE_MS, SUDO_POSE } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
@@ -142,6 +150,13 @@ export interface Options {
   actions?: TableActions
   events: Event[] // the feed — watched for `rejected` after dispatch
   enabled: boolean // false while the deal or an exclusive beat owns the table
+  /**
+   * The match this staging belongs to (#101, Fix C, finding 3) — the same
+   * boundary and the same reason as `_useBoardStaging.ts`'s own: `<Board>` is
+   * not remounted for a rematch, and a defence standing over an attack that
+   * belonged to the previous match would otherwise stay on the new table.
+   */
+  matchKey?: string | null
 }
 
 export function useDefenseStaging({
@@ -150,6 +165,7 @@ export function useDefenseStaging({
   actions,
   events,
   enabled,
+  matchKey = null,
 }: Options): DefenseStaging {
   const [staged, setStaged] = useState<DefenseStagedPlay | null>(null)
   const [landed, setLanded] = useState(false)
@@ -679,6 +695,26 @@ export function useDefenseStaging({
   // closure once its own flight lands, `landed`'s own comment above.
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const release = useCallback(() => commitStaged(null), [])
+
+  // A NEW MATCH wipes the gesture (#101, Fix C, finding 3) — the same boundary,
+  // idiom and reasoning as `_useBoardStaging.ts`'s own reset and `useBeats`'s
+  // before it. `<Board>` is not remounted for a rematch, so a defence left
+  // standing over an attack from the dead match would keep standing on the new
+  // table, and this hook's carriers would keep flying to a hand that no longer
+  // holds what they were carrying.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `matchKey` is the boundary; the body touches only stable setters, refs and memoized resets
+  useLayoutEffect(() => {
+    commitStaged(null)
+    cancellingRef.current = false
+    foldingRef.current = false
+    dispatchWatermarkRef.current = 0
+    setCancelling(false)
+    setLanded(false)
+    setSudoLanded(false)
+    arrowCtl.stop()
+    flyer.drop()
+    arrival.reset()
+  }, [matchKey])
 
   return {
     staged,
