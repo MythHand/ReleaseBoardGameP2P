@@ -21,7 +21,7 @@ import { onPickFromDiscard } from './discard'
 import { onGiveCard, onRequestCard } from './handAttacks'
 import { pruneEmptyPiles } from './piles'
 import { playableFor } from './project'
-import { onDiscardForRelease, onPlay } from './release'
+import { onCancelRelease, onDiscardForRelease, onPlay } from './release'
 import { fireTrigger, onNeutralize } from './triggers'
 import { onPass, onUnpass, onWindowExpired } from './window'
 
@@ -270,6 +270,8 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
       return onHandLimit(state, action)
     case 'discardForRelease':
       return onDiscardForRelease(state, action)
+    case 'cancelRelease':
+      return onCancelRelease(state, action)
     case 'defend':
       return onDefend(state, action)
     case 'requestCard':

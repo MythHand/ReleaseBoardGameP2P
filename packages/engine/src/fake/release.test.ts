@@ -172,6 +172,59 @@ it('never lets Debugger be played proactively', () => {
 // lifecycle, including the paths that never reach a window, lives in
 // ./win.test.ts, which replaced the assertion that used to sit here.
 
+it('takes a staged release back, leaving no trace in the feed', () => {
+  const s = engine.createGame(config())
+  const primed: GameState = {
+    ...s,
+    turn: { ...s.turn, player: 'p1', drawnFrom: [0] },
+    players: { ...s.players, p1: { ...s.players.p1, hand: [FE, BUG] } },
+  }
+  const staged = reduce(primed, { type: 'PLAY', player: 'p1', card: FE.uid, at: 1000 })
+  expect(staged.state.pending).toMatchObject({ kind: 'discardForRelease', player: 'p1' })
+
+  const back = reduce(staged.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'cancelRelease' },
+    at: 1001,
+  })
+  expect(back.state.pending).toBeNull()
+  // the hand is whole again and nothing was ever released
+  expect(back.state.players.p1.hand.map((c) => c.uid)).toEqual([FE.uid, BUG.uid])
+  // the play emitted nothing, so taking it back emits nothing either — no peer
+  // ever saw it happen
+  expect(back.events).toEqual([])
+})
+
+it('refuses a cancel from anyone but the player who staged it', () => {
+  const s = engine.createGame(config())
+  const primed: GameState = {
+    ...s,
+    turn: { ...s.turn, player: 'p1', drawnFrom: [0] },
+    players: { ...s.players, p1: { ...s.players.p1, hand: [FE, BUG] } },
+  }
+  const staged = reduce(primed, { type: 'PLAY', player: 'p1', card: FE.uid, at: 1000 })
+  const r = reduce(staged.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'cancelRelease' },
+    at: 1001,
+  })
+  expect(r.events.some((e) => e.type === 'rejected')).toBe(true)
+  expect(r.state.pending).toMatchObject({ kind: 'discardForRelease' })
+})
+
+it('refuses a cancel when no release is staged', () => {
+  const s = engine.createGame(config())
+  const r = reduce(s, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'cancelRelease' },
+    at: 1000,
+  })
+  expect(r.events.some((e) => e.type === 'rejected')).toBe(true)
+})
+
 it('rejects a play once the game is over, or of a frozen card', () => {
   const s = handed([FE], { ...BASE, releaseCond: 'easy' })
   const over: GameState = { ...s, over: { winner: 'p2', condition: 'release' } }

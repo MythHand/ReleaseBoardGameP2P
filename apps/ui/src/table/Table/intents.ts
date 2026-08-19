@@ -28,6 +28,9 @@ export type TableChoice =
   | { kind: 'giveCard'; card: string }
   | { kind: 'handLimit'; cards: string[] }
   | { kind: 'pickFromDiscard'; card: string; toDeck?: string }
+  // Taking a staged release back before its cost is paid — see the engine's
+  // own Choice for why it carries nothing.
+  | { kind: 'cancelRelease' }
 
 export type TablePending =
   | { kind: 'discardForRelease'; player: string; options: string[] }
