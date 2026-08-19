@@ -39,22 +39,32 @@ const HAND: { uid: string; card: CardData }[] = [
 // role boardStaging.test.tsx's own `comboOut` plays for its fold tests.
 let pulledOut: string[] = []
 
+// The hand actually rendered by the most recent `defenceBoard` call — HAND by
+// default, but the fold-lock test (Fix round 1, Important 3) rerenders with a
+// SECOND, independent pair of cards to prove the lock does not stick across
+// two separate exchanges. `fanUids`'s own fallback needs to know which hand
+// is live, not just its length (a same-length replacement would otherwise be
+// indistinguishable from HAND itself).
+let currentHand: { uid: string; card: CardData }[] = HAND
+
 // Builds a board whose `state.pending` is a `defend` owed to `selfId` — the
 // engine's own shape (packages/engine/src/fake/attacks.ts's `pendingView`):
 // `scope: 'release'`, a fixed attacker/attackCard, sudo false, and `options`
 // from `over` (legality is the projection's answer, never re-derived here).
 function defenceBoard(
-  over: { options: string[]; combos?: Record<string, string[]> },
+  over: { options: string[]; combos?: Record<string, string[]>; hand?: typeof HAND },
   actions: TableActions = {},
   // routed through `intro.events`, same as boardStaging.test.tsx's own
   // `boardWith` — Board only ever sees the feed that way.
   events: Event[] = [],
 ) {
+  const hand = over.hand ?? HAND
+  currentHand = hand
   const base = makeBoardProps()
   const props = makeBoardProps({
     state: {
       ...base.state,
-      you: { ...base.state.you, hand: HAND },
+      you: { ...base.state.you, hand },
       // no pending → nothing playable is a real engine invariant
       // (playableFor's own first check); a defend pending is no exception.
       playable: [],
@@ -149,12 +159,13 @@ async function clickFanCard(uid: string) {
 }
 
 // The fan's current uids — same construction as boardStaging.test.tsx's own
-// `fanUids`/`comboFanUids`. Falls back to the full hand whenever the DOM shows
-// every slot, so a REFUSED pull never needs `pulledOut` cleared first.
+// `fanUids`/`comboFanUids`. Falls back to the full (current) hand whenever the
+// DOM shows every slot, so a REFUSED pull never needs `pulledOut` cleared
+// first.
 function fanUids(): string[] {
   const rendered = document.querySelectorAll('[data-hand-slot]').length
-  if (rendered === HAND.length) return HAND.map((c) => c.uid)
-  return HAND.filter((c) => !pulledOut.includes(c.uid)).map((c) => c.uid)
+  if (rendered === currentHand.length) return currentHand.map((c) => c.uid)
+  return currentHand.filter((c) => !pulledOut.includes(c.uid)).map((c) => c.uid)
 }
 
 it('drops a defence on the attack and answers with it', async () => {
@@ -353,4 +364,159 @@ it('a pulled Sudo lights the defence it may enhance', async () => {
   )
   await pullFromFan('support-sudo#0')
   expect(defAccentOf('defense-hotfix#0')).toBe('var(--cat-support)')
+})
+
+// Fix round 1 (Important 3): mechanic 2 (the no-duplicate commit) had no
+// direct pin — the two existing fold tests only ever check AFTER the whole
+// ~620ms settle, a span the SAME commit's own guarantee has nothing to do
+// with. This checks the one render the guarantee is actually about: the
+// instant `fireEvent.mouseUp` returns, BEFORE any `act(async …)` wait, both
+// halves of the swap must already be true together — the standing Sudo gone,
+// the flyer already showing the whole pair. Moving `commitStaged` to after
+// the flight (or replacing the whole fold with a bare `setLanded(true)`)
+// makes this fail; I verified that by making the mutation locally before
+// writing this comment.
+it("the standing Sudo and the flyer's own pair swap in the SAME commit", async () => {
+  render(
+    defenceBoard(
+      { options: ['defense-hotfix#0'], combos: { 'support-sudo#0': ['defense-hotfix#0'] } },
+      {},
+    ),
+  )
+  await pullFromFan('support-sudo#0')
+  const index = fanUids().indexOf('defense-hotfix#0')
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  // no `await` above this line — the very next paint after the click
+  const sudoSlot = document.querySelector('[data-centre-slot="sudo"]') as HTMLElement
+  expect(sudoSlot.querySelector('[data-card]')).toBeNull()
+  // wherever the pair currently lives (the flyer, at this instant — the
+  // static cover render cannot exist yet, `landed` has had no chance to flip)
+  expect(document.querySelectorAll('[data-main] [data-card], [data-aux] [data-card]')).toHaveLength(
+    2,
+  )
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+})
+
+// Fix round 1 (Important 3): mechanic 3 (the fold lock) had no test at all.
+// Direct precedent: boardStaging.test.tsx's own "a fold whose pair-flyer
+// markers go missing still clears the lock" — but that test's own probe
+// (Escape) does not transfer here: `_useBoardStaging`'s fold does not commit
+// `phase: 'dispatched'` until `finish()` runs at the END of its flight, so a
+// bailed fold there is STILL cancellable (`phase` stays 'partner'). This
+// fold's own no-duplicate commit requires the OPPOSITE order — `phase:
+// 'dispatched'` is set before the flight even starts (Fix round 1, Important
+// 2's own finding) — so by the time this bail runs, Escape/cancel() is
+// ALREADY refused by `phase === 'dispatched'` regardless of the lock. The
+// lock's only OWN observable consequence here is whether a LATER, INDEPENDENT
+// fold can still complete — so that is what this proves, against a second
+// pending built with fresh cards once the first exchange has been echoed
+// away (`rerender`, the same device `boardStaging.test.tsx`'s own tests use
+// for a second cycle).
+it('a fold whose flyer markers go missing still clears the lock — a later, independent fold succeeds normally', async () => {
+  const onResolve = vi.fn()
+  const { rerender } = render(
+    defenceBoard(
+      { options: ['defense-hotfix#0'], combos: { 'support-sudo#0': ['defense-hotfix#0'] } },
+      { onResolve },
+    ),
+  )
+  const proto = Element.prototype.querySelector
+  const qs = vi.spyOn(Element.prototype, 'querySelector').mockImplementation(function (
+    this: Element,
+    selector: string,
+  ) {
+    if (selector === '[data-main]' || selector === '[data-aux]') return null
+    return proto.call(this, selector)
+  })
+  await pullFromFan('support-sudo#0')
+  await clickFanCard('defense-hotfix#0') // bails at `if (!mainEl || !auxEl)` — dispatches anyway, never animates
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'defend',
+    card: 'defense-hotfix#0',
+    combo: 'support-sudo#0',
+  })
+  qs.mockRestore() // back to the real DOM before the second exchange below
+
+  // a second, independent attack — the engine echoed the first exchange away
+  // (a fresh hand, a fresh pending naming fresh uids); if `foldingRef` had
+  // stuck from the bail above, this fold would refuse silently, forever
+  const hand2: { uid: string; card: CardData }[] = [
+    { uid: 'defense-hotfix#1', card: hotfix },
+    { uid: 'support-sudo#1', card: sudo },
+  ]
+  pulledOut = []
+  rerender(
+    defenceBoard(
+      {
+        options: ['defense-hotfix#1'],
+        combos: { 'support-sudo#1': ['defense-hotfix#1'] },
+        hand: hand2,
+      },
+      { onResolve },
+    ),
+  )
+  await pullFromFan('support-sudo#1')
+  await clickFanCard('defense-hotfix#1')
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'defend',
+    card: 'defense-hotfix#1',
+    combo: 'support-sudo#1',
+  })
+})
+
+// Task 17's own reduced-motion path had a test for the plain answer only
+// ("reduced motion stages without a flight") — the fold's own reduced-motion
+// branch (`if (reduced || !fromRect)`) was unpinned. Same constraint Task 16
+// already set precedent for on the plain path: every flight needs a path
+// reaching the same end state with no animation.
+it('reduced motion folds the pair without a flight', () => {
+  const mm = vi.spyOn(window, 'matchMedia').mockImplementation(
+    (query: string) =>
+      ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  )
+  const onResolve = vi.fn()
+  render(
+    defenceBoard(
+      { options: ['defense-hotfix#0'], combos: { 'support-sudo#0': ['defense-hotfix#0'] } },
+      { onResolve },
+    ),
+  )
+  // the pull, inlined — `pullFromFan` waits 600ms for a flight reduced motion
+  // never plays
+  const sudoIndex = fanUids().indexOf('support-sudo#0')
+  const sudoSlotEl = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[sudoIndex]
+  pulledOut = ['support-sudo#0']
+  fireEvent.mouseDown(sudoSlotEl, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  const sudoSlot = document.querySelector('[data-centre-slot="sudo"]') as HTMLElement
+  expect(sudoSlot.querySelector('[data-card]')).toBeTruthy()
+
+  // the fold, inlined the same way — `clickFanCard` waits 700ms for
+  // `foldIntoPair` flights reduced motion never plays
+  const defIndex = fanUids().indexOf('defense-hotfix#0')
+  const defSlotEl = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[defIndex]
+  pulledOut = [...pulledOut, 'defense-hotfix#0']
+  fireEvent.mouseDown(defSlotEl, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'defend',
+    card: 'defense-hotfix#0',
+    combo: 'support-sudo#0',
+  })
+  expect(screen.getByTestId('board-cover-staged').querySelectorAll('[data-card]')).toHaveLength(2)
+  mm.mockRestore()
 })

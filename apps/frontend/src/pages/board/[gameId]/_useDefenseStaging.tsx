@@ -315,6 +315,22 @@ export function useDefenseStaging({
           }
           flyer.drop('sudo')
         }
+        // A cancel (or a later dispatch) may have taken this staging away
+        // WHILE the flight above was still in the air (Fix round 1,
+        // Important 1) — the approved source's own `cancelStaged` guards this
+        // exact window with `busyRef.current`, dropped in the initial port.
+        // Without this check, a press landing mid-flight runs `cancel()`
+        // (whose own `arrowCtl.stop()` is a no-op — nothing is armed yet) and
+        // sends the card home, but this continuation, unaware, still arms an
+        // arrow from an empty slot that follows the cursor until some LATER
+        // staging happens to call `stop()`.
+        if (
+          cancellingRef.current ||
+          stagedRef.current?.phase !== 'partner' ||
+          stagedRef.current.support?.uid !== uid
+        ) {
+          return
+        }
         setSudoLanded(true)
         // the arrow starts where the Sudo now stands and follows the cursor —
         // the ported source's own `stageDefSudo`
@@ -374,10 +390,15 @@ export function useDefenseStaging({
   // cancel — a miss, Escape, or an invalid partner pick sends whatever is
   // standing back into the fan. Three shapes, mirroring `_useBoardStaging.ts`'s
   // own cancel: a lone Sudo waiting for a partner returns from its own slot; a
-  // folded pair returns both halves together from the cover slot (reached only
-  // if a rejection arrives AFTER the fold has landed — the fold itself is
-  // irrevocable, `foldingRef` below); and the plain defence returns from the
-  // cover slot alone, exactly as Task 16 left it.
+  // folded pair returns both halves together from the cover slot; and the
+  // plain defence returns from the cover slot alone, exactly as Task 16 left
+  // it. The merged branch is reached two ways: directly, if a rejection
+  // arrives once the fold has already settled (`phase` is 'rejected' but
+  // `foldingRef` is clear, so this guard lets it through); or via
+  // `onCardClick`'s own `finally`, which retries this the instant its fold's
+  // lock clears, for a rejection that arrived WHILE the fold was still
+  // animating (Fix round 1, Important 2 — reachable in normal play via the
+  // pending's own deadline).
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const cancel = useCallback(() => {
     const s = stagedRef.current
@@ -386,7 +407,11 @@ export function useDefenseStaging({
 
     if (s.phase === 'partner' && s.support && !s.main) {
       const support = s.support
-      const sRect = anchors.sudo.current?.getBoundingClientRect()
+      // prefer the flying card's OWN current box over the empty slot's — a
+      // cancel landing mid-flight (Fix round 1, Important 1's own window)
+      // would otherwise start the return flight from the slot the card has
+      // not reached yet, while the card is visibly still mid-air elsewhere
+      const sRect = rectOf(flyer.elOf('sudo')) ?? anchors.sudo.current?.getBoundingClientRect()
       flyer.drop('sudo')
       if (reduced || !sRect) {
         commitStaged(null)
@@ -451,6 +476,7 @@ export function useDefenseStaging({
     anchors.sudo,
     arrowCtl.stop,
     flyer.drop,
+    flyer.elOf,
   ])
 
   // the partner pick (Task 17) — the waiting Sudo is ALREADY standing at its
@@ -484,15 +510,24 @@ export function useDefenseStaging({
       // the fold is committed — irrevocable until it lands; `cancel()` and a
       // second click both refuse while this is true.
       foldingRef.current = true
-      // The standing Sudo is handed to the flyer in the SAME commit as the
-      // dispatch — no `await` between them, so React batches both into one
-      // commit: the static Sudo unmounts on the exact frame the flyer's aux
-      // half mounts. Never on screen twice, never absent (the no-duplicate
-      // rule this task's own brief calls out).
-      commitStaged({ support, main, phase: 'dispatched', merged: true })
-      dispatchWatermarkRef.current = eventsRef.current.length
-      setLanded(false) // fresh cycle — the fold below has not carried this pair yet
-      actions?.onResolve?.({ kind: 'defend', card: item.uid, combo: support.uid })
+      try {
+        // The standing Sudo is handed to the flyer in the SAME commit as the
+        // dispatch — no `await` between them, so React batches both into one
+        // commit: the static Sudo unmounts on the exact frame the flyer's aux
+        // half mounts. Never on screen twice, never absent (the no-duplicate
+        // rule this task's own brief calls out).
+        commitStaged({ support, main, phase: 'dispatched', merged: true })
+        dispatchWatermarkRef.current = eventsRef.current.length
+        setLanded(false) // fresh cycle — the fold below has not carried this pair yet
+        actions?.onResolve?.({ kind: 'defend', card: item.uid, combo: support.uid })
+      } catch (e) {
+        // Fix round 1 (Minor): a throw from the send must not leave the lock
+        // stuck — `_useBoardStaging.ts`'s own dispatch lives inside its fold's
+        // guarded block for the same reason (there `finish()` clears the lock
+        // as its own first statement, before calling out).
+        foldingRef.current = false
+        throw e
+      }
 
       if (reduced || !fromRect) {
         // reduced motion (or no fan geometry to fold from) settles instantly —
@@ -544,6 +579,17 @@ export function useDefenseStaging({
           // every exit clears the lock — the early returns above and a
           // rejecting `.finished` all bypass the success path's own clear.
           foldingRef.current = false
+          // Fix round 1 (Important 2): unlike `_useBoardStaging.ts`'s own
+          // fold, this one dispatches BEFORE this flight rather than after —
+          // the no-duplicate rule (the standing Sudo handed to the flyer in
+          // the SAME commit as the dispatch) requires it. That inversion
+          // opens a real window a rejection can land in: the rejected-watcher
+          // effect below sets `phase: 'rejected'` the moment it sees one, but
+          // its own `cancel()` call was refused while `foldingRef` was still
+          // true, and nothing else retries it. Retry now that the lock is
+          // clear — reachable in normal play (the pending's own deadline can
+          // expire mid-animation), not merely theoretical.
+          if (stagedRef.current?.phase === 'rejected') cancel()
         }
       })()
     },
