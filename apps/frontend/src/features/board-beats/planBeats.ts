@@ -63,8 +63,11 @@ export type BeatPlan =
       card: string
       sudo: boolean
     }
-  // Only a Code Review combo gets a beat of its own — a plain release has
-  // nowhere to fold FROM (see the walk below).
+  // Every release flies into its slot. `codeReview` rides along when the play
+  // was a combo; `cost` when the rules made it pay for itself — the card is
+  // shown OPEN beside the release before it leaves, so the release beat owns
+  // that discard rather than letting `discardBeat` fly it out of a hand slot it
+  // had already left.
   | {
       kind: 'releasePlaced'
       key: string
@@ -72,7 +75,8 @@ export type BeatPlan =
       player: string
       slot: string
       card: string
-      codeReview: string
+      codeReview?: string
+      cost?: { eventId: number; card: string }
     }
   // The pending pair splitting back into two singles for the discard. `main`
   // is optional, not `aux`: a sudo Rollback banks only the sudo half (the
@@ -180,6 +184,17 @@ function revealAfter(events: Event[], i: number): { card: string; discardId: num
   return { card, discardId: filed.id }
 }
 
+// The engine pays the cost and places the release in one reduction, emitting
+// `discarded(releaseCost)` immediately before `released`
+// (fake/release.ts:281,293 through `placeRelease`). Looking back by POSITION
+// rather than scanning the batch is what keeps an unrelated earlier discard
+// from being read as this release's cost.
+function costBefore(events: Event[], i: number): { eventId: number; card: string } | null {
+  const prev = events[i - 1]
+  if (prev?.type !== 'discarded' || prev.reason !== 'releaseCost') return null
+  return { eventId: prev.id, card: prev.card }
+}
+
 export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   const claimed = new Set<number>()
   // discards the draw beat has taken over — a revealed trigger leaves from the
@@ -246,10 +261,9 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       })
       continue
     }
-    if (e.type === 'released' && e.codeReview) {
-      // A plain release falls through to the default below, unchanged: it has
-      // nowhere to fold FROM — the beat is only for the Code Review combo.
+    if (e.type === 'released') {
       flush()
+      const cost = costBefore(events, i)
       plans.push({
         kind: 'releasePlaced',
         key: `release:${e.id}`,
@@ -257,12 +271,16 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         player: e.player,
         slot: e.slot,
         card: e.card,
-        codeReview: e.codeReview,
+        ...(e.codeReview ? { codeReview: e.codeReview } : {}),
+        ...(cost ? { cost } : {}),
       })
       continue
     }
     if (e.type === 'discarded') {
       if (owned.has(e.id)) continue
+      // the release's own cost — claimed by the `releasePlaced` beat that
+      // follows it in this same batch, where it is shown open before it leaves
+      if (e.reason === 'releaseCost') continue
       const p = before.pending
       // The sudo half of a resolving pair — checked ahead of the attack card
       // so a sudo Rollback (which banks ONLY this half; the attack card

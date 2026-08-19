@@ -304,7 +304,7 @@ describe('planBeats — the combo pair (#100)', () => {
     ])
   })
 
-  it('a released with codeReview plans a releasePlaced beat; a plain released plans nothing', () => {
+  it('a released with codeReview plans a releasePlaced beat', () => {
     const withReview = planBeats(
       [
         released({
@@ -328,11 +328,75 @@ describe('planBeats — the combo pair (#100)', () => {
         codeReview: 'support-code-review',
       },
     ])
-    const plain = planBeats(
-      [released({ id: 8, player: 'p1', slot: 'frontend', card: 'release-frontend' })],
+  })
+
+  it('plans a beat for a plain release too, and links the cost that paid for it', () => {
+    const plans = planBeats(
+      [
+        discarded(6, { card: 'attack-bug', reason: 'releaseCost' }),
+        released({ id: 7, player: 'p1', slot: 'frontend', card: 'release-frontend' }),
+      ],
       boardBefore(),
     )
-    expect(plain).toEqual([])
+    expect(plans).toEqual([
+      {
+        kind: 'releasePlaced',
+        key: 'release:7',
+        eventId: 7,
+        player: 'p1',
+        slot: 'frontend',
+        card: 'release-frontend',
+        cost: { eventId: 6, card: 'attack-bug' },
+      },
+    ])
+  })
+
+  it('does not let the discard beat fly the cost a second time', () => {
+    // the cost belongs to the release beat: it is shown open at the centre and
+    // leaves from there, not from the hand slot it had already left
+    const plans = planBeats(
+      [
+        discarded(6, { card: 'attack-bug', reason: 'releaseCost' }),
+        released({ id: 7, card: 'release-frontend' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans.some((p) => p.kind === 'discard')).toBe(false)
+  })
+
+  it('plans a release with no cost in easy mode', () => {
+    const plans = planBeats([released({ id: 7, card: 'release-frontend' })], boardBefore())
+    expect(plans).toEqual([
+      {
+        kind: 'releasePlaced',
+        key: 'release:7',
+        eventId: 7,
+        player: 'p1',
+        slot: 'frontend',
+        card: 'release-frontend',
+      },
+    ])
+  })
+
+  it('keeps carrying the Code Review of a comboed release', () => {
+    const plans = planBeats(
+      [released({ id: 7, card: 'release-frontend', codeReview: 'support-code-review' })],
+      boardBefore(),
+    )
+    expect(plans[0]).toMatchObject({ kind: 'releasePlaced', codeReview: 'support-code-review' })
+  })
+
+  it('does not claim an unrelated discard sitting before a release', () => {
+    // only `releaseCost` is the cost. A hand-limit discard that happens to
+    // precede a release is its own gesture and keeps its own beat.
+    const plans = planBeats(
+      [
+        discarded(6, { card: 'attack-bug', reason: 'handLimit' }),
+        released({ id: 7, card: 'release-frontend' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['discard', 'releasePlaced'])
   })
 
   it('resolution discards of the pending pair take the pair exit, others keep the discard beat', () => {
