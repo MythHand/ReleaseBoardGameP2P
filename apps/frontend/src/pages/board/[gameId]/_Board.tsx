@@ -62,7 +62,7 @@ import {
 // nothing to catch it — a type check cannot see a position. `opening` holds only
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
-import { COVER_POSE, useBoardAnchors } from '~/entities/game/board'
+import { COVER_POSE, SUDO_POSE, useBoardAnchors } from '~/entities/game/board'
 import type { BoardProps, Panel, StagedHandoff } from '~/entities/game/board/types'
 import { useBeats } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
@@ -317,6 +317,25 @@ export default function Board({
     answering && defenseStaging.landed && defenseStaging.overlay.length === 0
       ? defenseStaging.staged?.main
       : undefined
+  // the Sudo that folded into it (Task 17) — same gate as `stagedCover`, read
+  // alongside it so the cover slot's render (below) can tell a plain defence
+  // from a sudo-backed pair without a second read of `defenseStaging.staged`.
+  const stagedCoverSudo =
+    answering && defenseStaging.landed && defenseStaging.overlay.length === 0
+      ? defenseStaging.staged?.support
+      : undefined
+  // the defender's own Sudo, waiting at its own slot for the defence it will
+  // enhance (Task 17) — gated on `sudoLanded` the same way `stagedCover` is
+  // gated on `landed`, and on `phase === 'partner'` so it disappears the
+  // instant a fold commits (the no-duplicate rule: the fold's own commit
+  // clears `phase` away from 'partner' in the SAME tick the flyer's aux mounts).
+  const stagedSudo =
+    answering &&
+    defenseStaging.staged?.phase === 'partner' &&
+    defenseStaging.sudoLanded &&
+    defenseStaging.overlay.length === 0
+      ? defenseStaging.staged.support
+      : undefined
   // its own node, for the staging → beat handoff below — the static cover
   // render, once it lands, is what `defenseBeat.runCovered` finds already
   // standing where the cover goes (Task 16's own report: Carry #2).
@@ -515,12 +534,33 @@ export default function Board({
     return () => window.removeEventListener('mousedown', onMouseDown)
   }, [staging.costOptions.length, staging.cancel])
 
+  // A Sudo waiting for the defence it will enhance has no aimed target to
+  // click (Task 17) — the same "changed my mind" shape as a release awaiting
+  // its cost above, for the same reason: the fan's own pull gesture starts on
+  // mousedown too, so the press this has to ignore is the SAME event a drag
+  // begins on, not the click that follows it (the approved source's own
+  // `cancelStaged`/mousedown effect). Kept separate from `handleTableClick`
+  // below (rather than folded into its `answering` branch) for the identical
+  // reason the cost listener is: a single physical press must not fire
+  // `defenseStaging.cancel()` twice over.
+  useEffect(() => {
+    if (defenseStaging.staged?.phase !== 'partner') return
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('[data-hand-slot]')) return
+      defenseStaging.cancel()
+    }
+    window.addEventListener('mousedown', onMouseDown)
+    return () => window.removeEventListener('mousedown', onMouseDown)
+  }, [defenseStaging.staged?.phase, defenseStaging.cancel])
+
   // Escape cancels a staged defence the same way a miss on the table does —
   // see `handleTableClick`'s own `answering` branch below. Task 16's plain
   // path commits and dispatches in the same tick (no cancellable aim phase),
   // so this is armed only for the brief span between a rejection and
   // `cancel()`'s own return flight taking over (`defenseStaging.cancel`'s own
-  // guard refuses anything still `phase: 'dispatched'`).
+  // guard refuses anything still `phase: 'dispatched'`). A waiting Sudo
+  // (Task 17) is covered too — nothing here excludes `phase: 'partner'`.
   useEffect(() => {
     if (!answering) return
     const s = defenseStaging.staged
@@ -544,7 +584,10 @@ export default function Board({
     }
     if (answering) {
       const s = defenseStaging.staged
-      if (!s || s.phase === 'dispatched') return
+      // 'partner' (Task 17) is the mousedown listener's own — see above,
+      // which exists specifically so a single physical press cannot fire
+      // `defenseStaging.cancel()` from both places over one click.
+      if (!s || s.phase === 'dispatched' || s.phase === 'partner') return
       const target = e.target as HTMLElement
       if (target.closest('[data-hand-slot]')) return
       defenseStaging.cancel()
@@ -629,7 +672,14 @@ export default function Board({
       <div className={cls(opening.bgWrap, enter)} ref={anchors.bg}>
         <HudBackground tone="neutral" className={kit.bgLayer} />
       </div>
-      <Arrow from={staging.arrow.from} to={staging.arrow.to} />
+      {/* one arrow, whichever hook is live (#101, Task 17) — `answering` picks
+          the source the same way every other call site in this file does; the
+          turn hook's own arrow stays wherever it last pointed while a defend
+          pending suspends it, unread while `answering` is true. */}
+      <Arrow
+        from={answering ? defenseStaging.arrow.from : staging.arrow.from}
+        to={answering ? defenseStaging.arrow.to : staging.arrow.to}
+      />
 
       {slots?.banner && <div className={kit.banner}>{slots.banner}</div>}
       {slots?.corner && <div className={kit.corner}>{slots.corner}</div>}
@@ -732,13 +782,22 @@ export default function Board({
         {staging.paidCost && <Card card={staging.paidCost.card} interactive={false} width="100%" />}
       </div>
       {/* the defender's own Sudo waits in its OWN place until a defence is
-          chosen for it — the arrow says what it is aimed at */}
+          chosen for it — the arrow says what it is aimed at. Rendered once its
+          own flight there has landed (or at once under reduced motion, Task
+          17) — the same landed-gate role `stagedCover` below plays for the
+          defence's own flight to the cover slot. */}
       <div
         className={opening.sudoSlot}
         data-centre-slot="sudo"
         ref={anchors.sudo}
-        {...previewProps(null)}
-      />
+        {...previewProps(stagedSudo?.card ?? null)}
+      >
+        {stagedSudo && (
+          <div className={opening.pose} style={{ transform: restTransform(SUDO_POSE) }}>
+            <Card card={stagedSudo.card} interactive={false} width="100%" />
+          </div>
+        )}
+      </div>
       {/* the defence covering the attack — offset and tilted the other way.
           Axis-aligned itself (I6): the tilt lives on the inner `.pose` child,
           the same way the discard heap's own resting cards carry theirs, so
@@ -747,7 +806,10 @@ export default function Board({
           once under reduced motion) — `defenseBeat.runCovered` finds this
           exact node already standing here through the handoff (#101, Task 16:
           Carry #2), rather than falling back to a seat box that is never
-          bound for the local player. */}
+          bound for the local player. Carries a CardPair instead of a lone
+          Card once a Sudo has folded into it (#101, Task 17) — `stagedCoverSudo`
+          shares `stagedCover`'s own gate, so the two can never disagree on
+          whether the fold has landed. */}
       <div
         className={opening.coverSlot}
         data-centre-slot="cover"
@@ -761,7 +823,11 @@ export default function Board({
             style={{ transform: restTransform(COVER_POSE) }}
             data-testid="board-cover-staged"
           >
-            <Card card={stagedCover.card} interactive={false} width="100%" />
+            {stagedCoverSudo ? (
+              <CardPair main={stagedCover.card} aux={stagedCoverSudo.card} width="100%" />
+            ) : (
+              <Card card={stagedCover.card} interactive={false} width="100%" />
+            )}
           </div>
         )}
       </div>

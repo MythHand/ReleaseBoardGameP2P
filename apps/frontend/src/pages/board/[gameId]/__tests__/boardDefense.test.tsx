@@ -4,33 +4,47 @@
 // while the engine owes us that decision; `_useBoardStaging.ts` (this file's
 // own sibling suite, boardStaging.test.tsx) owns the TURN's plays and the two
 // never run at once. Same render harness (real `<Board>`, no mocks).
+//
+// Task 17 (#101) adds the enhanced answer: pulling the defender's own Sudo
+// stands it at its own slot, waiting for a partner CLICKED in the hand — the
+// same pull/pick shape boardStaging.test.tsx's own combo tests already pin for
+// the turn side, ported here for the defend side (`pullFromFan`/`clickFanCard`
+// mirror that file's own `pullFromComboFan`/`clickComboFanCard`).
 
 import type { Event } from '@release/engine'
 import type { CardData, TableActions } from '@release/ui'
 import { cardById } from '@release/ui'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
+import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
 import Board from '../_Board'
 import { makeBoardProps } from './fixture'
 
 // biome-ignore lint/style/noNonNullAssertion: a known catalogue entry
 const hotfix = cardById('defense-hotfix')!
+// biome-ignore lint/style/noNonNullAssertion: a known catalogue entry
+const sudo = cardById('support-sudo')!
 
 // The fixed hand every test in this file renders: the one defence card these
-// tests pull. Never mutated by the hook itself, same discipline as
-// boardStaging.test.tsx's own HAND.
-const HAND: { uid: string; card: CardData }[] = [{ uid: 'defense-hotfix#0', card: hotfix }]
+// tests pull, plus (Task 17) the defender's own Sudo. Never mutated by the
+// hook itself, same discipline as boardStaging.test.tsx's own HAND.
+const HAND: { uid: string; card: CardData }[] = [
+  { uid: 'defense-hotfix#0', card: hotfix },
+  { uid: 'support-sudo#0', card: sudo },
+]
 
-// The uid the most recent pull went after — same role as boardStaging.test.tsx's
-// own `lastPulled`.
-let lastPulled: string | null = null
+// The uids that have left the fan so far this test's own pull sequence —
+// reset by whichever helper starts a fresh one (`pullCardFromFan`,
+// `pullFromFan`), extended by whichever continues it (`clickFanCard`). Same
+// role boardStaging.test.tsx's own `comboOut` plays for its fold tests.
+let pulledOut: string[] = []
 
 // Builds a board whose `state.pending` is a `defend` owed to `selfId` — the
 // engine's own shape (packages/engine/src/fake/attacks.ts's `pendingView`):
 // `scope: 'release'`, a fixed attacker/attackCard, sudo false, and `options`
 // from `over` (legality is the projection's answer, never re-derived here).
 function defenceBoard(
-  over: { options: string[] },
+  over: { options: string[]; combos?: Record<string, string[]> },
   actions: TableActions = {},
   // routed through `intro.events`, same as boardStaging.test.tsx's own
   // `boardWith` — Board only ever sees the feed that way.
@@ -44,6 +58,12 @@ function defenceBoard(
       // no pending → nothing playable is a real engine invariant
       // (playableFor's own first check); a defend pending is no exception.
       playable: [],
+      // the defender's own Sudo pairing (Task 17) — the projection's answer
+      // (packages/engine/src/fake/project.ts's `combosFor`, extended in this
+      // task's own engine step), fixture-supplied here the same way
+      // boardStaging.test.tsx's own `comboBoardWith` supplies it for the turn
+      // side. `{}` (the default) means no Sudo pairing is offered.
+      comboOptions: over.combos ?? {},
       pending: {
         kind: 'defend',
         player: base.state.selfId,
@@ -81,11 +101,13 @@ function rejectedDefendEvent(card: string): Event {
 // own `pullCardFromFan`: down on its slot, past the 6px threshold, released
 // well outside the hand's band. Waits past the accepted flight's own settle
 // time (the SAME `playToCenter` preset boardStaging's own solo-release path
-// uses to reach a centre slot).
+// uses to reach a centre slot). Against the HAND's own fixed index — the
+// plain path this drives always pulls the fan's only OTHER card, so nothing
+// has shifted its position yet.
 async function pullCardFromFan(uid: string) {
   const index = HAND.findIndex((c) => c.uid === uid)
   const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
-  lastPulled = uid
+  pulledOut = [uid]
   fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
   fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
   fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
@@ -94,12 +116,45 @@ async function pullCardFromFan(uid: string) {
   })
 }
 
+// Drags the defender's own Sudo out of the fan (Task 17) — same drag contract
+// as `pullCardFromFan` above, against the CURRENT render order (`fanUids()`)
+// rather than HAND's fixed one, since a fold test may pull a second card off a
+// fan that has already lost its first.
+async function pullFromFan(uid: string) {
+  const index = fanUids().indexOf(uid)
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  pulledOut = [uid]
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 600))
+  })
+}
+
+// Clicks a card in the fan (mousedown + mouseup with no movement — a click,
+// not a drag; boardStaging.test.tsx's own `clickComboFanCard` carries the same
+// contract). The fold if `uid` is the waiting Sudo's own valid partner, a
+// miss (cancel) otherwise. Waits past MERGE_MS (620ms) so both `foldIntoPair`
+// flights have settled.
+async function clickFanCard(uid: string) {
+  const index = fanUids().indexOf(uid)
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  pulledOut = [...pulledOut, uid]
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+}
+
 // The fan's current uids — same construction as boardStaging.test.tsx's own
-// `fanUids`.
+// `fanUids`/`comboFanUids`. Falls back to the full hand whenever the DOM shows
+// every slot, so a REFUSED pull never needs `pulledOut` cleared first.
 function fanUids(): string[] {
   const rendered = document.querySelectorAll('[data-hand-slot]').length
   if (rendered === HAND.length) return HAND.map((c) => c.uid)
-  return HAND.filter((c) => c.uid !== lastPulled).map((c) => c.uid)
+  return HAND.filter((c) => !pulledOut.includes(c.uid)).map((c) => c.uid)
 }
 
 it('drops a defence on the attack and answers with it', async () => {
@@ -169,7 +224,7 @@ it('reduced motion stages without a flight', () => {
   // helper waits 600ms for a flight reduced motion never plays.
   const index = HAND.findIndex((c) => c.uid === 'defense-hotfix#0')
   const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
-  lastPulled = 'defense-hotfix#0'
+  pulledOut = ['defense-hotfix#0']
   fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
   fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
   fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
@@ -212,4 +267,90 @@ it('a defence chosen through the pending panel also covers the attack', async ()
   // the same visual the drag path produces — not the panel's own confirm
   // alone, which the pre-fix code already satisfied
   expect(screen.getByTestId('board-cover-staged')).toBeTruthy()
+})
+
+// Task 17 (#101): the defender's own Sudo takes its own slot, then folds into
+// the answer. `combos` (routed to `state.comboOptions` by `defenceBoard`
+// above) stands in for the engine's own `combosFor` answer — this task's own
+// engine step, pinned separately in packages/engine/src/fake/project.test.ts.
+
+it('stands the Sudo in its own slot and aims an arrow out of it', async () => {
+  render(
+    defenceBoard(
+      { options: ['defense-hotfix#0'], combos: { 'support-sudo#0': ['defense-hotfix#0'] } },
+      {},
+    ),
+  )
+  await pullFromFan('support-sudo#0')
+  const sudoSlot = document.querySelector('[data-centre-slot="sudo"]') as HTMLElement
+  expect(sudoSlot.querySelector('[data-card]')).toBeTruthy()
+  // The brief's own draft named `arrowStyles.arrow` — no such class exists in
+  // Arrow.module.css (verified: only `.svg`/`.origin`/`.base`/`.flow`/`.head`).
+  // `.origin` is the class boardStaging.test.tsx's own combo-arrow test
+  // already checks for the identical purpose ("is the arrow armed"), so this
+  // follows that established precedent instead.
+  expect(document.querySelector(`.${arrowStyles.origin}`)).toBeTruthy()
+})
+
+it('folds the picked defence together with the Sudo and answers as a pair', async () => {
+  const onResolve = vi.fn()
+  render(
+    defenceBoard(
+      { options: ['defense-hotfix#0'], combos: { 'support-sudo#0': ['defense-hotfix#0'] } },
+      { onResolve },
+    ),
+  )
+  await pullFromFan('support-sudo#0')
+  await clickFanCard('defense-hotfix#0')
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'defend',
+    card: 'defense-hotfix#0',
+    combo: 'support-sudo#0',
+  })
+  // the fold landed as a CardPair, not a lone Card, and the Sudo's own slot is
+  // empty again — never on screen twice, never absent (the no-duplicate rule)
+  expect(screen.getByTestId('board-cover-staged').querySelectorAll('[data-card]')).toHaveLength(2)
+  const sudoSlot = document.querySelector('[data-centre-slot="sudo"]') as HTMLElement
+  expect(sudoSlot.querySelector('[data-card]')).toBeNull()
+})
+
+it('a press on nothing valid takes the waiting Sudo home', async () => {
+  render(
+    defenceBoard(
+      { options: ['defense-hotfix#0'], combos: { 'support-sudo#0': ['defense-hotfix#0'] } },
+      {},
+    ),
+  )
+  await pullFromFan('support-sudo#0')
+  // proves the pull actually did something — without this, a Sudo that never
+  // leaves the fan at all would satisfy the assertion below just as well,
+  // pinning nothing (the whole reason for this check)
+  expect(fanUids()).not.toContain('support-sudo#0')
+  fireEvent.mouseDown(document.querySelector('[data-board-centre]')?.parentElement as HTMLElement)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+  expect(fanUids()).toContain('support-sudo#0')
+})
+
+// The hand cards a waiting Sudo may fold with light with its own category
+// accent — mirrors boardStaging.test.tsx's own `comboAccentOf`/its "a pulled
+// support lights its partners" test, ported to the defend side.
+function defAccentOf(uid: string): string | null {
+  const index = fanUids().indexOf(uid)
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+  const matches = slot?.querySelectorAll<HTMLElement>('[data-state="selected"]') ?? []
+  const lit = matches[matches.length - 1]
+  return lit ? lit.style.getPropertyValue('--accent') : null
+}
+
+it('a pulled Sudo lights the defence it may enhance', async () => {
+  render(
+    defenceBoard(
+      { options: ['defense-hotfix#0'], combos: { 'support-sudo#0': ['defense-hotfix#0'] } },
+      {},
+    ),
+  )
+  await pullFromFan('support-sudo#0')
+  expect(defAccentOf('defense-hotfix#0')).toBe('var(--cat-support)')
 })

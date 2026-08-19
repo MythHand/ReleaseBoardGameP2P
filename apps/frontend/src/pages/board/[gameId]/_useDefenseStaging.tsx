@@ -1,0 +1,634 @@
+// Answering an attack (#101, Task 16): pulling a defence out of the fan and
+// dropping it over the attack answers the `defend` pending the engine owes
+// us. Active only while that pending is ours — its sibling `_useBoardStaging.ts`
+// owns the TURN's plays, and the two never run at once: a window suspends
+// normal play, and the engine returns [] from `playableFor` while one is open
+// (packages/engine/src/fake/project.ts's own first check).
+//
+// Legality is the projection's answer throughout: `pending.options` names the
+// cards that may answer this attack. Task 17 (#101) adds the enhanced answer —
+// pulling the defender's OWN Sudo stands it at its own slot instead of onto the
+// attack, and it waits there for the defence it will enhance, clicked in the
+// hand rather than aimed at (the arrow only SHOWS where it is pointed, it does
+// not gate the click the way a target pick does). Which defences a Sudo may
+// enhance comes from `state.comboOptions[sudoUid]` — `combosFor`
+// (packages/engine/src/fake/project.ts) now sources that, while a `defend`
+// pending owed to this player is open, from the pending's own answerable set
+// (`canDefendWith`), filtered to a card whose rules carry the sudo tag. Nothing
+// here re-derives it; a Sudo with no entry (or an empty one) is simply not
+// pullable.
+//
+// This file went from `.ts` to `.tsx` for Task 17: the fold's own flyer carries
+// a `<CardPair>` as its `content` (`useFlyer`'s own allowance — "a scene may put
+// its OWN element in the node and reach into it afterwards"), the same idiom
+// `comboBeat.tsx`'s `foldIn` and `defenseBeat.tsx`'s own sudo-backed cover
+// already use. `_useBoardStaging.ts`'s OWN turn-side fold avoids this — it
+// paints its pair on a persistent, always-mounted node instead — because that
+// pair can go on to wait through further phases (aim, dispatch) at the SAME
+// spot; this one does not: it dispatches in the same motion as the fold, so
+// there is nothing further for a persistent node to hold open for. The interface
+// this file exported before Task 17 reserved a `pairRef` field on that
+// assumption ("mounted by _Board.tsx the same way _useBoardStaging's own is");
+// this task drops it; `defenseBeat.tsx`'s `runCovered` only ever reads
+// `handoff.el`, which `_Board.tsx`'s existing `coverStagedRef` already supplies
+// (wrapping either a `<Card>` or, once this task's fold lands, a `<CardPair>`).
+//
+// The plain path is small and mirrors `_useBoardStaging.ts`'s own solo-release
+// shape: pull commits and dispatches in the SAME tick (no aim, no partner), the
+// card flies to the cover slot at COVER_POSE, and once the flyer lands (or at
+// once under reduced motion) a static render at `anchors.cover` takes over —
+// `landed` is that gate, the same role `stageLanded` plays for a solo release.
+// This is what keeps the fallback in `defenseBeat.runCovered` dead for a local
+// defence (Carry #2 of this task's brief): the beat's own
+// `!(mine && handoff?.el)` check reads `el` off a REAL, already-standing node,
+// in both motion modes, not a flyer that a reduced-motion path never raises.
+
+import type { Event } from '@release/engine'
+import type { CardData, HandItem, HandPlayDrop, Point, TableActions } from '@release/ui'
+import { CardPair, PAIR_AUX_POSE, useArrow } from '@release/ui'
+import {
+  enterPose,
+  nextFrames,
+  play,
+  type Rect,
+  restTransform,
+  useFlyer,
+  useHandArrival,
+} from '@release/ui/animations'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import { COVER_POSE, MERGE_MS, SUDO_POSE } from '~/entities/game/board'
+import { useReducedMotion } from '~/shared/lib/useReducedMotion'
+
+// same 5-line helper comboBeat.tsx/defenseBeat.tsx each keep privately — copy
+// it, don't import across runners.
+const rectOf = (el: Element | null): Rect | null => {
+  if (!el) return null
+  const r = el.getBoundingClientRect()
+  return { left: r.left, top: r.top, width: r.width, height: r.height }
+}
+
+export interface DefenseStagedCard {
+  uid: string
+  card: CardData
+  index: number // index in you.hand at pull time — where a return flight lands it
+}
+
+export interface DefenseStagedPlay {
+  // the defender's own pulled Sudo — set the instant it lands at its own slot,
+  // whether it is still waiting for a partner (`phase: 'partner'`) or has
+  // already folded into one (`merged`); null on the plain path
+  support: DefenseStagedCard | null
+  // the plain pulled defence, or the partner once the fold has picked one
+  main: DefenseStagedCard | null
+  // 'partner': a lone Sudo standing at its own slot, waiting for a click in the
+  // hand. 'dispatched': the instant a legal pull (plain) or a valid fold
+  // (paired) commits — no further aim, so nothing waits between this and the
+  // engine's answer. 'rejected': the brief window between the engine saying no
+  // and the return flight taking the card(s) back.
+  phase: 'partner' | 'dispatched' | 'rejected'
+  // true once a partner has been picked — the cover slot carries a CardPair
+  // rather than a lone Card. Mirrors `_useBoardStaging`'s own `merged`.
+  merged: boolean
+}
+
+export interface DefenseStaging {
+  staged: DefenseStagedPlay | null
+  overlay: ReactNode[]
+  gapAt: number | null
+  gapSize: number
+  handItems: HandItem[]
+  // the arrow armed from the waiting Sudo's own slot, following the cursor —
+  // `_Board.tsx` renders it in place of `staging.arrow` while `answering`.
+  arrow: { from: Point | null; to: Point | null; active: boolean }
+  defenceOptions: string[]
+  // the hand cards a waiting Sudo may fold with light with its own category
+  // accent — mirrors `_useBoardStaging`'s own `accentAt`. Undefined outside
+  // `phase: 'partner'`.
+  accentAt: (index: number) => string | undefined
+  onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
+  /** the SAME commit + flight + dispatch `onHandPlay` runs, for a card chosen
+   * through `PendingPrompt`'s own card list rather than dragged out of the
+   * fan (#101, Fix round 1) — the panel is a second door onto the same
+   * `defend` decision, and this is what keeps both doors producing the same
+   * result: the card flies from its OWN hand slot (found via
+   * `anchors.handSlotAt`, the same lookup `comboBeat.tsx`'s `foldIn` uses for
+   * a local click-thrown play) rather than a drag's own drop point. */
+  answerWith: (uid: string) => boolean
+  /** the partner pick — a click in the hand while a Sudo waits, per
+   * `state.comboOptions[sudoUid]`. A miss cancels the whole staging, same as
+   * `_useBoardStaging`'s own `onCardClick`. */
+  onCardClick: (index: number) => void
+  cancel: () => void
+  release: () => void
+  /** true once the pulled defence's own flight to the cover slot has landed
+   * (or at once, under reduced motion) — gates `_Board.tsx`'s static cover
+   * render against the carrier still flying it there, same role
+   * `_useBoardStaging.ts`'s own `stageLanded` plays for a solo release. Also
+   * the gate for the FOLDED pair's static cover render (Task 17): the fold
+   * dispatches through the same `landed` cycle as the plain path. */
+  landed: boolean
+  /** true once the waiting Sudo's own flight to its slot has landed (or at
+   * once, under reduced motion) — gates `_Board.tsx`'s static sudo-slot render
+   * the same way `landed` gates the cover slot's. */
+  sudoLanded: boolean
+}
+
+export interface Options {
+  state: BoardState
+  anchors: BoardAnchors
+  actions?: TableActions
+  events: Event[] // the feed — watched for `rejected` after dispatch
+  enabled: boolean // false while the deal or an exclusive beat owns the table
+}
+
+export function useDefenseStaging({
+  state,
+  anchors,
+  actions,
+  events,
+  enabled,
+}: Options): DefenseStaging {
+  const [staged, setStaged] = useState<DefenseStagedPlay | null>(null)
+  const [landed, setLanded] = useState(false)
+  const [sudoLanded, setSudoLanded] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const reduced = useReducedMotion()
+  const flyer = useFlyer()
+  const arrowCtl = useArrow()
+
+  // same discipline as `_useBoardStaging.ts`: handlers that run after an
+  // await read refs, not state, so they see this tick's truth (I8).
+  const stagedRef = useRef(staged)
+  const cancellingRef = useRef(cancelling)
+  cancellingRef.current = cancelling
+  const eventsRef = useRef(events)
+  eventsRef.current = events
+  // captured the instant a dispatch commits `phase: 'dispatched'` — the
+  // rejected-watcher below only reads what came AFTER this point, the same
+  // watermark discipline `_useBoardStaging.ts` applies to this same array.
+  const dispatchWatermarkRef = useRef(0)
+  // The fold is IRREVOCABLE once a partner is picked — copies
+  // `_useBoardStaging.ts`'s own `foldingRef` verbatim in intent: `cancel()`
+  // and a second click both refuse while it is true, and every exit path
+  // (success or not) clears it in a `finally`.
+  const foldingRef = useRef(false)
+
+  const commitStaged = (next: DefenseStagedPlay | null) => {
+    stagedRef.current = next
+    setStaged(next)
+  }
+
+  const arrival = useHandArrival(anchors.hand, () => {
+    cancellingRef.current = false
+    setCancelling(false)
+    commitStaged(null)
+  })
+
+  // the pending "defend" owed to us — read once so every reader downstream
+  // (options, dispatch, the static render) agrees on the same instant of it.
+  const pending =
+    state.pending?.kind === 'defend' && state.pending.player === state.selfId ? state.pending : null
+  const defenceOptions = useMemo(() => pending?.options ?? [], [pending])
+
+  const handItems = useMemo(() => {
+    const out = new Set(
+      [staged?.support?.uid, staged?.main?.uid].filter((uid): uid is string => Boolean(uid)),
+    )
+    if (out.size === 0) return state.you.hand
+    return state.you.hand.filter((c) => !out.has(c.uid))
+  }, [state.you.hand, staged])
+
+  // While a Sudo waits for a partner, the defences it may enhance keep the
+  // support's own category accent — the same reading `_useBoardStaging`'s own
+  // `accentAt` gives a combo's partner. Gone the moment a partner is picked:
+  // the clicked card is no longer in `handItems` regardless.
+  const accentAt = useCallback(
+    (index: number) => {
+      const support = staged?.phase === 'partner' ? staged.support : null
+      const item = support ? handItems[index] : undefined
+      if (!support || !item) return undefined
+      const partners = state.comboOptions?.[support.uid] ?? []
+      return partners.includes(item.uid) ? `var(--cat-${support.card.category})` : undefined
+    },
+    [staged, handItems, state.comboOptions],
+  )
+
+  // The shared guard + lookup both entry points below open with: is this uid
+  // actually pullable right now, and if so where does it sit in `you.hand`.
+  // Neither dispatches nor flies anything — just answers "legal, and where".
+  const resolveLegal = useCallback(
+    (uid: string): { item: CardData; index: number } | null => {
+      if (!enabled || !pending || stagedRef.current) return null
+      if (!defenceOptions.includes(uid)) return null
+      const index = state.you.hand.findIndex((c) => c.uid === uid)
+      const item = state.you.hand[index]
+      return item ? { item: item.card, index } : null
+    },
+    [enabled, pending, defenceOptions, state.you.hand],
+  )
+
+  // Task 17's own gate: a Sudo is pullable only while nothing is staged and
+  // the projection says it has at least one defence in hand it may enhance —
+  // `state.comboOptions[uid]`, sourced from the pending's own answerable set
+  // (`packages/engine/src/fake/project.ts`'s `combosFor`). Never re-derived:
+  // an empty (or absent) entry means this Sudo is not pullable here, same as
+  // any other illegal pull.
+  const resolveSudo = useCallback(
+    (uid: string): { item: CardData; index: number } | null => {
+      if (!enabled || !pending || stagedRef.current) return null
+      const index = state.you.hand.findIndex((c) => c.uid === uid)
+      const item = state.you.hand[index]
+      if (item?.card.id !== 'support-sudo') return null
+      if ((state.comboOptions?.[uid] ?? []).length === 0) return null
+      return { item: item.card, index }
+    },
+    [enabled, pending, state.you.hand, state.comboOptions],
+  )
+
+  // The shared half of both plain entry points below: commit the dispatched
+  // play, fire the RESOLVE, and fly the card to the cover slot from wherever
+  // it came FROM — a drag's own drop point (`onHandPlay`) or the hand slot it
+  // still sits in (`answerWith`, the pending panel's own card list). Neither
+  // entry point calls `flyer.raise` itself, so there is exactly one place
+  // that can leave the fly-in half-built (#101, Fix round 1: PendingPrompt
+  // used to bypass this whole path, reopening Carry #2 through its own door).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  const commitAndFly = useCallback(
+    (uid: string, card: CardData, index: number, from: Rect | undefined) => {
+      commitStaged({
+        main: { uid, card, index },
+        support: null,
+        phase: 'dispatched',
+        merged: false,
+      })
+      dispatchWatermarkRef.current = eventsRef.current.length
+      setLanded(false) // fresh cycle — the flight below has not carried this card yet
+      actions?.onResolve?.({ kind: 'defend', card: uid, combo: undefined })
+      void (async () => {
+        const to = anchors.cover.current?.getBoundingClientRect()
+        if (!reduced && from && to) {
+          const [el] = await flyer.raise([{ key: 'cover', card, at: from }])
+          if (el) {
+            await play('playToCenter', el, {
+              from,
+              to,
+              rotate: COVER_POSE.rot,
+              dx: COVER_POSE.dx,
+              dy: COVER_POSE.dy,
+            })?.finished
+          }
+          flyer.drop('cover')
+        }
+        // the carrier has dropped it (or, under reduced motion, there was
+        // never one) — `_Board.tsx`'s static cover render may take over now,
+        // not a moment before (see `landed`'s own comment above).
+        setLanded(true)
+      })()
+    },
+    [reduced, anchors.cover, actions, flyer.raise, flyer.drop],
+  )
+
+  // Task 17's own staging half: the Sudo goes to its OWN slot, not onto the
+  // defence it will back — flying it there directly would read as the pair
+  // already assembled (the ported source's own note). Mirrors
+  // `commitAndFly`'s shape: commit synchronously (so `handItems` hides it from
+  // the fan at once), fly it to `anchors.sudo`, and arm the arrow from that
+  // slot's own centre once it lands.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  const stageDefSudo = useCallback(
+    (uid: string, card: CardData, index: number, from: Rect | undefined, dropped: HandPlayDrop) => {
+      commitStaged({ support: { uid, card, index }, main: null, phase: 'partner', merged: false })
+      setSudoLanded(false)
+      void (async () => {
+        const to = anchors.sudo.current?.getBoundingClientRect()
+        if (!reduced && from && to) {
+          const [el] = await flyer.raise([{ key: 'sudo', card, at: from }])
+          if (el) {
+            await play('playToCenter', el, {
+              from,
+              to,
+              rotate: SUDO_POSE.rot,
+              dx: SUDO_POSE.dx,
+              dy: SUDO_POSE.dy,
+            })?.finished
+          }
+          flyer.drop('sudo')
+        }
+        setSudoLanded(true)
+        // the arrow starts where the Sudo now stands and follows the cursor —
+        // the ported source's own `stageDefSudo`
+        const box = anchors.sudo.current?.getBoundingClientRect()
+        if (box) arrowCtl.aim({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, dropped)
+      })()
+    },
+    [reduced, anchors.sudo, arrowCtl.aim, flyer.raise, flyer.drop],
+  )
+
+  // GESTURE — pulling a legal defence out of the fan commits and dispatches
+  // at once (no aim, no partner): the plain-defence half of the allowance
+  // `_useBoardStaging.ts`'s own solo release already takes for a release with
+  // no Code Review to pair. Pulling the defender's OWN Sudo instead stages it
+  // waiting for a partner (Task 17) — the partner itself is CLICKED, never
+  // pulled, so this never fires for it.
+  const onHandPlay = useCallback(
+    (uid: string, drop: HandPlayDrop): boolean => {
+      const legal = resolveLegal(uid)
+      if (legal) {
+        commitAndFly(uid, legal.item, legal.index, drop.rect)
+        return true
+      }
+      const sudoLegal = resolveSudo(uid)
+      if (sudoLegal) {
+        stageDefSudo(uid, sudoLegal.item, sudoLegal.index, drop.rect, drop)
+        return true
+      }
+      return false
+    },
+    [resolveLegal, commitAndFly, resolveSudo, stageDefSudo],
+  )
+
+  // The pending panel's own answer (#101, Fix round 1): `PendingPrompt`'s
+  // card list + confirm button choose a uid without ever touching the fan —
+  // there is no drop point to fly from, so the origin is the hand slot the
+  // card still stands in, found the same way `comboBeat.tsx`'s `foldIn` finds
+  // one for a local click-thrown play (`anchors.handSlotAt`, read BEFORE
+  // `commitAndFly` changes `handItems` and reflows the fan out from under it).
+  // The panel offers no Sudo enhancement — it is `pending.options` only, same
+  // as Task 16 — so this stays the plain path exclusively.
+  const answerWith = useCallback(
+    (uid: string): boolean => {
+      const legal = resolveLegal(uid)
+      if (!legal) return false
+      commitAndFly(
+        uid,
+        legal.item,
+        legal.index,
+        rectOf(anchors.handSlotAt(legal.index)) ?? undefined,
+      )
+      return true
+    },
+    [resolveLegal, anchors.handSlotAt, commitAndFly],
+  )
+
+  // cancel — a miss, Escape, or an invalid partner pick sends whatever is
+  // standing back into the fan. Three shapes, mirroring `_useBoardStaging.ts`'s
+  // own cancel: a lone Sudo waiting for a partner returns from its own slot; a
+  // folded pair returns both halves together from the cover slot (reached only
+  // if a rejection arrives AFTER the fold has landed — the fold itself is
+  // irrevocable, `foldingRef` below); and the plain defence returns from the
+  // cover slot alone, exactly as Task 16 left it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  const cancel = useCallback(() => {
+    const s = stagedRef.current
+    if (!s || s.phase === 'dispatched' || cancellingRef.current || foldingRef.current) return
+    arrowCtl.stop()
+
+    if (s.phase === 'partner' && s.support && !s.main) {
+      const support = s.support
+      const sRect = anchors.sudo.current?.getBoundingClientRect()
+      flyer.drop('sudo')
+      if (reduced || !sRect) {
+        commitStaged(null)
+        return
+      }
+      cancellingRef.current = true
+      setCancelling(true)
+      void arrival.arrive(
+        [{ key: support.uid, card: support.card, from: sRect }],
+        handItems.length,
+        support.index,
+      )
+      return
+    }
+
+    const main = s.main
+    if (!main) return
+
+    if (s.merged && s.support) {
+      const support = s.support
+      const cRect = anchors.cover.current?.getBoundingClientRect()
+      const el = anchors.cover.current
+      flyer.drop('fold')
+      if (reduced || !cRect) {
+        commitStaged(null)
+        return
+      }
+      cancellingRef.current = true
+      setCancelling(true)
+      void arrival.arrive(
+        [
+          { key: support.uid, card: support.card, el, anchor: 'aux' as const, from: cRect },
+          { key: main.uid, card: main.card, el, anchor: 'main' as const, from: cRect },
+        ],
+        handItems.length,
+        support.index,
+      )
+      return
+    }
+
+    const cRect = anchors.cover.current?.getBoundingClientRect()
+    // whatever carrier or static render was showing the defence, gone — the
+    // return flight owns it now (a no-op if nothing was raised under this key,
+    // e.g. the reduced-motion path, where there never was one)
+    flyer.drop('cover')
+    if (reduced || !cRect) {
+      commitStaged(null)
+      return
+    }
+    cancellingRef.current = true
+    setCancelling(true)
+    void arrival.arrive(
+      [{ key: main.uid, card: main.card, from: cRect }],
+      handItems.length,
+      main.index,
+    )
+  }, [
+    reduced,
+    handItems.length,
+    arrival.arrive,
+    anchors.cover,
+    anchors.sudo,
+    arrowCtl.stop,
+    flyer.drop,
+  ])
+
+  // the partner pick (Task 17) — the waiting Sudo is ALREADY standing at its
+  // own slot; only the defence travels, folding both into a CardPair at the
+  // cover slot. Ported from `DefenseReleaseStory.tsx`'s own `mergeIntoPair`,
+  // via the SAME `flyer.raise`-with-`content` idiom `comboBeat.tsx`'s `foldIn`
+  // and `defenseBeat.tsx`'s own sudo-backed cover already use.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  const onCardClick = useCallback(
+    (index: number) => {
+      if (!enabled || cancellingRef.current || foldingRef.current) return
+      const s = stagedRef.current
+      if (s?.phase !== 'partner' || !s.support) return
+      const item = handItems[index]
+      if (!item) return
+      const support = s.support
+      const partners = state.comboOptions?.[support.uid] ?? []
+      if (!partners.includes(item.uid)) {
+        cancel() // not a valid partner — the whole staging returns
+        return
+      }
+      // I1 — measured before the commit below reflows the fan and clears the
+      // standing Sudo.
+      const box = anchors.cover.current?.getBoundingClientRect()
+      const sudoBox = anchors.sudo.current?.getBoundingClientRect()
+      const fromRect = rectOf(anchors.handSlotAt(index)) ?? undefined
+      if (!box || !sudoBox) return
+      arrowCtl.stop() // the choice is made — nothing is pointed at while the pair folds
+      const mainIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
+      const main: DefenseStagedCard = { uid: item.uid, card: item.card, index: mainIndex }
+      // the fold is committed — irrevocable until it lands; `cancel()` and a
+      // second click both refuse while this is true.
+      foldingRef.current = true
+      // The standing Sudo is handed to the flyer in the SAME commit as the
+      // dispatch — no `await` between them, so React batches both into one
+      // commit: the static Sudo unmounts on the exact frame the flyer's aux
+      // half mounts. Never on screen twice, never absent (the no-duplicate
+      // rule this task's own brief calls out).
+      commitStaged({ support, main, phase: 'dispatched', merged: true })
+      dispatchWatermarkRef.current = eventsRef.current.length
+      setLanded(false) // fresh cycle — the fold below has not carried this pair yet
+      actions?.onResolve?.({ kind: 'defend', card: item.uid, combo: support.uid })
+
+      if (reduced || !fromRect) {
+        // reduced motion (or no fan geometry to fold from) settles instantly —
+        // CardPair's own inline pose (identity main, PAIR_AUX_POSE aux) IS the
+        // pair at rest, nothing to paint frame by frame.
+        setLanded(true)
+        foldingRef.current = false
+        return
+      }
+      void (async () => {
+        try {
+          const enterMain = enterPose(fromRect, box)
+          const enterAux = enterPose(sudoBox, box)
+          const [el] = await flyer.raise([
+            {
+              key: 'fold',
+              at: box,
+              content: <CardPair main={item.card} aux={support.card} width="100%" />,
+              pose: restTransform(COVER_POSE),
+            },
+          ])
+          const mainEl = el?.querySelector<HTMLElement>('[data-main]')
+          const auxEl = el?.querySelector<HTMLElement>('[data-aux]')
+          if (!mainEl || !auxEl) {
+            flyer.drop('fold')
+            setLanded(true)
+            return
+          }
+          // painted at their entry poses first, so neither half flashes in
+          // its final place before the fold starts
+          mainEl.style.transform = enterMain
+          auxEl.style.transform = enterAux
+          await nextFrames() // both painted at their entry poses first (I2)
+          await Promise.all([
+            play('foldIntoPair', mainEl, { from: fromRect, box, dur: MERGE_MS })?.finished,
+            play('foldIntoPair', auxEl, {
+              from: sudoBox,
+              box,
+              pose: PAIR_AUX_POSE,
+              dur: MERGE_MS,
+              snap: true,
+            })?.finished,
+          ])
+          flyer.drop('fold')
+          // the carrier has dropped it — `_Board.tsx`'s static cover render
+          // may take over now, not a moment before (see `landed`'s comment).
+          setLanded(true)
+        } finally {
+          // every exit clears the lock — the early returns above and a
+          // rejecting `.finished` all bypass the success path's own clear.
+          foldingRef.current = false
+        }
+      })()
+    },
+    [
+      enabled,
+      handItems,
+      state.comboOptions,
+      state.you.hand,
+      reduced,
+      anchors.cover,
+      anchors.sudo,
+      anchors.handSlotAt,
+      arrowCtl.stop,
+      actions,
+      cancel,
+      flyer.raise,
+      flyer.drop,
+    ],
+  )
+
+  // the projection moved our card out of the hand: the answer was accepted —
+  // staging's job is done, the beat (or, absent one, the projection itself)
+  // takes over. Same catch-up `_useBoardStaging.ts` runs for a dispatched play.
+  // Checking only `main`'s uid is enough for the paired case too: the engine
+  // takes both cards out of the hand in the SAME action, so `main` leaving
+  // implies the whole play (support included) was accepted.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  useEffect(() => {
+    const s = stagedRef.current
+    if (s?.phase !== 'dispatched' || !s.main) return
+    if (!state.you.hand.some((c) => c.uid === s.main?.uid)) commitStaged(null)
+  }, [state.you.hand])
+
+  // the engine said no: the staged defence returns to the fan. A rejected
+  // RESOLVE carries no top-level `card` (packages/engine/src/fake/core.ts's
+  // `reject()` logs the whole original Action) — the card lives inside
+  // `action.choice`, so the watcher matches the pending's own identity there
+  // instead of `_useBoardStaging.ts`'s `'card' in e.action` check, which a
+  // RESOLVE action never satisfies. `action.choice.card` names the MAIN
+  // defence regardless of whether a Sudo rode along, so this needs no
+  // widening for the paired case. Scoped to what arrived AFTER this dispatch
+  // (`dispatchWatermarkRef`), same reason as `_useBoardStaging.ts`'s own watcher.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  useEffect(() => {
+    const s = stagedRef.current
+    if (s?.phase !== 'dispatched' || !s.main) return
+    const uid = s.main.uid
+    const fresh = events.slice(dispatchWatermarkRef.current)
+    const rejectedOurs = fresh.some((e) => {
+      if (e.type !== 'rejected') return false
+      const a = e.action
+      return a.type === 'RESOLVE' && a.choice.kind === 'defend' && a.choice.card === uid
+    })
+    if (rejectedOurs) {
+      // synchronously, ahead of `cancel()`'s own guard read of `.phase` — same
+      // reason as `_useBoardStaging.ts`'s own write here
+      commitStaged({ ...s, phase: 'rejected' })
+      cancel()
+    }
+  }, [events, cancel])
+
+  // the beat's own clear (Task 13's `defenseBeat.runCovered`) — no flight,
+  // just done: the staged node was already standing where the cover goes, so
+  // there is nothing here left to double-check. Kept distinct from the
+  // flyer's own teardown below — `release()` clears the STAGING state; the
+  // flyer that was carrying the visual is dropped by the SAME `onHandPlay`
+  // closure once its own flight lands, `landed`'s own comment above.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  const release = useCallback(() => commitStaged(null), [])
+
+  return {
+    staged,
+    overlay: [...flyer.overlay, ...arrival.overlay],
+    gapAt: arrival.gapAt,
+    gapSize: arrival.gapSize,
+    handItems,
+    arrow: arrowCtl,
+    accentAt,
+    defenceOptions,
+    onHandPlay,
+    answerWith,
+    onCardClick,
+    cancel,
+    release,
+    landed,
+    sudoLanded,
+  }
+}
