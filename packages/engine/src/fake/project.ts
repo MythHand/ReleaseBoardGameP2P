@@ -102,12 +102,28 @@ export function targetsFor(state: GameState, viewerId: PlayerId): Record<CardUid
 // rides with a release, but only when a third card is left to pay its cost
 // (release.ts:268 rejects a pair that leaves nothing to pay with, unless the
 // mode waives the cost). Mirrors `playableFor`/`canAttackWith`: no window, no
-// pending, no turn — no combos either.
+// pending, no turn — no combos either, EXCEPT the one case below.
+//
+// Task 17 (#101): a `defend` pending owed to THIS player is the one pending
+// that still has a legal Sudo pairing — the defence it is about to enhance.
+// `playableFor` empties out while any pending is open (its own first check),
+// so that path is closed the same as ever; the pending's own answerable set
+// (`canDefendWith`) stands in for it instead, exactly the way `playable`/
+// `throwable` already do for the turn/window case just above. Legality is
+// still the engine's answer either way — this reads it, never re-derives it.
+// "A sudo-backed attack can be enhanced by nothing" needs no extra check: a
+// sudo attack already drops every Cancel-kind defence (defense-rollback, the
+// only defence with its own sudo tag) out of `canDefendWith` (`defencesFor`
+// above), so the intersection below is empty on its own.
 export function combosFor(state: GameState, viewerId: PlayerId): Record<CardUid, CardUid[]> {
   const me = state.players[viewerId]
   const result: Record<CardUid, CardUid[]> = {}
   const playable = new Set(playableFor(state, viewerId))
   const throwable = new Set(canAttackWith(state, viewerId))
+  const defendable =
+    state.pending?.kind === 'defend' && state.pending.player === viewerId
+      ? new Set(state.pending.canDefendWith)
+      : null
   for (const s of me.hand) {
     if (s.id !== 'support-sudo' && s.id !== 'support-code-review') continue
     const partners = me.hand
@@ -116,6 +132,7 @@ export function combosFor(state: GameState, viewerId: PlayerId): Record<CardUid,
         const rules = rulesFor(c.id)
         if (s.id === 'support-sudo') {
           if (rules?.sudo !== true) return false
+          if (defendable) return defendable.has(c.uid)
           return playable.has(c.uid) || throwable.has(c.uid)
         }
         // Code Review rides a release being PLAYED — and the pair must leave a

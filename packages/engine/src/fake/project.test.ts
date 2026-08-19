@@ -607,7 +607,7 @@ describe('self.combos', () => {
     ])
   })
 
-  it('offers no combos while a defence pending suspends play', () => {
+  it('offers no combos while a defence pending suspends play, and the hand holds nothing it may answer with', () => {
     const s = primed({ p2: [inst('support-sudo', 0), inst('attack-bug', 0)] })
     const pendingDefend: GameState = {
       ...s,
@@ -622,6 +622,90 @@ describe('self.combos', () => {
         openedAt: 0,
         deadline: 1000,
         scope: 'hand' as const,
+      },
+    }
+    expect(project(pendingDefend, 'p2').self.combos).toEqual({})
+  })
+
+  // Task 17 (#101): a defend pending owed to this player is the one case
+  // `playableFor` empties out (project.ts's own first check) that still has a
+  // legal Sudo pairing — the defence it is about to enhance. Sourced from the
+  // pending's own answerable set (`canDefendWith`), not re-derived: legality
+  // stays the engine's answer even here.
+  it("pairs the defender's own Sudo with the defence it may enhance, while a defend pending is open", () => {
+    // only defense-rollback carries the sudo tag (cards.ts) — defense-hotfix
+    // answers the SAME attack but cannot be enhanced by a Sudo
+    const s = primed({
+      p2: [inst('support-sudo', 0), inst('defense-rollback', 0), inst('defense-hotfix', 0)],
+    })
+    const pendingDefend: GameState = {
+      ...s,
+      pending: {
+        kind: 'defend' as const,
+        player: 'p2',
+        attacker: 'p1',
+        attack: 'attack-bug#1',
+        attackId: 'attack-bug',
+        sudo: false,
+        canDefendWith: ['defense-rollback#0', 'defense-hotfix#0'],
+        openedAt: 0,
+        deadline: 1000,
+        scope: 'release' as const,
+      },
+    }
+    expect(project(pendingDefend, 'p2').self.combos['support-sudo#0']).toEqual([
+      'defense-rollback#0',
+    ])
+  })
+
+  // The restriction "under a sudo-backed attack a Sudo can enhance nothing"
+  // falls out of the intersection above for free: a sudo attack already drops
+  // Rollback from `canDefendWith` (Cancel fails against sudo — `defencesFor`,
+  // pinned in attacks.test.ts's own "denies a Cancel defence against a sudo
+  // attack"), so there is nothing left in the intersection to offer.
+  it('offers no sudo pairing under a sudo-backed attack, mirroring canDefendWith', () => {
+    const s = primed({
+      p2: [inst('support-sudo', 0), inst('defense-rollback', 0), inst('defense-not-a-bug', 0)],
+    })
+    const pendingDefend: GameState = {
+      ...s,
+      pending: {
+        kind: 'defend' as const,
+        player: 'p2',
+        attacker: 'p1',
+        attack: 'attack-bug#1',
+        attackId: 'attack-bug',
+        sudo: true,
+        // a sudo attack: Cancel-kind defense-rollback is withheld, only the
+        // Unicorn-kind defence remains
+        canDefendWith: ['defense-not-a-bug#0'],
+        openedAt: 0,
+        deadline: 1000,
+        scope: 'release' as const,
+      },
+    }
+    expect(project(pendingDefend, 'p2').self.combos['support-sudo#0']).toBeUndefined()
+  })
+
+  // A pending owed to someone ELSE must never leak the defender's own combo
+  // to the projection built for the viewer asking — `pendingView` already
+  // redacts `options` to [] for a non-owner; this is the same boundary for
+  // `combos`.
+  it('never offers a combo for a defend pending owed to someone else', () => {
+    const s = primed({ p2: [inst('support-sudo', 0), inst('defense-rollback', 0)] })
+    const pendingDefend: GameState = {
+      ...s,
+      pending: {
+        kind: 'defend' as const,
+        player: 'p1',
+        attacker: 'p2',
+        attack: 'attack-bug#1',
+        attackId: 'attack-bug',
+        sudo: false,
+        canDefendWith: ['defense-rollback#0'],
+        openedAt: 0,
+        deadline: 1000,
+        scope: 'release' as const,
       },
     }
     expect(project(pendingDefend, 'p2').self.combos).toEqual({})
