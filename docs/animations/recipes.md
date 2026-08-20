@@ -496,13 +496,19 @@ combo, or a local window attack that staged nothing at all.
   and settles at the centre pending, `[data-pending-play]`, upgraded from a lone card to a `CardPair`
   under `pending.sudo`.
 
-  Dropping the fold's carrier is safe only because that static render takes the card over on the
-  same commit. When the throw and its answer arrive in ONE sync flush, `base` predates the batch and
-  carries no pending, so there is nothing to take over — so the beat **publishes** the table it just
-  made (`pending: defend`), which `useBeats` renders as the shadow and hands on as the next beat's
-  base. Never published when the answer is ours to give: `options` is redacted for everyone but the
-  owner, so an empty one would tell our own board a defence is owed with no legal card to give it.
-  The corner that leaves is in [`backlog.md`](./backlog.md) and the audit page's register.
+  Letting go of whatever held the attack is safe only because that static render takes the card over
+  on the same commit. When the throw and its answer arrive in ONE sync flush, `base` predates the
+  batch and carries no pending, so there is nothing to take over — so the beat **publishes** the
+  table it just made (`pending: defend`), which `useBeats` renders as the shadow and hands on as the
+  next beat's base. One publish for every seat, before the carrier lets go, and that includes the
+  actor's own arm above: on a slow link, a rejoin or a replay the ATTACKER gets both events in one
+  batch too, and Fix C's version returned from that arm before ever reaching the publish, so their
+  own attack blinked out (#101, Fix D). Never published when the answer is ours to give: `options`
+  is redacted for everyone but the owner, so an empty one would tell our own board a defence is owed
+  with no legal card to give it. And never over a pending already standing, of any kind — the
+  publish spreads `base`, so a narrower guard would replace a real pending with a fabricated one.
+  The corners that remain — the defender's own one-flush seat, and the fabricated `0s` clock the
+  shim publishes — are in [`backlog.md`](./backlog.md) and the audit page's register.
 - **`releasePlaced`**, planned from every `released` event — widened from `codeReview`-only (Task 11,
   #101): a plain release now runs the same beat, and the beat also carries the release's own cost leg
   (see "Defending a release" below for the cost, board-side). Three origins, because a release has
@@ -1754,6 +1760,13 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
    where it actually stands**: a solo Release from the stage slot, a Code-Review pair from the
    CENTRE, both halves off the pair flyer (#101, Fix C). The press lands on the table root rather
    than on `window`, so nothing portalled above the board can cancel a card the player never touched.
+   And the return **reports whether it was taken**: `useHandArrival.arrive` refuses in silence when
+   there is no fan to measure or another arrival is already in the air, and every cancel here is
+   written on the assumption that the flight's own landing is what puts the gesture back. Refused
+   with something else airborne, that one lands and does the clearing; refused with nothing flying at
+   all — the local player eliminated mid-step is the live route — the gesture puts itself back by
+   hand, or the pair stays invisible and the fan closes over it for the rest of the match (#101,
+   Fix D).
 
 **A COMBO Release's cost step is the same step, with one difference the board has to respect.** The
 engine raises the identical `discardForRelease` pending (`codeReview` merely rides along), but
@@ -1761,8 +1774,21 @@ engine raises the identical `discardForRelease` pending (`codeReview` merely rid
 pair, and unlike a solo Release it is deliberately not cleared when the pending echoes back. The
 pair therefore stays `merged` for the whole step, and the fan's merged-pair pointer guard has to
 yield to it: the fan is that step's only picker (the panel is suppressed for this pending, and
-`Hand` has no keyboard path), so an inert fan made the cost unpayable by any input at all. See
-`backlog.md` for the keyboard half, which is still open.
+`Hand` has no keyboard path), so an inert fan made the cost unpayable by any input at all. What the
+yield costs is the occlusion the guard existed for: the hover preview stands over the pair again for
+the whole step, and since it is transparent to the pointer a press on it falls through and the
+table's own miss listener cancels the release — reading a card can undo the play. Both that and the
+keyboard half are open, in `backlog.md` and the register.
+
+**A Release reaches the stage slot by two roads, and they are one road in the code.** It is
+`playable` with nothing to aim at and no partner to fold with, so the fan turns a plain press on it
+into a click as readily as into a pull — and the click used to go to the click gesture, which
+dispatches the play and tells the stage machine nothing, so the card was hidden from the fan by the
+pending that named it and drawn nowhere else (#101, Fix D). Both roads now stage through the same
+`stageSoloRelease`; the only difference is where the flight starts, since a click has no drop rect —
+the card's own fan slot, measured off the fan's geometry (**I6**). Which road a click is, is the
+staging gesture's own question: it takes the click and says so, or declines and the plain gesture —
+which owns the window's attack affordance — gets it.
 
 **Params & timings.** `SHOW_HOLD` 1200 ms · `LAND_HOLD` 700 ms · `MERGE_MS` 620 ms · poses: attack
 `rot −4`, cover `rot 6, dx 16, dy −12`, sudo `rot −7`.
