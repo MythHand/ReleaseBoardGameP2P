@@ -48,7 +48,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import { type BoardAnchors, type BoardState, MERGE_MS } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 
 // Moved verbatim from the pre-#99 `_useBoardInteractions.ts` — the comparison a
@@ -70,9 +70,6 @@ const sameTarget = (a: TableTarget, b: TableTarget): boolean => {
       return b.kind === 'pile' && a.pile === b.pile
   }
 }
-
-// the two cards fold into a pair at the centre — ComboStory's own value
-const MERGE_MS = 620
 
 export interface StagedCard {
   uid: string

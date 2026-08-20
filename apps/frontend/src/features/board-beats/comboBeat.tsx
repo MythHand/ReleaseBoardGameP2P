@@ -14,6 +14,7 @@ import { useCallback, useRef } from 'react'
 import {
   type BeatRun,
   type BoardAnchors,
+  MERGE_MS,
   SHOW_HOLD,
   type StagedHandoff,
 } from '~/entities/game/board'
@@ -100,13 +101,13 @@ export function useComboBeat(
       if (auxEl) auxEl.style.transform = enterPose(fromRect, cRect)
       await nextFrames() // the painted frame at the source (I2)
       const flights = [
-        mainEl ? play('foldIntoPair', mainEl, { from: fromRect, box: cRect, dur: 620 }) : null,
+        mainEl ? play('foldIntoPair', mainEl, { from: fromRect, box: cRect, dur: MERGE_MS }) : null,
         auxEl
           ? play('foldIntoPair', auxEl, {
               from: fromRect,
               box: cRect,
               pose: PAIR_AUX_POSE,
-              dur: 620,
+              dur: MERGE_MS,
               snap: true,
             })
           : null,
