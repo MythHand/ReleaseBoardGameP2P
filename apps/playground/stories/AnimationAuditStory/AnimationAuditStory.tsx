@@ -840,6 +840,36 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
+      ru: 'Такт летит из bounding-box наклонённого слота веера — это I6, только наоборот',
+      en: 'A beat flies from a tilted fan slot’s bounding box — that is I6, backwards',
+    },
+    problem: {
+      ru: '`comboBeat.foldIn` и `defenseBeat.runCovered` берут исходную коробку карты как `rectOf(anchors.handSlotAt(i))` — сырой `getBoundingClientRect()` слота. Слот повёрнут (`slotPlacement` даёт каждому свой угол), так что это коробка ВОКРУГ наклонённой карты, шире и выше её самой: ровно то, от чего предостерегает I6. Соседняя нога той же цепочки уже делает правильно — `anchors.seatBox` кладёт `cardBoxIn(rect, CARD_W)`, и `useHandArrival.boxOf` тоже, со своим объяснением почему. Первый кадр полёта стартует не с той коробки, тем заметнее, чем сильнее отклонён слот. Кандидатов на починку два, и они дают РАЗНЫЕ ответы: `cardBoxIn(slotRect, CARD_W)` (дёшево, но считает от текущего прямоугольника, включая ховер-подъём) или `slotBox(i, total)` из `_useBoardStaging.ts` (честно, от `slotPlacement`, без DOM) — но `total` это длина ВЫРИСОВАННОГО веера, которой у такта нет: он работает против `base`, а веер отфильтрован тем, что стоит на столе (ровно та рассинхронизация, которую Fix D round 2 закрыл на соседнем шве). Выбор между ними — решение о геометрии, которое нечем проверить: jsdom обе ветки не различает.',
+      en: '`comboBeat.foldIn` and `defenseBeat.runCovered` take a card’s source box as `rectOf(anchors.handSlotAt(i))` — a raw `getBoundingClientRect()` of the slot. The slot is rotated (`slotPlacement` gives each its own angle), so that is the box AROUND the tilted card, wider and taller than the card itself: exactly what I6 warns against. The sibling leg of the same chain already does it right — `anchors.seatBox` applies `cardBoxIn(rect, CARD_W)`, and so does `useHandArrival.boxOf`, with its own note on why. The flight’s first frame starts from the wrong box, the more visibly the further the slot is deflected. Two candidate fixes, and they give DIFFERENT answers: `cardBoxIn(slotRect, CARD_W)` (cheap, but reads the current rect, hover lift included) or `slotBox(i, total)` from `_useBoardStaging.ts` (honest, derived from `slotPlacement`, no DOM) — but `total` is the length of the RENDERED fan, which a beat does not have: it runs against `base`, and the fan is filtered by whatever stands on the table (the very divergence Fix D round 2 closed at the neighbouring seam). Choosing between them is a geometry decision nothing here can check: jsdom cannot tell the two apart.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/comboBeat.tsx (foldIn), defenseBeat.tsx (runCovered) + entities/game/board/anchors.ts',
+      en: 'frontend: features/board-beats/comboBeat.tsx (foldIn), defenseBeat.tsx (runCovered) + entities/game/board/anchors.ts',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Клик в веере может начать вторую игру, пока первая ещё в пути',
+      en: 'A fan click can start a second play while the first is still in flight',
+    },
+    problem: {
+      ru: '`onHandPlay` отказывает любому ВЫТЯГИВАНИЮ, пока что-то стоит на столе; у клика такого правила нет. `_useBoardStaging.onCardClick` возвращает `false`, когда стоящая игра — не шаг «выбери партнёра» и не шаг оплаты, и клик уходит в обычный клик-жест, который разыграет любую карту из `state.playable` без цели. А `state.playable` в этот момент ещё старый: проекция отстаёт на круг. Движок вторую игру почти наверняка отклонит, и карта вернётся в веер тихо — но игрок увидит, как карта улетает и прилетает обратно без объяснения. Найдено в Fix D round 2 рядом с off-by-one на том же шве (клик отдавал индекс отрисованного веера в массив всей руки, и с релизом на столе клик по запасной карте переигрывал сам релиз); индекс починен, это независимая вторая половина. Закроет одна строка: `onCardClick` должен ГЛОТАТЬ клик, пока что-то стоит (`return true` вместо `return false`), — то же правило, что у `onHandPlay`, и согласуется с тем, что `stateAt` в этот момент ничего в веере не подсвечивает. Не сделано в Fix D: смена поведения на пути, общем для вытягивания и клика, а проверить её на живом столе нечем.',
+      en: '`onHandPlay` refuses any PULL while something stands on the table; a click has no such rule. `_useBoardStaging.onCardClick` returns `false` when the standing play is neither a partner pick nor a cost step, and the click goes on to the plain click gesture, which plays any card in `state.playable` that needs no target. And `state.playable` is stale at that moment: the projection is a round trip behind. The engine will almost certainly reject the second play and the card returns to the fan silently — but the player watches a card fly out and come back with no explanation. Found in Fix D round 2 beside an off-by-one at the same seam (the click handed a rendered-fan index to the whole-hand array, so with a release standing a click on the spare re-played the release itself); the index is fixed, this is the independent other half. Closed by one line: `onCardClick` should SWALLOW the click while anything is staged (`return true` instead of `return false`) — the same rule `onHandPlay` keeps, and consistent with `stateAt` lighting nothing in the fan at that moment. Not done in Fix D: it changes behaviour on a path shared by pulls and clicks, and there is nothing here to check it on a live table.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useBoardStaging.ts (onCardClick), _useBoardInteractions.ts',
+      en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts (onCardClick), _useBoardInteractions.ts',
+    },
+    status: 'open',
+  },
+  {
+    what: {
       ru: 'Превью веера снова закрывает центр во время оплаты, и нажатие сквозь него отменяет релиз',
       en: 'The fan’s preview covers the centre again during the cost step, and a press through it cancels the release',
     },

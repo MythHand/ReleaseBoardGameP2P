@@ -395,6 +395,16 @@ it('stands our own cover even with no handoff and no seat to fly from', async ()
 // The slot's rect is stubbed to something distinctive, because jsdom measures
 // every unstyled node as all zeros: the cover slot and the hand slot would
 // otherwise be the same rect, and `from` could not tell which leg produced it.
+//
+// What this test asserts is WHICH LEG answered, not that the box it answered
+// with is the right shape. `defenseBeat.tsx` takes the slot's raw
+// `getBoundingClientRect()`, and a fan slot is rotated, so that is the box
+// AROUND the tilted card rather than the card's own — the I6 breach its sibling
+// leg (`seatBox` → `cardBoxIn`) does not have. Pre-existing, recorded in
+// `docs/animations/backlog.md` and the audit register with both candidate fixes
+// and why choosing between them needs a live table. The expectation below is
+// written against today's raw rect on purpose: it is the marker for that entry,
+// not an endorsement of the measurement.
 it('flies our own defence out of the fan slot it left', async () => {
   played.names = []
   played.calls = []
