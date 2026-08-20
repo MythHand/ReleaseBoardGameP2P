@@ -19,6 +19,7 @@
       "**",
       "!**/dist",
       "!**/node_modules",
+      "!**/.claude",
       "!**/*.css",
       "!**/*.svg",
       "!apps/frontend/src/app/router.ts"
