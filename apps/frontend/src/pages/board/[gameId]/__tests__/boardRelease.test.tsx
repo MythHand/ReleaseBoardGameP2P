@@ -862,6 +862,40 @@ it('takes BOTH halves of a combo release home from the centre', async () => {
   expect(flying).toContain('support-code-review')
 })
 
+// The other half of finding 2's fix (#101, Fix D): the hand-back must fire ONLY
+// when nothing is going to land. The cost listener stays armed for the whole
+// return flight — the pending it keys off is a round trip away from clearing —
+// so a second press re-enters `cancel()` mid-flight, and `arrive` refuses that
+// one because it takes a single flight at a time. A hand-back on THAT refusal
+// puts both cards back in the fan while their own copies are still crossing the
+// table: the doubling this family of guards exists to prevent, arriving through
+// the fix for the opposite failure.
+it('a second press mid-flight does not put the pair back under the flight carrying it', async () => {
+  const { rerender } = render(comboReleaseBoard({}, {}))
+  await foldTheComboRelease()
+  rerender(comboReleaseBoard({ pending: comboCostPending() }, {}))
+  const miss = document.querySelector('[data-board-centre]')?.parentElement as HTMLElement
+
+  fireEvent.mouseDown(miss)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 60)) // well inside FLIGHT_MS (480ms)
+  })
+  expect(document.querySelectorAll('[class*="arriving"] [data-card]')).toHaveLength(2)
+
+  // the second press, while both halves are still in the air
+  fireEvent.mouseDown(miss)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 60))
+  })
+  // the fan still shows only the spare: the pair is on the flight, not in both
+  // places at once
+  const faces = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-hand-slot] [data-card]'),
+  ).map((el) => el.getAttribute('data-card'))
+  expect(faces).toEqual(['attack-bug'])
+  expect(document.querySelectorAll('[class*="arriving"] [data-card]')).toHaveLength(2)
+})
+
 // The permanent brick, and the one place it is actually permanent. The brief
 // for this round read `cancel()`'s cost branch as leaving the fan inert for
 // the rest of the match in every case; it does not, because `useHandArrival`'s
@@ -957,6 +991,90 @@ it('reduced motion clears the paid cost once the pending resolves, with no beat 
     expect(stage.querySelector('[data-card]')).toBeNull()
   } finally {
     mm.mockRestore()
+  }
+})
+
+// ===== Fix D, finding 2 — a cancel whose flight cannot even start =====
+//
+// The combo cost-cancel blanks the pair node and arms `cancelling` around
+// `arrival.arrive`, and everything it armed is cleared by that flight's own
+// landing (`useHandArrival`'s `onLanded`). But `arrive` refuses silently when
+// there is no fan to measure — the local player eliminated mid-step is the live
+// route to that, since `_Board.tsx` renders a badge where the fan goes — and
+// when it refuses, nothing lands: `staged` stays merged, both cards are
+// invisible, and once the pending clears `handInert` is true again and the fan is
+// dead for the rest of the match. The sibling `reduced || !cRect` branch got a
+// hand-back for exactly this reason; this one did not, and that asymmetry was the
+// bug.
+//
+// Driven through the hook: the refusal needs an unmeasurable fan, and the only
+// thing that decides that is which anchors the hook was handed.
+function comboCancelHarness() {
+  const base = makeBoardProps()
+  const centre = document.createElement('div')
+  document.body.appendChild(centre)
+  const view = renderHook(
+    ({ pending }: { pending: TablePending | null }) => {
+      const anchors = useBoardAnchors()
+      // the centre is measurable, so the cancel takes its FLIGHT branch rather
+      // than the reduced-motion one…
+      anchors.centre.current = centre
+      // …and there is no fan at all, so that flight is refused
+      anchors.hand.current = null
+      return useBoardStaging({
+        state: {
+          ...base.state,
+          you: { ...base.state.you, hand: COMBO_HAND },
+          turn: base.state.selfId,
+          hasDrawn: true,
+          playable: pending ? [] : COMBO_HAND.map((c) => c.uid),
+          comboOptions: pending ? {} : { 'support-code-review#0': ['release-frontend#0'] },
+          pending,
+        } as typeof base.state,
+        anchors,
+        events: [],
+        enabled: true,
+      })
+    },
+    { initialProps: { pending: null as TablePending | null } },
+  )
+  return { view, cleanup: () => centre.remove() }
+}
+
+it('hands the fan back when a combo cancel’s own flight is refused', async () => {
+  const { view, cleanup } = comboCancelHarness()
+  try {
+    const { result, rerender } = view
+    // the fold, through the hook's own gesture — the pair ends up merged and
+    // dispatched, exactly as the DOM fixture above produces it
+    act(() => {
+      result.current.onHandPlay('support-code-review#0', { x: 0, y: 0 })
+    })
+    await act(async () => {
+      result.current.onCardClick(0) // handItems, minus the support: the release
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(result.current.staged?.merged).toBe(true)
+
+    // the referee's answer: the cost pending, with the pair still standing
+    rerender({ pending: comboCostPending() })
+    expect(result.current.staged?.merged).toBe(true)
+
+    // the escape hatch, with nothing to fly home to
+    await act(async () => {
+      result.current.cancel()
+      await new Promise((r) => setTimeout(r, 600)) // longer than FLIGHT_MS (480ms)
+    })
+    // nothing landed, and nothing was going to — so the gesture put itself back
+    expect(result.current.staged).toBeNull()
+    // the Code Review is in the fan again; the release itself stays out of it
+    // until the referee's answer clears the pending that names it
+    expect(result.current.handItems.map((c) => c.uid)).toEqual([
+      'support-code-review#0',
+      'attack-bug#0',
+    ])
+  } finally {
+    cleanup()
   }
 })
 

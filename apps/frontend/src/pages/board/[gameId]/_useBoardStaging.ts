@@ -30,6 +30,7 @@ import type {
 } from '@release/ui'
 import { CARD_RATIO, CARD_W, centerOf, PAIR_AUX_POSE, slotPlacement, useArrow } from '@release/ui'
 import {
+  type Arriving,
   enterPose,
   nextFrames,
   play,
@@ -339,6 +340,39 @@ export function useBoardStaging({
     [anchors.hand],
   )
 
+  // SENDING CARDS HOME — every return flight in `cancel()` below goes through
+  // here, for one reason: `arrival.arrive` can refuse (#101, Fix D, finding 2).
+  // It takes one flight at a time and it needs a fan to measure, and either way
+  // it simply does not start — while the cancel that called it has already
+  // blanked the pair node and armed `cancelling`, both of which are cleared by
+  // that flight's own landing and nowhere else. So a refusal left both halves
+  // invisible with `staged` still merged, and the moment the pending cleared the
+  // fan's merged-pair guard went back up over a pair nobody could see: dead for
+  // the rest of the match. The sibling reduced-motion branch had a hand-back for
+  // exactly this; the flying one did not.
+  //
+  // `arrive` now answers whether it TOOK the flight. Taken: its landing clears
+  // everything, as before. Refused with another arrival already in the air:
+  // that one lands and clears it for us, so this must NOT step in — putting the
+  // cards back under a flight still carrying them is the doubling this whole
+  // family of guards exists to prevent. Refused with nothing flying at all:
+  // nothing will ever land, so the gesture is put back by hand — the same four
+  // clears `onLanded` performs, no more.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  const flyHome = useCallback(
+    (items: Arriving[], at?: number) => {
+      const airborne = arrival.busy
+      void arrival.arrive(items, handItems.length, at).then((flew) => {
+        if (flew || airborne) return
+        cancellingRef.current = false
+        setCancelling(false)
+        commitStaged(null)
+        setStage((s) => (s === 'leaving' ? 'none' : s))
+      })
+    },
+    [arrival.arrive, arrival.busy, handItems.length],
+  )
+
   // cancel — a miss, Escape, or an invalid partner pick sends whatever is
   // standing at the centre back into the fan at once. A lone support/aim
   // returns the same single-card way Task 4 already built; a merged pair
@@ -383,7 +417,7 @@ export function useBoardStaging({
         }
         cancellingRef.current = true
         setCancelling(true)
-        void arrival.arrive(
+        flyHome(
           [
             {
               key: merged.support.uid,
@@ -400,7 +434,6 @@ export function useBoardStaging({
               from: cRect,
             },
           ],
-          handItems.length,
           merged.support.index,
         )
         // measured while it was still visible, hidden now — ComboStory's own
@@ -423,7 +456,7 @@ export function useBoardStaging({
         // not-yet-cleared pending) would otherwise stand the release at the
         // slot a second time, on top of this very flight carrying it away.
         setStage('leaving')
-        void arrival.arrive([{ key: held.uid, card: held.card, from }], handItems.length)
+        flyHome([{ key: held.uid, card: held.card, from }])
         return
       }
       // Reduced motion, or nothing measurable: there is no flight to guard
@@ -449,12 +482,11 @@ export function useBoardStaging({
     setCancelling(true)
     if (s.merged && s.support && s.main) {
       const el = pairRef.current
-      void arrival.arrive(
+      flyHome(
         [
           { key: s.support.uid, card: s.support.card, el, anchor: 'aux' as const, from: cRect },
           { key: s.main.uid, card: s.main.card, el, anchor: 'main' as const, from: cRect },
         ],
-        handItems.length,
         s.support.index,
       )
       // `arrive`'s own geometry pass (above) measured the pair while it was
@@ -466,15 +498,10 @@ export function useBoardStaging({
     }
     const only = s.support ?? s.main
     if (!only) return
-    void arrival.arrive(
-      [{ key: only.uid, card: only.card, from: cRect }],
-      handItems.length,
-      only.index,
-    )
+    flyHome([{ key: only.uid, card: only.card, from: cRect }], only.index)
   }, [
     reduced,
-    handItems.length,
-    arrival.arrive,
+    flyHome,
     anchors.centre,
     anchors.stage,
     arrowCtl.stop,

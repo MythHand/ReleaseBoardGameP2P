@@ -121,9 +121,17 @@ export function useHandArrival(
 
   // send any number of cards into a hand of `handLength` cards. `at` names the
   // slot they open at; without it, the middle.
-  const arrive = async (items: Arriving[], handLength: number, at?: number) => {
+  //
+  // Answers whether the flight was TAKEN: `true` once it has landed (and
+  // `onLanded` has run), `false` the moment it is refused — there is no fan to
+  // measure, another arrival is already in the air, or nothing here can say
+  // where it is coming from. The refusal used to be silent, and a scene has no
+  // other way to hear it: `onLanded` is the only place most of them clear the
+  // staging they blanked for this flight, so a refusal left cards invisible with
+  // nothing left that would ever put them back (#101, Fix D, finding 2).
+  const arrive = async (items: Arriving[], handLength: number, at?: number): Promise<boolean> => {
     const hr = handRef.current?.getBoundingClientRect()
-    if (items.length === 0 || !hr || flights.length > 0) return
+    if (items.length === 0 || !hr || flights.length > 0) return false
     const gap = at == null ? Math.round(handLength / 2) : Math.max(0, Math.min(handLength, at))
     const total = handLength + items.length
     const list = items
@@ -162,7 +170,7 @@ export function useHandArrival(
         }
       })
       .filter((f): f is Flight => f != null)
-    if (list.length === 0) return
+    if (list.length === 0) return false
     // a card already drawn on screen is not copied — it steps aside for its flyer
     for (const it of items) if (it.el && !it.anchor) it.el.style.opacity = '0'
 
@@ -185,6 +193,7 @@ export function useHandArrival(
       list.map((f) => ({ key: f.key, card: f.card })),
     )
     reset()
+    return true
   }
 
   const overlay = flights.map((f) => (
