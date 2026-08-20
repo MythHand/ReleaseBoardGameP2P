@@ -840,6 +840,21 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
+      ru: 'Ответ движка обгоняет свою же защиту в полёте, и карта на такт возвращается в веер',
+      en: 'The engine answers before our own defence has landed, and the card returns to the fan for the beat',
+    },
+    problem: {
+      ru: '`_useDefenseStaging.commitAndFly` шлёт `onResolve` синхронно и только потом везёт карту веер→прикрытие. Ответ `covered` приезжает ВНУТРИ полёта (у хоста движок локальный; клиенту хватит круга короче одного полёта). Тот коммит рендерится с ещё пустым `beats.shadow`, то есть `state === live`: `answering` ложь, и пассивная догонялка чистит `staged`. Следующий коммит рисует тень (`base`), где карта снова в руке, а `staged` уже пуст — карта на весь такт возвращается в веер рядом с той, что лежит в центре. Fix D round 3 закрыл видимую половину (такт больше не читает пустой `el` как реджойн и не везёт карту из веера второй раз); возврат в веер остался, плюс краткое наложение носителя жеста с неподвижным подъёмом такта (≤480ms, обе копии сходятся в одну точку). Направления починки СВЯЗАНЫ и по отдельности делают хуже: пережить транзитный коммит без ленивого чтения `handoff.el` даёт две неподвижные копии в центре вместо одной в веере, а ленивое чтение без первого ломает гонку, ради которой снимок хендоффа и существует (см. комментарий `comboBeat.runAttack`). Нужны оба. Пока их нет, неподвижный подъём такта в `coverBox` держит центр занятым, и трогать его нельзя.',
+      en: '`_useDefenseStaging.commitAndFly` sends `onResolve` synchronously and only then carries the card fan→cover. The `covered` answer arrives INSIDE that flight (the host’s engine is local; a client needs only a round trip shorter than one flight). That commit renders with `beats.shadow` still null, so `state === live`: `answering` is false and the passive catch-up clears `staged`. The next commit draws the shadow (`base`), where the card is back in hand and `staged` is already gone — so the card returns to the fan for the whole beat, beside the one standing at the centre. Fix D round 3 closed the visible half (the beat no longer reads a null `el` as a rejoin and no longer flies the card in from the fan a second time); the return to the fan remains, plus a brief overlap of the gesture’s carrier with the beat’s stationary raise (≤480ms, both converging on one point). The two fix directions are COUPLED and each alone makes it worse: surviving the transient commit without a lazy `handoff.el` read gives two stationary copies at the centre instead of one in the fan, and the lazy read without the first breaks the race the handoff snapshot exists for (see `comboBeat.runAttack`’s comment). Both are needed. Until then the beat’s stationary raise at `coverBox` is what keeps the centre occupied and must not be removed.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useDefenseStaging.tsx (catch-up), _Board.tsx (handoff layout effect), features/board-beats/defenseBeat.tsx (runCovered), useBeats.ts',
+      en: 'frontend: pages/board/[gameId]/_useDefenseStaging.tsx (catch-up), _Board.tsx (handoff layout effect), features/board-beats/defenseBeat.tsx (runCovered), useBeats.ts',
+    },
+    status: 'open',
+  },
+  {
+    what: {
       ru: 'Такт летит из bounding-box наклонённого слота веера — это I6, только наоборот',
       en: 'A beat flies from a tilted fan slot’s bounding box — that is I6, backwards',
     },
