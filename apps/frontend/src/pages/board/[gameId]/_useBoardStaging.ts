@@ -162,6 +162,20 @@ export interface Options {
    * a rematch that interrupted a cost step left the paid card lying on the new
    * table for good, and the new match's first beat called `clearPaidCost` /
    * `takeStagedRelease` against state belonging to a match that had ended.
+   *
+   * WHAT ACTUALLY REACHES THIS TODAY DOES NOT CHANGE PER MATCH (#101, Fix D,
+   * finding 3). `_Board.tsx` passes `intro.gameId`, which `_layout.tsx` takes
+   * from `session.gameId`, which `useLobby.ts`'s `startGame` sets to
+   * `current.hostId` — the host's own peer id, identical for every match played
+   * in one room ("the board route is keyed by the host peer id"). So a second
+   * `startGame` produces the same key and this effect never fires. The reset
+   * below is right; the boundary it hangs on is inert, and `useBeats` hangs on
+   * the same value with the same hole. Latent rather than live — no in-place
+   * rematch exists, the only entry point remounts the board — and recorded in
+   * `docs/animations/backlog.md` with what would close it: a per-match id
+   * (a counter or the deal seed) minted by `startGame`, carried on
+   * `GAME_STARTING` so every peer agrees on it, and handed to both hooks and
+   * to `useBeats`.
    */
   matchKey?: string | null
 }
@@ -1064,7 +1078,10 @@ export function useBoardStaging({
   // mid-flight, a parked hand-arrival and an armed arrow all belong to the
   // gesture, not to the queue, and they would otherwise keep crossing a table
   // that no longer has the hand they were flying to.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `matchKey` is the boundary; everything the body touches is a stable setter, a ref or a memoized reset, and listing them would fire this on renders that are not a rematch
+  //
+  // The key it hangs on does not actually change per match today — see
+  // `Options.matchKey` above, and `docs/animations/backlog.md`.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `matchKey` is the boundary and the only dependency this may have. `arrowCtl.stop` and `flyer.drop` happen to be memoized, but `arrival.reset` is a plain function `useHandArrival` recreates on every render — so listing what the body touches would wipe the gesture on every render instead of once per match. The closure is this render's, which is exactly what a wipe wants.
   useLayoutEffect(() => {
     commitStaged(null)
     cancellingRef.current = false

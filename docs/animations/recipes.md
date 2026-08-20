@@ -523,20 +523,21 @@ combo, or a local window attack that staged nothing at all.
   - **anyone else's** — folds in from their seat via `foldIn` first, then flies.
 
   The static stage-slot render is released in the **same commit** the carrier goes up
-  (`takeStagedRelease` → `_useBoardStaging.ts`'s `releasePlacing`, the third guard on
-  `stagedRelease` beside `stageLanded` and `releaseReturning`): the `before` projection the beat
-  renders still carries the cost pending, so without it the card would be on screen twice for the
-  whole flight. The landing pose is `ReleaseZone`'s own static render — the beat's last frame IS the
-  projection.
-  What "the pending exchange" MEANS to the planner is the attack as the WALK sees it, not as the
-  board saw it before the batch: `planBeats` carries an `openAttack` that starts at `before.pending`
-  and that every `attacked` moves on — the same shape `piles` has always had for the deck counts.
-  Without it a one-flush batch built no `covered` and no `pairToDiscard` at all, and the exchange's
-  cards fell through to the ordinary discard routing, flying out of the attacker's SEAT instead of
-  off the centre. In a star topology that batch is the ordinary case for every watching peer.
+  (`takeStagedRelease` → `_useBoardStaging.ts`'s `StageState`, which moves from `standing` to
+  `leaving`): the `before` projection the beat renders still carries the cost pending, so without it
+  the card would be on screen twice for the whole flight. The landing pose is `ReleaseZone`'s own
+  static render — the beat's last frame IS the projection.
 
-- **`pairToDiscard`**, planned from the resolution's `discarded` pair: `planBeats` matches the
-  pending exchange's two halves — sudo-first, since a sudo Rollback banks only the sudo half — ahead
+- **`pairToDiscard`**, planned from the resolution's `discarded` pair. What "the pending exchange"
+  MEANS to the planner is the attack as the WALK sees it, not as the board saw it before the batch:
+  `planBeats` carries an `openAttack` that starts at `before.pending` and that every `attacked` moves
+  on — the same shape `piles` has always had for the deck counts. Without it a one-flush batch built
+  no `covered` and no `pairToDiscard` at all, and the exchange's cards fell through to the ordinary
+  discard routing, flying out of the attacker's SEAT instead of off the centre. In a star topology
+  that batch is the ordinary case for every watching peer.
+
+  On that exchange `planBeats` matches its two halves — sudo-first, since a sudo Rollback banks only
+  the sudo half — ahead
   of the ordinary discard routing (the centre is in no hand and no zone, so `sourceOf` would never
   find it there). `runPairOut` measures `[data-pending-play]` and hands `useDiscardExit` one
   `Leaving` with `aux` set: the pair splits into two singles, the aux riding its own `auxScatter`
@@ -1772,10 +1773,15 @@ carries its layer into the heap.
 
 **Across a match.** `<Board>` is not remounted for a rematch (`_layout.tsx` gives it no `key`), so
 both gestures take a `matchKey` and wipe themselves on it — the same boundary `useBeats` already
-resets on. Without it a rematch that interrupted a cost step left the paid card lying on the new
-table for good. Within a match, where the actor's own Release is relative to the stage slot is ONE
-`StageState` (`none` / `flying` / `standing` / `leaving`) that every play sets, rather than three
-booleans a play could inherit from the one before it.
+resets on. Otherwise a rematch that interrupted a cost step would leave the paid card lying on the
+new table for good. **The wipe is written and the key it hangs on is not** (#101, Fix D, finding 3):
+what reaches it is `intro.gameId`, which is the HOST PEER ID (`useLobby.ts` — "the board route is
+keyed by the host peer id"), identical for every match played in one room, so a second `startGame`
+produces the same key and the effect never fires. `useBeats` hangs on the same value and has the
+same hole. Latent rather than live today — no in-place rematch exists — and recorded in
+[`backlog.md`](./backlog.md) with what would close it. Within a match, where the actor's own Release
+is relative to the stage slot is ONE `StageState` (`none` / `flying` / `standing` / `leaving`) that
+every play sets, rather than three booleans a play could inherit from the one before it.
 
 **Rules encoded.** Two Releases are playable, one per zone slot, and the next waits for the current
 one's attack window to close — the dock's green state is that moment. The attack always answers the

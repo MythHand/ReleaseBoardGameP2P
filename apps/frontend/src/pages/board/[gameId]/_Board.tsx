@@ -302,7 +302,17 @@ export default function Board({
     enabled: !(deal.active || beats.exclusive),
     // the match boundary (#101, Fix C, finding 3) — `<Board>` is not remounted
     // for a rematch, so the gestures need the same wipe `useBeats` already
-    // takes on this key
+    // takes on this key.
+    //
+    // KNOWN INERT (#101, Fix D, finding 3): `intro.gameId` is `session.gameId`,
+    // which `useLobby.ts` sets to the HOST'S PEER ID — the same value for every
+    // match played in one room — so the wipe this arms never fires on a
+    // rematch. `useBeats` (above) hangs on the same value and has the same
+    // hole. Left as it is rather than half-fixed: a key that really changes per
+    // match has to be minted where the match is (`startGame`) and carried on
+    // `GAME_STARTING`, so every peer agrees on it, which is a session-layer
+    // change this branch should not make blind. Recorded in
+    // `docs/animations/backlog.md` and the audit register.
     matchKey: intro?.gameId ?? null,
   })
 

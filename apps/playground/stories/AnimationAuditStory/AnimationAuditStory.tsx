@@ -825,6 +825,36 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
+      ru: 'С клавиатуры на борде не отбиться и не оплатить релиз — двери нет вообще',
+      en: 'No keyboard answers an attack or pays for a release — there is no door at all',
+    },
+    problem: {
+      ru: 'До #101 (Fix B) панель `PendingPrompt` рисовала для `defend` список карт настоящими кнопками — единственный не-мышиный ход на борде. Панель снята сознательно: она перекрывала ту самую атаку, о которой спрашивала, и спрашивала второй раз то, на что веер уже отвечает жестом. Веер и без того мышиный целиком — `Hand` рисует карты `interactive={false}`, слоты это `<div>` без `tabIndex` с одним `onMouseDown`, и собственный biome-ignore в `Hand.tsx` говорит прямо: «pointer-only … no keyboard affordance implied». После ревью всей ветки (#101, Fix C) известно, что дыра шире: оплата релиза отвечается тоже ТОЛЬКО мышью — панель для `discardForRelease` снята по той же причине. Именно это сделало блокер того захода блокером: комбо-релиз держал веер в `pointer-events: none`, и цена становилась неоплачиваемой НИКАКИМ вводом. Мышиную половину починил Fix C; клавиатурной двери как не было, так и нет, поэтому у любого такого дедлока по-прежнему нет второго выхода. Закроет один общий ответ для `Hand` (фокусируемые слоты + Enter/пробел + стрелки?), а не костыль под каждый пендинг; возврат списка карт в панель воспроизводит и перекрытие центра, и второго спрашивающего.',
+      en: 'Until #101 (Fix B) the `PendingPrompt` panel drew a `defend` as a list of real buttons — the one non-mouse move on the board. The panel was removed deliberately: it covered the very attack it was asking about, and asked a second time what the fan already answers by gesture. The fan is mouse-only to begin with — `Hand` renders cards `interactive={false}`, its slots are `<div>`s with no `tabIndex` and a single `onMouseDown`, and its own biome-ignore says it outright: "pointer-only … no keyboard affordance implied". Since the whole-branch review (#101, Fix C) the gap is known to be wider: a release’s cost is mouse-only too — the panel is suppressed for `discardForRelease` for the same reason. That is what made that round’s blocker a blocker: a combo release held the fan at `pointer-events: none`, and the cost became unpayable by ANY input. Fix C repaired the mouse half; the keyboard door never existed, so any such deadlock still has no second way out. Closed by one answer for `Hand` as a whole (focusable slots + Enter/Space + arrows?), not a per-pending patch; putting the card list back in the panel reproduces both the occlusion and the second asker.',
+    },
+    where: {
+      ru: 'ui: table/Hand + frontend: pages/board/[gameId]/_Board.tsx (PendingPrompt), _useBoardStaging.ts (onCostPick)',
+      en: 'ui: table/Hand + frontend: pages/board/[gameId]/_Board.tsx (PendingPrompt), _useBoardStaging.ts (onCostPick)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Граница матча заведена на ключ, который не меняется между матчами',
+      en: 'The match boundary hangs on a key that never changes between matches',
+    },
+    problem: {
+      ru: '`<Board>` не перемонтируется на реванш (`_layout.tsx` не даёт ему `key`), поэтому и `useBeats`, и оба жестовых хука держат сброс на границе матча: стоящая в центре карта, оплаченная цена, стрелка, флаер, припаркованный `useHandArrival`. Сбросы написаны и покрыты тестами, но ключ матч не различает: в хук приходит `intro.gameId` → `session.gameId` → `useLobby.ts`’s `startGame`, где `const id = current.hostId` — peer id хоста, одинаковый для всех матчей одной комнаты. Второй `startGame` даёт тот же ключ, и эффект не срабатывает ни разу. Сегодня латентно (реванша «на месте» нет, вход в матч перемонтирует борд) и опаснее обычного «забыли сбросить» тем, что сброс есть и на ревью читается как закрытый вопрос. Закроет идентификатор, чеканящийся в `startGame` (счётчик матчей или уже существующий `seed`) и уезжающий в payload `GAME_STARTING` рядом с `gameId` — маршрут не трогается, — проброшенный в оба хука И в `useBeats`: у очереди ровно тот же инертный ключ.',
+      en: '`<Board>` is not remounted for a rematch (`_layout.tsx` gives it no `key`), so `useBeats` and both gesture hooks keep a match-boundary reset: a card standing at the centre, a paid cost, the arrow, the flyer, a parked `useHandArrival`. The resets are written and covered by tests, but the key tells no two matches apart: what reaches the hook is `intro.gameId` → `session.gameId` → `useLobby.ts`’s `startGame`, where `const id = current.hostId` — the host’s peer id, identical for every match played in one room. A second `startGame` produces the same key and the effect never fires. Latent today (no in-place rematch exists; entering a match remounts the board) and worse than the ordinary "forgot to reset" because the reset IS there and reads as a closed question in review. Closed by an id minted in `startGame` (a match counter, or the dealer `seed` that already exists) carried in the `GAME_STARTING` payload beside `gameId` — the route stays untouched — and threaded into both hooks AND `useBeats`: the queue hangs on the very same inert key.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_Board.tsx (matchKey), _useBoardStaging.ts, _useDefenseStaging.tsx, features/board-beats/useBeats.ts + network/useLobby.ts (startGame)',
+      en: 'frontend: pages/board/[gameId]/_Board.tsx (matchKey), _useBoardStaging.ts, _useDefenseStaging.tsx, features/board-beats/useBeats.ts + network/useLobby.ts (startGame)',
+    },
+    status: 'rework',
+  },
+  {
+    what: {
       ru: 'Кому Rollback вернул атаку — выводится, а не читается',
       en: 'Who Rollback returns an attack to — derived, not read',
     },

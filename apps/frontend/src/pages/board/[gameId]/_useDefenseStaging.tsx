@@ -702,7 +702,14 @@ export function useDefenseStaging({
   // standing over an attack from the dead match would keep standing on the new
   // table, and this hook's carriers would keep flying to a hand that no longer
   // holds what they were carrying.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `matchKey` is the boundary; the body touches only stable setters, refs and memoized resets
+  //
+  // The key it hangs on does not actually change per match today (#101, Fix D,
+  // finding 3): `intro.gameId` is the host's own peer id, the same for every
+  // match of a room, so this effect never fires on a rematch. The reset is
+  // right, the boundary is inert, and `useBeats` shares the hole — see
+  // `_useBoardStaging.ts`'s `Options.matchKey` and
+  // `docs/animations/backlog.md`.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `matchKey` is the boundary and the only dependency this may have. `arrowCtl.stop` and `flyer.drop` happen to be memoized, but `arrival.reset` is a plain function `useHandArrival` recreates on every render — so listing what the body touches would wipe the gesture on every render instead of once per match. The closure is this render's, which is exactly what a wipe wants.
   useLayoutEffect(() => {
     commitStaged(null)
     cancellingRef.current = false
