@@ -1,6 +1,7 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
 import { DEFAULT_SETUP, isCounting } from '@release/ui'
+import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { toBoardOver, toBoardState } from '~/entities/game/board'
@@ -36,6 +37,12 @@ export default function BoardPage() {
   const game = useGame()
   const navigate = useNavigate()
   const { gameId } = useParams()
+
+  // Where this peer is, for everyone else's results table.
+  const { setWhere } = session
+  useEffect(() => {
+    setWhere('game')
+  }, [setWhere])
 
   // The roster is a room fact, not a game fact — the engine's projection has no
   // concept of a spectator — so it comes from the session, split by role exactly

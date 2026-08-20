@@ -50,3 +50,29 @@ it('navigates once per game, not on every render', () => {
   rerender()
   expect(navigate).toHaveBeenCalledTimes(1)
 })
+
+it('carries a peer into the next match, not just the first', () => {
+  // The hole this closes: a peer reading the results of match 1 when the host
+  // starts match 2. Only reachable now that each match has its own id — a
+  // rematch used to reuse the host's peer id, so this dep never changed.
+  session = { gameId: 'host-peer-1-1', startGame }
+  const { rerender } = renderHook(() => useFollowGameStart())
+  expect(navigate).toHaveBeenCalledWith('/board/host-peer-1-1')
+
+  session = { gameId: 'host-peer-1-2', startGame }
+  rerender()
+
+  expect(navigate).toHaveBeenCalledWith('/board/host-peer-1-2')
+  expect(navigate).toHaveBeenCalledTimes(2)
+})
+
+it('stays put when the match is left rather than replaced', () => {
+  session = { gameId: 'host-peer-1-1', startGame }
+  const { rerender } = renderHook(() => useFollowGameStart())
+  navigate.mockClear()
+
+  session = { gameId: null, startGame }
+  rerender()
+
+  expect(navigate).not.toHaveBeenCalled()
+})
