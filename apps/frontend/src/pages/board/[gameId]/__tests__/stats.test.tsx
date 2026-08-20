@@ -1,6 +1,5 @@
 import type { PlayerView } from '@release/engine'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { PeerInfo } from '~/network'
 import StatsPage from '../stats'
@@ -66,9 +65,9 @@ it('announces that this peer is on the results screen', () => {
   expect(setWhere).toHaveBeenCalledWith('stats')
 })
 
-it('leaves the match before navigating, so the follower does not bounce it back', async () => {
+it('leaves the match before navigating, so the follower does not bounce it back', () => {
   render(<StatsPage />)
-  await userEvent.click(screen.getByText('stats.toLobby'))
+  fireEvent.click(screen.getByText('stats.toLobby'))
   expect(leaveGame).toHaveBeenCalledTimes(1)
   expect(goToLobby).toHaveBeenCalledWith('ROOM')
 })
