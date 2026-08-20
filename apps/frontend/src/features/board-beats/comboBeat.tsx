@@ -142,36 +142,25 @@ export function useComboBeat(
     async (plan: Extract<BeatPlan, { kind: 'attackPlaced' }>, ctx: BeatRun) => {
       const { staging: s } = latest.current
       const handoff = s?.current
-      // Adopted without comparing cards, and structurally so: the event names
-      // a card ID, the handoff holds a UID, and nothing can translate between
-      // them here — the adoption leans instead on `handoffRef` being non-null
-      // only while a dispatched play stands, so nothing stale is adoptable.
-      if (handoff?.mainUid && plan.attacker === ctx.base.selfId) {
-        // the actor's own play: the staged node stands exactly where the
-        // pending render takes over — nothing to move, hand the table back
-        handoff.release()
-        return
-      }
-      await nextFrames() // the shadow that renders `before` has committed (I2)
-      // everyone else (and a local click-thrown window attack, which staged
-      // nothing): the halves fold in from the actor's side — seat for an
-      // opponent, the hand slot the card left for the local thrower (found by
-      // id, as sourceOf does)
-      const el = await foldIn(plan.attacker, plan.card, plan.sudo ? 'support-sudo' : undefined, ctx)
-      if (!el) return
-      // WHAT THE CARRIER HANDS OVER TO. Dropping the fold's carrier is only
-      // safe because the centre's static pending render takes the card over on
-      // the very same commit — its last frame IS the projection. That holds
-      // whenever the `defend` pending was already on screen before this batch,
-      // which is the ordinary case.
+
+      // WHAT THE CARRIER HANDS OVER TO — the same question for every seat, so
+      // one answer for all of them (#101, Fix D, finding 7). Letting go of
+      // whatever held the attack (the fold's carrier below, or the actor's own
+      // staged node just here) is only safe because the centre's static pending
+      // render takes the card over on the very same commit — its last frame IS
+      // the projection. That holds whenever the `defend` pending was already on
+      // screen before this batch, which is the ordinary case.
       //
-      // It does NOT hold when the throw and its answer arrive in one sync
-      // flush (#101, Fix C, finding 4): `base` is the board from before the
-      // batch, so it carries no pending, so there is no static render, so the
-      // attack would blink out the moment the fold lands — and the `covered`
-      // beat behind it would then fly a defence over an empty slot and hold it
-      // there for SHOW_HOLD, covering nothing. In a star topology that flush is
-      // the ordinary case for every peer that is neither attacker nor defender.
+      // It does NOT hold when the throw and its answer arrive in one sync flush
+      // (#101, Fix C, finding 4): `base` is the board from before the batch, so
+      // it carries no pending, so there is no static render, so the attack
+      // blinks out the moment the carrier lets go — and the `covered` beat
+      // behind it then flies a defence over an empty slot and holds it there
+      // for SHOW_HOLD, covering nothing. In a star topology that flush is the
+      // ordinary case for every peer that is neither attacker nor defender, and
+      // on a slow link, a rejoin or a replay it is the ATTACKER's case too —
+      // which Fix C missed, because their arm returns before ever reaching
+      // here.
       //
       // So the beat publishes the table it just made: the attack is standing,
       // and an answer is owed. `useBeats` renders that as the shadow for the
@@ -183,8 +172,43 @@ export function useComboBeat(
       // an empty one would tell our own board a defence is owed and offer no
       // legal card to give it. A peer who is answering has seen the attack in
       // an earlier batch anyway, which is the only way they could have answered
-      // it, so this branch is unreachable for them by construction.
-      if (ctx.base.pending?.kind !== 'defend' && plan.target !== ctx.base.selfId) {
+      // it, so this branch is unreachable for them by construction. (The
+      // defender's own corner of the coalesced batch is in
+      // `docs/animations/backlog.md` — closing it needs derivable `options`,
+      // not a guard.)
+      //
+      // And never over a pending that is already standing, of ANY kind: the
+      // publish spreads `...ctx.base`, so a guard that only excluded `defend`
+      // would REPLACE another kind with a fabricated one rather than decline.
+      // Unreachable today (a cost step resolves before a window opens), which
+      // is why it is a guard and not an argument.
+      //
+      // KNOWN WRONG, AND NOT FIXABLE HERE: the clock (#101, Fix D, finding 9).
+      // The shim has none to carry — the `attacked` event stamps no timing —
+      // and the published shadow is what the WHOLE board renders, so these
+      // zeros reach `deriveDock` and give every watching peer a `hold` ring
+      // reading `0s`: an expired countdown for a decision that had only just
+      // opened, for the length of this beat.
+      //
+      // Omitting the two fields is the honest reading and would work at
+      // runtime — `deriveDock` asks with `'deadline' in pending` and `clock()`
+      // draws a flat ring for a missing bound (`dock.ts`), and those are the
+      // only readers of either field anywhere. It cannot be written: `defend`
+      // declares both required, and it must, because `engineContract.test-d.ts`
+      // pins the kit's pending union as structurally EXACT against the engine's
+      // own `PendingView`, where a defend always carries its clock. Loosening
+      // the kit to fit this shim would loosen the contract for the real
+      // projection too, and smuggling an untimed object past it with a cast
+      // would put the same lie one layer deeper.
+      //
+      // Which is the backlog's own argument, arriving from a second direction:
+      // this beat is the one producer of a pending that is not the engine, and
+      // what it actually needs is a separate, non-`pending` "an attack is lying
+      // on the table" shape that the centre can draw and the dock never reads.
+      // Recorded in `docs/animations/backlog.md` and the audit register; the
+      // zeros stay until that shape exists.
+      const standAttack = () => {
+        if (ctx.base.pending || plan.target === ctx.base.selfId) return
         ctx.publish({
           ...ctx.base,
           pending: {
@@ -201,6 +225,28 @@ export function useComboBeat(
           },
         })
       }
+
+      // Adopted without comparing cards, and structurally so: the event names
+      // a card ID, the handoff holds a UID, and nothing can translate between
+      // them here — the adoption leans instead on `handoffRef` being non-null
+      // only while a dispatched play stands, so nothing stale is adoptable.
+      if (handoff?.mainUid && plan.attacker === ctx.base.selfId) {
+        // the actor's own play: the staged node stands exactly where the
+        // pending render takes over — nothing to move, hand the table back.
+        // Published FIRST, so the render that takes over exists before the node
+        // that is standing there now is let go of.
+        standAttack()
+        handoff.release()
+        return
+      }
+      await nextFrames() // the shadow that renders `before` has committed (I2)
+      // everyone else (and a local click-thrown window attack, which staged
+      // nothing): the halves fold in from the actor's side — seat for an
+      // opponent, the hand slot the card left for the local thrower (found by
+      // id, as sourceOf does)
+      const el = await foldIn(plan.attacker, plan.card, plan.sudo ? 'support-sudo' : undefined, ctx)
+      if (!el) return
+      standAttack() // see above — published before the carrier below lets go
       flyer.drop('fold') // the centre pending render takes over (last frame = projection)
     },
     [foldIn, flyer.drop],

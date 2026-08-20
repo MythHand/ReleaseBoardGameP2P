@@ -300,6 +300,82 @@ it('publishes nothing when the attack was already standing before this batch', a
   expect(published).toHaveLength(0)
 })
 
+// ===== Fix D, finding 7 — the ACTOR's own corner of the same batch =====
+//
+// Fix C fixed the blink-out for spectators and missed the seat it is most
+// visible from. The attacker's own staged node is handed back at the top of the
+// beat — nothing to move, the pending render takes over — but in a coalesced
+// batch (a slow link, a rejoin, a replay) `base` predates the batch and carries
+// no pending either, so THEIR attack blinks out too, and the `covered` beat
+// behind it holds a defence over an empty slot for the whole SHOW_HOLD. The
+// answer is never theirs to give (they threw it), so the redaction argument
+// that keeps the publish away from the DEFENDER does not apply here.
+it('publishes our own attack too when the answer arrives in the same batch', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  const published: BoardState[] = []
+  const release = vi.fn()
+  const staging = { current: { mainUid: 'u1', el: node(), release } as StagedHandoff }
+  render(<Probe staging={staging} />)
+  const plan: Extract<BeatPlan, { kind: 'attackPlaced' }> = {
+    kind: 'attackPlaced',
+    key: 'attack:5',
+    eventId: 5,
+    attacker: 'p1', // us
+    card: 'attack-bug',
+    sudo: false,
+    target: 'p2',
+  }
+  await drive(() => api.beat?.runAttack(plan, { base, publish: (s) => published.push(s) }))
+  // the staged node is still handed back — nothing about that changes
+  expect(release).toHaveBeenCalledTimes(1)
+  expect(played.names).not.toContain('foldIntoPair')
+  // …and the attack it left standing is published, so the cover has something
+  // to cover
+  expect(published).toHaveLength(1)
+  expect(published[0].pending).toMatchObject({
+    kind: 'defend',
+    player: 'p2',
+    attacker: 'p1',
+    attackCard: 'attack-bug',
+  })
+})
+
+// It DECLINES over a standing pending rather than replacing it (#101, Fix D,
+// finding 7). The publish spreads `...ctx.base`, so a guard that only excluded
+// `defend` would overwrite any other kind with a fabricated one. Not reachable
+// today — a cost step resolves before a window opens — which is exactly why it
+// is worth a guard rather than an argument.
+it('never replaces a pending that is already standing', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  const published: BoardState[] = []
+  render(<Probe />)
+  const owing = {
+    ...base,
+    pending: {
+      kind: 'discardForRelease',
+      player: 'p2',
+      options: [],
+    },
+  } as unknown as BoardState
+  await drive(() =>
+    api.beat?.runAttack(
+      {
+        kind: 'attackPlaced',
+        key: 'attack:5',
+        eventId: 5,
+        attacker: 'p2',
+        card: 'attack-bug',
+        sudo: false,
+        target: 'p3',
+      },
+      { base: owing, publish: (s) => published.push(s) },
+    ),
+  )
+  expect(published).toHaveLength(0)
+})
+
 it('folds an opponent’s attack in from their seat', async () => {
   resetPlayed()
   const { api, Probe } = harness()
