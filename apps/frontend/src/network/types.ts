@@ -20,11 +20,17 @@ export type { Setup }
 
 export type Role = 'host' | 'player' | 'guest'
 
+// Which screen a peer is on. There is no 'offline' member on purpose: nobody
+// announces their own disconnection. A peer that has gone is simply absent from
+// LobbyState.peers, and the results screen reads that absence.
+export type Where = 'game' | 'stats' | 'lobby'
+
 export interface PeerInfo {
   id: string
   name: string
   role: Role
   ready: boolean
+  where: Where
 }
 
 // Discriminated union of every protocol message ({ type, payload }).
@@ -32,8 +38,15 @@ export type Message =
   // --- Lobby ---
   | { type: 'JOIN_REQUEST'; payload: { name: string } }
   | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: 'player' | 'guest' } }
-  | { type: 'PEER_JOINED'; payload: { id: string; name: string; role: Role; ready: boolean } }
+  | {
+      type: 'PEER_JOINED'
+      payload: { id: string; name: string; role: Role; ready: boolean; where: Where }
+    }
   | { type: 'PLAYER_READY'; payload: Record<string, never> }
+  // A peer announcing which screen it is on, so the results table can say where
+  // everyone went. Addressed to the host, which applies it and re-broadcasts the
+  // updated PeerInfo — exactly the path PLAYER_READY takes.
+  | { type: 'WHEREABOUTS'; payload: { where: Where } }
   | { type: 'LOBBY_CONFIG_UPDATED'; payload: { maxPlayers?: number; setup?: Setup } }
   | { type: 'LOBBY_DISBANDED'; payload: Record<string, never> }
   | { type: 'PLAYER_KICKED'; payload: { peerId: string; reason?: string } }

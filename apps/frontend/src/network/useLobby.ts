@@ -7,6 +7,7 @@ import {
   disbandLobby as disbandLobbyFn,
   handleJoinRequest,
   handleReady,
+  handleWhereabouts,
   kick as kickFn,
   type Outgoing,
   setMaxPlayers as setMaxPlayersFn,
@@ -26,7 +27,7 @@ import { isRelayable, relayTargets } from './session/relay'
 import { attachKeeper, createRemoteLink } from './session/remoteLink'
 import { createStartGate, type StartGate } from './session/startGate'
 import { createTransport, type Transport } from './transport/peer'
-import type { PeerInfo, Setup, WireMessage } from './types'
+import type { PeerInfo, Setup, Where, WireMessage } from './types'
 
 // Room codes double as the host's PeerJS id, so the displayed code is exactly
 // what a joiner connects to — formatRoomCode/parseRoomCode are inverses.
@@ -92,6 +93,10 @@ export interface UseLobby {
   createRoom(name: string, maxPlayers: number, setup?: Setup): Promise<string>
   joinRoom(code: string, name: string): Promise<string>
   ready(): void
+  // Where this peer now is. The host applies its own move locally; a guest sends
+  // it and learns the result from the broadcast that comes back — the same split
+  // `ready` makes, for the same reason: only the host's roster is authoritative.
+  setWhere(where: Where): void
   kick(peerId: string): void
   setMaxPlayers(n: number): void
   transferHost(id: string): void
@@ -230,6 +235,10 @@ export function useLobby(): UseLobby {
           const r = handleReady(current, msg.from)
           commit(r.state)
           dispatch(r.outgoing)
+        } else if (msg.type === 'WHEREABOUTS') {
+          const r = handleWhereabouts(current, msg.from, msg.payload.where)
+          commit(r.state)
+          dispatch(r.outgoing)
         } else if (msg.type === 'INTENT' || msg.type === 'INTRO_READY') {
           // The only party that calls into the engine. `applyIntent` resolves the
           // seat from the sender's peer id and stamps the player itself, so a
@@ -341,7 +350,7 @@ export function useLobby(): UseLobby {
           hostId: t.id,
           maxPlayers,
           setup: setup ?? DEFAULT_SETUP,
-          peers: [{ id: t.id, name, role: 'host', ready: true }],
+          peers: [{ id: t.id, name, role: 'host', ready: true, where: 'lobby' }],
         })
         commit(initial)
         setStatus('in-lobby')
@@ -411,7 +420,7 @@ export function useLobby(): UseLobby {
             hostId,
             maxPlayers: 6,
             setup: DEFAULT_SETUP,
-            peers: [{ id: t.id, name, role: 'guest', ready: false }],
+            peers: [{ id: t.id, name, role: 'guest', ready: false, where: 'lobby' }],
           }),
         )
         t.connectTo(hostId)
@@ -446,6 +455,25 @@ export function useLobby(): UseLobby {
       t.send(current.hostId, { type: 'PLAYER_READY', payload: {} })
     }
   }, [commit, dispatch])
+
+  // Where this peer now is. The host applies its own move locally; a guest sends
+  // it and learns the result from the broadcast that comes back — the same split
+  // `ready` makes, for the same reason: only the host's roster is authoritative.
+  const setWhere = useCallback(
+    (where: Where) => {
+      const t = transportRef.current
+      const current = stateRef.current
+      if (!t || !current) return
+      if (isHostRef.current) {
+        const r = handleWhereabouts(current, current.selfId, where)
+        commit(r.state)
+        dispatch(r.outgoing)
+      } else {
+        t.send(current.hostId, { type: 'WHEREABOUTS', payload: { where } })
+      }
+    },
+    [commit, dispatch],
+  )
 
   const kick = useCallback(
     (peerId: string) => {
@@ -651,6 +679,7 @@ export function useLobby(): UseLobby {
       createRoom,
       joinRoom,
       ready,
+      setWhere,
       kick,
       setMaxPlayers,
       transferHost,
@@ -674,6 +703,7 @@ export function useLobby(): UseLobby {
       createRoom,
       joinRoom,
       ready,
+      setWhere,
       kick,
       setMaxPlayers,
       transferHost,

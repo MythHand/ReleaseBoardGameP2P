@@ -39,6 +39,7 @@ function base(): UseLobby {
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
     ready: vi.fn(),
+    setWhere: vi.fn(),
     kick: vi.fn(),
     setMaxPlayers: vi.fn(),
     startGame: vi.fn(),

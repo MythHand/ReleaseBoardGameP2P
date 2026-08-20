@@ -6,6 +6,7 @@ const peer = (id: string, name: string, role: PeerInfo['role']): PeerInfo => ({
   name,
   role,
   ready: true,
+  where: 'lobby',
 })
 
 const roster = (...list: PeerInfo[]): Record<string, PeerInfo> =>

@@ -1,7 +1,15 @@
-import { canStart, disbandLobby, handleJoinRequest, handleReady, kick, setMaxPlayers } from './host'
+import {
+  canStart,
+  disbandLobby,
+  handleJoinRequest,
+  handleReady,
+  handleWhereabouts,
+  kick,
+  setMaxPlayers,
+} from './host'
 import { createLobbyState, playerCount } from './state'
 
-const host = { id: 'h', name: 'Host', role: 'host' as const, ready: true }
+const host = { id: 'h', name: 'Host', role: 'host' as const, ready: true, where: 'lobby' as const }
 
 function base(maxPlayers: number) {
   return createLobbyState({ selfId: 'h', hostId: 'h', maxPlayers, peers: [host] })
@@ -99,4 +107,72 @@ it('disbandLobby broadcasts LOBBY_DISBANDED without mutating state', () => {
     to: 'broadcast',
     message: { type: 'LOBBY_DISBANDED', payload: {} },
   })
+})
+
+it('records where a peer went and tells the table', () => {
+  const state = createLobbyState({
+    selfId: 'host',
+    hostId: 'host',
+    maxPlayers: 4,
+    peers: [
+      { id: 'host', name: 'Ann', role: 'host', ready: true, where: 'lobby' },
+      { id: 'g1', name: 'Bo', role: 'player', ready: false, where: 'lobby' },
+    ],
+  })
+
+  const r = handleWhereabouts(state, 'g1', 'stats')
+
+  expect(r.state.peers.g1.where).toBe('stats')
+  expect(r.outgoing).toEqual([
+    {
+      to: 'broadcast',
+      message: {
+        type: 'PEER_JOINED',
+        payload: { id: 'g1', name: 'Bo', role: 'player', ready: false, where: 'stats' },
+      },
+    },
+  ])
+})
+
+it('says nothing when a peer re-announces where it already is', () => {
+  // Every screen announces on mount, and React mounts more than once in
+  // StrictMode. Without this guard a remount is a table-wide broadcast.
+  const state = createLobbyState({
+    selfId: 'host',
+    hostId: 'host',
+    maxPlayers: 4,
+    peers: [{ id: 'g1', name: 'Bo', role: 'player', ready: false, where: 'stats' }],
+  })
+
+  const r = handleWhereabouts(state, 'g1', 'stats')
+
+  expect(r.state).toBe(state)
+  expect(r.outgoing).toEqual([])
+})
+
+it('ignores a whereabouts from someone not in the room', () => {
+  const state = createLobbyState({
+    selfId: 'host',
+    hostId: 'host',
+    maxPlayers: 4,
+    peers: [{ id: 'g1', name: 'Bo', role: 'player', ready: false, where: 'lobby' }],
+  })
+
+  const r = handleWhereabouts(state, 'stranger', 'game')
+
+  expect(r.state).toBe(state)
+  expect(r.outgoing).toEqual([])
+})
+
+it('seats a joiner in the lobby, since that is the only place to join from', () => {
+  const state = createLobbyState({
+    selfId: 'host',
+    hostId: 'host',
+    maxPlayers: 4,
+    peers: [{ id: 'host', name: 'Ann', role: 'host', ready: true, where: 'lobby' }],
+  })
+
+  const r = handleJoinRequest(state, 'g1', 'Bo')
+
+  expect(r.state.peers.g1.where).toBe('lobby')
 })
