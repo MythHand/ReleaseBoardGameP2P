@@ -114,8 +114,9 @@ export interface UseLobby {
   // The keeper, the link and the last sync stay. link.close() is local-only
   // (session/link.ts), but the match is already over and another peer may still
   // be reading its results — there is nothing here to reclaim and a live
-  // results screen to break. startGame replaces all three on a rematch, and
-  // leaveSession tears them down when the room itself is left.
+  // results screen to break. A rematch tears the old keeper and gate down inside
+  // startGame before building new ones, and leaveSession tears everything down
+  // when the room itself is left.
   leaveGame(): void
   clearError(): void
 }
@@ -575,8 +576,9 @@ export function useLobby(): UseLobby {
   // The keeper, the link and the last sync stay. link.close() is local-only
   // (session/link.ts), but the match is already over and another peer may still
   // be reading its results — there is nothing here to reclaim and a live
-  // results screen to break. startGame replaces all three on a rematch, and
-  // leaveSession tears them down when the room itself is left.
+  // results screen to break. A rematch tears the old keeper and gate down inside
+  // startGame before building new ones, and leaveSession tears everything down
+  // when the room itself is left.
   const leaveGame = useCallback(() => {
     gameIdRef.current = null
     setGameId(null)
@@ -593,7 +595,9 @@ export function useLobby(): UseLobby {
   )
 
   // Host-only: tell the table to follow, then move. The board route is keyed by
-  // the host peer id, so every peer resolves the same URL from the payload.
+  // the MATCH id, minted here and carried in the payload, so every peer resolves
+  // the same URL from the frame rather than deriving one — a rematch gets its own
+  // id and nobody has to recompute it.
   // Broadcast first — setGameId navigates this peer away, and an unmounting
   // component must not be what the others are waiting on.
   const startGame = useCallback(() => {
@@ -606,6 +610,17 @@ export function useLobby(): UseLobby {
     const seats = seatsFor(current.peers)
     const mine = seatOf(seats, current.selfId)
     if (!mine) return
+
+    // A rematch reassigns all three refs below. Reassignment is not teardown:
+    // the previous keeper's 250ms ticker would go on running for the life of the
+    // tab with setGameSync still in its listener set, and the previous gate's
+    // pending cap would fire into a match that no longer exists. Same order
+    // leaveSession uses — the gate first, because it must never outlive its
+    // session.
+    gateRef.current?.cancel()
+    gateRef.current = null
+    keeperRef.current?.close()
+    keeperRef.current = null
 
     // The engine never sources randomness, so the seed is the host's and travels
     // with the deal. Determinism is what lets every peer replay identically.

@@ -422,6 +422,39 @@ it('cancels the start gate when the session is torn down', async () => {
   }
 })
 
+it("a rematch takes the previous match's keeper and gate down with it", async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    act(() => {
+      result.current.startGame()
+    })
+    // Buffered behind match 1's gate. Match 1's cap is the only thing that would
+    // ever play it — and after a rematch there is no match 1 to play it into.
+    act(() => {
+      result.current.gameLink?.submit({ type: 'DRAW' })
+    })
+
+    act(() => {
+      result.current.startGame()
+    })
+    act(() => {
+      vi.advanceTimersByTime(INTRO_CAP_MS + 1)
+    })
+
+    // Reassigning the refs is not teardown: without an explicit close the old
+    // keeper's ticker runs for the life of the tab with setGameSync still in its
+    // listener set, and the old gate's cap fires this buffered draw into a game
+    // nobody is playing any more.
+    const drawn = sentTo(GUEST).filter(
+      (m) => m.type === 'SYNC' && m.payload.events.some((e) => e.type === 'drawn'),
+    )
+    expect(drawn).toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 it('a guest sends its whereabouts to the host', async () => {
   const { result } = renderHook(() => useLobby())
   await act(async () => {
