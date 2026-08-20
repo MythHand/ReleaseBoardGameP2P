@@ -190,9 +190,14 @@ it('host startGame broadcasts GAME_STARTING and records the game id', async () =
   const hostId = result.current.state?.hostId
   expect(transports[0].broadcast).toHaveBeenCalledWith({
     type: 'GAME_STARTING',
-    payload: { gameId: `${hostId}-1` },
+    payload: {
+      gameId: `${hostId}-1`,
+      // The seating rides the frame so no peer ever has to derive one.
+      seats: [{ playerId: 'p1', peerId: hostId, name: 'Dimbo' }],
+    },
   })
   expect(result.current.gameId).toBe(`${hostId}-1`)
+  expect(result.current.seats).toEqual([{ playerId: 'p1', peerId: hostId, name: 'Dimbo' }])
 })
 
 it('a guest follows the host out of the lobby', async () => {
@@ -205,13 +210,33 @@ it('a guest follows the host out of the lobby', async () => {
   act(() => {
     transports[0].onMessage?.({
       type: 'GAME_STARTING',
-      payload: { gameId: hostId },
+      payload: { gameId: hostId, seats: SEATING },
       from: hostId,
     } as WireMessage)
   })
 
   // The guest never clicked anything: this is the whole point of broadcasting.
   expect(result.current.gameId).toBe(hostId)
+})
+
+it("a guest holds the host's seating rather than deriving one of its own", async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: hostId, seats: SEATING },
+      from: hostId,
+    } as WireMessage)
+  })
+
+  // Named peers this guest's own roster has never heard of: only the frame can
+  // be the source. Anything the guest computed locally would seat itself.
+  expect(result.current.seats).toEqual(SEATING)
 })
 
 it('ignores a GAME_STARTING that did not come from the host', async () => {
@@ -223,7 +248,7 @@ it('ignores a GAME_STARTING that did not come from the host', async () => {
   act(() => {
     transports[0].onMessage?.({
       type: 'GAME_STARTING',
-      payload: { gameId: 'somewhere-else' },
+      payload: { gameId: 'somewhere-else', seats: SEATING },
       from: 'another-guest',
     } as WireMessage)
   })
@@ -231,6 +256,7 @@ it('ignores a GAME_STARTING that did not come from the host', async () => {
   // Starting the game is the host's word alone — otherwise any peer could drag
   // the table to a board of its choosing.
   expect(result.current.gameId).toBeNull()
+  expect(result.current.seats).toEqual([])
 })
 
 it('forgets the game id when the session is torn down', async () => {
@@ -248,6 +274,23 @@ it('forgets the game id when the session is torn down', async () => {
   })
   // A stale id would bounce the player straight back to the board they left.
   expect(result.current.gameId).toBeNull()
+  // And the seating describes a match nobody is in any more.
+  expect(result.current.seats).toEqual([])
+})
+
+it('walking back to the lobby forgets the match and its seating', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+  expect(result.current.seats).toHaveLength(2)
+
+  act(() => {
+    result.current.leaveGame()
+  })
+
+  expect(result.current.gameId).toBeNull()
+  expect(result.current.seats).toEqual([])
 })
 
 // --- reporting the opening deal is done ---
@@ -274,6 +317,13 @@ function sentAll(): Message[] {
 // otherwise the intent below would be rejected for being out of turn and prove
 // nothing about the gate.
 const GUEST = 'zguest'
+
+// A seating as a guest receives it: peers this guest's own roster has never
+// heard of, so nothing derived locally could produce it.
+const SEATING = [
+  { playerId: 'p1', peerId: 'aaa', name: 'Ann' },
+  { playerId: 'p2', peerId: 'bbb', name: 'Bo' },
+]
 
 async function hostWithGuest(): Promise<ReturnType<typeof renderHook<UseLobby, unknown>>> {
   const rendered = renderHook(() => useLobby())
@@ -366,7 +416,7 @@ it('a guest tells the host when its intro is done', async () => {
   act(() => {
     transports[0].onMessage?.({
       type: 'GAME_STARTING',
-      payload: { gameId: hostId },
+      payload: { gameId: hostId, seats: SEATING },
       from: hostId,
     } as WireMessage)
   })

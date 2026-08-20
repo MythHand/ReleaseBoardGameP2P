@@ -73,7 +73,13 @@ export default function BoardPage() {
   // back to the playerId there would restore the very defect above, and just as
   // quietly, so a miss yields no id at all and says so where a developer will
   // see it. The complaint is what catches the next id crossing too.
-  const seats = seatsFor(session.state?.peers ?? {})
+  //
+  // Frozen at the deal, not recomputed here: the roster loses a peer the moment
+  // its channel drops, and seats derived from it mid-match renumber whoever is
+  // left — so the overlay would name the wrong peer as winner. The fallback
+  // covers a session with no seating held (a reload).
+  const frozenSeats = session.seats
+  const seats = frozenSeats.length > 0 ? frozenSeats : seatsFor(session.state?.peers ?? {})
   const engineOver = game.view ? toBoardOver(game.view) : null
   const winnerSeat = engineOver ? seats.find((s) => s.playerId === engineOver.winnerId) : undefined
   if (engineOver && !winnerSeat && import.meta.env.DEV) {

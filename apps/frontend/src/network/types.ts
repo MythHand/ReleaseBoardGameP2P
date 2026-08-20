@@ -33,6 +33,17 @@ export interface PeerInfo {
   where: Where
 }
 
+// One seat at the table, minted by `seatsFor` (~/entities/game/seats) when the
+// host deals. It lives here rather than in `entities` because it travels on the
+// wire: GAME_STARTING carries the whole seating so every peer holds the same
+// frozen assignment for the life of the match, instead of each recomputing it
+// from a roster that shrinks whenever somebody drops.
+export interface Seat {
+  playerId: PlayerId
+  peerId: string
+  name: string
+}
+
 // Discriminated union of every protocol message ({ type, payload }).
 export type Message =
   // --- Lobby ---
@@ -57,7 +68,11 @@ export type Message =
   // one with — peers are identified by PeerJS id here, and seats are assigned by
   // the engine's setup. GAME_STARTED below is the sync layer's handshake and
   // stays reserved for it.
-  | { type: 'GAME_STARTING'; payload: { gameId: string } }
+  // The seating travels with the start, and is never recomputed after it. The
+  // roster is live — `applyPeerLeft` prunes a peer the moment its channel drops,
+  // mid-match as readily as in the lobby — so a seat derived from it at read
+  // time renumbers the survivors and hands one player another's counters.
+  | { type: 'GAME_STARTING'; payload: { gameId: string; seats: Seat[] } }
   // --- Game ---
   | { type: 'GAME_STARTED'; payload: { gameId: string; keeperId: PlayerId } }
   // A seat has finished its opening animation and is ready for the game to

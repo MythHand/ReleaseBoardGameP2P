@@ -22,10 +22,15 @@ export default function StatsPage() {
     setWhere('stats')
   }, [setWhere])
 
-  // Seats come from the roster exactly as the board builds them, so both screens
-  // resolve the engine's p1..pN to the same peers.
+  // The seating this match was dealt with, frozen at the deal and carried on
+  // GAME_STARTING. Deriving it here from `peers` is exactly the bug this reads
+  // around: the roster is pruned the moment somebody's channel drops, so a
+  // seating recomputed at render time renumbers the survivors — a departed
+  // player loses their row and the peer that inherits their seat id is shown
+  // their counters. The fallback is for a session that holds no seating at all
+  // (a reload), where degrading to today's roster beats an empty screen.
   const peers = session.state?.peers ?? {}
-  const seats = seatsFor(peers)
+  const seats = session.seats.length > 0 ? session.seats : seatsFor(peers)
   // No tally means no finished match to report: a spectator is never projected
   // to, and a reload loses the session entirely. An empty table is honest —
   // rows of zeros would claim a match in which nobody did anything, and the

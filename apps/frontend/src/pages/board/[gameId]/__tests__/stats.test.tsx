@@ -1,7 +1,7 @@
 import type { PlayerView } from '@release/engine'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
-import type { PeerInfo } from '~/network'
+import type { PeerInfo, Seat } from '~/network'
 import StatsPage from '../stats'
 
 const goToLobby = vi.fn()
@@ -10,6 +10,7 @@ const setWhere = vi.fn()
 
 let view: PlayerView | null
 let peers: Record<string, PeerInfo>
+let seats: Seat[]
 let selfId: string
 
 vi.mock('@release/translation', () => ({
@@ -25,6 +26,9 @@ vi.mock('~/app/providers/SessionProvider', () => ({
   useSession: () => ({
     state: { selfId, peers, hostId: 'peer-a' },
     roomCode: 'ROOM',
+    // The seating frozen at the deal, as the session holds it (#19) — not
+    // something this page derives from a roster that changes under it.
+    seats,
     leaveGame,
     setWhere,
   }),
@@ -42,6 +46,10 @@ beforeEach(() => {
     'peer-a': { id: 'peer-a', name: 'Ann', role: 'host', ready: true, where: 'stats' },
     'peer-b': { id: 'peer-b', name: 'Bo', role: 'player', ready: true, where: 'lobby' },
   }
+  seats = [
+    { playerId: 'p1', peerId: 'peer-a', name: 'Ann' },
+    { playerId: 'p2', peerId: 'peer-b', name: 'Bo' },
+  ]
   view = {
     over: { winner: 'p1', condition: 'release' },
     tally: { p1: { ...zero, attack: 5 }, p2: { ...zero, defense: 3 } },
@@ -50,8 +58,60 @@ beforeEach(() => {
 
 it('names the winner by resolving the engine seat back to a peer', () => {
   render(<StatsPage />)
-  // seatsFor sorts by peer id, so p1 is peer-a.
+  // The frozen seating says p1 is peer-a.
   expect(screen.getAllByText('Ann').length).toBeGreaterThan(0)
+})
+
+it('reads the seating the match was dealt with, not the roster still connected', () => {
+  // Three peers were dealt in as p1/p2/p3 and the middle one dropped mid-match.
+  // The roster is pruned on disconnect (network/useLobby.ts onDisconnect), so a
+  // seating recomputed here would make Cid p2 — printing Bo's counters under
+  // Cid's name, dropping Bo from the match entirely, and leaving the winning
+  // seat p3 unresolved so the winner block would not render at all.
+  selfId = 'aaa'
+  seats = [
+    { playerId: 'p1', peerId: 'aaa', name: 'Ann' },
+    { playerId: 'p2', peerId: 'bbb', name: 'Bo' },
+    { playerId: 'p3', peerId: 'ccc', name: 'Cid' },
+  ]
+  peers = {
+    aaa: { id: 'aaa', name: 'Ann', role: 'host', ready: true, where: 'stats' },
+    ccc: { id: 'ccc', name: 'Cid', role: 'player', ready: true, where: 'stats' },
+  }
+  view = {
+    over: { winner: 'p3', condition: 'release' },
+    tally: {
+      p1: { ...zero, attack: 11 },
+      p2: { ...zero, attack: 22 },
+      p3: { ...zero, attack: 33 },
+    },
+  } as unknown as PlayerView
+
+  const { container } = render(<StatsPage />)
+  const rows = Array.from(container.querySelectorAll('li')).map((li) => li.textContent ?? '')
+
+  expect(rows).toHaveLength(3)
+  // Every seat keeps its own counters, in the order the match was dealt.
+  expect(rows[0]).toContain('Ann')
+  expect(rows[0]).toContain('11')
+  // The player who left keeps their row, their number, and reads offline.
+  expect(rows[1]).toContain('Bo')
+  expect(rows[1]).toContain('22')
+  expect(rows[1]).toContain('stats.location.offline')
+  expect(rows[2]).toContain('Cid')
+  expect(rows[2]).toContain('33')
+  // And the winning seat still resolves to a peer, so the block renders.
+  expect(screen.getByText('stats.winnerLabel')).toBeTruthy()
+  expect(screen.getAllByText('Cid').length).toBeGreaterThan(1)
+})
+
+it('falls back to the roster when the session holds no seating', () => {
+  // A reload loses the session, so there is no frozen seating to read. Degrading
+  // to today's roster shows a partial result; refusing to seat anyone shows none.
+  seats = []
+  render(<StatsPage />)
+  expect(screen.getAllByText('Ann').length).toBeGreaterThan(0)
+  expect(screen.getByText('5')).toBeTruthy()
 })
 
 it("shows every seat's counters", () => {

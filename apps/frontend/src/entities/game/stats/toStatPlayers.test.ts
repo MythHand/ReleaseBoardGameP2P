@@ -49,6 +49,10 @@ it('reads player locations from the roster', () => {
 it('keeps the row of a player who left, and calls them offline', () => {
   // They played the match. Dropping the row would rewrite its history to
   // exclude someone who was there.
+  //
+  // `seats` still naming peer-b while the roster no longer does is the shape
+  // the page produces once the seating is frozen at the deal (#19): the roster
+  // is pruned on disconnect, the seating is not.
   const rows = toStatPlayers({
     tally: { p1: tally(), p2: tally({ attack: 9 }) },
     seats,
@@ -56,6 +60,54 @@ it('keeps the row of a player who left, and calls them offline', () => {
   })
   expect(rows).toHaveLength(2)
   expect(rows[1]).toMatchObject({ id: 'peer-b', name: 'Bo', location: 'offline', attack: 9 })
+})
+
+it('a seat that lost its peer keeps its own counters, and so does everyone else', () => {
+  // The scenario the frozen seating exists for. Three peers were dealt in as
+  // p1/p2/p3; the middle one drops mid-match. A seating recomputed from the
+  // surviving roster would renumber Cid to p2 and print Bo's counters under
+  // Cid's name while Bo vanished from the match entirely.
+  const dealt = [
+    { playerId: 'p1', peerId: 'aaa', name: 'Ann' },
+    { playerId: 'p2', peerId: 'bbb', name: 'Bo' },
+    { playerId: 'p3', peerId: 'ccc', name: 'Cid' },
+  ]
+  const survivors: Record<string, PeerInfo> = {
+    aaa: { id: 'aaa', name: 'Ann', role: 'host', ready: true, where: 'stats' },
+    ccc: { id: 'ccc', name: 'Cid', role: 'player', ready: true, where: 'stats' },
+  }
+
+  const rows = toStatPlayers({
+    tally: {
+      p1: tally({ attack: 1 }),
+      p2: tally({ attack: 2 }),
+      p3: tally({ attack: 3 }),
+    },
+    seats: dealt,
+    peers: survivors,
+  })
+
+  expect(rows).toEqual([
+    expect.objectContaining({ id: 'aaa', name: 'Ann', location: 'stats', attack: 1 }),
+    expect.objectContaining({ id: 'bbb', name: 'Bo', location: 'offline', attack: 2 }),
+    expect.objectContaining({ id: 'ccc', name: 'Cid', location: 'stats', attack: 3 }),
+  ])
+})
+
+it('rows follow the seating, not the order the roster happens to enumerate', () => {
+  // The two orders have to disagree for this to prove anything: the roster is
+  // built Bo-then-Ann, the seating says Ann sat first.
+  const rosterFirstBo: Record<string, PeerInfo> = {
+    'peer-b': peers['peer-b'],
+    'peer-a': peers['peer-a'],
+  }
+  const rows = toStatPlayers({
+    tally: { p1: tally({ attack: 1 }), p2: tally({ attack: 2 }) },
+    seats,
+    peers: rosterFirstBo,
+  })
+  expect(rows.map((r) => r.id)).toEqual(['peer-a', 'peer-b'])
+  expect(rows.map((r) => r.attack)).toEqual([1, 2])
 })
 
 it('names a departed player from the seat, since the roster no longer can', () => {
