@@ -840,6 +840,21 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
+      ru: 'Превью веера снова закрывает центр во время оплаты, и нажатие сквозь него отменяет релиз',
+      en: 'The fan’s preview covers the centre again during the cost step, and a press through it cancels the release',
+    },
+    problem: {
+      ru: '#100 увёл веер в `pointer-events: none`, пока пара стоит сложенной в центре: ховер-превью `Hand` поднимается ровно туда и закрывает её. #101 (Fix C) заставил гвард УСТУПАТЬ на шаге оплаты релиза — веер единственный, кто может назвать цену (панель для `discardForRelease` снята, клавиатуры у веера нет), так что инертный веер делал цену неоплачиваемой никаким вводом. Уступка верна, дедлок хуже перекрытия. Вторая половина размена: на всю фазу оплаты превью снова стоит над парой, а у `.zoom` стоит `pointer-events: none` — нажатие в превью проваливается на то, что под ним, не находит `[data-hand-slot]`, и слушатель промаха на корне стола читает его как «передумал» и отменяет релиз. Попытка ПРОЧИТАТЬ карту отменяет розыгрыш. Исключить превью из промаха нельзя, пока оно не цель события; сделать его целью значит отдать ему ховер, который его поднял. Закроет решение в `Hand`: превью, которое не поднимается над занятым центром (проп «где нельзя»), либо флаг на время показа, читаемый слушателем промаха.',
+      en: '#100 put the fan at `pointer-events: none` while a pair stands folded at the centre: `Hand`’s hover preview rises into exactly that space and covers it. #101 (Fix C) made the guard YIELD during a release’s cost step — the fan is the only picker there is (the panel is suppressed for `discardForRelease`, and the fan has no keyboard path), so an inert fan made the cost unpayable by any input. The yield is right; a deadlock is worse than an occlusion. The other half of the trade: for the whole cost step the preview stands over the pair again, and `.zoom` is `pointer-events: none` — a press landing on the preview falls THROUGH to whatever is beneath, matches no `[data-hand-slot]`, and the table-root miss listener reads it as "changed my mind" and cancels the release. Trying to READ a card can undo the play. The preview cannot be exempted while it is not an event target, and making it one hands it the hover that raised it. Closed by a decision in `Hand`: a preview that does not rise over an occupied centre (a "where it must not go" prop), or a flag it raises while shown that the miss listener reads.',
+    },
+    where: {
+      ru: 'ui: table/Hand (zoom) + frontend: pages/board/[gameId]/_Board.tsx (handWrap, cost mousedown)',
+      en: 'ui: table/Hand (zoom) + frontend: pages/board/[gameId]/_Board.tsx (handWrap, cost mousedown)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
       ru: 'Граница матча заведена на ключ, который не меняется между матчами',
       en: 'The match boundary hangs on a key that never changes between matches',
     },

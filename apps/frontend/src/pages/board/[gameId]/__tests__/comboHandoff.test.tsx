@@ -38,7 +38,7 @@
 
 import type { Event, PlayerId } from '@release/engine'
 import type { CardData, TableTarget } from '@release/ui'
-import { Card, CardPair, cardById, ReleaseZone } from '@release/ui'
+import { CARD_W, Card, CardPair, cardById, ReleaseZone } from '@release/ui'
 import { act, render, screen } from '@testing-library/react'
 import { useLayoutEffect, useRef } from 'react'
 import { expect, it, vi } from 'vitest'
@@ -49,13 +49,21 @@ import { useBoardStaging } from '../_useBoardStaging'
 
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => false }))
 
-const played = vi.hoisted(() => ({ names: [] as string[] }))
+// `calls` alongside `names` (#101, Fix D, finding 9): the ORDER of the two
+// movements is what most of this file asks about, but one test has to ask where
+// a movement actually started — a raise at the destination and a flight across
+// the table are both a `playToCenter` in `names`.
+const played = vi.hoisted(() => ({
+  names: [] as string[],
+  calls: [] as { name: string; params: Record<string, unknown> }[],
+}))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
   return {
     ...real,
     play: (name: string, el: Element, params?: Record<string, unknown>) => {
       played.names.push(name)
+      played.calls.push({ name, params: params ?? {} })
       return real.play(name, el, params)
     },
   }
@@ -229,10 +237,24 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
             )
           })()}
       </div>
-      {/* the opponent seat `foldIn` folds an opponent's own play in from
-          (`anchors.seatBox`) — every fixture in this file that throws a play
-          from the far side uses 'p2', so one bound seat covers all of them. */}
+      {/* the opponent seats `foldIn` folds an opponent's own play in from
+          (`anchors.seatBox`). 'p2' throws in every fixture here; 'p3' DEFENDS in
+          the one-flush exchange below, and until #101's Fix D that seat was not
+          bound at all — so the spectator's cover fell through to
+          `defenseBeat`'s own last-resort `?? coverBox` and "flew" nowhere,
+          zero distance, while the comment here claimed one seat covered every
+          fixture. Its rect is stubbed because jsdom measures every unstyled
+          node as all zeros, and a flight from a zero box to the cover slot's
+          zero box is exactly the non-journey this is here to tell apart. */}
       <div ref={(el) => anchors.bindSeat('p2', el)} />
+      <div
+        ref={(el) => {
+          if (el)
+            el.getBoundingClientRect = () =>
+              ({ left: 400, top: 200, width: 150, height: 210 }) as unknown as DOMRect
+          anchors.bindSeat('p3', el)
+        }}
+      />
       {/* the cost slot — only the paired-release-with-cost test below needs
           it (`runRelease`'s cost leg measures it regardless of actor/remote),
           but binding it unconditionally costs nothing for the other tests */}
@@ -882,6 +904,7 @@ const watchingAfter: BoardState = {
 
 it('plays the whole exchange for a watching peer that gets both events at once', async () => {
   played.names = []
+  played.calls = []
   const { rerender } = render(<Harness live={watchingBefore} events={[]} />)
   expect(screen.queryByTestId('pending')).toBeNull()
 
@@ -891,6 +914,12 @@ it('plays the whole exchange for a watching peer that gets both events at once',
   // one, and the second is the one that used to be missing entirely
   expect(played.names).toContain('foldIntoPair')
   expect(played.names).toContain('playToCenter')
+  // and the defence really TRAVELLED: out of the defender's own seat, which is
+  // `cardBoxIn` of the stubbed rect above (centre 475/305, a CARD_W box), not a
+  // zero-distance raise at the cover slot it lands on
+  const cover = played.calls.find((c) => c.name === 'playToCenter')
+  expect(cover?.params.from).toMatchObject({ left: 475 - CARD_W / 2 })
+  expect(cover?.params.from).not.toEqual(cover?.params.to)
   // the fold happened first: the cover covers something that is already there
   expect(played.names.indexOf('foldIntoPair')).toBeLessThan(played.names.indexOf('playToCenter'))
   // and the exchange reached the heap, in the order it lay on the table

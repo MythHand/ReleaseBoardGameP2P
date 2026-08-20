@@ -1058,6 +1058,21 @@ export default function Board({
               // other. The guard yields to the step that is waiting on the fan,
               // which is the narrower of the two and the one that can be
               // deadlocked.
+              //
+              // WHAT YIELDING COSTS, on the record rather than left to be
+              // rediscovered (#101, Fix D, finding 9): the hover zoom is back
+              // over the standing pair for the whole cost step, which is the
+              // occlusion #100's guard was added for — and `Hand`'s `.zoom` is
+              // `pointer-events: none`, so a press that lands on that preview
+              // falls THROUGH to whatever is beneath it, misses every
+              // `[data-hand-slot]`, and the cost listener above reads it as a
+              // miss and cancels the release. Reading a card can therefore
+              // undo the play. Not fixable from this side: exempting the
+              // preview needs it to be a pointer target, and giving it pointer
+              // events makes it steal the hover that raised it. Recorded in
+              // `docs/animations/backlog.md` and the audit register with the
+              // shape that would close it; the deadlock this guard yields for
+              // is the worse of the two, which is why it still yields.
               style={{ pointerEvents: handInert ? 'none' : undefined }}
               onMouseDown={handInert ? (e) => e.stopPropagation() : undefined}
             >
