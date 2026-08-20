@@ -481,19 +481,23 @@ it('does not fly our own staged defence in from the fan a second time', async ()
       },
     ),
   )
-  const flights = played.calls.filter((c) => c.name === 'playToCenter')
-  expect(flights).toHaveLength(1)
-  // it stands where it already is — a no-travel raise at the cover slot, which
-  // is what the fallback chain's own comment has always described as the honest
-  // answer to "it is here and I cannot say where it came from"
-  const box = cover.getBoundingClientRect()
-  expect(flights[0].params).toMatchObject({
-    from: { left: box.left, top: box.top, width: box.width, height: box.height },
-    to: { left: box.left, top: box.top, width: box.width, height: box.height },
-  })
-  // and emphatically NOT from the fan slot the card left, which is the replay
-  // the user watched
-  expect(flights[0].params.from).not.toMatchObject({ left: 40, top: 60 })
+  // The beat raises NOTHING for the cover. Round 3 gated only the fan-slot leg,
+  // which left this raising a motionless copy at the destination — necessary
+  // then, because the staging was being thrown away underneath it and that copy
+  // was the only thing holding the slot. Round 4 stopped the throwing away
+  // (`_useDefenseStaging`'s catch-up waits for its own carrier), so the gesture
+  // now delivers the card and holds it, and any raise here would be a second
+  // copy on top of the player's own.
+  expect(played.calls.filter((c) => c.name === 'playToCenter')).toHaveLength(0)
+  // and emphatically nothing from the fan slot the card left — the replay the
+  // user watched. Asserted against the stub above, which is the only reason
+  // this file can tell that box apart from the cover's.
+  expect(played.calls.map((c) => c.params.from)).not.toContainEqual(
+    expect.objectContaining({ left: 40, top: 60 }),
+  )
+  // the cover slot is still what the exchange leaves from, untouched by any of
+  // this: the exit measures `a.cover` regardless
+  expect(cover.getBoundingClientRect().left).toBe(0)
 })
 
 // ===== rollback returns the attack, instead of banking it =====

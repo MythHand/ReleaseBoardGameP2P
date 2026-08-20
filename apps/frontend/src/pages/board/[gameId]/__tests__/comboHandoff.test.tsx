@@ -46,6 +46,7 @@ import type { BoardState, StagedHandoff } from '~/entities/game/board'
 import { useBoardAnchors } from '~/entities/game/board'
 import { useBeats } from '~/features/board-beats'
 import { useBoardStaging } from '../_useBoardStaging'
+import { useDefenseStaging } from '../_useDefenseStaging'
 
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => false }))
 
@@ -944,4 +945,245 @@ it('keeps the attack standing at the centre while the cover is held over it', as
   // running (SHOW_HOLD is 1.2s), nowhere near the exit
   await drive(() => rerender(<Harness live={watchingAfter} events={oneFlush} />), 45)
   expect(screen.queryByTestId('pending')).toBeTruthy()
+})
+
+// ===== Fix D round 4 — the same seam, on the DEFENCE side =====
+//
+// The harness above is the turn side's. This is its twin, and it exists because
+// the defect the user hit on their first real two-peer game lived in the one
+// commit no fixture in this repo built: the batch effect firing while
+// `beats.shadow` is still null, WITH a defence staged and its own carrier still
+// in the air.
+//
+// Why that combination is the ordinary case, not an edge: `commitAndFly`
+// dispatches the RESOLVE synchronously and only then starts the fan→cover
+// flight. The engine's answer comes back inside that flight — always for a host
+// (its engine is local), and for a client on any round trip shorter than one
+// flight. On that commit `state === live`: no pending, so `answering` is false,
+// the static cover child is not mounted, `coverStagedRef` is null, and the
+// passive catch-up clears `staged`. Two artifacts followed, and the player saw
+// both at once: the beat flew the card in a SECOND time from the fan slot it had
+// already left, and the card itself popped back into the fan for the whole beat.
+//
+// Same construction rules as the harness above: real `useBeats`, real
+// `useDefenseStaging`, real `useDefenseBeat` underneath, wired in `_Board.tsx`'s
+// own hook ORDER — `useBeats` first, so its layout effect plans and drains
+// before the handoff effect below ever runs. That order is the race.
+const dapi: {
+  defense?: ReturnType<typeof useDefenseStaging>
+  handoffRef?: { current: StagedHandoff | null }
+} = {}
+
+const SLOT_RECT = { left: 40, top: 300, width: 150, height: 210 }
+const COVER_RECT = { left: 500, top: 100, width: 150, height: 210 }
+const stubRect = (el: HTMLElement | null, r: typeof SLOT_RECT) => {
+  if (el) el.getBoundingClientRect = () => r as unknown as DOMRect
+}
+
+function DefenceHarness({ live, events }: { live: BoardState; events: Event[] }) {
+  const anchors = useBoardAnchors()
+  const handoffRef = useRef<StagedHandoff | null>(null)
+  const coverStagedRef = useRef<HTMLDivElement>(null)
+  dapi.handoffRef = handoffRef
+  const clearPaidCostRef = useRef<(() => void) | null>(null)
+  const takeStagedReleaseRef = useRef<(() => void) | null>(null)
+  const beats = useBeats({
+    live,
+    events,
+    anchors,
+    enabled: true,
+    staging: handoffRef,
+    clearPaidCost: clearPaidCostRef,
+    takeStagedRelease: takeStagedReleaseRef,
+  })
+  const state = beats.shadow ?? live
+  const answering = state.pending?.kind === 'defend' && state.pending.player === state.selfId
+  const defenseStaging = useDefenseStaging({ state, anchors, actions: {}, events, enabled: true })
+  dapi.defense = defenseStaging
+
+  // `_Board.tsx`'s own `stagedCover` gate, verbatim: the static cover render
+  // only exists once this hook's carrier has let go of the card.
+  const stagedCover =
+    answering && defenseStaging.landed && defenseStaging.overlay.length === 0
+      ? defenseStaging.staged?.main
+      : undefined
+
+  // `_Board.tsx`'s handoff effect, same body and — critically — declared AFTER
+  // `useBeats` above, exactly as the board declares it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: landed/overlay gate a ref read, mirroring _Board.tsx
+  useLayoutEffect(() => {
+    const ds = defenseStaging.staged
+    handoffRef.current =
+      ds?.phase === 'dispatched' && ds.main
+        ? {
+            mainUid: ds.main.uid,
+            supportUid: ds.support?.uid,
+            el: coverStagedRef.current,
+            release: defenseStaging.release,
+          }
+        : null
+  }, [
+    defenseStaging.staged,
+    defenseStaging.release,
+    defenseStaging.landed,
+    defenseStaging.overlay.length,
+  ])
+
+  return (
+    <div>
+      <div ref={anchors.hand}>
+        {defenseStaging.handItems.map((slot) => (
+          <div key={slot.uid} data-hand-slot ref={(el) => stubRect(el, SLOT_RECT)}>
+            <Card card={slot.card} interactive={false} width="100%" />
+          </div>
+        ))}
+      </div>
+      <div data-testid="cover-slot" ref={anchors.cover}>
+        {stagedCover && (
+          <div ref={coverStagedRef} data-testid="cover-staged">
+            <Card card={stagedCover.card} interactive={false} width="100%" />
+          </div>
+        )}
+      </div>
+      <div ref={anchors.centre} />
+      <div ref={anchors.discardBox} />
+      {defenseStaging.overlay}
+      {beats.overlays}
+    </div>
+  )
+}
+
+const defBefore: BoardState = {
+  // TWO cards, and that is load-bearing: with only the defence in hand the fan
+  // is empty once it is staged, `handSlotAt` finds nothing to measure, and the
+  // beat falls through to the cover box by accident rather than by design. A
+  // real defender almost always holds something else, and then the stale index
+  // resolves to a NEIGHBOUR's slot — a card flying in from a slot that never
+  // held it.
+  you: {
+    name: 'You',
+    hand: [
+      { uid: 'defense-hotfix#0', card: card('defense-hotfix') },
+      { uid: 'attack-bug#0', card: card('attack-bug') },
+    ],
+    release: {},
+  },
+  opponents: [{ id: 'p2', name: 'Two', handCount: 3, release: {} }],
+  decks: { main: [10], events: 5, discardCount: 0, discardHeap: [] },
+  turn: 'p2',
+  selfId: 'p1',
+  history: [],
+  setup: {},
+  playable: [],
+  frozen: [],
+  pending: {
+    kind: 'defend',
+    player: 'p1',
+    attacker: 'p2',
+    attackCard: 'attack-bug',
+    sudo: false,
+    options: ['defense-hotfix#0'],
+    openedAt: 0,
+    deadline: 30_000,
+    scope: 'hand',
+  },
+} as unknown as BoardState
+
+// the projection the engine's answer produces: the pending is gone and the card
+// has left the hand — which is precisely what the catch-up reads as "done"
+const defAfter: BoardState = {
+  ...defBefore,
+  you: { ...defBefore.you, hand: [{ uid: 'attack-bug#0', card: card('attack-bug') }] },
+  pending: null,
+  decks: {
+    ...defBefore.decks,
+    discardHeap: [
+      { uid: 'h31', card: card('attack-bug'), rot: 4, dx: 2, dy: -3 },
+      { uid: 'h32', card: card('defense-hotfix'), rot: -6, dx: -1, dy: 5 },
+    ],
+    discardCount: 2,
+  },
+} as unknown as BoardState
+
+const defFlush: Event[] = [
+  { id: 30, type: 'defended', player: 'p1', card: 'defense-hotfix', effect: 'cancel' } as Event,
+  { id: 31, type: 'discarded', player: 'p2', card: 'attack-bug', reason: 'attackSpent' } as Event,
+  {
+    id: 32,
+    type: 'discarded',
+    player: 'p1',
+    card: 'defense-hotfix',
+    reason: 'defenceSpent',
+  } as Event,
+]
+
+// The gesture's own flight is held open on purpose: `landed === false` with the
+// carrier still up IS the production state this is about, and jsdom's WAAPI stub
+// resolves `.finished` on the next microtask, so without this the flight would
+// always have landed before the events arrived and the bug would be unreachable.
+function holdFlightsOpen() {
+  return vi
+    .spyOn(Element.prototype, 'animate')
+    .mockImplementation(
+      () => ({ cancel: () => {}, finished: new Promise<void>(() => {}) }) as unknown as Animation,
+    )
+}
+
+it('does not replay our own defence, or hand it back to the fan, when the answer lands mid-flight', async () => {
+  const animateSpy = holdFlightsOpen()
+  try {
+    played.names = []
+    played.calls = []
+    const { rerender } = render(<DefenceHarness live={defBefore} events={[]} />)
+    // jsdom measures every unstyled node as all zeros, and the whole question
+    // here is WHICH box a flight starts from — the cover slot or a fan slot —
+    // so the two have to be distinguishable. Stubbed once: the slot div lives
+    // for the life of the harness.
+    stubRect(screen.getByTestId('cover-slot'), COVER_RECT)
+
+    // pull the defence out of the fan — the real gesture, dispatched at once.
+    // `drive` (not a bare `act`) because `flyer.raise` mounts its overlay
+    // through a state update and then awaits `nextFrames()`: inside a single
+    // async `act` scope React defers that commit until the scope settles, so
+    // `raise` would hand back an unmounted node and the flight would be skipped
+    // — the very state this fixture must NOT be in.
+    await drive(() => {
+      dapi.defense?.onHandPlay('defense-hotfix#0', { x: 0, y: 0, rect: SLOT_RECT as DOMRect })
+    }, 20)
+    // the gesture's own flight is up and has NOT landed — the production state
+    // this whole fixture exists to construct
+    expect(played.calls.filter((c) => c.name === 'playToCenter')).toHaveLength(1)
+    expect(dapi.defense?.landed).toBe(false)
+    expect(dapi.handoffRef?.current).not.toBeNull()
+    expect(dapi.handoffRef?.current?.el ?? null).toBeNull()
+    const beforeBeat = played.calls.length
+
+    // the engine answers INSIDE that flight — `beats.shadow` is still null on
+    // this commit, so the batch effect plans and drains against `live`
+    await drive(() => rerender(<DefenceHarness live={defAfter} events={defFlush} />), 55)
+
+    // 1. the beat raised NOTHING for the cover. Our own defence is the
+    // gesture's to deliver — its carrier is mid-flight to that very slot — so a
+    // beat that raises anything there is raising a second copy of a card that is
+    // already on its way. Pre-fix it raised one; where that copy came FROM (the
+    // fan slot on a real board, this harness's cover box) is the difference the
+    // player saw, but the copy itself is the defect, and its absence is what
+    // this pins. The from-the-fan-slot half is pinned at unit level, where
+    // `handSlotAt` can be stubbed to a real rect
+    // (`defenseBeat.test.tsx`'s own rejoin test).
+    const beatFlights = played.calls.slice(beforeBeat).filter((c) => c.name === 'playToCenter')
+    expect(beatFlights).toHaveLength(0)
+
+    // 2. the card did not pop back into the fan — the gesture still owns it,
+    // and the fan holds only the card that was never played
+    expect(dapi.defense?.staged?.main?.uid).toBe('defense-hotfix#0')
+    expect(dapi.defense?.handItems.map((i) => i.uid)).toEqual(['attack-bug#0'])
+    expect(
+      Array.from(document.querySelectorAll('[data-hand-slot] [data-card]')).map((el) =>
+        el.getAttribute('data-card'),
+      ),
+    ).toEqual(['attack-bug'])
+  } finally {
+    animateSpy.mockRestore()
+  }
 })

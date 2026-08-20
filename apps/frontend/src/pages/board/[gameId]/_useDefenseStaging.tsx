@@ -327,24 +327,35 @@ export function useDefenseStaging({
       setLanded(false) // fresh cycle — the flight below has not carried this card yet
       actions?.onResolve?.({ kind: 'defend', card: uid, combo: undefined })
       void (async () => {
-        const to = anchors.cover.current?.getBoundingClientRect()
-        if (!reduced && from && to) {
-          const [el] = await flyer.raise([{ key: 'cover', card, at: from }])
-          if (el) {
-            await play('playToCenter', el, {
-              from,
-              to,
-              rotate: COVER_POSE.rot,
-              dx: COVER_POSE.dx,
-              dy: COVER_POSE.dy,
-            })?.finished
+        try {
+          const to = anchors.cover.current?.getBoundingClientRect()
+          if (!reduced && from && to) {
+            const [el] = await flyer.raise([{ key: 'cover', card, at: from }])
+            if (el) {
+              await play('playToCenter', el, {
+                from,
+                to,
+                rotate: COVER_POSE.rot,
+                dx: COVER_POSE.dx,
+                dy: COVER_POSE.dy,
+              })?.finished
+            }
+            flyer.drop('cover')
           }
-          flyer.drop('cover')
+        } finally {
+          // the carrier has dropped it (or, under reduced motion, there was
+          // never one) — `_Board.tsx`'s static cover render may take over now,
+          // not a moment before (see `landed`'s own comment above).
+          //
+          // In a `finally` since #101, Fix D round 4, and load-bearing there:
+          // the catch-up effect below now WAITS for this before it will clear
+          // the staging, so a `.finished` that rejects (a cancelled animation)
+          // must still report the carrier gone. Otherwise `landed` would stay
+          // false with a dispatched play staged, and the fan would keep a hole
+          // in it for the rest of the match — worse than the ghost this change
+          // exists to remove.
+          setLanded(true)
         }
-        // the carrier has dropped it (or, under reduced motion, there was
-        // never one) — `_Board.tsx`'s static cover render may take over now,
-        // not a moment before (see `landed`'s own comment above).
-        setLanded(true)
       })()
     },
     [reduced, anchors.cover, actions, flyer.raise, flyer.drop],
@@ -617,6 +628,13 @@ export function useDefenseStaging({
           // every exit clears the lock — the early returns above and a
           // rejecting `.finished` all bypass the success path's own clear.
           foldingRef.current = false
+          // and every exit reports the carrier gone, for the same reason
+          // `commitAndFly`'s own `finally` does (#101, Fix D round 4): the
+          // catch-up effect below will not clear a dispatched staging until
+          // `landed` is true, so a rejected flight that skipped the success
+          // path's `setLanded(true)` would leave the fan a hole for good. A
+          // no-op on every path that already set it.
+          setLanded(true)
           // Fix round 1 (Important 2): unlike `_useBoardStaging.ts`'s own
           // fold, this one dispatches BEFORE this flight rather than after —
           // the no-duplicate rule (the standing Sudo handed to the flyer in
@@ -654,12 +672,38 @@ export function useDefenseStaging({
   // Checking only `main`'s uid is enough for the paired case too: the engine
   // takes both cards out of the hand in the SAME action, so `main` leaving
   // implies the whole play (support included) was accepted.
+  //
+  // NOT WHILE OUR OWN CARRIER IS STILL DELIVERING THE CARD (#101, Fix D round
+  // 4). "The projection moved our card out of the hand" is only evidence that
+  // this gesture is finished if the gesture is not, at that very moment, still
+  // carrying the card across the table — and it usually is. `commitAndFly`
+  // dispatches the RESOLVE synchronously and only then starts the fan→cover
+  // flight, so the engine's answer comes back INSIDE that flight: always for a
+  // host, whose engine is local, and for a client on any round trip shorter
+  // than one flight. That answer arrives on a commit where `useBeats` has no
+  // shadow yet, so the board reads `live` — no pending, our card gone from the
+  // hand — and this effect fired and threw the staging away. One commit later
+  // the beat's shadow renders `base`, where the card is back in the hand and
+  // nothing is filtering it any more, so the card the player had just played
+  // POPPED BACK INTO THE FAN and sat there for the whole beat, beside the copy
+  // standing at the centre.
+  //
+  // `landed` is exactly the right question because both dispatch paths set it:
+  // false at the dispatch, true when their carrier lets go (or at once under
+  // reduced motion, and on every early exit — see both `finally` blocks). So
+  // this cannot strand the staging: `landed` is in the deps, so the effect
+  // re-runs the moment the carrier does let go, and clears then if the
+  // projection still says the card is gone. If a beat is running instead, the
+  // shadow puts the card back in `state.you.hand` and there is nothing to
+  // clear — the beat's own `release()` ends the staging, which is the designed
+  // hand-over.
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   useEffect(() => {
     const s = stagedRef.current
     if (s?.phase !== 'dispatched' || !s.main) return
+    if (!landed) return
     if (!state.you.hand.some((c) => c.uid === s.main?.uid)) commitStaged(null)
-  }, [state.you.hand])
+  }, [state.you.hand, landed])
 
   // the engine said no: the staged defence returns to the fan. A rejected
   // RESOLVE carries no top-level `card` (packages/engine/src/fake/core.ts's

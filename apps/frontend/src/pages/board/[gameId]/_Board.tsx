@@ -483,6 +483,29 @@ export default function Board({
   // instant right after the pull, before the ref had anything to bind to.
   // biome-ignore lint/correctness/useExhaustiveDependencies: landed/overlay gate a ref read, not a value the effect body itself references
   useLayoutEffect(() => {
+    // The DEFENCE's own dispatched play claims the handoff first, and is asked
+    // about before `answering` rather than inside it (#101, Fix D round 4). The
+    // commit that carries the engine's answer renders `live` — `beats.shadow` is
+    // not set until the beat starts — so `answering` flickers false for exactly
+    // that one commit, and keying the branch on it wrote `null` here from the
+    // TURN side, which has nothing staged while a pending is open. A beat
+    // planned on the next commit would then read no handoff at all and treat our
+    // own defence as a rejoin, flying it in from the fan. Asking "does the
+    // defence gesture have a dispatched play" cannot flicker: it is the hook's
+    // own state, and it now survives that commit (`_useDefenseStaging`'s
+    // catch-up waits for its carrier). The two hooks are never both staged —
+    // the engine suspends normal play while a pending is open — so this cannot
+    // steal the turn side's handoff either.
+    const answeringStaged = defenseStaging.staged
+    if (answeringStaged?.phase === 'dispatched' && answeringStaged.main) {
+      handoffRef.current = {
+        mainUid: answeringStaged.main.uid,
+        supportUid: answeringStaged.support?.uid,
+        el: coverStagedRef.current,
+        release: defenseStaging.release,
+      }
+      return
+    }
     if (answering) {
       const ds = defenseStaging.staged
       handoffRef.current =

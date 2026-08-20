@@ -56,31 +56,40 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
 
       // THE COVER — the defence lies over the attack, offset and tilted the
       // other way, so the two read as two plays and not one tidy stack.
-      if (coverBox && defence && !(mine && handoff?.el)) {
+      // OURS IS NOT THE BEAT'S TO CARRY. If we staged this defence, the gesture
+      // is already delivering it to the cover slot and the beat must keep its
+      // hands off: `_useDefenseStaging` flies the card there itself, and the
+      // instant its carrier lets go the static cover render takes over in the
+      // SAME commit (`flyer.drop` and `setLanded(true)` are batched), so the
+      // slot is occupied continuously with nothing to hand over and nothing to
+      // duplicate. `handoff.release()` below is the only thing this beat still
+      // owes a local defence.
+      //
+      // This used to ask `handoff?.el` instead of `handoff`, and the difference
+      // was the defect the user found on their first real two-peer game (#101,
+      // Fix D rounds 3 and 4). A null `el` is not "nobody is holding this card";
+      // it is the ORDINARY mid-flight state of a normal local defence, because
+      // the static cover child only mounts once the flight has landed. So the
+      // beat concluded nothing was standing anywhere and flew the card in a
+      // SECOND time, from the fan slot it had already left.
+      //
+      // Asking whether the play was STAGED — not whether its node happens to
+      // exist yet — takes the timing out of the question entirely. Round 3 fixed
+      // the same defect by gating the fan-slot leg, which left this branch
+      // raising a motionless copy at the destination; that copy was load-bearing
+      // only because the staging was being thrown away underneath it, and round
+      // 4 stopped that (`_useDefenseStaging`'s catch-up now waits for its own
+      // carrier). With the staging surviving, the copy is not merely unnecessary
+      // — it would be a second card on top of the gesture's own.
+      if (coverBox && defence && !(mine && handoff)) {
         // WHERE IT COMES FROM — resolved in the same order `comboBeat`'s own
         // `foldIn` resolves a source, with one more step on the end.
         //
-        // The fan slot the card left, for our own defence — but ONLY when there
-        // is no handoff at all, which is a rejoin or a replay: the gesture that
-        // would have staged it never happened on this peer, so nothing else
-        // knows where the card is. Then the actor's seat, for everyone else.
-        //
-        // That gate used to read `handoff?.el` (through the outer guard alone)
-        // rather than `handoff`, and the difference is the whole of #101, Fix D
-        // round 3 — the first defect anyone found by actually playing this
-        // scene. A null `el` is not the rejoin case; it is the ORDINARY
-        // mid-flight state of a perfectly normal local defence.
-        // `_useDefenseStaging.commitAndFly` dispatches the RESOLVE synchronously
-        // and only then starts the fan→cover flight, and while that flight is up
-        // `landed` is false, so `_Board.tsx`'s `stagedCover` renders nothing, so
-        // `coverStagedRef` binds nothing, so the layout effect that snapshots the
-        // node writes `el: null`. The engine's `covered` answer lands inside that
-        // window — the host's engine is local, and a client needs only a round
-        // trip shorter than one flight — and `useBeats` is called BEFORE that
-        // snapshot effect, so `runCovered` reads the previous commit's handoff
-        // and finds the null. The card was then flown in from the fan a second
-        // time, which is what the player reported as "it leaves from my hand
-        // instead of from the table".
+        // The fan slot the card left, for our own defence: reachable now only on
+        // a rejoin or a replay, since a staged one never gets here at all — the
+        // gesture that would have staged it never happened on this peer, so
+        // nothing else knows where the card is. Then the actor's seat, for
+        // everyone else.
         //
         // And finally the cover slot itself. `seatBox` is null for the LOCAL
         // player — only opponents' seats are bound — so before #101, Fix C
@@ -89,16 +98,8 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
         // follows then started from an empty box. A no-travel raise at the
         // destination is the honest answer to "it is here and I cannot say
         // where it came from": the card stands, in its own pose, and the
-        // exchange leaves from something real. That is now also where an
-        // ordinary staged defence lands — and it is LOAD-BEARING there, not
-        // merely harmless: the transient commit that carries the engine's answer
-        // clears `_useDefenseStaging`'s `staged`, so the static cover render is
-        // gone for the whole beat and this raise is the only thing standing at
-        // the cover. See `docs/animations/backlog.md` — if that clear is ever
-        // fixed, this guard wants revisiting, because the gesture's own render
-        // would then be standing here too.
-        const handIndex =
-          mine && !handoff ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.card) : -1
+        // exchange leaves from something real.
+        const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.card) : -1
         const from =
           (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
           a.seatBox(plan.defender) ??
