@@ -69,9 +69,11 @@ it('renders the button with no handler, rather than refusing to render', () => {
 })
 
 it('names the winner and marks the local player', () => {
-  const { getByText, getAllByText } = render(
-    <Stats winnerId="a" selfId="b" copy={copy} players={players} />,
-  )
-  expect(getByText('winner')).toBeTruthy()
+  const { getAllByText } = render(<Stats winnerId="a" selfId="b" copy={copy} players={players} />)
+  // Ann won: her name leads the winner block as well as her own table row.
+  expect(getAllByText('Ann').length).toBeGreaterThan(1)
+  // Bo is the local player, marked by a badge beside her nickname rather than
+  // by replacing it — so both the nickname and the mark must be on screen.
+  expect(getAllByText('Bo').length).toBeGreaterThan(0)
   expect(getAllByText('you').length).toBeGreaterThan(0)
 })
