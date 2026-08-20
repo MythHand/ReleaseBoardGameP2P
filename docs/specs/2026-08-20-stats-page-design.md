@@ -290,18 +290,34 @@ here rather than in [`docs/rules/backlog.md`](../rules/backlog.md).
    emits *two* `takenFromDiscard` events, one to hand and one to deck. Cards pulled, or times
    played? **Default: times played** (count the `to: 'hand'` event, which is also the public one,
    so the count is verifiable from any peer's log).
+
+   Shipped as stated. The count in the fold is the one line above; it remains open for the
+   designer to revisit. `packages/engine/src/tally.ts` is the single place the default is
+   expressed.
 2. **`attackedInto` — "attack cards taken" / "карт атаки прилетело".** Every attack aimed at this
    seat, or only those that landed? The plate's art includes Error 503, which nobody aims, which
    argues for a third reading — everything bad that happened to you. **Default: attacks that
    landed** (`tookHit`).
+
+   Shipped as stated. The count in the fold is the one line above; it remains open for the
+   designer to revisit. `packages/engine/src/tally.ts` is the single place the default is
+   expressed.
 3. **`err503` — "Error 503s from deck" / "ошибок 503 из колоды".** `trigger-error-503` off the
    draw deck certainly counts; `ai-error-503` off the events deck also emits `revealed`
    ([triggers.ts:338](../../packages/engine/src/fake/triggers.ts)). **Default: the trigger only.**
+
+   Shipped as stated. The count in the fold is the one line above; it remains open for the
+   designer to revisit. `packages/engine/src/tally.ts` is the single place the default is
+   expressed.
 
 A fourth, smaller one: the issue asks for a "negative (looser)" state and the approved story
 offers only `neutral` / `positive`, while `HudBackground` also has `problem`. We ship the story's
 pair — **`positive` for the winner, `neutral` for everyone else** — because the playground is the
 visual source of truth. Whether losing should read as `problem` is the designer's call.
+
+Shipped as stated. `apps/frontend/src/pages/board/[gameId]/stats.tsx` is the single place the
+default is expressed (the `bgTone` prop on the results screen); it remains open for the designer
+to revisit.
 
 ---
 
