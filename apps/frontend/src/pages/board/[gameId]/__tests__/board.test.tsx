@@ -6,7 +6,7 @@ import type { UseLobby } from '~/entities/lobby'
 // The board's own style module — the `.enter` class the opening hides blocks
 // with is reached the same way the ported suite reaches Arrow's classnames.
 import boardStyles from '../_Board.module.css'
-import BoardPage from '../_layout'
+import BoardPage from '../index'
 import StatsPage from '../stats'
 
 // The route now hands the board an opening to play (#89). This suite is about
@@ -41,24 +41,27 @@ beforeEach(() => {
   sessionValue = session()
 })
 
+// Board and stats are sibling routes (#19), matching the real router.ts, not
+// parent/child — the board no longer wraps an `<Outlet />`, so this fixture
+// must not nest `stats` under it either, or it would exercise a route shape
+// the app doesn't have.
 function renderBoard(path = '/board/g1') {
   const router = createMemoryRouter(
     [
-      {
-        path: '/board/:gameId',
-        element: <BoardPage />,
-        children: [{ path: 'stats', element: <StatsPage /> }],
-      },
+      { path: '/board/:gameId', element: <BoardPage /> },
+      { path: '/board/:gameId/stats', element: <StatsPage /> },
     ],
     { initialEntries: [path] },
   )
   return { router, ...render(<RouterProvider router={router} />) }
 }
 
-it('keeps the board mounted and shows stats in its outlet', async () => {
+it('renders the stats route alone, not the board sitting underneath it', async () => {
   renderBoard('/board/g1/stats')
-  expect(await screen.findByTestId('board-page')).toBeTruthy()
   expect(await screen.findByTestId('stats-page')).toBeTruthy()
+  // The regression this route shape fixes: the board used to stay mounted
+  // with stats inside its Outlet, painting a full viewport below the fold.
+  expect(screen.queryByTestId('board-page')).toBeNull()
 })
 
 it('shows a spectator the live table, not a board held hidden', async () => {

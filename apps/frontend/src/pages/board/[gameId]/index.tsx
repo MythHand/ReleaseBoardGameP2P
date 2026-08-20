@@ -1,14 +1,14 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
 import { DEFAULT_SETUP, isCounting } from '@release/ui'
-import { Outlet, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { toBoardOver, toBoardState } from '~/entities/game/board'
 import { seatsFor } from '~/entities/game/seats'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
 import Board from './_Board'
-import styles from './_layout.module.css'
+import styles from './index.module.css'
 
 // What the table shows before the first projection arrives — a beat on a live
 // connection, indefinitely for a spectator, who holds no seat to be projected
@@ -143,7 +143,6 @@ export default function BoardPage() {
           window: t('window', { returnObjects: true }),
         }}
       />
-      <Outlet />
     </div>
   )
 }
