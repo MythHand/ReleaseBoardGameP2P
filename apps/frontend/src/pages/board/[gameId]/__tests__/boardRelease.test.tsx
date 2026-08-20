@@ -666,13 +666,44 @@ it('says nothing when nothing is owed', () => {
   expect(screen.getByTestId('board-ask').getAttribute('data-shown')).toBe('false')
 })
 
-it('the dock names the cost step, and offers no key the engine would refuse', () => {
+// The dock does NOT get a state of its own for the cost (#101, review round 2).
+// A release's price is one action inside a turn, not a state of the table: the
+// phase has not changed and the turn is still yours, so the dock keeps saying
+// so. What is wanted of you is said by the ask on the table (asserted just
+// above) — a phase word repeating it adds nothing.
+it('the dock keeps the turn its own phase while a release waits to be paid', () => {
   const { copy } = makeBoardProps()
   render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
-  expect(screen.getAllByText(copy.turnDock.cost).length).toBeGreaterThan(0)
+  expect(screen.getAllByText(copy.turnDock.yourTurn).length).toBeGreaterThan(0)
+  // not a reaction, and not somebody else's decision to wait on
   expect(screen.queryByText(copy.turnDock.canDefend)).toBeNull()
-  // PASS rejects while any decision is open, so the dock offers no key at all
-  expect(screen.queryByTestId('dock-key')).toBeNull()
+  expect(screen.queryByText(copy.turnDock.reaction)).toBeNull()
+})
+
+// The key stays live, against `dock.ts`'s "only where the action is legal"
+// rule, because the action behind it IS legal — it just takes the staged
+// release back first. Same rule the table already runs: while an unpaid
+// release stands, anything other than paying takes it back.
+it('the dock key takes an unpaid release back instead of drawing or pushing', () => {
+  const onResolve = vi.fn()
+  const onPush = vi.fn()
+  vi.useFakeTimers()
+  // `finally`, not a trailing call: a failed assertion would otherwise leave
+  // fake timers installed for every test after this one in the file, turning
+  // one red test into twenty.
+  try {
+    render(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve, onPush }))
+    // TurnDock arms `keyLocked` on mount and releases it after LOCKOUT_MS
+    // (300ms) — a click before that is swallowed by design, so the timer has
+    // to advance or this asserts nothing about wiring (boardComponent.test.tsx's
+    // draw test says the same).
+    act(() => vi.advanceTimersByTime(400))
+    fireEvent.click(screen.getByTestId('dock-key'))
+  } finally {
+    vi.useRealTimers()
+  }
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
+  expect(onPush).not.toHaveBeenCalled()
 })
 
 // `hasTarget`/`state.comboOptions` already gate the aim/partner branches on

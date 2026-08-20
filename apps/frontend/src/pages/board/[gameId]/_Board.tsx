@@ -657,6 +657,26 @@ export default function Board({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [answering, defenseStaging.staged, defenseStaging.cancel])
 
+  // The dock's own key under an unpaid release (#101). The scene already has
+  // one rule for this: while an unpaid release stands, anything other than
+  // paying takes it back — a press on the table does exactly that. DRAW and
+  // PUSH are presses like any other, so the first one takes the release back
+  // and the next one does what the key says. That is why the dock keeps the
+  // turn's own phase and a live key rather than a state of its own: the action
+  // behind the key IS legal, it just costs the staged release first.
+  //
+  // Two presses rather than one combined "cancel and draw": the engine has to
+  // see the cancel commit before it will accept a DRAW, and the card's own
+  // return flight belongs to the first press. Firing both here would race the
+  // flight against a projection that has already moved on.
+  const dockKey = (act: (() => void) | undefined) => {
+    if (staging.costOptions.length > 0) {
+      staging.cancel()
+      return
+    }
+    act?.()
+  }
+
   // A click that lands outside any hand slot while a card is staged reads as
   // "changed my mind" — cancel. Clicks that land on a lit target already
   // resolve through onTargetPick before bubbling here (I8's own guard in
@@ -1221,8 +1241,8 @@ export default function Board({
             activePlayer={dockView.activePlayer}
             copy={dockCopy}
             paused={paused}
-            onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
-            onPush={actions?.onPush}
+            onDraw={actions?.onDraw ? () => dockKey(actions.onDraw) : undefined}
+            onPush={actions?.onPush ? () => dockKey(actions.onPush) : undefined}
             onPass={actions?.onPass}
           />
         </div>
