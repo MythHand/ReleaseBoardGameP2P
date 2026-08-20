@@ -197,6 +197,16 @@ Putting the crossing in one module means the winner block and the table resolve 
 way. A seat whose peer has left the roster still gets a row — it played the match — with
 `location: 'offline'` and its name from `Seat`.
 
+**The seating is frozen, not derived.** `seats` come from the session, where the host put them in
+`startGame` and every guest read them off `GAME_STARTING`'s payload — not from `seatsFor(peers)`
+at render time. The roster is live: `applyPeerLeft` prunes a peer the instant its channel drops,
+mid-match as readily as in the lobby, so a seating recomputed here renumbers the survivors. Three
+peers dealt as `p1/p2/p3` become `p1/p2` when the middle one leaves, and the row above — the one
+this design promises a departed player — is instead given to somebody else along with the wrong
+counters, while a win by `p3` resolves to nobody and the winner block disappears. Both pages fall
+back to `seatsFor(peers)` only when the session holds no seating at all (a reload), where a
+partial result still beats an empty screen.
+
 **`stats.tsx`** becomes the real page: `players` from the mapper, `winnerId` and `selfId` as peer
 ids, `lang`/`onLangChange` from i18next as the board does it, `bgTone` `'positive'` when the local
 peer is the winner and `'neutral'` otherwise, and `onToLobby`. The `chat` slot stays empty — chat
@@ -226,7 +236,7 @@ engine.reduce ── events ──► foldTally ──► GameState.tally
                               SYNC ──► useLobby.gameSync ──► useGame.view
                                               │
    session.state.peers (role, name, where) ───┼──► toStatPlayers ──► StatPlayer[]
-                     seatsFor(peers) ─────────┘                          │
+        seats, frozen at GAME_STARTING ────────┘                          │
                                                                     <Stats …/>
 ```
 
