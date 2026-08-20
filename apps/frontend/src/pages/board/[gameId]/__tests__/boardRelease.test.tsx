@@ -547,6 +547,13 @@ it('a release standing at the stage slot does not survive the next play', async 
 // cannot be driven through a cost step with an `intro` attached (the deal gate
 // holds every gesture inert until it reports done). The wiring that carries
 // the key from `<Board>` into the hook is pinned separately, below.
+//
+// What these two pin is the hook's RESET, which is correct. The key it is armed
+// with in the app is not: `intro.gameId` resolves to the host's own peer id, the
+// same for every match of a room, so the effect never fires on a real rematch
+// (#101, Fix D, finding 3). A rematch here is a prop change, which is what a
+// rematch IS for the hook — and says nothing about whether the prop ever
+// changes. Recorded in `docs/animations/backlog.md`; `useBeats` shares it.
 interface StagingProps {
   key: string | null
   pending: TablePending | null
@@ -739,7 +746,7 @@ it('a press inside the fan is not a miss', async () => {
 })
 
 // Fix round 1 (post-review — the cancel above renders the release TWICE):
-// `_Board.tsx`'s `stagedRelease` is gated on `staging.stageLanded` plus
+// `_Board.tsx`'s `stagedRelease` is gated on `staging.stageStanding` plus
 // `costPending`/`stagedReleaseLocal`, and the cancel above touches none of
 // those — so from the moment the return flight starts until the referee's
 // answer (clearing `state.pending`) actually arrives, the static stage-slot
@@ -1153,6 +1160,36 @@ it('a click-played release still takes its cost from the fan', async () => {
   rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
   await clickFanCard('attack-bug#0')
   expect(onResolve).toHaveBeenCalledWith({ kind: 'discardForRelease', card: 'attack-bug#0' })
+})
+
+// ===== Fix D round 2 — the fall-through must not dispatch a card nobody clicked
+//
+// `Hand` hands out an index into the array it RENDERS, which is `handItems` —
+// `you.hand` minus whatever is staged and minus the release a cost pending
+// names. The plain click gesture indexed `you.hand` with it. The two agree only
+// while nothing is staged, so the moment anything is, every index past the
+// hidden card points one card too far and the gesture plays a card the player
+// never touched.
+//
+// Pre-existing for a pulled release, and this round opened it for a CLICKED one
+// as well — the same off-by-one class as the defect that started this audit: a
+// fan index used against an array the fan is filtered out of. The seam takes a
+// uid now, so no index crosses it at all.
+//
+// (That a second play dispatches here at all — while the first is still mid
+// round trip — is a separate, older gap, recorded in `docs/animations/backlog.md`
+// with its own one-line fix. This test is about WHICH card, not whether.)
+it('a click after a release is staged plays the card that was clicked', async () => {
+  const onPlay = vi.fn()
+  render(releaseBoard({}, { onPlay }))
+  await clickFanCard('release-frontend#0')
+  expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, undefined)
+  // the fan is one shorter now — index 0 of what is RENDERED is the spare,
+  // index 0 of `you.hand` is still the release standing on the table
+  expect(document.querySelectorAll('[data-hand-slot]').length).toBe(HAND.length - 1)
+
+  await clickFanCard('attack-bug#0')
+  expect(onPlay.mock.calls.at(-1)?.[0]).toBe('attack-bug#0')
 })
 
 // The other half of the routing: a click the staging hook does NOT take must

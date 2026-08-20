@@ -705,9 +705,9 @@ it('flies the actor’s own plain release out of the stage slot, not out of the 
 
   // the placement guard is a per-release cycle, not a one-way latch: the NEXT
   // release pulled this match has to stand at the stage slot the same as the
-  // first one did. `_useBoardStaging.ts` clears it on the pull, beside
-  // `stageLanded`/`paidCost` — drop that line and this goes red while every
-  // assertion above stays green.
+  // first one did. `_useBoardStaging.ts` re-arms it on the pull — the stage
+  // machine goes back to `flying`, beside `paidCost`'s own clear — so drop that
+  // line and this goes red while every assertion above stays green.
   rerender(
     <Harness
       live={
@@ -734,9 +734,10 @@ it('flies the actor’s own plain release out of the stage slot, not out of the 
 
 // The other half of Defect 1: while that flight is in the air the static
 // stage-slot render must be GONE. The shadow the beat renders still carries
-// the `discardForRelease` pending (that is what `base` is), so
-// `costPending`/`stageLanded` are both exactly as they were — nothing but the
-// placement guard can empty the slot, which makes this a clean discriminator.
+// the `discardForRelease` pending (that is what `base` is), so `costPending`
+// and `stagedReleaseLocal` are both exactly as they were — nothing but the
+// stage machine leaving `standing` can empty the slot, which makes this a clean
+// discriminator.
 //
 // The flight is held open on purpose (the same `animate` stub
 // boardRelease.test.tsx uses): jsdom resolves `.finished` on the next

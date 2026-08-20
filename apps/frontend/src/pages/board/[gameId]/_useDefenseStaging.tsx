@@ -37,7 +37,8 @@
 // shape: pull commits and dispatches in the SAME tick (no aim, no partner), the
 // card flies to the cover slot at COVER_POSE, and once the flyer lands (or at
 // once under reduced motion) a static render at `anchors.cover` takes over —
-// `landed` is that gate, the same role `stageLanded` plays for a solo release.
+// `landed` is that gate, the same role the turn hook's `StageState` reaching
+// `standing` plays for a solo release.
 // This is what keeps the fallback in `defenseBeat.runCovered` dead for a local
 // defence (Carry #2 of this task's brief): the beat's own
 // `!(mine && handoff?.el)` check reads `el` off a REAL, already-standing node,
@@ -133,8 +134,9 @@ export interface DefenseStaging {
   release: () => void
   /** true once the pulled defence's own flight to the cover slot has landed
    * (or at once, under reduced motion) — gates `_Board.tsx`'s static cover
-   * render against the carrier still flying it there, same role
-   * `_useBoardStaging.ts`'s own `stageLanded` plays for a solo release. Also
+   * render against the carrier still flying it there, the same role
+   * `_useBoardStaging.ts`'s own `StageState` reaching `standing` plays for a
+   * solo release. Also
    * the gate for the FOLDED pair's static cover render (Task 17): the fold
    * dispatches through the same `landed` cycle as the plain path. */
   landed: boolean

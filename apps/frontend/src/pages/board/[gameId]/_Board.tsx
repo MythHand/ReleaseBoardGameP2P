@@ -336,7 +336,8 @@ export default function Board({
   })
   // the defence once its own flight has landed (or at once, under reduced
   // motion) — gates the static cover render below against the carrier still
-  // flying it there, same reason `stagedRelease` waits on `stageLanded`.
+  // flying it there, the same reason `stagedRelease` waits for the stage
+  // machine to reach `standing` (`stageStanding`).
   const stagedCover =
     answering && defenseStaging.landed && defenseStaging.overlay.length === 0
       ? defenseStaging.staged?.main
@@ -1126,7 +1127,15 @@ export default function Board({
                     : answering
                       ? (i) => defenseStaging.onCardClick(i)
                       : (i) => {
-                          if (!staging.onCardClick(i)) gestures.onCardClick(i)
+                          if (staging.onCardClick(i)) return
+                          // resolved against the array the fan actually
+                          // RENDERED, and handed on as a uid: `handItems` is
+                          // `you.hand` minus whatever is staged, so an index
+                          // that crossed this seam pointed at a different card
+                          // the whole time anything stood on the table (#101,
+                          // Fix D round 2).
+                          const item = staging.handItems[i]
+                          if (item) gestures.onCardClick(item.uid)
                         }
                 }
                 // drag-mode: a card that needs a target — or a legal defence
