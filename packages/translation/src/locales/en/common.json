@@ -55,6 +55,7 @@
     "subtitle": "Match over",
     "winnerLabel": "winner",
     "winnerTag": "winner",
+    "selfTag": "you",
     "colName": "player",
     "colLoc": "location",
     "colAttack": "attack",

@@ -107,6 +107,16 @@ export interface UseLobby {
   introReady(): void
   disband(): void
   leaveSession(): void
+  // Leaving the match without leaving the room. Only the local match id is
+  // cleared: it is what useFollowGameStart watches, so a peer walking back to
+  // the lobby with it still set would be sent straight to the board again.
+  //
+  // The keeper, the link and the last sync stay. link.close() is local-only
+  // (session/link.ts), but the match is already over and another peer may still
+  // be reading its results — there is nothing here to reclaim and a live
+  // results screen to break. startGame replaces all three on a rematch, and
+  // leaveSession tears them down when the room itself is left.
+  leaveGame(): void
   clearError(): void
 }
 
@@ -558,6 +568,20 @@ export function useLobby(): UseLobby {
   }, [])
   leaveSessionRef.current = leaveSession
 
+  // Leaving the match without leaving the room. Only the local match id is
+  // cleared: it is what useFollowGameStart watches, so a peer walking back to
+  // the lobby with it still set would be sent straight to the board again.
+  //
+  // The keeper, the link and the last sync stay. link.close() is local-only
+  // (session/link.ts), but the match is already over and another peer may still
+  // be reading its results — there is nothing here to reclaim and a live
+  // results screen to break. startGame replaces all three on a rematch, and
+  // leaveSession tears them down when the room itself is left.
+  const leaveGame = useCallback(() => {
+    gameIdRef.current = null
+    setGameId(null)
+  }, [])
+
   const setSetup = useCallback(
     (setup: Setup) => {
       const current = stateRef.current
@@ -694,6 +718,7 @@ export function useLobby(): UseLobby {
       introReady,
       disband,
       leaveSession,
+      leaveGame,
       clearError,
     }),
     [
@@ -718,6 +743,7 @@ export function useLobby(): UseLobby {
       introReady,
       disband,
       leaveSession,
+      leaveGame,
       clearError,
     ],
   )

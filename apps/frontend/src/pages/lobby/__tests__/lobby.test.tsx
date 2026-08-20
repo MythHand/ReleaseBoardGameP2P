@@ -58,6 +58,7 @@ function base(): UseLobby {
     setSetup: vi.fn(),
     disband: vi.fn(),
     leaveSession: vi.fn(),
+    leaveGame: vi.fn(),
     clearError: vi.fn(),
   }
 }

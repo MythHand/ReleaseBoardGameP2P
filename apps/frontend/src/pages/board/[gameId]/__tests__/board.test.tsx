@@ -34,6 +34,8 @@ function session(peers: Record<string, unknown> = {}): UseLobby {
     roomCode: 'YTG-N2Q',
     isHost: true,
     kick: vi.fn(),
+    setWhere: vi.fn(),
+    leaveGame: vi.fn(),
   } as unknown as UseLobby
 }
 
