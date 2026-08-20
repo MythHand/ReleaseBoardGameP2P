@@ -24,6 +24,7 @@ const opening = (): PlayerView => ({
   // brief's { mode, releasesToWin: 3, handLimit: 7 } is not one.
   setup: {},
   over: null,
+  tally: null,
 })
 
 it('recognises a game that has not been played yet', () => {

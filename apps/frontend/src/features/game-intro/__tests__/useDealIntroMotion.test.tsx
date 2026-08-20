@@ -61,6 +61,7 @@ const view = (): PlayerView => ({
   pending: null,
   setup: {},
   over: null,
+  tally: null,
 })
 
 const events = (): Event[] => [

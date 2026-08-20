@@ -3,6 +3,7 @@ import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import { shuffle } from '../rng'
 import type { CardUid, GameState, PlayerId } from '../state'
+import { foldTally } from '../tally'
 import { onAttack, onDefend } from './attacks'
 import {
   attackTargets,
@@ -313,9 +314,14 @@ export function reduce(state: GameState, action: Action): Reduction {
     }
   }
   // A rejected action hands back the identical state object, and must keep
-  // doing so — the clock only moves on a commit.
+  // doing so — the clock only moves on a commit. It also emits nothing worth
+  // counting, so the fold sits below this guard rather than above it.
   if (result.state === state) return result
-  return { state: stampTurnClock(result.state, at), events: result.events }
+  const stamped = stampTurnClock(result.state, at)
+  return {
+    state: { ...stamped, tally: foldTally(stamped.tally, result.events) },
+    events: result.events,
+  }
 }
 
 function dispatch(state: GameState, action: Action): Reduction {

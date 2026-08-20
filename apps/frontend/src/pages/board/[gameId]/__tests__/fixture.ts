@@ -99,6 +99,7 @@ export function introFixture(): { gameId: string; view: PlayerView; events: Even
       // `Setup` is Record<string, string> in both the engine and the kit.
       setup: {},
       over: null,
+      tally: null,
     },
     events: [
       { id: 1, type: 'dealt', player: 'p1', count: 2, open: ['protection-debugger'] },

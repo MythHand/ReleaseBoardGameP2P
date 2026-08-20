@@ -67,6 +67,7 @@ const view = (): PlayerView => ({
   // `Setup` is Record<string, string> in both the engine and the kit.
   setup: {},
   over: null,
+  tally: null,
 })
 
 const events = (): Event[] => [
