@@ -133,6 +133,11 @@ export function useLobby(): UseLobby {
   // `gameId` as a ref, so reporting readiness reads the live value instead of
   // whichever render closed over it.
   const gameIdRef = useRef<string | null>(null)
+  // Counts matches within one session. The room's identity is the host's peer
+  // id and never changes, but a match's must: every reset downstream keys on
+  // gameId — the follower's navigation, useGame's event feed, the deal intro —
+  // and a rematch that reused the id would silently be taken for the same game.
+  const matchSeqRef = useRef(0)
   const stateRef = useRef<LobbyState | null>(null)
   const isHostRef = useRef(false)
   // Whether the guest's DataChannel to the host ever opened. Distinguishes a
@@ -571,7 +576,8 @@ export function useLobby(): UseLobby {
     const current = stateRef.current
     const t = transportRef.current
     if (!current || !t || !isHostRef.current) return
-    const id = current.hostId
+    matchSeqRef.current += 1
+    const id = `${current.hostId}-${matchSeqRef.current}`
 
     const seats = seatsFor(current.peers)
     const mine = seatOf(seats, current.selfId)

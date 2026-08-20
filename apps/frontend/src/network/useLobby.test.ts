@@ -190,9 +190,9 @@ it('host startGame broadcasts GAME_STARTING and records the game id', async () =
   const hostId = result.current.state?.hostId
   expect(transports[0].broadcast).toHaveBeenCalledWith({
     type: 'GAME_STARTING',
-    payload: { gameId: hostId },
+    payload: { gameId: `${hostId}-1` },
   })
-  expect(result.current.gameId).toBe(hostId)
+  expect(result.current.gameId).toBe(`${hostId}-1`)
 })
 
 it('a guest follows the host out of the lobby', async () => {
@@ -449,4 +449,27 @@ it('a host applies its own whereabouts without sending anything to itself', asyn
 
   expect(result.current.state?.peers[selfId].where).toBe('game')
   expect(sentAll()).not.toContainEqual(expect.objectContaining({ type: 'WHEREABOUTS' }))
+})
+
+it('gives each match its own id, so a second one is distinguishable from the first', async () => {
+  // hostWithGuest() rather than a bare createRoom: startGame needs a seated
+  // table, and this is the file's own helper for one (line ~278).
+  const { result } = await hostWithGuest()
+  const hostId = result.current.state?.hostId ?? ''
+
+  act(() => {
+    result.current.startGame()
+  })
+  const first = result.current.gameId
+
+  act(() => {
+    result.current.startGame()
+  })
+  const second = result.current.gameId
+
+  expect(first).toBe(`${hostId}-1`)
+  expect(second).toBe(`${hostId}-2`)
+  // The whole point: a consumer keying a reset on gameId — the follower, the
+  // move-history feed, the deal intro — sees a rematch as a different game.
+  expect(first).not.toBe(second)
 })
