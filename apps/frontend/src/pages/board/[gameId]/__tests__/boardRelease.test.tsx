@@ -547,31 +547,37 @@ it('a release standing at the stage slot does not survive the next play', async 
 // cannot be driven through a cost step with an `intro` attached (the deal gate
 // holds every gesture inert until it reports done). The wiring that carries
 // the key from `<Board>` into the hook is pinned separately, below.
+interface StagingProps {
+  key: string | null
+  pending: TablePending | null
+}
+
 function stagingAt(matchKey: string | null) {
   const base = makeBoardProps()
   return renderHook(
-    ({ key }: { key: string | null }) =>
+    ({ key, pending }: StagingProps) =>
       useBoardStaging({
         state: {
           ...base.state,
           you: { ...base.state.you, hand: HAND },
           turn: base.state.selfId,
           hasDrawn: true,
-          playable: HAND.map((c) => c.uid),
-          pending: null,
+          // a pending suspends normal play — `playableFor`'s own first check
+          playable: pending ? [] : HAND.map((c) => c.uid),
+          pending,
         },
         anchors: useBoardAnchors(),
         events: [],
         enabled: true,
         matchKey: key,
       }),
-    { initialProps: { key: matchKey } },
+    { initialProps: { key: matchKey, pending: null } as StagingProps },
   )
 }
 
-it('a new match takes the last one’s standing release and paid cost off the table', async () => {
+it('a new match takes the last one’s standing release off the table', async () => {
   const { result, rerender } = stagingAt('g1')
-  // a release is standing, and a card has been picked to pay for it
+  // a release is standing at the stage slot
   await act(async () => {
     result.current.onHandPlay('release-frontend#0', { x: 0, y: 0 })
     await new Promise((r) => setTimeout(r, 50))
@@ -580,12 +586,38 @@ it('a new match takes the last one’s standing release and paid cost off the ta
   expect(result.current.staged?.phase).toBe('dispatched')
 
   // the rematch arrives mid-step
-  rerender({ key: 'g2' })
+  rerender({ key: 'g2', pending: null })
   expect(result.current.stageStanding).toBe(false)
   expect(result.current.staged).toBeNull()
-  expect(result.current.paidCost).toBeNull()
   // and the fan is whole again — nothing of the dead match is still hidden
   expect(result.current.handItems).toHaveLength(HAND.length)
+})
+
+// The PAID COST's own half of the same boundary (#101, Fix D, finding 6). It
+// used to ride along in the test above as `expect(paidCost).toBeNull()`, with
+// nothing behind it: `paidCost` is set only when a cost pick's own flight lands
+// (`_useBoardStaging.ts`'s `onCostPick`), that fixture never picked one, and the
+// value was null before the rematch as well as after — so `setPaidCost(null)` in
+// the reset could be deleted with the suite still green. Here the cost is
+// actually paid first, which is the state a rematch has to clear: `_Board.tsx`
+// renders `paidCost` ungated, so a leftover would lie on the new table for good.
+it('a new match takes the last one’s paid cost off the table', async () => {
+  const { result, rerender } = stagingAt('g1')
+  await act(async () => {
+    result.current.onHandPlay('release-frontend#0', { x: 0, y: 0 })
+    await new Promise((r) => setTimeout(r, 50))
+  })
+  // the referee answers with the cost pending, and the spare pays it
+  rerender({ key: 'g1', pending: costPending(['attack-bug#0']) })
+  await act(async () => {
+    result.current.onCostPick('attack-bug#0')
+    await new Promise((r) => setTimeout(r, 50))
+  })
+  expect(result.current.paidCost?.uid).toBe('attack-bug#0')
+
+  // the rematch arrives with the cost lying open beside the release
+  rerender({ key: 'g2', pending: costPending(['attack-bug#0']) })
+  expect(result.current.paidCost).toBeNull()
 })
 
 // The wiring, pinned the same way Fix A's own was: dropping `matchKey` from

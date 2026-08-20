@@ -1,3 +1,4 @@
+import { cardById } from '@release/ui'
 import type { Leaving } from '@release/ui/animations'
 import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
@@ -128,7 +129,16 @@ const base = {
 
 const node = () => document.createElement('div')
 
-function harness() {
+// biome-ignore lint/style/noNonNullAssertion: a known catalogue entry
+const hotfix = cardById('defense-hotfix')!
+
+// `handSlot` is what `anchors.handSlotAt` answers with. Null by default — the
+// board's own asymmetry on a REJOIN, where the gesture that would have put the
+// card in a slot never happened on this peer — and a real node for the one test
+// that exercises the fallback's FIRST leg (#101, Fix D, finding 6): with every
+// harness answering null, that leg was unreachable and deleting it left the
+// whole suite green.
+function harness(handSlot: HTMLElement | null = null) {
   const centre = node()
   const cover = node()
   const sudoNode = node()
@@ -150,7 +160,7 @@ function harness() {
     seatBox: (player: string) =>
       player === 'p1' ? null : { left: 0, top: 0, width: 150, height: 210 },
     seatOf: () => node(),
-    handSlotAt: () => null,
+    handSlotAt: () => handSlot,
     releaseSlot: () => node(),
     bindPile: () => {},
     bindSeat: () => {},
@@ -369,8 +379,54 @@ it('stands our own cover even with no handoff and no seat to fly from', async ()
     to: { left: box.left, top: box.top, width: box.width, height: box.height },
     rotate: COVER_POSE.rot,
   })
-  // and the exchange still leaves from a real box, not an empty one
+  // and the beat still reaches its exit. NOT evidence for the fix: the exit leg
+  // measures `a.cover` for its own `from` regardless (`defenseBeat.tsx`), so
+  // this says the exchange happened, not where it started from. The flight
+  // assertions above are what carry this test (#101, Fix D, finding 9).
   expect(exits.items.map((i) => i.card.id)).toContain('defense-hotfix')
+})
+
+// The FIRST leg of that same chain, which nothing reached until now: our own
+// defence flying out of the fan slot it left. It is the leg written for the
+// LOCAL player — the one `seatBox` can never answer for — so with every harness
+// stubbing `handSlotAt` to null it was dead code that no deletion could redden
+// (#101, Fix D, finding 6).
+//
+// The slot's rect is stubbed to something distinctive, because jsdom measures
+// every unstyled node as all zeros: the cover slot and the hand slot would
+// otherwise be the same rect, and `from` could not tell which leg produced it.
+it('flies our own defence out of the fan slot it left', async () => {
+  played.names = []
+  played.calls = []
+  exits.items = []
+  const slot = node()
+  slot.getBoundingClientRect = () =>
+    ({ left: 40, top: 60, width: 150, height: 210 }) as unknown as DOMRect
+  const { api, Probe, cover } = harness(slot)
+  render(<Probe />) // no `staging` — the fan slot is the only source there is
+  await drive(() =>
+    api.beat?.runCovered(
+      { ...cancelPlan(), defender: 'p1', attacker: 'p2' },
+      // the defence is still in the pre-batch hand, which is what makes the
+      // slot lookup answer at all
+      {
+        ...ctx,
+        base: {
+          ...base,
+          you: { ...base.you, hand: [{ uid: 'defense-hotfix#0', card: hotfix }] },
+        } as unknown as BoardState,
+      },
+    ),
+  )
+  const flights = played.calls.filter((c) => c.name === 'playToCenter')
+  expect(flights).toHaveLength(1)
+  const box = cover.getBoundingClientRect()
+  expect(flights[0].params).toMatchObject({
+    // the fan slot, not the cover slot it lands on — a real journey
+    from: { left: 40, top: 60, width: 150, height: 210 },
+    to: { left: box.left, top: box.top, width: box.width, height: box.height },
+    rotate: COVER_POSE.rot,
+  })
 })
 
 // ===== rollback returns the attack, instead of banking it =====
