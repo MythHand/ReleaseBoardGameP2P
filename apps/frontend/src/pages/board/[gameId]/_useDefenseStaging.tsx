@@ -749,10 +749,13 @@ export function useDefenseStaging({
   // table, and this hook's carriers would keep flying to a hand that no longer
   // holds what they were carrying.
   //
-  // The key it hangs on does not actually change per match today (#101, Fix D,
-  // finding 3): `intro.gameId` is the host's own peer id, the same for every
-  // match of a room, so this effect never fires on a rematch. The reset is
-  // right, the boundary is inert, and `useBeats` shares the hole — see
+  // The key it hangs on does not change per match on this branch, as of
+  // 2026-08-20 (#101, Fix D, finding 3): `intro.gameId` is the host's own peer
+  // id, the same for every match of a room, so this effect never fires on a
+  // rematch. A property of the branch rather than a law — in-place rematch work
+  // (#19) gives each match its own id, which makes this boundary live without
+  // anything here changing. The reset is right either way, and `useBeats`
+  // shares the same key — see
   // `_useBoardStaging.ts`'s `Options.matchKey` and
   // `docs/animations/backlog.md`.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `matchKey` is the boundary and the only dependency this may have. `arrowCtl.stop` and `flyer.drop` happen to be memoized, but `arrival.reset` is a plain function `useHandArrival` recreates on every render — so listing what the body touches would wipe the gesture on every render instead of once per match. The closure is this render's, which is exactly what a wipe wants.

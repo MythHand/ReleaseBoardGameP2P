@@ -163,8 +163,12 @@ export interface Options {
    * table for good, and the new match's first beat called `clearPaidCost` /
    * `takeStagedRelease` against state belonging to a match that had ended.
    *
-   * WHAT ACTUALLY REACHES THIS TODAY DOES NOT CHANGE PER MATCH (#101, Fix D,
-   * finding 3). `_Board.tsx` passes `intro.gameId`, which `_layout.tsx` takes
+   * WHAT REACHES THIS ON THIS BRANCH, AS OF 2026-08-20, DOES NOT CHANGE PER
+   * MATCH (#101, Fix D, finding 3) — a property of the branch, not a law: work
+   * on in-place rematch (#19) gives each match an id of its own, at which point
+   * this boundary becomes live on its own and the note below stops applying.
+   * Re-read `startGame` before leaning on either reading.
+   * `_Board.tsx` passes `intro.gameId`, which `_layout.tsx` takes
    * from `session.gameId`, which `useLobby.ts`'s `startGame` sets to
    * `current.hostId` — the host's own peer id, identical for every match played
    * in one room ("the board route is keyed by the host peer id"). So a second

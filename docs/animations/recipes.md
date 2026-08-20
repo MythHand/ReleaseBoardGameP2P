@@ -1800,7 +1800,9 @@ carries its layer into the heap.
 **Across a match.** `<Board>` is not remounted for a rematch (`_layout.tsx` gives it no `key`), so
 both gestures take a `matchKey` and wipe themselves on it — the same boundary `useBeats` already
 resets on. Otherwise a rematch that interrupted a cost step would leave the paid card lying on the
-new table for good. **The wipe is written and the key it hangs on is not** (#101, Fix D, finding 3):
+new table for good. **The wipe is written and the key it hangs on is not — on this branch, as of 2026-08-20** (#101,
+Fix D, finding 3; in-place rematch work on #19 gives each match its own id, which closes this from
+the other side, so re-read `startGame` before relying on either statement):
 what reaches it is `intro.gameId`, which is the HOST PEER ID (`useLobby.ts` — "the board route is
 keyed by the host peer id"), identical for every match played in one room, so a second `startGame`
 produces the same key and the effect never fires. `useBeats` hangs on the same value and has the
