@@ -5,7 +5,7 @@ import Stats, { type StatPlayer, type StatsCopy } from './Stats'
 const copy: StatsCopy = {
   title: 'Match results',
   subtitle: 'Match over',
-  winnerLabel: 'winner',
+  winnerLabel: 'match winner',
   winnerTag: 'winner',
   selfTag: 'you',
   colName: 'player',
@@ -69,11 +69,23 @@ it('renders the button with no handler, rather than refusing to render', () => {
 })
 
 it('names the winner and marks the local player', () => {
-  const { getAllByText } = render(<Stats winnerId="a" selfId="b" copy={copy} players={players} />)
-  // Ann won: her name leads the winner block as well as her own table row.
-  expect(getAllByText('Ann').length).toBeGreaterThan(1)
-  // Bo is the local player, marked by a badge beside her nickname rather than
-  // by replacing it — so both the nickname and the mark must be on screen.
-  expect(getAllByText('Bo').length).toBeGreaterThan(0)
+  const { getByText, getAllByText } = render(
+    <Stats winnerId="a" selfId="b" copy={copy} players={players} />,
+  )
+  // `winnerLabel` renders in exactly one place — the winner block — so this
+  // fails if that block stops rendering. Asserting on the winner's NAME would
+  // not: this fixture makes Ann the sole DDoS leader, so her name is on her
+  // achievement plate and her table row whether or not she is announced.
+  expect(getByText('match winner')).toBeTruthy()
+  expect(getAllByText('Ann').length).toBeGreaterThan(0)
+  // Bo is the local player, marked by a badge beside the nickname rather than
+  // by replacing it — `selfTag` is the only source of this string.
   expect(getAllByText('you').length).toBeGreaterThan(0)
+})
+
+it('shows no winner block when no one has won', () => {
+  // The negative control for the test above. Without it, "the block is present"
+  // would also be satisfied by a screen that renders it unconditionally.
+  const { queryByText } = render(<Stats winnerId="" selfId="b" copy={copy} players={players} />)
+  expect(queryByText('match winner')).toBeNull()
 })
