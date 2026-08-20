@@ -322,6 +322,15 @@ export function useLobby(): UseLobby {
             remote.link.subscribe(setGameSync)
             setGameLink(() => remote.link)
           }
+          // A rematch arrives as two separate DataChannel events — this frame,
+          // then the new match's first SYNC — and React commits the navigation
+          // between them. Left in place, the previous match's projection is what
+          // the board mounts on: the deal intro arms on the new gameId, finds no
+          // opening in the old view, reports itself done, and the rematch's deal
+          // is never played (the old game-over overlay paints for that commit
+          // too). The host has no such window because `startGame` batches its
+          // state into one update.
+          if (msg.payload.gameId !== gameIdRef.current) setGameSync(null)
           // The seating is the host's, taken as given: recomputing it locally is
           // the defect this payload exists to close. `?? []` only covers a peer
           // running an older build — the page then falls back to seatsFor.

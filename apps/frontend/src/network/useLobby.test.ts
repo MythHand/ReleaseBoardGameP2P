@@ -239,6 +239,80 @@ it("a guest holds the host's seating rather than deriving one of its own", async
   expect(result.current.seats).toEqual(SEATING)
 })
 
+it("a rematch drops the previous match's projection before the board remounts", async () => {
+  // GAME_STARTING and the new match's first SYNC are separate DataChannel
+  // events, and React commits the navigation between them. A projection left in
+  // place is the one the rematch's board mounts on: the deal intro arms on the
+  // new gameId, finds no opening in match 1's view, reports itself done — and
+  // the rematch's opening deal is never played, while match 1's game-over
+  // overlay paints for that commit.
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: 'g1', seats: SEATING },
+      from: hostId,
+    } as WireMessage)
+  })
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'SYNC',
+      payload: { view: { over: { winner: 'p1' } }, events: [] },
+      from: hostId,
+    } as unknown as WireMessage)
+  })
+  expect(result.current.gameSync).not.toBeNull()
+
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: 'g2', seats: SEATING },
+      from: hostId,
+    } as WireMessage)
+  })
+
+  expect(result.current.gameId).toBe('g2')
+  expect(result.current.gameSync).toBeNull()
+})
+
+it('a repeat of the same GAME_STARTING keeps the projection it already has', async () => {
+  // Only a *different* match invalidates the view. A duplicate frame — a relay
+  // hiccup, a re-broadcast — must not blank a table that is already playing.
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+  const starting = {
+    type: 'GAME_STARTING',
+    payload: { gameId: 'g1', seats: SEATING },
+    from: hostId,
+  } as WireMessage
+
+  act(() => {
+    transports[0].onMessage?.(starting)
+  })
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'SYNC',
+      payload: { view: { over: null }, events: [] },
+      from: hostId,
+    } as unknown as WireMessage)
+  })
+  const held = result.current.gameSync
+
+  act(() => {
+    transports[0].onMessage?.(starting)
+  })
+
+  expect(result.current.gameSync).toBe(held)
+})
+
 it('ignores a GAME_STARTING that did not come from the host', async () => {
   const { result } = renderHook(() => useLobby())
   await act(async () => {
