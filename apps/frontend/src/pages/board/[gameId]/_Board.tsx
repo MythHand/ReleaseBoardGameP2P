@@ -1084,19 +1084,25 @@ export default function Board({
                 // gesture machine, and the cards that travelled closed stay
                 // closed until the flip. Both are gone the moment it ends, so
                 // the released hand is the plain one this board always drew.
-                // A partner pick is a click too, not a pull — it routes here
-                // while the staging gesture is waiting for one. A release's
-                // cost is a click as well: routed by which gesture is live
-                // (`costOptions.length > 0`) rather than a second handler —
-                // `staging.onCardClick` itself checks that first.
+                // A partner pick is a click too, not a pull — so is a release's
+                // cost, and so is a release itself (#101, Fix D, finding 1).
+                // WHICH of those a given click is, is the staging gesture's own
+                // question: it takes the click and says so, or declines and the
+                // plain click gesture — which owns the window's attack
+                // affordance — gets it. Deciding it here instead is what hid the
+                // release's own case: the condition named the two steps anyone
+                // had thought of (`phase === 'partner'`, a cost owed), a release
+                // played at rest was neither, and it went to a gesture that
+                // dispatches the play and never tells the stage machine, so the
+                // card stood nowhere for the whole step that followed.
                 onCardClick={
                   deal.active
                     ? undefined
                     : answering
                       ? (i) => defenseStaging.onCardClick(i)
-                      : staging.staged?.phase === 'partner' || staging.costOptions.length > 0
-                        ? (i) => staging.onCardClick(i)
-                        : (i) => gestures.onCardClick(i)
+                      : (i) => {
+                          if (!staging.onCardClick(i)) gestures.onCardClick(i)
+                        }
                 }
                 // drag-mode: a card that needs a target — or a legal defence
                 // answering an open `defend` pending — is pulled out of the

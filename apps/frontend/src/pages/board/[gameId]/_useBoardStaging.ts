@@ -106,7 +106,11 @@ export interface BoardStaging {
   stateAt: (index: number) => HandCardState
   pairRef: RefObject<HTMLDivElement | null> // the persistent pair-flyer node _Board mounts
   onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
-  onCardClick: (index: number) => void // the partner pick — the fold
+  /** a click in the fan: the partner pick (the fold), the cost pick, or a
+   * release played at rest. Returns whether this gesture TOOK the click — false
+   * leaves it to the plain click gesture (`_useBoardInteractions`), which owns
+   * the window's attack affordance. */
+  onCardClick: (index: number) => boolean
   onTargetPick: (target: TableTarget) => void
   cancel: () => void
   /** the hand uids that may pay a staged release's cost — [] when none is owed */
@@ -529,6 +533,59 @@ export function useBoardStaging({
     [enabled, handItems, costOptions, accentAt],
   )
 
+  // STAGING A RELEASE — the one play that stands at the STAGE slot rather than
+  // the centre, and the one that BOTH roads out of the fan lead to: pulled
+  // (`onHandPlay`, just below) or clicked at rest (`onCardClick`, further down).
+  //
+  // It lives in one place because the two roads used to diverge, and the
+  // divergence was invisible (#101, Fix D, finding 1). A release is `playable`
+  // with nothing to aim at and no partner to fold with — `targetsFor` gives it
+  // no targets and `combosFor` keys only on a SUPPORT's uid, so `comboOptions`
+  // never carries a release — and `Hand` turns a press released under the drag
+  // threshold into a plain click. So a release reached the table by clicking as
+  // well as by pulling, and the click road went straight to
+  // `_useBoardInteractions`, which dispatches the play and touches nothing here:
+  // the stage machine stayed at `none`, `stageStanding` was false, `handItems`
+  // hid the card because the pending named it, and the release rendered NOWHERE
+  // for its whole cost step while the ask line under the centre asked the player
+  // to pay for it.
+  //
+  // `from` is the only thing the two roads differ on — the drag flyer's own rect
+  // for a pull, the card's own fan slot for a click, which has no drop rect at
+  // all. Both are card boxes rather than rotated slot rects (I6), and neither is
+  // measured under reduced motion, where there is no flight to start.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  const stageSoloRelease = useCallback(
+    (card: StagedCard, from: Rect | undefined) => {
+      commitStaged({ support: null, main: card, phase: 'dispatched', merged: false })
+      // A release is on its way to the stage slot and says so; every other pull
+      // leaves that slot empty and says THAT (see `onHandPlay` below). Setting it
+      // on every play is what stops one inheriting the last one's whereabouts
+      // (#101, Fix C, finding 5).
+      setStage('flying')
+      dispatchWatermarkRef.current = eventsRef.current.length
+      // fresh play, fresh cycle — a stale `paidCost` from an earlier release
+      // this match must not bleed into this one
+      setPaidCost(null)
+      actions?.onPlay?.(card.uid, undefined, undefined)
+      void (async () => {
+        const to = anchors.stage.current?.getBoundingClientRect()
+        if (!reduced && from && to) {
+          const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
+          if (el) await play('playToCenter', el, { from, to })?.finished
+          flyer.drop('stage')
+        }
+        // the carrier has dropped it (or, under reduced motion, there was
+        // never one) — `_Board.tsx`'s static render may take over now, not a
+        // moment before. Guarded on `flying` rather than written outright: a
+        // cancel or a rejection can land inside this flight's own span, and
+        // the release must not come back to `standing` after it has left.
+        setStage((s) => (s === 'flying' ? 'standing' : s))
+      })()
+    },
+    [reduced, anchors.stage, flyer.raise, flyer.drop, actions],
+  )
+
   // GESTURE — pulling a card out of the fan puts it on the table. A card with
   // its own targets stages a plain aim (Task 3's path: `main` set, `phase:
   // 'aim'`); a support with no targets of its own but a combo partner stages
@@ -575,42 +632,30 @@ export function useBoardStaging({
         state.playable.includes(uid)
       if (!hasTarget && partners.length === 0 && !soloRelease) return false // pull only what plays alone, with a partner, or a release
       const card: StagedCard = { uid, card: item.card, index }
+      // A release goes through the shared road above — the same one the click
+      // takes — so the two can never again disagree about where the card is.
+      // Placed after the guards on purpose: a refused pull touches no state.
+      if (soloRelease) {
+        stageSoloRelease(card, drop.rect)
+        return true
+      }
       commitStaged(
         hasTarget
           ? { support: null, main: card, phase: 'aim', merged: false }
-          : soloRelease
-            ? { support: null, main: card, phase: 'dispatched', merged: false }
-            : { support: card, main: null, phase: 'partner', merged: false },
+          : { support: card, main: null, phase: 'partner', merged: false },
       )
       // EVERY pull sets the stage machine, not only a release's — that is what
       // stops one play inheriting the last one's whereabouts (#101, Fix C,
-      // finding 5). A solo release is on its way to the stage slot; anything
-      // else leaves that slot empty, and says so. Placed after the guards
-      // above on purpose: a refused pull touches no state at all.
-      setStage(soloRelease ? 'flying' : 'none')
-      if (soloRelease) {
-        dispatchWatermarkRef.current = eventsRef.current.length
-        // fresh play, fresh cycle — a stale `paidCost` from an earlier release
-        // this match must not bleed into this one
-        setPaidCost(null)
-        actions?.onPlay?.(uid, undefined, undefined)
-      }
+      // finding 5). This pull leaves the stage slot empty, and says so.
+      setStage('none')
       void (async () => {
-        // a solo release flies to the STAGE slot, where it is meant to stand;
-        // every other pull still flies to the plain attack/aim centre
-        const to = (soloRelease ? anchors.stage : anchors.centre).current?.getBoundingClientRect()
+        const to = anchors.centre.current?.getBoundingClientRect()
         if (!reduced && drop.rect && to) {
           const [el] = await flyer.raise([{ key: 'stage', card: item.card, at: drop.rect }])
           if (el) await play('playToCenter', el, { from: drop.rect, to })?.finished
           flyer.drop('stage')
         }
-        // the carrier has dropped it (or, under reduced motion, there was
-        // never one) — `_Board.tsx`'s static render may take over now, not a
-        // moment before. Guarded on `flying` rather than written outright: a
-        // cancel or a rejection can land inside this flight's own span, and
-        // the release must not come back to `standing` after it has left.
-        if (soloRelease) setStage((s) => (s === 'flying' ? 'standing' : s))
-        else aimFromCentre()
+        aimFromCentre()
       })()
       return true
     },
@@ -622,11 +667,10 @@ export function useBoardStaging({
       state.playable,
       reduced,
       aimFromCentre,
+      stageSoloRelease,
       flyer.raise,
       flyer.drop,
       anchors.centre,
-      anchors.stage,
-      actions,
     ],
   )
 
@@ -684,29 +728,63 @@ export function useBoardStaging({
   // degenerate case, no branch, same as the main half's real one.
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const onCardClick = useCallback(
-    (index: number) => {
-      if (!enabled || cancellingRef.current || foldingRef.current) return
-      // A cost owed routes here too (Board wires the same click through
-      // whichever gesture is live, rather than a second handler): the click
-      // names a fan card by INDEX, resolved against `handItems` — the same
-      // rendered order `onCostPick`'s own caller expects a uid from.
+    (index: number): boolean => {
+      // Taken, not passed on: a fold in progress and a return flight in the air
+      // both mean this gesture owns the fan, and handing the click to the plain
+      // click gesture instead would dispatch a second play over the first. Under
+      // `!enabled` that gesture's own actions are inert anyway, so the refusal
+      // costs nothing and stays in one place.
+      if (!enabled || cancellingRef.current || foldingRef.current) return true
+      // A cost owed routes here too (Board hands every fan click to this
+      // gesture first, rather than picking one by condition): the click names a
+      // fan card by INDEX, resolved against `handItems` — the same rendered
+      // order `onCostPick`'s own caller expects a uid from.
       if (costOptions.length > 0) {
         const item = handItems[index]
         if (item) onCostPick(item.uid)
-        return
+        return true
       }
       const s = stagedRef.current
-      if (s?.phase !== 'partner' || !s.support) return
+      // A RELEASE CLICKED AT REST (#101, Fix D, finding 1) — the other road to
+      // the stage slot, and until now the one that led nowhere. It takes the
+      // same `stageSoloRelease` a pull takes; the only difference is that a
+      // click has no drop rect, so the flight starts from the card's own fan
+      // slot, measured off the fan's geometry exactly as `onCostPick` measures
+      // one (I6).
+      //
+      // `state.playable` is the whole legality check, the same one `onHandPlay`
+      // leans on for its own release branch: it is empty while a window or a
+      // pending is open (`playableFor`'s own first checks), so a window's attack
+      // affordance — a click too, and the plain gesture's to own — can never be
+      // taken by this branch. The target check mirrors `onHandPlay`'s: a release
+      // with something to aim at would belong at the centre, not here.
+      if (!s) {
+        const item = handItems[index]
+        const releaseAtRest =
+          item != null &&
+          item.card.category === 'release' &&
+          state.playable.includes(item.uid) &&
+          (state.targets?.[item.uid] ?? []).length === 0
+        if (!item || !releaseAtRest) return false
+        const handIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
+        if (handIndex < 0) return false
+        stageSoloRelease(
+          { uid: item.uid, card: item.card, index: handIndex },
+          reduced ? undefined : slotBox(index, handItems.length),
+        )
+        return true
+      }
+      if (s.phase !== 'partner' || !s.support) return false
       const item = handItems[index]
-      if (!item) return
+      if (!item) return true
       const support = s.support
       const partners = state.comboOptions?.[support.uid] ?? []
       if (!partners.includes(item.uid)) {
         cancel() // not a valid partner — the whole staging returns, ComboStory's own answer
-        return
+        return true
       }
       const cRect = anchors.centre.current?.getBoundingClientRect()
-      if (!cRect) return
+      if (!cRect) return true
       arrowCtl.stop() // the choice is made — nothing is pointed at while the pair folds
       const mainIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
       const main: StagedCard = { uid: item.uid, card: item.card, index: mainIndex }
@@ -778,7 +856,7 @@ export function useBoardStaging({
           el.style.opacity = '1'
         }
         finish()
-        return
+        return true
       }
       void (async () => {
         try {
@@ -819,6 +897,7 @@ export function useBoardStaging({
           foldingRef.current = false
         }
       })()
+      return true
     },
     [
       enabled,
@@ -826,11 +905,13 @@ export function useBoardStaging({
       state.comboOptions,
       state.window,
       state.targets,
+      state.playable,
       state.you.hand,
       reduced,
       slotBox,
       arrowCtl.stop,
       aimFromCentre,
+      stageSoloRelease,
       actions,
       cancel,
       costOptions,
