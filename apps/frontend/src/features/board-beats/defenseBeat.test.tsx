@@ -439,6 +439,63 @@ it('flies our own defence out of the fan slot it left', async () => {
   })
 })
 
+// ===== Fix D round 3 — the shape the user hit on their first real game =====
+//
+// A local defence that has been staged has a handoff, and that handoff's `el` is
+// null for the whole time its fan→cover flight is in the air: the static cover
+// child only mounts once `landed` is true and the carrier is gone
+// (`_Board.tsx`'s `stagedCover`), so the layout effect that snapshots the node
+// has nothing to bind and writes `el: null`.
+//
+// The engine's `covered` events arrive INSIDE that window — the host's engine is
+// local, and a client only needs a round trip shorter than one flight — and
+// `useBeats` is called before that snapshot effect, so `runCovered` reads the
+// previous commit's handoff: non-null, `el: null`. The outer guard passed, and
+// the hand-slot leg then flew the card in a SECOND time, from the fan.
+//
+// No test had ever built that shape. The two handoff-bearing tests below both
+// pass `el: node()`, and the rejoin test above passes no handoff at all — so the
+// only two shapes under test were the two that behave correctly, and the one the
+// app actually produces was covered by neither.
+it('does not fly our own staged defence in from the fan a second time', async () => {
+  played.names = []
+  played.calls = []
+  exits.items = []
+  const slot = node()
+  slot.getBoundingClientRect = () =>
+    ({ left: 40, top: 60, width: 150, height: 210 }) as unknown as DOMRect
+  const { api, Probe, cover } = harness(slot)
+  // the production shape: we staged this defence, so a handoff exists — and its
+  // node is null, because the gesture's own carrier is still flying it there
+  const staging = { current: { mainUid: 'u1', el: null, release: () => {} } as StagedHandoff }
+  render(<Probe staging={staging} />)
+  await drive(() =>
+    api.beat?.runCovered(
+      { ...cancelPlan(), defender: 'p1', attacker: 'p2' },
+      {
+        ...ctx,
+        base: {
+          ...base,
+          you: { ...base.you, hand: [{ uid: 'defense-hotfix#0', card: hotfix }] },
+        } as unknown as BoardState,
+      },
+    ),
+  )
+  const flights = played.calls.filter((c) => c.name === 'playToCenter')
+  expect(flights).toHaveLength(1)
+  // it stands where it already is — a no-travel raise at the cover slot, which
+  // is what the fallback chain's own comment has always described as the honest
+  // answer to "it is here and I cannot say where it came from"
+  const box = cover.getBoundingClientRect()
+  expect(flights[0].params).toMatchObject({
+    from: { left: box.left, top: box.top, width: box.width, height: box.height },
+    to: { left: box.left, top: box.top, width: box.width, height: box.height },
+  })
+  // and emphatically NOT from the fan slot the card left, which is the replay
+  // the user watched
+  expect(flights[0].params.from).not.toMatchObject({ left: 40, top: 60 })
+})
+
 // ===== rollback returns the attack, instead of banking it =====
 
 it('flies a plain Rollback’s attack back to the seat that threw it', async () => {
