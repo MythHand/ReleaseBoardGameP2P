@@ -164,6 +164,12 @@ export interface BoardChromeCopy {
   askCost: string
   askDefend: string
   askPartner: string
+  // An Error 503 owed an answer (#102). One line for all three methods rather
+  // than one per method: they are three GESTURES but one question, and what
+  // may answer is the projection's own set — so the line points at what is lit
+  // instead of naming a gesture that a pending offering only Monitoring (or
+  // only a sacrifice) would not have.
+  askNeutralize: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
   pauseGame?: string
