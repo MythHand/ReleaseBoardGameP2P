@@ -376,6 +376,11 @@ export function useNeutralizeStaging({
   // pressed and stays exactly where it is.
   const onSlotDown = useCallback(
     (key: NeutralizeSlotKey, e: ReactMouseEvent<HTMLDivElement>) => {
+      // Only a primary press acts. Monitoring's branch below dispatches an
+      // irreversible RESOLVE straight from this handler — it never reaches
+      // `useZonePull`'s own guard — so this check is what stops a right- or
+      // middle-click from spending the player's only answer.
+      if (e.button !== 0) return
       if (!grabbable(key)) return
       const card = state.you.release[key]
       if (!card) return

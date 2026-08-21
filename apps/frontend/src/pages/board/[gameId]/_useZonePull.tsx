@@ -59,6 +59,10 @@ export function useZonePull<K extends string = string>(opts: {
   const [content, setContent] = useState<ReactNode>(null)
 
   function begin(key: K, el: HTMLElement, e: ReactMouseEvent) {
+    // Only a primary press starts a drag — a right- or middle-press on the
+    // slot is not "pick this up", and the module is shared (#105/#106 reuse
+    // it too), so the guard belongs here rather than only in one caller.
+    if (e.button !== 0) return
     e.preventDefault() // don't start a text selection on pick-up
     const r = el.getBoundingClientRect()
     setDrag({
