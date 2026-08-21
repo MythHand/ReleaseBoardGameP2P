@@ -27,6 +27,11 @@ export type Choice =
   | { kind: 'handLimit'; cards: CardUid[] }
   // `toDeck` is the sudo second pick, placed on top of pile 0 unseen.
   | { kind: 'pickFromDiscard'; card: CardUid; toDeck?: CardUid }
+  // Taking a staged release back before its cost is paid. The `release` action
+  // emits nothing until the cost lands, so no peer ever saw the play — which is
+  // why this carries no card and emits no event either. The same "I changed my
+  // mind" door `UNPASS` already opens for a pass.
+  | { kind: 'cancelRelease' }
 
 export type Action =
   | { type: 'DRAW'; player: PlayerId; pile?: number; at: number }

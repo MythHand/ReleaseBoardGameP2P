@@ -57,10 +57,138 @@
   position: absolute;
   inset-block-start: 42%;
   inset-inline-start: 50%;
+  z-index: 10;
   inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  pointer-events: none;
   transform: translate(-50%, -50%);
+}
+
+/* The five slots the centre of the table is made of, all sharing one box and
+   differing only by where they sit and what lies over what. Quoted from the
+   playground's DefenseReleaseStory — the approved visual source.
+
+   Each slot stays AXIS-ALIGNED and the card's tilt lives on an inner `.pose`
+   element, so a slot's rect is the true card box a flight can aim at (I6). A
+   rotated slot's bounding rect is the box AROUND the tilted card, and aiming
+   at it makes a flight jump on its first frame. */
+.stageSlot,
+.costSlot,
+.sudoSlot,
+.coverSlot {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  inline-size: 150px;
+  aspect-ratio: var(--card-aspect);
+}
+
+.stageSlot {
+  transform: translate(calc(-50% - 92px), -50%);
+}
+
+.costSlot {
+  transform: translate(calc(-50% + 92px), -50%);
+}
+
+.sudoSlot {
+  z-index: 9;
+  transform: translate(calc(-50% - 180px), -50%);
+}
+
+/* over the attack: the defence covers it, so it must lie on top */
+.coverSlot {
+  z-index: 11;
+  transform: translate(-50%, -50%);
+}
+
+/* An EMPTY slot is not a target. `.coverSlot` sits exactly on top of `.centre`
+   (both translate(-50%, -50%), z 11 over z 10) and is mounted even with no card
+   in it, so with nothing there it would silently eat every pointer event meant
+   for the attack underneath — the hover on the attacked card would never
+   arrive, and neither would a defence dropped on it. This replaces `.centre`'s
+   old blanket `pointer-events: none`, which was correct only while the centre
+   was never a target of anything.
+
+   This rule itself is NOT covered by an automated test: jsdom does not load
+   this stylesheet, and Vitest's default CSS handling stubs a `.module.css`
+   import to an empty value in this app even with `?raw`/`?inline` appended,
+   so nothing here can read the stylesheet's real text from a test. The
+   closest automated check is `boardAnchors.test.tsx`'s "renders an empty
+   centre slot with no stray children" — a DIFFERENT, narrower guarantee (no
+   child of its own to catch a pointer event) that would stay green even if
+   this rule were deleted. Verify this rule by manual walkthrough when it
+   changes. */
+.centre:empty,
+.stageSlot:empty,
+.costSlot:empty,
+.sudoSlot:empty,
+.coverSlot:empty {
+  pointer-events: none;
+}
+
+/* What the table is waiting for — UNDER the staged cards, so the ask is where
+   the play is rather than on top of it. Quoted from the playground's
+   DefenseReleaseStory (`.ask`), the approved visual source, including its
+   offsets: the slots above are 150px wide at `--card-aspect`, so their bottom
+   edge sits ~105px below the 42% line and this lands clear of it by ~41px. Its
+   own surface, or the line dissolves into the table; mounted always so it can
+   fade OUT as well as in.
+
+   z 12 puts it over the cover slot (11) and the attack (10) — it never
+   overlaps either, and the flight carriers (`--z-flight`, 250) still pass over
+   everything here. The layer itself is transparent to the pointer: only the
+   decline inside it takes a click. */
+.ask {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  z-index: 12;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 132px);
+  transition:
+    opacity 260ms var(--ease-out),
+    transform 260ms var(--ease-out);
+}
+
+.ask[data-shown="true"] {
+  opacity: 1;
+  transform: translate(-50%, 146px);
+}
+
+/* the words themselves — a pill, so the line reads against whatever the table
+   happens to be painting behind it */
+.askLine {
+  padding-block: 10px;
+  padding-inline: 18px;
+  color: var(--fg);
+  text-align: center;
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  border: 1px solid var(--white-20);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px var(--black-45);
+}
+
+/* the one thing in the ask that is pressed rather than read */
+.askDecline {
+  pointer-events: auto;
+}
+
+/* the same end state, with no travel — the ask appears and disappears rather
+   than sliding, since nothing here depends on the motion to be understood */
+@media (prefers-reduced-motion: reduce) {
+  .ask {
+    transform: translate(-50%, 146px);
+    transition: none;
+  }
+}
+
+/* a card's pose on the table — its tilt/offset lives on this inner element */
+.pose {
+  block-size: 100%;
 }
 
 /* a card of that heap — the same box, its own scatter (as in the discard) */

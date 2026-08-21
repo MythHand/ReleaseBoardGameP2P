@@ -71,6 +71,20 @@ function stepTurn(session: Session, at: number): SessionResult {
   return applyIntent(session, peerId, { type: 'PUSH' }, at)
 }
 
+// Plays until a release is standing with its price unpaid. Same driver as
+// openWindowFixture below, but it stops the step BEFORE `stepTurn` pays the
+// cost rather than after — that pending is the state under test.
+function costPendingFixture(start: Session): Session {
+  let session = start
+  for (let step = 0; step < 200; step += 1) {
+    if (session.state.pending?.kind === 'discardForRelease') return session
+    const next = stepTurn(session, 1_000)
+    if (next.session === session) break
+    session = next.session
+  }
+  throw new Error('fixture failed to stage an unpaid release')
+}
+
 // Plays through both seats' turns until a release opens a reaction window.
 // Uses the view's `playable` list, so it stays correct if the fake's deck
 // changes.
@@ -370,6 +384,54 @@ it('only pushes on expiry when the draw obligation is already met', () => {
 
   expect(result.session.state.players.a.hand.length).toBe(handBefore)
   expect(result.session.state.turn.player).toBe('b')
+})
+
+// #101 (review round 2). Paying a release's price is the turn's own owner
+// acting inside their own turn, so the engine keeps stamping the deadline
+// through it — which means the keeper has to keep firing it. Deferring here
+// (as every other pending does) would leave the deadline set and nothing
+// watching it: a player could stop their own clock by staging a release.
+it('keeps firing the turn deadline while a release waits for its price', () => {
+  const { session } = twoPlayerSession()
+  const staged = costPendingFixture(tick(session, 1_000).session)
+  const owner = staged.state.turn.player
+  const deadline = staged.state.turn.deadline ?? 0
+  expect(deadline).toBeGreaterThan(0)
+
+  // nothing yet — the clock is running, not expired
+  expect(tick(staged, deadline - 1).session).toBe(staged)
+
+  const result = tick(staged, deadline + 1)
+
+  // the unpaid release goes back first: while an unpaid release stands,
+  // anything other than paying takes it back — and nothing paid it. It is also
+  // what makes the draw/push reachable, since the engine refuses both while
+  // any pending is open.
+  expect(result.session.state.pending).toBeNull()
+  expect(result.session.state.turn.player).not.toBe(owner)
+})
+
+// The release is TAKEN BACK, not paid for. Paying is the other thing an expiry
+// could plausibly do — it is exactly what `botAction` does with this pending
+// (packages/engine/src/fake/bots.ts), and what `driveAbsent` uses for a seat
+// that has actually left. A timeout is not a decision to spend a card, so the
+// zone stays empty and the release stays in the hand it never left.
+it('takes the unpaid release back rather than paying for it', () => {
+  const { session } = twoPlayerSession()
+  const staged = costPendingFixture(tick(session, 1_000).session)
+  const pending = staged.state.pending
+  if (pending?.kind !== 'discardForRelease') throw new Error('fixture lost its pending')
+  const owner = pending.player
+  const release = pending.release
+  const zoneBefore = Object.keys(staged.state.players[owner].release).length
+
+  const result = tick(staged, (staged.state.turn.deadline ?? 0) + 1)
+
+  const after = result.session.state.players[owner]
+  // the release did not land — had the expiry paid, this slot would be filled
+  expect(Object.keys(after.release).length).toBe(zoneBefore)
+  expect(after.hand.some((c) => c.uid === release)).toBe(true)
+  expect(result.session.state.decks.discard.some((c) => c.uid === release)).toBe(false)
 })
 
 it('leaves an expired turn to driveAbsent when its seat is disconnected', () => {

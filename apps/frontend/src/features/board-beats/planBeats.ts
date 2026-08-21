@@ -53,8 +53,10 @@ export type BeatPlan =
   | { kind: 'reshuffle'; key: string; cards: number }
   | { kind: 'piles'; key: string; steps: PileStep[] }
   // A window attack reaches the centre — the pair, if it threw with a Sudo,
-  // or a lone card if not. `target` is not carried: the pair settles at the
-  // centre, not at a seat, so nowhere in the beat needs it.
+  // or a lone card if not. The pair settles at the centre and not at a seat, so
+  // `target` is not a destination; it is carried because the runner has to know
+  // whether the answer is OURS to give before it may publish a shadow that says
+  // one is owed (#101, Fix C, finding 4 — see `comboBeat.runAttack`).
   | {
       kind: 'attackPlaced'
       key: string
@@ -62,9 +64,13 @@ export type BeatPlan =
       attacker: string
       card: string
       sudo: boolean
+      target: string
     }
-  // Only a Code Review combo gets a beat of its own — a plain release has
-  // nowhere to fold FROM (see the walk below).
+  // Every release flies into its slot. `codeReview` rides along when the play
+  // was a combo; `cost` when the rules made it pay for itself — the card is
+  // shown OPEN beside the release before it leaves, so the release beat owns
+  // that discard rather than letting `discardBeat` fly it out of a hand slot it
+  // had already left.
   | {
       kind: 'releasePlaced'
       key: string
@@ -72,7 +78,8 @@ export type BeatPlan =
       player: string
       slot: string
       card: string
-      codeReview: string
+      codeReview?: string
+      cost?: { eventId: number; card: string }
     }
   // The pending pair splitting back into two singles for the discard. `main`
   // is optional, not `aux`: a sudo Rollback banks only the sudo half (the
@@ -83,6 +90,46 @@ export type BeatPlan =
       key: string
       main?: { eventId: number; card: string }
       aux?: { eventId: number; card: string }
+    }
+  // A defence answers the attack standing at the centre. `effect` decides what
+  // happens next, and the plan carries everything the runner needs to play it
+  // without going back to the projection: the exchange's own cards and, for a
+  // Rollback, who gets the attack card back.
+  | {
+      kind: 'covered'
+      key: string
+      eventId: number
+      defender: string
+      card: string
+      /** the defender's own Sudo, when they comboed one onto the defence */
+      sudo?: string
+      effect: 'cancel' | 'return' | 'reflect' | 'take'
+      attacker: string
+      attackCard: string
+      /** the Sudo the ATTACK was thrown with */
+      attackSudo: boolean
+      /**
+       * The cards banked by this resolution, each with its own discard event.
+       * `reason` is carried, not dropped: `support-sudo` can appear on BOTH
+       * sides of one exchange (a sudo-backed attack answered by a sudo-backed
+       * defence), and the reason is the only thing that tells the two apart —
+       * `attackSpent` is the attacker's, `defenceSpent` the defender's.
+       */
+      spent: { eventId: number; card: string; reason: 'attackSpent' | 'defenceSpent' }[]
+      /** Rollback only: whose hand the attack card goes back to */
+      returnTo?: string
+    }
+  // Security Bug does not burn the release it beats — it takes it. The card crosses from
+  // the victim's zone into the thief's and morphs into its LOD reading IN
+  // FLIGHT: an opponent's zone reads at a glance, not in full.
+  | {
+      kind: 'stolen'
+      key: string
+      eventId: number
+      from: string
+      to: string
+      slot: string
+      card: string
     }
 
 // Reasons that CAN take a card out of a release slot — "can", not "always do".
@@ -180,6 +227,36 @@ function revealAfter(events: Event[], i: number): { card: string; discardId: num
   return { card, discardId: filed.id }
 }
 
+// The engine pays the cost and places the release in one reduction, emitting
+// `discarded(releaseCost)` immediately before `released`
+// (fake/release.ts:281,293 through `placeRelease`). Looking back by POSITION
+// rather than scanning the batch is what keeps an unrelated earlier discard
+// from being read as this release's cost.
+function costBefore(events: Event[], i: number): { eventId: number; card: string } | null {
+  const prev = events[i - 1]
+  if (prev?.type !== 'discarded' || prev.reason !== 'releaseCost') return null
+  return { eventId: prev.id, card: prev.card }
+}
+
+// What is standing at the centre awaiting an answer, as the WALK sees it —
+// not as the board saw it before the batch (#101, Fix C, finding 4).
+//
+// The three things a resolution needs to know about the attack it resolves.
+// It starts from `before.pending`, because usually the attack was thrown in an
+// earlier batch and is already on screen; but a batch can carry the throw AND
+// its answer, and then `before.pending` is null and every branch keyed off it
+// silently declined to plan. In a star topology that batch is the ordinary
+// case rather than an edge one: every peer that is neither attacker nor
+// defender receives both events in one relayed sync.
+//
+// Tracked exactly the way `piles` below already tracks the deck counts through
+// the same walk — one local that the events move on as they are read.
+interface OpenAttack {
+  attacker: string
+  attackCard: string
+  sudo: boolean
+}
+
 export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   const claimed = new Set<number>()
   // discards the draw beat has taken over — a revealed trigger leaves from the
@@ -187,6 +264,14 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   const owned = new Set<number>()
   const plans: BeatPlan[] = []
   let piles = before.decks.main
+  let openAttack: OpenAttack | null =
+    before.pending?.kind === 'defend'
+      ? {
+          attacker: before.pending.attacker,
+          attackCard: before.pending.attackCard,
+          sudo: before.pending.sudo,
+        }
+      : null
 
   // A run of one kind coalesces into one beat; anything else closes it. That is
   // what makes a hand-limit discard of three read as one gesture while a discard
@@ -236,20 +321,23 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // One event, one beat — the pair (or the lone card) reaches the centre
       // as a single gesture, never coalesced with what came before or after.
       flush()
+      // it is standing at the centre from here on, for whatever in THIS batch
+      // resolves it (#101, Fix C, finding 4)
+      openAttack = { attacker: e.attacker, attackCard: e.card, sudo: e.sudo }
       plans.push({
         kind: 'attackPlaced',
         key: `attack:${e.id}`,
         eventId: e.id,
+        target: e.target,
         attacker: e.attacker,
         card: e.card,
         sudo: e.sudo,
       })
       continue
     }
-    if (e.type === 'released' && e.codeReview) {
-      // A plain release falls through to the default below, unchanged: it has
-      // nowhere to fold FROM — the beat is only for the Code Review combo.
+    if (e.type === 'released') {
       flush()
+      const cost = costBefore(events, i)
       plans.push({
         kind: 'releasePlaced',
         key: `release:${e.id}`,
@@ -257,13 +345,82 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         player: e.player,
         slot: e.slot,
         card: e.card,
-        codeReview: e.codeReview,
+        ...(e.codeReview ? { codeReview: e.codeReview } : {}),
+        ...(cost ? { cost } : {}),
+      })
+      continue
+    }
+    if (e.type === 'defended') {
+      flush()
+      const p = openAttack
+      if (!p) continue // nothing on the table to answer — never stranded
+      // Everything banked by THIS resolution, in the order the engine banked it.
+      // The walk continues forward from here rather than scanning: a resolution's
+      // discards are contiguous, and the next non-discard event ends them.
+      const spent: { eventId: number; card: string; reason: 'attackSpent' | 'defenceSpent' }[] = []
+      let j = i + 1
+      while (j < events.length) {
+        const d = events[j]
+        if (d.type !== 'discarded') break
+        if (d.reason !== 'attackSpent' && d.reason !== 'defenceSpent') break
+        spent.push({ eventId: d.id, card: d.card, reason: d.reason })
+        owned.add(d.id)
+        j++
+      }
+      // Rollback keeps nobody's attack card: the engine puts it straight back
+      // into a hand and emits NOTHING for it (attacks.ts:245-252). Whose hand is
+      // derivable and only derivable: the defender's when they comboed their own
+      // Sudo onto the defence, the attacker's otherwise. Recorded as a gap in
+      // docs/animations/backlog.md, with `handTransfer` named as what would end
+      // the inference.
+      // matched on the REASON as well as the card: a sudo-backed attack answered
+      // by a plain Rollback must still return the attack to the ATTACKER, and
+      // matching on the card alone would read the attacker's own sudo as ours
+      //
+      // Assumes 'support-sudo' is the only sudo-capable support card in the
+      // catalogue — silently wrong (falls through to `attacker` below) if a
+      // second one is ever added.
+      const ownSudo = spent.find((s) => s.card === 'support-sudo' && s.reason === 'defenceSpent')
+      plans.push({
+        kind: 'covered',
+        key: `covered:${e.id}`,
+        eventId: e.id,
+        defender: e.player,
+        card: e.card,
+        sudo: ownSudo?.card,
+        effect: e.effect,
+        attacker: p.attacker,
+        attackCard: p.attackCard,
+        attackSudo: p.sudo,
+        spent,
+        ...(e.effect === 'return' ? { returnTo: ownSudo ? e.player : p.attacker } : {}),
+      })
+      openAttack = null // answered — nothing is standing at the centre now
+      i = j - 1 // the discards this plan claimed are consumed
+      continue
+    }
+    if (e.type === 'releaseStolen') {
+      // One event, one beat — the crossing is its own gesture, never coalesced
+      // with the exchange it followed (the attack's own exit already took the
+      // pair route above, when it applies) or anything after it.
+      flush()
+      plans.push({
+        kind: 'stolen',
+        key: `stolen:${e.id}`,
+        eventId: e.id,
+        from: e.from,
+        to: e.to,
+        slot: e.slot,
+        card: e.card,
       })
       continue
     }
     if (e.type === 'discarded') {
       if (owned.has(e.id)) continue
-      const p = before.pending
+      // the release's own cost — claimed by the `releasePlaced` beat that
+      // follows it in this same batch, where it is shown open before it leaves
+      if (e.reason === 'releaseCost') continue
+      const p = openAttack
       // The sudo half of a resolving pair — checked ahead of the attack card
       // so a sudo Rollback (which banks ONLY this half; the attack card
       // returns to its owner's hand instead) still gets a beat: the match here
@@ -283,8 +440,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // left the attacker's hand back when the attack was thrown, long before
       // this batch), and silently vanish instead of animating.
       if (
-        p?.kind === 'defend' &&
-        p.sudo &&
+        p?.sudo &&
         e.reason === 'attackSpent' &&
         // Assumes 'support-sudo' is the only sudo-capable support card in the
         // catalogue — silently wrong (this discard falls through to `sourceOf`
@@ -309,12 +465,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // never discarded under any other reason — a Rollback returns it to
       // hand instead of discarding it) but keeps this branch's own invariant
       // explicit and symmetric with the sudo branch above.
-      if (
-        p?.kind === 'defend' &&
-        e.reason === 'attackSpent' &&
-        e.card === p.attackCard &&
-        !pairOut
-      ) {
+      if (p && e.reason === 'attackSpent' && e.card === p.attackCard && !pairOut) {
         flush()
         pairOut = {
           kind: 'pairToDiscard',

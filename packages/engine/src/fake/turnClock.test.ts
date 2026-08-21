@@ -47,6 +47,22 @@ const primed = (hands?: Partial<Record<'p1' | 'p2' | 'p3', CardInstance[]>>): Ga
   }
 }
 
+// `primed` runs the EASY mode, where a release lands for free and no cost
+// pending ever opens. The clock-through-the-cost cases need the BASE rule, and
+// a spare card in p1's hand for the price to be payable at all.
+const costPrimed = (): GameState => {
+  const s = engine.createGame({ ...config(), setup: { ...EASY, releaseCond: 'base' } })
+  return {
+    ...s,
+    players: {
+      ...s.players,
+      p1: { ...s.players.p1, hand: [FE, BUG] },
+      p2: { ...s.players.p2, hand: [] },
+      p3: { ...s.players.p3, hand: [] },
+    },
+  }
+}
+
 it('starts with no turn clock — createGame has no timestamp to stamp one from', () => {
   const s = engine.createGame(config())
   expect(s.turn.openedAt).toBeUndefined()
@@ -100,6 +116,55 @@ it('gives the turn player a fresh clock the moment the window closes', () => {
   expect(closed.turn.player).toBe('p1')
   expect(closed.turn.openedAt).toBe(11_000)
   expect(closed.turn.deadline).toBe(11_000 + TURN_ACTION_MS)
+})
+
+// #101 (review round 2). Every other pending hands the wait to somebody else —
+// a defence, a hand limit, a 503 — and the turn is genuinely not being spent.
+// Paying a release's price is the turn's own owner still acting inside their
+// own turn, so suspending the clock there would let a player stop their own
+// clock by staging a release and walking away.
+it('keeps the clock running while a release waits for its price', () => {
+  const s = reduce(costPrimed(), { type: 'CLOCK_STARTED', at: 5000 }).state
+  const staged = reduce(s, { type: 'PLAY', player: 'p1', card: FE.uid, at: 9000 }).state
+  expect(staged.pending).toMatchObject({ kind: 'discardForRelease', player: 'p1' })
+  // the PLAY is a committed action like any other, so it re-stamps rather than
+  // merely leaving the old span alone
+  expect(staged.turn.openedAt).toBe(9000)
+  expect(staged.turn.deadline).toBe(9000 + TURN_ACTION_MS)
+})
+
+// The narrowness of that exception. Point it at any other pending and the
+// clock still has to stop, or the rule above has quietly become "no pending
+// suspends the clock".
+it('still clears the clock for a pending that is somebody else’s wait', () => {
+  const s = reduce(costPrimed(), { type: 'CLOCK_STARTED', at: 5000 }).state
+  const staged = reduce(s, { type: 'PLAY', player: 'p1', card: FE.uid, at: 9000 }).state
+  const placed = reduce(staged, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'discardForRelease', card: BUG.uid },
+    at: 10_000,
+  }).state
+  // the release landed and its window opened — that IS somebody else's wait
+  expect(placed.window).not.toBeNull()
+  expect(placed.turn.deadline).toBeUndefined()
+})
+
+// Taking the release back is a committed action, so it re-stamps like any
+// other — the player does not lose the turn for changing their mind, and does
+// not get to bank the unspent stretch either.
+it('re-stamps the clock when an unpaid release is taken back', () => {
+  const s = reduce(costPrimed(), { type: 'CLOCK_STARTED', at: 5000 }).state
+  const staged = reduce(s, { type: 'PLAY', player: 'p1', card: FE.uid, at: 9000 }).state
+  const back = reduce(staged, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'cancelRelease' },
+    at: 12_000,
+  }).state
+  expect(back.pending).toBeNull()
+  expect(back.turn.openedAt).toBe(12_000)
+  expect(back.turn.deadline).toBe(12_000 + TURN_ACTION_MS)
 })
 
 it('rejects CLOCK_STARTED while a window is open — the window owns that wait', () => {

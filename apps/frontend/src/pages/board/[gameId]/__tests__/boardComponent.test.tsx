@@ -8,8 +8,10 @@
 // `board.test.tsx` (the route-level suite, which must stay untouched) are the
 // same path here, and writing the former would have silently clobbered the
 // latter. See task-4-report.md for the full note.
+import { restTransform } from '@release/ui/animations'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { vi } from 'vitest'
+import { ATTACK_POSE } from '~/entities/game/board'
 import Board from '../_Board'
 import { makeBoardProps } from './fixture'
 
@@ -270,6 +272,45 @@ it('a pending attack stands at the centre for every viewer', () => {
   })
   const { getByTestId } = render(<Board {...props} />)
   expect(getByTestId('board-centre-pending')).toBeTruthy()
+})
+
+// Defect 2 (#101, Fix A): the attack RESTS at its own tilt, the way the cover
+// already does — the approved scene's own point is that the two read as two
+// separate plays at contrasting tilts, and `defenseBeat.runCovered` hands
+// `pose: ATTACK_POSE` to `useDiscardExit`, which documents it as "the table
+// tilt it STARTS from". A pending render at 0° made that exit pop from 0° to
+// −4° on its first frame.
+//
+// The tilt lives on an inner `.pose` child and not on the measured node
+// itself (I6): `data-pending-play` is what `comboBeat.runPairOut` measures to
+// split the pair back out, and a rotated node's bounding rect is the box
+// AROUND the tilted card. Same shape as the cover slot's own render.
+it('the pending attack rests at its own tilt, on an inner element', () => {
+  const base = makeBoardProps()
+  const props = makeBoardProps({
+    state: {
+      ...base.state,
+      pending: {
+        kind: 'defend',
+        player: 'p2',
+        attacker: 'p1',
+        attackCard: 'attack-bug',
+        sudo: false,
+        options: [],
+        openedAt: 0,
+        deadline: 15000,
+        scope: 'hand',
+      },
+    },
+  })
+  const { getByTestId } = render(<Board {...props} />)
+  const pending = getByTestId('board-centre-pending')
+  // the node a flight measures stays axis-aligned…
+  expect(pending.style.transform).toBe('')
+  // …and the tilt is on the child that carries the card
+  const pose = pending.firstElementChild as HTMLElement
+  expect(pose.style.transform).toBe(restTransform(ATTACK_POSE))
+  expect(pose.querySelector('[data-card="attack-bug"]')).toBeTruthy()
 })
 
 // #100, Task 11: a sudo defence pending stands the PAIR at the centre — the
