@@ -35,11 +35,17 @@ export interface PlannedDraw {
   mine: boolean
   card?: string
   /**
-   * turned up in front of the whole table. `discardId` is the trigger's own
+   * Turned up in front of the whole table. `discardId` is the trigger's own
    * `discarded`, which the DRAW beat owns: the card is at the centre when it is
    * filed, and flying it from a hand slot it never occupied would be a lie.
+   *
+   * ABSENT means the trigger STANDS. An Error 503 that raises a
+   * `neutralize503` is not banked until it is answered (#102, and
+   * docs/rules/resolution.md's own destinations table), so there is no discard
+   * to claim and nothing to fly — the beat hands it to the pending's static
+   * render instead.
    */
-  reveal?: { card: string; discardId: number }
+  reveal?: { card: string; discardId?: number }
 }
 
 export type PileStep =
@@ -216,14 +222,17 @@ export function classifyPiles(before: number[], after: number[]): PileStep | nul
 // that turned it up, and its `discarded` immediately after that
 // (fake/triggers.ts:123,139). Looking ahead by position rather than scanning the
 // batch is what keeps a later, unrelated reveal from being read as this draw's.
-function revealAfter(events: Event[], i: number): { card: string; discardId: number } | null {
+function revealAfter(events: Event[], i: number): { card: string; discardId?: number } | null {
   const reveal = events[i + 1]
   if (!reveal) return null
   const card =
     reveal.type === 'revealed' ? reveal.card : reveal.type === 'aiRevealed' ? reveal.aiCard : null
   if (card == null) return null
   const filed = events[i + 2]
-  if (filed?.type !== 'discarded' || filed.card !== card) return null
+  // No discard behind it: the trigger is standing, not leaving. Reported as a
+  // reveal all the same — the flight to the centre and the flip are the same
+  // either way, and only the tail differs.
+  if (filed?.type !== 'discarded' || filed.card !== card) return { card }
   return { card, discardId: filed.id }
 }
 
@@ -304,7 +313,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
     if (e.type === 'drawn') {
       if (!draw) flush()
       const reveal = e.card === undefined ? revealAfter(events, i) : null
-      if (reveal) owned.add(reveal.discardId)
+      if (reveal?.discardId !== undefined) owned.add(reveal.discardId)
       draw ??= { kind: 'draw', key: `draw:${e.id}`, draws: [] }
       draw.draws.push({
         key: `w${e.id}`,

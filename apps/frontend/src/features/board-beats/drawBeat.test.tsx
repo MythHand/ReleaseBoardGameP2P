@@ -224,3 +224,20 @@ it('reveals a trigger at the centre and files it in the discard itself', async (
   // handover changes nothing on screen.
   expect(exits.items[0].scatter).toEqual(scatterAt(6))
 })
+
+it('leaves a standing trigger at the centre and publishes the pending behind it', async () => {
+  played.names = []
+  exits.items = []
+  const { published, go } = run([draw({ card: undefined, reveal: { card: 'trigger-error-503' } })])
+  await go()
+  // it did NOT leave for the heap
+  expect(exits.items).toEqual([])
+  // …and the shadow it published carries the alarm, so the static render is
+  // already up when the carrier lets go
+  expect(published.at(-1)?.pending).toEqual({
+    kind: 'neutralize503',
+    player: 'p1',
+    card: 'trigger-error-503',
+    methods: [],
+  })
+})

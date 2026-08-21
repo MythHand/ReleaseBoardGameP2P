@@ -2,6 +2,7 @@ import type { CardData } from '@release/ui'
 import { CARD_W, cardAreaOf, cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
 import {
+  nextFrames,
   play,
   scatterAt,
   useDiscardExit,
@@ -114,7 +115,7 @@ export function useDrawBeat(anchors: BoardAnchors) {
           await wait(AFTER_FLIP)
           await wait(REVEAL_HOLD)
           const card = cardById(d.reveal.card)
-          if (card) {
+          if (card && d.reveal.discardId !== undefined) {
             // It leaves from the centre on the same scatter the heap already
             // rests it on (I7) — the flyer IS the card, so the step flies the
             // node rather than mounting a copy of it.
@@ -126,7 +127,39 @@ export function useDrawBeat(anchors: BoardAnchors) {
                 scatter: scatterAt(d.reveal.discardId),
               },
             ])
+            drop('draw')
+            continue
           }
+          // IT STANDS. An unanswered Error 503 is held on its pending until a
+          // method is chosen, so there is nothing to fly — the board's static
+          // alarm render takes the slot instead. Publish first, drop second:
+          // the board renders this beat's shadow while it runs
+          // (_Board.tsx's `deal.shadow ?? beats.shadow ?? live`), so the
+          // render is up before the carrier lets go and the slot is never
+          // blank for a frame — the same handoff ordering the cover slot uses.
+          //
+          // `methods: []` because the beat CANNOT know them: they live on the
+          // projection, and this runs against `base`. Empty is the honest
+          // value and a safe one — it offers no answer, so the staging hook
+          // stays inert, and the queue drains onto the live pending on the
+          // next tick (a raised pending ends the batch; fireTrigger returns
+          // there). A shadow of the projection for a frame, not a claim about
+          // the game.
+          const c = ctx.current
+          if (c) {
+            const next = {
+              ...c.base,
+              pending: {
+                kind: 'neutralize503' as const,
+                player: d.player,
+                card: d.reveal.card,
+                methods: [],
+              },
+            }
+            c.base = next
+            c.publish(next)
+          }
+          await nextFrames() // the publish above has committed (I2)
           drop('draw')
           continue
         }
