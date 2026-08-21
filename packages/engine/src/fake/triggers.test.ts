@@ -1,7 +1,7 @@
 import type { GameConfig } from '../engine'
 import type { CardInstance, GameState, Setup } from '../state'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
-import { playableFor } from './project'
+import { playableFor, project } from './project'
 import { reduce } from './reduce'
 
 const engine = createFakeEngine()
@@ -46,7 +46,104 @@ it('reveals Error 503 to everyone and demands neutralization', () => {
   const revealed = r.events.find((e) => e.type === 'revealed')
   expect(revealed).toBeDefined()
   expect(revealed?.visibleTo).toBeUndefined()
-  expect(r.state.pending).toEqual({ kind: 'neutralize503', player: 'p1', methods: ['debugger'] })
+  expect(r.state.pending).toEqual({
+    kind: 'neutralize503',
+    player: 'p1',
+    card: E503,
+    methods: ['debugger'],
+  })
+})
+
+it('holds the alarm on the pending instead of banking it at the reveal', () => {
+  const r = reduce(withTop(E503, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
+  // by the rules it reaches the discard only once it has been neutralized
+  expect(r.state.decks.discard.map((c) => c.uid)).not.toContain(E503.uid)
+  expect(r.events.filter((e) => e.type === 'discarded')).toEqual([])
+})
+
+it('banks the alarm with the Debugger that answered it, alarm first', () => {
+  const drawn = reduce(withTop(E503, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
+  const r = reduce(drawn.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'neutralize503', method: 'debugger' },
+    at: 1001,
+  })
+  expect(r.events.map((e) => e.type)).toEqual(['neutralized', 'discarded', 'discarded'])
+  const discards = r.events.filter((e) => e.type === 'discarded')
+  // alarm first: the discard event ids are what give the exchange its layering
+  // on the board, and each card lands on the scatter its own id produces (I7)
+  expect(discards.map((e) => (e.type === 'discarded' ? e.card : null))).toEqual([
+    'trigger-error-503',
+    'protection-debugger',
+  ])
+  expect(discards.map((e) => (e.type === 'discarded' ? e.reason : null))).toEqual([
+    'trigger',
+    'neutralized',
+  ])
+  // both hang off the `neutralized` that caused them
+  const cause = r.events.find((e) => e.type === 'neutralized')
+  expect(discards.every((e) => e.parent === cause?.id)).toBe(true)
+  expect(r.state.pending).toBeNull()
+})
+
+it('banks the alarm when Monitoring answers, and Monitoring stays', () => {
+  const s = withTop(E503, [])
+  const guarded: GameState = {
+    ...s,
+    players: { ...s.players, p1: { ...s.players.p1, release: { monitoring: MON } } },
+  }
+  const drawn = reduce(guarded, { type: 'DRAW', player: 'p1', at: 1000 })
+  const r = reduce(drawn.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'neutralize503', method: 'monitoring' },
+    at: 1001,
+  })
+  expect(r.state.players.p1.release.monitoring).toEqual(MON)
+  expect(r.state.decks.discard.map((c) => c.uid)).toEqual([E503.uid])
+  expect(r.events.map((e) => e.type)).toEqual(['neutralized', 'discarded'])
+})
+
+it('banks the alarm when a release is sacrificed for it', () => {
+  const s = withTop(E503, [])
+  const holding: GameState = {
+    ...s,
+    players: { ...s.players, p1: { ...s.players.p1, release: { frontend: { card: FE } } } },
+  }
+  const drawn = reduce(holding, { type: 'DRAW', player: 'p1', at: 1000 })
+  const r = reduce(drawn.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'neutralize503', method: 'sacrifice', card: FE.uid },
+    at: 1001,
+  })
+  expect(r.events.map((e) => e.type)).toEqual([
+    'neutralized',
+    'discarded', // the alarm
+    'releaseDestroyed',
+    'discarded', // the release that paid for it
+  ])
+  expect(r.state.decks.discard.map((c) => c.uid)).toEqual([E503.uid, FE.uid])
+  expect(r.state.players.p1.release.frontend).toBeUndefined()
+})
+
+it('still banks the alarm at once when there is no way out', () => {
+  // the defenceless path is unchanged: nothing stands, because nothing is asked
+  const r = reduce(withTop(E503, []), { type: 'DRAW', player: 'p1', at: 1000 })
+  expect(r.state.pending).toBeNull()
+  expect(r.state.decks.discard.map((c) => c.uid)).toContain(E503.uid)
+  expect(r.state.eliminated).toEqual(['p1'])
+})
+
+it('projects the alarm card to everyone at the table', () => {
+  const drawn = reduce(withTop(E503, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
+  // the rules make the reveal mandatory, so the card is public — not gated on
+  // `mine` the way an owner-only option list is
+  for (const viewer of ['p1', 'p2'] as const) {
+    const view = project(drawn.state, viewer)
+    expect(view.pending).toMatchObject({ kind: 'neutralize503', card: 'trigger-error-503' })
+  }
 })
 
 it('spends a Debugger to neutralize', () => {
@@ -135,8 +232,10 @@ it('reveals an AI trigger together with the event it pulls', () => {
 
 // --- Review findings: discarded events on every trigger-caused discard ---
 
-it('discards the revealed Error 503 itself, parented to the reveal', () => {
-  const r = reduce(withTop(E503, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
+it('discards the revealed Error 503 itself, parented to the reveal, when there is no way out', () => {
+  // Unlike the with-a-neutralize-option case above, nothing is asked here, so
+  // there is nothing to hold: the alarm is banked at once, same as before.
+  const r = reduce(withTop(E503, []), { type: 'DRAW', player: 'p1', at: 1000 })
   const revealed = r.events.find((e) => e.type === 'revealed')
   const discarded = r.events.find((e) => e.type === 'discarded' && e.card === 'trigger-error-503')
   expect(revealed).toBeDefined()
