@@ -169,6 +169,10 @@ function Probe({
       {/* How many flyers are mounted right now — a dead match's in-flight card
           shows up here until its runner's own reset() clears it. */}
       <div data-testid="overlay">{beats.overlays.length}</div>
+      {/* The running beat's own alarm (#102) — the wire this test exercises end
+          to end, from planBeats' `gather` flag through the discard beat's run
+          to the queue's own `Beat.alarm`. */}
+      <div data-testid="alarm">{beats.alarm ? 'alarm' : 'none'}</div>
     </>
   )
 }
@@ -462,4 +466,66 @@ it('keeps the rematch’s opening when it lands while a beat is in flight', asyn
     await new Promise((r) => setTimeout(r, 80))
   })
   expect(log).toEqual(['intro', 'intro2'])
+})
+
+// ===== the sweep's alarm (#102) — the wire between planBeats' `gather` flag
+// and the queue's own `Beat.alarm`, driven end to end rather than mocked at
+// either end (that is exactly the hole `boardAlarm.test.tsx`'s mocked-`useBeats`
+// test leaves open, and this closes it). An opponent going out is used rather
+// than the local player: `sourceOf` resolves a non-`selfId` discard straight to
+// `{ kind: 'seat', player }` with no hand/release bookkeeping to set up, so the
+// events below are the only thing exercising planBeats/beatOf's own wiring.
+const eliminatedEvent = { id: 5, type: 'eliminated', player: 'p2' } as Event
+const sweptEvent = {
+  id: 6,
+  type: 'discarded',
+  player: 'p2',
+  card: 'attack-bug',
+  reason: 'effect',
+} as Event
+const afterSweep = {
+  ...preDiscard,
+  decks: { ...preDiscard.decks, discardCount: 1 },
+} as unknown as BoardState
+
+it('lights the alarm while a gathered sweep runs, and drops it when the queue drains', async () => {
+  motion.reduced = false
+  sent.calls = []
+  // Park the discard beat mid-flight — `alarm` has to be read while the sweep
+  // is still the running beat, not glimpsed inside a single act() window that
+  // also carries it to completion.
+  sent.hang = true
+  const { getByTestId, rerender } = render(<Probe live={preDiscard} events={[]} anchors={stub} />)
+  rerender(<Probe live={afterSweep} events={[eliminatedEvent, sweptEvent]} anchors={stub} />)
+  await flush()
+  // The sweep is really running, not skipped or dropped.
+  expect(sent.calls).toHaveLength(1)
+  expect(getByTestId('alarm').textContent).toBe('alarm')
+  // Landing: the queue drains, and the alarm goes dark with it — the same
+  // handover every other beat gets, just with `alarm` as the thing watched.
+  sent.hang = false
+  await act(async () => {
+    sent.release?.()
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(getByTestId('alarm').textContent).toBe('none')
+})
+
+it('leaves the alarm dark through an ordinary, ungathered discard', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = true
+  const { getByTestId } = mount()
+  await flush()
+  expect(sent.calls).toHaveLength(1)
+  // No `eliminated` in this batch (see `discardEvent`/`mount` above), so
+  // `planBeats` never sets `gather` and the beat's own `alarm` stays false —
+  // the negative half of the wire, checked while the beat is still in flight.
+  expect(getByTestId('alarm').textContent).toBe('none')
+  sent.hang = false
+  await act(async () => {
+    sent.release?.()
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(getByTestId('alarm').textContent).toBe('none')
 })
