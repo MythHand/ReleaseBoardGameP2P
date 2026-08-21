@@ -232,6 +232,35 @@ describe('planBeats — the draw', () => {
     expect(beats.map((b) => b.kind)).toEqual(['draw'])
   })
 
+  // Task 1 stopped banking a 503 at reveal — it is held on the pending until
+  // answered — so the reveal can arrive with nothing behind it at all.
+  it('plans a revealed trigger that stands, with no discard of its own', () => {
+    const events: Event[] = [
+      drawn(4, { card: undefined }),
+      { id: 5, type: 'revealed', player: 'p1', card: 'trigger-error-503' } as Event,
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats).toHaveLength(1)
+    expect(beats[0].kind === 'draw' && beats[0].draws[0].reveal).toEqual({
+      card: 'trigger-error-503',
+    })
+  })
+
+  it('still plans a revealed trigger that files itself, with its discard id', () => {
+    const events: Event[] = [
+      drawn(4, { card: undefined }),
+      { id: 5, type: 'revealed', player: 'p1', card: 'trigger-error-503' } as Event,
+      discarded(6, { card: 'trigger-error-503', reason: 'trigger' }),
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats[0].kind === 'draw' && beats[0].draws[0].reveal).toEqual({
+      card: 'trigger-error-503',
+      discardId: 6,
+    })
+    // and it is claimed, so the discard planner does not fly it a second time
+    expect(beats.filter((b) => b.kind === 'discard')).toEqual([])
+  })
+
   it('puts a multi-draw in one beat, in the order it was drawn', () => {
     const beats = planBeats([drawn(4), drawn(5, { pile: 1 })], boardBefore())
     expect(beats).toHaveLength(1)
