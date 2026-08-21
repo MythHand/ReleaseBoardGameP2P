@@ -740,6 +740,25 @@ it('sends the alarm alone when Monitoring answered, and flies nothing', async ()
   expect(exits.items[0].layer).toBe(0)
 })
 
+// The crux of the whole task: a `neutralize503` pending with no card standing
+// anywhere at all — a `crush` (the AI threat card was never on the table), or
+// the `ai-error-503` mimic, whose card has already gone back to its own deck
+// (`fake/triggers.ts` builds this pending with `card: null`). Both reach the
+// board with `plan.alarm` absent. `exchange` reads layer off array POSITION
+// after filtering `null`s out — so with no alarm half at all, the answer is
+// the only entry and must land at layer 0, not be silently promoted to some
+// other slot in the heap.
+it('sends only the answer at layer 0 when there is no alarm to take away', async () => {
+  exits.items.length = 0
+  played.calls.length = 0
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() => api.beat?.runNeutralized({ ...debuggerPlan(), alarm: undefined }, ctx))
+  expect(exits.items).toHaveLength(1)
+  expect(exits.items[0].card.id).toBe('protection-debugger')
+  expect(exits.items[0].layer).toBe(0)
+})
+
 it('flies a sacrificed release out of its own zone slot', async () => {
   exits.items.length = 0
   played.calls.length = 0
