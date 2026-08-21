@@ -75,6 +75,7 @@ import {
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { COVER_POSE, MERGE_MS, SUDO_POSE } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
+import { useCoverFlight } from './_useCoverFlight'
 
 // same 5-line helper comboBeat.tsx/defenseBeat.tsx each keep privately — copy
 // it, don't import across runners.
@@ -170,11 +171,22 @@ export function useDefenseStaging({
   matchKey = null,
 }: Options): DefenseStaging {
   const [staged, setStaged] = useState<DefenseStagedPlay | null>(null)
-  const [landed, setLanded] = useState(false)
-  const [sudoLanded, setSudoLanded] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const reduced = useReducedMotion()
   const flyer = useFlyer()
+  // The stand-a-card-at-a-centre-slot cycle, twice — `_useCoverFlight.ts` owns
+  // the flight, the `landed` gate and the dispatch watermark, and nothing
+  // else: the dispatch and the way home stay here. Two instances because the
+  // two slots gate independently (a fold clicked while the Sudo is still in
+  // the air must not read the Sudo's landing as the pair's), and both are
+  // handed THIS hook's one flyer: the fold below is not the module's shape and
+  // keeps its own flight, which has to ride the same carrier — two `useFlyer`s
+  // number their nodes from their own counters and collide on React keys the
+  // moment both are in the air.
+  const coverFlight = useCoverFlight(flyer)
+  const sudoFlight = useCoverFlight(flyer)
+  const landed = coverFlight.landed
+  const sudoLanded = sudoFlight.landed
   const arrowCtl = useArrow()
 
   // same discipline as `_useBoardStaging.ts`: handlers that run after an
@@ -184,10 +196,6 @@ export function useDefenseStaging({
   cancellingRef.current = cancelling
   const eventsRef = useRef(events)
   eventsRef.current = events
-  // captured the instant a dispatch commits `phase: 'dispatched'` — the
-  // rejected-watcher below only reads what came AFTER this point, the same
-  // watermark discipline `_useBoardStaging.ts` applies to this same array.
-  const dispatchWatermarkRef = useRef(0)
   // The fold is IRREVOCABLE once a partner is picked — copies
   // `_useBoardStaging.ts`'s own `foldingRef` verbatim in intent: `cancel()`
   // and a second click both refuse while it is true, and every exit path
@@ -323,42 +331,24 @@ export function useDefenseStaging({
         phase: 'dispatched',
         merged: false,
       })
-      dispatchWatermarkRef.current = eventsRef.current.length
-      setLanded(false) // fresh cycle — the flight below has not carried this card yet
+      coverFlight.mark(eventsRef.current)
+      // the RESOLVE goes out synchronously, BEFORE the flight starts — the
+      // no-duplicate rule (the card handed to the flyer in the same commit as
+      // the dispatch) requires that order, and the catch-up effect below is
+      // written around it. `coverFlight.fly` arms `landed` as its own first
+      // statement and reports the carrier gone in a `finally`; the whole
+      // reason that `finally` is load-bearing lives with it in
+      // `_useCoverFlight.ts`.
       actions?.onResolve?.({ kind: 'defend', card: uid, combo: undefined })
-      void (async () => {
-        try {
-          const to = anchors.cover.current?.getBoundingClientRect()
-          if (!reduced && from && to) {
-            const [el] = await flyer.raise([{ key: 'cover', card, at: from }])
-            if (el) {
-              await play('playToCenter', el, {
-                from,
-                to,
-                rotate: COVER_POSE.rot,
-                dx: COVER_POSE.dx,
-                dy: COVER_POSE.dy,
-              })?.finished
-            }
-            flyer.drop('cover')
-          }
-        } finally {
-          // the carrier has dropped it (or, under reduced motion, there was
-          // never one) — `_Board.tsx`'s static cover render may take over now,
-          // not a moment before (see `landed`'s own comment above).
-          //
-          // In a `finally` since #101, Fix D round 4, and load-bearing there:
-          // the catch-up effect below now WAITS for this before it will clear
-          // the staging, so a `.finished` that rejects (a cancelled animation)
-          // must still report the carrier gone. Otherwise `landed` would stay
-          // false with a dispatched play staged, and the fan would keep a hole
-          // in it for the rest of the match — worse than the ghost this change
-          // exists to remove.
-          setLanded(true)
-        }
-      })()
+      void coverFlight.fly({
+        card,
+        from,
+        to: () => anchors.cover.current?.getBoundingClientRect(),
+        pose: COVER_POSE,
+        key: 'cover',
+      })
     },
-    [reduced, anchors.cover, actions, flyer.raise, flyer.drop],
+    [anchors.cover, actions, coverFlight.mark, coverFlight.fly],
   )
 
   // Task 17's own staging half: the Sudo goes to its OWN slot, not onto the
@@ -371,22 +361,14 @@ export function useDefenseStaging({
   const stageDefSudo = useCallback(
     (uid: string, card: CardData, index: number, from: Rect | undefined, dropped: HandPlayDrop) => {
       commitStaged({ support: { uid, card, index }, main: null, phase: 'partner', merged: false })
-      setSudoLanded(false)
       void (async () => {
-        const to = anchors.sudo.current?.getBoundingClientRect()
-        if (!reduced && from && to) {
-          const [el] = await flyer.raise([{ key: 'sudo', card, at: from }])
-          if (el) {
-            await play('playToCenter', el, {
-              from,
-              to,
-              rotate: SUDO_POSE.rot,
-              dx: SUDO_POSE.dx,
-              dy: SUDO_POSE.dy,
-            })?.finished
-          }
-          flyer.drop('sudo')
-        }
+        await sudoFlight.fly({
+          card,
+          from,
+          to: () => anchors.sudo.current?.getBoundingClientRect(),
+          pose: SUDO_POSE,
+          key: 'sudo',
+        })
         // A cancel (or a later dispatch) may have taken this staging away
         // WHILE the flight above was still in the air (Fix round 1,
         // Important 1) — the approved source's own `cancelStaged` guards this
@@ -403,14 +385,13 @@ export function useDefenseStaging({
         ) {
           return
         }
-        setSudoLanded(true)
         // the arrow starts where the Sudo now stands and follows the cursor —
         // the ported source's own `stageDefSudo`
         const box = anchors.sudo.current?.getBoundingClientRect()
         if (box) arrowCtl.aim({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, dropped)
       })()
     },
-    [reduced, anchors.sudo, arrowCtl.aim, flyer.raise, flyer.drop],
+    [anchors.sudo, arrowCtl.aim, sudoFlight.fly],
   )
 
   // GESTURE — pulling a legal defence out of the fan commits and dispatches
@@ -566,8 +547,8 @@ export function useDefenseStaging({
         // half mounts. Never on screen twice, never absent (the no-duplicate
         // rule this task's own brief calls out).
         commitStaged({ support, main, phase: 'dispatched', merged: true })
-        dispatchWatermarkRef.current = eventsRef.current.length
-        setLanded(false) // fresh cycle — the fold below has not carried this pair yet
+        coverFlight.mark(eventsRef.current)
+        coverFlight.arm() // fresh cycle — the fold below has not carried this pair yet
         actions?.onResolve?.({ kind: 'defend', card: item.uid, combo: support.uid })
       } catch (e) {
         // Fix round 1 (Minor): a throw from the send must not leave the lock
@@ -582,7 +563,7 @@ export function useDefenseStaging({
         // reduced motion (or no fan geometry to fold from) settles instantly —
         // CardPair's own inline pose (identity main, PAIR_AUX_POSE aux) IS the
         // pair at rest, nothing to paint frame by frame.
-        setLanded(true)
+        coverFlight.settle()
         foldingRef.current = false
         return
       }
@@ -602,7 +583,7 @@ export function useDefenseStaging({
           const auxEl = el?.querySelector<HTMLElement>('[data-aux]')
           if (!mainEl || !auxEl) {
             flyer.drop('fold')
-            setLanded(true)
+            coverFlight.settle()
             return
           }
           // painted at their entry poses first, so neither half flashes in
@@ -623,7 +604,7 @@ export function useDefenseStaging({
           flyer.drop('fold')
           // the carrier has dropped it — `_Board.tsx`'s static cover render
           // may take over now, not a moment before (see `landed`'s comment).
-          setLanded(true)
+          coverFlight.settle()
         } finally {
           // every exit clears the lock — the early returns above and a
           // rejecting `.finished` all bypass the success path's own clear.
@@ -632,9 +613,9 @@ export function useDefenseStaging({
           // `commitAndFly`'s own `finally` does (#101, Fix D round 4): the
           // catch-up effect below will not clear a dispatched staging until
           // `landed` is true, so a rejected flight that skipped the success
-          // path's `setLanded(true)` would leave the fan a hole for good. A
+          // path's `coverFlight.settle()` would leave the fan a hole for good. A
           // no-op on every path that already set it.
-          setLanded(true)
+          coverFlight.settle()
           // Fix round 1 (Important 2): unlike `_useBoardStaging.ts`'s own
           // fold, this one dispatches BEFORE this flight rather than after —
           // the no-duplicate rule (the standing Sudo handed to the flyer in
@@ -661,6 +642,9 @@ export function useDefenseStaging({
       arrowCtl.stop,
       actions,
       cancel,
+      coverFlight.mark,
+      coverFlight.arm,
+      coverFlight.settle,
       flyer.raise,
       flyer.drop,
     ],
@@ -719,7 +703,7 @@ export function useDefenseStaging({
     const s = stagedRef.current
     if (s?.phase !== 'dispatched' || !s.main) return
     const uid = s.main.uid
-    const fresh = events.slice(dispatchWatermarkRef.current)
+    const fresh = coverFlight.since(events)
     const rejectedOurs = fresh.some((e) => {
       if (e.type !== 'rejected') return false
       const a = e.action
@@ -731,7 +715,7 @@ export function useDefenseStaging({
       commitStaged({ ...s, phase: 'rejected' })
       cancel()
     }
-  }, [events, cancel])
+  }, [events, cancel, coverFlight.since])
 
   // the beat's own clear (Task 13's `defenseBeat.runCovered`) — no flight,
   // just done: the staged node was already standing where the cover goes, so
@@ -763,10 +747,9 @@ export function useDefenseStaging({
     commitStaged(null)
     cancellingRef.current = false
     foldingRef.current = false
-    dispatchWatermarkRef.current = 0
     setCancelling(false)
-    setLanded(false)
-    setSudoLanded(false)
+    coverFlight.reset()
+    sudoFlight.reset()
     arrowCtl.stop()
     flyer.drop()
     arrival.reset()

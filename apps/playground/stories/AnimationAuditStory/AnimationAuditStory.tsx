@@ -706,6 +706,21 @@ const SCENARIOS: Scenario[] = [
 const ISSUES: Issue[] = [
   {
     what: {
+      ru: 'Два `useFlyer` на одной странице сталкиваются ключами React',
+      en: 'Two `useFlyer`s on one page collide on React keys',
+    },
+    problem: {
+      ru: '`useFlyer` нумерует узлы приватным счётчиком (`seq` — React-ключ узла в `overlay`, инвариант I5: свежий узел на каждый полёт), и у каждого экземпляра он начинается с нуля. `overlay` при этом склеивается сценой с чужими массивами, так что первый поднятый носитель в двух экземплярах даёт двух детей с ключом `1` (с `useHandArrival` столкновения нет — там ключи строковые). Правила «сколько носителей на странице» не решено вовсе. Достижимо на защите: судо ещё летит к своему слоту, игрок кликает партнёра, и фолд поднимает второй носитель, пока первый в воздухе. Найдено при выделении `_useCoverFlight.ts` (#102): двум слотам одного стола нужны независимые гейты `landed`, то есть два экземпляра модуля, который владеет носителем. Обойдено в открытую — `useCoverFlight(shared?)` принимает уже существующий носитель, и `_useDefenseStaging.tsx` отдаёт обоим экземплярам ОДИН свой `useFlyer`. Закроет ключ, уникальный по экземпляру: `useId()` в `useFlyer` и `key` из пары «идентификатор + seq».',
+      en: '`useFlyer` numbers its nodes from a private counter (`seq` — the React key of the node in `overlay`, invariant I5: a fresh node per flight), and every instance starts it at zero. `overlay` is then concatenated by the scene with other arrays, so the first carrier raised in two instances yields two children keyed `1` (no clash with `useHandArrival`, whose keys are strings). The rule for how many carriers a page may hold is undecided. Reachable on the defence: the Sudo is still flying to its slot, the player clicks a partner, and the fold raises a second carrier while the first is in the air. Found while extracting `_useCoverFlight.ts` (#102): two slots on one table need independent `landed` gates, i.e. two instances of a module that owns the carrier. Worked around in the open — `useCoverFlight(shared?)` accepts an existing carrier, and `_useDefenseStaging.tsx` hands both instances its ONE `useFlyer`. What closes it is a key unique per instance: `useId()` inside `useFlyer`, and a key built from identifier + seq.',
+    },
+    where: {
+      ru: 'ui: animations/useFlyer.tsx (overlay key) + frontend: pages/board/[gameId]/_useCoverFlight.ts',
+      en: 'ui: animations/useFlyer.tsx (overlay key) + frontend: pages/board/[gameId]/_useCoverFlight.ts',
+    },
+    status: 'open',
+  },
+  {
+    what: {
       ru: 'Модуль, не записанный НИГДЕ, не виден ни одной проверке',
       en: 'A module written down NOWHERE is invisible to every check',
     },
