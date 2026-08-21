@@ -146,6 +146,73 @@ it('projects the alarm card to everyone at the table', () => {
   }
 })
 
+// Stacks `trigger-ai` as the next draw and shrinks the events deck to a
+// single entry, so which event fires is not the shuffle's decision — same
+// pattern eventCards.test.ts and aiEvents.test.ts use to drive one specific
+// AI event.
+const withAiEvent = (event: CardInstance, hand: CardInstance[] = []): GameState => {
+  // A non-colliding uid suffix: the real deck already carries its own
+  // `trigger-ai#0..N`, unremoved elsewhere in the pile, so reusing `#0` here
+  // would plant a genuine duplicate uid for the conservation check below to
+  // trip over. Same fix eventCards.test.ts's own `AI` fixture uses (`#ai0`).
+  const ai: CardInstance = { uid: 'trigger-ai#ai0', id: 'trigger-ai' }
+  const s = engine.createGame(config())
+  return {
+    ...s,
+    players: { ...s.players, p1: { ...s.players.p1, hand } },
+    decks: { ...s.decks, main: [[ai, ...s.decks.main[0]]], events: [event] },
+  }
+}
+
+it('sends the ai-error-503 mimic home to the events deck, never to the discard', () => {
+  // `resolveAiEvent`'s `ai-error-503` branch sets `card: null` on the
+  // `neutralize503` pending it raises: `fireTrigger`'s `trigger-ai` branch has
+  // already returned this event card to `decks.events` by the time the
+  // pending exists, so there is no card standing anywhere for a neutralize
+  // answer to bank alongside it. A regression that gave the pending the real
+  // card would make `bankAlarm` discard it — landing the same uid in both
+  // `decks.events` and `decks.discard` at once.
+  const event: CardInstance = { uid: 'ai-error-503#e0', id: 'ai-error-503' }
+  const drawn = reduce(withAiEvent(event, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
+  // A Debugger in hand means a `neutralize503` pending is actually raised,
+  // not an immediate elimination — and its card is null from the start.
+  expect(drawn.state.pending).toMatchObject({ kind: 'neutralize503', card: null })
+
+  const r = reduce(drawn.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'neutralize503', method: 'debugger' },
+    at: 1001,
+  })
+
+  expect(r.state.decks.events.map((c) => c.uid)).toContain(event.uid)
+  expect(r.state.decks.discard.map((c) => c.uid)).not.toContain(event.uid)
+
+  // Conservation invariant for this card specifically: one uid, one place.
+  // Scoped to `event.uid` rather than a whole-state uniqueness scan — this
+  // file's fixtures (DBG, E503, …) already reuse `#0`-suffixed uids for hand
+  // overrides without regard to what the real deck dealt elsewhere, so a
+  // blanket scan would flag pre-existing fixture noise unrelated to this fix.
+  // `conformance.ts`'s own realCardUids sweep (mirrored here) is what makes
+  // this the same accounting; the regression this guards against is this
+  // exact uid landing in two zones (`decks.events` and `decks.discard`) at
+  // once, which is precisely what counting its occurrences catches.
+  const allCards = [
+    ...r.state.decks.main.flat(),
+    ...r.state.decks.discard,
+    ...r.state.decks.events,
+    ...Object.values(r.state.players).flatMap((p) => [
+      ...p.hand,
+      ...(['frontend', 'backend', 'database'] as const).flatMap((slot) => {
+        const rel = p.release[slot]
+        return rel ? [rel.card, ...(rel.codeReview ? [rel.codeReview] : [])] : []
+      }),
+      ...(p.release.monitoring ? [p.release.monitoring] : []),
+    ]),
+  ]
+  expect(allCards.filter((c) => c.uid === event.uid)).toHaveLength(1)
+})
+
 it('spends a Debugger to neutralize', () => {
   const drawn = reduce(withTop(E503, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
   const r = reduce(drawn.state, {

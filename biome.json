@@ -19,7 +19,7 @@
       "**",
       "!**/dist",
       "!**/node_modules",
-      "!**/.claude",
+      "!**/.claude/worktrees",
       "!**/*.css",
       "!**/*.svg",
       "!apps/frontend/src/app/router.ts"
