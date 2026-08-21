@@ -61,6 +61,11 @@ export interface BoardState {
     // A played Code Review lying under the release it protects.
     support?: ReleaseSupport
     eliminated?: boolean
+    // The uid of whatever stands in each slot. The kit's `ReleaseSlots` carries
+    // card DATA and no identity — it is domain-free by design — but a choice
+    // the engine has to act on names a uid (`neutralize503`'s sacrifice), so
+    // the adapter keeps them here rather than widening the kit's own type.
+    releaseUid?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
   }
   opponents: BoardOpponent[]
   decks: {

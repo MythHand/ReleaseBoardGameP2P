@@ -182,6 +182,28 @@ describe('toBoardState', () => {
     expect(state.you.support?.frontend?.id).toBe('support-code-review')
   })
 
+  it('keeps the uid of every release the player holds', () => {
+    const withReleaseUids: PlayerView = {
+      ...view,
+      self: {
+        ...view.self,
+        release: {
+          frontend: { uid: 'release-frontend#3', card: 'release-frontend' },
+          monitoring: { uid: 'protection-monitoring#1', card: 'protection-monitoring' },
+        },
+      },
+    }
+    const state = toBoardState(withReleaseUids, [], labels)
+    // the card data the kit renders is unchanged…
+    expect(state.you.release.frontend?.id).toBe('release-frontend')
+    // …and the uid the engine needs to be told which release was sacrificed
+    // survives beside it
+    expect(state.you.releaseUid).toEqual({
+      frontend: 'release-frontend#3',
+      monitoring: 'protection-monitoring#1',
+    })
+  })
+
   it('carries a defend pending openedAt through unchanged, alongside deadline', () => {
     const withPending: PlayerView = {
       ...view,
