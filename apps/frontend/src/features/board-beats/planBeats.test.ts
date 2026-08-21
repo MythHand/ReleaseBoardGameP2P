@@ -858,6 +858,37 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
     ])
   })
 
+  // The shared gap (Task 7 fix round 1): a `neutralize503` pending can bank no
+  // alarm at all — a `crush` (the AI threat card is never on the table), or the
+  // `ai-error-503` mimic, whose card has already gone back to its own events
+  // deck (`fake/triggers.ts` builds this pending with `card: null`). Both reach
+  // this walk as a `neutralized` event followed ONLY by the answer's own
+  // `discarded(reason: 'neutralized')` — no `discarded(reason: 'trigger')`
+  // before it — so `alarm` is never assigned and the spread
+  // `...(alarm ? { alarm } : {})` omits the key entirely rather than setting it
+  // to `undefined`.
+  it('plans a neutralized resolution with no alarm to take away', () => {
+    const plans = planBeats(
+      [
+        neutralized({ id: 10 }),
+        discarded(11, { card: 'protection-debugger', reason: 'neutralized' }),
+      ],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans).toHaveLength(1)
+    // the key is OMITTED, not present-and-undefined — `toEqual` treats those
+    // as equal, so `not.toHaveProperty` is the assertion that actually pins it
+    expect(plans[0]).not.toHaveProperty('alarm')
+    expect(plans[0]).toEqual({
+      kind: 'neutralized',
+      key: 'neutralized:10',
+      eventId: 10,
+      player: 'p1',
+      method: 'debugger',
+      spent: [{ eventId: 11, card: 'protection-debugger' }],
+    })
+  })
+
   it('leaves nothing for the discard planner to fly twice', () => {
     const plans = planBeats(
       [
