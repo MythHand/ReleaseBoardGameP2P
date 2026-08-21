@@ -1033,6 +1033,36 @@ const ISSUES: Issue[] = [
     },
     status: 'rework',
   },
+  {
+    what: {
+      ru: 'Событийная карта, ушедшая домой, объявляется `discarded`',
+      en: 'An event card banked home is announced as `discarded`',
+    },
+    problem: {
+      ru: '`bankToDiscard` (`packages/engine/src/fake/core.ts`) уводит карту с полем `event` обратно в колоду событий, но `discarded`, которым это отчитывается, называет пунктом назначения сброс всегда, а стоящая на столе карта несёт обычный `release-<slot>` id (нарочно, чтобы читаться как рядовой релиз) — доске нечем отличить один случай от другого. Не новое и не только про 503: `discardBeat` несёт тот же слепой пробел для любой событийной карты. #102-й `neutralized`-план сацерифайса утверждает один такой сброс как обычный, и сожжённый `ai-release` летит в кучу сброса, где никогда по-настоящему не приземляется. Закроет пункт назначения на `discarded`, или отдельное событие для «событийная карта вернулась в свою колоду».',
+      en: '`bankToDiscard` (`packages/engine/src/fake/core.ts`) routes a card carrying an `event` field back to the events deck, but the `discarded` it reports names discard as the destination always, and the placed card carries the plain `release-<slot>` id on purpose (so it reads as an ordinary release) — the board has no way to tell the two apart. Pre-existing and general, not only about a 503: `discardBeat` carries the same blind spot for any event card. #102’s `neutralized` sacrifice plan claims one such discard as ordinary, and the burnt `ai-release` flies to the discard heap, where it never really lands. Closed by a destination on `discarded`, or an event of its own for “an event card went home”.',
+    },
+    where: {
+      ru: 'packages/engine: fake/core.ts (bankToDiscard), fake/triggers.ts (bankAlarm) + frontend: features/board-beats/planBeats.ts, discardBeat.tsx, defenseBeat.tsx',
+      en: 'packages/engine: fake/core.ts (bankToDiscard), fake/triggers.ts (bankAlarm) + frontend: features/board-beats/planBeats.ts, discardBeat.tsx, defenseBeat.tsx',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Пендинг без дедлайна останавливает партию',
+      en: 'A pending with no deadline stalls the match',
+    },
+    problem: {
+      ru: '`referee.ts:402` истекает по времени только `defend`-пендинги, а `:422` приостанавливает часы хода, пока открыт ЛЮБОЙ пендинг. Подключённый игрок, который не отвечает на `neutralize503`, `handLimit`, `discardForRelease`, `pickFromDiscard`, `requestCard`, `giveCard` или `crush`, замораживает партию для всех. Найдено при сборке #102 — правка общая для всех семи видов разом, а не для одного `neutralize503`, поэтому заведена отдельным issue (issue drafted, not yet filed).',
+      en: '`referee.ts:402` expires only `defend` pendings, and `:422` suspends the turn clock while any pending is open. A connected player who never answers a `neutralize503`, `handLimit`, `discardForRelease`, `pickFromDiscard`, `requestCard`, `giveCard` or `crush` freezes the match for everyone. Found while building #102 — the fix belongs to all seven kinds at once, not to one of them, so it is drafted as a separate issue (issue drafted, not yet filed).',
+    },
+    where: {
+      ru: 'frontend: network/session/referee.ts',
+      en: 'frontend: network/session/referee.ts',
+    },
+    status: 'open',
+  },
 ]
 
 // Section headings, notes, legend and table headers.
