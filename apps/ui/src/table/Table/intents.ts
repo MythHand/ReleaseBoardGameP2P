@@ -52,7 +52,9 @@ export type TablePending =
       deadline: number
       scope: 'release' | 'hand'
     }
-  | { kind: 'neutralize503'; player: string; methods: NeutralizeMethodId[] }
+  // null for the ai-error-503 mimic, which has no card standing anywhere to
+  // show — mirrors the engine's PendingView (Decision 7).
+  | { kind: 'neutralize503'; player: string; card: string | null; methods: NeutralizeMethodId[] }
   | { kind: 'crush'; player: string; slot: ReleaseSlotId; methods: NeutralizeMethodId[] }
   | { kind: 'requestCard'; player: string; target: string }
   | { kind: 'giveCard'; player: string; requested: string }

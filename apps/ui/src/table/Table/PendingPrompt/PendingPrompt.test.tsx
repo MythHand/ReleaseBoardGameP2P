@@ -277,7 +277,12 @@ it('drops a discard pick when the pending kind changes and later offers the same
     picks: 1,
     source: 'operation-git-cherry-pick',
   }
-  const other: TablePending = { kind: 'neutralize503', player: 'you', methods: ['debugger'] }
+  const other: TablePending = {
+    kind: 'neutralize503',
+    player: 'you',
+    card: 'trigger-error-503',
+    methods: ['debugger'],
+  }
 
   const { getAllByRole, getByRole, rerender } = render(
     <PendingPrompt pending={picking} hand={[]} copy={copy} onResolve={onResolve} />,
