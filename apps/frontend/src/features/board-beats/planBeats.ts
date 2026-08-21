@@ -137,6 +137,27 @@ export type BeatPlan =
       slot: string
       card: string
     }
+  // An Error 503 answered. Everything the runner needs to play the exchange
+  // without going back to the projection: the alarm standing at the centre,
+  // and what the answer cost — nothing at all for Monitoring, which answers
+  // from where it stands and stays there.
+  | {
+      kind: 'neutralized'
+      key: string
+      eventId: number
+      player: string
+      method: 'debugger' | 'monitoring' | 'sacrifice'
+      /** sacrifice only: the zone slot the answer flies out of */
+      slot?: string
+      /**
+       * The alarm's own discard. Optional, not guaranteed: a `crush` shares
+       * this event with no card standing anywhere, so the plan must survive
+       * having no alarm to take away.
+       */
+      alarm?: { eventId: number; card: string }
+      /** the Debugger, or the sacrificed release and its Code Review */
+      spent: { eventId: number; card: string }[]
+    }
 
 // Reasons that CAN take a card out of a release slot — "can", not "always do".
 // Typed against the engine's own union rather than `string`, so renaming a reason
@@ -422,6 +443,51 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         slot: e.slot,
         card: e.card,
       })
+      continue
+    }
+    if (e.type === 'neutralized') {
+      // One event, one beat — the exchange is its own gesture, never coalesced
+      // with what came before or after.
+      flush()
+      // Everything this resolution banked, in the order the engine banked it:
+      // the alarm first, then what paid for it (fake/triggers.ts's own
+      // `bankAlarm`). The walk continues forward rather than scanning — a
+      // resolution's discards are contiguous, and the first non-discard event
+      // ends them. `releaseDestroyed` sits between them for a sacrifice, and
+      // names the slot, so it is read rather than skipped.
+      let alarm: { eventId: number; card: string } | undefined
+      const spent: { eventId: number; card: string }[] = []
+      let slot: string | undefined
+      let j = i + 1
+      while (j < events.length) {
+        const d = events[j]
+        if (d.type === 'releaseDestroyed' && d.player === e.player) {
+          slot = d.slot
+          j++
+          continue
+        }
+        if (d.type !== 'discarded') break
+        if (d.reason === 'trigger' && !alarm) {
+          alarm = { eventId: d.id, card: d.card }
+        } else if (d.reason === 'neutralized') {
+          spent.push({ eventId: d.id, card: d.card })
+        } else {
+          break
+        }
+        owned.add(d.id)
+        j++
+      }
+      plans.push({
+        kind: 'neutralized',
+        key: `neutralized:${e.id}`,
+        eventId: e.id,
+        player: e.player,
+        method: e.method,
+        ...(slot ? { slot } : {}),
+        ...(alarm ? { alarm } : {}),
+        spent,
+      })
+      i = j - 1 // the discards this plan claimed are consumed
       continue
     }
     if (e.type === 'discarded') {
