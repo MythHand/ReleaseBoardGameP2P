@@ -77,6 +77,16 @@ interface Beat {
   ended?: BoardState
   /** it owns the table: input is dead while it runs */
   exclusive: boolean
+  /**
+   * A sweep is running: a defenceless player's whole table is gathering at
+   * the centre before it scatters (#102). The engine eliminates in the same
+   * batch as the reveal, so no `pending` is ever raised for this path — this
+   * is the only alarm the board gets, and it is what keeps the glow lit while
+   * the hand flies away with no pending to explain it. Set where the plan
+   * becomes a beat rather than derived from `plan.kind` in the queue's own
+   * runtime state, which keeps plan shapes out of it.
+   */
+  alarm: boolean
   run: (ctx: BeatRun) => Promise<void>
 }
 
@@ -84,6 +94,8 @@ export interface Beats {
   shadow: BoardState | null
   overlays: ReactNode[]
   exclusive: boolean
+  /** the running beat's own alarm — see `Beat.alarm` */
+  alarm: boolean
   gapAt: number | null
   gapSize: number
 }
@@ -157,36 +169,74 @@ export function useBeats(args: {
   const beatOf = useCallback(
     (plan: BeatPlan, base: BoardState): Beat | null => {
       if (plan.kind === 'discard') {
-        return { key: plan.key, base, exclusive: false, run: (ctx) => discards.run(plan, ctx) }
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: plan.gather === true,
+          run: (ctx) => discards.run(plan, ctx),
+        }
       }
       if (plan.kind === 'draw') {
-        return { key: plan.key, base, exclusive: false, run: (ctx) => draws.run(plan, ctx) }
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => draws.run(plan, ctx),
+        }
       }
       if (plan.kind === 'reshuffle') {
         return {
           key: plan.key,
           base,
           exclusive: false,
+          alarm: false,
           run: (ctx) => decks.runReshuffle(plan, ctx),
         }
       }
       if (plan.kind === 'piles') {
-        return { key: plan.key, base, exclusive: false, run: (ctx) => decks.runPiles(plan, ctx) }
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => decks.runPiles(plan, ctx),
+        }
       }
       if (plan.kind === 'attackPlaced') {
-        return { key: plan.key, base, exclusive: false, run: (ctx) => combo.runAttack(plan, ctx) }
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => combo.runAttack(plan, ctx),
+        }
       }
       if (plan.kind === 'releasePlaced') {
-        return { key: plan.key, base, exclusive: false, run: (ctx) => combo.runRelease(plan, ctx) }
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => combo.runRelease(plan, ctx),
+        }
       }
       if (plan.kind === 'pairToDiscard') {
-        return { key: plan.key, base, exclusive: false, run: (ctx) => combo.runPairOut(plan, ctx) }
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => combo.runPairOut(plan, ctx),
+        }
       }
       if (plan.kind === 'covered') {
         return {
           key: plan.key,
           base,
           exclusive: false,
+          alarm: false,
           run: (ctx) => defense.runCovered(plan, ctx),
         }
       }
@@ -195,6 +245,7 @@ export function useBeats(args: {
           key: plan.key,
           base,
           exclusive: false,
+          alarm: false,
           run: (ctx) => defense.runStolen(plan, ctx),
         }
       }
@@ -203,6 +254,7 @@ export function useBeats(args: {
           key: plan.key,
           base,
           exclusive: false,
+          alarm: false,
           run: (ctx) => defense.runNeutralized(plan, ctx),
         }
       }
@@ -362,6 +414,7 @@ export function useBeats(args: {
       // base and this one animates away from the projection at large.
       base: latest.current.live,
       exclusive: true,
+      alarm: false,
       run: beat.run,
     })
     void drain()
@@ -443,6 +496,7 @@ export function useBeats(args: {
       ...defense.overlay,
     ],
     exclusive: running?.exclusive ?? false,
+    alarm: running?.alarm ?? false,
     // The fan opens for a card on its way into it — the draw beat is the one
     // that grows it (I8); nothing else does yet.
     gapAt: draws.gapAt,

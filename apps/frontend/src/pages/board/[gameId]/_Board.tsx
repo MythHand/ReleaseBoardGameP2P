@@ -343,6 +343,11 @@ export default function Board({
   // 503 goes to the COVER slot, never over the alarm's own.
   const pendingAlarm = state.pending?.kind === 'neutralize503' ? state.pending : null
   const alarmMine = pendingAlarm?.player === state.selfId
+  // …or a sweep is running, which is the defenceless path's own alarm: it
+  // raises no `pending` at all (the engine eliminates in the same batch as
+  // the reveal), so without this the hand would fly away with nothing on
+  // screen explaining it.
+  const glowStrong = (pendingAlarm != null && alarmMine) || beats.alarm
   // an Error 503 owed to US means the neutralize hook owns the fan and the
   // zone — the third staging hook, and the third mutually exclusive one: the
   // engine suspends normal play while a pending is open, and a pending has one
@@ -1166,9 +1171,7 @@ export default function Board({
           `.glowBounds` and its hardcoded tech-bar offsets stay in the
           playground — that story is explicitly not the reference here (Page
           Shell Rule, apps/playground/CLAUDE.md). */}
-      {pendingAlarm && alarmMine && (
-        <EdgeGlow visible intensity="strong" data-testid="board-glow-strong" />
-      )}
+      {glowStrong && <EdgeGlow visible intensity="strong" data-testid="board-glow-strong" />}
 
       <div className={kit.you} data-testid="board-you">
         {youEliminated ? (

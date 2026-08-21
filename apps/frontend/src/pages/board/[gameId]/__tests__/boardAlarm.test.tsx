@@ -8,9 +8,30 @@
 // straight from `makeBoardProps`.
 
 import { render, screen } from '@testing-library/react'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import Board from '../_Board'
 import { makeBoardProps } from './fixture'
+
+// The sweep (#102, Task 10) lights the SAME strong glow this suite already
+// pins, but from `beats.alarm` rather than from a `pending` — the
+// defenceless path raises no pending at all (the engine eliminates in the
+// same batch as the reveal), so driving it end to end would mean rebuilding
+// the whole real-`useBeats` harness `comboHandoff.test.tsx` already carries
+// for a different seam. Instead: `useBeats` is wrapped so the REST of this
+// file gets its ordinary, unmodified return (every existing test below is
+// unaffected), and only the one new test flips `alarmOverride` to see the
+// glow the running beat would raise.
+const alarmOverride = vi.hoisted(() => ({ value: false }))
+vi.mock('~/features/board-beats', async (importOriginal) => {
+  const real = await importOriginal<typeof import('~/features/board-beats')>()
+  return {
+    ...real,
+    useBeats: (args: Parameters<typeof real.useBeats>[0]) => {
+      const result = real.useBeats(args)
+      return alarmOverride.value ? { ...result, alarm: true } : result
+    },
+  }
+})
 
 // A neutralize503 pending owed to `player` — the engine's own shape
 // (`packages/engine/src/view.ts`'s `Pending` union): `card` is a `CardId`
@@ -60,4 +81,14 @@ it('shows no alarm at all with nothing pending', () => {
   expect(screen.queryByTestId('board-centre-alarm')).toBeNull()
   expect(screen.queryByTestId('board-glow-strong')).toBeNull()
   expect(screen.queryByTestId('board-glow-weak')).toBeNull()
+})
+
+it('keeps the table lit while a knocked-out player’s cards sweep away', () => {
+  alarmOverride.value = true
+  try {
+    render(<Board {...makeBoardProps()} />)
+    expect(screen.getByTestId('board-glow-strong')).toBeTruthy()
+  } finally {
+    alarmOverride.value = false
+  }
 })
