@@ -52,12 +52,37 @@ it('counts an AI reveal against the seat that drew it', () => {
   expect(out.p1.ai).toBe(1)
 })
 
-it('counts only the Error 503 trigger, not the AI card of the same name', () => {
+it('counts both 503s — the draw-deck trigger and the AI card of the same name', () => {
+  // They are the same thing to the player who turned one up, whichever deck it
+  // came off (design decision, PR #122).
   const out = foldTally(base(), [
     ev({ type: 'revealed', player: 'p1', card: 'trigger-error-503' }),
     ev({ type: 'revealed', player: 'p1', card: 'ai-error-503' }),
   ])
-  expect(out.p1.err503).toBe(1)
+  expect(out.p1.err503).toBe(2)
+})
+
+it('counts a 503 as an attack against the player who turned it up', () => {
+  // The game attacked them, which from their side is the same fact `attacked`
+  // records for a player-thrown card.
+  const out = foldTally(base(), [ev({ type: 'revealed', player: 'p1', card: 'trigger-error-503' })])
+  expect(out.p1).toMatchObject({ err503: 1, attackedInto: 1 })
+})
+
+it('raises three counters for one AI draw that turns up a 503', () => {
+  // Three different true facts about one moment: an AI card came out of the
+  // deck, it was a 503, and the game attacked that player. The overlap is
+  // intended, not double-counting.
+  const out = foldTally(base(), [
+    ev({ type: 'aiRevealed', player: 'p1', aiCard: 'ai-error-503', eventCard: 'ai-error-503' }),
+    ev({ type: 'revealed', player: 'p1', card: 'ai-error-503' }),
+  ])
+  expect(out.p1).toMatchObject({ ai: 1, err503: 1, attackedInto: 1 })
+})
+
+it('does not count an ordinary reveal as a 503 or an attack', () => {
+  const out = foldTally(base(), [ev({ type: 'revealed', player: 'p1', card: 'attack-bug' })])
+  expect(out.p1).toMatchObject({ err503: 0, attackedInto: 0 })
 })
 
 it('counts a cherry-pick once per play, not once per card pulled', () => {
@@ -72,8 +97,24 @@ it('counts a cherry-pick once per play, not once per card pulled', () => {
   expect(out.p1.cherryPick).toBe(1)
 })
 
-it('counts a landed attack against the seat that took it', () => {
-  const out = foldTally(base(), [ev({ type: 'tookHit', player: 'p2' })])
+it('counts an attack against the seat it was aimed at, landed or not', () => {
+  // A Bug thrown at me is one attack against me whether I defended it or not —
+  // whether it got through is what the defence column already says (design
+  // decision, PR #122). `tookHit` is no longer what this metric reads.
+  const out = foldTally(base(), [
+    ev({ type: 'attacked', attacker: 'p1', card: 'attack-bug', sudo: false, target: 'p2' }),
+    ev({ type: 'defended', player: 'p2', card: 'defense-hotfix', effect: 'cancel' }),
+  ])
+  expect(out.p2).toMatchObject({ attackedInto: 1, defense: 1 })
+})
+
+it('does not count a landing as a second attack', () => {
+  // `tookHit` follows an `attacked` that was already counted; reading both
+  // would double every attack that got through.
+  const out = foldTally(base(), [
+    ev({ type: 'attacked', attacker: 'p1', card: 'attack-bug', sudo: false, target: 'p2' }),
+    ev({ type: 'tookHit', player: 'p2' }),
+  ])
   expect(out.p2.attackedInto).toBe(1)
 })
 
@@ -96,14 +137,18 @@ it('does not mutate the tally it was handed', () => {
 })
 
 it('accumulates across successive folds', () => {
-  const one = foldTally(base(), [ev({ type: 'tookHit', player: 'p2' })])
-  const two = foldTally(one, [ev({ type: 'tookHit', player: 'p2' })])
+  const hit = () =>
+    ev({ type: 'attacked', attacker: 'p1', card: 'attack-bug', sudo: false, target: 'p2' })
+  const one = foldTally(base(), [hit()])
+  const two = foldTally(one, [hit()])
   expect(two.p2.attackedInto).toBe(2)
 })
 
 it('counts a seat the seed never named', () => {
   // Defensive rather than reachable: seating is fixed at createGame. If a future
   // engine ever emits for an unseeded id, the fold must not throw on undefined.
-  const out = foldTally({}, [ev({ type: 'tookHit', player: 'p9' })])
+  const out = foldTally({}, [
+    ev({ type: 'attacked', attacker: 'p1', card: 'attack-bug', sudo: false, target: 'p9' }),
+  ])
   expect(out.p9.attackedInto).toBe(1)
 })

@@ -89,9 +89,9 @@ export interface PlayerTally {
   defense: number       // `defended` where player is this seat
   ddos: number          // `attacked` with card 'attack-ddos'
   ai: number            // `aiRevealed` where player is this seat
-  err503: number        // `revealed` with card 'trigger-error-503'
+  err503: number        // `revealed` with either 503 card
   cherryPick: number    // `takenFromDiscard` with to: 'hand'
-  attackedInto: number  // `tookHit` where player is this seat
+  attackedInto: number  // `attacked` where target is this seat, plus a 503 reveal
 }
 ```
 
@@ -99,7 +99,7 @@ Four of the seven are settled by the event union alone. `attack` covers both sco
 special case — a hand attack emits the same `attacked` event as a release attack
 ([handAttacks.ts:21](../../packages/engine/src/fake/handAttacks.ts)) — and `requested` is the
 request-a-card mechanic, not an attack card, so it is not counted. The remaining three are
-defaults under **Open questions** below.
+settled under **Settled questions** below.
 
 and `GameState` gains `tally: Record<PlayerId, PlayerTally>`, seeded to zeros by `createGame`.
 
@@ -287,47 +287,51 @@ has no business rendering a live session.
 
 ---
 
-## Open questions
+## Settled questions
 
-Three of the seven metrics have copy that does not pin an event. Per
-[CLAUDE.md](../../CLAUDE.md), these are recorded rather than inferred; each ships under the stated
-default so the screen is not blocked, and each default is one line in `tally.ts` to change.
+Three of the seven metrics had copy that did not pin an event, and a fourth question hung over the
+screen's background tone. All four were **answered by the design side in review of
+[PR #122](https://github.com/MythHand/ReleaseBoardGameP2P/pull/122)** and are closed. They are kept
+here rather than deleted: the record of what was chosen, and why, is what stops the next reader
+re-deriving a different answer from the same ambiguous copy.
 
 These are **display semantics, not rules** — the physical game has no achievements — so they stay
 here rather than in [`docs/rules/backlog.md`](../rules/backlog.md).
 
-1. **`cherryPick` — "times pulled from discard" / "раз достал из сброса".** One Git Cherry-pick
-   emits *two* `takenFromDiscard` events, one to hand and one to deck. Cards pulled, or times
-   played? **Default: times played** (count the `to: 'hand'` event, which is also the public one,
-   so the count is verifiable from any peer's log).
+1. **`cherryPick` — "times pulled from discard" / «раз достал из сброса». Closed: as shipped.**
+   One Git Cherry-pick emits *two* `takenFromDiscard` events, one to hand and one to deck. It
+   counts a card played from the hand, so "times played" is the correct reading — the fold counts
+   the `to: 'hand'` event, which is also the public one, so the number is verifiable from any
+   peer's log.
+2. **`attackedInto` — «карт атаки прилетело». Closed: count every attack MADE against the player,
+   not the ones that landed.** A Bug thrown at me is one attack against me whether I defended it
+   or not; whether it got through is what the defence column already says. `attacked` carries
+   `target`, so the fold reads that and no new event was needed. **An Error 503 out of the deck
+   counts here too** — the game attacked the player, which from their side is the same thing.
 
-   Shipped as stated. The count in the fold is the one line above; it remains open for the
-   designer to revisit. `packages/engine/src/tally.ts` is the single place the default is
-   expressed.
-2. **`attackedInto` — "attack cards taken" / "карт атаки прилетело".** Every attack aimed at this
-   seat, or only those that landed? The plate's art includes Error 503, which nobody aims, which
-   argues for a third reading — everything bad that happened to you. **Default: attacks that
-   landed** (`tookHit`).
+   The unit copy was corrected with it. The Russian already described the aim rather than the
+   landing, so it was the implementation that disagreed with the copy; the English
+   ("attack cards taken") said the opposite. Both also stumbled on the 503, which is a trigger and
+   not an attack card at all. Both catalogues now say what is actually counted.
+3. **`err503` — "Error 503s from deck" / «ошибок 503 из колоды». Closed: count both.** The
+   draw-deck trigger and `ai-error-503` off the events deck are the same thing to the player who
+   turned one up. Both already arrive as `revealed` with different `card` values, so the narrowing
+   to `trigger-error-503` was simply dropped.
 
-   Shipped as stated. The count in the fold is the one line above; it remains open for the
-   designer to revisit. `packages/engine/src/tally.ts` is the single place the default is
-   expressed.
-3. **`err503` — "Error 503s from deck" / "ошибок 503 из колоды".** `trigger-error-503` off the
-   draw deck certainly counts; `ai-error-503` off the events deck also emits `revealed`
-   ([triggers.ts:338](../../packages/engine/src/fake/triggers.ts)). **Default: the trigger only.**
+**The overlap between 2 and 3 is intended and needs no guarding against.** One draw of an AI card
+that turns up a 503 raises three counters — `ai` (an AI card came out of the deck), `err503` (it
+was a 503), and `attackedInto` (the game attacked that player). Three different true facts about
+one moment.
 
-   Shipped as stated. The count in the fold is the one line above; it remains open for the
-   designer to revisit. `packages/engine/src/tally.ts` is the single place the default is
-   expressed.
+4. **The background tone. Closed: no third tone; ship the two the story has.** The issue asked for
+   a "negative (looser)" state, and the reading behind that request is what was wrong rather than
+   the omission: `HudBackground`'s amber `problem` tone is a **lobby** state meaning a player has
+   dropped off the network. It is not a "loser" state, and the results screen has no use for it.
+   **`positive` for the winner, `neutral` for everyone else**, as wired, is correct, and the
+   issue's "negative (looser)" item closes as a no.
 
-A fourth, smaller one: the issue asks for a "negative (looser)" state and the approved story
-offers only `neutral` / `positive`, while `HudBackground` also has `problem`. We ship the story's
-pair — **`positive` for the winner, `neutral` for everyone else** — because the playground is the
-visual source of truth. Whether losing should read as `problem` is the designer's call.
-
-Shipped as stated. `apps/frontend/src/pages/board/[gameId]/stats.tsx` is the single place the
-default is expressed (the `bgTone` prop on the results screen); it remains open for the designer
-to revisit.
+`packages/engine/src/tally.ts` remains the single place each metric is expressed, and
+`apps/frontend/src/pages/board/[gameId]/stats.tsx` the single place the tone is.
 
 ---
 

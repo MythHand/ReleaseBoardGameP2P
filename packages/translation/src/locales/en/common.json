@@ -86,7 +86,7 @@
       },
       "attackedInto": {
         "title": "Bug Magnet",
-        "unit": "attack cards taken"
+        "unit": "attacks against them"
       }
     }
   },
