@@ -315,6 +315,66 @@ it('a rejected Debugger comes back to the fan', async () => {
   expect(screen.queryByTestId('board-cover-staged')).toBeNull()
 })
 
+it('a non-primary press on the Monitoring slot dispatches nothing', () => {
+  const onResolve = vi.fn()
+  const { container } = render(
+    withAlarm(
+      { methods: ['monitoring'], release: { monitoring: 'protection-monitoring' } },
+      { onResolve },
+    ),
+  )
+  layOut(container)
+  const el = slotNode(container, 'monitoring')
+  // a right-press: identical position, wrong button — must not commit the
+  // irreversible answer (unlike a Release slot, which merely starts a drag)
+  fireEvent.mouseDown(el, { clientX: 420, clientY: 620, button: 2 })
+  fireEvent.mouseUp(el, { clientX: 420, clientY: 620, button: 2 })
+  expect(onResolve).not.toHaveBeenCalled()
+  expect(screen.queryByTestId('board-cover-staged')).toBeNull()
+  expect(slotNode(container, 'monitoring').querySelector('[data-card]')).toBeTruthy()
+})
+
+it('does not light a Debugger in the fan when the pending excludes it', async () => {
+  const onResolve = vi.fn()
+  const { container } = render(
+    withAlarm(
+      {
+        methods: ['monitoring'],
+        hand: ['protection-debugger'],
+        release: { monitoring: 'protection-monitoring' },
+      },
+      { onResolve },
+    ),
+  )
+  layOut(container)
+  // the fan half of "what lights is exactly what can be taken" — a pending
+  // that does not name `debugger` must not light the Debugger in the hand
+  expect(handStateAt(0)).toBe('disabled')
+  await playFromHand(0, { x: 640, y: 200 })
+  expect(onResolve).not.toHaveBeenCalled()
+  expect(screen.queryByTestId('board-cover-staged')).toBeNull()
+})
+
+it('does not answer a press on Monitoring when the pending excludes it', () => {
+  const onResolve = vi.fn()
+  const { container } = render(
+    withAlarm(
+      {
+        methods: ['debugger'],
+        release: { monitoring: 'protection-monitoring' },
+        hand: ['protection-debugger'],
+      },
+      { onResolve },
+    ),
+  )
+  layOut(container)
+  // the Monitoring branch of `grabbable` must also read `methods` — a pending
+  // that does not offer `monitoring` must not let a press on it through
+  pressSlot(container, 'monitoring')
+  expect(onResolve).not.toHaveBeenCalled()
+  expect(slotNode(container, 'monitoring').querySelector('[data-card]')).toBeTruthy()
+})
+
 it('a rejected sacrifice goes back to its own slot', async () => {
   const onResolve = vi.fn()
   const state: Over = {
