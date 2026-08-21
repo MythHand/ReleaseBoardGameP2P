@@ -198,6 +198,14 @@ export function useBeats(args: {
           run: (ctx) => defense.runStolen(plan, ctx),
         }
       }
+      if (plan.kind === 'neutralized') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          run: (ctx) => defense.runNeutralized(plan, ctx),
+        }
+      }
       return null
     },
     [
@@ -210,6 +218,7 @@ export function useBeats(args: {
       combo.runPairOut,
       defense.runCovered,
       defense.runStolen,
+      defense.runNeutralized,
     ],
   )
 
