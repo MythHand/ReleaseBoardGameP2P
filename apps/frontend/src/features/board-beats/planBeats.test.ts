@@ -759,6 +759,118 @@ describe('planBeats — the answer to an attack (#101)', () => {
   })
 })
 
+describe('planBeats — the answer to an Error 503 (#102)', () => {
+  const neutralized = (
+    over: Partial<Extract<Event, { type: 'neutralized' }>> & { id: number },
+  ): Event => ({ type: 'neutralized', player: 'p1', method: 'debugger', ...over }) as Event
+
+  const alarmPending = () =>
+    ({
+      kind: 'neutralize503',
+      player: 'p1',
+      card: 'trigger-error-503',
+      methods: ['debugger'],
+    }) as NonNullable<BoardState['pending']>
+
+  it('plans a Debugger answer as one exchange', () => {
+    const plans = planBeats(
+      [
+        neutralized({ id: 10 }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+        discarded(12, { card: 'protection-debugger', reason: 'neutralized' }),
+      ],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans).toEqual([
+      {
+        kind: 'neutralized',
+        key: 'neutralized:10',
+        eventId: 10,
+        player: 'p1',
+        method: 'debugger',
+        alarm: { eventId: 11, card: 'trigger-error-503' },
+        spent: [{ eventId: 12, card: 'protection-debugger' }],
+      },
+    ])
+  })
+
+  it('plans a Monitoring answer with nothing spent', () => {
+    const plans = planBeats(
+      [
+        neutralized({ id: 10, method: 'monitoring' }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+      ],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans).toEqual([
+      {
+        kind: 'neutralized',
+        key: 'neutralized:10',
+        eventId: 10,
+        player: 'p1',
+        method: 'monitoring',
+        alarm: { eventId: 11, card: 'trigger-error-503' },
+        spent: [],
+      },
+    ])
+  })
+
+  it('names the slot a sacrificed release flies out of, and takes its Code Review with it', () => {
+    const before = boardBefore({
+      pending: alarmPending(),
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        support: { frontend: card('support-code-review') },
+      },
+    } as Partial<BoardState>)
+    const plans = planBeats(
+      [
+        neutralized({ id: 10, method: 'sacrifice' }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+        {
+          id: 12,
+          type: 'releaseDestroyed',
+          player: 'p1',
+          slot: 'frontend',
+          card: 'release-frontend',
+        } as Event,
+        discarded(13, { card: 'release-frontend', reason: 'neutralized' }),
+        discarded(14, { card: 'support-code-review', reason: 'neutralized' }),
+      ],
+      before,
+    )
+    expect(plans).toEqual([
+      {
+        kind: 'neutralized',
+        key: 'neutralized:10',
+        eventId: 10,
+        player: 'p1',
+        method: 'sacrifice',
+        slot: 'frontend',
+        alarm: { eventId: 11, card: 'trigger-error-503' },
+        spent: [
+          { eventId: 13, card: 'release-frontend' },
+          { eventId: 14, card: 'support-code-review' },
+        ],
+      },
+    ])
+  })
+
+  it('leaves nothing for the discard planner to fly twice', () => {
+    const plans = planBeats(
+      [
+        neutralized({ id: 10 }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+        discarded(12, { card: 'protection-debugger', reason: 'neutralized' }),
+      ],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans.filter((p) => p.kind === 'discard')).toEqual([])
+  })
+})
+
 describe('classifyPiles', () => {
   // The event carries counts and nothing else — not the operation, not the
   // index. Recovering it positionally is a derivation, not a guess: a split
