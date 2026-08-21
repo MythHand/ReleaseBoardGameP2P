@@ -320,6 +320,7 @@
     "askCost": "a release costs one card — click one in the hand",
     "askDefend": "answer with a defence — pull one out of the hand",
     "askPartner": "click the defence the sudo will enhance",
+    "askNeutralize": "neutralise the alarm — answer with a lit card",
     "tabHistory": "history",
     "tabParticipants": "participants",
     "tabRules": "rules",

@@ -748,6 +748,21 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
+      ru: 'У ответа Monitoring на 503 нет движения вообще',
+      en: 'Answering a 503 with Monitoring has no movement at all',
+    },
+    problem: {
+      ru: 'Три метода отвечают на Error 503, и у двух жест — полёт: Debugger из веера, релиз из своей зоны, оба в слот прикрытия (playToCenter, поза COVER_POSE). У Monitoring движения нет ни одного: карта отвечает оттуда, где стоит, и там же остаётся. Утверждённый источник (Error503Story) жеста под него не содержит — история выстреливала Monitoring сама. Отправить его в центр и вернуть — соврать про произошедшее, поэтому в задаче 9 (#102) сделано минимальное честное: нажатие шлёт RESOLVE и не двигает ничего. Ценой того, что единственный ответ из трёх остаётся без подтверждения на месте. Закроет пресет «карта отработала, не уходя» (вспышка/пульс на самом слоте) — в словаре такого нет.',
+      en: 'Three methods answer an Error 503, and two of them are a flight: the Debugger out of the fan, a release out of your own zone, both to the cover slot (playToCenter at COVER_POSE). Monitoring has no movement at all — it answers from where it stands and stays there. The approved source (Error503Story) carries no gesture for it, because the story auto-fired it. Flying it to the centre and back would be a lie about what happened, so Task 9 (#102) ships the smallest honest thing: the press sends the RESOLVE and moves nothing. The cost is that one answer of the three gets no confirmation in place. What closes it is a preset for “this card acted without leaving” (a flash/pulse on the slot itself) — the vocabulary has none.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useNeutralizeStaging.tsx + ui: animations/',
+      en: 'frontend: pages/board/[gameId]/_useNeutralizeStaging.tsx + ui: animations/',
+    },
+    status: 'open',
+  },
+  {
+    what: {
       ru: 'Два `useFlyer` на одной странице сталкиваются ключами React',
       en: 'Two `useFlyer`s on one page collide on React keys',
     },
