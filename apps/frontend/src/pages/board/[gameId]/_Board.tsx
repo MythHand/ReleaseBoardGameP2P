@@ -1436,6 +1436,25 @@ export default function Board({
           <PendingPrompt
             pending={state.pending}
             hand={you.hand}
+            // What a `crush` sacrifice may burn — only the three release
+            // slots (Frontend/Backend/Database); Monitoring is its own
+            // neutralize method, never a sacrifice target. Card data comes
+            // from `you.release`, uid from `you.releaseUid` — the engine's
+            // choice names the uid, not the slot (Task 11, #102).
+            release={{
+              frontend:
+                you.release.frontend && you.releaseUid?.frontend
+                  ? { uid: you.releaseUid.frontend, card: you.release.frontend }
+                  : undefined,
+              backend:
+                you.release.backend && you.releaseUid?.backend
+                  ? { uid: you.releaseUid.backend, card: you.release.backend }
+                  : undefined,
+              database:
+                you.release.database && you.releaseUid?.database
+                  ? { uid: you.releaseUid.database, card: you.release.database }
+                  : undefined,
+            }}
             copy={copy.pending}
             onResolve={(choice) => actions?.onResolve?.(choice)}
           />
