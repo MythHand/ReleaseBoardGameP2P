@@ -51,3 +51,31 @@ it('stops listening once the drag is over', () => {
   act(() => fireEvent.mouseUp(window, { clientX: 400, clientY: 300 }))
   expect(onDrop).not.toHaveBeenCalled()
 })
+
+it('tears down its window listeners and rAF when unmounted mid-drag, with no mouseup ever firing', () => {
+  const removeSpy = vi.spyOn(window, 'removeEventListener')
+  const cafSpy = vi.spyOn(window, 'cancelAnimationFrame')
+  const { view, onDrop, onCancel } = harness(() => true)
+  fireEvent.mouseDown(view.getByTestId('slot'), { clientX: 10, clientY: 10 })
+  act(() => {
+    fireEvent.mouseMove(window, { clientX: 200, clientY: 200 })
+  })
+
+  view.unmount()
+
+  expect(removeSpy).toHaveBeenCalledWith('mousemove', expect.any(Function))
+  expect(removeSpy).toHaveBeenCalledWith('mouseup', expect.any(Function))
+  expect(cafSpy).toHaveBeenCalled()
+
+  // Prove the listeners are actually gone, not just that removal was
+  // attempted: a mousemove/mouseup after unmount must reach no handler.
+  act(() => {
+    fireEvent.mouseMove(window, { clientX: 500, clientY: 500 })
+    fireEvent.mouseUp(window, { clientX: 500, clientY: 500 })
+  })
+  expect(onDrop).not.toHaveBeenCalled()
+  expect(onCancel).not.toHaveBeenCalled()
+
+  removeSpy.mockRestore()
+  cafSpy.mockRestore()
+})

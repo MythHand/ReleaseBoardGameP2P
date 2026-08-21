@@ -1,5 +1,5 @@
 import { CARD_RATIO, CARD_W } from '@release/ui'
-import type { MouseEvent as ReactMouseEvent, ReactNode, RefObject } from 'react'
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import styles from './_useZonePull.module.css'
 
@@ -51,11 +51,12 @@ export function useZonePull<K extends string = string>(opts: {
   const { onDrop, onCancel, accepts } = opts
   const [drag, setDrag] = useState<DragState<K> | null>(null)
   const dragRef = useRef<HTMLDivElement>(null)
-  // the carrier's content is a ref, not state: `render()` is called from the
-  // consumer's own render body, and the overlay component below reads it
-  // fresh at ITS render time (which happens after `render()` ran), so no
-  // extra state / re-render dance is needed to keep it current.
-  const contentRef = useRef<ReactNode>(null)
+  // The carrier's content is state, not a ref: `render()` is called from the
+  // consumer's own render body, and mutating a ref there is the thing React
+  // warns against — it's unsafe under concurrent rendering. This costs one
+  // extra render per `render()` call (pick-up only, not per frame); the rAF
+  // loop below still writes style.left/top/width straight onto the node.
+  const [content, setContent] = useState<ReactNode>(null)
 
   function begin(key: K, el: HTMLElement, e: ReactMouseEvent) {
     e.preventDefault() // don't start a text selection on pick-up
@@ -129,26 +130,11 @@ export function useZonePull<K extends string = string>(opts: {
   return {
     dragging: drag?.key ?? null,
     begin,
-    // `Carrier` is its own component so it reads `contentRef.current` at ITS
-    // own render — which React calls after the consumer's function body (and
-    // therefore after any `render()` call inside it) has already run.
-    overlay: drag && <Carrier dragRef={dragRef} contentRef={contentRef} />,
-    render: (node: ReactNode) => {
-      contentRef.current = node
-    },
+    overlay: drag && (
+      <div className={styles.carrier} ref={dragRef} style={{ width: CARD_W }}>
+        {content}
+      </div>
+    ),
+    render: (node: ReactNode) => setContent(node),
   }
-}
-
-function Carrier({
-  dragRef,
-  contentRef,
-}: {
-  dragRef: RefObject<HTMLDivElement | null>
-  contentRef: RefObject<ReactNode>
-}) {
-  return (
-    <div className={styles.carrier} ref={dragRef} style={{ width: CARD_W }}>
-      {contentRef.current}
-    </div>
-  )
 }
