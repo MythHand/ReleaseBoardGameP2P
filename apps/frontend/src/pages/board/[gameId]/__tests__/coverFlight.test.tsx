@@ -6,6 +6,10 @@ import { useCoverFlight } from '../_useCoverFlight'
 
 const played = vi.hoisted(() => ({
   calls: [] as { name: string; params: Record<string, unknown> }[],
+  // when set, `play()` hands back THIS promise instead of an already-resolved
+  // one — lets a test hold a flight in the air and resolve it on demand, to
+  // land it exactly when `stillCurrent` should (or should not) still be true.
+  pending: undefined as { finished: Promise<void>; resolve: () => void } | undefined,
 }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
@@ -13,6 +17,7 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     ...real,
     play: (name: string, _el: unknown, params: Record<string, unknown> = {}) => {
       played.calls.push({ name, params })
+      if (played.pending) return { finished: played.pending.finished } as unknown as Animation
       return { finished: Promise.resolve() } as unknown as Animation
     },
   }
@@ -76,6 +81,56 @@ it('reports landed even when the animation is cancelled mid-flight', async () =>
     })
   })
   expect(api.flight?.landed).toBe(true)
+})
+
+it('does not raise landed for a cycle a restage has already superseded', async () => {
+  // Whole-branch review fix: `stageDefSudo` cancels-and-restages its `partner`
+  // staging while a Sudo flight is still in the air (the SAME `useCoverFlight`
+  // instance carries the new cycle). Without `stillCurrent` gating the old
+  // cycle's `finally`, that stale cycle still flips `landed` true once its
+  // flight settles, painting `_Board.tsx`'s static Sudo card over a carrier
+  // that is still flying the NEW staging — two copies of the same card.
+  played.calls.length = 0
+  const api = harness()
+  const to = document.createElement('div')
+
+  let resolveFirst = () => {}
+  played.pending = {
+    finished: new Promise<void>((res) => {
+      resolveFirst = res
+    }),
+    resolve: () => {},
+  }
+
+  let current = 'first'
+  let firstFlight: Promise<void> | undefined
+  await act(() => {
+    firstFlight = api.flight?.fly({
+      card: hotfix,
+      from: { left: 0, top: 0, width: 150, height: 210 },
+      to: () => to.getBoundingClientRect(),
+      pose: POSE,
+      stillCurrent: () => current === 'first',
+    })
+  })
+  expect(api.flight?.landed).toBe(false)
+
+  // the restage: a second cycle takes over the same hook instance while the
+  // first flight is still awaiting `.finished`
+  current = 'second'
+
+  // the first flight's animation now settles (rejecting is the harder case —
+  // #101's `finally` load-bearing — but landing plainly late is enough to
+  // show the stale cycle must not touch `landed` either)
+  played.pending = undefined
+  resolveFirst()
+  await act(async () => {
+    await firstFlight
+  })
+
+  // the stale cycle must NOT have raised `landed` for the staging that
+  // replaced it
+  expect(api.flight?.landed).toBe(false)
 })
 
 it('sees only rejections that arrive after the mark', () => {

@@ -32,6 +32,15 @@ export interface FlyArgs {
   key?: string
   /** …or whatever the caller puts in the carrier instead of a bare card */
   content?: ReactNode
+  /** checked in the `finally`, right before `landed` is raised: answers
+   *  whether THIS cycle still owns the staging it was flying for. A caller
+   *  whose staging can be cancelled and replaced while the flight is still in
+   *  the air (Task 17's Sudo slot) passes this so a stale cycle's landing
+   *  does not flip `landed` true for whatever staging replaced it — see
+   *  `_useDefenseStaging.tsx`'s `stageDefSudo` for the concrete check. Omit it
+   *  when no restaging can happen mid-flight; the flag is then always raised,
+   *  same as before this option existed. */
+  stillCurrent?: () => boolean
 }
 
 export interface CoverFlight {
@@ -77,7 +86,7 @@ export function useCoverFlight(shared?: Flyer): CoverFlight {
   const settle = useCallback(() => setLanded(true), [])
 
   const fly = useCallback(
-    async ({ card, from, to, pose, key = 'cover', content }: FlyArgs) => {
+    async ({ card, from, to, pose, key = 'cover', content, stillCurrent }: FlyArgs) => {
       setLanded(false) // fresh cycle — the flight below has not carried this card yet
       try {
         const dest = to()
@@ -106,7 +115,16 @@ export function useCoverFlight(shared?: Flyer): CoverFlight {
         // there: a `.finished` that rejects must still report the carrier gone,
         // or `landed` stays false with a dispatched play staged and the fan
         // keeps a hole in it for the rest of the match.
-        setLanded(true)
+        //
+        // `stillCurrent` is checked HERE, not before the `try` — a rejected
+        // `.finished` must still reach this line, and a cancel-and-restage
+        // must still leave `landed` false for whatever now-current staging
+        // replaced this cycle. Both properties hold only if the flag on the
+        // OLD cycle is gated right where it is raised, not by skipping the
+        // `finally` altogether (whole-branch review, fix round: a restaged
+        // Sudo was flipping `sudoLanded` true for the NEW staging, painting
+        // the static card while the new carrier was still flying it).
+        if (!stillCurrent || stillCurrent()) setLanded(true)
       }
     },
     [reduced, flyer.raise, flyer.drop],

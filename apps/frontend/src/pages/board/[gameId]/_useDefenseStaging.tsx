@@ -361,6 +361,19 @@ export function useDefenseStaging({
   const stageDefSudo = useCallback(
     (uid: string, card: CardData, index: number, from: Rect | undefined, dropped: HandPlayDrop) => {
       commitStaged({ support: { uid, card, index }, main: null, phase: 'partner', merged: false })
+      // A cancel (or a later dispatch) may take this staging away WHILE the
+      // flight below is still in the air (Fix round 1, Important 1) — the
+      // approved source's own `cancelStaged` guards this exact window with
+      // `busyRef.current`, dropped in the initial port. Shared by the
+      // continuation below AND by `sudoFlight.fly`'s own `stillCurrent`
+      // (whole-branch review fix): without the latter, a stale cycle's
+      // `finally` still raises `sudoLanded` for whatever NEW staging replaced
+      // this one, and `_Board.tsx` paints the static Sudo card while the new
+      // carrier is still flying it — two copies of the same card on screen.
+      const stillCurrent = () =>
+        !cancellingRef.current &&
+        stagedRef.current?.phase === 'partner' &&
+        stagedRef.current.support?.uid === uid
       void (async () => {
         await sudoFlight.fly({
           card,
@@ -368,23 +381,14 @@ export function useDefenseStaging({
           to: () => anchors.sudo.current?.getBoundingClientRect(),
           pose: SUDO_POSE,
           key: 'sudo',
+          stillCurrent,
         })
-        // A cancel (or a later dispatch) may have taken this staging away
-        // WHILE the flight above was still in the air (Fix round 1,
-        // Important 1) — the approved source's own `cancelStaged` guards this
-        // exact window with `busyRef.current`, dropped in the initial port.
         // Without this check, a press landing mid-flight runs `cancel()`
         // (whose own `arrowCtl.stop()` is a no-op — nothing is armed yet) and
         // sends the card home, but this continuation, unaware, still arms an
         // arrow from an empty slot that follows the cursor until some LATER
         // staging happens to call `stop()`.
-        if (
-          cancellingRef.current ||
-          stagedRef.current?.phase !== 'partner' ||
-          stagedRef.current.support?.uid !== uid
-        ) {
-          return
-        }
+        if (!stillCurrent()) return
         // the arrow starts where the Sudo now stands and follows the cursor —
         // the ported source's own `stageDefSudo`
         const box = anchors.sudo.current?.getBoundingClientRect()

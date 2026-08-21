@@ -1,6 +1,7 @@
 import { CARD_RATIO, CARD_W } from '@release/ui'
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
+import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import styles from './_useZonePull.module.css'
 
 // Pulling a card out of your OWN release zone — a source nothing on the board
@@ -49,6 +50,7 @@ export function useZonePull<K extends string = string>(opts: {
   accepts: (x: number, y: number) => boolean
 }): ZonePull<K> {
   const { onDrop, onCancel, accepts } = opts
+  const reduced = useReducedMotion()
   const [drag, setDrag] = useState<DragState<K> | null>(null)
   const dragRef = useRef<HTMLDivElement>(null)
   // The carrier's content is state, not a ref: `render()` is called from the
@@ -92,7 +94,14 @@ export function useZonePull<K extends string = string>(opts: {
     const frame = (now: number) => {
       const node = dragRef.current
       if (node) {
-        const t = Math.min(1, (now - start) / RESIZE_MS)
+        // `prefers-reduced-motion` (project rule: honoured everywhere, and
+        // `play()` does not check it for us — JS choreography has to ask on
+        // its own, `useReducedMotion` is the codebase's way of doing that).
+        // The pick-up itself stays direct manipulation either way — the card
+        // still follows the cursor 1:1 — this only gates the 200ms EASE of
+        // its width from the source rect to the normal card size; under
+        // `reduce` it snaps to that size on the very first frame instead.
+        const t = reduced ? 1 : Math.min(1, (now - start) / RESIZE_MS)
         const ease = 1 - (1 - t) ** 3
         const w = drag.startW + (CARD_W - drag.startW) * ease
         const h = (w * CARD_H) / CARD_W
