@@ -902,6 +902,90 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
   })
 })
 
+describe('planBeats — the sweep (#102)', () => {
+  const eliminated = (
+    over: Partial<Extract<Event, { type: 'eliminated' }>> & { id: number },
+  ): Event => ({ type: 'eliminated', player: 'p1', ...over }) as Event
+
+  it('gathers a knocked-out player’s cards into one sweep', () => {
+    const plans = planBeats(
+      [
+        eliminated({ id: 20 }),
+        discarded(21, { card: 'attack-bug', reason: 'effect' }),
+        discarded(22, { card: 'protection-debugger', reason: 'effect' }),
+        discarded(23, { card: 'release-frontend', reason: 'destroyed' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans).toEqual([
+      {
+        kind: 'discard',
+        key: 'discard:21',
+        gather: true,
+        cards: [
+          { key: 'd21', eventId: 21, card: 'attack-bug', source: { kind: 'hand', index: 0 } },
+          {
+            key: 'd22',
+            eventId: 22,
+            card: 'protection-debugger',
+            source: { kind: 'hand', index: 1 },
+          },
+          {
+            key: 'd23',
+            eventId: 23,
+            card: 'release-frontend',
+            source: { kind: 'release', player: 'p1', slot: 'frontend' },
+          },
+        ],
+      },
+    ])
+  })
+
+  it('leaves an ordinary discard ungathered', () => {
+    const plans = planBeats([discarded(21, { reason: 'handLimit' })], boardBefore())
+    expect((plans[0] as { gather?: true }).gather).toBeUndefined()
+  })
+
+  // Correction 1's own failure mode, pinned: `sweeping` must be cleared
+  // INSIDE `flush()`, not at the eliminated/discarded call site, or the flag
+  // set by an earlier sweep would survive across an unrelated event and
+  // wrongly gather a LATER discard that has nothing to do with it.
+  it('does not gather a later, unrelated discard after the sweep has closed', () => {
+    const plans = planBeats(
+      [
+        eliminated({ id: 20 }),
+        discarded(21, { card: 'attack-bug', reason: 'effect' }),
+        tookHit({ id: 22 }), // closes the sweep's run — nothing to do with it
+        discarded(23, { card: 'protection-debugger', reason: 'handLimit' }),
+      ],
+      boardBefore(),
+    )
+    const discards = plans.filter((p) => p.kind === 'discard')
+    expect(discards).toEqual([
+      {
+        kind: 'discard',
+        key: 'discard:21',
+        gather: true,
+        cards: [
+          { key: 'd21', eventId: 21, card: 'attack-bug', source: { kind: 'hand', index: 0 } },
+        ],
+      },
+      {
+        kind: 'discard',
+        key: 'discard:23',
+        cards: [
+          {
+            key: 'd23',
+            eventId: 23,
+            card: 'protection-debugger',
+            source: { kind: 'hand', index: 1 },
+          },
+        ],
+      },
+    ])
+  })
+})
+
 describe('classifyPiles', () => {
   // The event carries counts and nothing else — not the operation, not the
   // index. Recovering it positionally is a derivation, not a guess: a split

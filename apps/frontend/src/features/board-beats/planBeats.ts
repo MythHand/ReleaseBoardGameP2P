@@ -55,7 +55,10 @@ export type PileStep =
 
 export type BeatPlan =
   | { kind: 'draw'; key: string; draws: PlannedDraw[] }
-  | { kind: 'discard'; key: string; cards: DiscardCard[] }
+  // `gather` marks a defenceless player's whole table leaving as one sweep —
+  // everything they owned gathered at the centre and held before it scatters
+  // (#102). Absent for an ordinary discard, never `false`.
+  | { kind: 'discard'; key: string; cards: DiscardCard[]; gather?: true }
   | { kind: 'reshuffle'; key: string; cards: number }
   | { kind: 'piles'; key: string; steps: PileStep[] }
   // A window attack reaches the centre — the pair, if it threw with a Sudo,
@@ -316,6 +319,13 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   // created it: `before.pending` cannot change mid-walk, and only one
   // exchange can be pending at a time.
   let pairOut: Extract<BeatPlan, { kind: 'pairToDiscard' }> | null = null
+  // The player a sweep is open for — set by `eliminated`, read by the
+  // `discarded` branch that follows it to mark that run gathered. Cleared
+  // INSIDE `flush()`, alongside the other run locals: `flush()` runs on every
+  // branch below (`drawn`, `released`, `defended`, …), not only on the
+  // `eliminated`/`discarded` pair, so a flag left standing past its own run
+  // would wrongly gather a later, unrelated discard.
+  let sweeping: string | null = null
   const flush = () => {
     if (draw) plans.push(draw)
     // A discard beat with nothing aimable is not a beat: every card in the run
@@ -327,6 +337,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
     discard = null
     pileRun = null
     pairOut = null
+    sweeping = null
   }
 
   for (let i = 0; i < events.length; i++) {
@@ -445,6 +456,15 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       })
       continue
     }
+    if (e.type === 'eliminated') {
+      // Everything this player owned leaves at once, and it leaves as ONE
+      // gesture: gathered at the centre, held open long enough for the table to
+      // read what happened, and only then scattered. The same beat the hand
+      // limit gets (#104 will reuse this leg).
+      flush()
+      sweeping = e.player
+      continue
+    }
     if (e.type === 'neutralized') {
       // One event, one beat — the exchange is its own gesture, never coalesced
       // with what came before or after.
@@ -554,8 +574,17 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // rules have not settled (docs/animations/backlog.md). Nothing is invented:
       // it is not flown, and the projection still puts it in the discard.
       if (!source) continue
+      // Captured BEFORE `flush()`: flush is what clears `sweeping` (it runs on
+      // every branch, not only this one), so reading the flag after it would
+      // always see it already gone and the sweep would never gather at all.
+      const gather = sweeping === e.player
       if (!discard) flush()
-      discard ??= { kind: 'discard', key: `discard:${e.id}`, cards: [] }
+      discard ??= {
+        kind: 'discard',
+        key: `discard:${e.id}`,
+        cards: [],
+        ...(gather ? { gather: true as const } : {}),
+      }
       discard.cards.push({ key: `d${e.id}`, eventId: e.id, card: e.card, source })
       continue
     }
