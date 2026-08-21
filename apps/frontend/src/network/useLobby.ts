@@ -592,21 +592,30 @@ export function useLobby(): UseLobby {
   }, [])
   leaveSessionRef.current = leaveSession
 
-  // Leaving the match without leaving the room. The local match id goes — it is
-  // what useFollowGameStart watches, so a peer walking back to the lobby with it
-  // still set would be sent straight to the board again — and the frozen seating
-  // with it, since it describes a match this peer has now left.
+  // Leaving the match without leaving the room. Only the local match id goes —
+  // it is what useFollowGameStart watches, so a peer walking back to the lobby
+  // with it still set would be sent straight to the board again.
   //
-  // The keeper, the link and the last sync stay. link.close() is local-only
-  // (session/link.ts), but the match is already over and another peer may still
-  // be reading its results — there is nothing here to reclaim and a live
-  // results screen to break. A rematch tears the old keeper and gate down inside
-  // startGame before building new ones, and leaveSession tears everything down
-  // when the room itself is left.
+  // The frozen seating deliberately STAYS. Clearing it would make the results
+  // screen fall back to seatsFor(live roster) for as long as it is still
+  // mounted, which is the renumbering the frozen seating exists to end: one
+  // player's counters standing under another player's name, and the departed
+  // player's row gone. Nothing paints today because React batches this with the
+  // navigation that follows it — but that makes the invariant rest on statement
+  // order inside one handler rather than on the data, and an added await, a
+  // split handler or a navigation moved into an effect would each be enough.
+  // The rows come from the seating the match was dealt with, full stop.
+  // Nothing reads it stale: GAME_STARTING overwrites it for the next match, and
+  // leaveSession clears it when the room itself is left.
+  //
+  // The keeper, the link and the last sync stay for the same kind of reason.
+  // link.close() is local-only (session/link.ts), but the match is already over
+  // and another peer may still be reading its results — there is nothing here to
+  // reclaim and a live results screen to break. A rematch tears the old keeper
+  // and gate down inside startGame before building new ones.
   const leaveGame = useCallback(() => {
     gameIdRef.current = null
     setGameId(null)
-    setSeats([])
   }, [])
 
   const setSetup = useCallback(

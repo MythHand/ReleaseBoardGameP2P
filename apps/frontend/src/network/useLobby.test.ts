@@ -352,19 +352,46 @@ it('forgets the game id when the session is torn down', async () => {
   expect(result.current.seats).toEqual([])
 })
 
-it('walking back to the lobby forgets the match and its seating', async () => {
+it('walking back to the lobby forgets the match but keeps its seating', async () => {
+  // The seating outlives leaveGame on purpose. A results screen still mounted
+  // would otherwise fall back to seatsFor(live roster) and renumber the seats —
+  // one player's counters under another player's name, the departed player's row
+  // gone. Nothing paints today because React batches this with the navigation
+  // that follows, but that would make the invariant rest on statement order
+  // inside a click handler rather than on the data.
   const { result } = await hostWithGuest()
   act(() => {
     result.current.startGame()
   })
-  expect(result.current.seats).toHaveLength(2)
+  const dealt = result.current.seats
+  expect(dealt).toHaveLength(2)
 
   act(() => {
     result.current.leaveGame()
   })
 
+  // The id goes — it is what would bounce this peer back to the board.
   expect(result.current.gameId).toBeNull()
-  expect(result.current.seats).toEqual([])
+  // The seating stays, unchanged.
+  expect(result.current.seats).toEqual(dealt)
+})
+
+it('a new match replaces the seating the last one left behind', async () => {
+  // Why keeping it across leaveGame is safe: nothing reads it stale.
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+  act(() => {
+    result.current.leaveGame()
+  })
+
+  act(() => {
+    result.current.startGame()
+  })
+
+  expect(result.current.gameId).toBe(`${result.current.state?.hostId}-2`)
+  expect(result.current.seats).toHaveLength(2)
 })
 
 // --- reporting the opening deal is done ---
