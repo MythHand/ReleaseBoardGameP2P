@@ -16,6 +16,7 @@ import {
   type DockView,
   Drawer,
   deriveDock,
+  EdgeGlow,
   GameModes,
   GameOver,
   GearIcon,
@@ -405,6 +406,12 @@ export default function Board({
   // and the layout effect below collapsing it, and both readers now resolve
   // that tie the same way because they read the same value.
   const pendingDefend = !staging.staged && state.pending?.kind === 'defend' ? state.pending : null
+
+  // The alarm standing at the centre. Read ONCE, same reason and same shape as
+  // `pendingDefend` above. `staging.staged` does not gate it: an answer to a
+  // 503 goes to the COVER slot, never over the alarm's own.
+  const pendingAlarm = state.pending?.kind === 'neutralize503' ? state.pending : null
+  const alarmMine = pendingAlarm?.player === state.selfId
 
   // the release standing at the stage slot while its cost is unpaid — read
   // ONCE, same reason as `pendingDefend` above, and its OWNERSHIP stated here
@@ -997,7 +1004,13 @@ export default function Board({
         data-board-centre
         data-centre-slot="attack"
         ref={anchors.centre}
-        {...previewProps(pendingDefend ? cardById(pendingDefend.attackCard) : null)}
+        {...previewProps(
+          pendingDefend
+            ? cardById(pendingDefend.attackCard)
+            : pendingAlarm?.card
+              ? cardById(pendingAlarm.card)
+              : null,
+        )}
       >
         {intro &&
           deal.staged.map((s) => {
@@ -1058,9 +1071,36 @@ export default function Board({
               </div>
             )
           })()}
+        {pendingAlarm &&
+          (() => {
+            const data = pendingAlarm.card ? cardById(pendingAlarm.card) : null
+            if (!data) return null
+            return (
+              <div
+                className={opening.centreCard}
+                data-testid="board-centre-alarm"
+                data-pending-play
+              >
+                <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+                  <Card card={data} interactive={false} width="100%" />
+                </div>
+              </div>
+            )
+          })()}
       </div>
 
-      <div className={kit.you}>
+      {/* OUR OWN alarm — strong, and BEFORE the hand in the DOM so it glows
+          UNDER it. The bounds are the table zone itself: `kit.table` is already
+          `position: relative; overflow: hidden; isolation: isolate`, so the
+          layout supplies them and there is nothing to measure. The playground's
+          `.glowBounds` and its hardcoded tech-bar offsets stay in the
+          playground — that story is explicitly not the reference here (Page
+          Shell Rule, apps/playground/CLAUDE.md). */}
+      {pendingAlarm && alarmMine && (
+        <EdgeGlow visible intensity="strong" data-testid="board-glow-strong" />
+      )}
+
+      <div className={kit.you} data-testid="board-you">
         {youEliminated ? (
           <Badge size="lg" className={kit.youBadge}>
             {copy.table.youEliminated}
@@ -1229,6 +1269,14 @@ export default function Board({
           </>
         )}
       </div>
+
+      {/* SOMEONE ELSE's alarm — weak, and AFTER the hand so it lies over it.
+          `pointer-events: none` is already on the primitive for both
+          intensities (EdgeGlow.module.css), so the fan's hover reaction is not
+          smothered and the DOM position is the only thing to get right. */}
+      {pendingAlarm && !alarmMine && (
+        <EdgeGlow visible intensity="weak" data-testid="board-glow-weak" />
+      )}
 
       {/* служебный док хода — низ слева, под колодами, слева от руки */}
       <div className={kit.turnDock}>
