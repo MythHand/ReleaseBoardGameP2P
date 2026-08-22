@@ -467,6 +467,12 @@ into the release zone.
 6. **The fold** — `play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: 620 })` and
    `play('foldIntoPair', auxEl, { from: cRect, box: cRect, pose: PAIR_AUX_POSE, dur: 620, snap: true })`
    in parallel; `await Promise.all([a1?.finished, a2?.finished])`.
+
+   > **Steps 5–6 are now a step of their own: `usePairFold`.** The scenes call it (Combo, Defense
+   > Release); the board still carries this hand-written version in three places, and replacing them
+   > is a call, not a rewrite. The step also mounts the pair invisible and reveals it in the same
+   > tick the entry poses are set, which is what the flyer form cannot do — `raise` waits for a paint
+   > before it hands the node back, so the pair shows up already folded for a frame or two.
 7. `finish()` — wrapped in `try`/`finally` so every exit clears `foldingRef`, not only this one —
    branches on the partner: a window names it → `phase: 'dispatched'`, `onAttack(main.uid,
    support.uid)`; it still has its own targets → `phase: 'target'`, re-aim from the centre; else (a

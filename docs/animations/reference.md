@@ -279,6 +279,34 @@ switch is made at the middle of that sweep, where the strip is at its smallest a
 
 ---
 
+---
+
+## Centre of the table — the places a card lands in
+
+`apps/ui/src/table/TableCentre/centre.ts`
+
+The same idea as the fan's geometry, for the centre: the named PLACES a card lands in, declared once
+and read by every scene that has one. `CENTRE_TOP` is how high the row sits (42% — the centre clears the hand),
+`CENTRE_SLOTS` gives each place its offset from the middle and its width (they are not all one width
+— the AI effect is 200), `CENTRE_SETS` groups them by game situation and records, per situation,
+whether a card lies there `square` or at its `own` angle.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `CENTRE_TOP` | `42` | the row's height, in % of the table — one value for every place and every scene |
+| `CENTRE_SLOTS` | `Record<CentreSlot, { dx, w, from }>` | where each place sits and how wide it is; `from` names the scene the value was transcribed from |
+| `CENTRE_SETS` | `Record<CentreSet, Partial<Record<CentreSlot, { tilt, z? }>>>` | the places a game situation uses, with the CHARACTER of the tilt (`square` \| `own`) and a layer only where a situation actually overlaps |
+| `centrePlaceStyle` | `centrePlaceStyle(set, slot)` → `CSSProperties` | the whole style of a place: height, offset, width, and a `zIndex` only if the situation declared one |
+| `centreTransform` | `centreTransform(slot)` → `string` | just the offset, for a caller that positions the rest itself |
+| `AskLine` | `<AskLine shown>{text}</AskLine>` (`@/table/TableCentre/AskLine`) | the line the table speaks with, hanging UNDER the centre: it holds no height of its own, only `CENTRE_TOP` plus an offset, and the 14px between hidden and shown is its whole movement (260ms, appears in place, always mounted so it fades out too). Its own page: `Ask line` |
+
+**No angle here, and no default angle either.** A place says WHERE a card lands; at what angle it
+lies is decided by whoever brought it. The tilts are deterministically random (`scatterAt` hashes
+one from a key, so every peer sees the same heap and a card lands exactly where it then lies), and a
+place that dictated a pose would collapse that into one angle for everyone — and drop a card that
+already computed its own into a different one on its last frame. What a situation records is the
+character alone, answering "who put the card there" (**I11**), never "how many degrees".
+
 ## Card preview — reading a card that stands on the table
 
 `apps/ui/src/table/CardPreview`. A card at the centre while a 503 comes out of the deck, an AI card
