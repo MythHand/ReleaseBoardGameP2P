@@ -2,9 +2,10 @@ import type { Event } from '@release/engine'
 import type { CardData } from '@release/ui'
 import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
+import { ELIM_DELAY } from './eliminateBeat'
 import { useBeats } from './useBeats'
 
 const motion = vi.hoisted(() => ({ reduced: true }))
@@ -169,6 +170,10 @@ function Probe({
       {/* How many flyers are mounted right now — a dead match's in-flight card
           shows up here until its runner's own reset() clears it. */}
       <div data-testid="overlay">{beats.overlays.length}</div>
+      {/* …and the overlays themselves, so a beat that puts something ON the
+          board (the elimination clip, #103) can be looked for rather than
+          merely counted */}
+      <div data-testid="overlays">{beats.overlays}</div>
       {/* The running beat's own alarm (#102) — the wire this test exercises end
           to end, from planBeats' `gather` flag through the discard beat's run
           to the queue's own `Beat.alarm`. */}
@@ -528,4 +533,51 @@ it('leaves the alarm dark through an ordinary, ungathered discard', async () => 
     await new Promise((r) => setTimeout(r, 80))
   })
   expect(getByTestId('alarm').textContent).toBe('none')
+})
+
+// ===== the elimination clip (#103) — the same wire as the sweep's alarm above,
+// carried one beat further: planBeats' `eliminated` plan through beatOf into a
+// runner that puts a video on the board and holds the table while it plays.
+it('holds the table under the elimination clip, and hands it back when it goes', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = false
+  const { getByTestId, container, rerender } = render(
+    <Probe live={preDiscard} events={[]} anchors={stub} />,
+  )
+  rerender(<Probe live={afterSweep} events={[eliminatedEvent, sweptEvent]} anchors={stub} />)
+  await flush()
+  // the sweep has landed and the clip's own delay has passed
+  await act(async () => void (await new Promise((r) => setTimeout(r, ELIM_DELAY + 120))))
+  expect(container.querySelector('video')).not.toBeNull()
+  // it owns the table while it plays — input is dead under a full-screen video
+  expect(getByTestId('exclusive').textContent).toBe('exclusive')
+  // …and what it plays over is the board the match is LEFT with, not the one
+  // the batch found. A non-exclusive beat here would hold the pre-batch shadow
+  // under the clip and empty the table the moment it lifted — the video would
+  // be covering the elimination instead of following it.
+  expect(getByTestId('discardCount').textContent).toBe('1')
+  // and the table comes back when the clip is done with it
+  await act(async () => {
+    fireEvent.error(container.querySelector('video') as HTMLVideoElement)
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(container.querySelector('video')).toBeNull()
+  expect(getByTestId('exclusive').textContent).toBe('open')
+})
+
+// The decision, pinned rather than left to emerge: a full-screen autoplaying
+// video is exactly what the preference is about, so under it there is no clip
+// at all — the board simply stands in its eliminated state, which is what
+// carries the news. `useBeats` already queues nothing under the preference;
+// this is here so that stays true of the clip specifically.
+it('plays no clip at all under prefers-reduced-motion', async () => {
+  motion.reduced = true
+  sent.calls = []
+  sent.hang = false
+  const { container, rerender } = render(<Probe live={preDiscard} events={[]} anchors={stub} />)
+  rerender(<Probe live={afterSweep} events={[eliminatedEvent, sweptEvent]} anchors={stub} />)
+  await flush()
+  await act(async () => void (await new Promise((r) => setTimeout(r, ELIM_DELAY + 120))))
+  expect(container.querySelector('video')).toBeNull()
 })

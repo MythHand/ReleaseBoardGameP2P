@@ -61,6 +61,11 @@ export type BeatPlan =
   | { kind: 'discard'; key: string; cards: DiscardCard[]; gather?: true }
   | { kind: 'reshuffle'; key: string; cards: number }
   | { kind: 'piles'; key: string; steps: PileStep[] }
+  // A player is out: the full-screen video plays over a board that has already
+  // settled into its eliminated state (#103). Carries no clip of its own — the
+  // runner resolves one from `eventId`, so every peer watching the same
+  // elimination watches the same clip without a word about it on the wire.
+  | { kind: 'eliminated'; key: string; eventId: number; player: string }
   // A window attack reaches the centre — the pair, if it threw with a Sudo,
   // or a lone card if not. The pair settles at the centre and not at a seat, so
   // `target` is not a destination; it is carried because the runner has to know
@@ -326,6 +331,11 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   // `eliminated`/`discarded` pair, so a flag left standing past its own run
   // would wrongly gather a later, unrelated discard.
   let sweeping: string | null = null
+  // The elimination's own beat (#103), held rather than pushed where its event
+  // is read: the video plays over an emptied board, and the `eliminated`
+  // arrives BEFORE the discards it opens. `flush()` is what puts it behind
+  // them — and what emits it at all when there was nothing to sweep.
+  let elimination: Extract<BeatPlan, { kind: 'eliminated' }> | null = null
   const flush = () => {
     if (draw) plans.push(draw)
     // A discard beat with nothing aimable is not a beat: every card in the run
@@ -333,11 +343,15 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
     if (discard && discard.cards.length > 0) plans.push(discard)
     if (pileRun) plans.push(pileRun)
     if (pairOut) plans.push(pairOut)
+    // LAST: everything this run flew has to be off the table before the video
+    // covers it.
+    if (elimination) plans.push(elimination)
     draw = null
     discard = null
     pileRun = null
     pairOut = null
     sweeping = null
+    elimination = null
   }
 
   for (let i = 0; i < events.length; i++) {
@@ -463,6 +477,15 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // limit gets (#104 will reuse this leg).
       flush()
       sweeping = e.player
+      // Held, not pushed — see `elimination` above. The `flush()` just above is
+      // what keeps two eliminations in one batch as two beats: the first is
+      // already out before the second is opened.
+      elimination = {
+        kind: 'eliminated',
+        key: `eliminated:${e.id}`,
+        eventId: e.id,
+        player: e.player,
+      }
       continue
     }
     if (e.type === 'neutralized') {
@@ -578,7 +601,16 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // every branch, not only this one), so reading the flag after it would
       // always see it already gone and the sweep would never gather at all.
       const gather = sweeping === e.player
+      // And captured for the same reason (#103): the video plays over an
+      // emptied board, so it must not be flushed out ahead of its own sweep.
+      const opened: Extract<BeatPlan, { kind: 'eliminated' }> | null = gather ? elimination : null
+      // Taken off the local BEFORE the flush and put back after: left standing,
+      // `flush()` would push the video ahead of the very sweep it waits for.
+      // Only for the run that belongs to it — an unrelated discard flushes the
+      // elimination out for real, which is right.
+      if (opened) elimination = null
       if (!discard) flush()
+      if (opened) elimination = opened
       discard ??= {
         kind: 'discard',
         key: `discard:${e.id}`,

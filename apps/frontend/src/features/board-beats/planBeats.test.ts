@@ -938,6 +938,8 @@ describe('planBeats — the sweep (#102)', () => {
           },
         ],
       },
+      // and the video behind it (#103) — the sweep is what it plays over
+      { kind: 'eliminated', key: 'eliminated:20', eventId: 20, player: 'p1' },
     ])
   })
 
@@ -982,6 +984,54 @@ describe('planBeats — the sweep (#102)', () => {
           },
         ],
       },
+    ])
+  })
+})
+
+describe('planBeats — elimination (#103)', () => {
+  const eliminated = (
+    over: Partial<Extract<Event, { type: 'eliminated' }>> & { id: number },
+  ): Event => ({ type: 'eliminated', player: 'p1', ...over }) as Event
+
+  // The video plays over a board that has already emptied, so the plan is
+  // pushed when the sweep's own run closes rather than where the event is
+  // read — the `eliminated` arrives BEFORE the discards it opens.
+  it('plays after the sweep it opened, not before it', () => {
+    const plans = planBeats(
+      [
+        eliminated({ id: 20 }),
+        discarded(21, { card: 'attack-bug', reason: 'effect' }),
+        discarded(22, { card: 'protection-debugger', reason: 'effect' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['discard', 'eliminated'])
+    expect(plans[1]).toEqual({
+      kind: 'eliminated',
+      key: 'eliminated:20',
+      eventId: 20,
+      player: 'p1',
+    })
+  })
+
+  // `lastStanding` reaches elimination with nothing to sweep, and a discard
+  // plan with no cards is dropped by `flush()` — so a video that rode on the
+  // sweep would not exist on exactly the path that has no sweep.
+  it('plays for an elimination that sweeps nothing', () => {
+    const plans = planBeats([eliminated({ id: 20, player: 'p2' })], boardBefore())
+    expect(plans).toEqual([{ kind: 'eliminated', key: 'eliminated:20', eventId: 20, player: 'p2' }])
+  })
+
+  // Two players out in one batch is two videos, not one: each elimination is
+  // its own beat, behind its own sweep.
+  it('gives each knocked-out player their own beat', () => {
+    const plans = planBeats(
+      [eliminated({ id: 20, player: 'p1' }), eliminated({ id: 21, player: 'p2' })],
+      boardBefore(),
+    )
+    expect(plans).toEqual([
+      { kind: 'eliminated', key: 'eliminated:20', eventId: 20, player: 'p1' },
+      { kind: 'eliminated', key: 'eliminated:21', eventId: 21, player: 'p2' },
     ])
   })
 })
