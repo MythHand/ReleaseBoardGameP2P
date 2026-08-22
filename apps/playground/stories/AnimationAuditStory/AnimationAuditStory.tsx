@@ -579,12 +579,12 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Error 503 — ход игрока и защита', en: 'Error 503 — player turn & defence' },
     from: {
-      ru: 'добор из колоды → 503 в центр + красное краевое свечение. У ЛЮБОГО ответа одна форма: карта летит в центр, накрывает тревогу со смещением (обе читаются), обе стоят открытыми COVER_HOLD и уходят в сброс одним обменом (useDiscardExit: тревога снизу, ответ сверху, пара с Code Review разбирается шагом). Monitoring — тот же такт без карты. Бросок принимает ВЕСЬ стол; отдаёт назад только своя область (зона + рука). Без защиты: рука сметается к центру, держится GATHER_HOLD (такт из Hand limit) и разлетается в сброс, дальше полноэкранное видео вылета (случайное из папки сцены). То же теперь играется и на живом борде (#102): пулл Debugger/Release из веера или клик по Monitoring — жест и накрывающий обмен в `_useNeutralizeStaging.tsx`, разрешение по методу — `runNeutralized` в `defenseBeat.tsx`; без защиты — тот же обмен, но сначала сгребание всего стола в кучу к центру (`discardBeat.tsx`, нога `gather`), и лишь потом разлёт; своё сильное свечение ПОД рукой и слабое чужое НАД ней — оба монтируются в `_Board.tsx`. Видео вылета в этот такт не входит — оно отдельной задачей (#103).',
-      en: "draw from the deck → 503 to the centre + red edge glow. EVERY answer has the same shape: the card flies to the centre, covers the alarm nudged aside (both readable), both stand open for COVER_HOLD and leave as one exchange (useDiscardExit: the alarm underneath, the answer on top, a pair with its Code Review split by the step). Monitoring is the same beat without a card. The WHOLE table accepts the drop; only the player's own area (zone + hand) gives the card back. No defence: the hand sweeps to the centre, holds for GATHER_HOLD (the hand-limit beat) and scatters to the discard, then a full-screen elimination video (random from the scene folder). The same movement now also runs on the live board (#102): pulling a Debugger/Release out of the fan or clicking Monitoring is the gesture and the covering exchange in `_useNeutralizeStaging.tsx`, resolved by method through `runNeutralized` in `defenseBeat.tsx`; with no defence, the same exchange happens, but the whole table is gathered into a heap at the centre first (`discardBeat.tsx`'s `gather` leg), and only then scatters. The own strong glow UNDER the hand and the opponent's weak glow OVER it both mount in `_Board.tsx`. The elimination video is NOT part of this beat — it belongs to a later task (#103).",
+      ru: 'добор из колоды → 503 в центр + красное краевое свечение. У ЛЮБОГО ответа одна форма: карта летит в центр, накрывает тревогу со смещением (обе читаются), обе стоят открытыми COVER_HOLD и уходят в сброс одним обменом (useDiscardExit: тревога снизу, ответ сверху, пара с Code Review разбирается шагом). Monitoring — тот же такт без карты. Бросок принимает ВЕСЬ стол; отдаёт назад только своя область (зона + рука). Без защиты: рука сметается к центру, держится GATHER_HOLD (такт из Hand limit) и разлетается в сброс, дальше полноэкранное видео вылета (случайное из папки сцены). То же теперь играется и на живом борде (#102): пулл Debugger/Release из веера или клик по Monitoring — жест и накрывающий обмен в `_useNeutralizeStaging.tsx`, разрешение по методу — `runNeutralized` в `defenseBeat.tsx`; без защиты — тот же обмен, но сначала сгребание всего стола в кучу к центру (`discardBeat.tsx`, нога `gather`), и лишь потом разлёт; своё сильное свечение ПОД рукой и слабое чужое НАД ней — оба монтируются в `_Board.tsx`. Видео вылета — свой такт следом (#103): `eliminateBeat.tsx` кладёт клип на всю сцену (inset: 0 стола, не окна) поверх уже осевшего стола, держит стол за собой (exclusive), крутит петлю до ELIM_MIN_MS и уходит. Клип не случайный: индекс считается из id события вылета, поэтому у всех за столом идёт ОДИН клип, и на провод для этого ничего не уходит. При prefers-reduced-motion такта нет вообще — доска просто стоит в состоянии вылета.',
+      en: "draw from the deck → 503 to the centre + red edge glow. EVERY answer has the same shape: the card flies to the centre, covers the alarm nudged aside (both readable), both stand open for COVER_HOLD and leave as one exchange (useDiscardExit: the alarm underneath, the answer on top, a pair with its Code Review split by the step). Monitoring is the same beat without a card. The WHOLE table accepts the drop; only the player's own area (zone + hand) gives the card back. No defence: the hand sweeps to the centre, holds for GATHER_HOLD (the hand-limit beat) and scatters to the discard, then a full-screen elimination video (random from the scene folder). The same movement now also runs on the live board (#102): pulling a Debugger/Release out of the fan or clicking Monitoring is the gesture and the covering exchange in `_useNeutralizeStaging.tsx`, resolved by method through `runNeutralized` in `defenseBeat.tsx`; with no defence, the same exchange happens, but the whole table is gathered into a heap at the centre first (`discardBeat.tsx`'s `gather` leg), and only then scatters. The own strong glow UNDER the hand and the opponent's weak glow OVER it both mount in `_Board.tsx`. The elimination video is its own beat behind it (#103): `eliminateBeat.tsx` lays the clip over the whole stage (inset: 0 of the table, not the viewport) on top of a board that has already settled, holds the table while it plays (exclusive), loops until ELIM_MIN_MS and goes. The clip is not random — the index is derived from the elimination event id, so the whole table watches ONE clip, and nothing about it goes on the wire. Under prefers-reduced-motion there is no beat at all: the board simply stands in its eliminated state.",
     },
     where: 'Error503Story',
     board:
-      'pages/board/[gameId]/_useNeutralizeStaging.tsx, features/board-beats/defenseBeat.tsx, features/board-beats/discardBeat.tsx, pages/board/[gameId]/_Board.tsx',
+      'pages/board/[gameId]/_useNeutralizeStaging.tsx, features/board-beats/defenseBeat.tsx, features/board-beats/discardBeat.tsx, features/board-beats/eliminateBeat.tsx, pages/board/[gameId]/_Board.tsx',
   },
   {
     name: { ru: 'AI-эффекты — разрешение', en: 'AI effects — resolution' },
@@ -706,6 +706,51 @@ const SCENARIOS: Scenario[] = [
 //     it — is in docs/animations/backlog.md; here they are visible, there they
 //     are actionable.
 const ISSUES: Issue[] = [
+  {
+    what: {
+      ru: 'Происхождение клипов вылета никем не подтверждено',
+      en: 'Nobody has confirmed where the elimination clips came from',
+    },
+    problem: {
+      ru: 'Четыре `.mp4` из папки сцены (`freshleb-whistlindiesel`, `gato-truco-gato` и два безымянных) переехали в `apps/frontend/src/features/board-beats/eliminate/` и теперь собираются в продуктовый билд (#103). В плейграунде это была песочница, в продукте — раздача чужого материала: ни лицензии, ни автора, ни источника ни у одного из четырёх. Задача #103 везёт их как есть намеренно — без клипов такт нечем ни показать, ни проверить, — но перед релизом их нужно либо очистить по правам, либо заменить своими. Закроет решение по каждому клипу: подтверждённая лицензия или замена. Механика такта от этого не меняется ни на строку — `ELIMINATION_CLIPS` собирается глобом, файлы подменяются как файлы.',
+      en: 'Four `.mp4`s out of the story folder (`freshleb-whistlindiesel`, `gato-truco-gato` and two unnamed) moved into `apps/frontend/src/features/board-beats/eliminate/` and now ship in the product build (#103). In the playground that was a sandbox; in the product it is redistributing somebody else’s material — not one of the four carries a licence, an author or a source. Task #103 ships them as they are on purpose (without clips there is no beat to show or to test), but before release they must be cleared or replaced. What closes it is a decision per clip: a confirmed licence, or a replacement. None of it touches the beat — `ELIMINATION_CLIPS` is a glob, and files are swapped as files.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/eliminate/*.mp4',
+      en: 'frontend: features/board-beats/eliminate/*.mp4',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Полноэкранное видео в проекте теперь есть в двух видах',
+      en: 'The project now has two kinds of video surface',
+    },
+    problem: {
+      ru: 'Issue #103 исходил из того, что плеер уже есть: `VideoPlayerKit` (`ui/blocks/VideoPlayer`). Это оказалось не так — тот блок это морфящаяся кнопка play, разворачивающаяся в `<iframe>` с встраиваемым роликом (экран Start), а не полноэкранный зацикленный `<video>` без звука. Общего у них нет ничего, кроме слова «видео», поэтому `eliminateBeat.tsx` несёт свой элемент (порт из Error503Story). Стоит это того, что политика воспроизведения теперь написана в двух местах: что делать с отказом кодека, с автоплеем, с prefers-reduced-motion. Пока это два разных потребителя (встраиваемый ролик против собственного файла), и сводить их рано. Закроет либо общий примитив «видео на всю сцену», когда появится второй такой же потребитель, либо явная запись, что это намеренно два разных.',
+      en: 'Issue #103 assumed the player already existed: `VideoPlayerKit` (`ui/blocks/VideoPlayer`). It does not — that block is a morphing play button that expands into an `<iframe>` embed (the Start screen), not a full-screen looped muted `<video>`. They share nothing but the word "video", so `eliminateBeat.tsx` carries its own element (ported from Error503Story). The cost is that playback policy is now written in two places: what to do with a refused codec, with autoplay, with prefers-reduced-motion. For now they are two different consumers (an embedded review clip against a file of our own) and folding them together would be premature. What closes it is either a shared "video over the stage" primitive once a second such consumer appears, or a written note that the two are deliberately separate.',
+    },
+    where: {
+      ru: 'ui: blocks/VideoPlayer + frontend: features/board-beats/eliminateBeat.tsx',
+      en: 'ui: blocks/VideoPlayer + frontend: features/board-beats/eliminateBeat.tsx',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Потолок клипа вылета (12s) — не из утверждённого источника',
+      en: 'The elimination clip’s 12s ceiling comes from no approved source',
+    },
+    problem: {
+      ru: 'Петлю клипа заканчивает событие `ended`, и подвисший поток его не пришлёт никогда. Такт при этом держит стол за собой (exclusive), так что клип, который не кончился, держал бы доску этого игрока мёртвой до конца партии. Поставлен сторож `ELIM_CEILING_MS = 12000` — по истечении такт отдаёт стол сам. Само число ниоткуда не следует: `ELIM_DELAY = 400` и `ELIM_MIN_MS = 5000` взяты из утверждённого источника (Error503Story), а потолка там нет вообще, потому что в песочнице зависший клип ничем не грозил. Записано здесь, а не решено на месте: это инженерная страховка под правилом, а не правило. Закроет либо утверждённое значение, либо сторож, считающий от реальной длительности клипа (`loadedmetadata` → `duration`), что снимает вопрос о числе целиком.',
+      en: 'The clip’s loop is ended by the `ended` event, and a stalled stream never fires one. The beat owns the table while it runs (exclusive), so a clip that never ends would hold this player’s board dead for the rest of the match. A watchdog is in place — `ELIM_CEILING_MS = 12000`, after which the beat hands the table back on its own. The number itself follows from nothing: `ELIM_DELAY = 400` and `ELIM_MIN_MS = 5000` come from the approved source (Error503Story), which has no ceiling at all, because in a sandbox a hung clip cost nothing. Written down rather than settled in place: this is an engineering guard under a rule, not a rule. What closes it is either an approved value, or a watchdog measured off the clip’s real length (`loadedmetadata` → `duration`), which removes the question of a number entirely.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/eliminateBeat.tsx (ELIM_CEILING_MS)',
+      en: 'frontend: features/board-beats/eliminateBeat.tsx (ELIM_CEILING_MS)',
+    },
+    status: 'open',
+  },
   {
     what: {
       ru: 'У ответа Monitoring на 503 нет движения вообще',

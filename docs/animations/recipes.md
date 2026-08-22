@@ -1398,6 +1398,98 @@ plan field — see Task 10) is what keeps the strong glow lit for the length of 
 
 ---
 
+## Elimination on the board — the clip over a table that has already settled
+
+**When it fires**
+On the engine's own `eliminated` event, and on nothing else. It is NOT a leg of the sweep: the
+sweep is a `discard` plan with `gather`, and elimination is reachable with nothing to sweep at all
+(`lastStanding` is a win condition), where that plan is dropped for having no cards. So `planBeats`
+gives the elimination a plan of its own — pushed inside `flush()`, **after** the discard run it
+opened, because the `eliminated` event arrives BEFORE the discards it marks and the clip has to
+play over an emptied table rather than under one.
+
+**Visual result**
+The board settles into its eliminated state — the seat zeroed, the local player's zone and fan
+replaced by the "you are out" badge — and the clip comes up over the whole stage a beat later. It
+loops until `ELIM_MIN_MS`, finishes the loop it is in, and is gone at once. What it uncovers is the
+state that was already there.
+
+**The state under it is the projection's, not the beat's**
+The beat **publishes nothing**. `eliminated` is folded by the engine's own projection
+(`fake/project.ts` → `toBoardState`), so the seat, the hand and the zone read as out because the
+board says so — which is what keeps them out for the rest of the match once the clip has gone. The
+beat is `exclusive`, and that is load-bearing twice over: input is dead under a full-screen video,
+and an exclusive beat publishes no shadow, so what lies under the clip is the LIVE board. A
+non-exclusive beat here would hold the pre-batch shadow up instead and empty the table at the
+moment the clip lifted — the video would be covering the elimination rather than following it.
+
+**One clip for the whole table**
+`ELIMINATION_CLIPS[plan.eventId % ELIMINATION_CLIPS.length]` — derived, never `Math.random()`.
+Every peer already holds the elimination's event id, so one elimination is one clip on every
+screen, at no cost on the wire and with no new event field. The list is globbed from
+`./eliminate/*.mp4` and **sorted by path**: the pick is an index, and glob order is Vite's to
+change.
+
+**Bundled, not fetched**
+The clips are imported (`import.meta.glob`, `query: '?url'`), so Vite emits each as its own hashed
+asset — they are not in the JS bundle and nothing is fetched until the overlay mounts. There is no
+backend and no CDN to fetch them from (Architecture Rule), and a build-time import means a renamed
+clip breaks the build instead of 404-ing on somebody's board.
+
+**Three ways it ends, one way out**
+`finish()` is the single exit — the overlay goes, the watchdog is disarmed, the beat's promise
+resolves once — and three things reach it:
+- `ended` past `ELIM_MIN_MS`. Before the floor, `ended` replays the clip instead.
+- `error` — a missing file, a refused codec. Nothing is put in its place: the board is already in
+  its eliminated state, which is what carries the news; the clip was the punctuation, not the
+  sentence.
+- `ELIM_CEILING_MS`, the watchdog. `ended` is the only thing that ends the loop and a stalled
+  stream never fires one, so without it a hung clip would hold this player's board dead for the
+  rest of the match. The value is a guard rather than a rule, and is recorded as such in
+  `backlog.md`.
+
+**The winner waits for it**
+The engine settles the elimination and the win it caused in ONE reduction (`fake/triggers.ts`:
+`eliminated`, its discards, then `gameOver`), so `view.over` is true the instant the batch lands —
+while the sweep and the clip are still queued. `over` also rides BESIDE the projection
+(`toBoardOver` hangs it off the props, not off `BoardState`), so the shadow that holds every other
+visible fact back does not cover it. `useBeats` therefore publishes one plain fact, `running` — the
+queue is still working, held for the whole drain rather than per beat — and `_Board` renders
+`GameOver` only when it is false. Without it the winner panel is announced over the top of the clip
+that explains why they won.
+
+**Under `prefers-reduced-motion` there is no clip at all**
+Decided, not emergent: a full-screen autoplaying video is exactly what the preference is about.
+`useBeats` queues no beat under the preference, so the board goes straight to its eliminated state
+— the same policy, in the same one place, that every other beat obeys.
+
+**Params & timings**
+| Step | Value |
+|---|---|
+| the emptied table holds before the clip covers it | `ELIM_DELAY = 400` |
+| the clip loops at least | `ELIM_MIN_MS = 5000` |
+| and hands the table back regardless after | `ELIM_CEILING_MS = 12000` (a guard — see `backlog.md`) |
+| fade in | 260ms, over a clip that is ALREADY playing — the fade does not hold it back |
+| fade out | none: the turn is over, there is nothing left to watch out of |
+
+**Invariants**
+- The overlay is `inset: 0` of the **stage**, not of the viewport — `.table` is already
+  `position: relative`, so it supplies its own bounds (the same reason the board's `EdgeGlow`
+  measures nothing).
+- **I5** on the clip: a media element does not re-fetch when `src` changes, so the `<video>` is
+  keyed by its source — a different clip is a different element.
+
+**Building blocks**
+`wait` · `Beat.exclusive` / `Beats.running` (`useBeats.ts`) · the `eliminated` plan
+(`planBeats.ts`).
+
+**Live reference**
+`apps/frontend/src/features/board-beats/eliminateBeat.tsx`, `features/board-beats/planBeats.ts`
+(the `eliminated` plan), `features/board-beats/useBeats.ts` (`beatOf`). The playground's own tail is
+`Error 503`'s `eliminate()` — the source this was ported from.
+
+---
+
 ## AI effects — trigger, pull the event, resolve by effect
 
 **When to call**

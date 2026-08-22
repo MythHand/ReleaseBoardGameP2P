@@ -243,6 +243,17 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
             })()
           : undefined
 
+      // TAKEOFF: the exchange is resolved and its cards are in the air, so the
+      // board lets go of the pending here — the same moment, and the same
+      // reason, as `runNeutralized` below and `discardBeat`'s own
+      // `withoutFlown`. It is what stops the answered attack rendering at the
+      // centre underneath its own flyer, takes the dock out of its reaction
+      // state, and keeps the beat BEHIND this one from animating against a
+      // board that still has the attack standing on it.
+      //
+      // Ahead of `returning` as well as of the exit: a Rollback's attack flies
+      // to a hand, and the centre must not still be claiming to hold it.
+      ctx.publish({ ...ctx.base, pending: null })
       // Together, not in sequence: the exchange leaving for the discard and
       // the attack leaving for its hand are one moment, not two gestures.
       await Promise.all([items.length > 0 ? latest.current.send(items) : undefined, returning])
@@ -339,6 +350,17 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
             }
           : null,
       ])
+      // TAKEOFF: the answer has been given and both cards are in the air, so the
+      // board lets go of the pending HERE — the same moment, and for the same
+      // reason, `discardBeat` publishes `withoutFlown`. It is what takes the red
+      // glow down (`glowStrong` reads the pending off the shadow) and what stops
+      // the answered alarm rendering at the centre underneath its own flyer.
+      //
+      // It also matters to the beat BEHIND this one: a beat that publishes
+      // nothing hands its own base on untouched, so the draw that a resumed
+      // sequence puts in the same batch used to animate against a board that
+      // still had the alarm standing on it (#103 testing, problem 1).
+      ctx.publish({ ...ctx.base, pending: null })
       if (items.length > 0) await latest.current.send(items)
       flyer.drop('cover')
     },

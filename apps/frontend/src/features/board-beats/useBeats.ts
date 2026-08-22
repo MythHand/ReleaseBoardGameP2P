@@ -14,6 +14,7 @@ import { useDeckBeat } from './deckBeat'
 import { useDefenseBeat } from './defenseBeat'
 import { useDiscardBeat } from './discardBeat'
 import { useDrawBeat } from './drawBeat'
+import { useEliminateBeat } from './eliminateBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
 
@@ -96,6 +97,18 @@ export interface Beats {
   exclusive: boolean
   /** the running beat's own alarm — see `Beat.alarm` */
   alarm: boolean
+  /**
+   * The queue is still working: a beat is running, and the batch behind it has
+   * not drained. What the board holds its END back on (#103) — the engine
+   * settles an elimination and the win it caused in ONE reduction, so `over`
+   * is true on the projection while the sweep and the clip are still queued,
+   * and `over` rides BESIDE the projection (`toBoardOver`, its own prop)
+   * rather than inside it, so no shadow can stand in for this.
+   *
+   * Not the same fact as `exclusive`, which asks whether input is dead: an
+   * ordinary discard is not exclusive and is very much still working.
+   */
+  running: boolean
   gapAt: number | null
   gapSize: number
 }
@@ -143,6 +156,7 @@ export function useBeats(args: {
   const decks = useDeckBeat(anchors)
   const combo = useComboBeat(anchors, staging, clearPaidCost, takeStagedRelease)
   const defense = useDefenseBeat(anchors, staging)
+  const elimination = useEliminateBeat()
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -182,7 +196,12 @@ export function useBeats(args: {
           key: plan.key,
           base,
           exclusive: false,
-          alarm: false,
+          // A 503 a standing Monitoring answered by itself raises no pending at
+          // all (#103 testing, problem 2), so `glowStrong` has nothing to read
+          // — yet the table still has to see that a 503 landed. The plan
+          // carries the fact; this is the same field, and the same reason, the
+          // defenceless sweep lights its own glow with.
+          alarm: plan.draws.some((d) => d.reveal?.neutralized === true),
           run: (ctx) => draws.run(plan, ctx),
         }
       }
@@ -249,6 +268,21 @@ export function useBeats(args: {
           run: (ctx) => defense.runStolen(plan, ctx),
         }
       }
+      if (plan.kind === 'eliminated') {
+        return {
+          key: plan.key,
+          base,
+          // EXCLUSIVE, unlike every beat above it: the clip covers the whole
+          // stage, and a table nobody can see is not a table anybody may play
+          // on. It is also what makes the runner's own ceiling load-bearing —
+          // a clip that never ends would hold the board here (#103).
+          exclusive: true,
+          // The alarm belongs to the sweep, and the sweep is over: the glow
+          // goes dark as the clip comes up, rather than burning under it.
+          alarm: false,
+          run: (ctx) => elimination.run(plan, ctx),
+        }
+      }
       if (plan.kind === 'neutralized') {
         return {
           key: plan.key,
@@ -271,6 +305,7 @@ export function useBeats(args: {
       defense.runCovered,
       defense.runStolen,
       defense.runNeutralized,
+      elimination.run,
     ],
   )
 
@@ -382,6 +417,7 @@ export function useBeats(args: {
     decks.reset()
     combo.reset()
     defense.reset()
+    elimination.reset()
   }, [intro?.key, live])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
@@ -494,9 +530,15 @@ export function useBeats(args: {
       ...decks.overlay,
       ...combo.overlay,
       ...defense.overlay,
+      ...elimination.overlay,
     ],
     exclusive: running?.exclusive ?? false,
     alarm: running?.alarm ?? false,
+    // `running` (the state) is held for the whole drain, not per beat: `drain()`
+    // clears it in its own `finally`, once the queue is empty. So this stays
+    // true across the handover between two beats of one batch, which is exactly
+    // the window the winner overlay must not appear in.
+    running: running != null,
     // The fan opens for a card on its way into it — the draw beat is the one
     // that grows it (I8); nothing else does yet.
     gapAt: draws.gapAt,
