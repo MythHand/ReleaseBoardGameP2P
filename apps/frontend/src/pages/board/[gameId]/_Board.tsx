@@ -871,7 +871,19 @@ export default function Board({
     : textTabs
 
   // завершение партии — оверлей поверх стола (триггерится извне)
-  const overWinner = over ? participants.find((p) => p.id === over.winnerId) : null
+  // The end is announced once the board has finished SHOWING how it was reached
+  // (#103). The engine settles an elimination and the win it caused in one
+  // reduction (`fake/triggers.ts`: `eliminated`, its discards, then `gameOver`),
+  // so `over` is true the instant that batch lands — while the sweep and the
+  // elimination clip are still queued. And `over` rides beside the projection
+  // rather than inside it (`toBoardOver` — it hangs off the props, not off
+  // `BoardState`), so the shadow every other visible fact is held back by does
+  // not cover it and there is nothing to derive this from: the queue has to say
+  // so itself. Under prefers-reduced-motion nothing is queued, so nothing is
+  // held back — the board goes straight to its end, the same answer the clip
+  // gets.
+  const overShown = over && !beats.running && !deal.active
+  const overWinner = overShown ? participants.find((p) => p.id === over.winnerId) : null
   const youEliminated = Boolean(you.eliminated)
   const disconnectedIds = new Set(room.disconnected ?? [])
 
@@ -1610,7 +1622,7 @@ export default function Board({
 
       {room.connection === 'reconnecting' && <Reconnect copy={copy.reconnect} />}
 
-      {over && (
+      {overShown && (
         <GameOver
           winner={overWinner}
           condition={over.condition}

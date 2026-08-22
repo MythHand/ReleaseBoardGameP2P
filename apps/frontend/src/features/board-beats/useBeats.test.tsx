@@ -178,6 +178,9 @@ function Probe({
           to end, from planBeats' `gather` flag through the discard beat's run
           to the queue's own `Beat.alarm`. */}
       <div data-testid="alarm">{beats.alarm ? 'alarm' : 'none'}</div>
+      {/* the queue is still working: what the game-over overlay waits on, so
+          the winner is not announced over the beat that won it (#103) */}
+      <div data-testid="running">{beats.running ? 'running' : 'idle'}</div>
     </>
   )
 }
@@ -580,4 +583,36 @@ it('plays no clip at all under prefers-reduced-motion', async () => {
   await flush()
   await act(async () => void (await new Promise((r) => setTimeout(r, ELIM_DELAY + 120))))
   expect(container.querySelector('video')).toBeNull()
+})
+
+// ===== the queue's own "still working" (#103) — `over` rides beside the
+// projection rather than inside it, so the board needs one plain fact to hold
+// the winner overlay back on. Driven through a parked beat rather than mocked:
+// the flag is only worth anything if it is true for the whole run.
+it('reports the queue as working until it drains', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = true
+  const { getByTestId } = mount()
+  await flush()
+  expect(sent.calls).toHaveLength(1) // the beat is really in flight
+  expect(getByTestId('running').textContent).toBe('running')
+  sent.hang = false
+  await act(async () => {
+    sent.release?.()
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(getByTestId('running').textContent).toBe('idle')
+})
+
+// Under the preference nothing is queued at all, so the queue is never working
+// and the winner is announced at once — the board goes straight to its end
+// state, which is the same answer the elimination clip gets.
+it('is never working under prefers-reduced-motion', async () => {
+  motion.reduced = true
+  sent.calls = []
+  sent.hang = false
+  const { getByTestId } = mount()
+  await flush()
+  expect(getByTestId('running').textContent).toBe('idle')
 })

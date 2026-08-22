@@ -97,6 +97,18 @@ export interface Beats {
   exclusive: boolean
   /** the running beat's own alarm — see `Beat.alarm` */
   alarm: boolean
+  /**
+   * The queue is still working: a beat is running, and the batch behind it has
+   * not drained. What the board holds its END back on (#103) — the engine
+   * settles an elimination and the win it caused in ONE reduction, so `over`
+   * is true on the projection while the sweep and the clip are still queued,
+   * and `over` rides BESIDE the projection (`toBoardOver`, its own prop)
+   * rather than inside it, so no shadow can stand in for this.
+   *
+   * Not the same fact as `exclusive`, which asks whether input is dead: an
+   * ordinary discard is not exclusive and is very much still working.
+   */
+  running: boolean
   gapAt: number | null
   gapSize: number
 }
@@ -517,6 +529,11 @@ export function useBeats(args: {
     ],
     exclusive: running?.exclusive ?? false,
     alarm: running?.alarm ?? false,
+    // `running` (the state) is held for the whole drain, not per beat: `drain()`
+    // clears it in its own `finally`, once the queue is empty. So this stays
+    // true across the handover between two beats of one batch, which is exactly
+    // the window the winner overlay must not appear in.
+    running: running != null,
     // The fan opens for a card on its way into it — the draw beat is the one
     // that grows it (I8); nothing else does yet.
     gapAt: draws.gapAt,
