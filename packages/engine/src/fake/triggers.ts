@@ -185,6 +185,41 @@ function bankAlarm(
   return { ...discard(state, [card]), eventSeq: log.seq }
 }
 
+// Declining the 503: the player CAN answer and will not. The card's own text
+// makes elimination the consequence of not neutralizing — "игрок выбывает, если
+// не нейтрализует карту одним из трёх способов" — and names no duty to spend a
+// способ merely because you hold one, so this is the same outcome the
+// defenceless path already reaches, by choice instead of by force.
+//
+// The reading is an inference and is written down as one: docs/rules/backlog.md
+// carries it, and the marker sits at the paragraph in docs/rules/cards.md it
+// came from. Reachable only through the alarm the player owns — a `crush`
+// shares `onNeutralize` but not this: declining one destroys a slot rather than
+// its owner, which is a different rule and not one this task settled.
+export function onDecline503(state: GameState, action: Action & { type: 'PASS' }): Reduction {
+  const pending = state.pending
+  if (pending?.kind !== 'neutralize503') return reject(state, action, 'no 503 is owed by you')
+  if (pending.player !== action.player) return reject(state, action, 'not your decision')
+
+  const log = createLog(state.eventSeq)
+  // The alarm is banked exactly as every other route out of a 503 banks it, and
+  // BEFORE the elimination, so the card that caused it reads as leaving first.
+  // No parent: the reveal that would have been one belongs to an earlier batch.
+  // `card` is typed nullable because `crush` shares the pending's shape and
+  // holds none. A 503 always has one; the guard is what makes that a fact the
+  // types agree with rather than one this function assumes.
+  const alarm = pending.card
+  let banked = state
+  if (alarm) {
+    log.add({ type: 'discarded', player: action.player, card: alarm.id, reason: 'trigger' })
+    banked = discard(state, [alarm])
+  }
+  return {
+    state: eliminate({ ...banked, pending: null, eventSeq: log.seq }, log, action.player),
+    events: log.events,
+  }
+}
+
 // Routes both trigger decisions: neutralize503 and crush share the same set of
 // methods and the same resolution machinery, differing only in what happens
 // on the corresponding "no answer" path (elimination vs. destroying a slot).

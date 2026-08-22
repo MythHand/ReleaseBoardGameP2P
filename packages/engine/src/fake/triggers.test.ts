@@ -451,3 +451,50 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
   expect(backToP1.state.turn.player).toBe('p1')
   expect(playableFor(backToP1.state, 'p1')).toContain(placedUid)
 })
+
+// ===== declining a 503 (#103 testing, problem 4) =====
+//
+// The card says the player выбывает "если не нейтрализует карту одним из трёх
+// способов" — it names no obligation to use a способ you happen to hold, so a
+// player who can answer and would rather not is declining, not cheating. The
+// board has always offered the key for it (`deriveDock` shows PASS through a
+// pending of your own) and every press was rejected in silence, because no
+// action behind it existed. See docs/rules/backlog.md — the reading is written
+// down there rather than settled here.
+it('lets a player who will not neutralize decline, and eliminates them for it', () => {
+  const drawn = reduce(withTop(E503, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
+  expect(drawn.state.pending).toMatchObject({ kind: 'neutralize503' })
+
+  const r = reduce(drawn.state, { type: 'PASS', player: 'p1', at: 1001 })
+
+  expect(r.state.pending).toBeNull()
+  expect(r.state.eliminated).toEqual(['p1'])
+  // the alarm is banked exactly as it is on every other route out of a 503
+  expect(r.state.decks.discard.map((c) => c.uid)).toContain(E503.uid)
+  expect(r.events.map((e) => e.type)).toEqual(expect.arrayContaining(['discarded', 'eliminated']))
+})
+
+it('takes the declining player’s whole table with them, hand and zone', () => {
+  const holding = withTop(E503, [DBG])
+  const withZone: GameState = {
+    ...holding,
+    players: {
+      ...holding.players,
+      p1: { ...holding.players.p1, release: { frontend: { card: FE } } },
+    },
+  }
+  const drawn = reduce(withZone, { type: 'DRAW', player: 'p1', at: 1000 })
+  const r = reduce(drawn.state, { type: 'PASS', player: 'p1', at: 1001 })
+
+  expect(r.state.players.p1.hand).toEqual([])
+  expect(r.state.players.p1.release.frontend).toBeUndefined()
+  // the Debugger they declined to spend goes with the rest of the hand
+  expect(r.state.decks.discard.map((c) => c.uid)).toContain(DBG.uid)
+})
+
+it('refuses a decline from anyone but the player the decision is owed by', () => {
+  const drawn = reduce(withTop(E503, [DBG]), { type: 'DRAW', player: 'p1', at: 1000 })
+  const r = reduce(drawn.state, { type: 'PASS', player: 'p2', at: 1001 })
+  expect(r.state.eliminated).toEqual([])
+  expect(r.events.some((e) => e.type === 'rejected')).toBe(true)
+})
