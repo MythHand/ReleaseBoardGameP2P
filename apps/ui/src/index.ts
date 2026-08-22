@@ -141,7 +141,7 @@ export {
   type PendingPromptProps,
   type WindowCopy,
 } from './table/Table/PendingPrompt'
-export { pileWidthFor } from './table/Table/piles'
+export { PILE_WIDTH, pileWidthFor } from './table/Table/piles'
 export type {
   Panel,
   TableChromeCopy as TableCopy,

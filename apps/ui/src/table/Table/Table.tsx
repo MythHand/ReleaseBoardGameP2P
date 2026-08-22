@@ -30,7 +30,7 @@ import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { deriveDock } from './dock'
 import PendingPrompt from './PendingPrompt'
-import { pileWidthFor } from './piles'
+import { PILE_WIDTH } from './piles'
 import styles from './Table.module.css'
 import type { Panel, TableProps } from './types'
 import { useTableInteractions } from './useTableInteractions'
@@ -336,7 +336,7 @@ export default function Table({
                 label={copy.table.deck}
                 deck="base"
                 count={count}
-                width={pileWidthFor(decks.main.length)}
+                width={PILE_WIDTH}
                 countPos="tl"
               />
             ))}

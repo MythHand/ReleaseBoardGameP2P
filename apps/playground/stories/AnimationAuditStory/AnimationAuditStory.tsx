@@ -763,23 +763,6 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
-      ru: 'Ширина стопки при нескольких колодах не утверждена',
-      en: 'The pile-width ramp above one pile has no approved value',
-    },
-    problem: {
-      ru: '`pileWidthFor` держит 150px при одной стопке добора, 120 при двух, 100 при трёх и более — рамп придуман для этой задачи, не утверждён. `DeckAnimationsStory` кладёт стопки в ряд, которому никогда не приходится делить стол с рукой и доком, поэтому её фиксированные 150 ничего не подтверждают для борда: ряд из трёх (Git Branch + Sudo) может налезть на руку на узких экранах.',
-      en: '`pileWidthFor` holds a draw pile at 150px at one, 120 at two, 100 at three or more — a ramp invented for this task, not approved. `DeckAnimationsStory` lays its piles out in a row that never has to share the table with the hand and the dock, so its fixed 150 confirms nothing for the board: a row of three (Git Branch + Sudo) can crowd the hand on a narrow screen.',
-    },
-    where: {
-      ru: 'apps/ui/src/table/Table/piles.ts (pileWidthFor)',
-      en: 'apps/ui/src/table/Table/piles.ts (pileWidthFor)',
-    },
-    // `open`, not `reuse`: the module is applied in both the kit and the board.
-    // What is missing is an approved source for the ramp — a decision.
-    status: 'open',
-  },
-  {
-    what: {
       ru: '`drawBeat` меряет якоря без `nextFrames` — мёрдж в том же батче уронит добор',
       en: '`drawBeat` measures anchors without `nextFrames` — a same-batch merge would drop the draw',
     },
