@@ -34,8 +34,23 @@ describe('the centre of the table', () => {
     // nothing at all rather than fail.
     const known = new Set(Object.keys(CENTRE_SLOTS))
     for (const [name, slots] of Object.entries(CENTRE_SETS)) {
-      for (const slot of slots) expect(known.has(slot), `${name} → ${slot}`).toBe(true)
+      for (const slot of Object.keys(slots)) expect(known.has(slot), `${name} → ${slot}`).toBe(true)
     }
+  })
+
+  it('tilts what a hand put there and leaves square what the system dealt', () => {
+    // I11 as geometry rather than as prose. The same place answers differently
+    // by situation, which is the whole reason the pose belongs to the set: a
+    // trigger revealed into the centre lies square, an attack thrown into the
+    // very same centre lies at its own angle.
+    expect(CENTRE_SETS.reveal.centre).toBeNull()
+    expect(CENTRE_SETS.defence.centre?.rot).toBeLessThan(0)
+    // and the defence leans the OTHER way, or the two would read as one stack
+    expect(CENTRE_SETS.defence.cover?.rot).toBeGreaterThan(0)
+    // …with an offset of its own, so the card underneath stays visible
+    expect(CENTRE_SETS.defence.cover?.dx).not.toBe(0)
+    // nothing the system deals is tilted anywhere
+    for (const slot of Object.values(CENTRE_SETS.ai)) expect(slot).toBeNull()
   })
 
   it('centres a slot with no offset and shifts the rest by their own dx', () => {

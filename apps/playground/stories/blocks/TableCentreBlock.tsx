@@ -3,6 +3,7 @@ import {
   CENTRE_SETS,
   CENTRE_SLOTS,
   CENTRE_TOP,
+  type CentrePose,
   type CentreSet,
   type CentreSlot,
   centreTransform,
@@ -22,6 +23,11 @@ import styles from './TableCentreBlock.module.css'
 // The page reads `CENTRE_SLOTS` / `CENTRE_SETS` from the kit rather than holding
 // its own copy — that is the whole reason the geometry moved into TS. Change a
 // number there and this page moves with it; it cannot drift.
+
+// A pose drawn as a transform: the tilt the card will wear on this place, plus
+// its own offset inside the frame. `null` — square.
+const poseTransform = (pose: CentrePose | null): string =>
+  pose ? `translate(${pose.dx}px, ${pose.dy}px) rotate(${pose.rot}deg)` : ''
 
 // which slot a situation is really about — framed in the turn accent so the eye
 // starts there and reads the others as answers to it
@@ -61,6 +67,8 @@ export default function TableCentreBlock() {
       colW: 'ширина',
       colZ: 'слой',
       colFrom: 'откуда перенесено',
+      square: 'ровно',
+      colPose: 'наклон',
       layers:
         'Слой значим только внутри своего набора: в защите места лежат друг на друге и разложены по 9/10/11, в разборе AI ничего не перекрывается, поэтому там свои значения, а 0 означает, что слоя в сцене не задано.',
       open: 'Чего здесь пока нет',
@@ -91,6 +99,8 @@ export default function TableCentreBlock() {
       colW: 'width',
       colZ: 'layer',
       colFrom: 'taken from',
+      square: 'square',
+      colPose: 'tilt',
       layers:
         'A layer only means anything inside its own set: in the defence the places lie on top of each other and run 9/10/11, in the AI reading nothing overlaps so its values are its own, and 0 means the scene set no layer at all.',
       open: 'What is deliberately missing',
@@ -113,35 +123,43 @@ export default function TableCentreBlock() {
         <Typography variant="body">{w.note[set]}</Typography>
         <div className={styles.stage}>
           <div className={styles.axis} />
-          {CENTRE_SETS[set].map((slot) => {
-            const { dx, z, w: width } = CENTRE_SLOTS[slot]
-            return (
-              <div
-                key={slot}
-                className={`${styles.slot} ${slot === LEAD[set] ? styles.slotLead : ''}`}
-                style={{
-                  insetBlockStart: `${CENTRE_TOP}%`,
-                  insetInlineStart: '50%',
-                  inlineSize: `${width}px`,
-                  // the real card box: a card is TALLER than it is wide by
-                  // CARD_RATIO, and a frame that ignored it would show places at
-                  // a size no card in the game ever has
-                  blockSize: `${Math.round(width * CARD_RATIO)}px`,
-                  transform: centreTransform(slot),
-                  zIndex: z,
-                }}
-              >
-                <div>
-                  <Typography as="div" base="mono-strong" tk="tk-10" className={styles.name}>
-                    {slot}
-                  </Typography>
-                  <Typography as="div" base="mono-xs" className={styles.geom}>
-                    {dx === 0 ? 'dx 0' : `dx ${dx > 0 ? '+' : ''}${dx}`} · {width}px · z {z}
-                  </Typography>
+          {(Object.entries(CENTRE_SETS[set]) as [CentreSlot, CentrePose | null][]).map(
+            ([slot, pose]) => {
+              const { dx, z, w: width } = CENTRE_SLOTS[slot]
+              return (
+                <div
+                  key={slot}
+                  className={`${styles.slot} ${slot === LEAD[set] ? styles.slotLead : ''}`}
+                  style={{
+                    insetBlockStart: `${CENTRE_TOP}%`,
+                    insetInlineStart: '50%',
+                    inlineSize: `${width}px`,
+                    // the real card box: a card is TALLER than it is wide by
+                    // CARD_RATIO, and a frame that ignored it would show places
+                    // at a size no card in the game ever has
+                    blockSize: `${Math.round(width * CARD_RATIO)}px`,
+                    // the frame stands at the place, TILTED THE WAY THE CARD
+                    // WILL BE: the pose is what the place is for, and a square
+                    // frame under a tilted card is a different picture
+                    transform: `${centreTransform(slot)} ${poseTransform(pose)}`,
+                    zIndex: z,
+                  }}
+                >
+                  <div>
+                    <Typography as="div" base="mono-strong" tk="tk-10" className={styles.name}>
+                      {slot}
+                    </Typography>
+                    <Typography as="div" base="mono-xs" className={styles.geom}>
+                      {dx === 0 ? 'dx 0' : `dx ${dx > 0 ? '+' : ''}${dx}`} · {width}px · z {z}
+                    </Typography>
+                    <Typography as="div" base="mono-xs" className={styles.pose}>
+                      {pose ? `${pose.rot > 0 ? '+' : ''}${pose.rot}°` : w.square}
+                    </Typography>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            },
+          )}
         </div>
       </KitSection>
 

@@ -73,6 +73,24 @@ export const CENTRE_SLOTS: Record<CentreSlot, CentreSlotGeom> = {
 }
 
 /**
+ * Поза карты на своём месте: наклон и смещение от центра рамки. Значения
+ * перенесены из `DefenseReleaseStory` — там они и утверждены.
+ */
+export interface CentrePose {
+  rot: number
+  dx: number
+  dy: number
+}
+
+/** атака ложится под своим углом */
+export const ATTACK_POSE: CentrePose = { rot: -4, dx: 0, dy: 0 }
+/** защита накрывает её, наклонившись в другую сторону и со смещением: две игры,
+ *  а не одна аккуратная стопка */
+export const COVER_POSE: CentrePose = { rot: 6, dx: 16, dy: -12 }
+/** судо ждёт рядом под своим углом */
+export const SUDO_POSE: CentrePose = { rot: -7, dx: 0, dy: 0 }
+
+/**
  * Наборы мест по игровым ситуациям. Ситуация — это то, что видит игрок за
  * столом, а не то, как оно устроено внутри: «релиз платит за себя» — набор из
  * двух мест, «атаку накрыли защитой» — из трёх.
@@ -80,18 +98,25 @@ export const CENTRE_SLOTS: Record<CentreSlot, CentreSlotGeom> = {
  * Набор существует, только если сцена его показала. Новая ситуация добавляет
  * свой набор сюда — и до тех пор её мест нет, а не «наверное такие же».
  */
+// Поза принадлежит НАБОРУ, а не месту: одно и то же место центра стоит ровно
+// или под углом в зависимости от того, кто карту туда положил. Вскрытый системой
+// триггер лежит в центре ровно, прилетевшая из руки атака — на том же месте под
+// −4°. Это инвариант I11 (`docs/animations/README.md`), записанный геометрией:
+// наклон и есть то единственное, что говорит «карту положила рука».
+//
+// `null` — ровно, без поворота.
 export const CENTRE_SETS = {
   /** карта, которую в центр выложила система: добор, вскрытый триггер, 503 */
-  reveal: ['centre'],
+  reveal: { centre: null },
   /** релиз стоит в центре и открыто платит свою цену */
-  release: ['stage', 'cost'],
+  release: { stage: null, cost: null },
   /** атака прилетела, её накрыли защитой, рядом ждёт судо */
-  defence: ['sudo', 'centre', 'cover'],
+  defence: { sudo: SUDO_POSE, centre: ATTACK_POSE, cover: COVER_POSE },
   /** карта AI: слева триггер, из-за которого она пришла, справа сам эффект */
-  ai: ['cause', 'effect'],
+  ai: { cause: null, effect: null },
   /** эффект AI требует карту: отданная встаёт открыто справа от него */
-  aiPick: ['cause', 'effect', 'picked'],
-} satisfies Record<string, CentreSlot[]>
+  aiPick: { cause: null, effect: null, picked: null },
+} satisfies Record<string, Partial<Record<CentreSlot, CentrePose | null>>>
 
 export type CentreSet = keyof typeof CENTRE_SETS
 

@@ -63,6 +63,13 @@
   color: var(--white-35);
 }
 
+/* the tilt the card will wear here — the one line on the frame that is about
+   meaning rather than measurement (I11) */
+.pose {
+  margin-block-start: 2px;
+  color: color-mix(in srgb, var(--turn-accent) 70%, transparent);
+}
+
 /* the values, as a table — the page is also where the numbers are read */
 .values {
   inline-size: 100%;
