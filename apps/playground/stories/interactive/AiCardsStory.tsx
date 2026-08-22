@@ -22,6 +22,7 @@ import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
+import { centrePlaceStyle } from '@/table/TableCentre/centre'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
@@ -642,6 +643,7 @@ export default function AiCardsStory() {
         {/* AI trigger (cause) — left of the centre, normal size */}
         <div
           className={styles.causeSlot}
+          style={centrePlaceStyle('ai', 'cause')}
           ref={causeRef}
           aria-hidden={!trigger}
           {...slotProps(trigger)}
@@ -652,6 +654,7 @@ export default function AiCardsStory() {
         {/* AI effect (main) — at the centre, larger */}
         <div
           className={styles.effectSlot}
+          style={centrePlaceStyle('ai', 'effect')}
           ref={effectRef}
           aria-hidden={!aiCard}
           {...slotProps(aiCard)}
@@ -661,7 +664,12 @@ export default function AiCardsStory() {
 
         {/* Bad Vibe: where the given-up card stands while both are read. Only a place —
             the card itself is on the carrier until it leaves for the discard. */}
-        <div className={styles.pickedSlot} ref={pickedRef} aria-hidden="true" />
+        <div
+          className={styles.pickedSlot}
+          style={centrePlaceStyle('aiPick', 'picked')}
+          ref={pickedRef}
+          aria-hidden="true"
+        />
 
         {/* base draw deck (click — start) + the AI events deck */}
         <div className={styles.decks}>

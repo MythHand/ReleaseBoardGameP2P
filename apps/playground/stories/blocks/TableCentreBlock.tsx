@@ -3,9 +3,9 @@ import {
   CENTRE_SETS,
   CENTRE_SLOTS,
   CENTRE_TOP,
+  type CentrePlace,
   type CentreSet,
   type CentreSlot,
-  type CentreTilt,
   centreTransform,
   Typography,
 } from '@release/ui'
@@ -23,6 +23,15 @@ import styles from './TableCentreBlock.module.css'
 // The page reads `CENTRE_SLOTS` / `CENTRE_SETS` from the kit rather than holding
 // its own copy — that is the whole reason the geometry moved into TS. Change a
 // number there and this page moves with it; it cannot drift.
+
+// A place's layer belongs to the situation, so the table lists them per set —
+// "9 in defence", and nothing at all where no situation layers it.
+const layersOf = (slot: CentreSlot): string => {
+  const found = (Object.entries(CENTRE_SETS) as [CentreSet, Record<string, CentrePlace>][])
+    .map(([set, places]) => (places[slot]?.z === undefined ? null : `${places[slot].z} · ${set}`))
+    .filter(Boolean)
+  return found.length > 0 ? found.join(', ') : '—'
+}
 
 // which slot a situation is really about — framed in the turn accent so the eye
 // starts there and reads the others as answers to it
@@ -122,43 +131,46 @@ export default function TableCentreBlock() {
         <Typography variant="body">{w.note[set]}</Typography>
         <div className={styles.stage}>
           <div className={styles.axis} />
-          {(Object.entries(CENTRE_SETS[set]) as [CentreSlot, CentreTilt][]).map(([slot, tilt]) => {
-            const { dx, z, w: width } = CENTRE_SLOTS[slot]
-            return (
-              <div
-                key={slot}
-                className={`${styles.slot} ${slot === LEAD[set] ? styles.slotLead : ''}`}
-                style={{
-                  insetBlockStart: `${CENTRE_TOP}%`,
-                  insetInlineStart: '50%',
-                  inlineSize: `${width}px`,
-                  // the real card box: a card is TALLER than it is wide by
-                  // CARD_RATIO, and a frame that ignored it would show places
-                  // at a size no card in the game ever has
-                  blockSize: `${Math.round(width * CARD_RATIO)}px`,
-                  // The frame is NEVER tilted, whatever the card on it will
-                  // do. A place marks where a card lands; its angle belongs to
-                  // whoever brought it and is deliberately not uniform. And a
-                  // rotated place would stop being the card's true box, which
-                  // is what every flight aims at (I6).
-                  transform: centreTransform(slot),
-                  zIndex: z,
-                }}
-              >
-                <div>
-                  <Typography as="div" base="mono-strong" tk="tk-10" className={styles.name}>
-                    {slot}
-                  </Typography>
-                  <Typography as="div" base="mono-xs" className={styles.geom}>
-                    {dx === 0 ? 'dx 0' : `dx ${dx > 0 ? '+' : ''}${dx}`} · {width}px · z {z}
-                  </Typography>
-                  <Typography as="div" base="mono-xs" className={styles.pose}>
-                    {tilt === 'own' ? w.own : w.square}
-                  </Typography>
+          {(Object.entries(CENTRE_SETS[set]) as [CentreSlot, CentrePlace][]).map(
+            ([slot, place]) => {
+              const { dx, w: width } = CENTRE_SLOTS[slot]
+              return (
+                <div
+                  key={slot}
+                  className={`${styles.slot} ${slot === LEAD[set] ? styles.slotLead : ''}`}
+                  style={{
+                    insetBlockStart: `${CENTRE_TOP}%`,
+                    insetInlineStart: '50%',
+                    inlineSize: `${width}px`,
+                    // the real card box: a card is TALLER than it is wide by
+                    // CARD_RATIO, and a frame that ignored it would show places
+                    // at a size no card in the game ever has
+                    blockSize: `${Math.round(width * CARD_RATIO)}px`,
+                    // The frame is NEVER tilted, whatever the card on it will
+                    // do. A place marks where a card lands; its angle belongs to
+                    // whoever brought it and is deliberately not uniform. And a
+                    // rotated place would stop being the card's true box, which
+                    // is what every flight aims at (I6).
+                    transform: centreTransform(slot),
+                    zIndex: place.z,
+                  }}
+                >
+                  <div>
+                    <Typography as="div" base="mono-strong" tk="tk-10" className={styles.name}>
+                      {slot}
+                    </Typography>
+                    <Typography as="div" base="mono-xs" className={styles.geom}>
+                      {dx === 0 ? 'dx 0' : `dx ${dx > 0 ? '+' : ''}${dx}`} · {width}px
+                      {place.z === undefined ? '' : ` · z ${place.z}`}
+                    </Typography>
+                    <Typography as="div" base="mono-xs" className={styles.pose}>
+                      {place.tilt === 'own' ? w.own : w.square}
+                    </Typography>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            },
+          )}
         </div>
       </KitSection>
 
@@ -182,7 +194,7 @@ export default function TableCentreBlock() {
                 <td className={styles.mono}>{slot}</td>
                 <td className={styles.mono}>{CENTRE_SLOTS[slot].dx}</td>
                 <td className={styles.mono}>{CENTRE_SLOTS[slot].w}</td>
-                <td className={styles.mono}>{CENTRE_SLOTS[slot].z}</td>
+                <td className={styles.mono}>{layersOf(slot)}</td>
                 <td className={styles.mono}>{CENTRE_SLOTS[slot].from}</td>
               </tr>
             ))}

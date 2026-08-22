@@ -58,33 +58,20 @@
 /* the AI trigger (cause) — left of the centre, normal card size */
 .causeSlot {
   position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  transform: translate(calc(-50% - 107px), -50%);
 }
 
 /* the AI effect (main) — at the centre, larger than the trigger */
 .effectSlot {
   position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  z-index: 1;
-  inline-size: 200px;
   aspect-ratio: var(--card-aspect);
-  transform: translate(calc(-50% + 82px), -50%);
 }
 
 /* Bad Vibe: the card the player gives up stands to the RIGHT of the Bad Vibe card,
    open to everyone, until both leave. A hand card's width — it came from the fan. */
 .pickedSlot {
   position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  transform: translate(calc(-50% + 277px), -50%);
 }
 
 /* discard — right of centre, before the right rail (canonical Table position).

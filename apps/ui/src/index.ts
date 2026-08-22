@@ -158,10 +158,12 @@ export {
   CENTRE_SETS,
   CENTRE_SLOTS,
   CENTRE_TOP,
+  type CentrePlace,
   type CentreSet,
   type CentreSlot,
   type CentreSlotGeom,
   type CentreTilt,
+  centrePlaceStyle,
   centreTransform,
 } from './table/TableCentre/centre'
 export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'

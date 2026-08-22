@@ -23,6 +23,7 @@ import { useCardPreview } from '@/table/CardPreview'
 import Hand from '@/table/Hand'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
+import { centrePlaceStyle } from '@/table/TableCentre/centre'
 import TurnDock, { type TurnDockState } from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
@@ -654,7 +655,12 @@ export default function Error503Story() {
         </div>
 
         {/* centre staging — the 503 comes out here; defence covers it here */}
-        <div className={styles.center} ref={centerRef} {...slotProps(centerCard)}>
+        <div
+          className={styles.center}
+          style={centrePlaceStyle('reveal', 'centre')}
+          ref={centerRef}
+          {...slotProps(centerCard)}
+        >
           {centerCard && (
             <div className={styles.centerCard}>
               <Card card={centerCard} interactive={false} width="100%" />

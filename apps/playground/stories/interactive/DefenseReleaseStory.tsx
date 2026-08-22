@@ -28,6 +28,7 @@ import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
+import { centrePlaceStyle } from '@/table/TableCentre/centre'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
@@ -859,16 +860,31 @@ export default function DefenseReleaseStory() {
         {/* the played Release waits here for its cost, which is shown beside it.
             The ask sits with the cards, not only in the dev bar — a release parked
             at the centre with no explanation reads as a stuck play. */}
-        <div className={styles.stageSlot} ref={stageRef} {...slotProps(staged)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('release', 'stage')}
+          ref={stageRef}
+          {...slotProps(staged)}
+        >
           {staged && <Card card={staged} interactive={false} width="100%" />}
         </div>
-        <div className={styles.costSlot} ref={costRef} {...slotProps(cost)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('release', 'cost')}
+          ref={costRef}
+          {...slotProps(cost)}
+        >
           {cost && <Card card={cost} interactive={false} width="100%" />}
         </div>
 
         {/* the attack stands at the CENTRE, open to the whole table — one card, or
             one pair when a sudo backs it (a sudo-enhanced attack is one play) */}
-        <div className={styles.centerSlot} ref={centerRef} {...slotProps(incoming)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('defence', 'centre')}
+          ref={centerRef}
+          {...slotProps(incoming)}
+        >
           {incoming && (
             <div className={styles.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
               {incomingSudo && SUDO_CARD ? (
@@ -882,7 +898,12 @@ export default function DefenseReleaseStory() {
 
         {/* the defender's own Sudo waits in its OWN place until a defence is
             chosen for it — the arrow says what it is aimed at */}
-        <div className={styles.sudoSlot} ref={sudoRef} {...slotProps(defSudo)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('defence', 'sudo')}
+          ref={sudoRef}
+          {...slotProps(defSudo)}
+        >
           {defSudo && !cover && (
             <div className={styles.pose} style={{ transform: restTransform(SUDO_POSE) }}>
               <Card card={defSudo} interactive={false} width="100%" />
@@ -891,7 +912,12 @@ export default function DefenseReleaseStory() {
         </div>
 
         {/* the defence covering the attack — offset and tilted the other way */}
-        <div className={styles.coverSlot} ref={coverRef} {...slotProps(cover)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('defence', 'cover')}
+          ref={coverRef}
+          {...slotProps(cover)}
+        >
           {cover && (
             <div className={styles.pose} style={{ transform: restTransform(COVER_POSE) }}>
               {coverAux ? (
