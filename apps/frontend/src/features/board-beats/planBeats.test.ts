@@ -2,6 +2,7 @@ import type { Event } from '@release/engine'
 import { cardById } from '@release/ui'
 import { describe, expect, it } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
+import type { BeatPlan } from './planBeats'
 import { classifyPiles, planBeats } from './planBeats'
 
 const card = (id: string) =>
@@ -1073,5 +1074,59 @@ describe('classifyPiles', () => {
   it('plays nothing when the counts say nothing happened', () => {
     expect(classifyPiles([10], [10])).toBeNull()
     expect(classifyPiles([0, 0], [0])).toBeNull()
+  })
+})
+
+describe('planBeats — a 503 a standing Monitoring answers by itself (#103)', () => {
+  const standingAlarm = () =>
+    ({
+      kind: 'neutralize503',
+      player: 'p1',
+      card: 'trigger-error-503',
+      methods: ['monitoring'],
+    }) as NonNullable<BoardState['pending']>
+
+  // The engine answers it inside the draw that turned it up: no pending, no
+  // gesture, one batch (`fake/triggers.ts` — the Monitoring branch). The
+  // `neutralized` sits BETWEEN the reveal and the discard it caused, because
+  // the discard is parented to the method that banked it.
+  const auto = (): Event[] =>
+    [
+      { id: 30, type: 'drawn', player: 'p1', pile: 0, deckSize: 9 },
+      { id: 31, type: 'revealed', player: 'p1', card: 'trigger-error-503' },
+      { id: 32, type: 'neutralized', player: 'p1', method: 'monitoring' },
+      { id: 33, type: 'discarded', player: 'p1', card: 'trigger-error-503', reason: 'trigger' },
+    ] as Event[]
+
+  it('gives the draw the discard to fly, past the method that banked it', () => {
+    const plans = planBeats(auto(), boardBefore())
+    const draw = plans.find((p) => p.kind === 'draw')
+    expect(draw).toBeDefined()
+    expect((draw as Extract<BeatPlan, { kind: 'draw' }>).draws[0].reveal).toEqual({
+      card: 'trigger-error-503',
+      discardId: 33,
+      neutralized: true,
+    })
+  })
+
+  // An exchange with nothing in it is not a beat: the draw owns the only card
+  // that moves, and a `neutralized` plan behind it would hold the table for its
+  // own hold with nothing to show for it.
+  it('plans no exchange of its own', () => {
+    const plans = planBeats(auto(), boardBefore())
+    expect(plans.map((p) => p.kind)).toEqual(['draw'])
+  })
+
+  // …but a CHOSEN Monitoring still has its own beat: the alarm stood at the
+  // centre through a pending and is taken away by the exchange, not by a draw.
+  it('leaves a chosen Monitoring answer its own exchange', () => {
+    const plans = planBeats(
+      [
+        { id: 40, type: 'neutralized', player: 'p1', method: 'monitoring' },
+        { id: 41, type: 'discarded', player: 'p1', card: 'trigger-error-503', reason: 'trigger' },
+      ] as Event[],
+      boardBefore({ pending: standingAlarm() }),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['neutralized'])
   })
 })

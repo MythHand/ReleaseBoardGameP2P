@@ -128,6 +128,24 @@ export function fireTrigger(
       log.add({ type: 'discarded', player, card: card.id, reason: 'trigger' }, revealedId)
       return eliminate(discard(state, [card]), log, player)
     }
+    // A standing Monitoring makes the 503 "игнорируются" (cards.md, the
+    // Monitoring entry): nothing is asked, so nothing stands. It is answered
+    // inside the very draw that turned it up — one batch, no decision, and the
+    // Monitoring stays where it is.
+    //
+    // The Error 503 entry lists Monitoring as one of three способов the player
+    // CHOOSES, which is the competing reading, and the two disagree about a
+    // real case: whether a player holding both may burn a Debugger instead.
+    // docs/rules/backlog.md carries both, and cards.md carries the marker —
+    // this branch is the reading the game runs on, not the one it settles.
+    if (state.players[player].release.monitoring) {
+      const neutralizedId = log.add({ type: 'neutralized', player, method: 'monitoring' })
+      // Parented to the method that banked it, exactly as `bankAlarm` does on
+      // every chosen answer — the causal trail does not change shape just
+      // because nobody was asked.
+      log.add({ type: 'discarded', player, card: card.id, reason: 'trigger' }, neutralizedId)
+      return { ...discard(state, [card]), eventSeq: log.seq }
+    }
     // …otherwise the alarm STANDS. It waits on the pending until an answer is
     // chosen, and the two go to the discard together (resolution.md's own
     // destinations table). Holding it is also what lets the board cover it:
