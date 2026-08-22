@@ -104,6 +104,12 @@ export interface DefenseStagedPlay {
   // engine's answer. 'rejected': the brief window between the engine saying no
   // and the return flight taking the card(s) back.
   phase: 'partner' | 'dispatched' | 'rejected'
+  /**
+   * The beat has taken this play over (`release()`): its own exit owns the
+   * card now, so the static cover render must let go of the slot. The play is
+   * NOT finished — see `release()` for why the fan must keep filtering it.
+   */
+  handed?: boolean
   // true once a partner has been picked — the cover slot carries a CardPair
   // rather than a lone Card. Mirrors `_useBoardStaging`'s own `merged`.
   merged: boolean
@@ -727,8 +733,26 @@ export function useDefenseStaging({
   // flyer's own teardown below — `release()` clears the STAGING state; the
   // flyer that was carrying the visual is dropped by the SAME `onHandPlay`
   // closure once its own flight lands, `landed`'s own comment above.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
-  const release = useCallback(() => commitStaged(null), [])
+  // The beat has taken the card over. The static cover render must let go —
+  // the beat's exit is flying that card now — but the play is NOT back in the
+  // player's hand, and clearing the staging here said that it was.
+  //
+  // While a beat runs the board renders its SHADOW: `base`, the projection
+  // from BEFORE the batch, whose `you.hand` still holds the card that was
+  // played. `handItems` filters the fan by what is staged, so nulling the
+  // staging here stopped the filtering and popped the played card back into
+  // the fan — visible beside its own copy flying to the discard, for the whole
+  // length of the exit.
+  //
+  // So this hands the slot over without ending the play: the cover render
+  // checks `handed`, the fan filter does not, and the catch-up effect below
+  // clears the staging for real once the queue drains onto a projection that
+  // has actually taken the card out of the hand.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable, the same reason every other caller in this file suppresses it
+  const release = useCallback(() => {
+    const s = stagedRef.current
+    if (s) commitStaged({ ...s, handed: true })
+  }, [])
 
   // A NEW MATCH wipes the gesture (#101, Fix C, finding 3) — the same boundary,
   // idiom and reasoning as `_useBoardStaging.ts`'s own reset and `useBeats`'s

@@ -369,7 +369,10 @@ export default function Board({
   // the answer once its own flight has landed (or at once under reduced
   // motion) — the same gate, and the same reason, as `stagedCover` above.
   const stagedNeutralize =
-    alarmMineOpen && neutralizing.landed && neutralizing.overlay.length === 0
+    alarmMineOpen &&
+    neutralizing.landed &&
+    neutralizing.overlay.length === 0 &&
+    !neutralizing.staged?.handed
       ? neutralizing.staged
       : undefined
 
@@ -377,15 +380,25 @@ export default function Board({
   // motion) — gates the static cover render below against the carrier still
   // flying it there, the same reason `stagedRelease` waits for the stage
   // machine to reach `standing` (`stageStanding`).
+  // `handed` is the beat saying "the exit owns this card now" — the slot must
+  // clear even though the play is still staged, because the staging is what
+  // keeps the card out of the fan until the projection catches up
+  // (`_useDefenseStaging`'s own `release()`).
   const stagedCover =
-    answering && defenseStaging.landed && defenseStaging.overlay.length === 0
+    answering &&
+    defenseStaging.landed &&
+    defenseStaging.overlay.length === 0 &&
+    !defenseStaging.staged?.handed
       ? defenseStaging.staged?.main
       : undefined
   // the Sudo that folded into it (Task 17) — same gate as `stagedCover`, read
   // alongside it so the cover slot's render (below) can tell a plain defence
   // from a sudo-backed pair without a second read of `defenseStaging.staged`.
   const stagedCoverSudo =
-    answering && defenseStaging.landed && defenseStaging.overlay.length === 0
+    answering &&
+    defenseStaging.landed &&
+    defenseStaging.overlay.length === 0 &&
+    !defenseStaging.staged?.handed
       ? defenseStaging.staged?.support
       : undefined
   // the defender's own Sudo, waiting at its own slot for the defence it will

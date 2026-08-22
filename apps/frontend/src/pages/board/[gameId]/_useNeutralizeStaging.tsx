@@ -70,6 +70,12 @@ export interface NeutralizeStaged {
   /** the sacrificed release's own Code Review, which burns with it */
   aux?: CardData | null
   home: Home
+  /**
+   * The beat has taken this answer over (`release()`): its exit owns the card
+   * now, so the static cover render must let go. The play is NOT finished —
+   * see `release()` for why the fan must keep filtering it.
+   */
+  handed?: boolean
 }
 
 export interface NeutralizeStaging {
@@ -430,8 +436,18 @@ export function useNeutralizeStaging({
     commitStaged(null)
   }, [pending, landed])
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
-  const release = useCallback(() => commitStaged(null), [])
+  // Hand the cover slot to the beat WITHOUT ending the play. Clearing the
+  // staging here would stop `handItems` filtering, and the board is still
+  // rendering the beat's shadow — the pre-batch projection, whose `you.hand`
+  // still holds the answer that was played — so the card would pop back into
+  // the fan beside its own copy flying to the discard. The turn side already
+  // solves this by splitting the two jobs (`takeStagedRelease` in
+  // `comboBeat.tsx`); this is the same split, done on the staging itself.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable, the same reason every other caller in this file suppresses it
+  const release = useCallback(() => {
+    const s = stagedRef.current
+    if (s) commitStaged({ ...s, handed: true })
+  }, [])
 
   // A NEW MATCH wipes the gesture — the same boundary, idiom and (inert on this
   // branch) reasoning as its two siblings'. `flight.reset()` belongs HERE and
