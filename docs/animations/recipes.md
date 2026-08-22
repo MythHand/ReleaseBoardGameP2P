@@ -1448,6 +1448,16 @@ resolves once — and three things reach it:
   rest of the match. The value is a guard rather than a rule, and is recorded as such in
   `backlog.md`.
 
+**The winner waits for it**
+The engine settles the elimination and the win it caused in ONE reduction (`fake/triggers.ts`:
+`eliminated`, its discards, then `gameOver`), so `view.over` is true the instant the batch lands —
+while the sweep and the clip are still queued. `over` also rides BESIDE the projection
+(`toBoardOver` hangs it off the props, not off `BoardState`), so the shadow that holds every other
+visible fact back does not cover it. `useBeats` therefore publishes one plain fact, `running` — the
+queue is still working, held for the whole drain rather than per beat — and `_Board` renders
+`GameOver` only when it is false. Without it the winner panel is announced over the top of the clip
+that explains why they won.
+
 **Under `prefers-reduced-motion` there is no clip at all**
 Decided, not emergent: a full-screen autoplaying video is exactly what the preference is about.
 `useBeats` queues no beat under the preference, so the board goes straight to its eliminated state
@@ -1470,7 +1480,8 @@ Decided, not emergent: a full-screen autoplaying video is exactly what the prefe
   keyed by its source — a different clip is a different element.
 
 **Building blocks**
-`wait` · `Beat.exclusive` (`useBeats.ts`) · the `eliminated` plan (`planBeats.ts`).
+`wait` · `Beat.exclusive` / `Beats.running` (`useBeats.ts`) · the `eliminated` plan
+(`planBeats.ts`).
 
 **Live reference**
 `apps/frontend/src/features/board-beats/eliminateBeat.tsx`, `features/board-beats/planBeats.ts`
