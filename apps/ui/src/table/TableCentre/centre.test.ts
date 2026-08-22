@@ -38,25 +38,36 @@ describe('the centre of the table', () => {
     }
   })
 
-  it('tilts what a hand put there and leaves square what the system dealt', () => {
-    // I11 as geometry rather than as prose. The same place answers differently
-    // by situation, which is the whole reason the pose belongs to the set: a
-    // trigger revealed into the centre lies square, an attack thrown into the
-    // very same centre lies at its own angle.
-    expect(CENTRE_SETS.reveal.centre).toBeNull()
-    expect(CENTRE_SETS.defence.centre?.rot).toBeLessThan(0)
-    // and the defence leans the OTHER way, or the two would read as one stack
-    expect(CENTRE_SETS.defence.cover?.rot).toBeGreaterThan(0)
-    // …with an offset of its own, so the card underneath stays visible
-    expect(CENTRE_SETS.defence.cover?.dx).not.toBe(0)
-    // nothing the system deals is tilted anywhere
-    for (const slot of Object.values(CENTRE_SETS.ai)) expect(slot).toBeNull()
+  it('says WHETHER a card lies square, and never at what angle', () => {
+    // The boundary the module is not allowed to cross. Tilts are the scene's and
+    // the beat's, and they are deliberately not uniform: the discard heap gives
+    // every card its own angle from `scatterAt`, random-looking but
+    // deterministic by key, so a heap looks the same on every peer and a card
+    // lands exactly where it then rests. An angle declared here would collapse
+    // that into one tilt for everyone — and drop a card that already computed
+    // its own into a different one on its last frame.
+    for (const geom of Object.values(CENTRE_SLOTS)) {
+      expect(Object.keys(geom).sort()).toEqual(['dx', 'from', 'w', 'z'])
+    }
+    for (const set of Object.values(CENTRE_SETS)) {
+      for (const tilt of Object.values(set)) expect(['square', 'own']).toContain(tilt)
+    }
+  })
+
+  it('reads the same place differently by situation, which is I11', () => {
+    // A trigger revealed into the centre lies square; an attack thrown into the
+    // very same centre lies at its own angle. That is why the character belongs
+    // to the set rather than to the place.
+    expect(CENTRE_SETS.reveal.centre).toBe('square')
+    expect(CENTRE_SETS.defence.centre).toBe('own')
+    // Nothing the system deals is tilted…
+    for (const tilt of Object.values(CENTRE_SETS.ai)) expect(tilt).toBe('square')
     // …and neither is a release that has not been played yet: it stands waiting
     // for its price, which is not a move being made. The rules owner's wording
     // of I11 — the tilt marks a card that has been PLAYED, not one that came
     // from a hand.
-    expect(CENTRE_SETS.release.stage).toBeNull()
-    expect(CENTRE_SETS.release.cost).toBeNull()
+    expect(CENTRE_SETS.release.stage).toBe('square')
+    expect(CENTRE_SETS.release.cost).toBe('square')
   })
 
   it('centres a slot with no offset and shifts the rest by their own dx', () => {

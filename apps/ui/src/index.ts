@@ -154,18 +154,15 @@ export type {
   TableState,
 } from './table/Table/types'
 export {
-  ATTACK_POSE,
   CENTRE_CARD_W,
   CENTRE_SETS,
   CENTRE_SLOTS,
   CENTRE_TOP,
-  type CentrePose,
   type CentreSet,
   type CentreSlot,
   type CentreSlotGeom,
-  COVER_POSE,
+  type CentreTilt,
   centreTransform,
-  SUDO_POSE,
 } from './table/TableCentre/centre'
 export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'
 export { default as TurnDock } from './table/TurnDock/TurnDock'
