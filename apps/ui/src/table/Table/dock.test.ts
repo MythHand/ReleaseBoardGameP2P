@@ -154,10 +154,24 @@ it('is `hold` with the window’s clock while your own release is contested', ()
   expect(d.activePlayer).toBeUndefined()
 })
 
-it('offers `reaction` to a responder holding no attack card — passing is theirs too', () => {
+it('offers `attack` to a responder holding no attack card — passing is theirs too', () => {
   const window: TableWindow = { ...windowOnYou, player: 'p2' }
   const d = deriveDock({ ...base, turn: 'p2', window }, 'you', 0)
-  expect(d.state).toBe('reaction')
+  // Its own phase, not a shade of `reaction`: being free to hit and being owed
+  // an answer are opposite situations, and the dock is read at a glance.
+  expect(d.state).toBe('attack')
+  expect(d.passed).toBe(false)
+})
+
+it('tells the attack phase that this seat has already passed', () => {
+  // The pass is not a forfeit and not a closed door: the window still stands,
+  // so the dock says so and the key turns into "unpass" (TurnDock).
+  const window: TableWindow = { ...windowOnYou, player: 'p2', passed: ['you'] }
+  const d = deriveDock({ ...base, turn: 'p2', window }, 'you', 0)
+  expect(d.state).toBe('attack')
+  expect(d.passed).toBe(true)
+  // and the clock is still yours to watch — it is the time YOU have to hit
+  expect(d.seconds).toBeGreaterThan(0)
 })
 
 it('keeps an eliminated viewer at `waiting` even while a window runs', () => {

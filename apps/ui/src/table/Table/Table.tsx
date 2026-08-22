@@ -8,7 +8,6 @@ import { CardMotionProvider } from '@/cards/cardMotion'
 import GearIcon from '@/icons/GearIcon'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Badge from '@/primitives/Badge'
-import Button from '@/primitives/Button'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
@@ -396,19 +395,14 @@ export default function Table({
             seconds={dockView.seconds}
             progress={dockView.progress}
             activePlayer={dockView.activePlayer}
+            passed={dockView.passed}
             copy={copy.turnDock}
             paused={paused}
             onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
             onPush={actions?.onPush}
             onPass={actions?.onPass}
+            onUnpass={actions?.onUnpass}
           />
-          {/* you already passed on the open window — TurnDock has no notion of
-              "unpass", so the affordance to take it back lives here instead */}
-          {state.window?.passed.includes(state.selfId) && (
-            <Button variant="tech" className={styles.unpass} onClick={() => actions?.onUnpass?.()}>
-              {copy.window.unpass}
-            </Button>
-          )}
         </div>
 
         {/* the engine is waiting on a decision from you — a pending owed to you

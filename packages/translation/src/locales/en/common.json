@@ -216,6 +216,10 @@
     "turnOf": "opponent turn",
     "reaction": "reaction",
     "reactionDanger": "error 503",
+    "attack": "attack",
+    "canAttack": "their release is open to you",
+    "passed": "passed — you can take it back",
+    "unpass": "unpass",
     "draw": "draw",
     "push": "PUSH",
     "pass": "pass",
@@ -228,17 +232,38 @@
   "pending": {
     "confirm": "confirm",
     "decline": "let it through",
-    "discardForRelease": { "prompt": "discard a card to ship this release", "action": "discard" },
-    "defend": { "prompt": "you are under attack", "action": "defend" },
+    "discardForRelease": {
+      "prompt": "discard a card to ship this release",
+      "action": "discard"
+    },
+    "defend": {
+      "prompt": "you are under attack",
+      "action": "defend"
+    },
     "neutralize503": {
       "prompt": "error 503 — neutralize it or you are out",
       "action": "neutralize"
     },
-    "crush": { "prompt": "your release is being crushed", "action": "neutralize" },
-    "requestCard": { "prompt": "name the card you demand", "action": "demand" },
-    "giveCard": { "prompt": "hand over the card", "action": "give" },
-    "handLimit": { "prompt": "your hand is over the limit", "action": "discard" },
-    "pickFromDiscard": { "prompt": "take a card from the discard", "action": "take" }
+    "crush": {
+      "prompt": "your release is being crushed",
+      "action": "neutralize"
+    },
+    "requestCard": {
+      "prompt": "name the card you demand",
+      "action": "demand"
+    },
+    "giveCard": {
+      "prompt": "hand over the card",
+      "action": "give"
+    },
+    "handLimit": {
+      "prompt": "your hand is over the limit",
+      "action": "discard"
+    },
+    "pickFromDiscard": {
+      "prompt": "take a card from the discard",
+      "action": "take"
+    }
   },
   "window": {
     "unpass": "cancel pass"

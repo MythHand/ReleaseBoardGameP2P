@@ -37,7 +37,12 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 //  - 'draw'     my turn, card not drawn yet → DRAW key + PUSH-locked caption
 //  - 'push'     my turn, already drawn      → PUSH key + "drawn" badge
 //  - 'waiting'  an opponent's turn          → active player in the key's slot
-//  - 'reaction' reaction window on a release → PASS key (amber, or red danger)
+//  - 'reaction' a decision is owed BY ME — a defence, a 503 (amber, or red danger)
+//  - 'attack'   somebody else's fresh release is open to me → PASS key, violet.
+//               Passing says only "not this moment": the window ends early when
+//               every responder has passed, and until it does the pass can be
+//               taken back from the same key, which then reads "unpass". The
+//               engine never bars a later attack because of it.
 //  - 'hold'     the table waits on something not mine to press — my own release
 //               under the window (caption says so), or someone else's decision
 //               (their name in the key's slot). Reaction accent, live ring, no
@@ -48,13 +53,18 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 // turn's own phase and accent while the cost is owed. What is wanted of the
 // player is said by the ask on the table, and the key stays live because
 // pressing it takes the staged release back first (`dock.ts`).
-export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction' | 'hold'
+export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction' | 'attack' | 'hold'
 
 export interface TurnDockCopy {
   yourTurn: string
   turnOf: string
   reaction: string
   reactionDanger: string
+  // 'attack' — the phase word, its caption, and the key once you have passed
+  attack: string
+  canAttack: string
+  passed: string
+  unpass: string
   draw: string
   push: string
   pass: string
@@ -79,14 +89,20 @@ interface TurnDockProps {
   // active player's name — shown in 'waiting' / 'reaction'
   activePlayer?: string
   // reaction only: red danger tone (e.g. Error 503) vs the default amber
-  // "attack a release" reaction
   danger?: boolean
+  // 'attack' only: this seat has already passed on the open window. The key
+  // turns into "unpass" rather than disappearing — a pass is a statement about
+  // this moment, not a forfeit, and taking it back is a legal move for as long
+  // as the window stands.
+  passed?: boolean
   // game paused (e.g. a peer dropped / host stepped away): the block desaturates
   // to grey — the frozen timer value is passed in as usual by the consumer
   paused?: boolean
   onDraw?: () => void
   onPush?: () => void
   onPass?: () => void
+  // 'attack' with `passed`: takes the pass back
+  onUnpass?: () => void
 }
 
 const PHASE_KEY: Record<TurnDockState, keyof TurnDockCopy> = {
@@ -94,6 +110,7 @@ const PHASE_KEY: Record<TurnDockState, keyof TurnDockCopy> = {
   push: 'yourTurn',
   waiting: 'turnOf',
   reaction: 'reaction',
+  attack: 'attack',
   hold: 'reaction',
 }
 
@@ -101,6 +118,10 @@ function accentFor(state: TurnDockState, danger: boolean): string {
   if (state === 'reaction' || state === 'hold') {
     return danger ? 'var(--danger-accent)' : 'var(--reaction-accent)'
   }
+  // The offensive half of a window gets its own hue: the same ring, the same
+  // key, but "I may hit" and "I must answer" are opposite situations and the
+  // dock is read at a glance.
+  if (state === 'attack') return 'var(--attack-accent)'
   if (state === 'waiting') return 'var(--idle-accent)'
   return 'var(--turn-accent)'
 }
@@ -112,10 +133,12 @@ export default function TurnDock({
   copy,
   activePlayer,
   danger = false,
+  passed = false,
   paused = false,
   onDraw,
   onPush,
   onPass,
+  onUnpass,
 }: TurnDockProps) {
   const mine = state === 'draw' || state === 'push'
   const reactionDanger = state === 'reaction' && danger
@@ -125,23 +148,40 @@ export default function TurnDock({
 
   // 'hold' splits by what fills the key's slot: a named decider says enough on
   // its own; an empty slot (your own release under the window) gets the why.
+  const attackPassed = state === 'attack' && passed
   const caption =
     state === 'draw'
       ? copy.locked
       : state === 'reaction'
         ? copy.canDefend
-        : state === 'hold' && !activePlayer
-          ? copy.underAttack
-          : null
+        : state === 'attack'
+          ? // having passed is a state worth saying out loud: the window is still
+            // open, the key still works, and the caption is what tells you the
+            // pass is yours to take back rather than a door that shut.
+            attackPassed
+            ? copy.passed
+            : copy.canAttack
+          : state === 'hold' && !activePlayer
+            ? copy.underAttack
+            : null
 
-  // key/label states share one Button frame (draw / push / reaction); 'waiting'
-  // shows the active player's name instead.
-  const buttonMode = mine || state === 'reaction'
-  const label = state === 'draw' ? copy.draw : state === 'push' ? copy.push : copy.pass
-  const handler = state === 'draw' ? onDraw : state === 'push' ? onPush : onPass
+  // key/label states share one Button frame (draw / push / reaction / attack);
+  // 'waiting' shows the active player's name instead.
+  const buttonMode = mine || state === 'reaction' || state === 'attack'
+  const label =
+    state === 'draw'
+      ? copy.draw
+      : state === 'push'
+        ? copy.push
+        : attackPassed
+          ? copy.unpass
+          : copy.pass
+  const handler =
+    state === 'draw' ? onDraw : state === 'push' ? onPush : attackPassed ? onUnpass : onPass
 
-  // re-arm the lockout whenever the actionable key changes (or reappears)
-  const keyId = buttonMode ? state : 'idle'
+  // re-arm the lockout whenever the actionable key changes (or reappears) —
+  // pass↔unpass is a change of action on one key, so it re-arms too.
+  const keyId = buttonMode ? `${state}${attackPassed ? ':unpass' : ''}` : 'idle'
   const [keyLocked, setKeyLocked] = useState(true)
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyId is the re-arm trigger, not read inside
   useEffect(() => {
@@ -163,9 +203,21 @@ export default function TurnDock({
   const idleRing = state === 'waiting'
 
   // widest known value per text slot — reserves a fixed box (no reflow)
-  const phaseSizer = longest(copy.yourTurn, copy.turnOf, copy.reaction, copy.reactionDanger)
-  const labelSizer = longest(copy.draw, copy.push, copy.pass)
-  const captionSizer = longest(copy.locked, copy.canDefend, copy.underAttack)
+  const phaseSizer = longest(
+    copy.yourTurn,
+    copy.turnOf,
+    copy.reaction,
+    copy.reactionDanger,
+    copy.attack,
+  )
+  const labelSizer = longest(copy.draw, copy.push, copy.pass, copy.unpass)
+  const captionSizer = longest(
+    copy.locked,
+    copy.canDefend,
+    copy.underAttack,
+    copy.canAttack,
+    copy.passed,
+  )
 
   return (
     <HudSurface accent={accent} className={`${styles.dock} ${paused ? styles.paused : ''}`}>

@@ -10,6 +10,9 @@ export interface DockView {
   seconds?: number
   progress: number
   activePlayer?: string
+  // 'attack' only: this seat has already passed on the open window, so the key
+  // offers to take the pass back instead of repeating it.
+  passed?: boolean
 }
 
 // Both ends of a deadline span, so the ring's sweep is exact rather than
@@ -125,12 +128,25 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
     if (state.window.player === selfId) {
       return { state: 'hold', danger: false, ...clock(openedAt, deadline, now) }
     }
+    // Somebody else's fresh release is open to me — the offensive half of a
+    // window, and its own phase rather than a shade of `reaction`: answering an
+    // attack and being free to make one are opposite situations, and the dock
+    // is read at a glance.
+    //
     // Every living responder may PASS (and UNPASS), holding attack cards or
     // not — the "everyone passed, close early" rule is only reachable when the
     // card-less can concur too. Gating this on canAttackWith is what used to
     // make every window run its full clock.
     if (!state.you.eliminated) {
-      return { state: 'reaction', danger: false, ...clock(openedAt, deadline, now), activePlayer }
+      return {
+        state: 'attack',
+        danger: false,
+        ...clock(openedAt, deadline, now),
+        activePlayer,
+        // A pass is about this moment, not the window: it can be taken back
+        // while the window stands, and it never bars a later attack.
+        passed: state.window.passed.includes(selfId),
+      }
     }
   }
 
