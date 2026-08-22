@@ -339,6 +339,17 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
             }
           : null,
       ])
+      // TAKEOFF: the answer has been given and both cards are in the air, so the
+      // board lets go of the pending HERE — the same moment, and for the same
+      // reason, `discardBeat` publishes `withoutFlown`. It is what takes the red
+      // glow down (`glowStrong` reads the pending off the shadow) and what stops
+      // the answered alarm rendering at the centre underneath its own flyer.
+      //
+      // It also matters to the beat BEHIND this one: a beat that publishes
+      // nothing hands its own base on untouched, so the draw that a resumed
+      // sequence puts in the same batch used to animate against a board that
+      // still had the alarm standing on it (#103 testing, problem 1).
+      ctx.publish({ ...ctx.base, pending: null })
       if (items.length > 0) await latest.current.send(items)
       flyer.drop('cover')
     },
