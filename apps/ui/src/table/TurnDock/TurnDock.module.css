@@ -98,3 +98,68 @@
   color: var(--fg);
   overflow-wrap: anywhere;
 }
+
+/* ===== pass dots — how many seats that may attack have already declined ===== */
+
+/* A count, not a list: the row grows with the number of responders and its lit
+   part with the passes. Never per player, so no name and no order to read into. */
+.dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dot {
+  inline-size: 8px;
+  block-size: 8px;
+  background: var(--white-14);
+  border: 1px solid var(--white-20);
+  border-radius: 50%;
+
+  /* the fill glides on, so a pass arriving from another peer is noticed without
+     anything moving — no pulse: nothing here waits on the viewer */
+  transition:
+    background var(--t-base) var(--ease-soft),
+    border-color var(--t-base) var(--ease-soft),
+    box-shadow var(--t-base) var(--ease-soft);
+}
+
+.dotLit {
+  background: var(--attack-accent);
+  border-color: var(--attack-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--attack-accent) 45%, transparent);
+}
+
+/* the defender's own view: the dots take the key's slot, so they are read from
+   across the table rather than glanced at in the corner */
+.dotsBig {
+  gap: 10px;
+}
+
+.dotsBig .dot {
+  inline-size: 14px;
+  block-size: 14px;
+}
+
+.dotsSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 100%;
+}
+
+/* ===== the key, lit ===== */
+
+/* A pass already made. The word does not change — it is the same key toggled,
+   and a relabelled key reads as a different action — so the state is the fill:
+   the accent goes from a wash to the surface itself. */
+.keyOn {
+  color: var(--bg);
+  background: var(--btn-accent);
+  border-color: var(--btn-accent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--btn-accent) 40%, transparent);
+}
+
+.keyOn:hover {
+  box-shadow: 0 0 24px color-mix(in srgb, var(--btn-accent) 55%, transparent);
+}

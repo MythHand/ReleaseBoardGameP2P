@@ -146,12 +146,41 @@ const windowOnYou: TableWindow = {
   canAttackWith: [],
 }
 
-it('is `hold` with the window’s clock while your own release is contested', () => {
+it('is `exposed` with the window’s clock while your own release is contested', () => {
   const d = deriveDock({ ...base, turn: 'you', hasDrawn: true, window: windowOnYou }, 'you', 6_000)
-  expect(d.state).toBe('hold')
+  // Its own phase, not `hold`: `hold` is waiting on somebody else's decision,
+  // and this is waiting on the table. The clock is yours to read — it is how
+  // long opponents have to hit you — and it is still your turn, so no name.
+  expect(d.state).toBe('exposed')
   expect(d.seconds).toBe(9)
   expect(d.progress).toBeCloseTo(0.6)
   expect(d.activePlayer).toBeUndefined()
+  // one dot per seat that may hit it — everyone alive except you
+  expect(d.passes).toEqual({ total: 1, lit: 0 })
+})
+
+it('counts the passes made on your own release, never the players who made them', () => {
+  const window: TableWindow = { ...windowOnYou, passed: ['p2'] }
+  const d = deriveDock({ ...base, turn: 'you', hasDrawn: true, window }, 'you', 0)
+  expect(d.passes).toEqual({ total: 1, lit: 1 })
+})
+
+it('leaves an eliminated seat out of the dots, so a full row means the window is done', () => {
+  // The row fills exactly as the window runs out — the engine closes it early
+  // when every LIVING responder has passed, so a dead seat must not hold a dot
+  // that can never light.
+  const state: TableState = {
+    ...base,
+    turn: 'you',
+    hasDrawn: true,
+    window: { ...windowOnYou, passed: ['p2'] },
+    opponents: [
+      ...base.opponents,
+      { id: 'p3', name: 'segfault', handCount: 3, release: {}, eliminated: true },
+    ],
+  }
+  const d = deriveDock(state, 'you', 0)
+  expect(d.passes).toEqual({ total: 1, lit: 1 })
 })
 
 it('offers `attack` to a responder holding no attack card — passing is theirs too', () => {

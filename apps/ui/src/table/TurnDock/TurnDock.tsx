@@ -40,9 +40,16 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 //  - 'reaction' a decision is owed BY ME — a defence, a 503 (amber, or red danger)
 //  - 'attack'   somebody else's fresh release is open to me → PASS key, violet.
 //               Passing says only "not this moment": the window ends early when
-//               every responder has passed, and until it does the pass can be
-//               taken back from the same key, which then reads "unpass". The
-//               engine never bars a later attack because of it.
+//               every responder has passed, and until it does the same key
+//               takes the pass back — LIT rather than relabelled, because a key
+//               whose word flips reads as a different action, and this is the
+//               same one toggled. The engine never bars a later attack, so the
+//               caption stays "you may attack" throughout.
+//  - 'exposed'  the window is on MY OWN release: the clock is the time others
+//               have to hit it. Turn-green, because this is still my turn's
+//               business, and no key — nothing here is mine to press. The pass
+//               dots take the key's slot instead, larger: how many opponents
+//               have already declined is the one thing worth watching here.
 //  - 'hold'     the table waits on something not mine to press — my own release
 //               under the window (caption says so), or someone else's decision
 //               (their name in the key's slot). Reaction accent, live ring, no
@@ -53,18 +60,19 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 // turn's own phase and accent while the cost is owed. What is wanted of the
 // player is said by the ask on the table, and the key stays live because
 // pressing it takes the staged release back first (`dock.ts`).
-export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction' | 'attack' | 'hold'
+export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction' | 'attack' | 'exposed' | 'hold'
 
 export interface TurnDockCopy {
   yourTurn: string
   turnOf: string
   reaction: string
   reactionDanger: string
-  // 'attack' — the phase word, its caption, and the key once you have passed
+  // 'attack' — the phase word and its caption. There is no second label for a
+  // pass already made: the key lights up instead of changing its word.
   attack: string
   canAttack: string
-  passed: string
-  unpass: string
+  // 'exposed' — waiting out the window over your own release
+  exposed: string
   draw: string
   push: string
   pass: string
@@ -91,18 +99,43 @@ interface TurnDockProps {
   // reaction only: red danger tone (e.g. Error 503) vs the default amber
   danger?: boolean
   // 'attack' only: this seat has already passed on the open window. The key
-  // turns into "unpass" rather than disappearing — a pass is a statement about
-  // this moment, not a forfeit, and taking it back is a legal move for as long
-  // as the window stands.
+  // lights up rather than disappearing or changing its word — a pass is a
+  // statement about this moment, not a forfeit, and pressing the lit key takes
+  // it back for as long as the window stands.
   passed?: boolean
+  // How the open window's passes stand, as a count: one dot per seat that may
+  // attack, lit for each one that has passed. Never per player — the row says
+  // how close the window is to closing early, not who is timid.
+  passes?: { total: number; lit: number }
   // game paused (e.g. a peer dropped / host stepped away): the block desaturates
   // to grey — the frozen timer value is passed in as usual by the consumer
   paused?: boolean
   onDraw?: () => void
   onPush?: () => void
   onPass?: () => void
-  // 'attack' with `passed`: takes the pass back
+  // 'attack' with `passed`: the same key, pressed again, takes the pass back
   onUnpass?: () => void
+}
+
+// The open window's passes, as a row of dots — one per seat that may attack,
+// lit for each pass made. Not tied to players on purpose: the engine knows WHO
+// passed, but a dot per name turns the row into a scoreboard of who is timid,
+// and the only thing the table needs from it is how close the window is to
+// closing early. Lit is a flat fill, never a pulse: nothing here is waiting on
+// the viewer.
+function PassDots({ total, lit, big = false }: { total: number; lit: number; big?: boolean }) {
+  if (total <= 0) return null
+  return (
+    <div className={`${styles.dots} ${big ? styles.dotsBig : ''}`} aria-hidden="true">
+      {Array.from({ length: total }, (_, i) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: the dots ARE a count — there is nothing identifiable to key on, which is the point
+          key={i}
+          className={`${styles.dot} ${i < lit ? styles.dotLit : ''}`}
+        />
+      ))}
+    </div>
+  )
 }
 
 const PHASE_KEY: Record<TurnDockState, keyof TurnDockCopy> = {
@@ -111,6 +144,7 @@ const PHASE_KEY: Record<TurnDockState, keyof TurnDockCopy> = {
   waiting: 'turnOf',
   reaction: 'reaction',
   attack: 'attack',
+  exposed: 'exposed',
   hold: 'reaction',
 }
 
@@ -123,6 +157,8 @@ function accentFor(state: TurnDockState, danger: boolean): string {
   // dock is read at a glance.
   if (state === 'attack') return 'var(--attack-accent)'
   if (state === 'waiting') return 'var(--idle-accent)'
+  // 'exposed' falls through to the turn accent deliberately: the window over my
+  // own release is my turn still running, not a phase of somebody else's.
   return 'var(--turn-accent)'
 }
 
@@ -134,6 +170,7 @@ export default function TurnDock({
   activePlayer,
   danger = false,
   passed = false,
+  passes,
   paused = false,
   onDraw,
   onPush,
@@ -146,36 +183,27 @@ export default function TurnDock({
   const accent = accentFor(state, danger)
   const accentStyle = { '--btn-accent': accent } as CSSProperties
 
-  // 'hold' splits by what fills the key's slot: a named decider says enough on
-  // its own; an empty slot (your own release under the window) gets the why.
   const attackPassed = state === 'attack' && passed
+  // The caption does not change when you pass: attacking stays legal for as
+  // long as the window stands, and a caption that flipped to "you passed" would
+  // say the opposite. The lit key is what reports the pass.
   const caption =
     state === 'draw'
       ? copy.locked
       : state === 'reaction'
         ? copy.canDefend
         : state === 'attack'
-          ? // having passed is a state worth saying out loud: the window is still
-            // open, the key still works, and the caption is what tells you the
-            // pass is yours to take back rather than a door that shut.
-            attackPassed
-            ? copy.passed
-            : copy.canAttack
-          : state === 'hold' && !activePlayer
+          ? copy.canAttack
+          : state === 'exposed'
             ? copy.underAttack
             : null
 
   // key/label states share one Button frame (draw / push / reaction / attack);
-  // 'waiting' shows the active player's name instead.
+  // 'waiting' shows the active player's name instead, and 'exposed' the dots.
   const buttonMode = mine || state === 'reaction' || state === 'attack'
-  const label =
-    state === 'draw'
-      ? copy.draw
-      : state === 'push'
-        ? copy.push
-        : attackPassed
-          ? copy.unpass
-          : copy.pass
+  // three things can fill the action slot, and exactly one of them at a time
+  const actionMode = buttonMode ? 'btn' : state === 'exposed' ? 'dots' : 'name'
+  const label = state === 'draw' ? copy.draw : state === 'push' ? copy.push : copy.pass
   const handler =
     state === 'draw' ? onDraw : state === 'push' ? onPush : attackPassed ? onUnpass : onPass
 
@@ -209,15 +237,10 @@ export default function TurnDock({
     copy.reaction,
     copy.reactionDanger,
     copy.attack,
+    copy.exposed,
   )
-  const labelSizer = longest(copy.draw, copy.push, copy.pass, copy.unpass)
-  const captionSizer = longest(
-    copy.locked,
-    copy.canDefend,
-    copy.underAttack,
-    copy.canAttack,
-    copy.passed,
-  )
+  const labelSizer = longest(copy.draw, copy.push, copy.pass)
+  const captionSizer = longest(copy.locked, copy.canDefend, copy.underAttack, copy.canAttack)
 
   return (
     <HudSurface accent={accent} className={`${styles.dock} ${paused ? styles.paused : ''}`}>
@@ -241,6 +264,13 @@ export default function TurnDock({
           <Reveal when={state === 'push'} className={styles.chip}>
             <Badge tone="hud">{copy.drawn}</Badge>
           </Reveal>
+          {/* the same right end of the row the "drawn" badge uses — the two
+              never coexist ('push' is my turn, 'attack' is a window) */}
+          {state === 'attack' && passes && (
+            <div className={styles.chip}>
+              <PassDots total={passes.total} lit={passes.lit} />
+            </div>
+          )}
         </div>
 
         <div className={styles.body}>
@@ -252,12 +282,12 @@ export default function TurnDock({
 
           <div className={styles.action}>
             <div className={styles.actionMain}>
-              <Swap token={buttonMode ? 'btn' : 'name'} anim={modeAnim} fill>
-                {buttonMode ? (
+              <Swap token={actionMode} anim={modeAnim} fill>
+                {actionMode === 'btn' ? (
                   <Button
                     variant="hud"
                     data-testid="dock-key"
-                    className={styles.key}
+                    className={`${styles.key} ${attackPassed ? styles.keyOn : ''}`}
                     style={accentStyle}
                     onClick={onKey}
                   >
@@ -265,6 +295,13 @@ export default function TurnDock({
                       {label}
                     </Swap>
                   </Button>
+                ) : actionMode === 'dots' ? (
+                  // my own release under the window: nothing to press, so the
+                  // key's slot carries the one thing worth watching — how many
+                  // of the seats that could hit it have already declined
+                  <div className={styles.dotsSlot}>
+                    <PassDots total={passes?.total ?? 0} lit={passes?.lit ?? 0} big />
+                  </div>
                 ) : (
                   <Swap token={activePlayer ?? ''} anim={NAME} fill className={styles.name}>
                     <Typography as="span" base="mono-xl">

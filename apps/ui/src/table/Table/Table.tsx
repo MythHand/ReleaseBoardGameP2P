@@ -396,6 +396,7 @@ export default function Table({
             progress={dockView.progress}
             activePlayer={dockView.activePlayer}
             passed={dockView.passed}
+            passes={dockView.passes}
             copy={copy.turnDock}
             paused={paused}
             onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}

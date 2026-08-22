@@ -11,8 +11,10 @@ export interface DockView {
   progress: number
   activePlayer?: string
   // 'attack' only: this seat has already passed on the open window, so the key
-  // offers to take the pass back instead of repeating it.
+  // is lit and pressing it takes the pass back.
   passed?: boolean
+  // 'attack' / 'exposed': the window's passes as a count — dots, not names.
+  passes?: { total: number; lit: number }
 }
 
 // Both ends of a deadline span, so the ring's sweep is exact rather than
@@ -52,6 +54,22 @@ export function isCounting(state: TableState, selfId: string): boolean {
   // would-be responder, whose branch is the guarded one.
   if (state.window) return state.window.player === selfId || !state.you.eliminated
   return state.turn === selfId && state.turnClock != null
+}
+
+// How the open window's passes stand, as two numbers: one dot per seat that may
+// attack, lit for each pass. Responders are every living seat except the one
+// whose release is under the window — the same rule the engine closes the window
+// early by, so the row fills up exactly as the window runs out. Clamped, because
+// a `passed` entry for a seat that has since been eliminated would otherwise
+// light a dot that no longer has a seat behind it.
+function passesOf(state: TableState, target: string): { total: number; lit: number } {
+  const seats = [
+    { id: state.selfId, eliminated: state.you.eliminated },
+    ...state.opponents.map((o) => ({ id: o.id, eliminated: o.eliminated })),
+  ]
+  const total = seats.filter((s) => s.id !== target && !s.eliminated).length
+  const passed = state.window?.passed.length ?? 0
+  return { total, lit: Math.min(passed, total) }
 }
 
 // `now` is supplied by the caller — the kit never reads the clock itself.
@@ -123,10 +141,17 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
     const { openedAt, deadline } = state.window
     // Your own release under the window: nothing here is yours to press — you
     // cannot attack it, pass on it, or end the turn under it — so the window's
-    // countdown IS the content. No activePlayer: it is your own turn, and the
-    // caption slot says what the wait is about instead.
+    // countdown IS the content, and it is your own clock to read: the time
+    // opponents have to hit you. Its own phase rather than a shade of `hold`,
+    // which is for waiting on somebody else's decision; this is waiting on the
+    // table. No activePlayer: it is still your turn.
     if (state.window.player === selfId) {
-      return { state: 'hold', danger: false, ...clock(openedAt, deadline, now) }
+      return {
+        state: 'exposed',
+        danger: false,
+        ...clock(openedAt, deadline, now),
+        passes: passesOf(state, selfId),
+      }
     }
     // Somebody else's fresh release is open to me — the offensive half of a
     // window, and its own phase rather than a shade of `reaction`: answering an
@@ -146,6 +171,7 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
         // A pass is about this moment, not the window: it can be taken back
         // while the window stands, and it never bars a later attack.
         passed: state.window.passed.includes(selfId),
+        passes: passesOf(state, state.window.player),
       }
     }
   }
