@@ -45,7 +45,18 @@ export interface PlannedDraw {
    * to claim and nothing to fly — the beat hands it to the pending's static
    * render instead.
    */
-  reveal?: { card: string; discardId?: number }
+  reveal?: {
+    card: string
+    discardId?: number
+    /**
+     * The draw ANSWERED it: a standing Monitoring makes a 503 "ignored", so the
+     * engine banks it inside this same batch and no pending is ever raised
+     * (#103 testing, problem 2). The board still lights the alarm for the beat
+     * — the table has to see that a 503 landed — and this is the only thing
+     * that can tell it to, since there is no pending to read it off.
+     */
+    neutralized?: true
+  }
 }
 
 export type PileStep =
@@ -251,18 +262,31 @@ export function classifyPiles(before: number[], after: number[]): PileStep | nul
 // that turned it up, and its `discarded` immediately after that
 // (fake/triggers.ts:123,139). Looking ahead by position rather than scanning the
 // batch is what keeps a later, unrelated reveal from being read as this draw's.
-function revealAfter(events: Event[], i: number): { card: string; discardId?: number } | null {
+function revealAfter(
+  events: Event[],
+  i: number,
+): { card: string; discardId?: number; neutralized?: true } | null {
   const reveal = events[i + 1]
   if (!reveal) return null
   const card =
     reveal.type === 'revealed' ? reveal.card : reveal.type === 'aiRevealed' ? reveal.aiCard : null
   if (card == null) return null
-  const filed = events[i + 2]
+  // A standing Monitoring answers a 503 inside the very draw that turned it up
+  // (#103 testing, problem 2), and the `neutralized` that says so sits between
+  // the reveal and the discard — the discard is parented to the method that
+  // banked it, the same shape every chosen answer has. So the method is stepped
+  // OVER to reach the card's own exit, rather than the engine's causal order
+  // being bent to suit the walk.
+  const answered = events[i + 2]?.type === 'neutralized'
+  const filed = events[answered ? i + 3 : i + 2]
   // No discard behind it: the trigger is standing, not leaving. Reported as a
   // reveal all the same — the flight to the centre and the flip are the same
   // either way, and only the tail differs.
   if (filed?.type !== 'discarded' || filed.card !== card) return { card }
-  return { card, discardId: filed.id }
+  // `neutralized` rides along because the BEAT needs it and cannot re-derive it:
+  // a 503 answered this way never raised a pending, so nothing lights the alarm
+  // off the projection and the draw has to carry that fact itself.
+  return { card, discardId: filed.id, ...(answered ? { neutralized: true as const } : {}) }
 }
 
 // The engine pays the cost and places the release in one reduction, emitting
@@ -510,6 +534,13 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
           continue
         }
         if (d.type !== 'discarded') break
+        // Already claimed by the DRAW that turned the trigger up: a 503 a
+        // standing Monitoring answered by itself is flown out by the draw beat,
+        // and two beats flying one card is the duplicate `owned` exists to stop.
+        if (owned.has(d.id)) {
+          j++
+          continue
+        }
         if (d.reason === 'trigger' && !alarm) {
           alarm = { eventId: d.id, card: d.card }
         } else if (d.reason === 'neutralized') {
@@ -519,6 +550,14 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         }
         owned.add(d.id)
         j++
+      }
+      // An exchange with nothing in it is not a beat. Reachable exactly once:
+      // a 503 a standing Monitoring answered by itself, whose only moving card
+      // is the alarm — and the DRAW that turned it up already owns that flight.
+      // A beat here would hold the table for its own hold with nothing to show.
+      if (!alarm && spent.length === 0) {
+        i = j - 1
+        continue
       }
       plans.push({
         kind: 'neutralized',

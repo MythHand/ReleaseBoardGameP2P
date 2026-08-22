@@ -196,7 +196,12 @@ export function useBeats(args: {
           key: plan.key,
           base,
           exclusive: false,
-          alarm: false,
+          // A 503 a standing Monitoring answered by itself raises no pending at
+          // all (#103 testing, problem 2), so `glowStrong` has nothing to read
+          // — yet the table still has to see that a 503 landed. The plan
+          // carries the fact; this is the same field, and the same reason, the
+          // defenceless sweep lights its own glow with.
+          alarm: plan.draws.some((d) => d.reveal?.neutralized === true),
           run: (ctx) => draws.run(plan, ctx),
         }
       }

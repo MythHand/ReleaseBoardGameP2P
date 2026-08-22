@@ -131,12 +131,17 @@ function Probe({
   anchors,
   intro,
   shadows,
+  alarms,
 }: {
   live: BoardState
   events: Event[]
   anchors: BoardAnchors
   intro?: IntroBeat | null
   shadows?: string[]
+  // Every value `alarm` has held, in order. A final-state assertion cannot see
+  // a glow that came up and went again inside one beat, which is exactly what a
+  // self-answered 503 does.
+  alarms?: boolean[]
 }) {
   const beats = useBeats({ live, events, anchors, enabled: true, intro })
   const shown = beats.shadow ?? live
@@ -151,6 +156,7 @@ function Probe({
     const row = beats.shadow.decks.main.join(',')
     if (shadows && shadows.at(-1) !== row) shadows.push(row)
   }
+  if (alarms && alarms.at(-1) !== beats.alarm) alarms.push(beats.alarm)
   return (
     <>
       {/* The fan as the BOARD would render it — one slot per card of whichever
@@ -615,4 +621,47 @@ it('is never working under prefers-reduced-motion', async () => {
   const { getByTestId } = mount()
   await flush()
   expect(getByTestId('running').textContent).toBe('idle')
+})
+
+// ===== a 503 a standing Monitoring answers by itself (#103 testing, problem 2)
+// No pending is ever raised, so nothing lights the alarm off the projection —
+// the plan carries the fact and the queue turns it into the beat's own `alarm`,
+// the same field the defenceless sweep already uses for the same reason.
+const autoAnswered503 = [
+  { id: 7, type: 'drawn', player: 'p1', pile: 0, deckSize: 9 },
+  { id: 8, type: 'revealed', player: 'p1', card: 'trigger-error-503' },
+  { id: 9, type: 'neutralized', player: 'p1', method: 'monitoring' },
+  { id: 10, type: 'discarded', player: 'p1', card: 'trigger-error-503', reason: 'trigger' },
+] as Event[]
+
+it('lights the alarm while a self-answered 503 is on its way out', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = false
+  const alarms: boolean[] = []
+  const { getByTestId, rerender } = render(
+    <Probe live={preDiscard} events={[]} anchors={stub} alarms={alarms} />,
+  )
+  rerender(<Probe live={afterSweep} events={autoAnswered503} anchors={stub} alarms={alarms} />)
+  await flush()
+  // it burned at some point during the beat…
+  expect(alarms).toContain(true)
+  // …and the table is not left lit once the queue has drained
+  expect(getByTestId('alarm').textContent).toBe('none')
+})
+
+it('leaves the alarm dark through an ordinary draw', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = false
+  const alarms: boolean[] = []
+  const plain = [
+    { id: 7, type: 'drawn', player: 'p1', card: 'attack-bug', pile: 0, deckSize: 9 },
+  ] as Event[]
+  const { rerender } = render(
+    <Probe live={preDiscard} events={[]} anchors={stub} alarms={alarms} />,
+  )
+  rerender(<Probe live={afterSweep} events={plain} anchors={stub} alarms={alarms} />)
+  await flush()
+  expect(alarms).not.toContain(true)
 })

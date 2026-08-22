@@ -87,22 +87,37 @@ it('banks the alarm with the Debugger that answered it, alarm first', () => {
   expect(r.state.pending).toBeNull()
 })
 
-it('banks the alarm when Monitoring answers, and Monitoring stays', () => {
+// "Пока стоит — trigger-error-503 ... игнорируются": nothing is asked, so
+// nothing stands. The 503 is answered inside the draw that turned it up, in one
+// batch, and Monitoring stays (#103 testing, problem 2). The competing reading —
+// that Monitoring is one of three methods the player CHOOSES — is in
+// docs/rules/backlog.md rather than settled here.
+it('answers a 503 by itself when Monitoring stands, and Monitoring stays', () => {
   const s = withTop(E503, [])
   const guarded: GameState = {
     ...s,
     players: { ...s.players, p1: { ...s.players.p1, release: { monitoring: MON } } },
   }
-  const drawn = reduce(guarded, { type: 'DRAW', player: 'p1', at: 1000 })
-  const r = reduce(drawn.state, {
-    type: 'RESOLVE',
-    player: 'p1',
-    choice: { kind: 'neutralize503', method: 'monitoring' },
-    at: 1001,
-  })
+  const r = reduce(guarded, { type: 'DRAW', player: 'p1', at: 1000 })
+
+  expect(r.state.pending).toBeNull()
   expect(r.state.players.p1.release.monitoring).toEqual(MON)
   expect(r.state.decks.discard.map((c) => c.uid)).toEqual([E503.uid])
-  expect(r.events.map((e) => e.type)).toEqual(['neutralized', 'discarded'])
+  // the causal order every other answer keeps: the method, then what it banked
+  expect(r.events.map((e) => e.type)).toEqual(['drawn', 'revealed', 'neutralized', 'discarded'])
+})
+
+// A Debugger cannot be spent on a threat that was never a threat: with
+// Monitoring standing there is no decision to offer it to.
+it('never offers to burn a Debugger while Monitoring stands', () => {
+  const s = withTop(E503, [DBG])
+  const guarded: GameState = {
+    ...s,
+    players: { ...s.players, p1: { ...s.players.p1, release: { monitoring: MON } } },
+  }
+  const r = reduce(guarded, { type: 'DRAW', player: 'p1', at: 1000 })
+  expect(r.state.pending).toBeNull()
+  expect(r.state.players.p1.hand.map((c) => c.uid)).toContain(DBG.uid)
 })
 
 it('banks the alarm when a release is sacrificed for it', () => {
@@ -234,14 +249,8 @@ it('lets Monitoring absorb it and survive', () => {
     ...s,
     players: { ...s.players, p1: { ...s.players.p1, release: { monitoring: MON } } },
   }
-  const drawn = reduce(guarded, { type: 'DRAW', player: 'p1', at: 1000 })
-  expect(drawn.state.pending).toMatchObject({ methods: ['monitoring'] })
-  const r = reduce(drawn.state, {
-    type: 'RESOLVE',
-    player: 'p1',
-    choice: { kind: 'neutralize503', method: 'monitoring' },
-    at: 1001,
-  })
+  const r = reduce(guarded, { type: 'DRAW', player: 'p1', at: 1000 })
+  expect(r.state.pending).toBeNull()
   expect(r.state.players.p1.release.monitoring).toEqual(MON)
   expect(r.state.decks.discard.map((c) => c.uid)).toContain(E503.uid)
 })
