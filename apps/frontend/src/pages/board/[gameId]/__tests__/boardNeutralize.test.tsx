@@ -12,9 +12,11 @@
 import type { Event } from '@release/engine'
 import type { CardData, TableActions } from '@release/ui'
 import { cardById } from '@release/ui'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
+import { useBoardAnchors } from '~/entities/game/board'
 import Board from '../_Board'
+import { useNeutralizeStaging } from '../_useNeutralizeStaging'
 import { makeBoardProps } from './fixture'
 
 type SlotKey = 'frontend' | 'backend' | 'database' | 'monitoring'
@@ -396,4 +398,63 @@ it('a rejected sacrifice goes back to its own slot', async () => {
   layOut(container)
   expect(screen.queryByTestId('board-cover-staged')).toBeNull()
   expect(slotNode(container, 'frontend').querySelector('[data-card]')).toBeTruthy()
+})
+
+// `release()` hands the cover slot to the beat — it does NOT end the play.
+// While the beat runs the board renders its shadow, the projection from BEFORE
+// the batch, whose `you.hand` still holds the answer that was played. If the
+// staging were cleared here the fan would stop filtering and the played card
+// would reappear beside its own copy flying to the discard — the duplicate a
+// player reported on the defence path, whose fix this mirrors.
+it('keeps the played answer out of the fan after the beat takes it over', () => {
+  const onResolve = vi.fn()
+  const base = makeBoardProps()
+  const state = {
+    ...base.state,
+    you: {
+      ...base.state.you,
+      hand: [
+        { uid: 'protection-debugger#0', card: card('protection-debugger') },
+        { uid: 'attack-bug#1', card: card('attack-bug') },
+      ],
+    },
+    playable: [],
+    pending: {
+      kind: 'neutralize503' as const,
+      player: base.state.selfId,
+      card: 'trigger-error-503',
+      methods: ['debugger' as const],
+    },
+  }
+  const { result } = renderHook(() => {
+    const anchors = useBoardAnchors()
+    return useNeutralizeStaging({
+      state,
+      anchors,
+      actions: { onResolve } as TableActions,
+      events: [],
+      enabled: true,
+    })
+  })
+
+  act(() => {
+    result.current.onHandPlay('protection-debugger#0', {
+      x: 640,
+      y: 100,
+      rect: { left: 0, top: 0, width: 150, height: 210 } as DOMRect,
+    })
+  })
+  expect(onResolve).toHaveBeenCalled()
+  expect(result.current.handItems.map((i) => i.uid)).toEqual(['attack-bug#1'])
+
+  // the beat takes the exchange over
+  act(() => {
+    result.current.release()
+  })
+
+  // the cover slot is handed back…
+  expect(result.current.staged?.handed).toBe(true)
+  // …and the card is STILL out of the fan, because the projection this hook is
+  // reading has not taken it out of the hand yet
+  expect(result.current.handItems.map((i) => i.uid)).toEqual(['attack-bug#1'])
 })
