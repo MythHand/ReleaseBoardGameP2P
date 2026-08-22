@@ -88,8 +88,8 @@ Not everything these docs describe is a shared library module. As of now:
   would trap the badge inside the wrapper. The scenes and the `Table` screen centre `.discard` with
   a full-height flex column (`inset-block: 0; align-items: center`), pointer-transparent so the
   column does not shadow the hand behind it.
-- Two **named steps** — one per kind of movement, not one generic flight engine — and the **carrier**
-  underneath them. A step owns its rule and its geometry; the carrier owns the node:
+- Three **named steps** — one per kind of movement, not one generic flight engine — and the
+  **carrier** underneath them. A step owns its rule and its geometry; the carrier owns the node:
 - **`useHandArrival`** — *cards arrive in the hand.* Any number, from any kind of source: a rect, a
   card resting at a tilt, an element already on screen, one half of a pair. The fan opens a gap for
   all of them in the MIDDLE and they tuck under it as they land. A draw and the undo of a play are
@@ -99,6 +99,12 @@ Not everything these docs describe is a shared library module. As of now:
 - **`useDiscardExit`** — *cards leave the table for the discard.* Any number: one by one but all
   at once. A pair splits into its two singles; one scatter drives both a card's flight and its
   rest; the table tilt unwinds in flight; the layer a card had decides the order it joins the heap.
+- **`usePairFold`** — *two cards become one pair on the table.* Both halves start from where their
+  real cards are — a defence out of the fan, a sudo already standing on the table — and fold into
+  the pair's frame together; the aux lands on `CardPair`'s own resting pose, so handing the finished
+  pair to a static render is invisible. The preset `foldIntoPair` folds ONE half; this is the gesture
+  around it, and it was written four times before it became a step. The node stays up until
+  `release()`: dropping it earlier blinks the pair between the last frame and the rest.
 - **`useFlyer`** — *the carrier.* Not a movement: the fixed node a card rides in, and the five
   invariants that belong to it (I10, I5, I2, I3, I4). Scenes and steps raise cards through it; it
   does not know where they fly.
@@ -112,11 +118,11 @@ appears at the destination.
 recurring *movements* are shared.
 
 **What this means for these docs:** the atoms, the self-animating primitives and the three steps
-you **import**. Only a scene's own orchestration is **reproduced** from its recipe. Where a
+plus the carrier you **import**. Only a scene's own orchestration is **reproduced** from its recipe. Where a
 movement has a step, the recipe says *which step and what to pass it* — the frame-by-frame
 mechanics live inside the step, in one place, and are not restated per scene.
 
-**Where they live:** all three steps are in `apps/ui/src/animations/`, imported as
+**Where they live:** every step and the carrier are in `apps/ui/src/animations/`, imported as
 `@release/ui/animations` — its own entry point, separate from the components, because a step is
 how a thing moves rather than a thing to render. They are **not** on the component barrel:
 `import { useHandArrival } from '@release/ui'` does not resolve, and that is deliberate rather

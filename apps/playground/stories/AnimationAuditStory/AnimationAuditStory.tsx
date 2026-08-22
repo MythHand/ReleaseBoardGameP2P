@@ -733,6 +733,21 @@ const SCENARIOS: Scenario[] = [
 const ISSUES: Issue[] = [
   {
     what: {
+      ru: 'Промах Security Bug нечем показать — правило есть, такта нет',
+      en: 'A missed Security Bug has nothing to show it — the rule exists, the beat does not',
+    },
+    problem: {
+      ru: 'Владелец правил решил (22.08.2026, docs/rules/cards.md): запрос Security Bug публичен и при попадании, и при промахе — стол видит, какую карту запросили, и при промахе тоже должен увидеть, какую запросили и не получили. Показан только удачный путь: карта соперника выбирается и открыто уезжает к атакующему (PickSpecificCardStory). Промах не показан ничем — карта атаки просто уходит в сброс. Правило есть, а на экране его нет: игрок узнаёт исход не из стола. Не дефект и потому опаснее — ничего не ломается и не мигает, просто публичная по правилам информация до стола не доезжает, и это не находится ни глазами на ревью, ни тестом. Закроет сцена промаха: запрошенная карта названа и показана, но не отдана, и читаться это должно как «её нет», а не как «передача не сработала». Владелец сознательно не строит эту анимацию сейчас.',
+      en: 'The rules owner decided (22.08.2026, docs/rules/cards.md) that a Security Bug request is public on a hit and on a miss alike — the table sees which card was asked for, and on a miss must likewise see which card was asked for and not received. Only the successful path is shown: the opponent card is chosen and travels to the attacker in the open (PickSpecificCardStory). The miss is shown by nothing — the attack card simply goes to the discard. The rule exists and the screen does not carry it: the player learns the outcome from somewhere other than the table. Not a defect, and more dangerous for it — nothing breaks and nothing flickers, information the rules call public just never reaches the table, and that is caught neither by eye at review nor by any test. Closed by a scene of the miss: the requested card named and shown but not handed over, reading as «it is not there» rather than as a transfer that failed. The owner is deliberately not building this animation now.',
+    },
+    where: {
+      ru: 'playground: interactive/PickSpecificCardStory (удачный путь) + docs/rules/cards.md (правило)',
+      en: 'playground: interactive/PickSpecificCardStory (the successful path) + docs/rules/cards.md (the rule)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
       ru: 'Модуль, не записанный НИГДЕ, не виден ни одной проверке',
       en: 'A module written down NOWHERE is invisible to every check',
     },

@@ -92,7 +92,7 @@ card (not at a wider cell/seat) — invariant **I6**. The `CARD_RATIO` value is 
 |---|---|---|
 | `cardAreaOf` | `cardAreaOf(cell)` → `Rect` | trim a Pile cell to its **top** card box (keep left/top/width, height = width·`CARD_RATIO`) |
 | `cardBoxIn` | `cardBoxIn(rect, width)` → `Rect` | a card box of `width`, **centered** in `rect` (e.g. a Seat). Pass a width measured from the real card element where possible. |
-| `pileWidthFor` | `pileWidthFor(count)` → `number` (`apps/ui/src/table/Table/piles.ts`) | how wide a draw pile is drawn given how many sit on the table — 150 at one, 120 at two, 100 at three or more. One function, shared by the kit's `Table` and the board's fork of it, so the ramp cannot drift between the two. The ramp above one pile has no approved value yet (`docs/animations/backlog.md`). |
+| `PILE_WIDTH` / `pileWidthFor` | `150` · `pileWidthFor(count)` → `number` (`apps/ui/src/table/Table/piles.ts`) | how wide a draw pile is drawn: **one width, whatever the count**. There used to be a ramp here (150 / 120 / 100 by number of piles) — it was invented for a multi-deck row, approved by no scene, and visible on no screen: the kit's `Piles` page draws single piles and no scene lays out more than one. `pileWidthFor` survives only because the board's fork still calls it. |
 
 ---
 
