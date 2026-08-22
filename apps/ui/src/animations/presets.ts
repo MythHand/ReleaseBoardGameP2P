@@ -10,7 +10,16 @@
 //   - функцией (el, params) => Animation          — когда нужны параметры (направление и т.п.).
 
 const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
+// Появление на месте: маленький элемент щёлкает в свой слот и стоит. Почти всё
+// расстояние проходится в первой пятой времени — на 200–260ms это читается как
+// «встало», потому что пути тут и нет, есть только факт появления.
 const SNAP = 'cubic-bezier(0.2, 0.9, 0.1, 1)'
+// ПРИЗЕМЛЕНИЕ КАРТЫ на своё место — то же по характеру, но у карты есть путь по
+// столу, и его должно быть видно. У SNAP первая треть съедала почти всё
+// расстояние, поэтому релиз в зону и судо под защиту читались броском, а не
+// полётом с посадкой. Здесь разгон мягче, а мягкий доезд в конце сохранён —
+// акцент «встало на место» остаётся, резкость уходит.
+const LAND = 'cubic-bezier(0.34, 0.8, 0.2, 1)'
 
 interface Rect {
   left: number
@@ -70,7 +79,7 @@ const flipTo = (
   if (!from || !box) return null
   return el.animate(
     [{ transform: enterPose(from, box) }, { transform: pose || 'translate(0, 0) scale(1)' }],
-    { duration: dur, easing: snap ? SNAP : EASE, fill: 'forwards' },
+    { duration: dur, easing: snap ? LAND : EASE, fill: 'forwards' },
   )
 }
 
@@ -144,7 +153,7 @@ export const PRESETS: Record<string, Preset> = {
     move(el, p as MoveParams, 480, EASE),
   // Релиз — в слот зоны релиза, с лёгким снап-приземлением.
   playToReleaseZone: (el: Element, p?: Record<string, unknown>): Animation | null =>
-    move(el, p as MoveParams, 480, SNAP),
+    move(el, p as MoveParams, 480, LAND),
   // Перенос разыгранной карты из центра в сброс.
   centerToDiscard: (el: Element, p?: Record<string, unknown>): Animation | null =>
     move(el, p as MoveParams, 420, EASE),

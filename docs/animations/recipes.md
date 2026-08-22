@@ -555,8 +555,8 @@ combo, or a local window attack that staged nothing at all.
 | Step | Preset / animation | Duration | Easing |
 |---|---|---|---|
 | fold — main half | `foldIntoPair` | 620 ms | EASE → its `enterPose` origin to identity |
-| fold — aux half | `foldIntoPair` (`snap`) | 620 ms | SNAP → `PAIR_AUX_POSE` |
-| release → zone | `playToReleaseZone` | 480 ms | SNAP |
+| fold — aux half | `foldIntoPair` (`snap`) | 620 ms | LAND → `PAIR_AUX_POSE` |
+| release → zone | `playToReleaseZone` | 480 ms | LAND |
 | discard (per half) | `useDiscardExit` | 420 ms | EASE + `scatterAt` / `auxScatter` |
 
 **Invariants**
@@ -1715,7 +1715,7 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
 1. **Play** — the Release flies to the stage slot and waits. A press on nothing valid takes it back
    (see *cancel* below).
 2. **Cost** — any hand card pays: it flies to the cost slot, is held open, then leaves via
-   **`useDiscardExit`**. Only now does the Release fly into its zone slot (`playToReleaseZone`, SNAP).
+   **`useDiscardExit`**. Only now does the Release fly into its zone slot (`playToReleaseZone`, LAND).
 
    **On the board** this is the acting player's own view — the cost is picked out of the fan by a
    click, never a bar control (`_useBoardStaging.ts`'s `onCostPick`), and stays held open as the
@@ -1904,8 +1904,8 @@ air** — the celebration is not a screen that replaces the table, it happens ov
 leaving the fan; a layer for the volleys; the `GameOver` window.
 
 **Sequence.**
-1. The release is pulled out of the fan and flown into its slot with `playToReleaseZone` (SNAP —
-   every release lands with the same snap). The zone is now closed.
+1. The release is pulled out of the fan and flown into its slot with `playToReleaseZone` (LAND —
+   every release lands the same way). The zone is now closed.
 2. Three volleys are scheduled at `POPPERS` — `[0, 620, 1450]`ms, powers `[1, 0.7, 1.25]`. Each is
    its **own component**, mounted with its own pieces: the pieces are made once and started once in
    a **mount effect**. Starting them from a render-time ref callback is what killed the pieces
