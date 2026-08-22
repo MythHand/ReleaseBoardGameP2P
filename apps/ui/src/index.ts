@@ -153,5 +153,15 @@ export type {
   TableSlots,
   TableState,
 } from './table/Table/types'
+export {
+  CENTRE_CARD_W,
+  CENTRE_SETS,
+  CENTRE_SLOTS,
+  CENTRE_TOP,
+  type CentreSet,
+  type CentreSlot,
+  type CentreSlotGeom,
+  centreTransform,
+} from './table/TableCentre/centre'
 export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'
 export { default as TurnDock } from './table/TurnDock/TurnDock'
