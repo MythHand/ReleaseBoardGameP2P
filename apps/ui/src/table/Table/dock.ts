@@ -39,7 +39,10 @@ export function isCounting(state: TableState, selfId: string): boolean {
   // below. It is one action inside a turn, so it falls through to the turn's
   // own clock rather than answering here, exactly as the ring it mirrors does.
   if (state.pending && state.pending.kind !== 'discardForRelease') {
-    return 'deadline' in state.pending
+    // Only your OWN decision counts down here — waiting on somebody else's is a
+    // flat ring, so there is nothing for a consumer to tick. Mirrors the two
+    // pending branches in `deriveDock` below.
+    return state.pending.player === selfId && 'deadline' in state.pending
   }
   // Mirrors the window branch below exactly: the window's OWNER gets the hold
   // ring with a live clock whoever they are — elimination only silences a
@@ -91,14 +94,24 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
 
   // Someone else's pending blocks every action of yours — DRAW, PLAY, PUSH,
   // even PASS all reject while any decision is open — so the dock holds and
-  // names whose decision the table is waiting on, with the live clock when
-  // that decision carries one (a defend does; the rest read as a flat ring).
+  // names whose decision the table is waiting on.
+  //
+  // Their clock is NOT shown, deliberately: a watcher sees whose move it is and
+  // an empty ring, never somebody else's countdown ticking at them. It is not
+  // their time to spend, and a number they cannot act on only twitches while
+  // they wait (designer's call). The whole span of "how long is left" belongs to
+  // the seat that owes the decision, and that seat reads it in the branch above.
+  //
+  // This is also what ends the `0s` ring for good: a beat that has to publish a
+  // stand-in pending so an attack keeps standing on screen (`docs/animations/
+  // backlog.md`) can carry no clock worth reading, and every peer it reaches is
+  // by definition not its owner — so they land here, where there is no clock to
+  // misread in the first place.
   if (pending && pending.kind !== 'discardForRelease') {
-    const timed = 'deadline' in pending ? pending : undefined
     return {
       state: 'hold',
       danger: false,
-      ...clock(timed?.openedAt, timed?.deadline, now),
+      progress: 0,
       activePlayer: state.opponents.find((o) => o.id === pending.player)?.name,
     }
   }

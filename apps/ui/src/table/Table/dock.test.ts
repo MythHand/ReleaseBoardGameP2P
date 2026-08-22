@@ -176,8 +176,12 @@ it('is `hold` naming the decider while someone else’s decision blocks the tabl
   const d = deriveDock({ ...base, turn: 'you', hasDrawn: true, pending }, 'you', 4_000)
   expect(d.state).toBe('hold')
   expect(d.activePlayer).toBe('kernel_panic')
-  // A timed foreign pending still shows the live clock — it is the table's wait.
-  expect(d.seconds).toBe(6)
+  // Whose decision it is, and nothing else. A watcher is never shown somebody
+  // else's countdown: it is not their time to spend, and a number they cannot
+  // act on only twitches at them while they wait. The same rule the inactivity
+  // clock already followed two tests down — this makes the pending obey it too.
+  expect(d.seconds).toBeUndefined()
+  expect(d.progress).toBe(0)
 })
 
 it('counts your own turn down from the projection’s inactivity clock', () => {
@@ -207,9 +211,13 @@ it('ticks the clock in exactly the states that draw a counting ring', () => {
   expect(isCounting({ ...base, turn: 'you', window }, 'you')).toBe(true)
   // a watcher of someone else's turn
   expect(isCounting({ ...base, turn: 'p2', turnClock }, 'you')).toBe(false)
-  // someone else's timed decision
+  // someone else's timed decision — a flat ring, so nothing to tick
   expect(
     isCounting({ ...base, turn: 'p2', pending: { ...defendPending, player: 'p2' } }, 'you'),
+  ).toBe(false)
+  // …and your own, which is the one that does count
+  expect(
+    isCounting({ ...base, turn: 'p2', pending: { ...defendPending, player: 'you' } }, 'you'),
   ).toBe(true)
   // ELIMINATED, but the window is on your own release: deriveDock still draws
   // the hold ring with a live clock (the owner branch never asks who is
