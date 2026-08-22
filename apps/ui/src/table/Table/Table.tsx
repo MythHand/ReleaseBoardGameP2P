@@ -144,7 +144,7 @@ export default function Table({
   onPanelChange,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup } = state
-  const derived = deriveDock(state, state.selfId, now)
+  const derived = deriveDock(state, state.selfId, now, room.timers ?? true)
   const dockView = { ...derived, ...dock }
   const {
     role = 'guest',
@@ -160,6 +160,8 @@ export default function Table({
     onParallaxChange,
     chatToasts = true,
     onChatToastsChange,
+    timers = true,
+    onTimersChange,
     paused = false,
     onPauseChange,
     pausePlayers = [],
@@ -243,7 +245,8 @@ export default function Table({
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
   const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
-  const hostControls = canLimitSpectators || canPause
+  const canTimers = isHost && Boolean(onTimersChange) && Boolean(copy.table.timers)
+  const hostControls = canLimitSpectators || canPause || canTimers
   // есть ли на столе переписка вообще: от этого зависит и вкладка рейла, и
   // настройка её уведомлений — управлять тем, чего на экране нет, незачем
   const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
@@ -500,6 +503,18 @@ export default function Table({
                           fill
                           className={styles.sliderFull}
                         />
+                      </SettingsField>
+                    )}
+                    {canTimers && (
+                      <SettingsField label={copy.table.timers} hint={copy.table.timersHint} inline>
+                        <Toggle
+                          on={timers}
+                          onChange={(on) => onTimersChange?.(on)}
+                          className={styles.settingToggle}
+                        >
+                          {(timers ? copy.table.timersOn : copy.table.timersOff) ??
+                            copy.table.timers}
+                        </Toggle>
                       </SettingsField>
                     )}
                     {canPause && (

@@ -227,6 +227,29 @@ it('is `hold` naming the decider while someone else’s decision blocks the tabl
   expect(d.progress).toBe(0)
 })
 
+it('shows a full, numberless ring everywhere when the host switched the clocks off', () => {
+  // Full, not empty and not zero: empty is what a finished countdown looks
+  // like and zero is what an expired one looks like, while a table without
+  // clocks has all the time there is. Checked on both kinds of deadline — the
+  // turn's own and the window's — because they reach the ring by different
+  // branches and one of them going numberless alone would be worse than
+  // neither.
+  const turnClock = { openedAt: 0, deadline: 30_000 }
+  const own = deriveDock({ ...base, turn: 'you', hasDrawn: true, turnClock }, 'you', 12_000, false)
+  expect(own.state).toBe('push')
+  expect(own.seconds).toBeUndefined()
+  expect(own.progress).toBe(1)
+
+  const window: TableWindow = { ...windowOnYou, player: 'p2' }
+  const win = deriveDock({ ...base, turn: 'p2', window }, 'you', 0, false)
+  expect(win.state).toBe('attack')
+  expect(win.seconds).toBeUndefined()
+  expect(win.progress).toBe(1)
+
+  // and nothing anywhere is left to tick
+  expect(isCounting({ ...base, turn: 'you', turnClock }, 'you', false)).toBe(false)
+})
+
 it('counts your own turn down from the projection’s inactivity clock', () => {
   const turnClock = { openedAt: 0, deadline: 30_000 }
   const d = deriveDock({ ...base, turn: 'you', hasDrawn: true, turnClock }, 'you', 12_000)

@@ -17,11 +17,15 @@ export interface DockView {
   passes?: { total: number; lit: number }
 }
 
+// What a ring shows with the clocks switched off: full, and no number. See
+// `deriveDock`'s `timers` for why full rather than empty.
+const FULL_RING = { progress: 1 } as const
+
 // Both ends of a deadline span, so the ring's sweep is exact rather than
 // assumed — no WINDOW_MS constant exists on purpose (a hardcoded duration
 // would make a visible countdown wrong the moment the engine's timings
 // change). Either bound missing (an untimed pending) reads as a flat ring.
-function clock(
+function countdown(
   openedAt: number | undefined,
   deadline: number | undefined,
   now: number,
@@ -39,7 +43,10 @@ function clock(
 // different rule than the one the ring is drawn from will freeze the
 // countdown for whatever state the two disagree about; there is one rule and
 // this is it — each branch mirrors the matching `deriveDock` branch below.
-export function isCounting(state: TableState, selfId: string): boolean {
+export function isCounting(state: TableState, selfId: string, timers = true): boolean {
+  // The table's clocks switched off by the host: every ring that could have
+  // counted is simply full, so there is nothing anywhere to tick.
+  if (!timers) return false
   // A release's own price is not a state of the table (#101) — see `deriveDock`
   // below. It is one action inside a turn, so it falls through to the turn's
   // own clock rather than answering here, exactly as the ring it mirrors does.
@@ -79,10 +86,22 @@ function passesOf(state: TableState, target: string): { total: number; lit: numb
 // RIGHT NOW. Every branch below that shows no key exists because the engine
 // rejects everything the dock could offer there — a live-looking key whose
 // clicks vanish in silent rejections is exactly the defect this table ended.
-export function deriveDock(state: TableState, selfId: string, now: number): DockView {
+export function deriveDock(
+  state: TableState,
+  selfId: string,
+  now: number,
+  // The host's switch for the whole table. Off, every ring that could have
+  // carried a clock reads FULL and numberless — not empty, which is what a
+  // finished countdown looks like, and not zero, which is what an expired one
+  // looks like. A full ring says "all the time there is", and that is exactly
+  // what a table without clocks gives you. The engine's deadlines are untouched;
+  // this is what the dock shows.
+  timers = true,
+): DockView {
   const yours = state.turn === selfId
   const activePlayer = state.opponents.find((o) => o.id === state.turn)?.name
   const pending = state.pending
+  const clock = timers ? countdown : () => FULL_RING
 
   // `discardForRelease` is excluded from BOTH pending branches below (#101).
   // A release's own price is one action inside a turn, not a state of the
