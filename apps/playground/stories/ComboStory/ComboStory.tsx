@@ -3,18 +3,17 @@ import type React from 'react'
 import type { CSSProperties } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  enterPose,
   nextFrames,
   play,
   useDiscardExit,
   useFlyer,
   useHandArrival,
+  usePairFold,
   wait,
 } from '@/animations'
 import { cardById } from '@/cards'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO } from '@/primitives/Card'
-import CardPair, { PAIR_AUX_POSE } from '@/primitives/CardPair'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
@@ -88,7 +87,6 @@ export default function ComboStory() {
   const slotRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const centerRef = useRef<HTMLDivElement>(null)
   const discardRef = useRef<HTMLDivElement>(null)
-  const flyRef = useRef<HTMLDivElement>(null)
   const handWrapRef = useRef<HTMLDivElement>(null)
 
   const [hand, setHand] = useState<HandItem[]>(makeHand)
@@ -120,9 +118,17 @@ export default function ComboStory() {
       return next
     }),
   )
-  const [flyPair, setFlyPair] = useState<{ main: CardData; aux: CardData } | null>(null)
-  // hand → centre (a single card). The merge STAGE below is a different thing: it
-  // is mounted for the whole scene and the pair choreography animates inside it.
+  // the source and its partner become one pair — the shared step. It owns the
+  // node the pair lives in, so the legs that come AFTER the fold (the release
+  // settling into its zone, the split into the discard, the return to the fan)
+  // reach it through `pairNode()`.
+  const {
+    overlay: pairOverlay,
+    fold: foldPair,
+    release: releasePair,
+    node: pairNode,
+  } = usePairFold()
+  // hand → centre (a single card)
   const { overlay: flyerOverlay, raise, drop } = useFlyer()
   const [log, setLog] = useState<string | null>(null)
 
@@ -165,9 +171,8 @@ export default function ComboStory() {
   }
 
   const hideFlyer = () => {
-    setFlyPair(null)
     setMerged(false)
-    if (flyRef.current) flyRef.current.style.opacity = '0'
+    releasePair()
   }
 
   // cancel — the whole staging goes back to the MIDDLE of the fan at once, on the
@@ -180,9 +185,9 @@ export default function ComboStory() {
     setPhase('idle')
     if (items.length === 0) return
     const cRect = centerRef.current?.getBoundingClientRect()
-    const el = flyRef.current
+    const el = pairNode()
     // where each card physically is: a lone staged card fills the centre slot; a
-    // merged pair sits in the flyer, and the step measures each half off its own
+    // merged pair sits in the step's node, and the step measures each half off its own
     // anchor (staged[0] became the pair's aux, staged[1] its main)
     // the key is the card's identity in the hand — the step hands it back on landing
     const leaving =
@@ -210,7 +215,7 @@ export default function ComboStory() {
   // the assembled pair leaves the centre: a release settles into its zone slot,
   // anything else splits into two singles in the discard
   const resolve = async (main: HandItem, aux: HandItem, hold: boolean, targetLabel?: string) => {
-    const el = flyRef.current
+    const el = pairNode()
     const cRect = centerRef.current?.getBoundingClientRect()
     if (!el || !cRect) return
     if (hold) await wait(PAIR_HOLD)
@@ -288,38 +293,19 @@ export default function ComboStory() {
     setHand((h) => h.filter((it) => it.uid !== item.uid))
     setStaged([src, item])
     setMerged(true)
-    setFlyPair({ main: item.card, aux: src.card })
     void (async () => {
-      await nextFrames()
-      const el = flyRef.current
-      if (!el) return
-      // I3 — a leftover fill:forwards on the container or the nested cards would
-      // overwrite the transforms set below
-      for (const a of el.getAnimations?.({ subtree: true }) ?? []) a.cancel()
-      el.style.left = `${cRect.left}px`
-      el.style.top = `${cRect.top}px`
-      el.style.width = `${cRect.width}px`
-      el.style.transform = 'none'
-      const mainEl = el.querySelector<HTMLElement>('[data-main]')
-      const auxEl = el.querySelector<HTMLElement>('[data-aux]')
-      if (!mainEl || !auxEl) return
-      // the source is ALREADY standing at the centre — it only folds under, so
-      // its own place IS the pair's frame and its entry pose is identity
-      mainEl.style.transform = enterPose(mainHand, cRect)
-      auxEl.style.transform = enterPose(cRect, cRect)
-      el.style.opacity = '1'
-      await nextFrames()
-
-      // MERGING AT THE CENTRE — the partner arrives and the pair folds together
-      const a1 = play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: MERGE_MS })
-      const a2 = play('foldIntoPair', auxEl, {
-        from: cRect,
+      // MERGING AT THE CENTRE — the partner arrives from its slot in the fan and
+      // the pair folds together. The source is ALREADY standing at the centre, so
+      // its own place IS the pair's frame: `auxFrom === box` makes its entry pose
+      // identity, and the step needs no branch for it.
+      await foldPair({
+        main: item.card,
+        aux: src.card,
+        mainFrom: mainHand,
+        auxFrom: cRect,
         box: cRect,
-        pose: PAIR_AUX_POSE,
         dur: MERGE_MS,
-        snap: true,
       })
-      await Promise.all([a1?.finished, a2?.finished])
 
       if (cardCanTarget(item.card)) {
         // the pair waits at the centre for a target — the player's own beat is the hold
@@ -482,9 +468,8 @@ export default function ComboStory() {
 
         {discardOverlay}
 
-        <div className={styles.flyer} ref={flyRef} aria-hidden="true">
-          {flyPair && <CardPair main={flyPair.main} aux={flyPair.aux} width="100%" />}
-        </div>
+        {/* the pair, while it is the step's to carry */}
+        {pairOverlay}
       </div>
     </div>
   )
