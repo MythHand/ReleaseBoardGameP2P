@@ -46,6 +46,25 @@ describe('the centre of the table', () => {
     expect(centreTransform('stage')).toBe('translate(calc(-50% + -92px), -50%)')
   })
 
+  it('gives every slot a width, and the AI effect the wider one it is drawn at', () => {
+    // Width is per slot, not one number for the centre: the AI effect is the
+    // card the table is reading at that moment and is drawn larger than the
+    // trigger beside it. A single shared width silently shrank it.
+    for (const slot of Object.keys(CENTRE_SLOTS) as CentreSlot[]) {
+      expect(CENTRE_SLOTS[slot].w, slot).toBeGreaterThan(0)
+    }
+    expect(CENTRE_SLOTS.effect.w).toBeGreaterThan(CENTRE_SLOTS.cause.w)
+  })
+
+  it('says for every slot which scene it was taken from', () => {
+    // The scenes stay the visual source; this file is only where the numbers are
+    // written down once. A slot with no scene behind it is a number somebody
+    // invented here, which is the one thing this file must not become.
+    for (const slot of Object.keys(CENTRE_SLOTS) as CentreSlot[]) {
+      expect(CENTRE_SLOTS[slot].from, slot).toMatch(/Story/)
+    }
+  })
+
   it('names no two slots the same place at the same layer', () => {
     // Two slots sharing both dx and z would be one slot with two names — and the
     // second one would be invisible, sitting exactly under the first.

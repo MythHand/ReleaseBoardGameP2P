@@ -2,10 +2,20 @@
    cards land in. So the page draws those places: a bounded stage standing in for
    the table, and every slot of a situation framed on it. */
 
+/* the control row above the stage — the switch between situations */
+.bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .stage {
   position: relative;
   inline-size: 100%;
-  min-block-size: 320px;
+
+  /* tall enough for a real card box at the widest place (200px × 1.4 = 280) plus
+     air above and below, so no situation is drawn cropped */
+  min-block-size: 380px;
   overflow: hidden;
   background:
     linear-gradient(var(--white-03), var(--white-03)),

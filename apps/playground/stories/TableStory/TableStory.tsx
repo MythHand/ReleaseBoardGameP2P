@@ -194,10 +194,10 @@ export default function TableStory() {
     ru: 'выключены — кольца в доке полные, без чисел',
     en: 'off — the dock’s rings are full, with no numbers',
   })
-  // one word in both states, as with the pause: the toggle carries on/off by
-  // colour, the word names what it switches
-  const timersOn = pick(lang, { ru: 'Таймеры', en: 'Timers' })
-  const timersOff = pick(lang, { ru: 'Таймеры', en: 'Timers' })
+  // ВКЛ / ВЫКЛ, as the parallax toggle above: this switch has a state the host
+  // needs to read off the control itself, not a name it already has in its label
+  const timersOn = pick(lang, { ru: 'Вкл', en: 'On' })
+  const timersOff = pick(lang, { ru: 'Выкл', en: 'Off' })
   const generalTitle = pick(lang, { ru: 'общие', en: 'general' })
   // одно слово в обоих состояниях: включённость несёт сам тумблер цветом,
   // а кнопка называет действие
