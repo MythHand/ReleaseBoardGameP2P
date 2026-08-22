@@ -146,6 +146,19 @@ const SPECS: Spec[] = [
     kind: 'fold',
   },
   {
+    name: 'landInPose',
+    group: 'Розыгрыш',
+    desc: {
+      ru: 'Карта прилетает на стол и садится сразу в свою позу — наклон едет вместе с ней.',
+      en: 'A card arrives on the table and lands already in its pose — the tilt travels with it.',
+    },
+    detail: {
+      ru: 'FLIP-форма (карта уже на месте, летит её вход) · 480ms · ease, snap по флагу · та же математика, что у foldIntoPair, но pose — поза САМОЙ карты на столе, а не половины внутри пары · I11: разложенное системой ложится ровно, пришедшее из руки игрока — наклонённым',
+      en: 'FLIP form (the card is already in place; its entry is what moves) · 480ms · ease, snap on the flag · the same math as foldIntoPair, but `pose` is the pose of the CARD on the table rather than of a half inside a pair · I11: what the system deals lies square, what came from a hand lies tilted',
+    },
+    kind: 'fold',
+  },
+  {
     name: 'gatherToDeck',
     group: 'Колоды',
     desc: {

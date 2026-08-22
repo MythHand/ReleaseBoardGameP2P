@@ -54,6 +54,26 @@ const move = (
   return el.animate([start, end], { duration, easing, fill: 'forwards' })
 }
 
+// FLIP-полёт на месте: элемент уже стоит там, где должен, поэтому анимируется
+// не он сам, а его вход — от позы, в которой он выглядел бы стоящим в `from`,
+// к позе покоя. База под два разных хода: складывание пары (foldIntoPair) и
+// посадку карты на стол (landInPose). Один код, потому что математика одна;
+// два имени, потому что смысл разный.
+const flipTo = (
+  el: Element,
+  from: Rect | undefined,
+  box: Rect | undefined,
+  pose: string,
+  dur: number,
+  snap: boolean,
+): Animation | null => {
+  if (!from || !box) return null
+  return el.animate(
+    [{ transform: enterPose(from, box) }, { transform: pose || 'translate(0, 0) scale(1)' }],
+    { duration: dur, easing: snap ? SNAP : EASE, fill: 'forwards' },
+  )
+}
+
 /**
  * Поза, в которой элемент, стоящий на своём месте, ВЫГЛЯДИТ стоящим в `from`:
  * смещение центр-в-центр плюс масштаб по ширине. Вход FLIP-полёта — им красят
@@ -170,11 +190,32 @@ export const PRESETS: Record<string, Preset> = {
       dur = 620,
       snap = false,
     } = (p ?? {}) as { from?: Rect; box?: Rect; pose?: string; dur?: number; snap?: boolean }
-    if (!from || !box) return null
-    return el.animate(
-      [{ transform: enterPose(from, box) }, { transform: pose || 'translate(0, 0) scale(1)' }],
-      { duration: dur, easing: snap ? SNAP : EASE, fill: 'forwards' },
-    )
+    return flipTo(el, from, box, pose, dur, snap)
+  },
+
+  // Прилёт карты НА СТОЛ — в свою позу покоя. FLIP-форма, как у foldIntoPair:
+  // элемент уже стоит на своём месте, а летит «из» прямоугольника from.
+  //   from — откуда карта пришла (её rect на момент старта),
+  //   box  — рамка места, где она уже стоит,
+  //   pose — поза покоя на столе (наклон и смещение), в которую она садится.
+  //
+  // Наклон едет ВМЕСТЕ с картой и в неё же приземляется. Ровная посадка с
+  // наклоном, догоняющим её следующим кадром, читается как щелчок — это
+  // расхождение и было записано в docs/animations/backlog.md.
+  //
+  // Отдельное имя при общей с foldIntoPair математике — намеренно. Пара и
+  // посадка на стол — разные ходы: у пары pose это поза ПОЛОВИНЫ внутри рамки,
+  // здесь — поза САМОЙ карты на столе. Одно имя на оба смысла заставило бы
+  // читателя каждый раз выяснять, что именно складывается.
+  landInPose: (el: Element, p?: Record<string, unknown>): Animation | null => {
+    const {
+      from,
+      box,
+      pose = '',
+      dur = 480,
+      snap = false,
+    } = (p ?? {}) as { from?: Rect; box?: Rect; pose?: string; dur?: number; snap?: boolean }
+    return flipTo(el, from, box, pose, dur, snap)
   },
 
   // ===== Смена содержимого слота (HUD, turn dock) =====

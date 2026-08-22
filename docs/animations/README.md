@@ -192,7 +192,8 @@ if (anim) await anim.finished                      // wait for the flight
 
 These hold across **every** recipe. Recipes reference them by number (I1…I10) instead of
 repeating them. Break one and the animation "works on paper" but jumps, double-flips, or
-teleports on screen.
+teleports on screen. I1–I10 are mechanical; **I11** is the one rule of meaning among them —
+what the tilt of a card on the table says about who put it there.
 
 - **I1 — Measure rects before mutating the DOM.** Capture `getBoundingClientRect()` for
   `from`/`to` before you mount or move anything. When many elements fly to one target,
@@ -251,6 +252,18 @@ teleports on screen.
   drag flyer follows the cursor and has no rect to render until the pointer moves, so it is placed
   in a **layout** effect instead — before the frame it mounted in is painted. Either way the rule
   is the same one: nothing may paint the node before it has coordinates.
+
+> **I11 — Who put the card there decides whether it lies straight.** The table is a table, and a
+> card on it reads as one somebody has just laid down. So: what the **system** deals into the
+> centre — a draw, a revealed trigger, an AI card off the events deck — lands **square**, exactly
+> as a dealer's card would; what came out of a **player's hand** — an attack thrown at a release,
+> the defence covering it, a sudo laid beside it — lands **tilted**, at its own angle. The tilt is
+> not decoration and not per-scene taste: it is the one thing that says a hand was involved.
+>
+> A pose is carried BY the flight (`landInPose`, or `rotate` on a travel preset), never applied
+> after it lands. A card that stops square and tilts a frame later reads as a click, and that is a
+> different event on screen from the one that happened. Rules owner's call, written down here
+> because it is a rule about every scene rather than about one movement.
 
 ---
 
