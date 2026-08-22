@@ -132,6 +132,23 @@ destructure `overlay` and render it.
 | `useDiscardExit` | `useDiscardExit(boxRef, onLanded?)` → `{ overlay, send, reset, FLIGHT_MS }` | `send(items)` flies **any number** of cards out at once and resolves when they land; `onLanded(cards)` gets them bottom-up for the heap. Omit `onLanded` when the scene keeps its own books on the heap |
 | `Leaving` | `{ key, card, from? \| node?, aux?, el?, pose?, layer?, scatter?, auxScatter?, fade?, delay? }` | `from` — it stands in a slot, the step raises its own flyer; `node` — it IS an element already on screen, that element flies. `aux` + `el` — a pair: split into two singles, the aux measured off `[data-aux]`, its tilt unwound in flight. `layer` — its layer on the table (decides the heap order). `scatter` — bring your own (a card going back to its place), for the MAIN half. `auxScatter` — the same, for the AUX half specifically; omitted, it lands on a fresh `jitter()` instead of `scatter`'s value. `fade` — it sinks below the visible top. `delay` — a stagger |
 
+### Pair-fold — two cards become one pair on the table
+
+The preset `foldIntoPair` is the brick: it folds ONE half. The gesture around it — carry a
+`<CardPair>`, paint both halves where their real cards are, wait a frame, fold both at once — was
+written four times before it became this step: once in `Defense Release` and three times on the
+board.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `usePairFold` | `usePairFold()` → `{ overlay, fold, release, node, FOLD_MS }` | `fold(it)` mounts the pair at its place on the table, paints each half at the pose it would have standing where its real card is, and runs `foldIntoPair` on both in parallel; resolves when they meet. The node **stays up** — the caller hands the pair to whatever renders it at rest and only then calls `release()`, or the pair blinks out between the last frame and the static render. `node()` is the pair's element, for a caller with something of its own to do with it |
+| `Folding` | `{ main, aux, mainFrom, auxFrom, box, pose?, layer?, dur? }` | `mainFrom` / `auxFrom` — where each card really is right now: nothing teleports to a common origin first. `box` — the pair's place. `pose` — the tilt the pair rests at (**I11**). `layer` — its rung when something else is in the air (**I9**). `dur` — the fold's length; the default is the approved 620ms |
+
+**Why it mounts invisible.** The carrier's own form has a blind spot: `useFlyer.raise` waits for a
+paint before it hands the node back, so a caller reaching in to set entry poses is always a frame or
+two late, and the pair shows up already folded before it starts to fold. This step sets both entry
+poses and reveals the node in the same tick, so that frame does not exist.
+
 ### The carrier — a card in the air
 
 Not a movement: the node. It owns the five invariants that belong to a flyer (I10, I5, I2, I3, I4)

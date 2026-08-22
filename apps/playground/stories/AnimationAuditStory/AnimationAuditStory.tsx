@@ -315,6 +315,18 @@ const MODULES: Module[] = [
     status: 'ok',
   },
   {
+    mod: 'usePairFold()',
+    what: {
+      ru: "Две карты становятся ПАРОЙ на столе — жест целиком, а не кирпич под ним. play('foldIntoPair') складывает одну половину; вокруг него каждый раз писались одни и те же шесть строк (поднять носитель с CardPair, покрасить обе половины позами их настоящих мест, подождать кадр, сложить обе разом) — и таких мест было четыре: сцена и три на борде. Обе половины стартуют оттуда, где карта действительно лежит; вспомогательная приземляется ровно в PAIR_AUX_POSE, поэтому передача готовой пары статичному рендеру не видна. Узел ОСТАЁТСЯ поднятым до release() — снять его раньше значит мигнуть парой между последним кадром и покоем. Слепое пятно флаерной формы закрыто: пара монтируется невидимой и открывается в тот же тик, когда половинам проставлены входные позы, так что кадра «уже сложена» не существует.",
+      en: "Two cards become a PAIR on the table — the whole gesture, not the brick under it. play('foldIntoPair') folds ONE half; around it the same six lines were written every time (raise a carrier holding a CardPair, paint both halves at the poses of their real places, wait a frame, fold both at once) — and there were four such places: the scene and three on the board. Both halves start from where the card actually lies; the aux lands exactly on PAIR_AUX_POSE, so handing the finished pair to a static render is invisible. The node STAYS up until release() — dropping it earlier blinks the pair between the last frame and the rest. The flyer form's blind spot is closed: the pair mounts invisible and is revealed in the same tick its halves get their entry poses, so the \"already folded\" frame does not exist.",
+    },
+    where: {
+      ru: '@release/ui/animations → DefenseRelease (защита + судо); борду предстоит заменить три свои копии вызовом',
+      en: '@release/ui/animations → DefenseRelease (a defence + its sudo); the board has three copies of its own left to replace with the call',
+    },
+    status: 'ok',
+  },
+  {
     mod: 'BoardAnchors',
     what: {
       ru: 'Реестр узлов борда: во что целится полёт и откуда стартует. Блоки HUD, discardBox, centre, hand, плюс seatBox(player) — карточная коробка по центру сидушки (I6, сидушка сильно шире карты), pileBox(index)/bindPile(index, el) — коробка стопки добора по индексу, которым движок называет её в `drawn.pile`, handSlotAt(index) и releaseSlot(player, slot). Только DOM: своего состояния не держит и чужое не зеркалит — потому карта в руке достаётся по индексу, а не по uid (иначе реестр зависел бы от той самой руки, от которой должен быть независим). Слот релиза всегда ищется под владельцем: frontend есть у каждого игрока. Одна идентичность на всю жизнь монтирования — потребители забирают реестр в ref внутрь долгих последовательностей.',

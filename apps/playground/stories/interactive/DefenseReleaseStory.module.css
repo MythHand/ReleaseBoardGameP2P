@@ -57,34 +57,6 @@
   transition: transform 420ms var(--ease-out);
 }
 
-/* what the table is waiting for — under the staged cards, so the ask is where
-   the play is, not only in the dev bar. Its own surface, or it dissolves into
-   the table; mounted always so it can fade out as well as in. */
-.ask {
-  position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  z-index: 12;
-  padding: 10px 18px;
-  color: var(--fg);
-  text-align: center;
-  pointer-events: none;
-  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
-  border: 1px solid var(--white-20);
-  border-radius: 999px;
-  box-shadow: 0 6px 20px var(--black-45);
-  opacity: 0;
-  transform: translate(-50%, 132px);
-  transition:
-    opacity 260ms var(--ease-out),
-    transform 260ms var(--ease-out);
-}
-
-.ask[data-shown="true"] {
-  opacity: 1;
-  transform: translate(-50%, 146px);
-}
-
 /* opponents — top-centre, clear of the tech bar */
 .opponents {
   position: absolute;

@@ -22,3 +22,7 @@ export { type Raise, useFlyer } from './useFlyer'
 // Both had been copied — the playground's scene and the real board each had
 // one — and nothing kept the copies in step.
 export { type Arriving, type Landed, useHandArrival } from './useHandArrival'
+// The fourth step, and the one the preset `foldIntoPair` was missing: the brick
+// was shared, the gesture around it was written four times — once in the scene
+// and three times on the board.
+export { type Folding, usePairFold } from './usePairFold'

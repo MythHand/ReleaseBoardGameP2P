@@ -153,6 +153,9 @@ export type {
   TableSlots,
   TableState,
 } from './table/Table/types'
+// The line under the centre — where the table says what it is waiting for. It
+// hangs off CENTRE_TOP, so it ships beside the geometry it follows.
+export { default as AskLine } from './table/TableCentre/AskLine'
 export {
   CENTRE_CARD_W,
   CENTRE_SETS,
