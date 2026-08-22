@@ -8,6 +8,7 @@ import type {
   ReleaseSlot,
   Setup,
 } from './state'
+import type { PlayerTally } from './tally'
 
 // A released card is public, so the view carries ids rather than instances —
 // except `uid`, which the UI needs as a stable animation key.
@@ -38,7 +39,17 @@ export interface WindowView {
 }
 
 export type PendingView =
-  | { kind: 'discardForRelease'; player: PlayerId; options: CardUid[] }
+  | {
+      kind: 'discardForRelease'
+      player: PlayerId
+      // The owner's own staged card: they need to know which of their cards is
+      // standing at the centre while its cost is unpaid. Redacted for anyone
+      // else, exactly as `options` already is (fake/attacks.ts's `pendingView`)
+      // — whether an opponent should see it too is an open rules question
+      // (docs/rules/backlog.md).
+      release?: CardUid
+      options: CardUid[]
+    }
   | {
       kind: 'defend'
       player: PlayerId
@@ -116,4 +127,7 @@ export interface PlayerView {
   pending: PendingView | null
   setup: Setup
   over: { winner: PlayerId; condition: 'release' | 'lastStanding' } | null
+  // Per-seat results, non-null exactly when `over` is — the two are driven by
+  // one condition in project(), so a consumer that has one has the other.
+  tally: Record<PlayerId, PlayerTally> | null
 }

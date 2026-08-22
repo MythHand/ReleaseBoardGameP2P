@@ -190,9 +190,14 @@ it('host startGame broadcasts GAME_STARTING and records the game id', async () =
   const hostId = result.current.state?.hostId
   expect(transports[0].broadcast).toHaveBeenCalledWith({
     type: 'GAME_STARTING',
-    payload: { gameId: hostId },
+    payload: {
+      gameId: `${hostId}-1`,
+      // The seating rides the frame so no peer ever has to derive one.
+      seats: [{ playerId: 'p1', peerId: hostId, name: 'Dimbo' }],
+    },
   })
-  expect(result.current.gameId).toBe(hostId)
+  expect(result.current.gameId).toBe(`${hostId}-1`)
+  expect(result.current.seats).toEqual([{ playerId: 'p1', peerId: hostId, name: 'Dimbo' }])
 })
 
 it('a guest follows the host out of the lobby', async () => {
@@ -205,13 +210,107 @@ it('a guest follows the host out of the lobby', async () => {
   act(() => {
     transports[0].onMessage?.({
       type: 'GAME_STARTING',
-      payload: { gameId: hostId },
+      payload: { gameId: hostId, seats: SEATING },
       from: hostId,
     } as WireMessage)
   })
 
   // The guest never clicked anything: this is the whole point of broadcasting.
   expect(result.current.gameId).toBe(hostId)
+})
+
+it("a guest holds the host's seating rather than deriving one of its own", async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: hostId, seats: SEATING },
+      from: hostId,
+    } as WireMessage)
+  })
+
+  // Named peers this guest's own roster has never heard of: only the frame can
+  // be the source. Anything the guest computed locally would seat itself.
+  expect(result.current.seats).toEqual(SEATING)
+})
+
+it("a rematch drops the previous match's projection before the board remounts", async () => {
+  // GAME_STARTING and the new match's first SYNC are separate DataChannel
+  // events, and React commits the navigation between them. A projection left in
+  // place is the one the rematch's board mounts on: the deal intro arms on the
+  // new gameId, finds no opening in match 1's view, reports itself done — and
+  // the rematch's opening deal is never played, while match 1's game-over
+  // overlay paints for that commit.
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: 'g1', seats: SEATING },
+      from: hostId,
+    } as WireMessage)
+  })
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'SYNC',
+      payload: { view: { over: { winner: 'p1' } }, events: [] },
+      from: hostId,
+    } as unknown as WireMessage)
+  })
+  expect(result.current.gameSync).not.toBeNull()
+
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: 'g2', seats: SEATING },
+      from: hostId,
+    } as WireMessage)
+  })
+
+  expect(result.current.gameId).toBe('g2')
+  expect(result.current.gameSync).toBeNull()
+})
+
+it('a repeat of the same GAME_STARTING keeps the projection it already has', async () => {
+  // Only a *different* match invalidates the view. A duplicate frame — a relay
+  // hiccup, a re-broadcast — must not blank a table that is already playing.
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+  const starting = {
+    type: 'GAME_STARTING',
+    payload: { gameId: 'g1', seats: SEATING },
+    from: hostId,
+  } as WireMessage
+
+  act(() => {
+    transports[0].onMessage?.(starting)
+  })
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'SYNC',
+      payload: { view: { over: null }, events: [] },
+      from: hostId,
+    } as unknown as WireMessage)
+  })
+  const held = result.current.gameSync
+
+  act(() => {
+    transports[0].onMessage?.(starting)
+  })
+
+  expect(result.current.gameSync).toBe(held)
 })
 
 it('ignores a GAME_STARTING that did not come from the host', async () => {
@@ -223,7 +322,7 @@ it('ignores a GAME_STARTING that did not come from the host', async () => {
   act(() => {
     transports[0].onMessage?.({
       type: 'GAME_STARTING',
-      payload: { gameId: 'somewhere-else' },
+      payload: { gameId: 'somewhere-else', seats: SEATING },
       from: 'another-guest',
     } as WireMessage)
   })
@@ -231,6 +330,7 @@ it('ignores a GAME_STARTING that did not come from the host', async () => {
   // Starting the game is the host's word alone — otherwise any peer could drag
   // the table to a board of its choosing.
   expect(result.current.gameId).toBeNull()
+  expect(result.current.seats).toEqual([])
 })
 
 it('forgets the game id when the session is torn down', async () => {
@@ -248,6 +348,50 @@ it('forgets the game id when the session is torn down', async () => {
   })
   // A stale id would bounce the player straight back to the board they left.
   expect(result.current.gameId).toBeNull()
+  // And the seating describes a match nobody is in any more.
+  expect(result.current.seats).toEqual([])
+})
+
+it('walking back to the lobby forgets the match but keeps its seating', async () => {
+  // The seating outlives leaveGame on purpose. A results screen still mounted
+  // would otherwise fall back to seatsFor(live roster) and renumber the seats —
+  // one player's counters under another player's name, the departed player's row
+  // gone. Nothing paints today because React batches this with the navigation
+  // that follows, but that would make the invariant rest on statement order
+  // inside a click handler rather than on the data.
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+  const dealt = result.current.seats
+  expect(dealt).toHaveLength(2)
+
+  act(() => {
+    result.current.leaveGame()
+  })
+
+  // The id goes — it is what would bounce this peer back to the board.
+  expect(result.current.gameId).toBeNull()
+  // The seating stays, unchanged.
+  expect(result.current.seats).toEqual(dealt)
+})
+
+it('a new match replaces the seating the last one left behind', async () => {
+  // Why keeping it across leaveGame is safe: nothing reads it stale.
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+  act(() => {
+    result.current.leaveGame()
+  })
+
+  act(() => {
+    result.current.startGame()
+  })
+
+  expect(result.current.gameId).toBe(`${result.current.state?.hostId}-2`)
+  expect(result.current.seats).toHaveLength(2)
 })
 
 // --- reporting the opening deal is done ---
@@ -274,6 +418,13 @@ function sentAll(): Message[] {
 // otherwise the intent below would be rejected for being out of turn and prove
 // nothing about the gate.
 const GUEST = 'zguest'
+
+// A seating as a guest receives it: peers this guest's own roster has never
+// heard of, so nothing derived locally could produce it.
+const SEATING = [
+  { playerId: 'p1', peerId: 'aaa', name: 'Ann' },
+  { playerId: 'p2', peerId: 'bbb', name: 'Bo' },
+]
 
 async function hostWithGuest(): Promise<ReturnType<typeof renderHook<UseLobby, unknown>>> {
   const rendered = renderHook(() => useLobby())
@@ -366,7 +517,7 @@ it('a guest tells the host when its intro is done', async () => {
   act(() => {
     transports[0].onMessage?.({
       type: 'GAME_STARTING',
-      payload: { gameId: hostId },
+      payload: { gameId: hostId, seats: SEATING },
       from: hostId,
     } as WireMessage)
   })
@@ -420,4 +571,89 @@ it('cancels the start gate when the session is torn down', async () => {
   } finally {
     vi.useRealTimers()
   }
+})
+
+it("a rematch takes the previous match's keeper and gate down with it", async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    act(() => {
+      result.current.startGame()
+    })
+    // Buffered behind match 1's gate. Match 1's cap is the only thing that would
+    // ever play it — and after a rematch there is no match 1 to play it into.
+    act(() => {
+      result.current.gameLink?.submit({ type: 'DRAW' })
+    })
+
+    act(() => {
+      result.current.startGame()
+    })
+    act(() => {
+      vi.advanceTimersByTime(INTRO_CAP_MS + 1)
+    })
+
+    // Reassigning the refs is not teardown: without an explicit close the old
+    // keeper's ticker runs for the life of the tab with setGameSync still in its
+    // listener set, and the old gate's cap fires this buffered draw into a game
+    // nobody is playing any more.
+    const drawn = sentTo(GUEST).filter(
+      (m) => m.type === 'SYNC' && m.payload.events.some((e) => e.type === 'drawn'),
+    )
+    expect(drawn).toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('a guest sends its whereabouts to the host', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = result.current.state?.hostId ?? ''
+
+  act(() => {
+    result.current.setWhere('stats')
+  })
+
+  expect(sentTo(hostId)).toContainEqual({ type: 'WHEREABOUTS', payload: { where: 'stats' } })
+})
+
+it('a host applies its own whereabouts without sending anything to itself', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.createRoom('Dimbo', 6)
+  })
+  const selfId = result.current.state?.selfId ?? ''
+
+  act(() => {
+    result.current.setWhere('game')
+  })
+
+  expect(result.current.state?.peers[selfId].where).toBe('game')
+  expect(sentAll()).not.toContainEqual(expect.objectContaining({ type: 'WHEREABOUTS' }))
+})
+
+it('gives each match its own id, so a second one is distinguishable from the first', async () => {
+  // hostWithGuest() rather than a bare createRoom: startGame needs a seated
+  // table, and this is the file's own helper for one (line ~278).
+  const { result } = await hostWithGuest()
+  const hostId = result.current.state?.hostId ?? ''
+
+  act(() => {
+    result.current.startGame()
+  })
+  const first = result.current.gameId
+
+  act(() => {
+    result.current.startGame()
+  })
+  const second = result.current.gameId
+
+  expect(first).toBe(`${hostId}-1`)
+  expect(second).toBe(`${hostId}-2`)
+  // The whole point: a consumer keying a reset on gameId — the follower, the
+  // move-history feed, the deal intro — sees a rematch as a different game.
+  expect(first).not.toBe(second)
 })

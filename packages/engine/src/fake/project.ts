@@ -1,6 +1,7 @@
 import type { Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
+import { emptyTally, type PlayerTally } from '../tally'
 import type { PlayerView, ReleasedView, ReleaseView } from '../view'
 import { pendingView } from './attacks'
 import { attackTargets, drawObligationMet } from './core'
@@ -102,12 +103,28 @@ export function targetsFor(state: GameState, viewerId: PlayerId): Record<CardUid
 // rides with a release, but only when a third card is left to pay its cost
 // (release.ts:268 rejects a pair that leaves nothing to pay with, unless the
 // mode waives the cost). Mirrors `playableFor`/`canAttackWith`: no window, no
-// pending, no turn — no combos either.
+// pending, no turn — no combos either, EXCEPT the one case below.
+//
+// Task 17 (#101): a `defend` pending owed to THIS player is the one pending
+// that still has a legal Sudo pairing — the defence it is about to enhance.
+// `playableFor` empties out while any pending is open (its own first check),
+// so that path is closed the same as ever; the pending's own answerable set
+// (`canDefendWith`) stands in for it instead, exactly the way `playable`/
+// `throwable` already do for the turn/window case just above. Legality is
+// still the engine's answer either way — this reads it, never re-derives it.
+// "A sudo-backed attack can be enhanced by nothing" needs no extra check: a
+// sudo attack already drops every Cancel-kind defence (defense-rollback, the
+// only defence with its own sudo tag) out of `canDefendWith` (`defencesFor`
+// above), so the intersection below is empty on its own.
 export function combosFor(state: GameState, viewerId: PlayerId): Record<CardUid, CardUid[]> {
   const me = state.players[viewerId]
   const result: Record<CardUid, CardUid[]> = {}
   const playable = new Set(playableFor(state, viewerId))
   const throwable = new Set(canAttackWith(state, viewerId))
+  const defendable =
+    state.pending?.kind === 'defend' && state.pending.player === viewerId
+      ? new Set(state.pending.canDefendWith)
+      : null
   for (const s of me.hand) {
     if (s.id !== 'support-sudo' && s.id !== 'support-code-review') continue
     const partners = me.hand
@@ -116,6 +133,7 @@ export function combosFor(state: GameState, viewerId: PlayerId): Record<CardUid,
         const rules = rulesFor(c.id)
         if (s.id === 'support-sudo') {
           if (rules?.sudo !== true) return false
+          if (defendable) return defendable.has(c.uid)
           return playable.has(c.uid) || throwable.has(c.uid)
         }
         // Code Review rides a release being PLAYED — and the pair must leave a
@@ -127,6 +145,18 @@ export function combosFor(state: GameState, viewerId: PlayerId): Record<CardUid,
     if (partners.length > 0) result[s.uid] = partners
   }
   return result
+}
+
+// The results are for the results screen. `cherryPick` counts a pull whose
+// second card is deliberately private (fake/discard.ts), so a live counter
+// would leak mid-match exactly what visibleTo was written to hide. Keyed by
+// seating so the map is complete and ordered however the table is seated, and
+// copied so a viewer cannot reach back into GameState through it.
+function tallyView(state: GameState): Record<PlayerId, PlayerTally> | null {
+  if (!state.over) return null
+  const out: Record<PlayerId, PlayerTally> = {}
+  for (const id of state.seating) out[id] = { ...(state.tally[id] ?? emptyTally()) }
+  return out
 }
 
 export function project(state: GameState, viewerId: PlayerId): PlayerView {
@@ -180,5 +210,6 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
     pending: pendingView(state, viewerId),
     setup: { ...state.setup },
     over: state.over && { ...state.over },
+    tally: tallyView(state),
   }
 }

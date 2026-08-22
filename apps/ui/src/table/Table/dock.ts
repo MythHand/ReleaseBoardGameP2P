@@ -35,7 +35,12 @@ function clock(
 // countdown for whatever state the two disagree about; there is one rule and
 // this is it — each branch mirrors the matching `deriveDock` branch below.
 export function isCounting(state: TableState, selfId: string): boolean {
-  if (state.pending) return 'deadline' in state.pending
+  // A release's own price is not a state of the table (#101) — see `deriveDock`
+  // below. It is one action inside a turn, so it falls through to the turn's
+  // own clock rather than answering here, exactly as the ring it mirrors does.
+  if (state.pending && state.pending.kind !== 'discardForRelease') {
+    return 'deadline' in state.pending
+  }
   // Mirrors the window branch below exactly: the window's OWNER gets the hold
   // ring with a live clock whoever they are — elimination only silences a
   // would-be responder, whose branch is the guarded one.
@@ -55,10 +60,26 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
   const activePlayer = state.opponents.find((o) => o.id === state.turn)?.name
   const pending = state.pending
 
+  // `discardForRelease` is excluded from BOTH pending branches below (#101).
+  // A release's own price is one action inside a turn, not a state of the
+  // table: the phase has not changed and the turn is still its owner's, so the
+  // dock keeps the turn's own phase, accent and clock — the actor falls to the
+  // `yours` branch at the bottom, everyone else to `waiting`, which is exactly
+  // what each of them saw a moment earlier. The engine only ever opens this
+  // pending on its owner's own turn (`playableFor` checks turn ownership), and
+  // no window can be open alongside it (same check), so those two branches are
+  // where it always lands.
+  //
+  // It keeps a live key rather than the "no key while the engine would refuse"
+  // rule below, because the action behind that key IS legal: the first press
+  // takes the staged release back (`cancelRelease`), the next one draws or
+  // pushes. That is the same rule the table already runs — while an unpaid
+  // release stands, anything other than paying takes it back.
+  //
   // A pending owed by you outranks everything — the engine is waiting on your
-  // decision. The PendingPrompt carries the choice; the dock narrates the
-  // phase and counts its clock down.
-  if (pending && pending.player === selfId) {
+  // decision. The choice itself lives on the table or in the PendingPrompt;
+  // the dock narrates the phase and counts its clock down.
+  if (pending && pending.kind !== 'discardForRelease' && pending.player === selfId) {
     const timed = 'deadline' in pending ? pending : undefined
     return {
       state: 'reaction',
@@ -72,7 +93,7 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
   // even PASS all reject while any decision is open — so the dock holds and
   // names whose decision the table is waiting on, with the live clock when
   // that decision carries one (a defend does; the rest read as a flat ring).
-  if (pending) {
+  if (pending && pending.kind !== 'discardForRelease') {
     const timed = 'deadline' in pending ? pending : undefined
     return {
       state: 'hold',

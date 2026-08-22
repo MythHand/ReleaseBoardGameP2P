@@ -294,3 +294,13 @@ export function onDiscardForRelease(
     events: log.events,
   }
 }
+
+export function onCancelRelease(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
+  const pending = state.pending
+  if (pending?.kind !== 'discardForRelease') return reject(state, action, 'no release staged')
+  if (pending.player !== action.player) return reject(state, action, 'not your decision')
+  // Nothing moved when the release was staged — the card never left the hand
+  // (`onPlay` only sets the pending), so there is nothing to put back and
+  // nothing to announce. Clearing the pending IS the whole undo.
+  return { state: { ...state, pending: null }, events: [] }
+}

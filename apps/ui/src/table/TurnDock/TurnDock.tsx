@@ -42,6 +42,12 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 //               under the window (caption says so), or someone else's decision
 //               (their name in the key's slot). Reaction accent, live ring, no
 //               key: everything a key could offer is illegal right now.
+//
+// Paying a release's own price is deliberately NOT a state here (#101): it is
+// one action inside a turn, not a state of the table, so the dock keeps the
+// turn's own phase and accent while the cost is owed. What is wanted of the
+// player is said by the ask on the table, and the key stays live because
+// pressing it takes the staged release back first (`dock.ts`).
 export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction' | 'hold'
 
 export interface TurnDockCopy {

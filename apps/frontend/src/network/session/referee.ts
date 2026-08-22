@@ -418,8 +418,14 @@ export function tick(session: Session, now: number): SessionResult {
   // timestamp — so the keeper starts that one clock itself, on its first tick.
   // The ticker only runs once the start gate opens (remoteLink), which is what
   // makes "first tick" mean "the table went live", not "cards still flying".
+  // `discardForRelease` does not suspend the turn clock (#101): paying a
+  // release's price is the turn's own owner acting inside their own turn, so
+  // the engine keeps stamping the deadline through it (`stampTurnClock`,
+  // packages/engine/src/fake/reduce.ts) and the keeper has to keep firing it.
+  // Every other pending hands the wait to somebody else and still defers.
   const { turn, drawing, over } = session.state
-  if (!window && !pending && !drawing && !over) {
+  const costPending = pending?.kind === 'discardForRelease' ? pending : null
+  if (!window && (!pending || costPending) && !drawing && !over) {
     if (turn.deadline === undefined) {
       const { state, events } = session.engine.reduce(session.state, {
         type: 'CLOCK_STARTED',
@@ -445,10 +451,29 @@ export function tick(session: Session, now: number): SessionResult {
       // pending's own flow takes over from there.
       let state = session.state
       let events: Event[] = []
+      // An unpaid release still standing goes back first, for the same reason a
+      // press on DRAW or PUSH takes it back (#101): while an unpaid release
+      // stands, anything other than paying takes it back — and here nothing
+      // paid it. It is also what makes the draw/push below reachable at all,
+      // since the engine refuses both while any pending is open. `cancelRelease`
+      // is free of consequences by construction: the play emitted nothing and
+      // moved no card, so clearing the pending IS the whole undo.
+      if (costPending) {
+        const taken = session.engine.reduce(state, {
+          type: 'RESOLVE',
+          player: costPending.player,
+          choice: { kind: 'cancelRelease' },
+          at: now,
+        })
+        state = taken.state
+        events = taken.events
+      }
       if (!drawObligationMet(state)) {
         const drawn = session.engine.reduce(state, { type: 'DRAW', player: turn.player, at: now })
         state = drawn.state
-        events = drawn.events
+        // Appended, not assigned: the cancel above may have run first. It emits
+        // nothing today, and this is what keeps that from being load-bearing.
+        events = [...events, ...drawn.events]
       }
       if (
         state.turn.player === turn.player &&

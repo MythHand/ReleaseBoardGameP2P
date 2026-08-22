@@ -1,11 +1,9 @@
 import type { PlayerId } from '@release/engine'
-import type { PeerInfo } from '~/network'
+import type { PeerInfo, Seat } from '~/network'
 
-export interface Seat {
-  playerId: PlayerId
-  peerId: string
-  name: string
-}
+// `Seat` is declared in network/types.ts because it rides GAME_STARTING, and
+// re-exported here so every reader still asks the seating module for it.
+export type { Seat }
 
 // PlayerId and peer id are distinct spaces that are both `string`, which is
 // exactly what hides a mix-up (network/session/remoteLink.ts:34). Minting
@@ -15,9 +13,13 @@ const seatId = (index: number): PlayerId => `p${index + 1}`
 
 // Who sits down, in the order the referee will seat them. Spectators are not
 // players and get no seat — they watch through the roster, not the engine.
-// The host computes this alone and every other peer learns its seat from the
-// SYNC it receives, so no cross-peer agreement on ordering is required; sorting
-// by peer id only keeps a single host's seating stable across re-renders.
+//
+// Called ONCE per match, by the host in `startGame`; the result is broadcast on
+// GAME_STARTING and held for the life of the match (network/useLobby.ts). It
+// reads the live roster, so calling it again later would seat whoever is still
+// connected — renumbering the survivors and moving players between seats. The
+// only remaining caller past the deal is the degraded fallback on a page that
+// has no frozen seating to read.
 export function seatsFor(peers: Record<string, PeerInfo>): Seat[] {
   return Object.values(peers)
     .filter((p) => p.role === 'host' || p.role === 'player')

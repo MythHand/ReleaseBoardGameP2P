@@ -31,6 +31,10 @@ const refs = () => ({
   dock: createRef<HTMLDivElement>(),
   zone: createRef<HTMLDivElement>(),
   centre: createRef<HTMLDivElement>(),
+  stage: createRef<HTMLDivElement>(),
+  cost: createRef<HTMLDivElement>(),
+  sudo: createRef<HTMLDivElement>(),
+  cover: createRef<HTMLDivElement>(),
   hand: createRef<HTMLDivElement>(),
   discardBox: createRef<HTMLDivElement>(),
   seatOf: () => null,
@@ -67,6 +71,7 @@ const view = (): PlayerView => ({
   // `Setup` is Record<string, string> in both the engine and the kit.
   setup: {},
   over: null,
+  tally: null,
 })
 
 const events = (): Event[] => [

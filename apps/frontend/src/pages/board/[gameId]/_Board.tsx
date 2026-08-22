@@ -41,6 +41,7 @@ import {
   Toggle,
   TurnDock,
   Typography,
+  useCardPreview,
 } from '@release/ui'
 import { HEAP_SHOW, restTransform } from '@release/ui/animations'
 import type React from 'react'
@@ -60,7 +61,7 @@ import {
 // nothing to catch it — a type check cannot see a position. `opening` holds only
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
-import { useBoardAnchors } from '~/entities/game/board'
+import { ATTACK_POSE, COVER_POSE, SUDO_POSE, useBoardAnchors } from '~/entities/game/board'
 import type { BoardProps, Panel, StagedHandoff } from '~/entities/game/board/types'
 import { useBeats } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
@@ -68,6 +69,7 @@ import { useHandOrder } from '~/features/hand-order/useHandOrder'
 import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
 import { useBoardStaging } from './_useBoardStaging'
+import { useDefenseStaging } from './_useDefenseStaging'
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
 // 0–8 зелёный, 9–18 жёлтый, 19–28 красный
@@ -169,6 +171,11 @@ export default function Board({
   // rather than the positioned blocks themselves.
   const anchors = useBoardAnchors()
 
+  // reading a card that stands at the centre — the shared block from the kit.
+  // Five slots here (the release, its cost, the attack, the defender's sudo,
+  // the cover), and each of them reads on its own.
+  const { slotProps: previewProps, overlay: previewOverlay } = useCardPreview()
+
   // The player's own sort of their fan, applied to the projection BEFORE the
   // intro, the queue or the staging gesture see it — so every shadow a beat
   // publishes and every rect a flight measures already agrees with the fan on
@@ -200,6 +207,21 @@ export default function Board({
   // queue needs at this point; the layout effect that keeps `.current` current
   // runs after every hook regardless of where it sits in the function.
   const handoffRef = useRef<StagedHandoff | null>(null)
+  // The same seam's second fact (#101, Task 11): a stable ref to
+  // `useBoardStaging`'s own `clearPaidCost`, for the same reason `handoffRef`
+  // above is a ref rather than a direct value — declared here, ahead of
+  // `useBeats`, kept current by the layout effect further down once `staging`
+  // exists to read it FROM.
+  const clearPaidCostRef = useRef<(() => void) | null>(null)
+  // The same seam's third fact (#101, Fix A): a stable ref to
+  // `useBoardStaging`'s own `takeStagedRelease`, for the same reason the two
+  // above are refs. The placement beat calls it the instant it picks the
+  // standing release up out of the stage slot, so the static render lets go in
+  // the same commit its carrier goes up.
+  const takeStagedReleaseRef = useRef<(() => void) | null>(null)
+  // The board's own root — what the "a press on nothing valid cancels"
+  // listeners below bind to, instead of `window` (#101, Fix C, finding 7).
+  const tableRef = useRef<HTMLDivElement>(null)
   // One queue, for everything that moves. The opening goes in as beat zero and
   // the wire's own beats queue behind it — one place that decides what plays,
   // in what order, and whether it plays at all under prefers-reduced-motion.
@@ -215,6 +237,8 @@ export default function Board({
     enabled: introOver || intro == null,
     intro: deal.beat,
     staging: handoffRef,
+    clearPaidCost: clearPaidCostRef,
+    takeStagedRelease: takeStagedReleaseRef,
   })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined
@@ -276,17 +300,164 @@ export default function Board({
     actions,
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
+    // the match boundary (#101, Fix C, finding 3) — `<Board>` is not remounted
+    // for a rematch, so the gestures need the same wipe `useBeats` already
+    // takes on this key.
+    //
+    // KNOWN INERT ON THIS BRANCH, AS OF 2026-08-20 (#101, Fix D, finding 3):
+    // `intro.gameId` is `session.gameId`, which `useLobby.ts` sets to the HOST'S
+    // PEER ID — the same value for every match played in one room — so the wipe
+    // this arms never fires on a rematch. That is a fact about this branch, not
+    // a rule: in-place rematch work (#19) gives each match its own id, and this
+    // line then starts working as written with nothing here to change. `useBeats` (above) hangs on the same value and has the same
+    // hole. Left as it is rather than half-fixed: a key that really changes per
+    // match has to be minted where the match is (`startGame`) and carried on
+    // `GAME_STARTING`, so every peer agrees on it, which is a session-layer
+    // change this branch should not make blind. Recorded in
+    // `docs/animations/backlog.md` and the audit register.
+    matchKey: intro?.gameId ?? null,
   })
+
+  // a `defend` pending owed to us means the defence hook owns the fan instead
+  // of the turn hook — the two never run at once (the engine suspends normal
+  // play while a window/pending is open), and this is the ONE derived
+  // constant every call site below picks a hook by, rather than repeating the
+  // condition at each one.
+  const answering = state.pending?.kind === 'defend' && state.pending.player === state.selfId
+  // the defence gesture (#101, Task 16): pulling a legal defence out of the
+  // fan drops it over the attack and answers the pending at once. Same
+  // `enabled` gate as the turn hook — the hook's own `pending` read is what
+  // keeps it inert the rest of the time.
+  const defenseStaging = useDefenseStaging({
+    state,
+    anchors,
+    actions,
+    events: intro?.events ?? [],
+    enabled: !(deal.active || beats.exclusive),
+    matchKey: intro?.gameId ?? null,
+  })
+  // the defence once its own flight has landed (or at once, under reduced
+  // motion) — gates the static cover render below against the carrier still
+  // flying it there, the same reason `stagedRelease` waits for the stage
+  // machine to reach `standing` (`stageStanding`).
+  const stagedCover =
+    answering && defenseStaging.landed && defenseStaging.overlay.length === 0
+      ? defenseStaging.staged?.main
+      : undefined
+  // the Sudo that folded into it (Task 17) — same gate as `stagedCover`, read
+  // alongside it so the cover slot's render (below) can tell a plain defence
+  // from a sudo-backed pair without a second read of `defenseStaging.staged`.
+  const stagedCoverSudo =
+    answering && defenseStaging.landed && defenseStaging.overlay.length === 0
+      ? defenseStaging.staged?.support
+      : undefined
+  // the defender's own Sudo, waiting at its own slot for the defence it will
+  // enhance (Task 17) — gated on `sudoLanded` the same way `stagedCover` is
+  // gated on `landed`, and on `phase === 'partner'` so it disappears the
+  // instant a fold commits (the no-duplicate rule: the fold's own commit
+  // clears `phase` away from 'partner' in the SAME tick the flyer's aux mounts).
+  const stagedSudo =
+    answering &&
+    defenseStaging.staged?.phase === 'partner' &&
+    defenseStaging.sudoLanded &&
+    defenseStaging.overlay.length === 0
+      ? defenseStaging.staged.support
+      : undefined
+  // its own node, for the staging → beat handoff below — the static cover
+  // render, once it lands, is what `defenseBeat.runCovered` finds already
+  // standing where the cover goes (Task 16's own report: Carry #2).
+  const coverStagedRef = useRef<HTMLDivElement>(null)
+  // the fan's own gap-while-a-return-flight-travels, from whichever hook is
+  // live — `Hand`'s own gapAt/gapSize props fold this in below, behind the
+  // deal's and the beat queue's own (unrelated) gaps.
+  const liveGapAt = answering ? defenseStaging.gapAt : staging.gapAt
+  const liveGapSize = answering ? defenseStaging.gapSize : staging.gapSize
+
   // the ONE card standing at the centre before a partner folds in — a plain
   // aim (`main`) or a support awaiting one (`support`). Once merged the pair
-  // flyer owns the centre instead (see `opening.pairFlyer` below).
+  // flyer owns the centre instead (see `opening.pairFlyer` below). A solo
+  // release is excluded on purpose: `_useBoardStaging` stages it too (so the
+  // fan hides it and a rejection returns it, the same as any other pull), but
+  // it belongs at the STAGE slot, not here — `stagedRelease` below renders it
+  // there, off the projection's own pending rather than off `staged`.
   const soloStaged =
-    staging.staged && !staging.staged.merged
+    staging.staged && !staging.staged.merged && staging.staged.main?.card.category !== 'release'
       ? (staging.staged.support ?? staging.staged.main)
       : null
   // its own node, for the staging → beat handoff below — a plain aim/support
   // never merges, so it never gets the pair flyer's persistent node instead.
   const soloStagedRef = useRef<HTMLDivElement>(null)
+
+  // The card the arrow leaves FROM, whichever hook armed it — a waiting
+  // support if there is one, the aimed card otherwise. Its category is the
+  // arrow's hue (#101, Fix B, Defect 5): the defence side only ever aims with
+  // the Sudo, which is how it comes out as the scene's own `--cat-support`
+  // without naming that token here.
+  const aimingCard = answering
+    ? defenseStaging.staged?.support?.card
+    : (staging.staged?.support ?? staging.staged?.main)?.card
+  const arrowColor = aimingCard ? `var(--cat-${aimingCard.category})` : undefined
+
+  // the pending "defend" the attack slot answers for — read ONCE so the hover
+  // preview below and the paint further down can never drift on what counts
+  // as "occupying" the slot. `staging.staged` wins over a pending: the two can
+  // only coincide for the instant between the local attacker's own dispatch
+  // and the layout effect below collapsing it, and both readers now resolve
+  // that tie the same way because they read the same value.
+  const pendingDefend = !staging.staged && state.pending?.kind === 'defend' ? state.pending : null
+
+  // the release standing at the stage slot while its cost is unpaid — read
+  // ONCE, same reason as `pendingDefend` above, and its OWNERSHIP stated here
+  // explicitly rather than leaned on the engine's own redaction of `.release`
+  // the way the pre-fix render did: without the `player` check, an opponent's
+  // own `discardForRelease` would still assign to this const (with `.release`
+  // simply absent), which happens to resolve to nothing below only because
+  // the redaction is doing that work silently — the same two-readers-drift
+  // class already fixed once on this branch (see `pendingDefend`'s own note).
+  const costPending =
+    state.pending?.kind === 'discardForRelease' && state.pending.player === state.selfId
+      ? state.pending
+      : null
+  // The staging gesture's OWN idea of the standing release — the same card
+  // `onHandPlay` committed the instant it was pulled, kept (in `staging`)
+  // until the projected pending arrives. `costPending` above is the canonical
+  // source once it exists, but it is a network round trip away: on a fast
+  // connection (the host peer's own can be near-instant) it can lag behind
+  // the LOCAL flight that carries the release here, and on a slow one it can
+  // arrive well after that flight has already landed — without this fallback
+  // the slot would show nothing for that whole gap.
+  const stagedReleaseLocal =
+    staging.staged?.phase === 'dispatched' &&
+    !staging.staged.support &&
+    staging.staged.main?.card.category === 'release'
+      ? staging.staged.main
+      : undefined
+  // `stageStanding` gates BOTH sources at once, and is the whole question:
+  // is the actor's own release standing at this slot right now? Neither source
+  // above can answer it, because both are a network round trip behind — the
+  // projected pending stays exactly as it is while a carrier flies the card in
+  // (the pull), out to the fan (a cancel) or out to the zone (the placement
+  // beat), and a render keyed on the pending alone would draw a second copy of
+  // the card under the carrier already holding it, once per direction.
+  //
+  // It used to be three separate booleans asked together (#101, Fix C, finding
+  // 5): `stageLanded && !releaseReturning && !releasePlacing`, one per round
+  // that added a flight. They were reset only on a SOLO release's own pull, so
+  // a Code Review combo — which stands its release at the centre instead —
+  // inherited whatever the last one left, and could draw its release here as
+  // well as in the pair. `_useBoardStaging.ts` now keeps one `StageState`
+  // that every play sets, so there is nothing left to inherit and one thing to
+  // ask.
+  // Whether the fan is closed to the pointer — read ONCE, so the style and the
+  // mousedown guard that go with it can never drift (the same discipline
+  // `pendingDefend` and `costPending` above are read once for). See the hand
+  // wrapper below for what each half of it is.
+  const handInert = Boolean(staging.staged?.merged) && staging.costOptions.length === 0
+
+  const stagedRelease = staging.stageStanding
+    ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
+      stagedReleaseLocal)
+    : undefined
 
   // The staging → beat handoff (#100): kept current in a layout effect,
   // because `el` has to be the DOM node as THIS render actually committed it —
@@ -294,7 +465,62 @@ export default function Board({
   // otherwise. `release` is the hook's own no-flight clear; the combo beat
   // calls it once its own read of this says the staged play is the one
   // standing where it is about to fold one in (I8).
+  //
+  // One ref, whichever hook is live (#101, Task 16): `answering` picks the
+  // source the same way every other call site does, so `defenseBeat.runCovered`
+  // reads OUR defence's own handoff for a `covered` beat, never a stale one
+  // left over from the turn hook. `coverStagedRef` only binds once
+  // `defenseStaging.landed` is true (both deps below), so `el` is non-null
+  // exactly when the static cover render is what is actually standing there —
+  // never a flyer that a reduced-motion path never raised (Carry #2).
+  //
+  // `defenseStaging.landed`/`.overlay` do not appear inside this effect's own
+  // body — biome's static check reads them as removable — but they are what
+  // makes it RE-RUN once `coverStagedRef.current` actually binds: `landed`
+  // flips true (and `overlay` drops back to `[]`) on the SAME render the
+  // static cover child mounts, and only a re-run of this effect, AFTER that
+  // commit, ever reads the ref's freshly-bound value. Dropping either
+  // dependency leaves `handoffRef.current.el` stuck at whatever it was the
+  // last time `staged`/`release` changed identity — typically null, from the
+  // instant right after the pull, before the ref had anything to bind to.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: landed/overlay gate a ref read, not a value the effect body itself references
   useLayoutEffect(() => {
+    // The DEFENCE's own dispatched play claims the handoff first, and is asked
+    // about before `answering` rather than inside it (#101, Fix D round 4). The
+    // commit that carries the engine's answer renders `live` — `beats.shadow` is
+    // not set until the beat starts — so `answering` flickers false for exactly
+    // that one commit, and keying the branch on it wrote `null` here from the
+    // TURN side, which has nothing staged while a pending is open. A beat
+    // planned on the next commit would then read no handoff at all and treat our
+    // own defence as a rejoin, flying it in from the fan. Asking "does the
+    // defence gesture have a dispatched play" cannot flicker: it is the hook's
+    // own state, and it now survives that commit (`_useDefenseStaging`'s
+    // catch-up waits for its carrier). The two hooks are never both staged —
+    // the engine suspends normal play while a pending is open — so this cannot
+    // steal the turn side's handoff either.
+    const answeringStaged = defenseStaging.staged
+    if (answeringStaged?.phase === 'dispatched' && answeringStaged.main) {
+      handoffRef.current = {
+        mainUid: answeringStaged.main.uid,
+        supportUid: answeringStaged.support?.uid,
+        el: coverStagedRef.current,
+        release: defenseStaging.release,
+      }
+      return
+    }
+    if (answering) {
+      const ds = defenseStaging.staged
+      handoffRef.current =
+        ds?.phase === 'dispatched' && ds.main
+          ? {
+              mainUid: ds.main.uid,
+              supportUid: ds.support?.uid,
+              el: coverStagedRef.current,
+              release: defenseStaging.release,
+            }
+          : null
+      return
+    }
     const s = staging.staged
     handoffRef.current =
       s?.phase === 'dispatched' && s.main
@@ -305,7 +531,33 @@ export default function Board({
             release: staging.release,
           }
         : null
-  }, [staging.staged, staging.pairRef, staging.release])
+  }, [
+    answering,
+    defenseStaging.staged,
+    defenseStaging.landed,
+    defenseStaging.overlay,
+    defenseStaging.release,
+    staging.staged,
+    staging.pairRef,
+    staging.release,
+  ])
+
+  // The same seam's second fact (#101, Task 11): `clearPaidCostRef` kept
+  // current the same way `handoffRef` above is. `staging.clearPaidCost` is
+  // stable for the life of the mount (a `useCallback` with no deps), so this
+  // effect fires once and never again in practice — it exists for the same
+  // structural reason `handoffRef`'s does, not because the value actually
+  // changes.
+  useLayoutEffect(() => {
+    clearPaidCostRef.current = staging.clearPaidCost
+  }, [staging.clearPaidCost])
+
+  // …and the third (#101, Fix A), for exactly the same structural reason:
+  // `staging.takeStagedRelease` is stable for the life of the mount, so this
+  // fires once.
+  useLayoutEffect(() => {
+    takeStagedReleaseRef.current = staging.takeStagedRelease
+  }, [staging.takeStagedRelease])
 
   // Escape skips the opening. Same window binding and the same reason as the
   // cancel above; `finish` is idempotent, so a second press is a no-op.
@@ -321,15 +573,109 @@ export default function Board({
 
   // Escape cancels a staged card the same way a miss on the table does —
   // armed only while there is something to cancel (I8: a press after the play
-  // already dispatched must not turn into a return flight).
+  // already dispatched must not turn into a return flight). Widened to a
+  // release awaiting its cost too (#101, Task 9): `staging.staged` is already
+  // null by the time `staging.costOptions` is populated — the catch-up effect
+  // in `_useBoardStaging.ts` clears it the moment the pending echoes back —
+  // so the release's own window has nothing else to key its arming off.
   useEffect(() => {
-    if (!staging.staged || staging.dispatched) return
+    const armed = staging.staged ?? staging.costOptions.length > 0
+    if (!armed || staging.dispatched) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') staging.cancel()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [staging.staged, staging.dispatched, staging.cancel])
+  }, [staging.staged, staging.dispatched, staging.costOptions.length, staging.cancel])
+
+  // A release awaiting its cost has no `staging.staged` to key a click-based
+  // miss off (see the Escape effect above) — so its own "changed my mind" is a
+  // dedicated `mousedown` listener instead, ported from the approved source
+  // (`DefenseReleaseStory`'s own `cancelStaged`/mousedown effect): the fan's
+  // own pull gesture starts on mousedown too, so the press this has to ignore
+  // is the SAME event a drag begins on, not the click that follows it. Kept
+  // separate from `handleTableClick` below (rather than widened into it) so a
+  // single physical press cannot fire `staging.cancel()` twice over — once
+  // from this listener, once from the click that follows the same press —
+  // and race `onResolve`/`arrival.arrive` against themselves.
+  //
+  // Bound to the TABLE, not to `window` (#101, Fix C, finding 7): a press has
+  // to land on the board to read as "changed my mind about a card on the
+  // board". On `window` it also caught anything portalled ABOVE the board —
+  // a dialog, an overlay, a future toast — and silently cancelled a staged
+  // card behind it. The rail and the drawer are inside the table root, so they
+  // still count as a miss, which is what they were always meant to be.
+  useEffect(() => {
+    const root = tableRef.current
+    if (!root || staging.costOptions.length === 0) return
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('[data-hand-slot]')) return
+      staging.cancel()
+    }
+    root.addEventListener('mousedown', onMouseDown)
+    return () => root.removeEventListener('mousedown', onMouseDown)
+  }, [staging.costOptions.length, staging.cancel])
+
+  // A Sudo waiting for the defence it will enhance has no aimed target to
+  // click (Task 17) — the same "changed my mind" shape as a release awaiting
+  // its cost above, for the same reason: the fan's own pull gesture starts on
+  // mousedown too, so the press this has to ignore is the SAME event a drag
+  // begins on, not the click that follows it (the approved source's own
+  // `cancelStaged`/mousedown effect). Kept separate from `handleTableClick`
+  // below (rather than folded into its `answering` branch) for the identical
+  // reason the cost listener is: a single physical press must not fire
+  // `defenseStaging.cancel()` twice over.
+  // Bound to the table root for the same reason the cost listener above is.
+  useEffect(() => {
+    const root = tableRef.current
+    if (!root || defenseStaging.staged?.phase !== 'partner') return
+    const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('[data-hand-slot]')) return
+      defenseStaging.cancel()
+    }
+    root.addEventListener('mousedown', onMouseDown)
+    return () => root.removeEventListener('mousedown', onMouseDown)
+  }, [defenseStaging.staged?.phase, defenseStaging.cancel])
+
+  // Escape cancels a staged defence the same way a miss on the table does —
+  // see `handleTableClick`'s own `answering` branch below. Task 16's plain
+  // path commits and dispatches in the same tick (no cancellable aim phase),
+  // so this is armed only for the brief span between a rejection and
+  // `cancel()`'s own return flight taking over (`defenseStaging.cancel`'s own
+  // guard refuses anything still `phase: 'dispatched'`). A waiting Sudo
+  // (Task 17) is covered too — nothing here excludes `phase: 'partner'`.
+  useEffect(() => {
+    if (!answering) return
+    const s = defenseStaging.staged
+    if (!s || s.phase === 'dispatched') return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') defenseStaging.cancel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [answering, defenseStaging.staged, defenseStaging.cancel])
+
+  // The dock's own key under an unpaid release (#101). The scene already has
+  // one rule for this: while an unpaid release stands, anything other than
+  // paying takes it back — a press on the table does exactly that. DRAW and
+  // PUSH are presses like any other, so the first one takes the release back
+  // and the next one does what the key says. That is why the dock keeps the
+  // turn's own phase and a live key rather than a state of its own: the action
+  // behind the key IS legal, it just costs the staged release first.
+  //
+  // Two presses rather than one combined "cancel and draw": the engine has to
+  // see the cancel commit before it will accept a DRAW, and the card's own
+  // return flight belongs to the first press. Firing both here would race the
+  // flight against a projection that has already moved on.
+  const dockKey = (act: (() => void) | undefined) => {
+    if (staging.costOptions.length > 0) {
+      staging.cancel()
+      return
+    }
+    act?.()
+  }
 
   // A click that lands outside any hand slot while a card is staged reads as
   // "changed my mind" — cancel. Clicks that land on a lit target already
@@ -341,11 +687,80 @@ export default function Board({
       dealFinish()
       return
     }
+    if (answering) {
+      const s = defenseStaging.staged
+      // 'partner' (Task 17) is the mousedown listener's own — see above,
+      // which exists specifically so a single physical press cannot fire
+      // `defenseStaging.cancel()` from both places over one click.
+      if (!s || s.phase === 'dispatched' || s.phase === 'partner') return
+      const target = e.target as HTMLElement
+      if (target.closest('[data-hand-slot]')) return
+      defenseStaging.cancel()
+      return
+    }
     if (!staging.staged || staging.dispatched) return
     const target = e.target as HTMLElement
     if (target.closest('[data-hand-slot]')) return
     staging.cancel()
   }
+
+  // What the table is waiting on, in words, and where the words go (#101,
+  // Fix B). Two steps ask the fan for a card and neither had a voice: the
+  // release's cost, whose panel is suppressed on purpose (a panel would be a
+  // second asker), and — from this round — the `defend`, whose panel used to
+  // cover the very attack it was asking about. The ask is its own line under
+  // the centre instead, quoting the approved scene's own placement: "the ask
+  // sits with the cards, not only in the dev bar — a release parked at the
+  // centre with no explanation reads as a stuck play."
+  //
+  // The scene's own COPY is deliberately not ported: it says "pull any of
+  // them out of the hand", and a pull is impossible here — the engine returns
+  // no playable cards while a pending is open, so the pull finds no target
+  // and the card flops back into the fan. On the board the cost is a click.
+  //
+  // A defend is not ONE step, which the first cut of this missed (fix round 1,
+  // M1): a Sudo standing at its own slot is answered by CLICKING the defence
+  // it will enhance, and a pull there is refused outright (`resolveLegal` and
+  // `resolveSudo` both bail while anything is staged). So the phase picks the
+  // words — same discipline as not porting the scene's cost line, applied to
+  // a state this round is what newly lights. Silence was the other option and
+  // is the wrong one: a step waiting on the fan with nothing saying so is
+  // Defect 3 itself, one level in.
+  //
+  // `undefined` here means we are not answering at all; `null` means we are
+  // and nothing is staged yet.
+  const defencePhase = answering ? (defenseStaging.staged?.phase ?? null) : undefined
+  // Still ours to decide. A dispatched defence (or one in the instant between
+  // a rejection and its return flight) has already answered, so nothing is
+  // being asked and nothing may be offered — the standard `dock.ts` states for
+  // its own keys: offered only where the action behind it is legal RIGHT NOW.
+  const unanswered = answering && defencePhase !== 'dispatched' && defencePhase !== 'rejected'
+  let ask: string | null = null
+  if (unanswered) {
+    ask = defencePhase === 'partner' ? copy.table.askPartner : copy.table.askDefend
+  } else if (costPending) {
+    ask = copy.table.askCost
+  }
+  // The line keeps the words it faded IN with while it fades back OUT — an
+  // empty pill mid-fade reads as a flicker. Written during render on purpose:
+  // it is a pure carry-forward of this render's own value, so a StrictMode
+  // double render produces the identical result.
+  const lastAsk = useRef<string | null>(null)
+  if (ask) lastAsk.current = ask
+
+  // Declining an attack — "I could block this and I choose not to". The only
+  // thing `PendingPrompt` did for a `defend` that the fan does not do, so it
+  // is the only thing that outlived it here. A real button, so it is the one
+  // affordance in this exchange a keyboard can reach.
+  //
+  // Offered exactly while `unanswered` (fix round 1, L1) — the panel had no
+  // such gate and neither did the first cut of this, so between a defence's
+  // dispatch and the projection clearing the pending it could fire a second
+  // RESOLVE onto a decision that is already closing. A waiting Sudo is NOT
+  // excluded: nothing has been dispatched there, so declining is legal, and
+  // it already does the right thing — the partner-phase mousedown listener
+  // above sends the Sudo home on the very press that fires this.
+  const declineAttack = () => actions?.onResolve?.({ kind: 'defend', card: null })
 
   const isHost = role === 'host'
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
@@ -392,6 +807,7 @@ export default function Board({
     // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening AND click-anywhere-cancels-staging (handleTableClick owns both); the accessible affordance for each is its own Escape handler above
     <div
       className={kit.table}
+      ref={tableRef}
       onClick={handleTableClick}
       role="presentation"
       data-testid="board-table"
@@ -401,7 +817,22 @@ export default function Board({
       <div className={cls(opening.bgWrap, enter)} ref={anchors.bg}>
         <HudBackground tone="neutral" className={kit.bgLayer} />
       </div>
-      <Arrow from={staging.arrow.from} to={staging.arrow.to} />
+      {/* one arrow, whichever hook is live (#101, Task 17) — `answering` picks
+          the source the same way every other call site in this file does; the
+          turn hook's own arrow stays wherever it last pointed while a defend
+          pending suspends it, unread while `answering` is true.
+
+          Its hue says what KIND of card is aiming (#101, Fix B) — the same
+          thing the approved scene says with a literal
+          `color="var(--cat-support)"`, read off the card actually standing
+          rather than hardcoded, since the turn side aims with every category
+          there is. No card standing means no arrow to colour, and Arrow's own
+          default takes over. */}
+      <Arrow
+        from={answering ? defenseStaging.arrow.from : staging.arrow.from}
+        to={answering ? defenseStaging.arrow.to : staging.arrow.to}
+        color={arrowColor}
+      />
 
       {slots?.banner && <div className={kit.banner}>{slots.banner}</div>}
       {slots?.corner && <div className={kit.corner}>{slots.corner}</div>}
@@ -480,13 +911,94 @@ export default function Board({
         </div>
       </div>
 
-      {/* the centre: where cards stand while the table is looking at them — the
-          player's own cards gather here during the opening, and every drawn card
-          stages here for the rest of the match. Mounted for the whole life of
-          the board, because a flight cannot aim at a node that is not there yet.
-          pointer-events: none — outside a beat it is an empty box and must not
-          catch clicks meant for the table. */}
-      <div className={opening.centre} data-board-centre ref={anchors.centre}>
+      {/* the release stands here and does NOT land — by the rules it costs one
+          card, and the cost is shown open beside it. Only then does it settle
+          into its zone slot and the attack window opens. */}
+      <div
+        className={opening.stageSlot}
+        data-centre-slot="stage"
+        ref={anchors.stage}
+        {...previewProps(stagedRelease?.card ?? null)}
+      >
+        {stagedRelease && <Card card={stagedRelease.card} interactive={false} width="100%" />}
+      </div>
+      <div
+        className={opening.costSlot}
+        data-centre-slot="cost"
+        ref={anchors.cost}
+        {...previewProps(staging.paidCost?.card ?? null)}
+      >
+        {/* the card that paid the release's cost — held open here, not
+            discarded on the spot, until the combo beat's own cost leg flies it
+            on and clears `paidCost` in the same commit (#101, Task 11:
+            comboBeat.tsx's `runRelease`) */}
+        {staging.paidCost && <Card card={staging.paidCost.card} interactive={false} width="100%" />}
+      </div>
+      {/* the defender's own Sudo waits in its OWN place until a defence is
+          chosen for it — the arrow says what it is aimed at. Rendered once its
+          own flight there has landed (or at once under reduced motion, Task
+          17) — the same landed-gate role `stagedCover` below plays for the
+          defence's own flight to the cover slot. */}
+      <div
+        className={opening.sudoSlot}
+        data-centre-slot="sudo"
+        ref={anchors.sudo}
+        {...previewProps(stagedSudo?.card ?? null)}
+      >
+        {stagedSudo && (
+          <div className={opening.pose} style={{ transform: restTransform(SUDO_POSE) }}>
+            <Card card={stagedSudo.card} interactive={false} width="100%" />
+          </div>
+        )}
+      </div>
+      {/* the defence covering the attack — offset and tilted the other way.
+          Axis-aligned itself (I6): the tilt lives on the inner `.pose` child,
+          the same way the discard heap's own resting cards carry theirs, so
+          `anchors.cover`'s own rect stays the true card box a flight can aim
+          at. Rendered once the pulled defence's own flight has landed (or at
+          once under reduced motion) — `defenseBeat.runCovered` finds this
+          exact node already standing here through the handoff (#101, Task 16:
+          Carry #2), rather than falling back to a seat box that is never
+          bound for the local player. Carries a CardPair instead of a lone
+          Card once a Sudo has folded into it (#101, Task 17) — `stagedCoverSudo`
+          shares `stagedCover`'s own gate, so the two can never disagree on
+          whether the fold has landed. */}
+      <div
+        className={opening.coverSlot}
+        data-centre-slot="cover"
+        ref={anchors.cover}
+        {...previewProps(stagedCover?.card ?? null)}
+      >
+        {stagedCover && (
+          <div
+            ref={coverStagedRef}
+            className={opening.pose}
+            style={{ transform: restTransform(COVER_POSE) }}
+            data-testid="board-cover-staged"
+          >
+            {stagedCoverSudo ? (
+              <CardPair main={stagedCover.card} aux={stagedCoverSudo.card} width="100%" />
+            ) : (
+              <Card card={stagedCover.card} interactive={false} width="100%" />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* the attack slot — where cards stand while the table is looking at them:
+          the player's own cards gather here during the opening, and every drawn
+          card stages here for the rest of the match. Mounted for the whole life
+          of the board, because a flight cannot aim at a node that is not there
+          yet. Empty, it must not catch clicks meant for the table underneath —
+          `.centre:empty` in `_Board.module.css` owns that, now that the cover
+          slot sits on top of it too. */}
+      <div
+        className={opening.centre}
+        data-board-centre
+        data-centre-slot="attack"
+        ref={anchors.centre}
+        {...previewProps(pendingDefend ? cardById(pendingDefend.attackCard) : null)}
+      >
         {intro &&
           deal.staged.map((s) => {
             const data = cardById(s.card)
@@ -510,24 +1022,39 @@ export default function Board({
             <Card card={soloStaged.card} interactive={false} width="100%" />
           </div>
         )}
-        {!staging.staged &&
-          state.pending?.kind === 'defend' &&
+        {pendingDefend &&
           (() => {
-            const data = cardById(state.pending.attackCard)
+            const data = cardById(pendingDefend.attackCard)
             if (!data) return null
             // sudo stands the pair; a plain hit stands the one card, as before.
-            const aux = state.pending.sudo ? cardById('support-sudo') : null
+            const aux = pendingDefend.sudo ? cardById('support-sudo') : null
             return (
               <div
                 className={opening.centreCard}
                 data-testid="board-centre-pending"
                 data-pending-play
               >
-                {aux ? (
-                  <CardPair main={data} aux={aux} width="100%" />
-                ) : (
-                  <Card card={data} interactive={false} width="100%" />
-                )}
+                {/* the attack RESTS at its own tilt (#101, Fix A, Defect 2),
+                    the way the cover already does — the approved scene's whole
+                    point is that the two read as two separate plays at
+                    contrasting tilts, and the exit hands `pose: ATTACK_POSE`
+                    to `useDiscardExit`, which documents it as "the table tilt
+                    it STARTS from": resting at 0° made the card pop to −4° on
+                    the exit's first frame. The tilt lives on this INNER
+                    element and not on the node above it, which is what
+                    `comboBeat.runPairOut` measures — a rotated node's bounding
+                    rect is the box AROUND the tilted card (I6). Same shape as
+                    the cover and sudo slots.
+                    The ARRIVAL still does not carry the tilt: `foldIn` is
+                    translate+scale only, so the rest pose is what supplies it
+                    — recorded in docs/animations/backlog.md. */}
+                <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+                  {aux ? (
+                    <CardPair main={data} aux={aux} width="100%" />
+                  ) : (
+                    <Card card={data} interactive={false} width="100%" />
+                  )}
+                </div>
               </div>
             )
           })()}
@@ -562,44 +1089,111 @@ export default function Board({
               // (ComboStory's own reason). So while a pair stands merged the
               // fan goes inert, and a press inside it must not read as the
               // miss `handleTableClick` cancels on.
-              style={{ pointerEvents: staging.staged?.merged ? 'none' : undefined }}
-              onMouseDown={staging.staged?.merged ? (e) => e.stopPropagation() : undefined}
+              //
+              // UNLESS a cost is owed (#101, Fix C, finding 1 — the blocker
+              // this round exists for). A Code Review combo that ships a
+              // release raises the ordinary `discardForRelease` pending, and
+              // the pair stays merged for the whole of it, because `staged` is
+              // the only thing that knows the pair (`pendingView` carries
+              // `release` but not `codeReview`). The fan is that step's ONLY
+              // picker — the panel is suppressed for this pending on purpose,
+              // two blocks down, and `Hand` offers no keyboard path — so an
+              // inert fan made the cost unpayable by any input at all, while
+              // the ask line under the centre asked for it. #100 added this
+              // guard and #101 suppressed the panel; neither could see the
+              // other. The guard yields to the step that is waiting on the fan,
+              // which is the narrower of the two and the one that can be
+              // deadlocked.
+              //
+              // WHAT YIELDING COSTS, on the record rather than left to be
+              // rediscovered (#101, Fix D, finding 9): the hover zoom is back
+              // over the standing pair for the whole cost step, which is the
+              // occlusion #100's guard was added for — and `Hand`'s `.zoom` is
+              // `pointer-events: none`, so a press that lands on that preview
+              // falls THROUGH to whatever is beneath it, misses every
+              // `[data-hand-slot]`, and the cost listener above reads it as a
+              // miss and cancels the release. Reading a card can therefore
+              // undo the play. Not fixable from this side: exempting the
+              // preview needs it to be a pointer target, and giving it pointer
+              // events makes it steal the hover that raised it. Recorded in
+              // `docs/animations/backlog.md` and the audit register with the
+              // shape that would close it; the deadlock this guard yields for
+              // is the worse of the two, which is why it still yields.
+              style={{ pointerEvents: handInert ? 'none' : undefined }}
+              onMouseDown={handInert ? (e) => e.stopPropagation() : undefined}
             >
               <Hand
-                items={staging.handItems}
+                // a `defend` pending owed to us means the defence hook owns
+                // the fan (#101, Task 16) — `answering` picks the source at
+                // every call site below, rather than merging the two hooks'
+                // outputs.
+                items={answering ? defenseStaging.handItems : staging.handItems}
                 // the fan opens room for the arriving heap while it travels —
                 // the deal wins the tie against every other beat the same way
                 // it already wins the shadow's, and the staging gesture's own
                 // return-flight gap is last: it opens only once nothing else
                 // owns the fan.
-                gapAt={deal.gapAt ?? beats.gapAt ?? staging.gapAt}
+                gapAt={deal.gapAt ?? beats.gapAt ?? liveGapAt}
                 gapSize={
                   deal.gapAt == null
                     ? beats.gapAt == null
-                      ? staging.gapSize
+                      ? liveGapSize
                       : beats.gapSize
                     : deal.gapSize
                 }
-                // a support awaiting a partner lights the hand cards it can
-                // fold with — off outside that phase (Hand ignores undefined).
-                accentAt={staging.accentAt}
+                // What lights, and in what hue — from whichever hook owns the
+                // fan (#101, Fix B). `stateAt` is what says a card is
+                // AVAILABLE; `accentAt` only says what colour, and without
+                // the pair of them the fan could never light for a step that
+                // is not a combo partner pick — which is every step this
+                // scene is about. Both hooks keep the one rule: lit only
+                // while a step is waiting on a choice from the fan, and only
+                // on the cards that answer it.
+                stateAt={answering ? defenseStaging.stateAt : staging.stateAt}
+                accentAt={answering ? defenseStaging.accentAt : staging.accentAt}
                 // while the deal runs the hand is held: no clicks reach either
                 // gesture machine, and the cards that travelled closed stay
                 // closed until the flip. Both are gone the moment it ends, so
                 // the released hand is the plain one this board always drew.
-                // A partner pick is a click too, not a pull — it routes here
-                // while the staging gesture is waiting for one.
+                // A partner pick is a click too, not a pull — so is a release's
+                // cost, and so is a release itself (#101, Fix D, finding 1).
+                // WHICH of those a given click is, is the staging gesture's own
+                // question: it takes the click and says so, or declines and the
+                // plain click gesture — which owns the window's attack
+                // affordance — gets it. Deciding it here instead is what hid the
+                // release's own case: the condition named the two steps anyone
+                // had thought of (`phase === 'partner'`, a cost owed), a release
+                // played at rest was neither, and it went to a gesture that
+                // dispatches the play and never tells the stage machine, so the
+                // card stood nowhere for the whole step that followed.
                 onCardClick={
                   deal.active
                     ? undefined
-                    : staging.staged?.phase === 'partner'
-                      ? (i) => staging.onCardClick(i)
-                      : (i) => gestures.onCardClick(i)
+                    : answering
+                      ? (i) => defenseStaging.onCardClick(i)
+                      : (i) => {
+                          if (staging.onCardClick(i)) return
+                          // resolved against the array the fan actually
+                          // RENDERED, and handed on as a uid: `handItems` is
+                          // `you.hand` minus whatever is staged, so an index
+                          // that crossed this seam pointed at a different card
+                          // the whole time anything stood on the table (#101,
+                          // Fix D round 2).
+                          const item = staging.handItems[i]
+                          if (item) gestures.onCardClick(item.uid)
+                        }
                 }
-                // drag-mode: a card that needs a target is pulled out of the
-                // fan (the staging gesture), not clicked. Off during the deal,
-                // same as the click gesture above.
-                onPlay={deal.active ? undefined : staging.onHandPlay}
+                // drag-mode: a card that needs a target — or a legal defence
+                // answering an open `defend` pending — is pulled out of the
+                // fan, not clicked. Off during the deal, same as the click
+                // gesture above.
+                onPlay={
+                  deal.active
+                    ? undefined
+                    : answering
+                      ? defenseStaging.onHandPlay
+                      : staging.onHandPlay
+                }
                 // the reorder gesture's commit — without it the kit settles the
                 // card into its new slot and the next projection render snaps
                 // it back. `to` indexes the fan AS RENDERED (minus any staged
@@ -607,7 +1201,13 @@ export default function Board({
                 onReorder={
                   deal.active
                     ? undefined
-                    : (uid, to) => handOrder.commit(you.hand, staging.handItems, uid, to)
+                    : (uid, to) =>
+                        handOrder.commit(
+                          you.hand,
+                          answering ? defenseStaging.handItems : staging.handItems,
+                          uid,
+                          to,
+                        )
                 }
                 renderFace={
                   deal.active
@@ -641,8 +1241,8 @@ export default function Board({
             activePlayer={dockView.activePlayer}
             copy={dockCopy}
             paused={paused}
-            onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
-            onPush={actions?.onPush}
+            onDraw={actions?.onDraw ? () => dockKey(actions.onDraw) : undefined}
+            onPush={actions?.onPush ? () => dockKey(actions.onPush) : undefined}
             onPass={actions?.onPass}
           />
         </div>
@@ -656,15 +1256,60 @@ export default function Board({
       </div>
 
       {/* the engine is waiting on a decision from you — a pending owed to you
-          always renders, regardless of whose turn the projection says it is */}
-      {state.pending?.player === state.selfId && (
-        <PendingPrompt
-          pending={state.pending}
-          hand={you.hand}
-          copy={copy.pending}
-          onResolve={(choice) => actions?.onResolve?.(choice)}
-        />
-      )}
+          always renders, regardless of whose turn the projection says it is.
+          Two kinds are the exception, both for the same reason: the cards on
+          the table already ask for them, so a panel would be a second asker
+          for the same decision. A release's own cost is answered by the fan
+          (`staging.onCostPick`); a `defend` is answered by pulling a defence
+          out of it (`defenseStaging.onHandPlay`).
+
+          For the `defend` the panel was worse than redundant (#101, Fix B):
+          `.prompt` is `inset: 0` at z-index 92 with a fully opaque `.panel`
+          centred inside it, and the centre slots it covered sit at z 9–11 —
+          so the attack being asked about was behind the question, and a card
+          flying to or from the cover slot (a carrier at `--z-flight`, 250)
+          vanished the instant it landed. What only the panel could do —
+          decline — is the board's own affordance now, in the ask below. */}
+      {state.pending?.player === state.selfId &&
+        state.pending.kind !== 'discardForRelease' &&
+        state.pending.kind !== 'defend' && (
+          <PendingPrompt
+            pending={state.pending}
+            hand={you.hand}
+            copy={copy.pending}
+            onResolve={(choice) => actions?.onResolve?.(choice)}
+          />
+        )}
+
+      {/* what the table is waiting for, under the cards it is waiting on.
+          Always mounted, so it can fade OUT as well as in — and `inert` while
+          it says nothing, which keeps the fading-out line out of the
+          accessibility tree rather than guarding the decline: the decline
+          renders only under `unanswered`, and `unanswered` implies the line
+          says something, so there is never a button inside to protect (fix
+          round 1, L4 — the first version of this comment claimed otherwise).
+          Under prefers-reduced-motion the module CSS drops the transition and
+          it simply appears; there is no `play()` here to gate. */}
+      <div
+        className={opening.ask}
+        data-shown={ask != null}
+        data-testid="board-ask"
+        inert={ask == null}
+      >
+        <Typography as="div" base="label-sm" tk="tk-16" className={opening.askLine}>
+          {lastAsk.current}
+        </Typography>
+        {unanswered && (
+          <Button
+            variant="tech"
+            className={opening.askDecline}
+            data-testid="board-decline"
+            onClick={declineAttack}
+          >
+            {copy.pending.decline}
+          </Button>
+        )}
+      </div>
 
       {/* вертикальный рейл у правого края — переключает панели drawer. Слой
           нужен только чтобы вести его появление, не трогая его собственный
@@ -788,6 +1433,8 @@ export default function Board({
       {deal.overlays}
       {beats.overlays}
       {staging.overlay}
+      {defenseStaging.overlay}
+      {previewOverlay}
 
       {/* the pair flyer — a persistent node (I10: position: fixed against the
           viewport, no containing block above it, same as every other flight

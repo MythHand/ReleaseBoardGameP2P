@@ -411,8 +411,8 @@ const MODULES: Module[] = [
       en: 'Reading a card that stands ON THE TABLE — the one at the centre: a 503 out of the deck, an AI effect, somebody else’s attack. The preview shows at ONE fixed place on the right, never at the cursor: a place the player learns, and one that cannot cover the centre where the game happens. Size — the hand’s hover zoom at its largest, plus 15% and minus 10%. Bound to a SLOT rather than to "the card at the centre": Defense Release has five of them and each reads on its own. ONE rule closes it — the pointer moved somewhere that is neither a readable slot nor the preview. Two needed behaviours fall out of that rule by themselves: the card flies to the discard while being read (its slot unmounts under a still cursor, no mouseleave is fired — the preview stays until the hand moves, DELIBERATELY the opposite of the hand’s zoom, which must leave with its card), and the pointer resting on the preview (it stays, or a preview over the discard would flicker). Face-down shows nothing: somebody else’s closed card has no identity in the projection either. The only delay is on LEAVING a slot (90ms): slots stand a few px apart and without it the preview would blink when crossing to the neighbouring card. There is deliberately no blind period — one would stop the centre answering when you move onto another card there.',
     },
     where: {
-      ru: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease',
-      en: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease',
+      ru: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease, Board',
+      en: 'table/CardPreview → CardPlay, AiCards, Error503, DefenseRelease, Board',
     },
     status: 'ok',
   },
@@ -643,10 +643,12 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Защита релиза (полный ход)', en: 'Defending a release (a whole turn)' },
     from: {
-      ru: 'релиз из веера встаёт в центр и НЕ приземляется — по правилам он стоит одной карты, оплата показывается рядом открыто; только после этого релиз садится в свой слот зоны (playToReleaseZone) и открывается окно атак. Атака летит с места соперника в центр (cardBoxIn — прицел по карточной коробке, не по всей сидушке) и ложится под своим наклоном. Ответ: защита накрывает атаку, обе уходят в сброс одним обменом (useDiscardExit, слои сохраняются). Своё судо встаёт в СВОЙ слот со стрелкой и складывается с выбранной защитой в пару через foldIntoPair — без дублей и телепортов: судо со стола передаётся флаеру тем же коммитом, поэтому оно ни на кадр не оказывается на экране дважды. Security Bug не жжёт релиз, а забирает его в зону атакующего — карта морфит в LOD прямо В ПОЛЁТЕ. Rollback возвращает атаку: без судо — в руку атакующего, с судо — в свою через useHandArrival. Промах мимо цели отменяет выложенное.',
-      en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence via foldIntoPair — no duplicates and no teleports: the standing Sudo is handed to the flyer in the same commit, so it is never on screen twice for even a frame. Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandArrival. A press on nothing valid takes a staged play back.",
+      ru: 'релиз из веера встаёт в центр и НЕ приземляется — по правилам он стоит одной карты, оплата показывается рядом открыто; только после этого релиз садится в свой слот зоны (playToReleaseZone) и открывается окно атак. Атака летит с места соперника в центр (cardBoxIn — прицел по карточной коробке, не по всей сидушке) и ложится под своим наклоном. Ответ: защита накрывает атаку, обе уходят в сброс одним обменом (useDiscardExit, слои сохраняются). Своё судо встаёт в СВОЙ слот со стрелкой и складывается с выбранной защитой в пару через foldIntoPair — без дублей и телепортов: судо со стола передаётся флаеру тем же коммитом, поэтому оно ни на кадр не оказывается на экране дважды. Security Bug не жжёт релиз, а забирает его в зону атакующего — карта морфит в LOD прямо В ПОЛЁТЕ. Rollback возвращает атаку: без судо — в руку атакующего, с судо — в свою через useHandArrival. Промах мимо цели отменяет выложенное. То же теперь играется и на живом борде (#101): постановка релиза, оплата из веера и отмена — `_useBoardStaging.ts`, ответ на атаку (плейн или со своим судо) — `_useDefenseStaging.tsx`; что происходит дальше — `features/board-beats/defenseBeat.tsx` (`runCovered` — обмен и возврат Rollback, `runStolen` — переезд релиза в чужую зону с тем самым LOD-морфом в полёте) и `features/board-beats/comboBeat.tsx` (`runRelease`, оплата и постановка релиза — теперь для любого релиза, не только с Code Review). Fix A (#101) правит там же две вещи: свой ПЛЕЙН релиз летит в зону из СТАВОЧНОГО слота, где он и стоял (а не сворачивается из веера, откуда он давно ушёл), и статичный рендер снимается тем же коммитом, что поднимает носителя, — карта не оказывается на экране дважды; атака на борде теперь и ПОКОИТСЯ под своим наклоном, как накрывающая защита, поэтому уход в сброс стартует с той же позы, что была на экране.',
+      en: "a Release pulled from the fan stands at the centre and does NOT land — by the rules it costs one card, and the cost is shown beside it in the open; only then does the Release settle into its zone slot (playToReleaseZone) and the attack window opens. An attack flies from the opponent seat to the centre (cardBoxIn — aimed at the card box, not the whole seat) and lies at its own tilt. The answer: a defence covers the attack and both leave as one exchange (useDiscardExit, layers preserved). The player's own Sudo takes ITS OWN slot with an arrow and folds into a pair with the chosen defence via foldIntoPair — no duplicates and no teleports: the standing Sudo is handed to the flyer in the same commit, so it is never on screen twice for even a frame. Security Bug does not burn the release but takes it into the attacker zone — the card morphs into its LOD reading IN FLIGHT. Rollback sends the attack back: plain — to the attacker hand, under Sudo — to your own via useHandArrival. A press on nothing valid takes a staged play back. The same now also runs on the live board (#101): staging a Release, paying its cost out of the fan and cancelling it — `_useBoardStaging.ts`; answering an attack (plain or with the defender's own Sudo) — `_useDefenseStaging.tsx`; what happens once the engine answers — `features/board-beats/defenseBeat.tsx` (`runCovered` for the exchange and Rollback's return, `runStolen` for the release crossing into another zone with that very in-flight LOD morph) and `features/board-beats/comboBeat.tsx` (`runRelease`, the cost and placement — now for every Release, not only a Code-Review-paired one). Fix A (#101) corrects two things in the same place: the actor's own PLAIN release now flies to the zone out of the STAGE slot where it was actually standing (rather than folding in from a fan it had long left), with the static render let go in the same commit the carrier goes up so the card is never on screen twice; and the board's attack now also RESTS at its own tilt, like the cover already did, so its exit starts from the pose that was on screen.",
     },
     where: 'DefenseRelease',
+    board:
+      'pages/board/[gameId]/_useBoardStaging.ts, pages/board/[gameId]/_useDefenseStaging.tsx, features/board-beats/defenseBeat.tsx, features/board-beats/comboBeat.tsx',
   },
   {
     name: {
@@ -823,18 +825,108 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
-      ru: "Возврат Rollback'ом судо-атаки — на борде для него нет движения",
-      en: 'A Rollback return on a sudo attack has no movement on the board',
+      ru: 'С клавиатуры на борде не отбиться и не оплатить релиз — двери нет вообще',
+      en: 'No keyboard answers an attack or pays for a release — there is no door at all',
     },
     problem: {
-      ru: 'Судо-Rollback банкует только Sudo-половину пары — атакующая карта по правилам возвращается в руку (в чью именно — зависит от `sudoDefence`, docs/animations/backlog.md) без единого `discarded`, и такт это не изобретает: `pairToDiscard` расщепляет в сброс ТОЛЬКО судо-половину, а куда делась атакующая карта, не показывает никак — она просто оказывается в руке. Не ошибка проекции, дыра в хореографии до тех пор, пока #101 не даст обменной хореографии возврата.',
-      en: "A sudo Rollback banks only the Sudo half of the pair — the attack card returns to a hand (whose depends on `sudoDefence`, see docs/animations/backlog.md) with no `discarded` event, and the beat does not invent one: `pairToDiscard` splits ONLY the sudo half into the discard, and the attack card is not shown going anywhere — it simply turns up in the hand. Not a projection bug, a choreography gap until #101 supplies the return's own exchange choreography.",
+      ru: 'До #101 (Fix B) панель `PendingPrompt` рисовала для `defend` список карт настоящими кнопками — единственный не-мышиный ход на борде. Панель снята сознательно: она перекрывала ту самую атаку, о которой спрашивала, и спрашивала второй раз то, на что веер уже отвечает жестом. Веер и без того мышиный целиком — `Hand` рисует карты `interactive={false}`, слоты это `<div>` без `tabIndex` с одним `onMouseDown`, и собственный biome-ignore в `Hand.tsx` говорит прямо: «pointer-only … no keyboard affordance implied». После ревью всей ветки (#101, Fix C) известно, что дыра шире: оплата релиза отвечается тоже ТОЛЬКО мышью — панель для `discardForRelease` снята по той же причине. Именно это сделало блокер того захода блокером: комбо-релиз держал веер в `pointer-events: none`, и цена становилась неоплачиваемой НИКАКИМ вводом. Мышиную половину починил Fix C; клавиатурной двери как не было, так и нет, поэтому у любого такого дедлока по-прежнему нет второго выхода. Закроет один общий ответ для `Hand` (фокусируемые слоты + Enter/пробел + стрелки?), а не костыль под каждый пендинг; возврат списка карт в панель воспроизводит и перекрытие центра, и второго спрашивающего.',
+      en: 'Until #101 (Fix B) the `PendingPrompt` panel drew a `defend` as a list of real buttons — the one non-mouse move on the board. The panel was removed deliberately: it covered the very attack it was asking about, and asked a second time what the fan already answers by gesture. The fan is mouse-only to begin with — `Hand` renders cards `interactive={false}`, its slots are `<div>`s with no `tabIndex` and a single `onMouseDown`, and its own biome-ignore says it outright: "pointer-only … no keyboard affordance implied". Since the whole-branch review (#101, Fix C) the gap is known to be wider: a release’s cost is mouse-only too — the panel is suppressed for `discardForRelease` for the same reason. That is what made that round’s blocker a blocker: a combo release held the fan at `pointer-events: none`, and the cost became unpayable by ANY input. Fix C repaired the mouse half; the keyboard door never existed, so any such deadlock still has no second way out. Closed by one answer for `Hand` as a whole (focusable slots + Enter/Space + arrows?), not a per-pending patch; putting the card list back in the panel reproduces both the occlusion and the second asker.',
     },
     where: {
-      ru: 'frontend: features/board-beats/comboBeat.tsx (runPairOut) + planBeats.ts (pairToDiscard)',
-      en: 'frontend: features/board-beats/comboBeat.tsx (runPairOut) + planBeats.ts (pairToDiscard)',
+      ru: 'ui: table/Hand + frontend: pages/board/[gameId]/_Board.tsx (PendingPrompt), _useBoardStaging.ts (onCostPick)',
+      en: 'ui: table/Hand + frontend: pages/board/[gameId]/_Board.tsx (PendingPrompt), _useBoardStaging.ts (onCostPick)',
     },
     status: 'open',
+  },
+  {
+    what: {
+      ru: 'Ответ движка обгонял свою же защиту в полёте — карта возвращалась в веер на весь такт',
+      en: 'The engine answered before our own defence had landed — the card returned to the fan for the beat',
+    },
+    problem: {
+      ru: 'ЗАКРЫТО в #101, Fix D round 4. `_useDefenseStaging.commitAndFly` шлёт `onResolve` синхронно и только потом везёт карту веер→прикрытие, а ответ `covered` приезжает ВНУТРИ полёта (у хоста движок локальный; клиенту хватит круга короче одного полёта). Тот коммит рендерился с ещё пустым `beats.shadow`, то есть `state === live`: пендинга нет, карты в руке нет — и пассивная догонялка чистила `staged`, считая розыгрыш принятым. Следующий коммит рисовал тень (`base`), где карта снова в руке и прятать её уже нечем, — карта возвращалась в веер и лежала там весь такт рядом с собой же в центре. Второй артефакт того же коммита: такт читал хендофф с пустым `el`, принимал это за реджойн и вёз карту из веера второй раз (закрыто в round 3). Починка: догонялка больше не верит проекции, пока её собственный носитель не отпустил карту (`landed`), и — раз staged теперь доживает до `release()` такта — такт вообще не трогает свою защиту (`!(mine && handoff)`), так что вопрос «успел ли появиться узел» просто не задаётся. Каждый выход обоих полётов отчитывается `setLanded(true)` в `finally`, поэтому веер не может остаться с дыркой, если полёт отменили.',
+      en: 'CLOSED in #101, Fix D round 4. `_useDefenseStaging.commitAndFly` sends `onResolve` synchronously and only then carries the card fan→cover, and the `covered` answer arrives INSIDE that flight (the host’s engine is local; a client needs only a round trip shorter than one flight). That commit rendered with `beats.shadow` still null, so `state === live`: no pending, the card gone from hand — and the passive catch-up cleared `staged`, reading the play as accepted. The next commit drew the shadow (`base`), where the card is back in hand with nothing left to hide it, so the card returned to the fan and lay there for the whole beat beside itself at the centre. The same commit’s second artifact: the beat read a handoff with a null `el`, took it for a rejoin, and flew the card in from the fan a second time (closed in round 3). The fix: the catch-up no longer believes the projection until its own carrier has let go (`landed`), and — since `staged` now survives to the beat’s `release()` — the beat leaves our own defence alone entirely (`!(mine && handoff)`), so the question of whether its node exists yet is never asked. Both flights report `setLanded(true)` from a `finally` on every exit, so a cancelled flight cannot leave the fan with a hole in it.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useDefenseStaging.tsx (catch-up, commitAndFly), _Board.tsx (handoff layout effect), features/board-beats/defenseBeat.tsx (runCovered)',
+      en: 'frontend: pages/board/[gameId]/_useDefenseStaging.tsx (catch-up, commitAndFly), _Board.tsx (handoff layout effect), features/board-beats/defenseBeat.tsx (runCovered)',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
+      ru: 'Такт летит из bounding-box наклонённого слота веера — это I6, только наоборот',
+      en: 'A beat flies from a tilted fan slot’s bounding box — that is I6, backwards',
+    },
+    problem: {
+      ru: '`comboBeat.foldIn` и `defenseBeat.runCovered` берут исходную коробку карты как `rectOf(anchors.handSlotAt(i))` — сырой `getBoundingClientRect()` слота. Слот повёрнут (`slotPlacement` даёт каждому свой угол), так что это коробка ВОКРУГ наклонённой карты, шире и выше её самой: ровно то, от чего предостерегает I6. Соседняя нога той же цепочки уже делает правильно — `anchors.seatBox` кладёт `cardBoxIn(rect, CARD_W)`, и `useHandArrival.boxOf` тоже, со своим объяснением почему. Первый кадр полёта стартует не с той коробки, тем заметнее, чем сильнее отклонён слот. Кандидатов на починку два, и они дают РАЗНЫЕ ответы: `cardBoxIn(slotRect, CARD_W)` (дёшево, но считает от текущего прямоугольника, включая ховер-подъём) или `slotBox(i, total)` из `_useBoardStaging.ts` (честно, от `slotPlacement`, без DOM) — но `total` это длина ВЫРИСОВАННОГО веера, которой у такта нет: он работает против `base`, а веер отфильтрован тем, что стоит на столе (ровно та рассинхронизация, которую Fix D round 2 закрыл на соседнем шве). Выбор между ними — решение о геометрии, которое нечем проверить: jsdom обе ветки не различает.',
+      en: '`comboBeat.foldIn` and `defenseBeat.runCovered` take a card’s source box as `rectOf(anchors.handSlotAt(i))` — a raw `getBoundingClientRect()` of the slot. The slot is rotated (`slotPlacement` gives each its own angle), so that is the box AROUND the tilted card, wider and taller than the card itself: exactly what I6 warns against. The sibling leg of the same chain already does it right — `anchors.seatBox` applies `cardBoxIn(rect, CARD_W)`, and so does `useHandArrival.boxOf`, with its own note on why. The flight’s first frame starts from the wrong box, the more visibly the further the slot is deflected. Two candidate fixes, and they give DIFFERENT answers: `cardBoxIn(slotRect, CARD_W)` (cheap, but reads the current rect, hover lift included) or `slotBox(i, total)` from `_useBoardStaging.ts` (honest, derived from `slotPlacement`, no DOM) — but `total` is the length of the RENDERED fan, which a beat does not have: it runs against `base`, and the fan is filtered by whatever stands on the table (the very divergence Fix D round 2 closed at the neighbouring seam). Choosing between them is a geometry decision nothing here can check: jsdom cannot tell the two apart.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/comboBeat.tsx (foldIn), defenseBeat.tsx (runCovered) + entities/game/board/anchors.ts',
+      en: 'frontend: features/board-beats/comboBeat.tsx (foldIn), defenseBeat.tsx (runCovered) + entities/game/board/anchors.ts',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Клик в веере может начать вторую игру, пока первая ещё в пути',
+      en: 'A fan click can start a second play while the first is still in flight',
+    },
+    problem: {
+      ru: '`onHandPlay` отказывает любому ВЫТЯГИВАНИЮ, пока что-то стоит на столе; у клика такого правила нет. `_useBoardStaging.onCardClick` возвращает `false`, когда стоящая игра — не шаг «выбери партнёра» и не шаг оплаты, и клик уходит в обычный клик-жест, который разыграет любую карту из `state.playable` без цели. А `state.playable` в этот момент ещё старый: проекция отстаёт на круг. Движок вторую игру почти наверняка отклонит, и карта вернётся в веер тихо — но игрок увидит, как карта улетает и прилетает обратно без объяснения. Найдено в Fix D round 2 рядом с off-by-one на том же шве (клик отдавал индекс отрисованного веера в массив всей руки, и с релизом на столе клик по запасной карте переигрывал сам релиз); индекс починен, это независимая вторая половина. Закроет одна строка: `onCardClick` должен ГЛОТАТЬ клик, пока что-то стоит (`return true` вместо `return false`), — то же правило, что у `onHandPlay`, и согласуется с тем, что `stateAt` в этот момент ничего в веере не подсвечивает. Не сделано в Fix D: смена поведения на пути, общем для вытягивания и клика, а проверить её на живом столе нечем.',
+      en: '`onHandPlay` refuses any PULL while something stands on the table; a click has no such rule. `_useBoardStaging.onCardClick` returns `false` when the standing play is neither a partner pick nor a cost step, and the click goes on to the plain click gesture, which plays any card in `state.playable` that needs no target. And `state.playable` is stale at that moment: the projection is a round trip behind. The engine will almost certainly reject the second play and the card returns to the fan silently — but the player watches a card fly out and come back with no explanation. Found in Fix D round 2 beside an off-by-one at the same seam (the click handed a rendered-fan index to the whole-hand array, so with a release standing a click on the spare re-played the release itself); the index is fixed, this is the independent other half. Closed by one line: `onCardClick` should SWALLOW the click while anything is staged (`return true` instead of `return false`) — the same rule `onHandPlay` keeps, and consistent with `stateAt` lighting nothing in the fan at that moment. Not done in Fix D: it changes behaviour on a path shared by pulls and clicks, and there is nothing here to check it on a live table.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useBoardStaging.ts (onCardClick), _useBoardInteractions.ts',
+      en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts (onCardClick), _useBoardInteractions.ts',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Превью веера снова закрывает центр во время оплаты, и нажатие сквозь него отменяет релиз',
+      en: 'The fan’s preview covers the centre again during the cost step, and a press through it cancels the release',
+    },
+    problem: {
+      ru: '#100 увёл веер в `pointer-events: none`, пока пара стоит сложенной в центре: ховер-превью `Hand` поднимается ровно туда и закрывает её. #101 (Fix C) заставил гвард УСТУПАТЬ на шаге оплаты релиза — веер единственный, кто может назвать цену (панель для `discardForRelease` снята, клавиатуры у веера нет), так что инертный веер делал цену неоплачиваемой никаким вводом. Уступка верна, дедлок хуже перекрытия. Вторая половина размена: на всю фазу оплаты превью снова стоит над парой, а у `.zoom` стоит `pointer-events: none` — нажатие в превью проваливается на то, что под ним, не находит `[data-hand-slot]`, и слушатель промаха на корне стола читает его как «передумал» и отменяет релиз. Попытка ПРОЧИТАТЬ карту отменяет розыгрыш. Исключить превью из промаха нельзя, пока оно не цель события; сделать его целью значит отдать ему ховер, который его поднял. Закроет решение в `Hand`: превью, которое не поднимается над занятым центром (проп «где нельзя»), либо флаг на время показа, читаемый слушателем промаха.',
+      en: '#100 put the fan at `pointer-events: none` while a pair stands folded at the centre: `Hand`’s hover preview rises into exactly that space and covers it. #101 (Fix C) made the guard YIELD during a release’s cost step — the fan is the only picker there is (the panel is suppressed for `discardForRelease`, and the fan has no keyboard path), so an inert fan made the cost unpayable by any input. The yield is right; a deadlock is worse than an occlusion. The other half of the trade: for the whole cost step the preview stands over the pair again, and `.zoom` is `pointer-events: none` — a press landing on the preview falls THROUGH to whatever is beneath, matches no `[data-hand-slot]`, and the table-root miss listener reads it as "changed my mind" and cancels the release. Trying to READ a card can undo the play. The preview cannot be exempted while it is not an event target, and making it one hands it the hover that raised it. Closed by a decision in `Hand`: a preview that does not rise over an occupied centre (a "where it must not go" prop), or a flag it raises while shown that the miss listener reads.',
+    },
+    where: {
+      ru: 'ui: table/Hand (zoom) + frontend: pages/board/[gameId]/_Board.tsx (handWrap, cost mousedown)',
+      en: 'ui: table/Hand (zoom) + frontend: pages/board/[gameId]/_Board.tsx (handWrap, cost mousedown)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Граница матча заведена на ключ, который не меняется между матчами',
+      en: 'The match boundary hangs on a key that never changes between matches',
+    },
+    problem: {
+      ru: '`<Board>` не перемонтируется на реванш (`_layout.tsx` не даёт ему `key`), поэтому и `useBeats`, и оба жестовых хука держат сброс на границе матча: стоящая в центре карта, оплаченная цена, стрелка, флаер, припаркованный `useHandArrival`. Сбросы написаны и покрыты тестами, но ключ матч не различает: в хук приходит `intro.gameId` → `session.gameId` → `useLobby.ts`’s `startGame`, где `const id = current.hostId` — peer id хоста, одинаковый для всех матчей одной комнаты. Второй `startGame` даёт тот же ключ, и эффект не срабатывает ни разу — так на этой ветке по состоянию на 2026-08-20. Это свойство ветки, а не закон: параллельно идёт работа над реваншем на месте (#19), где у каждого матча свой id, и там посылка уже неверна; при слиянии граница станет живой сама. Перед тем как опереться на любое из двух утверждений — перечитать `startGame` и то, что доезжает до `intro`. Сегодня латентно (реванша «на месте» нет, вход в матч перемонтирует борд) и опаснее обычного «забыли сбросить» тем, что сброс есть и на ревью читается как закрытый вопрос. Закроет идентификатор, чеканящийся в `startGame` (счётчик матчей или уже существующий `seed`) и уезжающий в payload `GAME_STARTING` рядом с `gameId` — маршрут не трогается, — проброшенный в оба хука И в `useBeats`: у очереди ровно тот же инертный ключ.',
+      en: '`<Board>` is not remounted for a rematch (`_layout.tsx` gives it no `key`), so `useBeats` and both gesture hooks keep a match-boundary reset: a card standing at the centre, a paid cost, the arrow, the flyer, a parked `useHandArrival`. The resets are written and covered by tests, but the key tells no two matches apart: what reaches the hook is `intro.gameId` → `session.gameId` → `useLobby.ts`’s `startGame`, where `const id = current.hostId` — the host’s peer id, identical for every match played in one room. A second `startGame` produces the same key and the effect never fires — on this branch, as of 2026-08-20. That is a property of the branch, not a law: in-place rematch work is in flight (#19) where each match gets an id of its own, so the premise is already false there and the boundary becomes live of its own accord on merge. Re-read `startGame` and what reaches `intro` before leaning on either statement. Latent today (no in-place rematch exists; entering a match remounts the board) and worse than the ordinary "forgot to reset" because the reset IS there and reads as a closed question in review. Closed by an id minted in `startGame` (a match counter, or the dealer `seed` that already exists) carried in the `GAME_STARTING` payload beside `gameId` — the route stays untouched — and threaded into both hooks AND `useBeats`: the queue hangs on the very same inert key.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_Board.tsx (matchKey), _useBoardStaging.ts, _useDefenseStaging.tsx, features/board-beats/useBeats.ts + network/useLobby.ts (startGame)',
+      en: 'frontend: pages/board/[gameId]/_Board.tsx (matchKey), _useBoardStaging.ts, _useDefenseStaging.tsx, features/board-beats/useBeats.ts + network/useLobby.ts (startGame)',
+    },
+    status: 'rework',
+  },
+  {
+    what: {
+      ru: 'Кому Rollback вернул атаку — выводится, а не читается',
+      en: 'Who Rollback returns an attack to — derived, not read',
+    },
+    problem: {
+      ru: '`attacks.ts:245-252` кладёт атакующую карту в руку прямой записью и не шлёт ни одного события — `handTransfer` объявлен в `events.ts:37` и здесь не используется. Такт (`defenseBeat.runCovered`) выводит получателя: защитник, если в этой же резолюции есть `discarded(support-sudo, defenceSpent)`, иначе атакующий. Вывод покрыт тестами (`planBeats.test.ts`, `defenseBeat.test.tsx`), но ломается молча при переименовании причины сброса или втором sudo-способном support в каталоге.',
+      en: '`attacks.ts:245-252` puts the attack card into a hand by a direct write and sends no event for it — `handTransfer` is declared at `events.ts:37` and unused here. The beat (`defenseBeat.runCovered`) derives the recipient: the defender if this same resolution carries a `discarded(support-sudo, defenceSpent)`, else the attacker. The derivation is covered by tests (`planBeats.test.ts`, `defenseBeat.test.tsx`), but breaks silently if the discard reason is renamed or a second sudo-capable support joins the catalogue.',
+    },
+    where: {
+      ru: 'packages/engine: fake/attacks.ts (setHand) + frontend: features/board-beats/planBeats.ts, defenseBeat.tsx',
+      en: 'packages/engine: fake/attacks.ts (setHand) + frontend: features/board-beats/planBeats.ts, defenseBeat.tsx',
+    },
+    status: 'rework',
   },
   {
     what: {
@@ -850,6 +942,66 @@ const ISSUES: Issue[] = [
       en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts (cancel)',
     },
     status: 'open',
+  },
+  {
+    what: {
+      ru: 'Один sync-флаш: тень публикуется всем, кроме того, кто сам отвечает',
+      en: 'One sync flush: the shadow is published to everyone except the peer who answers',
+    },
+    problem: {
+      ru: 'Когда бросок и ответ приезжают ОДНИМ батчем (в звезде — норма для всех, кто не атакующий и не защищающийся), `planBeats` ведёт `openAttack` по ходу разбора, как уже вёл `piles`, и такт `covered` строится. Вторая половина: атака должна быть на экране, пока над ней держат защиту, а `runAttack` снимает флаер сразу после фолда, рассчитывая на статичный рендер центра — которого в таком батче нет (`base` старше батча). Поэтому `runAttack` публикует тень с `pending: defend`. Не публикует, когда отвечать должны МЫ: `options` тут не вывести (движок редактирует их для всех, кроме владельца), а пустой список сказал бы нашему борду «с тебя защита» без единой легальной карты. Безопасность этой ветки — вывод, а не факт: пир, который ответил, обязан был увидеть атаку раньше. Fix D закрыл второй угол — свой собственный бросок: ветка атакующего выходила из такта раньше публикации, и его атака мигала так же; публикация вынесена в общий шаг и зовётся из обеих веток, а поверх любого уже стоящего пендинга теперь отказывает, а не перезаписывает. Остаётся угол защищающегося и выдуманные часы: тень публикуется с `openedAt: 0, deadline: 0`, и `deriveDock` показывает каждому смотрящему кольцо `hold` с `0s` на длину такта. Не класть эти поля вовсе нельзя: `engineContract.test-d.ts` держит union пендингов кита структурно ТОЧНО равным `PendingView` движка, где часы обязательны. Закроет поле/событие, из которого `options` выводится на месте, или отдельная не-`pending` форма «на столе лежит атака», которую центр умеет рисовать, а `answering` и док не читают — она же снимает и `0s`-кольцо.',
+      en: 'When a throw and its answer arrive in ONE batch — the norm in a star for every peer who is neither attacker nor defender — `planBeats` now tracks `openAttack` through the walk, the way it already tracked `piles`, and the `covered` beat is built. The other half: the attack has to be ON SCREEN while the cover is held over it, and `runAttack` drops its carrier right after the fold, counting on the centre’s static render — which such a batch does not have (`base` predates it). So `runAttack` publishes a `pending: defend` shadow. It does not publish when the answer is OURS: `options` cannot be derived here (the engine redacts them for everyone but the owner), and an empty list would tell our own board a defence is owed with no legal card to give it. That branch’s safety is an inference rather than a fact from the events: a peer who answered must have seen the attack earlier. Fix D closed a second corner — our OWN throw: the attacker’s arm left the beat before the publish, so their own attack blinked out the same way; the publish moved into a shared step called from both arms, and it now declines over any pending already standing rather than replacing it. Still open: the defender’s corner, and a fabricated clock — the shadow publishes `openedAt: 0, deadline: 0`, so `deriveDock` shows every watching peer a `hold` ring reading `0s` for the length of the beat. Omitting the two fields is not writable: `engineContract.test-d.ts` holds the kit’s pending union structurally EXACT against the engine’s `PendingView`, where a defend’s clock is required. Closed by a field/event that makes `options` derivable on the spot, or by a separate non-`pending` "an attack is lying on the table" shape the centre can draw and neither `answering` nor the dock reads — which removes the `0s` ring too.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/planBeats.ts (openAttack), comboBeat.tsx (runAttack)',
+      en: 'frontend: features/board-beats/planBeats.ts (openAttack), comboBeat.tsx (runAttack)',
+    },
+    status: 'rework',
+  },
+  {
+    what: {
+      ru: 'Атака на борде прилетает без наклона — его даёт поза покоя',
+      en: 'On the board an attack lands untilted — the rest pose supplies the tilt',
+    },
+    problem: {
+      ru: 'В сцене атака летит `playToCenter` с `rotate: ATTACK_POSE.rot` (480ms) и приземляется уже наклонённой. На борде тот же прилёт делает `comboBeat.foldIn` — `foldIntoPair`, 620ms, только translate+scale: пресет знает позу половины ВНУТРИ пары, но не поворот карты на столе, а один рантаймер обслуживает и одиночную атаку, и пару с судо. Поэтому наклон даёт поза покоя: pending-атака рисуется во внутреннем `.pose` при `restTransform(ATTACK_POSE)` (#101, Fix A) — она же то, ОТ чего стартует выход (`useDiscardExit.pose`), без неё карта дёргалась с 0° на −4° на первом кадре ухода. Покой совпал, движение — нет: в сцене доворот едет по дуге полёта, на борде появляется мгновенно. Закроет `rotate`/`pose` у `foldIntoPair` для карты (не для половины) или отдельный шаг «прилёт на стол в позе» со своей строкой в reference.md.',
+      en: 'In the scene an attack flies `playToCenter` with `rotate: ATTACK_POSE.rot` (480ms) and lands already tilted. On the board the same arrival is `comboBeat.foldIn` — `foldIntoPair`, 620ms, translate+scale only: the preset knows a half’s pose INSIDE a pair, not a card’s rotation on the table, and one runner serves a lone attack and a sudo pair alike. So the tilt comes from the rest pose instead: the pending attack renders in an inner `.pose` at `restTransform(ATTACK_POSE)` (#101, Fix A) — which is also what the exit starts from (`useDiscardExit.pose`), and without it the card popped from 0° to −4° on the exit’s first frame. The rest matches now, the movement does not: in the scene the turn rides the flight arc, on the board it appears instantly. Closed by a `rotate`/`pose` param on `foldIntoPair` for the CARD (not the half), or a step of its own for "landing on the table in a pose", with its row in reference.md.',
+    },
+    where: {
+      ru: 'frontend: features/board-beats/comboBeat.tsx (foldIn), pages/board/[gameId]/_Board.tsx + playground: interactive/DefenseReleaseStory.tsx',
+      en: 'frontend: features/board-beats/comboBeat.tsx (foldIn), pages/board/[gameId]/_Board.tsx + playground: interactive/DefenseReleaseStory.tsx',
+    },
+    status: 'rework',
+  },
+  {
+    what: {
+      ru: 'Фолд карты и судо в пару написан четыре раза, не как модуль',
+      en: 'The card-and-sudo fold into a pair is written four times, not as a module',
+    },
+    problem: {
+      ru: 'Один и тот же ход — измерить обе половины, покрасить входные позы enterPose, nextFrames, затем параллельный foldIntoPair на каждую половину — существует отдельным кодом в DefenseReleaseStory.tsx (mergeIntoPair), comboBeat.tsx (foldIn) и _useDefenseStaging.tsx (onCardClick), все три на флаере с CardPair как content, и ещё раз в _useBoardStaging.ts — тем же ходом, но на персистентном узле вместо флаера (оттого и без вспышки в позе покоя, которую флаерная форма даёт на первый кадр-другой, пока raise дожидается nextFrames). Правка тайминга или порядка кадров в одной копии не долетит до трёх остальных сама.',
+      en: 'The same move — measure both halves, paint their entry poses with enterPose, nextFrames, then a parallel foldIntoPair per half — exists as separate code in DefenseReleaseStory.tsx (mergeIntoPair), comboBeat.tsx (foldIn) and _useDefenseStaging.tsx (onCardClick), all three on a flyer carrying a CardPair as content, and once more in _useBoardStaging.ts — the same move, but on a persistent node instead of a flyer (which is also why it skips the flash of the rest pose the flyer form shows for a frame or two while raise awaits nextFrames). A timing or frame-order fix in one copy will not reach the other three on its own.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useBoardStaging.ts, _useDefenseStaging.tsx, features/board-beats/comboBeat.tsx + playground: interactive/DefenseReleaseStory.tsx',
+      en: 'frontend: pages/board/[gameId]/_useBoardStaging.ts, _useDefenseStaging.tsx, features/board-beats/comboBeat.tsx + playground: interactive/DefenseReleaseStory.tsx',
+    },
+    status: 'rework',
+  },
+  {
+    what: {
+      ru: 'Строка-подсказка под центром стола написана дважды',
+      en: 'The ask line under the centre of the table is written twice',
+    },
+    problem: {
+      ru: 'Всегда смонтированная плашка «чего стол ждёт», проявляющаяся и гаснущая переходом (opacity + сдвиг 132px → 146px за 260ms --ease-out), написана отдельным CSS два раза: .ask в DefenseReleaseStory.module.css (одобренный источник) и .ask в _Board.module.css — борд получил её в #101 (Fix B) вместе с отменой панели на defend. Значения совпадают до пикселя только потому, что вторая копия процитирована с первой. Это переход CSS, а не play(), поэтому словарь animations/ его и не покрывал: там полёты по координатам, а не состояние смонтированного элемента, — модуля под «поверхность, которая проявляется на месте» в проекте нет вовсе. Отдельно разошлось prefers-reduced-motion: у копии борда переход погашен, у копии сцены нет. Закроет либо класс-утилита рядом с токенами, либо (если таких поверхностей наберётся больше одной) маленький шаг в apps/ui со своей строкой в reference.md — но раньше кода стоит решение, считается ли поверхность на месте частью словаря «полётов».',
+      en: 'The always-mounted "what the table is waiting for" line, fading in and out by transition (opacity + a 132px → 146px shift over 260ms --ease-out), is written as separate CSS twice: `.ask` in DefenseReleaseStory.module.css (the approved source) and `.ask` in _Board.module.css — the board got it in #101 (Fix B) along with dropping the panel for a defend. The values match to the pixel only because the second copy was quoted off the first. It is a CSS transition rather than a play(), which is why the animations/ vocabulary never covered it: that vocabulary is flights by coordinates, not the state of a mounted element — there is no module for "a surface that appears in place" at all. prefers-reduced-motion has already diverged too: the board copy kills the transition, the scene copy does not. What closes it is either a utility class beside the tokens or, if more than one such surface turns up, a small step in apps/ui with its own row in reference.md — but ahead of the code sits the decision whether an in-place surface belongs to a vocabulary of flights.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_Board.module.css (.ask) + playground: interactive/DefenseReleaseStory.module.css (.ask)',
+      en: 'frontend: pages/board/[gameId]/_Board.module.css (.ask) + playground: interactive/DefenseReleaseStory.module.css (.ask)',
+    },
+    status: 'rework',
   },
 ]
 

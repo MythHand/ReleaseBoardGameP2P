@@ -1,0 +1,8 @@
+/* The screen is `min-block-size: 100%`, which needs a parent with a definite
+   height to resolve against — the app root only sets `min-block-size: 100vh`.
+   Same reason the board's own wrapper carries this, and `dvh` for the same
+   reason too: mobile browser chrome must not push content out of a viewport it
+   cannot scroll back. */
+.page {
+  min-block-size: 100dvh;
+}

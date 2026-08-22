@@ -5,12 +5,14 @@ import { components, hooks, utils } from '@generouted/react-router/client'
 
 export type Path =
   | `/`
+  | `/board/:gameId`
   | `/board/:gameId/stats`
   | `/help`
   | `/lobby/:lobbyId`
   | `/start`
 
 export type Params = {
+  '/board/:gameId': { gameId: string }
   '/board/:gameId/stats': { gameId: string }
   '/lobby/:lobbyId': { lobbyId: string }
 }

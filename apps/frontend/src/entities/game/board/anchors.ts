@@ -22,7 +22,17 @@ export interface BoardAnchors {
   seats: RefObject<HTMLDivElement | null>
   dock: RefObject<HTMLDivElement | null>
   zone: RefObject<HTMLDivElement | null>
+  /** the attack slot — `centre` IS it, kept under its old name because every
+   *  existing flight already aims there */
   centre: RefObject<HTMLDivElement | null>
+  /** the release standing at the centre, waiting for its cost to be paid */
+  stage: RefObject<HTMLDivElement | null>
+  /** the card paying that cost, held open beside it */
+  cost: RefObject<HTMLDivElement | null>
+  /** the defender's own Sudo, waiting for the defence it will enhance */
+  sudo: RefObject<HTMLDivElement | null>
+  /** the defence lying over the attack */
+  cover: RefObject<HTMLDivElement | null>
   hand: RefObject<HTMLDivElement | null>
   /** the discard's CARD box — what a flight into the heap aims at */
   discardBox: RefObject<HTMLDivElement | null>
@@ -47,6 +57,10 @@ export function useBoardAnchors(): BoardAnchors {
   const dock = useRef<HTMLDivElement>(null)
   const zone = useRef<HTMLDivElement>(null)
   const centre = useRef<HTMLDivElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
+  const cost = useRef<HTMLDivElement>(null)
+  const sudo = useRef<HTMLDivElement>(null)
+  const cover = useRef<HTMLDivElement>(null)
   const hand = useRef<HTMLDivElement>(null)
   const discardBox = useRef<HTMLDivElement>(null)
   const seatEls = useRef<Record<string, HTMLElement | null>>({})
@@ -96,6 +110,10 @@ export function useBoardAnchors(): BoardAnchors {
       dock,
       zone,
       centre,
+      stage,
+      cost,
+      sudo,
+      cover,
       hand,
       discardBox,
       seatOf,

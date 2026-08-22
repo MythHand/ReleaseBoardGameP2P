@@ -11,6 +11,7 @@ import type {
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useComboBeat } from './comboBeat'
 import { useDeckBeat } from './deckBeat'
+import { useDefenseBeat } from './defenseBeat'
 import { useDiscardBeat } from './discardBeat'
 import { useDrawBeat } from './drawBeat'
 import type { BeatPlan } from './planBeats'
@@ -97,8 +98,16 @@ export function useBeats(args: {
   // the start of `attackPlaced`/`releasePlaced` and cleared through its own
   // `release()` when that play turns out to be the local actor's.
   staging?: RefObject<StagedHandoff | null>
+  // The same seam's second fact (#101, Task 11): a stable ref to
+  // `_useBoardStaging.ts`'s own `clearPaidCost`, called once `releasePlaced`'s
+  // own cost leg hands the paid card to the discard exit.
+  clearPaidCost?: RefObject<(() => void) | null>
+  // The same seam's third fact (#101, Fix A): a stable ref to
+  // `_useBoardStaging.ts`'s own `takeStagedRelease`, called once
+  // `releasePlaced` picks the standing release up out of the stage slot.
+  takeStagedRelease?: RefObject<(() => void) | null>
 }): Beats {
-  const { live, events, anchors, enabled, intro, staging } = args
+  const { live, events, anchors, enabled, intro, staging, clearPaidCost, takeStagedRelease } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
   // The same answer as `running`, but ahead of it: `drain()` sets this
@@ -120,7 +129,8 @@ export function useBeats(args: {
   const discards = useDiscardBeat(anchors)
   const draws = useDrawBeat(anchors)
   const decks = useDeckBeat(anchors)
-  const combo = useComboBeat(anchors, staging)
+  const combo = useComboBeat(anchors, staging, clearPaidCost, takeStagedRelease)
+  const defense = useDefenseBeat(anchors, staging)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -172,6 +182,22 @@ export function useBeats(args: {
       if (plan.kind === 'pairToDiscard') {
         return { key: plan.key, base, exclusive: false, run: (ctx) => combo.runPairOut(plan, ctx) }
       }
+      if (plan.kind === 'covered') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          run: (ctx) => defense.runCovered(plan, ctx),
+        }
+      }
+      if (plan.kind === 'stolen') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          run: (ctx) => defense.runStolen(plan, ctx),
+        }
+      }
       return null
     },
     [
@@ -182,6 +208,8 @@ export function useBeats(args: {
       combo.runAttack,
       combo.runRelease,
       combo.runPairOut,
+      defense.runCovered,
+      defense.runStolen,
     ],
   )
 
@@ -271,7 +299,7 @@ export function useBeats(args: {
   // the arm also keeps it before the BATCH effect, which must not read a stale
   // watermark on the one pass where it matters most.)
   const playing = useRef<string | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks` and `combo` are read for the CURRENT render's runners on purpose, not added to the deps below — discardBeat/drawBeat/comboBeat's own `reset` are unmemoized (each depends on `useDiscardExit`'s or `useHandArrival`'s own `reset`, neither wrapped in `useCallback`), so listing any of them would fire this on every render instead of once per match key. `deckBeat`'s `reset` happens to be stable (its one dependency, `useFlyer`'s `drop`, IS memoized) — excluded here too, for one uniform list rather than a one-off exception for the runner that doesn't need it
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks`, `combo` and `defense` are read for the CURRENT render's runners on purpose, not added to the deps below — discardBeat/drawBeat/comboBeat/defenseBeat's own `reset` are unmemoized (each depends on `useDiscardExit`'s or `useHandArrival`'s own `reset`, neither wrapped in `useCallback`), so listing any of them would fire this on every render instead of once per match key. `deckBeat`'s `reset` happens to be stable (its one dependency, `useFlyer`'s `drop`, IS memoized) — excluded here too, for one uniform list rather than a one-off exception for the runner that doesn't need it
   useLayoutEffect(() => {
     const key = intro?.key ?? null
     if (key == null || playing.current === key) return
@@ -292,6 +320,7 @@ export function useBeats(args: {
     draws.reset()
     decks.reset()
     combo.reset()
+    defense.reset()
   }, [intro?.key, live])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
@@ -397,7 +426,13 @@ export function useBeats(args: {
     // own last frame.
     shadow:
       (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ?? null,
-    overlays: [...discards.overlay, ...draws.overlay, ...decks.overlay, ...combo.overlay],
+    overlays: [
+      ...discards.overlay,
+      ...draws.overlay,
+      ...decks.overlay,
+      ...combo.overlay,
+      ...defense.overlay,
+    ],
     exclusive: running?.exclusive ?? false,
     // The fan opens for a card on its way into it — the draw beat is the one
     // that grows it (I8); nothing else does yet.

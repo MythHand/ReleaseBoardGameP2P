@@ -44,11 +44,13 @@ function base(): UseLobby {
     gameId: null,
     gameLink: null,
     gameSync: null,
+    seats: [],
     error: null,
     errorKind: null,
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
     ready: vi.fn(),
+    setWhere: vi.fn(),
     kick: vi.fn(),
     setMaxPlayers: vi.fn(),
     startGame: vi.fn(),
@@ -57,6 +59,7 @@ function base(): UseLobby {
     setSetup: vi.fn(),
     disband: vi.fn(),
     leaveSession: vi.fn(),
+    leaveGame: vi.fn(),
     clearError: vi.fn(),
   }
 }
@@ -122,8 +125,8 @@ function inSession(): UseLobby {
         gitBranch: 'base',
       },
       peers: {
-        h: { id: 'h', name: 'Host', role: 'host', ready: true },
-        p1: { id: 'p1', name: 'Pat', role: 'player', ready: false },
+        h: { id: 'h', name: 'Host', role: 'host', ready: true, where: 'lobby' },
+        p1: { id: 'p1', name: 'Pat', role: 'player', ready: false, where: 'lobby' },
       },
     },
   }
@@ -197,8 +200,8 @@ it('LobbyView renders spectator section when guests present', () => {
         gitBranch: 'base',
       },
       peers: {
-        h: { id: 'h', name: 'Host', role: 'host', ready: true },
-        g1: { id: 'g1', name: 'Gus', role: 'guest', ready: false },
+        h: { id: 'h', name: 'Host', role: 'host', ready: true, where: 'lobby' },
+        g1: { id: 'g1', name: 'Gus', role: 'guest', ready: false, where: 'lobby' },
       },
     },
   }

@@ -55,6 +55,68 @@ it('is a danger reaction while a defence is pending against you', () => {
   expect(d.danger).toBe(true)
 })
 
+const costPending: TablePending = {
+  kind: 'discardForRelease',
+  player: 'you',
+  release: 'release-frontend#0',
+  options: ['c1'],
+}
+
+// #101 (review round 2): a release's own price is one action inside a turn,
+// not a state of the table. The phase has not changed and the turn is still
+// yours, so the dock keeps the turn's own phase, accent and clock — no sixth
+// TurnDockState, and no phase word repeating what the ask on the table says.
+it('keeps the turn its own phase while your release waits to be paid', () => {
+  const clock = { openedAt: 0, deadline: 30_000 }
+  const d = deriveDock(
+    { ...base, turn: 'you', hasDrawn: true, pending: costPending, turnClock: clock },
+    'you',
+    10_000,
+  )
+  expect(d.state).toBe('push')
+  expect(d.danger).toBe(false)
+  // the turn's OWN clock, still running — not a flat ring, and not the
+  // pending's (a `discardForRelease` carries no deadline of its own)
+  expect(d.seconds).toBe(20)
+})
+
+// The other half of the same rule: it is not a state of the table for the
+// people watching either. On your turn they read `waiting`, and staging a
+// release must not flip them to `hold` — that would announce a decision the
+// table is stuck on, when the turn is simply still yours.
+it('leaves everyone else on `waiting` while your release waits to be paid', () => {
+  const d = deriveDock(
+    { ...base, turn: 'p2', hasDrawn: true, pending: { ...costPending, player: 'p2' } },
+    'you',
+    0,
+  )
+  expect(d.state).toBe('waiting')
+  expect(d.activePlayer).toBe('kernel_panic')
+})
+
+// The narrowness of that exclusion, not the exclusion itself: only the one
+// pending the cards on the table answer falls through to the turn. Every OTHER
+// decision owed to you still raises its panel and still reads as a reaction.
+// `handLimit` is the subject on purpose — the `defend` case above already
+// covers itself, so pointing this at `defend` too would be the same call with
+// fewer assertions and would guard nothing. Widen the exclusion past
+// `discardForRelease` and this is what fails.
+it('lets that one decision through only, not every pending of yours', () => {
+  const pending: TablePending = { kind: 'handLimit', player: 'you', excess: 1, options: ['c1'] }
+  const d = deriveDock({ ...base, turn: 'you', hasDrawn: true, pending }, 'you', 0)
+  expect(d.state).toBe('reaction')
+})
+
+// `isCounting` and the ring are one rule (see its own note in dock.ts). The
+// cost is the case where the two would most easily drift: the pending has no
+// deadline, so the old `'deadline' in pending` answer said "not counting"
+// while the ring drawn above is the turn's own live clock.
+it('ticks through the cost, because the ring it mirrors is the turn’s own', () => {
+  const clock = { openedAt: 0, deadline: 30_000 }
+  const state = { ...base, turn: 'you', hasDrawn: true, pending: costPending, turnClock: clock }
+  expect(isCounting(state, 'you')).toBe(true)
+})
+
 it('sweeps the ring across the window’s own span, not a constant', () => {
   const window: TableWindow = {
     player: 'p2',

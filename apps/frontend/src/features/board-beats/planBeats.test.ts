@@ -48,6 +48,9 @@ const released = (over: Partial<Extract<Event, { type: 'released' }>> & { id: nu
 const tookHit = (over: Partial<Extract<Event, { type: 'tookHit' }>> & { id: number }): Event =>
   ({ type: 'tookHit', player: 'p1', ...over }) as Event
 
+const defended = (over: Partial<Extract<Event, { type: 'defended' }>> & { id: number }): Event =>
+  ({ type: 'defended', player: 'p1', card: 'defense-hotfix', effect: 'cancel', ...over }) as Event
+
 // The pending a resolving `defended`/`tookHit` sees on screen: `before` still
 // carries it, because the resolution hasn't happened yet as far as the board
 // shown before this batch is concerned (I1).
@@ -300,11 +303,14 @@ describe('planBeats — the combo pair (#100)', () => {
         attacker: 'p2',
         card: 'attack-bug',
         sudo: true,
+        // carried since #101, Fix C: the runner needs to know whether the
+        // answer is ours before it may publish a shadow saying one is owed
+        target: 'p1',
       },
     ])
   })
 
-  it('a released with codeReview plans a releasePlaced beat; a plain released plans nothing', () => {
+  it('a released with codeReview plans a releasePlaced beat', () => {
     const withReview = planBeats(
       [
         released({
@@ -328,11 +334,75 @@ describe('planBeats — the combo pair (#100)', () => {
         codeReview: 'support-code-review',
       },
     ])
-    const plain = planBeats(
-      [released({ id: 8, player: 'p1', slot: 'frontend', card: 'release-frontend' })],
+  })
+
+  it('plans a beat for a plain release too, and links the cost that paid for it', () => {
+    const plans = planBeats(
+      [
+        discarded(6, { card: 'attack-bug', reason: 'releaseCost' }),
+        released({ id: 7, player: 'p1', slot: 'frontend', card: 'release-frontend' }),
+      ],
       boardBefore(),
     )
-    expect(plain).toEqual([])
+    expect(plans).toEqual([
+      {
+        kind: 'releasePlaced',
+        key: 'release:7',
+        eventId: 7,
+        player: 'p1',
+        slot: 'frontend',
+        card: 'release-frontend',
+        cost: { eventId: 6, card: 'attack-bug' },
+      },
+    ])
+  })
+
+  it('does not let the discard beat fly the cost a second time', () => {
+    // the cost belongs to the release beat: it is shown open at the centre and
+    // leaves from there, not from the hand slot it had already left
+    const plans = planBeats(
+      [
+        discarded(6, { card: 'attack-bug', reason: 'releaseCost' }),
+        released({ id: 7, card: 'release-frontend' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans.some((p) => p.kind === 'discard')).toBe(false)
+  })
+
+  it('plans a release with no cost in easy mode', () => {
+    const plans = planBeats([released({ id: 7, card: 'release-frontend' })], boardBefore())
+    expect(plans).toEqual([
+      {
+        kind: 'releasePlaced',
+        key: 'release:7',
+        eventId: 7,
+        player: 'p1',
+        slot: 'frontend',
+        card: 'release-frontend',
+      },
+    ])
+  })
+
+  it('keeps carrying the Code Review of a comboed release', () => {
+    const plans = planBeats(
+      [released({ id: 7, card: 'release-frontend', codeReview: 'support-code-review' })],
+      boardBefore(),
+    )
+    expect(plans[0]).toMatchObject({ kind: 'releasePlaced', codeReview: 'support-code-review' })
+  })
+
+  it('does not claim an unrelated discard sitting before a release', () => {
+    // only `releaseCost` is the cost. A hand-limit discard that happens to
+    // precede a release is its own gesture and keeps its own beat.
+    const plans = planBeats(
+      [
+        discarded(6, { card: 'attack-bug', reason: 'handLimit' }),
+        released({ id: 7, card: 'release-frontend' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['discard', 'releasePlaced'])
   })
 
   it('resolution discards of the pending pair take the pair exit, others keep the discard beat', () => {
@@ -422,6 +492,240 @@ describe('planBeats — the combo pair (#100)', () => {
         ],
       },
       { kind: 'pairToDiscard', key: 'pairOut:11', aux: { eventId: 11, card: 'support-sudo' } },
+    ])
+  })
+})
+
+describe('planBeats — the answer to an attack (#101)', () => {
+  const pending = () =>
+    boardBefore({
+      pending: defendPending({ scope: 'release', sudo: false }),
+    } as Partial<BoardState>)
+
+  it('plans one exchange for a cancelling defence and claims both spent cards', () => {
+    const plans = planBeats(
+      [
+        defended({ id: 12, player: 'p1', card: 'defense-hotfix', effect: 'cancel' }),
+        discarded(13, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+        discarded(14, { player: 'p1', card: 'defense-hotfix', reason: 'defenceSpent' }),
+      ],
+      pending(),
+    )
+    expect(plans).toHaveLength(1)
+    expect(plans[0]).toMatchObject({
+      kind: 'covered',
+      key: 'covered:12',
+      defender: 'p1',
+      card: 'defense-hotfix',
+      effect: 'cancel',
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      spent: [
+        { eventId: 13, card: 'attack-bug' },
+        { eventId: 14, card: 'defense-hotfix' },
+      ],
+    })
+  })
+
+  // ===== MISSING FIXTURE 3 (#101, Fix C, finding 4) — ONE SYNC FLUSH =====
+  //
+  // Nothing in the suite ever planned a batch in which the attack and its
+  // answer arrive together, so nothing noticed that `before.pending` — the
+  // board as it stood BEFORE the batch — is the only thing this planner asks
+  // about what is standing at the centre. In a star topology that batch is
+  // the NORM rather than an edge case: every peer that is neither attacker
+  // nor defender gets both events in one relayed sync, so the defence
+  // animation this branch exists to build was missing for spectators, which
+  // is most of the table in a 3+ player game. The spent cards simply appeared
+  // in the heap with no cover ever shown.
+  //
+  // The planner already tracks a table fact through a batch this way: `piles`
+  // starts at `before.decks.main` and every `pilesChanged` moves it on. The
+  // attack standing at the centre is the same kind of fact.
+  it('plans the exchange when the attack and its answer arrive in one batch', () => {
+    const plans = planBeats(
+      [
+        attacked({ id: 11, attacker: 'p2', card: 'attack-bug', sudo: false, target: 'p1' }),
+        defended({ id: 12, player: 'p1', card: 'defense-hotfix', effect: 'cancel' }),
+        discarded(13, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+        discarded(14, { player: 'p1', card: 'defense-hotfix', reason: 'defenceSpent' }),
+      ],
+      // no pending on screen yet — this peer is seeing the attack for the
+      // first time in the same flush that resolves it
+      boardBefore(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['attackPlaced', 'covered'])
+    expect(plans[1]).toMatchObject({
+      kind: 'covered',
+      key: 'covered:12',
+      defender: 'p1',
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      attackSudo: false,
+      spent: [
+        { eventId: 13, card: 'attack-bug' },
+        { eventId: 14, card: 'defense-hotfix' },
+      ],
+    })
+  })
+
+  // The same flush, the other resolution: nobody defends. The attack card and
+  // the sudo that backed it leave the CENTRE as a pair — `sourceOf` could
+  // never find them (no hand, no zone), so `pairToDiscard` is the only thing
+  // that flies them, and it too was keyed off `before.pending`.
+  it('splits the pending pair when the attack and the hit arrive in one batch', () => {
+    const plans = planBeats(
+      [
+        attacked({ id: 11, attacker: 'p2', card: 'attack-bug', sudo: true, target: 'p1' }),
+        tookHit({ id: 12, player: 'p1' }),
+        discarded(13, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+        discarded(14, { player: 'p2', card: 'support-sudo', reason: 'attackSpent' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['attackPlaced', 'pairToDiscard'])
+    expect(plans[1]).toMatchObject({
+      kind: 'pairToDiscard',
+      main: { eventId: 13, card: 'attack-bug' },
+      aux: { eventId: 14, card: 'support-sudo' },
+    })
+  })
+
+  it('sends a plain Rollback’s attack back to the attacker and never banks it', () => {
+    const plans = planBeats(
+      [
+        defended({ id: 12, player: 'p1', card: 'defense-rollback', effect: 'return' }),
+        discarded(14, { player: 'p1', card: 'defense-rollback', reason: 'defenceSpent' }),
+      ],
+      pending(),
+    )
+    expect(plans[0]).toMatchObject({
+      kind: 'covered',
+      effect: 'return',
+      returnTo: 'p2',
+      spent: [{ eventId: 14, card: 'defense-rollback' }],
+    })
+  })
+
+  it('keeps a sudo Rollback’s attack for the defender', () => {
+    // `attacks.ts:247` — recipient = sudoDefence ? the defender : the attacker.
+    // The engine records the defender's sudo as a `defenceSpent` discard of
+    // `support-sudo`, and that is the only signal the return changed hands.
+    const plans = planBeats(
+      [
+        defended({ id: 12, player: 'p1', card: 'defense-rollback', effect: 'return' }),
+        discarded(14, { player: 'p1', card: 'defense-rollback', reason: 'defenceSpent' }),
+        discarded(15, { player: 'p1', card: 'support-sudo', reason: 'defenceSpent' }),
+      ],
+      pending(),
+    )
+    expect(plans[0]).toMatchObject({ effect: 'return', returnTo: 'p1', sudo: 'support-sudo' })
+  })
+
+  it('returns a sudo-backed attack to the attacker when the Rollback was plain', () => {
+    const plans = planBeats(
+      [
+        defended({ id: 12, player: 'p1', card: 'defense-rollback', effect: 'return' }),
+        discarded(13, { player: 'p2', card: 'support-sudo', reason: 'attackSpent' }),
+        discarded(14, { player: 'p1', card: 'defense-rollback', reason: 'defenceSpent' }),
+      ],
+      boardBefore({
+        pending: defendPending({ scope: 'release', sudo: true }),
+      } as Partial<BoardState>),
+    )
+    // the sudo in this exchange is the ATTACKER's, so the defender comboed
+    // nothing and the attack goes home to them
+    expect(plans[0]).toMatchObject({ effect: 'return', returnTo: 'p2', sudo: undefined })
+  })
+
+  it('carries the attack’s own sudo so the exchange leaves as the pair it was', () => {
+    const plans = planBeats(
+      [
+        defended({ id: 12, player: 'p1', card: 'defense-hotfix', effect: 'cancel' }),
+        discarded(13, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+        discarded(14, { player: 'p2', card: 'support-sudo', reason: 'attackSpent' }),
+        discarded(15, { player: 'p1', card: 'defense-hotfix', reason: 'defenceSpent' }),
+      ],
+      boardBefore({
+        pending: defendPending({ scope: 'release', sudo: true }),
+      } as Partial<BoardState>),
+    )
+    expect(plans[0]).toMatchObject({ kind: 'covered', attackSudo: true })
+    expect((plans[0] as { spent: unknown[] }).spent).toHaveLength(3)
+  })
+
+  it('plans no movement for the events that are only a change of state', () => {
+    // The window opening and closing, a pass, a hit taken, a monitoring
+    // destroyed — these are things the projection SHOWS (the dock, the ring,
+    // the badges), not things that fly. Planning nothing is the default and is
+    // pinned here on purpose: the alternative is inventing choreography, which
+    // this project sends to the backlog instead.
+    const plans = planBeats(
+      [
+        { id: 30, type: 'windowOpened', player: 'p1', slot: 'frontend', round: 1, deadline: 0 },
+        { id: 31, type: 'passed', player: 'p2' },
+        { id: 32, type: 'unpassed', player: 'p2' },
+        { id: 33, type: 'windowClosed', player: 'p1', slot: 'frontend' },
+      ] as Event[],
+      boardBefore(),
+    )
+    expect(plans).toEqual([])
+  })
+
+  it('leaves the take-hit resolution to the pair exit it already had', () => {
+    const plans = planBeats(
+      [
+        tookHit({ id: 9 }),
+        discarded(10, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+      ],
+      boardBefore({ pending: defendPending({ scope: 'release' }) } as Partial<BoardState>),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['pairToDiscard'])
+  })
+
+  // Security Bug: the release beaten by the attack is not destroyed — it is
+  // TAKEN, into the attacker's own zone. `attacks.test.ts`'s own
+  // "opens a fresh window on the stolen release" pins the real event order —
+  // `tookHit`, `discarded(attackSpent)`, `releaseStolen`, `windowClosed`,
+  // `windowOpened` — so this reaches through the whole batch, not just the
+  // one event, to pin that the pair's own exit still gets its beat AND the
+  // crossing gets its own, one event apiece.
+  it('plans the steal as a crossing between two zones', () => {
+    const plans = planBeats(
+      [
+        tookHit({ id: 9 }),
+        discarded(10, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+        {
+          id: 20,
+          type: 'releaseStolen',
+          from: 'p1',
+          to: 'p2',
+          slot: 'frontend',
+          card: 'release-frontend',
+        } as Event,
+        { id: 21, type: 'windowClosed', player: 'p2', slot: 'frontend' } as Event,
+        {
+          id: 22,
+          type: 'windowOpened',
+          player: 'p2',
+          slot: 'frontend',
+          round: 1,
+          deadline: 0,
+        } as Event,
+      ],
+      boardBefore({ pending: defendPending({ scope: 'release' }) } as Partial<BoardState>),
+    )
+    expect(plans).toEqual([
+      { kind: 'pairToDiscard', key: 'pairOut:10', main: { eventId: 10, card: 'attack-bug' } },
+      {
+        kind: 'stolen',
+        key: 'stolen:20',
+        eventId: 20,
+        from: 'p1',
+        to: 'p2',
+        slot: 'frontend',
+        card: 'release-frontend',
+      },
     ])
   })
 })

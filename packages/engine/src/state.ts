@@ -1,3 +1,5 @@
+import type { Tallies } from './tally'
+
 export type PlayerId = string
 // A catalogue id, e.g. 'release-frontend'. Resolves to art in apps/ui.
 export type CardId = string
@@ -181,5 +183,11 @@ export interface GameState {
   // entry with no rules was filtered out — a caller handing over the full
   // catalogue got a smaller deck with nothing said about it.
   ignored: { cards: CardId[]; setup: string[] }
+  // Per-seat counters for the results screen, folded from this game's own event
+  // log (tally.ts). It lives in GameState rather than beside the keeper for two
+  // reasons: every peer then reads one authority's numbers instead of counting a
+  // log that visibleTo made different for each of them, and a keeper handover
+  // carries it for free because KEEPER_STATE carries GameState.
+  tally: Tallies
   over: { winner: PlayerId; condition: 'release' | 'lastStanding' } | null
 }

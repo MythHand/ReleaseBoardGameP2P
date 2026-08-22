@@ -1,14 +1,15 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
 import { DEFAULT_SETUP, isCounting } from '@release/ui'
-import { Outlet, useNavigate, useParams } from 'react-router'
+import { useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { toBoardOver, toBoardState } from '~/entities/game/board'
 import { seatsFor } from '~/entities/game/seats'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
 import Board from './_Board'
-import styles from './_layout.module.css'
+import styles from './index.module.css'
 
 // What the table shows before the first projection arrives — a beat on a live
 // connection, indefinitely for a spectator, who holds no seat to be projected
@@ -36,6 +37,12 @@ export default function BoardPage() {
   const game = useGame()
   const navigate = useNavigate()
   const { gameId } = useParams()
+
+  // Where this peer is, for everyone else's results table.
+  const { setWhere } = session
+  useEffect(() => {
+    setWhere('game')
+  }, [setWhere])
 
   // The roster is a room fact, not a game fact — the engine's projection has no
   // concept of a spectator — so it comes from the session, split by role exactly
@@ -66,7 +73,13 @@ export default function BoardPage() {
   // back to the playerId there would restore the very defect above, and just as
   // quietly, so a miss yields no id at all and says so where a developer will
   // see it. The complaint is what catches the next id crossing too.
-  const seats = seatsFor(session.state?.peers ?? {})
+  //
+  // Frozen at the deal, not recomputed here: the roster loses a peer the moment
+  // its channel drops, and seats derived from it mid-match renumber whoever is
+  // left — so the overlay would name the wrong peer as winner. The fallback
+  // covers a session with no seating held (a reload).
+  const frozenSeats = session.seats
+  const seats = frozenSeats.length > 0 ? frozenSeats : seatsFor(session.state?.peers ?? {})
   const engineOver = game.view ? toBoardOver(game.view) : null
   const winnerSeat = engineOver ? seats.find((s) => s.playerId === engineOver.winnerId) : undefined
   if (engineOver && !winnerSeat && import.meta.env.DEV) {
@@ -143,7 +156,6 @@ export default function BoardPage() {
           window: t('window', { returnObjects: true }),
         }}
       />
-      <Outlet />
     </div>
   )
 }

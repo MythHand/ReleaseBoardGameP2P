@@ -147,6 +147,18 @@ export interface BoardChromeCopy {
   // заголовок группы управления хоста + подпись поля лимита зрителей
   hostTitle: string
   specLimit: string
+  // The ask under the centre of the table (#101) — one line per step that
+  // waits on a card from the fan and has no panel to speak for it: the
+  // standing release's own price, an attack owed an answer, and (fix round 1)
+  // the defender's own Sudo waiting for the defence it will enhance. That
+  // last one is a separate line and not a phrasing of `askDefend`, because it
+  // is a separate GESTURE: an open attack is answered by pulling a card out,
+  // a waiting Sudo by clicking one — and a pull in that state is refused
+  // outright (`resolveLegal`/`resolveSudo` both bail while anything is
+  // staged), so one line covering both would name a gesture that does nothing.
+  askCost: string
+  askDefend: string
+  askPartner: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
   pauseGame?: string

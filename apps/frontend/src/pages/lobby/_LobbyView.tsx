@@ -13,10 +13,10 @@ import {
   Toggle,
   Typography,
 } from '@release/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
-import { useFollowGameStart, useStartGame } from '~/features/start-game/useStartGame'
+import { useStartGame } from '~/features/start-game/useStartGame'
 import type { PeerInfo } from '~/network/types'
 import { BASE_URL } from '~/shared/config'
 import AppLogo from '~/shared/ui/AppLogo'
@@ -27,15 +27,18 @@ export default function LobbyView() {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const startGame = useStartGame()
-  // Host and guests both leave for the board from here — the host on its own
-  // click, everyone else on the broadcast that click sends.
-  useFollowGameStart()
   const navigate = useNavigate()
   // Rules reuse the app-wide `?modal=` router rather than a second local modal,
   // so the lobby and the start screen open the very same rules content.
   const openModal = useModalRoute()
 
   const [disbandOpen, setDisbandOpen] = useState(false)
+
+  // Where this peer is, for everyone else's results table.
+  const { setWhere } = session
+  useEffect(() => {
+    setWhere('lobby')
+  }, [setWhere])
 
   const state = session.state
   if (!state) return null

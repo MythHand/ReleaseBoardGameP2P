@@ -1,4 +1,4 @@
-import type { Message, PeerInfo } from '../types'
+import type { Message, PeerInfo, Where } from '../types'
 import {
   applyConfig,
   applyPeerJoined,
@@ -24,7 +24,8 @@ function peerList(state: LobbyState): PeerInfo[] {
 
 export function handleJoinRequest(state: LobbyState, fromId: string, name: string): Result {
   const role = assignRole(state)
-  const peer: PeerInfo = { id: fromId, name, role, ready: false }
+  // The lobby is the only place to join from, so a joiner always starts there.
+  const peer: PeerInfo = { id: fromId, name, role, ready: false, where: 'lobby' }
   const next = applyPeerJoined(state, peer)
   return {
     state: next,
@@ -45,7 +46,10 @@ export function handleJoinRequest(state: LobbyState, fromId: string, name: strin
       },
       {
         to: 'broadcast',
-        message: { type: 'PEER_JOINED', payload: { id: fromId, name, role, ready: false } },
+        message: {
+          type: 'PEER_JOINED',
+          payload: { id: fromId, name, role, ready: false, where: 'lobby' },
+        },
       },
     ],
   }
@@ -65,7 +69,43 @@ export function handleReady(state: LobbyState, fromId: string): Result {
         to: 'broadcast',
         message: {
           type: 'PEER_JOINED',
-          payload: { id: updated.id, name: updated.name, role: updated.role, ready: updated.ready },
+          payload: {
+            id: updated.id,
+            name: updated.name,
+            role: updated.role,
+            ready: updated.ready,
+            where: updated.where,
+          },
+        },
+      },
+    ],
+  }
+}
+
+// The presence half of the roster, shaped exactly like handleReady: the host is
+// the only authority for who is where, so a guest's announcement arrives here
+// and leaves as the host's own broadcast.
+export function handleWhereabouts(state: LobbyState, fromId: string, where: Where): Result {
+  const existing = state.peers[fromId]
+  if (!existing) return { state, outgoing: [] }
+  // Every screen announces on mount, so a remount would otherwise cost the
+  // whole table a broadcast that changed nothing.
+  if (existing.where === where) return { state, outgoing: [] }
+  const updated: PeerInfo = { ...existing, where }
+  return {
+    state: applyPeerJoined(state, updated),
+    outgoing: [
+      {
+        to: 'broadcast',
+        message: {
+          type: 'PEER_JOINED',
+          payload: {
+            id: updated.id,
+            name: updated.name,
+            role: updated.role,
+            ready: updated.ready,
+            where: updated.where,
+          },
         },
       },
     ],
@@ -120,7 +160,13 @@ export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
         to: 'broadcast' as const,
         message: {
           type: 'PEER_JOINED' as const,
-          payload: { id: peer.id, name: peer.name, role: peer.role, ready: peer.ready },
+          payload: {
+            id: peer.id,
+            name: peer.name,
+            role: peer.role,
+            ready: peer.ready,
+            where: peer.where,
+          },
         },
       })),
     ],

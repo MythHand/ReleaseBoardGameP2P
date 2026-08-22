@@ -55,6 +55,7 @@
     "subtitle": "Партия завершена",
     "winnerLabel": "победитель",
     "winnerTag": "winner",
+    "selfTag": "вы",
     "colName": "игрок",
     "colLoc": "где сейчас",
     "colAttack": "атак",
@@ -85,7 +86,7 @@
       },
       "attackedInto": {
         "title": "Забагованный",
-        "unit": "карт атаки прилетело"
+        "unit": "атак прилетело"
       }
     }
   },
@@ -292,6 +293,9 @@
     "codeTitle": "код игры",
     "hostTitle": "управление",
     "specLimit": "лимит зрителей",
+    "askCost": "релиз стоит одной карты — кликните карту в руке",
+    "askDefend": "ответьте защитой — вытащите её из руки",
+    "askPartner": "кликните защиту, которую усилит sudo",
     "tabHistory": "история",
     "tabParticipants": "участники",
     "tabRules": "правила",

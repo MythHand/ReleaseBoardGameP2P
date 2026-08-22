@@ -15,8 +15,11 @@ import type { BeatPlan, PileStep } from './planBeats'
 
 const GATHER_MS = 360 // the heap collecting itself into a pile
 const TURN_MS = 460 // the gathered pile turning face down on the deck
-const SPLIT_MS = 520
-const MERGE_MS = 520
+// Named for the piles, not for a pair: `MERGE_MS` in this feature folder is
+// the 620ms card-pair fold (entities/game/board/poses.ts). What moves here is
+// a whole pile absorbing into another, and it is a different duration.
+const PILE_SPLIT_MS = 520
+const PILE_MERGE_MS = 520
 const STEP_HOLD = 360 // the standard short beat between deck steps
 
 const rectOf = (el: Element | null): Rect | null => {
@@ -109,7 +112,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
             const anim = play('absorbToDeck', el, {
               from: rectOf(el),
               to,
-              duration: MERGE_MS,
+              duration: PILE_MERGE_MS,
             })
             if (anim) flights.push(anim.finished)
           }
@@ -119,7 +122,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
               const anim = play('absorbToDeck', heap, {
                 from: rectOf(heap),
                 to,
-                duration: MERGE_MS,
+                duration: PILE_MERGE_MS,
               })
               if (anim) flights.push(anim.finished)
             }
@@ -144,7 +147,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
         await nextFrames()
         const el = a.pileBox(s.at + 1)
         if (el && from) {
-          const anim = play('flyFrom', el, { from, duration: SPLIT_MS })
+          const anim = play('flyFrom', el, { from, duration: PILE_SPLIT_MS })
           if (anim) await anim.finished
         }
         return

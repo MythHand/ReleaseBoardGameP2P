@@ -3,6 +3,7 @@ import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import { shuffle } from '../rng'
 import type { CardUid, GameState, PlayerId } from '../state'
+import { foldTally } from '../tally'
 import { onAttack, onDefend } from './attacks'
 import {
   attackTargets,
@@ -21,7 +22,7 @@ import { onPickFromDiscard } from './discard'
 import { onGiveCard, onRequestCard } from './handAttacks'
 import { pruneEmptyPiles } from './piles'
 import { playableFor } from './project'
-import { onDiscardForRelease, onPlay } from './release'
+import { onCancelRelease, onDiscardForRelease, onPlay } from './release'
 import { fireTrigger, onNeutralize } from './triggers'
 import { onPass, onUnpass, onWindowExpired } from './window'
 
@@ -255,8 +256,18 @@ function onClockStarted(state: GameState, action: Action & { type: 'CLOCK_STARTE
 // a running draw owns the wait. One shared step after every commit, so no
 // handler — present or future — can forget it; a rejected action never reaches
 // here, which is what keeps `reject`'s state-identity contract intact.
+//
+// `discardForRelease` is the one pending that does NOT suspend it (#101). The
+// others hand the wait to somebody else — a defence, a hand limit, a 503 — and
+// the turn is genuinely not being spent. Paying a release's price is the turn's
+// own owner still acting inside their own turn, so pulling that stretch out
+// from under the turn's timer would let a player stop their own clock by
+// staging a release and walking away. The clock is app timing rather than a
+// rule (docs/rules/README.md, "Что правилом НЕ является"), so this is a timing
+// decision and not a rules one.
 function stampTurnClock(state: GameState, at: number): GameState {
-  const idle = !state.over && !state.pending && !state.window && !state.drawing
+  const costPending = state.pending?.kind === 'discardForRelease'
+  const idle = !state.over && (!state.pending || costPending) && !state.window && !state.drawing
   if (!idle) {
     if (state.turn.deadline === undefined && state.turn.openedAt === undefined) return state
     return { ...state, turn: { ...state.turn, openedAt: undefined, deadline: undefined } }
@@ -270,6 +281,8 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
       return onHandLimit(state, action)
     case 'discardForRelease':
       return onDiscardForRelease(state, action)
+    case 'cancelRelease':
+      return onCancelRelease(state, action)
     case 'defend':
       return onDefend(state, action)
     case 'requestCard':
@@ -313,9 +326,14 @@ export function reduce(state: GameState, action: Action): Reduction {
     }
   }
   // A rejected action hands back the identical state object, and must keep
-  // doing so — the clock only moves on a commit.
+  // doing so — the clock only moves on a commit. It also emits nothing worth
+  // counting, so the fold sits below this guard rather than above it.
   if (result.state === state) return result
-  return { state: stampTurnClock(result.state, at), events: result.events }
+  const stamped = stampTurnClock(result.state, at)
+  return {
+    state: { ...stamped, tally: foldTally(stamped.tally, result.events) },
+    events: result.events,
+  }
 }
 
 function dispatch(state: GameState, action: Action): Reduction {
