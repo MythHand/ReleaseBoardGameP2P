@@ -4,6 +4,7 @@ import type { Event } from '../events'
 import { shuffle } from '../rng'
 import { normalizeSetup } from '../setup-contract'
 import type { CardId, CardInstance, GameState, PlayerId, PlayerState } from '../state'
+import { seedTally } from '../tally'
 
 // Trigger cards cannot sit in an opening hand: their effect fires on the draw, so
 // holding one from setup would mean an unfired trigger (rules, Setup §3).
@@ -113,6 +114,7 @@ export function createGame(config: GameConfig): GameState {
     window: null,
     setup: normalized.setup,
     ignored: { cards: dropped, setup: normalized.ignored },
+    tally: seedTally(seating),
     over: null,
   }
 }

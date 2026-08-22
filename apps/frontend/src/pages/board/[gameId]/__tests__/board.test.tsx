@@ -6,7 +6,7 @@ import type { UseLobby } from '~/entities/lobby'
 // The board's own style module — the `.enter` class the opening hides blocks
 // with is reached the same way the ported suite reaches Arrow's classnames.
 import boardStyles from '../_Board.module.css'
-import BoardPage from '../_layout'
+import BoardPage from '../index'
 import StatsPage from '../stats'
 
 // The route now hands the board an opening to play (#89). This suite is about
@@ -33,7 +33,14 @@ function session(peers: Record<string, unknown> = {}): UseLobby {
     status: 'in-lobby',
     roomCode: 'YTG-N2Q',
     isHost: true,
+    // Frozen at the deal (#19): the board resolves the winning seat against
+    // this, not against a roster that a disconnect prunes mid-match. Empty here
+    // takes the page's degraded path, which is seatsFor(peers) — what this
+    // fixture has always exercised.
+    seats: [],
     kick: vi.fn(),
+    setWhere: vi.fn(),
+    leaveGame: vi.fn(),
   } as unknown as UseLobby
 }
 
@@ -41,24 +48,27 @@ beforeEach(() => {
   sessionValue = session()
 })
 
+// Board and stats are sibling routes (#19), matching the real router.ts, not
+// parent/child — the board no longer wraps an `<Outlet />`, so this fixture
+// must not nest `stats` under it either, or it would exercise a route shape
+// the app doesn't have.
 function renderBoard(path = '/board/g1') {
   const router = createMemoryRouter(
     [
-      {
-        path: '/board/:gameId',
-        element: <BoardPage />,
-        children: [{ path: 'stats', element: <StatsPage /> }],
-      },
+      { path: '/board/:gameId', element: <BoardPage /> },
+      { path: '/board/:gameId/stats', element: <StatsPage /> },
     ],
     { initialEntries: [path] },
   )
   return { router, ...render(<RouterProvider router={router} />) }
 }
 
-it('keeps the board mounted and shows stats in its outlet', async () => {
+it('renders the stats route alone, not the board sitting underneath it', async () => {
   renderBoard('/board/g1/stats')
-  expect(await screen.findByTestId('board-page')).toBeTruthy()
   expect(await screen.findByTestId('stats-page')).toBeTruthy()
+  // The regression this route shape fixes: the board used to stay mounted
+  // with stats inside its Outlet, painting a full viewport below the fold.
+  expect(screen.queryByTestId('board-page')).toBeNull()
 })
 
 it('shows a spectator the live table, not a board held hidden', async () => {
@@ -253,6 +263,47 @@ it('shows the winner overlay when the projection says the game is over', async (
   expect(await screen.findByText(/^(3 releases shipped|Собраны 3 релиза)$/i)).toBeTruthy()
   const winnerName = await screen.findByTestId('game-over-winner')
   expect(winnerName.textContent).toBe('Bo')
+})
+
+it('resolves the winner through the seating the match was dealt with', async () => {
+  // Three seats; the middle peer dropped before the game ended, and the roster
+  // was pruned the moment its channel did (network/useLobby.ts onDisconnect).
+  // A seating recomputed here from the survivors would number them p1/p2 and
+  // leave the winning seat p3 resolving to nobody — the overlay would name no
+  // one at the one moment the whole screen is about who won.
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 7,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+      { id: 'p3', name: 'Cid' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const projected = engine.project(state, 'p1')
+  const view = { ...projected, over: { winner: 'p3', condition: 'release' as const } }
+  sessionValue = {
+    ...session({
+      'peer-ann': { id: 'peer-ann', name: 'Ann', role: 'host', ready: true },
+      'peer-cid': { id: 'peer-cid', name: 'Cid', role: 'player', ready: true },
+    }),
+    seats: [
+      { playerId: 'p1', peerId: 'peer-ann', name: 'Ann' },
+      { playerId: 'p2', peerId: 'peer-bo', name: 'Bo' },
+      { playerId: 'p3', peerId: 'peer-cid', name: 'Cid' },
+    ],
+    gameSync: { view, events: [] },
+  } as unknown as UseLobby
+
+  renderBoard()
+
+  await screen.findByText(/^(winner|победитель)$/i)
+  const winnerName = await screen.findByTestId('game-over-winner')
+  expect(winnerName.textContent).toBe('Cid')
 })
 
 it('complains loudly instead of handing the kit a playerId it cannot resolve', async () => {

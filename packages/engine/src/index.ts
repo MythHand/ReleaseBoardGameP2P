@@ -26,6 +26,8 @@ export type {
   ReleaseSlot,
   Setup,
 } from './state'
+export type { PlayerTally, Tallies } from './tally'
+export { emptyTally, foldTally, seedTally } from './tally'
 export type {
   OpponentView,
   PendingView,

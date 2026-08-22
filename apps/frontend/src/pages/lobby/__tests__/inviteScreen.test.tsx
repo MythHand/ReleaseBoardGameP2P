@@ -34,11 +34,13 @@ function base(): UseLobby {
     gameId: null,
     gameLink: null,
     gameSync: null,
+    seats: [],
     error: null,
     errorKind: null,
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
     ready: vi.fn(),
+    setWhere: vi.fn(),
     kick: vi.fn(),
     setMaxPlayers: vi.fn(),
     startGame: vi.fn(),
@@ -47,6 +49,7 @@ function base(): UseLobby {
     setSetup: vi.fn(),
     disband: vi.fn(),
     leaveSession: vi.fn(),
+    leaveGame: vi.fn(),
     clearError: vi.fn(),
   }
 }

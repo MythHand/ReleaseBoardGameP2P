@@ -69,6 +69,9 @@ interface StatsProps {
   // слот переписки, а не её данные: экран даёт ей место у правого края, а чем
   // это место занять — решает консьюмер. Без слота экран прежний, во всю ширину.
   chat?: ReactNode
+  // Leaving the results. Optional: without it the button still renders and does
+  // nothing, which is how the playground shows the screen.
+  onToLobby?: () => void
 }
 
 // Accent of a plate — the whole HUD scheme of the achievement hangs on it:
@@ -191,6 +194,7 @@ export default function Stats({
   onLangChange,
   bgTone = 'neutral',
   chat,
+  onToLobby,
 }: StatsProps) {
   const winner = players.find((p) => p.id === winnerId)
   // «это ты» — один и тот же элемент везде, где экран называет игрока: блок
@@ -269,7 +273,7 @@ export default function Stats({
       </div>
 
       <footer className={styles.foot}>
-        <Button>{copy.toLobby}</Button>
+        <Button onClick={onToLobby}>{copy.toLobby}</Button>
       </footer>
 
       <div className={styles.achievements}>

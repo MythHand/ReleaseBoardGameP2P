@@ -1,6 +1,7 @@
 import type { Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
+import { emptyTally, type PlayerTally } from '../tally'
 import type { PlayerView, ReleasedView, ReleaseView } from '../view'
 import { pendingView } from './attacks'
 import { attackTargets, drawObligationMet } from './core'
@@ -146,6 +147,18 @@ export function combosFor(state: GameState, viewerId: PlayerId): Record<CardUid,
   return result
 }
 
+// The results are for the results screen. `cherryPick` counts a pull whose
+// second card is deliberately private (fake/discard.ts), so a live counter
+// would leak mid-match exactly what visibleTo was written to hide. Keyed by
+// seating so the map is complete and ordered however the table is seated, and
+// copied so a viewer cannot reach back into GameState through it.
+function tallyView(state: GameState): Record<PlayerId, PlayerTally> | null {
+  if (!state.over) return null
+  const out: Record<PlayerId, PlayerTally> = {}
+  for (const id of state.seating) out[id] = { ...(state.tally[id] ?? emptyTally()) }
+  return out
+}
+
 export function project(state: GameState, viewerId: PlayerId): PlayerView {
   const me = state.players[viewerId]
   const top = state.decks.discard[state.decks.discard.length - 1]
@@ -197,5 +210,6 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
     pending: pendingView(state, viewerId),
     setup: { ...state.setup },
     over: state.over && { ...state.over },
+    tally: tallyView(state),
   }
 }

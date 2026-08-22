@@ -469,6 +469,78 @@ export function describeEngine(
       })
     })
 
+    describe('tally', () => {
+      it('seeds a counter for every seat, all at zero', () => {
+        const engine = make()
+        const state = engine.createGame(configFor(options, 4242))
+        expect(Object.keys(state.tally).sort()).toEqual([...state.seating].sort())
+        for (const id of state.seating) {
+          expect(Object.values(state.tally[id]).every((n) => n === 0)).toBe(true)
+        }
+      })
+
+      it('never lets a counter go backwards', () => {
+        // The one invariant that holds for every metric under every rules
+        // change: these are occurrence counts, so a reduction may add to them
+        // and may leave them alone, but may never subtract.
+        const engine = make()
+        let state = engine.createGame(configFor(options, 4242))
+        for (let n = 0; n < 400; n += 1) {
+          const r = engine.reduce(state, fuzzAction(state, 5, n))
+          for (const id of state.seating) {
+            const before = state.tally[id]
+            const after = r.state.tally[id]
+            for (const key of Object.keys(before) as (keyof typeof before)[]) {
+              expect(after[key]).toBeGreaterThanOrEqual(before[key])
+            }
+          }
+          state = r.state
+        }
+      })
+
+      it('counts every attack that was logged, and no others', () => {
+        // The tally is a fold over the log, so the log is what it must agree
+        // with. `attacked` is public and never redacted, which makes it the one
+        // metric a conformance suite can recount from the outside.
+        const engine = make()
+        let state = engine.createGame(configFor(options, 4242))
+        const thrown: Record<string, number> = {}
+        for (let n = 0; n < 400; n += 1) {
+          const r = engine.reduce(state, fuzzAction(state, 5, n))
+          for (const e of r.events) {
+            if (e.type === 'attacked') thrown[e.attacker] = (thrown[e.attacker] ?? 0) + 1
+          }
+          state = r.state
+        }
+        for (const id of state.seating) {
+          expect(state.tally[id].attack).toBe(thrown[id] ?? 0)
+        }
+        // Otherwise the assertion above is vacuous: nobody ever attacked.
+        expect(Object.keys(thrown).length).toBeGreaterThan(0)
+      })
+
+      it('shows the tally to a viewer only once the match is over', () => {
+        const engine = make()
+        let state = engine.createGame(configFor(options, 3))
+        let sawOpen = false
+        for (let n = 0; n < 2200; n += 1) {
+          const view = engine.project(state, state.seating[0])
+          if (state.over) {
+            expect(view.tally).not.toBeNull()
+            expect(Object.keys(view.tally ?? {}).sort()).toEqual([...state.seating].sort())
+          } else {
+            expect(view.tally).toBeNull()
+            sawOpen = true
+          }
+          state = engine.reduce(state, fuzzAction(state, 3, n)).state
+        }
+        expect(sawOpen).toBe(true)
+        // Seed 3 reaches gameOver around step 1821 (see 'ends exactly once'),
+        // so the non-null half above is genuinely exercised.
+        expect(state.over).not.toBeNull()
+      })
+    })
+
     describe('totality', () => {
       it('never throws across a long fuzz stream', () => {
         const engine = make()

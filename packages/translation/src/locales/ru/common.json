@@ -55,6 +55,7 @@
     "subtitle": "Партия завершена",
     "winnerLabel": "победитель",
     "winnerTag": "winner",
+    "selfTag": "вы",
     "colName": "игрок",
     "colLoc": "где сейчас",
     "colAttack": "атак",
@@ -85,7 +86,7 @@
       },
       "attackedInto": {
         "title": "Забагованный",
-        "unit": "карт атаки прилетело"
+        "unit": "атак прилетело"
       }
     }
   },

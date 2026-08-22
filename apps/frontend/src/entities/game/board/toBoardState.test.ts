@@ -25,6 +25,7 @@ const view: PlayerView = {
   pending: null,
   setup: {},
   over: null,
+  tally: null,
 }
 
 // Only the event types these tests exercise — HistoryLabels requires the full

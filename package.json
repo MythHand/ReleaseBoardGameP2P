@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @release/web dev",
-    "dev:p2p": "concurrently -n web,peer -c green,blue \"VITE_PEER_HOST=localhost VITE_PEER_PORT=9000 VITE_PEER_PATH=/ pnpm --filter @release/web dev\" \"pnpm --filter @release/peerserver dev\"",
+    "dev:p2p": "concurrently -n web,peer -c green,blue \"VITE_PEER_HOST=localhost VITE_PEER_PORT=9000 VITE_PEER_PATH=/ pnpm --filter @release/web dev\" \"PORT=9000 pnpm --filter @release/peerserver dev\"",
     "dev:playground": "pnpm --filter @release/playground dev",
     "dev:all": "concurrently -n web,playground -c green,magenta \"pnpm dev\" \"pnpm dev:playground\"",
     "build": "pnpm -r build",

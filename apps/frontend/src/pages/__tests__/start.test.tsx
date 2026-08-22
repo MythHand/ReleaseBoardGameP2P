@@ -39,7 +39,7 @@ it('shows an interactive continue session button when session is active', () => 
       hostId: 'h',
       maxPlayers: 4,
       setup: {},
-      peers: { h: { id: 'h', name: 'Host', role: 'host', ready: true } },
+      peers: { h: { id: 'h', name: 'Host', role: 'host', ready: true, where: 'lobby' } },
     },
   } as Pick<UseLobby, 'status' | 'state'>
   render(
