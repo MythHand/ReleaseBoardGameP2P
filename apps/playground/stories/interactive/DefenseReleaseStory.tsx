@@ -2,9 +2,7 @@ import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  enterPose,
   type Leaving,
-  nextFrames,
   play,
   restTransform,
   type Scatter,
@@ -12,15 +10,15 @@ import {
   useDiscardExit,
   useFlyer,
   useHandArrival,
+  usePairFold,
   wait,
 } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import Arrow, { useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO, cardBoxIn } from '@/primitives/Card'
-import CardPair, { PAIR_AUX_POSE } from '@/primitives/CardPair'
+import CardPair from '@/primitives/CardPair'
 import Pile from '@/primitives/Pile'
-import Typography from '@/primitives/Typography'
 import { useCardPreview } from '@/table/CardPreview'
 import Hand from '@/table/Hand'
 import { CARD_W, slotPlacement } from '@/table/Hand/fan'
@@ -28,6 +26,8 @@ import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
+import AskLine from '@/table/TableCentre/AskLine'
+import { centrePlaceStyle } from '@/table/TableCentre/centre'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
@@ -195,6 +195,9 @@ export default function DefenseReleaseStory() {
   // table pose, and morphs into its at-a-glance reading mid-flight — so what rides
   // in the node is this scene's own element; the carrier holds the node.
   const { overlay: flyerOverlay, raise, patch, drop, elOf } = useFlyer()
+  // two cards becoming one pair — the shared step. The defence and the Sudo
+  // already standing on the table fold together, each from where it really is.
+  const { overlay: pairOverlay, fold: foldPair, release: releasePair } = usePairFold()
   // reading a card that stands at the centre — the shared block from the kit.
   // Five slots here (the release, its cost, the attack, the defender's sudo, the
   // cover), and each of them reads on its own.
@@ -473,42 +476,26 @@ export default function DefenseReleaseStory() {
   // exactly where its real card is on screen and travels to its place in the
   // pair. Nothing is hidden and nothing is re-created — the Sudo the player put
   // on the table is the same element that ends up tucked under the defence.
+  //
+  // The move itself is the shared step (`usePairFold`): it was written here
+  // first, and then three more times on the board. What stays the scene's is
+  // WHEN it happens and what the pair rests at — the step owns the geometry.
   const mergeIntoPair = async (defCard: CardType, fromRect: Rect | DOMRect, sudoCard: CardType) => {
     const box = coverRef.current?.getBoundingClientRect()
     const sudoBox = sudoRef.current?.getBoundingClientRect()
     if (!box || !sudoBox) return
-    const enterMain = enterPose(fromRect, box)
-    const enterAux = enterPose(sudoBox, box)
-    // the standing Sudo is handed over to the flyer in the SAME commit, so it is
+    // the standing Sudo is handed over to the pair in the SAME commit, so it is
     // never on screen twice and never off screen either
     setDefSudo(null)
-    const [el] = await raise([
-      {
-        key: 'fly',
-        at: { left: box.left, top: box.top, width: box.width, height: box.height },
-        content: faceOf(defCard, sudoCard),
-        pose: restTransform(COVER_POSE),
-      },
-    ])
-    const mainEl = el?.querySelector<HTMLElement>('[data-main]')
-    const auxEl = el?.querySelector<HTMLElement>('[data-aux]')
-    if (!mainEl || !auxEl) return
-    // painted at their entry poses first, so neither half flashes in its final
-    // place before the fold starts
-    mainEl.style.transform = enterMain
-    auxEl.style.transform = enterAux
-    await nextFrames()
-    const a1 = play('foldIntoPair', mainEl, { from: fromRect, box, dur: MERGE_MS })
-    // …to exactly CardPair's own resting pose for an aux, so handing the pair to
-    // the static slot afterwards changes nothing on screen
-    const a2 = play('foldIntoPair', auxEl, {
-      from: sudoBox,
+    await foldPair({
+      main: defCard,
+      aux: sudoCard,
+      mainFrom: fromRect,
+      auxFrom: sudoBox,
       box,
-      pose: PAIR_AUX_POSE,
+      pose: restTransform(COVER_POSE),
       dur: MERGE_MS,
-      snap: true,
     })
-    await Promise.all([a1?.finished, a2?.finished])
   }
 
   // a defence covers the attack at the centre: both leave for the discard and
@@ -531,7 +518,10 @@ export default function DefenseReleaseStory() {
     }
     setCover(item.card)
     setCoverAux(mySudo)
+    // the resting render has taken over — both carriers can go (whichever of the
+    // two brought the card here; the other call is a no-op)
     drop('fly')
+    releasePair()
     await wait(SHOW_HOLD)
 
     // I1 — measure both while they are still on the table, then let them go
@@ -859,16 +849,31 @@ export default function DefenseReleaseStory() {
         {/* the played Release waits here for its cost, which is shown beside it.
             The ask sits with the cards, not only in the dev bar — a release parked
             at the centre with no explanation reads as a stuck play. */}
-        <div className={styles.stageSlot} ref={stageRef} {...slotProps(staged)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('release', 'stage')}
+          ref={stageRef}
+          {...slotProps(staged)}
+        >
           {staged && <Card card={staged} interactive={false} width="100%" />}
         </div>
-        <div className={styles.costSlot} ref={costRef} {...slotProps(cost)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('release', 'cost')}
+          ref={costRef}
+          {...slotProps(cost)}
+        >
           {cost && <Card card={cost} interactive={false} width="100%" />}
         </div>
 
         {/* the attack stands at the CENTRE, open to the whole table — one card, or
             one pair when a sudo backs it (a sudo-enhanced attack is one play) */}
-        <div className={styles.centerSlot} ref={centerRef} {...slotProps(incoming)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('defence', 'centre')}
+          ref={centerRef}
+          {...slotProps(incoming)}
+        >
           {incoming && (
             <div className={styles.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
               {incomingSudo && SUDO_CARD ? (
@@ -882,7 +887,12 @@ export default function DefenseReleaseStory() {
 
         {/* the defender's own Sudo waits in its OWN place until a defence is
             chosen for it — the arrow says what it is aimed at */}
-        <div className={styles.sudoSlot} ref={sudoRef} {...slotProps(defSudo)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('defence', 'sudo')}
+          ref={sudoRef}
+          {...slotProps(defSudo)}
+        >
           {defSudo && !cover && (
             <div className={styles.pose} style={{ transform: restTransform(SUDO_POSE) }}>
               <Card card={defSudo} interactive={false} width="100%" />
@@ -891,7 +901,12 @@ export default function DefenseReleaseStory() {
         </div>
 
         {/* the defence covering the attack — offset and tilted the other way */}
-        <div className={styles.coverSlot} ref={coverRef} {...slotProps(cover)}>
+        <div
+          className={styles.slot}
+          style={centrePlaceStyle('defence', 'cover')}
+          ref={coverRef}
+          {...slotProps(cover)}
+        >
           {cover && (
             <div className={styles.pose} style={{ transform: restTransform(COVER_POSE) }}>
               {coverAux ? (
@@ -904,15 +919,15 @@ export default function DefenseReleaseStory() {
         </div>
         {previewOverlay}
 
-        {/* stays mounted so it can fade out as well as in */}
-        <div className={styles.ask} data-shown={phase === 'cost'} aria-hidden={phase !== 'cost'}>
-          <Typography base="label-sm" tk="tk-16">
-            {pick(lang, {
-              ru: 'релиз стоит одной карты — вытащи любую из руки',
-              en: 'a release costs one card — pull any of them out of the hand',
-            })}
-          </Typography>
-        </div>
+        {/* what the table is waiting for — the shared line from the kit, which
+            hangs off the centre's own height and stays mounted so it can fade
+            out as well as in */}
+        <AskLine shown={phase === 'cost'}>
+          {pick(lang, {
+            ru: 'релиз стоит одной карты — вытащи любую из руки',
+            en: 'a release costs one card — pull any of them out of the hand',
+          })}
+        </AskLine>
 
         {/* discard — right of centre; cards lie scattered (a tossed heap) */}
         <div className={styles.discard}>
@@ -987,8 +1002,10 @@ export default function DefenseReleaseStory() {
         {/* the travelling card — the shared carrier */}
         {flyerOverlay}
 
-        {/* the shared steps' own overlays: a card settling into the fan (Rollback
-            under Sudo), and the cards leaving the table for the discard */}
+        {/* the shared steps' own overlays: two cards folding into a pair, a card
+            settling into the fan (Rollback under Sudo), and the cards leaving
+            the table for the discard */}
+        {pairOverlay}
         {insertOverlay}
         {discardOverlay}
       </div>

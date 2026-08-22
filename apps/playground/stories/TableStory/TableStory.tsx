@@ -79,6 +79,8 @@ export default function TableStory() {
   const [kicked, setKicked] = useState<Set<string>>(() => new Set())
   const [paused, setPaused] = useState(false)
   const [parallax, setParallax] = useState(true)
+  // host switch: the action clocks for the whole table
+  const [timers, setTimers] = useState(true)
   const [ready, setReady] = useState<Set<string>>(() => new Set())
   // Anchor for the reaction demo states' sweep, reset each time either is
   // (re-)selected so switching back into it restarts the countdown. Keyed on
@@ -187,6 +189,15 @@ export default function TableStory() {
     ru: 'таймер хода замрёт у всех игроков',
     en: 'freezes the turn timer for everyone',
   })
+  const timersLabel = pick(lang, { ru: 'таймеры на действие', en: 'action timers' })
+  const timersHint = pick(lang, {
+    ru: 'ограничивают время на ход и на ответ',
+    en: 'limit the time for a turn and for an answer',
+  })
+  // ВКЛ / ВЫКЛ, as the parallax toggle above: this switch has a state the host
+  // needs to read off the control itself, not a name it already has in its label
+  const timersOn = pick(lang, { ru: 'Вкл', en: 'On' })
+  const timersOff = pick(lang, { ru: 'Выкл', en: 'Off' })
   const generalTitle = pick(lang, { ru: 'общие', en: 'general' })
   // одно слово в обоих состояниях: включённость несёт сам тумблер цветом,
   // а кнопка называет действие
@@ -259,6 +270,8 @@ export default function TableStory() {
             onLangChange: setLang,
             parallax,
             onParallaxChange: setParallax,
+            timers,
+            onTimersChange: setTimers,
             paused,
             onPauseChange: togglePause,
             pausePlayers,
@@ -280,6 +293,10 @@ export default function TableStory() {
               pauseOn,
               pauseOff,
               pauseHint,
+              timers: timersLabel,
+              timersOn,
+              timersOff,
+              timersHint,
             },
             modes: pick(lang, { ru: ruCommon.gameModes, en: enCommon.gameModes }),
             rules: pick(lang, { ru: ruCommon.rulesBlock, en: enCommon.rulesBlock }),

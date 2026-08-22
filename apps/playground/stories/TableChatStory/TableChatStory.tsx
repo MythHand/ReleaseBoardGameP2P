@@ -132,6 +132,8 @@ export default function TableChatStory() {
       ]
     })
   const [parallax, setParallax] = useState(true)
+  // host switch: the action clocks for the whole table
+  const [timers, setTimers] = useState(true)
   const [chatToasts, setChatToasts] = useState(true)
   const [ready, setReady] = useState<Set<string>>(() => new Set())
   // Anchor for the reaction demo states' sweep, reset each time either is
@@ -249,6 +251,14 @@ export default function TableChatStory() {
     ru: 'таймер хода замрёт у всех игроков',
     en: 'freezes the turn timer for everyone',
   })
+  // Таймеры на действие — переключатель хоста: динамика против простоев.
+  const timersLabel = pick(lang, { ru: 'таймеры на действие', en: 'action timers' })
+  const timersOn = pick(lang, { ru: 'Вкл', en: 'On' })
+  const timersOff = pick(lang, { ru: 'Выкл', en: 'Off' })
+  const timersHint = pick(lang, {
+    ru: 'ограничивают время на ход и на ответ',
+    en: 'limit the time for a turn and for an answer',
+  })
   const generalTitle = pick(lang, { ru: 'общие', en: 'general' })
   // одно слово в обоих состояниях: включённость несёт сам тумблер цветом,
   // а кнопка называет действие
@@ -326,6 +336,8 @@ export default function TableChatStory() {
             onParallaxChange: setParallax,
             chatToasts,
             onChatToastsChange: setChatToasts,
+            timers,
+            onTimersChange: setTimers,
             paused,
             onPauseChange: togglePause,
             pausePlayers,
@@ -347,6 +359,10 @@ export default function TableChatStory() {
               chatToastsOn,
               chatToastsOff,
               chatToastsHint,
+              timers: timersLabel,
+              timersOn,
+              timersOff,
+              timersHint,
               pauseGame: pauseLabel,
               pauseOn,
               pauseOff,

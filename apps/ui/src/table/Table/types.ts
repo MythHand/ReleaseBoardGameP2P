@@ -93,6 +93,13 @@ export interface TableRoom {
   // предпочтение показа, а не факт комнаты: живёт у этого игрока и никуда не
   // уезжает. Без обработчика поле в настройках не рисуется, а тосты идут.
   chatToasts?: boolean
+  // Action clocks for the whole table — a host switch. On (the default) the
+  // dock counts every deadline down; off, every ring that could have carried a
+  // clock is simply full, with no number. The engine keeps its deadlines either
+  // way: this is what the table SHOWS, and a host who turns it off is choosing
+  // a table without the pressure, not a table with different rules.
+  timers?: boolean
+  onTimersChange?: (on: boolean) => void
   onChatToastsChange?: (on: boolean) => void
   paused?: boolean
   onPauseChange?: (on: boolean) => void
@@ -129,6 +136,11 @@ export interface TableChromeCopy {
   pauseOn?: string
   pauseOff?: string
   pauseHint?: string
+  // host-only: the action clocks, on or off for the whole table
+  timers?: string
+  timersOn?: string
+  timersOff?: string
+  timersHint?: string
   // поле параллакса карт (опционально — как и пауза, рендерится только вместе
   // со своим обработчиком): подпись поля, состояние тумблера и пояснение
   parallax?: string

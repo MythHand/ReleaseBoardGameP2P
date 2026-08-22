@@ -1,38 +1,44 @@
 # Rules ambiguities — open questions
 
-**TODO: three of these are unanswered.**
+**All eleven are answered.** The last three came back from the rules owner on 22.08.2026 and are
+recorded in the spec — see below.
 
 This file asked eleven questions. [`docs/rules/`](../rules/) — the written spec [#91](https://github.com/MythHand/ReleaseBoardGameP2P/pull/91) landed — answered eight of them, and those are recorded below with where the answer lives rather than deleted, so nobody re-asks them. Two of the eight have since been **superseded** by a refinement from the rules owner — see below.
 
-Three are still open, and one is a divergence noted for the record.
+The remaining three were answered on 22.08.2026 and their answers now live in the spec; one
+divergence is noted for the record.
 
 **The live pool is the [comment on #92](https://github.com/MythHand/ReleaseBoardGameP2P/pull/92#issuecomment-5277857784)**, asked fresh rather than as this list with parts crossed out. This file stays as the record of what was asked and what came back.
 
 Each open question carries a recommendation. **"Agree with the recommendation" is a full answer**, and so is **"keep current behaviour"** — the point is that the engine stops deciding by accident.
 
-## Still open
+## Answered by the rules owner (22.08.2026)
 
-- [ ] **1. Can DDoS be answered by a defence card?**
+The three that were open. Each answer is now in the spec; the wording here is the owner's.
 
-  [`resolution.md` §2](../rules/resolution.md) gives the attack → defence chain and what each answer takes, and [§5](../rules/resolution.md) makes DDoS "отдельная ветка" — no fresh-release restriction, stopped by neither Code Review nor Monitoring. Neither says whether a Cancel or a Unicorn can answer one.
+- [x] **1. Can DDoS be answered by a defence card?** — **No.** DDoS cannot be answered at all: it
+  resolves the moment it is played and neither a Cancel nor a Unicorn stops it. The attack → defence
+  chain of §2 does not apply to it, wholly rather than partly.
+  → [`resolution.md` §5](../rules/resolution.md). Engine: already correct.
 
-  Today DDoS resolves the instant it is played and nobody may answer it ([`release.ts`](../../packages/engine/src/fake/release.ts)).
+- [x] **2. Is a failed Security Bug request public?** — **Yes, hit and miss alike.** Like any attack
+  card, Security Bug is played to the CENTRE of the table — that is the demonstration that it was
+  played, and while the attacker is choosing it simply lies there for everyone. Once the choice is
+  made the table sees openly which card was asked for, and sees the card handed over in the open. On
+  a miss the others must likewise see which card was asked for and not received. This mirrors the
+  physical table, where the action cannot be hidden.
+  → [`cards.md`, Security Bug](../rules/cards.md). Engine: already broadcasts the miss.
+  **Not built yet:** the playground has no beat for the miss — the requested card shown and not
+  handed over. Recorded in [`docs/animations/backlog.md`](../animations/backlog.md); the owner is
+  deliberately not building that animation now.
 
-  **Recommendation: keep it unanswerable.** DDoS does not destroy — it returns a release to hand and freezes it — so it is the mildest attack in the game, and the open-worded defences are the scarcest cards. Letting them cancel it spends the game's best answers on its smallest threat.
-
-- [ ] **2. Is a failed Security Bug request public?**
-
-  [`cards.md`](../rules/cards.md) says what happens — "нет — не происходит ничего, а карта атаки сбрасывается" — but not whether the table is told. The engine broadcasts the miss to everyone ([`handAttacks.ts`](../../packages/engine/src/fake/handAttacks.ts)).
-
-  **Recommendation: keep it public.** A private miss turns the card into a probe you can repeat until it lands, and the table loses the read on who was caught holding what.
-
-- [ ] **3. Does a release placed by an AI Release event use up the one-release-per-turn allowance?**
-
-  [`modes.md`](../rules/modes.md) defines Base as "не более одного релиза за ход". An `ai-release-*` release is placed by an event rather than played from hand, and the axis does not say which of those it counts.
-
-  The engine says it is free — `releasesPlayed` rises only when a player ships one themselves ([`release.ts`](../../packages/engine/src/fake/release.ts)).
-
-  **Recommendation: keep it free.** The allowance limits what a player chooses to do; an AI event is something done to them, and charging for it would make a lucky draw cost a turn's play.
+- [x] **3. Does an AI Release use up the one-release-per-turn allowance?** — **No.** The allowance
+  counts only releases played FROM THE HAND. The event deck is about luck, not about a player's
+  choice: counting it would distort the randomness itself (release cards would have to be excluded
+  from the draw) and would catch an unintentional "double release" — you ship your own, then draw a
+  card and an AI Release comes after it. Nothing blocks that, even if the randomness deals them in a
+  row.
+  → [`modes.md`, the release axis](../rules/modes.md). Engine: already free.
 
 ## Answered by the spec
 

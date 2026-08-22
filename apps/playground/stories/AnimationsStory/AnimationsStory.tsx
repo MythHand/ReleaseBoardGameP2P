@@ -113,8 +113,8 @@ const SPECS: Spec[] = [
     group: 'Розыгрыш',
     desc: { ru: 'Карта в слот зоны релиза.', en: 'A card into a release-zone slot.' },
     detail: {
-      ru: 'move · 480ms · snap-кривая (лёгкое пружинистое приземление)',
-      en: 'move · 480ms · snap curve (a light springy landing)',
+      ru: 'move · 480ms · кривая LAND (приземление карты: путь виден, доезд мягкий)',
+      en: 'move · 480ms · the LAND curve (a card landing: the travel is seen, the arrival is soft)',
     },
     kind: 'travel',
     from: { label: { ru: 'рука', en: 'hand' }, visual: 'hand' },
@@ -140,8 +140,21 @@ const SPECS: Spec[] = [
       en: 'Two cards fold into a pair: each half travels to its pose inside it.',
     },
     detail: {
-      ru: 'вызывается по разу на половину · 620ms · основная → рамка (ease), вспомогательная → PAIR_AUX_POSE (snap) · пара НИКУДА не летит, двигаются только внутренние узлы · первый кадр красится enterPose(from, box), иначе половины мигнут в конечной позе',
-      en: 'called once per half · 620ms · the main one → the frame (ease), the aux → PAIR_AUX_POSE (snap) · the pair does NOT fly anywhere, only the inner nodes move · the first frame is painted with enterPose(from, box), else the halves flash in their final pose',
+      ru: 'вызывается по разу на половину · 620ms · основная → рамка (ease), вспомогательная → PAIR_AUX_POSE (LAND) · пара НИКУДА не летит, двигаются только внутренние узлы · первый кадр красится enterPose(from, box), иначе половины мигнут в конечной позе',
+      en: 'called once per half · 620ms · the main one → the frame (ease), the aux → PAIR_AUX_POSE (LAND) · the pair does NOT fly anywhere, only the inner nodes move · the first frame is painted with enterPose(from, box), else the halves flash in their final pose',
+    },
+    kind: 'fold',
+  },
+  {
+    name: 'landInPose',
+    group: 'Розыгрыш',
+    desc: {
+      ru: 'Карта прилетает на стол и садится сразу в свою позу — наклон едет вместе с ней.',
+      en: 'A card arrives on the table and lands already in its pose — the tilt travels with it.',
+    },
+    detail: {
+      ru: 'FLIP-форма (карта уже на месте, летит её вход) · 480ms · ease, по флагу snap — кривая LAND · та же математика, что у foldIntoPair, но pose — поза САМОЙ карты на столе, а не половины внутри пары · I11: разложенное системой ложится ровно, пришедшее из руки игрока — наклонённым',
+      en: 'FLIP form (the card is already in place; its entry is what moves) · 480ms · ease, the LAND curve on the snap flag · the same math as foldIntoPair, but `pose` is the pose of the CARD on the table rather than of a half inside a pair · I11: what the system deals lies square, what came from a hand lies tilted',
     },
     kind: 'fold',
   },
@@ -254,8 +267,8 @@ const SPECS: Spec[] = [
       en: 'A small element appears in a reserved slot.',
     },
     detail: {
-      ru: 'opacity 0→1 + scale 0.9→1 · 260ms · snap · слот держит размер, соседи не сдвигаются',
-      en: 'opacity 0→1 + scale 0.9→1 · 260ms · snap · the slot keeps its size, neighbours do not shift',
+      ru: 'opacity 0→1 + scale 0.9→1 · 260ms · кривая SNAP (появление на месте, не полёт) · слот держит размер, соседи не сдвигаются',
+      en: 'opacity 0→1 + scale 0.9→1 · 260ms · the SNAP curve (appearing in place, not a flight) · the slot keeps its size, neighbours do not shift',
     },
     kind: 'badge',
   },

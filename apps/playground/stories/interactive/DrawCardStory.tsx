@@ -19,6 +19,7 @@ import Hand from '@/table/Hand'
 import type { HandItem } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
+import { centrePlaceStyle } from '@/table/TableCentre/centre'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
@@ -398,7 +399,7 @@ export default function DrawCardStory() {
         </div>
 
         {/* table center — draw staging; Error 503 stays here (for everyone) */}
-        <div className={styles.center} ref={centerRef}>
+        <div className={styles.center} style={centrePlaceStyle('reveal', 'centre')} ref={centerRef}>
           {centerCard && centerCard.id !== AI_TRIGGER && (
             <Card card={centerCard} interactive={false} width="100%" />
           )}
@@ -407,6 +408,7 @@ export default function DrawCardStory() {
         {/* AI trigger (cause) — left of the center, normal size */}
         <div
           className={styles.causeSlot}
+          style={centrePlaceStyle('ai', 'cause')}
           ref={causeRef}
           aria-hidden={centerCard?.id !== AI_TRIGGER}
         >
@@ -416,7 +418,12 @@ export default function DrawCardStory() {
         </div>
 
         {/* AI effect (main) — at the center, larger */}
-        <div className={styles.effectSlot} ref={effectRef} aria-hidden={!aiCard}>
+        <div
+          className={styles.effectSlot}
+          style={centrePlaceStyle('ai', 'effect')}
+          ref={effectRef}
+          aria-hidden={!aiCard}
+        >
           {aiCard && <Card card={aiCard} interactive={false} width="100%" />}
         </div>
 

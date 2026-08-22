@@ -1,0 +1,95 @@
+/* The centre of the table has nothing of its own to show — it IS the places
+   cards land in. So the page draws those places: a bounded stage standing in for
+   the table, and every slot of a situation framed on it. */
+
+/* the control row above the stage — the switch between situations */
+.bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.stage {
+  position: relative;
+  inline-size: 100%;
+
+  /* tall enough for a real card box at the widest place (200px × 1.4 = 280) plus
+     air above and below, so no situation is drawn cropped */
+  min-block-size: 380px;
+  overflow: hidden;
+  background:
+    linear-gradient(var(--white-03), var(--white-03)),
+    repeating-linear-gradient(
+        0deg,
+        var(--white-04) 0 1px,
+        transparent 1px 28px
+      ),
+    repeating-linear-gradient(90deg, var(--white-04) 0 1px, transparent 1px 28px);
+  border: 1px solid var(--white-08);
+  border-radius: 10px;
+}
+
+/* the table's own middle, so an offset of 0 is visibly the middle rather than
+   something the reader has to take on trust */
+.axis {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 50%;
+  border-inline-start: 1px dashed var(--white-08);
+}
+
+/* a place, framed. Dashed because it is a place and not a card: nothing is
+   standing here, and a solid box would read as an empty card. */
+.slot {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--white-30);
+  border-radius: 8px;
+}
+
+/* the one the situation is really about — the card everything else answers */
+.slotLead {
+  border-color: color-mix(in srgb, var(--turn-accent) 55%, transparent);
+}
+
+.name {
+  color: var(--white-65);
+  text-align: center;
+}
+
+.geom {
+  color: var(--white-35);
+}
+
+/* the tilt the card will wear here — the one line on the frame that is about
+   meaning rather than measurement (I11) */
+.pose {
+  margin-block-start: 2px;
+  color: color-mix(in srgb, var(--turn-accent) 70%, transparent);
+}
+
+/* the values, as a table — the page is also where the numbers are read */
+.values {
+  inline-size: 100%;
+  font-size: 12.5px;
+  border-collapse: collapse;
+}
+
+.values th {
+  padding: 8px 12px;
+  color: var(--white-50);
+  text-align: start;
+  border-block-end: 1px solid var(--white-14);
+}
+
+.values td {
+  padding: 9px 12px;
+  border-block-end: 1px solid var(--white-07);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  color: var(--fg);
+}

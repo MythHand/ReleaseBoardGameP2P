@@ -17,7 +17,7 @@
 /* idle: кнопка старта по центру */
 .startSlot {
   position: absolute;
-  inset-block-start: 46%;
+  inset-block-start: 42%;
   inset-inline: 0;
   display: flex;
   justify-content: center;
@@ -67,7 +67,7 @@
 
 .miss {
   position: absolute;
-  inset-block-start: 46%;
+  inset-block-start: 42%;
   inset-inline: 0;
   z-index: 45;
   font-family: var(--font-mono);

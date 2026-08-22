@@ -10,13 +10,22 @@ export interface DockView {
   seconds?: number
   progress: number
   activePlayer?: string
+  // 'attack' only: this seat has already passed on the open window, so the key
+  // is lit and pressing it takes the pass back.
+  passed?: boolean
+  // 'attack' / 'exposed': the window's passes as a count — dots, not names.
+  passes?: { total: number; lit: number }
 }
+
+// What a ring shows with the clocks switched off: full, and no number. See
+// `deriveDock`'s `timers` for why full rather than empty.
+const FULL_RING = { progress: 1 } as const
 
 // Both ends of a deadline span, so the ring's sweep is exact rather than
 // assumed — no WINDOW_MS constant exists on purpose (a hardcoded duration
 // would make a visible countdown wrong the moment the engine's timings
 // change). Either bound missing (an untimed pending) reads as a flat ring.
-function clock(
+function countdown(
   openedAt: number | undefined,
   deadline: number | undefined,
   now: number,
@@ -34,18 +43,40 @@ function clock(
 // different rule than the one the ring is drawn from will freeze the
 // countdown for whatever state the two disagree about; there is one rule and
 // this is it — each branch mirrors the matching `deriveDock` branch below.
-export function isCounting(state: TableState, selfId: string): boolean {
+export function isCounting(state: TableState, selfId: string, timers = true): boolean {
+  // The table's clocks switched off by the host: every ring that could have
+  // counted is simply full, so there is nothing anywhere to tick.
+  if (!timers) return false
   // A release's own price is not a state of the table (#101) — see `deriveDock`
   // below. It is one action inside a turn, so it falls through to the turn's
   // own clock rather than answering here, exactly as the ring it mirrors does.
   if (state.pending && state.pending.kind !== 'discardForRelease') {
-    return 'deadline' in state.pending
+    // Only your OWN decision counts down here — waiting on somebody else's is a
+    // flat ring, so there is nothing for a consumer to tick. Mirrors the two
+    // pending branches in `deriveDock` below.
+    return state.pending.player === selfId && 'deadline' in state.pending
   }
   // Mirrors the window branch below exactly: the window's OWNER gets the hold
   // ring with a live clock whoever they are — elimination only silences a
   // would-be responder, whose branch is the guarded one.
   if (state.window) return state.window.player === selfId || !state.you.eliminated
   return state.turn === selfId && state.turnClock != null
+}
+
+// How the open window's passes stand, as two numbers: one dot per seat that may
+// attack, lit for each pass. Responders are every living seat except the one
+// whose release is under the window — the same rule the engine closes the window
+// early by, so the row fills up exactly as the window runs out. Clamped, because
+// a `passed` entry for a seat that has since been eliminated would otherwise
+// light a dot that no longer has a seat behind it.
+function passesOf(state: TableState, target: string): { total: number; lit: number } {
+  const seats = [
+    { id: state.selfId, eliminated: state.you.eliminated },
+    ...state.opponents.map((o) => ({ id: o.id, eliminated: o.eliminated })),
+  ]
+  const total = seats.filter((s) => s.id !== target && !s.eliminated).length
+  const passed = state.window?.passed.length ?? 0
+  return { total, lit: Math.min(passed, total) }
 }
 
 // `now` is supplied by the caller — the kit never reads the clock itself.
@@ -55,10 +86,22 @@ export function isCounting(state: TableState, selfId: string): boolean {
 // RIGHT NOW. Every branch below that shows no key exists because the engine
 // rejects everything the dock could offer there — a live-looking key whose
 // clicks vanish in silent rejections is exactly the defect this table ended.
-export function deriveDock(state: TableState, selfId: string, now: number): DockView {
+export function deriveDock(
+  state: TableState,
+  selfId: string,
+  now: number,
+  // The host's switch for the whole table. Off, every ring that could have
+  // carried a clock reads FULL and numberless — not empty, which is what a
+  // finished countdown looks like, and not zero, which is what an expired one
+  // looks like. A full ring says "all the time there is", and that is exactly
+  // what a table without clocks gives you. The engine's deadlines are untouched;
+  // this is what the dock shows.
+  timers = true,
+): DockView {
   const yours = state.turn === selfId
   const activePlayer = state.opponents.find((o) => o.id === state.turn)?.name
   const pending = state.pending
+  const clock = timers ? countdown : () => FULL_RING
 
   // `discardForRelease` is excluded from BOTH pending branches below (#101).
   // A release's own price is one action inside a turn, not a state of the
@@ -91,14 +134,24 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
 
   // Someone else's pending blocks every action of yours — DRAW, PLAY, PUSH,
   // even PASS all reject while any decision is open — so the dock holds and
-  // names whose decision the table is waiting on, with the live clock when
-  // that decision carries one (a defend does; the rest read as a flat ring).
+  // names whose decision the table is waiting on.
+  //
+  // Their clock is NOT shown, deliberately: a watcher sees whose move it is and
+  // an empty ring, never somebody else's countdown ticking at them. It is not
+  // their time to spend, and a number they cannot act on only twitches while
+  // they wait (designer's call). The whole span of "how long is left" belongs to
+  // the seat that owes the decision, and that seat reads it in the branch above.
+  //
+  // This is also what ends the `0s` ring for good: a beat that has to publish a
+  // stand-in pending so an attack keeps standing on screen (`docs/animations/
+  // backlog.md`) can carry no clock worth reading, and every peer it reaches is
+  // by definition not its owner — so they land here, where there is no clock to
+  // misread in the first place.
   if (pending && pending.kind !== 'discardForRelease') {
-    const timed = 'deadline' in pending ? pending : undefined
     return {
       state: 'hold',
       danger: false,
-      ...clock(timed?.openedAt, timed?.deadline, now),
+      progress: 0,
       activePlayer: state.opponents.find((o) => o.id === pending.player)?.name,
     }
   }
@@ -107,17 +160,38 @@ export function deriveDock(state: TableState, selfId: string, now: number): Dock
     const { openedAt, deadline } = state.window
     // Your own release under the window: nothing here is yours to press — you
     // cannot attack it, pass on it, or end the turn under it — so the window's
-    // countdown IS the content. No activePlayer: it is your own turn, and the
-    // caption slot says what the wait is about instead.
+    // countdown IS the content, and it is your own clock to read: the time
+    // opponents have to hit you. Its own phase rather than a shade of `hold`,
+    // which is for waiting on somebody else's decision; this is waiting on the
+    // table. No activePlayer: it is still your turn.
     if (state.window.player === selfId) {
-      return { state: 'hold', danger: false, ...clock(openedAt, deadline, now) }
+      return {
+        state: 'exposed',
+        danger: false,
+        ...clock(openedAt, deadline, now),
+        passes: passesOf(state, selfId),
+      }
     }
+    // Somebody else's fresh release is open to me — the offensive half of a
+    // window, and its own phase rather than a shade of `reaction`: answering an
+    // attack and being free to make one are opposite situations, and the dock
+    // is read at a glance.
+    //
     // Every living responder may PASS (and UNPASS), holding attack cards or
     // not — the "everyone passed, close early" rule is only reachable when the
     // card-less can concur too. Gating this on canAttackWith is what used to
     // make every window run its full clock.
     if (!state.you.eliminated) {
-      return { state: 'reaction', danger: false, ...clock(openedAt, deadline, now), activePlayer }
+      return {
+        state: 'attack',
+        danger: false,
+        ...clock(openedAt, deadline, now),
+        activePlayer,
+        // A pass is about this moment, not the window: it can be taken back
+        // while the window stands, and it never bars a later attack.
+        passed: state.window.passed.includes(selfId),
+        passes: passesOf(state, state.window.player),
+      }
     }
   }
 

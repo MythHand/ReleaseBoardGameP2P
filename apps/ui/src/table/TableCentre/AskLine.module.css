@@ -1,0 +1,47 @@
+/* The line that says what the table is waiting for. It hangs UNDER the centre,
+   so its anchor is the centre's own height (--centre-top, from CENTRE_TOP) and
+   the two offsets below are the whole motion: it rises 14px as it appears.
+
+   Always mounted, so it can fade OUT as well as in — an ask that disappears on
+   the frame the phase ends reads as a glitch, not as an answer. */
+.ask {
+  position: absolute;
+  inset-block-start: var(--centre-top);
+  inset-inline-start: 50%;
+  z-index: 12;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-block: 10px;
+  padding-inline: 18px;
+  color: var(--fg);
+  text-align: center;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  border: 1px solid var(--white-20);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px var(--black-45);
+  opacity: 0;
+  transform: translate(-50%, 132px);
+  transition:
+    opacity 260ms var(--ease-out),
+    transform 260ms var(--ease-out);
+}
+
+.ask[data-shown="true"] {
+  opacity: 1;
+  transform: translate(-50%, 146px);
+}
+
+/* it carries controls sometimes (a refusal beside the ask) — those ARE for the
+   pointer, even though the plate itself is not */
+.ask > * {
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ask {
+    transform: translate(-50%, 146px);
+    transition: none;
+  }
+}

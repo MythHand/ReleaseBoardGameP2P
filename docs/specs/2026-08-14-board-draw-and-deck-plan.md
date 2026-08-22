@@ -1,5 +1,19 @@
 # Draw and deck animations on the board — Implementation Plan
 
+> **Изменилось после этой волны (сверено 22.08.2026).** Документ описывает состояние на момент своей
+> задачи и не переписывается задним числом — здесь только то, что с тех пор стало иначе:
+> - **Ширины стопки по числу колод больше нет.** Рампа 150 / 120 / 100 удалена: значение одно —
+>   `PILE_WIDTH = 150`. Она не была утверждена ни одной сценой, а страница `Piles` рисует одиночные
+>   стопки. Запись об этом из `docs/animations/backlog.md` удалена вместе с рампой.
+> - **У холда вскрытого триггера появился источник.** Владелец правил назвал сцену-пример: `AI cards`,
+>   `TABLE_HOLD = 2600` (у Галлюцинации вдвое дольше). `REVEAL_HOLD = 900` на борде — чужое число, и
+>   заменить его на перенесённое из сцены осталось правкой борда.
+> - **Запись «`drawBeat` меряет якоря без `nextFrames`» перестала быть латентной.** Она держалась на
+>   посылке «стопка исчезает только через Git Branch/Merge, а их с борда не сыграть». Посылка неверна:
+>   правила описывают исчезновение стопки при обычном доборе, а на последней сброс становится новой
+>   колодой добора (`docs/rules/resolution.md` §8). Значит пакет «добор + исчезновение стопки» —
+>   обычный ход, и добор в нём пропадает молча уже сейчас.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The board plays the two Wave 1 playground scenes — a card being drawn, and the deck being rebuilt, split or merged — from engine events instead of from a demo button.

@@ -14,12 +14,20 @@ the code wins — fix this file.
 
 | Name | Value | Used by |
 |---|---|---|
-| `EASE` | `cubic-bezier(0.4, 0, 0.2, 1)` | every preset except the three below |
-| `SNAP` | `cubic-bezier(0.2, 0.9, 0.1, 1)` | `playToReleaseZone` (snap landing), `popIn`, `foldIntoPair` when called with `snap` (the half that tucks under) |
+| `EASE` | `cubic-bezier(0.4, 0, 0.2, 1)` | every preset except the four below |
+| `LAND` | `cubic-bezier(0.34, 0.8, 0.2, 1)` | a CARD landing on its place: `playToReleaseZone`, and `foldIntoPair` / `landInPose` when called with `snap` |
+| `SNAP` | `cubic-bezier(0.2, 0.9, 0.1, 1)` | a small element APPEARING in its slot: `popIn` / `popOut` (the dock's «добор» badge, the toasts) |
 | per-keyframe | `ease-out` → `ease-in` | `confettiFly` only — the throw accelerates out, the arc falls back in, so the easing lives on the keyframes and not on the animation |
 
-`EASE` is the same curve as the `--ease-soft` CSS token. There is no CSS token for `SNAP`: it exists
-only in the registry, so a CSS transition cannot reproduce a snap landing.
+**`LAND` and `SNAP` are the same idea at two scales, and that is why there are two.** `SNAP` puts
+almost the whole distance in the first fifth of the time — over 200–260ms that reads as "it is
+there", which is right for something that has no path to show. A card DOES have a path across the
+table, and on 480–620ms the same curve read as a throw rather than as a flight with a landing (the
+release into its zone, the sudo tucking under a defence). `LAND` keeps the soft arrival and lets the
+travel be seen.
+
+`EASE` is the same curve as the `--ease-soft` CSS token. There is no CSS token for `LAND` or `SNAP`:
+they exist only in the registry, so a CSS transition cannot reproduce either landing.
 
 ---
 
@@ -39,7 +47,7 @@ The words that flow into a preset as `params`.
 | `faceDown` | boolean | `flipCard` direction (the `Card` auto-plays `flipCard` when this prop changes) |
 | `box` | `Rect` | `foldIntoPair`: the frame of the pair — where the halves fold INTO |
 | `pose` | string (transform) | `foldIntoPair`: the resting pose of this half inside the pair. Empty for the main one (it IS the frame); `PAIR_AUX_POSE` for the aux |
-| `snap` | boolean | `foldIntoPair`: land with the snap curve instead of ease (the half that tucks under) |
+| `snap` | boolean | `foldIntoPair` / `landInPose`: land on the `LAND` curve instead of `EASE` (the half that tucks under; a card settling on the table) |
 | `amp` | number (px) | `shake`: the swing of the first jolt. 7 by default — sized for an input field; a whole fan takes ~9 |
 | `shape` | `'settle' \| 'spring'` | `shake`: the CHARACTER, a key of `SHAKE_SHAPES` (§3) |
 | `peak` | number (px) | `confettiFly`: the height of the arc at its top (frame 0.42) |

@@ -4,6 +4,7 @@ import { CardLangProvider } from '@/cards/cardLang'
 import AnimationAuditStory from '../stories/AnimationAuditStory'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
+import AskLineBlock from '../stories/blocks/AskLineBlock'
 import ChatBlock from '../stories/blocks/ChatBlock'
 import ConfirmActionBlock from '../stories/blocks/ConfirmActionBlock'
 import GameOverBlock from '../stories/blocks/GameOverBlock'
@@ -20,6 +21,7 @@ import ReconnectBlock from '../stories/blocks/ReconnectBlock'
 import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
 import RulesBlock from '../stories/blocks/RulesBlock'
 import SeatBlock from '../stories/blocks/SeatBlock'
+import TableCentreBlock from '../stories/blocks/TableCentreBlock'
 import ToastBlock from '../stories/blocks/ToastBlock'
 import TurnDockBlock from '../stories/blocks/TurnDockBlock'
 import CardParallaxStory from '../stories/CardParallaxStory'
@@ -234,6 +236,8 @@ const groups: Group[] = [
       },
       { id: 'block-seat', title: 'Seat', render: () => <SeatBlock /> },
       { id: 'block-release-zone', title: 'Release zone', render: () => <ReleaseZoneBlock /> },
+      { id: 'block-table-centre', title: 'Table centre', render: () => <TableCentreBlock /> },
+      { id: 'block-ask-line', title: 'Ask line', render: () => <AskLineBlock /> },
       { id: 'block-turn-dock', title: 'Turn dock', render: () => <TurnDockBlock /> },
       { id: 'block-pause-game', title: 'Pause game', render: () => <PauseGameBlock /> },
       { id: 'block-confirm-action', title: 'Confirm action', render: () => <ConfirmActionBlock /> },

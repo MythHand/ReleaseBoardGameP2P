@@ -1,5 +1,11 @@
 # Arrow Targeting and Combo Pair Implementation Plan
 
+> **Изменилось после этой волны (сверено 22.08.2026).** Документ описывает состояние на момент своей
+> задачи и не переписывается задним числом — здесь только то, что с тех пор стало иначе:
+> - **Складывание пары стало шагом словаря — `usePairFold`** (`apps/ui/src/animations/`), со строкой в
+>   `reference.md` и карточкой модуля на странице аудита. Обе плейграундные сцены переведены на него;
+>   копии борда заменяются вызовом, а не переписыванием.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Bring the arrow aim gesture (#99) and the combo pair scene (#100) from the playground to the real board, driven by engine legality and engine events.

@@ -112,16 +112,8 @@
   inline-size: 100%;
 }
 
-/* the source travelling from the fan to the centre belongs to the shared carrier
-   (useFlyer); the .flyer below is NOT a flyer — it is the merge stage the pair is
-   assembled on, mounted for the whole scene */
+/* both cards in the air belong to shared steps: the source travels from the fan
+   to the centre on the carrier (useFlyer), and the pair is assembled and carried
+   by usePairFold — neither has a node of its own here */
 
 /* летящая карта (overlay) */
-.flyer {
-  position: fixed;
-  inset-block-start: 0;
-  inset-inline-start: 0;
-  z-index: var(--z-flight);
-  pointer-events: none;
-  opacity: 0;
-}

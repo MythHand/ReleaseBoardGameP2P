@@ -31,6 +31,12 @@ splitting a pair — lives inside the step and is described there, once.
 
 ## Playing a card — hand/opponent → center → discard
 
+> **What the centre IS** (rules owner, 22.08.2026): nothing at rest. It is an ACTIVE area — the place
+> cards are played through — not a place anything is fixed in. At the start of any player's turn it
+> is empty, because everything played has gone where it belongs. A Monitoring lands at the centre
+> FIRST and only then travels to its slot in the release zone; the closest thing to a live centre in
+> the playground is `Defense Release`.
+>
 > **The engine does not emit this pair.** `placed` is a Monitoring protection landing in the
 > release zone (`fake/release.ts:177`, `fake/triggers.ts:298`) and staying there, and a card spent
 > on an attack reaches the discard through `bankToDiscard` with **no event at all**. There is no
@@ -251,7 +257,7 @@ the discard on its own.
 | pile → centre | `drawToCenter` | 480 ms |
 | stand before flipping | `wait(BEFORE_FLIP)` | 220 ms |
 | flip settle | `wait(AFTER_FLIP)` | 560 ms |
-| a trigger's stand at the centre | `wait(REVEAL_HOLD)` | 900 ms — this task's own value, no approved source (`docs/animations/backlog.md`, #84) |
+| a trigger's stand at the centre | `wait(REVEAL_HOLD)` | 900 ms on the board — **not the approved value.** The source is the `AI cards` scene, whose subject the behaviour of AI cards at the centre is: `TABLE_HOLD = 2600` (twice that for Hallucination), and the trigger stands beside the AI card for exactly that hold before both leave. `Draw card`'s `AI_HOLD = 4000` is another scene's number — its subject is the draw piles. The board edit is what is left (`docs/animations/backlog.md`) |
 | own card → hand | `useHandArrival` | `FLIGHT_MS = 480` |
 | trigger → discard | `useDiscardExit` | `FLIGHT_MS = 420`, on `scatterAt(discardId)` |
 | opponent's card → seat | `dealToSeat` | 460 ms, `to = cardBoxIn(seat, CARD_W * 0.7)` |
@@ -467,6 +473,12 @@ into the release zone.
 6. **The fold** — `play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: 620 })` and
    `play('foldIntoPair', auxEl, { from: cRect, box: cRect, pose: PAIR_AUX_POSE, dur: 620, snap: true })`
    in parallel; `await Promise.all([a1?.finished, a2?.finished])`.
+
+   > **Steps 5–6 are now a step of their own: `usePairFold`.** The scenes call it (Combo, Defense
+   > Release); the board still carries this hand-written version in three places, and replacing them
+   > is a call, not a rewrite. The step also mounts the pair invisible and reveals it in the same
+   > tick the entry poses are set, which is what the flyer form cannot do — `raise` waits for a paint
+   > before it hands the node back, so the pair shows up already folded for a frame or two.
 7. `finish()` — wrapped in `try`/`finally` so every exit clears `foldingRef`, not only this one —
    branches on the partner: a window names it → `phase: 'dispatched'`, `onAttack(main.uid,
    support.uid)`; it still has its own targets → `phase: 'target'`, re-aim from the centre; else (a
@@ -507,8 +519,15 @@ combo, or a local window attack that staged nothing at all.
   is redacted for everyone but the owner, so an empty one would tell our own board a defence is owed
   with no legal card to give it. And never over a pending already standing, of any kind — the
   publish spreads `base`, so a narrower guard would replace a real pending with a fabricated one.
-  The corners that remain — the defender's own one-flush seat, and the fabricated `0s` clock the
-  shim publishes — are in [`backlog.md`](./backlog.md) and the audit page's register.
+  **The defender's corner is settled by an answer, and the answer is that there is no corner** (rules
+  owner, 22.08.2026): when someone attacks someone, the cards played to the centre are seen by
+  EVERYONE — it is a public action, and there is nothing to defend with against a card you cannot
+  see. The hiding was never intended; it fell out of the SHAPE, because the shadow is published as a
+  PENDING and a pending carries the legal-card list the engine redacts per viewer. What closes it is
+  splitting the two meanings: "a card lies on the table" — public, identical for everyone, read only
+  by the centre render; "a decision is owed by you" — private, with its options and its clock, read
+  by the dock and the gestures. The fabricated `0s` clock goes with it: a shape that carries no clock
+  cannot publish a false one. In [`backlog.md`](./backlog.md) and the register.
 - **`releasePlaced`**, planned from every `released` event — widened from `codeReview`-only (Task 11,
   #101): a plain release now runs the same beat, and the beat also carries the release's own cost leg
   (see "Defending a release" below for the cost, board-side). Three origins, because a release has
@@ -555,8 +574,8 @@ combo, or a local window attack that staged nothing at all.
 | Step | Preset / animation | Duration | Easing |
 |---|---|---|---|
 | fold — main half | `foldIntoPair` | 620 ms | EASE → its `enterPose` origin to identity |
-| fold — aux half | `foldIntoPair` (`snap`) | 620 ms | SNAP → `PAIR_AUX_POSE` |
-| release → zone | `playToReleaseZone` | 480 ms | SNAP |
+| fold — aux half | `foldIntoPair` (`snap`) | 620 ms | LAND → `PAIR_AUX_POSE` |
+| release → zone | `playToReleaseZone` | 480 ms | LAND |
 | discard (per half) | `useDiscardExit` | 420 ms | EASE + `scatterAt` / `auxScatter` |
 
 **Invariants**
@@ -571,7 +590,10 @@ combo, or a local window attack that staged nothing at all.
   actor's own play in a SECOND time from a hand slot it already left (found empirically; pinned by
   `comboHandoff.test.tsx`).
 - The pair flyer (`pairRef`) is a **persistent** node, opacity/position toggled rather than remounted
-  per fold — the same reason `foldIntoPair` is a per-half call, not a move of the whole pair.
+  per fold — the same reason `foldIntoPair` is a per-half call, not a move of the whole pair. Since
+  the fold became the `usePairFold` step, this hand-written form is one of the three copies the board
+  still carries: the step mounts its own node and reveals it in the tick the entry poses are set,
+  which is exactly what the persistent node was buying here.
 - The discard holds **singles**: the pending pair reaches it as **two** entries, split by
   `runPairOut`.
 
@@ -586,10 +608,14 @@ The gesture places the standing card(s) instantly (step 4 above). The beat is ne
 never runs (`useBeats`'s own blanket `if (reduced) return`); the board renders the projection it
 already holds.
 
-**Not yet right, and recorded**
-A cancelled pair returns both halves through one fan gap at the support's own index rather than two
-independent ones — ComboStory's own middle-return acceptance, kept as-is unless it reads badly on
-the live board. This finding is in [`backlog.md`](./backlog.md) and the audit page's register.
+**Recorded and since closed**
+A cancelled pair returning both halves through one fan gap was filed as a finding. It is not one:
+the rules owner settled that **there is no cancel-a-folded-pair case at all** — the moment the second
+card is taken for a combo, the pair is played. What the finding was reaching for — two cards going
+into the hand each into its own slot — is a different movement, and it already works: `useHandArrival`
+opens `gapSize` gaps and flies each card to `slotPlacement(gap + i, total)`, its own slot with its own
+angle. The showcase is the `Card to Hand` page, and it was checked there. See
+[`backlog.md`](./backlog.md).
 
 (The sudo-Rollback return this section used to flag as having no movement on the board at all — Wave
 3, #101 — is now built: see "Defending a release" below for the exchange itself, and `backlog.md` for
@@ -1707,6 +1733,13 @@ of the one it left.
 rules it costs one card, and the cost is shown open beside it. Only then does the Release settle into
 its zone slot and the opponents' attack window opens.
 
+**Where the places come from.** The five slots are not the scene's own numbers any more: their
+height, offset, width and layer come from `CENTRE_SLOTS` / `CENTRE_SETS` (`table/TableCentre/centre.ts`),
+which is also what the board reads — see [`reference.md`](./reference.md#centre-of-the-table--the-places-a-card-lands-in).
+The line asking for the cost is the `AskLine` component, hanging off the centre's own height. And the
+defence folding with your own sudo goes through the `usePairFold` step rather than a hand-written
+sequence.
+
 **Elements / refs.** Stage / cost / centre / sudo / cover slots around the table centre (each
 axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the true card box); the
 `ReleaseZone` (`slotRef`); opponent `Seat`s; the `Pile` discard; the `Hand`.
@@ -1715,7 +1748,7 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
 1. **Play** — the Release flies to the stage slot and waits. A press on nothing valid takes it back
    (see *cancel* below).
 2. **Cost** — any hand card pays: it flies to the cost slot, is held open, then leaves via
-   **`useDiscardExit`**. Only now does the Release fly into its zone slot (`playToReleaseZone`, SNAP).
+   **`useDiscardExit`**. Only now does the Release fly into its zone slot (`playToReleaseZone`, LAND).
 
    **On the board** this is the acting player's own view — the cost is picked out of the fan by a
    click, never a bar control (`_useBoardStaging.ts`'s `onCostPick`), and stays held open as the
@@ -1736,7 +1769,10 @@ axis-aligned, the tilt on an inner `.pose` element so the slot rect stays the tr
    pose supplies it instead: the pending centre render sits in an inner `.pose` element at
    `restTransform(ATTACK_POSE)`, exactly as the cover and sudo slots do. That rest pose is also what
    the exit starts from (`useDiscardExit`'s `pose` — "the table tilt it starts from"), so without it
-   the attack popped from 0° to −4° on the exit's first frame (#101, Fix A, Defect 2). The gap
+   the attack popped from 0° to −4° on the exit's first frame (#101, Fix A, Defect 2). The step that
+   ends this is now in the vocabulary — **`landInPose`** carries the tilt with the card and lands it
+   already wearing it (**I11**) — and the board's single-attack path is what has to call it; the pair
+   path stays on `foldIntoPair`. The gap
    between the two arrivals is in [`backlog.md`](./backlog.md) and the audit page's register.
 4. **Answer** — a defence covers the attack; both leave as **one exchange** through `useDiscardExit`,
    each carrying its table layer so the heap keeps the order they lay in (**I9**). The cover's own
@@ -1777,8 +1813,12 @@ yield to it: the fan is that step's only picker (the panel is suppressed for thi
 `Hand` has no keyboard path), so an inert fan made the cost unpayable by any input at all. What the
 yield costs is the occlusion the guard existed for: the hover preview stands over the pair again for
 the whole step, and since it is transparent to the pointer a press on it falls through and the
-table's own miss listener cancels the release — reading a card can undo the play. Both that and the
-keyboard half are open, in `backlog.md` and the register.
+table's own miss listener cancels the release — reading a card can undo the play. **Both halves are
+now closed by an answer rather than by code** (rules owner, 22.08.2026): the preview case does not
+exist — a preview is summoned by HOVERING, so it cannot be held while you click what it covers, and
+it leaves the moment the mouse does; and the keyboard was never planned — the game is built for the
+mouse, so bringing an island back for one step is not the answer. Both entries are closed in
+`backlog.md` and the register.
 
 **A Release reaches the stage slot by two roads, and they are one road in the code.** It is
 `playable` with nothing to aim at and no partner to fold with, so the fan turns a plain press on it
@@ -1799,15 +1839,12 @@ carries its layer into the heap.
 
 **Across a match.** `<Board>` is not remounted for a rematch (`_layout.tsx` gives it no `key`), so
 both gestures take a `matchKey` and wipe themselves on it — the same boundary `useBeats` already
-resets on. Otherwise a rematch that interrupted a cost step would leave the paid card lying on the
-new table for good. **The wipe is written and the key it hangs on is not — on this branch, as of 2026-08-20** (#101,
-Fix D, finding 3; in-place rematch work on #19 gives each match its own id, which closes this from
-the other side, so re-read `startGame` before relying on either statement):
-what reaches it is `intro.gameId`, which is the HOST PEER ID (`useLobby.ts` — "the board route is
-keyed by the host peer id"), identical for every match played in one room, so a second `startGame`
-produces the same key and the effect never fires. `useBeats` hangs on the same value and has the
-same hole. Latent rather than live today — no in-place rematch exists — and recorded in
-[`backlog.md`](./backlog.md) with what would close it. Within a match, where the actor's own Release
+resets on. **There is no rematch to boundary, and that is the answer, not a gap** (rules owner,
+22.08.2026): a new match is a NEW match — the whole path starts again from the lobby, and a rematch
+button was never planned. The single entry into a match therefore remounts the board and the state
+dies with the instance. The wipe stays as cheap insurance; the key it hangs on (`intro.gameId`, the
+HOST PEER ID — identical for every match in one room) never changes, and now nothing needs it to.
+Recorded closed in [`backlog.md`](./backlog.md). Within a match, where the actor's own Release
 is relative to the stage slot is ONE `StageState` (`none` / `flying` / `standing` / `leaving`) that
 every play sets, rather than three booleans a play could inherit from the one before it.
 
@@ -1904,8 +1941,8 @@ air** — the celebration is not a screen that replaces the table, it happens ov
 leaving the fan; a layer for the volleys; the `GameOver` window.
 
 **Sequence.**
-1. The release is pulled out of the fan and flown into its slot with `playToReleaseZone` (SNAP —
-   every release lands with the same snap). The zone is now closed.
+1. The release is pulled out of the fan and flown into its slot with `playToReleaseZone` (LAND —
+   every release lands the same way). The zone is now closed.
 2. Three volleys are scheduled at `POPPERS` — `[0, 620, 1450]`ms, powers `[1, 0.7, 1.25]`. Each is
    its **own component**, mounted with its own pieces: the pieces are made once and started once in
    a **mount effect**. Starting them from a render-time ref callback is what killed the pieces
@@ -1958,6 +1995,21 @@ each side), so a longer nickname never resizes it and nothing beside it shifts.
 4. The button keeps its frame; only the label swaps (through `Swap`) and the accent morphs by a CSS
    transition. The ring and the dot stay put — the accent transitions on `stroke` / `--dot`, and the
    ring fills back to full on a phase change.
+5. **A window over somebody's release is two more phases, and the frame still does not move.**
+   `attack` — the window is somebody else's and you may hit it: the key LIGHTS UP rather than
+   changing shape (the same ledge, same border and glow, stepped up — a flat fill would read as a
+   different control), and dots stand beside it, one per seat that may still hit, going out with each
+   pass. `exposed` — the window hangs over YOUR release: the turn colour stays yours, the clock shown
+   is the window's, and the key slot holds those same dots, because there is nothing to press.
+6. **No warning in the last seconds, and no extending the clock.** Neither was wanted (rules owner):
+   an extra accent over the dock's coral is redundant, and in a turn-based game the time for a turn
+   is fixed regardless of what the player is busy with — walking off for coffee must not stretch it.
+   The timer is its own layer of logic, and this is the direction it is built along.
+7. **A watcher never sees somebody else's countdown.** While the table waits on another player, the
+   dock names whose decision it is and shows a full, figureless ring: their time is not yours to
+   spend, and a number you cannot act on only twitches in front of you. Off entirely (the host's
+   table setting), every ring that could carry a clock reads full and numberless — not empty, which
+   is a finished countdown, and not zero, which is an expired one.
 
 **Params & timings.** `rollOut` 220 ms · `rollIn` 300 ms with the delay that waits it out · `popIn`
 260 ms (SNAP) · `popOut` 200 ms.
