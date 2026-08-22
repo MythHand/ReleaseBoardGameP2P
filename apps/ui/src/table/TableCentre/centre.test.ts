@@ -51,6 +51,12 @@ describe('the centre of the table', () => {
     expect(CENTRE_SETS.defence.cover?.dx).not.toBe(0)
     // nothing the system deals is tilted anywhere
     for (const slot of Object.values(CENTRE_SETS.ai)) expect(slot).toBeNull()
+    // …and neither is a release that has not been played yet: it stands waiting
+    // for its price, which is not a move being made. The rules owner's wording
+    // of I11 — the tilt marks a card that has been PLAYED, not one that came
+    // from a hand.
+    expect(CENTRE_SETS.release.stage).toBeNull()
+    expect(CENTRE_SETS.release.cost).toBeNull()
   })
 
   it('centres a slot with no offset and shifts the rest by their own dx', () => {

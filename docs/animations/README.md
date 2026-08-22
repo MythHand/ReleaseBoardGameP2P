@@ -260,6 +260,14 @@ what the tilt of a card on the table says about who put it there.
 > the defence covering it, a sudo laid beside it — lands **tilted**, at its own angle. The tilt is
 > not decoration and not per-scene taste: it is the one thing that says a hand was involved.
 >
+> **The tilt marks a card that has been PLAYED — thrown into the moment.** Not every card that came
+> out of a hand: a Release standing at the centre while its price is being paid has not been played
+> yet, it is waiting, and it stands square. It stays square when it lands in its zone, because a
+> release in a zone is the table's state rather than a move being made — the Code Review tucked
+> under it is the one that sits at an angle (`PAIR_AUX`). So the pairs are: an attack, the defence
+> covering it, a sudo waiting beside them — tilted; a release standing unpaid, a release in its
+> zone, anything the system dealt — square.
+>
 > A pose is carried BY the flight (`landInPose`, or `rotate` on a travel preset), never applied
 > after it lands. A card that stops square and tilts a frame later reads as a click, and that is a
 > different event on screen from the one that happened. Rules owner's call, written down here

@@ -191,8 +191,8 @@ export default function TableStory() {
   })
   const timersLabel = pick(lang, { ru: 'таймеры на действие', en: 'action timers' })
   const timersHint = pick(lang, {
-    ru: 'ограничивают время на ход и на ответ; выключены — партия идёт без спешки',
-    en: 'limit the time for a turn and for an answer; off — the match runs without a clock',
+    ru: 'ограничивают время на ход и на ответ',
+    en: 'limit the time for a turn and for an answer',
   })
   // ВКЛ / ВЫКЛ, as the parallax toggle above: this switch has a state the host
   // needs to read off the control itself, not a name it already has in its label

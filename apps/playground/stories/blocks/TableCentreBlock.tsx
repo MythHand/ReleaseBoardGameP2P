@@ -52,7 +52,7 @@ export default function TableCentreBlock() {
         reveal:
           'Добор, вскрытый триггер, Error 503. Одно место, ровно по центру — и карта на нём лежит без наклона (инвариант I11: наклон значит, что карту положила рука игрока).',
         release:
-          'Релиз стоит слева, его цена — открыто справа, симметрично центру. Пара, которую глаз читает разом: видно и что разыграно, и чем за это заплачено.',
+          'Релиз стоит слева, его цена — открыто справа, симметрично центру. Пара, которую глаз читает разом: видно и что разыграно, и чем за это заплачено. Обе карты ровные, хотя обе из руки: наклон отмечает сыгранную карту, а релиз в ожидании оплаты ещё не сыгран — и ровным он останется в своей зоне, где под углом лежит только подоткнутый Code Review.',
         defence:
           'Атака в центре, защита ровно поверх неё — то же место, слой выше. Судо ждёт слева и НИЖЕ атаки: оно ещё не часть пары. Накрывающая карта ложится со своим смещением и наклоном, чтобы читались две игры, а не одна аккуратная стопка.',
         ai: 'Слева триггер, из-за которого карта пришла, справа сам эффект — и он ШИРЕ остальных мест: это главная карта момента, её читают.',
@@ -84,7 +84,7 @@ export default function TableCentreBlock() {
         reveal:
           'A draw, a revealed trigger, an Error 503. One place, dead centre — and the card lies square on it (invariant I11: a tilt means a player’s hand put it there).',
         release:
-          'The release stands to the left, its price in the open to the right, symmetric about the centre. A pair the eye reads at once: what was played, and what was paid for it.',
+          'The release stands to the left, its price in the open to the right, symmetric about the centre. A pair the eye reads at once: what was played, and what was paid for it. Both lie square though both came from a hand: the tilt marks a card that has been PLAYED, and a release waiting for its price has not been — and it stays square in its zone, where only the Code Review tucked under it sits at an angle.',
         defence:
           'The attack at the centre, the defence exactly over it — same place, higher layer. The sudo waits to the left and BELOW the attack: it is not part of the pair yet. The covering card lands at its own offset and tilt, so the two read as two plays rather than one neat stack.',
         ai: 'The trigger that brought the card on the left, the effect itself on the right — and it is WIDER than the other places: it is the card the table is reading at that moment.',

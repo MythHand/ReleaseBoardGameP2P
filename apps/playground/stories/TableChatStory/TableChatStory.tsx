@@ -256,8 +256,8 @@ export default function TableChatStory() {
   const timersOn = pick(lang, { ru: 'Вкл', en: 'On' })
   const timersOff = pick(lang, { ru: 'Выкл', en: 'Off' })
   const timersHint = pick(lang, {
-    ru: 'ограничивают время на ход и на ответ; выключены — партия идёт без спешки',
-    en: 'limit the time for a turn and for an answer; off — the match runs without a clock',
+    ru: 'ограничивают время на ход и на ответ',
+    en: 'limit the time for a turn and for an answer',
   })
   const generalTitle = pick(lang, { ru: 'общие', en: 'general' })
   // одно слово в обоих состояниях: включённость несёт сам тумблер цветом,
