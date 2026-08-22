@@ -35,11 +35,17 @@ export interface PlannedDraw {
   mine: boolean
   card?: string
   /**
-   * turned up in front of the whole table. `discardId` is the trigger's own
+   * Turned up in front of the whole table. `discardId` is the trigger's own
    * `discarded`, which the DRAW beat owns: the card is at the centre when it is
    * filed, and flying it from a hand slot it never occupied would be a lie.
+   *
+   * ABSENT means the trigger STANDS. An Error 503 that raises a
+   * `neutralize503` is not banked until it is answered (#102, and
+   * docs/rules/resolution.md's own destinations table), so there is no discard
+   * to claim and nothing to fly — the beat hands it to the pending's static
+   * render instead.
    */
-  reveal?: { card: string; discardId: number }
+  reveal?: { card: string; discardId?: number }
 }
 
 export type PileStep =
@@ -49,7 +55,10 @@ export type PileStep =
 
 export type BeatPlan =
   | { kind: 'draw'; key: string; draws: PlannedDraw[] }
-  | { kind: 'discard'; key: string; cards: DiscardCard[] }
+  // `gather` marks a defenceless player's whole table leaving as one sweep —
+  // everything they owned gathered at the centre and held before it scatters
+  // (#102). Absent for an ordinary discard, never `false`.
+  | { kind: 'discard'; key: string; cards: DiscardCard[]; gather?: true }
   | { kind: 'reshuffle'; key: string; cards: number }
   | { kind: 'piles'; key: string; steps: PileStep[] }
   // A window attack reaches the centre — the pair, if it threw with a Sudo,
@@ -130,6 +139,27 @@ export type BeatPlan =
       to: string
       slot: string
       card: string
+    }
+  // An Error 503 answered. Everything the runner needs to play the exchange
+  // without going back to the projection: the alarm standing at the centre,
+  // and what the answer cost — nothing at all for Monitoring, which answers
+  // from where it stands and stays there.
+  | {
+      kind: 'neutralized'
+      key: string
+      eventId: number
+      player: string
+      method: 'debugger' | 'monitoring' | 'sacrifice'
+      /** sacrifice only: the zone slot the answer flies out of */
+      slot?: string
+      /**
+       * The alarm's own discard. Optional, not guaranteed: a `crush` shares
+       * this event with no card standing anywhere, so the plan must survive
+       * having no alarm to take away.
+       */
+      alarm?: { eventId: number; card: string }
+      /** the Debugger, or the sacrificed release and its Code Review */
+      spent: { eventId: number; card: string }[]
     }
 
 // Reasons that CAN take a card out of a release slot — "can", not "always do".
@@ -216,14 +246,17 @@ export function classifyPiles(before: number[], after: number[]): PileStep | nul
 // that turned it up, and its `discarded` immediately after that
 // (fake/triggers.ts:123,139). Looking ahead by position rather than scanning the
 // batch is what keeps a later, unrelated reveal from being read as this draw's.
-function revealAfter(events: Event[], i: number): { card: string; discardId: number } | null {
+function revealAfter(events: Event[], i: number): { card: string; discardId?: number } | null {
   const reveal = events[i + 1]
   if (!reveal) return null
   const card =
     reveal.type === 'revealed' ? reveal.card : reveal.type === 'aiRevealed' ? reveal.aiCard : null
   if (card == null) return null
   const filed = events[i + 2]
-  if (filed?.type !== 'discarded' || filed.card !== card) return null
+  // No discard behind it: the trigger is standing, not leaving. Reported as a
+  // reveal all the same — the flight to the centre and the flip are the same
+  // either way, and only the tail differs.
+  if (filed?.type !== 'discarded' || filed.card !== card) return { card }
   return { card, discardId: filed.id }
 }
 
@@ -286,6 +319,13 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   // created it: `before.pending` cannot change mid-walk, and only one
   // exchange can be pending at a time.
   let pairOut: Extract<BeatPlan, { kind: 'pairToDiscard' }> | null = null
+  // The player a sweep is open for — set by `eliminated`, read by the
+  // `discarded` branch that follows it to mark that run gathered. Cleared
+  // INSIDE `flush()`, alongside the other run locals: `flush()` runs on every
+  // branch below (`drawn`, `released`, `defended`, …), not only on the
+  // `eliminated`/`discarded` pair, so a flag left standing past its own run
+  // would wrongly gather a later, unrelated discard.
+  let sweeping: string | null = null
   const flush = () => {
     if (draw) plans.push(draw)
     // A discard beat with nothing aimable is not a beat: every card in the run
@@ -297,6 +337,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
     discard = null
     pileRun = null
     pairOut = null
+    sweeping = null
   }
 
   for (let i = 0; i < events.length; i++) {
@@ -304,7 +345,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
     if (e.type === 'drawn') {
       if (!draw) flush()
       const reveal = e.card === undefined ? revealAfter(events, i) : null
-      if (reveal) owned.add(reveal.discardId)
+      if (reveal?.discardId !== undefined) owned.add(reveal.discardId)
       draw ??= { kind: 'draw', key: `draw:${e.id}`, draws: [] }
       draw.draws.push({
         key: `w${e.id}`,
@@ -415,6 +456,60 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       })
       continue
     }
+    if (e.type === 'eliminated') {
+      // Everything this player owned leaves at once, and it leaves as ONE
+      // gesture: gathered at the centre, held open long enough for the table to
+      // read what happened, and only then scattered. The same beat the hand
+      // limit gets (#104 will reuse this leg).
+      flush()
+      sweeping = e.player
+      continue
+    }
+    if (e.type === 'neutralized') {
+      // One event, one beat — the exchange is its own gesture, never coalesced
+      // with what came before or after.
+      flush()
+      // Everything this resolution banked, in the order the engine banked it:
+      // the alarm first, then what paid for it (fake/triggers.ts's own
+      // `bankAlarm`). The walk continues forward rather than scanning — a
+      // resolution's discards are contiguous, and the first non-discard event
+      // ends them. `releaseDestroyed` sits between them for a sacrifice, and
+      // names the slot, so it is read rather than skipped.
+      let alarm: { eventId: number; card: string } | undefined
+      const spent: { eventId: number; card: string }[] = []
+      let slot: string | undefined
+      let j = i + 1
+      while (j < events.length) {
+        const d = events[j]
+        if (d.type === 'releaseDestroyed' && d.player === e.player) {
+          slot = d.slot
+          j++
+          continue
+        }
+        if (d.type !== 'discarded') break
+        if (d.reason === 'trigger' && !alarm) {
+          alarm = { eventId: d.id, card: d.card }
+        } else if (d.reason === 'neutralized') {
+          spent.push({ eventId: d.id, card: d.card })
+        } else {
+          break
+        }
+        owned.add(d.id)
+        j++
+      }
+      plans.push({
+        kind: 'neutralized',
+        key: `neutralized:${e.id}`,
+        eventId: e.id,
+        player: e.player,
+        method: e.method,
+        ...(slot ? { slot } : {}),
+        ...(alarm ? { alarm } : {}),
+        spent,
+      })
+      i = j - 1 // the discards this plan claimed are consumed
+      continue
+    }
     if (e.type === 'discarded') {
       if (owned.has(e.id)) continue
       // the release's own cost — claimed by the `releasePlaced` beat that
@@ -479,8 +574,17 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // rules have not settled (docs/animations/backlog.md). Nothing is invented:
       // it is not flown, and the projection still puts it in the discard.
       if (!source) continue
+      // Captured BEFORE `flush()`: flush is what clears `sweeping` (it runs on
+      // every branch, not only this one), so reading the flag after it would
+      // always see it already gone and the sweep would never gather at all.
+      const gather = sweeping === e.player
       if (!discard) flush()
-      discard ??= { kind: 'discard', key: `discard:${e.id}`, cards: [] }
+      discard ??= {
+        kind: 'discard',
+        key: `discard:${e.id}`,
+        cards: [],
+        ...(gather ? { gather: true as const } : {}),
+      }
       discard.cards.push({ key: `d${e.id}`, eventId: e.id, card: e.card, source })
       continue
     }

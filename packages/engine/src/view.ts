@@ -61,7 +61,9 @@ export type PendingView =
       deadline: number
       scope: 'release' | 'hand'
     }
-  | { kind: 'neutralize503'; player: PlayerId; methods: NeutralizeMethod[] }
+  // null for the ai-error-503 mimic, which has no card standing anywhere to
+  // show (state.ts's Pending carries the same reasoning).
+  | { kind: 'neutralize503'; player: PlayerId; card: CardId | null; methods: NeutralizeMethod[] }
   | { kind: 'crush'; player: PlayerId; slot: ReleaseSlot; methods: NeutralizeMethod[] }
   | { kind: 'requestCard'; player: PlayerId; target: PlayerId }
   | { kind: 'giveCard'; player: PlayerId; requested: CardId }

@@ -5,7 +5,7 @@ import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
-import { COVER_POSE } from '~/entities/game/board'
+import { ATTACK_POSE, COVER_POSE } from '~/entities/game/board'
 import { useDefenseBeat } from './defenseBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -685,4 +685,120 @@ it('reads a release stolen into our own zone in full, never as LOD', async () =>
   )
   expect(played.names).toContain('playToCenter')
   expect(patched.lod).toBeUndefined()
+})
+
+// ===== neutralized — the answered Error 503 leaves as one exchange (#102) =====
+
+const debuggerPlan = (): Extract<BeatPlan, { kind: 'neutralized' }> => ({
+  kind: 'neutralized',
+  key: 'neutralized:10',
+  eventId: 10,
+  player: 'p2',
+  method: 'debugger',
+  alarm: { eventId: 11, card: 'trigger-error-503' },
+  spent: [{ eventId: 12, card: 'protection-debugger' }],
+})
+
+it('covers the alarm and takes both away as one exchange', async () => {
+  exits.items.length = 0
+  played.calls.length = 0
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() => api.beat?.runNeutralized(debuggerPlan(), ctx))
+
+  // the answer flew to the cover slot at the cover's own tilt
+  expect(played.calls.some((c) => c.name === 'playToCenter')).toBe(true)
+  expect(played.calls.find((c) => c.name === 'playToCenter')?.params).toMatchObject({
+    rotate: COVER_POSE.rot,
+    dx: COVER_POSE.dx,
+    dy: COVER_POSE.dy,
+  })
+  // ONE send, two cards, the alarm underneath
+  expect(exits.items).toHaveLength(2)
+  expect(exits.items.map((i) => i.layer)).toEqual([0, 1])
+  expect(exits.items[0].card.id).toBe('trigger-error-503')
+  expect(exits.items[1].card.id).toBe('protection-debugger')
+  // each lands on its own discard event's scatter (I7)
+  expect(exits.items[0].scatter).toEqual(scatterAt(11))
+  expect(exits.items[1].scatter).toEqual(scatterAt(12))
+  // and each starts from the tilt it was resting at (I6/I9)
+  expect(exits.items[0].pose).toEqual(ATTACK_POSE)
+  expect(exits.items[1].pose).toEqual(COVER_POSE)
+})
+
+it('sends the alarm alone when Monitoring answered, and flies nothing', async () => {
+  exits.items.length = 0
+  played.calls.length = 0
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.runNeutralized({ ...debuggerPlan(), method: 'monitoring', spent: [] }, ctx),
+  )
+  expect(played.calls.filter((c) => c.name === 'playToCenter')).toEqual([])
+  expect(exits.items).toHaveLength(1)
+  expect(exits.items[0].card.id).toBe('trigger-error-503')
+  expect(exits.items[0].layer).toBe(0)
+})
+
+// The crux of the whole task: a `neutralize503` pending with no card standing
+// anywhere at all — a `crush` (the AI threat card was never on the table), or
+// the `ai-error-503` mimic, whose card has already gone back to its own deck
+// (`fake/triggers.ts` builds this pending with `card: null`). Both reach the
+// board with `plan.alarm` absent. `exchange` reads layer off array POSITION
+// after filtering `null`s out — so with no alarm half at all, the answer is
+// the only entry and must land at layer 0, not be silently promoted to some
+// other slot in the heap.
+it('sends only the answer at layer 0 when there is no alarm to take away', async () => {
+  exits.items.length = 0
+  played.calls.length = 0
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() => api.beat?.runNeutralized({ ...debuggerPlan(), alarm: undefined }, ctx))
+  expect(exits.items).toHaveLength(1)
+  expect(exits.items[0].card.id).toBe('protection-debugger')
+  expect(exits.items[0].layer).toBe(0)
+})
+
+it('flies a sacrificed release out of its own zone slot', async () => {
+  exits.items.length = 0
+  played.calls.length = 0
+  const { api, Probe, anchors } = harness()
+  const slotNode = document.createElement('div')
+  vi.spyOn(anchors, 'releaseSlot').mockReturnValue(slotNode)
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.runNeutralized(
+      {
+        ...debuggerPlan(),
+        method: 'sacrifice',
+        slot: 'frontend',
+        spent: [
+          { eventId: 12, card: 'release-frontend' },
+          { eventId: 13, card: 'support-code-review' },
+        ],
+      },
+      ctx,
+    ),
+  )
+  expect(anchors.releaseSlot).toHaveBeenCalledWith('p2', 'frontend')
+  // the release carries its Code Review as the pair's aux, each on its own scatter
+  expect(exits.items[1].aux?.id).toBe('support-code-review')
+  expect(exits.items[1].auxScatter).toEqual(scatterAt(13))
+})
+
+it('leaves our own staged answer alone and only releases the handoff', async () => {
+  exits.items.length = 0
+  played.calls.length = 0
+  const { api, Probe } = harness()
+  const release = vi.fn()
+  const staging = {
+    current: { mainUid: 'u9', el: document.createElement('div'), release },
+  } as unknown as RefObject<StagedHandoff | null>
+  render(<Probe staging={staging} />)
+  await drive(() => api.beat?.runNeutralized({ ...debuggerPlan(), player: 'p1' }, ctx))
+  // ours is already standing at the cover slot — the beat must not fly a second
+  // copy of it in from the fan (#101, Fix D rounds 3 and 4, same defect class)
+  expect(played.calls.filter((c) => c.name === 'playToCenter')).toEqual([])
+  expect(release).toHaveBeenCalledTimes(1)
+  expect(exits.items).toHaveLength(2)
 })

@@ -1,3 +1,4 @@
+import type { CardData } from '@release/ui'
 import { Card, CardPair, cardById } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import {
@@ -28,6 +29,40 @@ const rectOf = (el: Element | null): Rect | null => {
   const r = el.getBoundingClientRect()
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
+
+// One exchange, one send. Each card carries its layer, so the heap keeps the
+// order they lay in on the table (I9), and each lands on its own `discarded`
+// event's scatter (I7). Shared by the two resolutions that have this shape —
+// an attack answered by a defence, and an alarm answered by any of its three
+// methods — because it is one movement and #88's standing rule says one
+// movement is one module.
+//
+// LAYER COMES FROM POSITION, so a half that is not there must be passed as
+// `null` and filtered here rather than skipped by the caller: a missing attack
+// would otherwise silently promote the cover to layer 0 and invert the heap.
+interface ExchangeHalf {
+  eventId: number
+  card: CardData
+  aux?: CardData | null
+  auxEventId?: number
+  el: HTMLElement | null
+  from: Rect
+  pose: { rot: number; dx: number; dy: number }
+}
+const exchange = (halves: (ExchangeHalf | null)[]): Leaving[] =>
+  halves
+    .filter((h): h is ExchangeHalf => h !== null)
+    .map((h, layer) => ({
+      key: `x${h.eventId}`,
+      card: h.card,
+      aux: h.aux ?? null,
+      el: h.el,
+      from: h.from,
+      pose: h.pose,
+      layer,
+      scatter: scatterAt(h.eventId),
+      ...(h.auxEventId === undefined ? {} : { auxScatter: scatterAt(h.auxEventId) }),
+    }))
 
 export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<StagedHandoff | null>) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
@@ -139,7 +174,6 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       // heap keeps the order they lay in on the table (I9), and each lands on
       // its own `discarded` event's scatter (I7).
       const attackBox = rectOf(a.centre.current)
-      const items: Leaving[] = []
       // by reason as well as card: `support-sudo` can be banked on both sides
       // of one exchange, and only the reason says whose it was
       const spentOf = (card: string, reason: 'attackSpent' | 'defenceSpent') =>
@@ -147,34 +181,34 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       const attackSpent = spentOf(plan.attackCard, 'attackSpent')
       const attackAux = plan.attackSudo ? spentOf('support-sudo', 'attackSpent') : undefined
       const attackCard = cardById(plan.attackCard)
-      if (attackSpent && attackBox && attackCard) {
-        items.push({
-          key: `x${attackSpent.eventId}`,
-          card: attackCard,
-          aux: plan.attackSudo ? cardById('support-sudo') : null,
-          el: a.centre.current,
-          from: attackBox,
-          pose: ATTACK_POSE,
-          layer: 0,
-          scatter: scatterAt(attackSpent.eventId),
-          ...(attackAux ? { auxScatter: scatterAt(attackAux.eventId) } : {}),
-        })
-      }
       const defenceSpent = spentOf(plan.card, 'defenceSpent')
-      if (defenceSpent && coverBox && defence) {
-        const defenceAux = ownSudo ? spentOf('support-sudo', 'defenceSpent') : undefined
-        items.push({
-          key: `x${defenceSpent.eventId}`,
-          card: defence,
-          aux: ownSudo,
-          el: a.cover.current,
-          from: coverBox,
-          pose: COVER_POSE,
-          layer: 1,
-          scatter: scatterAt(defenceSpent.eventId),
-          ...(defenceAux ? { auxScatter: scatterAt(defenceAux.eventId) } : {}),
-        })
-      }
+      const defenceAux = ownSudo ? spentOf('support-sudo', 'defenceSpent') : undefined
+      // the attack first, the cover second — `exchange` reads the layer off the
+      // position, so a half that is not there goes in as `null`, never skipped
+      const items = exchange([
+        attackSpent && attackBox && attackCard
+          ? {
+              eventId: attackSpent.eventId,
+              card: attackCard,
+              aux: plan.attackSudo ? cardById('support-sudo') : null,
+              auxEventId: attackAux?.eventId,
+              el: a.centre.current,
+              from: attackBox,
+              pose: ATTACK_POSE,
+            }
+          : null,
+        defenceSpent && coverBox && defence
+          ? {
+              eventId: defenceSpent.eventId,
+              card: defence,
+              aux: ownSudo,
+              auxEventId: defenceAux?.eventId,
+              el: a.cover.current,
+              from: coverBox,
+              pose: COVER_POSE,
+            }
+          : null,
+      ])
       // ROLLBACK — the attack is not burned, it is sent back. The engine puts
       // it into a hand by mutating state and emits NOTHING for it
       // (attacks.ts:245-252), so `returnTo` is derived rather than read; the
@@ -212,6 +246,100 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       // Together, not in sequence: the exchange leaving for the discard and
       // the attack leaving for its hand are one moment, not two gestures.
       await Promise.all([items.length > 0 ? latest.current.send(items) : undefined, returning])
+      flyer.drop('cover')
+    },
+    [flyer.raise, flyer.drop],
+  )
+
+  // Error 503 answered (#102). The same exchange `runCovered` plays, with the
+  // alarm in the attack's place and one of three methods in the defence's.
+  // Monitoring is the same beat without a card: it answers from the zone and
+  // stays there, so nothing flies and the alarm leaves alone.
+  const runNeutralized = useCallback(
+    async (plan: Extract<BeatPlan, { kind: 'neutralized' }>, ctx: BeatRun) => {
+      // read BEFORE the first await, same race and same fix as runCovered's
+      const handoff = latest.current.staging?.current
+      const mine = plan.player === ctx.base.selfId
+      await nextFrames() // the shadow that renders `before` has committed (I2)
+      const a = latest.current.anchors
+      const coverBox = rectOf(a.cover.current)
+      const alarmBox = rectOf(a.centre.current)
+      const alarmCard = plan.alarm ? cardById(plan.alarm.card) : null
+      const answer = plan.spent[0] ? cardById(plan.spent[0].card) : null
+      const aux = plan.spent[1] ? cardById(plan.spent[1].card) : null
+
+      // THE COVER. Skipped for Monitoring, which has no card to move, and for
+      // our OWN answer, which the gesture has already delivered to this exact
+      // slot — asking whether the play was STAGED rather than whether its node
+      // happens to exist yet is what keeps a second copy from flying in
+      // (#101, Fix D rounds 3 and 4).
+      if (plan.method !== 'monitoring' && coverBox && answer && !(mine && handoff)) {
+        // Where it comes from: the sacrificed release's own zone slot, then our
+        // own fan slot on a rejoin or a replay, then the actor's seat for
+        // everyone else, and finally the cover slot itself — a no-travel raise
+        // is the honest answer to "it is here and I cannot say where it came
+        // from", and it leaves the exit starting from something real.
+        const fromSlot =
+          plan.method === 'sacrifice' && plan.slot
+            ? rectOf(a.releaseSlot(plan.player, plan.slot))
+            : null
+        const handIndex = mine
+          ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.spent[0]?.card)
+          : -1
+        const from =
+          fromSlot ??
+          (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
+          a.seatBox(plan.player) ??
+          coverBox
+        const [el] = await flyer.raise([
+          {
+            key: 'cover',
+            at: from,
+            content: aux ? <CardPair main={answer} aux={aux} width="100%" /> : undefined,
+            card: aux ? undefined : answer,
+          },
+        ])
+        if (el) {
+          await play('playToCenter', el, {
+            from,
+            to: coverBox,
+            rotate: COVER_POSE.rot,
+            dx: COVER_POSE.dx,
+            dy: COVER_POSE.dy,
+          })?.finished
+        }
+      }
+      await wait(SHOW_HOLD)
+
+      // released HERE, immediately ahead of the exit rather than before the
+      // hold — `release()` clears the local answerer's own static cover render
+      // at once, and the staging hook's `landed` gate has nothing else backing
+      // that slot. Same ordering runCovered had to be fixed into.
+      if (mine && handoff) handoff.release()
+
+      const items = exchange([
+        plan.alarm && alarmBox && alarmCard
+          ? {
+              eventId: plan.alarm.eventId,
+              card: alarmCard,
+              el: a.centre.current,
+              from: alarmBox,
+              pose: ATTACK_POSE,
+            }
+          : null,
+        plan.spent[0] && coverBox && answer
+          ? {
+              eventId: plan.spent[0].eventId,
+              card: answer,
+              aux,
+              auxEventId: plan.spent[1]?.eventId,
+              el: a.cover.current,
+              from: coverBox,
+              pose: COVER_POSE,
+            }
+          : null,
+      ])
+      if (items.length > 0) await latest.current.send(items)
       flyer.drop('cover')
     },
     [flyer.raise, flyer.drop],
@@ -278,6 +406,7 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
   return {
     overlay: [...exitOverlay, ...flyer.overlay, ...arrival.overlay],
     runCovered,
+    runNeutralized,
     runStolen,
     reset,
   }

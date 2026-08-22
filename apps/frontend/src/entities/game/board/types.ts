@@ -61,6 +61,11 @@ export interface BoardState {
     // A played Code Review lying under the release it protects.
     support?: ReleaseSupport
     eliminated?: boolean
+    // The uid of whatever stands in each slot. The kit's `ReleaseSlots` carries
+    // card DATA and no identity — it is domain-free by design — but a choice
+    // the engine has to act on names a uid (`neutralize503`'s sacrifice), so
+    // the adapter keeps them here rather than widening the kit's own type.
+    releaseUid?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
   }
   opponents: BoardOpponent[]
   decks: {
@@ -159,6 +164,12 @@ export interface BoardChromeCopy {
   askCost: string
   askDefend: string
   askPartner: string
+  // An Error 503 owed an answer (#102). One line for all three methods rather
+  // than one per method: they are three GESTURES but one question, and what
+  // may answer is the projection's own set — so the line points at what is lit
+  // instead of naming a gesture that a pending offering only Monitoring (or
+  // only a sacrifice) would not have.
+  askNeutralize: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
   pauseGame?: string

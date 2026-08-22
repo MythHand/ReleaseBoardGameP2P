@@ -38,6 +38,19 @@ function toReleaseSlots(release: ReleaseView) {
   }
 }
 
+// The identities `toReleaseSlots` above drops. All four slots are the engine's
+// own `ReleasedView` (uid + card id, + codeReview for the three release slots)
+// — uniform, so `.uid` sits at the same depth for `monitoring` as for the
+// others; there is no separate instance shape to unwrap here.
+function toReleaseUids(release: ReleaseView): NonNullable<BoardState['you']['releaseUid']> {
+  const out: NonNullable<BoardState['you']['releaseUid']> = {}
+  if (release.frontend) out.frontend = release.frontend.uid
+  if (release.backend) out.backend = release.backend.uid
+  if (release.database) out.database = release.database.uid
+  if (release.monitoring) out.monitoring = release.monitoring.uid
+  return out
+}
+
 // The aux lying under a release — a played Code Review. ReleaseZone renders it
 // tucked under via its `support` prop (the ComboStory zone already does).
 function toReleaseSupport(release: ReleaseView): ReleaseSupport {
@@ -182,6 +195,7 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       hand: view.self.hand.map((c) => ({ uid: c.uid, card: cardOrPlaceholder(c.id) })),
       release: toReleaseSlots(view.self.release),
       support: toReleaseSupport(view.self.release),
+      releaseUid: toReleaseUids(view.self.release),
     },
     opponents: view.opponents.map((o) => ({
       id: o.id,

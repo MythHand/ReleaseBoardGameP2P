@@ -1,5 +1,5 @@
 export { type BoardAnchors, useBoardAnchors } from './anchors'
-export { ATTACK_POSE, COVER_POSE, MERGE_MS, SHOW_HOLD, SUDO_POSE } from './poses'
+export { ATTACK_POSE, COVER_POSE, GATHER_HOLD, MERGE_MS, SHOW_HOLD, SUDO_POSE } from './poses'
 export { toAction } from './toAction'
 export { toBoardOver } from './toBoardOver'
 export type { HistoryLabels } from './toBoardState'
