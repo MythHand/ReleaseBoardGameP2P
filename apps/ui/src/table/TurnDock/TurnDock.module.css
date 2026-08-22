@@ -124,10 +124,14 @@
     box-shadow var(--t-base) var(--ease-soft);
 }
 
+/* Lit takes the DOCK's own accent, passed down as --dot-accent — violet while
+   the row sits in the attacker's corner, turn-green in the slot of the player
+   whose release is under the window. One row, wearing the phase it belongs to,
+   rather than a colour of its own that would read as a second meaning. */
 .dotLit {
-  background: var(--attack-accent);
-  border-color: var(--attack-accent);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--attack-accent) 45%, transparent);
+  background: var(--dot-accent);
+  border-color: var(--dot-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--dot-accent) 45%, transparent);
 }
 
 /* the defender's own view: the dots take the key's slot, so they are read from
@@ -148,18 +152,31 @@
   block-size: 100%;
 }
 
-/* ===== the key, lit ===== */
+/* ===== the key, engaged ===== */
 
 /* A pass already made. The word does not change — it is the same key toggled,
-   and a relabelled key reads as a different action — so the state is the fill:
-   the accent goes from a wash to the surface itself. */
-.keyOn {
-  color: var(--bg);
-  background: var(--btn-accent);
-  border-color: var(--btn-accent);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--btn-accent) 40%, transparent);
+   and a relabelled key reads as a different action — so the state is carried by
+   the key turning ON.
+   The HUD idiom is kept exactly: the same accent wash, the same border, the same
+   double glow, every one of them stepped up. NOT a solid fill — a flat block of
+   accent under light text is a different button from a different kit, and it
+   drops the surface's own gradient and inner light that make the dock read as
+   glass. Two classes, so this wins over `Button`'s `.hud` whatever order the
+   modules land in. */
+.key.keyOn {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--btn-accent) 34%, transparent),
+    color-mix(in srgb, var(--btn-accent) 20%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--btn-accent) 70%, transparent);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--btn-accent) 26%, transparent),
+    inset 0 0 20px color-mix(in srgb, var(--btn-accent) 16%, transparent);
 }
 
-.keyOn:hover {
-  box-shadow: 0 0 24px color-mix(in srgb, var(--btn-accent) 55%, transparent);
+.key.keyOn:hover {
+  box-shadow:
+    0 0 24px color-mix(in srgb, var(--btn-accent) 36%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--btn-accent) 22%, transparent);
 }

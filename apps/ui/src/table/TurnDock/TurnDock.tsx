@@ -123,10 +123,26 @@ interface TurnDockProps {
 // and the only thing the table needs from it is how close the window is to
 // closing early. Lit is a flat fill, never a pulse: nothing here is waiting on
 // the viewer.
-function PassDots({ total, lit, big = false }: { total: number; lit: number; big?: boolean }) {
+function PassDots({
+  total,
+  lit,
+  accent,
+  big = false,
+}: {
+  total: number
+  lit: number
+  // the dock's own phase accent — the row wears the phase it belongs to rather
+  // than a colour of its own, which would read as a second meaning
+  accent: string
+  big?: boolean
+}) {
   if (total <= 0) return null
   return (
-    <div className={`${styles.dots} ${big ? styles.dotsBig : ''}`} aria-hidden="true">
+    <div
+      className={`${styles.dots} ${big ? styles.dotsBig : ''}`}
+      style={{ '--dot-accent': accent } as CSSProperties}
+      aria-hidden="true"
+    >
       {Array.from({ length: total }, (_, i) => (
         <span
           // biome-ignore lint/suspicious/noArrayIndexKey: the dots ARE a count — there is nothing identifiable to key on, which is the point
@@ -268,7 +284,7 @@ export default function TurnDock({
               never coexist ('push' is my turn, 'attack' is a window) */}
           {state === 'attack' && passes && (
             <div className={styles.chip}>
-              <PassDots total={passes.total} lit={passes.lit} />
+              <PassDots total={passes.total} lit={passes.lit} accent={accent} />
             </div>
           )}
         </div>
@@ -300,7 +316,12 @@ export default function TurnDock({
                   // key's slot carries the one thing worth watching — how many
                   // of the seats that could hit it have already declined
                   <div className={styles.dotsSlot}>
-                    <PassDots total={passes?.total ?? 0} lit={passes?.lit ?? 0} big />
+                    <PassDots
+                      total={passes?.total ?? 0}
+                      lit={passes?.lit ?? 0}
+                      accent={accent}
+                      big
+                    />
                   </div>
                 ) : (
                   <Swap token={activePlayer ?? ''} anim={NAME} fill className={styles.name}>
