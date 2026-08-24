@@ -1,3 +1,4 @@
+import type { Seat } from '../types'
 import {
   canStart,
   disbandLobby,
@@ -209,4 +210,79 @@ it('seats a joiner in the lobby, since that is the only place to join from', () 
   const r = handleJoinRequest(state, 'g1', 'Bo', 'client-g1')
 
   expect(r.state.peers.g1.where).toBe('lobby')
+})
+
+// Named `returningBase` (not `base`) to avoid colliding with the `base(maxPlayers)`
+// helper above — this fixture is a mid-match lobby with a frozen seat to return to.
+const returningBase = () =>
+  createLobbyState({
+    selfId: 'host',
+    hostId: 'host',
+    maxPlayers: 2,
+    peers: [
+      {
+        id: 'host',
+        clientId: 'client-host',
+        name: 'Ann',
+        role: 'host',
+        ready: true,
+        where: 'game',
+      },
+    ],
+  })
+
+const seating: Seat[] = [
+  { playerId: 'p1', peerId: 'host', clientId: 'client-host', name: 'Ann' },
+  { playerId: 'p2', peerId: 'dead-peer', clientId: 'client-bo', name: 'Bo' },
+]
+
+it('seats a returning player back into the seat their clientId owns', () => {
+  const r = handleJoinRequest(returningBase(), 'fresh-peer', 'Bo', 'client-bo', seating)
+  expect(r.state.peers['fresh-peer']).toMatchObject({ role: 'player', name: 'Bo' })
+  expect(r.outgoing).toContainEqual({
+    to: 'broadcast',
+    message: { type: 'SEAT_REBOUND', payload: { playerId: 'p2', peerId: 'fresh-peer' } },
+  })
+})
+
+// The trap this test exists for: assignRole would look at a full room and hand
+// back 'guest', silently demoting a player out of a match they are still
+// seated in.
+it('does not demote a returning player when the room has filled behind them', () => {
+  const full = createLobbyState({
+    selfId: 'host',
+    hostId: 'host',
+    maxPlayers: 2,
+    peers: [
+      {
+        id: 'host',
+        clientId: 'client-host',
+        name: 'Ann',
+        role: 'host',
+        ready: true,
+        where: 'game',
+      },
+      {
+        id: 'squatter',
+        clientId: 'client-x',
+        name: 'Cy',
+        role: 'player',
+        ready: true,
+        where: 'game',
+      },
+    ],
+  })
+  const r = handleJoinRequest(full, 'fresh-peer', 'Bo', 'client-bo', seating)
+  expect(r.state.peers['fresh-peer'].role).toBe('player')
+})
+
+it('treats an unknown clientId as an ordinary join', () => {
+  const r = handleJoinRequest(returningBase(), 'newcomer', 'Cy', 'client-new', seating)
+  expect(r.state.peers.newcomer.role).toBe('player')
+  expect(r.outgoing.some((o) => o.message.type === 'SEAT_REBOUND')).toBe(false)
+})
+
+it('treats any join as ordinary when no match is running', () => {
+  const r = handleJoinRequest(returningBase(), 'fresh-peer', 'Bo', 'client-bo')
+  expect(r.outgoing.some((o) => o.message.type === 'SEAT_REBOUND')).toBe(false)
 })

@@ -56,7 +56,7 @@ export interface Seat {
 export type Message =
   // --- Lobby ---
   | { type: 'JOIN_REQUEST'; payload: { name: string; clientId: string } }
-  | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: 'player' | 'guest' } }
+  | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: Role } }
   | {
       type: 'PEER_JOINED'
       payload: {
