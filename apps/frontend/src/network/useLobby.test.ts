@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, vi } from 'vitest'
+import { getClientId } from '~/shared/lib/persistence'
 import { INTRO_CAP_MS } from './session/startGate'
 import type { Message, WireMessage } from './types'
 import { formatRoomCode, makeRoomCode, parseRoomCode, type UseLobby, useLobby } from './useLobby'
@@ -188,16 +189,17 @@ it('host startGame broadcasts GAME_STARTING and records the game id', async () =
   })
 
   const hostId = result.current.state?.hostId
+  const expectedSeats = [{ playerId: 'p1', peerId: hostId, clientId: getClientId(), name: 'Dimbo' }]
   expect(transports[0].broadcast).toHaveBeenCalledWith({
     type: 'GAME_STARTING',
     payload: {
       gameId: `${hostId}-1`,
       // The seating rides the frame so no peer ever has to derive one.
-      seats: [{ playerId: 'p1', peerId: hostId, name: 'Dimbo' }],
+      seats: expectedSeats,
     },
   })
   expect(result.current.gameId).toBe(`${hostId}-1`)
-  expect(result.current.seats).toEqual([{ playerId: 'p1', peerId: hostId, name: 'Dimbo' }])
+  expect(result.current.seats).toEqual(expectedSeats)
 })
 
 it('a guest follows the host out of the lobby', async () => {

@@ -2,6 +2,7 @@ import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { DEFAULT_SETUP } from '@release/ui'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { seatOf, seatsFor } from '~/entities/game/seats'
+import { getClientId } from '~/shared/lib/persistence'
 import {
   canStart as canStartFn,
   disbandLobby as disbandLobbyFn,
@@ -253,7 +254,7 @@ export function useLobby(): UseLobby {
       if (!current) return
       if (isHostRef.current) {
         if (msg.type === 'JOIN_REQUEST') {
-          const r = handleJoinRequest(current, msg.from, msg.payload.name)
+          const r = handleJoinRequest(current, msg.from, msg.payload.name, msg.payload.clientId)
           commit(r.state)
           dispatch(r.outgoing)
         } else if (msg.type === 'PLAYER_READY') {
@@ -388,7 +389,9 @@ export function useLobby(): UseLobby {
           hostId: t.id,
           maxPlayers,
           setup: setup ?? DEFAULT_SETUP,
-          peers: [{ id: t.id, name, role: 'host', ready: true, where: 'lobby' }],
+          peers: [
+            { id: t.id, clientId: getClientId(), name, role: 'host', ready: true, where: 'lobby' },
+          ],
         })
         commit(initial)
         setStatus('in-lobby')
@@ -435,7 +438,10 @@ export function useLobby(): UseLobby {
             // a bad/expired code never opens and surfaces as a PeerJS error.
             if (peerId === hostId) {
               hostConnectedRef.current = true
-              transportRef.current?.send(hostId, { type: 'JOIN_REQUEST', payload: { name } })
+              transportRef.current?.send(hostId, {
+                type: 'JOIN_REQUEST',
+                payload: { name, clientId: getClientId() },
+              })
               setStatus('in-lobby')
             }
           },
@@ -458,7 +464,16 @@ export function useLobby(): UseLobby {
             hostId,
             maxPlayers: 6,
             setup: DEFAULT_SETUP,
-            peers: [{ id: t.id, name, role: 'guest', ready: false, where: 'lobby' }],
+            peers: [
+              {
+                id: t.id,
+                clientId: getClientId(),
+                name,
+                role: 'guest',
+                ready: false,
+                where: 'lobby',
+              },
+            ],
           }),
         )
         t.connectTo(hostId)

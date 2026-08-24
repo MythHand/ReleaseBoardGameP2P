@@ -125,8 +125,22 @@ function inSession(): UseLobby {
         gitBranch: 'base',
       },
       peers: {
-        h: { id: 'h', name: 'Host', role: 'host', ready: true, where: 'lobby' },
-        p1: { id: 'p1', name: 'Pat', role: 'player', ready: false, where: 'lobby' },
+        h: {
+          id: 'h',
+          clientId: 'client-h',
+          name: 'Host',
+          role: 'host',
+          ready: true,
+          where: 'lobby',
+        },
+        p1: {
+          id: 'p1',
+          clientId: 'client-p1',
+          name: 'Pat',
+          role: 'player',
+          ready: false,
+          where: 'lobby',
+        },
       },
     },
   }
@@ -200,8 +214,22 @@ it('LobbyView renders spectator section when guests present', () => {
         gitBranch: 'base',
       },
       peers: {
-        h: { id: 'h', name: 'Host', role: 'host', ready: true, where: 'lobby' },
-        g1: { id: 'g1', name: 'Gus', role: 'guest', ready: false, where: 'lobby' },
+        h: {
+          id: 'h',
+          clientId: 'client-h',
+          name: 'Host',
+          role: 'host',
+          ready: true,
+          where: 'lobby',
+        },
+        g1: {
+          id: 'g1',
+          clientId: 'client-g1',
+          name: 'Gus',
+          role: 'guest',
+          ready: false,
+          where: 'lobby',
+        },
       },
     },
   }

@@ -22,10 +22,15 @@ function peerList(state: LobbyState): PeerInfo[] {
   return Object.values(state.peers)
 }
 
-export function handleJoinRequest(state: LobbyState, fromId: string, name: string): Result {
+export function handleJoinRequest(
+  state: LobbyState,
+  fromId: string,
+  name: string,
+  clientId: string,
+): Result {
   const role = assignRole(state)
   // The lobby is the only place to join from, so a joiner always starts there.
-  const peer: PeerInfo = { id: fromId, name, role, ready: false, where: 'lobby' }
+  const peer: PeerInfo = { id: fromId, clientId, name, role, ready: false, where: 'lobby' }
   const next = applyPeerJoined(state, peer)
   return {
     state: next,
@@ -48,7 +53,7 @@ export function handleJoinRequest(state: LobbyState, fromId: string, name: strin
         to: 'broadcast',
         message: {
           type: 'PEER_JOINED',
-          payload: { id: fromId, name, role, ready: false, where: 'lobby' },
+          payload: { id: fromId, clientId, name, role, ready: false, where: 'lobby' },
         },
       },
     ],
@@ -71,6 +76,7 @@ export function handleReady(state: LobbyState, fromId: string): Result {
           type: 'PEER_JOINED',
           payload: {
             id: updated.id,
+            clientId: updated.clientId,
             name: updated.name,
             role: updated.role,
             ready: updated.ready,
@@ -101,6 +107,7 @@ export function handleWhereabouts(state: LobbyState, fromId: string, where: Wher
           type: 'PEER_JOINED',
           payload: {
             id: updated.id,
+            clientId: updated.clientId,
             name: updated.name,
             role: updated.role,
             ready: updated.ready,
@@ -162,6 +169,7 @@ export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
           type: 'PEER_JOINED' as const,
           payload: {
             id: peer.id,
+            clientId: peer.clientId,
             name: peer.name,
             role: peer.role,
             ready: peer.ready,
