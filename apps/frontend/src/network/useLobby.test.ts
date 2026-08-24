@@ -1069,3 +1069,78 @@ it('ignores a SEAT_REBOUND that did not come from the host', async () => {
   // address another seat's fan-out at itself.
   expect(result.current.seats).toEqual(SEATING)
 })
+
+it('a player who left the match rejoins the room as a newcomer, not a returner', async () => {
+  const { result } = await hostWhoseGuestDropped()
+  // The frozen seating outlives leaveGame on purpose — a results screen still
+  // mounted reads it — so it is the match id, not the seating, that says
+  // whether there is anything to come back to.
+  act(() => {
+    result.current.leaveGame()
+  })
+
+  rejoin()
+
+  // No board to be sent to, and no seat to be marked mid-match with.
+  expect(sentTo(RETURNED).some((m) => m.type === 'GAME_STARTING')).toBe(false)
+  expect(result.current.state?.peers[RETURNED]).toMatchObject({ ready: false, where: 'lobby' })
+  // And the seating of a match nobody is playing is left exactly as it was.
+  expect(result.current.seats.find((s) => s.clientId === GUEST_CLIENT)?.peerId).toBe(GUEST)
+  expect(transports[0].broadcast).not.toHaveBeenCalledWith(
+    expect.objectContaining({ type: 'SEAT_REBOUND' }),
+  )
+})
+
+it('walking back to the lobby drops the stored match but keeps the room', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    act(() => {
+      result.current.startGame()
+    })
+    act(() => {
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+    expect(localStorage.getItem(KEEPER_KEY)).not.toBeNull()
+
+    act(() => {
+      result.current.leaveGame()
+    })
+
+    // The match is over for this peer; the room is not. A reload has to be able
+    // to put them back in the lobby, and must not put them back on the board.
+    expect(localStorage.getItem(KEEPER_KEY)).toBeNull()
+    expect(storedSession()).toMatchObject({
+      roomCode: result.current.roomCode,
+      name: 'Dimbo',
+      role: 'host',
+      gameId: null,
+    })
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('a snapshot still on its trailing edge cannot survive walking back to the lobby', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    act(() => {
+      result.current.startGame()
+    })
+    // Left inside the throttle's window: the deal's snapshot is queued and not
+    // yet serialized, so only cancelling it keeps it from landing behind the
+    // clear below.
+    act(() => {
+      result.current.leaveGame()
+    })
+
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+
+    expect(localStorage.getItem(KEEPER_KEY)).toBeNull()
+  } finally {
+    vi.useRealTimers()
+  }
+})

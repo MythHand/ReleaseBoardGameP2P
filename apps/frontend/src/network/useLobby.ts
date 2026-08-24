@@ -283,7 +283,8 @@ export function useLobby(): UseLobby {
   // has already left. A missing record means the session was never stored (or
   // has expired), and inventing one here would store a room with no `name` and
   // no `joinedAt` behind it.
-  const rememberGame = useCallback((id: string) => {
+  // `null` walks it back: the room stays stored, the match on it does not.
+  const rememberGame = useCallback((id: string | null) => {
     const stored = readSession()
     if (stored) writeSession({ ...stored, gameId: id })
   }, [])
@@ -357,18 +358,27 @@ export function useLobby(): UseLobby {
         if (msg.type === 'JOIN_REQUEST') {
           // The frozen seating is what tells a return from a first join, so it
           // has to be the live one — the ref, never a closed-over copy.
+          //
+          // And only while a match is actually running. The seating deliberately
+          // outlives `leaveGame` (a results screen still mounted reads it), so
+          // the match id is what says whether there is anything to come back to:
+          // without this gate a player who left the match and rejoined the room
+          // would be recognised as a returner and seated back into a match they
+          // walked out of — arriving in the lobby already `ready`, in `game`.
+          const liveGameId = gameIdRef.current
+          const seating = liveGameId ? seatsRef.current : undefined
           const r = handleJoinRequest(
             current,
             msg.from,
             msg.payload.name,
             msg.payload.clientId,
-            seatsRef.current,
+            seating,
           )
           commit(r.state)
           dispatch(r.outgoing)
 
-          const seat = seatsRef.current.find((s) => s.clientId === msg.payload.clientId)
-          if (seat) {
+          const seat = seating?.find((s) => s.clientId === msg.payload.clientId)
+          if (seat && liveGameId) {
             // Patch our own copy of the seating — `handleJoinRequest` told
             // everyone else with the SEAT_REBOUND it just dispatched — then
             // send the whole thing: GAME_STARTING is what `useFollowGameStart`
@@ -377,20 +387,17 @@ export function useLobby(): UseLobby {
               s.clientId === msg.payload.clientId ? { ...s, peerId: msg.from } : s,
             )
             applySeats(rebound)
-            const id = gameIdRef.current
-            if (id) {
-              dispatch([
-                {
-                  to: msg.from,
-                  message: { type: 'GAME_STARTING', payload: { gameId: id, seats: rebound } },
-                },
-              ])
-              // Called after GAME_STARTING on purpose: DataChannels preserve
-              // order, so the catch-up projection this produces lands behind the
-              // frame that routes the peer to its board — which is where that
-              // peer builds the remote link the projection needs to arrive on.
-              keeperRef.current?.peerReturned(seat.playerId, msg.from)
-            }
+            dispatch([
+              {
+                to: msg.from,
+                message: { type: 'GAME_STARTING', payload: { gameId: liveGameId, seats: rebound } },
+              },
+            ])
+            // Called after GAME_STARTING on purpose: DataChannels preserve
+            // order, so the catch-up projection this produces lands behind the
+            // frame that routes the peer to its board — which is where that
+            // peer builds the remote link the projection needs to arrive on.
+            keeperRef.current?.peerReturned(seat.playerId, msg.from)
           }
         } else if (msg.type === 'PLAYER_READY') {
           const r = handleReady(current, msg.from)
@@ -805,10 +812,27 @@ export function useLobby(): UseLobby {
   // and another peer may still be reading its results — there is nothing here to
   // reclaim and a live results screen to break. A rematch tears the old keeper
   // and gate down inside startGame before building new ones.
+  //
+  // What is stored follows the same split, for the same reason: leaving the
+  // match is not leaving the room. The keeper snapshot goes — it describes a
+  // match this peer is done with, and a reload finding it would put them back
+  // on a board they walked off — while the session record stays, minus its
+  // gameId, so the room itself is still restorable. The pending write is
+  // cancelled first: a snapshot still on its trailing edge would otherwise land
+  // behind the clear and resurrect exactly what was deleted.
+  //
+  // Nothing rewrites it afterwards. The keeper deliberately stays alive here,
+  // but the only caller is the results screen (pages/board/[gameId]/stats.tsx),
+  // reached once the match is over — and `tick` and `driveAbsent` both no-op on
+  // a finished game, so its commits are reference-identical and never queue a
+  // write.
   const leaveGame = useCallback(() => {
     gameIdRef.current = null
     setGameId(null)
-  }, [])
+    cancelKeeperSave()
+    clearKeeper()
+    rememberGame(null)
+  }, [cancelKeeperSave, rememberGame])
 
   const setSetup = useCallback(
     (setup: Setup) => {
