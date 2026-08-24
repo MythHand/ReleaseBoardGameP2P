@@ -5,6 +5,12 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+
+  /* The family is the only text property declared here, and the letter's size is
+     the one thing this primitive computes: `fontSize: size * 0.45` in Avatar.tsx,
+     so the initial keeps its proportion at any side. A scale step cannot express
+     a function of a prop — this is the documented exception in apps/ui/CLAUDE.md,
+     not a place that still has to be migrated to <Typography>. */
   font-family: var(--font-mono);
   background: var(--white-08);
 

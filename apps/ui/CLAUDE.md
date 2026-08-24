@@ -12,6 +12,7 @@ Shared component library — TypeScript + React + CSS Modules + design tokens; n
 - **Live showcase — the playground `Typography` page** ([`TypographyPreview.tsx`](../playground/stories/foundations/TypographyPreview.tsx)): all bases, tk variations, and the curated component variants. Check it before working on text and keep it in sync on changes.
 - **`composes` from the scale is legacy.** The library's internal components migrate from `composes` to `<Typography>` in phases (separate plan). New code goes through the component from the start.
 - Allowed locally outside the component: glyphs / icons (`font-size` only), a `line-height` nuance for the rhythm of a specific spot, an inline weight accent (like `<b>`), and a contextual `text-transform` reset (when an element sits inside an `uppercase` parent).
+- **A primitive whose character scales with its own size prop is an exception, and the size is the only part of it.** `Avatar` draws one initial inside a square whose side is a prop, and its size is derived — `fontSize: Math.round(size * 0.45)` — so the letter keeps its proportion at 26, 30, 34 or 128. The scale is a set of steps and cannot express a function of a prop: pinning the letter to the nearest step would break the proportion at every size in between. The family still comes from a token (`--font-mono`), and nothing else about the character is written by hand. Do not "fix" this to `<Typography>`.
 
 ## Color Rule
 

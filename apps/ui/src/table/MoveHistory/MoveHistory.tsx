@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import ScrollArea from '@/primitives/ScrollArea'
+import Typography from '@/primitives/Typography'
 import styles from './MoveHistory.module.css'
 
 export interface HistoryTarget {
@@ -120,7 +121,13 @@ function Row({ e, copy, nested = false }: RowProps) {
   const label = e.card ?? e.text ?? e.kind
   return (
     <>
-      <div
+      {/* The row carries the text step for everything inside it: a top-level
+          entry is body-xs (12), a nested one steps down to body-2xs (11) — the
+          same pair the system row uses. Both come from the scale through
+          Typography rather than from a px written here. */}
+      <Typography
+        as="div"
+        base={nested ? 'body-2xs' : 'body-xs'}
         className={`${styles.row} ${nested ? styles.nested : ''}`}
         data-accented={accent ? 'true' : 'false'}
         style={accent ? ({ '--accent': accent } as CSSProperties) : undefined}
@@ -169,7 +176,7 @@ function Row({ e, copy, nested = false }: RowProps) {
         )}
 
         <span className={styles.who}>{e.who}</span>
-      </div>
+      </Typography>
       {e.children?.map((c) => (
         <Row key={c.id} e={c} copy={copy} nested />
       ))}
