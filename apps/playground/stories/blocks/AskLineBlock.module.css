@@ -1,0 +1,68 @@
+/* The ask line has no shape of its own to show — it is a line hanging under the
+   centre of the table. So the page draws the table it hangs in: a bounded stage
+   with the centre marked, and the line where it really sits. */
+
+.bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.stage {
+  position: relative;
+  inline-size: 100%;
+
+  /* tall enough that 42% + 146px lands inside the box with air under it */
+  min-block-size: 420px;
+  overflow: hidden;
+  background:
+    linear-gradient(var(--white-03), var(--white-03)),
+    repeating-linear-gradient(
+        0deg,
+        var(--white-04) 0 1px,
+        transparent 1px 28px
+      ),
+    repeating-linear-gradient(90deg, var(--white-04) 0 1px, transparent 1px 28px);
+  border: 1px solid var(--white-08);
+  border-radius: 10px;
+}
+
+/* the centre the line hangs off — drawn so the offset below it is visible as an
+   offset rather than as an absolute position */
+.centre {
+  position: absolute;
+  inset-inline-start: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 150px;
+  block-size: 210px;
+  color: var(--white-35);
+  text-align: center;
+  border: 1px dashed var(--white-30);
+  border-radius: 8px;
+  transform: translate(-50%, -50%);
+}
+
+.values {
+  inline-size: 100%;
+  font-size: 12.5px;
+  border-collapse: collapse;
+}
+
+.values th {
+  padding: 8px 12px;
+  color: var(--white-50);
+  text-align: start;
+  border-block-end: 1px solid var(--white-14);
+}
+
+.values td {
+  padding: 9px 12px;
+  border-block-end: 1px solid var(--white-07);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  color: var(--fg);
+}

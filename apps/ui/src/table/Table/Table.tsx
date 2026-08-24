@@ -8,7 +8,6 @@ import { CardMotionProvider } from '@/cards/cardMotion'
 import GearIcon from '@/icons/GearIcon'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Badge from '@/primitives/Badge'
-import Button from '@/primitives/Button'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
 import Pile from '@/primitives/Pile'
@@ -30,7 +29,7 @@ import Seat from '@/table/Seat'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { deriveDock } from './dock'
 import PendingPrompt from './PendingPrompt'
-import { pileWidthFor } from './piles'
+import { PILE_WIDTH } from './piles'
 import styles from './Table.module.css'
 import type { Panel, TableProps } from './types'
 import { useTableInteractions } from './useTableInteractions'
@@ -145,7 +144,7 @@ export default function Table({
   onPanelChange,
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup } = state
-  const derived = deriveDock(state, state.selfId, now)
+  const derived = deriveDock(state, state.selfId, now, room.timers ?? true)
   const dockView = { ...derived, ...dock }
   const {
     role = 'guest',
@@ -161,6 +160,8 @@ export default function Table({
     onParallaxChange,
     chatToasts = true,
     onChatToastsChange,
+    timers = true,
+    onTimersChange,
     paused = false,
     onPauseChange,
     pausePlayers = [],
@@ -244,7 +245,8 @@ export default function Table({
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
   const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
-  const hostControls = canLimitSpectators || canPause
+  const canTimers = isHost && Boolean(onTimersChange) && Boolean(copy.table.timers)
+  const hostControls = canLimitSpectators || canPause || canTimers
   // есть ли на столе переписка вообще: от этого зависит и вкладка рейла, и
   // настройка её уведомлений — управлять тем, чего на экране нет, незачем
   const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
@@ -336,7 +338,7 @@ export default function Table({
                 label={copy.table.deck}
                 deck="base"
                 count={count}
-                width={pileWidthFor(decks.main.length)}
+                width={PILE_WIDTH}
                 countPos="tl"
               />
             ))}
@@ -396,19 +398,15 @@ export default function Table({
             seconds={dockView.seconds}
             progress={dockView.progress}
             activePlayer={dockView.activePlayer}
+            passed={dockView.passed}
+            passes={dockView.passes}
             copy={copy.turnDock}
             paused={paused}
             onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
             onPush={actions?.onPush}
             onPass={actions?.onPass}
+            onUnpass={actions?.onUnpass}
           />
-          {/* you already passed on the open window — TurnDock has no notion of
-              "unpass", so the affordance to take it back lives here instead */}
-          {state.window?.passed.includes(state.selfId) && (
-            <Button variant="tech" className={styles.unpass} onClick={() => actions?.onUnpass?.()}>
-              {copy.window.unpass}
-            </Button>
-          )}
         </div>
 
         {/* the engine is waiting on a decision from you — a pending owed to you
@@ -505,6 +503,18 @@ export default function Table({
                           fill
                           className={styles.sliderFull}
                         />
+                      </SettingsField>
+                    )}
+                    {canTimers && (
+                      <SettingsField label={copy.table.timers} hint={copy.table.timersHint} inline>
+                        <Toggle
+                          on={timers}
+                          onChange={(on) => onTimersChange?.(on)}
+                          className={styles.settingToggle}
+                        >
+                          {(timers ? copy.table.timersOn : copy.table.timersOff) ??
+                            copy.table.timers}
+                        </Toggle>
                       </SettingsField>
                     )}
                     {canPause && (

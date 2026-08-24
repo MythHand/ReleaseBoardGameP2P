@@ -110,11 +110,7 @@
    150px = the deck / hand card width, so nothing skews in size across the table */
 .center {
   position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  transform: translate(-50%, -50%);
 }
 
 /* a card revealed / resting at the centre */

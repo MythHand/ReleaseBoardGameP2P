@@ -1,5 +1,12 @@
 # Release and defence on the board — Implementation Plan
 
+> **Изменилось после этой волны (сверено 22.08.2026).** Документ описывает состояние на момент своей
+> задачи и не переписывается задним числом — здесь только то, что с тех пор стало иначе:
+> - **Складывание защиты со своим судо — шаг `usePairFold`.**
+> - **Места центра стола — `apps/ui/src/table/TableCentre/centre.ts`**, один источник на сцены и борд.
+> - **Строка «чего стол ждёт» — компонент кита `AskLine`** со своей страницей `Ask line`.
+> - **Посадка карты на место — кривая `LAND`;** `SNAP` осталась на появлении элемента в слоте.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Bring the playground's `DefenseReleaseStory` to the real board — a release played with its cost shown in the open, the attack window, attacks from seats, defences that cover them, the defence-side Sudo pair, Security Bug's steal and Rollback's return — all driven by engine events, plus the engine fix that gives a stolen release its own attack window.

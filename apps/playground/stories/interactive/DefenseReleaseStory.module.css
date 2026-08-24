@@ -24,75 +24,30 @@
    50%): it clears the hand and the zoom preview that rises out of it. Same
    value in every scene — do not "fix" it back. */
 
-/* the played Release waits at the centre for its cost; the cost is shown to its
-   right, so both are open on the table at the same time */
-.stageSlot {
+/* Every place of the centre shares this rule; WHERE each one sits, how wide it
+   is and what layer it stands on come from `CENTRE_SLOTS` / `CENTRE_SETS`
+   (`@release/ui`, `table/TableCentre/centre.ts`), applied inline by the scene.
+   They used to be five nearly identical rules here — and the same five again in
+   the board's fork, matching by hand alone.
+
+   No rotation here, and none from the module either: the place stays
+   axis-aligned so its rect is the card's true box for a flight to aim at (I6).
+   The tilt lives on `.pose` below. */
+.slot {
   position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  transform: translate(calc(-50% - 92px), -50%);
 }
 
-.costSlot {
-  position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  inline-size: 150px;
-  aspect-ratio: var(--card-aspect);
-  transform: translate(calc(-50% + 92px), -50%);
-}
-
-/* the attack stands here, at the true centre of the table — open to everyone,
-   and covered by the defence that answers it */
-.centerSlot {
-  position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  z-index: 10;
-  inline-size: 150px;
-  aspect-ratio: var(--card-aspect);
-  transform: translate(-50%, -50%);
-}
-
-/* the defender's own Sudo, waiting for the defence it will enhance — its own
-   place left of the attack, not on top of anything */
-.sudoSlot {
-  position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  z-index: 9;
-  inline-size: 150px;
-  aspect-ratio: var(--card-aspect);
-  transform: translate(calc(-50% - 180px), -50%);
-}
-
-/* the card covering the attack — same centre, nudged aside so both are read */
-.coverSlot {
-  position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  z-index: 11;
-  inline-size: 150px;
-  aspect-ratio: var(--card-aspect);
-  transform: translate(-50%, -50%);
+/* An EMPTY slot is not a target. The cover sits exactly on top of the centre
+   (same offset, layer 11 over 10) and is mounted even with no card in it, so
+   with nothing there it was silently eating every pointer event meant for the
+   attack underneath — the hover on the attacked card never arrived. */
+.slot:empty {
+  pointer-events: none;
 }
 
 /* a card's pose on the table — its tilt/offset lives on this inner element, so
    the slot itself stays axis-aligned and its rect is the true card box */
-
-/* An EMPTY slot is not a target. .coverSlot sits exactly on top of .centerSlot
-   (both translate(-50%,-50%), z 11 over z 10) and is mounted even with no card
-   in it, so with nothing there it was silently eating every pointer event meant
-   for the attack underneath — the hover on the attacked card never arrived. */
-.stageSlot:empty,
-.costSlot:empty,
-.centerSlot:empty,
-.sudoSlot:empty,
-.coverSlot:empty {
-  pointer-events: none;
-}
 
 .pose {
   block-size: 100%;
@@ -100,34 +55,6 @@
 
 .pose[data-straight="true"] {
   transition: transform 420ms var(--ease-out);
-}
-
-/* what the table is waiting for — under the staged cards, so the ask is where
-   the play is, not only in the dev bar. Its own surface, or it dissolves into
-   the table; mounted always so it can fade out as well as in. */
-.ask {
-  position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  z-index: 12;
-  padding: 10px 18px;
-  color: var(--fg);
-  text-align: center;
-  pointer-events: none;
-  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
-  border: 1px solid var(--white-20);
-  border-radius: 999px;
-  box-shadow: 0 6px 20px var(--black-45);
-  opacity: 0;
-  transform: translate(-50%, 132px);
-  transition:
-    opacity 260ms var(--ease-out),
-    transform 260ms var(--ease-out);
-}
-
-.ask[data-shown="true"] {
-  opacity: 1;
-  transform: translate(-50%, 146px);
 }
 
 /* opponents — top-centre, clear of the tech bar */

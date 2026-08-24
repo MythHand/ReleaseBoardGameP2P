@@ -141,7 +141,7 @@ export {
   type PendingPromptProps,
   type WindowCopy,
 } from './table/Table/PendingPrompt'
-export { pileWidthFor } from './table/Table/piles'
+export { PILE_WIDTH, pileWidthFor } from './table/Table/piles'
 export type {
   Panel,
   TableChromeCopy as TableCopy,
@@ -153,5 +153,21 @@ export type {
   TableSlots,
   TableState,
 } from './table/Table/types'
+// The line under the centre — where the table says what it is waiting for. It
+// hangs off CENTRE_TOP, so it ships beside the geometry it follows.
+export { default as AskLine } from './table/TableCentre/AskLine'
+export {
+  CENTRE_CARD_W,
+  CENTRE_SETS,
+  CENTRE_SLOTS,
+  CENTRE_TOP,
+  type CentrePlace,
+  type CentreSet,
+  type CentreSlot,
+  type CentreSlotGeom,
+  type CentreTilt,
+  centrePlaceStyle,
+  centreTransform,
+} from './table/TableCentre/centre'
 export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'
 export { default as TurnDock } from './table/TurnDock/TurnDock'

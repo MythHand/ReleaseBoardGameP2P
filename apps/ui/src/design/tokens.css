@@ -34,6 +34,7 @@
   --coral: #ff6b81; /* destructive / error — distinct from --cat-attack */
   --gold: #e3b341; /* caution accent (Badge warning, Dropdown) */
   --periwinkle: #7fb0ff; /* informational blue (Badge info) */
+  --violet: #6b3fd4; /* deep violet — the attack phase; the darkest HUD accent */
   --gray: #8a8a8a; /* mid grey — arrow desaturation mix */
   --charcoal: #1c1c1c; /* near-black — dark text on light surfaces (Rules) */
 
@@ -41,6 +42,10 @@
   --turn-accent: var(--brand-green); /* the player's active turn */
   --idle-accent: var(--white-45); /* opponent turn / neutral — muted white */
   --reaction-accent: var(--gold); /* reaction window — attack on a release */
+  --attack-accent: var(--violet); /* MY chance to attack someone else's fresh
+    release — the offensive half of a window, told apart from --reaction-accent,
+    which is the defensive one. Not --cat-attack: that is the card category's
+    colour, this is a phase of the turn dock. */
   --danger-accent: var(--coral); /* danger reaction (503) — and a pick that COSTS
     you a card (hand-limit discard, Bad Vibe) */
   --select-accent: var(--mint); /* pick one OUT OF A SET, when the pick is neutral

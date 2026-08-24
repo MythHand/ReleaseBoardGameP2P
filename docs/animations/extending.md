@@ -33,7 +33,9 @@ A preset is one of two shapes (both in `PRESETS`):
 
 Steps:
 1. Add an entry to `PRESETS` with a clear, game-moment name (a verb-ish phrase like `playToCenter`,
-   `returnToDeck`). Reuse `EASE` / `SNAP`; for a travel, build on `move(el, params, duration, easing)`
+   `returnToDeck`). Reuse `EASE` / `LAND` / `SNAP` — `LAND` when a CARD settles onto a place (its travel across the
+   table has to be visible), `SNAP` only when a small element APPEARS in its slot with no path to
+   show; for a travel, build on `move(el, params, duration, easing)`
    rather than hand-writing keyframes.
 2. For a variable duration, read it via `durationOf(p, fallback)` so call sites can override `duration`.
 3. Call it: `const anim = play('yourName', el, params); if (anim) await anim.finished`.

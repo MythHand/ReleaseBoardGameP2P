@@ -13,6 +13,7 @@ import { CARD_W } from '@/table/Hand/fan'
 import type { HandPlayDrop } from '@/table/Hand/Hand'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
+import { centrePlaceStyle } from '@/table/TableCentre/centre'
 import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechButton, TechHint } from '../controls/TechControls'
@@ -157,7 +158,7 @@ export default function CardPlayStory() {
         </div>
 
         {/* table center */}
-        <div className={styles.center} ref={centerRef}>
+        <div className={styles.center} style={centrePlaceStyle('reveal', 'centre')} ref={centerRef}>
           {center ? (
             // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only send to discard; sandbox story
             <div className={styles.centerCard} onMouseDown={flyToDiscard} {...slotProps(center)}>

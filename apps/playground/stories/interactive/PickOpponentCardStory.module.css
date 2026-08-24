@@ -55,7 +55,7 @@
 /* кнопка вызова — по центру, в стиле плейграунда */
 .startSlot {
   position: absolute;
-  inset-block-start: 44%;
+  inset-block-start: 42%;
   inset-inline: 0;
   display: flex;
   justify-content: center;

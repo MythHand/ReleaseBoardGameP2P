@@ -12,12 +12,15 @@ type Copy = typeof enCommon.turnDock
 
 // per-phase clock length (s); danger reaction runs the shorter 10s window.
 // `hold` exists only to keep this Record total over TurnDockState — the
-// showcase does not demo it.
+// showcase does not demo it (it is the wait on somebody else's decision, and
+// there is nothing in it to look at but a name).
 const TOTAL: Record<TurnDockState, number> = {
   draw: 30,
   push: 30,
   waiting: 25,
   reaction: 15,
+  attack: 15,
+  exposed: 15,
   hold: 15,
 }
 
@@ -33,6 +36,8 @@ const AUTO: Step[] = [
   { state: 'draw' },
   { state: 'push' },
   { state: 'waiting', player: 'neo' },
+  { state: 'attack', player: 'neo' },
+  { state: 'exposed' },
   { state: 'waiting', player: 'trinity' },
   { state: 'reaction', player: 'trinity' },
   { state: 'waiting', player: 'morpheus' },
@@ -48,6 +53,12 @@ function TurnDockLive({ copy, ctl }: { copy: Copy; ctl: Record<string, string> }
   const [seconds, setSeconds] = useState(TOTAL.draw)
   const [auto, setAuto] = useState(false)
   const [paused, setPaused] = useState(false)
+  // the pass is live here, not a prop: pressing the key is the whole point of
+  // this phase — pass, watch the key light, press again to take it back
+  const [passed, setPassed] = useState(false)
+  // a table of four: three seats may hit the release, one of them has already
+  // declined, and your own pass lights the next dot as you make it
+  const passes = { total: 3, lit: (passed ? 1 : 0) + 1 }
 
   const { state, player = 'neo', danger = false } = step
   const total = danger ? 10 : TOTAL[state]
@@ -57,6 +68,8 @@ function TurnDockLive({ copy, ctl }: { copy: Copy; ctl: Record<string, string> }
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset keys off the phase, not the derived total
   useEffect(() => {
     setSeconds(danger ? 10 : TOTAL[state])
+    // a pass belongs to the window it was made in — a new phase starts clean
+    setPassed(false)
   }, [state, player, danger])
 
   // tick down once a second (floors at 0); frozen while paused
@@ -100,6 +113,12 @@ function TurnDockLive({ copy, ctl }: { copy: Copy; ctl: Record<string, string> }
           {ctl.waitTrinity}
         </Button>
         <span className={styles.spacer} aria-hidden="true" />
+        <Button variant="tech" onClick={() => go({ state: 'attack', player: 'neo' })}>
+          {ctl.attack}
+        </Button>
+        <Button variant="tech" onClick={() => go({ state: 'exposed' })}>
+          {ctl.exposed}
+        </Button>
         <Button variant="tech" onClick={() => go({ state: 'reaction', player: 'neo' })}>
           {ctl.reaction}
         </Button>
@@ -125,7 +144,11 @@ function TurnDockLive({ copy, ctl }: { copy: Copy; ctl: Record<string, string> }
           progress={progress}
           activePlayer={player}
           danger={danger}
+          passed={passed}
+          passes={passes}
           paused={paused}
+          onPass={() => setPassed(true)}
+          onUnpass={() => setPassed(false)}
         />
       </div>
     </div>
@@ -146,15 +169,20 @@ export default function TurnDockBlock() {
       draw: 'Ваш ход — нужен добор',
       push: 'Ваш ход — можно PUSH',
       waiting: 'Ход оппонента',
-      reaction: 'Окно реакции — атака на релиз (янтарь)',
+      reaction: 'Окно реакции — от вас ждут ответа (янтарь)',
       reactionDanger: 'Окно реакции — Error 503 (danger, красный)',
+      attack: 'Атака — чужой свежий релиз открыт вам (фиолетовый)',
+      attackPassed: 'Атака — вы спасовали: клавиша залита, нажатие вернёт пас',
+      exposedState: 'Ожидание атаки — окно на вашем релизе (зелёный, точки на месте клавиши)',
       notesTitle: 'Наработки: поведение таймера',
       note1:
         'Свой ход — таймер бездействия, а не жёсткий лимит: продлевается на каждое осмысленное действие (сыграл/потянул карту, открыл прицел, добор). Обрубает только реально зависшего игрока — по таймауту авто-разрешение минимального хода (авто-добор → авто-PUSH) с предупреждением на последних секундах.',
       note2:
         'Окно реакции — время задано механикой правил: 15 сек первое окно, 10 сек каждый следующий раунд «продолжить атаку». Не выдумываем, только отображаем.',
       note3:
-        'Цвет кольца — акцент по фазе: зелёный (свой ход), янтарный (реакция-атака), красный (danger — Error 503). При смене фазы кольцо дозаполняется до полного и перетекает в новый цвет. На ходе соперника кольцо потухшее и без числа — чужой таймер бездействия сбрасывается на каждое действие, наблюдателю показывать нечего.',
+        'Точки паса — счётчик, а не список: по одной на каждого, кто может ударить, залитые — те, кто спасовал. Кто именно спасовал, точки не говорят намеренно: столу важно, насколько окно близко к досрочному закрытию, а не кто из соперников осторожничает. У атакующего они в правом верхнем углу, у того, чей релиз под ударом, — крупные, на месте клавиши.',
+      note4:
+        'Цвет кольца — акцент по фазе: зелёный (свой ход и ожидание атаки на свой релиз), фиолетовый (атака — чужой релиз открыт вам), янтарный (от вас ждут ответа), красный (danger — Error 503). При смене фазы кольцо дозаполняется до полного и перетекает в новый цвет. Чужих часов не показываем никогда: на ходе соперника и на чужом решении кольцо потухшее и без числа — это не ваше время, а число, на которое вы не влияете, только дёргается перед вами, пока вы ждёте.',
     },
     en: {
       live: 'Transitions (live)',
@@ -162,15 +190,21 @@ export default function TurnDockBlock() {
       draw: 'Your turn — draw required',
       push: 'Your turn — PUSH available',
       waiting: 'Opponent turn',
-      reaction: 'Reaction window — attack a release (amber)',
+      reaction: 'Reaction window — an answer is owed by you (amber)',
       reactionDanger: 'Reaction window — Error 503 (danger, red)',
+      attack: 'Attack — somebody else’s fresh release is open to you (violet)',
+      attackPassed: 'Attack — you passed: the key is lit, pressing it takes the pass back',
+      exposedState:
+        'Awaiting attack — the window is on your release (green, dots in the key’s slot)',
       notesTitle: 'Research: timer behaviour',
       note1:
         'Own turn — an inactivity timer, not a hard cap: it extends on every meaningful action (play/drag a card, open targeting, draw). Only a truly idle player gets cut off — on timeout, auto-resolve a minimal turn (auto-draw → auto-PUSH) with a warning in the final seconds.',
       note2:
         'Reaction window — time is defined by the rules: 15s for the first window, 10s for each follow-up “keep attacking” round. Not invented, only displayed.',
       note3:
-        'Ring colour is the per-phase accent: green (your turn), amber (attack reaction), red (danger — Error 503). On a phase change the ring fills back to full and glides to the new colour. On the opponent’s turn the ring is dimmed with no number — their inactivity timer resets on every action, so there is nothing meaningful to show a watcher.',
+        'The pass dots are a count, not a list: one per seat that may hit, filled for each pass made. Who passed is deliberately not said — what the table needs is how close the window is to closing early, not which opponent is being careful. The attacker reads them in the top-right corner; the player whose release is under the window gets them large, in the key’s slot.',
+      note4:
+        'Ring colour is the per-phase accent: green (your turn, and awaiting an attack on your own release), violet (attack — their fresh release is open to you), amber (an answer is owed by you), red (danger — Error 503). On a phase change the ring fills back to full and glides to the new colour. Somebody else’s clock is never shown: on their turn and on their decision the ring is dimmed with no number — it is not your time to spend, and a number you cannot act on only twitches while you wait.',
     },
   })
   const ctl = pick(lang, {
@@ -179,6 +213,8 @@ export default function TurnDockBlock() {
       push: 'после добора',
       waitNeo: 'ход neo',
       waitTrinity: 'ход trinity',
+      attack: 'атака',
+      exposed: 'ожидание атаки',
       reaction: 'реакция',
       danger: 'error 503',
       auto: 'авто',
@@ -191,6 +227,8 @@ export default function TurnDockBlock() {
       push: 'after draw',
       waitNeo: 'neo turn',
       waitTrinity: 'trinity turn',
+      attack: 'attack',
+      exposed: 'awaiting attack',
       reaction: 'reaction',
       danger: 'error 503',
       auto: 'auto',
@@ -216,6 +254,35 @@ export default function TurnDockBlock() {
         <KitCell caption={w.waiting}>
           <TurnDock state="waiting" copy={copy} seconds={25} progress={0.84} activePlayer="neo" />
         </KitCell>
+        <KitCell caption={w.attack}>
+          <TurnDock
+            state="attack"
+            copy={copy}
+            seconds={12}
+            progress={0.8}
+            activePlayer="neo"
+            passes={{ total: 3, lit: 1 }}
+          />
+        </KitCell>
+        <KitCell caption={w.attackPassed}>
+          <TurnDock
+            state="attack"
+            copy={copy}
+            seconds={6}
+            progress={0.4}
+            activePlayer="neo"
+            passed
+          />
+        </KitCell>
+        <KitCell caption={w.exposedState}>
+          <TurnDock
+            state="exposed"
+            copy={copy}
+            seconds={9}
+            progress={0.6}
+            passes={{ total: 3, lit: 2 }}
+          />
+        </KitCell>
         <KitCell caption={w.reaction}>
           <TurnDock state="reaction" copy={copy} seconds={8} progress={0.35} activePlayer="neo" />
         </KitCell>
@@ -235,6 +302,7 @@ export default function TurnDockBlock() {
         <Typography variant="body">{w.note1}</Typography>
         <Typography variant="body">{w.note2}</Typography>
         <Typography variant="body">{w.note3}</Typography>
+        <Typography variant="body">{w.note4}</Typography>
       </KitSection>
     </KitPage>
   )

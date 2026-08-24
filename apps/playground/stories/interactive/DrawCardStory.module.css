@@ -67,32 +67,19 @@
 /* центр стола — точка staging добора (якорь для измерения) */
 .center {
   position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  transform: translate(-50%, -50%);
 }
 
 /* AI-триггер (причина) — слева от центра, обычный размер карты */
 .causeSlot {
   position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  inline-size: 150px;
   aspect-ratio: var(--card-aspect);
-  transform: translate(calc(-50% - 107px), -50%);
 }
 
 /* AI-эффект (главная) — в центре, крупнее триггера */
 .effectSlot {
   position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  z-index: 1;
-  inline-size: 200px;
   aspect-ratio: var(--card-aspect);
-  transform: translate(calc(-50% + 82px), -50%);
 }
 
 /* the cards in the air belong to the shared carrier (useFlyer) — the scene has no

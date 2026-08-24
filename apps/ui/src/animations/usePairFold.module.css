@@ -1,0 +1,14 @@
+/* the pair in the air — same rung and same rules as the carrier's node
+   (useFlyer.module.css): fixed, viewport coords inline, never catching the
+   pointer. It mounts INVISIBLE and is revealed in the same tick the halves get
+   their entry poses, so the pair cannot be seen already folded for a frame. */
+.flyer {
+  position: fixed;
+  z-index: var(--z-flight);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.flyer[data-shown="true"] {
+  opacity: 1;
+}

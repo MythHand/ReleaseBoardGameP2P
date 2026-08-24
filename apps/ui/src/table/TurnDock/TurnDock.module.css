@@ -98,3 +98,85 @@
   color: var(--fg);
   overflow-wrap: anywhere;
 }
+
+/* ===== pass dots — how many seats that may attack have already declined ===== */
+
+/* A count, not a list: the row grows with the number of responders and its lit
+   part with the passes. Never per player, so no name and no order to read into. */
+.dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dot {
+  inline-size: 8px;
+  block-size: 8px;
+  background: var(--white-14);
+  border: 1px solid var(--white-20);
+  border-radius: 50%;
+
+  /* the fill glides on, so a pass arriving from another peer is noticed without
+     anything moving — no pulse: nothing here waits on the viewer */
+  transition:
+    background var(--t-base) var(--ease-soft),
+    border-color var(--t-base) var(--ease-soft),
+    box-shadow var(--t-base) var(--ease-soft);
+}
+
+/* Lit takes the DOCK's own accent, passed down as --dot-accent — violet while
+   the row sits in the attacker's corner, turn-green in the slot of the player
+   whose release is under the window. One row, wearing the phase it belongs to,
+   rather than a colour of its own that would read as a second meaning. */
+.dotLit {
+  background: var(--dot-accent);
+  border-color: var(--dot-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--dot-accent) 45%, transparent);
+}
+
+/* the defender's own view: the dots take the key's slot, so they are read from
+   across the table rather than glanced at in the corner */
+.dotsBig {
+  gap: 10px;
+}
+
+.dotsBig .dot {
+  inline-size: 14px;
+  block-size: 14px;
+}
+
+.dotsSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 100%;
+}
+
+/* ===== the key, engaged ===== */
+
+/* A pass already made. The word does not change — it is the same key toggled,
+   and a relabelled key reads as a different action — so the state is carried by
+   the key turning ON.
+   The HUD idiom is kept exactly: the same accent wash, the same border, the same
+   double glow, every one of them stepped up. NOT a solid fill — a flat block of
+   accent under light text is a different button from a different kit, and it
+   drops the surface's own gradient and inner light that make the dock read as
+   glass. Two classes, so this wins over `Button`'s `.hud` whatever order the
+   modules land in. */
+.key.keyOn {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--btn-accent) 34%, transparent),
+    color-mix(in srgb, var(--btn-accent) 20%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--btn-accent) 70%, transparent);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--btn-accent) 26%, transparent),
+    inset 0 0 20px color-mix(in srgb, var(--btn-accent) 16%, transparent);
+}
+
+.key.keyOn:hover {
+  box-shadow:
+    0 0 24px color-mix(in srgb, var(--btn-accent) 36%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--btn-accent) 22%, transparent);
+}

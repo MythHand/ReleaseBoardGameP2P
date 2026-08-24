@@ -22,6 +22,7 @@ import type { HandItem } from '@/table/Hand/Hand'
 import ReleaseZone from '@/table/ReleaseZone'
 import type { ReleaseSlots } from '@/table/ReleaseZone/ReleaseZone'
 import Seat from '@/table/Seat'
+import { centrePlaceStyle } from '@/table/TableCentre/centre'
 import TurnDock from '@/table/TurnDock/TurnDock'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
@@ -414,7 +415,7 @@ export default function GameDealStory() {
 
         {/* the centre: the player's own cards gather here before they go into the
             fan, each at its own scatter — a small heap, not a neat stack */}
-        <div className={styles.centre} ref={centre}>
+        <div className={styles.centre} style={centrePlaceStyle('reveal', 'centre')} ref={centre}>
           {staged.map((s) => (
             <div
               key={s.uid}

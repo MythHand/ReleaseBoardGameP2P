@@ -1,5 +1,13 @@
 # Draw and deck animations on the board
 
+> **Изменилось после этой волны (сверено 22.08.2026).** Документ описывает состояние на момент своей
+> задачи и не переписывается задним числом — здесь только то, что с тех пор стало иначе:
+> - **Пункт 3 (холд триггера) получил источник:** сцена-пример — `AI cards`, `TABLE_HOLD = 2600`
+>   (у Галлюцинации вдвое дольше). `AI_HOLD = 4000` в `Draw card` — число другой сцены, её предмет
+>   колоды добора; борду осталось перенести значение.
+> - **Пункт 4 (рампа ширины стопки) снят:** ширина одна, `PILE_WIDTH = 150`. Рампа 150 / 120 / 100
+>   не была утверждена ни одной сценой и удалена вместе со своей записью в бэклоге.
+
 Issue: [#97](https://github.com/MythHand/ReleaseBoardGameP2P/issues/97), sub-task of
 [#88](https://github.com/MythHand/ReleaseBoardGameP2P/issues/88). **Wave 1** — it stands on the
 board animation layer from [#96](https://github.com/MythHand/ReleaseBoardGameP2P/issues/96) and

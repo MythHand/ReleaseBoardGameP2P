@@ -13,7 +13,7 @@ code, the code wins — fix this file.
 ## Presets
 
 `PRESETS` in `apps/ui/src/animations/presets.ts`. Call by name: `play('name', el, params)`.
-Durations in ms; `EASE` / `SNAP` are defined in the glossary; the param words (`from`, `to`,
+Durations in ms; `EASE` / `LAND` / `SNAP` are defined in the glossary; the param words (`from`, `to`,
 `rotate`, `dx`, `dy`, `fade`, `dur`, …) are in the glossary too. **Watch the duration word:** the
 travel presets take `duration`, the slot/HUD ones take `dur` — passing the wrong one is silent, the
 preset simply keeps its default.
@@ -27,14 +27,15 @@ letting it flash in place first).
 | `flipCard` | 420 | EASE | — | `{ faceDown }` | flip face ↔ back (used by `Card` itself) |
 | `flyFrom` | `duration` ?? **520** | EASE | — | `{ from, duration }` | FLIP: element already in place, animate *from* its old rect |
 | `playToCenter` | 480 | EASE | — | `{ from, to, rotate?, dx?, dy? }` | play a non-release card to the table center |
-| `playToReleaseZone` | 480 | **SNAP** | — | `{ from, to, … }` | play a release into its zone slot (snap) |
+| `playToReleaseZone` | 480 | **LAND** | — | `{ from, to, … }` | play a release into its zone slot (snap) |
 | `centerToDiscard` | 420 | EASE | — | `{ from, to, rotate, dx, dy }` | move a played card center → discard |
 | `gatherToDeck` | `duration` ?? **520** | EASE | — | `{ from, to, duration? }` | a pile flies to a target deck and lands |
 | `absorbToDeck` | `duration` ?? **520** | EASE | **yes** | `{ from, to, duration? }` | a deck flies into another and dissolves (merge) |
 | `drawToCenter` | `duration` ?? **480** | EASE | — | `{ from, to, duration? }` | a card leaves the draw deck to the center |
 | `dealToSeat` | `duration` ?? **460** | EASE | **yes** | `{ from, to, duration? }` | a card goes center → a player seat and dissolves |
 | `returnToDeck` | `duration` ?? **480** | EASE | — | `{ from, to, duration? }` | a card returns center → deck (pair of `drawToCenter`) |
-| `foldIntoPair` | `dur` ?? **620** | EASE, **SNAP** with `snap` | — | `{ from, box, pose?, dur?, snap? }` | one HALF of a pair travels into its pose inside the pair. Called once per half; the pair itself does not move |
+| `foldIntoPair` | `dur` ?? **620** | EASE, **LAND** with `snap` | — | `{ from, box, pose?, dur?, snap? }` | one HALF of a pair travels into its pose inside the pair. Called once per half; the pair itself does not move |
+| `landInPose` | `dur` ?? **480** | EASE, **LAND** with `snap` | — | `{ from, box, pose?, dur?, snap? }` | a card ARRIVES ON THE TABLE and lands already in its rest pose — the tilt travels with it rather than appearing a frame after it stops. Same FLIP math as `foldIntoPair` (the element is already in place; its entry is what moves), different move: `pose` here is the card's own pose on the table, not a half's pose inside a pair |
 | `rollOut` | `dur` ?? **220** | EASE | — | `{ dur? }` | a slot's content fades out — first half of a swap. No movement: the slot is fixed |
 | `rollIn` | `dur` ?? **300** | EASE | — | `{ dur?, delay? }` | the new content fades in — second half. `delay` waits out the outgoing one |
 | `popIn` | 260 | **SNAP** | — | — | a small element appears in a reserved slot (fade + scale), neighbours do not shift |
@@ -91,7 +92,7 @@ card (not at a wider cell/seat) — invariant **I6**. The `CARD_RATIO` value is 
 |---|---|---|
 | `cardAreaOf` | `cardAreaOf(cell)` → `Rect` | trim a Pile cell to its **top** card box (keep left/top/width, height = width·`CARD_RATIO`) |
 | `cardBoxIn` | `cardBoxIn(rect, width)` → `Rect` | a card box of `width`, **centered** in `rect` (e.g. a Seat). Pass a width measured from the real card element where possible. |
-| `pileWidthFor` | `pileWidthFor(count)` → `number` (`apps/ui/src/table/Table/piles.ts`) | how wide a draw pile is drawn given how many sit on the table — 150 at one, 120 at two, 100 at three or more. One function, shared by the kit's `Table` and the board's fork of it, so the ramp cannot drift between the two. The ramp above one pile has no approved value yet (`docs/animations/backlog.md`). |
+| `PILE_WIDTH` / `pileWidthFor` | `150` · `pileWidthFor(count)` → `number` (`apps/ui/src/table/Table/piles.ts`) | how wide a draw pile is drawn: **one width, whatever the count**. There used to be a ramp here (150 / 120 / 100 by number of piles) — it was invented for a multi-deck row, approved by no scene, and visible on no screen: the kit's `Piles` page draws single piles and no scene lays out more than one. `pileWidthFor` survives only because the board's fork still calls it. |
 
 ---
 
@@ -130,6 +131,23 @@ destructure `overlay` and render it.
 |---|---|---|
 | `useDiscardExit` | `useDiscardExit(boxRef, onLanded?)` → `{ overlay, send, reset, FLIGHT_MS }` | `send(items)` flies **any number** of cards out at once and resolves when they land; `onLanded(cards)` gets them bottom-up for the heap. Omit `onLanded` when the scene keeps its own books on the heap |
 | `Leaving` | `{ key, card, from? \| node?, aux?, el?, pose?, layer?, scatter?, auxScatter?, fade?, delay? }` | `from` — it stands in a slot, the step raises its own flyer; `node` — it IS an element already on screen, that element flies. `aux` + `el` — a pair: split into two singles, the aux measured off `[data-aux]`, its tilt unwound in flight. `layer` — its layer on the table (decides the heap order). `scatter` — bring your own (a card going back to its place), for the MAIN half. `auxScatter` — the same, for the AUX half specifically; omitted, it lands on a fresh `jitter()` instead of `scatter`'s value. `fade` — it sinks below the visible top. `delay` — a stagger |
+
+### Pair-fold — two cards become one pair on the table
+
+The preset `foldIntoPair` is the brick: it folds ONE half. The gesture around it — carry a
+`<CardPair>`, paint both halves where their real cards are, wait a frame, fold both at once — was
+written four times before it became this step: once in `Defense Release` and three times on the
+board.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `usePairFold` | `usePairFold()` → `{ overlay, fold, release, node, FOLD_MS }` | `fold(it)` mounts the pair at its place on the table, paints each half at the pose it would have standing where its real card is, and runs `foldIntoPair` on both in parallel; resolves when they meet. The node **stays up** — the caller hands the pair to whatever renders it at rest and only then calls `release()`, or the pair blinks out between the last frame and the static render. `node()` is the pair's element, for a caller with something of its own to do with it |
+| `Folding` | `{ main, aux, mainFrom, auxFrom, box, pose?, layer?, dur? }` | `mainFrom` / `auxFrom` — where each card really is right now: nothing teleports to a common origin first. `box` — the pair's place. `pose` — the tilt the pair rests at (**I11**). `layer` — its rung when something else is in the air (**I9**). `dur` — the fold's length; the default is the approved 620ms |
+
+**Why it mounts invisible.** The carrier's own form has a blind spot: `useFlyer.raise` waits for a
+paint before it hands the node back, so a caller reaching in to set entry poses is always a frame or
+two late, and the pair shows up already folded before it starts to fold. This step sets both entry
+poses and reveals the node in the same tick, so that frame does not exist.
 
 ### The carrier — a card in the air
 
@@ -260,6 +278,34 @@ switch is made at the middle of that sweep, where the strip is at its smallest a
   the layer at `SWITCH_AT`) and owns the turn to `slotPlacement(...).rotate` along the way.
 
 ---
+
+---
+
+## Centre of the table — the places a card lands in
+
+`apps/ui/src/table/TableCentre/centre.ts`
+
+The same idea as the fan's geometry, for the centre: the named PLACES a card lands in, declared once
+and read by every scene that has one. `CENTRE_TOP` is how high the row sits (42% — the centre clears the hand),
+`CENTRE_SLOTS` gives each place its offset from the middle and its width (they are not all one width
+— the AI effect is 200), `CENTRE_SETS` groups them by game situation and records, per situation,
+whether a card lies there `square` or at its `own` angle.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `CENTRE_TOP` | `42` | the row's height, in % of the table — one value for every place and every scene |
+| `CENTRE_SLOTS` | `Record<CentreSlot, { dx, w, from }>` | where each place sits and how wide it is; `from` names the scene the value was transcribed from |
+| `CENTRE_SETS` | `Record<CentreSet, Partial<Record<CentreSlot, { tilt, z? }>>>` | the places a game situation uses, with the CHARACTER of the tilt (`square` \| `own`) and a layer only where a situation actually overlaps |
+| `centrePlaceStyle` | `centrePlaceStyle(set, slot)` → `CSSProperties` | the whole style of a place: height, offset, width, and a `zIndex` only if the situation declared one |
+| `centreTransform` | `centreTransform(slot)` → `string` | just the offset, for a caller that positions the rest itself |
+| `AskLine` | `<AskLine shown>{text}</AskLine>` (`@/table/TableCentre/AskLine`) | the line the table speaks with, hanging UNDER the centre: it holds no height of its own, only `CENTRE_TOP` plus an offset, and the 14px between hidden and shown is its whole movement (260ms, appears in place, always mounted so it fades out too). Its own page: `Ask line` |
+
+**No angle here, and no default angle either.** A place says WHERE a card lands; at what angle it
+lies is decided by whoever brought it. The tilts are deterministically random (`scatterAt` hashes
+one from a key, so every peer sees the same heap and a card lands exactly where it then lies), and a
+place that dictated a pose would collapse that into one angle for everyone — and drop a card that
+already computed its own into a different one on its last frame. What a situation records is the
+character alone, answering "who put the card there" (**I11**), never "how many degrees".
 
 ## Card preview — reading a card that stands on the table
 
