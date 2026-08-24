@@ -85,10 +85,17 @@ terminal. Handing the keeper to a surviving peer was considered and is **out of
 scope** here (see below).
 
 **Decision #9 — absent seats.** Amended with one guard: the keeper does not drive
-absent seats while **zero** seats are connected. Without it, a host that restores
-and is never rejoined bot-plays the entire match to completion against itself. The
-case is latent today — if every guest drops mid-match the host already plays it out
-solo — but restore turns "rare" into "every time".
+absent seats while **zero** seats are connected.
+
+Stated carefully, because the obvious justification is wrong. A restored host that
+is never rejoined does *not* trigger this: it keeps its own seat (see host restore
+below), so it is a present player watching the keeper drive absent opponents — which
+is decision #9 working exactly as designed, not a bug. The guard covers the case
+where the keeper has no audience at all: no connected seat, nobody to receive a
+`SYNC`, and a match advancing for no one. That is unreachable for a host-keeper
+today and becomes reachable the moment keeper handover lands on a peer whose own
+seat has since dropped. It costs one line and one test, so it goes in now rather
+than being rediscovered later.
 
 **It also closes a gap that spec recorded.** *"A seat's disconnection has no wire
 representation, by omission… presence is a screen concern, and the shape it needs
@@ -219,10 +226,19 @@ the broker may still hold the old registration and PeerJS rejects with
 `unavailable-id`. That gets a bounded retry with backoff; anything else surfaces
 through the existing `surfaceSetupError` path.
 
-**The absence-clock trap.** Every seat is adopted with `peerId: null` and
-`absentSince: now` — never the stored timestamps. Restore the stored values and
-`driveAbsent` sees every seat as far past its 30s grace and bot-plays the whole
-table before a single player can re-dial. The pause was not time spent.
+**The absence-clock trap.** Every seat *except the host's own* is adopted with
+`peerId: null` and `absentSince: now` — never the stored timestamps. Restore the
+stored values and `driveAbsent` sees every seat as far past its 30s grace and
+bot-plays the whole table before a single player can re-dial. The pause was not
+time spent.
+
+**The host's own seat is the exception**, and must keep its peer id. The room code
+*is* that peer id and step 1 reclaims it unchanged, so the seat the host held is
+still addressable — and `attachKeeper` routes an outgoing addressed to
+`transport.id` to the local link rather than over a connection to itself. Null it
+and the restoring host would sit in front of a table it never receives a projection
+for. Concretely: keep the seat whose stored `peerId` equals the reclaimed
+`transport.id`; null every other.
 
 **Two things that need no code.** The deal intro suppresses itself: `rebind` sends
 a projection with *empty* events, and `useDealIntro` hands over at once when there
