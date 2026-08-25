@@ -10,6 +10,7 @@ import {
   readKeeper,
   readSession,
   type StoredKeeper,
+  type StoredSession,
   writeKeeper,
   writeSession,
 } from '~/shared/lib/persistence'
@@ -33,7 +34,7 @@ import {
   type LobbyState,
 } from './lobby/state'
 import type { GameLink, Sync } from './session/link'
-import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
+import { backoffMs, MAX_RECONNECT_ATTEMPTS, type ReconnectEvent } from './session/reconnect'
 import {
   adoptSession,
   createSession,
@@ -114,6 +115,22 @@ function classify(type?: string): Exclude<ErrorKind, null> {
   return type === 'peer-unavailable' ? 'not-found' : 'connection'
 }
 
+// A guest's half of the reconnect overlay (restoring is the host's). Unlike
+// restoring's single boolean, a guest reload re-dials through the ordinary
+// joinRoom path — the same one a fresh join uses — so there is no separate
+// wire protocol to narrate, only this hook's own view of the attempt: which
+// number it's on, and the events the overlay renders as terminal lines.
+export interface ReconnectState {
+  attempt: number
+  maxAttempts: number
+  status: 'idle' | 'trying' | 'failed'
+  events: ReconnectEvent[]
+  // Starts a fresh run from attempt 1, superseding any run still in flight
+  // (mid-backoff or otherwise) — the same epoch-guard pattern restoreHost and
+  // joinRoom already use to let a newer attempt win over a stale one.
+  retry(): void
+}
+
 export interface UseLobby {
   state: LobbyState | null
   status: LobbyStatus
@@ -125,6 +142,10 @@ export interface UseLobby {
   // for that a restoring host sits in front of a blank table with nothing on
   // screen explaining why. The guest's half is `reconnect` (a later task).
   restoring: boolean
+  // The guest's half of the reconnect overlay — see ReconnectState. Idle
+  // whenever there is nothing to reconnect: no stored guest session, a host
+  // restore that already succeeded, or a run that finished either way.
+  reconnect: ReconnectState
   roomCode: string | null
   isHost: boolean
   canStart: boolean
@@ -246,6 +267,32 @@ export function useLobby(): UseLobby {
   // over the ref and resurrect the very session the user just cancelled.
   const sessionEpochRef = useRef(0)
 
+  // The guest's half of the reconnect overlay (see ReconnectState).
+  const [reconnectStatus, setReconnectStatus] = useState<'idle' | 'trying' | 'failed'>('idle')
+  const [reconnectAttempt, setReconnectAttempt] = useState(0)
+  const [reconnectEvents, setReconnectEvents] = useState<ReconnectEvent[]>([])
+  // The stored session a guest reconnect run is re-dialing. Set once, by
+  // whichever of the mount effect or retry() starts the run, and read by the
+  // loop itself rather than threaded through as a parameter — retry() has no
+  // fresher one to offer.
+  const reconnectSessionRef = useRef<StoredSession | null>(null)
+  // Bumped at the start of every run (mount-triggered or retry()). A run
+  // checks this after every await and bails the instant it no longer matches,
+  // so a retry() fired mid-backoff supersedes the run it interrupts instead of
+  // running alongside it.
+  const reconnectEpochRef = useRef(0)
+  // The pending outcome of the attempt currently awaiting a real connection
+  // result. joinRoom's own onConnection callback resolves it once the
+  // DataChannel to the host opens; the shared onError/onDisconnect callbacks
+  // reject it the same way they already report every other connection
+  // failure — a reconnect dial gets no error channel of its own. Cleared the
+  // instant an attempt concludes (either way), so a leaveSession() landing
+  // afterward finds nothing to settle and can never reject an already-settled
+  // or unawaited promise.
+  const reconnectSettleRef = useRef<{ resolve: () => void; reject: (err: unknown) => void } | null>(
+    null,
+  )
+
   const onError = useCallback((err: { type?: string; message: string }) => {
     // Signaling/peer errors (peer-unavailable, network, disconnected) always
     // mean the session can't proceed — surface them. A per-connection error is
@@ -256,6 +303,11 @@ export function useLobby(): UseLobby {
     setError(err.type ? `${err.type}: ${err.message}` : err.message)
     setErrorKind(classify(err.type))
     setStatus((s) => (err.type !== 'connection' || s === 'connecting' ? 'error' : s))
+    // A no-op outside a guest reconnect attempt (the ref is null the rest of
+    // the time) — this is the same error this callback already surfaces
+    // through status/errorKind, just also handed to whichever reconnect
+    // attempt is waiting on it.
+    reconnectSettleRef.current?.reject(err)
   }, [])
 
   // A rejected createTransport (setup failed before the peer opened) bypasses
@@ -388,6 +440,9 @@ export function useLobby(): UseLobby {
           setErrorKind((prev) => prev ?? 'connection')
         }
         setStatus('error')
+        // Same as onError above: a no-op unless a reconnect attempt is
+        // currently waiting on this exact dial's outcome.
+        reconnectSettleRef.current?.reject(new Error('host disconnected'))
       } else {
         commit(applyPeerLeft(current, peerId))
       }
@@ -673,6 +728,9 @@ export function useLobby(): UseLobby {
                 payload: { name, clientId: getClientId() },
               })
               setStatus('in-lobby')
+              // A no-op outside a guest reconnect attempt; see
+              // reconnectSettleRef's own comment for why this exists.
+              reconnectSettleRef.current?.resolve()
             }
           },
         })
@@ -878,14 +936,108 @@ export function useLobby(): UseLobby {
     }
   }, [onMessage, onError, onDisconnect, commit, applySeats, persistKeeper, surfaceSetupError])
 
+  const pushReconnectEvent = useCallback((kind: ReconnectEvent['kind'], attempt: number) => {
+    setReconnectEvents((prev) => [...prev, { kind, attempt, at: Date.now() }])
+  }, [])
+
+  // A guest's half of the mount-time restore (restoreHost is the host's). Only
+  // ever runs when restoreHost has already declined the session — the two are
+  // exclusive, never both. Unlike restoreHost, there is nothing to adopt
+  // locally: the host already owns this peer's seat, and re-dialling through
+  // joinRoom (which sends JOIN_REQUEST with this browser's clientId) is what
+  // gets it back — a lobby reload and a mid-match reload are the same re-dial,
+  // since `stored.gameId` only decides where the host seats the returner, not
+  // whether one happens.
+  const runGuestReconnect = useCallback(async () => {
+    const stored = reconnectSessionRef.current
+    if (!stored) return
+    // Bumped before anything awaits, so a retry() fired mid-run (mid-backoff,
+    // typically) supersedes this run rather than racing it — every check below
+    // reads it back after each await. `sessionEpoch` is the separate teardown
+    // guard: leaveSession() must stop this loop the same way it stops
+    // restoreHost's, even though nothing here mutates the ref directly.
+    const runEpoch = ++reconnectEpochRef.current
+    const sessionEpoch = sessionEpochRef.current
+    setReconnectStatus('trying')
+    setReconnectAttempt(0)
+    setReconnectEvents([])
+
+    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+      if (reconnectEpochRef.current !== runEpoch || sessionEpochRef.current !== sessionEpoch) return
+      setReconnectAttempt(attempt)
+      pushReconnectEvent('dialing', attempt)
+
+      // Settled by whichever of joinRoom's onConnection (resolve) or the
+      // shared onError/onDisconnect (reject) reports this dial's outcome —
+      // joinRoom's own promise only confirms this browser's own peer was
+      // created, not that the host answered.
+      const settled = new Promise<void>((resolve, reject) => {
+        reconnectSettleRef.current = { resolve, reject }
+      })
+      let connected = false
+      try {
+        await joinRoom(stored.roomCode, stored.name)
+        if (reconnectEpochRef.current === runEpoch && sessionEpochRef.current === sessionEpoch) {
+          await settled
+          connected = true
+        }
+      } catch {
+        // Handled below via `connected` staying false — a thrown setup
+        // failure (joinRoom) and a rejected `settled` (a real connection
+        // failure) are both just "this attempt didn't make it."
+      } finally {
+        // Cleared unconditionally: a stale entry left behind after a bail-out
+        // is exactly what would let a later, unrelated leaveSession() reject a
+        // promise nobody is still awaiting.
+        reconnectSettleRef.current = null
+      }
+
+      if (reconnectEpochRef.current !== runEpoch || sessionEpochRef.current !== sessionEpoch) return
+
+      if (connected) {
+        pushReconnectEvent('channel-open', attempt)
+        pushReconnectEvent('handshake', attempt)
+        // Done: cleared back to idle so a working table never sits under a
+        // reconnect overlay that thinks it is still trying.
+        setReconnectStatus('idle')
+        return
+      }
+
+      if (attempt === MAX_RECONNECT_ATTEMPTS) {
+        pushReconnectEvent('failed', attempt)
+        setReconnectStatus('failed')
+        return
+      }
+      pushReconnectEvent('backoff', attempt)
+      await new Promise((resolve) => setTimeout(resolve, backoffMs(attempt)))
+    }
+  }, [joinRoom, pushReconnectEvent])
+
+  // Starts a fresh run from attempt 1. A no-op if nothing was ever offered to
+  // reconnect (no stored guest session at mount) — matching restoreHost/
+  // joinRoom's own "nothing to do" silence rather than throwing.
+  const retryReconnect = useCallback(() => {
+    void runGuestReconnect()
+  }, [runGuestReconnect])
+
   // Once per mount, before any screen can act. A restore that finds nothing
-  // stored is a no-op, so this is safe on a cold start.
+  // stored is a no-op, so this is safe on a cold start. Guest reconnect only
+  // runs once restoreHost has declined the session — the two are exclusive,
+  // and a host session that DID restore has nothing left for a guest re-dial
+  // to do.
   const restored = useRef(false)
   useEffect(() => {
     if (restored.current) return
     restored.current = true
-    void restoreHost()
-  }, [restoreHost])
+    void (async () => {
+      const hostRestored = await restoreHost()
+      if (hostRestored) return
+      const stored = readSession()
+      if (stored?.role !== 'guest') return
+      reconnectSessionRef.current = stored
+      await runGuestReconnect()
+    })()
+  }, [restoreHost, runGuestReconnect])
 
   const ready = useCallback(() => {
     const t = transportRef.current
@@ -968,6 +1120,19 @@ export function useLobby(): UseLobby {
       // mid-await, joinRoom sees the bumped epoch and discards the peer it opens
       // instead of resurrecting the torn-down session.
       sessionEpochRef.current += 1
+      // Same guard for the guest reconnect loop: a run mid-backoff or mid-dial
+      // checks this after every await and stops rather than resurrecting a
+      // session the player just walked away from.
+      reconnectEpochRef.current += 1
+      reconnectSessionRef.current = null
+      // Settle (don't leave hanging) whichever attempt is currently awaiting a
+      // real connection result — the loop's own epoch check is what keeps this
+      // from acting on it, not the rejection itself.
+      reconnectSettleRef.current?.reject(new Error('session left'))
+      reconnectSettleRef.current = null
+      setReconnectStatus('idle')
+      setReconnectAttempt(0)
+      setReconnectEvents([])
       transportRef.current = null
       stateRef.current = null
       isHostRef.current = false
@@ -1198,6 +1363,13 @@ export function useLobby(): UseLobby {
       state,
       status,
       restoring,
+      reconnect: {
+        attempt: reconnectAttempt,
+        maxAttempts: MAX_RECONNECT_ATTEMPTS,
+        status: reconnectStatus,
+        events: reconnectEvents,
+        retry: retryReconnect,
+      },
       roomCode,
       isHost,
       canStart: state ? canStartFn(state) : false,
@@ -1226,6 +1398,10 @@ export function useLobby(): UseLobby {
       state,
       status,
       restoring,
+      reconnectAttempt,
+      reconnectStatus,
+      reconnectEvents,
+      retryReconnect,
       roomCode,
       isHost,
       gameId,

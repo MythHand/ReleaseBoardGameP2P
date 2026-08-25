@@ -1336,26 +1336,31 @@ it('does nothing on mount when no session was ever stored', async () => {
   expect(result.current.restoring).toBe(false)
 })
 
-it('does not treat a stored guest session as a host match to restore', async () => {
+it('hands a stored guest session to the guest reconnect path, not the host restore', async () => {
   localStorage.setItem(
     SESSION_KEY,
     JSON.stringify({
       roomCode: 'ABC-123',
       name: 'Bo',
       role: 'guest',
+      // Mid-match at the time of reload. The guest reconnect path (Task 7)
+      // covers this the same way it covers a lobby reload — restoreHost stays
+      // strictly host-only.
       gameId: 'g1',
       joinedAt: Date.now(),
     } satisfies StoredSession),
   )
   storedKeeperSnapshot('peer0')
 
-  renderHook(() => useLobby())
+  const { result } = renderHook(() => useLobby())
   await act(async () => {
     await Promise.resolve()
   })
-  // The guest reconnect path belongs to a later task; this one must not
-  // misfire on a session it does not own.
-  expect(transports).toHaveLength(0)
+  // restoreHost never touched this: no keeper adopted, no host role taken.
+  expect(result.current.isHost).toBe(false)
+  // The guest reconnect path re-dials instead of sitting idle on /start.
+  expect(transports).toHaveLength(1)
+  expect(result.current.roomCode).toBe('ABC-123')
 })
 
 it('does not restore a stored room with no match running', async () => {
@@ -1511,6 +1516,183 @@ it('restoring clears back to false once every reconnect attempt is spent', async
     // The finally clears it on the failure path too — a stuck `true` here
     // would leave the board's reconnect overlay up with nothing left trying.
     expect(result.current.restoring).toBe(false)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// --- guest reconnect ---
+
+// A stored guest session, the shape a reload would find. `gameId` distinguishes
+// a lobby reload (null) from a match reload — the guest reconnect path covers
+// both the same way, by re-dialing the same room.
+function storedGuestSession(gameId: string | null): void {
+  localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({
+      roomCode: 'ABC-123',
+      name: 'Bo',
+      role: 'guest',
+      gameId,
+      joinedAt: Date.now(),
+    } satisfies StoredSession),
+  )
+}
+
+it('re-dials the stored room when the reload happened in the lobby', async () => {
+  storedGuestSession(null)
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  // It dialed the stored room rather than sitting idle on /start.
+  expect(transports.length).toBe(1)
+  expect(result.current.roomCode).toBe('ABC-123')
+
+  // JOIN_REQUEST only goes out once the DataChannel to the host actually
+  // opens — the same onConnection callback joinRoom always used, driven the
+  // same way every other guest test in this file drives it.
+  const hostId = parseRoomCode('ABC-123')
+  await act(async () => {
+    transports[0].onConnection?.(hostId)
+    await Promise.resolve()
+  })
+
+  // And it announced itself with the clientId that gets its lobby slot back.
+  const join = sentTo(hostId).find((m) => m.type === 'JOIN_REQUEST')
+  expect(join?.type === 'JOIN_REQUEST' && join.payload.clientId).toBeTruthy()
+  // A successful reconnect must not leave the overlay up over a working table.
+  expect(result.current.reconnect.status).toBe('idle')
+})
+
+it('does not run the guest reconnect when the host restore already succeeded', async () => {
+  storedHostSession('g1')
+  storedKeeperSnapshot('peer0')
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  expect(result.current.isHost).toBe(true)
+  // Exactly the one dial the host restore made — restoreHost succeeding must
+  // not also fire off a guest-shaped reconnect on top of it.
+  expect(transports).toHaveLength(1)
+  expect(result.current.reconnect.status).toBe('idle')
+})
+
+it('retries the guest dial with backoff, and gives up once every attempt is spent', async () => {
+  vi.useFakeTimers()
+  try {
+    storedGuestSession(null)
+
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(result.current.reconnect.status).toBe('trying')
+    expect(result.current.reconnect.attempt).toBe(1)
+    expect(result.current.reconnect.maxAttempts).toBe(MAX_RECONNECT_ATTEMPTS)
+
+    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+      // The host never answers — PeerJS reports it unreachable.
+      await act(async () => {
+        transports[attempt - 1].onError?.({ type: 'peer-unavailable', message: 'nope' })
+        await Promise.resolve()
+      })
+      if (attempt < MAX_RECONNECT_ATTEMPTS) {
+        expect(result.current.reconnect.status).toBe('trying')
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(backoffMs(attempt))
+        })
+      }
+    }
+
+    expect(result.current.reconnect.status).toBe('failed')
+    expect(result.current.reconnect.attempt).toBe(MAX_RECONNECT_ATTEMPTS)
+    // One dial per attempt, no more.
+    expect(transports).toHaveLength(MAX_RECONNECT_ATTEMPTS)
+    expect(result.current.reconnect.events.at(-1)).toMatchObject({
+      kind: 'failed',
+      attempt: MAX_RECONNECT_ATTEMPTS,
+    })
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('a teardown mid-backoff stops the guest reconnect loop for good', async () => {
+  vi.useFakeTimers()
+  try {
+    storedGuestSession(null)
+
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    // Fail the first attempt, landing the loop inside its backoff wait.
+    await act(async () => {
+      transports[0].onError?.({ type: 'peer-unavailable', message: 'nope' })
+      await Promise.resolve()
+    })
+    expect(result.current.reconnect.status).toBe('trying')
+
+    act(() => {
+      result.current.leaveSession()
+    })
+    // The player walked away — the overlay this feeds must not keep showing a
+    // reconnect that is no longer happening.
+    expect(result.current.reconnect.status).toBe('idle')
+
+    // Advance well past every remaining backoff: no further dial may happen,
+    // and a late-resolving joinRoom must not resurrect the abandoned session.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000)
+    })
+
+    expect(transports).toHaveLength(1)
+    expect(result.current.reconnect.status).toBe('idle')
+    expect(result.current.status).toBe('idle')
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('retry starts a fresh run from attempt 1', async () => {
+  vi.useFakeTimers()
+  try {
+    storedGuestSession(null)
+
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+      await act(async () => {
+        transports[attempt - 1].onError?.({ type: 'peer-unavailable', message: 'nope' })
+        await Promise.resolve()
+      })
+      if (attempt < MAX_RECONNECT_ATTEMPTS) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(backoffMs(attempt))
+        })
+      }
+    }
+    expect(result.current.reconnect.status).toBe('failed')
+    const spentTransports = transports.length
+
+    act(() => {
+      result.current.reconnect.retry()
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(result.current.reconnect.status).toBe('trying')
+    expect(result.current.reconnect.attempt).toBe(1)
+    // A fresh dial, not a resumption of the spent run.
+    expect(transports.length).toBe(spentTransports + 1)
   } finally {
     vi.useRealTimers()
   }

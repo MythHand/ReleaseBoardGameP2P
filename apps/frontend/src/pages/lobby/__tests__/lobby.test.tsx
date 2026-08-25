@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
-import type { UseLobby } from '~/entities/lobby'
+import { MAX_RECONNECT_ATTEMPTS, type UseLobby } from '~/entities/lobby'
 import LobbyView from '../_LobbyView'
 import LobbyPage from '../[lobbyId]'
 
@@ -39,6 +39,13 @@ function base(): UseLobby {
     state: null,
     status: 'idle',
     restoring: false,
+    reconnect: {
+      attempt: 0,
+      maxAttempts: MAX_RECONNECT_ATTEMPTS,
+      status: 'idle',
+      events: [],
+      retry: vi.fn(),
+    },
     roomCode: null,
     isHost: false,
     canStart: false,
