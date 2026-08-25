@@ -115,6 +115,14 @@ function classify(type?: string): Exclude<ErrorKind, null> {
   return type === 'peer-unavailable' ? 'not-found' : 'connection'
 }
 
+// The outcome of one dial's connection to the HOST — not this browser's own
+// peer registering with the signaling server (joinRoom's own returned promise
+// already reports that), but whether the DataChannel to the host itself
+// opened, errored, or was told to close. Reported through a callback the
+// caller supplies, never through a ref: see joinRoom's `onDialOutcome`
+// parameter and runGuestReconnect's own `settleAttempt` for why.
+type DialOutcome = { ok: true } | { ok: false; error: unknown }
+
 // A guest's half of the reconnect overlay (restoring is the host's). Unlike
 // restoring's single boolean, a guest reload re-dials through the ordinary
 // joinRoom path — the same one a fresh join uses — so there is no separate
@@ -281,32 +289,44 @@ export function useLobby(): UseLobby {
   // so a retry() fired mid-backoff supersedes the run it interrupts instead of
   // running alongside it.
   const reconnectEpochRef = useRef(0)
-  // Bumped once per DIAL — every attempt within a run, not just once per run.
-  // reconnectEpochRef alone cannot scope the settle handlers below: it is
-  // constant across every attempt of the same run, so an earlier attempt's
-  // belated transport event would pass an epoch-only check even with no
-  // retry() involved, landing on whichever attempt is current. This is the
-  // finer-grained token joinRoom actually gates on (see `dialToken` there).
+  // Round 1 (retry() mid-dial) and round 2 (an earlier attempt's belated
+  // event landing during the next one, same run) were both caused by the
+  // same shape: a per-attempt outcome living in one shared, hook-level ref,
+  // reachable by every dial this loop ever opens. Round 3 found the third
+  // symptom of that same shape — an unconditional clear in the per-attempt
+  // `finally` could null out a *different*, newer attempt's entry. Rather
+  // than add a fourth guard, the outcome is no longer kept in a shared ref
+  // at all: each attempt in runGuestReconnect's loop below owns a plain
+  // local `settleAttempt` closure, and hands it directly to joinRoom's
+  // `onDialOutcome` parameter — see joinRoom for how its
+  // onConnection/onError/onDisconnect call it straight from a per-call
+  // closure, never through a ref. No attempt can reach, settle, or clear
+  // another attempt's handle, because there is no cell left for two
+  // attempts to both reach into.
+  //
+  // reconnectDialRef and reconnectPendingRef below are what remains: a
+  // separate, narrower need, unrelated to joinRoom's own callbacks.
+  // leaveSession runs in a different closure entirely, with nothing to
+  // close over an in-flight attempt's local `settleAttempt` — it needs some
+  // cross-closure way to unstick whichever attempt is currently awaiting a
+  // real connection result, or a teardown mid-dial would leave that
+  // attempt's `await settled` hanging forever with no epoch check able to
+  // catch it (the epoch is only re-checked once `settled` itself resolves).
+  // Bumped once per dial, purely to key reconnectPendingRef below — no
+  // longer read by joinRoom's callbacks at all.
   const reconnectDialRef = useRef(0)
-  // The pending outcome of the attempt currently awaiting a real connection
-  // result. Settled by joinRoom's own onConnection/onError/onDisconnect
-  // wrappers — not the shared onError/onDisconnect callbacks directly, since
-  // those are one function shared by every transport this hook ever opens
-  // and have no way to tell a current dial's event from a superseded one's.
-  // joinRoom captures reconnectDialRef's value live when a dial starts and
-  // gates every settle call on it still matching (see `dialToken` there): a
-  // retry() (a new run) or simply the loop's own move to its next attempt
-  // (same run) both bump reconnectDialRef, so the abandoned dial's own
-  // eventual open/error/close — however late it lands, even after a newer
-  // attempt has already overwritten this ref — finds the tokens no longer
-  // match and leaves the newer attempt's settle alone instead of resolving
-  // or rejecting it on the old dial's behalf. Cleared unconditionally the
-  // instant an attempt concludes (either way), so a leaveSession() landing
-  // afterward finds nothing to settle and can never reject an
-  // already-settled or unawaited promise.
-  const reconnectSettleRef = useRef<{ resolve: () => void; reject: (err: unknown) => void } | null>(
-    null,
-  )
+  // The one attempt (if any) currently awaiting a real connection result,
+  // keyed by the reconnectDialRef token that installed it. Read and written
+  // ONLY by runGuestReconnect's own install/clear (both self-keyed: a clear
+  // only clears the entry it itself installed) and by leaveSession (the one
+  // caller allowed to act on "whichever attempt is current" without a key
+  // of its own, since it represents the player leaving outright rather than
+  // a dial's own outcome). joinRoom's onConnection/onError/onDisconnect
+  // never read this — they call the closure they were handed directly.
+  const reconnectPendingRef = useRef<{
+    token: number
+    settle: (outcome: DialOutcome) => void
+  } | null>(null)
 
   const onError = useCallback((err: { type?: string; message: string }) => {
     // Signaling/peer errors (peer-unavailable, network, disconnected) always
@@ -703,7 +723,17 @@ export function useLobby(): UseLobby {
   )
 
   const joinRoom = useCallback(
-    async (code: string, name: string) => {
+    async (
+      code: string,
+      name: string,
+      // Reports this specific dial's connection outcome — never read from a
+      // ref, called directly from the per-call closures below the moment
+      // the outcome is known. Only the guest reconnect loop passes one (its
+      // own `settleAttempt`, one fresh instance per attempt); an ordinary,
+      // player-initiated join passes nothing, so every call below is a
+      // plain no-op for it.
+      onDialOutcome?: (outcome: DialOutcome) => void,
+    ) => {
       // A retry (the invite screen reuses the same submit path) would otherwise
       // leave the previous peer open — createTransport is assigned over the ref
       // below, so nothing else would ever close it.
@@ -717,37 +747,19 @@ export function useLobby(): UseLobby {
       // Snapshot the session generation so a Cancel/Home (leaveSession) during
       // the createTransport round-trip is detectable below.
       const epoch = sessionEpochRef.current
-      // Snapshot reconnectDialRef's value live when THIS dial starts. Outside
-      // a guest reconnect attempt this value is never consulted below
-      // (reconnectSettleRef stays null all along, so every guarded call is
-      // already a no-op on its own). Inside one, it is what lets this dial's
-      // own connection outcome — open, error, or close, however late it
-      // lands — be told apart from a later attempt's: reconnectDialRef is
-      // bumped once per dial (every attempt, not just once per run), so
-      // *either* a retry() (a new run) *or* the loop's own ordinary move to
-      // its next attempt (same run, no retry() involved — the flaky-network
-      // case this loop exists to survive) moves the token, and a belated
-      // callback below then finds the tokens no longer match and leaves the
-      // newer attempt's settle alone instead of resolving or rejecting it on
-      // this abandoned dial's behalf. See reconnectSettleRef's own comment
-      // for the fuller picture.
-      const dialToken = reconnectDialRef.current
       try {
         const t = await createTransport({
           onMessage,
           onError: (err) => {
             // The general error surfacing (status/errorKind) always applies —
-            // only the reconnect-settle side effect is token-gated.
+            // onDialOutcome is a separate, additional notification, not a
+            // gate on this.
             onError(err)
-            if (dialToken === reconnectDialRef.current) {
-              reconnectSettleRef.current?.reject(err)
-            }
+            onDialOutcome?.({ ok: false, error: err })
           },
           onDisconnect: (peerId) => {
             onDisconnect(peerId)
-            if (dialToken === reconnectDialRef.current) {
-              reconnectSettleRef.current?.reject(new Error('host disconnected'))
-            }
+            onDialOutcome?.({ ok: false, error: new Error('host disconnected') })
           },
           onConnection: (peerId) => {
             // Send JOIN_REQUEST exactly when the host DataChannel opens — a
@@ -762,9 +774,7 @@ export function useLobby(): UseLobby {
                 payload: { name, clientId: getClientId() },
               })
               setStatus('in-lobby')
-              if (dialToken === reconnectDialRef.current) {
-                reconnectSettleRef.current?.resolve()
-              }
+              onDialOutcome?.({ ok: true })
             }
           },
         })
@@ -1001,22 +1011,45 @@ export function useLobby(): UseLobby {
       setReconnectAttempt(attempt)
       pushReconnectEvent('dialing', attempt)
 
-      // A fresh token for THIS dial, read back by joinRoom just below (its
-      // own `dialToken` snapshot) — bumped per attempt, not just per run, so
-      // the loop's own move to its next attempt (no retry() involved) also
-      // retires the previous attempt's settle handlers, exactly like a
-      // retry() does across runs.
-      reconnectDialRef.current += 1
-      // Settled by whichever of joinRoom's onConnection (resolve) or the
-      // shared onError/onDisconnect (reject) reports this dial's outcome —
-      // joinRoom's own promise only confirms this browser's own peer was
-      // created, not that the host answered.
+      // A fresh token identifying THIS dial. Used only to key
+      // reconnectPendingRef below (installed for leaveSession's benefit,
+      // never read by joinRoom) — the settle handle itself is the plain
+      // local closure right after it, reachable by nothing outside this one
+      // iteration.
+      const dialToken = ++reconnectDialRef.current
+
+      // This attempt's own settle handle — local to this one iteration of
+      // the loop, never written to any shared ref. `settleAttempt` is
+      // handed straight to joinRoom as `onDialOutcome`, so its own
+      // onConnection/onError/onDisconnect closures call it directly; no
+      // other attempt, past or future, has any way to reach it. The
+      // `alreadySettled` guard is what gives it Promise-like "first call
+      // wins" semantics without actually needing a Promise for the plumbing.
+      let alreadySettled = false
+      let resolveAttempt: (() => void) | undefined
+      let rejectAttempt: ((err: unknown) => void) | undefined
       const settled = new Promise<void>((resolve, reject) => {
-        reconnectSettleRef.current = { resolve, reject }
+        resolveAttempt = resolve
+        rejectAttempt = reject
       })
+      const settleAttempt = (outcome: DialOutcome) => {
+        if (alreadySettled) return
+        alreadySettled = true
+        if (outcome.ok) resolveAttempt?.()
+        else rejectAttempt?.(outcome.error)
+      }
+      // The one place this attempt's handle becomes reachable from outside
+      // this closure — installed so leaveSession (a different function
+      // entirely) can still unstick it if the player leaves while it's
+      // genuinely in flight. Keyed by dialToken: leaveSession itself reads
+      // whatever is current without a key of its own (see its own comment),
+      // but every WRITE here — this install, and the self-keyed clear in
+      // the finally below — only ever touches the entry it itself owns.
+      reconnectPendingRef.current = { token: dialToken, settle: settleAttempt }
+
       let connected = false
       try {
-        await joinRoom(stored.roomCode, stored.name)
+        await joinRoom(stored.roomCode, stored.name, settleAttempt)
         if (reconnectEpochRef.current === runEpoch && sessionEpochRef.current === sessionEpoch) {
           await settled
           connected = true
@@ -1026,10 +1059,15 @@ export function useLobby(): UseLobby {
         // failure (joinRoom) and a rejected `settled` (a real connection
         // failure) are both just "this attempt didn't make it."
       } finally {
-        // Cleared unconditionally: a stale entry left behind after a bail-out
-        // is exactly what would let a later, unrelated leaveSession() reject a
-        // promise nobody is still awaiting.
-        reconnectSettleRef.current = null
+        // Self-keyed: only clear the entry if it is still the one THIS
+        // attempt installed. A newer attempt (retry(), or the loop's own
+        // next iteration) may already have installed its own by the time
+        // this runs — e.g. when this attempt's epoch check above declined
+        // to even await `settled` — and that entry must survive this
+        // attempt's own cleanup untouched.
+        if (reconnectPendingRef.current?.token === dialToken) {
+          reconnectPendingRef.current = null
+        }
       }
 
       if (reconnectEpochRef.current !== runEpoch || sessionEpochRef.current !== sessionEpoch) return
@@ -1178,11 +1216,17 @@ export function useLobby(): UseLobby {
       // session the player just walked away from.
       reconnectEpochRef.current += 1
       reconnectSessionRef.current = null
-      // Settle (don't leave hanging) whichever attempt is currently awaiting a
-      // real connection result — the loop's own epoch check is what keeps this
-      // from acting on it, not the rejection itself.
-      reconnectSettleRef.current?.reject(new Error('session left'))
-      reconnectSettleRef.current = null
+      // Settle (don't leave hanging) whichever attempt is currently awaiting
+      // a real connection result — the loop's own epoch check is what keeps
+      // this from resurrecting anything afterward, not the rejection
+      // itself; this exists only to unstick an `await settled` that would
+      // otherwise never resolve. No key needed here, unlike every write in
+      // the loop itself: leaveSession is the one caller allowed to act on
+      // "whichever attempt is current" without one, since it represents the
+      // player leaving outright rather than a dial's own outcome racing
+      // another dial's.
+      reconnectPendingRef.current?.settle({ ok: false, error: new Error('session left') })
+      reconnectPendingRef.current = null
       setReconnectStatus('idle')
       setReconnectAttempt(0)
       setReconnectEvents([])

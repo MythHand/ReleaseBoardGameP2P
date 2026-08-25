@@ -1842,3 +1842,65 @@ it("an earlier attempt's belated channel-open does not settle the next attempt i
     vi.useRealTimers()
   }
 })
+
+it("retry() firing while an earlier attempt's dial is still inside createTransport does not leave the new run stuck", async () => {
+  // The fix-round-3 scenario, precisely: retry() lands before the earlier
+  // attempt has even reached `await settled` — it is still awaiting
+  // createTransport itself. That earlier attempt's belated conclusion
+  // (however it resolves) must not prevent the run that superseded it from
+  // ever reaching a terminal state.
+  storedGuestSession(null)
+
+  // Attempt 1's own createTransport call is held open by hand rather than
+  // resolving on the next microtask like the default mock — this is what
+  // makes it "genuinely in flight, inside createTransport" at the moment
+  // retry() fires, rather than already at `await settled`.
+  let rejectStuckDial: ((err: unknown) => void) | undefined
+  const stuckDial = new Promise<never>((_resolve, reject) => {
+    rejectStuckDial = reject
+  })
+  vi.mocked(createTransport).mockImplementationOnce(() => stuckDial)
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  // Attempt 1 is stuck before ever producing a transport of its own.
+  expect(transports).toHaveLength(0)
+  expect(result.current.reconnect.status).toBe('trying')
+  expect(result.current.reconnect.attempt).toBe(1)
+
+  // retry() supersedes it. The new run's own attempt 1 uses the default
+  // mock (only one override was queued above), so it dials normally.
+  act(() => {
+    result.current.reconnect.retry()
+  })
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(transports).toHaveLength(1)
+  expect(result.current.reconnect.attempt).toBe(1)
+
+  // The abandoned attempt's createTransport call now concludes — belatedly,
+  // after the new run has already installed its own pending attempt. This
+  // is what used to null out the new run's settle handle out from under it.
+  await act(async () => {
+    rejectStuckDial?.(new Error('stale dial'))
+    await Promise.resolve()
+  })
+
+  const hostId = parseRoomCode('ABC-123')
+  // The new run's own dial succeeds normally.
+  await act(async () => {
+    transports[0].onConnection?.(hostId)
+    await Promise.resolve()
+  })
+
+  // Without a per-attempt settle handle, the abandoned attempt's belated
+  // conclusion silences the new run's own handle before its onConnection
+  // ever fires, so `await settled` inside the new run's own loop iteration
+  // never resolves or rejects — reconnect.status hangs at 'trying' forever,
+  // even though the connection the player is actually looking at (this
+  // transport) succeeded.
+  expect(result.current.reconnect.status).toBe('idle')
+})
