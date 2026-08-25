@@ -1,0 +1,101 @@
+import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
+import { createMemoryNetwork } from './memoryNetwork'
+import { createSession, type SessionRef } from './referee'
+import { attachKeeper } from './remoteLink'
+import { restoreSeats } from './restore'
+
+// The only test in this directory that drives the whole handshake through a
+// real Transport (memoryNetwork.ts) rather than calling referee.ts functions
+// directly — frames JSON round-trip exactly as they would over PeerJS, so a
+// serialization bug in what rides the wire cannot hide the way it could in a
+// referee-only test.
+//
+// Every other attachKeeper test in this directory stubs the ticker to avoid a
+// real setInterval outliving the test; matched here for the same reason,
+// though a synchronous test that closes its keeper well under 250ms would
+// never actually observe the default one fire.
+const noTicker = { start: () => {}, stop: () => {} }
+
+function liveSession() {
+  const net = createMemoryNetwork(['host', 'guest', 'guest-returned'])
+  const { session } = createSession({
+    gameId: 'g1',
+    keeperId: 'p1',
+    engine: createFakeEngine(),
+    seed: 1,
+    players: [
+      { playerId: 'p1', peerId: 'host', name: 'Ann' },
+      { playerId: 'p2', peerId: 'guest', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const ref: SessionRef = { current: session }
+  return { net, ref }
+}
+
+it('hands a returning peer its own hand back, on a new peer id', () => {
+  const { net, ref } = liveSession()
+  const keeper = attachKeeper({
+    ref,
+    transport: net.transport('host'),
+    now: () => 1_000,
+    ticker: noTicker,
+  })
+  const before = ref.current.engine.project(ref.current.state, 'p2').self.hand.map((c) => c.uid)
+
+  keeper.peerLeft('guest')
+  expect(ref.current.seats.find((s) => s.playerId === 'p2')?.peerId).toBeNull()
+
+  const received: unknown[] = []
+  net.onDeliver('guest-returned', (frame) => received.push(frame))
+  keeper.peerReturned('p2', 'guest-returned')
+
+  const sync = received.find((f) => (f as { type: string }).type === 'SYNC') as {
+    payload: { view: { self: { hand: { uid: string }[] } } }
+  }
+  expect(sync).toBeDefined()
+  expect(sync.payload.view.self.hand.map((c) => c.uid)).toEqual(before)
+  keeper.close()
+})
+
+// Nothing authenticates a clientId, so `rebind` refusing an occupied seat is
+// the whole defence. Pinned here because losing it would be silent: the
+// claimant would simply start receiving another player's hand.
+it('refuses a seat that is still connected', () => {
+  const { net, ref } = liveSession()
+  const keeper = attachKeeper({
+    ref,
+    transport: net.transport('host'),
+    now: () => 1_000,
+    ticker: noTicker,
+  })
+  keeper.peerReturned('p2', 'guest-returned')
+  expect(ref.current.seats.find((s) => s.playerId === 'p2')?.peerId).toBe('guest')
+  keeper.close()
+})
+
+it('a restored keeper resumes the same match a snapshot described', () => {
+  const { net, ref } = liveSession()
+  const snapshot = JSON.parse(JSON.stringify(ref.current.state))
+  const seats = restoreSeats(ref.current.seats, 'host', 50_000)
+
+  const restoredRef: SessionRef = {
+    current: { ...ref.current, state: snapshot, seats },
+  }
+  const keeper = attachKeeper({
+    ref: restoredRef,
+    transport: net.transport('host'),
+    now: () => 50_000,
+    ticker: noTicker,
+  })
+
+  // The host kept its own seat; the guest's is empty and freshly stamped.
+  expect(restoredRef.current.seats.find((s) => s.playerId === 'p1')?.peerId).toBe('host')
+  expect(restoredRef.current.seats.find((s) => s.playerId === 'p2')?.absentSince).toBe(50_000)
+
+  keeper.peerReturned('p2', 'guest-returned')
+  expect(restoredRef.current.seats.find((s) => s.playerId === 'p2')?.peerId).toBe('guest-returned')
+  keeper.close()
+})
