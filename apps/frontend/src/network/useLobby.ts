@@ -1,11 +1,13 @@
+import type { GameState, PlayerId } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { DEFAULT_SETUP } from '@release/ui'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { seatOf, seatsFor } from '~/entities/game/seats'
 import {
   clearKeeper,
   clearSession,
   getClientId,
+  readKeeper,
   readSession,
   type StoredKeeper,
   writeKeeper,
@@ -31,12 +33,20 @@ import {
   type LobbyState,
 } from './lobby/state'
 import type { GameLink, Sync } from './session/link'
-import { createSession, type Session, type SessionRef } from './session/referee'
+import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
+import {
+  adoptSession,
+  createSession,
+  type Seat as RefereeSeat,
+  type Session,
+  type SessionRef,
+} from './session/referee'
 import { isRelayable, relayTargets } from './session/relay'
 import { attachKeeper, createRemoteLink } from './session/remoteLink'
+import { restoreSeats } from './session/restore'
 import { createStartGate, type StartGate } from './session/startGate'
 import { createTransport, type Transport } from './transport/peer'
-import type { PeerInfo, Seat, Setup, Where, WireMessage } from './types'
+import type { Seat as LobbySeat, PeerInfo, Seat, Setup, Where, WireMessage } from './types'
 
 // Room codes double as the host's PeerJS id, so the displayed code is exactly
 // what a joiner connects to — formatRoomCode/parseRoomCode are inverses.
@@ -689,6 +699,147 @@ export function useLobby(): UseLobby {
     },
     [onMessage, onError, onDisconnect, commit, surfaceSetupError],
   )
+
+  // Runs once on mount, before anything else can create a transport. A stored
+  // session whose role is 'host' and whose keeper snapshot matches its gameId
+  // is a match this browser was keeping when the tab went away — everything
+  // else (no record, a guest's record, a room with no match running, a
+  // snapshot left over from a different match) is not this restore's problem
+  // and is left for the caller (a guest's own reconnect belongs to a later
+  // task).
+  const restoreHost = useCallback(async (): Promise<boolean> => {
+    const stored = readSession()
+    const snapshot = readKeeper()
+    if (stored?.role !== 'host' || !snapshot) return false
+    if (!stored.gameId || snapshot.gameId !== stored.gameId) return false
+
+    setStatus('connecting')
+    setError(null)
+    setErrorKind(null)
+
+    // Snapshot the session generation, the same way joinRoom does around its
+    // own createTransport await: a teardown that lands during the multi-attempt
+    // retry below (leaveSession bumps this on every call) must not have a
+    // stale restore resurrect the very session that was just abandoned.
+    const epoch = sessionEpochRef.current
+
+    // A fast reload can leave the signaling broker still holding the old
+    // registration under this exact peer id, which PeerJS reports as
+    // 'unavailable-id' — it frees itself moments later. Retried rather than
+    // surfaced immediately: reclaiming this EXACT id is the whole point, since
+    // the room code IS that id and a fresh one would strand every peer still
+    // dialing the old one.
+    let t: Transport | null = null
+    let lastErr: unknown
+    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+      try {
+        t = await createTransport({
+          peerId: parseRoomCode(stored.roomCode),
+          onMessage,
+          onError,
+          onDisconnect,
+        })
+        break
+      } catch (err) {
+        lastErr = err
+        if (attempt === MAX_RECONNECT_ATTEMPTS) break
+        await new Promise((resolve) => setTimeout(resolve, backoffMs(attempt)))
+      }
+    }
+    if (!t) {
+      // Every attempt spent without going through onError (a rejected
+      // createTransport bypasses it), so surface it here or 'connecting'
+      // spins forever.
+      if (sessionEpochRef.current === epoch) surfaceSetupError(lastErr)
+      return false
+    }
+    if (sessionEpochRef.current !== epoch) {
+      // Torn down while this was retrying: discard the freshly-opened peer
+      // instead of committing it, or the abandoned attempt resurrects.
+      t.close()
+      return false
+    }
+
+    transportRef.current = t
+    isHostRef.current = true
+    setIsHost(true)
+    setRoomCode(stored.roomCode)
+
+    const engine = createFakeEngine()
+    // The absence-clock trap: a stored `absentSince` describes time that
+    // passed while nothing was keeping the table. Restored as-is, the first
+    // tick's `driveAbsent` would see every seat far past its 30s grace and
+    // bot-play the whole match before a single player could re-dial — so every
+    // seat but the host's own is restamped to now. The host's own seat keeps
+    // its peer id: the room code IS that id and it was just reclaimed
+    // unchanged, so the seat is still addressable through it.
+    const restoredSeats = restoreSeats(snapshot.seats as RefereeSeat[], t.id, Date.now())
+    const session = adoptSession({
+      state: snapshot.state as GameState,
+      gameId: snapshot.gameId,
+      keeperId: snapshot.keeperId as PlayerId,
+      engine,
+      seats: restoredSeats,
+    })
+    const ref: SessionRef = { current: session }
+    sessionRef.current = ref
+
+    // No gate: the start gate holds the table until every seat reports
+    // INTRO_READY, and mid-match nobody ever will — passing one here would
+    // deadlock every intent for the rest of the game. `persistKeeper` is the
+    // same throttled write every other keeper in this hook already uses.
+    const keeper = attachKeeper({
+      ref,
+      transport: t,
+      now: () => Date.now(),
+      onCommit: persistKeeper,
+    })
+    keeperRef.current = keeper
+    keeper.link.subscribe(setGameSync)
+    setGameLink(() => keeper.link)
+
+    // Only the host is here; everyone else re-dials. Their JOIN_REQUEST
+    // carries the clientId that puts them back in their seat (Task 4).
+    commit(
+      createLobbyState({
+        selfId: t.id,
+        hostId: t.id,
+        maxPlayers: 6,
+        setup: {},
+        peers: [
+          {
+            id: t.id,
+            clientId: getClientId(),
+            name: stored.name,
+            role: 'host',
+            ready: true,
+            where: 'game',
+          },
+        ],
+      }),
+    )
+    // NOT resync(setupEvents(...)): that call replays the deal, and this
+    // match was dealt long ago.
+    gameIdRef.current = snapshot.gameId
+    setGameId(snapshot.gameId)
+    // The lobby-shaped seating comes straight from the snapshot rather than
+    // rebuilt from the referee's seats above, which carry neither clientId nor
+    // name — there is nothing to reconstruct them from. `applySeats` keeps the
+    // ref from drifting from the state, exactly as everywhere else this
+    // seating is written.
+    applySeats(snapshot.lobbySeats as LobbySeat[])
+    setStatus('in-lobby')
+    return true
+  }, [onMessage, onError, onDisconnect, commit, applySeats, persistKeeper, surfaceSetupError])
+
+  // Once per mount, before any screen can act. A restore that finds nothing
+  // stored is a no-op, so this is safe on a cold start.
+  const restored = useRef(false)
+  useEffect(() => {
+    if (restored.current) return
+    restored.current = true
+    void restoreHost()
+  }, [restoreHost])
 
   const ready = useCallback(() => {
     const t = transportRef.current

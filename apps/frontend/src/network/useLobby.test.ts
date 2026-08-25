@@ -1,7 +1,17 @@
+import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, vi } from 'vitest'
-import { getClientId, type StoredKeeper, type StoredSession } from '~/shared/lib/persistence'
+import {
+  clearKeeper,
+  clearSession,
+  getClientId,
+  type StoredKeeper,
+  type StoredSession,
+} from '~/shared/lib/persistence'
+import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
+import { createSession } from './session/referee'
 import { INTRO_CAP_MS } from './session/startGate'
+import { createTransport } from './transport/peer'
 import type { Message, WireMessage } from './types'
 import {
   formatRoomCode,
@@ -59,8 +69,17 @@ vi.mock('./transport/peer', () => ({
 beforeEach(() => {
   transports.length = 0
   // The hook writes `release:session` / `release:keeper` now, so a record left
-  // by the previous test would be read as this one's.
+  // by the previous test would be read as this one's — and now that the mount
+  // effect restores from one automatically (host restore, below), a leftover
+  // record does not just sit unread, it drives a real reconnect during a later
+  // test's mount. `localStorage.clear()` alone is not enough: persistence.ts
+  // falls back to an in-memory cache when storage throws (Safari private
+  // mode), and that cache is a module-level singleton that outlives any one
+  // test — clearSession/clearKeeper are what actually empty it, on top of the
+  // browser storage.
   localStorage.clear()
+  clearSession()
+  clearKeeper()
 })
 
 it('formats a room code as ABC-123 from the peer id', () => {
@@ -1164,6 +1183,225 @@ it('a snapshot still on its trailing edge cannot survive walking back to the lob
     })
 
     expect(localStorage.getItem(KEEPER_KEY)).toBeNull()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// --- host restore ---
+
+function storedHostSession(gameId: string | null): void {
+  localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({
+      roomCode: formatRoomCode('peer0'),
+      name: 'Dimbo',
+      role: 'host',
+      gameId,
+      joinedAt: Date.now(),
+    } satisfies StoredSession),
+  )
+}
+
+// A snapshot built through the real referee, the same way `startGame` builds
+// one — so the state a restore adopts is one the engine could actually have
+// produced, not a hand-rolled shape that only happens to typecheck.
+// `hostPeerId` is p1's peerId in the stored referee seats; the restore only
+// keeps a seat whose peerId matches the freshly reclaimed transport id, so a
+// test proving that has to control what that id will be.
+function storedKeeperSnapshot(hostPeerId: string): StoredKeeper {
+  const engine = createFakeEngine()
+  const { session } = createSession({
+    gameId: 'g1',
+    keeperId: 'p1',
+    engine,
+    seed: 1,
+    players: [
+      { playerId: 'p1', peerId: hostPeerId, name: 'Dimbo' },
+      { playerId: 'p2', peerId: 'old-guest', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const snapshot: StoredKeeper = {
+    gameId: 'g1',
+    keeperId: 'p1',
+    state: session.state,
+    seats: session.seats,
+    lobbySeats: [
+      { playerId: 'p1', peerId: hostPeerId, clientId: 'client-host', name: 'Dimbo' },
+      { playerId: 'p2', peerId: 'old-guest', clientId: 'client-guest', name: 'Bo' },
+    ],
+    savedAt: Date.now(),
+  }
+  localStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
+  return snapshot
+}
+
+it('restores the host to the match it was keeping, without replaying the deal', async () => {
+  storedHostSession('g1')
+  storedKeeperSnapshot('peer0')
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  expect(result.current.status).toBe('in-lobby')
+  expect(result.current.isHost).toBe(true)
+  expect(result.current.roomCode).toBe(formatRoomCode('peer0'))
+  expect(result.current.gameId).toBe('g1')
+  expect(result.current.seats).toEqual([
+    { playerId: 'p1', peerId: 'peer0', clientId: 'client-host', name: 'Dimbo' },
+    { playerId: 'p2', peerId: 'old-guest', clientId: 'client-guest', name: 'Bo' },
+  ])
+  // NOT resync(setupEvents(...)): that call replays the deal, and this match
+  // was dealt long ago. A gameSync this early could only have come from it —
+  // `resync` sends a SYNC even with an empty events array, so its absence is
+  // what proves it was never called.
+  expect(result.current.gameSync).toBeNull()
+})
+
+it("reclaims the room code's exact peer id rather than minting a fresh one", async () => {
+  storedHostSession('g1')
+  storedKeeperSnapshot('peer0')
+
+  renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  expect(createTransport).toHaveBeenCalledWith(
+    expect.objectContaining({ peerId: parseRoomCode(formatRoomCode('peer0')) }),
+  )
+})
+
+it('passes no gate: a submitted intent applies right away instead of waiting on INTRO_READY', async () => {
+  storedHostSession('g1')
+  storedKeeperSnapshot('peer0')
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(result.current.gameSync).toBeNull()
+
+  act(() => {
+    result.current.gameLink?.submit({ type: 'DRAW' })
+  })
+
+  // A gate still open would buffer this behind INTRO_READY and emit nothing.
+  expect(result.current.gameSync).not.toBeNull()
+})
+
+it('does nothing on mount when no session was ever stored', async () => {
+  renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(transports).toHaveLength(0)
+})
+
+it('does not treat a stored guest session as a host match to restore', async () => {
+  localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({
+      roomCode: 'ABC-123',
+      name: 'Bo',
+      role: 'guest',
+      gameId: 'g1',
+      joinedAt: Date.now(),
+    } satisfies StoredSession),
+  )
+  storedKeeperSnapshot('peer0')
+
+  renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  // The guest reconnect path belongs to a later task; this one must not
+  // misfire on a session it does not own.
+  expect(transports).toHaveLength(0)
+})
+
+it('does not restore a stored room with no match running', async () => {
+  storedHostSession(null)
+  storedKeeperSnapshot('peer0')
+
+  renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(transports).toHaveLength(0)
+})
+
+it('does not restore when the keeper snapshot belongs to a different match', async () => {
+  storedHostSession('g-live')
+  storedKeeperSnapshot('peer0') // snapshot itself carries gameId 'g1'
+
+  renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(transports).toHaveLength(0)
+})
+
+it('retries past a stale unavailable-id left by a fast reload, and recovers', async () => {
+  vi.useFakeTimers()
+  try {
+    storedHostSession('g1')
+    storedKeeperSnapshot('peer0')
+    // The broker still answers for the old registration on the first dial;
+    // by the retry it has let go.
+    vi.mocked(createTransport).mockImplementationOnce(() =>
+      Promise.reject({ type: 'unavailable-id', message: 'still registered' }),
+    )
+
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(backoffMs(1))
+    })
+
+    expect(result.current.status).toBe('in-lobby')
+    expect(result.current.isHost).toBe(true)
+    // The rejected attempt never produced a transport of its own.
+    expect(transports).toHaveLength(1)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('surfaces the error once every reconnect attempt is spent', async () => {
+  vi.useFakeTimers()
+  try {
+    storedHostSession('g1')
+    storedKeeperSnapshot('peer0')
+    for (let i = 0; i < MAX_RECONNECT_ATTEMPTS; i++) {
+      vi.mocked(createTransport).mockImplementationOnce(() =>
+        Promise.reject({ type: 'unavailable-id', message: 'still registered' }),
+      )
+    }
+
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    let totalBackoff = 0
+    for (let attempt = 1; attempt < MAX_RECONNECT_ATTEMPTS; attempt++) {
+      totalBackoff += backoffMs(attempt)
+    }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(totalBackoff)
+    })
+
+    expect(result.current.status).toBe('error')
+    // Never surfaced through a bare createTransport rejection path that would
+    // leave 'connecting' spinning forever.
+    expect(transports).toHaveLength(0)
   } finally {
     vi.useRealTimers()
   }
