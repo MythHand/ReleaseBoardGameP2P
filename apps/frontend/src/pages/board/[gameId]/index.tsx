@@ -150,9 +150,22 @@ export default function BoardPage() {
           // dialing its way back, and a host rebuilding the match it was
           // keeping. `restoring` is the host's half — without it the host
           // stares at an empty board for the length of the restore with
-          // nothing saying why.
+          // nothing saying why. `reconnect.status` stays 'failed' (not
+          // 'idle') once every attempt is spent, so the overlay must keep
+          // showing then too — 'trying' alone would drop it the moment the
+          // dial gives up, right when the player needs the retry/leave choice.
           connection:
-            session.restoring || session.reconnect.status === 'trying' ? 'reconnecting' : 'online',
+            session.restoring || session.reconnect.status !== 'idle' ? 'reconnecting' : 'online',
+          reconnect: {
+            attempt: session.reconnect.attempt,
+            maxAttempts: session.reconnect.maxAttempts,
+            status: session.reconnect.status === 'failed' ? 'failed' : 'trying',
+          },
+          onReconnectRetry: session.reconnect.retry,
+          onReconnectLeave: () => {
+            session.leaveSession()
+            void navigate('/start')
+          },
           onKickSpectator: session.kick,
           lang: i18n.resolvedLanguage === 'ru' ? 'ru' : 'en',
           onLangChange: (lang) => {
