@@ -379,6 +379,9 @@ export function useLobby(): UseLobby {
 
           const seat = seating?.find((s) => s.clientId === msg.payload.clientId)
           if (seat && liveGameId) {
+            // Captured before the seating is patched: this is the dead peer
+            // id the returner is replacing.
+            const stalePeerId = seat.peerId
             // Patch our own copy of the seating — `handleJoinRequest` told
             // everyone else with the SEAT_REBOUND it just dispatched — then
             // send the whole thing: GAME_STARTING is what `useFollowGameStart`
@@ -393,6 +396,20 @@ export function useLobby(): UseLobby {
                 message: { type: 'GAME_STARTING', payload: { gameId: liveGameId, seats: rebound } },
               },
             ])
+            // Belt-and-braces ordering fix: WebRTC disconnect detection can
+            // lag a fast manual reload, so this JOIN_REQUEST can land before
+            // onDisconnect fires for the dead connection it replaces. Left
+            // alone, the referee's seat would still name the stale peer id
+            // and `rebind` (session/referee.ts) refuses to claim a seat whose
+            // peerId is not null — soft-locking the seat with no self-healing
+            // path, since `driveAbsent`'s bot fallback never engages either
+            // (the referee believes the seat is still connected). Telling the
+            // referee here does not replace onDisconnect's own call to this;
+            // `disconnect` is a no-op for a peer id the referee does not
+            // know, so this is harmless when onDisconnect already ran first.
+            if (stalePeerId !== msg.from) {
+              keeperRef.current?.peerLeft(stalePeerId)
+            }
             // Called after GAME_STARTING on purpose: DataChannels preserve
             // order, so the catch-up projection this produces lands behind the
             // frame that routes the peer to its board — which is where that

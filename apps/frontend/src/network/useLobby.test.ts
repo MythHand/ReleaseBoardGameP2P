@@ -973,6 +973,30 @@ it('tells the keeper about a dropped peer, not just the roster', async () => {
   expect(sentTo(RETURNED).some((m) => m.type === 'SYNC')).toBe(true)
 })
 
+it('recovers a returning seat even when its JOIN_REQUEST beats onDisconnect there', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame()
+  })
+
+  // Deliberately do NOT fire onDisconnect for GUEST first. WebRTC disconnect
+  // detection can lag a fast manual reload, so the new connection's
+  // JOIN_REQUEST can be handled — and the lobby book patched — before the old
+  // channel is ever declared closed to the referee. Without the ordering fix
+  // in the rejoin branch, the referee's seat still names the dead peer id,
+  // `rebind` refuses the claim, and the seat is soft-locked with no
+  // self-healing path: every later intent from RETURNED fails seat
+  // resolution, and driveAbsent never engages because the referee still
+  // believes the seat is connected.
+  rejoin()
+
+  // The lobby book alone would show this as recovered (see the previous
+  // test's own risk); what proves the *referee's* book also moved is a SYNC
+  // reaching the new peer id — `rebind` only emits one once it accepts the
+  // claim.
+  expect(sentTo(RETURNED).some((m) => m.type === 'SYNC')).toBe(true)
+})
+
 it('calls a returning player back to the board it left', async () => {
   const { result } = await hostWhoseGuestDropped()
 
