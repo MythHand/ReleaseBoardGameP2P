@@ -281,21 +281,29 @@ export function useLobby(): UseLobby {
   // so a retry() fired mid-backoff supersedes the run it interrupts instead of
   // running alongside it.
   const reconnectEpochRef = useRef(0)
+  // Bumped once per DIAL — every attempt within a run, not just once per run.
+  // reconnectEpochRef alone cannot scope the settle handlers below: it is
+  // constant across every attempt of the same run, so an earlier attempt's
+  // belated transport event would pass an epoch-only check even with no
+  // retry() involved, landing on whichever attempt is current. This is the
+  // finer-grained token joinRoom actually gates on (see `dialToken` there).
+  const reconnectDialRef = useRef(0)
   // The pending outcome of the attempt currently awaiting a real connection
   // result. Settled by joinRoom's own onConnection/onError/onDisconnect
   // wrappers — not the shared onError/onDisconnect callbacks directly, since
   // those are one function shared by every transport this hook ever opens
   // and have no way to tell a current dial's event from a superseded one's.
-  // joinRoom captures the reconnect epoch live when a dial starts and gates
-  // every settle call on it (see `dialReconnectEpoch` there): a retry()
-  // fired while this dial is still genuinely in flight bumps that epoch, so
-  // the abandoned dial's own eventual open/error/close — however late it
-  // lands, even after the newer attempt has already overwritten this ref —
-  // finds the epochs no longer match and leaves the newer attempt's settle
-  // alone instead of resolving or rejecting it on the old dial's behalf.
-  // Cleared unconditionally the instant an attempt concludes (either way),
-  // so a leaveSession() landing afterward finds nothing to settle and can
-  // never reject an already-settled or unawaited promise.
+  // joinRoom captures reconnectDialRef's value live when a dial starts and
+  // gates every settle call on it still matching (see `dialToken` there): a
+  // retry() (a new run) or simply the loop's own move to its next attempt
+  // (same run) both bump reconnectDialRef, so the abandoned dial's own
+  // eventual open/error/close — however late it lands, even after a newer
+  // attempt has already overwritten this ref — finds the tokens no longer
+  // match and leaves the newer attempt's settle alone instead of resolving
+  // or rejecting it on the old dial's behalf. Cleared unconditionally the
+  // instant an attempt concludes (either way), so a leaveSession() landing
+  // afterward finds nothing to settle and can never reject an
+  // already-settled or unawaited promise.
   const reconnectSettleRef = useRef<{ resolve: () => void; reject: (err: unknown) => void } | null>(
     null,
   )
@@ -709,32 +717,35 @@ export function useLobby(): UseLobby {
       // Snapshot the session generation so a Cancel/Home (leaveSession) during
       // the createTransport round-trip is detectable below.
       const epoch = sessionEpochRef.current
-      // Snapshot the reconnect epoch live when THIS dial starts. Outside a
-      // guest reconnect attempt this value is never consulted below
+      // Snapshot reconnectDialRef's value live when THIS dial starts. Outside
+      // a guest reconnect attempt this value is never consulted below
       // (reconnectSettleRef stays null all along, so every guarded call is
       // already a no-op on its own). Inside one, it is what lets this dial's
       // own connection outcome — open, error, or close, however late it
-      // lands — be told apart from a later attempt's: a retry() fired while
-      // this dial is still genuinely in flight bumps reconnectEpochRef, so a
-      // belated callback below finds the epochs no longer match and leaves
-      // the newer attempt's settle alone instead of resolving or rejecting
-      // it on this abandoned dial's behalf. See reconnectSettleRef's own
-      // comment for the fuller picture.
-      const dialReconnectEpoch = reconnectEpochRef.current
+      // lands — be told apart from a later attempt's: reconnectDialRef is
+      // bumped once per dial (every attempt, not just once per run), so
+      // *either* a retry() (a new run) *or* the loop's own ordinary move to
+      // its next attempt (same run, no retry() involved — the flaky-network
+      // case this loop exists to survive) moves the token, and a belated
+      // callback below then finds the tokens no longer match and leaves the
+      // newer attempt's settle alone instead of resolving or rejecting it on
+      // this abandoned dial's behalf. See reconnectSettleRef's own comment
+      // for the fuller picture.
+      const dialToken = reconnectDialRef.current
       try {
         const t = await createTransport({
           onMessage,
           onError: (err) => {
             // The general error surfacing (status/errorKind) always applies —
-            // only the reconnect-settle side effect is epoch-gated.
+            // only the reconnect-settle side effect is token-gated.
             onError(err)
-            if (dialReconnectEpoch === reconnectEpochRef.current) {
+            if (dialToken === reconnectDialRef.current) {
               reconnectSettleRef.current?.reject(err)
             }
           },
           onDisconnect: (peerId) => {
             onDisconnect(peerId)
-            if (dialReconnectEpoch === reconnectEpochRef.current) {
+            if (dialToken === reconnectDialRef.current) {
               reconnectSettleRef.current?.reject(new Error('host disconnected'))
             }
           },
@@ -751,7 +762,7 @@ export function useLobby(): UseLobby {
                 payload: { name, clientId: getClientId() },
               })
               setStatus('in-lobby')
-              if (dialReconnectEpoch === reconnectEpochRef.current) {
+              if (dialToken === reconnectDialRef.current) {
                 reconnectSettleRef.current?.resolve()
               }
             }
@@ -990,6 +1001,12 @@ export function useLobby(): UseLobby {
       setReconnectAttempt(attempt)
       pushReconnectEvent('dialing', attempt)
 
+      // A fresh token for THIS dial, read back by joinRoom just below (its
+      // own `dialToken` snapshot) — bumped per attempt, not just per run, so
+      // the loop's own move to its next attempt (no retry() involved) also
+      // retires the previous attempt's settle handlers, exactly like a
+      // retry() does across runs.
+      reconnectDialRef.current += 1
       // Settled by whichever of joinRoom's onConnection (resolve) or the
       // shared onError/onDisconnect (reject) reports this dial's outcome —
       // joinRoom's own promise only confirms this browser's own peer was

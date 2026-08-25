@@ -1778,3 +1778,67 @@ it("a superseded run's belated channel-open does not settle the run that replace
   })
   expect(result.current.reconnect.status).toBe('idle')
 })
+
+it("an earlier attempt's belated channel-open does not settle the next attempt in the same run", async () => {
+  // The within-run counterpart to the retry() test above: reconnectEpochRef
+  // is bumped once per RUN, not once per attempt, so an epoch-only guard
+  // cannot tell attempt 1's belated event apart from attempt 2's own — even
+  // with no retry() anywhere in this test. This is the loop's own ordinary
+  // multi-attempt operation on a flaky connection, which is the ordinary
+  // condition the whole feature exists to survive, not a player clicking
+  // anything at an unlucky moment.
+  vi.useFakeTimers()
+  try {
+    storedGuestSession(null)
+
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(transports).toHaveLength(1)
+    expect(result.current.reconnect.attempt).toBe(1)
+
+    const hostId = parseRoomCode('ABC-123')
+    // Attempt 1 fails normally (the host is unreachable), settling its own
+    // promise through the ordinary onError path.
+    await act(async () => {
+      transports[0].onError?.({ type: 'peer-unavailable', message: 'nope' })
+      await Promise.resolve()
+    })
+    expect(result.current.reconnect.status).toBe('trying')
+
+    // The backoff elapses and attempt 2 dials — a fresh transport, still the
+    // same run.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(backoffMs(1))
+    })
+    expect(transports).toHaveLength(2)
+    expect(result.current.reconnect.attempt).toBe(2)
+
+    // Attempt 1's own, now-abandoned transport reports a belated
+    // channel-open — its own dial closure, fired directly the same way
+    // every guest test in this file drives onConnection, arriving after
+    // attempt 2 has already begun.
+    await act(async () => {
+      transports[0].onConnection?.(hostId)
+      await Promise.resolve()
+    })
+    // Without a per-attempt (not merely per-run) token, this resolves
+    // whatever is currently in reconnectSettleRef — attempt 2's own pending
+    // settle — reporting a connection attempt 2's actual dial
+    // (transports[1]) never confirmed, and falsely clearing the overlay
+    // over a table that was never actually reached: status would read
+    // 'idle' while transports[1] sits open but never joined.
+    expect(result.current.reconnect.status).toBe('trying')
+    expect(result.current.reconnect.attempt).toBe(2)
+
+    // Attempt 2's own outcome is still honored normally.
+    await act(async () => {
+      transports[1].onConnection?.(hostId)
+      await Promise.resolve()
+    })
+    expect(result.current.reconnect.status).toBe('idle')
+  } finally {
+    vi.useRealTimers()
+  }
+})
