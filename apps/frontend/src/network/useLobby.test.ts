@@ -1209,10 +1209,10 @@ function storedHostSession(gameId: string | null): void {
 // `hostPeerId` is p1's peerId in the stored referee seats; the restore only
 // keeps a seat whose peerId matches the freshly reclaimed transport id, so a
 // test proving that has to control what that id will be.
-function storedKeeperSnapshot(hostPeerId: string): StoredKeeper {
+function storedKeeperSnapshot(hostPeerId: string, gameId = 'g1'): StoredKeeper {
   const engine = createFakeEngine()
   const { session } = createSession({
-    gameId: 'g1',
+    gameId,
     keeperId: 'p1',
     engine,
     seed: 1,
@@ -1225,7 +1225,7 @@ function storedKeeperSnapshot(hostPeerId: string): StoredKeeper {
     events: FAKE_EVENTS,
   })
   const snapshot: StoredKeeper = {
-    gameId: 'g1',
+    gameId,
     keeperId: 'p1',
     state: session.state,
     seats: session.seats,
@@ -1261,6 +1261,36 @@ it('restores the host to the match it was keeping, without replaying the deal', 
   // `resync` sends a SYNC even with an empty events array, so its absence is
   // what proves it was never called.
   expect(result.current.gameSync).toBeNull()
+})
+
+// A restored session's gameId is `${hostId}-N}`, exactly what startGame itself
+// would have minted — matchSeqRef has to be reseeded from that N, or a rematch
+// in the same tab (no reload in between) mints the SAME id a second time. That
+// id collision is silent: useGame keys its move-history reset on `gameId`
+// changing, so a repeat would open the rematch's board still carrying the
+// finished match's events.
+it('reseeds the match counter on restore, so a rematch does not reuse the restored gameId', async () => {
+  const restoredGameId = 'peer0-1'
+  storedHostSession(restoredGameId)
+  storedKeeperSnapshot('peer0', restoredGameId)
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(result.current.gameId).toBe(restoredGameId)
+
+  // The restored match is over; walk back to the lobby and start a rematch
+  // without ever reloading the tab.
+  act(() => {
+    result.current.leaveGame()
+  })
+  act(() => {
+    result.current.startGame()
+  })
+
+  expect(result.current.gameId).not.toBeNull()
+  expect(result.current.gameId).not.toBe(restoredGameId)
 })
 
 it("reclaims the room code's exact peer id rather than minting a fresh one", async () => {

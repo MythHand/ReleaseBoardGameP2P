@@ -70,6 +70,27 @@ export function parseRoomCode(code: string): string {
   return code.replace(/[^a-z0-9]/gi, '').toLowerCase()
 }
 
+// What `matchSeqRef` must be seeded to after a restore, so the NEXT startGame
+// mints an id that was never used. `gameId` is always `${hostId}-${seq}`
+// (startGame), and the host id itself never contains a dash (room codes are
+// drawn from ROOM_CODE_ALPHABET, which has none), so the numeric suffix after
+// the last dash is the sequence number that produced this exact match.
+//
+// A restore starting a fresh `useRef(0)` and leaving it there is the bug this
+// guards: the very next startGame would mint the SAME id as the match just
+// restored — the id `matchSeqRef`'s own comment already warns a repeat would
+// be "silently taken for the same game" by every gameId-keyed consumer
+// (useGame's move-history feed among them). Parsed defensively: a suffix that
+// is not a positive integer for any reason must not silently leave the
+// counter at 0 and reproduce the exact collision this exists to prevent, so
+// it falls back to the clock instead — a value no realistic sequence of
+// startGame calls could ever collide with.
+export function matchSeqAfterRestore(gameId: string): number {
+  const suffix = gameId.slice(gameId.lastIndexOf('-') + 1)
+  const parsed = Number(suffix)
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : Date.now()
+}
+
 // How long to keep the transport alive after broadcasting LOBBY_DISBANDED, so
 // the buffered frame can flush over the DataChannels before peer.destroy().
 const DISBAND_FLUSH_MS = 200
@@ -841,6 +862,9 @@ export function useLobby(): UseLobby {
       // match was dealt long ago.
       gameIdRef.current = snapshot.gameId
       setGameId(snapshot.gameId)
+      // Or the next startGame (a rematch, no reload in between) would mint
+      // this exact id again — see matchSeqAfterRestore.
+      matchSeqRef.current = matchSeqAfterRestore(snapshot.gameId)
       // The lobby-shaped seating comes straight from the snapshot rather than
       // rebuilt from the referee's seats above, which carry neither clientId
       // nor name — there is nothing to reconstruct them from. `applySeats`
