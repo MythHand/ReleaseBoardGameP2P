@@ -282,13 +282,20 @@ export function useLobby(): UseLobby {
   // running alongside it.
   const reconnectEpochRef = useRef(0)
   // The pending outcome of the attempt currently awaiting a real connection
-  // result. joinRoom's own onConnection callback resolves it once the
-  // DataChannel to the host opens; the shared onError/onDisconnect callbacks
-  // reject it the same way they already report every other connection
-  // failure — a reconnect dial gets no error channel of its own. Cleared the
-  // instant an attempt concludes (either way), so a leaveSession() landing
-  // afterward finds nothing to settle and can never reject an already-settled
-  // or unawaited promise.
+  // result. Settled by joinRoom's own onConnection/onError/onDisconnect
+  // wrappers — not the shared onError/onDisconnect callbacks directly, since
+  // those are one function shared by every transport this hook ever opens
+  // and have no way to tell a current dial's event from a superseded one's.
+  // joinRoom captures the reconnect epoch live when a dial starts and gates
+  // every settle call on it (see `dialReconnectEpoch` there): a retry()
+  // fired while this dial is still genuinely in flight bumps that epoch, so
+  // the abandoned dial's own eventual open/error/close — however late it
+  // lands, even after the newer attempt has already overwritten this ref —
+  // finds the epochs no longer match and leaves the newer attempt's settle
+  // alone instead of resolving or rejecting it on the old dial's behalf.
+  // Cleared unconditionally the instant an attempt concludes (either way),
+  // so a leaveSession() landing afterward finds nothing to settle and can
+  // never reject an already-settled or unawaited promise.
   const reconnectSettleRef = useRef<{ resolve: () => void; reject: (err: unknown) => void } | null>(
     null,
   )
@@ -303,11 +310,6 @@ export function useLobby(): UseLobby {
     setError(err.type ? `${err.type}: ${err.message}` : err.message)
     setErrorKind(classify(err.type))
     setStatus((s) => (err.type !== 'connection' || s === 'connecting' ? 'error' : s))
-    // A no-op outside a guest reconnect attempt (the ref is null the rest of
-    // the time) — this is the same error this callback already surfaces
-    // through status/errorKind, just also handed to whichever reconnect
-    // attempt is waiting on it.
-    reconnectSettleRef.current?.reject(err)
   }, [])
 
   // A rejected createTransport (setup failed before the peer opened) bypasses
@@ -440,9 +442,6 @@ export function useLobby(): UseLobby {
           setErrorKind((prev) => prev ?? 'connection')
         }
         setStatus('error')
-        // Same as onError above: a no-op unless a reconnect attempt is
-        // currently waiting on this exact dial's outcome.
-        reconnectSettleRef.current?.reject(new Error('host disconnected'))
       } else {
         commit(applyPeerLeft(current, peerId))
       }
@@ -710,11 +709,35 @@ export function useLobby(): UseLobby {
       // Snapshot the session generation so a Cancel/Home (leaveSession) during
       // the createTransport round-trip is detectable below.
       const epoch = sessionEpochRef.current
+      // Snapshot the reconnect epoch live when THIS dial starts. Outside a
+      // guest reconnect attempt this value is never consulted below
+      // (reconnectSettleRef stays null all along, so every guarded call is
+      // already a no-op on its own). Inside one, it is what lets this dial's
+      // own connection outcome — open, error, or close, however late it
+      // lands — be told apart from a later attempt's: a retry() fired while
+      // this dial is still genuinely in flight bumps reconnectEpochRef, so a
+      // belated callback below finds the epochs no longer match and leaves
+      // the newer attempt's settle alone instead of resolving or rejecting
+      // it on this abandoned dial's behalf. See reconnectSettleRef's own
+      // comment for the fuller picture.
+      const dialReconnectEpoch = reconnectEpochRef.current
       try {
         const t = await createTransport({
           onMessage,
-          onError,
-          onDisconnect,
+          onError: (err) => {
+            // The general error surfacing (status/errorKind) always applies —
+            // only the reconnect-settle side effect is epoch-gated.
+            onError(err)
+            if (dialReconnectEpoch === reconnectEpochRef.current) {
+              reconnectSettleRef.current?.reject(err)
+            }
+          },
+          onDisconnect: (peerId) => {
+            onDisconnect(peerId)
+            if (dialReconnectEpoch === reconnectEpochRef.current) {
+              reconnectSettleRef.current?.reject(new Error('host disconnected'))
+            }
+          },
           onConnection: (peerId) => {
             // Send JOIN_REQUEST exactly when the host DataChannel opens — a
             // setTimeout(0) is not sufficient over real WebRTC because the channel
@@ -728,9 +751,9 @@ export function useLobby(): UseLobby {
                 payload: { name, clientId: getClientId() },
               })
               setStatus('in-lobby')
-              // A no-op outside a guest reconnect attempt; see
-              // reconnectSettleRef's own comment for why this exists.
-              reconnectSettleRef.current?.resolve()
+              if (dialReconnectEpoch === reconnectEpochRef.current) {
+                reconnectSettleRef.current?.resolve()
+              }
             }
           },
         })
@@ -998,7 +1021,15 @@ export function useLobby(): UseLobby {
         pushReconnectEvent('channel-open', attempt)
         pushReconnectEvent('handshake', attempt)
         // Done: cleared back to idle so a working table never sits under a
-        // reconnect overlay that thinks it is still trying.
+        // reconnect overlay that thinks it is still trying. The stored
+        // session is cleared too — a retry() fired after this point (a stray
+        // double-invoke, or anything reaching this callback outside the
+        // 'trying'/'failed' gate retryReconnect enforces below) must find
+        // nothing to re-dial rather than tearing down a live, working
+        // transport. Belt-and-braces alongside that gate, not a substitute
+        // for it: this is what makes the gate's premise ("idle means nothing
+        // to retry") actually true.
+        reconnectSessionRef.current = null
         setReconnectStatus('idle')
         return
       }
@@ -1013,12 +1044,17 @@ export function useLobby(): UseLobby {
     }
   }, [joinRoom, pushReconnectEvent])
 
-  // Starts a fresh run from attempt 1. A no-op if nothing was ever offered to
-  // reconnect (no stored guest session at mount) — matching restoreHost/
+  // Starts a fresh run from attempt 1. Guarded to only actually start one
+  // while the previous run is 'trying' or 'failed' — the overlay's retry
+  // button calls this directly, so a stray double-invoke (or any other path
+  // reaching this outside those two states) must not re-enter the loop once
+  // a run has already succeeded ('idle') or nothing was ever offered to
+  // reconnect in the first place. A no-op silently, matching restoreHost/
   // joinRoom's own "nothing to do" silence rather than throwing.
   const retryReconnect = useCallback(() => {
+    if (reconnectStatus !== 'trying' && reconnectStatus !== 'failed') return
     void runGuestReconnect()
-  }, [runGuestReconnect])
+  }, [runGuestReconnect, reconnectStatus])
 
   // Once per mount, before any screen can act. A restore that finds nothing
   // stored is a no-op, so this is safe on a cold start. Guest reconnect only

@@ -1697,3 +1697,84 @@ it('retry starts a fresh run from attempt 1', async () => {
     vi.useRealTimers()
   }
 })
+
+// --- fix round: superseded runs must not settle or tear down another run ---
+
+it('retry() after a successful reconnect leaves the live transport alone', async () => {
+  storedGuestSession(null)
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  const hostId = parseRoomCode('ABC-123')
+  await act(async () => {
+    transports[0].onConnection?.(hostId)
+    await Promise.resolve()
+  })
+  expect(result.current.reconnect.status).toBe('idle')
+
+  // A stray double-invoke, or anything else reaching retry() outside the
+  // 'trying'/'failed' gate — the button the next task wires this to must
+  // never be able to disconnect a player who is already back at the table.
+  act(() => {
+    result.current.reconnect.retry()
+  })
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  // No re-entry: no new dial, and — the actual danger — the live transport
+  // was never closed. joinRoom's very first act is transportRef.current?.close(),
+  // so a re-entered run would have torn down the working connection.
+  expect(transports).toHaveLength(1)
+  expect(transports[0].close).not.toHaveBeenCalled()
+  expect(result.current.reconnect.status).toBe('idle')
+})
+
+it("a superseded run's belated channel-open does not settle the run that replaced it", async () => {
+  storedGuestSession(null)
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  // Attempt 1 has dialed and is genuinely in flight — connectTo was called,
+  // but nothing has reported an outcome yet (not sleeping in backoff).
+  expect(transports).toHaveLength(1)
+  expect(result.current.reconnect.status).toBe('trying')
+
+  // retry() supersedes it mid-dial, the same window a stray click or the
+  // overlay's own retry button could land in.
+  act(() => {
+    result.current.reconnect.retry()
+  })
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(transports).toHaveLength(2)
+  expect(result.current.reconnect.attempt).toBe(1)
+
+  const hostId = parseRoomCode('ABC-123')
+  // The abandoned dial's own channel opens moments after being superseded —
+  // exactly the "had opened its channel when superseded" case: closing it
+  // from the new joinRoom() call fires a real close later, but here it
+  // reports success instead, on the outcome PeerJS actually delivered to it.
+  await act(async () => {
+    transports[0].onConnection?.(hostId)
+    await Promise.resolve()
+  })
+
+  // Without the epoch guard, transports[0]'s onConnection unconditionally
+  // resolves whatever is currently in reconnectSettleRef — which by now is
+  // run 2's own pending settle — reporting a connection nobody's actual live
+  // dial (transports[1]) ever confirmed.
+  expect(result.current.reconnect.status).toBe('trying')
+
+  // The genuinely new dial's own outcome is still honored normally.
+  await act(async () => {
+    transports[1].onConnection?.(hostId)
+    await Promise.resolve()
+  })
+  expect(result.current.reconnect.status).toBe('idle')
+})
