@@ -38,6 +38,7 @@ function base(): UseLobby {
   return {
     state: null,
     status: 'idle',
+    restoring: false,
     roomCode: null,
     isHost: false,
     canStart: false,

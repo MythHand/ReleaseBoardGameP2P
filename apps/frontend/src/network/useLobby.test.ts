@@ -1296,11 +1296,14 @@ it('passes no gate: a submitted intent applies right away instead of waiting on 
 })
 
 it('does nothing on mount when no session was ever stored', async () => {
-  renderHook(() => useLobby())
+  const { result } = renderHook(() => useLobby())
   await act(async () => {
     await Promise.resolve()
   })
   expect(transports).toHaveLength(0)
+  // The early return happens before setRestoring(true) is ever reached, so a
+  // no-op restore must never flip the overlay flag on.
+  expect(result.current.restoring).toBe(false)
 })
 
 it('does not treat a stored guest session as a host match to restore', async () => {
@@ -1402,6 +1405,82 @@ it('surfaces the error once every reconnect attempt is spent', async () => {
     // Never surfaced through a bare createTransport rejection path that would
     // leave 'connecting' spinning forever.
     expect(transports).toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// `restoring` is the host's half of the reconnect overlay (Task 8 derives the
+// board's `connection` prop from it): true only while restoreHost is actually
+// working, false the rest of the time — including once it settles, on either
+// path. A stuck `true` would leave the overlay up over a board that has
+// already recovered or already given up.
+it('restoring is true only while the restore is in flight, and clears once it recovers', async () => {
+  vi.useFakeTimers()
+  try {
+    storedHostSession('g1')
+    storedKeeperSnapshot('peer0')
+    // A rejected first attempt buys a real window (the backoff wait) in which
+    // to observe `restoring` mid-flight — a same-tick success would collapse
+    // start and end into a single microtask and prove nothing.
+    vi.mocked(createTransport).mockImplementationOnce(() =>
+      Promise.reject({ type: 'unavailable-id', message: 'still registered' }),
+    )
+
+    const { result } = renderHook(() => useLobby())
+    // Everything up to the first genuine await (createTransport) runs
+    // synchronously inside the mount effect, and renderHook flushes that
+    // through act() before returning — so `restoring` is already true here,
+    // not merely "eventually".
+    expect(result.current.restoring).toBe(true)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    // The first attempt has failed and the retry is behind its backoff wait —
+    // still in flight.
+    expect(result.current.restoring).toBe(true)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(backoffMs(1))
+    })
+
+    expect(result.current.status).toBe('in-lobby')
+    expect(result.current.restoring).toBe(false)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('restoring clears back to false once every reconnect attempt is spent', async () => {
+  vi.useFakeTimers()
+  try {
+    storedHostSession('g1')
+    storedKeeperSnapshot('peer0')
+    for (let i = 0; i < MAX_RECONNECT_ATTEMPTS; i++) {
+      vi.mocked(createTransport).mockImplementationOnce(() =>
+        Promise.reject({ type: 'unavailable-id', message: 'still registered' }),
+      )
+    }
+
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(result.current.restoring).toBe(true)
+
+    let totalBackoff = 0
+    for (let attempt = 1; attempt < MAX_RECONNECT_ATTEMPTS; attempt++) {
+      totalBackoff += backoffMs(attempt)
+    }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(totalBackoff)
+    })
+
+    expect(result.current.status).toBe('error')
+    // The finally clears it on the failure path too — a stuck `true` here
+    // would leave the board's reconnect overlay up with nothing left trying.
+    expect(result.current.restoring).toBe(false)
   } finally {
     vi.useRealTimers()
   }
