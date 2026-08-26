@@ -960,8 +960,18 @@ export function useLobby(): UseLobby {
           ],
         }),
       )
-      // NOT resync(setupEvents(...)): that call replays the deal, and this
-      // match was dealt long ago.
+      // `resync()` with NO events, which is the whole distinction that matters
+      // here. Attaching a keeper and subscribing to it delivers nothing on its
+      // own — something has to ask for the current state — so without this the
+      // restored host holds a live session it never receives a projection for,
+      // `useGame` keeps a null view, and the board sits on EMPTY_TABLE until
+      // the host happens to act. On a turn that is not theirs, it never can.
+      //
+      // Deliberately not `resync(engine.setupEvents(...))`: THAT replays the
+      // opening deal, and this match was dealt long ago. Empty events are a
+      // statement of where the game stands rather than an account of how it got
+      // there, so the board's intro finds no deal and hands over at once.
+      keeper.resync()
       gameIdRef.current = snapshot.gameId
       setGameId(snapshot.gameId)
       // Or the next startGame (a rematch, no reload in between) would mint

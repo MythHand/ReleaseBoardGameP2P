@@ -1239,6 +1239,35 @@ function storedKeeperSnapshot(hostPeerId: string, gameId = 'g1'): StoredKeeper {
   return snapshot
 }
 
+it('hands the restored host its own table back without waiting for it to act', async () => {
+  storedHostSession('g1')
+  const snapshot = storedKeeperSnapshot('peer0')
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  // The whole point of restoring: the board has something to render the moment
+  // it mounts. `useGame` derives its view from this, and the page falls through
+  // to EMPTY_TABLE while it is null — the blank table this feature exists to
+  // fix. A keeper the host has merely SUBSCRIBED to sends nothing on its own;
+  // something has to ask it for the current state.
+  expect(result.current.gameSync).not.toBeNull()
+
+  // It is the hand the snapshot described, not a fresh deal.
+  const engine = createFakeEngine()
+  const expected = engine.project(snapshot.state as Parameters<typeof engine.project>[0], 'p1')
+  expect(result.current.gameSync?.view.self.hand.map((c) => c.uid)).toEqual(
+    expected.self.hand.map((c) => c.uid),
+  )
+
+  // And it carries no events, so the board's deal intro finds nothing to replay
+  // and hands over at once. This is what separates `resync()` from the
+  // `resync(setupEvents(...))` that opens a brand new match.
+  expect(result.current.gameSync?.events).toEqual([])
+})
+
 it('restores the host to the match it was keeping, without replaying the deal', async () => {
   storedHostSession('g1')
   storedKeeperSnapshot('peer0')
@@ -1256,11 +1285,14 @@ it('restores the host to the match it was keeping, without replaying the deal', 
     { playerId: 'p1', peerId: 'peer0', clientId: 'client-host', name: 'Dimbo' },
     { playerId: 'p2', peerId: 'old-guest', clientId: 'client-guest', name: 'Bo' },
   ])
-  // NOT resync(setupEvents(...)): that call replays the deal, and this match
-  // was dealt long ago. A gameSync this early could only have come from it —
-  // `resync` sends a SYNC even with an empty events array, so its absence is
-  // what proves it was never called.
-  expect(result.current.gameSync).toBeNull()
+  // A restore DOES send one projection — the host has to be given the table it
+  // came back to. What it must not do is replay the deal, so the discriminator
+  // is the SYNC's events, not its existence: `resync()` carries none, while the
+  // `resync(setupEvents(...))` that opens a new match carries the whole opening.
+  // Asserting the absence of any SYNC would pass just as well for a host that
+  // was never handed its table at all.
+  expect(result.current.gameSync).not.toBeNull()
+  expect(result.current.gameSync?.events).toEqual([])
 })
 
 // A restored session's gameId is `${hostId}-N}`, exactly what startGame itself
@@ -1315,14 +1347,18 @@ it('passes no gate: a submitted intent applies right away instead of waiting on 
   await act(async () => {
     await Promise.resolve()
   })
-  expect(result.current.gameSync).toBeNull()
+  // The restore's own projection, before any intent — so "a sync exists" can no
+  // longer stand in for "the intent was applied". Identity is the discriminator.
+  const beforeIntent = result.current.gameSync
+  expect(beforeIntent).not.toBeNull()
 
   act(() => {
     result.current.gameLink?.submit({ type: 'DRAW' })
   })
 
-  // A gate still open would buffer this behind INTRO_READY and emit nothing.
-  expect(result.current.gameSync).not.toBeNull()
+  // A gate still closed would buffer this behind INTRO_READY and emit nothing,
+  // leaving the restore's own projection as the latest one.
+  expect(result.current.gameSync).not.toBe(beforeIntent)
 })
 
 it('does nothing on mount when no session was ever stored', async () => {
