@@ -550,6 +550,40 @@ it('projects the defence prompt only to the player who owes it', () => {
   expect(other && 'options' in other && other.options).toEqual([])
 })
 
+it('rejects a DDoS played with a sudo', () => {
+  // Not a rules curiosity — it is the premise the board's `resolved` flag rests
+  // on. planBeats decides a turn-played DDoS never stood awaiting an answer by
+  // checking that the NEXT event is that same card's own attackSpent discard.
+  // That reading only holds while a DDoS spends exactly one card. `attack-ddos`
+  // has no sudo effect in cards.ts, so a combo is rejected before any of it —
+  // and this says so out loud, because a card that resolved in place while
+  // spending something alongside it would slide past the check and bring the
+  // fabricated defend pending back (review of PR #125).
+  const s = engine.createGame(config())
+  const primed: GameState = {
+    ...s,
+    players: {
+      ...s.players,
+      p1: { ...s.players.p1, hand: [DDOS, SUDO] },
+      p2: { ...s.players.p2, release: { monitoring: MON } },
+    },
+  }
+
+  const r = reduce(primed, {
+    type: 'PLAY',
+    player: 'p1',
+    card: DDOS.uid,
+    combo: SUDO.uid,
+    target: { kind: 'monitoring', player: 'p2' },
+    at: 1000,
+  })
+
+  expect(r.state).toBe(primed)
+  expect(r.events).toContainEqual(
+    expect.objectContaining({ type: 'rejected', reason: 'that card has no sudo variant' }),
+  )
+})
+
 it('logs a turn-played DDoS as an attack, not only as its consequences', () => {
   // A DDoS played on your own turn used to reach the table through resolveDdos,
   // which logged what the attack DID — a Monitoring destroyed, a release
