@@ -20,10 +20,38 @@ export const RESTORE_TTL_MS = 12 * 60 * 60 * 1000
 // crashing on mount.
 const memory = new Map<string, string>()
 
+// `sessionStorage`, not `localStorage`, and that choice is load-bearing.
+//
+// Every record here describes ONE PEER: who this browser is at the table, which
+// room it is in, and (for a host) the match it is keeping. localStorage is
+// per-ORIGIN, so two tabs of the same app share one copy of all of it and the
+// last writer wins. Open a host in one tab and a guest in another — the obvious
+// way to play or test locally — and the guest's record overwrites the host's.
+// The host then reloads, reads "you are a guest", declines its own restore, and
+// starts dialling its own room code: a peer that no longer exists, because it is
+// the one that just reloaded. The player watches "link to host lost" forever
+// over an empty board. That is not a theoretical collision; it is the reported
+// bug, reproduced in a real browser.
+//
+// sessionStorage is scoped to the TAB, and survives exactly what has to be
+// survived: a reload, a crash-restore, and in-tab navigation. Two tabs get two
+// identities, which is what two peers are.
+//
+// What this gives up: closing the tab and reopening it no longer offers the
+// match back, because the record went with the tab. That is the smaller loss —
+// it trades a rarer convenience for the common case working at all.
+function store(): Storage | null {
+  try {
+    return sessionStorage
+  } catch {
+    return null
+  }
+}
+
 function read(key: string): string | null {
   try {
-    const stored = localStorage.getItem(key)
-    if (stored !== null) return stored
+    const stored = store()?.getItem(key)
+    if (stored !== null && stored !== undefined) return stored
   } catch {
     // fall through to memory
   }
@@ -33,7 +61,7 @@ function read(key: string): string | null {
 function write(key: string, value: string): void {
   memory.set(key, value)
   try {
-    localStorage.setItem(key, value)
+    store()?.setItem(key, value)
   } catch {
     // memory already holds it
   }
@@ -42,7 +70,7 @@ function write(key: string, value: string): void {
 function remove(key: string): void {
   memory.delete(key)
   try {
-    localStorage.removeItem(key)
+    store()?.removeItem(key)
   } catch {
     // memory is already clear
   }

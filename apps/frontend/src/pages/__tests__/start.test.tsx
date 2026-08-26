@@ -20,10 +20,10 @@ vi.mock('~/app/providers/SessionProvider', () => ({
 let sessionValue: Pick<UseLobby, 'status' | 'state' | 'roomCode'>
 
 // The store isn't cleared between tests by jsdom on its own, and persistence.ts
-// also keeps an in-memory fallback behind localStorage — clearSession() is what
+// also keeps an in-memory fallback behind sessionStorage — clearSession() is what
 // actually empties both (see useLobby.test.ts's beforeEach for the same need).
 beforeEach(() => {
-  localStorage.clear()
+  sessionStorage.clear()
   clearSession()
 })
 
@@ -87,7 +87,7 @@ it('keeps the continue session slot reserved but hidden when no session', () => 
 })
 
 it('offers to continue a stored session after a reload, with no live session', () => {
-  localStorage.setItem(
+  sessionStorage.setItem(
     'release:session',
     JSON.stringify({
       roomCode: 'ABC-123',

@@ -72,12 +72,12 @@ beforeEach(() => {
   // by the previous test would be read as this one's — and now that the mount
   // effect restores from one automatically (host restore, below), a leftover
   // record does not just sit unread, it drives a real reconnect during a later
-  // test's mount. `localStorage.clear()` alone is not enough: persistence.ts
+  // test's mount. `sessionStorage.clear()` alone is not enough: persistence.ts
   // falls back to an in-memory cache when storage throws (Safari private
   // mode), and that cache is a module-level singleton that outlives any one
   // test — clearSession/clearKeeper are what actually empty it, on top of the
   // browser storage.
-  localStorage.clear()
+  sessionStorage.clear()
   clearSession()
   clearKeeper()
 })
@@ -700,11 +700,11 @@ const SESSION_KEY = 'release:session'
 const KEEPER_KEY = 'release:keeper'
 
 function storedSession(): StoredSession | null {
-  return JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null')
+  return JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? 'null')
 }
 
 function storedKeeper(): StoredKeeper | null {
-  return JSON.parse(localStorage.getItem(KEEPER_KEY) ?? 'null')
+  return JSON.parse(sessionStorage.getItem(KEEPER_KEY) ?? 'null')
 }
 
 // How many times the keeper snapshot was actually serialized. The point of the
@@ -782,7 +782,7 @@ it('forgets what it stored when the room is left', async () => {
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
     })
-    expect(localStorage.getItem(KEEPER_KEY)).not.toBeNull()
+    expect(sessionStorage.getItem(KEEPER_KEY)).not.toBeNull()
 
     act(() => {
       result.current.leaveSession()
@@ -790,8 +790,8 @@ it('forgets what it stored when the room is left', async () => {
 
     // Both records describe a room this browser is no longer in; offering to
     // resume it is offering to rejoin a table the player walked away from.
-    expect(localStorage.getItem(SESSION_KEY)).toBeNull()
-    expect(localStorage.getItem(KEEPER_KEY)).toBeNull()
+    expect(sessionStorage.getItem(SESSION_KEY)).toBeNull()
+    expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
   } finally {
     vi.useRealTimers()
   }
@@ -804,7 +804,7 @@ it('forgets what it stored when the host kicks this peer', async () => {
   })
   const hostId = parseRoomCode('F96-NMT')
   const selfId = result.current.state?.selfId ?? ''
-  expect(localStorage.getItem(SESSION_KEY)).not.toBeNull()
+  expect(sessionStorage.getItem(SESSION_KEY)).not.toBeNull()
 
   act(() => {
     transports[0].onMessage?.({
@@ -816,8 +816,8 @@ it('forgets what it stored when the host kicks this peer', async () => {
 
   expect(result.current.status).toBe('kicked')
   // A stored record here would walk the kicked player straight back in.
-  expect(localStorage.getItem(SESSION_KEY)).toBeNull()
-  expect(localStorage.getItem(KEEPER_KEY)).toBeNull()
+  expect(sessionStorage.getItem(SESSION_KEY)).toBeNull()
+  expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
 })
 
 it('coalesces a burst of keeper commits into one serialization', async () => {
@@ -919,7 +919,7 @@ it('cannot let a pending snapshot land after the room is left', async () => {
 
     // A trailing write firing after clearKeeper() would put the abandoned match
     // straight back — and /start would offer to resume it.
-    expect(localStorage.getItem(KEEPER_KEY)).toBeNull()
+    expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
   } finally {
     vi.useRealTimers()
   }
@@ -1144,7 +1144,7 @@ it('walking back to the lobby drops the stored match but keeps the room', async 
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
     })
-    expect(localStorage.getItem(KEEPER_KEY)).not.toBeNull()
+    expect(sessionStorage.getItem(KEEPER_KEY)).not.toBeNull()
 
     act(() => {
       result.current.leaveGame()
@@ -1152,7 +1152,7 @@ it('walking back to the lobby drops the stored match but keeps the room', async 
 
     // The match is over for this peer; the room is not. A reload has to be able
     // to put them back in the lobby, and must not put them back on the board.
-    expect(localStorage.getItem(KEEPER_KEY)).toBeNull()
+    expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
     expect(storedSession()).toMatchObject({
       roomCode: result.current.roomCode,
       name: 'Dimbo',
@@ -1182,7 +1182,7 @@ it('a snapshot still on its trailing edge cannot survive walking back to the lob
       vi.advanceTimersByTime(1000)
     })
 
-    expect(localStorage.getItem(KEEPER_KEY)).toBeNull()
+    expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
   } finally {
     vi.useRealTimers()
   }
@@ -1191,7 +1191,7 @@ it('a snapshot still on its trailing edge cannot survive walking back to the lob
 // --- host restore ---
 
 function storedHostSession(gameId: string | null): void {
-  localStorage.setItem(
+  sessionStorage.setItem(
     SESSION_KEY,
     JSON.stringify({
       roomCode: formatRoomCode('peer0'),
@@ -1235,7 +1235,7 @@ function storedKeeperSnapshot(hostPeerId: string, gameId = 'g1'): StoredKeeper {
     ],
     savedAt: Date.now(),
   }
-  localStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
+  sessionStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
   return snapshot
 }
 
@@ -1373,7 +1373,7 @@ it('does nothing on mount when no session was ever stored', async () => {
 })
 
 it('hands a stored guest session to the guest reconnect path, not the host restore', async () => {
-  localStorage.setItem(
+  sessionStorage.setItem(
     SESSION_KEY,
     JSON.stringify({
       roomCode: 'ABC-123',
@@ -1563,7 +1563,7 @@ it('restoring clears back to false once every reconnect attempt is spent', async
 // a lobby reload (null) from a match reload — the guest reconnect path covers
 // both the same way, by re-dialing the same room.
 function storedGuestSession(gameId: string | null): void {
-  localStorage.setItem(
+  sessionStorage.setItem(
     SESSION_KEY,
     JSON.stringify({
       roomCode: 'ABC-123',
