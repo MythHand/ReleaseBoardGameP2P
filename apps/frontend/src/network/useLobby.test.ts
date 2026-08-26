@@ -1562,6 +1562,41 @@ it('restoring clears back to false once every reconnect attempt is spent', async
 // A stored guest session, the shape a reload would find. `gameId` distinguishes
 // a lobby reload (null) from a match reload — the guest reconnect path covers
 // both the same way, by re-dialing the same room.
+// Reloading is not the only way a peer ends up off the table: when the HOST
+// reloads, every guest's channel dies under it. Before this, that guest sat on
+// a frozen board with `status: 'error'` and no dial running — it recovered only
+// if the player thought to reload too. A drop mid-match starts the same
+// reconnect run a reload does.
+it('starts dialling when the host drops mid-match, instead of only erroring', async () => {
+  sessionStorage.clear()
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('ABC-123', 'Bo')
+  })
+  const hostId = parseRoomCode('ABC-123')
+  const t = transports[0]
+  act(() => {
+    t.onConnection?.(hostId)
+  })
+  // A live match, which is what separates this from a lobby disconnect.
+  act(() => {
+    t.onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: 'g1', seats: [] },
+      from: hostId,
+      seq: 1,
+    } as WireMessage)
+  })
+  expect(result.current.gameId).toBe('g1')
+
+  act(() => {
+    t.onDisconnect?.(hostId)
+  })
+
+  // The overlay's own signal, not a dead-end error screen.
+  expect(result.current.reconnect.status).toBe('trying')
+})
+
 function storedGuestSession(gameId: string | null): void {
   sessionStorage.setItem(
     SESSION_KEY,

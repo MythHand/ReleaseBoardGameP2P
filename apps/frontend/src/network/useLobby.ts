@@ -436,6 +436,12 @@ export function useLobby(): UseLobby {
 
   // A peer (or the host) dropping its DataChannel must update the roster, or the
   // lobby keeps counting a ghost player toward canStart()/turn rotation.
+  // `onDisconnect` is defined above `runGuestReconnect` and has to reach it, so
+  // the runner is held here and assigned once it exists. A ref rather than a
+  // dependency: onDisconnect is handed to the transport at creation time and
+  // must not be rebuilt every time the runner's identity changes.
+  const runGuestReconnectRef = useRef<(() => Promise<void>) | null>(null)
+
   const onDisconnect = useCallback(
     (peerId: string) => {
       const current = stateRef.current
@@ -462,6 +468,22 @@ export function useLobby(): UseLobby {
         // from peer-unavailable) — preserve it the same way the message is
         // preserved, or the two would disagree and 'not-found' would become
         // unreachable.
+        // Mid-match, a lost host is not the end of the session — it is the
+        // other way a peer ends up off the table, and the one a reload cannot
+        // help with because this tab never went away. It happens routinely:
+        // when the HOST reloads, every guest's channel dies under it. Left as
+        // an error, the guest sat on a frozen board with no dial running and
+        // recovered only if the player happened to reload too.
+        //
+        // Only once the channel had actually opened: a channel that never
+        // opened is a failed join, not a lost session, and keeps its more
+        // specific error below.
+        const stored = readSession()
+        if (gameIdRef.current && hostConnectedRef.current && stored?.role === 'guest') {
+          reconnectSessionRef.current = stored
+          void runGuestReconnectRef.current?.()
+          return
+        }
         if (hostConnectedRef.current) {
           setError('disconnected: host left the lobby')
           setErrorKind('connection')
@@ -1116,6 +1138,9 @@ export function useLobby(): UseLobby {
   // a run has already succeeded ('idle') or nothing was ever offered to
   // reconnect in the first place. A no-op silently, matching restoreHost/
   // joinRoom's own "nothing to do" silence rather than throwing.
+  // Published for `onDisconnect` above, which cannot close over it directly.
+  runGuestReconnectRef.current = runGuestReconnect
+
   const retryReconnect = useCallback(() => {
     if (reconnectStatus !== 'trying' && reconnectStatus !== 'failed') return
     void runGuestReconnect()
