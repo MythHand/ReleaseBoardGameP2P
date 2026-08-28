@@ -1130,3 +1130,62 @@ describe('planBeats — a 503 a standing Monitoring answers by itself (#103)', (
     expect(plans.map((p) => p.kind)).toEqual(['neutralized'])
   })
 })
+
+describe('planBeats — an attack resolved inside its own play (#19 follow-up)', () => {
+  // A DDoS is banked by the play that made it and raises no pending: its
+  // `attackSpent` discard comes NEXT, with no answer in between. The beat has
+  // to know, or it would publish a shadow saying an answer is owed for a throw
+  // nobody can answer.
+  it('marks a DDoS as resolved, so nothing claims an answer is owed', () => {
+    const plans = planBeats(
+      [
+        {
+          id: 10,
+          type: 'attacked',
+          attacker: 'p1',
+          card: 'attack-ddos',
+          sudo: false,
+          target: 'p2',
+        },
+        { id: 11, type: 'discarded', player: 'p1', card: 'attack-ddos', reason: 'attackSpent' },
+      ] as unknown as Event[],
+      boardBefore(),
+    )
+    const attack = plans.find((p) => p.kind === 'attackPlaced')
+    expect(attack).toMatchObject({ card: 'attack-ddos', resolved: true })
+  })
+
+  // An ordinary attack stands until it is answered, and must keep saying so.
+  it('leaves an attack that stands unmarked', () => {
+    const plans = planBeats(
+      [
+        { id: 10, type: 'attacked', attacker: 'p2', card: 'attack-bug', sudo: false, target: 'p1' },
+      ] as unknown as Event[],
+      boardBefore(),
+    )
+    expect(plans[0]).not.toHaveProperty('resolved')
+  })
+
+  // …and so does one answered later in the SAME batch: the answer sits between
+  // the throw and the discard, so the attack really did stand.
+  it('leaves an attack answered inside the batch unmarked', () => {
+    const plans = planBeats(
+      [
+        { id: 10, type: 'attacked', attacker: 'p2', card: 'attack-bug', sudo: false, target: 'p1' },
+        {
+          id: 11,
+          type: 'defended',
+          player: 'p1',
+          card: 'defense-hotfix',
+          effect: 'cancel',
+          attacker: 'p2',
+          attackCard: 'attack-bug',
+          attackSudo: false,
+        },
+        { id: 12, type: 'discarded', player: 'p2', card: 'attack-bug', reason: 'attackSpent' },
+      ] as unknown as Event[],
+      boardBefore(),
+    )
+    expect(plans.find((p) => p.kind === 'attackPlaced')).not.toHaveProperty('resolved')
+  })
+})

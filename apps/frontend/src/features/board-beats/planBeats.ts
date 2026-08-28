@@ -90,6 +90,18 @@ export type BeatPlan =
       card: string
       sudo: boolean
       target: string
+      /**
+       * The attack was resolved on the spot and never stood awaiting anything:
+       * its own `attackSpent` discard follows it in this very batch, with no
+       * answer between them. True for a DDoS, which the engine banks inside the
+       * play itself and raises no pending for (`fake/release.ts`).
+       *
+       * Carried because the beat cannot see it: `ctx.base.pending` is the state
+       * BEFORE the batch, so a runner has no way to ask whether the engine
+       * ended up owing anybody a defence. Absent means the ordinary case — an
+       * attack that stands until it is answered.
+       */
+      resolved?: true
     }
   // Every release flies into its slot. `codeReview` rides along when the play
   // was a combo; `cost` when the rules made it pay for itself — the card is
@@ -403,6 +415,15 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // it is standing at the centre from here on, for whatever in THIS batch
       // resolves it (#101, Fix C, finding 4)
       openAttack = { attacker: e.attacker, attackCard: e.card, sudo: e.sudo }
+      // …unless it was never standing at all. An attack whose own `attackSpent`
+      // discard comes NEXT was banked inside the play that made it, with no
+      // answer in between — a DDoS, which is not answerable by a defence card
+      // and raises no pending. Read off the batch rather than off a card id:
+      // what the beat must not do is claim an answer is owed when the engine
+      // owes nobody one, and the batch is where that fact actually lives.
+      const after = events[i + 1]
+      const resolved =
+        after?.type === 'discarded' && after.reason === 'attackSpent' && after.card === e.card
       plans.push({
         kind: 'attackPlaced',
         key: `attack:${e.id}`,
@@ -411,6 +432,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         attacker: e.attacker,
         card: e.card,
         sudo: e.sudo,
+        ...(resolved ? { resolved: true as const } : {}),
       })
       continue
     }
