@@ -606,10 +606,12 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'Error 503 — ход игрока и защита', en: 'Error 503 — player turn & defence' },
     from: {
-      ru: 'добор из колоды → 503 в центр + красное краевое свечение. У ЛЮБОГО ответа одна форма: карта летит в центр, накрывает тревогу со смещением (обе читаются), обе стоят открытыми COVER_HOLD и уходят в сброс одним обменом (useDiscardExit: тревога снизу, ответ сверху, пара с Code Review разбирается шагом). Monitoring — тот же такт без карты. Бросок принимает ВЕСЬ стол; отдаёт назад только своя область (зона + рука). Без защиты: рука сметается к центру, держится GATHER_HOLD (такт из Hand limit) и разлетается в сброс, дальше полноэкранное видео вылета (случайное из папки сцены).',
-      en: "draw from the deck → 503 to the centre + red edge glow. EVERY answer has the same shape: the card flies to the centre, covers the alarm nudged aside (both readable), both stand open for COVER_HOLD and leave as one exchange (useDiscardExit: the alarm underneath, the answer on top, a pair with its Code Review split by the step). Monitoring is the same beat without a card. The WHOLE table accepts the drop; only the player's own area (zone + hand) gives the card back. No defence: the hand sweeps to the centre, holds for GATHER_HOLD (the hand-limit beat) and scatters to the discard, then a full-screen elimination video (random from the scene folder).",
+      ru: 'добор из колоды → 503 в центр + красное краевое свечение. У ЛЮБОГО ответа одна форма: карта летит в центр, накрывает тревогу со смещением (обе читаются), обе стоят открытыми COVER_HOLD и уходят в сброс одним обменом (useDiscardExit: тревога снизу, ответ сверху, пара с Code Review разбирается шагом). Monitoring — тот же такт без карты. Бросок принимает ВЕСЬ стол; отдаёт назад только своя область (зона + рука). Без защиты: рука сметается к центру, держится GATHER_HOLD (такт из Hand limit) и разлетается в сброс, дальше полноэкранное видео вылета (случайное из папки сцены). То же теперь играется и на живом борде (#102): пулл Debugger/Release из веера или клик по Monitoring — жест и накрывающий обмен в `_useNeutralizeStaging.tsx`, разрешение по методу — `runNeutralized` в `defenseBeat.tsx`; без защиты — тот же обмен, но сначала сгребание всего стола в кучу к центру (`discardBeat.tsx`, нога `gather`), и лишь потом разлёт; своё сильное свечение ПОД рукой и слабое чужое НАД ней — оба монтируются в `_Board.tsx`. Видео вылета в этот такт не входит — оно отдельной задачей (#103).',
+      en: "draw from the deck → 503 to the centre + red edge glow. EVERY answer has the same shape: the card flies to the centre, covers the alarm nudged aside (both readable), both stand open for COVER_HOLD and leave as one exchange (useDiscardExit: the alarm underneath, the answer on top, a pair with its Code Review split by the step). Monitoring is the same beat without a card. The WHOLE table accepts the drop; only the player's own area (zone + hand) gives the card back. No defence: the hand sweeps to the centre, holds for GATHER_HOLD (the hand-limit beat) and scatters to the discard, then a full-screen elimination video (random from the scene folder). The same movement now also runs on the live board (#102): pulling a Debugger/Release out of the fan or clicking Monitoring is the gesture and the covering exchange in `_useNeutralizeStaging.tsx`, resolved by method through `runNeutralized` in `defenseBeat.tsx`; with no defence, the same exchange happens, but the whole table is gathered into a heap at the centre first (`discardBeat.tsx`'s `gather` leg), and only then scatters. The own strong glow UNDER the hand and the opponent's weak glow OVER it both mount in `_Board.tsx`. The elimination video is NOT part of this beat — it belongs to a later task (#103).",
     },
     where: 'Error503Story',
+    board:
+      'pages/board/[gameId]/_useNeutralizeStaging.tsx, features/board-beats/defenseBeat.tsx, features/board-beats/discardBeat.tsx, pages/board/[gameId]/_Board.tsx',
   },
   {
     name: { ru: 'AI-эффекты — разрешение', en: 'AI effects — resolution' },
@@ -743,6 +745,36 @@ const ISSUES: Issue[] = [
     where: {
       ru: 'playground: interactive/PickSpecificCardStory (удачный путь) + docs/rules/cards.md (правило)',
       en: 'playground: interactive/PickSpecificCardStory (the successful path) + docs/rules/cards.md (the rule)',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'У ответа Monitoring на 503 нет движения вообще',
+      en: 'Answering a 503 with Monitoring has no movement at all',
+    },
+    problem: {
+      ru: 'Три метода отвечают на Error 503, и у двух жест — полёт: Debugger из веера, релиз из своей зоны, оба в слот прикрытия (playToCenter, поза COVER_POSE). У Monitoring движения нет ни одного: карта отвечает оттуда, где стоит, и там же остаётся. Утверждённый источник (Error503Story) жеста под него не содержит — история выстреливала Monitoring сама. Отправить его в центр и вернуть — соврать про произошедшее, поэтому в задаче 9 (#102) сделано минимальное честное: нажатие шлёт RESOLVE и не двигает ничего. Ценой того, что единственный ответ из трёх остаётся без подтверждения на месте. Закроет пресет «карта отработала, не уходя» (вспышка/пульс на самом слоте) — в словаре такого нет.',
+      en: 'Three methods answer an Error 503, and two of them are a flight: the Debugger out of the fan, a release out of your own zone, both to the cover slot (playToCenter at COVER_POSE). Monitoring has no movement at all — it answers from where it stands and stays there. The approved source (Error503Story) carries no gesture for it, because the story auto-fired it. Flying it to the centre and back would be a lie about what happened, so Task 9 (#102) ships the smallest honest thing: the press sends the RESOLVE and moves nothing. The cost is that one answer of the three gets no confirmation in place. What closes it is a preset for “this card acted without leaving” (a flash/pulse on the slot itself) — the vocabulary has none.',
+    },
+    where: {
+      ru: 'frontend: pages/board/[gameId]/_useNeutralizeStaging.tsx + ui: animations/',
+      en: 'frontend: pages/board/[gameId]/_useNeutralizeStaging.tsx + ui: animations/',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Два `useFlyer` на одной странице сталкиваются ключами React',
+      en: 'Two `useFlyer`s on one page collide on React keys',
+    },
+    problem: {
+      ru: '`useFlyer` нумерует узлы приватным счётчиком (`seq` — React-ключ узла в `overlay`, инвариант I5: свежий узел на каждый полёт), и у каждого экземпляра он начинается с нуля. `overlay` при этом склеивается сценой с чужими массивами, так что первый поднятый носитель в двух экземплярах даёт двух детей с ключом `1` (с `useHandArrival` столкновения нет — там ключи строковые). Правила «сколько носителей на странице» не решено вовсе. Достижимо на защите: судо ещё летит к своему слоту, игрок кликает партнёра, и фолд поднимает второй носитель, пока первый в воздухе. Найдено при выделении `_useCoverFlight.ts` (#102): двум слотам одного стола нужны независимые гейты `landed`, то есть два экземпляра модуля, который владеет носителем. Обойдено в открытую — `useCoverFlight(shared?)` принимает уже существующий носитель, и `_useDefenseStaging.tsx` отдаёт обоим экземплярам ОДИН свой `useFlyer`. Закроет ключ, уникальный по экземпляру: `useId()` в `useFlyer` и `key` из пары «идентификатор + seq».',
+      en: '`useFlyer` numbers its nodes from a private counter (`seq` — the React key of the node in `overlay`, invariant I5: a fresh node per flight), and every instance starts it at zero. `overlay` is then concatenated by the scene with other arrays, so the first carrier raised in two instances yields two children keyed `1` (no clash with `useHandArrival`, whose keys are strings). The rule for how many carriers a page may hold is undecided. Reachable on the defence: the Sudo is still flying to its slot, the player clicks a partner, and the fold raises a second carrier while the first is in the air. Found while extracting `_useCoverFlight.ts` (#102): two slots on one table need independent `landed` gates, i.e. two instances of a module that owns the carrier. Worked around in the open — `useCoverFlight(shared?)` accepts an existing carrier, and `_useDefenseStaging.tsx` hands both instances its ONE `useFlyer`. What closes it is a key unique per instance: `useId()` inside `useFlyer`, and a key built from identifier + seq.',
+    },
+    where: {
+      ru: 'ui: animations/useFlyer.tsx (overlay key) + frontend: pages/board/[gameId]/_useCoverFlight.ts',
+      en: 'ui: animations/useFlyer.tsx (overlay key) + frontend: pages/board/[gameId]/_useCoverFlight.ts',
     },
     status: 'open',
   },
@@ -1027,6 +1059,36 @@ const ISSUES: Issue[] = [
       en: 'frontend: pages/board/[gameId]/_Board.module.css (.ask) + playground: interactive/DefenseReleaseStory.module.css (.ask)',
     },
     status: 'rework',
+  },
+  {
+    what: {
+      ru: 'Событийная карта, ушедшая домой, объявляется `discarded`',
+      en: 'An event card banked home is announced as `discarded`',
+    },
+    problem: {
+      ru: '`bankToDiscard` (`packages/engine/src/fake/core.ts`) уводит карту с полем `event` обратно в колоду событий, но `discarded`, которым это отчитывается, называет пунктом назначения сброс всегда, а стоящая на столе карта несёт обычный `release-<slot>` id (нарочно, чтобы читаться как рядовой релиз) — доске нечем отличить один случай от другого. Не новое и не только про 503: `discardBeat` несёт тот же слепой пробел для любой событийной карты. #102-й `neutralized`-план сацерифайса утверждает один такой сброс как обычный, и сожжённый `ai-release` летит в кучу сброса, где никогда по-настоящему не приземляется. Закроет пункт назначения на `discarded`, или отдельное событие для «событийная карта вернулась в свою колоду».',
+      en: '`bankToDiscard` (`packages/engine/src/fake/core.ts`) routes a card carrying an `event` field back to the events deck, but the `discarded` it reports names discard as the destination always, and the placed card carries the plain `release-<slot>` id on purpose (so it reads as an ordinary release) — the board has no way to tell the two apart. Pre-existing and general, not only about a 503: `discardBeat` carries the same blind spot for any event card. #102’s `neutralized` sacrifice plan claims one such discard as ordinary, and the burnt `ai-release` flies to the discard heap, where it never really lands. Closed by a destination on `discarded`, or an event of its own for “an event card went home”.',
+    },
+    where: {
+      ru: 'packages/engine: fake/core.ts (bankToDiscard), fake/triggers.ts (bankAlarm) + frontend: features/board-beats/planBeats.ts, discardBeat.tsx, defenseBeat.tsx',
+      en: 'packages/engine: fake/core.ts (bankToDiscard), fake/triggers.ts (bankAlarm) + frontend: features/board-beats/planBeats.ts, discardBeat.tsx, defenseBeat.tsx',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Пендинг без дедлайна останавливает партию',
+      en: 'A pending with no deadline stalls the match',
+    },
+    problem: {
+      ru: '`referee.ts:402` истекает по времени только `defend`-пендинги, а `:422` приостанавливает часы хода, пока открыт ЛЮБОЙ пендинг, кроме `discardForRelease` — тот исключён нарочно (`:421–427`) и форс-резолвится через `cancelRelease`, когда `turn.deadline` истекает, так что он не стоит в этом ряду. Подключённый игрок, который не отвечает на `neutralize503`, `handLimit`, `pickFromDiscard`, `requestCard`, `giveCard` или `crush`, замораживает партию для всех. Найдено при сборке #102 — правка общая для всех шести видов разом, а не для одного `neutralize503`, поэтому заведена отдельным issue (issue drafted, not yet filed).',
+      en: '`referee.ts:402` expires only `defend` pendings, and `:422` suspends the turn clock while any pending is open, except `discardForRelease` — that one is deliberately excluded (`:421–427`) and force-resolves via `cancelRelease` once `turn.deadline` fires, so it does not belong on this list. A connected player who never answers a `neutralize503`, `handLimit`, `pickFromDiscard`, `requestCard`, `giveCard` or `crush` freezes the match for everyone. Found while building #102 — the fix belongs to all six kinds at once, not to one of them, so it is drafted as a separate issue (issue drafted, not yet filed).',
+    },
+    where: {
+      ru: 'frontend: network/session/referee.ts',
+      en: 'frontend: network/session/referee.ts',
+    },
+    status: 'open',
   },
 ]
 

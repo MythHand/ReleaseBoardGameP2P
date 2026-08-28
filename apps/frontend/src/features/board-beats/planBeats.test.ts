@@ -232,6 +232,35 @@ describe('planBeats — the draw', () => {
     expect(beats.map((b) => b.kind)).toEqual(['draw'])
   })
 
+  // Task 1 stopped banking a 503 at reveal — it is held on the pending until
+  // answered — so the reveal can arrive with nothing behind it at all.
+  it('plans a revealed trigger that stands, with no discard of its own', () => {
+    const events: Event[] = [
+      drawn(4, { card: undefined }),
+      { id: 5, type: 'revealed', player: 'p1', card: 'trigger-error-503' } as Event,
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats).toHaveLength(1)
+    expect(beats[0].kind === 'draw' && beats[0].draws[0].reveal).toEqual({
+      card: 'trigger-error-503',
+    })
+  })
+
+  it('still plans a revealed trigger that files itself, with its discard id', () => {
+    const events: Event[] = [
+      drawn(4, { card: undefined }),
+      { id: 5, type: 'revealed', player: 'p1', card: 'trigger-error-503' } as Event,
+      discarded(6, { card: 'trigger-error-503', reason: 'trigger' }),
+    ]
+    const beats = planBeats(events, boardBefore())
+    expect(beats[0].kind === 'draw' && beats[0].draws[0].reveal).toEqual({
+      card: 'trigger-error-503',
+      discardId: 6,
+    })
+    // and it is claimed, so the discard planner does not fly it a second time
+    expect(beats.filter((b) => b.kind === 'discard')).toEqual([])
+  })
+
   it('puts a multi-draw in one beat, in the order it was drawn', () => {
     const beats = planBeats([drawn(4), drawn(5, { pile: 1 })], boardBefore())
     expect(beats).toHaveLength(1)
@@ -725,6 +754,233 @@ describe('planBeats — the answer to an attack (#101)', () => {
         to: 'p2',
         slot: 'frontend',
         card: 'release-frontend',
+      },
+    ])
+  })
+})
+
+describe('planBeats — the answer to an Error 503 (#102)', () => {
+  const neutralized = (
+    over: Partial<Extract<Event, { type: 'neutralized' }>> & { id: number },
+  ): Event => ({ type: 'neutralized', player: 'p1', method: 'debugger', ...over }) as Event
+
+  const alarmPending = () =>
+    ({
+      kind: 'neutralize503',
+      player: 'p1',
+      card: 'trigger-error-503',
+      methods: ['debugger'],
+    }) as NonNullable<BoardState['pending']>
+
+  it('plans a Debugger answer as one exchange', () => {
+    const plans = planBeats(
+      [
+        neutralized({ id: 10 }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+        discarded(12, { card: 'protection-debugger', reason: 'neutralized' }),
+      ],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans).toEqual([
+      {
+        kind: 'neutralized',
+        key: 'neutralized:10',
+        eventId: 10,
+        player: 'p1',
+        method: 'debugger',
+        alarm: { eventId: 11, card: 'trigger-error-503' },
+        spent: [{ eventId: 12, card: 'protection-debugger' }],
+      },
+    ])
+  })
+
+  it('plans a Monitoring answer with nothing spent', () => {
+    const plans = planBeats(
+      [
+        neutralized({ id: 10, method: 'monitoring' }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+      ],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans).toEqual([
+      {
+        kind: 'neutralized',
+        key: 'neutralized:10',
+        eventId: 10,
+        player: 'p1',
+        method: 'monitoring',
+        alarm: { eventId: 11, card: 'trigger-error-503' },
+        spent: [],
+      },
+    ])
+  })
+
+  it('names the slot a sacrificed release flies out of, and takes its Code Review with it', () => {
+    const before = boardBefore({
+      pending: alarmPending(),
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        support: { frontend: card('support-code-review') },
+      },
+    } as Partial<BoardState>)
+    const plans = planBeats(
+      [
+        neutralized({ id: 10, method: 'sacrifice' }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+        {
+          id: 12,
+          type: 'releaseDestroyed',
+          player: 'p1',
+          slot: 'frontend',
+          card: 'release-frontend',
+        } as Event,
+        discarded(13, { card: 'release-frontend', reason: 'neutralized' }),
+        discarded(14, { card: 'support-code-review', reason: 'neutralized' }),
+      ],
+      before,
+    )
+    expect(plans).toEqual([
+      {
+        kind: 'neutralized',
+        key: 'neutralized:10',
+        eventId: 10,
+        player: 'p1',
+        method: 'sacrifice',
+        slot: 'frontend',
+        alarm: { eventId: 11, card: 'trigger-error-503' },
+        spent: [
+          { eventId: 13, card: 'release-frontend' },
+          { eventId: 14, card: 'support-code-review' },
+        ],
+      },
+    ])
+  })
+
+  // The shared gap (Task 7 fix round 1): a `neutralize503` pending can bank no
+  // alarm at all — a `crush` (the AI threat card is never on the table), or the
+  // `ai-error-503` mimic, whose card has already gone back to its own events
+  // deck (`fake/triggers.ts` builds this pending with `card: null`). Both reach
+  // this walk as a `neutralized` event followed ONLY by the answer's own
+  // `discarded(reason: 'neutralized')` — no `discarded(reason: 'trigger')`
+  // before it — so `alarm` is never assigned and the spread
+  // `...(alarm ? { alarm } : {})` omits the key entirely rather than setting it
+  // to `undefined`.
+  it('plans a neutralized resolution with no alarm to take away', () => {
+    const plans = planBeats(
+      [
+        neutralized({ id: 10 }),
+        discarded(11, { card: 'protection-debugger', reason: 'neutralized' }),
+      ],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans).toHaveLength(1)
+    // the key is OMITTED, not present-and-undefined — `toEqual` treats those
+    // as equal, so `not.toHaveProperty` is the assertion that actually pins it
+    expect(plans[0]).not.toHaveProperty('alarm')
+    expect(plans[0]).toEqual({
+      kind: 'neutralized',
+      key: 'neutralized:10',
+      eventId: 10,
+      player: 'p1',
+      method: 'debugger',
+      spent: [{ eventId: 11, card: 'protection-debugger' }],
+    })
+  })
+
+  it('leaves nothing for the discard planner to fly twice', () => {
+    const plans = planBeats(
+      [
+        neutralized({ id: 10 }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+        discarded(12, { card: 'protection-debugger', reason: 'neutralized' }),
+      ],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans.filter((p) => p.kind === 'discard')).toEqual([])
+  })
+})
+
+describe('planBeats — the sweep (#102)', () => {
+  const eliminated = (
+    over: Partial<Extract<Event, { type: 'eliminated' }>> & { id: number },
+  ): Event => ({ type: 'eliminated', player: 'p1', ...over }) as Event
+
+  it('gathers a knocked-out player’s cards into one sweep', () => {
+    const plans = planBeats(
+      [
+        eliminated({ id: 20 }),
+        discarded(21, { card: 'attack-bug', reason: 'effect' }),
+        discarded(22, { card: 'protection-debugger', reason: 'effect' }),
+        discarded(23, { card: 'release-frontend', reason: 'destroyed' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans).toEqual([
+      {
+        kind: 'discard',
+        key: 'discard:21',
+        gather: true,
+        cards: [
+          { key: 'd21', eventId: 21, card: 'attack-bug', source: { kind: 'hand', index: 0 } },
+          {
+            key: 'd22',
+            eventId: 22,
+            card: 'protection-debugger',
+            source: { kind: 'hand', index: 1 },
+          },
+          {
+            key: 'd23',
+            eventId: 23,
+            card: 'release-frontend',
+            source: { kind: 'release', player: 'p1', slot: 'frontend' },
+          },
+        ],
+      },
+    ])
+  })
+
+  it('leaves an ordinary discard ungathered', () => {
+    const plans = planBeats([discarded(21, { reason: 'handLimit' })], boardBefore())
+    expect((plans[0] as { gather?: true }).gather).toBeUndefined()
+  })
+
+  // Correction 1's own failure mode, pinned: `sweeping` must be cleared
+  // INSIDE `flush()`, not at the eliminated/discarded call site, or the flag
+  // set by an earlier sweep would survive across an unrelated event and
+  // wrongly gather a LATER discard that has nothing to do with it.
+  it('does not gather a later, unrelated discard after the sweep has closed', () => {
+    const plans = planBeats(
+      [
+        eliminated({ id: 20 }),
+        discarded(21, { card: 'attack-bug', reason: 'effect' }),
+        tookHit({ id: 22 }), // closes the sweep's run — nothing to do with it
+        discarded(23, { card: 'protection-debugger', reason: 'handLimit' }),
+      ],
+      boardBefore(),
+    )
+    const discards = plans.filter((p) => p.kind === 'discard')
+    expect(discards).toEqual([
+      {
+        kind: 'discard',
+        key: 'discard:21',
+        gather: true,
+        cards: [
+          { key: 'd21', eventId: 21, card: 'attack-bug', source: { kind: 'hand', index: 0 } },
+        ],
+      },
+      {
+        kind: 'discard',
+        key: 'discard:23',
+        cards: [
+          {
+            key: 'd23',
+            eventId: 23,
+            card: 'protection-debugger',
+            source: { kind: 'hand', index: 1 },
+          },
+        ],
       },
     ])
   })

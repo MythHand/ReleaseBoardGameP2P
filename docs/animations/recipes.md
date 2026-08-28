@@ -1280,24 +1280,28 @@ player is out, and a full-screen elimination video plays for everyone.
 1. `drawFlow()`: `setFlyer(503, faceDown)`, `nextFrames`, position at `cardAreaOf(deckRect)` →
    `play('drawToCenter', {from, to: centerRect})`; on finish cancel + pin (**I3/I4**); `wait(180)` → flip up;
    `wait(560)` → `setCenterCard(503)`, clear flyer.
-2. **Monitoring present** → `setDock('push')`, `wait(750)`, `setCenterCard(null)`, `sweep([503], gather=false)`;
-   no glow, Monitoring stays.
+2. **Monitoring present** → `setDock('push')`, `wait(COVER_HOLD)`, `setCenterCard(null)`, `sweep([503],
+   gather=false)`; no glow, Monitoring stays. Held for the SAME `COVER_HOLD` every other answer stands open for
+   — not a shorter beat of its own.
 3. **No Monitoring** → `setAlert(true)`, `setPending(true)`, `setDock('reaction')`. `canDefend = Debugger in hand
    || rel.frontend || rel.backend`. If not → `wait(2500)` → `eliminate(false)`. Else hand off to the player.
 4. **Defence drag** (`beginDrag`): capture the grab fraction, source centre and `startW`; one rAF loop eases
-   `startW → CARD_W` over `ResizeMs = 200` while keeping the grab point under the cursor. On `mouseup`, hit-test
-   the centre with `DROP_PAD`: inside → `resolveDefense`, outside → `returnDrag`. The Debugger uses the canonical
-   `Hand.onPlay` (`handPlay`), accepted only for the Debugger dropped on the 503.
+   `startW → CARD_W` over `ResizeMs = 200` while keeping the grab point under the cursor. On `mouseup`,
+   `onTable(x, y)`: the WHOLE table accepts the drop; only the player's own area (the release zone + the fan,
+   measured via `youRef`) gives it back — inside → `resolveDefense`, outside (over `you`) → `returnDrag`. There
+   is no drop-target hint and no radius around the 503 itself; hitting "the table" is hitting anywhere that is
+   not your own area. The Debugger uses the canonical `Hand.onPlay` (`handPlay`), accepted only for the Debugger
+   dropped on the 503.
 5. `resolveDefense`: cover the 503 (transition `left/top/width` 240 ms to `centerRect`/`CARD_W`), `wait(300)`;
-   read each card's actual rect via `[data-main]`/`[data-aux]` anchors (nothing rotated → bbox = card, **no
-   teleport**); remove the played card from its source; `sweep(items, gather=false)` in stack order **503, Code
-   Review, Release**; `setDock('push')`.
+   `wait(COVER_HOLD)`; read each card's actual rect via `[data-main]`/`[data-aux]` anchors (nothing rotated →
+   bbox = card, **no teleport**); remove the played card from its source; `sweep(items, gather=false)` in stack
+   order **503, Code Review, Release**; `setDock('push')`.
 6. `returnDrag`: transition back to the source slot (240 ms), shrink to `startW`, `wait(260)`, clear drag.
 7. `eliminate(includeRelease)`: collect the hand's per-slot rects (`handSlotRects()`) + (on PASS) the release
    slots; clear hand/zone/centre; `sweep(items, gather=true)`; `setEliminated(true)`, `setDock('waiting')`;
    `playEliminationGif()`.
 8. `sweep(items, gather)`: mount `outs`, position at source rects; if `gather` glide all to `centerRect` (300 ms)
-   + `wait(560)`; then per card `play('centerToDiscard', toDiscardParams(from, cardAreaOf(discardRect),
+   + `wait(GATHER_HOLD)`; then per card `play('centerToDiscard', toDiscardParams(from, cardAreaOf(discardRect),
    jitter()))` (**I7**), append to `discard` with the same scatter.
 9. Elimination video: `playEliminationGif` picks a random bundled `./eliminate/*.mp4` and loops; `onGifEnded`
    replays until `ELIM_MIN_MS`, then fades out (360 ms) and resolves.
@@ -1306,20 +1310,22 @@ player is out, and a full-screen elimination video plays for everyone.
 | Step | Duration |
 |---|---|
 | draw flip / hold | `wait(180)`, then `wait(560)` |
-| Monitoring auto-neutralise hold | `wait(750)` |
+| every answer's open hold (Monitoring included) | `wait(COVER_HOLD)` = `1200` |
 | defenceless beat before KO | `wait(2500)` |
 | drag resize ease | `ResizeMs = 200` (cubic) |
-| cover / return glide | 240 ms + `wait(300)` / `wait(260)` |
-| gather glide (elimination) | 300 ms + `wait(560)` |
+| cover glide (drop) | 240 ms + `wait(300)` + `wait(COVER_HOLD)` |
+| return glide (off-target) | 240 ms + `wait(260)` |
+| gather hold (elimination) | glide 300 ms + `wait(GATHER_HOLD)` = `1500` |
 | discard flight | `play('centerToDiscard')` (move 420) |
 | elimination video | ≥ `ELIM_MIN_MS = 5000`, fade 360 ms |
-| drop forgiveness | `DROP_PAD = 48` px |
+| the cover's own offset | `COVER_DX = 16`, `COVER_DY = -12` (so alarm and answer both read) |
+| GIF entrance beat | `GIF_DELAY = 400`, after the table has emptied |
 
 **Invariants**
 - **Nothing rotates at the centre** (flat cover, flat `RelStack`): a rotated pair's bbox ≠ the card, which
   teleports the cards on the discard hand-off. Flat → bbox = card → the flight continues from where they lie.
-- Defence is a **drag with invisible hit areas** (no drop-target hints), hit-tested with `DROP_PAD` forgiveness —
-  never a click/arrow.
+- Defence is a **drag accepted by the whole table**, refused only by the player's own area (`onTable`) — no
+  drop-target hints, no radius carved around the 503 — never a click/arrow.
 - A Release drags **with its attached Code Review** (bound by position via `[data-main]`/`[data-aux]`, not
   "grouped").
 - The edge glow lives in `.glowBounds`, offset by the measured tech-bar height (screen edge ≠ table edge).
@@ -1335,6 +1341,86 @@ player is out, and a full-screen elimination video plays for everyone.
 
 **Live reference**
 `Error 503` — `apps/playground/stories/interactive/Error503Story.tsx`.
+
+---
+
+## Error 503 on the board — the alarm from `pending`, three gestures, one exchange
+
+**When it fires**
+There is no `drawFlow()` on the board — the 503 is not staged by a click. `neutralize503` is a
+projected `pending`: the moment the engine raises it, the alarm stands at the centre and the
+answering player's own hand-off (`_useNeutralizeStaging.tsx`) and the beat runner
+(`defenseBeat.runNeutralized`) both key off it. The three gestures are read live off
+`pending.methods` — a method not named there simply does not light up; nothing here re-derives
+legality.
+
+**The glow — two mount points, and DOM order is the rule**
+`_Board.tsx` mounts `EdgeGlow` **twice**, never once, because "your own alarm" and "someone else's"
+read differently and the DOM position is what makes that true rather than a z-index guess:
+- **Ours** — `intensity="strong"`, mounted **BEFORE** the hand, so it glows *under* it. `glowStrong =
+  (pendingAlarm && alarmMine) || beats.alarm` — the second half is the defenceless sweep's own
+  alarm, which raises no `pending` at all (the elimination lands in the same batch), so the running
+  beat's own `alarm` flag is what keeps the glow lit through it.
+- **Someone else's** — `intensity="weak"`, mounted **AFTER** the hand, so it lies *over* it.
+  `EdgeGlow` is already `pointer-events: none` at both intensities, so the fan's hover keeps working
+  underneath.
+
+Neither reaches for the playground's `.glowBounds` offset math — the table's own zone is already
+`position: relative; overflow: hidden; isolation: isolate`, so it supplies its own bounds and there
+is nothing to measure (the playground's story is deliberately not the reference here, Page Shell
+Rule).
+
+**The three gestures**
+All three read `pending.methods`; a slot or fan card the method set does not name never lights.
+- **Debugger** (`onHandPlay`) — pulled from the fan like any other hand play, accepted only when
+  `methods.includes('debugger')` and the card is the Debugger, dropped on the table (`onTable`: the
+  zone + fan is the player's own area, everywhere else on screen is the table — same rule the
+  playground story's `onTable` uses, measured off `anchors.zone`/`anchors.hand` rather than one
+  `youRef`).
+- **Sacrifice** (`onSlotDown` → `useZonePull`) — a release is dragged out of its slot (`_useZonePull`
+  owns the drag state and knows nothing about the game; `accepts: onTable`, `onDrop` commits the
+  choice); its own Code Review, if any, travels with it by position, not by "grouping".
+- **Monitoring** — a **press**, not a drag: `onSlotDown` dispatches `RESOLVE` straight from the
+  handler when the key is `monitoring`. Nothing is staged, nothing flies — the finding this leaves
+  open (no designed movement for an answer that does not leave the table) is recorded in
+  `backlog.md` and the audit register, not re-invented here.
+
+**The exchange**
+`commit()` sends the `RESOLVE` synchronously, in the same commit that hands the card to the flyer
+(the no-duplicate rule `_useDefenseStaging` also keeps) — never the other order. `runNeutralized`
+plays the answer's cover exactly the way `runCovered` plays a defence: `play('playToCenter')` to the
+cover slot at `COVER_POSE` (`{ rot: 6, dx: 16, dy: -12 }`), skipped entirely for Monitoring (no card)
+and for the answering player's OWN play (`!(mine && handoff)` — the gesture has already delivered it,
+asking whether the play was *staged* rather than whether its node exists yet is what keeps a second
+copy from flying in). Both stand open for `SHOW_HOLD = 1200`ms, then leave as **one send**: the alarm
+(layer 0) and the answer plus its aux (layer 1) — `useDiscardExit`'s `Leaving[]`, each card carrying
+its own `scatter` off its own `discarded` event id (**I7**, **I9**).
+
+**The gather leg — a defenceless player's whole table**
+When nobody answers, the sweep is `discardBeat`'s `plan.gather` branch (ported from the playground's
+own `sweep(items, gather)`), not a separate module: every card the eliminated player owned is raised
+at its own rect, glided to a scattered heap at the centre (the same `scatterAt` model the discard
+uses), held open for `GATHER_HOLD = 1500`ms so the table can read what happened, then handed to the
+discard exit with the heap's own boxes and poses. `Beat.alarm` (the running beat's own field, not a
+plan field — see Task 10) is what keeps the strong glow lit for the length of this sweep, since no
+`pending` stands to key `glowStrong` off.
+
+**Params & timings (board)**
+| Step | Value |
+|---|---|
+| answer's open hold before the exchange leaves | `SHOW_HOLD = 1200` |
+| the cover's own offset | `COVER_POSE = { rot: 6, dx: 16, dy: -12 }` |
+| the alarm's own rest tilt | `ATTACK_POSE = { rot: -4, dx: 0, dy: 0 }` |
+| gather hold before the defenceless sweep scatters | `GATHER_HOLD = 1500` |
+
+**Building blocks**
+[`play('playToCenter')`](./reference.md) · `useDiscardExit` (`Leaving[]`, `scatterAt`) · `useFlyer` ·
+`useZonePull` (`_useZonePull.ts`) · `EdgeGlow` (two mounts) · `Beat.alarm` (`useBeats.ts`).
+
+**Live reference**
+`apps/frontend/src/pages/board/[gameId]/_Board.tsx`, `_useNeutralizeStaging.tsx`,
+`features/board-beats/defenseBeat.tsx` (`runNeutralized`), `features/board-beats/discardBeat.tsx`
+(the `gather` branch), `features/board-beats/planBeats.ts` (the `neutralized` plan).
 
 ---
 

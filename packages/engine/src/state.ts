@@ -102,7 +102,22 @@ export type Pending =
       // Security Bug only: the card type the attacker named.
       requested?: CardId
     }
-  | { kind: 'neutralize503'; player: PlayerId; methods: NeutralizeMethod[] }
+  // The alarm waits here while its answer is chosen — out of the deck, in no
+  // hand and no zone, exactly as a thrown attack waits on a `defend`. By the
+  // rules it reaches the discard only once it has been neutralized, «вместе с
+  // картой, которой нейтрализовали» (docs/rules/resolution.md), so holding it
+  // is what lets both leave in one moment.
+  //
+  // `card` is null for the `ai-error-503` mimic: that card is an events-deck
+  // one-off, already back in the events deck by the time this pending exists
+  // (fireTrigger's trigger-ai branch, general.md §6.4) — never in the discard,
+  // so there is nothing here for a neutralize answer to bank alongside it.
+  | {
+      kind: 'neutralize503'
+      player: PlayerId
+      card: CardInstance | null
+      methods: NeutralizeMethod[]
+    }
   | { kind: 'crush'; player: PlayerId; slot: ReleaseSlot; methods: NeutralizeMethod[] }
   | { kind: 'requestCard'; player: PlayerId; target: PlayerId }
   | { kind: 'giveCard'; player: PlayerId; requested: CardId; attacker: PlayerId }

@@ -16,6 +16,7 @@ import {
   type DockView,
   Drawer,
   deriveDock,
+  EdgeGlow,
   GameModes,
   GameOver,
   GearIcon,
@@ -70,6 +71,7 @@ import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
 import { useBoardStaging } from './_useBoardStaging'
 import { useDefenseStaging } from './_useDefenseStaging'
+import { useNeutralizeStaging } from './_useNeutralizeStaging'
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
 // 0–8 зелёный, 9–18 жёлтый, 19–28 красный
@@ -336,19 +338,67 @@ export default function Board({
     enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
   })
+  // The alarm standing at the centre. Read ONCE, same reason and same shape as
+  // `pendingDefend` above. `staging.staged` does not gate it: an answer to a
+  // 503 goes to the COVER slot, never over the alarm's own.
+  const pendingAlarm = state.pending?.kind === 'neutralize503' ? state.pending : null
+  const alarmMine = pendingAlarm?.player === state.selfId
+  // …or a sweep is running, which is the defenceless path's own alarm: it
+  // raises no `pending` at all (the engine eliminates in the same batch as
+  // the reveal), so without this the hand would fly away with nothing on
+  // screen explaining it.
+  const glowStrong = (pendingAlarm != null && alarmMine) || beats.alarm
+  // an Error 503 owed to US means the neutralize hook owns the fan and the
+  // zone — the third staging hook, and the third mutually exclusive one: the
+  // engine suspends normal play while a pending is open, and a pending has one
+  // kind, so `answering` and this can never both be true. Same derived-constant
+  // discipline as `answering` above: read once, picked by at every call site.
+  const alarmMineOpen = pendingAlarm != null && alarmMine
+
+  // the 503 gesture (#102, Task 9): the card that performs the answer is the
+  // card you touch — a Debugger pulled out of the fan, a release dragged out of
+  // your own zone, or the standing Monitoring pressed where it is.
+  const neutralizing = useNeutralizeStaging({
+    state,
+    anchors,
+    actions,
+    events: intro?.events ?? [],
+    enabled: alarmMineOpen && !(deal.active || beats.exclusive),
+    matchKey: intro?.gameId ?? null,
+  })
+  // the answer once its own flight has landed (or at once under reduced
+  // motion) — the same gate, and the same reason, as `stagedCover` above.
+  const stagedNeutralize =
+    alarmMineOpen &&
+    neutralizing.landed &&
+    neutralizing.overlay.length === 0 &&
+    !neutralizing.staged?.handed
+      ? neutralizing.staged
+      : undefined
+
   // the defence once its own flight has landed (or at once, under reduced
   // motion) — gates the static cover render below against the carrier still
   // flying it there, the same reason `stagedRelease` waits for the stage
   // machine to reach `standing` (`stageStanding`).
+  // `handed` is the beat saying "the exit owns this card now" — the slot must
+  // clear even though the play is still staged, because the staging is what
+  // keeps the card out of the fan until the projection catches up
+  // (`_useDefenseStaging`'s own `release()`).
   const stagedCover =
-    answering && defenseStaging.landed && defenseStaging.overlay.length === 0
+    answering &&
+    defenseStaging.landed &&
+    defenseStaging.overlay.length === 0 &&
+    !defenseStaging.staged?.handed
       ? defenseStaging.staged?.main
       : undefined
   // the Sudo that folded into it (Task 17) — same gate as `stagedCover`, read
   // alongside it so the cover slot's render (below) can tell a plain defence
   // from a sudo-backed pair without a second read of `defenseStaging.staged`.
   const stagedCoverSudo =
-    answering && defenseStaging.landed && defenseStaging.overlay.length === 0
+    answering &&
+    defenseStaging.landed &&
+    defenseStaging.overlay.length === 0 &&
+    !defenseStaging.staged?.handed
       ? defenseStaging.staged?.support
       : undefined
   // the defender's own Sudo, waiting at its own slot for the defence it will
@@ -370,8 +420,16 @@ export default function Board({
   // the fan's own gap-while-a-return-flight-travels, from whichever hook is
   // live — `Hand`'s own gapAt/gapSize props fold this in below, behind the
   // deal's and the beat queue's own (unrelated) gaps.
-  const liveGapAt = answering ? defenseStaging.gapAt : staging.gapAt
-  const liveGapSize = answering ? defenseStaging.gapSize : staging.gapSize
+  const liveGapAt = answering
+    ? defenseStaging.gapAt
+    : alarmMineOpen
+      ? neutralizing.gapAt
+      : staging.gapAt
+  const liveGapSize = answering
+    ? defenseStaging.gapSize
+    : alarmMineOpen
+      ? neutralizing.gapSize
+      : staging.gapSize
 
   // the ONE card standing at the centre before a partner folds in — a plain
   // aim (`main`) or a support awaiting one (`support`). Once merged the pair
@@ -508,6 +566,24 @@ export default function Board({
       }
       return
     }
+    // OUR OWN 503 answer claims it next (#102, Task 9), on the same terms:
+    // `defenseBeat.runNeutralized` reads this to know the answer is already
+    // standing at the cover slot (so it does not fly a second copy in), and
+    // calls `release()` through it the instant it takes the exchange over.
+    // Monitoring stages nothing — it answers from where it stands — so there
+    // is nothing to hand over and this stays null for it, which is exactly
+    // what the beat's own `!(mine && handoff)` check wants.
+    if (alarmMineOpen) {
+      const nz = neutralizing.staged
+      handoffRef.current = nz
+        ? {
+            mainUid: nz.home.kind === 'hand' ? nz.home.uid : (you.releaseUid?.[nz.home.slot] ?? ''),
+            el: coverStagedRef.current,
+            release: neutralizing.release,
+          }
+        : null
+      return
+    }
     if (answering) {
       const ds = defenseStaging.staged
       handoffRef.current =
@@ -537,6 +613,12 @@ export default function Board({
     defenseStaging.landed,
     defenseStaging.overlay,
     defenseStaging.release,
+    alarmMineOpen,
+    neutralizing.staged,
+    neutralizing.landed,
+    neutralizing.overlay,
+    neutralizing.release,
+    you.releaseUid,
     staging.staged,
     staging.pairRef,
     staging.release,
@@ -740,6 +822,10 @@ export default function Board({
     ask = defencePhase === 'partner' ? copy.table.askPartner : copy.table.askDefend
   } else if (costPending) {
     ask = copy.table.askCost
+  } else if (alarmMineOpen && !neutralizing.staged && !neutralizing.answered) {
+    // a step waiting on the fan AND on the zone, with the panel suppressed
+    // below, is silent without this — Defect 3 (#101, Fix B) one pending over.
+    ask = copy.table.askNeutralize
   }
   // The line keeps the words it faded IN with while it fades back OUT — an
   // empty pill mid-fade reads as a flicker. Written during render on purpose:
@@ -967,22 +1053,31 @@ export default function Board({
         className={opening.coverSlot}
         data-centre-slot="cover"
         ref={anchors.cover}
-        {...previewProps(stagedCover?.card ?? null)}
+        {...previewProps(stagedCover?.card ?? stagedNeutralize?.card ?? null)}
       >
-        {stagedCover && (
-          <div
-            ref={coverStagedRef}
-            className={opening.pose}
-            style={{ transform: restTransform(COVER_POSE) }}
-            data-testid="board-cover-staged"
-          >
-            {stagedCoverSudo ? (
-              <CardPair main={stagedCover.card} aux={stagedCoverSudo.card} width="100%" />
-            ) : (
-              <Card card={stagedCover.card} interactive={false} width="100%" />
-            )}
-          </div>
-        )}
+        {/* One slot, two answers — a defence covering an attack, or a 503's own
+            answer (#102, Task 9). They are never both staged: a pending has one
+            kind and it suspends normal play. The pair reading is shared: a
+            sudo-backed defence, or a sacrificed release with its Code Review. */}
+        {(() => {
+          const main = stagedCover?.card ?? stagedNeutralize?.card
+          const aux = stagedCoverSudo?.card ?? stagedNeutralize?.aux
+          if (!main) return null
+          return (
+            <div
+              ref={coverStagedRef}
+              className={opening.pose}
+              style={{ transform: restTransform(COVER_POSE) }}
+              data-testid="board-cover-staged"
+            >
+              {aux ? (
+                <CardPair main={main} aux={aux} width="100%" />
+              ) : (
+                <Card card={main} interactive={false} width="100%" />
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* the attack slot — where cards stand while the table is looking at them:
@@ -997,7 +1092,13 @@ export default function Board({
         data-board-centre
         data-centre-slot="attack"
         ref={anchors.centre}
-        {...previewProps(pendingDefend ? cardById(pendingDefend.attackCard) : null)}
+        {...previewProps(
+          pendingDefend
+            ? cardById(pendingDefend.attackCard)
+            : pendingAlarm?.card
+              ? cardById(pendingAlarm.card)
+              : null,
+        )}
       >
         {intro &&
           deal.staged.map((s) => {
@@ -1058,9 +1159,34 @@ export default function Board({
               </div>
             )
           })()}
+        {pendingAlarm &&
+          (() => {
+            const data = pendingAlarm.card ? cardById(pendingAlarm.card) : null
+            if (!data) return null
+            return (
+              <div
+                className={opening.centreCard}
+                data-testid="board-centre-alarm"
+                data-pending-play
+              >
+                <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+                  <Card card={data} interactive={false} width="100%" />
+                </div>
+              </div>
+            )
+          })()}
       </div>
 
-      <div className={kit.you}>
+      {/* OUR OWN alarm — strong, and BEFORE the hand in the DOM so it glows
+          UNDER it. The bounds are the table zone itself: `kit.table` is already
+          `position: relative; overflow: hidden; isolation: isolate`, so the
+          layout supplies them and there is nothing to measure. The playground's
+          `.glowBounds` and its hardcoded tech-bar offsets stay in the
+          playground — that story is explicitly not the reference here (Page
+          Shell Rule, apps/playground/CLAUDE.md). */}
+      {glowStrong && <EdgeGlow visible intensity="strong" data-testid="board-glow-strong" />}
+
+      <div className={kit.you} data-testid="board-you">
         {youEliminated ? (
           <Badge size="lg" className={kit.youBadge}>
             {copy.table.youEliminated}
@@ -1078,6 +1204,14 @@ export default function Board({
                 slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
                 onPick={(t) => staging.onTargetPick(t)}
                 targets={staging.targets}
+                // the zone's own half of the 503 gesture (#102, Task 9). What
+                // lights is exactly what may be taken — `pending.methods` is
+                // the only authority — and a slot whose card is elsewhere
+                // (carried by the drag, or standing at the cover slot as the
+                // answer) shows its empty place rather than a second copy.
+                accentAt={(key) => neutralizing.accentAt(key)}
+                liftedAt={(key) => neutralizing.liftedAt(key)}
+                onSlotDown={(key, e) => neutralizing.onSlotDown(key, e)}
               />
             </div>
             {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan is never read as "pointed at nothing" while a pair stands merged; the Hand owns the real interaction (ComboStory's own hand wrapper carries the same guard) */}
@@ -1127,7 +1261,13 @@ export default function Board({
                 // the fan (#101, Task 16) — `answering` picks the source at
                 // every call site below, rather than merging the two hooks'
                 // outputs.
-                items={answering ? defenseStaging.handItems : staging.handItems}
+                items={
+                  answering
+                    ? defenseStaging.handItems
+                    : alarmMineOpen
+                      ? neutralizing.handItems
+                      : staging.handItems
+                }
                 // the fan opens room for the arriving heap while it travels —
                 // the deal wins the tie against every other beat the same way
                 // it already wins the shadow's, and the staging gesture's own
@@ -1149,8 +1289,19 @@ export default function Board({
                 // scene is about. Both hooks keep the one rule: lit only
                 // while a step is waiting on a choice from the fan, and only
                 // on the cards that answer it.
-                stateAt={answering ? defenseStaging.stateAt : staging.stateAt}
-                accentAt={answering ? defenseStaging.accentAt : staging.accentAt}
+                stateAt={
+                  answering
+                    ? defenseStaging.stateAt
+                    : alarmMineOpen
+                      ? neutralizing.stateAt
+                      : staging.stateAt
+                }
+                // no fan accent while a 503 is open: `neutralizing.accentAt`
+                // answers for a ZONE slot, and the fan's own lighting is
+                // entirely `stateAt`'s (the Debugger, or nothing).
+                accentAt={
+                  answering ? defenseStaging.accentAt : alarmMineOpen ? undefined : staging.accentAt
+                }
                 // while the deal runs the hand is held: no clicks reach either
                 // gesture machine, and the cards that travelled closed stay
                 // closed until the flip. Both are gone the moment it ends, so
@@ -1171,17 +1322,22 @@ export default function Board({
                     ? undefined
                     : answering
                       ? (i) => defenseStaging.onCardClick(i)
-                      : (i) => {
-                          if (staging.onCardClick(i)) return
-                          // resolved against the array the fan actually
-                          // RENDERED, and handed on as a uid: `handItems` is
-                          // `you.hand` minus whatever is staged, so an index
-                          // that crossed this seam pointed at a different card
-                          // the whole time anything stood on the table (#101,
-                          // Fix D round 2).
-                          const item = staging.handItems[i]
-                          if (item) gestures.onCardClick(item.uid)
-                        }
+                      : alarmMineOpen
+                        ? // a 503 is answered by a PULL, never by a click —
+                          // one gesture per step, the same discipline the
+                          // defence's own `askPartner` line records
+                          undefined
+                        : (i) => {
+                            if (staging.onCardClick(i)) return
+                            // resolved against the array the fan actually
+                            // RENDERED, and handed on as a uid: `handItems` is
+                            // `you.hand` minus whatever is staged, so an index
+                            // that crossed this seam pointed at a different card
+                            // the whole time anything stood on the table (#101,
+                            // Fix D round 2).
+                            const item = staging.handItems[i]
+                            if (item) gestures.onCardClick(item.uid)
+                          }
                 }
                 // drag-mode: a card that needs a target — or a legal defence
                 // answering an open `defend` pending — is pulled out of the
@@ -1192,7 +1348,9 @@ export default function Board({
                     ? undefined
                     : answering
                       ? defenseStaging.onHandPlay
-                      : staging.onHandPlay
+                      : alarmMineOpen
+                        ? neutralizing.onHandPlay
+                        : staging.onHandPlay
                 }
                 // the reorder gesture's commit — without it the kit settles the
                 // card into its new slot and the next projection render snaps
@@ -1204,7 +1362,11 @@ export default function Board({
                     : (uid, to) =>
                         handOrder.commit(
                           you.hand,
-                          answering ? defenseStaging.handItems : staging.handItems,
+                          answering
+                            ? defenseStaging.handItems
+                            : alarmMineOpen
+                              ? neutralizing.handItems
+                              : staging.handItems,
                           uid,
                           to,
                         )
@@ -1229,6 +1391,14 @@ export default function Board({
           </>
         )}
       </div>
+
+      {/* SOMEONE ELSE's alarm — weak, and AFTER the hand so it lies over it.
+          `pointer-events: none` is already on the primitive for both
+          intensities (EdgeGlow.module.css), so the fan's hover reaction is not
+          smothered and the DOM position is the only thing to get right. */}
+      {pendingAlarm && !alarmMine && (
+        <EdgeGlow visible intensity="weak" data-testid="board-glow-weak" />
+      )}
 
       {/* служебный док хода — низ слева, под колодами, слева от руки */}
       <div className={kit.turnDock}>
@@ -1272,10 +1442,32 @@ export default function Board({
           decline — is the board's own affordance now, in the ask below. */}
       {state.pending?.player === state.selfId &&
         state.pending.kind !== 'discardForRelease' &&
-        state.pending.kind !== 'defend' && (
+        state.pending.kind !== 'defend' &&
+        // the gesture IS the answer, and the panel covered the very cards it
+        // was asking about — same reason, same fix as `defend` above (#102)
+        state.pending.kind !== 'neutralize503' && (
           <PendingPrompt
             pending={state.pending}
             hand={you.hand}
+            // What a `crush` sacrifice may burn — only the three release
+            // slots (Frontend/Backend/Database); Monitoring is its own
+            // neutralize method, never a sacrifice target. Card data comes
+            // from `you.release`, uid from `you.releaseUid` — the engine's
+            // choice names the uid, not the slot (Task 11, #102).
+            release={{
+              frontend:
+                you.release.frontend && you.releaseUid?.frontend
+                  ? { uid: you.releaseUid.frontend, card: you.release.frontend }
+                  : undefined,
+              backend:
+                you.release.backend && you.releaseUid?.backend
+                  ? { uid: you.releaseUid.backend, card: you.release.backend }
+                  : undefined,
+              database:
+                you.release.database && you.releaseUid?.database
+                  ? { uid: you.releaseUid.database, card: you.release.database }
+                  : undefined,
+            }}
             copy={copy.pending}
             onResolve={(choice) => actions?.onResolve?.(choice)}
           />
@@ -1434,6 +1626,7 @@ export default function Board({
       {beats.overlays}
       {staging.overlay}
       {defenseStaging.overlay}
+      {neutralizing.overlay}
       {previewOverlay}
 
       {/* the pair flyer — a persistent node (I10: position: fixed against the

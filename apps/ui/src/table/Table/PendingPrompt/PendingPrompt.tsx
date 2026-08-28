@@ -34,6 +34,9 @@ export interface PendingPromptCopy {
 export interface PendingPromptProps {
   pending: TablePending
   hand: HandItem[]
+  // the player's own releases, by slot: what a `sacrifice` method may burn.
+  // Carries the uid, because the engine's choice names one, not a slot.
+  release?: Partial<Record<'frontend' | 'backend' | 'database', { uid: string; card: CardType }>>
   copy: PendingPromptCopy
   onResolve: (choice: TableChoice) => void
 }
@@ -55,21 +58,27 @@ const METHOD_LABEL: Record<NeutralizeMethodId, string> = {
   sacrifice: 'Sacrifice',
 }
 
-// A selectable card, resolved against `hand` — never against the catalogue.
-// A uid the hand doesn't carry (stale pending mid-transition) silently drops.
+// A selectable card, resolved against `hand` by default — never against the
+// catalogue. A uid the hand doesn't carry (stale pending mid-transition)
+// silently drops. `card` is an escape hatch for a card that is not in a
+// hand at all (a release standing in the player's own zone, offered as a
+// `crush` sacrifice target): when passed, it is rendered directly and `hand`
+// is not consulted.
 function CardOption({
   uid,
   hand,
+  card,
   selected,
   onClick,
 }: {
   uid: string
   hand: HandItem[]
+  card?: CardType
   selected: boolean
   onClick: () => void
 }) {
-  const item = hand.find((h) => h.uid === uid)
-  if (!item) return null
+  const shown = card ?? hand.find((h) => h.uid === uid)?.card
+  if (!shown) return null
   return (
     <button
       type="button"
@@ -78,12 +87,7 @@ function CardOption({
       className={styles.option}
       onClick={onClick}
     >
-      <Card
-        card={item.card}
-        interactive={false}
-        width={104}
-        state={selected ? 'selected' : 'idle'}
-      />
+      <Card card={shown} interactive={false} width={104} state={selected ? 'selected' : 'idle'} />
     </button>
   )
 }
@@ -180,7 +184,13 @@ function TextOption({
 // one exception is `requestCard`, which is a bluff rather than a legal move —
 // see CatalogueCardOption above for why reading the catalogue there is not a
 // legality decision.
-export default function PendingPrompt({ pending, hand, copy, onResolve }: PendingPromptProps) {
+export default function PendingPrompt({
+  pending,
+  hand,
+  release,
+  copy,
+  onResolve,
+}: PendingPromptProps) {
   // Reset selection when the pending itself changes (a new kind/player, not a
   // referential change to the same one — TableState is rebuilt from scratch on
   // every projection update, so `pending` is rarely `===` across renders even
@@ -191,6 +201,9 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
   const [method, setMethod] = useState<NeutralizeMethodId | null>(null)
   const [requestedCard, setRequestedCard] = useState<string | null>(null)
   const [discardPicks, setDiscardPicks] = useState<string[]>([])
+  // which release a `crush` sacrifice burns — separate from `card` (the
+  // 503's own sacrifice state lives on the board's own scene now, #102).
+  const [sacrificed, setSacrificed] = useState<string | null>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: fingerprint is the re-arm trigger, not read inside
   useEffect(() => {
     setCard(null)
@@ -198,6 +211,7 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
     setMethod(null)
     setRequestedCard(null)
     setDiscardPicks([])
+    setSacrificed(null)
   }, [fingerprint])
 
   const kindCopy = copy[pending.kind]
@@ -309,18 +323,43 @@ export default function PendingPrompt({ pending, hand, copy, onResolve }: Pendin
       break
     }
     case 'crush': {
-      complete = method != null && pending.methods.includes(method)
+      const burnable = Object.values(release ?? {}).filter(
+        (r): r is { uid: string; card: CardType } => r != null,
+      )
+      // A sacrifice must name WHICH release it burns — the engine refuses one
+      // that does not ('sacrifice needs a release card', triggers.ts), so the
+      // panel is not complete until a release is picked.
+      const needsCard = method === 'sacrifice'
+      complete =
+        method != null &&
+        pending.methods.includes(method) &&
+        (!needsCard || (sacrificed != null && burnable.some((r) => r.uid === sacrificed)))
       confirm = () => {
-        if (method && pending.methods.includes(method)) onResolve({ kind: 'crush', method })
+        if (!complete || !method) return
+        onResolve({ kind: 'crush', method, ...(needsCard ? { card: sacrificed as string } : {}) })
       }
-      options = pending.methods.map((m) => (
-        <TextOption
-          key={m}
-          label={METHOD_LABEL[m]}
-          selected={method === m}
-          onClick={() => setMethod(m)}
-        />
-      ))
+      options = [
+        ...pending.methods.map((m) => (
+          <TextOption
+            key={m}
+            label={METHOD_LABEL[m]}
+            selected={method === m}
+            onClick={() => setMethod(m)}
+          />
+        )),
+        ...(needsCard
+          ? burnable.map((r) => (
+              <CardOption
+                key={r.uid}
+                uid={r.uid}
+                hand={hand}
+                card={r.card}
+                selected={sacrificed === r.uid}
+                onClick={() => setSacrificed(r.uid)}
+              />
+            ))
+          : []),
+      ]
       break
     }
     case 'requestCard': {

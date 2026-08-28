@@ -444,7 +444,14 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
     case 'giveCard':
       return { kind: 'giveCard', player: p.player, requested: p.requested }
     case 'neutralize503':
-      return { kind: 'neutralize503', player: p.player, methods: [...p.methods] }
+      return {
+        kind: 'neutralize503',
+        player: p.player,
+        // public: the rules oblige the drawer to show it to everyone. null for
+        // the ai-error-503 mimic, which has no card standing anywhere.
+        card: p.card ? p.card.id : null,
+        methods: [...p.methods],
+      }
     case 'crush':
       return { kind: 'crush', player: p.player, slot: p.slot, methods: [...p.methods] }
     case 'pickFromDiscard':
