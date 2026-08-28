@@ -34,7 +34,7 @@ vi.mock('@release/translation', () => ({
     i18n: { resolvedLanguage: 'en', changeLanguage: () => Promise.resolve() },
   }),
 }))
-vi.mock('~/app/lib/lobbyNavigation', () => ({ useGoToLobby: () => vi.fn() }))
+vi.mock('~/app/lib/lobbyNavigation', () => ({ useLeaveMatch: () => vi.fn() }))
 vi.mock('~/app/providers/SessionProvider', () => ({
   useSession: () => ({
     state: { selfId, peers, hostId: 'peer-a' },
