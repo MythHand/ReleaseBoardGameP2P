@@ -1,5 +1,5 @@
 import { wait } from '@release/ui/animations'
-import { type ReactNode, useCallback, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import type { BeatRun } from '~/entities/game/board'
 import styles from './eliminateBeat.module.css'
 import type { BeatPlan } from './planBeats'
@@ -31,25 +31,114 @@ export const ELIMINATION_CLIPS: string[] = Object.entries(
 export const ELIM_DELAY = 400
 /** loop for at least this long, then let the current loop finish */
 export const ELIM_MIN_MS = 5000
+
 /**
- * And leave after this long no matter what. Not a rule about the game — an
- * engineering floor under one: the loop is ended by `ended`, and a stalled
- * stream never fires it. The beat owns the table while it runs, so without this
- * a clip that hangs holds one player's board dead for the rest of the match.
+ * How long each clip actually runs, in ms, keyed by the file it belongs to and
+ * living right beside the list above — because the guard below is armed with a
+ * number taken from here, and a number that has drifted from its file would cut
+ * a healthy clip short.
+ *
+ * `eliminateClips.test.ts` reads the real duration out of each file's own
+ * `moov/mvhd` box and fails if this table disagrees, or if a clip ships with no
+ * entry. That check is the point rather than a formality: these clips ship with
+ * unconfirmed rights and are expected to be replaced
+ * (docs/animations/backlog.md), and a swap must fail loudly here instead of
+ * quietly mis-timing the beat.
  */
-export const ELIM_CEILING_MS = 12000
+export const CLIP_MS: Record<string, number> = {
+  'IHa0T7Ffr43z1kTd.mp4': 4700,
+  'doc_2026-07-31_23-09-35.mp4': 3267,
+  'freshleb-whistlindiesel.mp4': 2034,
+  'gato-truco-gato.mp4': 6467,
+}
+
+/**
+ * The guard for one clip: the first whole loop at or past the floor — which is
+ * exactly how long a healthy clip can legitimately be on screen, since the beat
+ * loops until `ELIM_MIN_MS` and then lets the pass it is in finish. So the timer
+ * fires just after a legitimate end and never interferes with playback.
+ *
+ * A blanket ceiling used to do this job with one number for every clip, which
+ * meant the number was wrong for all of them: too generous for a short clip
+ * (the board sits dead past the end) and a real risk of cutting a long one.
+ *
+ * The fallback exists only for a clip with no entry in `CLIP_MS`, which the
+ * test above is what prevents — the longest guard the table knows, so an
+ * unlisted clip is never cut short, only left a little long.
+ */
+/**
+ * And a guard of a different shape, for a different failure: a clip that never
+ * BEGINS. The per-clip number above is the clip's own time and is only started
+ * by real playback — deliberately, so loading cannot spend it — which leaves
+ * "it never played at all" counted by nothing. The beat owns the table while it
+ * runs, so that would hold the board for the rest of the match.
+ *
+ * So this one is about LOADING, not about any clip, and is not derived from one.
+ * It should never be reached: the clips are fetched ahead of time (see
+ * `useEliminationPreload`), a refused codec fires `error`, and a refused
+ * autoplay rejects `play()` — both handled. It is the floor under the case
+ * none of those cover.
+ */
+export const ELIM_START_MS = 10000
+
+export function guardMsFor(src: string): number {
+  const name = src.split('/').pop() ?? ''
+  const own = CLIP_MS[name]
+  if (own) return Math.ceil(ELIM_MIN_MS / own) * own
+  const known = Object.values(CLIP_MS).map((d) => Math.ceil(ELIM_MIN_MS / d) * d)
+  return known.length > 0 ? Math.max(...known) : ELIM_MIN_MS * 2
+}
+
+/**
+ * The clips are fetched BEFORE anybody needs one. Until this existed the first
+ * byte was asked for at the exact moment the overlay was already on screen,
+ * which is where both failures came from: loading spending the clip's own time,
+ * and the risk of an overlay standing empty over the board.
+ *
+ * At IDLE, and only once the match is running — never at app start. Initial
+ * load is not paid for by clips today (Vite emits them as their own assets) and
+ * losing that for a clip that may never be needed is a bad trade. All four are
+ * fetched, because which one comes up is known only at the elimination itself.
+ *
+ * Nothing is kept: the point is the HTTP cache, so `<video>` starts from it
+ * rather than from the network. A failure is ignored on purpose — the clip's
+ * own `error` path is what handles a clip that will not load, and a preload
+ * that could raise would make a background convenience into a way to break the
+ * board.
+ */
+export function useEliminationPreload(enabled: boolean): void {
+  const done = useRef(false)
+  useEffect(() => {
+    if (!enabled || done.current || ELIMINATION_CLIPS.length === 0) return
+    const idle =
+      typeof requestIdleCallback === 'function'
+        ? requestIdleCallback
+        : (cb: () => void) => setTimeout(cb, 1200) as unknown as number
+    const handle = idle(() => {
+      if (done.current) return
+      done.current = true
+      for (const src of ELIMINATION_CLIPS) void fetch(src).catch(() => {})
+    })
+    return () => {
+      if (typeof cancelIdleCallback === 'function') cancelIdleCallback(handle as number)
+      else clearTimeout(handle as unknown as ReturnType<typeof setTimeout>)
+    }
+  }, [enabled])
+}
 
 export function useEliminateBeat() {
   const [clip, setClip] = useState<string | null>(null)
   const started = useRef(0)
   const resolve = useRef<(() => void) | null>(null)
-  const ceiling = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Whichever guard is currently armed: the loading one until playback starts,
+  // the clip's own from then on. One ref, because only ever one is running.
+  const guard = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // One way out, however the clip got here: the overlay goes, the watchdog is
   // disarmed, and the beat's own promise resolves exactly once.
   const finish = useCallback(() => {
-    if (ceiling.current) clearTimeout(ceiling.current)
-    ceiling.current = null
+    if (guard.current) clearTimeout(guard.current)
+    guard.current = null
     setClip(null)
     resolve.current?.()
     resolve.current = null
@@ -63,12 +152,28 @@ export function useEliminateBeat() {
       // every screen — a table watching the same thing, at no cost on the wire.
       const src = ELIMINATION_CLIPS[plan.eventId % ELIMINATION_CLIPS.length]
       await wait(ELIM_DELAY)
-      started.current = Date.now()
+      // NOT started here — the clock starts when the clip really plays
+      // (`onPlaying`). Until then only the loading guard is running.
+      started.current = 0
       setClip(src)
       return new Promise<void>((res) => {
         resolve.current = res
-        ceiling.current = setTimeout(finish, ELIM_CEILING_MS)
+        guard.current = setTimeout(finish, ELIM_START_MS)
       })
+    },
+    [finish],
+  )
+
+  // Playback really began. This is where both clocks start: the floor the loop
+  // is measured against, and the clip's own guard — so a slow load spends
+  // neither. Only the first one counts; a stall that resumes fires `playing`
+  // again and must not hand the clip a fresh budget.
+  const onPlaying = useCallback(
+    (e: React.SyntheticEvent<HTMLVideoElement>) => {
+      if (started.current !== 0) return
+      started.current = performance.now()
+      if (guard.current) clearTimeout(guard.current)
+      guard.current = setTimeout(finish, guardMsFor(e.currentTarget.getAttribute('src') ?? ''))
     },
     [finish],
   )
@@ -76,7 +181,7 @@ export function useEliminateBeat() {
   // one loop finished: play it again until the floor is reached, then leave
   const onEnded = useCallback(
     (e: React.SyntheticEvent<HTMLVideoElement>) => {
-      if (Date.now() - started.current < ELIM_MIN_MS) {
+      if (performance.now() - started.current < ELIM_MIN_MS) {
         const v = e.currentTarget
         v.currentTime = 0
         void v.play()
@@ -105,9 +210,28 @@ export function useEliminateBeat() {
             key={clip}
             className={styles.video}
             src={clip}
+            // `autoPlay` starts it; the ref starts it again and CATCHES. A
+            // refused autoplay rejects the promise and fires no event at all,
+            // so without this the beat would wait on a clip that was never
+            // going to play. Muted playback is allowed by every current policy,
+            // which is what makes this the rare path rather than the usual one.
+            ref={(el) => {
+              if (!el) return
+              try {
+                // `play()` returns a promise in a browser; an environment with
+                // no media pipeline (jsdom) throws from it instead. Neither is
+                // a reason to end the beat by itself — a throw here means the
+                // element's own events are what drive it, and the loading guard
+                // is still standing behind them.
+                void el.play()?.catch(() => finish())
+              } catch {
+                // no media pipeline — leave it to the events and the guard
+              }
+            }}
             autoPlay
             muted
             playsInline
+            onPlaying={onPlaying}
             onEnded={onEnded}
             onError={onError}
           />

@@ -2,10 +2,11 @@ import { act, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { BeatRun, BoardState } from '~/entities/game/board'
 import {
-  ELIM_CEILING_MS,
   ELIM_DELAY,
   ELIM_MIN_MS,
+  ELIM_START_MS,
   ELIMINATION_CLIPS,
+  guardMsFor,
   useEliminateBeat,
 } from './eliminateBeat'
 import type { BeatPlan } from './planBeats'
@@ -77,12 +78,21 @@ async function start(eventId = 20) {
   }
   // past the delay that lets the emptied table read before the video covers it
   await tick(ELIM_DELAY + 20)
+  const video = () => document.querySelector('video')
   return {
     api,
     finished,
     tick,
     isDone: () => done,
-    video: () => document.querySelector('video'),
+    video,
+    // The clip really starts: nothing counts until this arrives, because
+    // loading must not spend the clip's own budget (#126 review).
+    playing: () => {
+      act(() => {
+        fireEvent.playing(video() as HTMLVideoElement)
+      })
+    },
+    guard: () => guardMsFor(video()?.getAttribute('src') ?? ''),
     settle: async () => {
       while (!done) await tick(200)
       await finished
@@ -105,7 +115,7 @@ it('holds the emptied table before the clip covers it', async () => {
   })
   expect(document.querySelector('video')).not.toBeNull()
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(ELIM_CEILING_MS)
+    await vi.advanceTimersByTimeAsync(ELIM_START_MS + 100)
   })
   await finished
   vi.useRealTimers()
@@ -125,6 +135,7 @@ it('resolves one clip from the elimination itself', async () => {
 
 it('loops a clip that ends before the floor', async () => {
   const run = await start()
+  run.playing()
   await run.tick(1000)
   const before = plays.count
   act(() => {
@@ -138,6 +149,7 @@ it('loops a clip that ends before the floor', async () => {
 
 it('leaves once a loop finishes past the floor', async () => {
   const run = await start()
+  run.playing()
   await run.tick(ELIM_MIN_MS + 100)
   act(() => {
     fireEvent.ended(run.video() as HTMLVideoElement)
@@ -163,11 +175,54 @@ it('hands the table back when the clip cannot play', async () => {
 })
 
 // `ended` is the only thing that ends the loop, and a stalled stream never
-// fires it. Without a ceiling that would hold this player's board dead for the
-// rest of the match.
-it('gives the table back on its own when the clip never ends', async () => {
+// fires it. The guard is the clip's OWN first-whole-loop-past-the-floor, so it
+// lands just after a legitimate end rather than at some blanket number that is
+// wrong for every clip at once (#126 review).
+it('gives the table back on its own when a playing clip stalls', async () => {
   const run = await start()
-  await run.tick(ELIM_CEILING_MS + 100)
+  run.playing()
+  await run.tick(run.guard() + 100)
+  await run.finished
+  expect(run.isDone()).toBe(true)
+  expect(run.video()).toBeNull()
+  vi.useRealTimers()
+})
+
+// The condition that makes the per-clip number honest: loading must not spend
+// the clip's own budget, or a slow connection cuts the clip short with a
+// different number. So nothing is counted until playback really starts.
+it('does not spend the clip’s own time while it is still loading', async () => {
+  const run = await start()
+  await run.tick(run.guard() + 100) // longer than the clip's whole budget…
+  expect(run.isDone()).toBe(false) // …and it has not started, so nothing is spent
+  run.playing()
+  await run.tick(run.guard() - 100)
+  expect(run.isDone()).toBe(false) // the clip's own time is only now running out
+  await run.tick(200)
+  await run.finished
+  expect(run.isDone()).toBe(true)
+  vi.useRealTimers()
+})
+
+// …which leaves a hole the per-clip guard cannot cover, because it is not about
+// the clip: one that never begins at all spends no budget and would hold the
+// board for the rest of the match. That is a LOADING failure, so it gets a
+// loading-shaped guard of its own rather than a share of the clip's time.
+it('gives the table back when the clip never begins', async () => {
+  const run = await start()
+  await run.tick(ELIM_START_MS + 100)
+  await run.finished
+  expect(run.isDone()).toBe(true)
+  expect(run.video()).toBeNull()
+  vi.useRealTimers()
+})
+
+// Autoplay refused: the promise rejects and no event ever arrives, so the beat
+// would sit on a dead table waiting for a clip that was never going to play.
+it('hands the table back when playback is refused outright', async () => {
+  HTMLMediaElement.prototype.play = vi.fn(() => Promise.reject(new Error('NotAllowedError')))
+  const run = await start()
+  await run.tick(50)
   await run.finished
   expect(run.isDone()).toBe(true)
   expect(run.video()).toBeNull()

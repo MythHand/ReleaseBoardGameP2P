@@ -1462,17 +1462,44 @@ asset — they are not in the JS bundle and nothing is fetched until the overlay
 backend and no CDN to fetch them from (Architecture Rule), and a build-time import means a renamed
 clip breaks the build instead of 404-ing on somebody's board.
 
-**Three ways it ends, one way out**
-`finish()` is the single exit — the overlay goes, the watchdog is disarmed, the beat's promise
-resolves once — and three things reach it:
+**Fetched before anybody needs one**
+`useEliminationPreload` fetches all four at browser idle, once the match is running — mounted from
+`_Board.tsx` on `!deal.active`. Not at app start: initial load does not pay for these today, and a
+clip that may never be needed should not change that. All four, because which one comes up is known
+only at the elimination itself. Nothing is kept — the point is the HTTP cache, so `<video>` starts
+from it instead of from the network.
+
+**The guard is the clip's own time, not a blanket ceiling**
+A single ceiling for every clip is wrong for all of them at once: too generous for a short clip (the
+board sits dead past its end) and a real risk of cutting a long one. So each clip is guarded with
+its own number, derived from the rule the beat already plays by — loop to the floor, then let the
+pass you are in finish. That is `ceil(ELIM_MIN_MS / duration) * duration`: the first whole loop at
+or past the floor, which is exactly the last frame a healthy clip can legitimately show. The timer
+lands just after it and never interferes with playback.
+
+Two conditions make that number honest, and both are pinned:
+- **the count starts at real playback (`playing`), not at mount** — otherwise loading spends the
+  clip's own budget and a slow connection reproduces the same cut with a different number. Only the
+  first `playing` counts; a stall that resumes must not hand the clip a fresh budget.
+- **the lengths live beside the clip list** (`CLIP_MS`), and `eliminateClips.test.ts` reads each
+  file's real duration out of its own `moov/mvhd` box and fails if the table disagrees or a clip
+  ships without an entry. That matters here specifically: the clips ship with unconfirmed rights and
+  are expected to be replaced, so a swap has to fail loudly rather than quietly mis-time the beat.
+
+`performance.now()`, as in the source.
+
+**Four ways it ends, one way out**
+`finish()` is the single exit — the overlay goes, whichever guard is armed is disarmed, the beat's
+promise resolves once — and four things reach it:
 - `ended` past `ELIM_MIN_MS`. Before the floor, `ended` replays the clip instead.
 - `error` — a missing file, a refused codec. Nothing is put in its place: the board is already in
   its eliminated state, which is what carries the news; the clip was the punctuation, not the
   sentence.
-- `ELIM_CEILING_MS`, the watchdog. `ended` is the only thing that ends the loop and a stalled
-  stream never fires one, so without it a hung clip would hold this player's board dead for the
-  rest of the match. The value is a guard rather than a rule, and is recorded as such in
-  `backlog.md`.
+- a rejected `play()` — autoplay refused. It fires no event at all, so without catching the promise
+  the beat would wait on a clip that was never going to play.
+- a guard: the clip's own time once playback has started, and `ELIM_START_MS` before it has. The
+  second is a LOADING guard, not a clip one — it covers the only case the per-clip number cannot,
+  a clip that never begins at all, which would otherwise hold the board for the rest of the match.
 
 **The winner waits for it**
 The engine settles the elimination and the win it caused in ONE reduction (`fake/triggers.ts`:
@@ -1494,7 +1521,8 @@ Decided, not emergent: a full-screen autoplaying video is exactly what the prefe
 |---|---|
 | the emptied table holds before the clip covers it | `ELIM_DELAY = 400` |
 | the clip loops at least | `ELIM_MIN_MS = 5000` |
-| and hands the table back regardless after | `ELIM_CEILING_MS = 12000` (a guard — see `backlog.md`) |
+| and is guarded at its own first whole loop past that | 6.10 / 6.53 / 6.47 / 9.40s for the current four |
+| a clip that never starts playing at all | `ELIM_START_MS = 10000` (a loading guard, not a clip one) |
 | fade in | 260ms, over a clip that is ALREADY playing — the fade does not hold it back |
 | fade out | none: the turn is over, there is nothing left to watch out of |
 
