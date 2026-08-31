@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { CLIP_MS, ELIM_MIN_MS, ELIMINATION_CLIPS, guardMsFor } from './eliminateBeat'
+import {
+  CLIP_MS,
+  ELIM_GUARD_SLACK_MS,
+  ELIM_MIN_MS,
+  ELIMINATION_CLIPS,
+  guardMsFor,
+  idealEndMsFor,
+} from './eliminateBeat'
 
 // The guard is armed with a number this table supplies, so the table has to be
 // true about the files. Swap a clip for one of a different length and this test
@@ -84,14 +91,14 @@ describe('the elimination clips and the times the guard trusts', () => {
   // last frame a legitimate clip can show is the first whole multiple of its own
   // length at or past the floor — the guard fires just after that and never
   // during playback.
-  it('derives each guard as the first whole loop at or past the floor', () => {
+  it('derives each ideal end as the first whole loop at or past the floor', () => {
     for (const url of ELIMINATION_CLIPS) {
       const d = CLIP_MS[nameOf(url)]
-      const guard = guardMsFor(url)
-      expect(guard).toBe(Math.ceil(ELIM_MIN_MS / d) * d)
-      expect(guard).toBeGreaterThanOrEqual(ELIM_MIN_MS)
+      const ideal = idealEndMsFor(url)
+      expect(ideal).toBe(Math.ceil(ELIM_MIN_MS / d) * d)
+      expect(ideal).toBeGreaterThanOrEqual(ELIM_MIN_MS)
       // it is a whole number of passes, never a cut mid-clip
-      expect((Math.round((guard / d) * 1000) / 1000) % 1).toBe(0)
+      expect((Math.round((ideal / d) * 1000) / 1000) % 1).toBe(0)
     }
   })
 
@@ -99,7 +106,7 @@ describe('the elimination clips and the times the guard trusts', () => {
   // formula — if the formula and the intent ever part company, this says so.
   it('comes out at the times the decision named', () => {
     const byName = Object.fromEntries(
-      ELIMINATION_CLIPS.map((u) => [nameOf(u), Math.round(guardMsFor(u))]),
+      ELIMINATION_CLIPS.map((u) => [nameOf(u), Math.round(idealEndMsFor(u))]),
     )
     expect(byName).toEqual({
       'freshleb-whistlindiesel.mp4': 6102,
@@ -107,5 +114,31 @@ describe('the elimination clips and the times the guard trusts', () => {
       'gato-truco-gato.mp4': 6467,
       'IHa0T7Ffr43z1kTd.mp4': 9400,
     })
+  })
+
+  // THE POINT OF THE SLACK. The ideal end is what playback would take with no
+  // seam between loops — but `ended` fires, the handler rewinds, `play()` is
+  // called and a frame decodes, every time round. Armed on the ideal number
+  // exactly, the timer beats the last `ended` to the exit on every clip that
+  // loops, and the beat stops ending at a loop boundary and goes back to ending
+  // on a number — the very thing the per-clip guard replaced.
+  it('gives every clip room for the seams it will actually have', () => {
+    for (const url of ELIMINATION_CLIPS) {
+      const d = CLIP_MS[nameOf(url)]
+      const ideal = idealEndMsFor(url)
+      const loops = Math.round(ideal / d)
+      // strictly later than the last honest end, by room that grows with the
+      // number of seams rather than one flat allowance for every clip
+      expect(guardMsFor(url)).toBe(ideal + loops * ELIM_GUARD_SLACK_MS)
+      expect(guardMsFor(url)).toBeGreaterThan(ideal)
+    }
+  })
+
+  // …and not so much room that a stalled stream sits there. The guard is still
+  // a guard: a board nobody can play on should come back in about a second.
+  it('does not let a stall wait appreciably longer for it', () => {
+    for (const url of ELIMINATION_CLIPS) {
+      expect(guardMsFor(url) - idealEndMsFor(url)).toBeLessThanOrEqual(1000)
+    }
   })
 })

@@ -2,11 +2,13 @@ import { act, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { BeatRun, BoardState } from '~/entities/game/board'
 import {
+  CLIP_MS,
   ELIM_DELAY,
   ELIM_MIN_MS,
   ELIM_START_MS,
   ELIMINATION_CLIPS,
   guardMsFor,
+  idealEndMsFor,
   useEliminateBeat,
 } from './eliminateBeat'
 import type { BeatPlan } from './planBeats'
@@ -237,4 +239,49 @@ it('drops the clip when a new match cancels what is in the air', async () => {
   })
   expect(run.video()).toBeNull()
   await run.settle()
+})
+
+// The reviewer's scenario on #126, driven rather than argued: a clip that loops
+// does not reach its last `ended` at the ideal time. Every seam — `ended`, the
+// rewind, `play()`, a frame decoding — pushes the real end later, so a guard
+// armed on the ideal number exactly gets to the exit first and the beat ends on
+// a timer instead of on the loop boundary. Nothing would have flagged it: the
+// clip just stops a few frames early.
+it('lets a looping clip reach its own last ended, seams and all', async () => {
+  // the clip with the most passes, and so the most seams — found rather than
+  // assumed, since the list is sorted by path and its order is not ours to fix
+  const worst = ELIMINATION_CLIPS.reduce(
+    (best, url, i) => {
+      const d = CLIP_MS[url.split('/').pop() as string]
+      const n = Math.round(idealEndMsFor(url) / d)
+      return n > best.n ? { n, i } : best
+    },
+    { n: 0, i: 0 },
+  )
+  const run = await start(worst.i)
+  const src = run.video()?.getAttribute('src') as string
+  const one = CLIP_MS[src.split('/').pop() as string]
+  const loops = Math.round(idealEndMsFor(src) / one)
+  expect(loops).toBeGreaterThan(1) // this test is meaningless on a single-pass clip
+
+  const seam = 120 // what a real rewind-and-decode costs between passes
+  run.playing()
+  for (let pass = 1; pass < loops; pass++) {
+    await run.tick(one + seam)
+    act(() => {
+      fireEvent.ended(run.video() as HTMLVideoElement)
+    })
+    // still going: the floor has not been reached, so `ended` replays it
+    expect(run.isDone()).toBe(false)
+  }
+  // the last pass — the beat is now past the ideal end and every seam with it,
+  // which is exactly where a guard with no slack would already have fired
+  await run.tick(one + seam)
+  expect(run.isDone()).toBe(false)
+  act(() => {
+    fireEvent.ended(run.video() as HTMLVideoElement)
+  })
+  await run.finished
+  expect(run.isDone()).toBe(true)
+  vi.useRealTimers()
 })

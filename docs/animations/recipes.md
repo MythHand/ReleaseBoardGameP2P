@@ -1473,9 +1473,19 @@ from it instead of from the network.
 A single ceiling for every clip is wrong for all of them at once: too generous for a short clip (the
 board sits dead past its end) and a real risk of cutting a long one. So each clip is guarded with
 its own number, derived from the rule the beat already plays by — loop to the floor, then let the
-pass you are in finish. That is `ceil(ELIM_MIN_MS / duration) * duration`: the first whole loop at
-or past the floor, which is exactly the last frame a healthy clip can legitimately show. The timer
-lands just after it and never interferes with playback.
+pass you are in finish. That is `idealEndMsFor`: `ceil(ELIM_MIN_MS / duration) * duration`, the
+first whole loop at or past the floor, which is what a healthy clip takes IN THE IDEAL.
+
+**…plus room for the seams that end really contains.** Real playback runs a little longer than the
+ideal: `ended` fires, the handler rewinds to 0, `play()` is called and a frame decodes, every time
+round. Armed on the ideal number exactly, the timer beats the last `ended` to the exit on every clip
+that loops — and the beat goes back to ending on a number instead of on a loop boundary, which is
+the thing the per-clip guard exists to stop. Worse, it never surfaces as a failure, only as a clip
+that ends a few frames early. So `guardMsFor` adds `ELIM_GUARD_SLACK_MS` **per loop** — what varies
+between clips is the number of seams, not a fixed overhead, and these clips are expected to be
+replaced, so the shape has to survive a shorter one arriving. The guard is there for a stalled
+stream: it should fire well after any honest end, and a stall waiting a few hundred ms longer costs
+nothing.
 
 Two conditions make that number honest, and both are pinned:
 - **the count starts at real playback (`playing`), not at mount** — otherwise loading spends the
@@ -1521,7 +1531,8 @@ Decided, not emergent: a full-screen autoplaying video is exactly what the prefe
 |---|---|
 | the emptied table holds before the clip covers it | `ELIM_DELAY = 400` |
 | the clip loops at least | `ELIM_MIN_MS = 5000` |
-| and is guarded at its own first whole loop past that | 6.10 / 6.53 / 6.47 / 9.40s for the current four |
+| its ideal end, the first whole loop past that | 6.10 / 6.53 / 6.47 / 9.40s for the current four |
+| the guard, which is that plus room per seam | `+ ELIM_GUARD_SLACK_MS = 250` per loop |
 | a clip that never starts playing at all | `ELIM_START_MS = 10000` (a loading guard, not a clip one) |
 | fade in | 260ms, over a clip that is ALREADY playing — the fade does not hold it back |
 | fade out | none: the turn is over, there is nothing left to watch out of |

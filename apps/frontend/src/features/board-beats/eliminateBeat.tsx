@@ -53,41 +53,79 @@ export const CLIP_MS: Record<string, number> = {
 }
 
 /**
- * The guard for one clip: the first whole loop at or past the floor — which is
- * exactly how long a healthy clip can legitimately be on screen, since the beat
- * loops until `ELIM_MIN_MS` and then lets the pass it is in finish. So the timer
- * fires just after a legitimate end and never interferes with playback.
+ * How long a healthy clip is on screen IN THE IDEAL: the first whole loop at or
+ * past the floor, since the beat loops until `ELIM_MIN_MS` and then lets the
+ * pass it is in finish. This is the number the review settled on — 6.10 / 6.53 /
+ * 6.47 / 9.40s for the four clips here — and it is what the beat aims at.
+ *
+ * It is NOT what the guard is armed with; see `guardMsFor` below.
  *
  * A blanket ceiling used to do this job with one number for every clip, which
  * meant the number was wrong for all of them: too generous for a short clip
  * (the board sits dead past the end) and a real risk of cutting a long one.
  *
  * The fallback exists only for a clip with no entry in `CLIP_MS`, which the
- * test above is what prevents — the longest guard the table knows, so an
- * unlisted clip is never cut short, only left a little long.
+ * duration test is what prevents — the longest the table knows, so an unlisted
+ * clip is never cut short, only left a little long.
  */
-/**
- * And a guard of a different shape, for a different failure: a clip that never
- * BEGINS. The per-clip number above is the clip's own time and is only started
- * by real playback — deliberately, so loading cannot spend it — which leaves
- * "it never played at all" counted by nothing. The beat owns the table while it
- * runs, so that would hold the board for the rest of the match.
- *
- * So this one is about LOADING, not about any clip, and is not derived from one.
- * It should never be reached: the clips are fetched ahead of time (see
- * `useEliminationPreload`), a refused codec fires `error`, and a refused
- * autoplay rejects `play()` — both handled. It is the floor under the case
- * none of those cover.
- */
-export const ELIM_START_MS = 10000
-
-export function guardMsFor(src: string): number {
+export function idealEndMsFor(src: string): number {
   const name = src.split('/').pop() ?? ''
   const own = CLIP_MS[name]
   if (own) return Math.ceil(ELIM_MIN_MS / own) * own
   const known = Object.values(CLIP_MS).map((d) => Math.ceil(ELIM_MIN_MS / d) * d)
   return known.length > 0 ? Math.max(...known) : ELIM_MIN_MS * 2
 }
+
+/**
+ * Room for ONE loop seam. Real playback always runs a little longer than the
+ * ideal: `ended` fires, the handler rewinds to 0, `play()` is called and a frame
+ * decodes — every time round — and the first frame after `playing` is not free
+ * either.
+ *
+ * Per loop rather than one flat allowance, because what differs between clips is
+ * the number of seams, not a fixed overhead: the 2.034s clip runs three passes
+ * and crosses two seams, the 6.467s clip runs one and crosses none. A single
+ * number would have to be sized for the worst case and would then be far too
+ * generous for the clip needing it least — and these clips are expected to be
+ * replaced, so the shape has to survive a shorter one arriving.
+ */
+export const ELIM_GUARD_SLACK_MS = 250
+
+/**
+ * What the guard is actually armed with: the ideal end, plus room for the seams
+ * that end will really contain.
+ *
+ * Armed on the ideal number exactly, the timer beat the last `ended` to the exit
+ * on every clip that loops — so the beat stopped ending at a loop boundary and
+ * went back to ending on a number, which is the thing the per-clip guard was
+ * introduced to stop. And it would never have surfaced as a failure, only as a
+ * clip that ends a few frames early (#126 review).
+ *
+ * The guard is here for a stalled stream, so it should fire well after any
+ * honest end: a stall waiting a few hundred ms longer costs nothing, while
+ * healthy playback racing a timer costs the beat its own ending.
+ */
+export function guardMsFor(src: string): number {
+  const ideal = idealEndMsFor(src)
+  const own = CLIP_MS[src.split('/').pop() ?? '']
+  const loops = own ? Math.round(ideal / own) : 1
+  return ideal + loops * ELIM_GUARD_SLACK_MS
+}
+
+/**
+ * And a guard of a different shape, for a different failure: a clip that never
+ * BEGINS. Everything above is the clip's own time and is only started by real
+ * playback — deliberately, so loading cannot spend it — which leaves "it never
+ * played at all" counted by nothing. The beat owns the table while it runs, so
+ * that would hold the board for the rest of the match.
+ *
+ * So this one is about LOADING, not about any clip, and is not derived from one.
+ * It should never be reached: the clips are fetched ahead of time (see
+ * `useEliminationPreload`), a refused codec fires `error`, and a refused
+ * autoplay rejects `play()` — both handled. It is the floor under the case none
+ * of those cover.
+ */
+export const ELIM_START_MS = 10000
 
 /**
  * The clips are fetched BEFORE anybody needs one. Until this existed the first
