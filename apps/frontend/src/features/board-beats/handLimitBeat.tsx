@@ -47,6 +47,21 @@ function cellBoxes(n: number, table: Rect): Rect[] {
   }))
 }
 
+function claimCards(
+  cards: DiscardCard[],
+  placed: HandLimitHandoff['cards'],
+): HandLimitHandoff['cards'] | null {
+  if (cards.length !== placed.length) return null
+  const spare = [...placed]
+  const claimed: HandLimitHandoff['cards'] = []
+  for (const card of cards) {
+    const at = spare.findIndex((item) => item.card.id === card.card)
+    if (at < 0) return null
+    claimed.push(spare.splice(at, 1)[0])
+  }
+  return claimed
+}
+
 export function useHandLimitBeat(
   anchors: BoardAnchors,
   handoff?: RefObject<HandLimitHandoff | null>,
@@ -67,6 +82,10 @@ export function useHandLimitBeat(
 
   const run = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'handLimit' }>, ctx: BeatRun) => {
+      // The page may clear this ref as its pending render advances while we
+      // yield. Capture the gesture fact now; measure its live cells only after
+      // the shadow has painted below.
+      const held = latest.current.handoff?.current
       // WAIT FOR THE SHADOW, THEN MEASURE — the queue starts this from inside a
       // layout effect, so at entry React has committed the projection that
       // ARRIVED and the shadow that puts the cards back is a commit away. Two
@@ -74,13 +93,13 @@ export function useHandLimitBeat(
       // `discardBeat` waits).
       await nextFrames()
       const a = latest.current.anchors
-      const held = latest.current.handoff?.current
       // Adopt only a grid that is REALLY ours and really complete: the same
       // player, and a cell for every card the engine banked. Anything else
       // falls through to the honest path — a flight from where the board can
       // actually see the card.
       const mine = plan.player === ctx.base.selfId
-      const spare = held && mine && held.player === plan.player ? [...held.cards] : null
+      const adopted =
+        held && mine && held.player === plan.player ? claimCards(plan.cards, held.cards) : null
 
       // TAKEOFF: the cards are gone from wherever they stood — publish before
       // the movement, or the board shows each card twice for its whole flight.
@@ -89,15 +108,14 @@ export function useHandLimitBeat(
 
       let items: Leaving[] = []
 
-      if (spare) {
+      if (adopted) {
         // ADOPT. The grid is standing; each card leaves from the cell it has
         // been sitting in. Matched by card id with a claimed list, the same way
         // `sourceOf` claims a hand slot: two copies of one card are
         // interchangeable to look at, so the first unclaimed one is right.
-        for (const c of plan.cards) {
-          const at = spare.findIndex((p) => p.card.id === c.card)
-          if (at < 0) continue
-          const [placed] = spare.splice(at, 1)
+        for (let i = 0; i < plan.cards.length; i++) {
+          const c = plan.cards[i]
+          const placed = adopted[i]
           const box = rectOf(held?.cellAt(placed.slot) ?? null)
           if (!box) continue
           items.push({
@@ -169,7 +187,7 @@ export function useHandLimitBeat(
       // and the flight swap inside one commit. `release()` drops the grid's
       // render only — the picked cards stay out of the fan until the pending
       // itself clears.
-      if (spare) held?.release()
+      if (adopted) held?.release()
       flyer.drop()
       await latest.current.send(items)
     },
