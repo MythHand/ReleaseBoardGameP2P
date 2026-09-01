@@ -993,3 +993,895 @@ Expected: all seven packages Done.
 git add apps/frontend/src/features/board-beats/transferBeat.tsx apps/frontend/src/features/board-beats/transferBeat.test.tsx
 git commit -m "transferBeat: the closed flight, for peers the event did not name (#105)"
 ```
+
+---
+
+### Task 6: `runRequested` — the entrance, and the whole miss
+
+Two jobs in one runner, because the projection survives one outcome and not the other.
+
+On a **hit** the projection does the holding. The pending flips `requestCard → giveCard`, and `giveCard` is projected unredacted to every peer (`fake/attacks.ts:444` — no `mine` gate, unlike `handLimit`), so `pending.requested` is public and every board can render the named card at the centre. The beat is only the entrance, and its last frame is that render (I7).
+
+On a **miss** the pending clears outright. Nothing in the projection survives, so the beat carries the entire scene — and it must, because `docs/rules/cards.md:125` makes the request public on a miss exactly as on a hit: the table has to see which card was asked for and not received.
+
+The refusal has two forms, and this is not a special case bolted on. To the asker and to spectators the target is a Seat, so their seat flinches. To the target themselves there is no seat — they are `you`, and what they own is the fan — so their own hand flinches, which is the story's original gesture exactly. The seat flinch is its translation for everyone who sees the target as a seat instead of a fan.
+
+**Files:**
+- Modify: `apps/frontend/src/features/board-beats/transferBeat.tsx`
+- Create: `apps/frontend/src/features/board-beats/transferBeat.module.css`
+- Modify: `apps/frontend/src/features/board-beats/useBeats.ts`
+- Modify: `packages/translation/src/locales/en/common.json`, `packages/translation/src/locales/ru/common.json`
+- Test: `apps/frontend/src/features/board-beats/transferBeat.test.tsx`
+
+**Interfaces:**
+- Produces, added to `useTransferBeat`'s return:
+
+```ts
+  runRequested: (plan: Extract<BeatPlan, { kind: 'requested' }>, beat: BeatRun) => Promise<void>
+```
+
+- [ ] **Step 1: Add the copy key to both catalogs**
+
+The band itself reuses the existing `pending.requestCard` copy — it asks the same question the panel asked. Only the miss note is new.
+
+In `packages/translation/src/locales/en/common.json`, inside `table`, after `askNeutralize`:
+
+```json
+    "requestMiss": "not in hand",
+```
+
+In `packages/translation/src/locales/ru/common.json`, at the same place inside `table`:
+
+```json
+    "requestMiss": "нет такой карты",
+```
+
+- [ ] **Step 2: Write the failing tests**
+
+Append to `transferBeat.test.tsx`. Add the import and a second probe beside the first:
+
+```tsx
+export const requestPlan = (
+  over: Partial<Extract<BeatPlan, { kind: 'requested' }>> = {},
+): Extract<BeatPlan, { kind: 'requested' }> => ({
+  kind: 'requested',
+  key: 'requested:1',
+  eventId: 1,
+  attacker: 'p1',
+  target: 'p2',
+  card: 'attack-bug',
+  hit: true,
+  ...over,
+})
+
+function runRequested(plan: Extract<BeatPlan, { kind: 'requested' }>, on: BoardState = base) {
+  const published: BoardState[] = []
+  let start: (() => Promise<void>) | null = null
+  function Probe() {
+    const beat = useTransferBeat(anchors)
+    start = () => beat.runRequested(plan, { base: on, publish: (s) => published.push(s) })
+    return <>{beat.overlay}</>
+  }
+  const view = render(<Probe />)
+  return {
+    published,
+    view,
+    go: async () => {
+      vi.useFakeTimers()
+      try {
+        let done = false
+        const finished = start?.().then(() => {
+          done = true
+        })
+        while (!done) {
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(20)
+          })
+        }
+        await finished
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  }
+}
+
+it('hands a hit over to the projection instead of holding it', async () => {
+  // The named card has to survive the gap between two BATCHES — the transfer
+  // comes from the victim's own RESOLVE — and no beat overlay can span that.
+  // So the beat publishes the public `giveCard` pending and lets the board's
+  // own render take the centre, which is why this leg is only an entrance.
+  const r = runRequested(requestPlan({ hit: true }))
+  await r.go()
+  const pendings = r.published.map((s) => s.pending?.kind)
+  expect(pendings).toContain('giveCard')
+})
+
+it('flinches the target seat on a miss, and takes nothing', async () => {
+  const r = runRequested(requestPlan({ hit: false }))
+  await r.go()
+  expect(played.names).toContain('shake')
+  // the story's values: a whole seat flinching, not the 7px settle sized for
+  // an input field
+  expect(played.shakes[0]).toMatchObject({ amp: 9, dur: 460, shape: 'spring' })
+  expect(arrivals.calls).toBe(0)
+  expect(r.published.map((s) => s.pending?.kind)).not.toContain('giveCard')
+})
+
+it('flinches your own fan when the miss is aimed at you', async () => {
+  // To everyone else the target is a Seat; to the target there is no seat at
+  // all — they are `you`, and what they own is the fan. Same gesture, rendered
+  // as the target actually appears.
+  const seatOf = vi.fn(() => document.createElement('div'))
+  const own = { ...base, selfId: 'p2' } as BoardState
+  const r = runRequested(requestPlan({ hit: false, target: 'p2' }), own)
+  await r.go()
+  expect(played.names).toContain('shake')
+  expect(seatOf).not.toHaveBeenCalled()
+})
+```
+
+- [ ] **Step 3: Run to verify they fail**
+
+Run: `pnpm -C apps/frontend test -- transferBeat`
+Expected: FAIL — `beat.runRequested is not a function`.
+
+- [ ] **Step 4: Add the note's stylesheet**
+
+Create `apps/frontend/src/features/board-beats/transferBeat.module.css`:
+
+```css
+/* The miss note. It sits over the table centre, above the flyer layer, and it
+   is the only thing on screen that says a request came back empty — the rules
+   make that public, so it must be legible to the whole table and not only to
+   whoever asked. */
+.note {
+  position: fixed;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  transform: translate(-50%, 140px);
+  z-index: 260;
+  padding-block: 8px;
+  padding-inline: 18px;
+  border-radius: 8px;
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+```
+
+Before writing it, confirm both token names exist in `apps/ui/src/design/tokens.css`. If either does not, pick the nearest existing token for a raised surface and for muted text — **do not invent a colour**, and do not hardcode one.
+
+- [ ] **Step 5: Add the leg**
+
+In `transferBeat.tsx`, add the imports:
+
+```ts
+import { useTranslation } from '@release/translation'
+import { nextFrames } from '@release/ui/animations'
+import { useState } from 'react'
+import styles from './transferBeat.module.css'
+```
+
+Add the constants beside the others:
+
+```ts
+const REQUEST_HOLD = 820 // the named card stands at the centre before the outcome
+const MISS_HOLD = 1620 // the flinch and the note, before the scene clears
+// A whole seat (or a whole fan) flinching, not the 7px `settle` sized for an
+// input field — the story's own values.
+const SHAKE = { amp: 9, dur: 460, shape: 'spring' } as const
+```
+
+Inside the hook, above `runTransfer`:
+
+```ts
+  const { t } = useTranslation()
+  // The miss note. State rather than a ref: it is rendered, and the overlay has
+  // to re-render when it appears and again when it goes.
+  const [missed, setMissed] = useState(false)
+
+  const runRequested = useCallback(
+    async (plan: Extract<BeatPlan, { kind: 'requested' }>, beat: BeatRun) => {
+      ctx.current = beat
+      try {
+        const a = latest.current.anchors
+        const centre = rectOf(a.centre.current)
+        const card = cardById(plan.card)
+        if (!centre || !card) return
+        // The named card, face-up, at the centre — for EVERY peer. `requested`
+        // carries no `visibleTo`: the rules make the request public on a hit
+        // and a miss alike (docs/rules/cards.md:125).
+        const [el] = await raise([{ key: KEY, card, at: centre, faceDown: false }])
+        if (el) {
+          // It ARRIVES rather than travels: only the asker has an origin for it
+          // (the catalog cell they named it in, which their own band is holding
+          // enlarged), and inventing one for everybody else — flying it out of
+          // the attacker's seat — would say the card left their hand. It did not.
+          const anim = play('landInPose', el, { from: centre, box: centre })
+          if (anim) await anim.finished
+        }
+
+        if (plan.hit) {
+          // Hand it to the projection. `giveCard` is public (fake/attacks.ts:444
+          // projects it with no `mine` gate), so the board's own centre render
+          // takes this exact spot — and it has to, because the transfer arrives
+          // in a LATER batch and no overlay of this beat's can span the gap.
+          //
+          // Publish first, drop second: the board renders this beat's shadow
+          // while it runs, so the static render is up before the carrier lets
+          // go and the slot is never blank for a frame. Same ordering, and the
+          // same reason, as the standing trigger in `drawBeat`.
+          const c = ctx.current
+          if (c) {
+            const next: BoardState = {
+              ...c.base,
+              pending: {
+                kind: 'giveCard' as const,
+                player: plan.target,
+                requested: plan.card,
+              },
+            }
+            c.base = next
+            c.publish(next)
+          }
+          await nextFrames() // the publish above has committed (I2)
+          drop(KEY)
+          return
+        }
+
+        // A MISS. The pending clears outright, so nothing in the projection
+        // survives this — the beat carries the whole scene or the table never
+        // learns the outcome, which is the rule this exists to keep.
+        await wait(REQUEST_HOLD)
+        // Rendered as the target actually appears: a Seat to everyone watching,
+        // and to the target themselves no seat at all — they are `you`, and
+        // what they own is the fan. One gesture, two renderings.
+        const mine = plan.target === beat.base.selfId
+        const flinch = mine ? a.hand.current : a.seatOf(plan.target)
+        play('shake', flinch, SHAKE)
+        setMissed(true)
+        await wait(MISS_HOLD)
+        setMissed(false)
+        drop(KEY)
+      } finally {
+        ctx.current = null
+      }
+    },
+    [raise, drop],
+  )
+```
+
+And render the note in the overlay:
+
+```ts
+  return {
+    overlay: [
+      ...flyerOverlay,
+      ...handOverlay,
+      ...(missed
+        ? [
+            <div key="transfer-miss" className={styles.note}>
+              {t('table.requestMiss')}
+            </div>,
+          ]
+        : []),
+    ],
+    gapAt,
+    gapSize,
+    runRequested,
+    runTransfer,
+    reset,
+  }
+```
+
+Add `setMissed(false)` to `reset`, so a match boundary cannot leave a dead match's note on the new board:
+
+```ts
+  const reset = useCallback(() => {
+    drop()
+    resetArrival()
+    setMissed(false)
+  }, [drop, resetArrival])
+```
+
+- [ ] **Step 6: Run to verify they pass**
+
+Run: `pnpm -C apps/frontend test -- transferBeat`
+Expected: PASS, all nine tests.
+
+- [ ] **Step 7: Wire `requested` into the queue**
+
+In `useBeats.ts`, beside the `handTransfer` case added in Task 3:
+
+```ts
+      if (plan.kind === 'requested') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => transfers.runRequested(plan, ctx),
+        }
+      }
+```
+
+Add `transfers.runRequested` to `beatOf`'s dependency array.
+
+- [ ] **Step 8: Full suite, typecheck, lint, commit**
+
+Run: `pnpm -C apps/frontend test`
+Expected: PASS (see Task 3 Step 7 on the load-sensitive `boardIntro` case).
+
+Run: `pnpm typecheck`
+Expected: all seven packages Done.
+
+Run: `npx release-lint check --error-on-warnings apps/frontend/src/features/board-beats/`
+Expected: no fixes applied.
+
+```bash
+git add apps/frontend/src/features/board-beats/ packages/translation/src/locales/
+git commit -m "transferBeat: the named card at the centre, and the miss the table must see (#105)"
+```
+
+---
+
+### Task 7: The offer — a random steal fans the donor's hand out of their seat
+
+`stealRandom` picks with the seeded RNG and raises no pending, so there is nothing to choose. What the scene is *for* is the suspense of which card it turns out to be, and that is worth keeping: without it a random steal and a named one are the same flight, and the table cannot tell a Bug from a Security Bug by looking.
+
+The story fans the donor's backs down from the top because a playground stage has no seats. The board has them, so the fan comes out of the donor's seat instead — the gesture translated, not the geometry transcribed. Runs only for the **taker**, and only when `named` is false: a victim already knows what left their hand, and a watcher was told nothing at all.
+
+**Files:**
+- Modify: `apps/frontend/src/features/board-beats/transferBeat.tsx`
+- Test: `apps/frontend/src/features/board-beats/transferBeat.test.tsx`
+
+**Interfaces:**
+- Consumes: everything Tasks 3–6 produced. No new exports.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `transferBeat.test.tsx`:
+
+```tsx
+it('fans the donor hand out of their seat before a random steal lands', async () => {
+  const r = runTransfer(transferPlan({ named: false, donorHand: 4 }))
+  await r.go()
+  // one `takeFromSeat` per offered back, plus the taken card's own flight
+  const offers = played.names.filter((n) => n === 'takeFromSeat').length
+  expect(offers).toBe(5)
+  expect(arrivals.calls).toBe(1)
+})
+
+it('offers nothing when the card was named', async () => {
+  // A named transfer has no suspense in it — the asker chose the card and the
+  // whole table watched them choose. Fanning a hand here would invent a
+  // question that was already answered.
+  const r = runTransfer(transferPlan({ named: true, donorHand: 4 }))
+  await r.go()
+  expect(played.names.filter((n) => n === 'takeFromSeat').length).toBe(1)
+})
+
+it('offers nothing to a watcher', async () => {
+  const r = runTransfer(
+    transferPlan({ from: 'p2', to: 'p3', role: 'watcher', card: undefined, named: false }),
+  )
+  await r.go()
+  expect(played.names.filter((n) => n === 'takeFromSeat').length).toBe(1)
+})
+```
+
+- [ ] **Step 2: Run to verify they fail**
+
+Run: `pnpm -C apps/frontend test -- transferBeat`
+Expected: FAIL on the first — one `takeFromSeat`, not five. The other two pass already and are here to stay passing.
+
+- [ ] **Step 3: Add the constants and the offer**
+
+In `transferBeat.tsx`, beside the other constants:
+
+```ts
+const OFFER_STEP = 45 // between neighbouring backs, as they fan out
+const OFFER_HOLD = 620 // the hand stands offered before the card turns over
+const OFFER_SPREAD = 0.62 // how far across the centre the fan opens, as a share of its width
+const OFFER_MAX = 9 // backs actually rendered; a bigger hand is not a bigger question
+```
+
+Add a private helper above the hook — the fan's geometry, kept here because it is this scene's and nothing else's:
+
+```ts
+// Where the offered backs sit: a shallow arc across the centre, evenly spaced,
+// each the size a card is at the table. Not a grid — a hand held out. The
+// count is capped because past a point more backs stop reading as "a hand" and
+// start reading as "a deck", and the suspense is the same either way.
+function offerPoses(count: number, centre: Rect): Rect[] {
+  const n = Math.max(1, Math.min(OFFER_MAX, count))
+  const span = centre.width * OFFER_SPREAD
+  const step = n === 1 ? 0 : span / (n - 1)
+  const first = centre.left + centre.width / 2 - span / 2 - centre.width / 2
+  return Array.from({ length: n }, (_, i) => ({
+    left: first + step * i,
+    top: centre.top,
+    width: centre.width,
+    height: centre.height,
+  }))
+}
+```
+
+Inside `runTransfer`'s `taker` branch, immediately after the `if (!seat || !centre || !card) return` guard and **before** the single `raise` that already exists:
+
+```ts
+          // A random steal offers the donor's hand first: the suspense is real,
+          // because the card genuinely is random. A named one has no question
+          // left in it — the table watched the asker choose.
+          if (!plan.named && plan.donorHand > 0) {
+            const poses = offerPoses(plan.donorHand, centre)
+            const backs = poses.map((_, i) => ({
+              key: `offer${i}`,
+              card: COVER,
+              at: from,
+              faceDown: true,
+            }))
+            const els = await raise(backs)
+            await Promise.all(
+              els.map(async (b, i) => {
+                if (!b) return
+                await wait(i * OFFER_STEP)
+                const anim = play('takeFromSeat', b, { from, to: poses[i] })
+                if (anim) await anim.finished
+              }),
+            )
+            await wait(OFFER_HOLD)
+            // …and back they go. The one that was taken is not among them: it
+            // flies on its own below, out of the same seat, so the offer is
+            // cleared whole rather than one card short.
+            await Promise.all(
+              els.map(async (b, i) => {
+                if (!b) return
+                const anim = play('dealToSeat', b, { from: poses[i], to: from })
+                if (anim) await anim.finished
+              }),
+            )
+            for (let i = 0; i < backs.length; i++) drop(`offer${i}`)
+          }
+```
+
+- [ ] **Step 4: Run to verify they pass**
+
+Run: `pnpm -C apps/frontend test -- transferBeat`
+Expected: PASS, all twelve tests.
+
+- [ ] **Step 5: Typecheck and commit**
+
+Run: `pnpm typecheck`
+Expected: all seven packages Done.
+
+```bash
+git add apps/frontend/src/features/board-beats/transferBeat.tsx apps/frontend/src/features/board-beats/transferBeat.test.tsx
+git commit -m "transferBeat: a random steal offers the donor's hand first (#105)"
+```
+
+---
+
+### Task 8: `_useRequestStaging` — the band, and the silent hand-over
+
+The ask surface, and the last piece that makes any of the above reachable in a real game. Two things, and no animation of its own.
+
+**The band.** `CardCatalog` across the middle, replacing `PendingPrompt` for `requestCard` exactly as `defend`, `discardForRelease` and `neutralize503` were replaced before it. The reason is the same one that carved out those three: `.prompt` is `inset: 0` at z-index 92 with a fully opaque `.panel` centred inside it, so the panel covers the very table the scene plays on. And the `chosen` hold — the named card standing enlarged while the rest of the catalog slides away — is the first beat of the transfer, which a panel that unmounts when the pending clears cannot hold.
+
+**The hand-over.** `giveCard` asks the victim which copy of one card id to surrender. The copies differ only by uid, so the choice carries no information; the victim watches the scene instead. It fires **immediately** rather than on a timer, because the beat queue already serialises — the transfer beat cannot start before the entrance beat has drained — so the readable pause belongs to `runTransfer`'s own hold. One place owns pacing, and no timer can drift out of step with it.
+
+It also has to live here rather than in a beat: `prefers-reduced-motion` collapses every beat, and this is a game action, not choreography. A victim with reduced motion on must still hand the card over.
+
+**Files:**
+- Create: `apps/frontend/src/pages/board/[gameId]/_useRequestStaging.tsx`
+- Modify: `apps/frontend/src/pages/board/[gameId]/_Board.tsx`
+- Create: `apps/frontend/src/pages/board/[gameId]/_useRequestStaging.module.css`
+- Test: `apps/frontend/src/pages/board/[gameId]/__tests__/boardTransfer.test.tsx` (create)
+
+**Interfaces:**
+- Consumes: `BoardState`, `BoardAnchors` (`~/entities/game/board`); `TableActions`, `TablePending`, `CardCatalog`, `ConfirmAction`, `CARDS` (`@release/ui`).
+- Produces:
+
+```ts
+export function useRequestStaging(args: {
+  state: BoardState
+  actions?: TableActions
+  copy: { prompt: string; action: string; confirm: string }
+  enabled: boolean
+  matchKey: string | null
+}): { band: ReactNode | null }
+```
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `apps/frontend/src/pages/board/[gameId]/__tests__/boardTransfer.test.tsx`. `makeBoardProps` is the existing fixture in this folder.
+
+```tsx
+import { render } from '@testing-library/react'
+import { expect, it, vi } from 'vitest'
+import Board from '../_Board'
+import { makeBoardProps } from './fixture'
+
+const withPending = (pending: unknown, over: Record<string, unknown> = {}) => {
+  const base = makeBoardProps()
+  return {
+    ...base,
+    state: { ...base.state, selfId: 'you', pending, ...over },
+  }
+}
+
+it('answers a requestCard on the table, not through the panel', () => {
+  // Same reason `defend` and `neutralize503` left the panel: `.prompt` is
+  // inset:0 at z 92 over an opaque panel, so the question covers the table it
+  // is about — and the `chosen` hold is the first beat of the transfer, which
+  // a panel that unmounts with the pending cannot hold.
+  const props = withPending({ kind: 'requestCard', player: 'you', target: 'p2' })
+  const { queryByTestId } = render(<Board {...props} />)
+  expect(queryByTestId('pending-prompt')).toBeNull()
+  expect(queryByTestId('board-request-band')).not.toBeNull()
+})
+
+it('hands the card over without asking, once, per pending', () => {
+  // The copies differ only by uid — the engine itself matches on `card.id`
+  // (fake/handAttacks.ts `onGiveCard`) — so there is nothing to choose. The
+  // guard is per-pending and NOT per-mount: a latch that outlives what it
+  // latches is the failure `useBeats` has been bitten by twice in its own
+  // comments, and a second Security Bug in one match is an ordinary thing.
+  const onResolve = vi.fn()
+  const held = makeBoardProps().state.you.hand[0]
+  const props = withPending({ kind: 'giveCard', player: 'you', requested: held.card.id })
+  const { rerender } = render(<Board {...props} actions={{ onResolve }} />)
+  expect(onResolve).toHaveBeenCalledTimes(1)
+  expect(onResolve.mock.calls[0][0]).toMatchObject({ kind: 'giveCard', card: held.uid })
+
+  rerender(<Board {...props} actions={{ onResolve }} />)
+  expect(onResolve).toHaveBeenCalledTimes(1)
+
+  const second = withPending({ kind: 'giveCard', player: 'you', requested: held.card.id })
+  rerender(<Board {...{ ...second, actions: { onResolve } }} />)
+  expect(onResolve).toHaveBeenCalledTimes(2)
+})
+
+it('stands the named card at the centre for a peer who is not a party', () => {
+  // `giveCard` is projected unredacted (fake/attacks.ts:444), and the rules
+  // make the request public (cards.md:125). A spectator answers nothing and
+  // still has to see what was asked for.
+  const onResolve = vi.fn()
+  const props = withPending({ kind: 'giveCard', player: 'p2', requested: 'attack-bug' })
+  const { queryByTestId } = render(<Board {...props} actions={{ onResolve }} />)
+  expect(onResolve).not.toHaveBeenCalled()
+  expect(queryByTestId('board-requested-card')).not.toBeNull()
+})
+
+it('still hands the card over under reduced motion', () => {
+  // Every beat collapses here. The hand-over is a game action, not
+  // choreography — a victim who prefers reduced motion must not stall the
+  // engine waiting for an animation that will never play.
+  window.matchMedia = ((q: string) => ({
+    matches: q.includes('reduce'),
+    media: q,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  })) as unknown as typeof window.matchMedia
+  const onResolve = vi.fn()
+  const held = makeBoardProps().state.you.hand[0]
+  const props = withPending({ kind: 'giveCard', player: 'you', requested: held.card.id })
+  render(<Board {...props} actions={{ onResolve }} />)
+  expect(onResolve).toHaveBeenCalledTimes(1)
+})
+```
+
+- [ ] **Step 2: Run to verify they fail**
+
+Run: `pnpm -C apps/frontend test -- boardTransfer`
+Expected: FAIL — `pending-prompt` is present (the panel still answers `requestCard`), `board-request-band` is null, and `onResolve` was never called.
+
+- [ ] **Step 3: Write the staging hook**
+
+Create `apps/frontend/src/pages/board/[gameId]/_useRequestStaging.tsx`:
+
+```tsx
+import type { TableActions } from '@release/ui'
+import { CARDS, CardCatalog, ConfirmAction } from '@release/ui'
+import type { ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { BoardState } from '~/entities/game/board'
+import styles from './_useRequestStaging.module.css'
+
+// Naming a card, and losing one. Active only while a `requestCard` or a
+// `giveCard` pending is ours — its siblings `_useBoardStaging.ts`,
+// `_useDefenseStaging.tsx` and `_useNeutralizeStaging.tsx` never run at the
+// same time, because a pending suspends normal play and a pending has one kind.
+//
+// It owns no animation. What flies belongs to `transferBeat`; what is decided
+// belongs here, and the two meet through the projection.
+
+// The guess space: every card that can actually BE in a hand. Triggers cannot
+// (`docs/rules/cards.md:320`, `:339` — they resolve as they are drawn), and no
+// event-deck card can either (`docs/rules/general.md:189` — each of them is at
+// any time «либо в колоде, либо на столе»). Same filter the kit's own panel now
+// uses; declared again here rather than imported, because the kit does not put
+// it on its barrel and a cross-package reach for one array is not worth a new
+// export.
+const HOLDABLE = CARDS.filter((c) => c.deck === 'base' && c.category !== 'trigger')
+
+export function useRequestStaging(args: {
+  state: BoardState
+  actions?: TableActions
+  copy: { prompt: string; action: string; confirm: string }
+  enabled: boolean
+  matchKey: string | null
+}): { band: ReactNode | null } {
+  const { state, actions, copy, enabled, matchKey } = args
+  const pending = state.pending
+  const asking = enabled && pending?.kind === 'requestCard' && pending.player === state.selfId
+  const giving = enabled && pending?.kind === 'giveCard' && pending.player === state.selfId
+
+  const [named, setNamed] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState(false)
+
+  // The hand-over answers itself. The engine asks which COPY to surrender and
+  // the copies differ only by uid — `onGiveCard` matches on `card.id`, so any
+  // of them is the right one — which makes this a decision with no content.
+  // The victim watches the scene instead of a panel.
+  //
+  // Fired at once rather than after a pause: the beat queue serialises, so the
+  // transfer cannot start before the entrance beat has drained, and the pause
+  // that makes the scene readable belongs to the beat's own hold. A timer here
+  // would be a second opinion about pacing, free to drift from the first.
+  //
+  // It lives in the staging hook and NOT in a beat because
+  // `prefers-reduced-motion` collapses every beat: this is a game action, and
+  // an engine left waiting on an animation nobody plays is a stalled match.
+  const handed = useRef<string | null>(null)
+  useEffect(() => {
+    if (!giving || pending?.kind !== 'giveCard') return
+    // Keyed on the pending itself, not on the mount: a second Security Bug in
+    // one match raises a second `giveCard`, and a once-per-mount latch would
+    // swallow it. Player and card alone do not separate two identical requests,
+    // so the fingerprint carries the hand's own identity for the copy going.
+    const copyUid = state.you.hand.find((h) => h.card.id === pending.requested)?.uid
+    if (!copyUid) return
+    const key = `${pending.player}:${pending.requested}:${copyUid}`
+    if (handed.current === key) return
+    handed.current = key
+    actions?.onResolve?.({ kind: 'giveCard', card: copyUid })
+  }, [giving, pending, state.you.hand, actions])
+
+  // A new match starts the surface over: a name armed in a dead match must not
+  // confirm into the new one. The same boundary `useBeats` and both sibling
+  // staging hooks already take.
+  const playing = useRef<string | null>(null)
+  useEffect(() => {
+    if (matchKey == null || playing.current === matchKey) return
+    playing.current = matchKey
+    setNamed(null)
+    setConfirmed(false)
+    handed.current = null
+  }, [matchKey])
+
+  // Nothing armed survives the pending it was armed for.
+  useEffect(() => {
+    if (!asking) {
+      setNamed(null)
+      setConfirmed(false)
+    }
+  }, [asking])
+
+  if (!asking) return { band: null }
+
+  return {
+    band: (
+      <div className={styles.requestBand} data-testid="board-request-band">
+        <CardCatalog
+          cards={HOLDABLE}
+          open={!confirmed}
+          selected={named}
+          chosen={confirmed ? named : null}
+          onPick={(c) => setNamed(c.id)}
+        />
+        <ConfirmAction
+          open={!confirmed}
+          label={copy.confirm}
+          caption={copy.prompt}
+          disabled={named == null}
+          onConfirm={() => {
+            // Membership is re-checked against THIS render's offer, not merely
+            // against "something is selected" — the discipline every branch of
+            // the kit's own panel keeps, for the same reason.
+            if (!named || !HOLDABLE.some((c) => c.id === named)) return
+            setConfirmed(true)
+            actions?.onResolve?.({ kind: 'requestCard', card: named })
+          }}
+        />
+      </div>
+    ),
+  }
+}
+```
+
+- [ ] **Step 4: Add the band's stylesheet**
+
+Create `apps/frontend/src/pages/board/[gameId]/_useRequestStaging.module.css` — the hook owns its own, the way `_useZonePull.module.css` does, rather than reaching into the page's:
+
+```css
+/* The catalog band — the middle of the table, between the seats and the fan.
+   Below the flyer layer on purpose: a card taken from an opponent flies over
+   the catalog it was named in, not under it. */
+.requestBand {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+}
+```
+
+- [ ] **Step 5: Wire `_Board.tsx`**
+
+Add the import:
+
+```ts
+import { useRequestStaging } from './_useRequestStaging'
+```
+
+Instantiate it beside `neutralizing` (around line 368):
+
+```ts
+  // naming a card, and losing one (#105). The band replaces the panel for
+  // `requestCard`; the `giveCard` half answers itself and renders nothing.
+  const requesting = useRequestStaging({
+    state,
+    actions,
+    copy: {
+      prompt: copy.pending.requestCard.prompt,
+      action: copy.pending.requestCard.action,
+      confirm: copy.pending.confirm,
+    },
+    enabled: !(deal.active || beats.exclusive),
+    matchKey: intro?.gameId ?? null,
+  })
+```
+
+Extend the `PendingPrompt` suppression list (around line 1462) with the two new kinds, and add them to the comment above it — the band is the asker for one, and the other has no question in it:
+
+```ts
+      {state.pending?.player === state.selfId &&
+        state.pending.kind !== 'discardForRelease' &&
+        state.pending.kind !== 'defend' &&
+        state.pending.kind !== 'neutralize503' &&
+        // the band on the table asks this one, for the same reason the three
+        // above are asked by the cards themselves (#105)
+        state.pending.kind !== 'requestCard' &&
+        // …and this one is not a question: the copies differ only by uid, so
+        // `_useRequestStaging` answers it and the victim watches the scene
+        state.pending.kind !== 'giveCard' && (
+          <PendingPrompt
+```
+
+Render the band beside the other staging overlays:
+
+```ts
+      {requesting.band}
+```
+
+And stand the named card at the centre for **every** peer while a `giveCard` is open. Put it inside the existing `.centre` slot, beside the `pendingDefend` and `pendingAlarm` renders:
+
+```ts
+        {/* the card that was named, held publicly while the engine waits for it
+            to be handed over. This is what carries it across the gap between
+            `requested` and `handTransfer` — they arrive in different batches,
+            so no beat overlay can span it — and `giveCard` is projected to
+            everyone (fake/attacks.ts:444), so every peer stands the same card. */}
+        {state.pending?.kind === 'giveCard' &&
+          (() => {
+            const data = cardById(state.pending.requested)
+            if (!data) return null
+            return (
+              <div className={opening.centreCard} data-testid="board-requested-card">
+                <Card card={data} interactive={false} width="100%" />
+              </div>
+            )
+          })()}
+```
+
+- [ ] **Step 6: Run to verify they pass**
+
+Run: `pnpm -C apps/frontend test -- boardTransfer`
+Expected: PASS, all four tests.
+
+- [ ] **Step 7: Full suite, typecheck, lint, commit**
+
+Run: `pnpm -C apps/frontend test`
+Expected: PASS (see Task 3 Step 7 on `boardIntro`).
+
+Run: `pnpm typecheck`
+Expected: all seven packages Done.
+
+Run: `npx release-lint check --error-on-warnings "apps/frontend/src/pages/board/[gameId]/"`
+Expected: no fixes applied.
+
+```bash
+git add "apps/frontend/src/pages/board/[gameId]/"
+git commit -m "The ask: a catalog band on the table, and a hand-over with no question in it (#105)"
+```
+
+---
+
+### Task 9: The written spec, the audit page, and the findings
+
+CLAUDE.md makes the audit page and `docs/animations/` a matched pair with the code, and two of the three recipes here are describing implementations that do not exist. Fixing them is the deliverable, not a tidy-up.
+
+**Files:**
+- Modify: `docs/animations/recipes.md`
+- Modify: `docs/animations/reference.md`
+- Modify: `docs/animations/backlog.md`
+- Modify: `apps/playground/stories/AnimationAuditStory/AnimationAuditStory.tsx`
+
+- [ ] **Step 1: Correct the two stale recipes**
+
+In `docs/animations/recipes.md`:
+
+- **"Opponent takes your card"** (~line 1699) describes a two-hop flight ending at an opponent **fan** centre with `rotate(180)` and `zIndex` dropping to 30. The story has used **Seats** since `440bc56`: it aims at `cardBoxIn(seat, r.width * SEAT_SHRINK)` and the card shrinks in and fades — the `dealToSeat` movement. Rewrite the Visual result, Elements/refs (`seatRefs`, not `fanRef`), Sequence step 3, and the Invariants block to match the story as it stands.
+- **"Taking an opponent's card — deal grid, flip the pick, settle into the hand"** (~line 1119) describes a centred grid built from `gridPositions`, `ORIGIN`, `COLS_MAX`, `DEAL_CARD_W` and `slotRefs`. `PickOpponentCardStory` renders `<Hand faceDown>` sliding down from the top and has none of those names; repo-wide they belong to `GameEndStory` and `ComboStory`. Rewrite it against the fan the story actually has.
+
+- [ ] **Step 2: Add the board recipe**
+
+A new section after the two above, covering what this task shipped: the three audiences (taker / victim / watcher), the `requested` entrance and its miss, the offer before a random steal, and the fact that the named card is held by the projection rather than by a beat. Follow the house shape the other recipes use — **When to call · Visual result · Elements / refs · Sequence · Params & timings · Invariants · End state & cleanup · Building blocks · Live reference**.
+
+- [ ] **Step 3: Add the beat registry row**
+
+In `docs/animations/reference.md`, in the beat registry table beside `draw` and `reshuffle`:
+
+```markdown
+| `transfer` | `features/board-beats/transferBeat.tsx` | `requested`, `handTransfer` | `takeFromSeat`, `dealToSeat`, `playToCenter`, `landInPose`, `flipCard` (via `Card`), `shake`, the hand-arrival step |
+```
+
+- [ ] **Step 4: Update the audit page**
+
+In `apps/playground/stories/AnimationAuditStory/AnimationAuditStory.tsx`:
+
+- Correct the `OpponentTakesCardStory` entry (`where: 'OpponentTakesCardStory'`), which repeats the abandoned fan flight — `rotate(180)`, `zIndex` 30, "tuck behind the fan".
+- Correct the `PickOpponentCard` entry, which says "раздача-грид карт рубашкой / a deal-grid of face-down cards".
+- Add `board:` pointers to all three scene entries, in the shape the Error 503 and canonical-hand entries already use: `features/board-beats/transferBeat.tsx, pages/board/[gameId]/_useRequestStaging.tsx, pages/board/[gameId]/_Board.tsx`.
+- Update the open finding "A missed Security Bug has nothing to show it" — the board now carries it publicly, so record what shipped and close it.
+
+Both languages. Every entry on that page is `{ ru, en }`.
+
+- [ ] **Step 5: Record the two findings that stay open**
+
+In `docs/animations/backlog.md` and in the audit page's `ISSUES` register (status `open`, both languages):
+
+1. **The rules stand the Security Bug at the centre while the asker chooses; the engine has already banked it.** `docs/rules/cards.md:126` says the attack card lies at the centre for the whole table for the duration of the choice — that is the table's evidence it was played. `onHandDefend` banks it with `bankSpent(..., 'attackSpent')` in the same reduction that raises `pending: requestCard` (`fake/attacks.ts:191-208`), so the projection has it in the discard before anybody chooses. The board cannot stand a card the projection says is in the heap. What closes it: the engine parking the attack card on the `requestCard` pending, the way `defend` already parks a thrown attack — an engine change with its own conformance surface, which is why it is recorded and not done here.
+2. **The written spec drifted from two scenes and nothing caught it.** `recipes.md` and the audit page described an opponent fan for `OpponentTakesCardStory` and a deal grid for `PickOpponentCardStory`; neither exists, and one of them never did. `docs.test.ts` catches an undocumented **preset**, but nothing checks that a recipe still describes the scene it names. Both are corrected by this task; the gap that let them rot is not. What would close it: a test that reads each recipe's "Live reference" story and asserts the identifiers the recipe names actually appear in it.
+
+- [ ] **Step 6: Verify and commit**
+
+Run: `pnpm -C apps/ui test -- docs`
+Expected: PASS — every preset, including `takeFromSeat`, has its row.
+
+Run: `pnpm -C apps/playground test`
+Expected: PASS.
+
+Run: `pnpm typecheck`
+Expected: all seven packages Done.
+
+```bash
+git add docs/animations/ apps/playground/stories/AnimationAuditStory/
+git commit -m "The animation spec catches up with two scenes it never described (#105)"
+```
+
+---
+
+## Self-Review
+
+**Spec coverage.** Every section of the design has a task: the `takeFromSeat` preset (Decision 6) → Task 1; the two plan kinds and all three derivations → Task 2; `runTransfer`'s three legs → Tasks 3–5; `runRequested`'s entrance and miss, both refusal renderings (Decision 3) → Task 6; the offer before a random steal (Decision 4, as corrected) → Task 7; the band and the auto-resolve (Decisions 1, 2) and the public centre card (Decision 7) → Task 8; the documentation and both open findings → Task 9. Decision 5 (one hook, one runner) is the file structure itself. Decision 8 (the kit's guess space) landed before this plan, in `25381ca`, and Task 8 reuses its filter.
+
+**Placeholders.** None. Every code step carries the actual code. Two steps carry a judgement rather than a literal — Task 6 Step 4 asks the implementer to confirm two token names exist before using them (and forbids inventing a colour), and Task 9 Steps 1–2 describe prose to rewrite rather than dictating the paragraphs. Both are deliberate: the first is a check that must happen against the real token file, and the second is documentation whose wording is not mechanically derivable.
+
+**Type consistency.** `TransferRole` is defined in Task 2 and used by name in Tasks 3–7. `useTransferBeat` returns `{ overlay, gapAt, gapSize, runTransfer, reset }` from Task 3 and gains `runRequested` in Task 6 — `useBeats` is wired for `handTransfer` in Task 3 and for `requested` in Task 6, matching. `KEY`, `COVER`, `SEAT_SHRINK`, `rectOf`, `dropFromDonor` and `ctx` are declared in Task 3 and reused unchanged afterwards; `COVER` is introduced in Task 5 and then also used by Task 7's offer, which is why Task 7 comes after it. `offerPoses` is Task 7's alone. The test helpers `transferPlan` and `runTransfer` are exported from the test file in Task 3 and reused in Tasks 4, 5 and 7; `requestPlan` and the second probe arrive in Task 6.
+
+**One ordering constraint worth stating.** Task 7 depends on `COVER` from Task 5, not merely on Task 3. Running the tasks out of order would leave the offer with no card to fan.
