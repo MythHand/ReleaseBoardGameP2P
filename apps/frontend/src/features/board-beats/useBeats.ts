@@ -5,6 +5,7 @@ import type {
   BeatRun,
   BoardAnchors,
   BoardState,
+  HandLimitHandoff,
   IntroBeat,
   StagedHandoff,
 } from '~/entities/game/board'
@@ -15,6 +16,7 @@ import { useDefenseBeat } from './defenseBeat'
 import { useDiscardBeat } from './discardBeat'
 import { useDrawBeat } from './drawBeat'
 import { useEliminateBeat } from './eliminateBeat'
+import { useHandLimitBeat } from './handLimitBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
 
@@ -131,8 +133,22 @@ export function useBeats(args: {
   // `_useBoardStaging.ts`'s own `takeStagedRelease`, called once
   // `releasePlaced` picks the standing release up out of the stage slot.
   takeStagedRelease?: RefObject<(() => void) | null>
+  // The hand limit's own handoff (#104): the grid the local player filled by
+  // hand, read once at the start of a `handLimit` beat so the runner flies the
+  // cells that are standing instead of a fan the cards left long ago.
+  handLimit?: RefObject<HandLimitHandoff | null>
 }): Beats {
-  const { live, events, anchors, enabled, intro, staging, clearPaidCost, takeStagedRelease } = args
+  const {
+    live,
+    events,
+    anchors,
+    enabled,
+    intro,
+    staging,
+    clearPaidCost,
+    takeStagedRelease,
+    handLimit,
+  } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
   // The same answer as `running`, but ahead of it: `drain()` sets this
@@ -157,6 +173,7 @@ export function useBeats(args: {
   const combo = useComboBeat(anchors, staging, clearPaidCost, takeStagedRelease)
   const defense = useDefenseBeat(anchors, staging)
   const elimination = useEliminateBeat()
+  const handLimits = useHandLimitBeat(anchors, handLimit)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -189,6 +206,15 @@ export function useBeats(args: {
           exclusive: false,
           alarm: plan.gather === true,
           run: (ctx) => discards.run(plan, ctx),
+        }
+      }
+      if (plan.kind === 'handLimit') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => handLimits.run(plan, ctx),
         }
       }
       if (plan.kind === 'draw') {
@@ -306,6 +332,7 @@ export function useBeats(args: {
       defense.runStolen,
       defense.runNeutralized,
       elimination.run,
+      handLimits.run,
     ],
   )
 
@@ -418,6 +445,7 @@ export function useBeats(args: {
     combo.reset()
     defense.reset()
     elimination.reset()
+    handLimits.reset()
   }, [intro?.key, live])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
@@ -531,6 +559,7 @@ export function useBeats(args: {
       ...combo.overlay,
       ...defense.overlay,
       ...elimination.overlay,
+      ...handLimits.overlay,
     ],
     exclusive: running?.exclusive ?? false,
     alarm: running?.alarm ?? false,
