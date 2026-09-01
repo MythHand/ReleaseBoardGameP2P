@@ -86,18 +86,70 @@ describe('planBeats', () => {
     ])
   })
 
-  // The step's own rule: cards leave one by one but ALL AT ONCE. A hand-limit
-  // discard of three is one gesture, not three.
+  // The step's own rule: cards leave one by one but ALL AT ONCE.
   it('puts every discard of one batch in a single beat', () => {
     const events = [
-      discarded(4, { reason: 'handLimit' }),
-      discarded(5, { card: 'protection-debugger', reason: 'handLimit' }),
+      discarded(4, { reason: 'effect' }),
+      discarded(5, { card: 'protection-debugger', reason: 'effect' }),
     ]
     const beats = planBeats(events, boardBefore())
     expect(beats).toHaveLength(1)
     const [beat] = beats
     expect(beat.kind === 'discard' && beat.cards.map((c) => c.key)).toEqual(['d4', 'd5'])
     expect(beat.key).toBe('discard:4')
+  })
+
+  // The excess leaves as one gesture, and NOT as an ordinary discard: on the
+  // actor's own board those cards are standing in the grid at the centre, and
+  // the grid is what the beat flies out (#104).
+  it('gives a hand-limit discard its own beat, keyed by its first card', () => {
+    const beats = planBeats(
+      [
+        discarded(4, { reason: 'handLimit' }),
+        discarded(5, { card: 'protection-debugger', reason: 'handLimit' }),
+      ],
+      boardBefore(),
+    )
+    expect(beats).toHaveLength(1)
+    const [beat] = beats
+    expect(beat.kind).toBe('handLimit')
+    expect(beat.key).toBe('handLimit:4')
+    expect(beat.kind === 'handLimit' && beat.player).toBe('p1')
+    expect(beat.kind === 'handLimit' && beat.cards.map((c) => c.key)).toEqual(['d4', 'd5'])
+  })
+
+  it('never folds a hand-limit discard together with an ordinary one', () => {
+    const beats = planBeats(
+      [
+        discarded(4, { reason: 'effect' }),
+        discarded(5, { card: 'protection-debugger', reason: 'handLimit' }),
+      ],
+      boardBefore(),
+    )
+    expect(beats.map((b) => b.kind)).toEqual(['discard', 'handLimit'])
+  })
+
+  // Two players over the limit in one relayed batch: one grid each, or the
+  // second player's cards would fly into the first player's grid.
+  it('closes the run when a second player pays the same price', () => {
+    const beats = planBeats(
+      [
+        discarded(4, { reason: 'handLimit' }),
+        discarded(5, { player: 'p2', card: 'attack-bug', reason: 'handLimit' }),
+      ],
+      boardBefore(),
+    )
+    expect(beats.map((b) => b.kind)).toEqual(['handLimit', 'handLimit'])
+    expect(beats[1].kind === 'handLimit' && beats[1].player).toBe('p2')
+  })
+
+  // Bad Vibe-Coding raises the same pending mid-turn with `endsTurn: false`
+  // (packages/engine/src/fake/triggers.ts) — one card, no turn boundary behind
+  // it, and the identical beat.
+  it('plans the mid-turn single-card case exactly the same way', () => {
+    const beats = planBeats([discarded(9, { reason: 'handLimit' })], boardBefore())
+    expect(beats.map((b) => b.kind)).toEqual(['handLimit'])
+    expect(beats[0].kind === 'handLimit' && beats[0].cards).toHaveLength(1)
   })
 
   it('claims each hand slot once when two copies of a card go out together', () => {
@@ -432,7 +484,7 @@ describe('planBeats — the combo pair (#100)', () => {
       ],
       boardBefore(),
     )
-    expect(plans.map((p) => p.kind)).toEqual(['discard', 'releasePlaced'])
+    expect(plans.map((p) => p.kind)).toEqual(['handLimit', 'releasePlaced'])
   })
 
   it('resolution discards of the pending pair take the pair exit, others keep the discard beat', () => {
@@ -945,7 +997,7 @@ describe('planBeats — the sweep (#102)', () => {
   })
 
   it('leaves an ordinary discard ungathered', () => {
-    const plans = planBeats([discarded(21, { reason: 'handLimit' })], boardBefore())
+    const plans = planBeats([discarded(21, { reason: 'effect' })], boardBefore())
     expect((plans[0] as { gather?: true }).gather).toBeUndefined()
   })
 
@@ -959,7 +1011,7 @@ describe('planBeats — the sweep (#102)', () => {
         eliminated({ id: 20 }),
         discarded(21, { card: 'attack-bug', reason: 'effect' }),
         tookHit({ id: 22 }), // closes the sweep's run — nothing to do with it
-        discarded(23, { card: 'protection-debugger', reason: 'handLimit' }),
+        discarded(23, { card: 'protection-debugger', reason: 'effect' }),
       ],
       boardBefore(),
     )
