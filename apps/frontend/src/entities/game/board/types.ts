@@ -241,6 +241,28 @@ export interface StagedHandoff {
 }
 
 /**
+ * The hand limit's own handoff (#104). The local player builds the grid at the
+ * centre themselves, card by card, long before the engine's `discarded` events
+ * come back — so the beat that takes those cards to the heap must fly the cells
+ * that are already standing rather than a hand the cards left minutes ago.
+ *
+ * A ref, read once at run start, for the same reason `StagedHandoff` is one. It
+ * lives here because the page produces it and a feature consumes it.
+ *
+ * `release()` does NOT end the gesture: it drops the grid's own render, in the
+ * same commit the exit's carriers go up. The picked cards stay hidden from the
+ * fan until the pending itself clears — the same split `_useNeutralizeStaging`
+ * keeps, and for the same reason (the board is still rendering the beat's
+ * shadow, whose hand still holds them).
+ */
+export interface HandLimitHandoff {
+  player: string
+  cards: { uid: string; card: CardData; slot: number }[]
+  cellAt: (slot: number) => HTMLElement | null
+  release: () => void
+}
+
+/**
  * The opening, handed to the beat queue as one beat. It is not planned from
  * events like the others — it is a whole shape rather than a fold of the
  * projection, so it publishes its own `shadow` and the queue renders that. But

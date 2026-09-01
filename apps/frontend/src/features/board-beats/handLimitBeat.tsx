@@ -1,0 +1,188 @@
+import { cardById, GRID_TOP, gridCells } from '@release/ui'
+import type { Leaving, Rect } from '@release/ui/animations'
+import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
+import { type RefObject, useCallback, useRef } from 'react'
+import type { BeatRun, BoardAnchors, HandLimitHandoff } from '~/entities/game/board'
+import { CLEAR_STEP, GATHER_HOLD } from '~/entities/game/board'
+import type { BeatPlan, DiscardCard } from './planBeats'
+import { withoutFlown } from './withoutFlown'
+
+// THE HAND LIMIT'S OWN EXIT (#104). The excess does not trickle into the heap
+// one card at a time: it stands in a grid at the centre — sized upfront from
+// the count, so every card goes straight to its own cell — the grid is held
+// open long enough for the table to read what the turn cost, and only then does
+// the whole of it leave, card by card but as one movement.
+//
+// Two ways in, one way out:
+//   • ADOPT — the actor is us. The grid is already standing: the page's own
+//     gesture (`_useHandLimit.tsx`) built it card by card while the player was
+//     deciding, long before these events came back off the wire. Nothing flies
+//     in, and a carrier here would put a second copy of every card on screen.
+//   • BUILD — every other peer, and ourselves with no handoff (a rejoin). The
+//     cells are computed rather than rendered: a gathered card needs no DOM cell
+//     of its own, it flies to a box and stands there as a carrier — the same
+//     thing #102's sweep does with its heap.
+//
+// The tail is shared, and so is `GATHER_HOLD` itself: the hold here IS the
+// no-defence sweep's hold, one value with two readers rather than two tunings.
+
+const rectOf = (el: Element | null): Rect | null => {
+  if (!el) return null
+  const r = el.getBoundingClientRect()
+  return { left: r.left, top: r.top, width: r.width, height: r.height }
+}
+
+// The grid's cells in viewport coordinates. `gridCells` gives offsets from the
+// grid's own point; the point itself is `GRID_TOP` of the table, measured off
+// the ambience layer, which is `inset: 0` of the table (I6 — these are card
+// boxes, never a tilted node's bounding rect).
+function cellBoxes(n: number, table: Rect): Rect[] {
+  const cx = table.left + table.width / 2
+  const cy = table.top + (table.height * GRID_TOP) / 100
+  return gridCells(n).map((c) => ({
+    left: cx + c.dx - c.w / 2,
+    top: cy + c.dy - c.h / 2,
+    width: c.w,
+    height: c.h,
+  }))
+}
+
+export function useHandLimitBeat(
+  anchors: BoardAnchors,
+  handoff?: RefObject<HandLimitHandoff | null>,
+) {
+  const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
+  const flyer = useFlyer()
+  const latest = useRef({ anchors, send, handoff })
+  latest.current = { anchors, send, handoff }
+
+  // where a card that has to be FLOWN in starts from — the same three sources
+  // `discardBeat` knows, for the same reason it knows them
+  const whereFrom = useCallback((c: DiscardCard): Rect | null => {
+    const a = latest.current.anchors
+    if (c.source.kind === 'hand') return rectOf(a.handSlotAt(c.source.index))
+    if (c.source.kind === 'release') return rectOf(a.releaseSlot(c.source.player, c.source.slot))
+    return a.seatBox(c.source.player)
+  }, [])
+
+  const run = useCallback(
+    async (plan: Extract<BeatPlan, { kind: 'handLimit' }>, ctx: BeatRun) => {
+      // WAIT FOR THE SHADOW, THEN MEASURE — the queue starts this from inside a
+      // layout effect, so at entry React has committed the projection that
+      // ARRIVED and the shadow that puts the cards back is a commit away. Two
+      // frames is how we get to the other side of it (I1, and the same reason
+      // `discardBeat` waits).
+      await nextFrames()
+      const a = latest.current.anchors
+      const held = latest.current.handoff?.current
+      // Adopt only a grid that is REALLY ours and really complete: the same
+      // player, and a cell for every card the engine banked. Anything else
+      // falls through to the honest path — a flight from where the board can
+      // actually see the card.
+      const mine = plan.player === ctx.base.selfId
+      const spare = held && mine && held.player === plan.player ? [...held.cards] : null
+
+      // TAKEOFF: the cards are gone from wherever they stood — publish before
+      // the movement, or the board shows each card twice for its whole flight.
+      // The discard end stays `ctx.base`'s own (see `withoutFlown`).
+      ctx.publish(withoutFlown(ctx.base, plan.cards))
+
+      let items: Leaving[] = []
+
+      if (spare) {
+        // ADOPT. The grid is standing; each card leaves from the cell it has
+        // been sitting in. Matched by card id with a claimed list, the same way
+        // `sourceOf` claims a hand slot: two copies of one card are
+        // interchangeable to look at, so the first unclaimed one is right.
+        for (const c of plan.cards) {
+          const at = spare.findIndex((p) => p.card.id === c.card)
+          if (at < 0) continue
+          const [placed] = spare.splice(at, 1)
+          const box = rectOf(held?.cellAt(placed.slot) ?? null)
+          if (!box) continue
+          items.push({
+            key: c.key,
+            card: placed.card,
+            from: box,
+            layer: placed.slot,
+            delay: placed.slot * CLEAR_STEP,
+            scatter: scatterAt(c.eventId),
+          })
+        }
+      } else {
+        // BUILD. Cells are computed, not rendered — a gathered card stands on
+        // its own carrier until the exit takes over.
+        const table = rectOf(a.bg.current)
+        const boxes = table ? cellBoxes(plan.cards.length, table) : []
+        const flying: { key: string; card: DiscardCard; from: Rect; box: Rect }[] = []
+        for (let i = 0; i < plan.cards.length; i++) {
+          const from = whereFrom(plan.cards[i])
+          const box = boxes[i]
+          if (!from || !box) continue
+          flying.push({ key: `hl${plan.cards[i].eventId}`, card: plan.cards[i], from, box })
+        }
+        if (flying.length > 0) {
+          // I10 — every carrier mounts on its OWN rect, and they travel at once:
+          // the grid fills as one gesture, not as a queue of arrivals.
+          await flyer.raise(
+            flying.map((f, i) => {
+              const card = cardById(f.card.card)
+              return { key: f.key, at: f.from, layer: i, ...(card ? { card } : {}) }
+            }),
+          )
+          await Promise.all(
+            flying.map(async (f) => {
+              const el = flyer.elOf(f.key)
+              if (el) await play('playToCenter', el, { from: f.from, to: f.box })?.finished
+              // I4 — it IS at the cell now; pin it, or the next render puts the
+              // carrier back where it was raised
+              flyer.pin(f.key, f.box)
+            }),
+          )
+        }
+        items = flying.map((f) => {
+          const card = cardById(f.card.card)
+          const slot = plan.cards.indexOf(f.card)
+          return {
+            key: f.card.key,
+            // a card the catalogue does not know cannot be flown at all, and
+            // `flying` only ever holds ones it does
+            card: card as NonNullable<ReturnType<typeof cardById>>,
+            from: f.box,
+            layer: slot,
+            delay: slot * CLEAR_STEP,
+            scatter: scatterAt(f.card.eventId),
+          }
+        })
+      }
+
+      if (items.length === 0) return
+
+      // HELD OPEN — the same beat the no-defence sweep holds for, and the same
+      // value: the table has to be able to read what the turn cost before any
+      // of it moves.
+      await wait(GATHER_HOLD)
+
+      // Hand the grid back immediately ahead of the exit, never before the hold
+      // (`defenseBeat`'s own ordering, and the bug it was written for): the
+      // exit mounts its own carriers at these very boxes, so the page's render
+      // and the flight swap inside one commit. `release()` drops the grid's
+      // render only — the picked cards stay out of the fan until the pending
+      // itself clears.
+      if (spare) held?.release()
+      flyer.drop()
+      await latest.current.send(items)
+    },
+    [whereFrom, flyer.raise, flyer.elOf, flyer.pin, flyer.drop],
+  )
+
+  // A new match cancels what is in the air: both the exit step's flights and
+  // this runner's own carriers belong here, not to the queue, and a card left
+  // mid-flight would keep crossing the board of a match that no longer exists.
+  const reset = useCallback(() => {
+    resetExit()
+    flyer.drop()
+  }, [resetExit, flyer.drop])
+
+  return { overlay: [...exitOverlay, ...flyer.overlay], run, reset }
+}

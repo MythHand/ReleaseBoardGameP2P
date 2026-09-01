@@ -28,3 +28,5 @@ export const MERGE_MS = 620
 /** the swept cards are held open at the centre before they scatter — the same
  *  beat the hand limit's grid gets (#104 will reuse this leg) */
 export const GATHER_HOLD = 1500
+/** the finished grid leaves card by card — this is the step between them */
+export const CLEAR_STEP = 90
