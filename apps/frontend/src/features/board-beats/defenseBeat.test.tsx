@@ -237,6 +237,37 @@ const rollbackPlan = (
 
 // ===== covered =====
 
+// The same fact `runNeutralized` had to learn (#103 testing, problem 1): a beat
+// that publishes nothing hands its own base on untouched, so the shadow held the
+// pre-batch board — the `defend` pending included — for the whole run. The
+// answered attack went on rendering at the centre under its own flyer, the dock
+// stayed in its reaction state, and the beat behind this one animated against
+// that same stale board.
+it('lets go of the answered attack as the exchange takes off', async () => {
+  exits.items.length = 0
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: BoardState[] = []
+  const withAttack = {
+    ...base,
+    pending: {
+      kind: 'defend',
+      player: 'p1',
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      sudo: false,
+    },
+  } as unknown as BoardState
+  await drive(() =>
+    api.beat?.runCovered(cancelPlan(), {
+      base: withAttack,
+      publish: (st) => published.push(st),
+    }),
+  )
+  expect(published.length).toBeGreaterThan(0)
+  expect(published.at(-1)?.pending).toBeNull()
+})
+
 it('lays the defence over the attack and sends the whole exchange out together', async () => {
   played.names = []
   played.calls = []
@@ -697,6 +728,43 @@ const debuggerPlan = (): Extract<BeatPlan, { kind: 'neutralized' }> => ({
   method: 'debugger',
   alarm: { eventId: 11, card: 'trigger-error-503' },
   spent: [{ eventId: 12, card: 'protection-debugger' }],
+})
+
+// The answer is given, so the alarm is ANSWERED — and the board has to say so
+// while the exchange is still in the air. The beat published nothing at all
+// before this, so `beats.shadow` held the pre-batch board — pending and all —
+// for the whole run: the red glow burned until the queue drained, the answered
+// 503 went on rendering at the centre under its own flyer, and the beat handed
+// that same stale board on to the draw behind it, which is why a resumed draw
+// landed its card while the alarm was still up (#103 testing, problem 1).
+//
+// Published at TAKEOFF, the same moment (and for the same reason) `discardBeat`
+// publishes `withoutFlown`: the cards are in the air, so the table must not
+// still be holding them.
+it('lets go of the answered alarm as the exchange takes off', async () => {
+  exits.items.length = 0
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: (BoardState | null)[] = []
+  // `send` is what puts the pair in the air, so what the board had published by
+  // THEN is the question — not what it ends on.
+  const withAlarm = {
+    ...base,
+    pending: {
+      kind: 'neutralize503',
+      player: 'p2',
+      card: 'trigger-error-503',
+      methods: ['debugger'],
+    },
+  } as unknown as BoardState
+  await drive(() =>
+    api.beat?.runNeutralized(debuggerPlan(), {
+      base: withAlarm,
+      publish: (s) => published.push(s),
+    }),
+  )
+  expect(published.length).toBeGreaterThan(0)
+  expect(published.at(-1)?.pending).toBeNull()
 })
 
 it('covers the alarm and takes both away as one exchange', async () => {

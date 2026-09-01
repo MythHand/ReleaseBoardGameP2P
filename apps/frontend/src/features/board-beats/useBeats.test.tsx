@@ -2,9 +2,10 @@ import type { Event } from '@release/engine'
 import type { CardData } from '@release/ui'
 import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
+import { ELIM_DELAY } from './eliminateBeat'
 import { useBeats } from './useBeats'
 
 const motion = vi.hoisted(() => ({ reduced: true }))
@@ -130,12 +131,17 @@ function Probe({
   anchors,
   intro,
   shadows,
+  alarms,
 }: {
   live: BoardState
   events: Event[]
   anchors: BoardAnchors
   intro?: IntroBeat | null
   shadows?: string[]
+  // Every value `alarm` has held, in order. A final-state assertion cannot see
+  // a glow that came up and went again inside one beat, which is exactly what a
+  // self-answered 503 does.
+  alarms?: boolean[]
 }) {
   const beats = useBeats({ live, events, anchors, enabled: true, intro })
   const shown = beats.shadow ?? live
@@ -150,6 +156,7 @@ function Probe({
     const row = beats.shadow.decks.main.join(',')
     if (shadows && shadows.at(-1) !== row) shadows.push(row)
   }
+  if (alarms && alarms.at(-1) !== beats.alarm) alarms.push(beats.alarm)
   return (
     <>
       {/* The fan as the BOARD would render it — one slot per card of whichever
@@ -169,10 +176,17 @@ function Probe({
       {/* How many flyers are mounted right now — a dead match's in-flight card
           shows up here until its runner's own reset() clears it. */}
       <div data-testid="overlay">{beats.overlays.length}</div>
+      {/* …and the overlays themselves, so a beat that puts something ON the
+          board (the elimination clip, #103) can be looked for rather than
+          merely counted */}
+      <div data-testid="overlays">{beats.overlays}</div>
       {/* The running beat's own alarm (#102) — the wire this test exercises end
           to end, from planBeats' `gather` flag through the discard beat's run
           to the queue's own `Beat.alarm`. */}
       <div data-testid="alarm">{beats.alarm ? 'alarm' : 'none'}</div>
+      {/* the queue is still working: what the game-over overlay waits on, so
+          the winner is not announced over the beat that won it (#103) */}
+      <div data-testid="running">{beats.running ? 'running' : 'idle'}</div>
     </>
   )
 }
@@ -528,4 +542,126 @@ it('leaves the alarm dark through an ordinary, ungathered discard', async () => 
     await new Promise((r) => setTimeout(r, 80))
   })
   expect(getByTestId('alarm').textContent).toBe('none')
+})
+
+// ===== the elimination clip (#103) — the same wire as the sweep's alarm above,
+// carried one beat further: planBeats' `eliminated` plan through beatOf into a
+// runner that puts a video on the board and holds the table while it plays.
+it('holds the table under the elimination clip, and hands it back when it goes', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = false
+  const { getByTestId, container, rerender } = render(
+    <Probe live={preDiscard} events={[]} anchors={stub} />,
+  )
+  rerender(<Probe live={afterSweep} events={[eliminatedEvent, sweptEvent]} anchors={stub} />)
+  await flush()
+  // the sweep has landed and the clip's own delay has passed
+  await act(async () => void (await new Promise((r) => setTimeout(r, ELIM_DELAY + 120))))
+  expect(container.querySelector('video')).not.toBeNull()
+  // it owns the table while it plays — input is dead under a full-screen video
+  expect(getByTestId('exclusive').textContent).toBe('exclusive')
+  // …and what it plays over is the board the match is LEFT with, not the one
+  // the batch found. A non-exclusive beat here would hold the pre-batch shadow
+  // under the clip and empty the table the moment it lifted — the video would
+  // be covering the elimination instead of following it.
+  expect(getByTestId('discardCount').textContent).toBe('1')
+  // and the table comes back when the clip is done with it
+  await act(async () => {
+    fireEvent.error(container.querySelector('video') as HTMLVideoElement)
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(container.querySelector('video')).toBeNull()
+  expect(getByTestId('exclusive').textContent).toBe('open')
+})
+
+// The decision, pinned rather than left to emerge: a full-screen autoplaying
+// video is exactly what the preference is about, so under it there is no clip
+// at all — the board simply stands in its eliminated state, which is what
+// carries the news. `useBeats` already queues nothing under the preference;
+// this is here so that stays true of the clip specifically.
+it('plays no clip at all under prefers-reduced-motion', async () => {
+  motion.reduced = true
+  sent.calls = []
+  sent.hang = false
+  const { container, rerender } = render(<Probe live={preDiscard} events={[]} anchors={stub} />)
+  rerender(<Probe live={afterSweep} events={[eliminatedEvent, sweptEvent]} anchors={stub} />)
+  await flush()
+  await act(async () => void (await new Promise((r) => setTimeout(r, ELIM_DELAY + 120))))
+  expect(container.querySelector('video')).toBeNull()
+})
+
+// ===== the queue's own "still working" (#103) — `over` rides beside the
+// projection rather than inside it, so the board needs one plain fact to hold
+// the winner overlay back on. Driven through a parked beat rather than mocked:
+// the flag is only worth anything if it is true for the whole run.
+it('reports the queue as working until it drains', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = true
+  const { getByTestId } = mount()
+  await flush()
+  expect(sent.calls).toHaveLength(1) // the beat is really in flight
+  expect(getByTestId('running').textContent).toBe('running')
+  sent.hang = false
+  await act(async () => {
+    sent.release?.()
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(getByTestId('running').textContent).toBe('idle')
+})
+
+// Under the preference nothing is queued at all, so the queue is never working
+// and the winner is announced at once — the board goes straight to its end
+// state, which is the same answer the elimination clip gets.
+it('is never working under prefers-reduced-motion', async () => {
+  motion.reduced = true
+  sent.calls = []
+  sent.hang = false
+  const { getByTestId } = mount()
+  await flush()
+  expect(getByTestId('running').textContent).toBe('idle')
+})
+
+// ===== a 503 a standing Monitoring answers by itself (#103 testing, problem 2)
+// No pending is ever raised, so nothing lights the alarm off the projection —
+// the plan carries the fact and the queue turns it into the beat's own `alarm`,
+// the same field the defenceless sweep already uses for the same reason.
+const autoAnswered503 = [
+  { id: 7, type: 'drawn', player: 'p1', pile: 0, deckSize: 9 },
+  { id: 8, type: 'revealed', player: 'p1', card: 'trigger-error-503' },
+  { id: 9, type: 'neutralized', player: 'p1', method: 'monitoring' },
+  { id: 10, type: 'discarded', player: 'p1', card: 'trigger-error-503', reason: 'trigger' },
+] as Event[]
+
+it('lights the alarm while a self-answered 503 is on its way out', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = false
+  const alarms: boolean[] = []
+  const { getByTestId, rerender } = render(
+    <Probe live={preDiscard} events={[]} anchors={stub} alarms={alarms} />,
+  )
+  rerender(<Probe live={afterSweep} events={autoAnswered503} anchors={stub} alarms={alarms} />)
+  await flush()
+  // it burned at some point during the beat…
+  expect(alarms).toContain(true)
+  // …and the table is not left lit once the queue has drained
+  expect(getByTestId('alarm').textContent).toBe('none')
+})
+
+it('leaves the alarm dark through an ordinary draw', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = false
+  const alarms: boolean[] = []
+  const plain = [
+    { id: 7, type: 'drawn', player: 'p1', card: 'attack-bug', pile: 0, deckSize: 9 },
+  ] as Event[]
+  const { rerender } = render(
+    <Probe live={preDiscard} events={[]} anchors={stub} alarms={alarms} />,
+  )
+  rerender(<Probe live={afterSweep} events={plain} anchors={stub} alarms={alarms} />)
+  await flush()
+  expect(alarms).not.toContain(true)
 })
