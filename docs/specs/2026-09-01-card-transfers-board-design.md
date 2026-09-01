@@ -32,7 +32,7 @@ event carried rather than on a rule the board re-derives.
 | 1 | Where `requestCard` is answered | **The `CardCatalog` band, not the panel.** `PendingPrompt` is suppressed for it, exactly as it already is for `defend`, `discardForRelease` and `neutralize503`. The `PICK_BEAT` hold is the first beat of the transfer, and a panel that unmounts when the pending clears cannot hold it. |
 | 2 | The `giveCard` step | **Auto-resolved, immediately.** The engine makes the victim pick which copy to surrender; the copies are one card id and differ only by uid, so the choice carries no information. The victim watches the scene instead of a panel. |
 | 3 | The miss | **Built, and public to the whole table.** `cards.md:125` makes the request public on a hit and a miss alike, and `requested` carries `hit` to every peer. The refusal is the story's flinch, rendered as the target is: their **seat** to everyone watching, their own **fan** to the target. |
-| 4 | The random steal | **Keeps the grid, as a reveal.** Nobody picks — `stealRandom` uses the seeded RNG — but the grid is the only thing that makes "a card at random" read differently from "the card I named", which otherwise share one flight. |
+| 4 | The random steal | **The donor's backs fan out of their seat.** Nobody picks — `stealRandom` uses the seeded RNG — but the offered hand is the only thing that makes "a card at random" read differently from "the card I named", which otherwise share one flight. The story's gesture translated, not its geometry: it fans from the top because a playground stage has no seats. |
 | 5 | Where the machinery lives | **One staging hook and one beat runner.** A per-scene runner would copy the flight twice and the closed flight three times; folding it into `drawBeat` would put "taken out of a hand" inside the runner for "off a pile". |
 | 6 | The seat → centre movement | **A new preset, `takeFromSeat`,** the pair `dealToSeat` has never had. Geometrically it is `drawToCenter`, but that preset's name says it leaves the draw deck; the vocabulary already names movements by meaning over geometry (`returnToDeck` is documented as the pair of `drawToCenter`). |
 | 7 | What holds the named card between batches | **The projection.** `requested` and `handTransfer` arrive in different batches, so no beat overlay can span the gap — but `giveCard` is projected unredacted to every peer (`attacks.ts:444`, no `mine` gate unlike `handLimit`), so `pending.requested` is a public render. |
@@ -40,7 +40,7 @@ event carried rather than on a rule the board re-derives.
 
 ## What the issue asks for, and what the code actually says
 
-### The mirror described in the issue is a flight the story abandoned
+### The written spec is stale for two of the three scenes
 
 The issue says the taken card "travels to their fan centre with `rotate(180)`, `zIndex` dropping to
 30 on the way up so it tucks behind the fan." `OpponentTakesCardStory` does not do that. Opponents
@@ -54,9 +54,20 @@ against an older iteration of a story that, at that same commit, already importe
 aimed at a seat box. So the drift is not recent and not the story's fault — the written pair was
 never in step with it.
 
-The board settles it anyway, because the board has no opponent fan: opponent hands are Seats and
-their counts. The story is right, the two spec surfaces are wrong, and syncing them is part of this
-task rather than a follow-up.
+The same is true of the random steal, and worse. `recipes.md`'s "Taking an opponent's card — deal
+grid, flip the pick, settle into the hand" names `PickOpponentCardStory` as its live reference and
+describes a centred grid built from `gridPositions`, `ORIGIN`, `COLS_MAX`, `DEAL_CARD_W` and
+`slotRefs`. That story renders `<Hand faceDown>` sliding down from the top — a fan. Repo-wide those
+five names appear only in `GameEndStory`, `ComboStory` and the docs; there is no grid in the scene
+the recipe claims to transcribe, and there never was. The audit entry repeats it, and so does the
+issue.
+
+The board settles all of it anyway, because the board has no top fan: opponent hands are Seats and
+their counts. So both older scenes are **translated** rather than transcribed — the specific hit and
+the random steal alike come out of the donor's seat, which is where a hidden hand lives here. The
+gesture survives; the geometry belongs to a stage with no seats in it. The stories are right about
+what happens, the two spec surfaces are wrong about how, and syncing them is part of this task
+rather than a follow-up.
 
 ### Triggers cannot be in a hand, and the panel offers them anyway
 
@@ -164,9 +175,9 @@ than the 7px `settle` sized for an input.
 **`runTransfer`** branches once, on `plan.role`:
 
 - **taker** — `takeFromSeat` from `anchors.seatBox(from)` to the centre, `flipCard` face-up,
-  `REVEAL_HOLD`, then `arrive()` into the fan. With `named: false` the grid leg runs first:
-  `donorHand` backs deal out of the donor's seat and hold, the engine's card flips, the rest shrink
-  back into the seat.
+  `REVEAL_HOLD`, then `arrive()` into the fan. With `named: false` the offer leg runs first:
+  `donorHand` backs fan out of the donor's seat toward the centre and hold, the engine's card flips
+  face-up, and the rest slide back into the seat.
 - **victim** — the mirror: out of `anchors.handSlotAt(index)` — `plan.card` is present for a party
   to the transfer, so the index comes from `base.you.hand`, which is the registry's own contract
   (it indexes rather than looks up by uid precisely so it need not know the hand) — to the centre,
@@ -190,7 +201,7 @@ All of them come from the stories rather than being chosen here; the names are t
 | `SHAKE` | `amp 9 / 460 ms / spring` | the refusal, on a seat or on the fan |
 | `REVEAL_W` | 220 px | the width a card reaches at the centre |
 | `SEAT_SHRINK` | 0.7 | how small a card gets sinking into a seat (`drawBeat`'s own value) |
-| grid stagger | 45 ms | between neighbouring backs in the random-steal reveal |
+| fan stagger | 45 ms | between neighbouring backs in the random-steal offer |
 
 ### The ask surface — `pages/board/[gameId]/_useRequestStaging.tsx` (new)
 
@@ -270,8 +281,9 @@ and the board simply holds the projection, while the `giveCard` resolve still fi
 
 - `docs/animations/reference.md` — the `takeFromSeat` row (test-enforced) and a `transfer` row in the
   beat registry beside `draw` and `reshuffle`.
-- `docs/animations/recipes.md` — rewrite "Opponent takes your card", which describes a flight the
-  story abandoned; add the board recipe with its three audiences.
+- `docs/animations/recipes.md` — rewrite **two** stale recipes: "Opponent takes your card"
+  (describes a flight the story abandoned) and "Taking an opponent's card" (describes a grid that
+  exists in no story at all). Add the board recipe with its three audiences.
 - `AnimationAuditStory` — the same stale entry corrected, `board:` pointers on all three scene
   entries, and the open Security Bug miss finding updated to what shipped.
 - New finding, register and `docs/animations/backlog.md`: the rules stand the Security Bug at the
