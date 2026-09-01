@@ -36,6 +36,7 @@ event carried rather than on a rule the board re-derives.
 | 5 | Where the machinery lives | **One staging hook and one beat runner.** A per-scene runner would copy the flight twice and the closed flight three times; folding it into `drawBeat` would put "taken out of a hand" inside the runner for "off a pile". |
 | 6 | The seat → centre movement | **A new preset, `takeFromSeat`,** the pair `dealToSeat` has never had. Geometrically it is `drawToCenter`, but that preset's name says it leaves the draw deck; the vocabulary already names movements by meaning over geometry (`returnToDeck` is documented as the pair of `drawToCenter`). |
 | 7 | What holds the named card between batches | **The projection.** `requested` and `handTransfer` arrive in different batches, so no beat overlay can span the gap — but `giveCard` is projected unredacted to every peer (`attacks.ts:444`, no `mine` gate unlike `handLimit`), so `pending.requested` is a public render. |
+| 8 | `PendingPrompt`'s guess space | **Fixed in the kit, in this task.** The panel offered all 37 catalogue entries, 14 of which can never be in a hand. Narrowed to `HOLDABLE` — the base deck without triggers — with both exclusions cited to the rules text. |
 
 ## What the issue asks for, and what the code actually says
 
@@ -64,10 +65,16 @@ builds its options from the whole catalogue — all 37 definitions. The rules te
 of them can never be demanded: `cards.md:320` — «Обе карты **нельзя держать в руке**» — and
 `cards.md:339` — «В руку триггер не попадает ни на мгновение».
 
-So the story's filter (`deck === 'base' && category !== 'trigger'`) is rules-backed and the panel's
-list is over-broad. The board uses the story's filter. The kit's own panel keeps serving the
-playground's `TableStory` and is left alone here; the over-broad list is recorded as a finding rather
-than fixed in passing.
+The events deck is excluded by the rules just as plainly: `general.md:189` — «общее число её карт в
+игре — 21: каждая **либо в колоде, либо на столе**». Neither exclusion is inferred.
+
+So the story's filter (`deck === 'base' && category !== 'trigger'`) is rules-backed on both halves,
+and the panel offered 37 entries where only 23 can be held. **Fixed here**, in the kit rather than
+only on the board: `PendingPrompt` now builds its options from a `HOLDABLE` constant carrying both
+citations, and both the `complete` guard and the `confirm` membership check read it, so a stale
+selection cannot resolve a card that is no longer on offer. The board uses the same filter. Left
+unfixed, the panel made a guess that cannot possibly hit look like a legal one — worse than a
+missing option, because nothing rejects it and the request simply always misses.
 
 ### The rules stand the Security Bug at the centre; the engine has already banked it
 
@@ -267,16 +274,15 @@ and the board simply holds the projection, while the `giveCard` resolve still fi
   story abandoned; add the board recipe with its three audiences.
 - `AnimationAuditStory` — the same stale entry corrected, `board:` pointers on all three scene
   entries, and the open Security Bug miss finding updated to what shipped.
-- New findings, register and `docs/animations/backlog.md`: the rules stand the Security Bug at the
-  centre while the asker chooses but the engine banks it first; and `PendingPrompt`'s `requestCard`
-  branch offers the two triggers the rules say can never be held.
+- New finding, register and `docs/animations/backlog.md`: the rules stand the Security Bug at the
+  centre while the asker chooses, but the engine banks it in the same reduction that opens the
+  pending. (The panel's over-broad guess space was the other finding; it is fixed in this task
+  instead, so it is recorded as history rather than left open.)
 
 ## Out of scope
 
 - **The engine's banking order** for the Security Bug. Recorded, not fixed — it is an engine
   behaviour change with its own conformance surface, and this task is the board.
-- **`PendingPrompt`'s catalogue filter** in `@release/ui`. The kit's panel keeps serving the
-  playground; the board no longer uses that branch.
 - **AI cards (#106)**, which reuse this catalog and `ConfirmAction`, and **git cards (#108)**, still
   blocked on #61.
 - **A deadline or a decline for `requestCard`.** Neither is settled in the rules, and neither is
