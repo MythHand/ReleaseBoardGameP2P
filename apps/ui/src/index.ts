@@ -169,5 +169,15 @@ export {
   centrePlaceStyle,
   centreTransform,
 } from './table/TableCentre/centre'
+export {
+  GRID_CARD_W,
+  GRID_GAP,
+  GRID_TOP,
+  type GridCell,
+  type GridShape,
+  gridCardW,
+  gridCells,
+  gridOf,
+} from './table/TableCentre/discardGrid'
 export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'
 export { default as TurnDock } from './table/TurnDock/TurnDock'
