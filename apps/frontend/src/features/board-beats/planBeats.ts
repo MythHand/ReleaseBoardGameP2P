@@ -45,7 +45,18 @@ export interface PlannedDraw {
    * to claim and nothing to fly — the beat hands it to the pending's static
    * render instead.
    */
-  reveal?: { card: string; discardId?: number }
+  reveal?: {
+    card: string
+    discardId?: number
+    /**
+     * The draw ANSWERED it: a standing Monitoring makes a 503 "ignored", so the
+     * engine banks it inside this same batch and no pending is ever raised
+     * (#103 testing, problem 2). The board still lights the alarm for the beat
+     * — the table has to see that a 503 landed — and this is the only thing
+     * that can tell it to, since there is no pending to read it off.
+     */
+    neutralized?: true
+  }
 }
 
 export type PileStep =
@@ -61,6 +72,11 @@ export type BeatPlan =
   | { kind: 'discard'; key: string; cards: DiscardCard[]; gather?: true }
   | { kind: 'reshuffle'; key: string; cards: number }
   | { kind: 'piles'; key: string; steps: PileStep[] }
+  // A player is out: the full-screen video plays over a board that has already
+  // settled into its eliminated state (#103). Carries no clip of its own — the
+  // runner resolves one from `eventId`, so every peer watching the same
+  // elimination watches the same clip without a word about it on the wire.
+  | { kind: 'eliminated'; key: string; eventId: number; player: string }
   // A window attack reaches the centre — the pair, if it threw with a Sudo,
   // or a lone card if not. The pair settles at the centre and not at a seat, so
   // `target` is not a destination; it is carried because the runner has to know
@@ -258,18 +274,31 @@ export function classifyPiles(before: number[], after: number[]): PileStep | nul
 // that turned it up, and its `discarded` immediately after that
 // (fake/triggers.ts:123,139). Looking ahead by position rather than scanning the
 // batch is what keeps a later, unrelated reveal from being read as this draw's.
-function revealAfter(events: Event[], i: number): { card: string; discardId?: number } | null {
+function revealAfter(
+  events: Event[],
+  i: number,
+): { card: string; discardId?: number; neutralized?: true } | null {
   const reveal = events[i + 1]
   if (!reveal) return null
   const card =
     reveal.type === 'revealed' ? reveal.card : reveal.type === 'aiRevealed' ? reveal.aiCard : null
   if (card == null) return null
-  const filed = events[i + 2]
+  // A standing Monitoring answers a 503 inside the very draw that turned it up
+  // (#103 testing, problem 2), and the `neutralized` that says so sits between
+  // the reveal and the discard — the discard is parented to the method that
+  // banked it, the same shape every chosen answer has. So the method is stepped
+  // OVER to reach the card's own exit, rather than the engine's causal order
+  // being bent to suit the walk.
+  const answered = events[i + 2]?.type === 'neutralized'
+  const filed = events[answered ? i + 3 : i + 2]
   // No discard behind it: the trigger is standing, not leaving. Reported as a
   // reveal all the same — the flight to the centre and the flip are the same
   // either way, and only the tail differs.
   if (filed?.type !== 'discarded' || filed.card !== card) return { card }
-  return { card, discardId: filed.id }
+  // `neutralized` rides along because the BEAT needs it and cannot re-derive it:
+  // a 503 answered this way never raised a pending, so nothing lights the alarm
+  // off the projection and the draw has to carry that fact itself.
+  return { card, discardId: filed.id, ...(answered ? { neutralized: true as const } : {}) }
 }
 
 // The engine pays the cost and places the release in one reduction, emitting
@@ -338,6 +367,11 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   // `eliminated`/`discarded` pair, so a flag left standing past its own run
   // would wrongly gather a later, unrelated discard.
   let sweeping: string | null = null
+  // The elimination's own beat (#103), held rather than pushed where its event
+  // is read: the video plays over an emptied board, and the `eliminated`
+  // arrives BEFORE the discards it opens. `flush()` is what puts it behind
+  // them — and what emits it at all when there was nothing to sweep.
+  let elimination: Extract<BeatPlan, { kind: 'eliminated' }> | null = null
   const flush = () => {
     if (draw) plans.push(draw)
     // A discard beat with nothing aimable is not a beat: every card in the run
@@ -345,11 +379,15 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
     if (discard && discard.cards.length > 0) plans.push(discard)
     if (pileRun) plans.push(pileRun)
     if (pairOut) plans.push(pairOut)
+    // LAST: everything this run flew has to be off the table before the video
+    // covers it.
+    if (elimination) plans.push(elimination)
     draw = null
     discard = null
     pileRun = null
     pairOut = null
     sweeping = null
+    elimination = null
   }
 
   for (let i = 0; i < events.length; i++) {
@@ -485,6 +523,15 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // limit gets (#104 will reuse this leg).
       flush()
       sweeping = e.player
+      // Held, not pushed — see `elimination` above. The `flush()` just above is
+      // what keeps two eliminations in one batch as two beats: the first is
+      // already out before the second is opened.
+      elimination = {
+        kind: 'eliminated',
+        key: `eliminated:${e.id}`,
+        eventId: e.id,
+        player: e.player,
+      }
       continue
     }
     if (e.type === 'neutralized') {
@@ -509,6 +556,13 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
           continue
         }
         if (d.type !== 'discarded') break
+        // Already claimed by the DRAW that turned the trigger up: a 503 a
+        // standing Monitoring answered by itself is flown out by the draw beat,
+        // and two beats flying one card is the duplicate `owned` exists to stop.
+        if (owned.has(d.id)) {
+          j++
+          continue
+        }
         if (d.reason === 'trigger' && !alarm) {
           alarm = { eventId: d.id, card: d.card }
         } else if (d.reason === 'neutralized') {
@@ -518,6 +572,14 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         }
         owned.add(d.id)
         j++
+      }
+      // An exchange with nothing in it is not a beat. Reachable exactly once:
+      // a 503 a standing Monitoring answered by itself, whose only moving card
+      // is the alarm — and the DRAW that turned it up already owns that flight.
+      // A beat here would hold the table for its own hold with nothing to show.
+      if (!alarm && spent.length === 0) {
+        i = j - 1
+        continue
       }
       plans.push({
         kind: 'neutralized',
@@ -600,7 +662,16 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // every branch, not only this one), so reading the flag after it would
       // always see it already gone and the sweep would never gather at all.
       const gather = sweeping === e.player
+      // And captured for the same reason (#103): the video plays over an
+      // emptied board, so it must not be flushed out ahead of its own sweep.
+      const opened: Extract<BeatPlan, { kind: 'eliminated' }> | null = gather ? elimination : null
+      // Taken off the local BEFORE the flush and put back after: left standing,
+      // `flush()` would push the video ahead of the very sweep it waits for.
+      // Only for the run that belongs to it — an unrelated discard flushes the
+      // elimination out for real, which is right.
+      if (opened) elimination = null
       if (!discard) flush()
+      if (opened) elimination = opened
       discard ??= {
         kind: 'discard',
         key: `discard:${e.id}`,

@@ -64,7 +64,7 @@ import {
 import kit from '@/table/Table/Table.module.css'
 import { ATTACK_POSE, COVER_POSE, SUDO_POSE, useBoardAnchors } from '~/entities/game/board'
 import type { BoardProps, Panel, StagedHandoff } from '~/entities/game/board/types'
-import { useBeats } from '~/features/board-beats'
+import { useBeats, useEliminationPreload } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import { useHandOrder } from '~/features/hand-order/useHandOrder'
 import opening from './_Board.module.css'
@@ -254,6 +254,13 @@ export default function Board({
   // a thing being decided, so the fan stays live while one flies out
   // (docs/animations/README.md — "Gating the hand", approach 3); `exclusive` is
   // the queue's own answer, and today nothing but the opening sets it.
+  // The elimination clips are fetched at idle once the match is actually being
+  // played — not while the opening is still running, which is the one stretch
+  // where the board has real work to do and nothing can be eliminated yet
+  // (#126 review). Never at app start: initial load does not pay for these
+  // today, and a clip that may never be needed should not change that.
+  useEliminationPreload(!deal.active)
+
   const actions = deal.active || beats.exclusive ? INERT_ACTIONS : liveActions
 
   const { you, opponents, decks, turn, history, setup } = state
@@ -871,7 +878,19 @@ export default function Board({
     : textTabs
 
   // завершение партии — оверлей поверх стола (триггерится извне)
-  const overWinner = over ? participants.find((p) => p.id === over.winnerId) : null
+  // The end is announced once the board has finished SHOWING how it was reached
+  // (#103). The engine settles an elimination and the win it caused in one
+  // reduction (`fake/triggers.ts`: `eliminated`, its discards, then `gameOver`),
+  // so `over` is true the instant that batch lands — while the sweep and the
+  // elimination clip are still queued. And `over` rides beside the projection
+  // rather than inside it (`toBoardOver` — it hangs off the props, not off
+  // `BoardState`), so the shadow every other visible fact is held back by does
+  // not cover it and there is nothing to derive this from: the queue has to say
+  // so itself. Under prefers-reduced-motion nothing is queued, so nothing is
+  // held back — the board goes straight to its end, the same answer the clip
+  // gets.
+  const overShown = over && !beats.running && !deal.active
+  const overWinner = overShown ? participants.find((p) => p.id === over.winnerId) : null
   const youEliminated = Boolean(you.eliminated)
   const disconnectedIds = new Set(room.disconnected ?? [])
 
@@ -1610,7 +1629,7 @@ export default function Board({
 
       {room.connection === 'reconnecting' && <Reconnect copy={copy.reconnect} />}
 
-      {over && (
+      {overShown && (
         <GameOver
           winner={overWinner}
           condition={over.condition}
