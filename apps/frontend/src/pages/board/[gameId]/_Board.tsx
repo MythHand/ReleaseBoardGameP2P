@@ -65,7 +65,12 @@ import {
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
 import { ATTACK_POSE, COVER_POSE, SUDO_POSE, useBoardAnchors } from '~/entities/game/board'
-import type { BoardProps, Panel, StagedHandoff } from '~/entities/game/board/types'
+import type {
+  BoardProps,
+  HandLimitHandoff,
+  Panel,
+  StagedHandoff,
+} from '~/entities/game/board/types'
 import { useBeats, useEliminationPreload } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import { useHandOrder } from '~/features/hand-order/useHandOrder'
@@ -212,6 +217,10 @@ export default function Board({
   // queue needs at this point; the layout effect that keeps `.current` current
   // runs after every hook regardless of where it sits in the function.
   const handoffRef = useRef<StagedHandoff | null>(null)
+  // The hand limit's own handoff (#104), a ref for the same reason `handoffRef`
+  // is one: the beat reads it once at run start (I8), not a render's worth of
+  // state it would have to wait on.
+  const handLimitRef = useRef<HandLimitHandoff | null>(null)
   // The same seam's second fact (#101, Task 11): a stable ref to
   // `useBoardStaging`'s own `clearPaidCost`, for the same reason `handoffRef`
   // above is a ref rather than a direct value — declared here, ahead of
@@ -242,6 +251,7 @@ export default function Board({
     enabled: introOver || intro == null,
     intro: deal.beat,
     staging: handoffRef,
+    handLimit: handLimitRef,
     clearPaidCost: clearPaidCostRef,
     takeStagedRelease: takeStagedReleaseRef,
   })
@@ -649,6 +659,22 @@ export default function Board({
     staging.pairRef,
     staging.release,
   ])
+
+  // The grid, offered to the beat exactly while there IS one to take: the
+  // RESOLVE is out (so the grid is complete and locked) and the cells are still
+  // standing. `release()` is how the beat drops that render; the picked cards
+  // stay out of the fan until the pending itself clears.
+  useLayoutEffect(() => {
+    handLimitRef.current =
+      handLimit.dispatched && handLimit.placed.length > 0
+        ? {
+            player: state.selfId,
+            cards: handLimit.placed,
+            cellAt: handLimit.cellAt,
+            release: handLimit.release,
+          }
+        : null
+  }, [handLimit.dispatched, handLimit.placed, handLimit.cellAt, handLimit.release, state.selfId])
 
   // The same seam's second fact (#101, Task 11): `clearPaidCostRef` kept
   // current the same way `handoffRef` above is. `staging.clearPaidCost` is

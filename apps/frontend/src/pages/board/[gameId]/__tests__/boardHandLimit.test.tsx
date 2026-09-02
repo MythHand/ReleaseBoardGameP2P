@@ -410,6 +410,20 @@ it('plays the same gesture for a mid-turn single card', async () => {
   expect(onResolve).toHaveBeenCalledWith({ kind: 'handLimit', cards: ['attack-bug#0'] })
 })
 
+// The seam (#104): once the RESOLVE is out, the grid the player filled is what
+// the beat flies — so the page must be offering it. Asserted through the board's
+// own render rather than the ref: the cells are still standing and still hold
+// their cards after the dispatch, which is exactly what the beat measures.
+it('keeps the filled grid standing after the dispatch, for the beat to take', async () => {
+  render(boardOverLimit(2, { onResolve: vi.fn() }))
+  await pullCardFromFan(0)
+  await pullCardFromFan(0)
+  expect(screen.getByTestId('board-discard-grid')).toBeTruthy()
+  expect(filledCells()).toBe(2)
+  // and the fan does not get them back while it stands
+  expect(fanSlots()).toBe(HAND.length - 2)
+})
+
 it('asks for the discard in the ask line and offers no panel', () => {
   render(boardOverLimit(2))
   const copy = makeBoardProps().copy
