@@ -12,17 +12,23 @@ import type { CardData, TableActions } from '@release/ui'
 import { cardById } from '@release/ui'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
+import handArrivalStyles from '@/animations/useHandArrival.module.css'
 import Board from '../_Board'
 import { makeBoardProps } from './fixture'
 
 const motion = vi.hoisted(() => ({ reduced: true }))
 const flights = vi.hoisted(() => ({ release: [] as (() => void)[] }))
+const arrivals = vi.hoisted(() => ({ refuse: false }))
 
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => motion.reduced }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@release/ui/animations')>()
   return {
     ...actual,
+    useHandArrival: (...args: Parameters<typeof actual.useHandArrival>) => {
+      const step = actual.useHandArrival(...args)
+      return arrivals.refuse ? { ...step, arrive: async () => false } : step
+    },
     useFlyer: () => ({
       overlay: [],
       raise: () =>
@@ -98,19 +104,44 @@ async function pullCardFromFan(index: number) {
 const fanSlots = () => document.querySelectorAll('[data-hand-slot]').length
 const filledCells = () => document.querySelectorAll('[data-grid-card]').length
 
-function rejectedHandLimit(cards: string[]): Event {
+function rejectedHandLimit(cards: string[], player = 'you', id = 9): Event {
   return {
-    id: 9,
+    id,
     type: 'rejected',
     action: {
       type: 'RESOLVE',
-      player: 'you',
+      player,
       choice: { kind: 'handLimit', cards },
       at: 0,
     },
     reason: 'illegal',
   }
 }
+
+it.each([
+  {
+    name: "another player's",
+    event: rejectedHandLimit(['attack-bug#0'], 'p2', 10),
+  },
+  {
+    name: 'a different ordered card list',
+    event: rejectedHandLimit(['protection-debugger#0'], 'you', 10),
+  },
+])('keeps the local grid locked for $name rejection', async ({ event }) => {
+  const onResolve = vi.fn()
+  const actions = { onResolve }
+  // An exact rejection already in the feed is stale for this dispatch and must
+  // stay ignored alongside the fresh non-matching event under test.
+  const stale = rejectedHandLimit(['attack-bug#0'], 'you', 8)
+  const view = render(boardOverLimit(1, actions, [stale]))
+  await pullCardFromFan(0)
+  expect(onResolve).toHaveBeenCalledTimes(1)
+
+  view.rerender(boardOverLimit(1, actions, [stale, event]))
+  await act(async () => {})
+  expect(filledCells()).toBe(1)
+  expect(fanSlots()).toBe(HAND.length - 1)
+})
 
 it('a pull under the limit takes a cell in the grid', async () => {
   render(boardOverLimit(2))
@@ -170,6 +201,46 @@ it('accepts another pull while the previous card is still in flight', async () =
   motion.reduced = true
 })
 
+it('invalidates a parked flight when the pending clears before landing', async () => {
+  motion.reduced = false
+  flights.release = []
+  const onResolve = vi.fn()
+  const actions = { onResolve }
+  const view = render(boardOverLimit(1, actions))
+
+  try {
+    await pullCardFromFan(0)
+    expect(flights.release).toHaveLength(1)
+    const staleLand = flights.release.shift()
+
+    view.rerender(boardOverLimit(1, actions, [], false))
+    await act(async () => {})
+    expect(screen.queryByTestId('board-discard-grid')).toBeNull()
+    expect(fanSlots()).toBe(HAND.length)
+
+    await act(async () => {
+      staleLand?.()
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(screen.queryByTestId('board-discard-grid')).toBeNull()
+    expect(onResolve).not.toHaveBeenCalled()
+
+    // A later decision starts from a clean generation: the stale landing above
+    // cannot leave a hidden placed card or a landed count behind it.
+    view.rerender(boardOverLimit(1, actions))
+    await pullCardFromFan(0)
+    expect(flights.release).toHaveLength(1)
+    await act(async () => {
+      flights.release.shift()?.()
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(onResolve).toHaveBeenCalledTimes(1)
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'handLimit', cards: ['attack-bug#0'] })
+  } finally {
+    motion.reduced = true
+  }
+})
+
 it('unlocks and returns the cards when the engine rejects the RESOLVE', async () => {
   const onResolve = vi.fn()
   const actions = { onResolve }
@@ -182,6 +253,115 @@ it('unlocks and returns the cards when the engine rejects the RESOLVE', async ()
   await act(async () => {})
   expect(filledCells()).toBe(0)
   expect(fanSlots()).toBe(HAND.length)
+})
+
+it('opens a fan gap while a rejected card animates home', async () => {
+  motion.reduced = false
+  flights.release = []
+  const onResolve = vi.fn()
+  const actions = { onResolve }
+  const view = render(boardOverLimit(1, actions))
+
+  try {
+    await pullCardFromFan(0)
+    await act(async () => {
+      flights.release.shift()?.()
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(filledCells()).toBe(1)
+    const before = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[1]?.style.transform
+
+    view.rerender(boardOverLimit(1, actions, [rejectedHandLimit(['attack-bug#0'])]))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 80))
+    })
+
+    expect(document.querySelector(`.${handArrivalStyles.arriving}`)).toBeTruthy()
+    const during = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[1]?.style.transform
+    expect(during).not.toBe(before)
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 520))
+    })
+    expect(document.querySelector(`.${handArrivalStyles.arriving}`)).toBeNull()
+    expect(fanSlots()).toBe(HAND.length)
+  } finally {
+    motion.reduced = true
+  }
+})
+
+it('invalidates a returning carrier when the pending clears before it lands', async () => {
+  motion.reduced = false
+  flights.release = []
+  const onResolve = vi.fn()
+  const actions = { onResolve }
+  const view = render(boardOverLimit(1, actions))
+
+  try {
+    await pullCardFromFan(0)
+    await act(async () => {
+      flights.release.shift()?.()
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(onResolve).toHaveBeenCalledTimes(1)
+
+    view.rerender(boardOverLimit(1, actions, [rejectedHandLimit(['attack-bug#0'])]))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(document.querySelector(`.${handArrivalStyles.arriving}`)).toBeTruthy()
+
+    view.rerender(boardOverLimit(1, actions, [], false))
+    await act(async () => {})
+    expect(document.querySelector(`.${handArrivalStyles.arriving}`)).toBeNull()
+    expect(fanSlots()).toBe(HAND.length)
+
+    // The old arrival's timer may still settle internally. A new decision must
+    // keep its own picked uid and dispatch independently when its carrier lands.
+    view.rerender(boardOverLimit(1, actions))
+    await pullCardFromFan(0)
+    expect(fanSlots()).toBe(HAND.length - 1)
+    expect(flights.release).toHaveLength(1)
+    await act(async () => {
+      flights.release.shift()?.()
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(onResolve).toHaveBeenCalledTimes(2)
+    expect(onResolve).toHaveBeenLastCalledWith({
+      kind: 'handLimit',
+      cards: ['attack-bug#0'],
+    })
+  } finally {
+    motion.reduced = true
+  }
+})
+
+it('cleans up synchronously when a rejected-card arrival is refused', async () => {
+  motion.reduced = false
+  flights.release = []
+  const onResolve = vi.fn()
+  const actions = { onResolve }
+  const view = render(boardOverLimit(1, actions))
+
+  try {
+    await pullCardFromFan(0)
+    await act(async () => {
+      flights.release.shift()?.()
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(filledCells()).toBe(1)
+
+    arrivals.refuse = true
+    view.rerender(boardOverLimit(1, actions, [rejectedHandLimit(['attack-bug#0'])]))
+    await act(async () => {})
+
+    expect(filledCells()).toBe(0)
+    expect(fanSlots()).toBe(HAND.length)
+    expect(document.querySelector(`.${handArrivalStyles.arriving}`)).toBeNull()
+  } finally {
+    arrivals.refuse = false
+    motion.reduced = true
+  }
 })
 
 it('clears the local grid when reduced motion skips the beat', async () => {

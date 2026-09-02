@@ -442,16 +442,20 @@ export default function Board({
   // the fan's own gap-while-a-return-flight-travels, from whichever hook is
   // live — `Hand`'s own gapAt/gapSize props fold this in below, behind the
   // deal's and the beat queue's own (unrelated) gaps.
-  const liveGapAt = answering
-    ? defenseStaging.gapAt
-    : alarmMineOpen
-      ? neutralizing.gapAt
-      : staging.gapAt
-  const liveGapSize = answering
-    ? defenseStaging.gapSize
-    : alarmMineOpen
-      ? neutralizing.gapSize
-      : staging.gapSize
+  const liveGapAt = discarding
+    ? handLimit.gapAt
+    : answering
+      ? defenseStaging.gapAt
+      : alarmMineOpen
+        ? neutralizing.gapAt
+        : staging.gapAt
+  const liveGapSize = discarding
+    ? handLimit.gapSize
+    : answering
+      ? defenseStaging.gapSize
+      : alarmMineOpen
+        ? neutralizing.gapSize
+        : staging.gapSize
 
   // the ONE card standing at the centre before a partner folds in — a plain
   // aim (`main`) or a support awaiting one (`support`). Once merged the pair

@@ -46,6 +46,8 @@ export interface HandLimitStaging {
   /** how many cards are still owed; 0 outside the decision */
   owed: number
   overlay: ReactNode[]
+  gapAt: number | null
+  gapSize: number
   handItems: HandItem[]
   stateAt: (index: number) => HandCardState
   accentAt: (index: number) => string | undefined
@@ -95,12 +97,14 @@ export function useHandLimit({
   const cellsRef = useRef(0)
   const pickedRef = useRef<string[]>([])
   const dispatchedRef = useRef(false)
+  const dispatchedChoice = useRef<{ player: string; cards: string[] } | null>(null)
   const claimed = useRef(new Set<number>())
   const landed = useRef(0)
   const cellEls = useRef<Record<number, HTMLElement | null>>({})
   const flightSeq = useRef(0)
   // bumped on a match wipe — a flight from a dead match stops committing
   const runId = useRef(0)
+  const arrivalRun = useRef<number | null>(null)
   // how much of the feed had arrived when we dispatched: the rejection watcher
   // reads only what came after, or a past rejection of the same decision would
   // cancel a fresh one
@@ -122,6 +126,8 @@ export function useHandLimit({
   // the cards return to the fan on a rejection — the shared step, the same one
   // a draw and an undo use, so a refused decision reads as the event it undoes
   const arrival = useHandArrival(anchors.hand, () => {
+    if (arrivalRun.current !== runId.current) return
+    arrivalRun.current = null
     pickedRef.current = []
     setPicked([])
   })
@@ -139,6 +145,8 @@ export function useHandLimit({
     cellsRef.current = 0
     pickedRef.current = []
     dispatchedRef.current = false
+    dispatchedChoice.current = null
+    arrivalRun.current = null
     setCells(0)
     setPlaced([])
     setPicked([])
@@ -151,10 +159,14 @@ export function useHandLimit({
   // when it locks — and so a carry-back can never race the dispatch.
   const finish = useCallback(() => {
     if (dispatchedRef.current) return
+    const p = latest.current.pending
+    if (!p) return
+    const choice = { player: p.player, cards: [...pickedRef.current] }
     dispatchedRef.current = true
+    dispatchedChoice.current = choice
     setDispatched(true)
     watermark.current = latest.current.events.length
-    latest.current.actions?.onResolve?.({ kind: 'handLimit', cards: pickedRef.current })
+    latest.current.actions?.onResolve?.({ kind: 'handLimit', cards: choice.cards })
   }, [])
 
   // one card: the fan → its own cell. I8 — the card, its uid, its slot and its
@@ -254,10 +266,18 @@ export function useHandLimit({
   // where the identity lives.
   useEffect(() => {
     if (!dispatched) return
+    const sent = dispatchedChoice.current
+    if (!sent) return
     const rejectedOurs = events.slice(watermark.current).some((e) => {
       if (e.type !== 'rejected') return false
       const a = e.action
-      return a.type === 'RESOLVE' && a.choice.kind === 'handLimit'
+      return (
+        a.type === 'RESOLVE' &&
+        a.player === sent.player &&
+        a.choice.kind === 'handLimit' &&
+        a.choice.cards.length === sent.cards.length &&
+        a.choice.cards.every((uid, i) => uid === sent.cards[i])
+      )
     })
     if (!rejectedOurs) return
     const back = placed
@@ -269,6 +289,7 @@ export function useHandLimit({
     claimed.current.clear()
     landed.current = 0
     dispatchedRef.current = false
+    dispatchedChoice.current = null
     setDispatched(false)
     setPlaced([])
     setCells(0)
@@ -278,7 +299,16 @@ export function useHandLimit({
       setPicked([])
       return
     }
-    void arrival.arrive(back, handItemsRef.current.length)
+    void (async () => {
+      const mine = runId.current
+      arrivalRun.current = mine
+      const taken = await arrival.arrive(back, handItemsRef.current.length)
+      if (runId.current !== mine) return
+      if (taken) return
+      arrivalRun.current = null
+      pickedRef.current = []
+      setPicked([])
+    })()
   }, [dispatched, events, placed, reduced, arrival.arrive])
 
   // The pending is gone: the decision is closed and nothing here may outlive
@@ -287,9 +317,12 @@ export function useHandLimit({
   // what drops the grid's render, and this is what finally clears the fan's
   // filter. Under reduced motion no beat ever runs, and this is the only path.
   useEffect(() => {
-    if (pending || cellsRef.current === 0) return
+    if (pending || (cellsRef.current === 0 && pickedRef.current.length === 0)) return
+    runId.current += 1
+    flyer.drop()
+    arrival.reset()
     wipe()
-  }, [pending, wipe])
+  }, [pending, wipe, flyer.drop, arrival.reset])
 
   // A NEW MATCH wipes the gesture — the same boundary, idiom and (inert on this
   // branch, until #19 mints a per-match id) reasoning as its three siblings'.
@@ -309,6 +342,8 @@ export function useHandLimit({
     dispatched,
     owed: pending ? Math.max(0, pending.excess - picked.length) : 0,
     overlay: [...flyer.overlay, ...arrival.overlay],
+    gapAt: arrival.gapAt,
+    gapSize: arrival.gapSize,
     handItems,
     stateAt,
     accentAt,
