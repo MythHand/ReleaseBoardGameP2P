@@ -1,3 +1,4 @@
+import type { CardData } from '@release/ui'
 import { CARD_W, cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
 import { play, useFlyer, useHandArrival, wait } from '@release/ui/animations'
@@ -25,6 +26,20 @@ const SEAT_SHRINK = 0.7 // how small a card is inside a seat — `drawBeat`'s ow
 // air here, and a key IS a flyer — raising the same key twice replaces the
 // carrier instead of hanging a second node on the same name.
 const KEY = 'transfer'
+
+// A card nobody at this seat is entitled to know. The projection never says
+// what it is, so nothing here may guess: this carries no face, only the base
+// deck's cover, and it is always flown faceDown. `Card` reads `deck` for the
+// back and nothing else.
+const COVER: CardData = {
+  id: 'unknown',
+  name: '',
+  category: 'protection',
+  deck: 'base',
+  art: '',
+  tags: [],
+  qty: 0,
+}
 
 const rectOf = (el: Element | null): Rect | null => {
   if (!el) return null
@@ -166,8 +181,43 @@ export function useTransferBeat(anchors: BoardAnchors) {
           }
           return
         }
-        // watcher — Task 5. Until then it publishes nothing and hands its own
-        // base on untouched: the queue drains and the live projection wins.
+        // A watcher. `plan.card` is absent — not "unknown to us", absent from
+        // the event — so there is nothing to turn over and nothing to hold at
+        // the centre to be read. It crosses closed, and the two counts are the
+        // only thing that actually changes. This leg is currently unreachable in
+        // production: the engine tags every `handTransfer` event with
+        // `visibleTo: [from, to]`, and non-parties never receive the event. The
+        // leg ships because it expresses the "never widen a redacted event"
+        // property, and it will stay passing after `handTransfer` becomes public
+        // with `card` redacted the way `drawn` already is.
+        const a = latest.current.anchors
+        const fromSeat = a.seatBox(plan.from)
+        const toSeat = a.seatBox(plan.to)
+        const centre = rectOf(a.centre.current)
+        if (!fromSeat || !toSeat || !centre) return
+        const from = cardBoxIn(fromSeat, CARD_W * SEAT_SHRINK)
+        const to = cardBoxIn(toSeat, CARD_W * SEAT_SHRINK)
+        const [el] = await raise([{ key: KEY, card: COVER, at: from, faceDown: true }])
+        if (el) {
+          const out = play('takeFromSeat', el, { from, to: centre })
+          if (out) await out.finished
+          pin(KEY, centre)
+          dropFromDonor(plan.from)
+          const home = play('dealToSeat', el, { from: centre, to })
+          if (home) await home.finished
+        }
+        drop(KEY)
+        const c = ctx.current
+        if (c) {
+          const next: BoardState = {
+            ...c.base,
+            opponents: c.base.opponents.map((o) =>
+              o.id === plan.to ? { ...o, handCount: o.handCount + 1 } : o,
+            ),
+          }
+          c.base = next
+          c.publish(next)
+        }
       } finally {
         ctx.current = null
       }

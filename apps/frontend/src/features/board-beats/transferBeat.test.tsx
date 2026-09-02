@@ -148,3 +148,26 @@ it('takes the lost card out of your own fan', async () => {
   const hands = r.published.map((s) => s.you.hand.length)
   expect(hands).toContain(0)
 })
+
+it('crosses the table closed when the event carried no card', async () => {
+  const r = runTransfer(
+    transferPlan({ from: 'p2', to: 'p3', role: 'watcher', card: undefined, named: false }),
+  )
+  await r.go()
+  expect(played.names).toContain('takeFromSeat')
+  expect(played.names).toContain('dealToSeat')
+  // never turned over, and never handed to the fan
+  expect(arrivals.calls).toBe(0)
+})
+
+it('leaks no identity into the DOM for a peer that is not a party', async () => {
+  // The engine redacts `handTransfer.card` to `visibleTo: [from, to]`, and this
+  // is the board keeping that promise. A `faceDown` prop is not enough on its
+  // own — what matters is that no real card id is ever mounted, because a card
+  // rendered face-down still carries its own art and name in the DOM.
+  const r = runTransfer(
+    transferPlan({ from: 'p2', to: 'p3', role: 'watcher', card: undefined, named: false }),
+  )
+  await r.go()
+  expect(r.view.container.innerHTML).not.toContain('attack-bug')
+})
