@@ -34,6 +34,11 @@ const SHAKE = { amp: 9, dur: 460, shape: 'spring' } as const
 // carrier instead of hanging a second node on the same name.
 const KEY = 'transfer'
 
+const OFFER_STEP = 45 // between neighbouring backs, as they fan out
+const OFFER_HOLD = 620 // the hand stands offered before the card turns over
+const OFFER_SPREAD = 0.62 // how far across the centre the fan opens, as a share of its width
+const OFFER_MAX = 9 // backs actually rendered; a bigger hand is not a bigger question
+
 // A card nobody at this seat is entitled to know. The projection never says
 // what it is, so nothing here may guess: this carries no face, only the base
 // deck's cover, and it is always flown faceDown. `Card` reads `deck` for the
@@ -52,6 +57,23 @@ const rectOf = (el: Element | null): Rect | null => {
   if (!el) return null
   const r = el.getBoundingClientRect()
   return { left: r.left, top: r.top, width: r.width, height: r.height }
+}
+
+// Where the offered backs sit: a shallow arc across the centre, evenly spaced,
+// each the size a card is at the table. Not a grid — a hand held out. The
+// count is capped because past a point more backs stop reading as "a hand" and
+// start reading as "a deck", and the suspense is the same either way.
+function offerPoses(count: number, centre: Rect): Rect[] {
+  const n = Math.max(1, Math.min(OFFER_MAX, count))
+  const span = centre.width * OFFER_SPREAD
+  const step = n === 1 ? 0 : span / (n - 1)
+  const first = centre.left + centre.width / 2 - span / 2 - centre.width / 2
+  return Array.from({ length: n }, (_, i) => ({
+    left: first + step * i,
+    top: centre.top,
+    width: centre.width,
+    height: centre.height,
+  }))
 }
 
 export function useTransferBeat(anchors: BoardAnchors) {
@@ -190,6 +212,39 @@ export function useTransferBeat(anchors: BoardAnchors) {
           // out of the seat's own card box (I6), at the size a card is while it
           // is inside a hidden hand — the exact box `dealToSeat` sinks into
           const from = cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          // A random steal offers the donor's hand first: the suspense is real,
+          // because the card genuinely is random. A named one has no question
+          // left in it — the table watched the asker choose.
+          if (!plan.named && plan.donorHand > 0) {
+            const poses = offerPoses(plan.donorHand, centre)
+            const backs = poses.map((_, i) => ({
+              key: `offer${i}`,
+              card: COVER,
+              at: from,
+              faceDown: true,
+            }))
+            const els = await raise(backs)
+            await Promise.all(
+              els.map(async (b, i) => {
+                if (!b) return
+                await wait(i * OFFER_STEP)
+                const anim = play('takeFromSeat', b, { from, to: poses[i] })
+                if (anim) await anim.finished
+              }),
+            )
+            await wait(OFFER_HOLD)
+            // …and back they go. The one that was taken is not among them: it
+            // flies on its own below, out of the same seat, so the offer is
+            // cleared whole rather than one card short.
+            await Promise.all(
+              els.map(async (b, i) => {
+                if (!b) return
+                const anim = play('dealToSeat', b, { from: poses[i], to: from })
+                if (anim) await anim.finished
+              }),
+            )
+            for (let i = 0; i < backs.length; i++) drop(`offer${i}`)
+          }
           const [el] = await raise([{ key: KEY, card, at: from, faceDown: true }])
           if (el) {
             const anim = play('takeFromSeat', el, { from, to: centre })

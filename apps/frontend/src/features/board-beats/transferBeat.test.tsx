@@ -265,3 +265,29 @@ it('flinches your own fan when the miss is aimed at you', async () => {
     spy.mockRestore()
   }
 })
+
+it('fans the donor hand out of their seat before a random steal lands', async () => {
+  const r = runTransfer(transferPlan({ named: false, donorHand: 4 }))
+  await r.go()
+  // one `takeFromSeat` per offered back, plus the taken card's own flight
+  const offers = played.names.filter((n) => n === 'takeFromSeat').length
+  expect(offers).toBe(5)
+  expect(arrivals.calls).toBe(1)
+})
+
+it('offers nothing when the card was named', async () => {
+  // A named transfer has no suspense in it — the asker chose the card and the
+  // whole table watched them choose. Fanning a hand here would invent a
+  // question that was already answered.
+  const r = runTransfer(transferPlan({ named: true, donorHand: 4 }))
+  await r.go()
+  expect(played.names.filter((n) => n === 'takeFromSeat').length).toBe(1)
+})
+
+it('offers nothing to a watcher', async () => {
+  const r = runTransfer(
+    transferPlan({ from: 'p2', to: 'p3', role: 'watcher', card: undefined, named: false }),
+  )
+  await r.go()
+  expect(played.names.filter((n) => n === 'takeFromSeat').length).toBe(1)
+})
