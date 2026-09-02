@@ -369,6 +369,16 @@ export default function Board({
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
+    onReturned: (uid, slot) => {
+      const item = you.hand.find((card) => card.uid === uid)
+      if (!item) return
+      // The card never left `you.hand`, so this is a placement, not an
+      // arrival: rebuild the fan as it will look with the card back at the
+      // slot the pointer named, and commit that order.
+      const visible = [...handLimit.handItems]
+      visible.splice(slot, 0, item)
+      handOrder.commit(you.hand, visible, uid, slot)
+    },
   })
   // The alarm standing at the centre. Read ONCE, same reason and same shape as
   // `pendingDefend` above. `staging.staged` does not gate it: an answer to a
@@ -1267,7 +1277,12 @@ export default function Board({
                 ref={(el) => handLimit.bindCell(i, el)}
               >
                 {held ? (
-                  <div className={opening.cellCard} data-grid-card>
+                  // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only pick-up back into the hand; the discard itself is confirmed by the grid filling up
+                  <div
+                    className={opening.cellCard}
+                    data-grid-card={held.uid}
+                    onMouseDown={(e) => handLimit.onCellDown(e, held)}
+                  >
                     <Card card={held.card} interactive={false} width="100%" />
                   </div>
                 ) : (
@@ -1377,14 +1392,19 @@ export default function Board({
                 // it already wins the shadow's, and the staging gesture's own
                 // return-flight gap is last: it opens only once nothing else
                 // owns the fan.
-                gapAt={deal.gapAt ?? beats.gapAt ?? liveGapAt}
+                gapAt={
+                  deal.gapAt ?? (discarding ? handLimit.gapAt : null) ?? beats.gapAt ?? liveGapAt
+                }
                 gapSize={
                   deal.gapAt == null
-                    ? beats.gapAt == null
-                      ? liveGapSize
-                      : beats.gapSize
+                    ? discarding && handLimit.gapAt != null
+                      ? handLimit.gapSize
+                      : beats.gapAt == null
+                        ? liveGapSize
+                        : beats.gapSize
                     : deal.gapSize
                 }
+                carrying={discarding && handLimit.carrying}
                 // What lights, and in what hue — from whichever hook owns the
                 // fan (#101, Fix B). `stateAt` is what says a card is
                 // AVAILABLE; `accentAt` only says what colour, and without

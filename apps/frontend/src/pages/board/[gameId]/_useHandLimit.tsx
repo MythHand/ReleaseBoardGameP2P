@@ -12,8 +12,17 @@
 // gate here would read as lag, not as safety (docs/animations/README.md —
 // "Gating the hand", approach 3).
 import type { Event } from '@release/engine'
-import type { CardData, HandCardState, HandItem, HandPlayDrop, TableActions } from '@release/ui'
+import {
+  Card,
+  type CardData,
+  type HandCardState,
+  type HandItem,
+  type HandPlayDrop,
+  handStep,
+  type TableActions,
+} from '@release/ui'
 import { play, type Rect, useFlyer, useHandArrival } from '@release/ui/animations'
+import type React from 'react'
 import {
   type ReactNode,
   useCallback,
@@ -25,6 +34,10 @@ import {
 } from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
+import styles from './_useHandLimit.module.css'
+
+// How far above the fan still counts as "over the hand" — the Hand's own band.
+const BAND_PAD = 32
 
 /** a card standing in the grid, in its own cell */
 export interface GridCard {
@@ -43,6 +56,8 @@ export interface HandLimitStaging {
   handed: boolean
   /** the RESOLVE is out — the grid is locked */
   dispatched: boolean
+  /** a card is riding the cursor out of the grid — the fan offers nothing else */
+  carrying: boolean
   /** how many cards are still owed; 0 outside the decision */
   owed: number
   overlay: ReactNode[]
@@ -52,6 +67,8 @@ export interface HandLimitStaging {
   stateAt: (index: number) => HandCardState
   accentAt: (index: number) => string | undefined
   onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
+  /** press on a card standing in the grid: it comes off onto the cursor */
+  onCellDown: (e: React.MouseEvent, card: GridCard) => void
   bindCell: (slot: number, el: HTMLDivElement | null) => void
   cellAt: (slot: number) => HTMLElement | null
   /** the beat's own hand-over — drops the grid's render, keeps the fan filtered */
@@ -66,6 +83,13 @@ export interface Options {
   enabled: boolean // false while the deal or an exclusive beat owns the table
   /** the match this gesture belongs to — the same boundary its siblings keep */
   matchKey?: string | null
+  /**
+   * A card came back out of the grid and landed in the fan at `slot`. The page
+   * commits the player's own order for it (`useHandOrder`) — the card never
+   * left `you.hand`, so this is a placement, not an arrival, and the slot the
+   * pointer named is the one that must stick.
+   */
+  onReturned?: (uid: string, slot: number) => void
 }
 
 export function useHandLimit({
@@ -75,6 +99,7 @@ export function useHandLimit({
   events,
   enabled,
   matchKey = null,
+  onReturned,
 }: Options): HandLimitStaging {
   const reduced = useReducedMotion()
   const flyer = useFlyer()
@@ -83,6 +108,18 @@ export function useHandLimit({
   const [picked, setPicked] = useState<string[]>([])
   const [handed, setHanded] = useState(false)
   const [dispatched, setDispatched] = useState(false)
+  // The card riding the cursor: its cell, its size, and where in it the pointer
+  // took hold — so it does not jump to its own corner on pick-up.
+  const [back, setBack] = useState<
+    (GridCard & { w: number; h: number; fracX: number; fracY: number }) | null
+  >(null)
+  const [dropSlot, setDropSlot] = useState<number | null>(null)
+  const backRef = useRef<HTMLDivElement | null>(null)
+  const cursor = useRef({ x: 0, y: 0 })
+  // The drag's handlers are the closure they began with (I8) — the slot under
+  // the pointer changes under them, so they read it through a ref.
+  const dropSlotRef = useRef<number | null>(null)
+  dropSlotRef.current = dropSlot
 
   // Ours to answer, or nobody's. `options` is the projection's own answer to
   // which cards may go (every uid in the hand, `[]` for everyone else), and
@@ -105,12 +142,15 @@ export function useHandLimit({
   // bumped on a match wipe — a flight from a dead match stops committing
   const runId = useRef(0)
   const arrivalRun = useRef<number | null>(null)
+  // Rejections and pointer placements share `useHandArrival`; only the latter
+  // commits the slot the player named when its carrier lands.
+  const arrivalReturnsPlacement = useRef(false)
   // how much of the feed had arrived when we dispatched: the rejection watcher
   // reads only what came after, or a past rejection of the same decision would
   // cancel a fresh one
   const watermark = useRef(0)
-  const latest = useRef({ actions, events, pending })
-  latest.current = { actions, events, pending }
+  const latest = useRef({ actions, events, pending, onReturned })
+  latest.current = { actions, events, pending, onReturned }
   cellsRef.current = cells
   pickedRef.current = picked
   dispatchedRef.current = dispatched
@@ -125,11 +165,19 @@ export function useHandLimit({
 
   // the cards return to the fan on a rejection — the shared step, the same one
   // a draw and an undo use, so a refused decision reads as the event it undoes
-  const arrival = useHandArrival(anchors.hand, () => {
+  const arrival = useHandArrival(anchors.hand, (gap, landedCards) => {
     if (arrivalRun.current !== runId.current) return
     arrivalRun.current = null
-    pickedRef.current = []
-    setPicked([])
+    const commitsPlacement = arrivalReturnsPlacement.current
+    arrivalReturnsPlacement.current = false
+    const returned = new Set(landedCards.map((landedCard) => landedCard.key))
+    pickedRef.current = pickedRef.current.filter((uid) => !returned.has(uid))
+    setPicked(pickedRef.current)
+    if (commitsPlacement) {
+      for (const [i, landedCard] of landedCards.entries()) {
+        latest.current.onReturned?.(landedCard.key, gap + i)
+      }
+    }
   })
 
   const bindCell = useCallback((slot: number, el: HTMLDivElement | null) => {
@@ -147,11 +195,15 @@ export function useHandLimit({
     dispatchedRef.current = false
     dispatchedChoice.current = null
     arrivalRun.current = null
+    arrivalReturnsPlacement.current = false
+    dropSlotRef.current = null
     setCells(0)
     setPlaced([])
     setPicked([])
     setHanded(false)
     setDispatched(false)
+    setBack(null)
+    setDropSlot(null)
   }, [])
 
   // The last cell filled: the decision is complete and goes out as ONE action.
@@ -199,6 +251,121 @@ export function useHandLimit({
     [reduced, finish, flyer.raise, flyer.drop],
   )
 
+  // Where the pointer is pointing along the fan, by the fan's own arithmetic:
+  // n+1 places for n cards, so a card can go before the first and after the last.
+  const slotAt = useCallback(
+    (clientX: number, n: number) => {
+      const hr = anchors.hand.current?.getBoundingClientRect()
+      if (!hr) return Math.round(n / 2)
+      const step = handStep(n + 1)
+      const i = Math.round((clientX - (hr.left + hr.width / 2)) / step + n / 2)
+      return Math.max(0, Math.min(n, i))
+    },
+    [anchors.hand],
+  )
+
+  const onCellDown = useCallback(
+    (e: React.MouseEvent, card: GridCard) => {
+      if (back || dispatchedRef.current) return
+      const r = e.currentTarget.getBoundingClientRect()
+      e.preventDefault()
+      cursor.current = { x: e.clientX, y: e.clientY }
+      // The cell is free again the instant the card leaves it — a SET, so this
+      // very cell is the one the next pull takes back.
+      claimed.current.delete(card.slot)
+      landed.current -= 1
+      setPlaced((placedCards) => placedCards.filter((placedCard) => placedCard.slot !== card.slot))
+      setBack({
+        ...card,
+        w: r.width,
+        h: r.height,
+        fracX: (e.clientX - r.left) / r.width,
+        fracY: (e.clientY - r.top) / r.height,
+      })
+    },
+    [back],
+  )
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `back` is the trigger; the handlers deliberately use the closure captured when the drag began (I8)
+  useEffect(() => {
+    if (!back) return
+    const mine = runId.current
+    const place = () => {
+      const el = backRef.current
+      if (!el) return
+      el.style.left = `${cursor.current.x - back.fracX * back.w}px`
+      el.style.top = `${cursor.current.y - back.fracY * back.h}px`
+    }
+    place()
+    const onMove = (e: MouseEvent) => {
+      cursor.current = { x: e.clientX, y: e.clientY }
+      place()
+      const hr = anchors.hand.current?.getBoundingClientRect()
+      const over = hr ? e.clientY >= hr.top - BAND_PAD : false
+      setDropSlot(over ? slotAt(e.clientX, handItemsRef.current.length) : null)
+    }
+    const onUp = async (e: MouseEvent) => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      const hr = anchors.hand.current?.getBoundingClientRect()
+      const rect = backRef.current?.getBoundingClientRect()
+      const overHand = hr ? e.clientY >= hr.top - BAND_PAD : false
+      const at = dropSlotRef.current ?? slotAt(e.clientX, handItemsRef.current.length)
+      setDropSlot(null)
+      if (overHand) {
+        setBack(null)
+        // Into the slot the POINTER named, not the middle of the fan: the hand
+        // just said where, and landing anywhere else ignores it.
+        if (reduced || !rect) {
+          pickedRef.current = pickedRef.current.filter((uid) => uid !== back.uid)
+          setPicked(pickedRef.current)
+          latest.current.onReturned?.(back.uid, at)
+          return
+        }
+        void (async () => {
+          arrivalRun.current = mine
+          arrivalReturnsPlacement.current = true
+          const taken = await arrival.arrive(
+            [{ key: back.uid, card: back.card, from: rect }],
+            handItemsRef.current.length,
+            at,
+          )
+          if (runId.current !== mine || taken) return
+          arrivalRun.current = null
+          arrivalReturnsPlacement.current = false
+          // If the shared step is busy or cannot measure the fan, preserve the
+          // logical return instead of leaving the card absent from both places.
+          pickedRef.current = pickedRef.current.filter((uid) => uid !== back.uid)
+          setPicked(pickedRef.current)
+          latest.current.onReturned?.(back.uid, at)
+        })()
+        return
+      }
+      // Released anywhere else: the card FLIES HOME to its own cell. Snapping
+      // would read as the drag having failed; it simply goes back.
+      const el = backRef.current
+      const to = cellEls.current[back.slot]?.getBoundingClientRect()
+      if (!reduced && el && rect && to) {
+        await play('playToCenter', el, { from: rect, to })?.finished
+      }
+      if (runId.current !== mine) return
+      claimed.current.add(back.slot)
+      landed.current += 1
+      setPlaced((placedCards) => [
+        ...placedCards,
+        { uid: back.uid, card: back.card, slot: back.slot },
+      ])
+      setBack(null)
+      if (landed.current === cellsRef.current) finish()
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [back])
+
   // the lowest cell nobody has claimed. A SEARCH, not a running count: a card
   // carried back out frees its own cell, and the next pull must be able to take
   // exactly that one back (Task 8).
@@ -210,7 +377,7 @@ export function useHandLimit({
   const onHandPlay = useCallback(
     (uid: string, drop: HandPlayDrop): boolean => {
       const p = latest.current.pending
-      if (!enabled || !p || dispatchedRef.current) return false
+      if (back || !enabled || !p || dispatchedRef.current) return false
       if (!p.options.includes(uid)) return false
       // AT THE LIMIT: refused, and the kit glides the card home — the existing
       // settle-back (`Hand.tsx`), not a new animation.
@@ -230,7 +397,7 @@ export function useHandLimit({
       void flyToCell(uid, item.card, slot, drop.rect)
       return true
     },
-    [enabled, state.you.hand, flyToCell, freeSlot],
+    [back, enabled, state.you.hand, flyToCell, freeSlot],
   )
 
   // Lit while cards are still owed, and only on the cards that answer — the
@@ -280,7 +447,7 @@ export function useHandLimit({
       )
     })
     if (!rejectedOurs) return
-    const back = placed
+    const returning = placed
       .map((p) => {
         const box = cellEls.current[p.slot]?.getBoundingClientRect()
         return box ? { key: p.uid, card: p.card, from: box } : null
@@ -294,7 +461,7 @@ export function useHandLimit({
     setPlaced([])
     setCells(0)
     cellsRef.current = 0
-    if (reduced || back.length === 0) {
+    if (reduced || returning.length === 0) {
       pickedRef.current = []
       setPicked([])
       return
@@ -302,7 +469,8 @@ export function useHandLimit({
     void (async () => {
       const mine = runId.current
       arrivalRun.current = mine
-      const taken = await arrival.arrive(back, handItemsRef.current.length)
+      arrivalReturnsPlacement.current = false
+      const taken = await arrival.arrive(returning, handItemsRef.current.length)
       if (runId.current !== mine) return
       if (taken) return
       arrivalRun.current = null
@@ -343,20 +511,37 @@ export function useHandLimit({
     arrival.reset()
   }, [matchKey])
 
+  const backOverlay = back ? (
+    <div
+      key="hand-limit-back"
+      className={styles.backFlyer}
+      ref={backRef}
+      style={{
+        left: cursor.current.x - back.fracX * back.w,
+        top: cursor.current.y - back.fracY * back.h,
+        inlineSize: back.w,
+      }}
+    >
+      <Card card={back.card} interactive={false} width="100%" />
+    </div>
+  ) : null
+
   return {
     cells,
     placed,
     picked,
     handed,
     dispatched,
+    carrying: back != null,
     owed: pending ? Math.max(0, pending.excess - picked.length) : 0,
-    overlay: [...flyer.overlay, ...arrival.overlay],
-    gapAt: arrival.gapAt,
-    gapSize: arrival.gapSize,
+    overlay: [...flyer.overlay, ...arrival.overlay, ...(backOverlay ? [backOverlay] : [])],
+    gapAt: back ? dropSlot : arrival.gapAt,
+    gapSize: back ? 1 : arrival.gapSize,
     handItems,
     stateAt,
     accentAt,
     onHandPlay,
+    onCellDown,
     bindCell,
     cellAt,
     release,
