@@ -155,11 +155,15 @@ Every plan is `exclusive: false` and `alarm: false` — a transfer does not own 
 
 On a **hit** the projection holds the card: the pending flips `requestCard → giveCard`, and
 `pending.requested` is public, so every peer renders the named card at the centre. The beat is only
-the entrance. For the asker it is the catalog's `chosen` cell holding `PICK_BEAT` while the rest
-slide away, then that cell's card flying to the centre; for everyone else there is no origin cell, so
-the card arrives with `landInPose`. The asymmetry is deliberate: the asker has a real origin, nobody
-else does, and flying it out of the attacker's seat would say the card left their hand, which it did
-not. The last frame is the projection's own render, so the handover changes nothing on screen (I7).
+the entrance — and it shipped as the SAME entrance for every peer, asker included: a `popIn` at the
+centre, with no origin cell for anyone. The asker-specific origin this section originally called for —
+the catalog's `chosen` cell holding `PICK_BEAT`, then that cell's card flying to the centre — did not
+survive implementation: the beat runs in `transferBeat.tsx`, the `chosen` cell lives in
+`_useRequestStaging.tsx`, and a beat cannot measure a DOM node owned by a hook that renders elsewhere
+(Task 8). `landInPose` was dropped for an independent, second reason — with `from` and `box` identical
+(there is nowhere else to travel from once the origin is gone), it resolves to an identity transform
+and animates nothing, so `popIn` took its place. The last frame is still the projection's own render,
+so the handover changes nothing on screen (I7).
 
 On a **miss** the pending clears outright and there is nothing to hand to, so the beat carries the
 whole scene: the named card raised at the centre, `REQUEST_HOLD`, the refusal, the note, and the
@@ -193,7 +197,7 @@ All of them come from the stories rather than being chosen here; the names are t
 
 | Constant | Value | Where |
 |---|---|---|
-| `PICK_BEAT` | 620 ms | the named card holds while the rest of the catalog slides away |
+| `PICK_BEAT` | — | never shipped to a board file — it lives only in the playground stories (`OpponentTakesCardStory`, `PickSpecificCardStory`), which resolve their own local promise on it. The board's actual hold comes from `CardCatalog`'s own CSS transition, and the band unmounts outright — no timer — the instant `_useRequestStaging`'s `pending` stops being `requestCard` (a hit flips it straight to `giveCard`). |
 | `REQUEST_HOLD` | 820 ms | the named card stands at the centre before the outcome (`REVEAL_HOLD` in the stories) |
 | `REVEAL_HOLD` | 820 ms | face-up at the centre before it drops into the fan (taker) |
 | `CENTER_HOLD` | 820 ms | face-down at the centre before it sinks into the seat (victim) |

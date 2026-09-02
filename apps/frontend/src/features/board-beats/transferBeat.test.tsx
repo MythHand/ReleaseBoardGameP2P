@@ -89,13 +89,13 @@ const transferPlan = (
   ...over,
 })
 
-function runTransfer(plan: Extract<BeatPlan, { kind: 'handTransfer' }>) {
+function runTransfer(plan: Extract<BeatPlan, { kind: 'handTransfer' }>, on: BoardState = base) {
   const published: BoardState[] = []
   const domSnapshots: string[] = []
   let start: (() => Promise<void>) | null = null
   function Probe() {
     const beat = useTransferBeat(anchors)
-    start = () => beat.runTransfer(plan, { base, publish: (s) => published.push(s) })
+    start = () => beat.runTransfer(plan, { base: on, publish: (s) => published.push(s) })
     return <>{beat.overlay}</>
   }
   const view = render(<Probe />)
@@ -154,6 +154,23 @@ it('drops the donor count as the card leaves the seat', async () => {
   expect(counts).toContain(4)
 })
 
+it('clears the giveCard pending once the taken card is in the air, not just at the end', async () => {
+  // `_Board.tsx` stands the named card at the centre for as long as
+  // `state.pending?.kind === 'giveCard'` — the carrier that spans the batch
+  // gap between `requested` and `handTransfer`. Once THIS leg's own flyer
+  // has the card, that static render is a duplicate standing underneath it
+  // for the rest of the beat unless the leg clears the pending it inherited.
+  const on = {
+    ...base,
+    pending: { kind: 'giveCard', player: 'p1', requested: 'attack-bug' },
+  } as BoardState
+  const r = runTransfer(transferPlan(), on)
+  await r.go()
+  expect(r.published.some((s) => s.pending === null)).toBe(true)
+  // and it stays cleared — nothing later in the leg should resurrect it
+  expect(r.published.at(-1)?.pending).toBeNull()
+})
+
 it('sends a lost card from the fan into the taker seat, and never into a hand', async () => {
   const r = runTransfer(transferPlan({ from: 'p1', to: 'p2', role: 'victim' }))
   await r.go()
@@ -170,6 +187,20 @@ it('takes the lost card out of your own fan', async () => {
   await r.go()
   const hands = r.published.map((s) => s.you.hand.length)
   expect(hands).toContain(0)
+})
+
+it('clears the giveCard pending once the lost card leaves the fan, not just at the end', async () => {
+  // Same invariant as the taker leg's own test, mirrored: this leg's flyer
+  // takes the card out of `you.hand`, so the `giveCard` pending it inherited
+  // must not survive to keep `_Board.tsx`'s static centre render doubling it.
+  const on = {
+    ...base,
+    pending: { kind: 'giveCard', player: 'p1', requested: 'attack-bug' },
+  } as BoardState
+  const r = runTransfer(transferPlan({ from: 'p1', to: 'p2', role: 'victim' }), on)
+  await r.go()
+  expect(r.published.some((s) => s.pending === null)).toBe(true)
+  expect(r.published.at(-1)?.pending).toBeNull()
 })
 
 it('crosses the table closed when the event carried no card', async () => {
@@ -263,6 +294,23 @@ it('flinches the target seat on a miss, and takes nothing', async () => {
   expect(played.shakes[0]).toMatchObject({ amp: 9, dur: 460, shape: 'spring' })
   expect(arrivals.calls).toBe(0)
   expect(r.published.map((s) => s.pending?.kind)).not.toContain('giveCard')
+})
+
+it('clears the requestCard pending once the flyer is up on a miss, not just at the end', async () => {
+  // `_useRequestStaging`'s `asking` (and its `CardCatalog` band) stays
+  // mounted for as long as `pending.kind === 'requestCard'` is the asker's
+  // own. A miss never hands that pending to a `giveCard` — nothing in the
+  // projection survives it — so the leg has to clear it itself once its own
+  // centre flyer takes over, or the band lingers underneath that flyer for
+  // the whole hold, shake and note.
+  const on = {
+    ...base,
+    pending: { kind: 'requestCard', player: 'p1', target: 'p2' },
+  } as BoardState
+  const r = runRequested(requestPlan({ hit: false }), on)
+  await r.go()
+  expect(r.published.length).toBeGreaterThan(0)
+  expect(r.published.at(-1)?.pending).toBeNull()
 })
 
 it('flinches your own fan when the miss is aimed at you', async () => {

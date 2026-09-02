@@ -120,6 +120,38 @@ export function useTransferBeat(anchors: BoardAnchors) {
     c.publish(next)
   }, [])
 
+  // The recipient is one card heavier the moment the flight lands on them.
+  // Symmetric with `dropFromDonor` above, and its own step for the same
+  // reason — used from the two legs where the recipient IS an opponent's seat
+  // rather than `you.hand` (the taker's own arrival goes through
+  // `useHandArrival` instead, which publishes its own landing).
+  const bumpRecipient = useCallback((player: string) => {
+    const c = ctx.current
+    if (!c) return
+    const next: BoardState = {
+      ...c.base,
+      opponents: c.base.opponents.map((o) =>
+        o.id === player ? { ...o, handCount: o.handCount + 1 } : o,
+      ),
+    }
+    c.base = next
+    c.publish(next)
+  }, [])
+
+  // The pre-batch pending stops here, the moment a leg's own carrier takes
+  // the card over. Same idiom as `defenseBeat`'s TAKEOFF publish: the beat
+  // publishes the state it is animating TOWARD, so `_Board.tsx`'s static
+  // `giveCard` render (and `_useRequestStaging`'s `requestCard` band) has
+  // nothing left to key on once this fires — instead of standing the same
+  // card at the centre underneath this exact flyer for the rest of the leg.
+  const clearPending = useCallback(() => {
+    const c = ctx.current
+    if (!c) return
+    const next: BoardState = { ...c.base, pending: null }
+    c.base = next
+    c.publish(next)
+  }, [])
+
   const { t } = useTranslation()
   // The miss note. State rather than a ref: it is rendered, and the overlay has
   // to re-render when it appears and again when it goes.
@@ -178,6 +210,15 @@ export function useTransferBeat(anchors: BoardAnchors) {
         // A MISS. The pending clears outright, so nothing in the projection
         // survives this — the beat carries the whole scene or the table never
         // learns the outcome, which is the rule this exists to keep.
+        //
+        // Cleared HERE, not at the end: the flyer above is already up and
+        // holding the card at the centre, so this is the moment it takes over
+        // from the asker's own `CardCatalog` band (`_useRequestStaging`,
+        // still armed on `requestCard`). Left standing, that band would stay
+        // mounted showing the same card underneath this flyer for the whole
+        // hold, shake and note, then vanish with no animation when the queue
+        // drains.
+        clearPending()
         await wait(REQUEST_HOLD)
         // Rendered as the target actually appears: a Seat to everyone watching,
         // and to the target themselves no seat at all — they are `you`, and
@@ -193,7 +234,7 @@ export function useTransferBeat(anchors: BoardAnchors) {
         ctx.current = null
       }
     },
-    [raise, drop],
+    [raise, drop, clearPending],
   )
 
   const runTransfer = useCallback(
@@ -246,6 +287,14 @@ export function useTransferBeat(anchors: BoardAnchors) {
             for (let i = 0; i < backs.length; i++) drop(`offer${i}`)
           }
           const [el] = await raise([{ key: KEY, card, at: from, faceDown: true }])
+          // TAKEOFF: our own flyer now holds the card (still at the seat, not
+          // yet at the centre — but the pending is not standing in for a
+          // position, it is standing in for OWNERSHIP of this card's render,
+          // and that just changed hands). Clearing any earlier would race the
+          // raise above and blank nothing in exchange; any later leaves
+          // `_Board.tsx`'s static `giveCard` render doubling this same card
+          // at the centre while the flyer is still crossing to it.
+          clearPending()
           if (el) {
             const anim = play('takeFromSeat', el, { from, to: centre })
             if (anim) await anim.finished
@@ -281,11 +330,16 @@ export function useTransferBeat(anchors: BoardAnchors) {
           const slot = index >= 0 ? rectOf(a.handSlotAt(index)) : null
           if (!slot) return
           const [el] = await raise([{ key: KEY, card, at: slot, faceDown: false }])
-          // your fan closes the gap while the card is in the air
+          // your fan closes the gap while the card is in the air, and the
+          // `giveCard` pending clears in the same publish: our own flyer now
+          // holds the card, so `_Board.tsx`'s static centre render has
+          // nothing left to earn its keep with (same TAKEOFF moment the taker
+          // leg marks separately, folded here into a publish this leg already
+          // makes).
           const c0 = ctx.current
           if (c0) {
             const hand = c0.base.you.hand.filter((_, i) => i !== index)
-            const next = { ...c0.base, you: { ...c0.base.you, hand } }
+            const next = { ...c0.base, pending: null, you: { ...c0.base.you, hand } }
             c0.base = next
             c0.publish(next)
           }
@@ -306,17 +360,7 @@ export function useTransferBeat(anchors: BoardAnchors) {
           }
           drop(KEY)
           // …and the taker's counter carries it now. That counter IS their hand.
-          const c1 = ctx.current
-          if (c1) {
-            const next: BoardState = {
-              ...c1.base,
-              opponents: c1.base.opponents.map((o) =>
-                o.id === plan.to ? { ...o, handCount: o.handCount + 1 } : o,
-              ),
-            }
-            c1.base = next
-            c1.publish(next)
-          }
+          bumpRecipient(plan.to)
           return
         }
         // A watcher. `plan.card` is absent — not "unknown to us", absent from
@@ -336,6 +380,12 @@ export function useTransferBeat(anchors: BoardAnchors) {
         const from = cardBoxIn(fromSeat, CARD_W * SEAT_SHRINK)
         const to = cardBoxIn(toSeat, CARD_W * SEAT_SHRINK)
         const [el] = await raise([{ key: KEY, card: COVER, at: from, faceDown: true }])
+        // TAKEOFF, watcher leg: the `giveCard` pending is public even to a
+        // watcher (`pendingView`'s `requested` carries no `mine` gate — the
+        // request was named aloud), so a watcher's board is standing the same
+        // static centre render as everyone else's until this fires. Our own
+        // cover flyer above now carries the crossing, so it stops here.
+        clearPending()
         if (el) {
           const out = play('takeFromSeat', el, { from, to: centre })
           if (out) await out.finished
@@ -345,22 +395,12 @@ export function useTransferBeat(anchors: BoardAnchors) {
           if (home) await home.finished
         }
         drop(KEY)
-        const c = ctx.current
-        if (c) {
-          const next: BoardState = {
-            ...c.base,
-            opponents: c.base.opponents.map((o) =>
-              o.id === plan.to ? { ...o, handCount: o.handCount + 1 } : o,
-            ),
-          }
-          c.base = next
-          c.publish(next)
-        }
+        bumpRecipient(plan.to)
       } finally {
         ctx.current = null
       }
     },
-    [raise, pin, patch, drop, elOf, dropFromDonor],
+    [raise, pin, patch, drop, elOf, dropFromDonor, bumpRecipient, clearPending],
   )
 
   // A new match cancels what is in the air: the carrier this run may have left
