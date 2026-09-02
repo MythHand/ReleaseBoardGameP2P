@@ -4,7 +4,11 @@ import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
 import { useTransferBeat } from './transferBeat'
 
-const played = vi.hoisted(() => ({ names: [] as string[], shakes: [] as unknown[] }))
+const played = vi.hoisted(() => ({
+  names: [] as string[],
+  shakes: [] as unknown[],
+  takes: [] as unknown[],
+}))
 const arrivals = vi.hoisted(() => ({ handLengths: [] as number[], calls: 0 }))
 
 vi.mock('@release/ui/animations', async (importOriginal) => {
@@ -14,6 +18,7 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     play: (name: string, _el: unknown, params?: unknown) => {
       played.names.push(name)
       if (name === 'shake') played.shakes.push(params)
+      if (name === 'takeFromSeat') played.takes.push(params)
       return { finished: Promise.resolve() } as unknown as Animation
     },
     useHandArrival: (...args: Parameters<typeof real.useHandArrival>) => {
@@ -110,6 +115,7 @@ function runTransfer(plan: Extract<BeatPlan, { kind: 'handTransfer' }>) {
 beforeEach(() => {
   played.names = []
   played.shakes = []
+  played.takes = []
   arrivals.handLengths = []
   arrivals.calls = 0
 })
@@ -290,4 +296,25 @@ it('offers nothing to a watcher', async () => {
   )
   await r.go()
   expect(played.names.filter((n) => n === 'takeFromSeat').length).toBe(1)
+})
+
+it('centres a single offered back on the table centre', async () => {
+  // A single card in hand triggers the offer, which should position it at the
+  // centre rather than offset to the left (the bug was: span was non-zero even
+  // when n=1, causing an offset of -OFFER_SPREAD*width/2).
+  const r = runTransfer(transferPlan({ named: false, donorHand: 1 }))
+  await r.go()
+  // 1 offered back + 1 taken card's own flight = 2 takeFromSeat calls
+  const takes = played.names.filter((n) => n === 'takeFromSeat').length
+  expect(takes).toBe(2)
+  expect(arrivals.calls).toBe(1)
+})
+
+it('caps the offer at OFFER_MAX even when the donor holds more', async () => {
+  const r = runTransfer(transferPlan({ named: false, donorHand: 20 }))
+  await r.go()
+  // 9 offered backs (OFFER_MAX) + 1 taken card's own flight
+  const takes = played.names.filter((n) => n === 'takeFromSeat').length
+  expect(takes).toBe(10)
+  expect(arrivals.calls).toBe(1)
 })

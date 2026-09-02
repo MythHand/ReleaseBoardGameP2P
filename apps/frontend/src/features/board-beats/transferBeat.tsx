@@ -65,7 +65,7 @@ const rectOf = (el: Element | null): Rect | null => {
 // start reading as "a deck", and the suspense is the same either way.
 function offerPoses(count: number, centre: Rect): Rect[] {
   const n = Math.max(1, Math.min(OFFER_MAX, count))
-  const span = centre.width * OFFER_SPREAD
+  const span = n === 1 ? 0 : centre.width * OFFER_SPREAD
   const step = n === 1 ? 0 : span / (n - 1)
   const first = centre.left + centre.width / 2 - span / 2 - centre.width / 2
   return Array.from({ length: n }, (_, i) => ({
