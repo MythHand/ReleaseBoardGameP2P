@@ -73,6 +73,7 @@ const transferPlan = (
 
 function runTransfer(plan: Extract<BeatPlan, { kind: 'handTransfer' }>) {
   const published: BoardState[] = []
+  const domSnapshots: string[] = []
   let start: (() => Promise<void>) | null = null
   function Probe() {
     const beat = useTransferBeat(anchors)
@@ -83,6 +84,7 @@ function runTransfer(plan: Extract<BeatPlan, { kind: 'handTransfer' }>) {
   return {
     published,
     view,
+    domSnapshots,
     go: async () => {
       vi.useFakeTimers()
       try {
@@ -94,6 +96,8 @@ function runTransfer(plan: Extract<BeatPlan, { kind: 'handTransfer' }>) {
           await act(async () => {
             await vi.advanceTimersByTimeAsync(20)
           })
+          // Capture the DOM state after each animation frame
+          domSnapshots.push(view.container.innerHTML)
         }
         await finished
       } finally {
@@ -169,5 +173,8 @@ it('leaks no identity into the DOM for a peer that is not a party', async () => 
     transferPlan({ from: 'p2', to: 'p3', role: 'watcher', card: undefined, named: false }),
   )
   await r.go()
-  expect(r.view.container.innerHTML).not.toContain('attack-bug')
+  // Check every snapshot captured during the flight
+  for (const snapshot of r.domSnapshots) {
+    expect(snapshot).not.toContain('attack-bug')
+  }
 })
