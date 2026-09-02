@@ -92,6 +92,24 @@ export interface Options {
   onReturned?: (uid: string, slot: number) => void
 }
 
+interface ArrivalEntry {
+  key: string
+  uid: string
+}
+
+type ArrivalContext =
+  | {
+      kind: 'placement'
+      run: number
+      entry: ArrivalEntry & { slot: number }
+    }
+  | {
+      kind: 'rejection'
+      run: number
+      entries: ArrivalEntry[]
+      rejected: string[]
+    }
+
 export function useHandLimit({
   state,
   anchors,
@@ -113,9 +131,13 @@ export function useHandLimit({
   const [back, setBack] = useState<
     (GridCard & { w: number; h: number; fracX: number; fracY: number }) | null
   >(null)
+  const [placementReturning, setPlacementReturning] = useState(false)
   const [dropSlot, setDropSlot] = useState<number | null>(null)
   const backRef = useRef<HTMLDivElement | null>(null)
   const cursor = useRef({ x: 0, y: 0 })
+  // True from cell pickup through the final carrier's landing/refusal. State
+  // paints the Hand contract; this ref closes the synchronous gesture gates.
+  const carryActive = useRef(false)
   // The drag's handlers are the closure they began with (I8) — the slot under
   // the pointer changes under them, so they read it through a ref.
   const dropSlotRef = useRef<number | null>(null)
@@ -141,10 +163,10 @@ export function useHandLimit({
   const flightSeq = useRef(0)
   // bumped on a match wipe — a flight from a dead match stops committing
   const runId = useRef(0)
-  const arrivalRun = useRef<number | null>(null)
-  // Rejections and pointer placements share `useHandArrival`; only the latter
-  // commits the slot the player named when its carrier lands.
-  const arrivalReturnsPlacement = useRef(false)
+  const arrivalSeq = useRef(0)
+  // Rejections and pointer placements share `useHandArrival`, but the callback
+  // consumes only the exact invocation whose unique carrier keys landed.
+  const arrivalContext = useRef<ArrivalContext | null>(null)
   // how much of the feed had arrived when we dispatched: the rejection watcher
   // reads only what came after, or a past rejection of the same decision would
   // cancel a fresh one
@@ -163,21 +185,34 @@ export function useHandLimit({
   const handItemsRef = useRef(handItems)
   handItemsRef.current = handItems
 
-  // the cards return to the fan on a rejection — the shared step, the same one
-  // a draw and an undo use, so a refused decision reads as the event it undoes
-  const arrival = useHandArrival(anchors.hand, (gap, landedCards) => {
-    if (arrivalRun.current !== runId.current) return
-    arrivalRun.current = null
-    const commitsPlacement = arrivalReturnsPlacement.current
-    arrivalReturnsPlacement.current = false
-    const returned = new Set(landedCards.map((landedCard) => landedCard.key))
-    pickedRef.current = pickedRef.current.filter((uid) => !returned.has(uid))
+  const restorePicked = useCallback((uids: string[]) => {
+    const restored = new Set(uids)
+    pickedRef.current = pickedRef.current.filter((uid) => !restored.has(uid))
     setPicked(pickedRef.current)
-    if (commitsPlacement) {
-      for (const [i, landedCard] of landedCards.entries()) {
-        latest.current.onReturned?.(landedCard.key, gap + i)
-      }
+  }, [])
+
+  // The cards return to the fan through one shared step. Its invocation record
+  // distinguishes a rejected action (restore its WHOLE choice, even if only
+  // some cells had geometry) from one pointer placement (commit its own slot).
+  const arrival = useHandArrival(anchors.hand, (_gap, landedCards) => {
+    const context = arrivalContext.current
+    if (!context || context.run !== runId.current) return
+    const expected = context.kind === 'placement' ? [context.entry] : context.entries
+    if (
+      landedCards.length !== expected.length ||
+      landedCards.some((landedCard, i) => landedCard.key !== expected[i]?.key)
+    ) {
+      return
     }
+    arrivalContext.current = null
+    if (context.kind === 'rejection') {
+      restorePicked(context.rejected)
+      return
+    }
+    restorePicked([context.entry.uid])
+    latest.current.onReturned?.(context.entry.uid, context.entry.slot)
+    carryActive.current = false
+    setPlacementReturning(false)
   })
 
   const bindCell = useCallback((slot: number, el: HTMLDivElement | null) => {
@@ -194,8 +229,8 @@ export function useHandLimit({
     pickedRef.current = []
     dispatchedRef.current = false
     dispatchedChoice.current = null
-    arrivalRun.current = null
-    arrivalReturnsPlacement.current = false
+    arrivalContext.current = null
+    carryActive.current = false
     dropSlotRef.current = null
     setCells(0)
     setPlaced([])
@@ -203,6 +238,7 @@ export function useHandLimit({
     setHanded(false)
     setDispatched(false)
     setBack(null)
+    setPlacementReturning(false)
     setDropSlot(null)
   }, [])
 
@@ -264,27 +300,25 @@ export function useHandLimit({
     [anchors.hand],
   )
 
-  const onCellDown = useCallback(
-    (e: React.MouseEvent, card: GridCard) => {
-      if (back || dispatchedRef.current) return
-      const r = e.currentTarget.getBoundingClientRect()
-      e.preventDefault()
-      cursor.current = { x: e.clientX, y: e.clientY }
-      // The cell is free again the instant the card leaves it — a SET, so this
-      // very cell is the one the next pull takes back.
-      claimed.current.delete(card.slot)
-      landed.current -= 1
-      setPlaced((placedCards) => placedCards.filter((placedCard) => placedCard.slot !== card.slot))
-      setBack({
-        ...card,
-        w: r.width,
-        h: r.height,
-        fracX: (e.clientX - r.left) / r.width,
-        fracY: (e.clientY - r.top) / r.height,
-      })
-    },
-    [back],
-  )
+  const onCellDown = useCallback((e: React.MouseEvent, card: GridCard) => {
+    if (carryActive.current || dispatchedRef.current) return
+    const r = e.currentTarget.getBoundingClientRect()
+    e.preventDefault()
+    carryActive.current = true
+    cursor.current = { x: e.clientX, y: e.clientY }
+    // The cell is free again the instant the card leaves it — a SET, so this
+    // very cell is the one the next pull takes back.
+    claimed.current.delete(card.slot)
+    landed.current -= 1
+    setPlaced((placedCards) => placedCards.filter((placedCard) => placedCard.slot !== card.slot))
+    setBack({
+      ...card,
+      w: r.width,
+      h: r.height,
+      fracX: (e.clientX - r.left) / r.width,
+      fracY: (e.clientY - r.top) / r.height,
+    })
+  }, [])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `back` is the trigger; the handlers deliberately use the closure captured when the drag began (I8)
   useEffect(() => {
@@ -317,27 +351,37 @@ export function useHandLimit({
         // Into the slot the POINTER named, not the middle of the fan: the hand
         // just said where, and landing anywhere else ignores it.
         if (reduced || !rect) {
-          pickedRef.current = pickedRef.current.filter((uid) => uid !== back.uid)
-          setPicked(pickedRef.current)
+          restorePicked([back.uid])
           latest.current.onReturned?.(back.uid, at)
+          carryActive.current = false
           return
         }
         void (async () => {
-          arrivalRun.current = mine
-          arrivalReturnsPlacement.current = true
+          const context: ArrivalContext = {
+            kind: 'placement',
+            run: mine,
+            entry: {
+              key: `hl-arrival-${++arrivalSeq.current}`,
+              uid: back.uid,
+              slot: at,
+            },
+          }
+          arrivalContext.current = context
+          setPlacementReturning(true)
           const taken = await arrival.arrive(
-            [{ key: back.uid, card: back.card, from: rect }],
+            [{ key: context.entry.key, card: back.card, from: rect }],
             handItemsRef.current.length,
             at,
           )
           if (runId.current !== mine || taken) return
-          arrivalRun.current = null
-          arrivalReturnsPlacement.current = false
+          if (arrivalContext.current !== context) return
+          arrivalContext.current = null
           // If the shared step is busy or cannot measure the fan, preserve the
           // logical return instead of leaving the card absent from both places.
-          pickedRef.current = pickedRef.current.filter((uid) => uid !== back.uid)
-          setPicked(pickedRef.current)
+          restorePicked([back.uid])
           latest.current.onReturned?.(back.uid, at)
+          carryActive.current = false
+          setPlacementReturning(false)
         })()
         return
       }
@@ -356,6 +400,7 @@ export function useHandLimit({
         { uid: back.uid, card: back.card, slot: back.slot },
       ])
       setBack(null)
+      carryActive.current = false
       if (landed.current === cellsRef.current) finish()
     }
     window.addEventListener('mousemove', onMove)
@@ -377,7 +422,15 @@ export function useHandLimit({
   const onHandPlay = useCallback(
     (uid: string, drop: HandPlayDrop): boolean => {
       const p = latest.current.pending
-      if (back || !enabled || !p || dispatchedRef.current) return false
+      if (
+        back ||
+        placementReturning ||
+        carryActive.current ||
+        !enabled ||
+        !p ||
+        dispatchedRef.current
+      )
+        return false
       if (!p.options.includes(uid)) return false
       // AT THE LIMIT: refused, and the kit glides the card home — the existing
       // settle-back (`Hand.tsx`), not a new animation.
@@ -397,7 +450,7 @@ export function useHandLimit({
       void flyToCell(uid, item.card, slot, drop.rect)
       return true
     },
-    [back, enabled, state.you.hand, flyToCell, freeSlot],
+    [back, placementReturning, enabled, state.you.hand, flyToCell, freeSlot],
   )
 
   // Lit while cards are still owed, and only on the cards that answer — the
@@ -406,7 +459,7 @@ export function useHandLimit({
   // of the move, not the type of the card.
   const stateAt = useCallback(
     (index: number): HandCardState => {
-      if (!enabled || !pending || dispatched) return 'idle'
+      if (carryActive.current || !enabled || !pending || dispatched) return 'idle'
       if (picked.length >= pending.excess) return 'idle'
       const item = handItems[index]
       if (!item) return 'idle'
@@ -450,7 +503,7 @@ export function useHandLimit({
     const returning = placed
       .map((p) => {
         const box = cellEls.current[p.slot]?.getBoundingClientRect()
-        return box ? { key: p.uid, card: p.card, from: box } : null
+        return box ? { uid: p.uid, card: p.card, from: box } : null
       })
       .filter((x): x is NonNullable<typeof x> => x != null)
     claimed.current.clear()
@@ -462,22 +515,30 @@ export function useHandLimit({
     setCells(0)
     cellsRef.current = 0
     if (reduced || returning.length === 0) {
-      pickedRef.current = []
-      setPicked([])
+      restorePicked(sent.cards)
       return
     }
     void (async () => {
       const mine = runId.current
-      arrivalRun.current = mine
-      arrivalReturnsPlacement.current = false
-      const taken = await arrival.arrive(returning, handItemsRef.current.length)
+      const entries = returning.map((item) => ({
+        ...item,
+        key: `hl-arrival-${++arrivalSeq.current}`,
+      }))
+      const context: ArrivalContext = {
+        kind: 'rejection',
+        run: mine,
+        entries: entries.map(({ key, uid }) => ({ key, uid })),
+        rejected: [...sent.cards],
+      }
+      arrivalContext.current = context
+      const taken = await arrival.arrive(entries, handItemsRef.current.length)
       if (runId.current !== mine) return
       if (taken) return
-      arrivalRun.current = null
-      pickedRef.current = []
-      setPicked([])
+      if (arrivalContext.current !== context) return
+      arrivalContext.current = null
+      restorePicked(context.rejected)
     })()
-  }, [dispatched, events, placed, reduced, arrival.arrive])
+  }, [dispatched, events, placed, reduced, arrival.arrive, restorePicked])
 
   // The pending is gone: the decision is closed and nothing here may outlive
   // it. While a beat runs, the board renders its shadow — which still carries
@@ -532,7 +593,7 @@ export function useHandLimit({
     picked,
     handed,
     dispatched,
-    carrying: back != null,
+    carrying: back != null || placementReturning,
     owed: pending ? Math.max(0, pending.excess - picked.length) : 0,
     overlay: [...flyer.overlay, ...arrival.overlay, ...(backOverlay ? [backOverlay] : [])],
     gapAt: back ? dropSlot : arrival.gapAt,

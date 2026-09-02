@@ -369,6 +369,47 @@ it('opens a fan gap while a rejected card animates home', async () => {
   }
 })
 
+it('restores every rejected uid when only some grid cells have return geometry', async () => {
+  motion.reduced = false
+  flights.release = []
+  const onResolve = vi.fn()
+  const actions = { onResolve }
+  const view = render(boardOverLimit(2, actions))
+
+  try {
+    await pullCardFromFan(0)
+    await pullCardFromFan(0)
+    await act(async () => {
+      for (const land of flights.release.splice(0)) land()
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(onResolve).toHaveBeenCalledWith({
+      kind: 'handLimit',
+      cards: ['attack-bug#0', 'protection-debugger#0'],
+    })
+
+    const missing = document.querySelector<HTMLElement>('[data-grid-cell="1"]')
+    if (!missing) throw new Error('missing second grid cell')
+    vi.spyOn(missing, 'getBoundingClientRect').mockReturnValueOnce(undefined as unknown as DOMRect)
+    view.rerender(
+      boardOverLimit(2, actions, [rejectedHandLimit(['attack-bug#0', 'protection-debugger#0'])]),
+    )
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 80))
+    })
+    expect(document.querySelector(`.${handArrivalStyles.arriving}`)).toBeTruthy()
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 520))
+    })
+    expect(document.querySelector(`.${handArrivalStyles.arriving}`)).toBeNull()
+    // Geometry controls what can animate, never which rejected UIDs recover.
+    expect(fanSlots()).toBe(HAND.length)
+  } finally {
+    motion.reduced = true
+  }
+})
+
 it('invalidates a returning carrier when the pending clears before it lands', async () => {
   motion.reduced = false
   flights.release = []

@@ -9,6 +9,7 @@ import type { CardData, TableActions } from '@release/ui'
 import { cardById } from '@release/ui'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
+import handArrivalStyles from '@/animations/useHandArrival.module.css'
 import Board from '../_Board'
 import { makeBoardProps } from './fixture'
 
@@ -76,6 +77,16 @@ async function carryBack(slot: number) {
 
 const fanSlots = () => document.querySelectorAll('[data-hand-slot]').length
 const filledCells = () => document.querySelectorAll('[data-grid-card]').length
+const handCardIds = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('[data-hand-slot] [data-card]')).map((card) =>
+    card.getAttribute('data-card'),
+  )
+const ownersOf = (id: string) =>
+  [
+    document.querySelector(`[data-grid-card] [data-card="${id}"]`),
+    document.querySelector(`[data-hand-slot] [data-card="${id}"]`),
+    document.querySelector(`.${handArrivalStyles.arriving} [data-card="${id}"]`),
+  ].filter(Boolean).length
 
 it('a card carried back to the hand leaves the grid and returns to the fan', async () => {
   render(boardOverLimit(2))
@@ -118,6 +129,9 @@ it('does not fill and resolve the grid while a card is being carried back', asyn
   expect(onResolve).not.toHaveBeenCalled()
   expect(filledCells()).toBe(1)
   expect(fanSlots()).toBe(HAND.length - 1)
+  expect(
+    document.querySelector('[data-grid-cell="0"] [data-grid-card]')?.getAttribute('data-grid-card'),
+  ).toBe('attack-bug#0')
 })
 
 it('hands the card from the cursor carrier to the arrival before showing it in the fan', async () => {
@@ -136,11 +150,78 @@ it('hands the card from the cursor carrier to the arrival before showing it in t
 
     // The source and cursor carrier have gone, but the arrival owns the card;
     // rendering the fan copy now would duplicate it for the whole flight.
+    expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`)).toHaveLength(1)
+    expect(filledCells()).toBe(0)
     expect(fanSlots()).toBe(HAND.length - 1)
+    expect(ownersOf('attack-bug')).toBe(1)
     await act(async () => {
       await new Promise((r) => setTimeout(r, 600))
     })
+    expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`)).toHaveLength(0)
     expect(fanSlots()).toBe(HAND.length)
+    // clientX 120 points after the one remaining card in jsdom's zero-width
+    // hand box, so the player's private order must keep that named slot.
+    expect(handCardIds()).toEqual(['protection-debugger', 'attack-bug'])
+  } finally {
+    motion.reduced = true
+  }
+})
+
+it('blocks a second grid return while the first placement arrival owns its card', async () => {
+  motion.reduced = false
+  try {
+    render(boardOverLimit(3))
+    await pullCardFromFan(0)
+    await pullCardFromFan(0)
+
+    const first = document.querySelector<HTMLElement>('[data-grid-cell="0"] [data-grid-card]')
+    const second = document.querySelector<HTMLElement>('[data-grid-cell="1"] [data-grid-card]')
+    if (!first || !second) throw new Error('missing filled grid cells')
+    const hand = document.querySelector<HTMLElement>('[class*="handWrap"]')
+    const y = (hand?.getBoundingClientRect().top ?? 0) + 10
+    fireEvent.mouseDown(first, { clientX: 100, clientY: 100 })
+    fireEvent.mouseMove(window, { clientX: 120, clientY: y })
+    fireEvent.mouseUp(window, { clientX: 120, clientY: y })
+    expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`)).toHaveLength(1)
+
+    fireEvent.mouseDown(second, { clientX: 100, clientY: 100 })
+    expect(filledCells()).toBe(1)
+    expect(
+      document
+        .querySelector('[data-grid-cell="1"] [data-grid-card]')
+        ?.getAttribute('data-grid-card'),
+    ).toBe('protection-debugger#0')
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 600))
+    })
+    expect(handCardIds()).toEqual(['attack-bug'])
+  } finally {
+    motion.reduced = true
+  }
+})
+
+it('blocks a fan pull until the placement arrival lands', async () => {
+  motion.reduced = false
+  const onResolve = vi.fn()
+  try {
+    render(boardOverLimit(2, { onResolve }))
+    await pullCardFromFan(0)
+
+    const cell = document.querySelector<HTMLElement>('[data-grid-cell="0"] [data-grid-card]')
+    if (!cell) throw new Error('no card in that cell')
+    const hand = document.querySelector<HTMLElement>('[class*="handWrap"]')
+    const y = (hand?.getBoundingClientRect().top ?? 0) + 10
+    fireEvent.mouseDown(cell, { clientX: 100, clientY: 100 })
+    fireEvent.mouseMove(window, { clientX: 120, clientY: y })
+    fireEvent.mouseUp(window, { clientX: 120, clientY: y })
+    expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`)).toHaveLength(1)
+
+    await pullCardFromFan(0)
+    expect(onResolve).not.toHaveBeenCalled()
+    expect(filledCells()).toBe(0)
+    expect(fanSlots()).toBe(HAND.length)
+    expect(handCardIds()).toEqual(['protection-debugger', 'attack-bug'])
   } finally {
     motion.reduced = true
   }
