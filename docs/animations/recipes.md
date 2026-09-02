@@ -1115,54 +1115,74 @@ spot, flips back-up, and the new deck appears there.
 
 ---
 
-## Taking an opponent's card — deal grid, flip the pick, settle into the hand
+## Taking an opponent's card at random — their fan comes down, one back turns over, into your hand
 
 **When to call**
-Player triggers "take a random opponent card" → `deal()`. Phases `idle → deal → resolve`.
+Player triggers "take a random opponent card" → `deal()`. Phases `idle → present → reveal`.
 
 **Visual result**
-Face-down cards fan out from an origin point into a centered grid (staggered); clicking one slides it
-forward and flips it face up; after a pause the chosen card flies into the player's hand while the rest
-shrink back to the origin.
+The opponent's hand — the same `Hand`, backs up, turned 180° so its arc bows toward you — slides down
+from the top of the stage and is held out. Clicking a back sends the rest of the fan back up off the
+top while that card travels to the centre, turning upright on the way; there it flips face up, stands
+for a hold, and drops into your own fan.
 
 **Elements / refs**
-- `slotRefs[i]` — the deal-grid slots (each a face-down `Card`). `handRef` — the player fan (`useHandArrival`).
-- State: `phase`, `pool: PoolCard[]`, `chosen: number | null`, `dealt: boolean`, `hand`.
+- `.topHand` — the offered fan's wrapper, which owns the slide; `.topHandInner` inside it owns the
+  `rotate(180deg)`. The fan itself is `<Hand items={oppHand} faceDown onCardClick={pickCard}>`, so the
+  slots are `Hand`'s own children and the scene keeps no slot registry of its own.
+- `revealRef` — the flying card (`position: fixed`). `handRef` — your fan (`useHandArrival`).
+- State: `phase`, `oppHand: PoolCard[]`, `handIn` (the slide toggle), `chosen: string | null` (a uid),
+  `reveal: { card, from, to } | null`, `centered`, `flipped`, `hand`.
 
 **Sequence**
-1. `deal()`: `setPool(sampleBase(count))`; `setChosen(null)`; `setDealt(false)`; `setPhase('deal')`; then a
-   **double-rAF** → `setDealt(true)` (mount slots at `ORIGIN`, then transition to the grid).
-2. Slot layout is CSS-transition driven by `slotStyle(i)`:
-   - `!dealt` → `transform: ORIGIN` (`translate(-50%, -CARD_H/2 - 20) scale(0.35)`), `opacity: 0`.
-   - dealt, phase `deal` → grid `translate(calc(-50% + pos.x), pos.y - CARD_H/2)`; unchosen slots stagger via
-     `transitionDelay: i*45ms` (while `chosen === null`).
-3. `pickCard(i)` (only in `deal`, `chosen === null`): `setChosen(i)` → the chosen `Card` flips face up
-   (`faceDown={chosen !== i}`) and slides forward (`scale(1.12)`, `z 40`); `window.setTimeout(() => resolve(i), REVEAL_HOLD = 820)`.
-4. `resolve(i)`: measure `slotRefs[i]` rect; `arrive([{ key: uid, card: pool[i].card, from: rect }], hand.length)` (the `useHandArrival` hook
-   flies it into the fan); `setPhase('resolve')`. In `resolve`, `slotStyle` sends the chosen slot to `opacity:0`
-   (the hook owns the flight) and the rest back to `ORIGIN` (`opacity:0`).
-5. `useHandArrival` `onLanded(gap, landed)`: splice into `hand` at `gap`; `setPhase('idle')`; clear `chosen/dealt/pool`.
+1. `deal()`: `setOppHand(sampleBase(count)…)`; `setPhase('present')`; `handIn = false` → **double-rAF**
+   → `handIn = true`. `.topHand` transitions from `translateY(-160%)` to `0`: the fan is mounted off
+   the top edge and paints there before it is asked to come down (like **I2**, and for its reason).
+2. `pickCard(i, el)` (only in `present`, `chosen === null`): measure the clicked slot; compute the
+   delta to the **viewport** centre (`window.innerWidth / 2` — this scene has no stage inset to
+   correct for, unlike its two siblings); `setChosen(uid)`; `setPhase('reveal')`; `handIn = false` (the
+   rest of the fan slides back up and off); build `reveal` with the slot's rect as `from` and, as `to`,
+   `translate(dx, dy) scale(REVEAL_W / r.width) rotate(0deg)`; **double-rAF** → `centered = true`.
+   The chosen slot's `renderFace` returns `null` from here on, so the card is never on screen twice.
+3. The flyer starts at `rotate(180deg)` — the orientation it had inside the opponent's fan — and the
+   CSS transition on `.reveal` carries it all the way to `to`, so it turns upright over the flight
+   rather than snapping at either end.
+4. `onRevealEnd` (transform end, `centered && !flipped`): `flipped = true`, so `Card` plays its own
+   `flipCard`; then `setTimeout(fall, REVEAL_HOLD)`.
+5. `fall()`: measure the reveal node; `arrive([{ key: nextHandUid(), card, from: rect }], hand.length)`
+   — the shared `useHandArrival` flies it into your fan; `setReveal(null)`.
+6. `onLanded(gap, landed)`: splice into `hand` at `gap`, then clear the round — `phase` to `idle`, and
+   `oppHand` / `chosen` / `reveal` / `centered` / `flipped` / `handIn` reset.
 
 **Params & timings**
-| Step | Mechanism | Duration |
+| Step | Mechanism | Value |
 |---|---|---|
-| deal-in / return | CSS transition on the slot (`ORIGIN ↔ grid`), staggered `i*45ms` | (CSS) |
-| flip the pick | `Card` `flipCard` on `faceDown` change | 420 ms |
-| reveal hold before flight | `setTimeout(REVEAL_HOLD)` | 820 ms |
+| the fan comes down / goes back up | CSS transition on `.topHand` (`transform`), `--ease-soft` | 520 ms |
+| slot → centre | CSS transition on `.reveal` (`transform`), `--ease-soft` | 460 ms |
+| flip the pick | `Card`'s own `flipCard` on the `faceDown` change | 420 ms |
+| centre hold before the drop | `setTimeout(REVEAL_HOLD)` | 820 ms |
 | chosen → hand | `useHandArrival` | `FLIGHT_MS = 480` |
+| the width it reaches at the centre | `REVEAL_W` | 220 px |
+| how big a hand is offered / your own | `count` (slider) / `INITIAL_HAND` | 2…16, default 8 / 5 |
 
 **Invariants**
-- The deal / reveal / return are **CSS transitions** on the slots (not `play()` presets); the flip is the
-  `Card`'s own `flipCard`. Only the final hand insert uses a module (`useHandArrival`).
-- Local: the double-rAF (like **I2**) lets slots paint at `ORIGIN` before transitioning to the grid; the
-  reveal→flight gap is `REVEAL_HOLD`.
+- The slide, the flight and the return are **CSS transitions** on nodes the scene owns; the flip is
+  the `Card`'s own `flipCard`. Only the final hand insert is a module (`useHandArrival`).
+- The chosen slot renders `null` while the flyer carries the card — one card, one node.
+- Local: the double-rAF (like **I2**) is used twice, once so the fan paints off the top edge before it
+  comes down, once so the flyer paints at its slot rect before it leaves it.
+- Nothing here decides WHICH card is taken — the player clicks a back and learns what it was only at
+  the centre. The pick is a **reveal**, and that is the half of this scene the board keeps when the
+  engine's RNG does the choosing (see the board recipe below).
 
 **End state & cleanup**
-- Chosen card inserted into the hand at `gap`; pool cleared; `phase` back to `idle` (via the hook callback).
+The chosen card is spliced into your hand at `gap`, `oppHand` is cleared and `phase` is back to `idle`
+— all of it from the hook's `onLanded`. `restart` clears the hold timer, resets the arrival and
+rebuilds your hand.
 
 **Building blocks**
-[`useHandArrival`](./reference.md#hand-arrival--cards-arrive-in-the-hand) · `Card` `flipCard` (auto). Grid geometry: `gridPositions`
-(uses `DEAL_CARD_W`, `CARD_H`, `GAP_X/Y`, `COLS_MAX`); the `ORIGIN` transform.
+[`useHandArrival`](./reference.md#hand-arrival--cards-arrive-in-the-hand) · `Hand` (`faceDown`,
+`onCardClick`, `renderFace`) · `Card` `flipCard` (auto) · CSS transitions on `.topHand` / `.reveal`.
 
 **Live reference**
 `Random opponent card` — `apps/playground/stories/interactive/PickOpponentCardStory.tsx`.
@@ -1696,56 +1716,270 @@ leaves (miss).
 
 ---
 
-## Opponent takes your card — the victim's view (a card leaves your hand)
+## Opponent takes your card — the victim's view (a card leaves your hand for a seat)
 
 **When to call**
-Mirror of the above, from the target's side (`giveCard`): the opponent names a card and it leaves YOUR hand.
-`start()` → `pickWanted(card)`. Phases `idle → choose → picked → (take | miss)`; stages `from → center → up`.
+Mirror of "Take a specific card", from the target's side (`giveCard`): the opponent names a card and it
+leaves YOUR hand. `start()` → `pickWanted(card)` → `confirmWanted()`. Phases
+`idle → choose → picked → (take | miss)`; stages `from → center → up`.
 
 **Visual result**
-The opponent's broadcast catalog grid and their face-down fan slide in from the top. The picked card holds; then,
-if you hold it, that card lifts out of your hand, flies to the centre, flips **face-down** (now theirs) and tucks
-up behind the opponent fan; else a "you don't have that card" note shows and nothing leaves.
+The opponent's catalog stands in the middle band — the same `CardCatalog` the taker picks from,
+broadcast, so you watch them choose. The named card holds enlarged while the rest of the catalog slides
+away; then, if you hold that card, it lifts out of your fan, flies to the stage centre, flips
+**face-down** (it is theirs now) and sinks into the taker's **seat**, shrinking into a card-sized box
+inside it and dissolving as their hand counter goes up. Else a "you don't have that card" note shows
+and nothing leaves.
 
 **Elements / refs**
-- `rootRef` (stage), `handRef` (your fan — slots are inner children), `fanRef` (opponent fan — the take lands at
-  its centre).
-- State: `phase`, `wanted`, `oppHand`, `handIn`, `hand`, `take: {card, from, center, up}`,
-  `stage: 'from' | 'center' | 'up'`, `flipped`.
+- `rootRef` (stage — the centre is measured against it, not `window`: the playground has a sidebar),
+  `handRef` (your fan — the slots are its inner children), `seatRefs[id]` (the opponents' `Seat` nodes;
+  the take lands in `TAKER`'s).
+- The opponents are **`Seat`s**, exactly as on the table: their hands are hidden there and the counter
+  IS the hand. There is no opponent fan in this scene to fly into or tuck behind.
+- State: `phase`, `wanted`, `hand`, `taken` (what the taker has gained this run), `take: { card, from,
+  center, up }`, `stage`, `flipped`.
 
 **Sequence**
-1. `start()` / `pickWanted(card)` — as the mirror (the opponent fan slides in; the pick holds `PICK_BEAT`).
-2. `resolve(card)`: find the card in YOUR hand by id. **miss** (`< 0`) → `setPhase('miss')`, `later(backToIdle,
-   MISS_HOLD)`. **hit** → read the source slot rect; compute two transforms — `center` (to the stage centre,
-   `scale(REVEAL_W / r.width)`, `rotate(0)`) and `up` (to the opponent-fan centre, `scale(1)`, `rotate(180)`);
-   remove the card from `hand` (the fan closes the gap); `stage='from'` → double-rAF → `stage='center'`.
-3. `onTakeEnd` (transform end): `center && !flipped` → `flipped=true` (flip **face-down** — now the opponent's
-   hidden card), `later(setStage('up'), CENTER_HOLD)`; `stage==='up'` → append the card to `oppHand`, clear
-   `take`, `later(setHandIn(false), 640)`, `later(backToIdle, 1200)`.
+1. `start()`: `setPhase('choose')` — `CardCatalog` opens across `.grid` (base deck, no triggers, cells
+   at `GRID_W`) with `ConfirmAction` under it. Naming a card is irreversible, so a click only ARMS the
+   pick (`pickWanted` → `wanted`; the cell lights in the shared selection colour) and the bar commits
+   it.
+2. `confirmWanted()`: `setPhase('picked')` — the catalog goes `open={false}` with `chosen={wanted.id}`,
+   which is what holds the named card enlarged while the rest slide away — and
+   `later(() => resolve(wanted), PICK_BEAT)`. From here your fan is `pointer-events: none` for the whole
+   sequence, the same guard Combo, AI cards and Cherry-pick take while they resolve.
+3. `resolve(card)`: find the card in YOUR hand by id. **miss** (`index < 0`) → `setPhase('miss')`, the
+   `.miss` note, `later(backToIdle, MISS_HOLD)`; nothing leaves and nothing flinches. **hit** → read the
+   source slot's rect; compute two transforms — `center` (to the stage centre from `rootRef`,
+   `scale(REVEAL_W / r.width)`, `rotate(0deg)`) and `up` (to the centre of
+   `cardBoxIn(seatRect, r.width * SEAT_SHRINK)`, scaled to that box, `rotate(0deg)`); drop the card from
+   `hand` so your fan closes the gap; `stage = 'from'` → **double-rAF** → `stage = 'center'`.
+4. `onTakeEnd` (transform end): `center && !flipped` → `flipped = true` (`Card faceDown={flipped}` — it
+   turns **face-down**, it is the opponent's hidden card from here), then `later(setStage('up'),
+   CENTER_HOLD)`. `stage === 'up'` → `setTaken(n + 1)` (the taker's `handCount` now carries it),
+   `setTake(null)`, `later(backToIdle, 620)`.
 
 **Params & timings**
 | Step | Value |
 |---|---|
 | chosen holds / others leave | `PICK_BEAT = 620` ms |
+| each hop | CSS transition on `.take` (`transform` + `opacity`), `--ease-soft`, 460 ms |
 | centre width | `REVEAL_W = 220` px |
-| centre hold before flying up | `CENTER_HOLD = 820` ms |
+| centre hold before it sinks into the seat | `CENTER_HOLD = 820` ms |
+| how small it gets inside the seat | `SEAT_SHRINK = 0.7` of the source slot's width |
 | miss note | `MISS_HOLD = 1620` ms |
-| fan leaves after landing | `later(…, 640)` then `backToIdle` at `1200` ms |
+| back to idle once it has landed | `later(…, 620)` ms |
+| your hand / catalog cell | `INITIAL_HAND = 6` · `GRID_W = 100` |
 
 **Invariants**
-- The taken card ends **face-down**, `rotate(180)` — it becomes the opponent's hidden card, matching their fan.
-- The centre is measured against the **stage**, not `window` (**I1** + sidebar).
-- Two-hop flight (`from → center → up`) via **CSS transitions**; `zIndex` drops to 30 on the way up so it tucks
-  behind the opponent fan. No `useHandArrival` — the card leaves the hand, it does not settle into one.
+- The card ends **face-down inside a seat**, not in a fan. It aims at
+  `cardBoxIn(seat, width * SEAT_SHRINK)` and never at the seat's own rect (**I6** — a seat is far wider
+  than a card, and a card told to fill it would inflate), shrinks into that box and fades. This is the
+  `dealToSeat` movement, the same one `Draw card` uses for a card going to a hidden hand — expressed
+  here as a CSS transition rather than the preset, because the whole two-hop flight is one
+  transitioning node.
+- The centre is measured against the **stage** (`rootRef`), not `window` (**I1** + the sidebar).
+- Two hops (`from → center → up`) on one node at a constant `zIndex: 55`. There is nothing to tuck
+  under: the destination is a seat, and a seat is not a stack of cards.
+- **No `useHandArrival`** — the card leaves a hand, it does not settle into one. That is the one thing
+  separating this from its mirror, and the thing a later refactor unifies by accident.
 
 **End state & cleanup**
-- Hit → the card is gone from your hand and shown joining the opponent fan; back to `idle`. Miss → nothing leaves.
+Hit → the card is gone from your hand and the taker's counter is one higher; back to `idle`. Miss →
+nothing leaves. `restart` clears the timers, rebuilds your hand and zeroes `taken`.
 
 **Building blocks**
-`Hand` (`faceDown`, `renderFace`) · CSS transitions on `.take` / `.topHand`.
+`CardCatalog` (`open` / `selected` / `chosen`) · `ConfirmAction` · `Seat` ·
+[`cardBoxIn`](./reference.md#card-geometry-helpers) · `Hand` · CSS transitions on `.take`.
 
 **Live reference**
 `Opponent takes your card` — `apps/playground/stories/interactive/OpponentTakesCardStory.tsx`.
+
+---
+
+## A card changes hands (live board) — taker, victim, watcher, and the ask before them
+
+Driven by `requested` and `handTransfer`, planned by `planBeats` and run by `transferBeat`
+(`useTransferBeat`). The two recipes above are its playground originals, and the board **translates**
+them rather than transcribing them: there is no opponent fan here — an opponent's hand is a `Seat` and
+a count — so the named steal and the random one both come out of the donor's seat. The gesture
+survives; the geometry belonged to a stage with no seats in it.
+
+**When to call**
+Never directly. `useBeats` plans a `requested` beat from the engine's `requested` event and a
+`handTransfer` beat from `handTransfer`, and runs them through `runRequested` / `runTransfer`. Neither
+is `exclusive` and neither raises `alarm`: a card changing hands does not own the table, and nothing
+about it needs input dead.
+
+**Visual result**
+Three of them, and which one you get is decided by what the event carried rather than by a rule the
+board re-derives.
+- **Taker** — the card comes out of the donor's seat, turns face-up at the centre, stands, and settles
+  into your fan. If the steal was random rather than named, the donor's backs fan out of their seat
+  first, hold, and go back.
+- **Victim** — the mirror: the card leaves your own fan, flies to the centre, turns face-**down**, and
+  sinks into the taker's seat.
+- **Watcher** — a closed card crosses the table from one seat to the other; nothing turns over and the
+  two counts are all that changes.
+
+And before any of them, when the card was demanded by name: the named card stands at the centre for the
+whole table, then either hands over to the projection (hit) or is followed by the flinch and the note
+(miss).
+
+**Elements / refs** — all from `BoardAnchors`
+- `centre` — the attack slot; every leg of every branch stages there.
+- `seatBox(player)` — a card-sized box centred on a seat (**I6**), shrunk again to
+  `CARD_W * SEAT_SHRINK` for the size a card is while it is inside a hidden hand: the exact box
+  `dealToSeat` sinks into and `takeFromSeat` comes out of.
+- `seatOf(player)` — the seat NODE, for the miss flinch.
+- `hand` — your own fan. `useHandArrival` for the taker, `handSlotAt(index)` for the victim's source
+  slot, and the flinch target when the miss is aimed at you.
+
+**Sequence — `runRequested` (the ask)**
+1. Raise the named card face-up at the centre and `play('popIn')` — on EVERY peer, the asker included.
+   `requested` carries no `visibleTo` and its `hit` field reaches everybody, because the rules make the
+   request public on a hit and a miss alike (`docs/rules/cards.md:125`). It **appears** rather than
+   travels: the one candidate origin is the catalog cell the asker named it in, and that cell belongs
+   to a staging hook this beat can neither see nor measure — so no peer gets a flight, rather than one
+   peer getting a different scene from the rest of the table.
+2. **Hit** — publish the `giveCard` pending into the beat's own shadow, `await nextFrames()` so the
+   publish has committed (**I2**), then `drop`. The beat is only the entrance: `requested` and
+   `handTransfer` arrive in **different batches**, so no overlay can span the gap. What carries the card
+   across it is `_Board.tsx`'s own centre render of `cardById(pending.requested)`, public to every peer
+   (`fake/attacks.ts:444` projects `giveCard` with no `mine` gate). Publish first and drop second, so
+   the static render is standing before the carrier lets go and the slot is never blank for a frame —
+   the same ordering, for the same reason, as `drawBeat`'s standing trigger.
+3. **Miss** — the pending clears outright, so nothing in the projection survives it and the beat has to
+   carry the whole scene or the table never learns the outcome. `wait(REQUEST_HOLD)` with the named card
+   standing, `play('shake', …, SHAKE)` on the target, the note, `wait(MISS_HOLD)`, `drop`. The target is
+   flinched **as they are rendered**: `seatOf(target)` to everyone watching, and `anchors.hand` — their
+   own fan — when the miss is aimed at you, because you have no seat. One gesture, two renderings: the
+   fan flinch is the playground's original and the seat flinch is its translation.
+
+**Sequence — `runTransfer` (the card)**
+One branch, on `plan.role`.
+- **taker** — `takeFromSeat` from the donor's seat box to the centre; `pin` (**I4**); the donor's count
+  drops and is published as its own step; `patch({ faceDown: false })`, so the `Card` plays its own
+  `flipCard`; `wait(REVEAL_HOLD)`; measure the flyer, `drop`, then `arrive(…, grown, grown)` into the
+  fan at its **end** — `grown` is read off `ctx.base.you.hand.length`, the fan this beat has grown so
+  far (**I8**), and the end is not a choice: the engine appends what a hand gains and `toBoardState`
+  passes that order through untouched, so any other slot makes the beat's last frame disagree with the
+  projection it hands over to.
+- **the offer — the taker's leg only, and only when `plan.named` is false** — before the flight,
+  `plan.donorHand` backs (capped at `OFFER_MAX`) rise out of the donor's seat box on `takeFromSeat`,
+  staggered `OFFER_STEP` apart, into the shallow arc `offerPoses` lays across the centre; they hold
+  `OFFER_HOLD` and return on `dealToSeat`. The taken card is **not** among them — it flies on its own,
+  out of the same seat, so the offer clears whole rather than one card short. Nobody picks and nothing
+  waits for input: `stealRandom` has already chosen, with the seeded RNG. The offered hand is the only
+  thing that makes "a card at random" read differently from "the card I named", which otherwise share
+  one flight.
+- **victim** — out of `handSlotAt(index)`, the index resolved here against the hand this beat planned
+  against (the registry indexes rather than looks up by uid, deliberately, so it need not know the
+  hand); your fan closes the gap while the card is in the air; `playToCenter`; `pin`;
+  `patch({ faceDown: true })` — it turns **face-down**, and that is the beat, because from here it is
+  theirs and a hidden hand is where it is going; `wait(CENTER_HOLD)`; `dealToSeat` into the taker's seat
+  box; `drop`; their count goes up. **No `useHandArrival`** — the card leaves a hand, it does not settle
+  into one.
+- **watcher** — `plan.card` is absent, so there is nothing to turn over and nothing to hold at the
+  centre to be read. `takeFromSeat` out of the donor's seat box to the centre on a `COVER` stand-in that
+  carries no identity, `pin`, the donor's count drops, `dealToSeat` into the taker's seat box, `drop`,
+  the taker's count goes up. Face-down for every frame.
+
+**What selects the closed flight**
+`plan.card`, and nothing else. Present means the engine put this peer in the event's audience; absent
+means it did not, and nothing here widens it — re-deriving who may see what is how a hand leaks. The
+three derived facts are all read off the **pre-batch** projection (**I1**): `role` off `selfId`,
+`named` as `base.pending?.kind === 'giveCard'` (a plain equality against a public pending — the
+transfer's own batch says nothing about whether it was demanded, because `requested{hit:true}` opened
+that pending in an earlier reduction), and `donorHand` as the donor's count while it still stands on
+screen, since `live` has already taken the card out.
+
+> The watcher leg is currently **unreachable in production**: the engine tags every `handTransfer` with
+> `visibleTo: [from, to]` and `forViewer` drops the whole event for anyone else, so a bystander sees no
+> transfer at all. The leg ships because it expresses the "never widen a redacted event" property, and
+> it stays correct the day `handTransfer` becomes public with `card` redacted the way `drawn` already
+> is. Recorded in [`backlog.md`](./backlog.md) and in the audit register.
+
+**Params & timings**
+| Step | Preset / wait | Value |
+|---|---|---|
+| the named card appears at the centre | `popIn` | 260 ms |
+| it stands before the outcome | `wait(REQUEST_HOLD)` | 820 ms |
+| the flinch | `play('shake', …, SHAKE)` | `{ amp: 9, dur: 460, shape: 'spring' }` — a whole seat or a whole fan flinching, not the 7px `settle` sized for an input |
+| the note, before the scene clears | `wait(MISS_HOLD)` | 1620 ms |
+| seat → centre | `takeFromSeat` | 460 ms |
+| centre → seat | `dealToSeat` | 460 ms |
+| hand slot → centre | `playToCenter` | 480 ms |
+| face-up at the centre (taker) | `wait(REVEAL_HOLD)` | 820 ms |
+| face-down at the centre (victim) | `wait(CENTER_HOLD)` | 820 ms |
+| into the fan | `useHandArrival` | `FLIGHT_MS = 480` |
+| a card's size inside a seat | `SEAT_SHRINK` | 0.7 of `CARD_W` (`drawBeat`'s own value) |
+| the offer: stagger · hold · spread · cap | `OFFER_STEP` · `OFFER_HOLD` · `OFFER_SPREAD` · `OFFER_MAX` | 45 ms · 620 ms · 0.62 of the centre's width · 9 backs |
+
+Every hold above is the stories' own number, carried over rather than chosen here. `PICK_BEAT = 620` is
+the one that did not come with them, and the board has no equivalent constant: `CardCatalog`'s `chosen`
+cell holds by CSS alone (`scale(1.7)` while its neighbours leave over 220 ms) and the band unmounts the
+moment the pending stops being a `requestCard`. So the ask is paced by the engine's own round trip, and
+the readable pause belongs to `runRequested` — `popIn` and, on a miss, `REQUEST_HOLD`.
+
+**Invariants**
+- **I1** — the plan reads the projection still on screen, so the donor's count is the one the table can
+  see and the victim's own hand is the one their fan is rendering.
+- **I2** — `nextFrames()` between publishing the `giveCard` shadow and dropping the carrier, so the
+  static render has committed before the flyer lets go.
+- **I4** — the carrier is pinned at the centre after each arrival there, so the flip, the hold and the
+  onward flight all leave from where the card visibly stands.
+- **I6** — every seat end of every flight is `cardBoxIn(seatBox(player), CARD_W * SEAT_SHRINK)`, never
+  the seat's own rect.
+- **I8** — the taker's `grown` is read off `ctx.base`, the hand this beat has already grown, not off
+  the hand the batch started with.
+- Local: `plan.card`'s absence, not `role`, is what selects the closed flight; and the last frame of the
+  hit entrance is the projection's own centre render, so the handover changes nothing on screen.
+
+**End state & cleanup**
+Taker: the card spliced into your fan at its end, the donor one count lighter. Victim: the card gone
+from your hand, the taker one count heavier. Watcher: both counts moved, nothing else. The carrier is
+dropped on every path, the offer's backs are dropped by key, and the miss note is cleared before the
+beat returns. A beat that throws costs the animation and never the state — `drain()` drops the shadow in
+its `finally` and the live projection wins. A missing rect (a seat that is not mounted, a hand slot that
+is not there) ends the leg early and lets the projection stand, the contract every runner keeps. A new
+match calls `reset()`: the carrier goes and so does a parked arrival, which would otherwise land a dead
+match's card in the new one's fan.
+
+**Gating**
+The ask is answered in the middle band, not in the panel. `_useRequestStaging.tsx` stands a
+`CardCatalog` there while a `requestCard` pending is ours — `open` while unconfirmed, `selected` for the
+armed pick, `chosen` after `ConfirmAction` commits it, because naming a card is irreversible — and
+`_Board.tsx` suppresses `PendingPrompt` for `requestCard` and `giveCard` the way it already does for
+`defend`, `discardForRelease` and `neutralize503`. What the catalog offers is the base deck without
+triggers (`docs/rules/cards.md:320`, `:339`) and without the events deck
+(`docs/rules/general.md:189`) — every card that can actually BE in a hand, both exclusions cited; the
+`confirm` handler re-checks membership against that same list, so a stale selection cannot resolve a
+card that is no longer on offer. `giveCard` gets no panel at all: the engine asks the victim which COPY
+to surrender, the copies differ only by uid and `onGiveCard` matches on `card.id`, so the choice carries
+no information and the hook auto-resolves it — once per pending, latched on the pending's own identity
+rather than on the mount, because a second Security Bug in one match is an ordinary thing.
+
+**Under `prefers-reduced-motion`**
+No beat is planned and none runs; the board holds the projection it already has. The `giveCard`
+auto-resolve still fires — it lives in the staging hook and not in a beat for exactly this reason: it is
+a game action, and an engine left waiting on an animation nobody plays is a stalled match.
+
+**Building blocks**
+[`takeFromSeat`](./reference.md#presets) · [`dealToSeat`](./reference.md#presets) ·
+[`playToCenter`](./reference.md#presets) · [`popIn`](./reference.md#presets) ·
+[`shake`](./reference.md#presets) · `flipCard` (auto, via `Card`) ·
+[`useHandArrival`](./reference.md#hand-arrival--cards-arrive-in-the-hand) ·
+[`useFlyer`](./reference.md#the-movement-steps-and-the-carrier-under-them) ·
+[`cardBoxIn`](./reference.md#card-geometry-helpers) · `CardCatalog` · `ConfirmAction`.
+
+**Live reference**
+Not a playground scene — this beat runs on the real board:
+`apps/frontend/src/features/board-beats/transferBeat.tsx`, with the plans in
+`features/board-beats/planBeats.ts`, the ask in `pages/board/[gameId]/_useRequestStaging.tsx` and the
+public centre card in `pages/board/[gameId]/_Board.tsx`. The playground originals are the two recipes
+above plus `Specific opponent card`.
 
 ---
 

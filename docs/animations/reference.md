@@ -194,10 +194,12 @@ runner lifted out of `useBeats` unchanged, `drawBeat.tsx` and `deckBeat.tsx` are
 | `discard` | `features/board-beats/discardBeat.tsx` | `discarded`, coalesced per batch | the discard-exit step |
 | `reshuffle` | `features/board-beats/deckBeat.tsx` (`runReshuffle`) | `deckReshuffled` | `gatherToDeck`, `flipCard` (via `patch`) |
 | `piles` | `features/board-beats/deckBeat.tsx` (`runPiles`/`step`) | `pilesChanged`, classified by `classifyPiles` (`planBeats.ts`) against the running pile counts — the event itself names neither the operation nor the split index | `flyFrom` (split), `absorbToDeck` (merge), `gatherToDeck` (fromDiscard) |
+| `transfer` | `features/board-beats/transferBeat.tsx` (`runRequested`/`runTransfer`) | `requested` — public, whole; `handTransfer` — with `role` off `selfId`, `named` off `base.pending`, and `card` only if the event carried one | `popIn`, `shake`, `takeFromSeat`, `playToCenter`, `dealToSeat`, `flipCard` (via `patch`), the hand-arrival step |
 
-See [`recipes.md`](./recipes.md#a-card-is-drawn-live-board) and
-[`recipes.md`](./recipes.md#the-deck-is-rebuilt-split-merged-live-board) for the sequences; the
-classification table for `piles` is written out there, not repeated here.
+See [`recipes.md`](./recipes.md#a-card-is-drawn-live-board),
+[`recipes.md`](./recipes.md#the-deck-is-rebuilt-split-merged-live-board) and
+[`recipes.md`](./recipes.md#a-card-changes-hands-live-board--taker-victim-watcher-and-the-ask-before-them)
+for the sequences; the classification table for `piles` is written out there, not repeated here.
 
 **One scatter, two readers.** A discard flies on `scatterAt(eventId)` and the heap
 (`toBoardState.toDiscardHeap`) rests it on `scatterAt(eventId)` — the same call on the same id, which
