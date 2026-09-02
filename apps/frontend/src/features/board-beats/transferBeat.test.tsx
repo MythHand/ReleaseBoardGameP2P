@@ -47,9 +47,22 @@ const base = {
 } as unknown as BoardState
 
 const node = () => document.createElement('div')
+// Centre node with a real bounding rect for geometry tests
+const centreNode = document.createElement('div')
+centreNode.getBoundingClientRect = () => ({
+  left: 400,
+  top: 300,
+  width: 200,
+  height: 280,
+  right: 600,
+  bottom: 580,
+  x: 400,
+  y: 300,
+  toJSON: () => ({}),
+})
 const anchors = {
   hand: { current: node() },
-  centre: { current: node() },
+  centre: { current: centreNode },
   discardBox: { current: node() },
   pileBox: () => node(),
   seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
@@ -299,14 +312,22 @@ it('offers nothing to a watcher', async () => {
 })
 
 it('centres a single offered back on the table centre', async () => {
-  // A single card in hand triggers the offer, which should position it at the
-  // centre rather than offset to the left (the bug was: span was non-zero even
-  // when n=1, causing an offset of -OFFER_SPREAD*width/2).
+  // A single card in hand triggers the offer. The offered back must be
+  // centred at the table centre, not offset left by -OFFER_SPREAD*width/2.
+  // The bug: span was non-zero even when n=1, causing an offset.
   const r = runTransfer(transferPlan({ named: false, donorHand: 1 }))
   await r.go()
   // 1 offered back + 1 taken card's own flight = 2 takeFromSeat calls
   const takes = played.names.filter((n) => n === 'takeFromSeat').length
   expect(takes).toBe(2)
+  // The offered back is the first takeFromSeat call; its destination pose is
+  // in played.takes[0].to. Animation primitives translate by centres, so assert
+  // the pose's centre equals the table centre's centre.
+  const offeredBackPose = (played.takes[0] as { to: { left: number; width: number } }).to
+  const offeredCentre = offeredBackPose.left + offeredBackPose.width / 2
+  // Centre is at left=400, width=200, so its centre is 400+100=500
+  const tableCentre = 400 + 200 / 2
+  expect(offeredCentre).toBe(tableCentre)
   expect(arrivals.calls).toBe(1)
 })
 
