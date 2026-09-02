@@ -12,7 +12,14 @@ export {
   useEliminateBeat,
   useEliminationPreload,
 } from './eliminateBeat'
-export type { BeatPlan, DiscardCard, DiscardSource, PileStep, PlannedDraw } from './planBeats'
+export type {
+  BeatPlan,
+  DiscardCard,
+  DiscardSource,
+  PileStep,
+  PlannedDraw,
+  TransferRole,
+} from './planBeats'
 export { classifyPiles, planBeats } from './planBeats'
 export type { Beats } from './useBeats'
 export { useBeats } from './useBeats'
