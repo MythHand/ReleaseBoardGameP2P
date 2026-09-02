@@ -21,5 +21,6 @@ export type {
   TransferRole,
 } from './planBeats'
 export { classifyPiles, planBeats } from './planBeats'
+export { useTransferBeat } from './transferBeat'
 export type { Beats } from './useBeats'
 export { useBeats } from './useBeats'
