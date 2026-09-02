@@ -317,12 +317,21 @@ export function useHandLimit({
   // what drops the grid's render, and this is what finally clears the fan's
   // filter. Under reduced motion no beat ever runs, and this is the only path.
   useEffect(() => {
-    if (pending || (cellsRef.current === 0 && pickedRef.current.length === 0)) return
+    // An accepted local decision clears the projection's pending before its
+    // beat measures the standing grid. Keep the cells until that beat calls
+    // `release()`; under reduced motion no beat runs, so this remains the
+    // synchronous catch-up path.
+    if (
+      pending ||
+      (dispatched && !handed && !reduced) ||
+      (cellsRef.current === 0 && pickedRef.current.length === 0)
+    )
+      return
     runId.current += 1
     flyer.drop()
     arrival.reset()
     wipe()
-  }, [pending, wipe, flyer.drop, arrival.reset])
+  }, [pending, dispatched, handed, reduced, wipe, flyer.drop, arrival.reset])
 
   // A NEW MATCH wipes the gesture — the same boundary, idiom and (inert on this
   // branch, until #19 mints a per-match id) reasoning as its three siblings'.

@@ -14,11 +14,12 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import handArrivalStyles from '@/animations/useHandArrival.module.css'
 import Board from '../_Board'
-import { makeBoardProps } from './fixture'
+import { introFixture, makeBoardProps } from './fixture'
 
 const motion = vi.hoisted(() => ({ reduced: true }))
-const flights = vi.hoisted(() => ({ release: [] as (() => void)[] }))
+const flights = vi.hoisted(() => ({ release: [] as (() => void)[], raises: [] as string[][] }))
 const arrivals = vi.hoisted(() => ({ refuse: false }))
+const exits = vi.hoisted(() => ({ items: [] as string[][], release: () => {} }))
 
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => motion.reduced }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
@@ -29,12 +30,27 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
       const step = actual.useHandArrival(...args)
       return arrivals.refuse ? { ...step, arrive: async () => false } : step
     },
+    nextFrames: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
+    wait: () => Promise.resolve(),
+    useDiscardExit: () => ({
+      overlay: [],
+      send: (items: { key: string }[]) => {
+        exits.items.push(items.map((item) => item.key))
+        return new Promise<void>((resolve) => {
+          exits.release = resolve
+        })
+      },
+      reset: () => {},
+      FLIGHT_MS: 0,
+    }),
     useFlyer: () => ({
       overlay: [],
-      raise: () =>
-        new Promise<HTMLDivElement[]>((resolve) => {
+      raise: (items: { key: string }[]) => {
+        flights.raises.push(items.map((item) => item.key))
+        return new Promise<HTMLDivElement[]>((resolve) => {
           flights.release.push(() => resolve([document.createElement('div')]))
-        }),
+        })
+      },
       elOf: () => null,
       pin: () => {},
       glide: () => Promise.resolve(),
@@ -62,6 +78,7 @@ function boardOverLimit(
   actions: TableActions = {},
   events: Event[] = [],
   pending = true,
+  intro?: ReturnType<typeof handLimitIntro>,
 ) {
   const base = makeBoardProps()
   return (
@@ -83,7 +100,31 @@ function boardOverLimit(
         },
         actions,
         intro:
-          events.length > 0 ? { gameId: null, view: null, events, onDone: () => {} } : undefined,
+          intro ??
+          (events.length > 0 ? { gameId: null, view: null, events, onDone: () => {} } : undefined),
+      })}
+    />
+  )
+}
+
+function handLimitIntro(events: Event[] = []) {
+  return { gameId: 'hand-limit-handoff', view: introFixture().view, events, onDone: vi.fn() }
+}
+
+function boardAfterAcceptedHandLimit(events: Event[], intro: ReturnType<typeof handLimitIntro>) {
+  const base = makeBoardProps()
+  return (
+    <Board
+      {...makeBoardProps({
+        state: {
+          ...base.state,
+          you: { ...base.state.you, hand: [HAND[2]] },
+          turn: base.state.selfId,
+          hasDrawn: true,
+          pending: null,
+          decks: { ...base.state.decks, discardCount: 2 },
+        },
+        intro: { ...intro, events },
       })}
     />
   )
@@ -116,6 +157,19 @@ function rejectedHandLimit(cards: string[], player = 'you', id = 9): Event {
     },
     reason: 'illegal',
   }
+}
+
+function acceptedHandLimit(): Event[] {
+  return [
+    { id: 10, type: 'discarded', player: 'you', card: 'attack-bug', reason: 'handLimit' },
+    {
+      id: 11,
+      type: 'discarded',
+      player: 'you',
+      card: 'protection-debugger',
+      reason: 'handLimit',
+    },
+  ] as Event[]
 }
 
 it.each([
@@ -422,6 +476,48 @@ it('keeps the filled grid standing after the dispatch, for the beat to take', as
   expect(filledCells()).toBe(2)
   // and the fan does not get them back while it stands
   expect(fanSlots()).toBe(HAND.length - 2)
+})
+
+it('hands the local grid straight to the accepted discard beat', async () => {
+  flights.raises = []
+  exits.items = []
+  exits.release = () => {}
+  const onResolve = vi.fn()
+  const intro = handLimitIntro()
+  const view = render(boardOverLimit(2, { onResolve }, [], true, intro))
+  try {
+    await vi.waitFor(() => expect(intro.onDone).toHaveBeenCalledTimes(1))
+    await pullCardFromFan(0)
+    await pullCardFromFan(0)
+    expect(onResolve).toHaveBeenCalledWith({
+      kind: 'handLimit',
+      cards: ['attack-bug#0', 'protection-debugger#0'],
+    })
+
+    // The picker was deliberately reduced, but the accepted batch must run.
+    motion.reduced = false
+    await act(async () => {
+      view.rerender(boardAfterAcceptedHandLimit(acceptedHandLimit(), intro))
+      await Promise.resolve()
+    })
+    await vi.waitFor(() => expect(exits.items.length + flights.raises.length).toBeGreaterThan(0))
+
+    // Adoption sends the cards that are already standing. A missing board
+    // handoff would reconstruct that grid from fan-origin flyers instead.
+    expect(flights.raises).toEqual([])
+    await vi.waitFor(() => expect(exits.items).toEqual([['d10', 'd11']]))
+
+    // `send` is deliberately parked: the static grid must already be gone while
+    // the discard exit owns the handover, but the fan remains filtered.
+    await vi.waitFor(() => expect(screen.queryByTestId('board-discard-grid')).toBeNull())
+    expect(fanSlots()).toBe(HAND.length - 2)
+
+    exits.release()
+    await act(async () => {})
+  } finally {
+    exits.release()
+    motion.reduced = true
+  }
 })
 
 it('asks for the discard in the ask line and offers no panel', () => {
