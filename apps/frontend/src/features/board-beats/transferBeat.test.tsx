@@ -130,3 +130,21 @@ it('drops the donor count as the card leaves the seat', async () => {
   const counts = r.published.map((s) => s.opponents[0].handCount)
   expect(counts).toContain(4)
 })
+
+it('sends a lost card from the fan into the taker seat, and never into a hand', async () => {
+  const r = runTransfer(transferPlan({ from: 'p1', to: 'p2', role: 'victim' }))
+  await r.go()
+  expect(played.names).toContain('dealToSeat')
+  // THE assertion that separates the mirror from the original. `useHandArrival`
+  // is the step for a card ARRIVING in the fan; a card leaving one must never
+  // touch it. Pinned explicitly because it is exactly the kind of thing a later
+  // refactor unifies by accident, and nothing else would notice.
+  expect(arrivals.calls).toBe(0)
+})
+
+it('takes the lost card out of your own fan', async () => {
+  const r = runTransfer(transferPlan({ from: 'p1', to: 'p2', role: 'victim' }))
+  await r.go()
+  const hands = r.published.map((s) => s.you.hand.length)
+  expect(hands).toContain(0)
+})

@@ -18,6 +18,7 @@ import type { BeatPlan } from './planBeats'
 // a hand leaks.
 
 const REVEAL_HOLD = 820 // face-up at the centre before it drops into the fan
+const CENTER_HOLD = 820 // face-down at the centre before it sinks into the seat
 const SEAT_SHRINK = 0.7 // how small a card is inside a seat — `drawBeat`'s own value
 
 // One flyer key for the whole run: there is never more than one card in the
@@ -111,9 +112,62 @@ export function useTransferBeat(anchors: BoardAnchors) {
             await latest.current.arrive([{ key: `t${plan.eventId}`, card, from: at }], grown, grown)
           return
         }
-        // victim — Task 4; watcher — Task 5. Until then they publish nothing
-        // and hand their own base on untouched: the queue drains, the shadow is
-        // dropped, and the live projection wins.
+        if (plan.role === 'victim') {
+          const a = latest.current.anchors
+          const centre = rectOf(a.centre.current)
+          const seat = a.seatBox(plan.to)
+          const card = plan.card ? cardById(plan.card) : null
+          if (!centre || !seat || !card) return
+          // Which slot it leaves from. The registry indexes rather than looks
+          // up by uid — deliberately, so it need not know the hand — and the
+          // caller already holds the hand it planned against, so the index is
+          // resolved here. Matching on the card ID is what the engine itself
+          // matched on (`onGiveCard` checks `card.id === pending.requested`);
+          // copies are interchangeable, so the first is as right as any.
+          const index = beat.base.you.hand.findIndex((h) => h.card.id === plan.card)
+          const slot = index >= 0 ? rectOf(a.handSlotAt(index)) : null
+          if (!slot) return
+          const [el] = await raise([{ key: KEY, card, at: slot, faceDown: false }])
+          // your fan closes the gap while the card is in the air
+          const c0 = ctx.current
+          if (c0) {
+            const hand = c0.base.you.hand.filter((_, i) => i !== index)
+            const next = { ...c0.base, you: { ...c0.base.you, hand } }
+            c0.base = next
+            c0.publish(next)
+          }
+          if (el) {
+            const anim = play('playToCenter', el, { from: slot, to: centre })
+            if (anim) await anim.finished
+            pin(KEY, centre)
+          }
+          // It turns FACE-DOWN, and that is the beat: from here it is theirs,
+          // and a hidden hand is where it is going.
+          patch(KEY, { faceDown: true })
+          await wait(CENTER_HOLD)
+          const to = cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          const held = elOf(KEY)
+          if (held) {
+            const anim = play('dealToSeat', held, { from: centre, to })
+            if (anim) await anim.finished
+          }
+          drop(KEY)
+          // …and the taker's counter carries it now. That counter IS their hand.
+          const c1 = ctx.current
+          if (c1) {
+            const next: BoardState = {
+              ...c1.base,
+              opponents: c1.base.opponents.map((o) =>
+                o.id === plan.to ? { ...o, handCount: o.handCount + 1 } : o,
+              ),
+            }
+            c1.base = next
+            c1.publish(next)
+          }
+          return
+        }
+        // watcher — Task 5. Until then it publishes nothing and hands its own
+        // base on untouched: the queue drains and the live projection wins.
       } finally {
         ctx.current = null
       }
