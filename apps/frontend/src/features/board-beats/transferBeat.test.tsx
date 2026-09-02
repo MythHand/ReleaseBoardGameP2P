@@ -178,3 +178,90 @@ it('leaks no identity into the DOM for a peer that is not a party', async () => 
     expect(snapshot).not.toContain('attack-bug')
   }
 })
+
+const requestPlan = (
+  over: Partial<Extract<BeatPlan, { kind: 'requested' }>> = {},
+): Extract<BeatPlan, { kind: 'requested' }> => ({
+  kind: 'requested',
+  key: 'requested:1',
+  eventId: 1,
+  attacker: 'p1',
+  target: 'p2',
+  card: 'attack-bug',
+  hit: true,
+  ...over,
+})
+
+function runRequested(plan: Extract<BeatPlan, { kind: 'requested' }>, on: BoardState = base) {
+  const published: BoardState[] = []
+  let start: (() => Promise<void>) | null = null
+  function Probe() {
+    const beat = useTransferBeat(anchors)
+    start = () => beat.runRequested(plan, { base: on, publish: (s) => published.push(s) })
+    return <>{beat.overlay}</>
+  }
+  const view = render(<Probe />)
+  return {
+    published,
+    view,
+    go: async () => {
+      vi.useFakeTimers()
+      try {
+        let done = false
+        const finished = start?.().then(() => {
+          done = true
+        })
+        while (!done) {
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(20)
+          })
+        }
+        await finished
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  }
+}
+
+it('hands a hit over to the projection instead of holding it', async () => {
+  // The named card has to survive the gap between two BATCHES — the transfer
+  // comes from the victim's own RESOLVE — and no beat overlay can span that.
+  // So the beat publishes the public `giveCard` pending and lets the board's
+  // own render take the centre, which is why this leg is only an entrance.
+  const r = runRequested(requestPlan({ hit: true }))
+  await r.go()
+  const pendings = r.published.map((s) => s.pending?.kind)
+  expect(pendings).toContain('giveCard')
+})
+
+it('flinches the target seat on a miss, and takes nothing', async () => {
+  const r = runRequested(requestPlan({ hit: false }))
+  await r.go()
+  expect(played.names).toContain('shake')
+  // the story's values: a whole seat flinching, not the 7px settle sized for
+  // an input field
+  expect(played.shakes[0]).toMatchObject({ amp: 9, dur: 460, shape: 'spring' })
+  expect(arrivals.calls).toBe(0)
+  expect(r.published.map((s) => s.pending?.kind)).not.toContain('giveCard')
+})
+
+it('flinches your own fan when the miss is aimed at you', async () => {
+  // To everyone else the target is a Seat; to the target there is no seat at
+  // all — they are `you`, and what they own is the fan. Same gesture, rendered
+  // as the target actually appears.
+  //
+  // Spying on the real `anchors.seatOf` rather than an unwired mock: the claim
+  // is that the code never calls the seat lookup for its own outcome, and only
+  // a spy on the lookup the code actually calls can prove that.
+  const spy = vi.spyOn(anchors, 'seatOf')
+  try {
+    const own = { ...base, selfId: 'p2' } as BoardState
+    const r = runRequested(requestPlan({ hit: false, target: 'p2' }), own)
+    await r.go()
+    expect(played.names).toContain('shake')
+    expect(spy).not.toHaveBeenCalled()
+  } finally {
+    spy.mockRestore()
+  }
+})

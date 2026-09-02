@@ -305,6 +305,15 @@ export function useBeats(args: {
           run: (ctx) => transfers.runTransfer(plan, ctx),
         }
       }
+      if (plan.kind === 'requested') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => transfers.runRequested(plan, ctx),
+        }
+      }
       return null
     },
     [
@@ -320,6 +329,7 @@ export function useBeats(args: {
       defense.runNeutralized,
       elimination.run,
       transfers.runTransfer,
+      transfers.runRequested,
     ],
   )
 

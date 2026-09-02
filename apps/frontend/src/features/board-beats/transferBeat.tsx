@@ -1,10 +1,12 @@
+import { useTranslation } from '@release/translation'
 import type { CardData } from '@release/ui'
 import { CARD_W, cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import { play, useFlyer, useHandArrival, wait } from '@release/ui/animations'
-import { useCallback, useRef } from 'react'
+import { nextFrames, play, useFlyer, useHandArrival, wait } from '@release/ui/animations'
+import { useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
+import styles from './transferBeat.module.css'
 
 // A card changes hands. One surface seen from three sides — you take a card,
 // you lose one, or you watch one cross the table — and they are one runner
@@ -21,6 +23,11 @@ import type { BeatPlan } from './planBeats'
 const REVEAL_HOLD = 820 // face-up at the centre before it drops into the fan
 const CENTER_HOLD = 820 // face-down at the centre before it sinks into the seat
 const SEAT_SHRINK = 0.7 // how small a card is inside a seat — `drawBeat`'s own value
+const REQUEST_HOLD = 820 // the named card stands at the centre before the outcome
+const MISS_HOLD = 1620 // the flinch and the note, before the scene clears
+// A whole seat (or a whole fan) flinching, not the 7px `settle` sized for an
+// input field — the story's own values.
+const SHAKE = { amp: 9, dur: 460, shape: 'spring' } as const
 
 // One flyer key for the whole run: there is never more than one card in the
 // air here, and a key IS a flyer — raising the same key twice replaces the
@@ -90,6 +97,82 @@ export function useTransferBeat(anchors: BoardAnchors) {
     c.base = next
     c.publish(next)
   }, [])
+
+  const { t } = useTranslation()
+  // The miss note. State rather than a ref: it is rendered, and the overlay has
+  // to re-render when it appears and again when it goes.
+  const [missed, setMissed] = useState(false)
+
+  const runRequested = useCallback(
+    async (plan: Extract<BeatPlan, { kind: 'requested' }>, beat: BeatRun) => {
+      ctx.current = beat
+      try {
+        const a = latest.current.anchors
+        const centre = rectOf(a.centre.current)
+        const card = cardById(plan.card)
+        if (!centre || !card) return
+        // The named card, face-up, at the centre — for EVERY peer, asker
+        // included. `requested` carries no `visibleTo`: the rules make the
+        // request public on a hit and a miss alike (docs/rules/cards.md:125).
+        const [el] = await raise([{ key: KEY, card, at: centre, faceDown: false }])
+        if (el) {
+          // It APPEARS rather than travels. The one candidate origin — the
+          // catalog cell the asker named it in — belongs to a hook this beat
+          // cannot see (Task 8) and cannot measure, so no peer gets a flight:
+          // every board, asker included, gets the same pop into the reserved
+          // centre slot.
+          const anim = play('popIn', el)
+          if (anim) await anim.finished
+        }
+
+        if (plan.hit) {
+          // Hand it to the projection. `giveCard` is public (fake/attacks.ts:444
+          // projects it with no `mine` gate), so the board's own centre render
+          // takes this exact spot — and it has to, because the transfer arrives
+          // in a LATER batch and no overlay of this beat's can span the gap.
+          //
+          // Publish first, drop second: the board renders this beat's shadow
+          // while it runs, so the static render is up before the carrier lets
+          // go and the slot is never blank for a frame. Same ordering, and the
+          // same reason, as the standing trigger in `drawBeat`.
+          const c = ctx.current
+          if (c) {
+            const next: BoardState = {
+              ...c.base,
+              pending: {
+                kind: 'giveCard' as const,
+                player: plan.target,
+                requested: plan.card,
+              },
+            }
+            c.base = next
+            c.publish(next)
+          }
+          await nextFrames() // the publish above has committed (I2)
+          drop(KEY)
+          return
+        }
+
+        // A MISS. The pending clears outright, so nothing in the projection
+        // survives this — the beat carries the whole scene or the table never
+        // learns the outcome, which is the rule this exists to keep.
+        await wait(REQUEST_HOLD)
+        // Rendered as the target actually appears: a Seat to everyone watching,
+        // and to the target themselves no seat at all — they are `you`, and
+        // what they own is the fan. One gesture, two renderings.
+        const mine = plan.target === beat.base.selfId
+        const flinch = mine ? a.hand.current : a.seatOf(plan.target)
+        play('shake', flinch, SHAKE)
+        setMissed(true)
+        await wait(MISS_HOLD)
+        setMissed(false)
+        drop(KEY)
+      } finally {
+        ctx.current = null
+      }
+    },
+    [raise, drop],
+  )
 
   const runTransfer = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'handTransfer' }>, beat: BeatRun) => {
@@ -231,7 +314,25 @@ export function useTransferBeat(anchors: BoardAnchors) {
   const reset = useCallback(() => {
     drop()
     resetArrival()
+    setMissed(false)
   }, [drop, resetArrival])
 
-  return { overlay: [...flyerOverlay, ...handOverlay], gapAt, gapSize, runTransfer, reset }
+  return {
+    overlay: [
+      ...flyerOverlay,
+      ...handOverlay,
+      ...(missed
+        ? [
+            <div key="transfer-miss" className={styles.note}>
+              {t('table.requestMiss')}
+            </div>,
+          ]
+        : []),
+    ],
+    gapAt,
+    gapSize,
+    runRequested,
+    runTransfer,
+    reset,
+  }
 }
