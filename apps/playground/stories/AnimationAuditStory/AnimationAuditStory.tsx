@@ -793,8 +793,23 @@ const ISSUES: Issue[] = [
       en: "docs/rules/cards.md:112 (Bug / Out of Memory / Legacy Code) says only «take one random card from an opponent's hand» — not a word about whether the table sees which card moved. For Security Bug the same file settles it outright (cards.md:127: «the table sees in the open which card was asked for, and sees the transfer in the open»); for the random steal it is silent. The difference between the two readings is visible on screen and checked by nothing else. The board today gives card to the two parties, and a bystander learns nothing in either case — but that follows from the shape of the event rather than from a rules decision, and it coincides with one of the readings by accident. Guessing «by the sense of it» is especially easy and especially dangerous here: a beat is already written against the guess, a test would pin it, and it would become the source the next task checks against. The other side costs too: if the table MUST see which card a random steal took, the watcher leg has to stop being closed, and that is a different beat rather than a parameter. What closes it: an answer from the rules owner, one line in cards.md at the hand-effect paragraph. No answer is invented here — the project forbids settling rules by inference.",
     },
     where: {
-      ru: 'docs/rules/cards.md:112 (молчит) vs :127 (решено для Security Bug)',
-      en: 'docs/rules/cards.md:112 (silent) vs :127 (settled for Security Bug)',
+      ru: 'docs/rules/cards.md:112 (молчит) vs :127 (решено для Security Bug); заведено вопросом в docs/rules/backlog.md',
+      en: 'docs/rules/cards.md:112 (silent) vs :127 (settled for Security Bug); filed as an open question in docs/rules/backlog.md',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Метка «Не из правил» в cards.md не поставлена — по ней разъехались бы 35 ссылок',
+      en: 'The «not from the rules» marker is missing from cards.md — adding it would shift 35 citations',
+    },
+    problem: {
+      ru: 'Правило проекта (CLAUDE.md) требует, чтобы открытый вопрос по правилам стоял в двух местах: записью в docs/rules/backlog.md и меткой «> ❓ Не из правил.» в самом абзаце спеки, из которого он вырос. Для вопроса выше (видит ли стол, какую карту забрала случайная кража) запись заведена, а метка в cards.md — нет, и это осознанный отказ, а не забывчивость. Вставка метки сдвигает все строки ниже 112, а на docs/rules/cards.md:NNN завязаны 35 ссылок по номеру строки (grep по apps, packages, docs на момент #105) — в комментариях кода, тестах, на этой странице и в доках, — и ВСЕ они указывают на 112 или ниже, то есть на точку вставки или за неё. Соблюсти правило буквально значит молча сдвинуть тридцать пять ссылок, и каждая неверная перепривязка — свежий тихий дефект ровно того класса, который #105 и разгребал. Цена отказа своя: читатель cards.md:112 не узнает, что абзац спорный, — вопрос виден только из backlog. Закроет переход на ссылки по якорю или заголовку вместо номера строки; после него вставка строк перестаёт что-либо ломать, и метка идёт в абзац, как правило и требует. До тех пор метка считается ДОЛЖНОЙ, а не отменённой.',
+      en: 'The project rule (CLAUDE.md) requires an open rules question to stand in two places: an entry in docs/rules/backlog.md and a «> ❓ Не из правил.» marker in the very paragraph of the spec it came from. For the question above (does the table learn which card a random steal took) the entry exists and the cards.md marker does not — a deliberate refusal, not an oversight. Inserting the marker shifts every line below 112, and 35 citations are anchored to docs/rules/cards.md:NNN by line number (grep over apps, packages, docs as of #105) — in code comments, tests, this page and the docs — and ALL of them point at 112 or below, that is at the insertion point or past it. Following the rule literally means silently shifting thirty-five pointers, and every wrong re-anchoring is a fresh silent defect of exactly the class #105 was cleaning up. The refusal has its own cost: a reader of cards.md:112 will not learn the paragraph is disputed — the question is visible only from the backlog. What closes it: citing cards.md by anchor or heading instead of line number, after which inserting lines breaks nothing and the marker goes into the paragraph as the rule asks. Until then the marker is OWED, not waived.',
+    },
+    where: {
+      ru: 'docs/rules/backlog.md (запись заведена) + docs/rules/cards.md:112 (метки нет)',
+      en: 'docs/rules/backlog.md (the entry is filed) + docs/rules/cards.md:112 (no marker)',
     },
     status: 'open',
   },

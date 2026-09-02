@@ -1656,31 +1656,39 @@ Vibe).
 ## Take a specific card — name it, then it flies out of the opponent's hand
 
 **When to call**
-The player names a card to demand from an opponent (`requestCard`) → `start()`, then `pickWanted(card)`. Phases
-`idle → choose → picked → (reveal | miss)`. The outcome is forced in the showcase by the `inHand` toggle.
+The player names a card to demand from an opponent (`requestCard`) → `start()`, then `pickWanted(card)` to arm the
+choice and `confirmWanted()` to commit it. Phases `idle → choose → picked → (reveal | miss)`. The outcome is
+forced in the showcase by the `inHand` toggle.
 
 **Visual result**
-A catalog grid (base cards, no triggers, face-up) appears at the centre and the opponent's face-down fan slides
-in from the top. Clicking a grid card holds it (the rest leave); then either that card flies out of the opponent
-fan to the centre, flips face up and drops into your hand (hit), or the fan shakes with a "not in hand" note and
-leaves (miss).
+A `CardCatalog` (base cards, no triggers, face-up) appears in the middle band and the opponent's face-down fan
+slides in from the top. Clicking a cell arms it — the card lights in the selection colour — and the confirm bar
+commits it, after which the named card holds enlarged while the rest of the catalog slides away; then either that
+card flies out of the opponent fan to the centre, flips face up and drops into your hand (hit), or the fan
+flinches in place with a "not in hand" note and leaves (miss).
 
 **Elements / refs**
 - `rootRef` (stage — the centre is measured against it, not `window`: the playground has a sidebar), `handRef`
-  (your fan), `fanRef` (opponent fan wrapper — slots are its inner children), `revealRef` (the flying card).
+  (your fan), `topHandRef` (the opponent fan's slide wrapper — the node that flinches on a miss), `fanRef`
+  (the fan inside it — slots are its inner children), `revealRef` (the flying card).
+- `CardCatalog` (`open` / `selected` / `chosen`, `width = GRID_W`) and `ConfirmAction` under it.
 - State: `phase`, `wanted`, `oppHand: PoolCard[]`, `handIn` (fan slide toggle), `chosenUid`, `reveal`,
   `centered`, `flipped`, `hand`.
 
 **Sequence**
 1. `start()`: `setOppHand(sampleBase(OPP_HAND))`; `setPhase('choose')`; `handIn=false` → double-rAF → `handIn=true`
-   (the fan slides in).
-2. `pickWanted(card)` (only in `choose`): `setWanted`; `setPhase('picked')`; `later(() => resolve(card),
+   (the fan slides in). The catalog opens with it.
+2. `pickWanted(card)` (only in `choose`) only **arms** the pick: `setWanted`, and the cell goes `selected`. Naming
+   a card is irreversible, so the commit is the shared `ConfirmAction` bar — `confirmWanted()` (guarded on
+   `phase === 'choose' && wanted`) does `setPhase('picked')`, which flips the catalog to `open={false}` with
+   `chosen={wanted.id}` — the named cell holds enlarged while the rest leave — and `later(() => resolve(wanted),
    PICK_BEAT)`.
-3. `resolve(card)`: **miss** (`!inHand`) → `setPhase('miss')`, `later(setHandIn(false), MISS_HOLD)`,
-   `later(backToIdle, MISS_HOLD + 560)`. **hit** → plant the wanted card into a random opponent slot; read that
-   slot's rect (**I1**); compute the delta to the **stage centre** (`cx/cy` from `rootRef`, not `window`);
-   `chosenUid = that slot` (its face renders `null`, so only the flyer shows the card); `handIn=false` (the rest
-   of the fan slides up and off); build `reveal` (`from` rect + `to` transform: translate to centre,
+3. `resolve(card)`: **miss** (`!inHand`) → `setPhase('miss')`, `play('shake', topHandRef.current, { amp:
+   MISS_SHAKE, dur: MISS_SHAKE_MS, shape: 'spring' })` — the fan flinches whole, in place —
+   `later(setHandIn(false), MISS_HOLD)`, `later(backToIdle, MISS_HOLD + 560)`. **hit** → plant the wanted card
+   into a random opponent slot; read that slot's rect (**I1**); compute the delta to the **stage centre**
+   (`cx/cy` from `rootRef`, not `window`); `chosenUid = that slot` (its face renders `null`, so only the flyer
+   shows the card); `handIn=false` (the rest of the fan slides up and off); build `reveal` (`from` rect + `to` transform: translate to centre,
    `scale(REVEAL_W / r.width)`, `rotate(0)`); double-rAF → `centered=true` (a CSS transition drives the flight).
 4. `onRevealEnd` (transform end, `centered && !flipped`): `flipped=true` (flip face up), `later(fall,
    REVEAL_HOLD)`.
@@ -1694,7 +1702,8 @@ leaves (miss).
 | reveal centre width | `REVEAL_W = 220` px |
 | centre hold before the drop | `REVEAL_HOLD = 820` ms |
 | miss shake + note | `MISS_HOLD = 1620` ms (+560 to idle) |
-| opponent fan / grid width | `OPP_HAND = 6`, `GRID_W = 100` |
+| the flinch itself | `play('shake')`, `MISS_SHAKE = 9` / `MISS_SHAKE_MS = 460` / `shape: 'spring'` — a whole fan, not the 7px `settle` sized for an input |
+| opponent fan / catalog cell width | `OPP_HAND = 6`, `GRID_W = 100` |
 | final drop | `useHandArrival` (`FLIGHT_MS = 480`) |
 
 **Invariants**
@@ -1709,10 +1718,14 @@ leaves (miss).
   the hand.
 
 **Building blocks**
-`useHandArrival` · `Hand` (`faceDown`, `renderFace`) · CSS transitions on `.reveal` / `.topHand`.
+`useHandArrival` · `CardCatalog` (`open` / `selected` / `chosen`) · `ConfirmAction` ·
+[`play('shake')`](./reference.md#presets) · `Hand` (`faceDown`, `renderFace`) · CSS transitions on `.reveal` /
+`.topHand`.
 
 **Live reference**
-`Specific opponent card` — `apps/playground/stories/interactive/PickSpecificCardStory.tsx`.
+`Specific opponent card` — `apps/playground/stories/interactive/PickSpecificCardStory.tsx`. The board's version
+of this scene is the `requested` half of
+[A card changes hands](./recipes.md#a-card-changes-hands-live-board--taker-victim-watcher-and-the-ask-before-them).
 
 ---
 
