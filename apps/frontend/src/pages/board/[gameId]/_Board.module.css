@@ -101,6 +101,39 @@
   transform: translate(-50%, -50%);
 }
 
+/* The hand limit's grid (#104). Only the things every cell shares live here —
+   the position of each one is inline, from `gridCells`, because the layout is a
+   function of the count and a stylesheet cannot be asked about it (the same
+   rule `TableCentre/centre.ts` states for the named places). Above the centre
+   slots: while this is up they are empty, and nothing else may sit over it. */
+.discardGrid {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+
+  /* the container is a layer, not a target — only a filled cell answers the
+     pointer, and an empty one must not eat a press meant for the table */
+  pointer-events: none;
+}
+
+.gridCell {
+  position: absolute;
+  inset-inline-start: 50%;
+  aspect-ratio: var(--card-aspect);
+}
+
+.cellCard {
+  position: relative;
+  block-size: 100%;
+}
+
+.cellEmpty {
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--white-12);
+  border-radius: 8px;
+}
+
 /* An EMPTY slot is not a target. `.coverSlot` sits exactly on top of `.centre`
    (both translate(-50%, -50%), z 11 over z 10) and is mounted even with no card
    in it, so with nothing there it would silently eat every pointer event meant

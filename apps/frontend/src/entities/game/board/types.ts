@@ -170,6 +170,10 @@ export interface BoardChromeCopy {
   // instead of naming a gesture that a pending offering only Monitoring (or
   // only a sacrifice) would not have.
   askNeutralize: string
+  // The hand is over the limit and the fan is the picker (#104). Count-free on
+  // interpolation to put a number into — and the grid's own empty cells already
+  // show how many are owed.
+  askHandLimit: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
   pauseGame?: string

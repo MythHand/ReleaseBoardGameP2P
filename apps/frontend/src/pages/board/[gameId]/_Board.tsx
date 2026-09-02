@@ -20,6 +20,8 @@ import {
   GameModes,
   GameOver,
   GearIcon,
+  GRID_TOP,
+  gridCells,
   Hand,
   HudBackground,
   LangSwitcher,
@@ -71,6 +73,7 @@ import opening from './_Board.module.css'
 import { useBoardInteractions } from './_useBoardInteractions'
 import { useBoardStaging } from './_useBoardStaging'
 import { useDefenseStaging } from './_useDefenseStaging'
+import { useHandLimit } from './_useHandLimit'
 import { useNeutralizeStaging } from './_useNeutralizeStaging'
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
@@ -338,6 +341,18 @@ export default function Board({
   // `enabled` gate as the turn hook — the hook's own `pending` read is what
   // keeps it inert the rest of the time.
   const defenseStaging = useDefenseStaging({
+    state,
+    anchors,
+    actions,
+    events: intro?.events ?? [],
+    enabled: !(deal.active || beats.exclusive),
+    matchKey: intro?.gameId ?? null,
+  })
+  // the hand limit owed to US means this hook owns the fan (#104) — a third
+  // owner beside `answering` and the turn hook, and the three can never
+  // overlap: `state.pending` is one slot.
+  const discarding = state.pending?.kind === 'handLimit' && state.pending.player === state.selfId
+  const handLimit = useHandLimit({
     state,
     anchors,
     actions,
@@ -829,6 +844,8 @@ export default function Board({
     ask = defencePhase === 'partner' ? copy.table.askPartner : copy.table.askDefend
   } else if (costPending) {
     ask = copy.table.askCost
+  } else if (discarding && handLimit.owed > 0) {
+    ask = copy.table.askHandLimit
   } else if (alarmMineOpen && !neutralizing.staged && !neutralizing.answered) {
     // a step waiting on the fan AND on the zone, with the panel suppressed
     // below, is silent without this — Defect 3 (#101, Fix B) one pending over.
@@ -1196,6 +1213,42 @@ export default function Board({
           })()}
       </div>
 
+      {/* THE DISCARD GRID (#104) — the excess a turn's end costs, laid out for
+          the whole table to read. The cells are a fixed shape chosen before the
+          first card moved, so every card flies straight to its own; an empty
+          one shows the shape still being filled. It is dropped the moment the
+          beat takes the grid over (`handed`), which is the same commit the
+          exit's own carriers go up in. */}
+      {handLimit.cells > 0 && !handLimit.handed && (
+        <div className={opening.discardGrid} data-testid="board-discard-grid">
+          {gridCells(handLimit.cells).map((cell, i) => {
+            const held = handLimit.placed.find((p) => p.slot === i)
+            return (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: the cells are a fixed grid and the index IS the slot
+                key={i}
+                className={opening.gridCell}
+                data-grid-cell={i}
+                style={{
+                  insetBlockStart: `${GRID_TOP}%`,
+                  inlineSize: `${cell.w}px`,
+                  transform: `translate(calc(-50% + ${cell.dx}px), calc(-50% + ${cell.dy}px))`,
+                }}
+                ref={(el) => handLimit.bindCell(i, el)}
+              >
+                {held ? (
+                  <div className={opening.cellCard} data-grid-card>
+                    <Card card={held.card} interactive={false} width="100%" />
+                  </div>
+                ) : (
+                  <span className={opening.cellEmpty} />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* OUR OWN alarm — strong, and BEFORE the hand in the DOM so it glows
           UNDER it. The bounds are the table zone itself: `kit.table` is already
           `position: relative; overflow: hidden; isolation: isolate`, so the
@@ -1281,11 +1334,13 @@ export default function Board({
                 // every call site below, rather than merging the two hooks'
                 // outputs.
                 items={
-                  answering
-                    ? defenseStaging.handItems
-                    : alarmMineOpen
-                      ? neutralizing.handItems
-                      : staging.handItems
+                  discarding
+                    ? handLimit.handItems
+                    : answering
+                      ? defenseStaging.handItems
+                      : alarmMineOpen
+                        ? neutralizing.handItems
+                        : staging.handItems
                 }
                 // the fan opens room for the arriving heap while it travels —
                 // the deal wins the tie against every other beat the same way
@@ -1309,17 +1364,25 @@ export default function Board({
                 // while a step is waiting on a choice from the fan, and only
                 // on the cards that answer it.
                 stateAt={
-                  answering
-                    ? defenseStaging.stateAt
-                    : alarmMineOpen
-                      ? neutralizing.stateAt
-                      : staging.stateAt
+                  discarding
+                    ? handLimit.stateAt
+                    : answering
+                      ? defenseStaging.stateAt
+                      : alarmMineOpen
+                        ? neutralizing.stateAt
+                        : staging.stateAt
                 }
                 // no fan accent while a 503 is open: `neutralizing.accentAt`
                 // answers for a ZONE slot, and the fan's own lighting is
                 // entirely `stateAt`'s (the Debugger, or nothing).
                 accentAt={
-                  answering ? defenseStaging.accentAt : alarmMineOpen ? undefined : staging.accentAt
+                  discarding
+                    ? handLimit.accentAt
+                    : answering
+                      ? defenseStaging.accentAt
+                      : alarmMineOpen
+                        ? undefined
+                        : staging.accentAt
                 }
                 // while the deal runs the hand is held: no clicks reach either
                 // gesture machine, and the cards that travelled closed stay
@@ -1337,7 +1400,7 @@ export default function Board({
                 // dispatches the play and never tells the stage machine, so the
                 // card stood nowhere for the whole step that followed.
                 onCardClick={
-                  deal.active
+                  deal.active || discarding
                     ? undefined
                     : answering
                       ? (i) => defenseStaging.onCardClick(i)
@@ -1365,11 +1428,13 @@ export default function Board({
                 onPlay={
                   deal.active
                     ? undefined
-                    : answering
-                      ? defenseStaging.onHandPlay
-                      : alarmMineOpen
-                        ? neutralizing.onHandPlay
-                        : staging.onHandPlay
+                    : discarding
+                      ? handLimit.onHandPlay
+                      : answering
+                        ? defenseStaging.onHandPlay
+                        : alarmMineOpen
+                          ? neutralizing.onHandPlay
+                          : staging.onHandPlay
                 }
                 // the reorder gesture's commit — without it the kit settles the
                 // card into its new slot and the next projection render snaps
@@ -1381,11 +1446,13 @@ export default function Board({
                     : (uid, to) =>
                         handOrder.commit(
                           you.hand,
-                          answering
-                            ? defenseStaging.handItems
-                            : alarmMineOpen
-                              ? neutralizing.handItems
-                              : staging.handItems,
+                          discarding
+                            ? handLimit.handItems
+                            : answering
+                              ? defenseStaging.handItems
+                              : alarmMineOpen
+                                ? neutralizing.handItems
+                                : staging.handItems,
                           uid,
                           to,
                         )
@@ -1461,6 +1528,7 @@ export default function Board({
           decline — is the board's own affordance now, in the ask below. */}
       {state.pending?.player === state.selfId &&
         state.pending.kind !== 'discardForRelease' &&
+        state.pending.kind !== 'handLimit' &&
         state.pending.kind !== 'defend' &&
         // the gesture IS the answer, and the panel covered the very cards it
         // was asking about — same reason, same fix as `defend` above (#102)
@@ -1645,6 +1713,7 @@ export default function Board({
       {beats.overlays}
       {staging.overlay}
       {defenseStaging.overlay}
+      {handLimit.overlay}
       {neutralizing.overlay}
       {previewOverlay}
 
