@@ -124,7 +124,7 @@ it.each([
     event: rejectedHandLimit(['attack-bug#0'], 'p2', 10),
   },
   {
-    name: 'a different ordered card list',
+    name: 'a different card list',
     event: rejectedHandLimit(['protection-debugger#0'], 'you', 10),
   },
 ])('keeps the local grid locked for $name rejection', async ({ event }) => {
@@ -141,6 +141,31 @@ it.each([
   await act(async () => {})
   expect(filledCells()).toBe(1)
   expect(fanSlots()).toBe(HAND.length - 1)
+})
+
+it('keeps a two-card grid locked for a reversed rejection and unlocks for exact order', async () => {
+  const onResolve = vi.fn()
+  const actions = { onResolve }
+  const view = render(boardOverLimit(2, actions))
+  await pullCardFromFan(0)
+  await pullCardFromFan(0)
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'handLimit',
+    cards: ['attack-bug#0', 'protection-debugger#0'],
+  })
+  expect(filledCells()).toBe(2)
+
+  const reversed = rejectedHandLimit(['protection-debugger#0', 'attack-bug#0'], 'you', 10)
+  view.rerender(boardOverLimit(2, actions, [reversed]))
+  await act(async () => {})
+  expect(filledCells()).toBe(2)
+  expect(fanSlots()).toBe(HAND.length - 2)
+
+  const exact = rejectedHandLimit(['attack-bug#0', 'protection-debugger#0'], 'you', 11)
+  view.rerender(boardOverLimit(2, actions, [reversed, exact]))
+  await act(async () => {})
+  expect(filledCells()).toBe(0)
+  expect(fanSlots()).toBe(HAND.length)
 })
 
 it('a pull under the limit takes a cell in the grid', async () => {
