@@ -135,7 +135,8 @@ playground.
 | `ELIM_MIN_MS` | `5000` | `Error503Story` | minimum elimination-video play time before it fades |
 | `COVER_DX` / `COVER_DY` | `16` / `-12` | `Error503Story` | the answer covers the 503 nudged, so both cards are read |
 | `COVER_HOLD` | `1200` | `Error503Story` | the answer and the alarm stand open before they leave together |
-| `GATHER_HOLD` | `1500` | `Error503Story` | the swept hand is held at the centre before it scatters (the hand-limit beat) |
+| `GATHER_HOLD` | `1500` | `Error503Story` · `HandLimitStory` | cards gathered at the centre are held before they scatter — the sweep's heap and the hand limit's grid, one value |
+| `CLEAR_STEP` | `90` | `HandLimitStory` | between cards as the finished grid leaves for the discard |
 | `PICK_HOLD` | `900` | `AiCardsStory` | Bad Vibe: the given-up card stands beside the AI card before both leave |
 | `TABLE_HOLD` | `2600` | `AiCardsStory` | hold on the table after an AI card reveals, before it resolves |
 | `HALLUCINATION_HOLD` | `5200` | `AiCardsStory` | `×2 TABLE_HOLD` — Hallucination lingers |

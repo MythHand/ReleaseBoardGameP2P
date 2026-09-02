@@ -1937,6 +1937,21 @@ heap. A carried-back card is in the hand again and its cell is free — the cell
 claimed SET rather than a count, or a card returning to the grid would take the next free cell instead
 of the one it left.
 
+**On the board (#104).** The scene is split across the two halves of the board's own machinery, and
+the split is what keeps the promise "the hand is never blocked by a flight":
+
+- **The gesture** (`pages/board/[gameId]/_useHandLimit.tsx`) owns everything before the engine
+  answers: the pull gate (`pending.options` for legality, `excess` for the limit), one carrier per
+  card — no single-flight guard, unlike its three sibling hooks — the grid's claimed cells, the
+  carry-back, and the single `RESOLVE` fired when the last card LANDS.
+- **The beat** (`features/board-beats/handLimitBeat.tsx`) owns everything after: it adopts the grid
+  the local player built (through `HandLimitHandoff`) or builds the same one from the actor's seat
+  for every other peer, holds `GATHER_HOLD`, and sends every card out with `layer` = its slot and
+  `delay` = `slot × CLEAR_STEP`.
+
+The geometry both halves read is `@release/ui`'s `TableCentre/discardGrid.ts` — the shapes, the
+widths and the cell offsets, quoted from this scene.
+
 **Live reference.** `Hand limit` (Cards group).
 
 ---
