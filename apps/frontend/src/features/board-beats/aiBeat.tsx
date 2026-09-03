@@ -98,7 +98,16 @@ export function useAiBeat(anchors: BoardAnchors) {
       await wait(AFTER_FLIP)
 
       // 3. the table reads them. Hallucination lingers twice as long — the
-      //    scene's own doubling, not a judgement made here.
+      //    scene's own doubling, not a judgement made here. This is the ONE
+      //    place this runner reads the card's id, and it is not the exception
+      //    to "don't re-derive the ending" — it never decides what the effect
+      //    DOES, only how long the READING lasts, and `plan.tail` still
+      //    exclusively governs the former. `AiCardsStory` (the approved scene)
+      //    reads `eventCard` twice for two different questions — once for this
+      //    hold, once for its own turn-interrupt flag — because presentation
+      //    and mechanic are separate questions there too. If a second AI card
+      //    ever needs its own hold, the right fix is a `hold` field on the
+      //    plan, not a second id check here.
       await wait(plan.eventCard === 'ai-hallucination' ? HALLUCINATION_HOLD : TABLE_HOLD)
 
       // 4. the trigger goes to the heap, on the scatter its own event id
@@ -147,5 +156,5 @@ export function useAiBeat(anchors: BoardAnchors) {
     ctx.current = null
   }, [drop, resetArrival])
 
-  return { overlay: [...flyerOverlay, ...handOverlay], gapAt, gapSize, run, reset }
+  return { overlay: [...flyerOverlay, ...handOverlay, ...exit.overlay], gapAt, gapSize, run, reset }
 }
