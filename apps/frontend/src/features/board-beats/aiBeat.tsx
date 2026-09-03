@@ -26,6 +26,7 @@ const AFTER_FLIP = 560 // the flip, plus a pause to read it by
 // rather than hanging a second node on the same name.
 const TRIG = 'trig'
 const EFF = 'eff'
+const CRUSHED = 'crushed' // the release a crush destroys — its own carrier, its own road
 
 const rectOf = (el: Element | null): Rect | null => {
   if (!el) return null
@@ -34,7 +35,7 @@ const rectOf = (el: Element | null): Rect | null => {
 }
 
 export function useAiBeat(anchors: BoardAnchors) {
-  const { overlay: flyerOverlay, patch, drop, elOf, toSlot } = useToCentre()
+  const { overlay: flyerOverlay, patch, drop, elOf, raise, toSlot } = useToCentre()
   const exit = useDiscardExit(anchors.discardBox)
   const ctx = useRef<BeatRun | null>(null)
 
@@ -110,6 +111,16 @@ export function useAiBeat(anchors: BoardAnchors) {
       //    plan, not a second id check here.
       await wait(plan.eventCard === 'ai-hallucination' ? HALLUCINATION_HOLD : TABLE_HOLD)
 
+      // The destroyed release becomes a flyer exactly where it stands, and the
+      // zone lets go of it in the same commit — a card cannot be in a slot and
+      // in the air at once.
+      let crushedFrom: Rect | null = null
+      if (plan.tail.kind === 'crush') {
+        const card = cardById(plan.tail.card)
+        crushedFrom = rectOf(a.releaseSlot(plan.player, plan.tail.slot))
+        if (card && crushedFrom) await raise([{ key: CRUSHED, card, at: crushedFrom }])
+      }
+
       // 4. the trigger goes to the heap, on the scatter its own event id
       //    produces — one value, two readers (I7), so the heap rests it exactly
       //    where the flight put it.
@@ -145,9 +156,28 @@ export function useAiBeat(anchors: BoardAnchors) {
         drop(EFF)
       })()
 
-      await Promise.all([triggerOut, effectOut])
+      // …and the destroyed release takes the road the plan already worked out.
+      const crushedOut = (async () => {
+        if (plan.tail.kind !== 'crush' || !crushedFrom) return
+        const card = cardById(plan.tail.card)
+        if (!card) return
+        // Its road is the plan's answer, not one worked out here: the fact lives
+        // on the pre-batch projection (`releaseEvent`), which the runner cannot
+        // see and the plan already read (#71 — the class of bug this closes).
+        if (plan.tail.destination === 'events') {
+          await goHome(CRUSHED, crushedFrom)
+          drop(CRUSHED)
+          return
+        }
+        await latest.current.exit.send([
+          { key: CRUSHED, card, node: elOf(CRUSHED), scatter: scatterAt(plan.eventId) },
+        ])
+        drop(CRUSHED)
+      })()
+
+      await Promise.all([triggerOut, effectOut, crushedOut])
     },
-    [toSlot, patch, drop, elOf, goHome],
+    [toSlot, patch, drop, elOf, raise, goHome],
   )
 
   const reset = useCallback(() => {

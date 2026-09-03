@@ -53,4 +53,37 @@ describe('aiBeat', () => {
     expect(playedNames()).toContain('playToReleaseZone')
     expect(playedNames()).not.toContain('returnToDeck')
   })
+
+  const crushPlan = (destination: 'events' | 'discard') => ({
+    kind: 'aiEvent' as const,
+    key: 'ai:1',
+    eventId: 1,
+    player: 'p1',
+    pile: 0,
+    trigger: 'trigger-ai',
+    triggerDiscardId: 3,
+    eventCard: 'ai-crush-frontend',
+    tail: { kind: 'crush' as const, slot: 'frontend', card: 'release-frontend', destination },
+  })
+
+  it('sends a destroyed AI release home and never to the heap', async () => {
+    // 'p1:frontend' is already wired into the default fixture's `releaseSlot`
+    // (`testing.tsx`'s own `slots` map) — no override needed to reach it.
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(result.current.run, crushPlan('events'), anchors)
+    // two cards go home: the AI card, and the release it destroyed
+    expect(playedNames()).toEqual(expect.arrayContaining(['returnToDeck']))
+    // the ONLY thing in the heap is the trigger
+    const keys = (anchors.exitSpy.mock.calls.flat(2) as { key: string }[]).map((c) => c.key)
+    expect(keys).toEqual(['d3'])
+  })
+
+  it('sends a destroyed ordinary release to the heap', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(result.current.run, crushPlan('discard'), anchors)
+    const keys = (anchors.exitSpy.mock.calls.flat(2) as { key: string }[]).map((c) => c.key)
+    expect(keys).toEqual(expect.arrayContaining(['d3', 'crushed']))
+  })
 })
