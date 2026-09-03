@@ -519,6 +519,17 @@ it('keeps the filled grid standing after the dispatch, for the beat to take', as
   expect(fanSlots()).toBe(HAND.length - 2)
 })
 
+it('stops advertising a grid card as grabbable once the choice is dispatched', async () => {
+  render(boardOverLimit(2, { onResolve: vi.fn() }))
+  await pullCardFromFan(0)
+  expect(document.querySelector('[data-grid-card]')?.getAttribute('data-grabbable')).toBe('true')
+
+  await pullCardFromFan(0)
+  const locked = Array.from(document.querySelectorAll('[data-grid-card]'))
+  expect(locked).toHaveLength(2)
+  expect(locked.every((card) => card.getAttribute('data-grabbable') == null)).toBe(true)
+})
+
 it('hands the local grid straight to the accepted discard beat', async () => {
   flights.raises = []
   exits.items = []
@@ -552,6 +563,45 @@ it('hands the local grid straight to the accepted discard beat', async () => {
     // the discard exit owns the handover, but the fan remains filtered.
     await vi.waitFor(() => expect(screen.queryByTestId('board-discard-grid')).toBeNull())
     expect(fanSlots()).toBe(HAND.length - 2)
+
+    exits.release()
+    await act(async () => {})
+  } finally {
+    exits.release()
+    motion.reduced = true
+  }
+})
+
+it('hands off when onResolve synchronously advances to the accepted projection', async () => {
+  flights.raises = []
+  exits.items = []
+  exits.release = () => {}
+  const intro = handLimitIntro()
+  let rerender: ReturnType<typeof render>['rerender'] = () => {}
+  const onResolve = vi.fn(() => {
+    // The keeper can accept its own action synchronously. This rerender happens
+    // in the same turn as `finish()`, before Board's later handoff layout effect
+    // has published the now-dispatched grid ref.
+    motion.reduced = false
+    rerender(boardAfterAcceptedHandLimit(acceptedHandLimit(), intro))
+  })
+  const view = render(boardOverLimit(2, { onResolve }, [], true, intro))
+  rerender = view.rerender
+
+  try {
+    await vi.waitFor(() => expect(intro.onDone).toHaveBeenCalledTimes(1))
+    await pullCardFromFan(0)
+    await pullCardFromFan(0)
+
+    expect(onResolve).toHaveBeenCalledWith({
+      kind: 'handLimit',
+      cards: ['attack-bug#0', 'protection-debugger#0'],
+    })
+    await vi.waitFor(() => expect(exits.items.length + flights.raises.length).toBeGreaterThan(0))
+
+    expect(flights.raises).toEqual([])
+    await vi.waitFor(() => expect(exits.items).toEqual([['d10', 'd11']]))
+    await vi.waitFor(() => expect(screen.queryByTestId('board-discard-grid')).toBeNull())
 
     exits.release()
     await act(async () => {})

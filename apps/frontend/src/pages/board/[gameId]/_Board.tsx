@@ -1281,7 +1281,10 @@ export default function Board({
                   <div
                     className={opening.cellCard}
                     data-grid-card={held.uid}
-                    onMouseDown={(e) => handLimit.onCellDown(e, held)}
+                    data-grabbable={handLimit.dispatched ? undefined : 'true'}
+                    onMouseDown={
+                      handLimit.dispatched ? undefined : (e) => handLimit.onCellDown(e, held)
+                    }
                   >
                     <Card card={held.card} interactive={false} width="100%" />
                   </div>
@@ -1476,7 +1479,7 @@ export default function Board({
                 // fan, not clicked. Off during the deal, same as the click
                 // gesture above.
                 onPlay={
-                  deal.active
+                  deal.active || (discarding && handLimit.carrying)
                     ? undefined
                     : discarding
                       ? handLimit.onHandPlay
@@ -1491,7 +1494,7 @@ export default function Board({
                 // it back. `to` indexes the fan AS RENDERED (minus any staged
                 // card), which is exactly what the commit expects.
                 onReorder={
-                  deal.active
+                  deal.active || (discarding && handLimit.carrying)
                     ? undefined
                     : (uid, to) =>
                         handOrder.commit(

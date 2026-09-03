@@ -128,12 +128,15 @@
 .cellCard {
   position: relative;
   block-size: 100%;
+}
+
+.cellCard[data-grabbable="true"] {
   pointer-events: auto;
   cursor: grab;
   transition: transform 180ms var(--ease-out);
 }
 
-.cellCard:hover {
+.cellCard[data-grabbable="true"]:hover {
   transform: translateY(-6px);
 }
 
@@ -228,7 +231,7 @@
     transition: none;
   }
 
-  .cellCard {
+  .cellCard[data-grabbable="true"] {
     transition: none;
   }
 }

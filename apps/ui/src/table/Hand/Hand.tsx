@@ -199,7 +199,10 @@ export default function Hand({
   const zoomHide = useRef<number | null>(null)
 
   const n = items.length
-  const dragEnabled = Boolean(onPlay ?? onReorder)
+  // A scene carrying a card into this fan owns the pointer until that arrival
+  // commits. Keeping drag mode armed here would let a second fan card lift and
+  // reorder underneath the active carrier.
+  const dragEnabled = !carrying && Boolean(onPlay ?? onReorder)
   // ховер подавлен во время перетаскивания — своего или чужого (carrying)
   const hovered = drag || carrying ? null : hoveredUid
   const hoveredIndex = hovered ? items.findIndex((it) => it.uid === hovered) : -1

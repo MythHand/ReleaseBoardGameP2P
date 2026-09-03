@@ -263,6 +263,34 @@ it.each([
   expect(handoff.release).not.toHaveBeenCalled()
 })
 
+it('falls through to the whole projection when one adopted cell cannot be measured', async () => {
+  raises.keys.length = 0
+  exits.items.length = 0
+  order.calls.length = 0
+  const cells = [node(), null]
+  const handoff: HandLimitHandoff = {
+    player: 'p1',
+    cards: [
+      { uid: 'u1', card: attackCard, slot: 0 },
+      { uid: 'u2', card: protectionCard, slot: 1 },
+    ],
+    cellAt: (slot: number) => cells[slot] ?? null,
+    release: vi.fn(() => order.calls.push('release')),
+  }
+  const { api, Probe } = harness(handoff)
+  render(<Probe />)
+
+  await drive(() => api.beat?.run(plan(), { base, publish: () => {} }))
+
+  // One unmeasurable member makes the adopted exit all-or-nothing. The held
+  // grid yields as a whole to the accepted projection; no partial carrier set
+  // tells the table that only one of two discards happened.
+  expect(raises.keys).toEqual([])
+  expect(exits.items).toEqual([])
+  expect(handoff.release).toHaveBeenCalledTimes(1)
+  expect(order.calls).toEqual(['release'])
+})
+
 // Everyone else has no grid: the beat builds one and flies the cards in from
 // the actor's seat before the same hold and the same exit.
 it('builds the grid itself for a discard that is not ours', async () => {
@@ -339,6 +367,53 @@ it('drops a card whose source rect is missing and leaves state to the projection
   await drive(() => api.beat?.run(plan(), { base, publish: () => {} }))
   expect(raises.keys).toEqual([])
   expect(exits.items).toEqual([])
+})
+
+it('never raises or exits an unknown catalogue card from a malformed build plan', async () => {
+  raises.keys.length = 0
+  exits.items.length = 0
+  const malformed = {
+    ...plan('p2'),
+    cards: [{ ...plan('p2').cards[0], card: 'not-in-the-catalogue' }, plan('p2').cards[1]],
+  } as unknown as Extract<BeatPlan, { kind: 'handLimit' }>
+  const { api, Probe } = harness(null)
+  render(<Probe />)
+
+  await drive(() => api.beat?.run(malformed, { base, publish: () => {} }))
+
+  expect(raises.keys).toEqual(['hl5'])
+  expect(exits.items.map((item) => item.card.id)).toEqual(['protection-debugger'])
+  expect(exits.items.map((item) => item.layer)).toEqual([1])
+})
+
+it('does not release or send an old grid after reset interrupts its hold', async () => {
+  exits.items.length = 0
+  order.calls.length = 0
+  const cells = [node(), node()]
+  const handoff: HandLimitHandoff = {
+    player: 'p1',
+    cards: [
+      { uid: 'u1', card: attackCard, slot: 0 },
+      { uid: 'u2', card: protectionCard, slot: 1 },
+    ],
+    cellAt: (slot: number) => cells[slot] ?? null,
+    release: vi.fn(() => order.calls.push('release')),
+  }
+  const { api, Probe } = harness(handoff)
+  render(<Probe />)
+
+  await drive(
+    () => api.beat?.run(plan(), { base, publish: () => {} }),
+    () => {
+      // `nextFrames()` has completed by then and the adopted grid is inside
+      // GATHER_HOLD. Reset belongs to a new match and invalidates this tail.
+      window.setTimeout(() => api.beat?.reset(), 100)
+    },
+  )
+
+  expect(handoff.release).not.toHaveBeenCalled()
+  expect(exits.items).toEqual([])
+  expect(order.calls).not.toContain('send')
 })
 
 it('resets both the grid carriers and the discard-exit carriers', () => {

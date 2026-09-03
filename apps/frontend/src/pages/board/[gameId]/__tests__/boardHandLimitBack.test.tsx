@@ -21,27 +21,33 @@ vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => motion
 const bug = cardById('attack-bug')!
 // biome-ignore lint/style/noNonNullAssertion: known catalogue entries
 const debugger_ = cardById('protection-debugger')!
+// biome-ignore lint/style/noNonNullAssertion: known catalogue entries
+const hotfix = cardById('defense-hotfix')!
 
 const HAND: { uid: string; card: CardData }[] = [
   { uid: 'attack-bug#0', card: bug },
   { uid: 'protection-debugger#0', card: debugger_ },
 ]
 
-function boardOverLimit(excess: number, actions: TableActions = {}) {
+function boardOverLimit(
+  excess: number,
+  actions: TableActions = {},
+  hand: { uid: string; card: CardData }[] = HAND,
+) {
   const base = makeBoardProps()
   return (
     <Board
       {...makeBoardProps({
         state: {
           ...base.state,
-          you: { ...base.state.you, hand: HAND },
+          you: { ...base.state.you, hand },
           turn: base.state.selfId,
           hasDrawn: true,
           pending: {
             kind: 'handLimit',
             player: base.state.selfId,
             excess,
-            options: HAND.map((c) => c.uid),
+            options: hand.map((c) => c.uid),
           },
         },
         actions,
@@ -222,6 +228,41 @@ it('blocks a fan pull until the placement arrival lands', async () => {
     expect(filledCells()).toBe(0)
     expect(fanSlots()).toBe(HAND.length)
     expect(handCardIds()).toEqual(['protection-debugger', 'attack-bug'])
+  } finally {
+    motion.reduced = true
+  }
+})
+
+it('keeps the fan order inert while a placement arrival owns the returned card', async () => {
+  motion.reduced = false
+  const hand = [...HAND, { uid: 'defense-hotfix#0', card: hotfix }]
+  try {
+    render(boardOverLimit(2, {}, hand))
+    await pullCardFromFan(0)
+
+    const cell = document.querySelector<HTMLElement>('[data-grid-cell="0"] [data-grid-card]')
+    if (!cell) throw new Error('no card in that cell')
+    const handWrap = document.querySelector<HTMLElement>('[class*="handWrap"]')
+    const y = (handWrap?.getBoundingClientRect().top ?? 0) + 10
+    fireEvent.mouseDown(cell, { clientX: 100, clientY: 100 })
+    fireEvent.mouseMove(window, { clientX: 120, clientY: y })
+    fireEvent.mouseUp(window, { clientX: 120, clientY: y })
+    expect(document.querySelectorAll(`.${handArrivalStyles.arriving}`)).toHaveLength(1)
+    expect(handCardIds()).toEqual(['protection-debugger', 'defense-hotfix'])
+
+    // Reorder the two visible fan cards while the carried card is still in its
+    // placement arrival. The arrival owns the only active pointer interaction,
+    // so the fan must neither lift a card nor commit a private reorder.
+    const first = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[0]
+    fireEvent.mouseDown(first, { clientX: 0, clientY: y })
+    fireEvent.mouseMove(window, { clientX: 240, clientY: y })
+    fireEvent.mouseUp(window, { clientX: 240, clientY: y })
+    expect(handCardIds()).toEqual(['protection-debugger', 'defense-hotfix'])
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 600))
+    })
+    expect(handCardIds()).toEqual(['protection-debugger', 'defense-hotfix', 'attack-bug'])
   } finally {
     motion.reduced = true
   }

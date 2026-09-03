@@ -119,7 +119,7 @@ Quoted verbatim from `HandLimitStory`, exported from `@release/ui`:
   (`CENTRE_TOP` is 42) — the scene's value, carried verbatim rather than aligned by inference, and
   it is the scene's because a block of up to three rows is not a card box.
 - `gridCells(n) → { dx, dy, w, h }[]` — one entry per slot, **offsets from the grid's centre point**,
-  the shape `centreTransform` already speaks in. Cell height is `w / CARD_RATIO`
+  the shape `centreTransform` already speaks in. Cell height is `w * CARD_RATIO`
   (`@release/ui`'s own, so nothing re-types the card's proportion). The page positions its cells with
   these offsets rather than a CSS grid, so the numbers it renders are the numbers the beat flies to —
   one function, two readers, no second layout to keep in step.
@@ -172,7 +172,8 @@ export interface HandLimitHandoff {
 }
 ```
 
-A ref, read once at run start, for the same reason `StagedHandoff` is one. It lives in `entities`
+A ref, sampled by the runner into axis-aligned viewport `from` rectangles, for the same reason
+`StagedHandoff` is one. The runner does not retain or hand a live cell node to the exit. It lives in `entities`
 because the page produces it and a feature consumes it.
 
 ### The board — `_Board.tsx`
@@ -209,8 +210,9 @@ measuring before that yields the wrong slot (**I1**). Then `ctx.publish(withoutF
 
 Then one of two ways into the grid:
 
-1. **Adopt** — the plan's player is us and the handoff names that same player and hands back cells.
-   Nothing flies in; the grid is already standing where the player put it.
+1. **Adopt** — the plan's player is us and the handoff names that same player. The runner measures
+   every handed-off cell into an axis-aligned viewport `from` rectangle. Nothing flies in; the grid
+   is already standing where the player put it.
 2. **Build** — every other peer, and ourselves with no handoff. Cell boxes come from `gridCells`
    against the grid's centre point (`GRID_TOP` of the table rect read from `anchors.bg`); one flyer
    per card is raised at its source (the actor's seat box, or a hand slot on the self-fallback) and
@@ -218,7 +220,8 @@ Then one of two ways into the grid:
 
 And one tail either way: `wait(GATHER_HOLD)` → `handoff?.release()` in the same synchronous burst as
 the send, so the page's grid lets go in the commit the carriers go up in → `send()` through
-`useDiscardExit` with `node` (adopt) or `from` (build), `layer` = the slot, `delay` = `slot ×
+`useDiscardExit` with measured axis-aligned `from` rectangles in both paths, `layer` = the slot,
+`delay` = `slot ×
 CLEAR_STEP`, and `scatter: scatterAt(eventId)` so each card ends on the pose the heap already holds
 for it (**I7**). `reset()` drops the carriers on a match boundary, like every sibling runner.
 
