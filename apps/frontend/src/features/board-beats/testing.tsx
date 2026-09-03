@@ -63,12 +63,24 @@ import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 
 export const animationsTrace = {
   played: [] as string[],
+  waited: [] as number[],
   exitSpy: vi.fn(async (_items: unknown[]) => {}),
 }
 
 /** The preset names passed to `play()`, in call order since the last reset. */
 export function playedNames(): string[] {
   return animationsTrace.played
+}
+
+/**
+ * The `ms` arguments passed to `wait()`, in call order since the last reset.
+ * A test that writes its own `vi.mock('@release/ui/animations', …)` (see this
+ * file's own header — the mock cannot live here) traces `wait` the same way
+ * the shared mock above traces `play`: push onto `animationsTrace.waited`,
+ * then delegate to the real implementation.
+ */
+export function waitedMs(): number[] {
+  return animationsTrace.waited
 }
 
 /** A card-shaped rect at a given point — `toCentre.test.tsx`'s own `RECT`, shared. */
@@ -101,6 +113,7 @@ export type AnchorsFixture = BoardAnchors & {
 // recordings into this one.
 export function anchorsFixture(overrides: Partial<BoardAnchors> = {}): AnchorsFixture {
   animationsTrace.played = []
+  animationsTrace.waited = []
   animationsTrace.exitSpy = vi.fn(async () => {})
   const piles: Record<number, HTMLDivElement> = { 0: nodeAt(boxed(0, 300)) }
   const slots: Record<string, HTMLDivElement> = {
@@ -192,6 +205,7 @@ export async function runBeat<P>(
   opts: { base?: BoardState; publish?: (s: BoardState) => void } = {},
 ): Promise<{ published: BoardState[] }> {
   animationsTrace.played = []
+  animationsTrace.waited = []
   anchors.exitSpy.mockClear()
   const published: BoardState[] = []
   const base = opts.base ?? DEFAULT_BASE

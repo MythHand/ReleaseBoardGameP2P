@@ -1,6 +1,13 @@
 import { cardAreaOf, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import { play, scatterAt, useDiscardExit, useHandArrival, wait } from '@release/ui/animations'
+import {
+  nextFrames,
+  play,
+  scatterAt,
+  useDiscardExit,
+  useHandArrival,
+  wait,
+} from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
@@ -149,6 +156,22 @@ export function useAiBeat(anchors: BoardAnchors) {
           }
           // It STAYS. No return home: the batch said `released`/`placed`, which
           // is what standing on the table looks like from outside the engine.
+          drop(EFF)
+          return
+        }
+        // IT STANDS. A prompt is owed and this card is what explains it, so the
+        // carrier is simply dropped where it landed and the projection's own
+        // render takes the slot (`_Board.tsx`'s `aiStanding`, off
+        // `pending.source`). Its journey home belongs to the batch that answers
+        // the prompt, not to this one.
+        //
+        // The trigger does NOT get the same treatment, and the difference is
+        // not a preference: the engine banks it in this very batch, so holding
+        // it would contradict a projection that already has it in the heap. The
+        // AI card can stand because `decks.events` is projected as a count —
+        // one fewer, and nothing on screen disagrees.
+        if (plan.tail.kind === 'standing') {
+          await nextFrames() // the projection's render is up before the carrier lets go (I2)
           drop(EFF)
           return
         }

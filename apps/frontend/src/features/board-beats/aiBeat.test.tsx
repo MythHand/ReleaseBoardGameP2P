@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { useAiBeat } from './aiBeat'
-import { anchorsFixture, animationsTrace, playedNames, renderBeat, runBeat } from './testing'
+import {
+  anchorsFixture,
+  animationsTrace,
+  playedNames,
+  renderBeat,
+  runBeat,
+  waitedMs,
+} from './testing'
+import { HALLUCINATION_HOLD, TABLE_HOLD } from './toCentre'
 
 // The harness's own mock has to be wired here, not inside `./testing` — see
 // that file's own header for why (importing a shared FACTORY FUNCTION into a
@@ -16,6 +24,10 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     play: (name: string, el: Element | null, params?: Record<string, unknown>) => {
       animationsTrace.played.push(name)
       return real.play(name, el, params)
+    },
+    wait: (ms: number) => {
+      animationsTrace.waited.push(ms)
+      return real.wait(ms)
     },
     useDiscardExit: () => ({
       overlay: [],
@@ -85,5 +97,58 @@ describe('aiBeat', () => {
     await runBeat(result.current.run, crushPlan('discard'), anchors)
     const keys = (anchors.exitSpy.mock.calls.flat(2) as { key: string }[]).map((c) => c.key)
     expect(keys).toEqual(expect.arrayContaining(['d3', 'crushed']))
+  })
+
+  const standingPlan = {
+    kind: 'aiEvent' as const,
+    key: 'ai:1',
+    eventId: 1,
+    player: 'p1',
+    pile: 0,
+    trigger: 'trigger-ai',
+    triggerDiscardId: 3,
+    eventCard: 'ai-bad-vibe-coding',
+    tail: { kind: 'standing' as const },
+  }
+
+  it('lets the trigger go and leaves the AI card standing when a prompt is owed', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    // NOT wrapped in an outer `act(...)` — see `runBeat`'s own header in
+    // `./testing`.
+    await runBeat(result.current.run, standingPlan, anchors)
+    // the trigger was filed…
+    const keys = (anchors.exitSpy.mock.calls.flat(2) as { key: string }[]).map((c) => c.key)
+    expect(keys).toEqual(['d3'])
+    // …and the AI card neither followed it nor went home
+    expect(playedNames()).not.toContain('returnToDeck')
+  })
+
+  it('takes both away when nothing is owed', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(result.current.run, { ...standingPlan, tail: { kind: 'none' as const } }, anchors)
+    expect(playedNames()).toContain('returnToDeck')
+  })
+
+  // `runBeat`'s own opts carry no `onWait` hook (the brief's snippet assumed
+  // one, but the harness only ever traced `play`) — extended the same trace
+  // to `wait` instead (`animationsTrace.waited`, exposed as `waitedMs()`),
+  // which is what every OTHER beat-test assertion in this file already does
+  // for `play`.
+  it('holds Hallucination twice as long as anything else', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(
+      result.current.run,
+      {
+        ...standingPlan,
+        eventCard: 'ai-hallucination',
+        tail: { kind: 'turnEnded' as const },
+      },
+      anchors,
+    )
+    expect(waitedMs()).toContain(HALLUCINATION_HOLD)
+    expect(waitedMs()).not.toContain(TABLE_HOLD)
   })
 })
