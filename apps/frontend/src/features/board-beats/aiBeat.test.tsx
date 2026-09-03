@@ -3,6 +3,7 @@ import { useAiBeat } from './aiBeat'
 import {
   anchorsFixture,
   animationsTrace,
+  callOrder,
   playedNames,
   renderBeat,
   runBeat,
@@ -28,6 +29,29 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     wait: (ms: number) => {
       animationsTrace.waited.push(ms)
       return real.wait(ms)
+    },
+    // `aiBeat.tsx` has exactly one call site for `nextFrames` (the `standing`
+    // branch) — `useFlyer.tsx`'s own internal `raise()` imports `nextFrames`
+    // straight from `./timing`, not through this barrel, so it never touches
+    // this trace. That makes a plain call-order log here unambiguous: any
+    // `'nextFrames'` entry IS the standing branch's own await.
+    nextFrames: () => {
+      animationsTrace.order.push('nextFrames')
+      return real.nextFrames()
+    },
+    // Wrapping `useFlyer` (not `drop` alone — it isn't a named export) so
+    // `useToCentre`'s `drop` is traced the same way: this barrel IS what
+    // `toCentre.ts` imports `useFlyer` from, so the wrapped `drop` is the one
+    // `aiBeat.tsx` actually calls.
+    useFlyer: () => {
+      const flyer = real.useFlyer()
+      return {
+        ...flyer,
+        drop: (key?: string) => {
+          animationsTrace.order.push(`drop:${key ?? '*'}`)
+          return flyer.drop(key)
+        },
+      }
     },
     useDiscardExit: () => ({
       overlay: [],
@@ -124,11 +148,37 @@ describe('aiBeat', () => {
     expect(playedNames()).not.toContain('returnToDeck')
   })
 
-  it('takes both away when nothing is owed', async () => {
+  // `none`, `alarm` and `turnEnded` reach byte-identical code — Task 6's
+  // `goHome` fallback, unmodified by this task — so one table-driven case
+  // over the three tails the brief names, rather than three near-copies of
+  // the same assertion.
+  it.each([
+    { kind: 'none' as const },
+    { kind: 'alarm' as const },
+    { kind: 'turnEnded' as const },
+  ])('takes both away when the tail is $kind', async (tail) => {
     const anchors = anchorsFixture()
     const { result } = renderBeat(() => useAiBeat(anchors))
-    await runBeat(result.current.run, { ...standingPlan, tail: { kind: 'none' as const } }, anchors)
+    await runBeat(result.current.run, { ...standingPlan, tail }, anchors)
     expect(playedNames()).toContain('returnToDeck')
+  })
+
+  // Pins I2 (`aiBeat.tsx:173-175`'s own comment): the projection's render
+  // must be up before the carrier lets go, not after. `nextFrames()` is
+  // called exactly once in this scenario (see the mock's own comment), and
+  // `order`'s indices only agree with "before" if the call actually precedes
+  // the drop — a version that dropped the carrier FIRST and awaited
+  // `nextFrames()` after would still make the call, but out of order, and
+  // this assertion catches that the same way it catches deleting the line.
+  it('paints the projection before letting the AI carrier go', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(result.current.run, standingPlan, anchors)
+    const order = callOrder()
+    const nextFramesIndex = order.indexOf('nextFrames')
+    const dropIndex = order.indexOf('drop:eff')
+    expect(nextFramesIndex).toBeGreaterThanOrEqual(0)
+    expect(dropIndex).toBeGreaterThan(nextFramesIndex)
   })
 
   // `runBeat`'s own opts carry no `onWait` hook (the brief's snippet assumed

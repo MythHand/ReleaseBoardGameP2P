@@ -64,6 +64,12 @@ import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 export const animationsTrace = {
   played: [] as string[],
   waited: [] as number[],
+  // A single merged, chronologically-ordered log of `nextFrames()` calls
+  // (pushed as `'nextFrames'`) and `drop(key)` calls (pushed as `` `drop:${key}` ``).
+  // Kept separate from `played`/`waited` because what a test needs from it is
+  // RELATIVE ORDER between the two kinds of entry (did the render get its
+  // frame before the carrier let go — I2), not either call's own arguments.
+  order: [] as string[],
   exitSpy: vi.fn(async (_items: unknown[]) => {}),
 }
 
@@ -81,6 +87,17 @@ export function playedNames(): string[] {
  */
 export function waitedMs(): number[] {
   return animationsTrace.waited
+}
+
+/**
+ * The merged `nextFrames()`/`drop(key)` call log — see `animationsTrace.order`.
+ * A test proving an ordering invariant (a render must be up before a carrier
+ * drops, I2) reads two indices out of this and compares them, rather than
+ * asserting either call happened in isolation — presence alone survives a
+ * reordering bug that only sequence catches.
+ */
+export function callOrder(): string[] {
+  return animationsTrace.order
 }
 
 /** A card-shaped rect at a given point — `toCentre.test.tsx`'s own `RECT`, shared. */
@@ -114,6 +131,7 @@ export type AnchorsFixture = BoardAnchors & {
 export function anchorsFixture(overrides: Partial<BoardAnchors> = {}): AnchorsFixture {
   animationsTrace.played = []
   animationsTrace.waited = []
+  animationsTrace.order = []
   animationsTrace.exitSpy = vi.fn(async () => {})
   const piles: Record<number, HTMLDivElement> = { 0: nodeAt(boxed(0, 300)) }
   const slots: Record<string, HTMLDivElement> = {
@@ -206,6 +224,7 @@ export async function runBeat<P>(
 ): Promise<{ published: BoardState[] }> {
   animationsTrace.played = []
   animationsTrace.waited = []
+  animationsTrace.order = []
   anchors.exitSpy.mockClear()
   const published: BoardState[] = []
   const base = opts.base ?? DEFAULT_BASE
