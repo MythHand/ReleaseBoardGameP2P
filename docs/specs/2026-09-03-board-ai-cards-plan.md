@@ -43,6 +43,7 @@
 | `apps/frontend/src/pages/board/[gameId]/_Board.tsx` | the three slots, the standing card, the events pile's box, the two prompt surfaces | 5, 10, 11 |
 | `apps/frontend/src/pages/board/[gameId]/_Board.module.css` | only what all three slots share | 5 |
 | `apps/frontend/src/features/board-beats/aiBeat.tsx` | **new** — everything that flies for an AI card | 6–8, 11 |
+| `apps/frontend/src/features/board-beats/testing.tsx` | **new** — the shared beat-test harness Tasks 7-9 import | 6 |
 | `apps/frontend/src/features/board-beats/useBeats.ts` | queue wiring; `owed`; the gap contributors | 4, 6, 11 |
 | `apps/frontend/src/features/board-beats/index.ts` | barrel exports | 6 |
 | `apps/frontend/src/features/board-beats/defenseBeat.tsx` | the road home, and the sacrifice flight that was wrong | 9 |
@@ -833,15 +834,15 @@ function aiTailAfter(
   if (next?.type === 'turnEnded') return { kind: 'turnEnded' }
   const mimic = next?.type === 'revealed' && next.card === eventCard
   // A prompt is owed for THIS card — not merely "some pending exists", which a
-  // relayed batch could have carried in from anywhere.
-  const standing = owed?.kind !== 'defend' && owed?.source === eventCard
+  // relayed batch could have carried in from anywhere. Only the four pendings
+  // an AI effect can raise carry `source` at all, so the equality is the whole
+  // test; no kind check is needed in front of it.
+  const standing = owed?.source === eventCard
   if (standing) return { kind: 'standing', ...(mimic ? { alarm: true as const } : {}) }
   if (mimic) return { kind: 'alarm' }
   return { kind: 'none' }
 }
 ```
-
-Note the `owed?.kind !== 'defend'` guard is not needed for correctness (a `defend` has no `source`) — drop it if the compiler is happy without it, and keep the check to `owed?.source === eventCard` alone.
 
 - [ ] **Step 4: Claim the pair in the walk**
 
@@ -1155,6 +1156,7 @@ The opening is common to all six endings, so it lands with the file and with one
 **Interfaces:**
 - Consumes: `useToCentre`, `TABLE_HOLD`, `HALLUCINATION_HOLD` (Task 2); the `aiEvent` plan (Task 4); `anchors.cause`, `.effect`, `.eventsBox` (Task 5).
 - Produces: `useAiBeat(anchors: BoardAnchors)` → `{ overlay: ReactNode[], run, reset }`, where `run(plan, ctx: BeatRun): Promise<void>`.
+- **Produces: the shared beat-test harness**, `apps/frontend/src/features/board-beats/testing.tsx`, exporting `anchorsFixture(overrides?)`, `renderBeat(hook)`, `runBeat(run, plan, anchors, opts?)`, `playedNames()` and `boxed(left, top)`. Tasks 7, 8 and 9 all use it, and no other task creates it. Build it by lifting whichever of `transferBeat.test.tsx` / `handLimitBeat.test.tsx` has the closer harness — do not invent a third shape. If the two disagree in a way that matters, say so in your report rather than picking silently.
 - Produces: flyer keys `'trig'` (the trigger), `'eff'` (the AI card), `'crushed'` (Task 7). One key is one flyer; raising the same key twice replaces the carrier.
 
 - [ ] **Step 1: Write the failing test**
@@ -1195,7 +1197,7 @@ describe('aiBeat', () => {
 })
 ```
 
-There is no `./testing` helper module in `board-beats` today. Build the harness the way `transferBeat.test.tsx` and `handLimitBeat.test.tsx` already do — read whichever of those is closer and copy its shape rather than inventing a third; if they both inline their harness, inline this one too and delete the `./testing` import.
+There is no `./testing` module in `board-beats` today, and creating it is part of this task (see **Interfaces**) — Tasks 7, 8 and 9 import the same five helpers. Lift the shape from whichever of `transferBeat.test.tsx` / `handLimitBeat.test.tsx` is closer; both currently inline their harnesses, so this is an extraction rather than an invention. `playedNames()` returns the preset names passed to `play()` in call order, which is what Tasks 7 and 8 assert on.
 
 - [ ] **Step 2: Run it to verify it fails**
 
