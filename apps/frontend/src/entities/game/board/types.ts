@@ -184,6 +184,11 @@ export interface BoardChromeCopy {
   // interpolation to put a number into — and the grid's own empty cells already
   // show how many are owed.
   askHandLimit: string
+  // Inside's own caption (#106, `pickFromDiscard`) — the row over the
+  // discard asks this one, the same way the fan itself asks the four lines
+  // above it. Shared with Git Cherry-pick once #61 lands: the two effects
+  // resolve through the same pending, so they read the same line.
+  insidePrompt: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
   pauseGame?: string

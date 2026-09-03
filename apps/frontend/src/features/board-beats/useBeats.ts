@@ -358,6 +358,18 @@ export function useBeats(args: {
           run: (ctx) => ais.run(plan, ctx),
         }
       }
+      if (plan.kind === 'takenFromDiscard') {
+        return {
+          key: plan.key,
+          base,
+          // Not exclusive: a card coming back out of the discard is read, not
+          // obeyed, and nothing about it needs input dead — same reasoning as
+          // `aiEvent` just above.
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => ais.runTaken(plan, ctx),
+        }
+      }
       return null
     },
     [
@@ -376,6 +388,7 @@ export function useBeats(args: {
       transfers.runTransfer,
       transfers.runRequested,
       ais.run,
+      ais.runTaken,
     ],
   )
 
@@ -615,11 +628,17 @@ export function useBeats(args: {
     // true across the handover between two beats of one batch, which is exactly
     // the window the winner overlay must not appear in.
     running: running != null,
-    // The fan opens for a card on its way into it. Two beats grow it now — a
-    // draw (I8) and a card taken from an opponent — and they can never both be
-    // open, because one beat runs at a time. So this is a choice between them,
-    // not a merge of them.
-    gapAt: draws.gapAt ?? transfers.gapAt,
-    gapSize: draws.gapAt == null ? transfers.gapSize : draws.gapSize,
+    // The fan opens for a card on its way into it. Three beats grow it now —
+    // a draw (I8), a card taken from an opponent, and a Release taken back
+    // out of the discard (#106) — and never more than one of them is open at
+    // once, because one beat runs at a time. So this is a choice between
+    // them, not a merge of them.
+    gapAt: draws.gapAt ?? transfers.gapAt ?? ais.gapAt,
+    gapSize:
+      draws.gapAt == null
+        ? transfers.gapAt == null
+          ? ais.gapSize
+          : transfers.gapSize
+        : draws.gapSize,
   }
 }

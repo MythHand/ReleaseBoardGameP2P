@@ -124,3 +124,108 @@ describe('the AI pair at the centre', () => {
     expect(cell.style.transform).not.toBe(centreTransform('picked'))
   })
 })
+
+// THE ROW THAT TAKES A RELEASE OUT OF THE DISCARD (#106, Task 11, ai-inside).
+// The choice is the owner's alone (`pendingView` gates `options` behind
+// `mine`), so it is answered by a row on the table rather than the shared
+// panel — the same split `requestCard`'s band already keeps.
+describe('the row that takes a Release out of the discard (ai-inside)', () => {
+  const pickingPending = (options: { uid: string; id: string }[], player = 'you') => ({
+    kind: 'pickFromDiscard' as const,
+    player,
+    options,
+    picks: 1 as const,
+    source: 'ai-inside',
+  })
+
+  it("offers the discard's releases in a row, and not the pending panel", () => {
+    const base = makeBoardProps()
+    const onResolve = vi.fn()
+    render(
+      <Board
+        {...makeBoardProps({
+          state: {
+            ...base.state,
+            pending: pickingPending([
+              { uid: 'r1', id: 'release-frontend' },
+              { uid: 'r2', id: 'release-backend' },
+            ]),
+          },
+          actions: { onResolve },
+        })}
+      />,
+    )
+    expect(screen.getByTestId('board-inside-row')).not.toBeNull()
+    expect(screen.queryByTestId('pending-prompt')).toBeNull()
+    // two candidates is a CHOICE — it must wait for the confirm, not answer
+    // itself the way a single one does
+    expect(onResolve).not.toHaveBeenCalled()
+  })
+
+  it('answers a single candidate without asking, and only once — and fires again for a distinct pending', () => {
+    const base = makeBoardProps()
+    const onResolve = vi.fn()
+    // a FRESH `pending` object per call — `TableState` is rebuilt from
+    // scratch on every real projection update, so the latch has to key on
+    // VALUE, not on referential identity (the same discipline
+    // `PendingPrompt`'s own `fingerprint` keeps).
+    const propsFor = (uid: string) =>
+      makeBoardProps({
+        state: { ...base.state, pending: pickingPending([{ uid, id: 'release-frontend' }]) },
+        actions: { onResolve },
+      })
+    const { rerender } = render(<Board {...propsFor('r1')} />)
+    rerender(<Board {...propsFor('r1')} />)
+    expect(onResolve).toHaveBeenCalledTimes(1)
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'pickFromDiscard', card: 'r1' })
+    expect(screen.queryByTestId('board-inside-row')).toBeNull()
+
+    // a second, DISTINCT pending — a later `ai-inside` in the same match —
+    // resolves again: the latch is keyed on the pending's own identity, not
+    // on the mount (`useBeats`'s own two latch bugs of that family).
+    rerender(<Board {...propsFor('r2')} />)
+    expect(onResolve).toHaveBeenCalledTimes(2)
+    expect(onResolve).toHaveBeenLastCalledWith({ kind: 'pickFromDiscard', card: 'r2' })
+  })
+
+  // This file's own top-level `vi.mock('~/shared/lib/useReducedMotion', …)`
+  // (above) already forces reduced motion for every test here — which is
+  // exactly the point: the auto-resolve lives in the STAGING hook, not in a
+  // beat, so it never waits on `useBeats`'s own reduced-motion branch at all.
+  // It is a game action, not choreography — an engine left waiting on an
+  // animation nobody plays is a stalled match.
+  it('answers a single candidate under reduced motion too', () => {
+    const base = makeBoardProps()
+    const onResolve = vi.fn()
+    render(
+      <Board
+        {...makeBoardProps({
+          state: {
+            ...base.state,
+            pending: pickingPending([{ uid: 'r1', id: 'release-frontend' }]),
+          },
+          actions: { onResolve },
+        })}
+      />,
+    )
+    expect(onResolve).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows an opponent nothing of the options', () => {
+    const base = makeBoardProps()
+    render(
+      <Board
+        {...makeBoardProps({
+          state: {
+            ...base.state,
+            selfId: 'p2',
+            pending: pickingPending([], 'you'),
+          },
+        })}
+      />,
+    )
+    expect(screen.queryByTestId('board-inside-row')).toBeNull()
+    // …but the AI card that asked is public, and stands
+    expect(screen.getByTestId('board-ai-effect')).not.toBeNull()
+  })
+})

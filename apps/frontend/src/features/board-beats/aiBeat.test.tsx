@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { useAiBeat } from './aiBeat'
+import type { BoardState } from '~/entities/game/board'
+import { SHOW_HOLD, useAiBeat } from './aiBeat'
 import {
   anchorsFixture,
   animationsTrace,
@@ -200,5 +201,70 @@ describe('aiBeat', () => {
     )
     expect(waitedMs()).toContain(HALLUCINATION_HOLD)
     expect(waitedMs()).not.toContain(TABLE_HOLD)
+  })
+})
+
+describe('runTaken — a Release comes back out of the discard (#106, Task 11)', () => {
+  const takenPlan = {
+    kind: 'takenFromDiscard' as const,
+    key: 'taken:20',
+    eventId: 20,
+    player: 'p1',
+    card: 'release-frontend',
+    mine: true,
+  }
+
+  it("shows the card at the centre for everyone, lands it in the hand, and sends Inside's own card home", async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    // NOT wrapped in an outer `act(...)` — see `runBeat`'s own header in
+    // `./testing`.
+    const { published } = await runBeat(
+      result.current.runTaken,
+      { ...takenPlan, homeward: 'ai-inside' },
+      anchors,
+    )
+    // out of the heap, into the hand, and the AI card follows it home — in
+    // that order
+    expect(playedNames()).toEqual(['drawToCenter', 'returnToDeck'])
+    expect(waitedMs()).toContain(SHOW_HOLD)
+    expect(waitedMs()).toContain(420) // `flipCard`'s own duration — matches `goHome`
+    expect(
+      published.some(
+        (s) => s.you.hand.length === 1 && s.you.hand[0]?.card.id === 'release-frontend',
+      ),
+    ).toBe(true)
+  })
+
+  it('delivers to the taker at their seat, face up the whole way, and bumps their count', async () => {
+    const anchors = anchorsFixture()
+    const base: BoardState = {
+      you: { name: 'You', hand: [], release: {} },
+      opponents: [{ id: 'p2', name: 'Two', handCount: 3, release: {} }],
+      decks: { main: [10], events: 5, discardCount: 0 },
+      selfId: 'p1',
+      history: [],
+      setup: {},
+      playable: [],
+      frozen: [],
+    } as unknown as BoardState
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    const { published } = await runBeat(
+      result.current.runTaken,
+      { ...takenPlan, player: 'p2', mine: false },
+      anchors,
+      { base },
+    )
+    expect(playedNames()).toEqual(['drawToCenter', 'dealToSeat'])
+    // the recipient's counter carries it now — the same fact
+    // `transferBeat.tsx`'s own `bumpRecipient` publishes
+    expect(published.at(-1)?.opponents[0].handCount).toBe(4)
+  })
+
+  it('does not send anything home when the plan carries no `homeward`', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(result.current.runTaken, takenPlan, anchors)
+    expect(playedNames()).not.toContain('returnToDeck')
   })
 })

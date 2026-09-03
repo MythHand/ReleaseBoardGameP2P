@@ -80,6 +80,7 @@ import { useBoardInteractions } from './_useBoardInteractions'
 import { useBoardStaging } from './_useBoardStaging'
 import { useDefenseStaging } from './_useDefenseStaging'
 import { useHandLimit } from './_useHandLimit'
+import { useInsideStaging } from './_useInsideStaging'
 import { useNeutralizeStaging } from './_useNeutralizeStaging'
 import { useRequestStaging } from './_useRequestStaging'
 
@@ -432,6 +433,18 @@ export default function Board({
     },
     enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
+  })
+  // taking a Release back out of the discard (#106, `ai-inside`) — the row
+  // over the discard replaces the panel, the same way the band above
+  // replaces it for `requestCard`. No `matchKey`: the row's own local state
+  // clears itself the moment this hook stops holding an ours-`pickFromDiscard`
+  // pending, which happens whenever the pending resolves or changes kind —
+  // and it always does before a second one of the same kind can open.
+  const inside = useInsideStaging({
+    state,
+    actions,
+    copy: { prompt: copy.table.insidePrompt, confirm: copy.pending.confirm },
+    enabled: !(deal.active || beats.exclusive),
   })
   // the answer once its own flight has landed (or at once under reduced
   // motion) — the same gate, and the same reason, as `stagedCover` above.
@@ -1685,7 +1698,10 @@ export default function Board({
         state.pending.kind !== 'requestCard' &&
         // …and this one is not a question: the copies differ only by uid, so
         // `_useRequestStaging` answers it and the victim watches the scene
-        state.pending.kind !== 'giveCard' && (
+        state.pending.kind !== 'giveCard' &&
+        // the row on the table asks this one, for the same reason the others
+        // above are asked by the cards themselves (#106)
+        state.pending.kind !== 'pickFromDiscard' && (
           <PendingPrompt
             pending={state.pending}
             hand={you.hand}
@@ -1869,6 +1885,7 @@ export default function Board({
       {handLimit.overlay}
       {neutralizing.overlay}
       {requesting.band}
+      {inside.row}
       {previewOverlay}
 
       {/* the pair flyer — a persistent node (I10: position: fixed against the

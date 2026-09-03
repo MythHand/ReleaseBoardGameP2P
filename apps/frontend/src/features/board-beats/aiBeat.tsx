@@ -28,6 +28,9 @@ import { HALLUCINATION_HOLD, TABLE_HOLD, useToCentre } from './toCentre'
 const FLIP_MS = 420 // `flipCard`'s own duration
 const BEFORE_FLIP = 220 // the card rests where it landed before it turns over
 const AFTER_FLIP = 560 // the flip, plus a pause to read it by
+// `AiCardsStory`'s own `insideGrab` — how long a card taken from the discard
+// stands open at the centre before it leaves. Exported for its own test.
+export const SHOW_HOLD = 1500
 
 // One key is one flyer: raising a key that is still up replaces the carrier
 // rather than hanging a second node on the same name.
@@ -203,11 +206,99 @@ export function useAiBeat(anchors: BoardAnchors) {
     [toSlot, patch, drop, elOf, raise, goHome],
   )
 
+  // A RELEASE COMES BACK OUT OF THE DISCARD — `ai-inside`'s own answer,
+  // resolved. One path, two audiences: it is shown open at the centre for
+  // the whole table (`takenFromDiscard` carries no `visibleTo` — it is
+  // public), and only THEN does it split by who it belongs to.
+  const runTaken = useCallback(
+    async (plan: Extract<BeatPlan, { kind: 'takenFromDiscard' }>, beat: BeatRun) => {
+      ctx.current = beat
+      const a = latest.current.anchors
+      const card = cardById(plan.card)
+      const heap = rectOf(a.discardBox.current)
+      const centre = rectOf(a.effect.current)
+      if (!card || !heap || !centre) return
+      // out of the heap and up to the centre, face up — `AiCardsStory`'s own
+      // `insideGrab`, held for the same `SHOW_HOLD`
+      await toSlot({ key: EFF, card, from: cardAreaOf(heap), to: centre, faceDown: false })
+      await wait(SHOW_HOLD)
+      const from = rectOf(elOf(EFF))
+      if (plan.mine && from) {
+        drop(EFF)
+        await latest.current.arrive(
+          [{ key: `ins${plan.eventId}`, card, from }],
+          beat.base.you.hand.length,
+        )
+      } else {
+        const seat = a.seatBox(plan.player)
+        const el = elOf(EFF)
+        if (el && seat) {
+          const anim = play('dealToSeat', el, { from: centre, to: seat, scale: 0.7 })
+          if (anim) await anim.finished
+        }
+        drop(EFF)
+        // The recipient is one card heavier the moment the flight lands on
+        // them — `transferBeat.tsx`'s own `bumpRecipient`, the same fact for
+        // the same reason: the engine's own snapshot already counts it, and
+        // without this the handover to `live` pops their fan by one the
+        // instant the queue drains.
+        const c = ctx.current
+        if (c) {
+          const next = {
+            ...c.base,
+            opponents: c.base.opponents.map((o) =>
+              o.id === plan.player ? { ...o, handCount: o.handCount + 1 } : o,
+            ),
+          }
+          c.base = next
+          c.publish(next)
+        }
+      }
+      // Inside's own card goes home now that its prompt is answered — its
+      // own road, not this exchange's (#106). It has been standing on the
+      // projection's own render (`_Board.tsx`'s `aiStanding`, off
+      // `pending.source`) since the batch that revealed it — that beat could
+      // not fly it home, because it still had to stand and explain the
+      // prompt this one answers.
+      //
+      // Written out here rather than shared with `handLimitBeat.tsx`'s or
+      // `defenseBeat.tsx`'s own `sendHomeward`: each runner owns its own
+      // carrier, and a carrier passed between hooks is how this codebase has
+      // already grown two latch bugs of that family (`useBeats.ts`'s own
+      // comments).
+      if (plan.homeward) {
+        const ai = cardById(plan.homeward)
+        const home = rectOf(a.effect.current)
+        const deck = rectOf(a.eventsBox.current)
+        if (ai && home && deck) {
+          // a no-travel raise at the card's own standing spot — the honest
+          // answer to "it is here already"
+          const [el] = await raise([{ key: 'homeward', at: home, card: ai }])
+          if (el) {
+            patch('homeward', { faceDown: true })
+            await wait(FLIP_MS)
+            const anim = play('returnToDeck', el, { from: home, to: cardAreaOf(deck) })
+            if (anim) await anim.finished
+            drop('homeward')
+          }
+        }
+      }
+    },
+    [toSlot, elOf, drop, raise, patch],
+  )
+
   const reset = useCallback(() => {
     drop()
     resetArrival()
     ctx.current = null
   }, [drop, resetArrival])
 
-  return { overlay: [...flyerOverlay, ...handOverlay, ...exit.overlay], gapAt, gapSize, run, reset }
+  return {
+    overlay: [...flyerOverlay, ...handOverlay, ...exit.overlay],
+    gapAt,
+    gapSize,
+    run,
+    runTaken,
+    reset,
+  }
 }

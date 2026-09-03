@@ -290,6 +290,22 @@ export type BeatPlan =
        */
       homeward?: string
     }
+  // A Release comes back out of the discard — `ai-inside` (#106), and Git
+  // Cherry-pick once #61 lands. The CHOICE is private (`pendingView` gates
+  // `pickFromDiscard.options` behind `mine`), so it is a staging hook's job,
+  // not this file's; what this plans is the OUTCOME, which `takenFromDiscard`
+  // makes public for the whole table the instant it is resolved.
+  | {
+      kind: 'takenFromDiscard'
+      key: string
+      eventId: number
+      player: string
+      card: string
+      mine: boolean
+      /** the AI card standing behind the prompt this batch answers — same
+       * fact, same reasoning, as `neutralized`'s own `homeward` above. */
+      homeward?: string
+    }
 
 // Reasons that CAN take a card out of a release slot — "can", not "always do".
 // Typed against the engine's own union rather than `string`, so renaming a reason
@@ -802,6 +818,26 @@ export function planBeats(
         role,
         named,
         donorHand,
+      })
+      continue
+    }
+    if (e.type === 'takenFromDiscard') {
+      flush()
+      // Cherry-pick's second pick (`to: 'deck'`) is a private placement, not
+      // a beat — its card is redacted for everyone but the placer, and there
+      // is no board surface for it yet (#61). Only the public half plans
+      // anything; the other is flushed and passed straight through, the
+      // default this whole file already keeps for an event with no
+      // choreography.
+      if (e.to !== 'hand') continue
+      plans.push({
+        kind: 'takenFromDiscard',
+        key: `taken:${e.id}`,
+        eventId: e.id,
+        player: e.player,
+        card: e.card,
+        mine: e.player === before.selfId,
+        ...homewardOf(before),
       })
       continue
     }

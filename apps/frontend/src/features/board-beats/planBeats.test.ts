@@ -1569,3 +1569,62 @@ describe('planBeats — aiEvent (#106)', () => {
     expect(plans.some((p) => p.kind === 'discard')).toBe(false)
   })
 })
+
+describe('planBeats — a Release comes back out of the discard (#106, Task 11)', () => {
+  it("plans the card coming out of the discard, and sends Inside's own card home with it", () => {
+    const before = boardBefore({
+      pending: {
+        kind: 'pickFromDiscard',
+        player: 'p1',
+        options: [],
+        picks: 1,
+        source: 'ai-inside',
+      },
+    } as Partial<BoardState>)
+    const plans = planBeats(
+      [{ id: 20, type: 'takenFromDiscard', player: 'p1', card: 'release-frontend', to: 'hand' }],
+      before,
+    )
+    expect(plans).toHaveLength(1)
+    expect(plans[0]).toMatchObject({
+      kind: 'takenFromDiscard',
+      eventId: 20,
+      player: 'p1',
+      card: 'release-frontend',
+      mine: true,
+      homeward: 'ai-inside',
+    })
+  })
+
+  it('reads `mine` off the projection, not off the player who acted', () => {
+    // `before.selfId` is 'p1' (`boardBefore`'s own default) — a card taken by
+    // 'p2' is public (`takenFromDiscard` carries no `visibleTo`), and every
+    // peer plans the same beat off it, just with `mine` the other way.
+    const plans = planBeats(
+      [{ id: 20, type: 'takenFromDiscard', player: 'p2', card: 'release-backend', to: 'hand' }],
+      boardBefore(),
+    )
+    expect(plans).toHaveLength(1)
+    expect(plans[0]).toMatchObject({ kind: 'takenFromDiscard', mine: false })
+  })
+
+  it('plans nothing when no prompt was open — `homeward` stays absent', () => {
+    const plans = planBeats(
+      [{ id: 20, type: 'takenFromDiscard', player: 'p1', card: 'release-frontend', to: 'hand' }],
+      boardBefore(),
+    )
+    expect(plans[0]).not.toHaveProperty('homeward')
+  })
+
+  // Cherry-pick's second pick (#61, not yet implemented) puts a card back on
+  // top of a pile, unseen by anyone but the placer — a private placement,
+  // not a beat. Flushed and passed straight through, the default this file
+  // already keeps for an event with no choreography.
+  it("passes Cherry-pick's own placement through with no beat of its own", () => {
+    const plans = planBeats(
+      [{ id: 20, type: 'takenFromDiscard', player: 'p1', card: 'release-frontend', to: 'deck' }],
+      boardBefore(),
+    )
+    expect(plans).toHaveLength(0)
+  })
+})
