@@ -76,7 +76,6 @@ The words that flow into a preset as `params`.
 | `CARD_RATIO` | `1.4` (height / width) | `@/primitives/Card` | card art proportion. Reciprocal of the `--card-aspect` CSS token (`368 / 515`, width / height) — keep JS names off "aspect" to avoid the opposite convention. |
 | `CARD_W` | `150` | `@/table/Hand/fan` | canonical hand-card width (the real source) |
 | `SOURCE_CARD_W` | `140` | `CardToHandStory` | preview source-card width |
-| `DEAL_CARD_W` | `150` | `PickOpponentCardStory` | deal-grid card width |
 | `ROT` / `DX_FRAC` / `DY_FRAC` | `14` / `0.083` / `0.067` | `scatter.ts` | scatter ±ranges: tilt `±14°` (absolute — a tilt does not scale with size), offsets as FRACTIONS of the card width (`≈ ±10px` / `±8px` at `REF_WIDTH = 120`), so a heap looks equally tossed at any card size |
 | `PAIR_AUX` / `PAIR_AUX_POSE` | `{ rot: -7, dy: -26 }` → `translateY(-26%) rotate(-7deg)` | `@/primitives/CardPair` | the aux card's pose inside a pair. Declared as **data**, the CSS string derived from it — three readers need two forms: the component and `foldIntoPair` take the string, `useDiscardExit` takes `.rot` as a number when a pair splits and the aux half flies out at the tilt it was seen at. Same shape as `Scatter` + `restTransform` for the heap. (`dy` is a % of the card height; a split does not need it — the half's place comes from its measured rect.) |
 | `SHAKE_SHAPES` | `settle: 1, 6/7, 4/7, 3/7` · `spring: 1, 1, 2/3, 2/3` | `presets.ts` | the character of a shake as fractions of `amp`, out-and-back through zero. `settle` = a jolt that calms down (an input field), `spring` = two full swings then two smaller (a large element that flinched whole) |
@@ -185,9 +184,15 @@ and `BEAT` is the pause between beats, so the order reads as an order and not as
 ## 5. Data / content constants
 
 Not animation tuning, listed for completeness: `BASE`, `AI_DECK`, `NON_TRIGGER`, `ORDINARY_POOL`,
-`DECK_COUNTS`, `SOURCES`, `RELEASE_SLOTS`, `DISCARD_N`, `COLS_MAX`, `GAP_X` / `GAP_Y`, `CARD_H`,
-`ORIGIN`, `INITIAL_HAND`, card ids (`BRANCH`, `MERGE`, `SUDO`), trigger ids (`ERROR_503`,
-`AI_TRIGGER`).
+`DECK_COUNTS`, `SOURCES`, `RELEASE_SLOTS`, `DISCARD_N`, `CARD_H`, `INITIAL_HAND`, card ids
+(`BRANCH`, `MERGE`, `SUDO`), trigger ids (`ERROR_503`, `AI_TRIGGER`).
+
+> `DEAL_CARD_W`, `COLS_MAX`, `GAP_X` / `GAP_Y` and `ORIGIN` used to be listed here and above, as the
+> geometry of a deal-grid in `PickOpponentCardStory`. That grid exists in no story: three of the four
+> names exist nowhere in the repository, and `ORIGIN` survives only in `@/cards/useCardTilt` meaning
+> something else entirely (a pointer's rest position). They were the glossary's half of the same drift
+> that had `recipes.md` transcribing a scene it had never read (#105). Removed rather than repointed:
+> there is nothing to point at.
 
 ---
 

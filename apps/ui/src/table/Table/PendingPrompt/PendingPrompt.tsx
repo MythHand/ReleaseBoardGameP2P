@@ -92,6 +92,19 @@ function CardOption({
   )
 }
 
+// The guess space for `requestCard`: every card that can actually BE in a
+// hand, which is not the whole catalogue. Two groups are excluded, and the
+// rules say so outright rather than leaving it to inference:
+//   • triggers — `docs/rules/cards.md:320` («Обе карты нельзя держать в руке»)
+//     and `:339` («В руку триггер не попадает ни на мгновение»): they resolve
+//     at the moment they are drawn and never reach a hand.
+//   • the events deck — `docs/rules/general.md:189`: each of its cards is at
+//     any time «либо в колоде, либо на столе», so none passes through a hand.
+// Offering them made a guess that cannot possibly hit look like a legal one —
+// worse than a missing option, because nothing rejects it and the request just
+// always misses.
+const HOLDABLE = CARDS.filter((c) => c.deck === 'base' && c.category !== 'trigger')
+
 // A selectable card TYPE from the kit's own catalogue — used only by
 // `requestCard`, where the choice names a card the opponent might hold, not
 // one you own. This is not a legality lookup: `requestCard`'s `Choice` is a
@@ -366,20 +379,20 @@ export default function PendingPrompt({
       // The pending names who's being asked (`target`), not what may be
       // asked for — there is no `pending.options` because this is a guess,
       // not a legal move (see the module comment on CatalogueCardOption). The
-      // guess space is every distinct card type the kit's catalogue knows —
-      // 37 definitions, not the ~125-card physical deck (which counts
-      // per-copy quantities the catalogue collapses into one entry each).
+      // guess space is every distinct card type that can be HELD (`HOLDABLE`
+      // above) — not the ~125-card physical deck, which counts per-copy
+      // quantities the catalogue collapses into one entry each.
       // The catalogue is static, so membership here can't go stale the way
       // pending.options can — checked anyway, for the same structural reason
       // as every other kind: confirm should never resolve an option that
       // isn't actually on offer.
-      complete = requestedCard != null && CARDS.some((c) => c.id === requestedCard)
+      complete = requestedCard != null && HOLDABLE.some((c) => c.id === requestedCard)
       confirm = () => {
-        if (requestedCard && CARDS.some((c) => c.id === requestedCard)) {
+        if (requestedCard && HOLDABLE.some((c) => c.id === requestedCard)) {
           onResolve({ kind: 'requestCard', card: requestedCard })
         }
       }
-      options = CARDS.map((c) => (
+      options = HOLDABLE.map((c) => (
         <CatalogueCardOption
           key={c.id}
           card={c}

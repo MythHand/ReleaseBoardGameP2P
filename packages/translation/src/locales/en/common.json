@@ -321,6 +321,7 @@
     "askDefend": "answer with a defence — pull one out of the hand",
     "askPartner": "click the defence the sudo will enhance",
     "askNeutralize": "neutralise the alarm — answer with a lit card",
+    "requestMiss": "not in hand",
     "tabHistory": "history",
     "tabParticipants": "participants",
     "tabRules": "rules",

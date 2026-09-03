@@ -1,0 +1,12 @@
+/* The catalog band — the middle of the table, between the seats and the fan.
+   Below the flyer layer on purpose: a card taken from an opponent flies over
+   the catalog it was named in, not under it. */
+.requestBand {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  transform: translateY(-50%);
+}

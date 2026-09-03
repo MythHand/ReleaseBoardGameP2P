@@ -174,6 +174,14 @@ export const PRESETS: Record<string, Preset> = {
   // Карта из центра уходит к игроку (его место/рука) и растворяется в скрытой руке.
   dealToSeat: (el: Element, p?: Record<string, unknown>): Animation | null =>
     move(el, { ...(p as MoveParams), fade: true }, durationOf(p, 460), EASE),
+  // A card comes OUT of a player's seat to the centre — the pair of
+  // dealToSeat, which dissolves a card into a hidden hand. No fade: this one
+  // is arriving on the table rather than leaving it, and it is about to be
+  // turned over. Geometrically the same travel as drawToCenter; kept separate
+  // because that preset's name says it leaves the draw deck, and a card taken
+  // out of a hand does not.
+  takeFromSeat: (el: Element, p?: Record<string, unknown>): Animation | null =>
+    move(el, p as MoveParams, durationOf(p, 460), EASE),
   // Карта возвращается из центра обратно в колоду (центр→колода) — парный к
   // drawToCenter; move уменьшает по ширине до карточной области колоды.
   returnToDeck: (el: Element, p?: Record<string, unknown>): Animation | null =>

@@ -72,6 +72,7 @@ import { useBoardInteractions } from './_useBoardInteractions'
 import { useBoardStaging } from './_useBoardStaging'
 import { useDefenseStaging } from './_useDefenseStaging'
 import { useNeutralizeStaging } from './_useNeutralizeStaging'
+import { useRequestStaging } from './_useRequestStaging'
 
 // светофор для лимита зрителей (зеркало палитры из экрана Lobby):
 // 0–8 зелёный, 9–18 жёлтый, 19–28 красный
@@ -371,6 +372,20 @@ export default function Board({
     actions,
     events: intro?.events ?? [],
     enabled: alarmMineOpen && !(deal.active || beats.exclusive),
+    matchKey: intro?.gameId ?? null,
+  })
+
+  // naming a card, and losing one (#105). The band replaces the panel for
+  // `requestCard`; the `giveCard` half answers itself and renders nothing.
+  const requesting = useRequestStaging({
+    state,
+    actions,
+    copy: {
+      prompt: copy.pending.requestCard.prompt,
+      action: copy.pending.requestCard.action,
+      confirm: copy.pending.confirm,
+    },
+    enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
   })
   // the answer once its own flight has landed (or at once under reduced
@@ -1194,6 +1209,21 @@ export default function Board({
               </div>
             )
           })()}
+        {/* the card that was named, held publicly while the engine waits for it
+            to be handed over. This is what carries it across the gap between
+            `requested` and `handTransfer` — they arrive in different batches,
+            so no beat overlay can span it — and `giveCard` is projected to
+            everyone (fake/attacks.ts:444), so every peer stands the same card. */}
+        {state.pending?.kind === 'giveCard' &&
+          (() => {
+            const data = cardById(state.pending.requested)
+            if (!data) return null
+            return (
+              <div className={opening.centreCard} data-testid="board-requested-card">
+                <Card card={data} interactive={false} width="100%" />
+              </div>
+            )
+          })()}
       </div>
 
       {/* OUR OWN alarm — strong, and BEFORE the hand in the DOM so it glows
@@ -1464,7 +1494,13 @@ export default function Board({
         state.pending.kind !== 'defend' &&
         // the gesture IS the answer, and the panel covered the very cards it
         // was asking about — same reason, same fix as `defend` above (#102)
-        state.pending.kind !== 'neutralize503' && (
+        state.pending.kind !== 'neutralize503' &&
+        // the band on the table asks this one, for the same reason the three
+        // above are asked by the cards themselves (#105)
+        state.pending.kind !== 'requestCard' &&
+        // …and this one is not a question: the copies differ only by uid, so
+        // `_useRequestStaging` answers it and the victim watches the scene
+        state.pending.kind !== 'giveCard' && (
           <PendingPrompt
             pending={state.pending}
             hand={you.hand}
@@ -1646,6 +1682,7 @@ export default function Board({
       {staging.overlay}
       {defenseStaging.overlay}
       {neutralizing.overlay}
+      {requesting.band}
       {previewOverlay}
 
       {/* the pair flyer — a persistent node (I10: position: fixed against the
