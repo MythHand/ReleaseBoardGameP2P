@@ -51,6 +51,22 @@ function toReleaseUids(release: ReleaseView): NonNullable<BoardState['you']['rel
   return out
 }
 
+// The other identity `toReleaseSlots` drops — and the one the board cannot do
+// without. A standing AI release wears the plain `release-<slot>` id so it reads
+// and plays as an ordinary one; `event` is the only thing that says otherwise,
+// and without it a beat has no way to tell a card going home to the events deck
+// from one going to the discard heap (docs/animations/backlog.md).
+type ReleaseEvents = Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
+
+function toReleaseEvents(release: ReleaseView): ReleaseEvents {
+  const out: ReleaseEvents = {}
+  if (release.frontend?.event) out.frontend = release.frontend.event
+  if (release.backend?.event) out.backend = release.backend.event
+  if (release.database?.event) out.database = release.database.event
+  if (release.monitoring?.event) out.monitoring = release.monitoring.event
+  return out
+}
+
 // The aux lying under a release — a played Code Review. ReleaseZone renders it
 // tucked under via its `support` prop (the ComboStory zone already does).
 function toReleaseSupport(release: ReleaseView): ReleaseSupport {
@@ -196,6 +212,7 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       release: toReleaseSlots(view.self.release),
       support: toReleaseSupport(view.self.release),
       releaseUid: toReleaseUids(view.self.release),
+      releaseEvent: toReleaseEvents(view.self.release),
     },
     opponents: view.opponents.map((o) => ({
       id: o.id,
@@ -203,6 +220,7 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       handCount: o.handCount,
       release: toReleaseSlots(o.release),
       support: toReleaseSupport(o.release),
+      releaseEvent: toReleaseEvents(o.release),
       eliminated: o.eliminated,
     })),
     decks: {

@@ -204,6 +204,32 @@ describe('toBoardState', () => {
     })
   })
 
+  it('carries the events-deck identity of a standing AI release, for you and for an opponent', () => {
+    const withEvents: PlayerView = {
+      ...view,
+      self: {
+        ...view.self,
+        release: {
+          frontend: { uid: 'ai#1', card: 'release-frontend', event: 'ai-release-frontend' },
+          backend: { uid: 'base#1', card: 'release-backend' },
+        },
+      },
+      opponents: [
+        {
+          ...view.opponents[0],
+          release: {
+            monitoring: { uid: 'ai#2', card: 'protection-monitoring', event: 'ai-monitoring' },
+          },
+        },
+      ],
+    }
+    const state = toBoardState(withEvents, [], labels)
+    expect(state.you.releaseEvent).toEqual({ frontend: 'ai-release-frontend' })
+    expect(state.opponents[0].releaseEvent).toEqual({ monitoring: 'ai-monitoring' })
+    // the slots themselves are unchanged — the card still reads as an ordinary one
+    expect(state.you.release.frontend?.id).toBe('release-frontend')
+  })
+
   it('carries a defend pending openedAt through unchanged, alongside deadline', () => {
     const withPending: PlayerView = {
       ...view,
