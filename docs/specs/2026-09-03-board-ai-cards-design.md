@@ -139,9 +139,11 @@ hold what `source` reports. `pending` passes through `toBoardState.ts:239` untou
 `contract.test-d.ts` asserts `TablePending ≡ PendingView`, so one change lands on both sides and the
 type test refuses to let them drift.
 
-`conformance.ts` gains a card-conservation property — the one #71's own fix list asked for and did
-not get: total instances across hands, zones, piles, discard and the events deck stay constant
-through any action stream. It is the guard that makes this whole class un-reintroducible.
+`conformance.ts` needs nothing. #71's fix list asked for a card-conservation invariant, and unlike
+the field above it **was** delivered: "never creates or loses a card across a long stream" compares
+`realCardUids` before and after a 300-step drive, and "never lets a card from the events deck reach
+the discard" guards §6.4 directly. Both already pass. So the engine half of this task is the two
+fields and their projection tests, and nothing in the fuzz surface moves.
 
 ### The plan — `features/board-beats/planBeats.ts`
 
@@ -338,10 +340,11 @@ all and the board holds the projection, while the Inside auto-resolve still fire
   `picked` and not at `gridCells(1)`'s cell; a `pickFromDiscard` that is ours renders the row and not
   `pending-prompt`; a single candidate resolves once, and again for a second distinct pending; under
   reduced motion the resolve still fires while the beats collapse.
-- **Engine** — `ReleasedView.event` survives projection for an AI release and is absent for an
-  ordinary one; each of the three pendings reports `source`; and the card-conservation property in
-  `conformance.ts`. Verified by mutation, not by reasoning — #61's standing warning, and the nine
-  green tests that asserted nothing during the engine's own implementation.
+- **Engine** — in `fake/project.test.ts`: `ReleasedView.event` survives projection for an AI release
+  and is absent for an ordinary one, and each of the three pendings reports `source` (publicly, for a
+  viewer who is not the one being asked). Verified by mutation, not by reasoning — #61's standing
+  warning, and the nine green tests that asserted nothing during the engine's own implementation.
+  `conformance.ts` is untouched: its two relevant properties already exist and already pass.
 
 ## Documentation
 
