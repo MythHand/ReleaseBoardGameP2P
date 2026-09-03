@@ -10,6 +10,7 @@ import type {
   StagedHandoff,
 } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
+import { useAiBeat } from './aiBeat'
 import { useComboBeat } from './comboBeat'
 import { useDeckBeat } from './deckBeat'
 import { useDefenseBeat } from './defenseBeat'
@@ -176,6 +177,7 @@ export function useBeats(args: {
   const elimination = useEliminateBeat()
   const handLimits = useHandLimitBeat(anchors, handLimit)
   const transfers = useTransferBeat(anchors)
+  const ais = useAiBeat(anchors)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -340,6 +342,22 @@ export function useBeats(args: {
           run: (ctx) => transfers.runRequested(plan, ctx),
         }
       }
+      if (plan.kind === 'aiEvent') {
+        return {
+          key: plan.key,
+          base,
+          // Not exclusive: an AI card is read, not obeyed, and nothing about it
+          // needs input dead.
+          exclusive: false,
+          // The 503 mimic's own glow. A `standing` tail carries it too, because
+          // the alarm is owed for as long as the prompt is — same field, same
+          // reason, as `draw`'s `neutralized` case.
+          alarm:
+            plan.tail.kind === 'alarm' ||
+            (plan.tail.kind === 'standing' && plan.tail.alarm === true),
+          run: (ctx) => ais.run(plan, ctx),
+        }
+      }
       return null
     },
     [
@@ -357,6 +375,7 @@ export function useBeats(args: {
       handLimits.run,
       transfers.runTransfer,
       transfers.runRequested,
+      ais.run,
     ],
   )
 
@@ -446,7 +465,7 @@ export function useBeats(args: {
   // the arm also keeps it before the BATCH effect, which must not read a stale
   // watermark on the one pass where it matters most.)
   const playing = useRef<string | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks`, `combo`, `defense`, `elimination`, `handLimits` and `transfers` are read for the CURRENT render's runners on purpose, not added to the deps below — this effect is keyed to the match, not runner object identity
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks`, `combo`, `defense`, `elimination`, `handLimits`, `transfers` and `ais` are read for the CURRENT render's runners on purpose, not added to the deps below — this effect is keyed to the match, not runner object identity
   useLayoutEffect(() => {
     const key = intro?.key ?? null
     if (key == null || playing.current === key) return
@@ -471,6 +490,7 @@ export function useBeats(args: {
     elimination.reset()
     handLimits.reset()
     transfers.reset()
+    ais.reset()
   }, [intro?.key, live])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
@@ -586,6 +606,7 @@ export function useBeats(args: {
       ...elimination.overlay,
       ...handLimits.overlay,
       ...transfers.overlay,
+      ...ais.overlay,
     ],
     exclusive: running?.exclusive ?? false,
     alarm: running?.alarm ?? false,

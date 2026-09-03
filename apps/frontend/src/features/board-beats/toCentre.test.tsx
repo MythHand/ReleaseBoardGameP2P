@@ -58,7 +58,14 @@ describe('useToCentre', () => {
       }),
     )
     expect(landed).toEqual(RECT(400, 300))
-    expect(step.elOf('draw')).not.toBeNull()
+    const el = step.elOf('draw')
+    expect(el).not.toBeNull()
+    // I4 — the landed card IS at its rect, in the DOM and not just in the
+    // return value, so the next leg starts from where it stands. Deleting the
+    // `pin(key, to)` call inside `toSlot` would not fail the assertions above
+    // it (the promise still resolves with `to`, and `elOf` still finds the
+    // node raise() mounted) — only this one catches it.
+    expect(el?.style.left).toBe('400px')
   })
 
   it("holds the scene's own value, not a number of its own", () => {
