@@ -33,6 +33,7 @@ letting it flash in place first).
 | `absorbToDeck` | `duration` ?? **520** | EASE | **yes** | `{ from, to, duration? }` | a deck flies into another and dissolves (merge) |
 | `drawToCenter` | `duration` ?? **480** | EASE | — | `{ from, to, duration? }` | a card leaves the draw deck to the center |
 | `dealToSeat` | `duration` ?? **460** | EASE | **yes** | `{ from, to, duration? }` | a card goes center → a player seat and dissolves |
+| `takeFromSeat` | `duration` ?? **460** | EASE | — | `{ from, to, duration? }` | a card comes out of a player seat to the center (pair of `dealToSeat`) |
 | `returnToDeck` | `duration` ?? **480** | EASE | — | `{ from, to, duration? }` | a card returns center → deck (pair of `drawToCenter`) |
 | `foldIntoPair` | `dur` ?? **620** | EASE, **LAND** with `snap` | — | `{ from, box, pose?, dur?, snap? }` | one HALF of a pair travels into its pose inside the pair. Called once per half; the pair itself does not move |
 | `landInPose` | `dur` ?? **480** | EASE, **LAND** with `snap` | — | `{ from, box, pose?, dur?, snap? }` | a card ARRIVES ON THE TABLE and lands already in its rest pose — the tilt travels with it rather than appearing a frame after it stops. Same FLIP math as `foldIntoPair` (the element is already in place; its entry is what moves), different move: `pose` here is the card's own pose on the table, not a half's pose inside a pair |
@@ -193,10 +194,12 @@ runner lifted out of `useBeats` unchanged, `drawBeat.tsx` and `deckBeat.tsx` are
 | `discard` | `features/board-beats/discardBeat.tsx` | `discarded`, coalesced per batch | the discard-exit step |
 | `reshuffle` | `features/board-beats/deckBeat.tsx` (`runReshuffle`) | `deckReshuffled` | `gatherToDeck`, `flipCard` (via `patch`) |
 | `piles` | `features/board-beats/deckBeat.tsx` (`runPiles`/`step`) | `pilesChanged`, classified by `classifyPiles` (`planBeats.ts`) against the running pile counts — the event itself names neither the operation nor the split index | `flyFrom` (split), `absorbToDeck` (merge), `gatherToDeck` (fromDiscard) |
+| `transfer` | `features/board-beats/transferBeat.tsx` (`runRequested`/`runTransfer`) | `requested` — public, whole; `handTransfer` — with `role` off `selfId`, `named` off `base.pending`, and `card` only if the event carried one | `popIn`, `shake`, `takeFromSeat`, `playToCenter`, `dealToSeat`, `flipCard` (via `patch`), the hand-arrival step |
 
-See [`recipes.md`](./recipes.md#a-card-is-drawn-live-board) and
-[`recipes.md`](./recipes.md#the-deck-is-rebuilt-split-merged-live-board) for the sequences; the
-classification table for `piles` is written out there, not repeated here.
+See [`recipes.md`](./recipes.md#a-card-is-drawn-live-board),
+[`recipes.md`](./recipes.md#the-deck-is-rebuilt-split-merged-live-board) and
+[`recipes.md`](./recipes.md#a-card-changes-hands-live-board--taker-victim-watcher-and-the-ask-before-them)
+for the sequences; the classification table for `piles` is written out there, not repeated here.
 
 **One scatter, two readers.** A discard flies on `scatterAt(eventId)` and the heap
 (`toBoardState.toDiscardHeap`) rests it on `scatterAt(eventId)` — the same call on the same id, which

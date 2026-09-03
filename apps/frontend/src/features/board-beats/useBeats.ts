@@ -19,6 +19,7 @@ import { useEliminateBeat } from './eliminateBeat'
 import { useHandLimitBeat } from './handLimitBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
+import { useTransferBeat } from './transferBeat'
 
 // The board's beat queue. `useGame` accumulates engine events off the wire in
 // BATCHES — a peer can receive several moves in one sync — so a board that
@@ -174,6 +175,7 @@ export function useBeats(args: {
   const defense = useDefenseBeat(anchors, staging)
   const elimination = useEliminateBeat()
   const handLimits = useHandLimitBeat(anchors, handLimit)
+  const transfers = useTransferBeat(anchors)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -318,6 +320,26 @@ export function useBeats(args: {
           run: (ctx) => defense.runNeutralized(plan, ctx),
         }
       }
+      if (plan.kind === 'handTransfer') {
+        return {
+          key: plan.key,
+          base,
+          // Not exclusive: a card changing hands does not own the table the way
+          // an elimination clip does, and nothing about it needs input dead.
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => transfers.runTransfer(plan, ctx),
+        }
+      }
+      if (plan.kind === 'requested') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => transfers.runRequested(plan, ctx),
+        }
+      }
       return null
     },
     [
@@ -333,6 +355,8 @@ export function useBeats(args: {
       defense.runNeutralized,
       elimination.run,
       handLimits.run,
+      transfers.runTransfer,
+      transfers.runRequested,
     ],
   )
 
@@ -422,7 +446,7 @@ export function useBeats(args: {
   // the arm also keeps it before the BATCH effect, which must not read a stale
   // watermark on the one pass where it matters most.)
   const playing = useRef<string | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks`, `combo` and `defense` are read for the CURRENT render's runners on purpose, not added to the deps below — discardBeat/drawBeat/comboBeat/defenseBeat's own `reset` are unmemoized (each depends on `useDiscardExit`'s or `useHandArrival`'s own `reset`, neither wrapped in `useCallback`), so listing any of them would fire this on every render instead of once per match key. `deckBeat`'s `reset` happens to be stable (its one dependency, `useFlyer`'s `drop`, IS memoized) — excluded here too, for one uniform list rather than a one-off exception for the runner that doesn't need it
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks`, `combo`, `defense`, `elimination`, `handLimits` and `transfers` are read for the CURRENT render's runners on purpose, not added to the deps below — this effect is keyed to the match, not runner object identity
   useLayoutEffect(() => {
     const key = intro?.key ?? null
     if (key == null || playing.current === key) return
@@ -446,6 +470,7 @@ export function useBeats(args: {
     defense.reset()
     elimination.reset()
     handLimits.reset()
+    transfers.reset()
   }, [intro?.key, live])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
@@ -560,6 +585,7 @@ export function useBeats(args: {
       ...defense.overlay,
       ...elimination.overlay,
       ...handLimits.overlay,
+      ...transfers.overlay,
     ],
     exclusive: running?.exclusive ?? false,
     alarm: running?.alarm ?? false,
@@ -568,9 +594,11 @@ export function useBeats(args: {
     // true across the handover between two beats of one batch, which is exactly
     // the window the winner overlay must not appear in.
     running: running != null,
-    // The fan opens for a card on its way into it — the draw beat is the one
-    // that grows it (I8); nothing else does yet.
-    gapAt: draws.gapAt,
-    gapSize: draws.gapSize,
+    // The fan opens for a card on its way into it. Two beats grow it now — a
+    // draw (I8) and a card taken from an opponent — and they can never both be
+    // open, because one beat runs at a time. So this is a choice between them,
+    // not a merge of them.
+    gapAt: draws.gapAt ?? transfers.gapAt,
+    gapSize: draws.gapAt == null ? transfers.gapSize : draws.gapSize,
   }
 }

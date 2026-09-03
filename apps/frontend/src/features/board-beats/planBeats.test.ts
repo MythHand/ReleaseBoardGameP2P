@@ -1241,3 +1241,82 @@ describe('planBeats — an attack resolved inside its own play (#19 follow-up)',
     expect(plans.find((p) => p.kind === 'attackPlaced')).not.toHaveProperty('resolved')
   })
 })
+
+describe('card transfers', () => {
+  const requested = (over: Partial<Extract<Event, { type: 'requested' }>> = {}): Event =>
+    ({
+      id: 1,
+      type: 'requested',
+      attacker: 'p1',
+      target: 'p2',
+      card: 'attack-bug',
+      hit: true,
+      ...over,
+    }) as Event
+
+  const transfer = (over: Partial<Extract<Event, { type: 'handTransfer' }>> = {}): Event =>
+    ({ id: 2, type: 'handTransfer', from: 'p2', to: 'p1', card: 'attack-bug', ...over }) as Event
+
+  it('carries a request through whole, hit or miss', () => {
+    const [hit] = planBeats([requested()], boardBefore())
+    expect(hit).toMatchObject({
+      kind: 'requested',
+      attacker: 'p1',
+      target: 'p2',
+      card: 'attack-bug',
+      hit: true,
+    })
+    const [miss] = planBeats([requested({ hit: false })], boardBefore())
+    expect(miss).toMatchObject({ kind: 'requested', hit: false })
+  })
+
+  it('names the role from selfId', () => {
+    const taker = planBeats([transfer()], boardBefore())[0]
+    expect(taker).toMatchObject({ kind: 'handTransfer', role: 'taker' })
+
+    const victim = planBeats([transfer({ from: 'p1', to: 'p2' })], boardBefore())[0]
+    expect(victim).toMatchObject({ kind: 'handTransfer', role: 'victim' })
+
+    const watcher = planBeats([transfer({ from: 'p2', to: 'p3' })], boardBefore())[0]
+    expect(watcher).toMatchObject({ kind: 'handTransfer', role: 'watcher' })
+  })
+
+  it('reads `named` off the giveCard pending, not off the batch', () => {
+    // The `requested` that started a Security Bug landed in an EARLIER batch —
+    // it opened the pending and returned. So the only thing in reach that says
+    // this transfer was a named one is the projection the batch animates away
+    // from, and it says so publicly: `giveCard` is projected unredacted.
+    const named = planBeats(
+      [transfer()],
+      boardBefore({ pending: { kind: 'giveCard', player: 'p2', requested: 'attack-bug' } }),
+    )[0]
+    expect(named).toMatchObject({ kind: 'handTransfer', named: true })
+
+    // A random steal raises no pending at all (handAttacks.ts:43 `stealRandom`).
+    const random = planBeats([transfer()], boardBefore())[0]
+    expect(random).toMatchObject({ kind: 'handTransfer', named: false })
+  })
+
+  it('takes the donor hand size off the pre-batch projection', () => {
+    // I1: by the time the beat runs the projection has already taken the card
+    // out, so a grid measured from `live` would be one back short.
+    const plan = planBeats(
+      [transfer()],
+      boardBefore({
+        opponents: [{ id: 'p2', name: 'Two', handCount: 4, release: {} }],
+      }),
+    )[0]
+    expect(plan).toMatchObject({ kind: 'handTransfer', donorHand: 4 })
+  })
+
+  it('never widens a redacted transfer', () => {
+    // THE correctness property. `handTransfer.card` is present only for the two
+    // parties (handAttacks.ts sets `visibleTo: [from, to]`), and the closed
+    // flight is selected by that absence — never by a rule the board re-derives
+    // about who may see what. A plan that invented a card here would leak the
+    // identity into the DOM for every spectator.
+    const plan = planBeats([transfer({ from: 'p2', to: 'p3', card: undefined })], boardBefore())[0]
+    expect(plan).toMatchObject({ kind: 'handTransfer', role: 'watcher' })
+    expect((plan as Extract<BeatPlan, { kind: 'handTransfer' }>).card).toBeUndefined()
+  })
+})

@@ -64,6 +64,9 @@ export type PileStep =
   | { kind: 'merge'; withDiscard: boolean; piles: number[] }
   | { kind: 'fromDiscard'; at: number; piles: number[] }
 
+/** who this peer is to a transfer — the same shape `PlannedDraw.mine` has, widened */
+export type TransferRole = 'taker' | 'victim' | 'watcher'
+
 export type BeatPlan =
   | { kind: 'draw'; key: string; draws: PlannedDraw[] }
   // `gather` marks a defenceless player's whole table leaving as one sweep —
@@ -87,6 +90,35 @@ export type BeatPlan =
   // runner resolves one from `eventId`, so every peer watching the same
   // elimination watches the same clip without a word about it on the wire.
   | { kind: 'eliminated'; key: string; eventId: number; player: string }
+  // A card is demanded by name (Security Bug). Public on a hit AND on a miss —
+  // `docs/rules/cards.md:125` — so every peer plans this identically, and `hit`
+  // is what tells the two outcomes apart. `attacker`/`target` come off the
+  // event rather than off the turn because a `reflect` (Works on my Machine,
+  // fake/attacks.ts:260-269) swaps the roles, and the event is the only thing
+  // that already knows which way round they ended up.
+  | {
+      kind: 'requested'
+      key: string
+      eventId: number
+      attacker: string
+      target: string
+      card: string
+      hit: boolean
+    }
+  // A card changes hands. `card` is present only for the two parties
+  // (`visibleTo: [from, to]` in fake/handAttacks.ts); its ABSENCE is what
+  // selects the closed flight, and nothing here may widen it.
+  | {
+      kind: 'handTransfer'
+      key: string
+      eventId: number
+      from: string
+      to: string
+      card?: string
+      role: TransferRole
+      named: boolean
+      donorHand: number
+    }
   // A window attack reaches the centre — the pair, if it threw with a Sudo,
   // or a lone card if not. The pair settles at the centre and not at a seat, so
   // `target` is not a destination; it is carried because the runner has to know
@@ -547,6 +579,52 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
         eventId: e.id,
         player: e.player,
       }
+      continue
+    }
+    if (e.type === 'requested') {
+      // A transfer is its own gesture and must not coalesce into a run of
+      // discards standing in front of it.
+      flush()
+      plans.push({
+        kind: 'requested',
+        key: `requested:${e.id}`,
+        eventId: e.id,
+        attacker: e.attacker,
+        target: e.target,
+        card: e.card,
+        hit: e.hit,
+      })
+      continue
+    }
+    if (e.type === 'handTransfer') {
+      flush()
+      // `named` cannot come from this batch: `requested{hit:true}` opened the
+      // `giveCard` pending and returned, and the transfer arrives from the
+      // victim's own RESOLVE — a separate reduction. The projection the batch
+      // animates away from is what still knows, and it knows publicly.
+      const named = before.pending?.kind === 'giveCard'
+      const role: TransferRole =
+        e.to === before.selfId ? 'taker' : e.from === before.selfId ? 'victim' : 'watcher'
+      // I1 — the donor's fan as it stands ON SCREEN. `live` has already lost
+      // the card, so a grid measured there would deal one back too few.
+      const donorHand =
+        e.from === before.selfId
+          ? before.you.hand.length
+          : (before.opponents.find((o) => o.id === e.from)?.handCount ?? 0)
+      plans.push({
+        kind: 'handTransfer',
+        key: `transfer:${e.id}`,
+        eventId: e.id,
+        from: e.from,
+        to: e.to,
+        // spread rather than assigned: `card` must stay ABSENT when the event
+        // had none, not become an explicit `undefined` a later reader could
+        // mistake for a value it is allowed to fill in
+        ...(e.card ? { card: e.card } : {}),
+        role,
+        named,
+        donorHand,
+      })
       continue
     }
     if (e.type === 'neutralized') {

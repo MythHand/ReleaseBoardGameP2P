@@ -105,6 +105,33 @@ it('resolves requestCard with a real catalogue card id, not a release slot', () 
   expect(CARDS.some((c) => c.id === choice.card)).toBe(true)
 })
 
+it('offers only cards that can actually be in a hand', () => {
+  // The guess space is not the whole catalogue. Two groups can never be held,
+  // and the rules say so outright rather than leaving it to be inferred:
+  //   • triggers — docs/rules/cards.md:320 «Обе карты нельзя держать в руке»
+  //     and :339 «В руку триггер не попадает ни на мгновение»; they resolve at
+  //     the moment they are drawn.
+  //   • the events deck — docs/rules/general.md:189, every one of its cards is
+  //     "либо в колоде, либо на столе", so none of them passes through a hand.
+  // Offering them makes a guess that cannot possibly hit look like a legal
+  // one, which is worse than a missing option: nothing rejects it, the request
+  // simply always misses.
+  const { getAllByRole } = render(
+    <PendingPrompt
+      pending={{ kind: 'requestCard', player: 'you', target: 'p2' }}
+      hand={hand}
+      copy={copy}
+      onResolve={vi.fn()}
+    />,
+  )
+  const offered = getAllByRole('option').length
+  const holdable = CARDS.filter((c) => c.deck === 'base' && c.category !== 'trigger')
+  expect(offered).toBe(holdable.length)
+  expect(offered).toBeLessThan(CARDS.length)
+  expect(holdable.some((c) => c.category === 'trigger')).toBe(false)
+  expect(holdable.some((c) => c.deck === 'ai')).toBe(false)
+})
+
 it('cannot resolve a stale selection once a new pending of the same kind/player drops it', () => {
   // The reset effect keys off `${pending.kind}:${pending.player}` — a second
   // pending of the *same* kind for the *same* player (a real shape once the
