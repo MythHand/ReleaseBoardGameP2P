@@ -18,7 +18,8 @@ then it resolves seven different ways. The visual source of truth is `AiCardsSto
 
 ## The goal
 
-An AI trigger is one scene with seven endings, and the table reads it as one: a card comes off the
+An AI trigger is one scene with seven endings — seven card effects, which the board resolves through
+six tail kinds, because Release and Monitoring end the same way — and the table reads it as one: a card comes off the
 pile and stands at the left as the cause, the events deck gives up the card that explains it, both
 are held long enough to be read, and only then does the effect happen. The seven endings differ in
 where the cards go afterwards — and the card economy is the part to get exactly right, because #71
@@ -75,10 +76,18 @@ sacrificed AI release into the discard heap, where it never really lands, becaus
 has already taken it.
 
 **Fixed here, in the engine.** `ReleasedView` gains `event?: CardId`. The board reads it off the
-pre-batch projection rather than off any event, because that is where a standing release is, and one
-field then answers every caller: `ai-crush`, `monitoringDestroyed`, elimination spoils, and the
-sacrifice flight that is wrong today. Left unfixed, this task would have had to guess — and guessing
-on the rules is exactly what `CLAUDE.md` forbids.
+pre-batch projection rather than off any event, because that is where a standing release is. One
+field is *capable* of answering every caller — `ai-crush`, `monitoringDestroyed`, elimination spoils,
+and the sacrifice flight that is wrong today — but only two are wired to it in this task: the crush
+ending and the sacrifice flight. Left unfixed, this task would have had to guess, and guessing on the
+rules is exactly what `CLAUDE.md` forbids.
+
+> Corrected after the whole-branch review, which found the original sentence claimed all four.
+> `discardBeat` never consults `releaseEvent`, so an AI release swept up by an elimination
+> (`eliminate`'s `discarded(reason:'destroyed')`) and an AI Monitoring destroyed by
+> `handAttacks.ts:103` still fly into a heap they never reach. That is the #71 class, still open —
+> the backlog entry's own closing text is honestly narrower than this paragraph was, and the entry
+> is right. Wiring `discardBeat` is the remaining half.
 
 ### Three prompts have nothing on the table explaining them
 
