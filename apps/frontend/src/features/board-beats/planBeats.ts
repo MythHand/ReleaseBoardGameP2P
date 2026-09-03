@@ -1,5 +1,5 @@
 import type { DiscardReason, Event } from '@release/engine'
-import type { ReleaseSlots } from '@release/ui'
+import type { ReleaseSlots, TablePending } from '@release/ui'
 import type { BoardState } from '~/entities/game/board'
 
 // A batch of engine events becomes the movements the board should play. Pure:
@@ -67,8 +67,35 @@ export type PileStep =
 /** who this peer is to a transfer — the same shape `PlannedDraw.mine` has, widened */
 export type TransferRole = 'taker' | 'victim' | 'watcher'
 
+// How an AI event's own scene ends, read off the events that follow it rather
+// than off the trigger's card id (see `aiTailAfter`). `standing` and `none`
+// are the pair no batch can tell apart on its own — see `owed` there.
+export type AiTail =
+  | { kind: 'zone'; slot: string; card: string }
+  | { kind: 'crush'; slot: string; card: string; destination: 'events' | 'discard' }
+  | { kind: 'turnEnded' }
+  | { kind: 'alarm' }
+  | { kind: 'standing'; alarm?: true }
+  | { kind: 'none' }
+
 export type BeatPlan =
   | { kind: 'draw'; key: string; draws: PlannedDraw[] }
+  // An AI trigger's whole scene, claimed from the pile onward — the card-less
+  // `drawn` that turned it up, its own reveal, and its own exit, folded into
+  // ONE beat rather than left for the draw plan to see (#106). `trigger` is
+  // the drawn card itself (`aiRevealed.aiCard`); `eventCard` is what it
+  // becomes on the table — the two are never the same id.
+  | {
+      kind: 'aiEvent'
+      key: string
+      eventId: number
+      player: string
+      pile: number
+      trigger: string
+      triggerDiscardId: number
+      eventCard: string
+      tail: AiTail
+    }
   // `gather` marks a defenceless player's whole table leaving as one sweep —
   // everything they owned gathered at the centre and held before it scatters
   // (#102). Absent for an ordinary discard, never `false`.
@@ -316,14 +343,17 @@ export function classifyPiles(before: number[], after: number[]): PileStep | nul
 // that turned it up, and its `discarded` immediately after that
 // (fake/triggers.ts:123,139). Looking ahead by position rather than scanning the
 // batch is what keeps a later, unrelated reveal from being read as this draw's.
+//
+// Handles only the base Error 503 (`revealed`) now: an AI trigger is claimed
+// whole by the `drawn` branch below, before its own reveal is ever reached
+// here.
 function revealAfter(
   events: Event[],
   i: number,
 ): { card: string; discardId?: number; neutralized?: true } | null {
   const reveal = events[i + 1]
   if (!reveal) return null
-  const card =
-    reveal.type === 'revealed' ? reveal.card : reveal.type === 'aiRevealed' ? reveal.aiCard : null
+  const card = reveal.type === 'revealed' ? reveal.card : null
   if (card == null) return null
   // A standing Monitoring answers a 503 inside the very draw that turned it up
   // (#103 testing, problem 2), and the `neutralized` that says so sits between
@@ -341,6 +371,61 @@ function revealAfter(
   // a 503 answered this way never raised a pending, so nothing lights the alarm
   // off the projection and the draw has to carry that fact itself.
   return { card, discardId: filed.id, ...(answered ? { neutralized: true as const } : {}) }
+}
+
+// The zone a player's releases stand in, on the board that is still on screen
+// (I1). `sourceOf` reaches for the same two places; this asks a different
+// question of them, so it is its own two lines rather than a parameter on that.
+const releaseEventsOf = (before: BoardState, player: string) =>
+  player === before.selfId
+    ? before.you.releaseEvent
+    : before.opponents.find((o) => o.id === player)?.releaseEvent
+
+// What the AI card DID, read from the events behind it rather than from its own
+// id. That is this file's standing rule (see the DDoS note on `attacked`), and
+// here it earns its keep twice: `released`/`placed` following is what says the
+// event card stayed on the table instead of going home, and `revealed` followed
+// by `eliminated` is what separates a defenceless 503 from one that will be
+// answered.
+//
+// `owed` is the one thing no batch can report about itself: raising a pending
+// emits no event, so a crush over an empty slot and a crush that will be
+// answered are the same empty batch and opposite scenes.
+function aiTailAfter(
+  events: Event[],
+  i: number,
+  before: BoardState,
+  eventCard: string,
+  owed: TablePending | null | undefined,
+): AiTail {
+  const next = events[i + 3]
+  if (next?.type === 'released') {
+    return { kind: 'zone', slot: next.slot, card: next.card }
+  }
+  if (next?.type === 'placed') {
+    return { kind: 'zone', slot: 'monitoring', card: next.card }
+  }
+  if (next?.type === 'releaseDestroyed') {
+    const home = releaseEventsOf(before, next.player)?.[next.slot as 'frontend'] !== undefined
+    return {
+      kind: 'crush',
+      slot: next.slot,
+      card: next.card,
+      destination: home ? 'events' : 'discard',
+    }
+  }
+  if (next?.type === 'turnEnded') return { kind: 'turnEnded' }
+  const mimic = next?.type === 'revealed' && next.card === eventCard
+  // A prompt is owed for THIS card — not merely "some pending exists", which a
+  // relayed batch could have carried in from anywhere. Only the four pendings
+  // an AI effect can raise carry `source` at all, so the equality is the whole
+  // test; no kind check is needed in front of it. `'source' in owed` is what
+  // makes the check compile against the union: some of its members (`defend`,
+  // `requestCard`, …) carry no `source` field at all.
+  const standing = owed != null && 'source' in owed && owed.source === eventCard
+  if (standing) return { kind: 'standing', ...(mimic ? { alarm: true as const } : {}) }
+  if (mimic) return { kind: 'alarm' }
+  return { kind: 'none' }
 }
 
 // The engine pays the cost and places the release in one reduction, emitting
@@ -373,7 +458,14 @@ interface OpenAttack {
   sudo: boolean
 }
 
-export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
+export function planBeats(
+  events: Event[],
+  before: BoardState,
+  // The pending this batch LEFT standing — `useBeats`'s `live.pending`. The one
+  // fact a batch cannot report about itself, because raising a pending emits no
+  // event. Optional so every existing caller and test keeps compiling.
+  owed?: TablePending | null,
+): BeatPlan[] {
   const claimed = new Set<number>()
   // discards the draw beat has taken over — a revealed trigger leaves from the
   // centre, so the discard planner must not claim it a second time
@@ -440,6 +532,30 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   for (let i = 0; i < events.length; i++) {
     const e = events[i]
     if (e.type === 'drawn') {
+      // AN AI TRIGGER IS NOT A DRAW. It is its own scene from the pile onward,
+      // so it is claimed whole here and the draw plan never sees it — the
+      // trigger's WHOLE life then lives inside one beat, which is the invariant
+      // `drawBeat`'s own header defends.
+      const ai = events[i + 1]
+      if (e.card === undefined && ai?.type === 'aiRevealed') {
+        flush()
+        const filed = events[i + 2]
+        // The trigger's own exit, claimed so the discard planner cannot take it
+        // a second time — the same `owned` set `revealAfter` writes to.
+        if (filed?.type === 'discarded' && filed.card === ai.aiCard) owned.add(filed.id)
+        plans.push({
+          kind: 'aiEvent',
+          key: `ai:${e.id}`,
+          eventId: e.id,
+          player: e.player,
+          pile: e.pile,
+          trigger: ai.aiCard,
+          triggerDiscardId: filed?.type === 'discarded' ? filed.id : -1,
+          eventCard: ai.eventCard,
+          tail: aiTailAfter(events, i, before, ai.eventCard, owed),
+        })
+        continue
+      }
       if (!draw) flush()
       const reveal = e.card === undefined ? revealAfter(events, i) : null
       if (reveal?.discardId !== undefined) owned.add(reveal.discardId)

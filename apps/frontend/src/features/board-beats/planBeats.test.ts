@@ -272,17 +272,17 @@ describe('planBeats — the draw', () => {
     })
   })
 
-  // The trigger's card is at the CENTRE when it is filed, not in a hand or a
-  // zone. The draw beat flies it out from where it stands, so the discard
-  // planner must not also claim it — that would be two flights for one card.
-  it('leaves the trigger’s own discard to the draw that revealed it', () => {
+  // AN AI TRIGGER IS NOT A DRAW (#106). Its card-less `drawn` is claimed whole
+  // by the `aiEvent` plan, from the pile onward, so the draw plan never sees
+  // it at all — see the `aiEvent` describe block below for the full shape.
+  it('claims an AI trigger whole rather than leaving it to the draw', () => {
     const events: Event[] = [
       drawn(4, { card: undefined }),
       { id: 5, type: 'aiRevealed', player: 'p1', aiCard: 'trigger-ai', eventCard: 'ai-x' } as Event,
       discarded(6, { card: 'trigger-ai', reason: 'trigger' }),
     ]
     const beats = planBeats(events, boardBefore())
-    expect(beats.map((b) => b.kind)).toEqual(['draw'])
+    expect(beats.map((b) => b.kind)).toEqual(['aiEvent'])
   })
 
   // Task 1 stopped banking a 503 at reveal — it is held on the pending until
@@ -1318,5 +1318,150 @@ describe('card transfers', () => {
     const plan = planBeats([transfer({ from: 'p2', to: 'p3', card: undefined })], boardBefore())[0]
     expect(plan).toMatchObject({ kind: 'handTransfer', role: 'watcher' })
     expect((plan as Extract<BeatPlan, { kind: 'handTransfer' }>).card).toBeUndefined()
+  })
+})
+
+describe('planBeats — aiEvent (#106)', () => {
+  // drawn(card-less) → aiRevealed → discarded(trigger) → the effect's own events
+  const aiBatch = (...tail: Event[]): Event[] => [
+    { id: 1, type: 'drawn', player: 'p1', pile: 0, deckSize: 30 },
+    {
+      id: 2,
+      type: 'aiRevealed',
+      player: 'p1',
+      aiCard: 'trigger-ai',
+      eventCard: 'ai-crush-frontend',
+    },
+    { id: 3, type: 'discarded', player: 'p1', card: 'trigger-ai', reason: 'trigger' },
+    ...tail,
+  ]
+
+  it('claims the draw and its reveal, and emits no draw plan', () => {
+    const plans = planBeats(aiBatch(), boardBefore())
+    expect(plans.map((p) => p.kind)).toEqual(['aiEvent'])
+    expect(plans[0]).toMatchObject({
+      player: 'p1',
+      pile: 0,
+      trigger: 'trigger-ai',
+      triggerDiscardId: 3,
+      eventCard: 'ai-crush-frontend',
+    })
+  })
+
+  it('reads the ending off the events that follow, never off the card id', () => {
+    const zone = planBeats(
+      [
+        { id: 1, type: 'drawn', player: 'p1', pile: 0, deckSize: 30 },
+        {
+          id: 2,
+          type: 'aiRevealed',
+          player: 'p1',
+          aiCard: 'trigger-ai',
+          eventCard: 'ai-release-frontend',
+        },
+        { id: 3, type: 'discarded', player: 'p1', card: 'trigger-ai', reason: 'trigger' },
+        { id: 4, type: 'released', player: 'p1', slot: 'frontend', card: 'release-frontend' },
+      ],
+      boardBefore(),
+    )
+    expect(zone[0]).toMatchObject({
+      tail: { kind: 'zone', slot: 'frontend', card: 'release-frontend' },
+    })
+
+    const halluc = planBeats(
+      [
+        { id: 1, type: 'drawn', player: 'p1', pile: 0, deckSize: 30 },
+        {
+          id: 2,
+          type: 'aiRevealed',
+          player: 'p1',
+          aiCard: 'trigger-ai',
+          eventCard: 'ai-hallucination',
+        },
+        { id: 3, type: 'discarded', player: 'p1', card: 'trigger-ai', reason: 'trigger' },
+        { id: 4, type: 'turnEnded', player: 'p1' },
+      ],
+      boardBefore(),
+    )
+    expect(halluc[0]).toMatchObject({ tail: { kind: 'turnEnded' } })
+  })
+
+  // THE PAIR THAT MATTERS #1 — two batches identical apart from the projection
+  it('sends a destroyed AI release home and an ordinary one to the heap', () => {
+    const batch = aiBatch({
+      id: 4,
+      type: 'releaseDestroyed',
+      player: 'p1',
+      slot: 'frontend',
+      card: 'release-frontend',
+    })
+    const ai = boardBefore({
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        releaseEvent: { frontend: 'ai-release-frontend' },
+      },
+    } as Partial<BoardState>)
+    const plain = boardBefore({
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        releaseEvent: {},
+      },
+    } as Partial<BoardState>)
+    expect(planBeats(batch, ai)[0]).toMatchObject({ tail: { destination: 'events' } })
+    expect(planBeats(batch, plain)[0]).toMatchObject({ tail: { destination: 'discard' } })
+  })
+
+  // THE PAIR THAT MATTERS #2 — two batches identical AND empty
+  it('separates a prompt that is owed from nothing having happened, using `owed`', () => {
+    const batch = aiBatch()
+    const before = boardBefore()
+    expect(planBeats(batch, before, null)[0]).toMatchObject({ tail: { kind: 'none' } })
+    expect(
+      planBeats(batch, before, {
+        kind: 'crush',
+        player: 'p1',
+        slot: 'frontend',
+        methods: ['debugger'],
+        source: 'ai-crush-frontend',
+      })[0],
+    ).toMatchObject({ tail: { kind: 'standing' } })
+  })
+
+  it('lights the alarm for the 503 mimic, standing or not', () => {
+    const revealed: Event = { id: 4, type: 'revealed', player: 'p1', card: 'ai-error-503' }
+    const mimic = (...rest: Event[]): Event[] => [
+      { id: 1, type: 'drawn', player: 'p1', pile: 0, deckSize: 30 },
+      { id: 2, type: 'aiRevealed', player: 'p1', aiCard: 'trigger-ai', eventCard: 'ai-error-503' },
+      { id: 3, type: 'discarded', player: 'p1', card: 'trigger-ai', reason: 'trigger' },
+      revealed,
+      ...rest,
+    ]
+    // answerable: the prompt is owed, the card stands, and the glow is owed with it
+    expect(
+      planBeats(mimic(), boardBefore(), {
+        kind: 'neutralize503',
+        player: 'p1',
+        card: null,
+        methods: ['debugger'],
+        source: 'ai-error-503',
+      })[0],
+    ).toMatchObject({ tail: { kind: 'standing', alarm: true } })
+    // defenceless: `eliminated` follows in the same batch and the sweep takes over
+    const doomed = planBeats(
+      mimic({ id: 5, type: 'eliminated', player: 'p1' }),
+      boardBefore(),
+      null,
+    )
+    expect(doomed[0]).toMatchObject({ tail: { kind: 'alarm' } })
+    expect(doomed.some((p) => p.kind === 'eliminated')).toBe(true)
+  })
+
+  it('does not let the discard planner claim the trigger a second time', () => {
+    const plans = planBeats(aiBatch(), boardBefore(), null)
+    expect(plans.some((p) => p.kind === 'discard')).toBe(false)
   })
 })
