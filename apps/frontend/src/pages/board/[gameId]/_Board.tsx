@@ -1354,11 +1354,20 @@ export default function Board({
                 key={i}
                 className={opening.gridCell}
                 data-grid-cell={i}
-                style={{
-                  insetBlockStart: `${GRID_TOP}%`,
-                  inlineSize: `${cell.w}px`,
-                  transform: `translate(calc(-50% + ${cell.dx}px), calc(-50% + ${cell.dy}px))`,
-                }}
+                style={
+                  // Bad Vibe-Coding's one card does not belong in the grid's own
+                  // shape: `gridCells(1)` centres it at dx 0, underneath the AI
+                  // card standing at the `effect` place. `centrePlaceStyle`
+                  // supplies its own `insetInlineStart`/`inlineSize`/`transform`,
+                  // so the two branches are complete alternatives, not a merge.
+                  handLimit.aiPicked
+                    ? centrePlaceStyle('aiPick', 'picked')
+                    : {
+                        insetBlockStart: `${GRID_TOP}%`,
+                        inlineSize: `${cell.w}px`,
+                        transform: `translate(calc(-50% + ${cell.dx}px), calc(-50% + ${cell.dy}px))`,
+                      }
+                }
                 ref={(el) => handLimit.bindCell(i, el)}
               >
                 {held ? (
