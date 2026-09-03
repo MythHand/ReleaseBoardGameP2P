@@ -406,7 +406,8 @@ function aiTailAfter(
     return { kind: 'zone', slot: 'monitoring', card: next.card }
   }
   if (next?.type === 'releaseDestroyed') {
-    const home = releaseEventsOf(before, next.player)?.[next.slot as 'frontend'] !== undefined
+    const home =
+      releaseEventsOf(before, next.player)?.[next.slot as keyof ReleaseSlots] !== undefined
     return {
       kind: 'crush',
       slot: next.slot,
@@ -467,8 +468,10 @@ export function planBeats(
   owed?: TablePending | null,
 ): BeatPlan[] {
   const claimed = new Set<number>()
-  // discards the draw beat has taken over — a revealed trigger leaves from the
-  // centre, so the discard planner must not claim it a second time
+  // Events another plan has already taken over, keyed by id rather than type —
+  // a revealed trigger's own discard leaves from the centre, so the discard
+  // planner must not claim it a second time, and an AI event's own `released`
+  // tail must not be re-planned by the ordinary release branch either.
   const owned = new Set<number>()
   const plans: BeatPlan[] = []
   let piles = before.decks.main
@@ -543,6 +546,16 @@ export function planBeats(
         // The trigger's own exit, claimed so the discard planner cannot take it
         // a second time — the same `owned` set `revealAfter` writes to.
         if (filed?.type === 'discarded' && filed.card === ai.aiCard) owned.add(filed.id)
+        // The tail's own `released`, when the effect keeps the event card on
+        // the table (`zone`): `aiTailAfter` only PEEKS at it to read the slot
+        // and card, so without this the `released` branch below would reach
+        // the same event on the next iteration and plan it a second time — one
+        // event, two independent beats. Claimed by id, never by type: only
+        // `released` collides with a top-level branch (`placed`,
+        // `releaseDestroyed`, `revealed`, `turnEnded` have none, and
+        // `eliminated` firing for the defenceless-503 sweep is intended).
+        const tail = events[i + 3]
+        if (tail?.type === 'released') owned.add(tail.id)
         plans.push({
           kind: 'aiEvent',
           key: `ai:${e.id}`,
@@ -600,6 +613,10 @@ export function planBeats(
       continue
     }
     if (e.type === 'released') {
+      // Already claimed as an AI event's own tail (`kind: 'zone'`) — the AI
+      // event owns this whole scene, and a second, independent `releasePlaced`
+      // for the same id would be two beats flying one card.
+      if (owned.has(e.id)) continue
       flush()
       const cost = costBefore(events, i)
       plans.push({

@@ -1364,6 +1364,9 @@ describe('planBeats — aiEvent (#106)', () => {
       ],
       boardBefore(),
     )
+    // The full array, not just `zone[0]` — the tail's own `released` must be
+    // CLAIMED, not merely read, or the ordinary release branch plans it too.
+    expect(zone.map((p) => p.kind)).toEqual(['aiEvent'])
     expect(zone[0]).toMatchObject({
       tail: { kind: 'zone', slot: 'frontend', card: 'release-frontend' },
     })
@@ -1383,6 +1386,7 @@ describe('planBeats — aiEvent (#106)', () => {
       ],
       boardBefore(),
     )
+    expect(halluc.map((p) => p.kind)).toEqual(['aiEvent'])
     expect(halluc[0]).toMatchObject({ tail: { kind: 'turnEnded' } })
   })
 
@@ -1411,24 +1415,30 @@ describe('planBeats — aiEvent (#106)', () => {
         releaseEvent: {},
       },
     } as Partial<BoardState>)
-    expect(planBeats(batch, ai)[0]).toMatchObject({ tail: { destination: 'events' } })
-    expect(planBeats(batch, plain)[0]).toMatchObject({ tail: { destination: 'discard' } })
+    const aiPlans = planBeats(batch, ai)
+    const plainPlans = planBeats(batch, plain)
+    expect(aiPlans.map((p) => p.kind)).toEqual(['aiEvent'])
+    expect(plainPlans.map((p) => p.kind)).toEqual(['aiEvent'])
+    expect(aiPlans[0]).toMatchObject({ tail: { destination: 'events' } })
+    expect(plainPlans[0]).toMatchObject({ tail: { destination: 'discard' } })
   })
 
   // THE PAIR THAT MATTERS #2 — two batches identical AND empty
   it('separates a prompt that is owed from nothing having happened, using `owed`', () => {
     const batch = aiBatch()
     const before = boardBefore()
-    expect(planBeats(batch, before, null)[0]).toMatchObject({ tail: { kind: 'none' } })
-    expect(
-      planBeats(batch, before, {
-        kind: 'crush',
-        player: 'p1',
-        slot: 'frontend',
-        methods: ['debugger'],
-        source: 'ai-crush-frontend',
-      })[0],
-    ).toMatchObject({ tail: { kind: 'standing' } })
+    const nothing = planBeats(batch, before, null)
+    const owed = planBeats(batch, before, {
+      kind: 'crush',
+      player: 'p1',
+      slot: 'frontend',
+      methods: ['debugger'],
+      source: 'ai-crush-frontend',
+    })
+    expect(nothing.map((p) => p.kind)).toEqual(['aiEvent'])
+    expect(owed.map((p) => p.kind)).toEqual(['aiEvent'])
+    expect(nothing[0]).toMatchObject({ tail: { kind: 'none' } })
+    expect(owed[0]).toMatchObject({ tail: { kind: 'standing' } })
   })
 
   it('lights the alarm for the 503 mimic, standing or not', () => {
@@ -1441,23 +1451,24 @@ describe('planBeats — aiEvent (#106)', () => {
       ...rest,
     ]
     // answerable: the prompt is owed, the card stands, and the glow is owed with it
-    expect(
-      planBeats(mimic(), boardBefore(), {
-        kind: 'neutralize503',
-        player: 'p1',
-        card: null,
-        methods: ['debugger'],
-        source: 'ai-error-503',
-      })[0],
-    ).toMatchObject({ tail: { kind: 'standing', alarm: true } })
-    // defenceless: `eliminated` follows in the same batch and the sweep takes over
+    const answerable = planBeats(mimic(), boardBefore(), {
+      kind: 'neutralize503',
+      player: 'p1',
+      card: null,
+      methods: ['debugger'],
+      source: 'ai-error-503',
+    })
+    expect(answerable.map((p) => p.kind)).toEqual(['aiEvent'])
+    expect(answerable[0]).toMatchObject({ tail: { kind: 'standing', alarm: true } })
+    // defenceless: `eliminated` follows in the same batch and the sweep takes
+    // over — the mimic's own scene AND the sweep it triggers, one beat apiece
     const doomed = planBeats(
       mimic({ id: 5, type: 'eliminated', player: 'p1' }),
       boardBefore(),
       null,
     )
+    expect(doomed.map((p) => p.kind)).toEqual(['aiEvent', 'eliminated'])
     expect(doomed[0]).toMatchObject({ tail: { kind: 'alarm' } })
-    expect(doomed.some((p) => p.kind === 'eliminated')).toBe(true)
   })
 
   it('does not let the discard planner claim the trigger a second time', () => {
