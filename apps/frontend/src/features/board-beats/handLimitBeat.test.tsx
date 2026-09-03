@@ -12,7 +12,13 @@ import type { BeatPlan } from './planBeats'
 // and `useDiscardExit` is replaced at the leaf — its own `send` reaches `play`
 // through a sibling import the barrel mock never sees.
 const raises = vi.hoisted(() => ({ keys: [] as string[], at: [] as Rect[] }))
-const played = vi.hoisted(() => ({ moves: [] as { from: Rect; to: Rect }[] }))
+const played = vi.hoisted(() => ({
+  moves: [] as { from: Rect; to: Rect }[],
+  // every preset name `play()` was called with, in order — the road home's
+  // own test tells `returnToDeck` apart from the grid's `playToCenter` legs.
+  names: [] as string[],
+  calls: [] as { name: string; params: Record<string, unknown> }[],
+}))
 const exits = vi.hoisted(() => ({ items: [] as Leaving[] }))
 const order = vi.hoisted(() => ({ calls: [] as string[] }))
 const resets = vi.hoisted(() => ({ flyer: 0, exit: 0 }))
@@ -38,6 +44,8 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     },
     play: (...args: Parameters<typeof real.play>) => {
       const [name, , params = {}] = args
+      played.names.push(name)
+      played.calls.push({ name, params })
       if (name === 'playToCenter') {
         order.calls.push('move')
         played.moves.push({ from: params.from as Rect, to: params.to as Rect })
@@ -145,6 +153,10 @@ function harness(handoff?: HandLimitHandoff | null, overrides: Partial<BoardAnch
     centre: { current: node() },
     hand: { current: node() },
     discardBox: { current: node() },
+    // Distinctive rects — the road home's own test tells `effect`'s box
+    // apart from `eventsBox`'s by these.
+    effect: { current: nodeAt({ left: 450, top: 300, width: 150, height: 210 }) },
+    eventsBox: { current: nodeAt({ left: 20, top: 20, width: 150, height: 210 }) },
     handSlotAt: () => node(),
     releaseSlot: () => node(),
     seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }) as Rect,
@@ -156,7 +168,7 @@ function harness(handoff?: HandLimitHandoff | null, overrides: Partial<BoardAnch
     api.beat = useHandLimitBeat(anchors, ref)
     return <>{api.beat.overlay}</>
   }
-  return { api, Probe, ref }
+  return { api, Probe, ref, anchors }
 }
 
 // The grid the local player built is standing: the beat must fly THOSE cells
@@ -357,6 +369,42 @@ it('publishes the cards out of the hand and leaves the heap alone', async () => 
   expect(published).toHaveLength(1)
   expect(published[0].you.hand).toHaveLength(0)
   expect(published[0].decks.discardCount).toBe(base.decks.discardCount)
+})
+
+// The road home (#106): the AI card standing behind this prompt
+// (`_Board.tsx`'s `aiStanding`, off `pending.source`) leaves for the events
+// deck on the very batch that answers the prompt it explains — Bad
+// Vibe-Coding's own `handLimit` pending (fake/triggers.ts:419).
+it('sends the AI card standing behind the prompt home once this batch answers it', async () => {
+  raises.keys.length = 0
+  raises.at.length = 0
+  played.names.length = 0
+  played.calls.length = 0
+  exits.items.length = 0
+  const { api, Probe, anchors } = harness(null)
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.run({ ...plan(), homeward: 'ai-bad-vibe-coding' }, { base, publish: () => {} }),
+  )
+  expect(played.names).toContain('returnToDeck')
+  const home = played.calls.find((c) => c.name === 'returnToDeck')
+  const effectBox = anchors.effect.current?.getBoundingClientRect()
+  const eventsBox = anchors.eventsBox.current?.getBoundingClientRect()
+  expect(home?.params).toMatchObject({
+    from: { left: effectBox?.left, top: effectBox?.top },
+    to: { left: eventsBox?.left, top: eventsBox?.top },
+  })
+})
+
+it('adds no road home when the batch answered nobody’s AI card', async () => {
+  raises.keys.length = 0
+  played.names.length = 0
+  played.calls.length = 0
+  exits.items.length = 0
+  const { api, Probe } = harness(null)
+  render(<Probe />)
+  await drive(() => api.beat?.run(plan(), { base, publish: () => {} }))
+  expect(played.names).not.toContain('returnToDeck')
 })
 
 it('drops a card whose source rect is missing and leaves state to the projection', async () => {

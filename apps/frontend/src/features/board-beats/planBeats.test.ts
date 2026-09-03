@@ -152,6 +152,25 @@ describe('planBeats', () => {
     expect(beats[0].kind === 'handLimit' && beats[0].cards).toHaveLength(1)
   })
 
+  // The road home (#106): Bad Vibe-Coding raises its prompt as a `handLimit`
+  // pending with its own `source` (fake/triggers.ts:419) — the discard that
+  // answers it is where the card goes.
+  it('sends a Bad Vibe-Coding card home on the discard that pays its price', () => {
+    const beats = planBeats(
+      [discarded(9, { reason: 'handLimit' })],
+      boardBefore({
+        pending: {
+          kind: 'handLimit',
+          player: 'p1',
+          excess: 1,
+          options: [],
+          source: 'ai-bad-vibe-coding',
+        },
+      } as Partial<BoardState>),
+    )
+    expect(beats[0]).toMatchObject({ homeward: 'ai-bad-vibe-coding' })
+  })
+
   it('claims each hand slot once when two copies of a card go out together', () => {
     const state = boardBefore({
       you: {
@@ -902,6 +921,9 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
         player: 'p1',
         method: 'sacrifice',
         slot: 'frontend',
+        // no `releaseEvent` on this fixture's release — an ordinary release,
+        // so `bankToDiscard` really does put it in the heap
+        destination: 'discard',
         alarm: { eventId: 11, card: 'trigger-error-503' },
         spent: [
           { eventId: 13, card: 'release-frontend' },
@@ -909,6 +931,39 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
         ],
       },
     ])
+  })
+
+  // docs/animations/backlog.md:1062 — a sacrificed release that IS an
+  // events-deck card has already been sent home by `bankToDiscard`, no matter
+  // what this resolution's own `discarded(reason: 'neutralized')` says. Read
+  // the same way `AiTail`'s crush reads it (`planBeats — aiEvent`'s "THE PAIR
+  // THAT MATTERS #1"), off the pre-batch `releaseEvent` map.
+  it('names an events-deck release’s real destination, not the heap its own discard implies', () => {
+    const before = boardBefore({
+      pending: alarmPending(),
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        releaseEvent: { frontend: 'ai-release-frontend' },
+      },
+    } as Partial<BoardState>)
+    const plans = planBeats(
+      [
+        neutralized({ id: 10, method: 'sacrifice' }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+        {
+          id: 12,
+          type: 'releaseDestroyed',
+          player: 'p1',
+          slot: 'frontend',
+          card: 'release-frontend',
+        } as Event,
+        discarded(13, { card: 'release-frontend', reason: 'neutralized' }),
+      ],
+      before,
+    )
+    expect(plans.find((p) => p.kind === 'neutralized')).toMatchObject({ destination: 'events' })
   })
 
   // The shared gap (Task 7 fix round 1): a `neutralize503` pending can bank no
@@ -952,6 +1007,44 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
       boardBefore({ pending: alarmPending() }),
     )
     expect(plans.filter((p) => p.kind === 'discard')).toEqual([])
+  })
+
+  // The road home (#106): the AI card standing behind the prompt this batch
+  // answers has to leave eventually, and this is when. Selected off the
+  // PRE-BATCH pending with a plain equality — `before.pending` is still the
+  // projection with the prompt open (I1).
+  it('sends the standing AI card home on the batch that answers its prompt', () => {
+    const before = boardBefore({
+      pending: {
+        kind: 'crush',
+        player: 'p1',
+        slot: 'frontend',
+        methods: ['debugger'],
+        source: 'ai-crush-frontend',
+      },
+    } as Partial<BoardState>)
+    const plans = planBeats(
+      [
+        neutralized({ id: 10 }),
+        discarded(11, { card: 'protection-debugger', reason: 'neutralized' }),
+      ],
+      before,
+    )
+    expect(plans.find((p) => p.kind === 'neutralized')).toMatchObject({
+      homeward: 'ai-crush-frontend',
+    })
+  })
+
+  it('adds no road home when the prompt was nobody’s AI card', () => {
+    const plans = planBeats(
+      [
+        neutralized({ id: 10 }),
+        discarded(11, { card: 'trigger-error-503', reason: 'trigger' }),
+        discarded(12, { card: 'protection-debugger', reason: 'neutralized' }),
+      ],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans.find((p) => p.kind === 'neutralized')).not.toHaveProperty('homeward')
   })
 })
 

@@ -1,4 +1,4 @@
-import { cardById, GRID_TOP, gridCells } from '@release/ui'
+import { cardAreaOf, cardById, GRID_TOP, gridCells } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
 import { type RefObject, useCallback, useRef } from 'react'
@@ -80,6 +80,39 @@ export function useHandLimitBeat(
     if (c.source.kind === 'release') return rectOf(a.releaseSlot(c.source.player, c.source.slot))
     return a.seatBox(c.source.player)
   }, [])
+
+  // The AI card standing behind this prompt goes home now that the batch has
+  // answered it. It has been standing on the projection's own render
+  // (`_Board.tsx`'s `aiStanding`, off `pending.source`) since the batch that
+  // revealed it — that beat could not fly it home, because it still had to
+  // stand and explain the prompt this beat is what answers.
+  //
+  // Written out here rather than imported from `defenseBeat.tsx`'s own
+  // `sendHomeward`, or `aiBeat.tsx`'s `goHome`: each runner owns its own
+  // `useFlyer` carrier, and a carrier passed between hooks is how this
+  // codebase has already grown two latch bugs of that family (`useBeats.ts`'s
+  // own comments). `isStale` is this file's own — a reset mid-flight must not
+  // let a card from an abandoned match keep travelling.
+  const sendHomeward = useCallback(
+    async (id: string, isStale: () => boolean) => {
+      const a = latest.current.anchors
+      const card = cardById(id)
+      const from = rectOf(a.effect.current)
+      const deck = rectOf(a.eventsBox.current)
+      if (!card || !from || !deck) return
+      // a no-travel raise at the card's own standing spot — the honest answer
+      // to "it is here already"
+      const [el] = await flyer.raise([{ key: 'homeward', at: from, card }])
+      if (!el || isStale()) return
+      flyer.patch('homeward', { faceDown: true })
+      await wait(420) // `flipCard`'s own duration — matches `aiBeat.tsx`'s `goHome`
+      if (isStale()) return
+      const anim = play('returnToDeck', el, { from, to: cardAreaOf(deck) })
+      if (anim) await anim.finished
+      flyer.drop('homeward')
+    },
+    [flyer.raise, flyer.patch, flyer.drop],
+  )
 
   const run = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'handLimit' }>, ctx: BeatRun) => {
@@ -220,8 +253,12 @@ export function useHandLimitBeat(
       if (isStale()) return
       await latest.current.send(items)
       if (isStale()) return
+
+      // The AI card that raised this prompt goes home now that the batch has
+      // answered it — its own road, not this grid's (#106).
+      if (plan.homeward) await sendHomeward(plan.homeward, isStale)
     },
-    [whereFrom, flyer.raise, flyer.elOf, flyer.pin, flyer.drop],
+    [whereFrom, flyer.raise, flyer.elOf, flyer.pin, flyer.drop, sendHomeward],
   )
 
   // A new match cancels what is in the air: both the exit step's flights and

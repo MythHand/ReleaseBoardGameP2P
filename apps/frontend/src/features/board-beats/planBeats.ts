@@ -109,7 +109,18 @@ export type BeatPlan =
   //
   // `player` is carried because the runner asks whether the grid is ours before
   // it decides to adopt one; a relayed batch can carry two players' discards.
-  | { kind: 'handLimit'; key: string; player: string; cards: DiscardCard[] }
+  | {
+      kind: 'handLimit'
+      key: string
+      player: string
+      cards: DiscardCard[]
+      /**
+       * The AI card standing behind the prompt this batch answers, on its way
+       * back to the events deck. Same fact, same reasoning, as the
+       * `neutralized` plan's own `homeward` — see it for the full comment.
+       */
+      homeward?: string
+    }
   | { kind: 'reshuffle'; key: string; cards: number }
   | { kind: 'piles'; key: string; steps: PileStep[] }
   // A player is out: the full-screen video plays over a board that has already
@@ -250,6 +261,15 @@ export type BeatPlan =
       /** sacrifice only: the zone slot the answer flies out of */
       slot?: string
       /**
+       * Sacrifice only, alongside `slot`: where the destroyed release actually
+       * goes, read the same way `AiTail`'s crush reads it — an events-deck
+       * release is already claimed back by `bankToDiscard` regardless of what
+       * this resolution's own `discarded(reason: 'neutralized')` says, so the
+       * board must fly it home rather than into the heap it never really
+       * reaches (docs/animations/backlog.md:1062).
+       */
+      destination?: 'events' | 'discard'
+      /**
        * The alarm's own discard. Optional, not guaranteed: a `crush` shares
        * this event with no card standing anywhere, so the plan must survive
        * having no alarm to take away.
@@ -257,6 +277,18 @@ export type BeatPlan =
       alarm?: { eventId: number; card: string }
       /** the Debugger, or the sacrificed release and its Code Review */
       spent: { eventId: number; card: string }[]
+      /**
+       * The AI card standing behind the prompt this batch answers, on its way
+       * back to the events deck. Selected off the pre-batch projection —
+       * `before.pending` is by definition the projection that still had the
+       * prompt open (I1) — with a plain equality rather than a rule
+       * reconstructed from card ids, the same way `handTransfer`'s `named` is
+       * selected (#105).
+       *
+       * The card does not fly home in the beat that revealed it, because it
+       * has to stand and explain the prompt. This is where it goes.
+       */
+      homeward?: string
     }
 
 // Reasons that CAN take a card out of a release slot — "can", not "always do".
@@ -380,6 +412,19 @@ const releaseEventsOf = (before: BoardState, player: string) =>
   player === before.selfId
     ? before.you.releaseEvent
     : before.opponents.find((o) => o.id === player)?.releaseEvent
+
+// The AI card standing behind whatever prompt this batch answers, read off the
+// PRE-BATCH projection with a plain equality — `before.pending` is by
+// definition the projection that still had the prompt open (I1), so there is
+// nothing here to reconstruct from a card id. `'source' in before.pending` is
+// what makes this compile against the union: only `neutralize503`, `crush`,
+// `handLimit` and `pickFromDiscard` carry `source` at all, and every other
+// member (`defend`, `requestCard`, `giveCard`, `discardForRelease`) has no such
+// field for TypeScript to narrow onto.
+const homewardOf = (before: BoardState): { homeward?: string } => {
+  const pending = before.pending
+  return pending && 'source' in pending && pending.source ? { homeward: pending.source } : {}
+}
 
 // What the AI card DID, read from the events behind it rather than from its own
 // id. That is this file's standing rule (see the DDoS note on `attacked`), and
@@ -773,11 +818,21 @@ export function planBeats(
       let alarm: { eventId: number; card: string } | undefined
       const spent: { eventId: number; card: string }[] = []
       let slot: string | undefined
+      // Read the same way `AiTail`'s crush reads it: `bankToDiscard` already
+      // sent an events-deck release home the instant it left the zone,
+      // regardless of what this resolution's own `discarded(reason:
+      // 'neutralized')` says — so the board has to ask the same question the
+      // crush ending asks, not trust the discard event's word for where the
+      // card went (docs/animations/backlog.md:1062).
+      let destination: 'events' | 'discard' | undefined
       let j = i + 1
       while (j < events.length) {
         const d = events[j]
         if (d.type === 'releaseDestroyed' && d.player === e.player) {
           slot = d.slot
+          const home =
+            releaseEventsOf(before, e.player)?.[d.slot as keyof ReleaseSlots] !== undefined
+          destination = home ? 'events' : 'discard'
           j++
           continue
         }
@@ -814,8 +869,10 @@ export function planBeats(
         player: e.player,
         method: e.method,
         ...(slot ? { slot } : {}),
+        ...(destination ? { destination } : {}),
         ...(alarm ? { alarm } : {}),
         spent,
+        ...homewardOf(before),
       })
       i = j - 1 // the discards this plan claimed are consumed
       continue
@@ -836,7 +893,13 @@ export function planBeats(
         if (!source) continue
         if (handLimit && handLimit.player !== e.player) flush()
         if (!handLimit) flush()
-        handLimit ??= { kind: 'handLimit', key: `handLimit:${e.id}`, player: e.player, cards: [] }
+        handLimit ??= {
+          kind: 'handLimit',
+          key: `handLimit:${e.id}`,
+          player: e.player,
+          cards: [],
+          ...homewardOf(before),
+        }
         handLimit.cards.push({ key: `d${e.id}`, eventId: e.id, card: e.card, source })
         continue
       }
