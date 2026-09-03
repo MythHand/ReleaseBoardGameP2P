@@ -50,10 +50,15 @@ which is #61." That was true when the issue was written and is not true now. `ca
 filters the discard to releases and raises a `pickFromDiscard` pending with `picks: 1` and
 `source: event.id`. `openPickFromDiscard`/`onPickFromDiscard` in `fake/discard.ts` resolve it.
 
-What is missing is only the **board** surface. `PendingPrompt` carries the copy contract for
-`pickFromDiscard` and says so in a comment — "No case in the switch below yet renders it — that is a
-later task". This is that task. #61 stays open for the five Git operations and System Upgrade; none
-of them is touched here.
+What is missing is only the **board** surface. `PendingPrompt` does render a `pickFromDiscard`
+case (`PendingPrompt.tsx:405`) — an earlier task added it, and the comment above the copy contract
+still claiming "No case in the switch below yet renders it" is stale. The board suppresses that
+panel anyway, in favour of the row (Decision 7): the panel is a generic list, while the scene puts
+the candidates open at the centre, and a panel that unmounts when the pending clears cannot hold a
+flight. #61 stays open for the five Git operations and System Upgrade; none of them is touched here.
+
+> Corrected during implementation. The original text said the kit had no case at all and cited that
+> comment as evidence — the comment was the stale part, not the code.
 
 ### The board cannot see where a destroyed card goes, and this is not hypothetical
 
