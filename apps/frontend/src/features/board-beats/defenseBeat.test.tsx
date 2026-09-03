@@ -910,6 +910,86 @@ it('sends a sacrificed AI release home instead of into the heap it never really 
   expect(codeReview?.aux).toBeFalsy()
 })
 
+// Fix round 1: the split above sends the Code Review as a STANDALONE item,
+// which drops the one thing `useDiscardExit`'s own `expand()` used to give it
+// for free — its true tucked position, measured off `[data-aux]` inside
+// `a.cover.current`. That DOM only ever holds a static `CardPair` for OUR OWN
+// staged sacrifice (`_Board.tsx`'s `stagedNeutralize`), so this is the one
+// scenario the fallback (`coverBox` — the release's own box) was silently
+// wrong for.
+it('starts a locally staged Code Review from its own tucked position, not the release’s box', async () => {
+  exits.items.length = 0
+  played.names = []
+  played.calls = []
+  const { api, Probe, cover } = harness()
+  // mimic `_Board.tsx`'s own static render for our staged sacrifice: the
+  // release's own box (`coverBox`), and the Code Review tucked under it at
+  // its own rotated rect (`CardPair`'s `[data-aux]`) — distinct from the
+  // release's box, the same way a real tilted, offset tuck would be.
+  cover.getBoundingClientRect = () =>
+    ({ left: 300, top: 300, width: 150, height: 210, right: 450, bottom: 510 }) as DOMRect
+  const auxNode = document.createElement('div')
+  auxNode.setAttribute('data-aux', '')
+  auxNode.getBoundingClientRect = () =>
+    ({ left: 310, top: 250, width: 170, height: 160, right: 480, bottom: 410 }) as DOMRect
+  cover.appendChild(auxNode)
+  const release = vi.fn()
+  const staging = {
+    current: { mainUid: 'u9', el: document.createElement('div'), release },
+  } as unknown as RefObject<StagedHandoff | null>
+  render(<Probe staging={staging} />)
+  await drive(() =>
+    api.beat?.runNeutralized(
+      {
+        ...debuggerPlan(),
+        player: 'p1', // base.selfId — this IS our own staged sacrifice
+        method: 'sacrifice',
+        slot: 'frontend',
+        destination: 'events',
+        spent: [
+          { eventId: 12, card: 'release-frontend' },
+          { eventId: 13, card: 'support-code-review' },
+        ],
+      },
+      ctx,
+    ),
+  )
+  const codeReview = exits.items.find((i) => i.card.id === 'support-code-review')
+  expect(codeReview).toBeDefined()
+  // trimmed from the aux's own rotated bounding rect, centred on it —
+  // `cardBoxIn({left:310,top:250,width:170,height:160}, 150)` — not the
+  // release's own coverBox ({left:300,top:300,...})
+  expect(codeReview?.from).toEqual({ left: 320, top: 225, width: 150, height: 210 })
+})
+
+// Minor gap (fix round 1): `sacrificedHome` gates only on `plan.spent[0]`,
+// so a sacrifice with no Code Review at all was correct by trace but
+// exercised by nothing.
+it('sends a sacrificed AI release home even with no Code Review to split off', async () => {
+  exits.items.length = 0
+  played.names = []
+  played.calls = []
+  const { api, Probe, anchors } = harness()
+  vi.spyOn(anchors, 'releaseSlot').mockReturnValue(document.createElement('div'))
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.runNeutralized(
+      {
+        ...debuggerPlan(),
+        method: 'sacrifice',
+        slot: 'frontend',
+        destination: 'events',
+        spent: [{ eventId: 12, card: 'release-frontend' }],
+      },
+      ctx,
+    ),
+  )
+  expect(played.names).toContain('returnToDeck')
+  // only the alarm is left to the heap — no Code Review to split off, and
+  // the release itself already took the road home
+  expect(exits.items.map((i) => i.card.id)).toEqual(['trigger-error-503'])
+})
+
 it('leaves a sacrificed release that is NOT an events-deck card to the ordinary discard road', async () => {
   exits.items.length = 0
   played.names = []

@@ -166,6 +166,13 @@ export function useHandLimitBeat(
           // Geometry is animation input, never game truth. Keep the complete
           // grid through its hold, then yield every card together to the
           // accepted projection instead of releasing it under a partial exit.
+          //
+          // The road home is deliberately skipped on this bail-out (#106):
+          // once the pending clears, `_Board.tsx`'s `aiStanding` derivation
+          // yields null anyway, so the card leaves the standing slot
+          // regardless of whether this beat flies it — and flying it home
+          // from a beat that has already given up on its own geometry risks
+          // a flight from a stale rect, which is worse than no flight.
           await wait(GATHER_HOLD)
           if (isStale()) return
           held?.release()
@@ -234,6 +241,11 @@ export function useHandLimitBeat(
         }))
       }
 
+      // Same deliberate omission as the adopted-mismatch bail-out above: the
+      // road home (#106) is not sent from here either. Nothing measurable
+      // means the grid itself never played, so there is nothing for the
+      // homeward leg to follow either — and the same "a stale rect is worse
+      // than no flight" reasoning applies.
       if (items.length === 0) return
 
       // HELD OPEN — the same beat the no-defence sweep holds for, and the same

@@ -1,5 +1,5 @@
 import type { CardData } from '@release/ui'
-import { Card, CardPair, cardAreaOf, cardById } from '@release/ui'
+import { Card, CardPair, cardAreaOf, cardBoxIn, cardById, PAIR_AUX } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import {
   nextFrames,
@@ -365,6 +365,24 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       // that slot. Same ordering runCovered had to be fixed into.
       if (mine && handoff) handoff.release()
 
+      // The Code Review's own true rest position, for the split below that
+      // sends it alone — measured the same way `useDiscardExit`'s own
+      // `expand()` measures a pair's aux (I6): its bounding rect is the box
+      // AROUND the tilt, trimmed back to a card box. Read HERE, synchronously
+      // and before any `await` — the same timing `handoff.release()` just
+      // above relies on — because `a.cover.current` still holds the STATIC
+      // `CardPair` DOM this frame (`_Board.tsx`'s `stagedNeutralize`); the
+      // `handed: true` re-render that would clear it has not flushed yet.
+      // Only OUR OWN staged sacrifice ever renders a pair there — an
+      // opponent's cover never does — so `auxEl` is null for every other
+      // case, and the fallback (`coverBox`) is exactly what this leg would
+      // read without ever having made this measurement.
+      const auxFrom = (() => {
+        if (!toEvents || !plan.spent[1] || !coverBox) return null
+        const el = a.cover.current?.querySelector<HTMLElement>('[data-aux]')
+        return el ? cardBoxIn(el.getBoundingClientRect(), coverBox.width) : null
+      })()
+
       const items = exchange([
         plan.alarm && alarmBox && alarmCard
           ? {
@@ -380,15 +398,17 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
         // does not: the pair splits here into two singles rather than
         // leaving as one `aux`, the same split `useDiscardExit` itself makes
         // for an ordinary pair, just taken earlier because the two are no
-        // longer bound for the same place.
+        // longer bound for the same place. `from`/`pose` mirror exactly what
+        // `expand()` would have given the aux half of that pair — the split
+        // changes WHERE the card goes, not the rest state it leaves from.
         toEvents
           ? plan.spent[1] && coverBox && aux
             ? {
                 eventId: plan.spent[1].eventId,
                 card: aux,
                 el: a.cover.current,
-                from: coverBox,
-                pose: COVER_POSE,
+                from: auxFrom ?? coverBox,
+                pose: { rot: COVER_POSE.rot + PAIR_AUX.rot, dx: 0, dy: 0 },
               }
             : null
           : plan.spent[0] && coverBox && answer
