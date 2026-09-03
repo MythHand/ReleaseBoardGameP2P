@@ -13,6 +13,7 @@ import {
   Card,
   CardPair,
   cardById,
+  centrePlaceStyle,
   type DockView,
   Drawer,
   deriveDock,
@@ -386,6 +387,15 @@ export default function Board({
   // 503 goes to the COVER slot, never over the alarm's own.
   const pendingAlarm = state.pending?.kind === 'neutralize503' ? state.pending : null
   const alarmMine = pendingAlarm?.player === state.selfId
+  // The AI card a prompt belongs to — `source` on `crush`, `neutralize503`,
+  // `handLimit` and `pickFromDiscard`, and only those four: the rest of
+  // `TablePending`'s union does not declare the field at all, so the `in`
+  // check is what narrows to the branches that do, rather than an optional
+  // chain TS would refuse across the wider union. Public on all four: the
+  // whole table watched the card be revealed, so every peer stands the same
+  // one.
+  const pendingSource = state.pending && 'source' in state.pending ? state.pending.source : null
+  const aiStanding = pendingSource ? (cardById(pendingSource) ?? null) : null
   // …or a sweep is running, which is the defenceless path's own alarm: it
   // raises no `pending` at all (the engine eliminates in the same batch as
   // the reveal), so without this the hand would fly away with nothing on
@@ -1062,13 +1072,20 @@ export default function Board({
               />
             ))}
           </div>
-          <Pile
-            label={copy.table.events}
-            deck="ai"
-            count={decks.events}
-            width={150}
-            countPos="tl"
-          />
+          {/* Pile has a closed prop list — no arbitrary attribute passes
+              through it — so the events pile's card box is a wrapping node
+              instead of `boxRef` on the pile itself (matching the discard
+              pile's own `boxRef` would leave nothing here for a test, or a
+              future flight, to find by attribute). */}
+          <div ref={anchors.eventsBox} data-events-box>
+            <Pile
+              label={copy.table.events}
+              deck="ai"
+              count={decks.events}
+              width={150}
+              countPos="tl"
+            />
+          </div>
         </div>
       </div>
 
@@ -1111,6 +1128,44 @@ export default function Board({
             comboBeat.tsx's `runRelease`) */}
         {staging.paidCost && <Card card={staging.paidCost.card} interactive={false} width="100%" />}
       </div>
+
+      {/* THE AI PAIR (#106). The trigger that caused it stands left; the card
+          it pulled stands right, and wider — it is the card of the moment.
+          Positioned from `centrePlaceStyle`, the declared single source for
+          centre geometry, rather than from literals of their own: the four
+          slots above predate that source and still carry copies of its numbers
+          (recorded in the register), and three more copies is how a duplication
+          becomes the house style. */}
+      <div
+        className={opening.aiSlot}
+        data-centre-slot="cause"
+        style={centrePlaceStyle('ai', 'cause')}
+        ref={anchors.cause}
+      />
+      <div
+        className={opening.aiSlot}
+        data-centre-slot="effect"
+        style={centrePlaceStyle('ai', 'effect')}
+        ref={anchors.effect}
+      >
+        {/* The card standing behind a prompt, held publicly while the engine
+            waits for an answer. This is what carries it across the gap between
+            the batch that revealed it and the batch that answers — they are
+            different batches, so no beat overlay can span it, and `source` is
+            public on every one of the four pendings that can raise it. */}
+        {aiStanding && (
+          <div className={opening.aiCard} data-testid="board-ai-effect">
+            <Card card={aiStanding} interactive={false} width="100%" />
+          </div>
+        )}
+      </div>
+      <div
+        className={opening.aiSlot}
+        data-centre-slot="picked"
+        style={centrePlaceStyle('aiPick', 'picked')}
+        ref={anchors.picked}
+      />
+
       {/* the defender's own Sudo waits in its OWN place until a defence is
           chosen for it — the arrow says what it is aimed at. Rendered once its
           own flight there has landed (or at once under reduced motion, Task
