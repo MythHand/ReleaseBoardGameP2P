@@ -190,8 +190,28 @@ export function useHandLimitBeat(
       } else {
         // BUILD. Cells are computed, not rendered — a gathered card stands on
         // its own carrier until the exit takes over.
+        //
+        // …except Bad Vibe-Coding's, which has no grid at all (#106, Decision
+        // 6): `gridCells(1)` centres its one cell at `dx 0`, underneath the AI
+        // card standing at the `effect` place. `plan.picked` is the same fact
+        // `_useHandLimit`'s own `aiPicked` render reads, carried on the plan
+        // because THIS path is every peer who is not the discarder — they have
+        // no handoff to adopt, so without it they would build that overlap.
+        //
+        // The box is MEASURED off the board's own `picked` anchor rather than
+        // computed here: that node is positioned by
+        // `centrePlaceStyle('aiPick', 'picked')`, so the beat and the render
+        // read one geometry instead of two copies of `CENTRE_SLOTS.picked`.
         const table = rectOf(a.bg.current)
-        const boxes = table ? cellBoxes(plan.cards.length, table) : []
+        const pickedBox = plan.picked ? rectOf(a.picked.current) : null
+        // One card by construction — the pending's `excess` is 1 for Bad Vibe
+        // — and if that ever stopped being true this stacks them exactly as
+        // the page's own `aiPicked` render already stacks its cells there.
+        const boxes = pickedBox
+          ? plan.cards.map(() => pickedBox)
+          : table
+            ? cellBoxes(plan.cards.length, table)
+            : []
         const flying: {
           key: string
           planCard: DiscardCard

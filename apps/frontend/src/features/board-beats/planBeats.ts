@@ -115,6 +115,20 @@ export type BeatPlan =
       player: string
       cards: DiscardCard[]
       /**
+       * Bad Vibe-Coding's own shape (#106, Decision 6): the prompt was raised
+       * by an AI card, so the one card given up does NOT stand in the grid's
+       * own cell — `gridCells(1)` centres that at `dx 0`, underneath the AI
+       * card standing at the `effect` place. It stands at the `picked` place
+       * beside it instead.
+       *
+       * The runner needs this told to it, not left to the page: only the
+       * DISCARDER's board has a handoff to adopt (`_useHandLimit`'s own
+       * `aiPicked` render), and every other peer builds the grid from
+       * computed boxes — so without a plan fact those peers would build the
+       * overlap Decision 6 exists to prevent.
+       */
+      picked?: true
+      /**
        * The AI card standing behind the prompt this batch answers, on its way
        * back to the events deck. Same fact, same reasoning, as the
        * `neutralized` plan's own `homeward` — see it for the full comment.
@@ -440,6 +454,22 @@ const releaseEventsOf = (before: BoardState, player: string) =>
 const homewardOf = (before: BoardState): { homeward?: string } => {
   const pending = before.pending
   return pending && 'source' in pending && pending.source ? { homeward: pending.source } : {}
+}
+
+// Whether a hand-limit run is Bad Vibe-Coding's rather than a turn's end —
+// the same question, off the same pre-batch pending (I1), that
+// `_useHandLimit.tsx`'s own `aiPicked` asks of the live one. Derived here and
+// carried on the plan because the ANSWER has to reach peers who never render
+// that hook at all: the discarder adopts a grid the page already stood, and
+// everyone else builds one from boxes this fact chooses.
+//
+// The kind check is what `homewardOf` above deliberately does without: that
+// one asks "is an AI card standing behind whatever this batch answers", which
+// is true of four pendings; this one asks "is THIS run the AI's", and only a
+// `handLimit` pending can be.
+const pickedPlace = (before: BoardState): { picked?: true } => {
+  const pending = before.pending
+  return pending?.kind === 'handLimit' && pending.source ? { picked: true as const } : {}
 }
 
 // What the AI card DID, read from the events behind it rather than from its own
@@ -934,6 +964,7 @@ export function planBeats(
           key: `handLimit:${e.id}`,
           player: e.player,
           cards: [],
+          ...pickedPlace(before),
           ...homewardOf(before),
         }
         handLimit.cards.push({ key: `d${e.id}`, eventId: e.id, card: e.card, source })

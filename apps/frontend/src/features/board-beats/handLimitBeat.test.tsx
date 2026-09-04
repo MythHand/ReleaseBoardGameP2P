@@ -67,6 +67,8 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
   }
 })
 
+const PICKED_BOX: Rect = { left: 877, top: 300, width: 150, height: 210 }
+
 const node = () => document.createElement('div')
 
 const nodeAt = (rect: Rect) => {
@@ -156,6 +158,10 @@ function harness(handoff?: HandLimitHandoff | null, overrides: Partial<BoardAnch
     // Distinctive rects — the road home's own test tells `effect`'s box
     // apart from `eventsBox`'s by these.
     effect: { current: nodeAt({ left: 450, top: 300, width: 150, height: 210 }) },
+    // The board's own `picked` place (`centrePlaceStyle('aiPick', 'picked')`),
+    // nowhere near the grid's own centred cell — Decision 6's test tells the
+    // two apart by these.
+    picked: { current: nodeAt(PICKED_BOX) },
     eventsBox: { current: nodeAt({ left: 20, top: 20, width: 150, height: 210 }) },
     handSlotAt: () => node(),
     releaseSlot: () => node(),
@@ -472,4 +478,64 @@ it('resets both the grid carriers and the discard-exit carriers', () => {
   act(() => api.beat?.reset())
   expect(resets.flyer).toBe(1)
   expect(resets.exit).toBe(1)
+})
+
+// DECISION 6, ON EVERY BOARD (#106). Bad Vibe-Coding's one given-up card does
+// not belong in the grid's own shape: `gridCells(1)` centres its cell at
+// `dx 0`, underneath the AI card standing at the `effect` place. The page's
+// own render already knew that (`_useHandLimit`'s `aiPicked`), but the page
+// only exists on the DISCARDER's board — every other peer reaches this beat
+// with no handoff to adopt, so the fact has to travel on the plan.
+it('stands Bad Vibe’s given-up card at the picked place, not in the grid', async () => {
+  raises.keys.length = 0
+  raises.at.length = 0
+  played.moves.length = 0
+  exits.items.length = 0
+  const seat: Rect = { left: 25, top: 35, width: 145, height: 203 }
+  const { api, Probe } = harness(null, {
+    bg: { current: nodeAt({ left: 100, top: 200, width: 1000, height: 600 }) },
+    seatBox: vi.fn(() => seat),
+  })
+  const badVibe: Extract<BeatPlan, { kind: 'handLimit' }> = {
+    kind: 'handLimit',
+    key: 'handLimit:4',
+    player: 'p2',
+    picked: true,
+    cards: [{ key: 'd4', eventId: 4, card: 'attack-bug', source: { kind: 'seat', player: 'p2' } }],
+  }
+  render(<Probe />)
+  await drive(() => api.beat?.run(badVibe, { base, publish: () => {} }))
+
+  // it flew to the `picked` anchor's own box — the board positions that node
+  // from `centrePlaceStyle('aiPick', 'picked')`, so this IS `centre.ts`'s
+  // geometry and not a number this test invented
+  expect(played.moves).toEqual([{ from: seat, to: PICKED_BOX }])
+  expect(exits.items.map((i) => i.from)).toEqual([PICKED_BOX])
+})
+
+it('still builds the ordinary centred grid when the run is a turn’s end', async () => {
+  // The contrast that makes the assertion above mean something: the same one
+  // card, the same table, no `picked` — and it goes to the grid's own cell,
+  // which is centred on the table and nowhere near the picked place.
+  raises.keys.length = 0
+  played.moves.length = 0
+  exits.items.length = 0
+  const seat: Rect = { left: 25, top: 35, width: 145, height: 203 }
+  const { api, Probe } = harness(null, {
+    bg: { current: nodeAt({ left: 100, top: 200, width: 1000, height: 600 }) },
+    seatBox: vi.fn(() => seat),
+  })
+  const turnEnd: Extract<BeatPlan, { kind: 'handLimit' }> = {
+    kind: 'handLimit',
+    key: 'handLimit:4',
+    player: 'p2',
+    cards: [{ key: 'd4', eventId: 4, card: 'attack-bug', source: { kind: 'seat', player: 'p2' } }],
+  }
+  render(<Probe />)
+  await drive(() => api.beat?.run(turnEnd, { base, publish: () => {} }))
+
+  expect(played.moves).toHaveLength(1)
+  expect(played.moves[0].to).not.toEqual(PICKED_BOX)
+  // centred on the table (left 100 + width 1000) — `gridCells(1)`'s own `dx 0`
+  expect(played.moves[0].to.left + played.moves[0].to.width / 2).toBe(600)
 })

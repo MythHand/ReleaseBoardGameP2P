@@ -171,6 +171,35 @@ describe('planBeats', () => {
     expect(beats[0]).toMatchObject({ homeward: 'ai-bad-vibe-coding' })
   })
 
+  // DECISION 6 HAS TO REACH THE BEAT (#106). `_useHandLimit`'s own `aiPicked`
+  // render exists only on the DISCARDER's board; every other peer builds the
+  // grid from computed boxes, so unless the plan says which shape this run is,
+  // Bad Vibe's one card gathers at `gridCells(1)`'s `dx 0` — underneath the AI
+  // card standing at `effect`.
+  it('marks a Bad Vibe-Coding run as the picked place, not the grid', () => {
+    const beats = planBeats(
+      [discarded(9, { reason: 'handLimit' })],
+      boardBefore({
+        pending: {
+          kind: 'handLimit',
+          player: 'p1',
+          excess: 1,
+          options: [],
+          source: 'ai-bad-vibe-coding',
+        },
+      } as Partial<BoardState>),
+    )
+    expect(beats[0]).toMatchObject({ kind: 'handLimit', picked: true })
+  })
+
+  it('leaves an ordinary turn’s-end run to the grid', () => {
+    // No pending is open when a turn ends, so nothing marks the shape — the
+    // contrast that makes the assertion above mean something.
+    const beats = planBeats([discarded(9, { reason: 'handLimit' })], boardBefore())
+    expect(beats[0].kind).toBe('handLimit')
+    expect(beats[0]).not.toHaveProperty('picked')
+  })
+
   it('claims each hand slot once when two copies of a card go out together', () => {
     const state = boardBefore({
       you: {
