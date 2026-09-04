@@ -196,7 +196,15 @@ export function useAiBeat(anchors: BoardAnchors) {
         // AI card can stand because `decks.events` is projected as a count —
         // one fewer, and nothing on screen disagrees.
         if (plan.tail.kind === 'standing') {
-          await nextFrames() // the projection's render is up before the carrier lets go (I2)
+          // One frame boundary before the carrier lets go. NOT "the
+          // projection's render comes up first" — it cannot: the shadow is
+          // still `before`, which has no pending, and `aiStanding` only
+          // appears once the queue drains to `live`. What the await actually
+          // buys is that the drop lands on a later commit than the flight's
+          // own last frame, so the carrier is never removed inside the same
+          // commit that painted it at its landing spot (I2). The ordering is
+          // pinned by `aiBeat.test.tsx`'s own call-order assertion.
+          await nextFrames()
           drop(EFF)
           return
         }
