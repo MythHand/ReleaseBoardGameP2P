@@ -5,9 +5,15 @@ import { useEffect, useRef, useState } from 'react'
 import type { BoardState } from '~/entities/game/board'
 import styles from './_useInsideStaging.module.css'
 
-// Taking a Release back out of the discard — `ai-inside`, and Git
-// Cherry-pick when #61 lands. Active only while a `pickFromDiscard` pending
-// is ours; its siblings (`_useRequestStaging`, `_useDefenseStaging`,
+// Taking a Release back out of the discard — `ai-inside`, and ONLY
+// `ai-inside`. Git Cherry-pick (`operation-git-cherry-pick`) also raises a
+// `pickFromDiscard` pending, but over the WHOLE discard rather than its
+// releases, and under sudo takes two (one to hand, one to the draw deck's
+// top) — a shape this row was never built for. That pick is the shared
+// panel's business (`PendingPrompt`'s own `pickFromDiscard` case, which
+// already resolves `toDeck`), so `ours` below is gated on `source` and not
+// merely on `kind`. Active only while an `ai-inside` `pickFromDiscard`
+// pending is ours; its siblings (`_useRequestStaging`, `_useDefenseStaging`,
 // `_useNeutralizeStaging`) never run at the same time, because a pending
 // suspends normal play and a pending has one kind.
 //
@@ -30,7 +36,10 @@ export function useInsideStaging(args: {
   const { state, actions, copy, enabled } = args
   const pending = state.pending
   const ours =
-    enabled && pending?.kind === 'pickFromDiscard' && pending.player === state.selfId
+    enabled &&
+    pending?.kind === 'pickFromDiscard' &&
+    pending.source === 'ai-inside' &&
+    pending.player === state.selfId
       ? pending
       : null
 

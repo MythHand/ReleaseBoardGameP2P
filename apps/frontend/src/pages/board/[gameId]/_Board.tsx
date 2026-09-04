@@ -395,8 +395,17 @@ export default function Board({
   // chain TS would refuse across the wider union. Public on all four: the
   // whole table watched the card be revealed, so every peer stands the same
   // one.
+  //
+  // `pickFromDiscard`'s `source` is not always an AI card, though:
+  // `operation-git-cherry-pick` raises the same pending kind and is a base-deck
+  // Operation, not an events-deck draw. Standing it here would put Cherry-pick
+  // in the AI pair's own slot, which is not where its own visible card goes —
+  // so this only stands a source whose catalogue entry is genuinely
+  // `deck === 'ai'`, which leaves Cherry-pick to render nowhere here (it has
+  // no dedicated slot of its own on this branch).
   const pendingSource = state.pending && 'source' in state.pending ? state.pending.source : null
-  const aiStanding = pendingSource ? (cardById(pendingSource) ?? null) : null
+  const pendingSourceCard = pendingSource ? (cardById(pendingSource) ?? null) : null
+  const aiStanding = pendingSourceCard?.deck === 'ai' ? pendingSourceCard : null
   // …or a sweep is running, which is the defenceless path's own alarm: it
   // raises no `pending` at all (the engine eliminates in the same batch as
   // the reveal), so without this the hand would fly away with nothing on
@@ -1699,9 +1708,14 @@ export default function Board({
         // …and this one is not a question: the copies differ only by uid, so
         // `_useRequestStaging` answers it and the victim watches the scene
         state.pending.kind !== 'giveCard' &&
-        // the row on the table asks this one, for the same reason the others
-        // above are asked by the cards themselves (#106)
-        state.pending.kind !== 'pickFromDiscard' && (
+        // the row on the table asks Inside's own pick, for the same reason
+        // the others above are asked by the cards themselves (#106) — but
+        // only Inside's: Git Cherry-pick raises the same pending kind over
+        // the whole discard (and a sudo second pick to the draw deck), a
+        // shape the row was never built for, so it falls through to this
+        // panel, which already has a complete case for it
+        // (`PendingPrompt.tsx`'s own `pickFromDiscard`, `toDeck` included)
+        !(state.pending.kind === 'pickFromDiscard' && state.pending.source === 'ai-inside') && (
           <PendingPrompt
             pending={state.pending}
             hand={you.hand}

@@ -229,3 +229,53 @@ describe('the row that takes a Release out of the discard (ai-inside)', () => {
     expect(screen.getByTestId('board-ai-effect')).not.toBeNull()
   })
 })
+
+// THE PANEL THAT ANSWERS GIT CHERRY-PICK'S OWN PICK (regression). Cherry-pick
+// (`operation-git-cherry-pick`) raises the same `pickFromDiscard` kind Inside
+// does, but over the whole discard rather than its releases, and under sudo
+// takes two — a shape `_useInsideStaging`'s row was never built for. This is
+// the missing case Task 11 shipped without: both cards were routed onto the
+// one surface built for Inside alone.
+describe("the panel that answers Git Cherry-pick's own pick", () => {
+  const cherryPending = (options: { uid: string; id: string }[], picks: 1 | 2 = 1) => ({
+    kind: 'pickFromDiscard' as const,
+    player: 'you',
+    options,
+    picks,
+    source: 'operation-git-cherry-pick',
+  })
+
+  it('offers the shared panel over any discard card, and not the Inside row', () => {
+    const base = makeBoardProps()
+    render(
+      <Board
+        {...makeBoardProps({
+          state: {
+            ...base.state,
+            pending: cherryPending([
+              { uid: 'c1', id: 'attack-bug' },
+              { uid: 'c2', id: 'protection-debugger' },
+            ]),
+          },
+        })}
+      />,
+    )
+    expect(screen.getByTestId('pending-prompt')).not.toBeNull()
+    expect(screen.queryByTestId('board-inside-row')).toBeNull()
+  })
+
+  it('does not stand Cherry-pick in the AI pair own slot — it is a base-deck Operation, not an events-deck draw', () => {
+    const base = makeBoardProps()
+    render(
+      <Board
+        {...makeBoardProps({
+          state: {
+            ...base.state,
+            pending: cherryPending([{ uid: 'c1', id: 'attack-bug' }]),
+          },
+        })}
+      />,
+    )
+    expect(screen.queryByTestId('board-ai-effect')).toBeNull()
+  })
+})
