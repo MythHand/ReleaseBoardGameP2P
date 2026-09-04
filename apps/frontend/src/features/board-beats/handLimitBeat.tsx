@@ -147,7 +147,8 @@ export function useHandLimitBeat(
       // TAKEOFF: the cards are gone from wherever they stood — publish before
       // the movement, or the board shows each card twice for its whole flight.
       // The discard end stays `ctx.base`'s own (see `withoutFlown`).
-      ctx.publish(withoutFlown(ctx.base, plan.cards))
+      const flown = withoutFlown(ctx.base, plan.cards)
+      ctx.publish(flown)
 
       let items: Leaving[] = []
 
@@ -288,7 +289,24 @@ export function useHandLimitBeat(
 
       // The AI card that raised this prompt goes home now that the batch has
       // answered it — its own road, not this grid's (#106).
-      if (plan.homeward) await sendHomeward(plan.homeward, isStale)
+      //
+      // The pending goes FIRST, in its own publish, exactly as
+      // `defenseBeat.runNeutralized` does it and for the same reason: the
+      // shadow still carries the prompt, so `_Board.tsx`'s `aiStanding`
+      // (off `pending.source`) is still rendering that card in the `effect`
+      // slot — and `sendHomeward` is about to raise a carrier at that very
+      // rect and fly it away. Without this the table sees a duplicate stand
+      // still while its own copy leaves.
+      //
+      // A publish, not a flag the render could be told to obey: the two
+      // early returns above deliberately skip this leg (see their comments),
+      // and they rely on the PROJECTION clearing the card once the pending
+      // does. Suppressing the render instead would leave those paths with a
+      // card both suppressed and never flown — genuinely vanished.
+      if (plan.homeward) {
+        ctx.publish({ ...flown, pending: null })
+        await sendHomeward(plan.homeward, isStale)
+      }
     },
     [whereFrom, flyer.raise, flyer.elOf, flyer.pin, flyer.drop, sendHomeward],
   )

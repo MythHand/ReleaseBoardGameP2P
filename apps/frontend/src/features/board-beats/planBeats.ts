@@ -984,11 +984,25 @@ export function planBeats(
         owned.add(d.id)
         j++
       }
-      // An exchange with nothing in it is not a beat. Reachable exactly once:
-      // a 503 a standing Monitoring answered by itself, whose only moving card
-      // is the alarm — and the DRAW that turned it up already owns that flight.
-      // A beat here would hold the table for its own hold with nothing to show.
-      if (!alarm && spent.length === 0) {
+      // The AI card's road home, read before the guard below and not after it
+      // — because it is the second job this batch can be carrying, and the
+      // guard used to know only about the first.
+      const homeward = homewardOf(before)
+      // An exchange with nothing in it is not a beat: a 503 a standing
+      // Monitoring answered by itself, whose only moving card is the alarm —
+      // and the DRAW that turned it up already owns that flight. A beat here
+      // would hold the table for its own hold with nothing to show.
+      //
+      // …UNLESS a card is still owed its road home (#106). Answering a `crush`
+      // or the `ai-error-503` mimic with MONITORING produces neither half of
+      // the test above — `pending.card` is null for both, so `bankAlarm` logs
+      // no discard, and Monitoring costs no card, so nothing is `spent` — and
+      // yet an AI card is standing at the `effect` place waiting for exactly
+      // this batch to take it home. Dropped here, it never flies at all: it
+      // simply vanishes when the queue drains to `live`. So the emptiness that
+      // makes this "not a beat" is emptiness of BOTH jobs, not just the
+      // exchange's.
+      if (!alarm && spent.length === 0 && !homeward.homeward) {
         i = j - 1
         continue
       }
@@ -1002,7 +1016,7 @@ export function planBeats(
         ...(destination ? { destination } : {}),
         ...(alarm ? { alarm } : {}),
         spent,
-        ...homewardOf(before),
+        ...homeward,
       })
       i = j - 1 // the discards this plan claimed are consumed
       continue

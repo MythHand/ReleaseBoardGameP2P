@@ -363,4 +363,34 @@ describe('runTaken — a Release comes back out of the discard (#106, Task 11)',
     await runBeat(result.current.runTaken, takenPlan, anchors)
     expect(playedNames()).not.toContain('returnToDeck')
   })
+
+  // The duplicate this closes: the shadow still carried the pending, so the
+  // projection kept rendering the AI card at `effect` while the carrier below
+  // flew away from that very rect.
+  it('lets the pending go before the AI card flies home', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    const base = {
+      you: { name: 'You', hand: [], release: {} },
+      opponents: [],
+      decks: { main: [10], events: 5, discardCount: 0 },
+      selfId: 'p1',
+      pending: { kind: 'pickFromDiscard', player: 'p1', options: [], source: 'ai-inside' },
+      history: [],
+      setup: {},
+      playable: [],
+      frozen: [],
+    } as unknown as BoardState
+    // each publish stamped with the flights already played when it happened —
+    // presence alone would survive a publish made AFTER the flight
+    const stamps: { pending: unknown; plays: string[] }[] = []
+    await runBeat(result.current.runTaken, { ...takenPlan, homeward: 'ai-inside' }, anchors, {
+      base,
+      publish: (s) => stamps.push({ pending: s.pending, plays: [...playedNames()] }),
+    })
+    expect(playedNames()).toContain('returnToDeck')
+    const cleared = stamps.find((st) => st.pending === null)
+    expect(cleared).toBeDefined()
+    expect(cleared?.plays).not.toContain('returnToDeck')
+  })
 })

@@ -326,6 +326,17 @@ export function useAiBeat(anchors: BoardAnchors) {
       // already grown two latch bugs of that family (`useBeats.ts`'s own
       // comments).
       if (plan.homeward) {
+        // The pending goes first, in its own publish — `defenseBeat`'s own
+        // ordering (`runNeutralized`), and the same reason: the shadow still
+        // carries the prompt, so `_Board.tsx`'s `aiStanding` is still
+        // rendering this very card at `effect` while the carrier below is
+        // about to fly away from that same rect.
+        const c = ctx.current
+        if (c) {
+          const next = { ...c.base, pending: null }
+          c.base = next
+          c.publish(next)
+        }
         const ai = cardById(plan.homeward)
         const home = rectOf(a.effect.current)
         const deck = rectOf(a.eventsBox.current)

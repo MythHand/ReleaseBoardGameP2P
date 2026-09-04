@@ -539,3 +539,40 @@ it('still builds the ordinary centred grid when the run is a turn’s end', asyn
   // centred on the table (left 100 + width 1000) — `gridCells(1)`'s own `dx 0`
   expect(played.moves[0].to.left + played.moves[0].to.width / 2).toBe(600)
 })
+
+// The duplicate this closes: the shadow still carried the prompt, so
+// `_Board.tsx`'s `aiStanding` kept rendering the AI card in the `effect` slot
+// while `sendHomeward` raised its carrier at that same rect and flew it away.
+it('lets the pending go before the AI card flies home', async () => {
+  played.names.length = 0
+  const withPending = {
+    ...base,
+    pending: {
+      kind: 'handLimit',
+      player: 'p1',
+      excess: 1,
+      options: [],
+      source: 'ai-bad-vibe-coding',
+    },
+  } as unknown as BoardState
+  // each publish is stamped with the flights that had already played when it
+  // happened — presence alone would survive a publish made AFTER the flight
+  const stamps: { pending: unknown; plays: string[] }[] = []
+  const { api, Probe } = harness(null)
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.run(
+      { ...plan(), homeward: 'ai-bad-vibe-coding' },
+      {
+        base: withPending,
+        publish: (s) => stamps.push({ pending: s.pending, plays: [...played.names] }),
+      },
+    ),
+  )
+  expect(played.names).toContain('returnToDeck')
+  const cleared = stamps.find((st) => st.pending === null)
+  expect(cleared).toBeDefined()
+  expect(cleared?.plays).not.toContain('returnToDeck')
+  // and the takeoff publish that came before it did NOT put the flown cards back
+  expect(stamps.at(-1)?.pending).toBeNull()
+})

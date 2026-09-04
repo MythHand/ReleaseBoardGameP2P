@@ -1077,6 +1077,47 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
     )
     expect(plans.find((p) => p.kind === 'neutralized')).not.toHaveProperty('homeward')
   })
+
+  // THE BATCH THAT LOOKS EMPTY AND IS NOT (#106). Answer a `crush` — or the
+  // `ai-error-503` mimic — with MONITORING and the resolution banks nothing at
+  // all: both pendings carry a null `card`, so `bankAlarm` logs no discard, and
+  // Monitoring costs nothing, so there is no `discarded(neutralized)` either.
+  // The "an exchange with nothing in it is not a beat" guard used to drop the
+  // whole plan on that shape — and with it the road home, leaving the AI card
+  // standing at `effect` to vanish the moment the queue drained.
+  it('keeps a Monitoring answer that owes an AI card its road home', () => {
+    const plans = planBeats(
+      [neutralized({ id: 10, method: 'monitoring' })],
+      boardBefore({
+        pending: {
+          kind: 'crush',
+          player: 'p1',
+          slot: 'frontend',
+          methods: ['monitoring'],
+          source: 'ai-crush-frontend',
+        },
+      } as Partial<BoardState>),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['neutralized'])
+    expect(plans[0]).toMatchObject({
+      method: 'monitoring',
+      spent: [],
+      homeward: 'ai-crush-frontend',
+    })
+    expect(plans[0]).not.toHaveProperty('alarm')
+  })
+
+  it('still drops a Monitoring answer that owes nothing at all', () => {
+    // The contrast that keeps the guard a guard: a 503 the standing Monitoring
+    // answered by itself banks its alarm inside the DRAW that turned it up, so
+    // this resolution really does have nothing to show — and no AI card is
+    // standing behind it either.
+    const plans = planBeats(
+      [neutralized({ id: 10, method: 'monitoring' })],
+      boardBefore({ pending: alarmPending() }),
+    )
+    expect(plans).toEqual([])
+  })
 })
 
 describe('planBeats — the sweep (#102)', () => {
