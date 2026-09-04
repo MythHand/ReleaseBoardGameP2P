@@ -1,6 +1,8 @@
 import type { DiscardReason, Event } from '@release/engine'
-import type { ReleaseSlots, TablePending } from '@release/ui'
+import type { ReleaseSlots, ReleaseSupport, TablePending } from '@release/ui'
+import type { Scatter } from '@release/ui/animations'
 import type { BoardState } from '~/entities/game/board'
+import { standInScatter } from '~/entities/game/board'
 
 // A batch of engine events becomes the movements the board should play. Pure:
 // it reads the projection as it stood BEFORE the batch, because that is the
@@ -72,7 +74,43 @@ export type TransferRole = 'taker' | 'victim' | 'watcher'
 // are the pair no batch can tell apart on its own — see `owed` there.
 export type AiTail =
   | { kind: 'zone'; slot: string; card: string }
-  | { kind: 'crush'; slot: string; card: string; destination: 'events' | 'discard' }
+  | {
+      kind: 'crush'
+      slot: string
+      card: string
+      destination: 'events' | 'discard'
+      /**
+       * Where the heap will actually REST this release — the pose the board's
+       * own `toDiscardHeap` gives its stand-in for the discard's top, read
+       * through the shared `standInScatter` rather than spelled out again
+       * here (I7: one value, two readers; the flight and the rest must agree
+       * or the card jumps on its last frame).
+       *
+       * A stand-in, because there is no `discarded` event to key a real
+       * scatter off: an automatic `destroySlot` emits `releaseDestroyed`
+       * alone (fake/triggers.ts:88-92). Present ONLY when this release is
+       * what the discard's top will be — that is, when it goes to the heap at
+       * all AND wears no Code Review. `bankToDiscard` banks the spoils in the
+       * order `destroySlot` lists them, `[release, codeReview]`, so a
+       * protected release is buried under its own Code Review and the heap
+       * holds nothing for it; that half stays recorded in
+       * `docs/animations/backlog.md` rather than guessed at here.
+       */
+      rest?: Scatter
+      /**
+       * The Code Review tucked under the destroyed release. `destroySlot`'s
+       * spoils are the release AND its Code Review (fake/triggers.ts:87), so
+       * the two leave the zone together; without this the board flies one of
+       * them and the other simply blinks out of the zone.
+       *
+       * Read off the pre-batch projection's `support`, not off an event:
+       * an automatic destruction emits `releaseDestroyed` alone and names
+       * only the release. Same shape of answer `neutralized.spent[1]` gives
+       * the sacrifice ending, which is the same pair leaving for the same
+       * reason.
+       */
+      codeReview?: string
+    }
   | { kind: 'turnEnded' }
   | { kind: 'alarm' }
   | { kind: 'standing'; alarm?: true }
@@ -443,6 +481,14 @@ const releaseEventsOf = (before: BoardState, player: string) =>
     ? before.you.releaseEvent
     : before.opponents.find((o) => o.id === player)?.releaseEvent
 
+// The Code Review lying under a release, on the board that is still on screen
+// (I1) — the third question asked of those same two places, and its own two
+// lines for the same reason `releaseEventsOf` is.
+const releaseSupportOf = (before: BoardState, player: string) =>
+  player === before.selfId
+    ? before.you.support
+    : before.opponents.find((o) => o.id === player)?.support
+
 // The AI card standing behind whatever prompt this batch answers, read off the
 // PRE-BATCH projection with a plain equality — `before.pending` is by
 // definition the projection that still had the prompt open (I1), so there is
@@ -488,6 +534,7 @@ function aiTailAfter(
   before: BoardState,
   eventCard: string,
   owed: TablePending | null | undefined,
+  discardAfter: number | undefined,
 ): AiTail {
   const next = events[i + 3]
   if (next?.type === 'released') {
@@ -499,11 +546,18 @@ function aiTailAfter(
   if (next?.type === 'releaseDestroyed') {
     const home =
       releaseEventsOf(before, next.player)?.[next.slot as keyof ReleaseSlots] !== undefined
+    const aux = releaseSupportOf(before, next.player)?.[next.slot as keyof ReleaseSupport]
+    // Only the card that ends up on TOP of the discard has a pose the heap
+    // will actually rest it on — see `rest`'s own comment on `AiTail`.
+    const rest =
+      !home && !aux && discardAfter !== undefined ? standInScatter(discardAfter) : undefined
     return {
       kind: 'crush',
       slot: next.slot,
       card: next.card,
       destination: home ? 'events' : 'discard',
+      ...(rest ? { rest } : {}),
+      ...(aux ? { codeReview: aux.id } : {}),
     }
   }
   if (next?.type === 'turnEnded') return { kind: 'turnEnded' }
@@ -557,6 +611,16 @@ export function planBeats(
   // fact a batch cannot report about itself, because raising a pending emits no
   // event. Optional so every existing caller and test keeps compiling.
   owed?: TablePending | null,
+  // The discard's card count AFTER this batch — `useBeats`'s
+  // `live.decks.discardCount`. Passed for the same reason `owed` is: it is a
+  // fact about the batch that the batch cannot report about itself, because
+  // the engine banks some cards with no event at all. READ off the projection
+  // that will render the heap, never reconstructed from `before` plus what
+  // this batch appears to have banked — that arithmetic would make this file a
+  // second source for the engine's own banking order. Optional so every
+  // existing caller and test keeps compiling; absent, the crush ending simply
+  // carries no resting pose.
+  discardAfter?: number,
 ): BeatPlan[] {
   const claimed = new Set<number>()
   // Events another plan has already taken over, keyed by id rather than type —
@@ -656,7 +720,7 @@ export function planBeats(
           trigger: ai.aiCard,
           triggerDiscardId: filed?.type === 'discarded' ? filed.id : -1,
           eventCard: ai.eventCard,
-          tail: aiTailAfter(events, i, before, ai.eventCard, owed),
+          tail: aiTailAfter(events, i, before, ai.eventCard, owed, discardAfter),
         })
         continue
       }

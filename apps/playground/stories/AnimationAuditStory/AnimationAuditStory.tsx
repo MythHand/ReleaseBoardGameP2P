@@ -1218,6 +1218,21 @@ const ISSUES: Issue[] = [
     },
     status: 'open',
   },
+  {
+    what: {
+      ru: 'Крашу нечем показать вторую карту: релиз под своим Code Review',
+      en: 'A crush has no place for its second card: a release under its own Code Review',
+    },
+    problem: {
+      ru: 'Автоматическое разрушение слота (`destroySlot` без `reason`, `packages/engine/src/fake/triggers.ts:88-92`) выдаёт только `releaseDestroyed` — ни одного `discarded`, — а `toDiscardHeap` складывает кучу по одной карте на `discarded`. Половина закрыта: куча всё-таки показывает одну карту, свою заглушку верха сброса, и у заглушки есть поза `standInScatter(count)`; послебатчевый счётчик приезжает в `planBeats` четвёртым аргументом — так же и по той же причине, что `owed`, — такт летит ровно на эту позу (поле `rest` у `AiTail.crush`), и обе стороны читают одно значение, а не две копии формулы (I7). Осталась вторая карта: `bankToDiscard` кладёт spoils в порядке `[релиз, Code Review]` (проверено на движке), поэтому при наличии Code Review сверху оказывается он, релиз лежит под ним, и в куче для релиза нет ничего — ни события, ни заглушки; позы нет и у самого Code Review. Эти две карты такт отпускает без разброса: придумать им место значит завести второй источник для того, что рисует `toDiscardHeap`. Ветка сегодня недостижима — краш открывает пендинг всегда, потому что целевой слот занят по условию, а значит `sacrifice` всегда в `neutralizeOptions`. Закроет `reason` у автоматического `destroySlot`, чтобы он выдавал `discarded` на каждую карту spoils, как любая другая банковка.',
+      en: 'An automatic slot destruction (`destroySlot` with no `reason`, `packages/engine/src/fake/triggers.ts:88-92`) emits `releaseDestroyed` and no `discarded` at all, while `toDiscardHeap` folds the heap one card per `discarded`. Half of this is closed: the heap does still show one card — its stand-in for the discard’s top — and that stand-in has a pose, `standInScatter(count)`; the post-batch count now reaches `planBeats` as a fourth argument, the same way and for the same reason as `owed`, the beat flies onto exactly that pose (`AiTail.crush`’s `rest`), and both ends read one value rather than two copies of a formula (I7). What is left is the second card: `bankToDiscard` banks the spoils as `[release, Code Review]` (verified against the engine), so with a Code Review present it is the Code Review on top, the release lies buried under it, and the heap holds nothing for the release — no event, no stand-in; the Code Review has no pose of its own either. The beat releases those two with no scatter: inventing a place for them would make the board a second source for what `toDiscardHeap` draws. The branch is unreachable today — a crush always opens a pending, because its target slot is occupied by construction and `sacrifice` is therefore always in `neutralizeOptions`. What closes it: a `reason` on the automatic `destroySlot` so it emits `discarded` per spoil, like every other bank.',
+    },
+    where: {
+      ru: 'packages/engine/src/fake/triggers.ts:76-100 + frontend: entities/game/board/toBoardState.ts:160, features/board-beats/aiBeat.tsx',
+      en: 'packages/engine/src/fake/triggers.ts:76-100 + frontend: entities/game/board/toBoardState.ts:160, features/board-beats/aiBeat.tsx',
+    },
+    status: 'open',
+  },
 ]
 
 // Section headings, notes, legend and table headers.

@@ -1,6 +1,7 @@
 import type { Event, PlayerView, ReleaseView } from '@release/engine'
 import type { HeapCard, HistoryEntry, ReleaseSupport } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
+import type { Scatter } from '@release/ui/animations'
 import { HEAP_SHOW, scatterAt } from '@release/ui/animations'
 import type { BoardState } from './types'
 
@@ -143,6 +144,21 @@ function toHistoryEntry(e: Event, labels: HistoryLabels): HistoryEntry {
   }
 }
 
+/**
+ * The pose the heap rests its stand-in for the discard's TOP on — the card that
+ * reached the pile with no `discarded` event of its own to key a scatter off
+ * (`bankToDiscard` banks silently for `attackSpent`/`defenceSpent`, and for an
+ * automatic `destroySlot`). The key is the COUNT, negated: event ids are
+ * positive, so a stand-in can never inherit a real card's pose.
+ *
+ * Exported rather than inlined below because a BEAT has to be able to fly such
+ * a card onto exactly this pose — I7, one value with two readers, the same
+ * reason `scatterAt(eventId)` is shared with every exit that files a card by
+ * its own discard event. `planBeats` reads it for the crush ending, whose
+ * destroyed release the engine banks in silence.
+ */
+export const standInScatter = (discardCount: number): Scatter => scatterAt(-1 - discardCount)
+
 // The discard as it lies on the table. `PlayerView` carries only the top card
 // and a count, so the heap is folded out of the feed: one entry per `discarded`
 // event, its scatter keyed by the event id. Deterministic on purpose — every
@@ -188,7 +204,7 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     // it. Accepted rather than fixed — the feed carries no event for a banked
     // card (backlog.md), so once buried there is nothing to draw in its place,
     // and past HEAP_SHOW the missing card is invisible anyway.
-    heap.push({ uid: `top${count}`, card: top, ...scatterAt(-1 - count) })
+    heap.push({ uid: `top${count}`, card: top, ...standInScatter(count) })
   }
   // Never more cards than the pile says it holds: after a partial take the fold
   // still remembers every card that ever went in, and a heap deeper than the

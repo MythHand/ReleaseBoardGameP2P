@@ -105,7 +105,8 @@ export function boxed(left: number, top: number): Rect {
   return { left, top, width: 150, height: 210 }
 }
 
-function nodeAt(rect: Rect): HTMLDivElement {
+/** A div that measures as the given rect — the fixture's own anchors, shared. */
+export function nodeAt(rect: Rect): HTMLDivElement {
   const el = document.createElement('div')
   el.getBoundingClientRect = () =>
     ({

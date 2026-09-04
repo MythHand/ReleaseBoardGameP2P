@@ -1,7 +1,7 @@
 import type { Event, PlayerView } from '@release/engine'
 import { HEAP_SHOW, scatterAt } from '@release/ui/animations'
 import { describe, expect, it } from 'vitest'
-import { type HistoryLabels, toBoardState } from './toBoardState'
+import { type HistoryLabels, standInScatter, toBoardState } from './toBoardState'
 
 // A minimal but real PlayerView — every field is the engine's actual shape,
 // not a mock. `hand[0].id` is a catalogue id ('attack-bug'); `hand[0].uid` is
@@ -315,6 +315,12 @@ describe('the discard heap', () => {
     // Keyed out of the event ids' range, so the stand-in can never take a real
     // card's pose (see the implementation note on negative keys).
     expect(heap.at(-1)).toMatchObject(scatterAt(-5))
+    // …and it is the SHARED value, not a formula written twice. `planBeats`
+    // reads `standInScatter` to fly a silently banked card onto exactly this
+    // pose (#106, the crush ending), so the flight and the rest are one value
+    // (I7); a key spelled out separately here would let the two drift apart
+    // with nothing failing.
+    expect(heap.at(-1)).toMatchObject(standInScatter(4))
   })
 
   // The pile can EMPTY without the feed saying so card by card: refillFromDiscard

@@ -1,7 +1,9 @@
 import type { Event } from '@release/engine'
 import { cardById } from '@release/ui'
+import { scatterAt } from '@release/ui/animations'
 import { describe, expect, it } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
+import { standInScatter } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
 import { classifyPiles, planBeats } from './planBeats'
 
@@ -1543,6 +1545,136 @@ describe('planBeats — aiEvent (#106)', () => {
     expect(plainPlans.map((p) => p.kind)).toEqual(['aiEvent'])
     expect(aiPlans[0]).toMatchObject({ tail: { destination: 'events' } })
     expect(plainPlans[0]).toMatchObject({ tail: { destination: 'discard' } })
+  })
+
+  // A crush takes the release AND the Code Review tucked under it —
+  // `destroySlot`'s own spoils (fake/triggers.ts:87). The event names only the
+  // release, so the pair has to be read off the pre-batch projection's
+  // `support`; without it the Code Review blinks out of the zone unflown.
+  it('carries the Code Review the destroyed release was wearing', () => {
+    const batch = aiBatch({
+      id: 4,
+      type: 'releaseDestroyed',
+      player: 'p1',
+      slot: 'frontend',
+      card: 'release-frontend',
+    })
+    const protectedRelease = boardBefore({
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        support: { frontend: card('support-code-review') },
+        releaseEvent: {},
+      },
+    } as Partial<BoardState>)
+    const bare = boardBefore({
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        support: {},
+        releaseEvent: {},
+      },
+    } as Partial<BoardState>)
+    expect(planBeats(batch, protectedRelease)[0]).toMatchObject({
+      tail: { kind: 'crush', card: 'release-frontend', codeReview: 'support-code-review' },
+    })
+    // and an unprotected release carries none — the field says "there was one",
+    // never "there might have been"
+    const plan = planBeats(batch, bare)[0] as Extract<BeatPlan, { kind: 'aiEvent' }>
+    expect(plan.tail).not.toHaveProperty('codeReview')
+  })
+
+  it('reads a destroyed opponent’s Code Review off their own zone', () => {
+    const batch = aiBatch({
+      id: 4,
+      type: 'releaseDestroyed',
+      player: 'p2',
+      slot: 'backend',
+      card: 'release-backend',
+    })
+    const before = boardBefore({
+      opponents: [
+        {
+          id: 'p2',
+          name: 'Two',
+          handCount: 3,
+          release: { backend: card('release-backend') },
+          support: { backend: card('support-code-review') },
+        },
+      ],
+    } as Partial<BoardState>)
+    expect(planBeats(batch, before)[0]).toMatchObject({
+      tail: { kind: 'crush', codeReview: 'support-code-review' },
+    })
+  })
+
+  // WHERE THE HEAP WILL ACTUALLY REST IT. An automatic `destroySlot` emits no
+  // `discarded`, so there is no event id to key a scatter off — but the heap
+  // still shows the card, as its stand-in for the discard's top, and that
+  // stand-in has a pose. The plan reads it through the very function
+  // `toDiscardHeap` rests it with (I7), off the post-batch count `useBeats`
+  // hands in — never recomputed from `before` plus what the batch looks like
+  // it banked.
+  it('rests a crushed release on the pose the heap will actually give it', () => {
+    const batch = aiBatch({
+      id: 4,
+      type: 'releaseDestroyed',
+      player: 'p1',
+      slot: 'frontend',
+      card: 'release-frontend',
+    })
+    const before = boardBefore({
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        support: {},
+        releaseEvent: {},
+      },
+    } as Partial<BoardState>)
+    const plan = planBeats(batch, before, null, 7)[0] as Extract<BeatPlan, { kind: 'aiEvent' }>
+    expect(plan.tail).toMatchObject({ kind: 'crush', rest: standInScatter(7) })
+    // and it is the STAND-IN's pose, never a real discard event's — those are
+    // keyed positive and this one is deliberately out of their range
+    expect(plan.tail).not.toMatchObject({ rest: scatterAt(4) })
+  })
+
+  it('rests nothing when the heap has nothing to rest it as', () => {
+    const batch = aiBatch({
+      id: 4,
+      type: 'releaseDestroyed',
+      player: 'p1',
+      slot: 'frontend',
+      card: 'release-frontend',
+    })
+    const withReview = boardBefore({
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        support: { frontend: card('support-code-review') },
+        releaseEvent: {},
+      },
+    } as Partial<BoardState>)
+    const goesHome = boardBefore({
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        support: {},
+        releaseEvent: { frontend: 'ai-release-frontend' },
+      },
+    } as Partial<BoardState>)
+    // buried under its own Code Review — `bankToDiscard` banks the spoils as
+    // [release, codeReview], so the Code Review is the top and this one is
+    // under it, with no entry of its own (docs/animations/backlog.md)
+    expect(planBeats(batch, withReview, null, 7)[0]).not.toMatchObject({ tail: { rest: {} } })
+    // never reaches the heap at all — it is claimed back by the events deck
+    expect(planBeats(batch, goesHome, null, 7)[0]).not.toMatchObject({ tail: { rest: {} } })
+    // and with no count handed in there is nothing to read
+    expect(planBeats(batch, boardBefore(), null)[0]).not.toMatchObject({ tail: { rest: {} } })
   })
 
   // THE PAIR THAT MATTERS #2 — two batches identical AND empty

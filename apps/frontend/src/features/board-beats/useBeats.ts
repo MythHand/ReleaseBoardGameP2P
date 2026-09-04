@@ -590,7 +590,7 @@ export function useBeats(args: {
     // chaining itself: a plan is a fold of events, and where a beat ends is only
     // known once it has run.
     let previous: Beat | undefined
-    for (const plan of planBeats(fresh, before, live.pending)) {
+    for (const plan of planBeats(fresh, before, live.pending, live.decks.discardCount)) {
       const beat = beatOf(plan, before)
       if (!beat) continue
       beat.after = previous

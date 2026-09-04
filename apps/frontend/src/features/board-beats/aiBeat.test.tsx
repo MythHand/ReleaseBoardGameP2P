@@ -1,10 +1,13 @@
+import { scatterAt } from '@release/ui/animations'
 import { describe, expect, it, vi } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
 import { SHOW_HOLD, useAiBeat } from './aiBeat'
 import {
   anchorsFixture,
   animationsTrace,
+  boxed,
   callOrder,
+  nodeAt,
   playedNames,
   renderBeat,
   runBeat,
@@ -122,6 +125,99 @@ describe('aiBeat', () => {
     await runBeat(result.current.run, crushPlan('discard'), anchors)
     const keys = (anchors.exitSpy.mock.calls.flat(2) as { key: string }[]).map((c) => c.key)
     expect(keys).toEqual(expect.arrayContaining(['d3', 'crushed']))
+  })
+
+  // A zone slot wearing a Code Review renders as a `CardPair`; the aux half is
+  // its own tilted node, which is how the beat finds where the second card
+  // actually stands.
+  const protectedSlot = () => {
+    const slot = nodeAt(boxed(700, 100))
+    const aux = nodeAt({ left: 706, top: 118, width: 150, height: 210 })
+    aux.setAttribute('data-aux', '')
+    slot.appendChild(aux)
+    return slot
+  }
+
+  // `destroySlot`'s spoils are the release AND its Code Review
+  // (fake/triggers.ts:87). Flying only the release left the second card
+  // blinking out of the zone with no flight of its own.
+  it('takes the Code Review with the release it was protecting', async () => {
+    const slot = protectedSlot()
+    const anchors = anchorsFixture({ releaseSlot: () => slot })
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(
+      result.current.run,
+      {
+        ...crushPlan('discard'),
+        tail: { ...crushPlan('discard').tail, codeReview: 'support-code-review' },
+      },
+      anchors,
+    )
+    const items = anchors.exitSpy.mock.calls.flat(2) as { key: string; card: { id: string } }[]
+    expect(items.map((i) => i.key).sort()).toEqual(['crushed', 'crushedAux', 'd3'])
+    expect(items.find((i) => i.key === 'crushedAux')?.card.id).toBe('support-code-review')
+  })
+
+  it('keeps the Code Review out of the events deck when the release goes home', async () => {
+    // The split `defenseBeat`'s sacrifice leg already makes: a Code Review is
+    // never an events-deck card, so it takes the ordinary road even when the
+    // release it protected does not.
+    const slot = protectedSlot()
+    const anchors = anchorsFixture({ releaseSlot: () => slot })
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(
+      result.current.run,
+      {
+        ...crushPlan('events'),
+        tail: { ...crushPlan('events').tail, codeReview: 'support-code-review' },
+      },
+      anchors,
+    )
+    const items = anchors.exitSpy.mock.calls.flat(2) as { key: string; card: { id: string } }[]
+    expect(items.map((i) => i.key).sort()).toEqual(['crushedAux', 'd3'])
+    expect(playedNames()).toContain('returnToDeck')
+  })
+
+  // I7 FOR A CARD WITH NO EVENT OF ITS OWN. `destroySlot` called without a
+  // reason emits `releaseDestroyed` and no `discarded`, so there is no event
+  // id to key a scatter off — but the heap still shows the card as its
+  // stand-in for the discard's top, and the plan carries that pose. The
+  // flight has to land ON it: anything else (the draw's own `plan.eventId`,
+  // as this used to send, or a fresh `jitter()`) jumps on the last frame,
+  // which is the whole reason one scatter drives both.
+  it('lands a crushed release on the very pose the heap will rest it on', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    const rest = { rot: 3, dx: 4, dy: 5 }
+    await runBeat(
+      result.current.run,
+      { ...crushPlan('discard'), tail: { ...crushPlan('discard').tail, rest } },
+      anchors,
+    )
+    const items = anchors.exitSpy.mock.calls.flat(2) as { key: string; scatter?: unknown }[]
+    expect(items.find((i) => i.key === 'crushed')?.scatter).toEqual(rest)
+  })
+
+  // The contrast, and the recorded gap: a release buried under its own Code
+  // Review is not the heap's top, so the plan carries no pose for it — and the
+  // Code Review has no entry of its own either. The trigger beside them is what
+  // a card WITH a real `discarded` id looks like.
+  it('claims a heap pose only for the card the heap actually rests', async () => {
+    const slot = protectedSlot()
+    const anchors = anchorsFixture({ releaseSlot: () => slot })
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(
+      result.current.run,
+      {
+        ...crushPlan('discard'),
+        tail: { ...crushPlan('discard').tail, codeReview: 'support-code-review' },
+      },
+      anchors,
+    )
+    const items = anchors.exitSpy.mock.calls.flat(2) as { key: string; scatter?: unknown }[]
+    expect(items.find((i) => i.key === 'd3')?.scatter).toEqual(scatterAt(3))
+    expect(items.find((i) => i.key === 'crushed')?.scatter).toBeUndefined()
+    expect(items.find((i) => i.key === 'crushedAux')?.scatter).toBeUndefined()
   })
 
   const standingPlan = {

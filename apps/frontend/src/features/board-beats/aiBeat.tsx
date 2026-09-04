@@ -1,4 +1,4 @@
-import { cardAreaOf, cardById } from '@release/ui'
+import { cardAreaOf, cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
 import {
   nextFrames,
@@ -37,6 +37,11 @@ export const SHOW_HOLD = 1500
 const TRIG = 'trig'
 const EFF = 'eff'
 const CRUSHED = 'crushed' // the release a crush destroys — its own carrier, its own road
+// …and the Code Review tucked under it. `destroySlot`'s spoils are both cards
+// (fake/triggers.ts:87), and their roads fork — the release may be an
+// events-deck card and go home, the Code Review never is — so each gets its
+// own carrier rather than travelling as one pair.
+const CRUSHED_AUX = 'crushedAux'
 
 const rectOf = (el: Element | null): Rect | null => {
   if (!el) return null
@@ -125,10 +130,27 @@ export function useAiBeat(anchors: BoardAnchors) {
       // zone lets go of it in the same commit — a card cannot be in a slot and
       // in the air at once.
       let crushedFrom: Rect | null = null
+      let auxFrom: Rect | null = null
       if (plan.tail.kind === 'crush') {
         const card = cardById(plan.tail.card)
-        crushedFrom = rectOf(a.releaseSlot(plan.player, plan.tail.slot))
-        if (card && crushedFrom) await raise([{ key: CRUSHED, card, at: crushedFrom }])
+        const aux = plan.tail.codeReview ? cardById(plan.tail.codeReview) : null
+        const slotEl = a.releaseSlot(plan.player, plan.tail.slot)
+        crushedFrom = rectOf(slotEl)
+        // The Code Review is tucked under the release, so the zone renders the
+        // slot as a `CardPair` and the aux half has its own tilted node. I6 —
+        // a tilted node's bounding rect is the box AROUND it, so trim it back
+        // to a card box, exactly as `defenseBeat`'s sacrifice leg measures the
+        // same pair.
+        const auxEl = aux ? (slotEl?.querySelector<HTMLElement>('[data-aux]') ?? null) : null
+        auxFrom =
+          auxEl && crushedFrom ? cardBoxIn(auxEl.getBoundingClientRect(), crushedFrom.width) : null
+        const going = [
+          ...(card && crushedFrom ? [{ key: CRUSHED, card, at: crushedFrom }] : []),
+          ...(aux && (auxFrom ?? crushedFrom)
+            ? [{ key: CRUSHED_AUX, card: aux, at: (auxFrom ?? crushedFrom) as Rect }]
+            : []),
+        ]
+        if (going.length > 0) await raise(going)
       }
 
       // 4. the trigger goes to the heap, on the scatter its own event id
@@ -182,23 +204,60 @@ export function useAiBeat(anchors: BoardAnchors) {
         drop(EFF)
       })()
 
-      // …and the destroyed release takes the road the plan already worked out.
+      // …and the destroyed release takes the road the plan already worked out,
+      // with the Code Review that was tucked under it going its own way.
+      //
+      // NEITHER CARD HAS A `discarded` EVENT TO FLY ON. `destroySlot` called
+      // without a reason (fake/triggers.ts:88-92 — the automatic destruction)
+      // emits `releaseDestroyed` and nothing else, so `toDiscardHeap`, which
+      // folds one heap card per `discarded`, holds no entry keyed to either.
+      //
+      // The heap does still rest ONE of them: its `top<count>` stand-in for
+      // the discard's top. `plan.tail.rest` is that pose, read at plan time
+      // through the shared `standInScatter` off the projection that will
+      // render the heap — so the flight and the rest are one value (I7) and
+      // the card does not jump on its last frame. It is present only when this
+      // release really is what the top will be; a release buried under its own
+      // Code Review has nothing, and neither has the Code Review itself. Those
+      // two are recorded in `docs/animations/backlog.md` rather than papered
+      // over with an invented pose — an omitted scatter takes a fresh
+      // `jitter()`, which is at least honestly arbitrary. What is gone for
+      // good is the previous `scatterAt(plan.eventId)`: a place keyed to the
+      // DRAW's own event id, under which nothing rests at all.
       const crushedOut = (async () => {
         if (plan.tail.kind !== 'crush' || !crushedFrom) return
         const card = cardById(plan.tail.card)
-        if (!card) return
-        // Its road is the plan's answer, not one worked out here: the fact lives
-        // on the pre-batch projection (`releaseEvent`), which the runner cannot
-        // see and the plan already read (#71 — the class of bug this closes).
-        if (plan.tail.destination === 'events') {
-          await goHome(CRUSHED, crushedFrom)
+        const aux = plan.tail.codeReview ? cardById(plan.tail.codeReview) : null
+        // The Code Review is never an events-deck card, so it always takes the
+        // ordinary road even when the release it protected does not — the same
+        // split, for the same reason, `defenseBeat`'s sacrifice leg makes.
+        const auxOut = aux
+          ? latest.current.exit
+              .send([{ key: CRUSHED_AUX, card: aux, node: elOf(CRUSHED_AUX) }])
+              .then(() => drop(CRUSHED_AUX))
+          : Promise.resolve()
+        const mainOut = (async () => {
+          if (!card) return
+          // Its road is the plan's answer, not one worked out here: the fact
+          // lives on the pre-batch projection (`releaseEvent`), which the
+          // runner cannot see and the plan already read (#71 — the class of
+          // bug this closes).
+          if (plan.tail.kind === 'crush' && plan.tail.destination === 'events') {
+            await goHome(CRUSHED, crushedFrom)
+            drop(CRUSHED)
+            return
+          }
+          await latest.current.exit.send([
+            {
+              key: CRUSHED,
+              card,
+              node: elOf(CRUSHED),
+              ...(plan.tail.kind === 'crush' && plan.tail.rest ? { scatter: plan.tail.rest } : {}),
+            },
+          ])
           drop(CRUSHED)
-          return
-        }
-        await latest.current.exit.send([
-          { key: CRUSHED, card, node: elOf(CRUSHED), scatter: scatterAt(plan.eventId) },
-        ])
-        drop(CRUSHED)
+        })()
+        await Promise.all([mainOut, auxOut])
       })()
 
       await Promise.all([triggerOut, effectOut, crushedOut])
