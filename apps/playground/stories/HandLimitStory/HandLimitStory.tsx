@@ -9,7 +9,7 @@ import Typography from '@/primitives/Typography'
 import Hand from '@/table/Hand'
 import { handStep } from '@/table/Hand/fan'
 import type { HandItem, HandPlayDrop } from '@/table/Hand/Hand'
-import { gridCardW, gridOf } from '@/table/TableCentre/discardGrid'
+import { GRID_GAP, GRID_TOP, gridCardW, gridOf } from '@/table/TableCentre/discardGrid'
 import { pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import TechBar from '../controls/TechBar'
@@ -355,7 +355,14 @@ export default function HandLimitStory() {
         {cells > 0 && (
           <div
             className={styles.grid}
-            style={{ gridTemplateColumns: `repeat(${grid.cols}, ${cardW}px)` }}
+            // the row and the gap are the kit's own numbers (discardGrid.ts) —
+            // a CSS module cannot import them, so they arrive inline, the same
+            // idiom the board itself uses for GRID_TOP (`_Board.tsx`)
+            style={{
+              insetBlockStart: `${GRID_TOP}%`,
+              gap: `${GRID_GAP}px`,
+              gridTemplateColumns: `repeat(${grid.cols}, ${cardW}px)`,
+            }}
           >
             {Array.from({ length: cells }, (_, i) => {
               const card = placed.find((p) => p.slot === i)?.card
