@@ -170,6 +170,10 @@ export interface BoardChromeCopy {
   // instead of naming a gesture that a pending offering only Monitoring (or
   // only a sacrifice) would not have.
   askNeutralize: string
+  // The hand is over the limit and the fan is the picker (#104). Count-free on
+  // interpolation to put a number into — and the grid's own empty cells already
+  // show how many are owed.
+  askHandLimit: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
   pauseGame?: string
@@ -238,6 +242,28 @@ export interface StagedHandoff {
   supportUid?: string
   el: HTMLElement | null // the staged node at the centre (pair flyer or single-card node)
   release: () => void // clears the page's staging state
+}
+
+/**
+ * The hand limit's own handoff (#104). The local player builds the grid at the
+ * centre themselves, card by card, long before the engine's `discarded` events
+ * come back — so the beat that takes those cards to the heap must fly the cells
+ * that are already standing rather than a hand the cards left minutes ago.
+ *
+ * A ref, read once at run start, for the same reason `StagedHandoff` is one. It
+ * lives here because the page produces it and a feature consumes it.
+ *
+ * `release()` does NOT end the gesture: it drops the grid's own render, in the
+ * same commit the exit's carriers go up. The picked cards stay hidden from the
+ * fan until the pending itself clears — the same split `_useNeutralizeStaging`
+ * keeps, and for the same reason (the board is still rendering the beat's
+ * shadow, whose hand still holds them).
+ */
+export interface HandLimitHandoff {
+  player: string
+  cards: { uid: string; card: CardData; slot: number }[]
+  cellAt: (slot: number) => HTMLElement | null
+  release: () => void
 }
 
 /**

@@ -5,6 +5,7 @@ import type {
   BeatRun,
   BoardAnchors,
   BoardState,
+  HandLimitHandoff,
   IntroBeat,
   StagedHandoff,
 } from '~/entities/game/board'
@@ -15,6 +16,7 @@ import { useDefenseBeat } from './defenseBeat'
 import { useDiscardBeat } from './discardBeat'
 import { useDrawBeat } from './drawBeat'
 import { useEliminateBeat } from './eliminateBeat'
+import { useHandLimitBeat } from './handLimitBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
 import { useTransferBeat } from './transferBeat'
@@ -132,8 +134,22 @@ export function useBeats(args: {
   // `_useBoardStaging.ts`'s own `takeStagedRelease`, called once
   // `releasePlaced` picks the standing release up out of the stage slot.
   takeStagedRelease?: RefObject<(() => void) | null>
+  // The hand limit's own handoff (#104): the grid the local player filled by
+  // hand, read once at the start of a `handLimit` beat so the runner flies the
+  // cells that are standing instead of a fan the cards left long ago.
+  handLimit?: RefObject<HandLimitHandoff | null>
 }): Beats {
-  const { live, events, anchors, enabled, intro, staging, clearPaidCost, takeStagedRelease } = args
+  const {
+    live,
+    events,
+    anchors,
+    enabled,
+    intro,
+    staging,
+    clearPaidCost,
+    takeStagedRelease,
+    handLimit,
+  } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
   // The same answer as `running`, but ahead of it: `drain()` sets this
@@ -158,6 +174,7 @@ export function useBeats(args: {
   const combo = useComboBeat(anchors, staging, clearPaidCost, takeStagedRelease)
   const defense = useDefenseBeat(anchors, staging)
   const elimination = useEliminateBeat()
+  const handLimits = useHandLimitBeat(anchors, handLimit)
   const transfers = useTransferBeat(anchors)
 
   // `intro` rides along because the arming effect below reads the beat from here
@@ -191,6 +208,15 @@ export function useBeats(args: {
           exclusive: false,
           alarm: plan.gather === true,
           run: (ctx) => discards.run(plan, ctx),
+        }
+      }
+      if (plan.kind === 'handLimit') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => handLimits.run(plan, ctx),
         }
       }
       if (plan.kind === 'draw') {
@@ -328,6 +354,7 @@ export function useBeats(args: {
       defense.runStolen,
       defense.runNeutralized,
       elimination.run,
+      handLimits.run,
       transfers.runTransfer,
       transfers.runRequested,
     ],
@@ -419,7 +446,7 @@ export function useBeats(args: {
   // the arm also keeps it before the BATCH effect, which must not read a stale
   // watermark on the one pass where it matters most.)
   const playing = useRef<string | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks`, `combo`, `defense` and `transfers` are read for the CURRENT render's runners on purpose, not added to the deps below — discardBeat/drawBeat/comboBeat/defenseBeat/transferBeat's own `reset` are unmemoized (each depends on `useDiscardExit`'s or `useHandArrival`'s own `reset`, neither wrapped in `useCallback`), so listing any of them would fire this on every render instead of once per match key. `deckBeat`'s `reset` happens to be stable (its one dependency, `useFlyer`'s `drop`, IS memoized) — excluded here too, for one uniform list rather than a one-off exception for the runner that doesn't need it
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `discards`, `draws`, `decks`, `combo`, `defense`, `elimination`, `handLimits` and `transfers` are read for the CURRENT render's runners on purpose, not added to the deps below — this effect is keyed to the match, not runner object identity
   useLayoutEffect(() => {
     const key = intro?.key ?? null
     if (key == null || playing.current === key) return
@@ -442,6 +469,7 @@ export function useBeats(args: {
     combo.reset()
     defense.reset()
     elimination.reset()
+    handLimits.reset()
     transfers.reset()
   }, [intro?.key, live])
 
@@ -556,6 +584,7 @@ export function useBeats(args: {
       ...combo.overlay,
       ...defense.overlay,
       ...elimination.overlay,
+      ...handLimits.overlay,
       ...transfers.overlay,
     ],
     exclusive: running?.exclusive ?? false,

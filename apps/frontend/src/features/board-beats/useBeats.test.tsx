@@ -335,6 +335,39 @@ it('hands the board back to the live projection when the queue drains', async ()
   expect(getByTestId('hand').textContent).toBe('0')
 })
 
+// The new kind is registered: a hand-limit batch produces a beat, the queue
+// runs it, and the board is not left holding a shadow afterwards (#104).
+it('runs a hand-limit discard and drains', async () => {
+  motion.reduced = false
+  sent.calls = []
+  sent.hang = true
+  const anchors = { ...stub, bg: { current: node() } } as BoardAnchors
+  const event = {
+    id: 4,
+    type: 'discarded',
+    player: 'p1',
+    card: 'attack-bug',
+    reason: 'handLimit',
+  } as Event
+  const utils = render(<Probe live={preDiscard} events={[]} anchors={anchors} />)
+  utils.rerender(<Probe live={afterDiscard} events={[event]} anchors={anchors} />)
+
+  // nextFrames + GATHER_HOLD (1500): by this point the registered runner has
+  // built the grid and reached useDiscardExit, where the mock parks it.
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 1700))
+  })
+  expect(sent.calls).toHaveLength(1)
+
+  // Let the exit land. The queue must drain back to the arrived projection.
+  sent.hang = false
+  await act(async () => {
+    sent.release?.()
+    await new Promise((r) => setTimeout(r, 80))
+  })
+  expect(utils.getByTestId('discardCount').textContent).toBe('1')
+})
+
 // The shadow's lifetime scopes PER END. Mid-flight, the fan has already let go
 // of the card — it left the table the moment its slot was measured, at takeoff
 // — but the discard end still holds the pre-batch heap, because the card has

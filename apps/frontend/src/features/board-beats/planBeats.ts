@@ -73,6 +73,16 @@ export type BeatPlan =
   // everything they owned gathered at the centre and held before it scatters
   // (#102). Absent for an ordinary discard, never `false`.
   | { kind: 'discard'; key: string; cards: DiscardCard[]; gather?: true }
+  // The excess a turn's end (or a Bad Vibe-Coding) costs, leaving as ONE
+  // gesture: a grid at the centre, sized upfront from the count, held open for
+  // the table to read and only then sent to the heap. Its own kind rather than
+  // a flag on `discard`, because on the ACTOR's own board these cards are
+  // already standing in that grid — the page put them there card by card — and
+  // the runner needs the page's handoff to find them.
+  //
+  // `player` is carried because the runner asks whether the grid is ours before
+  // it decides to adopt one; a relayed batch can carry two players' discards.
+  | { kind: 'handLimit'; key: string; player: string; cards: DiscardCard[] }
   | { kind: 'reshuffle'; key: string; cards: number }
   | { kind: 'piles'; key: string; steps: PileStep[] }
   // A player is out: the full-screen video plays over a board that has already
@@ -392,6 +402,9 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
   // created it: `before.pending` cannot change mid-walk, and only one
   // exchange can be pending at a time.
   let pairOut: Extract<BeatPlan, { kind: 'pairToDiscard' }> | null = null
+  // The hand limit's own run — coalesced per PLAYER: two seats can pay the
+  // price in one relayed batch, and each pays it into a grid of its own.
+  let handLimit: Extract<BeatPlan, { kind: 'handLimit' }> | null = null
   // The player a sweep is open for — set by `eliminated`, read by the
   // `discarded` branch that follows it to mark that run gathered. Cleared
   // INSIDE `flush()`, alongside the other run locals: `flush()` runs on every
@@ -411,6 +424,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
     if (discard && discard.cards.length > 0) plans.push(discard)
     if (pileRun) plans.push(pileRun)
     if (pairOut) plans.push(pairOut)
+    if (handLimit) plans.push(handLimit)
     // LAST: everything this run flew has to be off the table before the video
     // covers it.
     if (elimination) plans.push(elimination)
@@ -419,6 +433,7 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
     pileRun = null
     pairOut = null
     sweeping = null
+    handLimit = null
     elimination = null
   }
 
@@ -677,6 +692,21 @@ export function planBeats(events: Event[], before: BoardState): BeatPlan[] {
       // the release's own cost — claimed by the `releasePlaced` beat that
       // follows it in this same batch, where it is shown open before it leaves
       if (e.reason === 'releaseCost') continue
+      // The hand limit's own gesture, claimed ahead of everything below: it is
+      // never part of an exchange (no pending is open when a turn ends) and
+      // never an ordinary discard. A run belongs to ONE player, so a second
+      // seat's excess in the same batch closes the first's.
+      if (e.reason === 'handLimit') {
+        const source = sourceOf(e, before, claimed)
+        // Not found anywhere the board can see: nothing is invented, and the
+        // projection still puts the card in the heap. Same rule as below.
+        if (!source) continue
+        if (handLimit && handLimit.player !== e.player) flush()
+        if (!handLimit) flush()
+        handLimit ??= { kind: 'handLimit', key: `handLimit:${e.id}`, player: e.player, cards: [] }
+        handLimit.cards.push({ key: `d${e.id}`, eventId: e.id, card: e.card, source })
+        continue
+      }
       const p = openAttack
       // The sudo half of a resolving pair — checked ahead of the attack card
       // so a sudo Rollback (which banks ONLY this half; the attack card
