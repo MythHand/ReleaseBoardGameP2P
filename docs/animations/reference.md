@@ -310,6 +310,34 @@ place that dictated a pose would collapse that into one angle for everyone — a
 already computed its own into a different one on its last frame. What a situation records is the
 character alone, answering "who put the card there" (**I11**), never "how many degrees".
 
+## Discard grid — the hand-limit's grid at the centre
+
+`apps/ui/src/table/TableCentre/discardGrid.ts`
+
+The hand limit's excess does not trickle into the heap one card at a time; it builds an open **grid**
+at the centre, sized upfront from the known count. Same folder and same reason as `centre.ts` above —
+geometry written in a CSS module can be neither reused by a flight nor asked about by a test — but a
+different shape: a set is a handful of named places a scene declared, a grid's cells are a function of
+a count nobody can list in advance. Quoted verbatim from the playground's `HandLimitStory` (the
+approved visual source); both the board's gesture and its beat, and the story itself, read it from
+here rather than keeping their own copy.
+
+| Name | Signature | What it does |
+|---|---|---|
+| `GRID_TOP` | `44` | the grid's row, in % of the table's height |
+| `GRID_GAP` | `12` | px between neighbouring cells |
+| `GRID_CARD_W` | `[150, 132, 116]` | card width by row count (1/2/3 rows) |
+| `gridOf` | `gridOf(n)` → `{ cols, rows }` | the shape for `n` cards, chosen upfront from the known excess: ≤4 one row, ≤6 two rows of 3, ≤8 two of 4, ≤10 two of 5, past that three rows |
+| `gridCardW` | `gridCardW(rows)` → `number` | `GRID_CARD_W` for that row count |
+| `gridCells` | `gridCells(n)` → `GridCell[]` | every cell of an `n`-card grid, as `{ dx, dy, w, h }` offsets from the grid's own centre point |
+
+**No CSS `gap` on the consumer's side.** `gridCells` already folds `GRID_GAP` into each cell's `dx`/`dy`,
+so a caller positions every cell absolutely (`GRID_TOP` for the row, the offset for the rest) and never
+declares a gap of its own — the board's grid cell (`pages/board/[gameId]/_Board.tsx`) does exactly
+that, inline, because a CSS module cannot import a TS constant.
+
+*Live reference:* `Hand limit` (Cards group) — see the recipe for the full sequence.
+
 ## Card preview — reading a card that stands on the table
 
 `apps/ui/src/table/CardPreview`. A card at the centre while a 503 comes out of the deck, an AI card
