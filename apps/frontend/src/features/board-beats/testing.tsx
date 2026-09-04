@@ -95,6 +95,16 @@ export function playedWith(name: string): Record<string, unknown> | undefined {
 }
 
 /**
+ * EVERY `play(name, …)` call's params since the last reset, in call order.
+ * The counterpart to `playedWith` for a scene that plays one preset more than
+ * once: two cards going home on `returnToDeck` are one name and two flights,
+ * and an assertion that cannot tell them apart is satisfied by either alone.
+ */
+export function playedAll(name: string): (Record<string, unknown> | undefined)[] {
+  return animationsTrace.played.flatMap((n, i) => (n === name ? [animationsTrace.params[i]] : []))
+}
+
+/**
  * The `ms` arguments passed to `wait()`, in call order since the last reset.
  * A test that writes its own `vi.mock('@release/ui/animations', …)` (see this
  * file's own header — the mock cannot live here) traces `wait` the same way

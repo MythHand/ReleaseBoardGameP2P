@@ -8,6 +8,7 @@ import {
   boxed,
   callOrder,
   nodeAt,
+  playedAll,
   playedNames,
   playedWith,
   renderBeat,
@@ -70,6 +71,12 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
   }
 })
 
+// The fixture's own two boxes, named: `releaseSlot('p1', 'frontend')` and the
+// `effect` place (`testing.tsx`'s `slots` map and `anchorsFixture`). A flight
+// home is told from another by WHERE IT STARTS, so these have to be nameable.
+const ZONE_SLOT = boxed(700, 100)
+const EFFECT_BOX = boxed(450, 300)
+
 describe('aiBeat', () => {
   it('brings the trigger and the card it pulled to their own places, then settles the release', async () => {
     const anchors = anchorsFixture()
@@ -116,8 +123,16 @@ describe('aiBeat', () => {
     const anchors = anchorsFixture()
     const { result } = renderBeat(() => useAiBeat(anchors))
     await runBeat(result.current.run, crushPlan('events'), anchors)
-    // two cards go home: the AI card, and the release it destroyed
-    expect(playedNames()).toEqual(expect.arrayContaining(['returnToDeck']))
+    // TWO cards go home, and WHICH is the whole point (#71): the AI card leaves
+    // from the `effect` place it was standing in, the destroyed release from
+    // its own zone slot. `arrayContaining(['returnToDeck'])` stood here and
+    // proved neither — the AI card's own `goHome` supplies a `returnToDeck` on
+    // every crush there is, so no-op'ing the release's flight left this test,
+    // the one named for #71's guarantee, entirely green.
+    const homes = playedAll('returnToDeck').map((params) => params?.from)
+    expect(homes).toHaveLength(2)
+    expect(homes).toContainEqual(ZONE_SLOT) // the release, out of the zone
+    expect(homes).toContainEqual(EFFECT_BOX) // the AI card, off the centre
     // the ONLY thing in the heap is the trigger
     const keys = (anchors.exitSpy.mock.calls.flat(2) as { key: string }[]).map((c) => c.key)
     expect(keys).toEqual(['d3'])
@@ -128,7 +143,11 @@ describe('aiBeat', () => {
     const { result } = renderBeat(() => useAiBeat(anchors))
     await runBeat(result.current.run, crushPlan('discard'), anchors)
     const keys = (anchors.exitSpy.mock.calls.flat(2) as { key: string }[]).map((c) => c.key)
-    expect(keys).toEqual(expect.arrayContaining(['d3', 'crushed']))
+    expect(keys.sort()).toEqual(['crushed', 'd3'])
+    // …and it did NOT also go home. Exactly one card takes that road here — the
+    // AI card, off the centre — so this test cannot pass on the evidence the
+    // events-deck one above is about, nor that one on this.
+    expect(playedAll('returnToDeck').map((params) => params?.from)).toEqual([EFFECT_BOX])
   })
 
   // A zone slot wearing a Code Review renders as a `CardPair`; the aux half is
@@ -179,7 +198,11 @@ describe('aiBeat', () => {
     )
     const items = anchors.exitSpy.mock.calls.flat(2) as { key: string; card: { id: string } }[]
     expect(items.map((i) => i.key).sort()).toEqual(['crushedAux', 'd3'])
-    expect(playedNames()).toContain('returnToDeck')
+    // two go home and no more — the AI card and the release. A third would be
+    // the Code Review taking a road that is not its own.
+    const homes = playedAll('returnToDeck').map((params) => params?.from)
+    expect(homes).toHaveLength(2)
+    expect(homes).toContainEqual(ZONE_SLOT)
   })
 
   // I7 FOR A CARD WITH NO EVENT OF ITS OWN. `destroySlot` called without a
