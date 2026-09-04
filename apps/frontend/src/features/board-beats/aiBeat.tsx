@@ -275,7 +275,14 @@ export function useAiBeat(anchors: BoardAnchors) {
       const a = latest.current.anchors
       const card = cardById(plan.card)
       const heap = rectOf(a.discardBox.current)
-      const centre = rectOf(a.effect.current)
+      // `anchors.centre`, NOT `effect`: the `effect` place belongs to the AI
+      // card that demanded this pick, and while `pickFromDiscard` is still
+      // open that card is standing in it (`_Board.tsx`'s `aiStanding`) — two
+      // cards in one rect for the whole of `SHOW_HOLD`. `centre.ts` names the
+      // `centre` place for exactly this: what is happening NOW — something the
+      // system has put at the centre for the table to read, which is what a
+      // release coming back out of the discard is.
+      const centre = rectOf(a.centre.current)
       if (!card || !heap || !centre) return
       // out of the heap and up to the centre, face up — `AiCardsStory`'s own
       // `insideGrab`, held for the same `SHOW_HOLD`

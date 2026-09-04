@@ -300,7 +300,7 @@ than in a beat because `prefers-reduced-motion` collapses every beat and the pic
 not choreography.
 
 **The outcome is a beat.** `takenFromDiscard` is public and carries the card, so a new `takenFromDiscard`
-plan flies it for everyone: discard box → `effect` on `drawToCenter`, `wait(SHOW_HOLD)`, then
+plan flies it for everyone: discard box → `centre` on `drawToCenter`, `wait(SHOW_HOLD)`, then
 `useHandArrival` into the taker's own fan, or `dealToSeat` into their seat for anyone watching. One
 path, two audiences, branched on `player === selfId` the way `PlannedDraw.mine` already is.
 

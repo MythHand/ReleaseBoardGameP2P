@@ -63,6 +63,12 @@ import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 
 export const animationsTrace = {
   played: [] as string[],
+  // The params each `play()` call carried, index-aligned with `played`. A test
+  // asking WHERE a flight aimed reads this; one asking only WHETHER it ran
+  // reads `played`. A beat test whose own `vi.mock` does not push here simply
+  // leaves it empty — the two arrays are only aligned for the files that fill
+  // both, which is why `playedWith()` below looks the index up by name.
+  params: [] as (Record<string, unknown> | undefined)[],
   waited: [] as number[],
   // A single merged, chronologically-ordered log of `nextFrames()` calls
   // (pushed as `'nextFrames'`) and `drop(key)` calls (pushed as `` `drop:${key}` ``).
@@ -76,6 +82,16 @@ export const animationsTrace = {
 /** The preset names passed to `play()`, in call order since the last reset. */
 export function playedNames(): string[] {
   return animationsTrace.played
+}
+
+/**
+ * The params of the FIRST `play(name, …)` call since the last reset — what a
+ * flight aimed at, not merely that it happened. Only meaningful in a test file
+ * whose own `vi.mock` pushes onto `animationsTrace.params` alongside `played`.
+ */
+export function playedWith(name: string): Record<string, unknown> | undefined {
+  const at = animationsTrace.played.indexOf(name)
+  return at < 0 ? undefined : animationsTrace.params[at]
 }
 
 /**
@@ -131,6 +147,7 @@ export type AnchorsFixture = BoardAnchors & {
 // recordings into this one.
 export function anchorsFixture(overrides: Partial<BoardAnchors> = {}): AnchorsFixture {
   animationsTrace.played = []
+  animationsTrace.params = []
   animationsTrace.waited = []
   animationsTrace.order = []
   animationsTrace.exitSpy = vi.fn(async () => {})
@@ -224,6 +241,7 @@ export async function runBeat<P>(
   opts: { base?: BoardState; publish?: (s: BoardState) => void } = {},
 ): Promise<{ published: BoardState[] }> {
   animationsTrace.played = []
+  animationsTrace.params = []
   animationsTrace.waited = []
   animationsTrace.order = []
   anchors.exitSpy.mockClear()

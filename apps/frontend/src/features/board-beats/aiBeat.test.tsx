@@ -9,6 +9,7 @@ import {
   callOrder,
   nodeAt,
   playedNames,
+  playedWith,
   renderBeat,
   runBeat,
   waitedMs,
@@ -28,6 +29,9 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     ...real,
     play: (name: string, el: Element | null, params?: Record<string, unknown>) => {
       animationsTrace.played.push(name)
+      // index-aligned with `played` — `playedWith(name)` is what reads it, and
+      // it is what tells "a flight happened" from "a flight aimed HERE"
+      animationsTrace.params.push(params)
       return real.play(name, el, params)
     },
     wait: (ms: number) => {
@@ -362,6 +366,27 @@ describe('runTaken — a Release comes back out of the discard (#106, Task 11)',
     const { result } = renderBeat(() => useAiBeat(anchors))
     await runBeat(result.current.runTaken, takenPlan, anchors)
     expect(playedNames()).not.toContain('returnToDeck')
+  })
+
+  // THE SLOT IS OCCUPIED. `pickFromDiscard` is still open while this flies, so
+  // `_Board.tsx`'s `aiStanding` is rendering the AI card that demanded the pick
+  // in the `effect` place. Aiming there put two cards in one rect for the whole
+  // of `SHOW_HOLD`; `centre` is the place `centre.ts` names for a card the
+  // system has put up for the table to read.
+  it('shows the taken card at the centre, not on top of the AI card that demanded it', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    await runBeat(result.current.runTaken, takenPlan, anchors)
+    const centre = anchors.centre.current?.getBoundingClientRect()
+    const effect = anchors.effect.current?.getBoundingClientRect()
+    expect(playedWith('drawToCenter')?.to).toMatchObject({
+      left: centre?.left,
+      top: centre?.top,
+    })
+    expect(playedWith('drawToCenter')?.to).not.toMatchObject({
+      left: effect?.left,
+      top: effect?.top,
+    })
   })
 
   // The duplicate this closes: the shadow still carried the pending, so the
