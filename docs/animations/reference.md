@@ -22,6 +22,17 @@ Fill: `forwards` everywhere except `shake` (none — it returns to the origin by
 `rollIn` / `hudIn` (**`both`**, so a `delay` holds the element invisible until its turn instead of
 letting it flash in place first).
 
+> **A persisted end state must not leave a transform behind.** Fill `forwards`/`both` means the last
+> keyframe stays on the element for good — and any transform value other than `none` makes that
+> element a permanent **stacking context**, which traps its children's `z-index` inside it however
+> high they set it. That is invisible until something outside the block flies past: a pile's counter
+> sits at `calc(var(--z-flight) + 40)` precisely so a card passes UNDER the badge, and
+> `Pile.module.css`'s own comment says it works "only while the consumer's placement is not a
+> stacking context". `hudIn` ends on `transform: 'none'` for this reason — `translate(0, 0)` looks
+> identical and is not. Found on the board as a counter that blinked behind every card leaving a
+> pile (PR #132); pinned by `apps/ui/src/animations/presets.test.ts`. **A new block preset should
+> end on `none` too.**
+
 | Preset | Duration | Easing | Fade | Params | Purpose |
 |---|---|---|---|---|---|
 | `flipCard` | 420 | EASE | — | `{ faceDown }` | flip face ↔ back (used by `Card` itself) |
