@@ -627,3 +627,27 @@ it('leaves a live clock alone when its owner reconnects — no extension', () =>
   expect(returned.outgoing).toHaveLength(1)
   expect(returned.outgoing[0].to).toBe('peer-back')
 })
+
+it('does not drive absent seats when no seat is connected at all', () => {
+  const { session } = twoPlayerSession()
+  const empty: Session = {
+    ...session,
+    seats: session.seats.map((s) => ({ ...s, peerId: null, absentSince: 0 })),
+  }
+  const result = driveAbsent(empty, ABSENT_GRACE_MS + 1)
+  // A keeper with no audience advances nothing: no state change, no fan-out.
+  expect(result.session).toBe(empty)
+  expect(result.outgoing).toEqual([])
+})
+
+it('still drives an absent seat while another seat is connected', () => {
+  const { session } = twoPlayerSession()
+  const oneGone: Session = {
+    ...session,
+    seats: session.seats.map((s) =>
+      s.playerId === session.state.turn.player ? { ...s, peerId: null, absentSince: 0 } : s,
+    ),
+  }
+  const result = driveAbsent(oneGone, ABSENT_GRACE_MS + 1)
+  expect(result.session).not.toBe(oneGone)
+})
