@@ -38,6 +38,10 @@ function session(peers: Record<string, unknown> = {}): UseLobby {
     // takes the page's degraded path, which is seatsFor(peers) — what this
     // fixture has always exercised.
     seats: [],
+    // Both halves of the reconnect overlay (#110) — idle/false here, since
+    // this fixture is about a session already settled, not one reconnecting.
+    restoring: false,
+    reconnect: { attempt: 0, maxAttempts: 5, status: 'idle', events: [], retry: vi.fn() },
     kick: vi.fn(),
     setWhere: vi.fn(),
     leaveGame: vi.fn(),

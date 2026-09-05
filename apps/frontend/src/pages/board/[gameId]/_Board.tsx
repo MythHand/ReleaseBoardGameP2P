@@ -1784,7 +1784,17 @@ export default function Board({
         />
       )}
 
-      {room.connection === 'reconnecting' && <Reconnect copy={copy.reconnect} />}
+      {room.connection === 'reconnecting' && (
+        <Reconnect
+          copy={copy.reconnect}
+          host={room.code ?? ''}
+          attempt={room.reconnect?.attempt ?? 1}
+          maxAttempts={room.reconnect?.maxAttempts ?? 5}
+          status={room.reconnect?.status ?? 'trying'}
+          onRetry={room.onReconnectRetry ?? (() => {})}
+          onLeave={room.onReconnectLeave ?? (() => {})}
+        />
+      )}
 
       {overShown && (
         <GameOver

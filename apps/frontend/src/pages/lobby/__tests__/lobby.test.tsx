@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
-import type { UseLobby } from '~/entities/lobby'
+import { MAX_RECONNECT_ATTEMPTS, type UseLobby } from '~/entities/lobby'
 import LobbyView from '../_LobbyView'
 import LobbyPage from '../[lobbyId]'
 
@@ -38,6 +38,14 @@ function base(): UseLobby {
   return {
     state: null,
     status: 'idle',
+    restoring: false,
+    reconnect: {
+      attempt: 0,
+      maxAttempts: MAX_RECONNECT_ATTEMPTS,
+      status: 'idle',
+      events: [],
+      retry: vi.fn(),
+    },
     roomCode: null,
     isHost: false,
     canStart: false,
@@ -125,8 +133,22 @@ function inSession(): UseLobby {
         gitBranch: 'base',
       },
       peers: {
-        h: { id: 'h', name: 'Host', role: 'host', ready: true, where: 'lobby' },
-        p1: { id: 'p1', name: 'Pat', role: 'player', ready: false, where: 'lobby' },
+        h: {
+          id: 'h',
+          clientId: 'client-h',
+          name: 'Host',
+          role: 'host',
+          ready: true,
+          where: 'lobby',
+        },
+        p1: {
+          id: 'p1',
+          clientId: 'client-p1',
+          name: 'Pat',
+          role: 'player',
+          ready: false,
+          where: 'lobby',
+        },
       },
     },
   }
@@ -200,8 +222,22 @@ it('LobbyView renders spectator section when guests present', () => {
         gitBranch: 'base',
       },
       peers: {
-        h: { id: 'h', name: 'Host', role: 'host', ready: true, where: 'lobby' },
-        g1: { id: 'g1', name: 'Gus', role: 'guest', ready: false, where: 'lobby' },
+        h: {
+          id: 'h',
+          clientId: 'client-h',
+          name: 'Host',
+          role: 'host',
+          ready: true,
+          where: 'lobby',
+        },
+        g1: {
+          id: 'g1',
+          clientId: 'client-g1',
+          name: 'Gus',
+          role: 'guest',
+          ready: false,
+          where: 'lobby',
+        },
       },
     },
   }

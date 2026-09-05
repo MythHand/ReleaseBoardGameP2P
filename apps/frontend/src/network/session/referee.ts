@@ -191,6 +191,13 @@ export function rebind(
 // answer the reaction window for someone sitting right there. Here the seat is
 // empty, so there is no decision to take away.
 export function driveAbsent(session: Session, now: number): SessionResult {
+  // A keeper with nobody connected has no table to keep moving: every SYNC it
+  // produced would be addressed to a seat that cannot receive it, and the
+  // match would advance for no one. Not reachable for a host-keeper, which
+  // keeps its own seat through a restore — this guards the case where the
+  // keeper itself is the peer whose seat dropped.
+  if (!session.seats.some((s) => s.peerId !== null)) return { session, outgoing: [] }
+
   const expired = session.seats.filter(
     (s) => s.peerId === null && s.absentSince !== null && now - s.absentSince >= ABSENT_GRACE_MS,
   )
