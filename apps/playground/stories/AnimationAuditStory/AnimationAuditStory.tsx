@@ -1303,7 +1303,7 @@ function ModuleTable({ rows }: { rows: Module[] }) {
           <th>{ui.colModule}</th>
           <th>{ui.colWhatDoes}</th>
           <th>{ui.colWhereMod}</th>
-          <th>{ui.colStatus}</th>
+          <th className={styles.status}>{ui.colStatus}</th>
         </tr>
       </thead>
       <tbody>
@@ -1317,7 +1317,7 @@ function ModuleTable({ rows }: { rows: Module[] }) {
             </td>
             <td className={styles.what}>{r.what[lang]}</td>
             <td className={styles.where}>{r.where[lang]}</td>
-            <td>
+            <td className={styles.status}>
               <Badge status={r.status} />
             </td>
           </tr>
@@ -1366,7 +1366,7 @@ function IssueTable({ rows }: { rows: Issue[] }) {
           <th>{ui.colWhatShort}</th>
           <th>{ui.colProblem}</th>
           <th>{ui.colWhere}</th>
-          <th>{ui.colStatus}</th>
+          <th className={styles.status}>{ui.colStatus}</th>
         </tr>
       </thead>
       <tbody>
@@ -1375,7 +1375,7 @@ function IssueTable({ rows }: { rows: Issue[] }) {
             <td className={styles.mod}>{r.what[lang]}</td>
             <td className={styles.what}>{r.problem[lang]}</td>
             <td className={styles.where}>{r.where[lang]}</td>
-            <td>
+            <td className={styles.status}>
               <Badge status={r.status} />
             </td>
           </tr>
