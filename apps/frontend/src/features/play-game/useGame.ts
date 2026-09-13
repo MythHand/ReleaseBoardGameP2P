@@ -1,5 +1,5 @@
 import type { Choice, Event, PlayerView, Target } from '@release/engine'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import type { Intent } from '~/network'
 import { clearLog, readLog, writeLog } from '~/shared/lib/persistence'
@@ -36,15 +36,14 @@ export function useGame(): Game {
   // The move history is this peer's own running record rather than part of
   // GameState: each seat accumulates only the events it was entitled to see.
   //
-  // Restored in a LAZY INITIALISER, not an effect, and that is load-bearing.
+  // Read synchronously for every game id, including one restored after mount.
   // The board arms its beats in a layout effect; a feed restored one passive
   // effect later would be read as empty on the commit that first carried a
   // projection, and then as fifty new events on the next — the whole match,
   // planned as choreography. sessionStorage is synchronous, so the feed can
-  // simply exist on the first render.
-  const [events, setEvents] = useState<Event[]>(() =>
-    gameId ? ((readLog(gameId) ?? []) as Event[]) : [],
-  )
+  // simply exist on that transition render.
+  const storedForGame = useMemo(() => (gameId ? readLog(gameId) : null), [gameId])
+  const [events, setEvents] = useState<Event[]>(() => storedForGame ?? [])
   // Starts pointed at the game that just supplied `events` above, not at
   // `null`: both run in the same first render, so a ref that started at
   // `null` would read as "a different game" on mount and the effect below
@@ -67,17 +66,23 @@ export function useGame(): Game {
   // here, in a plain render-time variable, is what lets both `carried` and the
   // persist effect agree on "this render still describes the outgoing game".
   const sameGame = seenGame.current === gameId
+  const incomingEvents = useMemo(
+    () => (sameGame ? [] : (storedForGame ?? [])),
+    [sameGame, storedForGame],
+  )
 
   useEffect(() => {
-    // A new game must not inherit the last one's feed.
+    // Commit exactly the snapshot exposed during the transition render. A
+    // missing record clears the outgoing game's storage; a valid empty feed
+    // must remain distinguishable from no record at all.
     if (seenGame.current !== gameId) {
       seenGame.current = gameId
       seenSync.current = null
-      clearLog()
-      restoredThrough.current = 0
-      setEvents([])
+      if (!storedForGame) clearLog()
+      restoredThrough.current = incomingEvents.at(-1)?.id ?? 0
+      setEvents(incomingEvents)
     }
-  }, [gameId])
+  }, [gameId, incomingEvents, storedForGame])
 
   useEffect(() => {
     if (!sync || sync === seenSync.current) return
@@ -128,11 +133,11 @@ export function useGame(): Game {
   // single render before the effect has folded this sync in.
   const pending =
     sync && sync !== seenSync.current ? sync.events.filter((e) => e.type !== 'rejected') : []
-  // `events` is likewise cleared by an effect, so for one commit after a new game
-  // starts it still holds the last one's feed. Read as empty here rather than
-  // handing the new game a history it did not have — the seat ids repeat between
-  // games, so a stale `dealt` would otherwise be taken for this game's deal.
-  const carried = sameGame ? events : []
+  // `events` is likewise replaced by an effect, so for one commit after a new
+  // game starts it still holds the last one's feed. Expose the incoming game's
+  // stored snapshot instead — the seat ids repeat between games, so the
+  // outgoing feed must never be taken for this game's deal.
+  const carried = sameGame ? events : incomingEvents
 
   // A resync not yet folded in by the sync effect above is already reflected in
   // `pending` — and so in the `events` returned below — on THIS render. The ref
@@ -141,10 +146,9 @@ export function useGame(): Game {
   // the very feed it is supposed to cover. Mirror the effect's own rule
   // (`events.at(-1)?.id ?? restoredThrough.current`) directly in the
   // return expression, the same way `pending`/`carried` mirror it for `events`.
+  const restoredBase = sameGame ? restoredThrough.current : (incomingEvents.at(-1)?.id ?? 0)
   const restoredNow =
-    pending.length > 0 && sync?.resync
-      ? (pending.at(-1)?.id ?? restoredThrough.current)
-      : restoredThrough.current
+    pending.length > 0 && sync?.resync ? (pending.at(-1)?.id ?? restoredBase) : restoredBase
 
   return {
     view: sync?.view ?? null,

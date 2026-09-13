@@ -62,8 +62,8 @@ it('hands a returning peer its own hand back, on a new peer id', () => {
   keeper.close()
 })
 
-// Nothing authenticates a clientId, so `rebind` refusing an occupied seat is
-// the whole defence. Pinned here because losing it would be silent: the
+// Rejoin authentication must never bypass `rebind` refusing an occupied seat.
+// Pinned here because losing it would be silent: the
 // claimant would simply start receiving another player's hand.
 it('refuses a seat that is still connected', () => {
   const { net, ref } = liveSession()

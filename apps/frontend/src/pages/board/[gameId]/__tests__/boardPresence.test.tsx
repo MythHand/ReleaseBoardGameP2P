@@ -78,7 +78,6 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       peers: {
         me: {
           id: 'me',
-          clientId: 'client-me',
           name: 'Ann',
           role: 'host',
           ready: true,
@@ -87,8 +86,8 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       },
     },
     seats: [
-      { playerId: 'p1', peerId: 'me', clientId: 'client-me', name: 'Ann' },
-      { playerId: 'p2', peerId: 'gone', clientId: 'client-bo', name: 'Bo' },
+      { playerId: 'p1', peerId: 'me', name: 'Ann' },
+      { playerId: 'p2', peerId: 'gone', name: 'Bo' },
     ],
     gameSync: { view: realView('p1'), events: [] },
   } as Partial<UseLobby>)
@@ -129,7 +128,6 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
       peers: {
         me: {
           id: 'me',
-          clientId: 'client-me',
           name: 'Ann',
           role: 'host',
           ready: true,
@@ -137,7 +135,7 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
         },
       },
     },
-    seats: [{ playerId: 'p1', peerId: 'me', clientId: 'client-me', name: 'Ann' }],
+    seats: [{ playerId: 'p1', peerId: 'me', name: 'Ann' }],
   } as Partial<UseLobby>)
   renderBoardWith()
   expect(screen.queryByText(/^(reconnecting…|переподключение…)$/i)).toBeNull()

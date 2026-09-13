@@ -1,14 +1,8 @@
 import type { PeerInfo } from '~/network'
-import { seatOf, seatsFor } from './seats'
+import { privateSeatsFor, publicSeats, seatOf, seatsFor } from './seats'
 
-const peer = (
-  id: string,
-  name: string,
-  role: PeerInfo['role'],
-  clientId = `client-${id}`,
-): PeerInfo => ({
+const peer = (id: string, name: string, role: PeerInfo['role']): PeerInfo => ({
   id,
-  clientId,
   name,
   role,
   ready: true,
@@ -58,12 +52,31 @@ it('seats the same roster the same way however it is enumerated', () => {
   expect(seatsFor(roster(a, b, c))).toEqual(seatsFor(roster(c, a, b)))
 })
 
-it('carries each peer clientId onto the seat it is dealt', () => {
-  const seats = seatsFor(
-    roster(peer('peer-a', 'Ann', 'host', 'client-a'), peer('peer-b', 'Bo', 'player', 'client-b')),
-  )
-  expect(seats).toEqual([
-    { playerId: 'p1', peerId: 'peer-a', clientId: 'client-a', name: 'Ann' },
-    { playerId: 'p2', peerId: 'peer-b', clientId: 'client-b', name: 'Bo' },
-  ])
+it('builds host-private seats and strips credentials for the wire', () => {
+  const peers = roster(peer('peer-a', 'Ann', 'host'))
+  const seats = seatsFor(peers)
+  const privateSeats = privateSeatsFor(seats, new Map([['peer-a', 'resume-a']]))
+  expect(privateSeats[0]).toEqual({
+    seat: { playerId: 'p1', peerId: 'peer-a', name: 'Ann' },
+    resumeToken: 'resume-a',
+  })
+  expect(publicSeats(privateSeats)[0]).toEqual({ playerId: 'p1', peerId: 'peer-a', name: 'Ann' })
+})
+
+it('refuses to start with a player whose private credential is missing', () => {
+  const peers = roster(peer('peer-a', 'Ann', 'host'))
+  expect(() => privateSeatsFor(seatsFor(peers), new Map())).toThrow('missing resume token')
+})
+
+it('refuses to start with duplicate private credentials', () => {
+  const peers = roster(peer('peer-a', 'Ann', 'host'), peer('peer-b', 'Bo', 'player'))
+  expect(() =>
+    privateSeatsFor(
+      seatsFor(peers),
+      new Map([
+        ['peer-a', 'duplicate-token'],
+        ['peer-b', 'duplicate-token'],
+      ]),
+    ),
+  ).toThrow('duplicate resume token')
 })

@@ -25,6 +25,7 @@ export function createMemoryNetwork(peerIds: string[]) {
       return {
         id: self,
         connectTo() {},
+        authenticate() {},
         send(to: string, message: Message) {
           // A peer holds no connection to itself, so PeerJS's `send` resolves
           // `connections.get(self)` to undefined and drops the frame

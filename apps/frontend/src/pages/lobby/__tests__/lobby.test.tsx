@@ -135,7 +135,6 @@ function inSession(): UseLobby {
       peers: {
         h: {
           id: 'h',
-          clientId: 'client-h',
           name: 'Host',
           role: 'host',
           ready: true,
@@ -143,7 +142,6 @@ function inSession(): UseLobby {
         },
         p1: {
           id: 'p1',
-          clientId: 'client-p1',
           name: 'Pat',
           role: 'player',
           ready: false,
@@ -224,7 +222,6 @@ it('LobbyView renders spectator section when guests present', () => {
       peers: {
         h: {
           id: 'h',
-          clientId: 'client-h',
           name: 'Host',
           role: 'host',
           ready: true,
@@ -232,7 +229,6 @@ it('LobbyView renders spectator section when guests present', () => {
         },
         g1: {
           id: 'g1',
-          clientId: 'client-g1',
           name: 'Gus',
           role: 'guest',
           ready: false,
@@ -318,8 +314,8 @@ it('walking back from the results screen shows the lobby with everyone still in 
     ...inSession(),
     gameId: null,
     seats: [
-      { playerId: 'p1', peerId: 'h', clientId: 'client-h', name: 'Host' },
-      { playerId: 'p2', peerId: 'p1', clientId: 'client-p1', name: 'Pat' },
+      { playerId: 'p1', peerId: 'h', name: 'Host' },
+      { playerId: 'p2', peerId: 'p1', name: 'Pat' },
     ],
   }
 

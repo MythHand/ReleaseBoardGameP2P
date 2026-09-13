@@ -6,7 +6,7 @@ import { forViewer, rejectionsIn } from './audience'
 export interface Seat {
   playerId: PlayerId
   // null while the seat is disconnected. The seat itself survives, which is
-  // why PlayerId is a persisted client id rather than a PeerJS peer id.
+  // why PlayerId persists independently from the replaceable PeerJS peer id.
   peerId: string | null
   absentSince: number | null
 }
@@ -160,13 +160,11 @@ export function rebind(
   const seat = session.seats.find((s) => s.playerId === playerId)
   if (!seat) return { session, outgoing: [] }
 
-  // Only an absent seat can be claimed. Nothing authenticates a PlayerId — it
-  // is a uuid the client persists and announces — so a peer naming someone
-  // else's would otherwise take a seat that is still connected: the fan-out
-  // would follow the new peer id, the claimant would immediately receive that
-  // seat's full projection (hand included) from the SYNC below, and the player
-  // still holding it would stop hearing anything with no error. `disconnect`
-  // is the only thing that frees a seat, and it runs on the connection closing.
+  // The caller has already authenticated the seat's host-minted resume token;
+  // this layer receives only the resulting player id. The occupied-seat guard
+  // is defense in depth against a stale or duplicated binding, not the resume
+  // authentication mechanism. `disconnect` is the only operation that frees a
+  // seat, and it runs when the owning connection generation is retired.
   if (seat.peerId !== null) return { session, outgoing: [] }
 
   const seats = session.seats.map((s) =>

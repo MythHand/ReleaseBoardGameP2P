@@ -5,6 +5,11 @@ import type { PeerInfo, Seat } from '~/network'
 // re-exported here so every reader still asks the seating module for it.
 export type { Seat }
 
+export interface PrivateSeat {
+  seat: Seat
+  resumeToken: string
+}
+
 // PlayerId and peer id are distinct spaces that are both `string`, which is
 // exactly what hides a mix-up (network/session/remoteLink.ts:34). Minting
 // `p1…pN` rather than reusing the peer id keeps them visibly different, so a
@@ -24,8 +29,25 @@ export function seatsFor(peers: Record<string, PeerInfo>): Seat[] {
   return Object.values(peers)
     .filter((p) => p.role === 'host' || p.role === 'player')
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((p, i) => ({ playerId: seatId(i), peerId: p.id, clientId: p.clientId, name: p.name }))
+    .map((p, i) => ({ playerId: seatId(i), peerId: p.id, name: p.name }))
 }
+
+export function privateSeatsFor(
+  seats: Seat[],
+  tokensByPeer: ReadonlyMap<string, string>,
+): PrivateSeat[] {
+  const privateSeats = seats.map((seat) => {
+    const resumeToken = tokensByPeer.get(seat.peerId)
+    if (!resumeToken) throw new Error(`missing resume token for ${seat.peerId}`)
+    return { seat, resumeToken }
+  })
+  if (new Set(privateSeats.map(({ resumeToken }) => resumeToken)).size !== privateSeats.length) {
+    throw new Error('duplicate resume token')
+  }
+  return privateSeats
+}
+
+export const publicSeats = (seats: PrivateSeat[]): Seat[] => seats.map(({ seat }) => seat)
 
 // The seat a given peer got, or null if it is watching rather than playing.
 export function seatOf(seats: Seat[], peerId: string): Seat | null {

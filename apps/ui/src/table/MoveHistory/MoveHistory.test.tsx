@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import { followTail } from './followTail'
-import MoveHistory from './MoveHistory'
+import MoveHistory, { type HistoryEntry } from './MoveHistory'
 
 vi.mock('./followTail', () => ({ followTail: vi.fn() }))
 
@@ -65,5 +65,41 @@ it('follows to the tail on the very first mount, not only on later arrivals', ()
       ]}
     />,
   )
+  expect(followTail).toHaveBeenCalled()
+})
+
+it('follows when a child is appended without changing the root count', () => {
+  const root: HistoryEntry = { id: 1, who: 'Ann', kind: 'attack', children: [] }
+  const { rerender } = render(<MoveHistory copy={copy} entries={[root]} />)
+  vi.mocked(followTail).mockClear()
+
+  rerender(
+    <MoveHistory
+      copy={copy}
+      entries={[{ ...root, children: [{ id: 2, who: 'Bo', kind: 'defend' }] }]}
+    />,
+  )
+
+  expect(followTail).toHaveBeenCalled()
+})
+
+it('follows when a grandchild is appended without changing root or child counts', () => {
+  const child: HistoryEntry = { id: 2, who: 'Bo', kind: 'defend', children: [] }
+  const root: HistoryEntry = { id: 1, who: 'Ann', kind: 'attack', children: [child] }
+  const { rerender } = render(<MoveHistory copy={copy} entries={[root]} />)
+  vi.mocked(followTail).mockClear()
+
+  rerender(
+    <MoveHistory
+      copy={copy}
+      entries={[
+        {
+          ...root,
+          children: [{ ...child, children: [{ id: 3, who: 'Cy', kind: 'counter' }] }],
+        },
+      ]}
+    />,
+  )
+
   expect(followTail).toHaveBeenCalled()
 })

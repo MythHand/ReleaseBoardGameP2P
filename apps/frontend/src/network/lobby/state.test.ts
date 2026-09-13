@@ -10,7 +10,6 @@ import {
 
 const host = {
   id: 'h',
-  clientId: 'client-h',
   name: 'Host',
   role: 'host' as const,
   ready: false,
@@ -25,7 +24,6 @@ it('counts host + players, not guests', () => {
   let s = base(4)
   s = applyPeerJoined(s, {
     id: 'p1',
-    clientId: 'client-p1',
     name: 'P1',
     role: 'player',
     ready: false,
@@ -33,7 +31,6 @@ it('counts host + players, not guests', () => {
   })
   s = applyPeerJoined(s, {
     id: 'g1',
-    clientId: 'client-g1',
     name: 'G1',
     role: 'guest',
     ready: false,
@@ -47,7 +44,6 @@ it('assigns player while slots remain, guest once full', () => {
   expect(assignRole(s)).toBe('player')
   s = applyPeerJoined(s, {
     id: 'p1',
-    clientId: 'client-p1',
     name: 'P1',
     role: 'player',
     ready: false,
@@ -60,7 +56,6 @@ it('removes a peer on leave', () => {
   let s = base(4)
   s = applyPeerJoined(s, {
     id: 'p1',
-    clientId: 'client-p1',
     name: 'P1',
     role: 'player',
     ready: false,
@@ -74,7 +69,6 @@ it('does not mutate the input state', () => {
   const s = base(4)
   const next = applyPeerJoined(s, {
     id: 'p1',
-    clientId: 'client-p1',
     name: 'P1',
     role: 'player',
     ready: false,
@@ -125,7 +119,6 @@ it('applyPeerList preserves setup', () => {
   const setup = { handLimit: 'fast' }
   const hostPeer = {
     id: 'h',
-    clientId: 'client-h',
     name: 'Host',
     role: 'host' as const,
     ready: false,
