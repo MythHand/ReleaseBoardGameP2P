@@ -66,15 +66,17 @@ export default function BoardPage() {
       // The roster's name is the live one; the seat's is what the match was
       // played under, and the only one left once a peer is gone.
       name: live?.name ?? seat.name,
-      connected: Boolean(live),
+      // A bot is always here: it has no connection to lose.
+      connected: Boolean(live) || Boolean(seat.bot),
     }
   })
 
   // Absence IS the offline signal — the same rule the results screen uses.
   // In the engine's own id space (`seat.playerId`, p1..pN): the Seat this
   // marks offline is read off `state.opponents`, which the engine (and
-  // toBoardState) name that way, not by peer id.
-  const disconnected = seats.filter((s) => !peerMap[s.peerId]).map((s) => s.playerId)
+  // toBoardState) name that way, not by peer id. A bot is excluded up front:
+  // it never held a connection, so its absence from the roster means nothing.
+  const disconnected = seats.filter((s) => !s.bot && !peerMap[s.peerId]).map((s) => s.playerId)
 
   const spectators = Object.values(peerMap).filter((p) => p.role === 'guest')
 
