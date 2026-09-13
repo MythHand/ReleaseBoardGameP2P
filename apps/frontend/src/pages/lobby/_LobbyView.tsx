@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { useStartGame } from '~/features/start-game/useStartGame'
-import { effectiveBots, MAX_BOTS } from '~/network'
+import { effectiveBots } from '~/network'
 import type { PeerInfo } from '~/network/types'
 import { BASE_URL } from '~/shared/config'
 import AppLogo from '~/shared/ui/AppLogo'
@@ -52,9 +52,9 @@ export default function LobbyView() {
   const spectators = Object.values(state.peers).filter((p) => p.role === 'guest')
   const capacity = state.maxPlayers
   const minCapacity = Math.max(2, players.length)
-  // What the table can actually give right now — capped by the free seats —
-  // as distinct from `state.bots`, the raw number the host asked for on the
-  // slider. They differ whenever people fill or leave seats.
+  // What the table can actually give right now — capped by the free seats — as
+  // distinct from `state.bots`, the raw number the host asked for. They differ
+  // whenever people fill or leave seats.
   const bots = effectiveBots(state)
 
   // The invite link — what a host actually sends someone. Opening it lands on
@@ -64,6 +64,15 @@ export default function LobbyView() {
     : ''
 
   const setMode = (key: string, value: string) => session.setSetup({ ...state.setup, [key]: value })
+
+  // Both act on the number the host can SEE (`bots`), not on the raw ask stored
+  // in `state.bots`. With the slider gone there is no control showing the ask,
+  // so letting the two drift would make a click do nothing visible: a host who
+  // once asked for five and now has one free seat would press [remove] and
+  // watch the row stay. The ceiling still does its job between clicks — a bot
+  // yields its seat to a joiner and comes back when they leave.
+  const addBot = () => session.setBots(bots + 1)
+  const removeBot = () => session.setBots(bots - 1)
 
   const leave = () => {
     session.leaveSession()
@@ -205,17 +214,6 @@ export default function LobbyView() {
               />
             )}
 
-            {isHost && (
-              <Slider
-                className={styles.capRow}
-                label={t('lobbyScreen.bots')}
-                value={state.bots}
-                min={0}
-                max={MAX_BOTS}
-                onChange={session.setBots}
-              />
-            )}
-
             <div className={styles.list}>
               {slots.map(({ key, peer: p, bot }) =>
                 p ? (
@@ -236,8 +234,10 @@ export default function LobbyView() {
                     dropdown={isHost && p.id !== state.selfId ? kickItems(p.id) : undefined}
                   />
                 ) : bot ? (
-                  // A bot cannot be kicked, only counted down via the slider —
-                  // so no dropdown here, unlike a human player's slot.
+                  // Removal goes through the same ⋯ menu that kicks a person, and
+                  // takes the count down by one rather than this particular row:
+                  // bots have no identity beyond their number, so the row that
+                  // disappears is always the last one.
                   <PlayerSlot
                     key={key}
                     name={t('lobbyScreen.botName', { n: bot })}
@@ -247,9 +247,26 @@ export default function LobbyView() {
                       </Badge>
                     }
                     status={<Badge tone="success">{t('lobbyScreen.ready')}</Badge>}
+                    dropdownLabel={t('lobbyScreen.actions')}
+                    dropdown={
+                      isHost
+                        ? [{ label: t('lobbyScreen.removeBot'), onClick: removeBot }]
+                        : undefined
+                    }
                   />
                 ) : (
-                  <EmptySlot key={key}>{t('lobbyScreen.freeSlot')}</EmptySlot>
+                  <EmptySlot
+                    key={key}
+                    action={
+                      isHost ? (
+                        <Button variant="pill" onClick={addBot}>
+                          {t('lobbyScreen.addBot')}
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    {t('lobbyScreen.freeSlot')}
+                  </EmptySlot>
                 ),
               )}
             </div>

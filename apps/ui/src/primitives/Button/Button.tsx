@@ -2,7 +2,15 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import Typography, { type TypographyBase, type TypographyTk } from '../Typography'
 import styles from './Button.module.css'
 
-export type ButtonVariant = 'primary' | 'tech' | 'danger' | 'dangerGhost' | 'icon' | 'hud' | 'bare'
+export type ButtonVariant =
+  | 'primary'
+  | 'tech'
+  | 'danger'
+  | 'dangerGhost'
+  | 'icon'
+  | 'hud'
+  | 'pill'
+  | 'bare'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
@@ -22,6 +30,7 @@ const LABEL_TYPO: Record<ButtonVariant, { base: TypographyBase; tk: TypographyTk
   dangerGhost: { base: 'label-sm', tk: 'tk-18' },
   icon: null,
   hud: { base: 'value-lg', tk: 'tk-16' },
+  pill: { base: 'label-sm', tk: 'tk-12' },
   bare: null,
 }
 

@@ -51,7 +51,15 @@ export default function PlayerSlot({
   )
 }
 
-// Пустой слот-заглушка (пунктирная строка): «свободный слот» и т.п.
-export function EmptySlot({ children }: { children: ReactNode }) {
-  return <div className={styles.slotEmpty}>{children}</div>
+// Пустой слот-заглушка (пунктирная строка): «свободный слот» и т.п. `action` —
+// необязательное действие над самим слотом (посадить бота); рендерится в том же
+// правом кластере, где у занятой строки стоит статус, чтобы кнопки в колонке
+// стояли на одной линии.
+export function EmptySlot({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className={styles.slotEmpty}>
+      {children}
+      {Boolean(action) && <div className={styles.rowEnd}>{action}</div>}
+    </div>
+  )
 }

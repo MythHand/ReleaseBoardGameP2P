@@ -65,7 +65,8 @@ export interface LobbyCopy {
   modesLockedHint: string
   players: string
   capacity: string
-  bots: string
+  addBot: string
+  removeBot: string
   // Interpolated with the bot's number, the way the frontend's catalog does it.
   botName: string
   roleBot: string
@@ -186,6 +187,11 @@ export default function Lobby({
   // number says how many of whatever is left should be bots.
   const shownBots = Math.max(0, Math.min(bots, capacity - players.length))
 
+  // Both act on the number on screen, not on the stored ask — the screen shows
+  // no control for the ask, so a click that changed only it would look broken.
+  const addBot = () => setBots(shownBots + 1)
+  const removeBot = () => setBots(shownBots - 1)
+
   // A row is a player, a bot (carrying its number), or an empty seat.
   const slots: (Player | { bot: number } | null)[] = [
     ...players,
@@ -267,17 +273,6 @@ export default function Lobby({
               />
             )}
 
-            {isHost && (
-              <Slider
-                className={styles.capRow}
-                label={copy.bots}
-                value={bots}
-                min={0}
-                max={5}
-                onChange={setBots}
-              />
-            )}
-
             <div className={styles.list}>
               {slots.map((p, i) =>
                 p && 'id' in p ? (
@@ -320,10 +315,23 @@ export default function Lobby({
                       </Badge>
                     }
                     status={<Badge tone="success">{copy.ready}</Badge>}
+                    dropdownLabel={copy.actions}
+                    dropdown={isHost ? [{ label: copy.removeBot, onClick: removeBot }] : undefined}
                   />
                 ) : (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: пустые слоты — позиционные заглушки без стабильного id
-                  <EmptySlot key={`empty-${i}`}>{copy.freeSlot}</EmptySlot>
+                  <EmptySlot
+                    // biome-ignore lint/suspicious/noArrayIndexKey: пустые слоты — позиционные заглушки без стабильного id
+                    key={`empty-${i}`}
+                    action={
+                      isHost ? (
+                        <Button variant="pill" onClick={addBot}>
+                          {copy.addBot}
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    {copy.freeSlot}
+                  </EmptySlot>
                 ),
               )}
             </div>

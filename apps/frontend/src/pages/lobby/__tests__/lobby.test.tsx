@@ -356,25 +356,58 @@ it('announces the lobby as its whereabouts when arriving back from a match', () 
   expect(setWhere).toHaveBeenCalledWith('lobby')
 })
 
-it('lets the host ask for bots and shows them in the free seats', () => {
+it('seats a bot from a free slot and shows it in the row above', () => {
   const session = inSession()
+  const setBots = vi.fn()
   sessionValue = {
     ...session,
     isHost: true,
+    setBots,
     // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
     state: { ...session.state!, maxPlayers: 6, bots: 2 },
   }
   renderInRouter(<LobbyView />)
 
-  expect(screen.getByText('lobbyScreen.bots')).toBeTruthy()
   // Two bot rows: one per bot the host asked for (inSession() seats 2 humans,
   // so 6 - 2 = 4 free seats comfortably cover the 2 asked for).
   expect(screen.getAllByText('lobbyScreen.botName')).toHaveLength(2)
+
+  // One button per remaining free seat; pressing any of them asks for one more
+  // bot than the table currently shows, not one more than the stored ask.
+  const add = screen.getAllByText('lobbyScreen.addBot')
+  expect(add).toHaveLength(2)
+  fireEvent.click(add[0])
+  expect(setBots).toHaveBeenCalledWith(3)
 })
 
-// The slider is the host's, exactly as the capacity slider beside it is. A
-// guest still sees the bots — in the rows.
-it('hides the bots slider from a guest but not the bots', () => {
+it('takes a bot away through the same menu that kicks a person', () => {
+  const session = inSession()
+  const setBots = vi.fn()
+  sessionValue = {
+    ...session,
+    isHost: true,
+    setBots,
+    // A table whose seats are full enough to clamp the ask: 2 humans in 3
+    // seats leaves room for one of the five bots asked for. What the host sees
+    // is one bot, and that is what [remove] must count down from.
+    // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
+    state: { ...session.state!, maxPlayers: 3, bots: 5 },
+  }
+  renderInRouter(<LobbyView />)
+
+  // The bot row comes after the two human ones, and the humans' menus carry
+  // kick rather than this — so opening the third menu opens the bot's.
+  const menus = screen.getAllByLabelText('lobbyScreen.actions')
+  fireEvent.click(menus[menus.length - 1])
+  fireEvent.click(screen.getByText('lobbyScreen.removeBot'))
+
+  // Counted down from the one bot on screen, not from the ask of five.
+  expect(setBots).toHaveBeenCalledWith(0)
+})
+
+// The controls are the host's, exactly as the capacity slider is. A guest still
+// sees the bots — in the rows.
+it('hides the bot controls from a guest but not the bots', () => {
   const session = inSession()
   sessionValue = {
     ...session,
@@ -384,6 +417,7 @@ it('hides the bots slider from a guest but not the bots', () => {
   }
   renderInRouter(<LobbyView />)
 
-  expect(screen.queryByText('lobbyScreen.bots')).toBeNull()
+  expect(screen.queryByText('lobbyScreen.addBot')).toBeNull()
+  expect(screen.queryByText('lobbyScreen.removeBot')).toBeNull()
   expect(screen.getAllByText('lobbyScreen.botName')).toHaveLength(1)
 })
