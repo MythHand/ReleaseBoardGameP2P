@@ -8,6 +8,13 @@ signaling server, no PeerJS. The bot brain is not written here — the engine al
 written here is a seat the engine drives, a keeper with no network under it, and the roster the
 board reads.
 
+> **Superseded in part, 2026-09-13.** Decisions 1, 3, 4 and 5 — the roomless session, its synthetic
+> roster, the start-screen entry and the create-form control — were replaced by
+> [`2026-09-13-lobby-bots-design.md`](./2026-09-13-lobby-bots-design.md), which asks for bots in the
+> lobby instead. The rest of this document still describes the shipped code: `Seat.bot`, the
+> `driveUnattended` driver, `restoreSeats`' bot branch, the stall warning, and the open pacing
+> question in decision 8.
+
 > Builds on what the P2P layer already put in place: the referee (`network/session/referee.ts`), the
 > keeper (`attachKeeper`, `network/session/remoteLink.ts`), the start gate
 > (`network/session/startGate.ts`), the keeper snapshot and its restore
