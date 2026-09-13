@@ -68,7 +68,22 @@
 .roleTag,
 .lockTag {
   position: absolute;
-  inset-block-end: -22px;
-  inset-inline: 0;
-  text-align: center;
+  inset-block-start: 8px;
+  inset-inline-start: 50%;
+  z-index: 1;
+  padding: 2px 8px;
+  white-space: nowrap;
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.roleTag {
+  color: var(--deep-green);
+  background: var(--brand-green);
+}
+
+.lockTag {
+  color: var(--coral);
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  border: 1px solid var(--coral-45);
 }

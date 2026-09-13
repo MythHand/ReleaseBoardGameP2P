@@ -187,6 +187,67 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
     })
   })
 
+  it('clears sudo selection marks on confirm and restores them after rejection', () => {
+    mockReducedMotion(false)
+    const base = makeBoardProps()
+    const pending = cherryPending(
+      [
+        { uid: 'hand', id: 'attack-bug' },
+        { uid: 'deck', id: 'release-frontend' },
+      ],
+      2,
+    )
+    const choice = { kind: 'pickFromDiscard' as const, card: 'hand', toDeck: 'deck' }
+    const props = {
+      ...base,
+      state: { ...base.state, pending },
+      actions: { onResolve: vi.fn() },
+    }
+    const { rerender } = render(<Board {...props} />)
+    const handCell = screen.getByTestId('cherry-cell-hand')
+    const deckCell = screen.getByTestId('cherry-cell-deck')
+    const cardState = (cell: HTMLElement) =>
+      cell.querySelector('[data-card]')?.getAttribute('data-state')
+
+    fireEvent.click(handCell)
+    fireEvent.click(deckCell)
+    expect(cardState(handCell)).toBe('selected')
+    expect(cardState(deckCell)).toBe('selected')
+    expect(handCell.textContent).toContain('→ hand')
+    expect(deckCell.textContent).toContain('→ deck')
+
+    fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+    expect(props.actions.onResolve).toHaveBeenCalledWith(choice)
+    expect(cardState(handCell)).toBe('idle')
+    expect(cardState(deckCell)).toBe('idle')
+    expect(handCell.textContent).not.toContain('→ hand')
+    expect(deckCell.textContent).not.toContain('→ deck')
+
+    rerender(
+      <Board
+        {...props}
+        intro={{
+          gameId: null,
+          view: null,
+          onDone: () => {},
+          events: [
+            {
+              id: 10,
+              type: 'rejected',
+              reason: 'that is not the offer',
+              action: { type: 'RESOLVE', player: 'you', at: 0, choice },
+            },
+          ],
+        }}
+      />,
+    )
+    expect(cardState(handCell)).toBe('selected')
+    expect(cardState(deckCell)).toBe('selected')
+    expect(handCell.textContent).toContain('→ hand')
+    expect(deckCell.textContent).toContain('→ deck')
+    expect(screen.getByRole('button', { name: /confirm/i }).hasAttribute('disabled')).toBe(false)
+  })
+
   // Task A4's own line: the flights must never cross it. `play()` drives
   // WAAPI directly and does not check the preference — the CSS-transition
   // dealing/reveal legs and the `later()` timers are what have to ask, or a

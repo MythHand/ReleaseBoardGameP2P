@@ -2308,8 +2308,10 @@ us. Inside's row (`ai-inside`) is the OTHER surface over the same pending kind; 
   `useHandArrival.onLanded` publishes the selected physical UID at the opened gap while saving
   that same order for subsequent projections. The hand updates even if the heap return is still
   flying; the engine appending the card cannot move it back to the end afterward.
-- **The grid scroll box reserves vertical space** for selection glow and role labels, including
-  the first and last rows. Keep scrolling and the transform-free flight ancestor.
+- **Selection matches the playground.** Hand/deck roles use contrasting badges at the top of
+  the card, above its face. Role/lock badges and selection glow exist only while choosing;
+  confirmation clears them immediately, and rejection restores the choice. The scroll box
+  reserves space for the outer glow. Keep scrolling and the transform-free flight ancestor.
 - **The two sudo roles come from the engine**, not from click order: `openPickFromDiscard` withholds triggers from
   a base offer and `onPickFromDiscard` refuses one the hand slot, so a trigger in `options` can only be the deck
   card.

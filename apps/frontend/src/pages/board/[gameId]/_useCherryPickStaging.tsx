@@ -429,23 +429,23 @@ export function useCherryPickStaging(args: {
                   interactive={false}
                   width="100%"
                   faceDown={flipped.has(o.uid)}
-                  state={selected ? 'selected' : 'idle'}
+                  state={!confirmed && selected ? 'selected' : 'idle'}
                   // one out of a set — the uniform selection colour, never the
                   // per-category accent
                   accent="var(--select-accent)"
                 />
-                {handRole && (
-                  <Typography variant="tag" className={styles.roleTag}>
+                {!confirmed && handRole && (
+                  <Typography base="overline" tk="tk-10" className={styles.roleTag}>
                     {copy.toHand}
                   </Typography>
                 )}
-                {deckRole && (
-                  <Typography variant="tag" className={styles.roleTag}>
+                {!confirmed && deckRole && (
+                  <Typography base="overline" tk="tk-10" className={styles.roleTag}>
                     {copy.toDeck}
                   </Typography>
                 )}
-                {!sudo && isTrigger(o.id) && (
-                  <Typography variant="tag" className={styles.lockTag}>
+                {!confirmed && !sudo && isTrigger(o.id) && (
+                  <Typography base="overline" tk="tk-10" className={styles.lockTag}>
                     {copy.noHand}
                   </Typography>
                 )}
