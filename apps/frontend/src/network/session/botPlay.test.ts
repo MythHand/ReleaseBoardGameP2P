@@ -1,4 +1,4 @@
-import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
+import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, WINDOW_FIRST_MS } from '@release/engine/fake'
 import type { Transport } from '../transport/peer'
 import type { Ticker } from './link'
 import { createMemoryNetwork } from './memoryNetwork'
@@ -6,8 +6,15 @@ import { createSession, type SessionRef } from './referee'
 import { attachKeeper } from './remoteLink'
 import { createStartGate } from './startGate'
 
-// A ticker the test advances by hand, so nothing here waits on a real clock.
-function manualTicker(): Ticker & { fire(): void } {
+// The keeper's 250ms interval, which the real ticker would be firing on.
+const TICK_MS = 250
+
+// A ticker the test advances by hand, so nothing here waits on a real clock —
+// and a clock that moves with it. The two must travel together: the keeper
+// closes a contest window on elapsed time (`tick`, the only thing allowed to),
+// so a ticker that fires instantly against a frozen clock would sit out a
+// 15-second deadline that never arrives and the bot's turn would never end.
+function manualTicker(clock: { at: number }): Ticker & { fire(): void } {
   let fn: (() => void) | null = null
   return {
     start(f) {
@@ -17,6 +24,7 @@ function manualTicker(): Ticker & { fire(): void } {
       fn = null
     },
     fire() {
+      clock.at += TICK_MS
       fn?.()
     },
   }
@@ -31,6 +39,7 @@ function fakeTransport(): Transport {
 
 function botGame(botCount: number) {
   const engine = createFakeEngine()
+  const clock = { at: 1_000_000 }
   const { session } = createSession({
     gameId: 'g1',
     keeperId: 'p1',
@@ -41,10 +50,12 @@ function botGame(botCount: number) {
     // of the seeds where the opening draw IS a trigger, which is exactly what
     // this comment warns against — verified by running the suite, not by
     // eyeballing the deck. 17 reaches a clean draw and drives the bot's turn
-    // across several ticks (five, at this deck/seat count) before handing
-    // p1 the turn back, rather than resolving in one, so the test still
-    // exercises "one action per tick" rather than degenerating into a single
-    // step.
+    // across several ticks before handing p1 the turn back, rather than
+    // resolving in one, so the test still exercises "one action per tick"
+    // rather than degenerating into a single step. How many ticks that takes
+    // is the deck's business, not this test's: at this seed the bot releases,
+    // and the window that opens costs it the window's whole deadline in
+    // ticks. Which is why the clock below moves and the loop counts in time.
     seed: 17,
     players: [
       { playerId: 'p1', peerId: 'peer-me', name: 'Ann' },
@@ -61,11 +72,11 @@ function botGame(botCount: number) {
   })
   const ref: SessionRef = { current: session }
   const gate = createStartGate({ expect: ['p1'] })
-  const ticker = manualTicker()
+  const ticker = manualTicker(clock)
   const keeper = attachKeeper({
     ref,
     transport: fakeTransport(),
-    now: () => Date.now(),
+    now: () => clock.at,
     ticker,
     gate,
   })
@@ -99,8 +110,13 @@ it('plays a bot seat through to the human getting the turn back', () => {
   keeper.link.submit({ type: 'PUSH' })
   expect(ref.current.state.turn.player).toBe('p2')
 
-  // One action per tick, exactly as an absent seat has always been driven.
-  for (let i = 0; i < 20 && ref.current.state.turn.player === 'p2'; i += 1) ticker.fire()
+  // One action per tick, exactly as an absent seat has always been driven. The
+  // budget is stated in time rather than in ticks, because what the bot's turn
+  // can cost is a contest window's deadline — a duration the engine owns.
+  const budget = WINDOW_FIRST_MS + 5_000
+  for (let i = 0; i < budget / 250 && ref.current.state.turn.player === 'p2'; i += 1) {
+    ticker.fire()
+  }
   expect(ref.current.state.turn.player).toBe('p1')
 })
 

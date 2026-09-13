@@ -944,7 +944,7 @@ it('logs what an absent seat`s own accepted bot suggestion commits', () => {
 
 // A System Upgrade is the only pending owed to several seats at once, so it is
 // the only one where a seat that walks away can hold everybody else's match
-// hostage — `driveAbsent` has to answer for it seat by seat, not once.
+// hostage — `driveUnattended` has to answer for it seat by seat, not once.
 it('drains a System Upgrade roster past a seat that walked away', () => {
   const { session } = createSession({
     gameId: 'g1',
@@ -984,7 +984,7 @@ it('drains a System Upgrade roster past a seat that walked away', () => {
     ),
   }
 
-  const result = driveAbsent(bWalkedAway, ABSENT_GRACE_MS + 1)
+  const result = driveUnattended(bWalkedAway, ABSENT_GRACE_MS + 1)
   const pending = result.session.state.pending
   expect(pending?.kind).toBe('systemUpgrade')
   if (pending?.kind !== 'systemUpgrade') throw new Error('the upgrade must still stand')

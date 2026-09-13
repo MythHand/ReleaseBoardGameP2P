@@ -1,4 +1,4 @@
-import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
+import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, WINDOW_FIRST_MS } from '@release/engine/fake'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, vi } from 'vitest'
 import {
@@ -584,8 +584,16 @@ it('drives a bot seat to completion once startGame has seated it', async () => {
     expect(rendered.result.current.gameSync?.view.turn.player).toBe('p2')
 
     // One action per tick, exactly as botPlay.test.ts drives the same seed —
-    // nothing here submits anything on the bot's behalf.
-    for (let i = 0; i < 20 && rendered.result.current.gameSync?.view.turn.player === 'p2'; i += 1) {
+    // nothing here submits anything on the bot's behalf. The budget is a
+    // duration rather than a tick count for the reason given there: a bot that
+    // releases opens a contest window, and the window closes on elapsed time,
+    // which only the keeper's own `tick` may spend.
+    const budget = WINDOW_FIRST_MS + 5_000
+    for (
+      let i = 0;
+      i < budget / 250 && rendered.result.current.gameSync?.view.turn.player === 'p2';
+      i += 1
+    ) {
       act(() => {
         vi.advanceTimersByTime(250)
       })
