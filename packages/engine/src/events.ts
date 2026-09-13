@@ -3,8 +3,20 @@ import type { CardId, NeutralizeMethod, PlayerId, ReleaseSlot } from './state'
 
 export interface EventBase {
   id: number
-  // The causing event's id. A defence names the attack it answered, an attack
-  // names the release it targeted — so the history tree needs no inference.
+  // The causing event's id, so the history tree needs no inference. What is
+  // linked today, and nothing beyond it: an answer to an attack (`defended`,
+  // `tookHit`) names the `attacked` it answered; what a DDoS did
+  // (`monitoringDestroyed`, `releaseReturned`) names the `attacked` that did it,
+  // since nothing answers a DDoS and its target is the thrower's choice; and a
+  // `discarded` names what spent the card — `eliminated`, `revealed`,
+  // `neutralized`, `aiRevealed`, `tookHit`, `defended`, `attacked` (a spent
+  // DDoS), `monitoringDestroyed` or `releaseReturned`.
+  //
+  // Absent everywhere else, which is a statement about the emitters, not about
+  // what could be linked. This comment once described an intent instead — that
+  // an attack also names the release it targeted — and was read as behaviour
+  // and built on for a whole task before anyone checked (#138). Add a link here
+  // only after the emitter emits it.
   parent?: number
   // The audience, declared by the engine because only the rules know what is
   // secret. Absent means public. The future sync layer filters on this field.
@@ -45,6 +57,12 @@ export type Event = EventBase &
     | { type: 'gameOver'; winner: PlayerId; condition: 'release' | 'lastStanding' }
     | { type: 'rejected'; action: Action; reason: string }
     | { type: 'takenFromDiscard'; player: PlayerId; card: CardId; to: 'hand' | 'deck' }
+    // System Upgrade: a seat's answer, landing face up at the centre. Public,
+    // because the rules put it there face up — and because the board animates
+    // each arrival as it happens rather than the whole roster at the end.
+    | { type: 'upgradeThrown'; player: PlayerId; card: CardId }
+    // Sudo System Upgrade: the actor takes one of the open cards at the centre.
+    | { type: 'upgradeTaken'; player: PlayerId; card: CardId }
     // Belongs to no player: the table recycles its own discard, and the count
     // is the only detail worth showing — the cards themselves were public on
     // the way in and are secret again on the way out.
