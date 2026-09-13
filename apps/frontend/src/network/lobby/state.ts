@@ -57,6 +57,11 @@ export function applyPeerList(state: LobbyState, peers: PeerInfo[]): LobbyState 
     selfId: state.selfId,
     hostId: state.hostId,
     maxPlayers: state.maxPlayers,
+    // Forwarded like every other field here: rebuilding through
+    // createLobbyState without it would silently reset a guest's bot count
+    // to the `?? 0` default on every PEER_LIST, undoing whatever
+    // LOBBY_CONFIG_UPDATED had already told it.
+    bots: state.bots,
     setup: state.setup,
     peers,
   })

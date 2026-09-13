@@ -1465,7 +1465,28 @@ export function useLobby(): UseLobby {
       if (!mine) return
       // The ceiling resolved once, here, at the only moment it matters: from
       // now on this seating is frozen and broadcast, and nobody derives it again.
-      const dealt = [...humans, ...botSeats(effectiveBots(current), humans.length, botNames)]
+      //
+      // Clamped against `botNames.length` rather than trusting it to already
+      // match: the caller (useStartGame) counts bots from React state, while
+      // `effectiveBots(current)` here reads the ref — a peer joining or
+      // leaving between that render and this click can make the two disagree.
+      // Asking `botSeats` for more names than it was given is what produces a
+      // nameless bot (`names[i] ?? ''`); asking for fewer than the ceiling
+      // allows seats a bot short of what the table could otherwise fit, which
+      // is the safe side of that same mismatch to fail on.
+      const botCount = Math.min(effectiveBots(current), botNames.length)
+      const dealt = [...humans, ...botSeats(botCount, humans.length, botNames)]
+      // The referee's own idea of an empty seat is `peerId: null` — exactly
+      // what `driveUnattended` (session/referee.ts) selects on to know a seat
+      // plays itself. The wire seating above needs a real string there instead:
+      // it is the roster row's key and the board's React key, and a bot still
+      // needs one to be addressable at all (see botSeats's own comment). So the
+      // two disagree on purpose — `dealt` keeps the synthetic `bot:N` address
+      // for display and keying, while the referee is seated from a copy where
+      // a bot's peerId is nulled back out, which is what gets it actually
+      // driven from the first tick instead of waiting out a human's grace
+      // period it was never subject to.
+      const refereeSeats = dealt.map((s) => (s.bot ? { ...s, peerId: null } : s))
 
       // A rematch reassigns all three refs `attachNewMatch` sets below.
       // Reassignment is not teardown: the previous keeper's 250ms ticker would go
@@ -1488,7 +1509,7 @@ export function useLobby(): UseLobby {
       const { engine, session, keeper } = attachNewMatch({
         gameId: id,
         keeperId: mine.playerId,
-        players: dealt,
+        players: refereeSeats,
         setup: current.setup,
         transport: t,
         // A bot runs no opening animation, so the gate waits only on the humans —

@@ -17,12 +17,6 @@ vi.mock('~/app/providers/SessionProvider', () => ({
   useSession: () => sessionValue,
 }))
 
-const navigate = vi.fn()
-vi.mock('react-router', async () => ({
-  ...(await vi.importActual<typeof import('react-router')>('react-router')),
-  useNavigate: () => navigate,
-}))
-
 let sessionValue: Pick<UseLobby, 'status' | 'state' | 'roomCode'>
 
 // The store isn't cleared between tests by jsdom on its own, and persistence.ts

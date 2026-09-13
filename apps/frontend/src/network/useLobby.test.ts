@@ -9,7 +9,7 @@ import {
   type StoredSession,
 } from '~/shared/lib/persistence'
 import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
-import { createSession } from './session/referee'
+import { createSession, type Seat as RefereeSeat } from './session/referee'
 import { INTRO_CAP_MS } from './session/startGate'
 import { createTransport } from './transport/peer'
 import type { Message, WireMessage } from './types'
@@ -504,6 +504,97 @@ it('seats nobody extra when no bots were asked for', async () => {
     result.current.startGame([])
   })
   expect(result.current.seats.some((s) => s.bot)).toBe(false)
+})
+
+// The regression this closes: a bot seat's wire address (`bot:N`, the roster
+// row's key) used to be handed straight to the referee as its seat's peerId
+// too. `driveUnattended` (session/referee.ts) only ever plays a seat whose
+// peerId is null, so a bot seated from the lobby had a non-null peerId and
+// was never selected — the table just waited on it forever. `storedKeeper()`
+// is how this file already reaches the referee's own seats (see "stores the
+// lobby seating beside the referee's" above): the wire seating (`result.
+// current.seats`) is a different array on purpose and would not have caught
+// this.
+it("nulls a bot's peerId in the referee even though the wire seating keeps its bot:N address", async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    act(() => {
+      result.current.setBots(1)
+    })
+    act(() => {
+      result.current.startGame(['Бот 1'])
+    })
+    act(() => {
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+
+    const botSeat = result.current.seats.find((s) => s.bot)
+    expect(botSeat?.peerId).toBe('bot:1')
+
+    // `StoredKeeper.seats` is `unknown` (persistence.ts does not import
+    // engine/referee types), so this is exactly the referee's own `Seat[]`
+    // read back through the one seam that exposes it to a test.
+    const refereeSeats = storedKeeper()?.seats as RefereeSeat[] | undefined
+    const refereeSeat = refereeSeats?.find((s) => s.playerId === botSeat?.playerId)
+    expect(refereeSeat?.peerId).toBeNull()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// The other half of the same regression: nulling the referee's peerId is only
+// worth anything if `driveUnattended` actually then plays the seat. A solo
+// host (no guest) plus one bot mirrors session/botPlay.test.ts's own
+// `botGame(1)` fixture — same two-seat shape, same seed — so the same
+// vetted script (a clean opening draw, five ticks to hand the turn back)
+// applies here too, this time reached through `startGame` itself rather than
+// a hand-built session.
+it('drives a bot seat to completion once startGame has seated it', async () => {
+  vi.useFakeTimers()
+  const seed = vi.spyOn(crypto, 'getRandomValues').mockImplementation(((arr: Uint32Array) => {
+    arr[0] = 17
+    return arr
+  }) as typeof crypto.getRandomValues)
+  try {
+    const rendered = renderHook(() => useLobby())
+    await act(async () => {
+      await rendered.result.current.createRoom('Ann', 6)
+    })
+    act(() => {
+      rendered.result.current.setBots(1)
+    })
+    act(() => {
+      rendered.result.current.startGame(['Бот 1'])
+    })
+    // Opens the gate: a solo host is the only seat it waits on.
+    act(() => {
+      rendered.result.current.introReady()
+    })
+    expect(rendered.result.current.gameSync?.view.turn.player).toBe('p1')
+
+    // The host's own opening turn — a human seat, so nothing plays it but the
+    // human. Once it ends, only the bot (p2) is left to move.
+    act(() => {
+      rendered.result.current.gameLink?.submit({ type: 'DRAW' })
+    })
+    act(() => {
+      rendered.result.current.gameLink?.submit({ type: 'PUSH' })
+    })
+    expect(rendered.result.current.gameSync?.view.turn.player).toBe('p2')
+
+    // One action per tick, exactly as botPlay.test.ts drives the same seed —
+    // nothing here submits anything on the bot's behalf.
+    for (let i = 0; i < 20 && rendered.result.current.gameSync?.view.turn.player === 'p2'; i += 1) {
+      act(() => {
+        vi.advanceTimersByTime(250)
+      })
+    }
+    expect(rendered.result.current.gameSync?.view.turn.player).toBe('p1')
+  } finally {
+    seed.mockRestore()
+    vi.useRealTimers()
+  }
 })
 
 it('host builds the game behind a gate covering every seat', async () => {

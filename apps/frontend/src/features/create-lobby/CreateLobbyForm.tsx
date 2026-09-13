@@ -38,15 +38,16 @@ export default function CreateLobbyForm() {
     <Form
       onSubmit={async (data) => {
         const nickname = sanitizeNickname(data.name ?? '').trim()
-        if (!nickname || connecting) return
-        try {
-          // Pass the host's mode picks so the lobby seeds them instead of
-          // DEFAULT_SETUP. A setup failure rejects here and is surfaced via
-          // session.error below, so only navigate on success.
-          const code = await createLobby(nickname, DEFAULT_CAPACITY, setup)
-          goToLobby(code)
-        } catch {
-          // Error already surfaced through session.error; stay on the form.
+        if (nickname && !connecting) {
+          try {
+            // Pass the host's mode picks so the lobby seeds them instead of
+            // DEFAULT_SETUP. A setup failure rejects here and is surfaced via
+            // session.error below, so only navigate on success.
+            const code = await createLobby(nickname, DEFAULT_CAPACITY, setup)
+            goToLobby(code)
+          } catch {
+            // Error already surfaced through session.error; stay on the form.
+          }
         }
       }}
       requiredMessage={t('start.required')}

@@ -138,6 +138,30 @@ it('applyPeerList preserves setup', () => {
   expect(next.setup).toEqual(setup)
 })
 
+// The bug this closes: applyPeerList rebuilds through createLobbyState, whose
+// `bots` defaults to 0 when the argument is omitted — so a guest's count
+// silently reset to 0 on every PEER_LIST, undoing whatever
+// LOBBY_CONFIG_UPDATED had told it moments earlier.
+it('applyPeerList preserves bots', () => {
+  const hostPeer = {
+    id: 'h',
+    clientId: 'client-h',
+    name: 'Host',
+    role: 'host' as const,
+    ready: false,
+    where: 'lobby' as const,
+  }
+  const s = createLobbyState({
+    selfId: 'h',
+    hostId: 'h',
+    maxPlayers: 4,
+    bots: 2,
+    peers: [hostPeer],
+  })
+  const next = applyPeerList(s, [hostPeer])
+  expect(next.bots).toBe(2)
+})
+
 const table = (maxPlayers: number, bots: number, humans: number): LobbyState =>
   createLobbyState({
     selfId: 'h',

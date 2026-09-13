@@ -51,7 +51,7 @@ function renderBoardWith(path = '/board/g1') {
 // point is a live table with an actual opponent seat, not a mock shape. Names
 // default to the pair the other tests in this file were written against;
 // the bot presence test below overrides them so the on-table seat carries the
-// bot's own display name, the same as it would rear a human opponent's.
+// bot's own display name, the same as it would wear a human opponent's.
 function realView(playerId: 'p1' | 'p2' = 'p1', names: [string, string] = ['Ann', 'Bo']) {
   const engine = createFakeEngine()
   const state = engine.createGame({

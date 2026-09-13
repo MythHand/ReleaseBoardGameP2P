@@ -69,7 +69,7 @@ export function handleJoinRequest(
         to: fromId,
         message: {
           type: 'LOBBY_CONFIG_UPDATED',
-          payload: { maxPlayers: state.maxPlayers, setup: state.setup },
+          payload: { maxPlayers: state.maxPlayers, setup: state.setup, bots: state.bots },
         },
       },
       {
