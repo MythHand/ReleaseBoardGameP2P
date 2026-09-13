@@ -108,8 +108,9 @@ under which is mapped path by path in [`REUSE.toml`](./REUSE.toml); the licence 
 | What | Where | Licence |
 |------|-------|---------|
 | **Source code** | everything not listed below | [AGPL-3.0-or-later](./LICENSE) |
-| **The game** — card art, card texts, rules text | `apps/ui/src/assets/cards/`, `apps/ui/src/cards/content.ts`, `packages/translation/src/locales/*/rules.json`, `docs/rules/` | [CC BY-NC-SA 4.0](./LICENSES/CC-BY-NC-SA-4.0.txt) |
-| **The brand** — logos, favicons, app icons, the start-screen photo, the loader's sounds | `apps/ui/src/assets/brand/`, `apps/ui/src/brand/*.svg`, `apps/ui/src/assets/favicons/`, `apps/frontend/public/*.png`, `apps/ui/src/assets/home/photo.jpg`, `apps/ui/src/assets/audio/` | All rights reserved, except in unmodified copies — [terms](./LICENSES/LicenseRef-AllRightsReserved.txt) |
+| **The game** — card art, card texts, rules text | `apps/ui/src/assets/cards/`, `apps/ui/src/cards/content.ts`, `packages/translation/src/locales/*/rules.json`, `docs/rules/`, `docs/understanding.md` | [CC BY-NC-SA 4.0](./LICENSES/CC-BY-NC-SA-4.0.txt) |
+| **The brand** — logos, favicons, app icons, the start-screen photo, the logo's sound in the loader | `apps/ui/src/assets/brand/`, `apps/ui/src/brand/*.svg`, `apps/ui/src/assets/favicons/`, `apps/frontend/public/*.png`, `apps/ui/src/assets/home/photo.jpg`, `apps/ui/src/assets/audio/logo-theme.wav` | All rights reserved, except in unmodified copies — [terms](./LICENSES/LicenseRef-AllRightsReserved.txt) |
+| **Fonts** — Onest, JetBrains Mono, Fira Mono | `apps/ui/src/assets/fonts/` | [SIL OFL 1.1](./LICENSES/OFL-1.1.txt) — each family's `OFL.txt` beside it |
 | **Third-party media** | the files marked so in `REUSE.toml` | their own — listed there with their source |
 
 Copyright (C) 2026 the authors named below for each part, and file by file in `REUSE.toml`.

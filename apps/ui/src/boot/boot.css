@@ -229,55 +229,6 @@
   overflow: visible;
 }
 
-/* ---------- Restart screen ---------- */
-.boot .restart-screen {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  gap: 18px;
-  place-items: center;
-  align-content: center;
-  background: #000;
-  opacity: 0;
-  transition: opacity 350ms ease-out;
-}
-
-.boot .restart-screen.shown {
-  opacity: 1;
-}
-
-.boot .restart-btn {
-  display: inline-flex;
-  gap: 14px;
-  align-items: center;
-  padding: 18px 24px;
-  font-family: inherit;
-  font-size: 24px;
-  color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  transition: opacity 120ms ease-out, transform 120ms ease-out;
-}
-
-.boot .restart-btn .bracket-l,
-.boot .restart-btn .bracket-r {
-  opacity: 0.45;
-}
-
-.boot .restart-btn:hover {
-  opacity: 0.85;
-}
-
-.boot .restart-hint {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.3em;
-  opacity: 0.35;
-}
-
 /* ---------- Audio toggle ---------- */
 .boot .audio-toggle {
   position: absolute;

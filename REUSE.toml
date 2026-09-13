@@ -16,8 +16,9 @@ path = "**"
 SPDX-FileCopyrightText = ["2026 Dmitry Togulev", "2026 Andrey Konnov"]
 SPDX-License-Identifier = "AGPL-3.0-or-later"
 
-# The game: card art, card texts, rules text, and the rules owner's answers the
-# rules spec is built on.
+# The game: card art, card texts, rules text, the rules owner's answers the
+# rules spec is built on, and the early retelling of the game in our own words
+# (docs/understanding.md).
 #
 # TODO: the answers still in docs/specs/ (`*-rules-decisions.md`) move to
 # docs/rules/decisions/, where the folder alone covers them. They wait for #134,
@@ -29,6 +30,7 @@ path = [
   "packages/translation/src/locales/*/rules.json",
   "docs/rules/**",
   "docs/specs/*-rules-decisions.md",
+  "docs/understanding.md",
 ]
 SPDX-FileCopyrightText = ["2026 Dmitry Togulev", "2026 Alexey Shtyrnyaev"]
 SPDX-License-Identifier = "CC-BY-NC-SA-4.0"
@@ -58,14 +60,36 @@ SPDX-FileCopyrightText = ["2026 Dmitry Togulev", "2026 Alexey Shtyrnyaev"]
 SPDX-License-Identifier = "LicenseRef-AllRightsReserved"
 
 # The loader's sounds — the line tick and the logo's sound. Synthesized for this
-# project with Claude Code (Anthropic): generated from code, not recorded.
+# project with Claude Code (Anthropic): generated from code, not recorded. The
+# scripts that made them are in apps/ui/src/assets/audio/synth/ and are code,
+# under the default above. The tick is open like the code: its script rebuilds
+# it exactly. The logo's sound belongs to the brand.
 [[annotations]]
-path = [
-  "apps/ui/src/assets/audio/tick.wav",
-  "apps/ui/src/assets/audio/logo-theme.wav",
-]
+path = "apps/ui/src/assets/audio/tick.wav"
+SPDX-FileCopyrightText = "2026 Dmitry Togulev"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+[[annotations]]
+path = "apps/ui/src/assets/audio/logo-theme.wav"
 SPDX-FileCopyrightText = "2026 Dmitry Togulev"
 SPDX-License-Identifier = "LicenseRef-AllRightsReserved"
+
+# Fonts, served from the repository: each family with its own OFL.txt beside it.
+# Changed here: converted from TTF to WOFF2.
+[[annotations]]
+path = "apps/ui/src/assets/fonts/onest/**"
+SPDX-FileCopyrightText = "2021 The Onest Project Authors (https://github.com/googlefonts/onest)"
+SPDX-License-Identifier = "OFL-1.1"
+
+[[annotations]]
+path = "apps/ui/src/assets/fonts/jetbrains-mono/**"
+SPDX-FileCopyrightText = "2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)"
+SPDX-License-Identifier = "OFL-1.1"
+
+[[annotations]]
+path = "apps/ui/src/assets/fonts/fira-mono/**"
+SPDX-FileCopyrightText = "2012-2013 The Mozilla Corporation and Telefonica S.A."
+SPDX-License-Identifier = "OFL-1.1"
 
 # Elimination clip: Buster Keaton's falling house, from Steamboat Bill, Jr.
 # (1928), converted from the GIF on Wikimedia Commons —

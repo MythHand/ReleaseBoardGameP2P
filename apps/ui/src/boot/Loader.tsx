@@ -1,5 +1,5 @@
 // Лоадер игры (порт из user_input/Loader). Самостоятельный декоративный boot-экран:
-// blank → terminal → blank → logo (frame → fill flash → split+shake → reassemble → hold → fade) → restart.
+// blank → terminal → blank → logo (frame → fill flash → split+shake → reassemble → hold → fade) → onDone.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { wait } from '@/animations/timing'
 import LoaderAudio from './audio'
@@ -247,29 +247,6 @@ function LogoStage({ active, onComplete }: LogoStageProps) {
   )
 }
 
-// ---------------- Restart screen ----------------
-interface RestartScreenProps {
-  onRestart: () => void
-}
-
-function RestartScreen({ onRestart }: RestartScreenProps) {
-  const [shown, setShown] = useState(false)
-  useEffect(() => {
-    const t = setTimeout(() => setShown(true), 80)
-    return () => clearTimeout(t)
-  }, [])
-  return (
-    <div className={`restart-screen ${shown ? 'shown' : ''}`}>
-      <button type="button" className="restart-btn" onClick={onRestart}>
-        <span className="bracket-l">[</span>
-        <span className="restart-label">REBOOT</span>
-        <span className="bracket-r">]</span>
-      </button>
-      <div className="restart-hint">press to replay loader</div>
-    </div>
-  )
-}
-
 // ---------------- Audio toggle ----------------
 function AudioToggle() {
   const [muted, setMuted] = useState(false)
@@ -291,7 +268,7 @@ function AudioToggle() {
 // click, is what lets the browser play sound at all. NO cannot close the tab (a
 // script may only close a window it opened itself), so the question answers
 // back instead: the cursor wipes it, types a retort, holds it, and types the
-// question again. Three retorts — two drawn at random, then a flat "No." — and
+// question again. Four retorts — three drawn at random, then a flat "No." — and
 // NO is struck out and goes dim.
 const QUESTION = 'Release at any cost?'
 const RETORT_POOL = [
@@ -299,6 +276,12 @@ const RETORT_POOL = [
   'Make the right choice',
   'Are you really a developer?',
   "This crap won't work",
+  'Did you mean YES?',
+  'Error 503: NO unavailable',
+  'sudo release',
+  'Rollback is not an option',
+  "That's not in the spec",
+  'The client already paid',
 ]
 const LAST_RETORT = 'No.'
 const GREEN_WORD = 'Release' // in the logo's green, as the logo has it
@@ -308,7 +291,7 @@ const TYPE_MS = 75 // per key on average, the question the first time
 const RETYPE_MS = 60 // per key on average, the question coming back
 const RETORT_MS = 65 // per key on average, a retort
 const ERASE_MS = 16 // per character wiped: a held-down backspace
-const RETORT_HOLD_MS = 700
+const RETORT_HOLD_MS = 1030
 
 // A person at a keyboard, not a metronome: each key lands a little early or
 // late, now and then a few run together, now and then the hand stops to think,
@@ -324,11 +307,11 @@ function keystroke(base: number, key: string): number {
   return key === ' ' ? beat + base * 0.8 : beat
 }
 
-// two of the pool, never the same one twice, then the flat answer
+// three of the pool, never the same one twice, then the flat answer
 function drawRetorts(): string[] {
   const pool = [...RETORT_POOL]
   const picked: string[] = []
-  while (picked.length < 2) picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0])
+  while (picked.length < 3) picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0])
   return [...picked, LAST_RETORT]
 }
 
@@ -454,20 +437,19 @@ function StartGate({ onYes }: { onYes: () => void }) {
 type LoaderStage = 'idle' | 'blank0' | 'terminal' | 'blank1' | 'logo' | 'blank2' | 'done'
 
 // ---------------- App / state machine ----------------
-function App() {
+function App({ onDone }: LoaderProps) {
   const [stage, setStage] = useState<LoaderStage>('idle')
-  const [runId, setRunId] = useState(0)
   const [armed, setArmed] = useState(false)
+  // Read at the moment the logo has faded: a new callback from the host must not
+  // change onLogoDone, or the logo stage would start over.
+  const doneRef = useRef(onDone)
+  useEffect(() => {
+    doneRef.current = onDone
+  })
 
   const start = useCallback(() => {
     LoaderAudio.resume()
     setArmed(true)
-    setStage('blank0')
-    setTimeout(() => setStage('terminal'), 380)
-  }, [])
-
-  const restart = useCallback(() => {
-    setRunId((n) => n + 1)
     setStage('blank0')
     setTimeout(() => setStage('terminal'), 380)
   }, [])
@@ -479,29 +461,36 @@ function App() {
 
   const onLogoDone = useCallback(() => {
     setStage('blank2')
-    setTimeout(() => setStage('done'), 220)
+    setTimeout(() => {
+      setStage('done')
+      doneRef.current?.()
+    }, 220)
   }, [])
 
   return (
-    <div className="root" key={runId}>
+    <div className="root">
       {!armed && stage === 'idle' && <StartGate onYes={start} />}
 
       {stage === 'terminal' && <Terminal active={true} onComplete={onTerminalDone} />}
 
       <LogoStage active={stage === 'logo'} onComplete={onLogoDone} />
 
-      {stage === 'done' && <RestartScreen onRestart={restart} />}
-
       {armed && <AudioToggle />}
     </div>
   )
 }
 
+interface LoaderProps {
+  // Called once the logo has faded out: the loader is over, and whatever comes
+  // next is the host's to show. After it the loader only holds a blank screen.
+  onDone?: () => void
+}
+
 // Самостоятельный модуль: оборачиваем в .boot (скоуп стилей).
-export default function Loader() {
+export default function Loader({ onDone }: LoaderProps) {
   return (
     <div className="boot">
-      <App />
+      <App onDone={onDone} />
     </div>
   )
 }
