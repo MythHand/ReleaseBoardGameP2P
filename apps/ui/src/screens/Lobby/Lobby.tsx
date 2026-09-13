@@ -249,7 +249,10 @@ export default function Lobby({
             <h2 className={styles.h}>
               {copy.players}
               <span className={styles.count}>
-                {players.length} / {capacity}
+                {/* The count describes the table that will be dealt: people and the bots
+                    that fit, matching the slots shown below. With 4 players in a 5-seat
+                    table, it reads 5 / 5 (one bot), not 4 / 5. */}
+                {players.length + shownBots} / {capacity}
               </span>
             </h2>
 
