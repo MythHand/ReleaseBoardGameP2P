@@ -633,6 +633,9 @@ describe('self.combos', () => {
         attacker: 'p1',
         attack: 'attack-bug#1',
         attackId: 'attack-bug',
+        // No `attacked` event behind this hand-built pending; the projection
+        // tests below read neither it nor the id.
+        attackEventId: 0,
         sudo: false,
         canDefendWith: [],
         openedAt: 0,
@@ -662,6 +665,9 @@ describe('self.combos', () => {
         attacker: 'p1',
         attack: 'attack-bug#1',
         attackId: 'attack-bug',
+        // No `attacked` event behind this hand-built pending; the projection
+        // tests below read neither it nor the id.
+        attackEventId: 0,
         sudo: false,
         canDefendWith: ['defense-rollback#0', 'defense-hotfix#0'],
         openedAt: 0,
@@ -691,6 +697,9 @@ describe('self.combos', () => {
         attacker: 'p1',
         attack: 'attack-bug#1',
         attackId: 'attack-bug',
+        // No `attacked` event behind this hand-built pending; the projection
+        // tests below read neither it nor the id.
+        attackEventId: 0,
         sudo: true,
         // a sudo attack: Cancel-kind defense-rollback is withheld, only the
         // Unicorn-kind defence remains
@@ -717,6 +726,9 @@ describe('self.combos', () => {
         attacker: 'p2',
         attack: 'attack-bug#1',
         attackId: 'attack-bug',
+        // No `attacked` event behind this hand-built pending; the projection
+        // tests below read neither it nor the id.
+        attackEventId: 0,
         sudo: false,
         canDefendWith: ['defense-rollback#0'],
         openedAt: 0,

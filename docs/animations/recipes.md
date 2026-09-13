@@ -1419,10 +1419,9 @@ All three read `pending.methods`; a slot or fan card the method set does not nam
 - **Sacrifice** (`onSlotDown` → `useZonePull`) — a release is dragged out of its slot (`_useZonePull`
   owns the drag state and knows nothing about the game; `accepts: onTable`, `onDrop` commits the
   choice); its own Code Review, if any, travels with it by position, not by "grouping".
-- **Monitoring** — a **press**, not a drag: `onSlotDown` dispatches `RESOLVE` straight from the
-  handler when the key is `monitoring`. Nothing is staged, nothing flies — the finding this leaves
-  open (no designed movement for an answer that does not leave the table) is recorded in
-  `backlog.md` and the audit register, not re-invented here.
+- **Monitoring** — not a gesture at all: a standing Monitoring answers the 503 inside the very draw that
+  turned it up, and the player is asked nothing (`packages/engine/src/fake/triggers.ts`). Nothing flies
+  and nothing glows — the alarm never starts. By the owner's decision (#139) it has no movement of its own.
 
 **The exchange**
 `commit()` sends the `RESOLVE` synchronously, in the same commit that hands the card to the flyer
