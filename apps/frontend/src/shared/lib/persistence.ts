@@ -2,8 +2,8 @@
 //
 // Plain functions rather than a store: the keeper snapshot is written from
 // `referee.ts`, which is a pure module with no React in it — and keeping it
-// that way is what lets solo play, the playground and every headless test
-// exercise the same code the network does (network/session/link.ts).
+// that way is what lets the playground and every headless test exercise the
+// same code the network does (network/session/link.ts).
 
 const CLIENT_KEY = 'release:clientId'
 const SESSION_KEY = 'release:session'
@@ -101,11 +101,9 @@ export function getClientId(): string {
 }
 
 export interface StoredSession {
-  // null for a solo match: there is no room, and nothing to dial on the way
-  // back — the keeper snapshot beside this record is the whole session.
-  roomCode: string | null
+  roomCode: string
   name: string
-  role: 'host' | 'guest' | 'solo'
+  role: 'host' | 'guest'
   gameId: string | null
   joinedAt: number
 }

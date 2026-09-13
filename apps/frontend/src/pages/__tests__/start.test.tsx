@@ -1,8 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
-import { clearSession, writeSession } from '~/shared/lib/persistence'
+import { clearSession } from '~/shared/lib/persistence'
 import StartPage from '../start'
 import styles from '../start.module.css'
 
@@ -113,22 +113,4 @@ it('offers to continue a stored session after a reload, with no live session', (
   )
   const btn = screen.getByText('start.continueSession').closest('button')
   expect(btn?.hasAttribute('disabled')).toBe(false)
-})
-
-it('sends a stored solo match back to its board, not to a lobby', () => {
-  writeSession({
-    roomCode: null,
-    name: 'Ann',
-    role: 'solo',
-    gameId: 'solo-1',
-    joinedAt: Date.now(),
-  })
-  sessionValue = { status: 'idle', state: null, roomCode: null }
-  render(
-    <MemoryRouter>
-      <StartPage />
-    </MemoryRouter>,
-  )
-  fireEvent.click(screen.getByText('start.continueSession'))
-  expect(navigate).toHaveBeenCalledWith('/board/solo-1')
 })
