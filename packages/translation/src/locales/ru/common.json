@@ -655,6 +655,7 @@
   "lobbyScreen": {
     "title": "Лобби",
     "subtitle": "Ожидание игроков…",
+    "botName": "Бот {{n}}",
     "language": "язык",
     "disband": "расформировать",
     "rules": "правила",

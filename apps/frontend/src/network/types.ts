@@ -50,6 +50,11 @@ export interface Seat {
   // to and never changes for the life of the match.
   clientId: string
   name: string
+  // A seat the engine plays itself. It holds no connection, so every reader
+  // that treats "no peer in the roster" as "this player dropped" has to know
+  // the difference. It rides GAME_STARTING with the rest of the seating, so
+  // every peer learns it at the same moment.
+  bot?: boolean
 }
 
 // Discriminated union of every protocol message ({ type, payload }).

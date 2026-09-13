@@ -655,6 +655,7 @@
   "lobbyScreen": {
     "title": "Lobby",
     "subtitle": "Waiting for players…",
+    "botName": "Bot {{n}}",
     "language": "language",
     "disband": "disband",
     "rules": "rules",

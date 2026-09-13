@@ -220,7 +220,7 @@ it('host startGame broadcasts GAME_STARTING and records the game id', async () =
   expect(result.current.gameId).toBeNull()
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   const hostId = result.current.state?.hostId
@@ -376,7 +376,7 @@ it('forgets the game id when the session is torn down', async () => {
     await result.current.createRoom('Dimbo', 6)
   })
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   expect(result.current.gameId).not.toBeNull()
 
@@ -398,7 +398,7 @@ it('walking back to the lobby forgets the match but keeps its seating', async ()
   // inside a click handler rather than on the data.
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   const dealt = result.current.seats
   expect(dealt).toHaveLength(2)
@@ -417,14 +417,14 @@ it('a new match replaces the seating the last one left behind', async () => {
   // Why keeping it across leaveGame is safe: nothing reads it stale.
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   act(() => {
     result.current.leaveGame()
   })
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   expect(result.current.gameId).toBe(`${result.current.state?.hostId}-2`)
@@ -483,10 +483,34 @@ async function hostWithGuest(): Promise<ReturnType<typeof renderHook<UseLobby, u
   return rendered
 }
 
+it('seats the asked-for bots after the humans when the match starts', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.setBots(2)
+  })
+  act(() => {
+    result.current.startGame(['Бот 1', 'Бот 2'])
+  })
+
+  const seats = result.current.seats
+  expect(seats.map((s) => s.playerId)).toEqual(['p1', 'p2', 'p3', 'p4'])
+  expect(seats.filter((s) => s.bot).map((s) => s.name)).toEqual(['Бот 1', 'Бот 2'])
+  // The humans are untouched by the presence of bots.
+  expect(seats.filter((s) => !s.bot)).toHaveLength(2)
+})
+
+it('seats nobody extra when no bots were asked for', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame([])
+  })
+  expect(result.current.seats.some((s) => s.bot)).toBe(false)
+})
+
 it('host builds the game behind a gate covering every seat', async () => {
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   const syncs = () => sentTo(GUEST).filter((m) => m.type === 'SYNC').length
   // The deal's own projection, and nothing else yet.
@@ -520,7 +544,7 @@ it('host builds the game behind a gate covering every seat', async () => {
 it('the opening projection carries the deal to every seat', async () => {
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   // Asserted on what actually left this peer, not on `createSession`'s return
@@ -540,7 +564,7 @@ it('the opening projection carries the deal to every seat', async () => {
 it('gives the local seat its deal too, not only the wire', async () => {
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   // The host's own seat is served through its local link rather than a
   // connection to itself, so it is a separate delivery path and a separate way
@@ -593,7 +617,7 @@ it('cancels the start gate when the session is torn down', async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // Buffered behind the gate: the cap firing is what would later play it.
     act(() => {
@@ -620,7 +644,7 @@ it("a rematch takes the previous match's keeper and gate down with it", async ()
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // Buffered behind match 1's gate. Match 1's cap is the only thing that would
     // ever play it — and after a rematch there is no match 1 to play it into.
@@ -629,7 +653,7 @@ it("a rematch takes the previous match's keeper and gate down with it", async ()
     })
 
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       vi.advanceTimersByTime(INTRO_CAP_MS + 1)
@@ -684,12 +708,12 @@ it('gives each match its own id, so a second one is distinguishable from the fir
   const hostId = result.current.state?.hostId ?? ''
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   const first = result.current.gameId
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   const second = result.current.gameId
 
@@ -752,7 +776,7 @@ it('records the match in the stored session when the host starts one', async () 
   const { result } = await hostWithGuest()
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   // Without this a restore knows the room but not that a match is running, and
@@ -783,7 +807,7 @@ it('forgets what it stored when the room is left', async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
@@ -832,7 +856,7 @@ it('coalesces a burst of keeper commits into one serialization', async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // The write trails the commit; nothing has been serialized yet.
     expect(keeperWrites(writes)).toBe(0)
@@ -875,7 +899,7 @@ it('does not rewrite the snapshot for a keeper that is only ticking', async () =
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       result.current.introReady()
@@ -912,7 +936,7 @@ it('cannot let a pending snapshot land after the room is left', async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // Teardown inside the throttle's window, which is where the race lives.
     act(() => {
@@ -936,7 +960,7 @@ it("stores the lobby seating beside the referee's, which carries neither name no
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
@@ -964,7 +988,7 @@ it("stores the lobby seating beside the referee's, which carries neither name no
 async function hostWhoseGuestDropped(): Promise<ReturnType<typeof renderHook<UseLobby, unknown>>> {
   const rendered = await hostWithGuest()
   act(() => {
-    rendered.result.current.startGame()
+    rendered.result.current.startGame([])
   })
   act(() => {
     transports[0].onDisconnect?.(GUEST)
@@ -1001,7 +1025,7 @@ it('tells the keeper about a dropped peer, not just the roster', async () => {
 it('recovers a returning seat even when its JOIN_REQUEST beats onDisconnect there', async () => {
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   // Deliberately do NOT fire onDisconnect for GUEST first. WebRTC disconnect
@@ -1145,7 +1169,7 @@ it('walking back to the lobby drops the stored match but keeps the room', async 
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
@@ -1175,7 +1199,7 @@ it('a snapshot still on its trailing edge cannot survive walking back to the lob
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // Left inside the throttle's window: the deal's snapshot is queued and not
     // yet serialized, so only cancelling it keeps it from landing behind the
@@ -1359,7 +1383,7 @@ it('reseeds the match counter on restore, so a rematch does not reuse the restor
     result.current.leaveGame()
   })
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   expect(result.current.gameId).not.toBeNull()

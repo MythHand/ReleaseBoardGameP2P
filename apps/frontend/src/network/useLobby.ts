@@ -2,7 +2,7 @@ import type { Event, GameState, PlayerId } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { DEFAULT_SETUP } from '@release/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { seatOf, seatsFor } from '~/entities/game/seats'
+import { botSeats, seatOf, seatsFor } from '~/entities/game/seats'
 import {
   clearKeeper,
   clearSession,
@@ -22,6 +22,7 @@ import {
   handleWhereabouts,
   kick as kickFn,
   type Outgoing,
+  setBots as setBotsFn,
   setMaxPlayers as setMaxPlayersFn,
   transferHost as transferHostFn,
 } from './lobby/host'
@@ -31,6 +32,7 @@ import {
   applyPeerLeft,
   applyPeerList,
   createLobbyState,
+  effectiveBots,
   type LobbyState,
 } from './lobby/state'
 import type { GameLink, Sync } from './session/link'
@@ -192,9 +194,14 @@ export interface UseLobby {
   setWhere(where: Where): void
   kick(peerId: string): void
   setMaxPlayers(n: number): void
+  // How many of the free seats should be bots. A ceiling the table honours as
+  // far as it fits — see `effectiveBots`.
+  setBots(n: number): void
   transferHost(id: string): void
   setSetup(setup: Setup): void
-  startGame(): void
+  // `botNames` is display copy, so it arrives from the features layer rather
+  // than being built here: `network/` may not import i18next.
+  startGame(botNames: string[]): void
   // A match against bots: no room, no broker, no transport. The link, the
   // seating and the projection are the same shape a networked match produces,
   // so nothing downstream of this hook can tell the difference.
@@ -1318,6 +1325,17 @@ export function useLobby(): UseLobby {
     [commit, dispatch],
   )
 
+  const setBots = useCallback(
+    (n: number) => {
+      const current = stateRef.current
+      if (!current || !isHostRef.current) return
+      const r = setBotsFn(current, n)
+      commit(r.state)
+      dispatch(r.outgoing)
+    },
+    [commit, dispatch],
+  )
+
   // NOTE: transferHost currently only broadcasts the intent (TRANSFER_HOST).
   // The actual host handoff — reconnecting peers to the new host and sending the
   // HOST_TRANSFERRED confirmation — is not implemented yet; it belongs to the
@@ -1537,68 +1555,77 @@ export function useLobby(): UseLobby {
   // id and nobody has to recompute it.
   // Broadcast first — setGameId navigates this peer away, and an unmounting
   // component must not be what the others are waiting on.
-  const startGame = useCallback(() => {
-    const current = stateRef.current
-    const t = transportRef.current
-    if (!current || !t || !isHostRef.current) return
-    matchSeqRef.current += 1
-    const id = `${current.hostId}-${matchSeqRef.current}`
+  const startGame = useCallback(
+    (botNames: string[]) => {
+      const current = stateRef.current
+      const t = transportRef.current
+      if (!current || !t || !isHostRef.current) return
+      matchSeqRef.current += 1
+      const id = `${current.hostId}-${matchSeqRef.current}`
 
-    const dealt = seatsFor(current.peers)
-    const mine = seatOf(dealt, current.selfId)
-    if (!mine) return
+      const humans = seatsFor(current.peers)
+      const mine = seatOf(humans, current.selfId)
+      if (!mine) return
+      // The ceiling resolved once, here, at the only moment it matters: from
+      // now on this seating is frozen and broadcast, and nobody derives it again.
+      const dealt = [...humans, ...botSeats(effectiveBots(current), humans.length, botNames)]
 
-    // A rematch reassigns all three refs `attachNewMatch` sets below.
-    // Reassignment is not teardown: the previous keeper's 250ms ticker would go
-    // on running for the life of the tab with setGameSync still in its listener
-    // set, and the previous gate's pending cap would fire into a match that no
-    // longer exists. Same order leaveSession uses — the gate first, because it
-    // must never outlive its session.
-    gateRef.current?.cancel()
-    gateRef.current = null
-    keeperRef.current?.close()
-    keeperRef.current = null
-    // The previous match's snapshot may still be waiting on its trailing edge.
-    // Left queued it would be written under the new match's lobby seating, and
-    // the new keeper's own first commit would then have to overwrite it.
-    cancelKeeperSave()
+      // A rematch reassigns all three refs `attachNewMatch` sets below.
+      // Reassignment is not teardown: the previous keeper's 250ms ticker would go
+      // on running for the life of the tab with setGameSync still in its listener
+      // set, and the previous gate's pending cap would fire into a match that no
+      // longer exists. Same order leaveSession uses — the gate first, because it
+      // must never outlive its session.
+      gateRef.current?.cancel()
+      gateRef.current = null
+      keeperRef.current?.close()
+      keeperRef.current = null
+      // The previous match's snapshot may still be waiting on its trailing edge.
+      // Left queued it would be written under the new match's lobby seating, and
+      // the new keeper's own first commit would then have to overwrite it.
+      cancelKeeperSave()
 
-    // Every seat, including the host's own: one rule for the table. Spectators
-    // hold no seat and are never waited on — they have no projection to replay,
-    // so they never run a deal and could never report done.
-    const { engine, session, keeper } = attachNewMatch({
-      gameId: id,
-      keeperId: mine.playerId,
-      players: dealt,
-      setup: current.setup,
-      transport: t,
-      gateExpect: dealt.map((s) => s.playerId),
-    })
+      // Every seat, including the host's own: one rule for the table. Spectators
+      // hold no seat and are never waited on — they have no projection to replay,
+      // so they never run a deal and could never report done.
+      const { engine, session, keeper } = attachNewMatch({
+        gameId: id,
+        keeperId: mine.playerId,
+        players: dealt,
+        setup: current.setup,
+        transport: t,
+        // A bot runs no opening animation, so the gate waits only on the humans —
+        // otherwise a solo-with-bots match would hold at the intro for the full
+        // cap with nobody left to report done.
+        gateExpect: humans.map((s) => s.playerId),
+      })
 
-    // Tell the table to follow before dealing, so a guest has built its remote
-    // link by the time its projection arrives. DataChannels preserve order, so
-    // GAME_STARTING is always ahead of the SYNC that follows it.
-    dispatch([
-      {
-        to: 'broadcast',
-        message: { type: 'GAME_STARTING', payload: { gameId: id, seats: dealt } },
-      },
-    ])
-    gameIdRef.current = id
-    setGameId(id)
-    rememberGame(id)
-    // The same array the engine was seated with, held rather than recomputed —
-    // see the `seats` member above. Before `resync` below, because the snapshot
-    // that commit produces stores this seating alongside the referee's.
-    applySeats(dealt)
-    // The deal travels with the first projection. `createSession` also returns it
-    // as `outgoing`, but that array is unreachable from here — the keeper owns
-    // delivery — so it is asked of the engine again and handed to the fan-out.
-    // Without it every peer receives a hand with no account of where it came
-    // from: the board's intro has no deal to replay and the move history opens
-    // on a blank.
-    keeper.resync(engine.setupEvents(session.state))
-  }, [dispatch, applySeats, cancelKeeperSave, rememberGame, attachNewMatch])
+      // Tell the table to follow before dealing, so a guest has built its remote
+      // link by the time its projection arrives. DataChannels preserve order, so
+      // GAME_STARTING is always ahead of the SYNC that follows it.
+      dispatch([
+        {
+          to: 'broadcast',
+          message: { type: 'GAME_STARTING', payload: { gameId: id, seats: dealt } },
+        },
+      ])
+      gameIdRef.current = id
+      setGameId(id)
+      rememberGame(id)
+      // The same array the engine was seated with, held rather than recomputed —
+      // see the `seats` member above. Before `resync` below, because the snapshot
+      // that commit produces stores this seating alongside the referee's.
+      applySeats(dealt)
+      // The deal travels with the first projection. `createSession` also returns it
+      // as `outgoing`, but that array is unreachable from here — the keeper owns
+      // delivery — so it is asked of the engine again and handed to the fan-out.
+      // Without it every peer receives a hand with no account of where it came
+      // from: the board's intro has no deal to replay and the move history opens
+      // on a blank.
+      keeper.resync(engine.setupEvents(session.state))
+    },
+    [dispatch, applySeats, cancelKeeperSave, rememberGame, attachNewMatch],
+  )
 
   // The solo half of `startGame`. Everything structural is the same —
   // `attachNewMatch` sees to that — and two things are not: the transport is a
@@ -1734,6 +1761,7 @@ export function useLobby(): UseLobby {
       setWhere,
       kick,
       setMaxPlayers,
+      setBots,
       transferHost,
       setSetup,
       startGame,
@@ -1766,6 +1794,7 @@ export function useLobby(): UseLobby {
       setWhere,
       kick,
       setMaxPlayers,
+      setBots,
       transferHost,
       setSetup,
       startGame,
