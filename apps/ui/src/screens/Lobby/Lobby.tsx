@@ -65,6 +65,10 @@ export interface LobbyCopy {
   modesLockedHint: string
   players: string
   capacity: string
+  bots: string
+  // Interpolated with the bot's number, the way the frontend's catalog does it.
+  botName: string
+  roleBot: string
   // заголовок колонки чата — сам блок чата своего заголовка не имеет
   chat: string
   spectators: string
@@ -133,6 +137,7 @@ export default function Lobby({
   const [setup, setSetup] = useState<Setup>(initialSetup)
   const [players, setPlayers] = useState<Player[]>(initialPlayers)
   const [capacity, setCapacity] = useState(initialCapacity)
+  const [bots, setBots] = useState(0)
   const [spectators, setSpectators] = useState<Spectator[]>(MOCK_SPECTATORS)
   const [specCapacity, setSpecCapacity] = useState(8)
   const [disbandOpen, setDisbandOpen] = useState(false)
@@ -177,7 +182,15 @@ export default function Lobby({
   const playersFull = players.length >= capacity
   const spectatorsFull = spectators.length >= specCapacity
 
-  const slots: (Player | null)[] = [...players]
+  // The same ceiling the app applies: people take the seats first, and the
+  // number says how many of whatever is left should be bots.
+  const shownBots = Math.max(0, Math.min(bots, capacity - players.length))
+
+  // A row is a player, a bot (carrying its number), or an empty seat.
+  const slots: (Player | { bot: number } | null)[] = [
+    ...players,
+    ...Array.from({ length: shownBots }, (_, i) => ({ bot: i + 1 })),
+  ]
   while (slots.length < capacity) slots.push(null)
 
   const renderStatus = (p: Player) => {
@@ -251,9 +264,20 @@ export default function Lobby({
               />
             )}
 
+            {isHost && (
+              <Slider
+                className={styles.capRow}
+                label={copy.bots}
+                value={bots}
+                min={0}
+                max={5}
+                onChange={setBots}
+              />
+            )}
+
             <div className={styles.list}>
               {slots.map((p, i) =>
-                p ? (
+                p && 'id' in p ? (
                   <PlayerSlot
                     key={p.id}
                     name={p.name}
@@ -282,6 +306,17 @@ export default function Lobby({
                           ]
                         : undefined
                     }
+                  />
+                ) : p && 'bot' in p ? (
+                  <PlayerSlot
+                    key={`bot-${p.bot}`}
+                    name={copy.botName.replace('{{n}}', String(p.bot))}
+                    badge={
+                      <Badge tone="muted" size="sm" outlined>
+                        {copy.roleBot}
+                      </Badge>
+                    }
+                    status={<Badge tone="success">{copy.ready}</Badge>}
                   />
                 ) : (
                   // biome-ignore lint/suspicious/noArrayIndexKey: пустые слоты — позиционные заглушки без стабильного id
