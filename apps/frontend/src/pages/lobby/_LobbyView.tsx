@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { useStartGame } from '~/features/start-game/useStartGame'
+import { effectiveBots, MAX_BOTS } from '~/network'
 import type { PeerInfo } from '~/network/types'
 import { BASE_URL } from '~/shared/config'
 import AppLogo from '~/shared/ui/AppLogo'
@@ -51,6 +52,10 @@ export default function LobbyView() {
   const spectators = Object.values(state.peers).filter((p) => p.role === 'guest')
   const capacity = state.maxPlayers
   const minCapacity = Math.max(2, players.length)
+  // What the table can actually give right now — capped by the free seats —
+  // as distinct from `state.bots`, the raw number the host asked for on the
+  // slider. They differ whenever people fill or leave seats.
+  const bots = effectiveBots(state)
 
   // The invite link — what a host actually sends someone. Opening it lands on
   // the invite screen with the code already filled in.
@@ -73,10 +78,11 @@ export default function LobbyView() {
   // Fill the player column with empty slots up to the capacity. Each slot
   // carries a stable key — empty slots are keyed by their fixed position rather
   // than the raw render index, so React identity stays put as players come/go.
-  const slots: { key: string; peer: PeerInfo | null }[] = [
+  const slots: { key: string; peer: PeerInfo | null; bot?: number }[] = [
     ...players.map((p) => ({ key: p.id, peer: p })),
-    ...Array.from({ length: Math.max(0, capacity - players.length) }, (_, j) => ({
-      key: `empty-${players.length + j}`,
+    ...Array.from({ length: bots }, (_, i) => ({ key: `bot-${i}`, peer: null, bot: i + 1 })),
+    ...Array.from({ length: Math.max(0, capacity - players.length - bots) }, (_, j) => ({
+      key: `empty-${players.length + bots + j}`,
       peer: null as PeerInfo | null,
     })),
   ]
@@ -184,7 +190,7 @@ export default function LobbyView() {
             <Typography variant="sectionTitle" className={styles.h}>
               {t('lobbyScreen.players')}
               <Typography base="mono-md" tk="tk-10" as="span" className={styles.count}>
-                {players.length} / {capacity}
+                {players.length + bots} / {capacity}
               </Typography>
             </Typography>
 
@@ -199,8 +205,19 @@ export default function LobbyView() {
               />
             )}
 
+            {isHost && (
+              <Slider
+                className={styles.capRow}
+                label={t('lobbyScreen.bots')}
+                value={state.bots}
+                min={0}
+                max={MAX_BOTS}
+                onChange={session.setBots}
+              />
+            )}
+
             <div className={styles.list}>
-              {slots.map(({ key, peer: p }) =>
+              {slots.map(({ key, peer: p, bot }) =>
                 p ? (
                   <PlayerSlot
                     key={key}
@@ -217,6 +234,19 @@ export default function LobbyView() {
                     status={renderStatus(p)}
                     dropdownLabel={t('lobbyScreen.actions')}
                     dropdown={isHost && p.id !== state.selfId ? kickItems(p.id) : undefined}
+                  />
+                ) : bot ? (
+                  // A bot cannot be kicked, only counted down via the slider —
+                  // so no dropdown here, unlike a human player's slot.
+                  <PlayerSlot
+                    key={key}
+                    name={t('lobbyScreen.botName', { n: bot })}
+                    badge={
+                      <Badge tone="muted" size="sm" outlined>
+                        {t('lobbyScreen.roleBot')}
+                      </Badge>
+                    }
+                    status={<Badge tone="success">{t('lobbyScreen.ready')}</Badge>}
                   />
                 ) : (
                   <EmptySlot key={key}>{t('lobbyScreen.freeSlot')}</EmptySlot>

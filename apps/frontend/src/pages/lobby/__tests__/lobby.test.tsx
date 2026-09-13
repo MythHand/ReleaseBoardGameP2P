@@ -356,3 +356,35 @@ it('announces the lobby as its whereabouts when arriving back from a match', () 
   // results screen after they had left it.
   expect(setWhere).toHaveBeenCalledWith('lobby')
 })
+
+it('lets the host ask for bots and shows them in the free seats', () => {
+  const session = inSession()
+  sessionValue = {
+    ...session,
+    isHost: true,
+    // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
+    state: { ...session.state!, maxPlayers: 6, bots: 2 },
+  }
+  renderInRouter(<LobbyView />)
+
+  expect(screen.getByText('lobbyScreen.bots')).toBeTruthy()
+  // Two bot rows: one per bot the host asked for (inSession() seats 2 humans,
+  // so 6 - 2 = 4 free seats comfortably cover the 2 asked for).
+  expect(screen.getAllByText('lobbyScreen.botName')).toHaveLength(2)
+})
+
+// The slider is the host's, exactly as the capacity slider beside it is. A
+// guest still sees the bots — in the rows.
+it('hides the bots slider from a guest but not the bots', () => {
+  const session = inSession()
+  sessionValue = {
+    ...session,
+    isHost: false,
+    // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
+    state: { ...session.state!, maxPlayers: 6, bots: 1 },
+  }
+  renderInRouter(<LobbyView />)
+
+  expect(screen.queryByText('lobbyScreen.bots')).toBeNull()
+  expect(screen.getAllByText('lobbyScreen.botName')).toHaveLength(1)
+})

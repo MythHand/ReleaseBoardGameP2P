@@ -664,6 +664,8 @@
     "modesLockedHint": "настраивает host",
     "players": "Игроки",
     "capacity": "Вместимость",
+    "bots": "Ботов",
+    "roleBot": "бот",
     "chat": "чат",
     "spectators": "Зрители",
     "specLimit": "Лимит",
