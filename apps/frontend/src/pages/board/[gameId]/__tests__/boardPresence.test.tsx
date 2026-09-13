@@ -20,7 +20,7 @@ vi.mock('~/app/providers/SessionProvider', () => ({
 // set them, because nothing in the page read them yet.
 function session(overrides: Partial<UseLobby> = {}): UseLobby {
   return {
-    state: { selfId: 'me', hostId: 'me', maxPlayers: 6, setup: {}, peers: {} },
+    state: { selfId: 'me', hostId: 'me', maxPlayers: 6, bots: 0, setup: {}, peers: {} },
     status: 'in-lobby',
     roomCode: 'YTG-N2Q',
     isHost: true,
@@ -74,6 +74,7 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      bots: 0,
       setup: {},
       peers: {
         me: {
@@ -125,6 +126,7 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      bots: 0,
       setup: {},
       peers: {
         me: {

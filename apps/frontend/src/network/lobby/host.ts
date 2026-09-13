@@ -4,6 +4,7 @@ import {
   applyPeerJoined,
   applyPeerLeft,
   assignRole,
+  effectiveBots,
   type LobbyState,
   playerCount,
 } from './state'
@@ -222,8 +223,22 @@ export function transferHost(state: LobbyState, newHostId: string): Result {
   }
 }
 
+// The rules seat 2–6 (docs/rules/general.md:13), so one human and five bots is
+// the largest table a lone host can ask for.
+export const MAX_BOTS = 5
+
+export function setBots(state: LobbyState, bots: number): Result {
+  const clamped = Math.min(MAX_BOTS, Math.max(0, Math.trunc(bots)))
+  return {
+    state: applyConfig(state, { bots: clamped }),
+    outgoing: [
+      { to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { bots: clamped } } },
+    ],
+  }
+}
+
 export function canStart(state: LobbyState): boolean {
-  if (playerCount(state) < 2) return false
+  if (playerCount(state) + effectiveBots(state) < 2) return false
   return Object.values(state.peers)
     .filter((p) => p.role === 'host' || p.role === 'player')
     .every((p) => p.ready)

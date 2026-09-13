@@ -6,9 +6,11 @@ import {
   handleReady,
   handleWhereabouts,
   kick,
+  MAX_BOTS,
+  setBots,
   setMaxPlayers,
 } from './host'
-import { createLobbyState, playerCount } from './state'
+import { createLobbyState, type LobbyState, playerCount } from './state'
 
 const host = {
   id: 'h',
@@ -285,4 +287,46 @@ it('treats an unknown clientId as an ordinary join', () => {
 it('treats any join as ordinary when no match is running', () => {
   const r = handleJoinRequest(returningBase(), 'fresh-peer', 'Bo', 'client-bo')
   expect(r.outgoing.some((o) => o.message.type === 'SEAT_REBOUND')).toBe(false)
+})
+
+// Local to this suite: state.test.ts defines its own copy rather than sharing
+// one, matching how this repository keeps small test fixtures per file.
+const table = (maxPlayers: number, bots: number, humans: number): LobbyState =>
+  createLobbyState({
+    selfId: 'h',
+    hostId: 'h',
+    maxPlayers,
+    bots,
+    peers: Array.from({ length: humans }, (_, i) => ({
+      id: i === 0 ? 'h' : `p${i}`,
+      clientId: `c${i}`,
+      name: `P${i}`,
+      role: i === 0 ? ('host' as const) : ('player' as const),
+      ready: true,
+      where: 'lobby' as const,
+    })),
+  })
+
+it('clamps the bot count to the 0..5 the rules allow and tells everyone', () => {
+  const r = setBots(table(6, 0, 1), 9)
+  expect(r.state.bots).toBe(MAX_BOTS)
+  expect(r.outgoing).toEqual([
+    { to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { bots: 5 } } },
+  ])
+  expect(setBots(table(6, 0, 1), -2).state.bots).toBe(0)
+})
+
+// One bot is a table; no bots alone is not.
+it('lets a host start alone with a bot, and not without one', () => {
+  expect(canStart(table(6, 1, 1))).toBe(true)
+  expect(canStart(table(6, 0, 1))).toBe(false)
+})
+
+it('still refuses to start while a human is not ready', () => {
+  const two = table(6, 0, 2)
+  const notReady = {
+    ...two,
+    peers: { ...two.peers, p1: { ...two.peers.p1, ready: false } },
+  }
+  expect(canStart(notReady)).toBe(false)
 })

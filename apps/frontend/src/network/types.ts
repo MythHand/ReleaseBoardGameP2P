@@ -73,7 +73,7 @@ export type Message =
   // everyone went. Addressed to the host, which applies it and re-broadcasts the
   // updated PeerInfo — exactly the path PLAYER_READY takes.
   | { type: 'WHEREABOUTS'; payload: { where: Where } }
-  | { type: 'LOBBY_CONFIG_UPDATED'; payload: { maxPlayers?: number; setup?: Setup } }
+  | { type: 'LOBBY_CONFIG_UPDATED'; payload: { maxPlayers?: number; setup?: Setup; bots?: number } }
   | { type: 'LOBBY_DISBANDED'; payload: Record<string, never> }
   | { type: 'PLAYER_KICKED'; payload: { peerId: string; reason?: string } }
   | { type: 'TRANSFER_HOST'; payload: { newHostId: string } }
