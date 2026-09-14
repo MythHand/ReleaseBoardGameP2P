@@ -2,8 +2,9 @@
 #
 # The source code is AGPL-3.0-or-later. The game itself — its art, the text on
 # its cards and its rules — is CC BY-NC-SA 4.0, so the game cannot be used
-# commercially outside the code. The brand is not licensed beyond unmodified
-# copies of this project (see TRADEMARKS.md).
+# commercially outside the code. The brand is licensed only in the cases its own
+# terms list — unmodified copies, a copy run for yourself, and mods (see
+# TRADEMARKS.md).
 #
 # Format: REUSE specification 3.3 (https://reuse.software/spec-3.3/). When
 # several tables match one file, only the last of them applies — so the default

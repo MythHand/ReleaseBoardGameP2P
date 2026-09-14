@@ -109,7 +109,7 @@ under which is mapped path by path in [`REUSE.toml`](./REUSE.toml); the licence 
 |------|-------|---------|
 | **Source code** | everything not listed below | [AGPL-3.0-or-later](./LICENSE) |
 | **The game** — card art, card texts, rules text | `apps/ui/src/assets/cards/`, `apps/ui/src/cards/content.ts`, `packages/translation/src/locales/*/rules.json`, `docs/rules/`, `docs/understanding.md` | [CC BY-NC-SA 4.0](./LICENSES/CC-BY-NC-SA-4.0.txt) |
-| **The brand** — logos, favicons, app icons, the start-screen photo, the logo's sound in the loader | `apps/ui/src/assets/brand/`, `apps/ui/src/brand/*.svg`, `apps/ui/src/assets/favicons/`, `apps/frontend/public/*.png`, `apps/ui/src/assets/home/photo.jpg`, `apps/ui/src/assets/audio/logo-theme.wav` | All rights reserved, except in unmodified copies — [terms](./LICENSES/LicenseRef-AllRightsReserved.txt) |
+| **The brand** — logos, favicons, app icons, the start-screen photo, the logo's sound in the loader | `apps/ui/src/assets/brand/`, `apps/ui/src/brand/*.svg`, `apps/ui/src/assets/favicons/`, `apps/frontend/public/*.png`, `apps/ui/src/assets/home/photo.jpg`, `apps/ui/src/assets/audio/logo-theme.wav` | All rights reserved, except in the cases its terms allow — [terms](./LICENSES/LicenseRef-AllRightsReserved.txt) |
 | **Fonts** — Onest, JetBrains Mono, Fira Mono | `apps/ui/src/assets/fonts/` | [SIL OFL 1.1](./LICENSES/OFL-1.1.txt) — each family's `OFL.txt` beside it |
 | **Third-party media** | the files marked so in `REUSE.toml` | their own — listed there with their source |
 
@@ -123,11 +123,24 @@ the "fork, change a couple of lines, ship it closed/hosted for profit" loophole)
 **The game** is by Dmitry Togulev and Alexey Shtyrnyaev. The art, the card texts and the rules
 may be shared and adapted for non-commercial use, with attribution and under the same licence.
 Commercial use — printing and selling the cards, or putting the art or the texts into a paid
-product — is not covered by this licence.
+product — is not covered by this licence. We count playing the game inside a team or a company,
+team-building included, as commercial use too. On top of the licence, we permit this one case:
+the **unmodified** game may be run inside a team or a company for its own people. Setting up the
+environment it runs in does not count as modifying it; what does is defined in
+[`TRADEMARKS.md`](./TRADEMARKS.md#what-counts-as-a-modified-version).
 
 **The brand** belongs to Dmitry Togulev, and the Release любой ценой logo to him and Alexey
 Shtyrnyaev. The logos of Release любой ценой and MythHand, and the icons made from them, may be
-kept only in an unmodified copy of this project; a modified version replaces them. How the name
-and logos may be referred to: [`TRADEMARKS.md`](./TRADEMARKS.md).
+used only as they are and only in the cases below; a modified version beyond them replaces them.
+How the name and logos may be used, and the terms for mods: [`TRADEMARKS.md`](./TRADEMARKS.md).
+
+| Case | Allowed? |
+|------|----------|
+| Run it for yourself, changed or not, where no one else can reach it — to try it, or to prepare a change | yes |
+| Run or share an unmodified copy, non-commercially | yes |
+| Run an unmodified copy inside a team or a company, team-building included | yes — the one case we permit on top of the licences |
+| Run a modified copy inside a team or a company — your own logo, texts rewritten for the company | no |
+| Run or share a modified copy publicly, non-commercially | yes — as a mod, on the terms in [`TRADEMARKS.md`](./TRADEMARKS.md#mods) |
+| Anything commercial | no — except the source code on its own, without the cards, texts and brand |
 
 Third-party notice: Deploy or Die — MIT License, see [`LICENSE-deployordie`](./LICENSE-deployordie).

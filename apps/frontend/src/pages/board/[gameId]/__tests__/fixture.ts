@@ -1,11 +1,10 @@
 // Forked from apps/ui/src/table/Table/testFixture.ts (2026-08-11, #89).
 //
-// The kit fixture imports the locale JSON directly
-// (`@release/translation/locales/en/common.json`); the frontend's Vite alias
-// for `@release/translation` points at the package's `index.ts` file rather
-// than its `src` directory, so that subpath does not resolve here. `index.ts`
-// already assembles the same object as `resources.en.common`, so that's the
-// public-surface route to the same data.
+// The kit fixture imports the catalog directly (`@release/translation/catalog`);
+// the frontend's Vite alias for `@release/translation` points at the package's
+// `index.ts` file rather than its `src` directory, so that subpath does not
+// resolve here. `index.ts` already assembles the same object as
+// `resources.en.common`, so that's the public-surface route to the same data.
 import type { Event, PlayerView } from '@release/engine'
 import { resources } from '@release/translation'
 // `makeTable` builds the deterministic mock snapshot (roster, hand, history…)

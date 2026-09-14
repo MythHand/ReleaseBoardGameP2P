@@ -81,7 +81,7 @@
 ## Что здесь канон, а что производное
 
 **Текст правил — канон.** Он живёт в каталоге переводов (`rulesBlock.text` в
-`packages/translation/src/locales/{ru,en}/common.json`, 67 ключей вида `objective`, `mech.release`,
+`packages/translation/src/locales/{ru,en}/rules.json`, 67 ключей вида `objective`, `mech.release`,
 `c.secbug`, `mode.hand.8bit`) и показывается игроку блоком «Правила». Тексты интерфейса правит
 только тот, кто правит правила игры — **спека их не переписывает и не «улучшает»**.
 [`rules-board-game.md`](./rules-board-game.md) — тот же текст в виде md, для чтения подряд.
