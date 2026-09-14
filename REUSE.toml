@@ -2,9 +2,9 @@
 #
 # The source code is AGPL-3.0-or-later. The game itself — its art, the text on
 # its cards and its rules — is CC BY-NC-SA 4.0, so the game cannot be used
-# commercially outside the code. The brand is licensed only in the cases its own
-# terms list — unmodified copies, a copy run for yourself, and mods (see
-# TRADEMARKS.md).
+# commercially outside the code. The names and logos are licensed only in the
+# cases their own terms list — a copy run for yourself, unmodified copies, and
+# mods (see TRADEMARKS.md).
 #
 # Format: REUSE specification 3.3 (https://reuse.software/spec-3.3/). When
 # several tables match one file, only the last of them applies — so the default
@@ -36,7 +36,7 @@ path = [
 SPDX-FileCopyrightText = ["2026 Dmitry Togulev", "2026 Alexey Shtyrnyaev"]
 SPDX-License-Identifier = "CC-BY-NC-SA-4.0"
 
-# The brand: the logos, the favicons and app icons made from them, and the
+# Names and logos: the logos, the favicons and app icons made from them, and the
 # start-screen photo.
 [[annotations]]
 path = [
@@ -49,8 +49,8 @@ path = [
 SPDX-FileCopyrightText = "2026 Dmitry Togulev"
 SPDX-License-Identifier = "LicenseRef-AllRightsReserved"
 
-# The Release любой ценой logo: the same terms as the rest of the brand, with
-# two holders.
+# The Release любой ценой logo: the same terms as the other names-and-logos
+# files, with two holders.
 [[annotations]]
 path = [
   "apps/ui/src/assets/brand/release_logo.svg",
@@ -64,7 +64,7 @@ SPDX-License-Identifier = "LicenseRef-AllRightsReserved"
 # project with Claude Code (Anthropic): generated from code, not recorded. The
 # scripts that made them are in apps/ui/src/assets/audio/synth/ and are code,
 # under the default above. The tick is open like the code: its script rebuilds
-# it exactly. The logo's sound belongs to the brand.
+# it exactly. The logo's sound goes with the names and logos.
 [[annotations]]
 path = "apps/ui/src/assets/audio/tick.wav"
 SPDX-FileCopyrightText = "2026 Dmitry Togulev"

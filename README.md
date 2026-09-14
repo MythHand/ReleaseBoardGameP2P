@@ -101,15 +101,15 @@ from the Deploy or Die repository are preserved in
 
 ## License
 
-This repository holds three kinds of material under three sets of terms. Which file falls
+The repository holds several kinds of material, each under its own terms. Which file falls
 under which is mapped path by path in [`REUSE.toml`](./REUSE.toml); the licence texts are in
 [`LICENSES/`](./LICENSES).
 
 | What | Where | Licence |
 |------|-------|---------|
-| **Source code** | everything not listed below | [AGPL-3.0-or-later](./LICENSE) |
-| **The game** — card art, card texts, rules text | `apps/ui/src/assets/cards/`, `apps/ui/src/cards/content.ts`, `packages/translation/src/locales/*/rules.json`, `docs/rules/`, `docs/understanding.md` | [CC BY-NC-SA 4.0](./LICENSES/CC-BY-NC-SA-4.0.txt) |
-| **The brand** — logos, favicons, app icons, the start-screen photo, the logo's sound in the loader | `apps/ui/src/assets/brand/`, `apps/ui/src/brand/*.svg`, `apps/ui/src/assets/favicons/`, `apps/frontend/public/*.png`, `apps/ui/src/assets/home/photo.jpg`, `apps/ui/src/assets/audio/logo-theme.wav` | All rights reserved, except in the cases its terms allow — [terms](./LICENSES/LicenseRef-AllRightsReserved.txt) |
+| **Source code**, and everything not listed below | the rest of the repository | [AGPL-3.0-or-later](./LICENSE) |
+| **The game** — card art, card texts, rules text, the rules owner's answers, the early retelling of the game | `apps/ui/src/assets/cards/`, `apps/ui/src/cards/content.ts`, `packages/translation/src/locales/*/rules.json`, `docs/rules/`, `docs/specs/*-rules-decisions.md`, `docs/understanding.md` | [CC BY-NC-SA 4.0](./LICENSES/CC-BY-NC-SA-4.0.txt) |
+| **Name and logos** — the logos of Release любой ценой and MythHand, the favicons and app icons made from them, the start-screen photo, the logo's sound in the loader | `apps/ui/src/assets/brand/`, `apps/ui/src/brand/*.svg`, `apps/ui/src/assets/favicons/`, `apps/frontend/public/*.png`, `apps/ui/src/assets/home/photo.jpg`, `apps/ui/src/assets/audio/logo-theme.wav` | All rights reserved, except in the cases its terms allow — [terms](./LICENSES/LicenseRef-AllRightsReserved.txt) |
 | **Fonts** — Onest, JetBrains Mono, Fira Mono | `apps/ui/src/assets/fonts/` | [SIL OFL 1.1](./LICENSES/OFL-1.1.txt) — each family's `OFL.txt` beside it |
 | **Third-party media** | the files marked so in `REUSE.toml` | their own — listed there with their source |
 
@@ -117,30 +117,31 @@ Copyright (C) 2026 the authors named below for each part, and file by file in `R
 
 **The code** is by Dmitry Togulev ([@dimbo-design](https://github.com/dimbo-design)) and Andrey
 Konnov ([@ditayler](https://github.com/ditayler)). Building other projects on top of this is
-welcome — keep the attribution and, per the AGPL, keep your version's source open (this closes
-the "fork, change a couple of lines, ship it closed/hosted for profit" loophole).
+welcome — keep the attribution and, per the AGPL, keep your version's source open.
 
 **The game** is by Dmitry Togulev and Alexey Shtyrnyaev. The art, the card texts and the rules
 may be shared and adapted for non-commercial use, with attribution and under the same licence.
 Commercial use — printing and selling the cards, or putting the art or the texts into a paid
-product — is not covered by this licence. We count playing the game inside a team or a company,
-team-building included, as commercial use too. On top of the licence, we permit this one case:
-the **unmodified** game may be run inside a team or a company for its own people. Setting up the
-environment it runs in does not count as modifying it; what does is defined in
+product — is not covered by this licence. We count playing the game inside a company or another
+organisation — at work, team-building included — as commercial use too. On top of the licence,
+we permit this one case: the **unmodified** game may be run inside a company or another
+organisation for its own staff. Setting up the environment it runs in does not count as
+modifying it; what does is defined in
 [`TRADEMARKS.md`](./TRADEMARKS.md#what-counts-as-a-modified-version).
 
-**The brand** belongs to Dmitry Togulev, and the Release любой ценой logo to him and Alexey
-Shtyrnyaev. The logos of Release любой ценой and MythHand, and the icons made from them, may be
-used only as they are and only in the cases below; a modified version beyond them replaces them.
-How the name and logos may be used, and the terms for mods: [`TRADEMARKS.md`](./TRADEMARKS.md).
+**Name and logos.** The names Release любой ценой and MythHand, the MythHand logo, the icons
+made from the logos, the start-screen photo and the logo's sound belong to Dmitry Togulev; the
+Release любой ценой logo belongs to him and Alexey Shtyrnyaev. These files may be used only as
+they are and only in the cases below; any other modified version replaces them with its own. How
+the names and logos may be used, and the terms for mods: [`TRADEMARKS.md`](./TRADEMARKS.md).
 
 | Case | Allowed? |
 |------|----------|
 | Run it for yourself, changed or not, where no one else can reach it — to try it, or to prepare a change | yes |
 | Run or share an unmodified copy, non-commercially | yes |
-| Run an unmodified copy inside a team or a company, team-building included | yes — the one case we permit on top of the licences |
-| Run a modified copy inside a team or a company — your own logo, texts rewritten for the company | no |
-| Run or share a modified copy publicly, non-commercially | yes — as a mod, on the terms in [`TRADEMARKS.md`](./TRADEMARKS.md#mods) |
-| Anything commercial | no — except the source code on its own, without the cards, texts and brand |
+| Run an unmodified copy inside a company or another organisation for its own staff, team-building included | yes — the one case we permit on top of the licences |
+| Run a modified copy inside a company or another organisation — any change to the code, the rules, the cards, the texts or the logos | no — the code on its own falls under the AGPL, but not together with our cards, texts, names and logos |
+| Run or share a modified copy publicly, non-commercially | yes — keeping our name and logos only as a mod, on the terms in [`TRADEMARKS.md`](./TRADEMARKS.md#mods); otherwise under a name and logos of its own, crediting the original as the licences require |
+| Anything commercial | no — except the source code on its own, without the cards, texts, names and logos |
 
 Third-party notice: Deploy or Die — MIT License, see [`LICENSE-deployordie`](./LICENSE-deployordie).
