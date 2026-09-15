@@ -2,8 +2,8 @@
 //
 // Plain functions rather than a store: the keeper snapshot is written from
 // `referee.ts`, which is a pure module with no React in it — and keeping it
-// that way is what lets solo play, the playground and every headless test
-// exercise the same code the network does (network/session/link.ts).
+// that way is what lets the playground and every headless test exercise the
+// same code the network does (network/session/link.ts).
 
 const CLIENT_KEY = 'release:clientId'
 const SESSION_KEY = 'release:session'

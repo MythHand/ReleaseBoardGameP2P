@@ -4,6 +4,7 @@ import {
   applyPeerJoined,
   applyPeerLeft,
   assignRole,
+  effectiveBots,
   type LobbyState,
   playerCount,
 } from './state'
@@ -35,12 +36,18 @@ export function handleJoinRequest(
   // host pruned its old peer id the instant the channel dropped, so it arrives
   // looking exactly like a newcomer — the clientId is the only thing that says
   // otherwise.
-  const seat = seats?.find((s) => s.clientId === clientId)
+  const seat = seats?.find((s) => !s.bot && s.clientId === clientId)
 
   // Role comes from the seat, never from assignRole. A returning player whose
   // room filled up behind them would otherwise be handed 'guest' and silently
   // demoted out of a match they are still seated in.
-  const role: Role = seat ? (fromId === state.hostId ? 'host' : 'player') : assignRole(state)
+  const role: Role = seat
+    ? fromId === state.hostId
+      ? 'host'
+      : 'player'
+    : seats
+      ? 'guest'
+      : assignRole(state)
 
   const peer: PeerInfo = {
     id: fromId,
@@ -68,7 +75,7 @@ export function handleJoinRequest(
         to: fromId,
         message: {
           type: 'LOBBY_CONFIG_UPDATED',
-          payload: { maxPlayers: state.maxPlayers, setup: state.setup },
+          payload: { maxPlayers: state.maxPlayers, setup: state.setup, bots: state.bots },
         },
       },
       {
@@ -222,8 +229,22 @@ export function transferHost(state: LobbyState, newHostId: string): Result {
   }
 }
 
+// The rules seat 2–6 (docs/rules/general.md:13), so one human and five bots is
+// the largest table a lone host can ask for.
+export const MAX_BOTS = 5
+
+export function setBots(state: LobbyState, bots: number): Result {
+  const clamped = Math.min(MAX_BOTS, Math.max(0, Math.trunc(bots)))
+  return {
+    state: applyConfig(state, { bots: clamped }),
+    outgoing: [
+      { to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { bots: clamped } } },
+    ],
+  }
+}
+
 export function canStart(state: LobbyState): boolean {
-  if (playerCount(state) < 2) return false
+  if (playerCount(state) + effectiveBots(state) < 2) return false
   return Object.values(state.peers)
     .filter((p) => p.role === 'host' || p.role === 'player')
     .every((p) => p.ready)

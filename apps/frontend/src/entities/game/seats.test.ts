@@ -1,5 +1,5 @@
 import type { PeerInfo } from '~/network'
-import { seatOf, seatsFor } from './seats'
+import { botSeats, seatOf, seatsFor } from './seats'
 
 const peer = (
   id: string,
@@ -66,4 +66,26 @@ it('carries each peer clientId onto the seat it is dealt', () => {
     { playerId: 'p1', peerId: 'peer-a', clientId: 'client-a', name: 'Ann' },
     { playerId: 'p2', peerId: 'peer-b', clientId: 'client-b', name: 'Bo' },
   ])
+})
+
+// Bot seats continue the same p1..pN sequence the humans are numbered in,
+// because the engine seats a table, not two kinds of player.
+it('numbers bot seats after the humans', () => {
+  const seats = botSeats(2, 3, ['Бот 1', 'Бот 2'])
+  expect(seats.map((s) => s.playerId)).toEqual(['p4', 'p5'])
+  expect(seats.map((s) => s.name)).toEqual(['Бот 1', 'Бот 2'])
+  expect(seats.every((s) => s.bot)).toBe(true)
+})
+
+// A bot holds no connection, so its ids exist only to be a stable key. They
+// carry a colon so they can never collide with a PeerJS id, which is drawn
+// from an alphabet that has none.
+it('gives a bot an address nothing can dial', () => {
+  const [seat] = botSeats(1, 1, ['Бот 1'])
+  expect(seat.peerId).toContain(':')
+  expect(seat.peerId).toBe(seat.clientId)
+})
+
+it('asks for no seats when no bots were asked for', () => {
+  expect(botSeats(0, 2, [])).toEqual([])
 })

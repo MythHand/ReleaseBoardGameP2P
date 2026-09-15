@@ -50,6 +50,11 @@ export interface Seat {
   // to and never changes for the life of the match.
   clientId: string
   name: string
+  // A seat the engine plays itself. It holds no connection, so every reader
+  // that treats "no peer in the roster" as "this player dropped" has to know
+  // the difference. It rides GAME_STARTING with the rest of the seating, so
+  // every peer learns it at the same moment.
+  bot?: boolean
 }
 
 // Discriminated union of every protocol message ({ type, payload }).
@@ -73,7 +78,7 @@ export type Message =
   // everyone went. Addressed to the host, which applies it and re-broadcasts the
   // updated PeerInfo — exactly the path PLAYER_READY takes.
   | { type: 'WHEREABOUTS'; payload: { where: Where } }
-  | { type: 'LOBBY_CONFIG_UPDATED'; payload: { maxPlayers?: number; setup?: Setup } }
+  | { type: 'LOBBY_CONFIG_UPDATED'; payload: { maxPlayers?: number; setup?: Setup; bots?: number } }
   | { type: 'LOBBY_DISBANDED'; payload: Record<string, never> }
   | { type: 'PLAYER_KICKED'; payload: { peerId: string; reason?: string } }
   | { type: 'TRANSFER_HOST'; payload: { newHostId: string } }

@@ -31,3 +31,23 @@ export function seatsFor(peers: Record<string, PeerInfo>): Seat[] {
 export function seatOf(seats: Seat[], peerId: string): Seat | null {
   return seats.find((s) => s.peerId === peerId) ?? null
 }
+
+// A bot's address. It holds no connection, so this exists only to be a stable
+// key for the row and the seat — nothing is ever sent to it. The colon keeps it
+// out of the PeerJS id space, whose alphabet has none, so a synthetic address
+// can never collide with a real peer.
+const botAddress = (n: number) => `bot:${n}`
+
+// The seats the bots take, continuing the human numbering. `afterHumans` is how
+// many seats the people already took, and `names` must hold exactly `count`
+// entries: they are display copy and cannot be built here, because this module
+// is below the i18n boundary (see useStartGame).
+export function botSeats(count: number, afterHumans: number, names: string[]): Seat[] {
+  return Array.from({ length: count }, (_, i) => ({
+    playerId: seatId(afterHumans + i),
+    peerId: botAddress(i + 1),
+    clientId: botAddress(i + 1),
+    name: names[i] ?? '',
+    bot: true,
+  }))
+}

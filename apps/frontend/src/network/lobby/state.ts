@@ -4,6 +4,12 @@ export interface LobbyState {
   selfId: string
   hostId: string
   maxPlayers: number
+  // How many bots the host has ASKED for — a ceiling, not a reservation. What
+  // the table can actually seat is `effectiveBots` below, which shrinks as
+  // people take the seats and grows back when they leave. Storing the request
+  // rather than the outcome is what keeps a bot from ever costing a person a
+  // seat, and what saves this from needing a displacement rule.
+  bots: number
   setup: Setup
   peers: Record<string, PeerInfo>
 }
@@ -12,6 +18,7 @@ export function createLobbyState(args: {
   selfId: string
   hostId: string
   maxPlayers: number
+  bots?: number
   setup?: Setup
   peers: PeerInfo[]
 }): LobbyState {
@@ -21,6 +28,7 @@ export function createLobbyState(args: {
     selfId: args.selfId,
     hostId: args.hostId,
     maxPlayers: args.maxPlayers,
+    bots: args.bots ?? 0,
     setup: args.setup ?? {},
     peers,
   }
@@ -28,6 +36,16 @@ export function createLobbyState(args: {
 
 export function playerCount(state: LobbyState): number {
   return Object.values(state.peers).filter((p) => p.role === 'host' || p.role === 'player').length
+}
+
+// What the table can actually seat, given who is in it. Every reader derives
+// bots from this rather than storing which seats are bots — storing that is
+// what would force a displacement rule when somebody joins, a kick rule for a
+// thing that cannot be kicked, and a ready rule for a thing that is always
+// ready. `Math.max(0, …)` covers a capacity lowered below the people already
+// present, where the subtraction goes negative.
+export function effectiveBots(state: LobbyState): number {
+  return Math.max(0, Math.min(state.bots, state.maxPlayers - playerCount(state)))
 }
 
 export function assignRole(state: LobbyState): 'player' | 'guest' {
@@ -39,6 +57,11 @@ export function applyPeerList(state: LobbyState, peers: PeerInfo[]): LobbyState 
     selfId: state.selfId,
     hostId: state.hostId,
     maxPlayers: state.maxPlayers,
+    // Forwarded like every other field here: rebuilding through
+    // createLobbyState without it would silently reset a guest's bot count
+    // to the `?? 0` default on every PEER_LIST, undoing whatever
+    // LOBBY_CONFIG_UPDATED had already told it.
+    bots: state.bots,
     setup: state.setup,
     peers,
   })
@@ -56,11 +79,12 @@ export function applyPeerLeft(state: LobbyState, peerId: string): LobbyState {
 
 export function applyConfig(
   state: LobbyState,
-  patch: { maxPlayers?: number; setup?: Setup },
+  patch: { maxPlayers?: number; setup?: Setup; bots?: number },
 ): LobbyState {
   return {
     ...state,
     ...(patch.maxPlayers !== undefined && { maxPlayers: patch.maxPlayers }),
     ...(patch.setup !== undefined && { setup: patch.setup }),
+    ...(patch.bots !== undefined && { bots: patch.bots }),
   }
 }
