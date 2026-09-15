@@ -26,11 +26,15 @@ strategy.
 Checks from the repository root:
 
 ```sh
-pnpm --filter @release/web exec release-tsc --noEmit -p debug/tsconfig.json
+pnpm --filter @release/web typecheck
 pnpm --filter @release/web exec vitest run debug/scenarios.test.ts
 pnpm exec release-lint check apps/frontend/debug
-pnpm --filter @release/web exec stylelint 'debug/**/*.css'
+pnpm --filter @release/web stylelint
 ```
+
+The frontend `typecheck` and `stylelint` scripts include `debug/`, so the regular
+CI checks validate this entry as well as `src/`. The production build still uses
+the application entry only.
 
 ## Centre and transfer regression presets (#154–157)
 

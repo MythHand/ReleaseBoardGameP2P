@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "release-tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview",
-    "typecheck": "release-tsc --noEmit -p tsconfig.json",
-    "stylelint": "stylelint \"src/**/*.css\"",
+    "typecheck": "release-tsc --noEmit -p tsconfig.json && release-tsc --noEmit -p debug/tsconfig.json",
+    "stylelint": "stylelint \"src/**/*.css\" \"debug/**/*.css\"",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
