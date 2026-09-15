@@ -10,7 +10,13 @@ import LobbyPage from '../[lobbyId]'
 // mock has to hand back a shape for those keys rather than echoing the key —
 // otherwise their labels render blank and assertions on them are meaningless.
 const OBJECT_COPY: Record<string, unknown> = {
-  lobbyCode: { label: 'lobbyCode.label', copy: 'lobbyCode.copy', copied: 'lobbyCode.copied' },
+  lobbyCode: {
+    label: 'lobbyCode.label',
+    copy: 'lobbyCode.copy',
+    copied: 'lobbyCode.copied',
+    copyLink: 'lobbyCode.copyLink',
+    copyCode: 'lobbyCode.copyCode',
+  },
 }
 
 vi.mock('@release/translation', () => ({
@@ -61,6 +67,7 @@ function base(): UseLobby {
     setWhere: vi.fn(),
     kick: vi.fn(),
     setMaxPlayers: vi.fn(),
+    setBots: vi.fn(),
     startGame: vi.fn(),
     introReady: vi.fn(),
     transferHost: vi.fn(),
@@ -125,6 +132,7 @@ function inSession(): UseLobby {
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
+      bots: 0,
       setup: {
         handLimit: 'base',
         releases: 'base',
@@ -177,7 +185,7 @@ it('Continue reveals the live session view (room code, roster, copy)', () => {
   expect(screen.getByText('ABC-23D')).toBeTruthy()
   expect(screen.getByText('Host')).toBeTruthy()
   expect(screen.getByText('Pat')).toBeTruthy()
-  expect(screen.getByText('lobbyCode.copy')).toBeTruthy()
+  expect(screen.getByText('lobbyCode.copyLink')).toBeTruthy()
 })
 
 it('LobbyView guest Leave tears the session down', () => {
@@ -212,6 +220,7 @@ it('LobbyView renders spectator section when guests present', () => {
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
+      bots: 0,
       setup: {
         handLimit: 'base',
         releases: 'base',
@@ -245,14 +254,13 @@ it('LobbyView renders spectator section when guests present', () => {
 // The HUD tone is the lobby's "ready to go" signal. It rides on the same
 // canStart the Start button uses, so the green background and an enabled Start
 // can never disagree — a mismatch there is exactly what a host would query.
-// The copy button hands over the invite LINK, not the bare code — that link is
-// what opens the invite screen with the code pre-filled. @release/ui's LobbyCode
-// block copies the code, which is why this markup is rendered locally.
+// The link opens the invite screen with the code pre-filled.
 it('LobbyView copies the invite link rather than the code', () => {
+  writeText.mockClear()
   sessionValue = inSession()
   const { container } = renderInRouter(<LobbyView />)
   const copyBtn = [...container.querySelectorAll('button')].find(
-    (b) => b.textContent === 'lobbyCode.copy',
+    (b) => b.textContent === 'lobbyCode.copyLink',
   )
   expect(copyBtn).toBeTruthy()
   expect(screen.getByText('ABC-23D')).toBeTruthy()
@@ -347,4 +355,78 @@ it('announces the lobby as its whereabouts when arriving back from a match', () 
   // Otherwise everyone else's results table would still show this peer on the
   // results screen after they had left it.
   expect(setWhere).toHaveBeenCalledWith('lobby')
+})
+
+it('seats a bot from a free slot and shows it in the row above', () => {
+  const session = inSession()
+  const setBots = vi.fn()
+  sessionValue = {
+    ...session,
+    isHost: true,
+    setBots,
+    // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
+    state: { ...session.state!, maxPlayers: 6, bots: 2 },
+  }
+  renderInRouter(<LobbyView />)
+
+  // Two bot rows: one per bot the host asked for (inSession() seats 2 humans,
+  // so 6 - 2 = 4 free seats comfortably cover the 2 asked for).
+  expect(screen.getAllByText('lobbyScreen.botName')).toHaveLength(2)
+
+  // One button per remaining free seat; pressing any of them asks for one more
+  // bot than the table currently shows, not one more than the stored ask.
+  const add = screen.getAllByText('lobbyScreen.addBot')
+  expect(add).toHaveLength(2)
+  fireEvent.click(add[0])
+  expect(setBots).toHaveBeenCalledWith(3)
+})
+
+it('takes a bot away through the same menu that kicks a person', () => {
+  const session = inSession()
+  const setBots = vi.fn()
+  sessionValue = {
+    ...session,
+    isHost: true,
+    setBots,
+    // A table whose seats are full enough to clamp the ask: 2 humans in 3
+    // seats leaves room for one of the five bots asked for. What the host sees
+    // is one bot, and that is what [remove] must count down from.
+    // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
+    state: { ...session.state!, maxPlayers: 3, bots: 5 },
+  }
+  renderInRouter(<LobbyView />)
+
+  // The bot row comes after the two human ones, and the humans' menus carry
+  // kick rather than this — so opening the third menu opens the bot's.
+  const menus = screen.getAllByLabelText('lobbyScreen.actions')
+  fireEvent.click(menus[menus.length - 1])
+  fireEvent.click(screen.getByText('lobbyScreen.removeBot'))
+
+  // Counted down from the one bot on screen, not from the ask of five.
+  expect(setBots).toHaveBeenCalledWith(0)
+})
+
+// The controls are the host's, exactly as the capacity slider is. A guest still
+// sees the bots — in the rows.
+it('hides the bot controls from a guest but not the bots', () => {
+  const session = inSession()
+  sessionValue = {
+    ...session,
+    isHost: false,
+    // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
+    state: { ...session.state!, maxPlayers: 6, bots: 1 },
+  }
+  renderInRouter(<LobbyView />)
+
+  expect(screen.queryByText('lobbyScreen.addBot')).toBeNull()
+  expect(screen.queryByText('lobbyScreen.removeBot')).toBeNull()
+  expect(screen.getAllByText('lobbyScreen.botName')).toHaveLength(1)
+})
+
+it('copies the bare room code through its separate header button', () => {
+  writeText.mockClear()
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  fireEvent.click(screen.getByText('lobbyCode.copyCode'))
+  expect(writeText).toHaveBeenCalledWith('ABC-23D')
 })

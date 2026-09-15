@@ -51,7 +51,13 @@ export default function PlayerSlot({
   )
 }
 
-// Пустой слот-заглушка (пунктирная строка): «свободный слот» и т.п.
-export function EmptySlot({ children }: { children: ReactNode }) {
-  return <div className={styles.slotEmpty}>{children}</div>
+// An empty slot can carry an action (adding a bot) in the same end cluster
+// used for occupied rows' status, so controls align across the player column.
+export function EmptySlot({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className={styles.slotEmpty}>
+      {children}
+      {Boolean(action) && <div className={styles.rowEnd}>{action}</div>}
+    </div>
+  )
 }

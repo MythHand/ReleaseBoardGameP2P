@@ -156,3 +156,27 @@ it('gives a seat with no counters a row of zeros rather than dropping it', () =>
 it('has no rows when nobody was seated', () => {
   expect(toStatPlayers({ tally: {}, seats: [], peers })).toEqual([])
 })
+
+// A bot is in no roster, and absence is how this module spells "offline" —
+// so without the check a bot would be reported as a player who left.
+it('reports a bot seat as being in the game, not offline', () => {
+  const rows = toStatPlayers({
+    tally: {},
+    seats: [
+      { playerId: 'p1', peerId: 'peer-a', name: 'Ann' },
+      { playerId: 'p2', peerId: 'bot:1', name: 'Бот 1', bot: true },
+    ],
+    peers: {
+      'peer-a': {
+        id: 'peer-a',
+
+        name: 'Ann',
+        role: 'host',
+        ready: true,
+        where: 'stats',
+      },
+    },
+  })
+  expect(rows.map((r) => r.location)).toEqual(['stats', 'game'])
+  expect(rows[1].name).toBe('Бот 1')
+})

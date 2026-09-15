@@ -1,0 +1,25 @@
+All rights reserved by the copyright holders named for each file in REUSE.toml, except as
+permitted below.
+
+The files this identifier is applied to in REUSE.toml are protected. The licences
+that let the source code (AGPL-3.0-or-later) and the game content (CC BY-NC-SA 4.0)
+be used do not extend to them.
+
+They may be used — run, displayed and redistributed as part of this project — only
+in these cases, and only as they are: the files themselves may not be altered.
+
+1. In a copy of this project run for yourself, changed or not, where no one else
+   can reach it — to try the project, or to prepare a change to it.
+2. In an unmodified copy of this project, non-commercially.
+3. In an unmodified copy of this project run inside a company or another
+   organisation for its own staff, team-building included.
+4. In a modified version run or shared publicly and non-commercially, as a mod,
+   on the terms set out under "Mods" in TRADEMARKS.md.
+
+What makes a copy modified is defined in TRADEMARKS.md: setting up the environment
+the game runs in does not. No other use is permitted — in particular, no commercial
+use, and no use in a modified version played inside a company or another
+organisation.
+
+How the project's name and logos may be referred to is described in
+TRADEMARKS.md.

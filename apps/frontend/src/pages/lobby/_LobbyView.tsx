@@ -2,11 +2,11 @@ import { useTranslation } from '@release/translation'
 import {
   Badge,
   Button,
-  CopyButton,
   EmptySlot,
   GameSettings,
   HudBackground,
   LangSwitcher,
+  LobbyCode,
   Modal,
   PlayerSlot,
   Slider,
@@ -17,6 +17,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { useStartGame } from '~/features/start-game/useStartGame'
+import { effectiveBots } from '~/network'
 import type { PeerInfo } from '~/network/types'
 import { BASE_URL } from '~/shared/config'
 import AppLogo from '~/shared/ui/AppLogo'
@@ -51,6 +52,10 @@ export default function LobbyView() {
   const spectators = Object.values(state.peers).filter((p) => p.role === 'guest')
   const capacity = state.maxPlayers
   const minCapacity = Math.max(2, players.length)
+  // What the table can actually give right now — capped by the free seats — as
+  // distinct from `state.bots`, the raw number the host asked for. They differ
+  // whenever people fill or leave seats.
+  const bots = effectiveBots(state)
 
   // The invite link — what a host actually sends someone. Opening it lands on
   // the invite screen with the code already filled in.
@@ -59,6 +64,15 @@ export default function LobbyView() {
     : ''
 
   const setMode = (key: string, value: string) => session.setSetup({ ...state.setup, [key]: value })
+
+  // Both act on the number the host can SEE (`bots`), not on the raw ask stored
+  // in `state.bots`. With the slider gone there is no control showing the ask,
+  // so letting the two drift would make a click do nothing visible: a host who
+  // once asked for five and now has one free seat would press [remove] and
+  // watch the row stay. The ceiling still does its job between clicks — a bot
+  // yields its seat to a joiner and comes back when they leave.
+  const addBot = () => session.setBots(bots + 1)
+  const removeBot = () => session.setBots(bots - 1)
 
   const leave = () => {
     session.leaveSession()
@@ -73,10 +87,11 @@ export default function LobbyView() {
   // Fill the player column with empty slots up to the capacity. Each slot
   // carries a stable key — empty slots are keyed by their fixed position rather
   // than the raw render index, so React identity stays put as players come/go.
-  const slots: { key: string; peer: PeerInfo | null }[] = [
+  const slots: { key: string; peer: PeerInfo | null; bot?: number }[] = [
     ...players.map((p) => ({ key: p.id, peer: p })),
-    ...Array.from({ length: Math.max(0, capacity - players.length) }, (_, j) => ({
-      key: `empty-${players.length + j}`,
+    ...Array.from({ length: bots }, (_, i) => ({ key: `bot-${i}`, peer: null, bot: i + 1 })),
+    ...Array.from({ length: Math.max(0, capacity - players.length - bots) }, (_, j) => ({
+      key: `empty-${players.length + bots + j}`,
       peer: null as PeerInfo | null,
     })),
   ]
@@ -127,25 +142,11 @@ export default function LobbyView() {
           </Typography>
         </div>
         <div className={styles.headRight}>
-          <div className={styles.codeBox}>
-            <Typography base="label-sm" tk="tk-16" as="span" className={styles.codeLabel}>
-              {t('lobbyCode.label')}
-            </Typography>
-            <div className={styles.codeRow}>
-              {/* Copies the invite link, not the bare code — that link is what
-                  opens the invite screen with the code already filled in. */}
-              <CopyButton
-                variant="tech"
-                copyValue={shareUrl}
-                copiedChildren={t('lobbyCode.copied')}
-              >
-                {t('lobbyCode.copy')}
-              </CopyButton>
-              <Typography variant="code" className={styles.codeValue}>
-                {session.roomCode}
-              </Typography>
-            </div>
-          </div>
+          <LobbyCode
+            code={session.roomCode ?? ''}
+            link={shareUrl}
+            copy={t('lobbyCode', { returnObjects: true })}
+          />
           <LangSwitcher
             value={i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'}
             onChange={(lang) => i18n.changeLanguage(lang)}
@@ -184,7 +185,7 @@ export default function LobbyView() {
             <Typography variant="sectionTitle" className={styles.h}>
               {t('lobbyScreen.players')}
               <Typography base="mono-md" tk="tk-10" as="span" className={styles.count}>
-                {players.length} / {capacity}
+                {players.length + bots} / {capacity}
               </Typography>
             </Typography>
 
@@ -200,7 +201,7 @@ export default function LobbyView() {
             )}
 
             <div className={styles.list}>
-              {slots.map(({ key, peer: p }) =>
+              {slots.map(({ key, peer: p, bot }) =>
                 p ? (
                   <PlayerSlot
                     key={key}
@@ -218,8 +219,40 @@ export default function LobbyView() {
                     dropdownLabel={t('lobbyScreen.actions')}
                     dropdown={isHost && p.id !== state.selfId ? kickItems(p.id) : undefined}
                   />
+                ) : bot ? (
+                  // Removal goes through the same ⋯ menu that kicks a person, and
+                  // takes the count down by one rather than this particular row:
+                  // bots have no identity beyond their number, so the row that
+                  // disappears is always the last one.
+                  <PlayerSlot
+                    key={key}
+                    name={t('lobbyScreen.botName', { n: bot })}
+                    badge={
+                      <Badge tone="muted" size="sm" outlined>
+                        {t('lobbyScreen.roleBot')}
+                      </Badge>
+                    }
+                    status={<Badge tone="success">{t('lobbyScreen.ready')}</Badge>}
+                    dropdownLabel={t('lobbyScreen.actions')}
+                    dropdown={
+                      isHost
+                        ? [{ label: t('lobbyScreen.removeBot'), onClick: removeBot }]
+                        : undefined
+                    }
+                  />
                 ) : (
-                  <EmptySlot key={key}>{t('lobbyScreen.freeSlot')}</EmptySlot>
+                  <EmptySlot
+                    key={key}
+                    action={
+                      isHost ? (
+                        <Button variant="pill" onClick={addBot}>
+                          {t('lobbyScreen.addBot')}
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    {t('lobbyScreen.freeSlot')}
+                  </EmptySlot>
                 ),
               )}
             </div>

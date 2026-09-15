@@ -26,8 +26,9 @@ export function toStatPlayers(args: {
       // played under, and the only one left once a peer is gone.
       name: peer?.name ?? seat.name,
       // Absence IS the offline signal — nobody announces their own
-      // disconnection, so `where` has no such member to read.
-      location: peer?.where ?? 'offline',
+      // disconnection, so `where` has no such member to read. A bot is the one
+      // seat that is absent from the roster without having gone anywhere.
+      location: seat.bot ? 'game' : (peer?.where ?? 'offline'),
       ...counts,
     }
   })

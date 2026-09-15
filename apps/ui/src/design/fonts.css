@@ -1,0 +1,44 @@
+/* The three families the game is set in, served from the repository rather than
+   a font CDN (SIL OFL 1.1 — the OFL.txt beside each family). Onest and JetBrains
+   Mono are variable: one file carries every weight. Fira Mono comes in 400, 500
+   and 700. */
+
+@font-face {
+  font-family: Onest;
+  font-style: normal;
+  font-weight: 100 900;
+  src: url("../assets/fonts/onest/Onest-VariableFont_wght.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  src: url("../assets/fonts/jetbrains-mono/JetBrainsMono-VariableFont_wght.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Fira Mono";
+  font-style: normal;
+  font-weight: 400;
+  src: url("../assets/fonts/fira-mono/FiraMono-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Fira Mono";
+  font-style: normal;
+  font-weight: 500;
+  src: url("../assets/fonts/fira-mono/FiraMono-Medium.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Fira Mono";
+  font-style: normal;
+  font-weight: 700;
+  src: url("../assets/fonts/fira-mono/FiraMono-Bold.woff2") format("woff2");
+  font-display: swap;
+}

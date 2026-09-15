@@ -1,4 +1,4 @@
-import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
+import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, WINDOW_FIRST_MS } from '@release/engine/fake'
 import { act, renderHook as renderTestingHook } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import type { PrivateSeat } from '~/entities/game/seats'
@@ -10,7 +10,7 @@ import {
   type StoredSession,
 } from '~/shared/lib/persistence'
 import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
-import { createSession } from './session/referee'
+import { createSession, type Seat as RefereeSeat } from './session/referee'
 import { INTRO_CAP_MS } from './session/startGate'
 import { createTransport } from './transport/peer'
 import type { Message, Setup, WireMessage } from './types'
@@ -94,6 +94,11 @@ vi.mock('./transport/peer', () => ({
 
 beforeEach(() => {
   transports.length = 0
+  // createTransport is one shared vi.fn() for the whole file, so its call
+  // history accumulates across every test unless cleared here — without this,
+  // a solo test asserting `.not.toHaveBeenCalled()` would see every networked
+  // test that ran before it and fail no matter what it does itself.
+  vi.mocked(createTransport).mockClear()
   // The hook writes `release:session` / `release:keeper` now, so a record left
   // by the previous test would be read as this one's — and now that the mount
   // effect restores from one automatically (host restore, below), a leftover
@@ -247,7 +252,7 @@ it('host startGame broadcasts GAME_STARTING and records the game id', async () =
   expect(result.current.gameId).toBeNull()
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   const hostId = result.current.state?.hostId
@@ -477,7 +482,7 @@ it('forgets the game id when the session is torn down', async () => {
     await result.current.createRoom('Dimbo', 6)
   })
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   expect(result.current.gameId).not.toBeNull()
 
@@ -499,7 +504,7 @@ it('walking back to the lobby forgets the match but keeps its seating', async ()
   // inside a click handler rather than on the data.
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   const dealt = result.current.seats
   expect(dealt).toHaveLength(2)
@@ -518,14 +523,14 @@ it('a new match replaces the seating the last one left behind', async () => {
   // Why keeping it across leaveGame is safe: nothing reads it stale.
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   act(() => {
     result.current.leaveGame()
   })
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   expect(result.current.gameId).toBe(`${result.current.state?.hostId}-2`)
@@ -599,7 +604,7 @@ it('keeps resume tokens out of every public host frame', async () => {
     sessionStorage.setItem('release:resumeToken', HOST_RESUME_TOKEN)
     const hosted = await hostWithGuest()
     act(() => {
-      hosted.result.current.startGame()
+      hosted.result.current.startGame([])
       transports[0].onDisconnect?.(GUEST)
       transports[0].onMessage?.({
         type: 'JOIN_REQUEST',
@@ -645,6 +650,67 @@ it('keeps resume tokens out of every public host frame', async () => {
     expect(serialized).not.toContain(HOST_RESUME_TOKEN)
     expect(serialized).not.toContain(GUEST_RESUME_TOKEN)
     restored.unmount()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('seats the asked-for bots after the humans when the match starts', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.setBots(2)
+  })
+  act(() => {
+    result.current.startGame(['Бот 1', 'Бот 2'])
+  })
+
+  const seats = result.current.seats
+  expect(seats.map((s) => s.playerId)).toEqual(['p1', 'p2', 'p3', 'p4'])
+  expect(seats.filter((s) => s.bot).map((s) => s.name)).toEqual(['Бот 1', 'Бот 2'])
+  // The humans are untouched by the presence of bots.
+  expect(seats.filter((s) => !s.bot)).toHaveLength(2)
+})
+
+it('seats nobody extra when no bots were asked for', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame([])
+  })
+  expect(result.current.seats.some((s) => s.bot)).toBe(false)
+})
+
+// The regression this closes: a bot seat's wire address (`bot:N`, the roster
+// row's key) used to be handed straight to the referee as its seat's peerId
+// too. `driveUnattended` (session/referee.ts) only ever plays a seat whose
+// peerId is null, so a bot seated from the lobby had a non-null peerId and
+// was never selected — the table just waited on it forever. `storedKeeper()`
+// is how this file already reaches the referee's own seats (see "stores the
+// lobby seating beside the referee's" above): the wire seating (`result.
+// current.seats`) is a different array on purpose and would not have caught
+// this.
+it("nulls a bot's peerId in the referee even though the wire seating keeps its bot:N address", async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    act(() => {
+      result.current.setBots(1)
+    })
+    act(() => {
+      result.current.startGame(['Бот 1'])
+    })
+    act(() => {
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+
+    const botSeat = result.current.seats.find((s) => s.bot)
+    expect(botSeat?.peerId).toBe('bot:1')
+
+    // `StoredKeeper.seats` is `unknown` (persistence.ts does not import
+    // engine/referee types), so this is exactly the referee's own `Seat[]`
+    // read back through the one seam that exposes it to a test.
+    const refereeSeats = storedKeeper()?.seats as RefereeSeat[] | undefined
+    const refereeSeat = refereeSeats?.find((s) => s.playerId === botSeat?.playerId)
+    expect(refereeSeat?.peerId).toBeNull()
   } finally {
     vi.useRealTimers()
   }
@@ -715,7 +781,7 @@ it('rotates credentials between rooms so a former host cannot claim the later se
       from: GUEST,
       seq: 1,
     })
-    host.result.current.startGame()
+    host.result.current.startGame([])
     hostTransport.onDisconnect?.(GUEST)
     hostTransport.onMessage?.({
       type: 'JOIN_REQUEST',
@@ -829,7 +895,7 @@ it('drops an empty resume token without poisoning game start', async () => {
   expect(result.current.state?.peers[GUEST]).toBeUndefined()
   expect(() => {
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
   }).not.toThrow()
   expect(result.current.seats).toEqual([
@@ -837,10 +903,72 @@ it('drops an empty resume token without poisoning game start', async () => {
   ])
 })
 
+// The other half of the same regression: nulling the referee's peerId is only
+// worth anything if `driveUnattended` actually then plays the seat. A solo
+// host (no guest) plus one bot mirrors session/botPlay.test.ts's own
+// `botGame(1)` fixture — same two-seat shape, same seed — so the same
+// vetted script (a clean opening draw, five ticks to hand the turn back)
+// applies here too, this time reached through `startGame` itself rather than
+// a hand-built session.
+it('drives a bot seat to completion once startGame has seated it', async () => {
+  vi.useFakeTimers()
+  const seed = vi.spyOn(crypto, 'getRandomValues').mockImplementation(((arr: Uint32Array) => {
+    arr[0] = 17
+    return arr
+  }) as typeof crypto.getRandomValues)
+  try {
+    const rendered = renderHook(() => useLobby())
+    await act(async () => {
+      await rendered.result.current.createRoom('Ann', 6)
+    })
+    act(() => {
+      rendered.result.current.setBots(1)
+    })
+    act(() => {
+      rendered.result.current.startGame(['Бот 1'])
+    })
+    // Opens the gate: a solo host is the only seat it waits on.
+    act(() => {
+      rendered.result.current.introReady()
+    })
+    expect(rendered.result.current.gameSync?.view.turn.player).toBe('p1')
+
+    // The host's own opening turn — a human seat, so nothing plays it but the
+    // human. Once it ends, only the bot (p2) is left to move.
+    act(() => {
+      rendered.result.current.gameLink?.submit({ type: 'DRAW' })
+    })
+    act(() => {
+      rendered.result.current.gameLink?.submit({ type: 'PUSH' })
+    })
+    expect(rendered.result.current.gameSync?.view.turn.player).toBe('p2')
+
+    // One action per tick, exactly as botPlay.test.ts drives the same seed —
+    // nothing here submits anything on the bot's behalf. The budget is a
+    // duration rather than a tick count for the reason given there: a bot that
+    // releases opens a contest window, and the window closes on elapsed time,
+    // which only the keeper's own `tick` may spend.
+    const budget = WINDOW_FIRST_MS + 5_000
+    for (
+      let i = 0;
+      i < budget / 250 && rendered.result.current.gameSync?.view.turn.player === 'p2';
+      i += 1
+    ) {
+      act(() => {
+        vi.advanceTimersByTime(250)
+      })
+    }
+    expect(rendered.result.current.gameSync?.view.turn.player).toBe('p1')
+  } finally {
+    seed.mockRestore()
+    vi.useRealTimers()
+  }
+})
+
 it('host builds the game behind a gate covering every seat', async () => {
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   const syncs = () => sentTo(GUEST).filter((m) => m.type === 'SYNC').length
   // The deal's own projection, and nothing else yet.
@@ -874,7 +1002,7 @@ it('host builds the game behind a gate covering every seat', async () => {
 it('the opening projection carries the deal to every seat', async () => {
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   // Asserted on what actually left this peer, not on `createSession`'s return
@@ -894,7 +1022,7 @@ it('the opening projection carries the deal to every seat', async () => {
 it('gives the local seat its deal too, not only the wire', async () => {
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   // The host's own seat is served through its local link rather than a
   // connection to itself, so it is a separate delivery path and a separate way
@@ -947,7 +1075,7 @@ it('cancels the start gate when the session is torn down', async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // Buffered behind the gate: the cap firing is what would later play it.
     act(() => {
@@ -974,7 +1102,7 @@ it("a rematch takes the previous match's keeper and gate down with it", async ()
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // Buffered behind match 1's gate. Match 1's cap is the only thing that would
     // ever play it — and after a rematch there is no match 1 to play it into.
@@ -983,7 +1111,7 @@ it("a rematch takes the previous match's keeper and gate down with it", async ()
     })
 
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       vi.advanceTimersByTime(INTRO_CAP_MS + 1)
@@ -1038,12 +1166,12 @@ it('gives each match its own id, so a second one is distinguishable from the fir
   const hostId = result.current.state?.hostId ?? ''
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   const first = result.current.gameId
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   const second = result.current.gameId
 
@@ -1106,7 +1234,7 @@ it('records the match in the stored session when the host starts one', async () 
   const { result } = await hostWithGuest()
 
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   // Without this a restore knows the room but not that a match is running, and
@@ -1137,7 +1265,7 @@ it('forgets what it stored when the room is left', async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
@@ -1186,7 +1314,7 @@ it('coalesces a burst of keeper commits into one serialization', async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // The write trails the commit; nothing has been serialized yet.
     expect(keeperWrites(writes)).toBe(0)
@@ -1229,7 +1357,7 @@ it('does not rewrite the snapshot for a keeper that is only ticking', async () =
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       result.current.introReady()
@@ -1266,7 +1394,7 @@ it('cannot let a pending snapshot land after the room is left', async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // Teardown inside the throttle's window, which is where the race lives.
     act(() => {
@@ -1290,7 +1418,7 @@ it("stores private seating beside the referee's public seats", async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
@@ -1323,7 +1451,7 @@ it("stores private seating beside the referee's public seats", async () => {
 async function hostWhoseGuestDropped(): Promise<ReturnType<typeof renderHook>> {
   const rendered = await hostWithGuest()
   act(() => {
-    rendered.result.current.startGame()
+    rendered.result.current.startGame([])
   })
   act(() => {
     transports[0].onDisconnect?.(GUEST)
@@ -1350,7 +1478,7 @@ async function hostWithOpenGame(): Promise<ReturnType<typeof renderHook>> {
     return values
   })
   act(() => {
-    rendered.result.current.startGame()
+    rendered.result.current.startGame([])
   })
   random.mockRestore()
   act(() => {
@@ -1489,7 +1617,7 @@ it('rejects intents before and after invalid authentication, then accepts one af
 it('rejects intro readiness before and after invalid authentication, then accepts it after valid rejoin', async () => {
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
   act(() => {
     result.current.introReady()
@@ -1559,7 +1687,7 @@ it('tells the keeper about a dropped peer, not just the roster', async () => {
 it('recovers a returning seat even when its JOIN_REQUEST beats onDisconnect there', async () => {
   const { result } = await hostWithGuest()
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   // Deliberately do NOT fire onDisconnect for GUEST first. WebRTC disconnect
@@ -1569,7 +1697,7 @@ it('recovers a returning seat even when its JOIN_REQUEST beats onDisconnect ther
   // in the rejoin branch, the referee's seat still names the dead peer id,
   // `rebind` refuses the claim, and the seat is soft-locked with no
   // self-healing path: every later intent from RETURNED fails seat
-  // resolution, and driveAbsent never engages because the referee still
+  // resolution, and driveUnattended never engages because the referee still
   // believes the seat is connected.
   rejoin()
 
@@ -1748,7 +1876,7 @@ it('walking back to the lobby drops the stored match but keeps the room', async 
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
@@ -1778,7 +1906,7 @@ it('a snapshot still on its trailing edge cannot survive walking back to the lob
   try {
     const { result } = await hostWithGuest()
     act(() => {
-      result.current.startGame()
+      result.current.startGame([])
     })
     // Left inside the throttle's window: the deal's snapshot is queued and not
     // yet serialized, so only cancelling it keeps it from landing behind the
@@ -2176,7 +2304,7 @@ it('preserves non-default lobby configuration when starting a rematch after rest
     })
     act(() => {
       result.current.leaveGame()
-      result.current.startGame()
+      result.current.startGame([])
     })
 
     const rematchGameId = result.current.gameId
@@ -2312,7 +2440,7 @@ it('reseeds the match counter on restore, so a rematch does not reuse the restor
     result.current.leaveGame()
   })
   act(() => {
-    result.current.startGame()
+    result.current.startGame([])
   })
 
   expect(result.current.gameId).not.toBeNull()
@@ -3275,4 +3403,134 @@ it("retry() firing while an earlier attempt's dial is still inside createTranspo
   // even though the connection the player is actually looking at (this
   // transport) succeeded.
   expect(result.current.reconnect.status).toBe('idle')
+})
+
+it('does not rebind or route a newcomer claiming a bot resume token into the match', async () => {
+  const { result, unmount } = renderHook(() => useLobby())
+  try {
+    await act(async () => {
+      await result.current.createRoom('Host', 6)
+    })
+    act(() => result.current.setBots(1))
+    act(() => result.current.startGame(['Bot 1']))
+    const seating = result.current.seats
+    transports[0].send.mockClear()
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'JOIN_REQUEST',
+        from: 'new-peer',
+        payload: { name: 'Newcomer', resumeToken: 'bot:1' },
+      } as WireMessage)
+    })
+    expect(result.current.state?.peers['new-peer'].role).toBe('guest')
+    expect(result.current.seats).toEqual(seating)
+    expect(
+      transports[0].send.mock.calls.some(([, message]) => message.type === 'GAME_STARTING'),
+    ).toBe(false)
+  } finally {
+    unmount()
+  }
+})
+
+it('restores a host with a bot and continues its turn without human absence grace', async () => {
+  vi.useFakeTimers()
+  vi.setSystemTime(1_000_000)
+  const engine = createFakeEngine()
+  const { session } = createSession({
+    gameId: 'g1',
+    keeperId: 'p1',
+    engine,
+    seed: 17,
+    players: [
+      { playerId: 'p1', peerId: 'peer0', name: 'Host' },
+      { playerId: 'p2', peerId: null, name: 'Bot 1', bot: true },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const drawn = engine.reduce(session.state, { type: 'DRAW', player: 'p1', at: Date.now() })
+  const pushed = engine.reduce(drawn.state, { type: 'PUSH', player: 'p1', at: Date.now() })
+  expect(pushed.state.turn.player).toBe('p2')
+  storedHostSession('g1')
+  const botSeat = { playerId: 'p2', peerId: 'bot:1', name: 'Bot 1', bot: true }
+  sessionStorage.setItem(
+    KEEPER_KEY,
+    JSON.stringify({
+      gameId: 'g1',
+      keeperId: 'p1',
+      state: pushed.state,
+      seats: session.seats,
+      privateSeats: [
+        { seat: { playerId: 'p1', peerId: 'peer0', name: 'Host' }, resumeToken: HOST_RESUME_TOKEN },
+        { seat: botSeat, resumeToken: null },
+      ],
+      log: [...session.log, ...drawn.events, ...pushed.events],
+      savedAt: Date.now(),
+    } satisfies StoredKeeper),
+  )
+  const { result, unmount } = renderHook(() => useLobby())
+  try {
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(result.current.gameId).toBe('g1')
+    expect(result.current.seats).toContainEqual(botSeat)
+    expect(result.current.gameSync?.view.turn.player).toBe('p2')
+    expect(result.current.gameSync?.events).toEqual([])
+    act(() => {
+      vi.advanceTimersByTime(250)
+    })
+    expect(result.current.gameSync?.view.pending).toMatchObject({
+      kind: 'discardForRelease',
+      player: 'p2',
+    })
+    act(() => {
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+    const restored = JSON.parse(sessionStorage.getItem(KEEPER_KEY) ?? '{}') as StoredKeeper
+    expect(restored.seats).toContainEqual({
+      playerId: 'p2',
+      peerId: null,
+      absentSince: null,
+      bot: true,
+    })
+  } finally {
+    unmount()
+    vi.useRealTimers()
+  }
+})
+
+it('rebinds only the human seat when its resume token collides with a bot id', async () => {
+  const { result, unmount } = renderHook(() => useLobby())
+  try {
+    await act(async () => {
+      await result.current.createRoom('Host', 6)
+    })
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'JOIN_REQUEST',
+        from: GUEST,
+        payload: { name: 'Human', resumeToken: 'bot:1' },
+      } as WireMessage)
+    })
+    act(() => result.current.setBots(1))
+    act(() => result.current.startGame(['Bot 1']))
+    const botSeat = result.current.seats.find((seat) => seat.bot)
+    expect(botSeat?.peerId).toBe('bot:1')
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'JOIN_REQUEST',
+        from: RETURNED,
+        payload: { name: 'Human', resumeToken: 'bot:1' },
+      } as WireMessage)
+    })
+    expect(result.current.seats.find((seat) => seat.bot)).toEqual(botSeat)
+    expect(result.current.seats.find((seat) => !seat.bot && seat.name === 'Human')?.peerId).toBe(
+      RETURNED,
+    )
+    expect(sentTo(RETURNED).some((message) => message.type === 'SYNC')).toBe(true)
+  } finally {
+    unmount()
+  }
 })

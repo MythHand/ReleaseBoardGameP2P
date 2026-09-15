@@ -13,6 +13,8 @@ const COPY = {
     createGame: 'создать игру',
     startGame: 'начать игру',
     tech: 'Tech — бордер-бокс',
+    pill: 'Pill — действие в строке лобби',
+    addBot: 'добавить бота',
     rules: 'правила',
     danger: 'Danger — деструктивные',
     dangerSolid: 'danger — сплошная (модалка)',
@@ -33,6 +35,8 @@ const COPY = {
     createGame: 'create game',
     startGame: 'start game',
     tech: 'Tech — border box',
+    pill: 'Pill — lobby row action',
+    addBot: 'add bot',
     rules: 'rules',
     danger: 'Danger — destructive',
     dangerSolid: 'danger — solid (modal)',
@@ -71,6 +75,17 @@ export default function ButtonsKit() {
         <KitCell caption="disabled">
           <Button variant="tech" disabled>
             {t.rules}
+          </Button>
+        </KitCell>
+      </KitSection>
+
+      <KitSection title={t.pill}>
+        <KitCell caption="default">
+          <Button variant="pill">{t.addBot}</Button>
+        </KitCell>
+        <KitCell caption="disabled">
+          <Button variant="pill" disabled>
+            {t.addBot}
           </Button>
         </KitCell>
       </KitSection>
