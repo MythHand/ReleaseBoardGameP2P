@@ -126,6 +126,7 @@ function cardIdOf(e: Event): string | undefined {
   switch (e.type) {
     case 'upgradeThrown':
     case 'upgradeTaken':
+    case 'operationPlayed':
     case 'released':
     case 'placed':
     case 'discarded':
@@ -174,7 +175,11 @@ const SUDO_ID = 'support-sudo'
 
 function comboOf(e: Event): HistoryEntry['combo'] {
   const id =
-    e.type === 'attacked' && e.sudo ? SUDO_ID : e.type === 'released' ? e.codeReview : undefined
+    (e.type === 'attacked' || e.type === 'operationPlayed') && e.sudo
+      ? SUDO_ID
+      : e.type === 'released'
+        ? e.codeReview
+        : undefined
   if (!id) return undefined
   const card = cardById(id)
   if (!card) return undefined
@@ -270,6 +275,7 @@ function toHistoryEntry(
     case 'drawn':
     case 'upgradeThrown':
     case 'upgradeTaken':
+    case 'operationPlayed':
     case 'released':
     case 'placed':
     case 'discarded':

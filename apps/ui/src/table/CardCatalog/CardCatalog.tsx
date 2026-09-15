@@ -1,5 +1,7 @@
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
+import CardPull from '@/table/CardPull/CardPull'
+import type { HandPlayDrop } from '@/table/Hand/Hand'
 import styles from './CardCatalog.module.css'
 
 // КАТАЛОГ ВЫБОРА КАРТЫ — набор карт лицом вверх, из которого называют одну.
@@ -26,6 +28,7 @@ export interface CardCatalogProps {
   // что названо после подтверждения — держится, пока остальные уходят
   chosen?: string | null
   onPick?: (card: CardType) => void
+  onDrop?: (card: CardType, drop: HandPlayDrop) => boolean
   // ширина карты в ячейке
   width?: number
   // задержка появления между соседними ячейками
@@ -38,6 +41,7 @@ export default function CardCatalog({
   selected,
   chosen,
   onPick,
+  onDrop,
   width = 100,
   stagger = 18,
 }: CardCatalogProps) {
@@ -49,24 +53,39 @@ export default function CardCatalog({
 
   return (
     <div className={styles.grid}>
-      {cards.map((c, i) => (
-        <button
-          key={c.id}
-          type="button"
-          className={cellClass(c.id)}
-          style={{ animationDelay: `${i * stagger}ms` }}
-          onClick={open && onPick ? () => onPick(c) : undefined}
-        >
-          <Card
+      {cards.map((c, i) =>
+        onDrop ? (
+          <CardPull
+            key={c.id}
             card={c}
-            interactive={false}
+            label={c.name}
             width={width}
-            state={open && selected === c.id ? 'selected' : 'idle'}
-            // выбор одной из набора — единый цвет выбора, а не акцент категории
-            accent="var(--select-accent)"
+            disabled={!open}
+            selected={selected === c.id}
+            className={cellClass(c.id)}
+            style={{ animationDelay: `${i * stagger}ms` }}
+            onDrop={(drop) => onDrop(c, drop)}
+            onKeyboardPick={() => onPick?.(c)}
           />
-        </button>
-      ))}
+        ) : (
+          <button
+            key={c.id}
+            type="button"
+            className={cellClass(c.id)}
+            style={{ animationDelay: `${i * stagger}ms` }}
+            onClick={open && onPick ? () => onPick(c) : undefined}
+          >
+            <Card
+              card={c}
+              interactive={false}
+              width={width}
+              state={open && selected === c.id ? 'selected' : 'idle'}
+              // выбор одной из набора — единый цвет выбора, а не акцент категории
+              accent="var(--select-accent)"
+            />
+          </button>
+        ),
+      )}
     </div>
   )
 }

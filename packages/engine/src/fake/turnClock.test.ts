@@ -288,7 +288,7 @@ it('a banking resolution that reopens the window withholds the clock — the win
 
 it('a hand-scope pair banks on the attacker`s own turn, and their clock restarts with it', () => {
   // No window at all: p1 sudo-combos a Bug at p2's hand on their own turn.
-  // p2 takes the hit — the pair banks, the steal happens, and the same commit
+  // p2 takes the hit, then p1 selects a blind position. The final commit
   // returns the idle wait (and the clock) to p1, whose turn never left.
   const s = reduce(primed({ p1: [BUG, SUDO], p2: [HOTFIX] }), {
     type: 'CLOCK_STARTED',
@@ -305,15 +305,22 @@ it('a hand-scope pair banks on the attacker`s own turn, and their clock restarts
   expect(thrown.pending).toMatchObject({ kind: 'defend', scope: 'hand' })
   expect(thrown.turn.deadline).toBeUndefined()
 
-  const r = reduce(thrown, {
+  const offered = reduce(thrown, {
     type: 'RESOLVE',
     player: 'p2',
     choice: { kind: 'defend', card: null },
     at: 12_000,
   }).state
+  expect(offered.turn.deadline).toBeUndefined()
+  const r = reduce(offered, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'stealCard', index: 0 },
+    at: 13_000,
+  }).state
   expect(r.decks.discard).toEqual(expect.arrayContaining([BUG, SUDO]))
   expect(r.pending).toBeNull()
   expect(r.turn.player).toBe('p1')
-  expect(r.turn.openedAt).toBe(12_000)
-  expect(r.turn.deadline).toBe(12_000 + TURN_ACTION_MS)
+  expect(r.turn.openedAt).toBe(13_000)
+  expect(r.turn.deadline).toBe(13_000 + TURN_ACTION_MS)
 })

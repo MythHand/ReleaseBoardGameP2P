@@ -12,7 +12,7 @@ import {
 } from '../state'
 import type { PendingView } from '../view'
 import { bankToDiscard, createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
-import { stealRandom } from './handAttacks'
+import { openHandChoice } from './handAttacks'
 import { canAttackWith, closeWindow, handOverWindow, openWindow, respondersFor } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
@@ -197,25 +197,22 @@ function onHandDefend(
 
   if (choice.card === null) {
     const hitId = log.add({ type: 'tookHit', player: action.player }, pending.attackEventId)
-    const spent = bankSpent(
-      { ...state, pending: null },
-      log,
-      attacker,
-      [attackCard, ...combo],
-      'attackSpent',
-      hitId,
-    )
-    if (attackCard.id === 'attack-security-bug') {
-      return {
-        state: {
-          ...spent,
-          pending: { kind: 'requestCard', player: attacker, target: action.player },
-          eventSeq: log.seq,
+    return {
+      state: openHandChoice(
+        state,
+        log,
+        action.player,
+        attacker,
+        {
+          attack: attackCard,
+          combo: pending.combo,
+          owner: attacker,
+          parent: hitId,
         },
-        events: log.events,
-      }
+        action.at,
+      ),
+      events: log.events,
     }
-    return { state: stealRandom(spent, log, action.player, attacker), events: log.events }
   }
 
   if (!pending.canDefendWith.includes(choice.card)) {
@@ -267,18 +264,23 @@ function onHandDefend(
   if (effect === 'reflect') {
     // Works on my Machine turns the attack back on its author: the roles swap,
     // so the original target becomes the taker and the attacker the victim.
-    let swapped = bankSpent(next, log, attacker, [attackCard, ...combo], 'attackSpent', defendedId)
-    swapped = bankSpent(swapped, log, action.player, spentDefence, 'defenceSpent', defendedId)
-    if (attackCard.id === 'attack-security-bug') {
-      return {
-        state: {
-          ...swapped,
-          pending: { kind: 'requestCard', player: action.player, target: attacker },
+    const swapped = bankSpent(next, log, action.player, spentDefence, 'defenceSpent', defendedId)
+    return {
+      state: openHandChoice(
+        swapped,
+        log,
+        attacker,
+        action.player,
+        {
+          attack: attackCard,
+          combo: pending.combo,
+          owner: attacker,
+          parent: defendedId,
         },
-        events: log.events,
-      }
+        action.at,
+      ),
+      events: log.events,
     }
-    return { state: stealRandom(swapped, log, attacker, action.player), events: log.events }
   }
 
   next = bankSpent(next, log, attacker, [attackCard, ...combo], 'attackSpent', defendedId)
@@ -461,10 +463,36 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         options: mine ? state.players[p.player].hand.map((c) => c.uid) : [],
         ...(p.source ? { source: p.source } : {}),
       }
+    case 'stealCard':
+      return {
+        kind: 'stealCard',
+        player: p.player,
+        target: p.target,
+        count: p.slots.length,
+        attack: p.context.attack.id,
+        sudo: !!p.context.combo,
+        openedAt: p.openedAt,
+        deadline: p.deadline,
+      }
     case 'requestCard':
-      return { kind: 'requestCard', player: p.player, target: p.target }
+      return {
+        kind: 'requestCard',
+        player: p.player,
+        target: p.target,
+        ...(p.context ? { attack: p.context.attack.id, sudo: !!p.context.combo } : {}),
+        openedAt: p.openedAt,
+        deadline: p.deadline,
+      }
     case 'giveCard':
-      return { kind: 'giveCard', player: p.player, requested: p.requested }
+      return {
+        kind: 'giveCard',
+        player: p.player,
+        requested: p.requested,
+        attacker: p.attacker,
+        ...(p.context ? { attack: p.context.attack.id, sudo: !!p.context.combo } : {}),
+        openedAt: p.openedAt,
+        deadline: p.deadline,
+      }
     case 'neutralize503':
       return {
         kind: 'neutralize503',

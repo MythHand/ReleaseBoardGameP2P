@@ -288,7 +288,8 @@
     "tabParticipants": "участники",
     "tabRules": "правила",
     "tabModes": "игровой режим",
-    "tabChat": "чат"
+    "tabChat": "чат",
+    "stealCard": "вытащи карту из закрытого веера"
   },
   "lobbyCode": {
     "label": "код игры",
@@ -421,6 +422,7 @@
     "upgradeTaken": "взял из центра",
     "upgradeThrown": "сброшено в центр",
     "windowClosed": "реакция завершена",
-    "windowOpened": "реакция"
+    "windowOpened": "реакция",
+    "operationPlayed": "операция разыграна"
   }
 }

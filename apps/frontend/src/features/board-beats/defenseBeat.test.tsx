@@ -1166,3 +1166,17 @@ it.each([
     vi.useRealTimers()
   }
 })
+
+it('keeps a reflected hand attack visible while only the defence leaves', async () => {
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: BoardState[] = []
+  const plan = {
+    ...cancelPlan(),
+    effect: 'reflect' as const,
+    spent: [{ eventId: 14, card: 'defense-hotfix', reason: 'defenceSpent' as const }],
+  }
+  await drive(() => api.beat?.runCovered(plan, { base, publish: (s) => published.push(s) }))
+  expect(published.at(-1)?.pending).toBeNull()
+  expect(published.at(-1)?.centreAttack).toEqual({ card: 'attack-bug', sudo: false })
+})

@@ -59,6 +59,8 @@ export interface BoardOpponent {
 // Everything the engine's projection can answer. Assembled by the consumer's
 // adapter; nothing here is room- or session-shaped.
 export interface BoardState {
+  // Visual ownership only: an answered attack waits for its discard beat.
+  centreAttack?: { card: string; sudo: boolean }
   aiCause?: { card: string; eventId: number }
   you: {
     name: string
@@ -219,6 +221,7 @@ export interface BoardChromeCopy {
   // several seats at once, so it needs three captions rather than one: the ask
   // while this seat is owed, what the table is waiting for once it has
   // answered, and the sudo actor's pick from what everyone threw.
+  stealCard: string
   upgradePrompt: string
   upgradeWaiting: string
   upgradeTakePrompt: string

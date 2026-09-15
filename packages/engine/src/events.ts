@@ -33,6 +33,7 @@ export type Event = EventBase &
     | { type: 'dealt'; player: PlayerId; count: number; open?: CardId[] }
     | { type: 'drawn'; player: PlayerId; card?: CardId; pile: number; deckSize: number }
     | { type: 'released'; player: PlayerId; slot: ReleaseSlot; card: CardId; codeReview?: CardId }
+    | { type: 'operationPlayed'; player: PlayerId; card: CardId; sudo: boolean }
     | { type: 'placed'; player: PlayerId; card: CardId }
     | { type: 'discarded'; player: PlayerId; card: CardId; reason: DiscardReason }
     | { type: 'windowOpened'; player: PlayerId; slot: ReleaseSlot; round: number; deadline: number }
@@ -46,7 +47,14 @@ export type Event = EventBase &
     | { type: 'releaseStolen'; from: PlayerId; to: PlayerId; slot: ReleaseSlot; card: CardId }
     | { type: 'releaseReturned'; player: PlayerId; slot: ReleaseSlot; card: CardId }
     | { type: 'monitoringDestroyed'; player: PlayerId; card: CardId }
-    | { type: 'handTransfer'; from: PlayerId; to: PlayerId; card?: CardId }
+    | {
+        type: 'handTransfer'
+        from: PlayerId
+        to: PlayerId
+        card?: CardId
+        publicCard?: true
+        index?: number
+      }
     | { type: 'requested'; attacker: PlayerId; target: PlayerId; card: CardId; hit: boolean }
     | { type: 'revealed'; player: PlayerId; card: CardId }
     | { type: 'aiRevealed'; player: PlayerId; aiCard: CardId; eventCard: CardId }
@@ -128,6 +136,7 @@ const EVENT_PAYLOAD_KEYS: Record<EventType, readonly string[]> = {
   drawn: ['player', 'card', 'pile', 'deckSize'],
   released: ['player', 'slot', 'card', 'codeReview'],
   placed: ['player', 'card'],
+  operationPlayed: ['player', 'card', 'sudo'],
   discarded: ['player', 'card', 'reason'],
   windowOpened: ['player', 'slot', 'round', 'deadline'],
   windowClosed: ['player', 'slot'],
@@ -140,7 +149,7 @@ const EVENT_PAYLOAD_KEYS: Record<EventType, readonly string[]> = {
   releaseStolen: ['from', 'to', 'slot', 'card'],
   releaseReturned: ['player', 'slot', 'card'],
   monitoringDestroyed: ['player', 'card'],
-  handTransfer: ['from', 'to', 'card'],
+  handTransfer: ['from', 'to', 'card', 'publicCard', 'index'],
   requested: ['attacker', 'target', 'card', 'hit'],
   revealed: ['player', 'card'],
   aiRevealed: ['player', 'aiCard', 'eventCard'],
@@ -173,6 +182,9 @@ function hasExactAudience(value: unknown, expected: string[]): boolean {
 
 function hasCanonicalAudience(event: UnknownRecord): boolean {
   if (event.type === 'handTransfer') {
+    // New transfers are public choreography; redactFor removes blind faces.
+    // Legacy private transfers retain their exact original audience.
+    if (event.visibleTo === undefined) return true
     return (
       hasString(event, 'card') &&
       hasExactAudience(event.visibleTo, [event.from as string, event.to as string])
@@ -216,6 +228,10 @@ function hasEventShape(event: UnknownRecord): boolean {
     case 'upgradeThrown':
     case 'upgradeTaken':
       return hasString(event, 'player') && hasString(event, 'card')
+    case 'operationPlayed':
+      return (
+        hasString(event, 'player') && hasString(event, 'card') && typeof event.sudo === 'boolean'
+      )
     case 'discarded':
       return (
         hasString(event, 'player') &&
@@ -274,7 +290,14 @@ function hasEventShape(event: UnknownRecord): boolean {
         hasString(event, 'card')
       )
     case 'handTransfer':
-      return hasString(event, 'from') && hasString(event, 'to') && hasOptionalString(event, 'card')
+      return (
+        hasString(event, 'from') &&
+        hasString(event, 'to') &&
+        hasOptionalString(event, 'card') &&
+        (event.publicCard === undefined ||
+          (event.publicCard === true && hasString(event, 'card'))) &&
+        (event.index === undefined || hasNonNegativeInteger(event, 'index'))
+      )
     case 'requested':
       return (
         hasString(event, 'attacker') &&

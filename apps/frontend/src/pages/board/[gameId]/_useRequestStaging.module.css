@@ -21,3 +21,38 @@
 .catalog > div {
   block-size: auto;
 }
+
+.offer {
+  position: absolute;
+  inset-block-start: 12px;
+  inset-inline: 0;
+  block-size: 224px;
+  pointer-events: none;
+}
+
+.offerCard {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 50%;
+  pointer-events: auto;
+  transition: opacity 320ms var(--ease-soft);
+}
+
+.offer[data-in="false"] .offerCard {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.hint {
+  position: absolute;
+  inset-block-end: 270px;
+  inset-inline: 196px 72px;
+  color: var(--fg);
+  text-align: center;
+}
+
+.picked {
+  position: fixed;
+  z-index: var(--z-flight);
+  pointer-events: none;
+}

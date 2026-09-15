@@ -19,7 +19,7 @@ import {
   TURN_ACTION_MS,
 } from './core'
 import { onPickFromDiscard } from './discard'
-import { onGiveCard, onRequestCard } from './handAttacks'
+import { onGiveCard, onRequestCard, onStealCard } from './handAttacks'
 import { pruneEmptyPiles } from './piles'
 import { playableFor } from './project'
 import { onReorderTop } from './rebase'
@@ -291,6 +291,8 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
       return onRequestCard(state, action)
     case 'giveCard':
       return onGiveCard(state, action)
+    case 'stealCard':
+      return onStealCard(state, action)
     case 'neutralize503':
     case 'crush':
       return onNeutralize(state, action)

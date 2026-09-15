@@ -387,3 +387,92 @@ it('caps the offer at OFFER_MAX even when the donor holds more', async () => {
   expect(takes).toBe(10)
   expect(arrivals.calls).toBe(1)
 })
+
+it('takes the chosen closed card from its parked position without replaying a fake offer', async () => {
+  const root = document.createElement('div')
+  root.append(centreNode)
+  const picked = document.createElement('div')
+  picked.dataset.transferPicked = ''
+  picked.getBoundingClientRect = () => ({ left: 620, top: 430, width: 150, height: 210 }) as DOMRect
+  root.append(picked)
+  const pending = {
+    ...base,
+    pending: { kind: 'stealCard', player: 'p1', target: 'p2', count: 5, attack: 'attack-bug' },
+  } as BoardState
+  const r = runTransfer(transferPlan({ named: false, index: 2 }), pending)
+  await r.go()
+  expect(played.names.filter((name) => name === 'takeFromSeat')).toHaveLength(1)
+  expect(played.takes[0]).toMatchObject({ from: { left: 620, top: 430, width: 150, height: 210 } })
+  root.removeChild(centreNode)
+})
+
+it('shows a publicly named transfer to an observer, without inventing a blind identity', async () => {
+  const r = runTransfer(
+    transferPlan({ role: 'watcher', from: 'p2', to: 'p3', named: true, card: 'attack-bug' }),
+  )
+  await r.go()
+  expect(r.domSnapshots.some((html) => html.includes('data-card="attack-bug"'))).toBe(true)
+})
+
+it('retains the public attack after the choice clears until its separate discard exit', async () => {
+  const on = {
+    ...base,
+    pending: {
+      kind: 'giveCard',
+      player: 'p2',
+      attacker: 'p1',
+      requested: 'attack-bug',
+      attack: 'attack-security-bug',
+      sudo: true,
+    },
+  } as BoardState
+  const r = runTransfer(transferPlan(), on)
+  await r.go()
+  expect(r.published.at(-1)?.pending).toBeNull()
+  expect(r.published.at(-1)?.centreAttack).toEqual({ card: 'attack-security-bug', sudo: true })
+})
+
+it('gives the selected physical copy from its parked rect when the hand has duplicate faces', async () => {
+  const root = document.createElement('div')
+  root.append(centreNode)
+  const picked = document.createElement('div')
+  picked.dataset.transferPicked = ''
+  picked.dataset.transferUid = 'copy-two'
+  picked.getBoundingClientRect = () => ({ left: 650, top: 420, width: 150, height: 210 }) as DOMRect
+  root.append(picked)
+  const on = {
+    ...base,
+    you: {
+      ...base.you,
+      hand: [
+        { uid: 'copy-one', card: { id: 'attack-bug' } },
+        { uid: 'copy-two', card: { id: 'attack-bug' } },
+      ],
+    },
+  } as BoardState
+  const r = runTransfer(transferPlan({ role: 'victim', from: 'p1', to: 'p2' }), on)
+  await r.go()
+  expect(r.published.at(-1)?.you.hand.map((c) => c.uid)).toEqual(['copy-one'])
+  root.removeChild(centreNode)
+})
+
+it('reveals the transferred card beside the retained attack in the shared cost slot', async () => {
+  const cost = document.createElement('div')
+  cost.getBoundingClientRect = () => ({ left: 750, top: 320, width: 150, height: 210 }) as DOMRect
+  const previous = anchors.cost
+  anchors.cost = { current: cost }
+  const on = {
+    ...base,
+    pending: {
+      kind: 'giveCard',
+      player: 'p2',
+      requested: 'attack-bug',
+      attack: 'attack-security-bug',
+      sudo: false,
+    },
+  } as BoardState
+  const r = runTransfer(transferPlan(), on)
+  await r.go()
+  expect(played.takes[0]).toMatchObject({ to: { left: 750, top: 320, width: 150, height: 210 } })
+  anchors.cost = previous
+})

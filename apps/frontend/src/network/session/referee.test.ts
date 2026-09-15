@@ -1,4 +1,4 @@
-import type { GameState } from '@release/engine'
+import { CARD_RULES, type GameState } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, TURN_ACTION_MS } from '@release/engine/fake'
 import { vi } from 'vitest'
 import {
@@ -993,4 +993,250 @@ it('drains a System Upgrade roster past a seat that walked away', () => {
   // The seat that is still there is still owed: the keeper answers for absence,
   // never for a player who is present and simply thinking.
   expect(pending.owed).toContain('c')
+})
+
+it('waits 25 seconds before reproducibly selecting a blind position', () => {
+  const { session: base } = twoPlayerSession()
+  const state: GameState = {
+    ...base.state,
+    players: {
+      ...base.state.players,
+      a: { ...base.state.players.a, hand: [{ uid: 'bug#test', id: 'attack-bug' }] },
+      b: { ...base.state.players.b, hand: [{ uid: 'sudo#test', id: 'support-sudo' }] },
+    },
+  }
+  const played = applyIntent(
+    { ...base, state },
+    'peer-a',
+    { type: 'PLAY', card: 'bug#test', target: { kind: 'player', player: 'b' } },
+    1000,
+  )
+  const opened = applyIntent(
+    played.session,
+    'peer-b',
+    { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
+    1001,
+  )
+  const pending = opened.session.state.pending
+  expect(pending?.kind).toBe('stealCard')
+  if (pending?.kind !== 'stealCard') throw new Error('missing choice')
+  expect(pending.deadline - pending.openedAt).toBe(25_000)
+  expect(tick(opened.session, pending.deadline - 1).session).toBe(opened.session)
+  const done = tick(opened.session, pending.deadline)
+  expect(done.session.state.pending).toBeNull()
+  expect(done.session.state.players.a.hand).toEqual([{ uid: 'sudo#test', id: 'support-sudo' }])
+  expect(done).toEqual(tick(opened.session, pending.deadline))
+})
+
+it.each([
+  'attack-bug',
+  'attack-security-bug',
+])('resynchronizes %s choices and transfer visibility for three seats', (attack) => {
+  const { session: base } = createSession({
+    gameId: 'transfer',
+    keeperId: 'a',
+    engine: createFakeEngine(),
+    seed: 42,
+    players: ['a', 'b', 'c'].map((playerId) => ({
+      playerId,
+      peerId: `peer-${playerId}`,
+      name: playerId,
+    })),
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const state: GameState = {
+    ...base.state,
+    players: {
+      ...base.state.players,
+      a: { ...base.state.players.a, hand: [{ uid: 'attack#test', id: attack }] },
+      b: {
+        ...base.state.players.b,
+        hand: [
+          { uid: 'sudo#test', id: 'support-sudo' },
+          { uid: 'spare#test', id: 'protection-debugger' },
+        ],
+      },
+    },
+  }
+  const played = applyIntent(
+    { ...base, state },
+    'peer-a',
+    { type: 'PLAY', card: 'attack#test', target: { kind: 'player', player: 'b' } },
+    1000,
+  )
+  const offered = applyIntent(
+    played.session,
+    'peer-b',
+    { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
+    1001,
+  )
+  const absent = disconnect(offered.session, 'peer-a', 1002).session
+  const restored = { ...absent, state: JSON.parse(JSON.stringify(absent.state)) as GameState }
+  const rebound = rebind(restored, 'a', 'peer-new-a', 1003)
+  const sync = rebound.outgoing.find(
+    (o) => o.to === 'peer-new-a' && o.message.type === 'SYNC',
+  )?.message
+  if (sync?.type !== 'SYNC') throw new Error('no resync')
+  expect(sync.payload.view.pending?.kind).toBe(
+    attack === 'attack-bug' ? 'stealCard' : 'requestCard',
+  )
+  expect(JSON.stringify(sync.payload.view.pending)).not.toContain('sudo#test')
+  expect(JSON.stringify(sync.payload.view.pending)).not.toContain('spare#test')
+  let done: SessionResult
+  if (attack === 'attack-bug') {
+    done = applyIntent(
+      rebound.session,
+      'peer-new-a',
+      { type: 'RESOLVE', choice: { kind: 'stealCard', index: 0 } },
+      1004,
+    )
+  } else {
+    done = applyIntent(
+      rebound.session,
+      'peer-new-a',
+      { type: 'RESOLVE', choice: { kind: 'requestCard', card: 'support-sudo' } },
+      1004,
+    )
+  }
+  expect(done.session.state.pending).toBeNull()
+  for (const peer of ['peer-new-a', 'peer-b', 'peer-c']) {
+    const message = done.outgoing.find((o) => o.to === peer && o.message.type === 'SYNC')?.message
+    if (message?.type !== 'SYNC') throw new Error('no transfer sync')
+    const transfer = message.payload.events.find((e) => e.type === 'handTransfer')
+    expect(transfer).toBeDefined()
+    if (transfer?.type !== 'handTransfer') throw new Error('no transfer')
+    if (peer === 'peer-c' && attack === 'attack-bug') expect(transfer.card).toBeUndefined()
+    else expect(transfer.card).toBeDefined()
+  }
+  const observerAbsent = disconnect(done.session, 'peer-c', 20000).session
+  const observerBack = rebind(observerAbsent, 'c', 'peer-new-c', 20001)
+  const replay = observerBack.outgoing.find(
+    (o) => o.to === 'peer-new-c' && o.message.type === 'SYNC',
+  )?.message
+  if (replay?.type !== 'SYNC') throw new Error('no observer resync')
+  const transfer = replay.payload.events.find((e) => e.type === 'handTransfer')
+  expect(transfer).toBeDefined()
+  if (transfer?.type === 'handTransfer')
+    expect(transfer.card !== undefined).toBe(attack === 'attack-security-bug')
+})
+
+it('times out a Security Bug request with a holdable catalogue type even when discard is empty', () => {
+  const { session: base } = twoPlayerSession()
+  const state: GameState = {
+    ...base.state,
+    decks: { ...base.state.decks, discard: [] },
+    players: {
+      ...base.state.players,
+      a: { ...base.state.players.a, hand: [{ uid: 'security#test', id: 'attack-security-bug' }] },
+      b: { ...base.state.players.b, hand: [{ uid: 'sudo#test', id: 'support-sudo' }] },
+    },
+  }
+  const played = applyIntent(
+    { ...base, state },
+    'peer-a',
+    { type: 'PLAY', card: 'security#test', target: { kind: 'player', player: 'b' } },
+    1000,
+  )
+  const offered = applyIntent(
+    played.session,
+    'peer-b',
+    { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
+    1001,
+  )
+  const pending = offered.session.state.pending
+  if (pending?.kind !== 'requestCard' || pending.deadline === undefined)
+    throw new Error('no request deadline')
+  const done = tick(offered.session, pending.deadline)
+  const request = done.session.log.find((e) => e.type === 'requested')
+  if (request?.type !== 'requested') throw new Error('missing request')
+  expect(CARD_RULES[request.card]).toBeDefined()
+  expect(['ai', 'trigger']).not.toContain(CARD_RULES[request.card]?.kind)
+  expect(pending.deadline - (pending.openedAt ?? 0)).toBe(25_000)
+  expect(done.session.state.pending).toBeNull()
+  expect(done.session.state.decks.discard).toEqual([
+    { uid: 'security#test', id: 'attack-security-bug' },
+  ])
+})
+
+it('starts a 25-second deadline for a legacy request without re-banking its spent attack', () => {
+  const { session: base } = twoPlayerSession()
+  const state: GameState = {
+    ...base.state,
+    turn: { ...base.state.turn, openedAt: undefined, deadline: undefined },
+    decks: {
+      ...base.state.decks,
+      discard: [{ uid: 'security#legacy', id: 'attack-security-bug' }],
+    },
+    players: {
+      ...base.state.players,
+      b: { ...base.state.players.b, hand: [{ uid: 'sudo#legacy', id: 'support-sudo' }] },
+    },
+    pending: { kind: 'requestCard', player: 'a', target: 'b' },
+  }
+  const started = tick({ ...base, state }, 1000)
+  const pending = started.session.state.pending
+  expect(pending).toMatchObject({ kind: 'requestCard', openedAt: 1000, deadline: 26000 })
+  expect(started.session.log).toEqual(base.log)
+  expect(tick(started.session, 25999).session).toBe(started.session)
+  const done = tick(started.session, 26000)
+  expect(done.session.state.pending).toBeNull()
+  expect(done.session.state.decks.discard.filter((c) => c.uid === 'security#legacy')).toHaveLength(
+    1,
+  )
+})
+
+it.each([
+  'attack-bug',
+  'attack-security-bug',
+])('lets the absence driver resolve a disconnected %s chooser after grace', (attack) => {
+  const { session: base } = twoPlayerSession()
+  const state: GameState = {
+    ...base.state,
+    players: {
+      ...base.state.players,
+      a: { ...base.state.players.a, hand: [{ uid: 'attack#absent', id: attack }] },
+      b: { ...base.state.players.b, hand: [{ uid: 'sudo#absent', id: 'support-sudo' }] },
+    },
+  }
+  const played = applyIntent(
+    { ...base, state },
+    'peer-a',
+    { type: 'PLAY', card: 'attack#absent', target: { kind: 'player', player: 'b' } },
+    1000,
+  )
+  const offered = applyIntent(
+    played.session,
+    'peer-b',
+    { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
+    1001,
+  )
+  const absent = disconnect(offered.session, 'peer-a', 1002).session
+  expect(tick(absent, 16001).session).toBe(absent)
+  expect(driveUnattended(absent, 1002 + ABSENT_GRACE_MS - 1).session).toBe(absent)
+  const done = driveUnattended(absent, 1002 + ABSENT_GRACE_MS)
+  expect(done.session.state.pending).toBeNull()
+  expect(done.session.state.decks.discard).toEqual([{ uid: 'attack#absent', id: attack }])
+})
+
+it('automatically completes a legacy handover even while the donor is disconnected', () => {
+  const { session: base } = twoPlayerSession()
+  const first = { uid: 'sudo#first', id: 'support-sudo' }
+  const second = { uid: 'sudo#second', id: 'support-sudo' }
+  const state: GameState = {
+    ...base.state,
+    players: {
+      ...base.state.players,
+      a: { ...base.state.players.a, hand: [] },
+      b: { ...base.state.players.b, hand: [first, second] },
+    },
+    pending: { kind: 'giveCard', player: 'b', attacker: 'a', requested: first.id },
+  }
+  const disconnected = disconnect({ ...base, state }, 'peer-b', 1000).session
+  const done = tick(disconnected, 1001)
+  expect(done.session.state.pending).toBeNull()
+  expect(done.session.state.players.a.hand).toEqual([first])
+  expect(done.session.state.players.b.hand).toEqual([second])
+  expect(done.session.log.at(-1)).toMatchObject({ type: 'handTransfer', publicCard: true })
 })

@@ -85,6 +85,7 @@ export function isWellFormedAction(action: unknown): action is Action {
 
 // A stalled defence blocks everyone, so it carries a deadline like the window.
 export const DEFEND_MS = 15_000
+export const HAND_CHOICE_MS = 25_000
 
 // The turn's inactivity clock: 30s per action, app timing rather than a rule
 // (docs/rules/README.md, "Что правилом НЕ является" — the value the docs name).

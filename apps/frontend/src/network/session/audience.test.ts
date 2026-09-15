@@ -2,8 +2,8 @@ import type { Event } from '@release/engine'
 import { forViewer, rejectionsIn } from './audience'
 
 const publicEvent: Event = { id: 1, type: 'turnStarted', player: 'a', index: 0 }
-// `handTransfer` is genuinely private to its two ends: nobody else may know it
-// happened at all. A draw is NOT that shape any more — see the redaction tests.
+// Historical events may still declare a private audience; keep respecting it.
+// New transfers are public events with per-field redaction, as tested below.
 const privateEvent: Event = {
   id: 2,
   type: 'handTransfer',
@@ -58,4 +58,22 @@ it('shows a draw to the whole table, with the card only for the drawer', () => {
 
 it('collects rejections separately', () => {
   expect(rejectionsIn([publicEvent, rejection])).toEqual([rejection])
+})
+
+it('keeps blind transfers public with private faces, and named transfers fully public', () => {
+  const blind: Event = {
+    id: 5,
+    type: 'handTransfer',
+    from: 'a',
+    to: 'b',
+    card: 'support-sudo',
+    index: 1,
+  }
+  expect(forViewer([blind], 'a')).toEqual([blind])
+  expect(forViewer([blind], 'b')).toEqual([blind])
+  expect(forViewer([blind], 'c')).toEqual([
+    { id: 5, type: 'handTransfer', from: 'a', to: 'b', index: 1 },
+  ])
+  const named: Event = { ...blind, publicCard: true }
+  expect(forViewer([named], 'c')).toEqual([named])
 })

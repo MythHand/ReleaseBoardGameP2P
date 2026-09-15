@@ -1,8 +1,18 @@
 import type { Action, Target } from '../actions'
+import { CARD_RULES } from '../cards'
 import type { Reduction } from '../engine'
-import { randomAt } from '../rng'
-import type { CardInstance, GameState, PlayerId } from '../state'
-import { bankToDiscard, createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
+import { shuffle } from '../rng'
+import type { CardInstance, GameState, HandAttackContext, PlayerId } from '../state'
+import {
+  bankToDiscard,
+  createLog,
+  DEFEND_MS,
+  defencesFor,
+  HAND_CHOICE_MS,
+  type Log,
+  reject,
+  setHand,
+} from './core'
 
 const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
 
@@ -39,40 +49,92 @@ export function openHandAttack(
   }
 }
 
-// Bug / Out of Memory / Legacy Code: one card at random. The cursor advances
-// through state, so the same action on the same state always takes the same card.
-export function stealRandom(
+// The host shuffles positions once, before offering the closed fan. A position
+// is therefore a blind random selection; neither hand order nor private UIDs
+// are exposed. Persisting slots makes reconnect/replay preserve the same fan.
+export function openHandChoice(
   state: GameState,
   log: Log,
   from: PlayerId,
   to: PlayerId,
-  parent?: number,
+  context: HandAttackContext,
+  at: number,
 ): GameState {
+  const timing = { openedAt: at, deadline: at + HAND_CHOICE_MS }
+  if (context.attack.id === 'attack-security-bug') {
+    return {
+      ...state,
+      pending: { kind: 'requestCard', player: to, target: from, context, ...timing },
+      eventSeq: log.seq,
+    }
+  }
   const hand = state.players[from].hand
-  if (hand.length === 0) return { ...state, eventSeq: log.seq }
-  const index = Math.floor(randomAt(state.seed, state.rngCursor) * hand.length)
-  const card = hand[index]
+  if (hand.length === 0) return finishHandAttack(state, log, context)
+  const shuffled = shuffle(
+    hand.map((c) => c.uid),
+    state.seed,
+    state.rngCursor,
+  )
+  return {
+    ...state,
+    rngCursor: shuffled.cursor,
+    pending: {
+      kind: 'stealCard',
+      player: to,
+      target: from,
+      slots: shuffled.items,
+      context,
+      ...timing,
+    },
+    eventSeq: log.seq,
+  }
+}
+
+function finishHandAttack(state: GameState, log: Log, context?: HandAttackContext): GameState {
+  if (!context) return { ...state, pending: null, eventSeq: log.seq }
+  const cards = [context.attack, ...(context.combo ? [context.combo] : [])]
+  for (const card of cards)
+    log.add(
+      { type: 'discarded', player: context.owner, card: card.id, reason: 'attackSpent' },
+      context.parent,
+    )
+  return { ...discard(state, cards), pending: null, eventSeq: log.seq }
+}
+
+export function onStealCard(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
+  const pending = state.pending
+  if (pending?.kind !== 'stealCard') return reject(state, action, 'no blind selection pending')
+  if (pending.player !== action.player) return reject(state, action, 'not your decision')
+  const choice = action.choice
+  if (
+    choice.kind !== 'stealCard' ||
+    !Number.isInteger(choice.index) ||
+    choice.index < 0 ||
+    choice.index >= pending.slots.length
+  ) {
+    return reject(state, action, 'invalid blind position')
+  }
+  const hand = state.players[pending.target].hand
+  const card = hand.find((c) => c.uid === pending.slots[choice.index])
+  if (!card) return reject(state, action, 'that position is no longer available')
+  const log = createLog(state.eventSeq)
   log.add(
     {
       type: 'handTransfer',
-      from,
-      to,
+      from: pending.target,
+      to: pending.player,
       card: card.id,
-      // Only the two parties learn which card moved; the table sees counts.
-      visibleTo: [from, to],
+      index: choice.index,
     },
-    parent,
+    pending.context.parent,
   )
   const stripped = setHand(
     state,
-    from,
+    pending.target,
     hand.filter((c) => c.uid !== card.uid),
   )
-  return {
-    ...setHand(stripped, to, [...stripped.players[to].hand, card]),
-    rngCursor: state.rngCursor + 1,
-    eventSeq: log.seq,
-  }
+  const moved = setHand(stripped, pending.player, [...stripped.players[pending.player].hand, card])
+  return { state: finishHandAttack(moved, log, pending.context), events: log.events }
 }
 
 // DDoS: destroy a Monitoring, or bounce a release back to its owner's hand and
@@ -171,6 +233,9 @@ export function onRequestCard(state: GameState, action: Action & { type: 'RESOLV
   if (pending.player !== action.player) return reject(state, action, 'not your decision')
   const choice = action.choice
   if (choice.kind !== 'requestCard') return reject(state, action, 'wrong choice for this decision')
+  if (typeof choice.card !== 'string' || !Object.hasOwn(CARD_RULES, choice.card)) {
+    return reject(state, action, 'unknown requested card type')
+  }
 
   const log = createLog(state.eventSeq)
   const held = state.players[pending.target].hand.filter((c) => c.id === choice.card)
@@ -184,7 +249,7 @@ export function onRequestCard(state: GameState, action: Action & { type: 'RESOLV
       card: choice.card,
       hit: false,
     })
-    return { state: { ...state, pending: null, eventSeq: log.seq }, events: log.events }
+    return { state: finishHandAttack(state, log, pending.context), events: log.events }
   }
 
   log.add({
@@ -194,20 +259,21 @@ export function onRequestCard(state: GameState, action: Action & { type: 'RESOLV
     card: choice.card,
     hit: true,
   })
-  // The holder chooses which copy to surrender.
-  return {
-    state: {
-      ...state,
-      pending: {
-        kind: 'giveCard',
-        player: pending.target,
-        requested: choice.card,
-        attacker: pending.player,
-      },
-      eventSeq: log.seq,
-    },
-    events: log.events,
-  }
+  const card = held[0]
+  log.add({
+    type: 'handTransfer',
+    from: pending.target,
+    to: pending.player,
+    card: card.id,
+    publicCard: true,
+  })
+  const stripped = setHand(
+    state,
+    pending.target,
+    state.players[pending.target].hand.filter((c) => c.uid !== card.uid),
+  )
+  const moved = setHand(stripped, pending.player, [...stripped.players[pending.player].hand, card])
+  return { state: finishHandAttack(moved, log, pending.context), events: log.events }
 }
 
 export function onGiveCard(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
@@ -229,7 +295,7 @@ export function onGiveCard(state: GameState, action: Action & { type: 'RESOLVE' 
     from: action.player,
     to: pending.attacker,
     card: card.id,
-    visibleTo: [action.player, pending.attacker],
+    publicCard: true,
   })
   const stripped = setHand(
     state,
@@ -240,5 +306,5 @@ export function onGiveCard(state: GameState, action: Action & { type: 'RESOLVE' 
     ...stripped.players[pending.attacker].hand,
     card,
   ])
-  return { state: { ...moved, pending: null, eventSeq: log.seq }, events: log.events }
+  return { state: finishHandAttack(moved, log, pending.context), events: log.events }
 }

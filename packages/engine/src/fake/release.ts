@@ -126,6 +126,7 @@ export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Red
   const log = createLog(state.eventSeq)
 
   if (rules.kind === 'operation') {
+    log.add({ type: 'operationPlayed', player: action.player, card: card.id, sudo: !!sudoCombo })
     const spentCards = [card, ...(sudoCombo ? [sudoCombo] : [])]
     const withoutCards = setHand(
       state,

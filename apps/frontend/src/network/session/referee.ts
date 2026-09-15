@@ -1,5 +1,5 @@
 import type { Action, DeckEntry, Engine, Event, GameState, PlayerId, Setup } from '@release/engine'
-import { botAction, drawObligationMet } from '@release/engine/fake'
+import { botAction, drawObligationMet, HAND_CHOICE_MS } from '@release/engine/fake'
 import { IS_DEV } from '~/shared/config'
 import type { Intent, Message } from '../types'
 import { forViewer, rejectionsIn } from './audience'
@@ -511,6 +511,16 @@ export function adoptSession(args: {
 export function tick(session: Session, now: number): SessionResult {
   const window = session.state.window
   const pending = session.state.pending
+  // Old saves may still await an identical-copy handover. It is automatic,
+  // including for an absent donor: there is no player decision to time out.
+  if (pending?.kind === 'giveCard') {
+    const action = botAction(session.engine, session.state, pending.player, now)
+    if (action?.type !== 'RESOLVE') return { session, outgoing: [] }
+    const { state, events } = session.engine.reduce(session.state, action)
+    if (state === session.state) return { session, outgoing: [] }
+    const next: Session = { ...session, state, log: [...session.log, ...events] }
+    return { session: next, outgoing: syncAll(next, events) }
+  }
   // An attack thrown into an open window sets a `defend` pending but leaves
   // `state.window` untouched (onAttack, packages/engine/src/fake/attacks.ts),
   // so the two can coexist with the defend deadline at or after the window's.
@@ -549,6 +559,40 @@ export function tick(session: Session, now: number): SessionResult {
       { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
       now,
     )
+  }
+
+  // Legacy snapshots spent Security Bug before opening its request, and had
+  // no decision clock. Start the missing clock once without reconstructing
+  // already-discarded cards or changing historical event audiences.
+  if (pending?.kind === 'requestCard' && pending.deadline === undefined) {
+    const next: Session = {
+      ...session,
+      state: {
+        ...session.state,
+        pending: {
+          ...pending,
+          openedAt: now,
+          deadline: now + HAND_CHOICE_MS,
+        },
+      },
+    }
+    return { session: next, outgoing: syncAll(next, []) }
+  }
+
+  // These choices suspend the turn clock, so each owns a deadline. The
+  // normal bot samples the full catalogue or blind positions, without
+  // consulting the victim hand. Seeded sampling remains replayable.
+  if (
+    pending &&
+    (pending.kind === 'stealCard' || pending.kind === 'requestCard') &&
+    pending.deadline !== undefined &&
+    now >= pending.deadline
+  ) {
+    const seat = session.seats.find((s) => s.playerId === pending.player)
+    if (!seat?.peerId) return { session, outgoing: [] }
+    const action = botAction(session.engine, session.state, pending.player, now)
+    if (action?.type === 'RESOLVE')
+      return applyIntent(session, seat.peerId, { type: 'RESOLVE', choice: action.choice }, now)
   }
 
   // The turn's inactivity clock. The engine stamps it on every commit that

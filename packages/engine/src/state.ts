@@ -73,6 +73,14 @@ export interface ReactionWindow {
   passed: PlayerId[]
 }
 
+// Cards remain at the centre until the whole hand-attack decision resolves.
+export interface HandAttackContext {
+  attack: CardInstance
+  combo?: CardInstance
+  owner: PlayerId
+  parent?: number
+}
+
 export type Pending =
   // `codeReview` survives the pause: the combo is declared when the release is
   // played, but the card only lands after the cost is paid.
@@ -135,8 +143,32 @@ export type Pending =
       // by anything other than an AI card.
       source?: CardId
     }
-  | { kind: 'requestCard'; player: PlayerId; target: PlayerId }
-  | { kind: 'giveCard'; player: PlayerId; requested: CardId; attacker: PlayerId }
+  | {
+      kind: 'stealCard'
+      player: PlayerId
+      target: PlayerId
+      slots: CardUid[]
+      context: HandAttackContext
+      openedAt: number
+      deadline: number
+    }
+  | {
+      kind: 'requestCard'
+      player: PlayerId
+      target: PlayerId
+      context?: HandAttackContext
+      openedAt?: number
+      deadline?: number
+    }
+  | {
+      kind: 'giveCard'
+      player: PlayerId
+      requested: CardId
+      attacker: PlayerId
+      context?: HandAttackContext
+      openedAt?: number
+      deadline?: number
+    }
   // `endsTurn` false is Bad Vibe-Coding borrowing the prompt without the
   // consequence: the same "discard N" question, but the seat stays put.
   // Absent means the ordinary end-of-turn hand limit, which does end the turn.

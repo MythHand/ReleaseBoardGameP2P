@@ -1,3 +1,4 @@
+import { CARD_RULES } from '../cards'
 import type { Engine, GameConfig } from '../engine'
 import { seatOwing } from '../state'
 import { botAction, runUntilIdle } from './bots'
@@ -53,7 +54,7 @@ it('drives the table back to the human without hanging', () => {
 })
 
 it('reaches a finished game when every seat is driven', () => {
-  let state = engine.createGame(config())
+  let state = engine.createGame({ ...config(), seed: 1 })
   for (let n = 0; n < 2000 && !state.over; n += 1) {
     const seat = seatOwing(state.pending) ?? state.turn.player
     const action = botAction(engine, state, seat, 1000 + n * 100)
@@ -130,3 +131,59 @@ it('does not hang when the policy cannot make progress', () => {
   expect(result.turn.player).toBe('p2')
   expect(result.over).toBeNull()
 }, 2_000)
+
+it.each([
+  'requestCard',
+  'stealCard',
+] as const)('chooses reproducible, varied and valid %s answers without private hand knowledge', (kind) => {
+  const base = engine.createGame(config())
+  const context = { attack: { uid: 'attack-bug#test', id: 'attack-bug' }, owner: 'p1', parent: 1 }
+  const pending =
+    kind === 'requestCard'
+      ? { kind, player: 'p1', target: 'p2', context, openedAt: 0, deadline: 25000 }
+      : {
+          kind,
+          player: 'p1',
+          target: 'p2',
+          context,
+          slots: ['a', 'b', 'c'],
+          openedAt: 0,
+          deadline: 25000,
+        }
+  const catalogue = Object.entries(CARD_RULES)
+    .filter(([, rule]) => rule.kind !== 'trigger' && rule.kind !== 'ai')
+    .map(([id]) => id)
+  const choices = new Set<string | number>()
+  const seedChoices = new Set<string | number>()
+  for (let n = 0; n < 500; n++) {
+    const state = { ...base, pending, eventSeq: n }
+    const action = botAction(engine, state, 'p1', 1)
+    expect(action).toEqual(botAction(engine, JSON.parse(JSON.stringify(state)), 'p1', 1))
+    const hiddenChanged = {
+      ...state,
+      players: { ...state.players, p2: { ...state.players.p2, hand: [] } },
+    }
+    expect(action).toEqual(botAction(engine, hiddenChanged, 'p1', 1))
+    if (action?.type !== 'RESOLVE') throw new Error('missing decision')
+    const seeded = botAction(engine, { ...state, seed: n, eventSeq: 0 }, 'p1', 1)
+    if (seeded?.type !== 'RESOLVE') throw new Error('missing seeded decision')
+    if (action.choice.kind === 'requestCard' && seeded.choice.kind === 'requestCard') {
+      expect(catalogue).toContain(action.choice.card)
+      choices.add(action.choice.card)
+      seedChoices.add(seeded.choice.card)
+    } else if (action.choice.kind === 'stealCard' && seeded.choice.kind === 'stealCard') {
+      expect([0, 1, 2]).toContain(action.choice.index)
+      choices.add(action.choice.index)
+      seedChoices.add(seeded.choice.index)
+    } else throw new Error('wrong decision')
+  }
+  expect(choices.size).toBe(kind === 'requestCard' ? catalogue.length : 3)
+  expect(seedChoices.size).toBeGreaterThan(1)
+  if (kind === 'requestCard') {
+    const seen = new Set([
+      ...Object.values(base.players).flatMap((p) => p.hand.map((c) => c.id)),
+      ...base.decks.discard.map((c) => c.id),
+    ])
+    expect([...choices].some((id) => !seen.has(String(id)))).toBe(true)
+  }
+})

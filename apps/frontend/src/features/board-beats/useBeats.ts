@@ -20,6 +20,7 @@ import { useDrawBeat } from './drawBeat'
 import { useEliminateBeat } from './eliminateBeat'
 import { useGameEndBeat } from './gameEndBeat'
 import { useHandLimitBeat } from './handLimitBeat'
+import { useOperationBeat, withoutPendingOperation } from './operationBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
 import { useTransferBeat } from './transferBeat'
@@ -100,6 +101,7 @@ interface Beat {
 }
 
 export interface Beats {
+  operationStanding: boolean
   shadow: BoardState | null
   overlays: ReactNode[]
   exclusive: boolean
@@ -193,6 +195,7 @@ export function useBeats(args: {
   const transfers = useTransferBeat(anchors)
   const ais = useAiBeat(anchors)
   const upgrades = useUpgradeBeat(anchors, staging)
+  const operations = useOperationBeat(anchors, staging)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -239,6 +242,18 @@ export function useBeats(args: {
   // that a beat HAS a runner; it does not know what any of them do.
   const beatOf = useCallback(
     (plan: BeatPlan, base: BoardState): Beat | null => {
+      if (plan.kind === 'operationPlaced' || plan.kind === 'operationExit') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) =>
+            plan.kind === 'operationPlaced'
+              ? operations.runPlaced(plan, ctx)
+              : operations.runExit(plan, ctx),
+        }
+      }
       if (plan.kind === 'discard') {
         return {
           key: plan.key,
@@ -440,6 +455,8 @@ export function useBeats(args: {
     },
     [
       events,
+      operations.runPlaced,
+      operations.runExit,
       discards.run,
       draws.run,
       decks.runReshuffle,
@@ -565,6 +582,7 @@ export function useBeats(args: {
     // the board of the NEW one, flying to a discard pile — or a hand — that no
     // longer exists. So every runner's own reset() runs here too, beside the
     // wipe, for the same match-boundary reason.
+    operations.reset()
     discards.reset()
     draws.reset()
     decks.reset()
@@ -576,6 +594,15 @@ export function useBeats(args: {
     transfers.reset()
     ais.reset()
   }, [intro?.key, live])
+
+  // Adopt only after the match-boundary reset, or its cleanup would erase
+  // the restored carrier on the same commit. A late intro key is another
+  // match-boundary reset, even when the restore watermark stays unchanged.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: live/events supply the snapshot at the restore boundary
+  useLayoutEffect(() => {
+    if (reduced || (restoredThrough ?? 0) > 0) operations.reset()
+    if (!reduced && (restoredThrough ?? 0) > 0) operations.restore(live, events)
+  }, [intro?.key, reduced, restoredThrough, operations.reset, operations.restore])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
   // fresh object cannot re-arm it, and React 19 StrictMode's double invoke plays
@@ -659,19 +686,22 @@ export function useBeats(args: {
     const before = settled.current
     settled.current = live
     const fresh = events.filter((e) => e.id > seen.current)
-    if (fresh.length === 0) return
+    if (fresh.length === 0 && !operations.standing) return
     seen.current = fresh.at(-1)?.id ?? seen.current
     // Reduced motion collapses every beat to its end state, and the end state is
     // the projection the board already holds — so there is nothing to do but
     // let it render. Planned nowhere, run nowhere: one branch, one place.
-    if (reduced) return
+    if (reduced) {
+      operations.reset()
+      return
+    }
     // Every beat of the batch is planned against ONE projection — the board
     // still on screen (I1) — and then chained, so that a beat which moves the
     // board hands it on instead of having it taken back. Planning cannot do the
     // chaining itself: a plan is a fold of events, and where a beat ends is only
     // known once it has run.
     let previous: Beat | undefined
-    for (const plan of planBeats(fresh, before, live.pending, live.decks.discardCount)) {
+    for (const plan of planBeats(fresh, before, live.pending ?? null, live.decks.discardCount)) {
       const beat = beatOf(plan, before)
       if (!beat) continue
       beat.after = previous
@@ -701,7 +731,9 @@ export function useBeats(args: {
     unqueued.length > 0 &&
     planBeats(unqueued, settled.current, live.pending, live.decks.discardCount).length > 0
 
+  const reducedPending = reduced ? withoutPendingOperation(live, events) : live
   return {
+    operationStanding: operations.standing,
     // The shadow is what the running beat has published, or its own base while
     // it has published nothing yet. The one exception is the opening, which
     // publishes a whole shape of its own rather than animating away from a
@@ -710,8 +742,15 @@ export function useBeats(args: {
     // beat reports done, so the handover to the live projection is the queue's
     // own last frame.
     shadow:
-      (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ??
-      (awaitingBatch ? settled.current : null),
+      reducedPending === live
+        ? operations.standing
+          ? operations.withoutHeld(
+              (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ??
+                (awaitingBatch ? settled.current : live),
+            )
+          : ((running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ??
+            (awaitingBatch ? settled.current : null))
+        : reducedPending,
     overlays: [
       ...discards.overlay,
       ...draws.overlay,
@@ -724,6 +763,7 @@ export function useBeats(args: {
       ...transfers.overlay,
       ...ais.overlay,
       ...upgrades.overlay,
+      ...operations.overlay,
     ],
     exclusive: running?.exclusive ?? false,
     alarm: running?.alarm ?? false,

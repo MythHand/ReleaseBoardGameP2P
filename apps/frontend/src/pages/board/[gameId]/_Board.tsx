@@ -443,12 +443,14 @@ export default function Board({
   })
 
   // naming a card, and losing one (#105). The band replaces the panel for
-  // `requestCard`; the `giveCard` half answers itself and renders nothing.
+  // `requestCard`; a successful name transfers the first matching copy automatically.
   const requesting = useRequestStaging({
     state,
+    events: intro?.events ?? [],
     actions,
     copy: {
       prompt: copy.pending.requestCard.prompt,
+      steal: copy.table.stealCard,
       action: copy.pending.requestCard.action,
       confirm: copy.pending.confirm,
     },
@@ -621,6 +623,21 @@ export default function Board({
   // and the layout effect below collapsing it, and both readers now resolve
   // that tie the same way because they read the same value.
   const pendingDefend = !staging.staged && state.pending?.kind === 'defend' ? state.pending : null
+  const transferPending =
+    state.pending &&
+    (state.pending.kind === 'stealCard' ||
+      state.pending.kind === 'requestCard' ||
+      state.pending.kind === 'giveCard')
+      ? state.pending
+      : null
+  const centreAttack =
+    pendingDefend ??
+    (!staging.staged && transferPending?.attack
+      ? { attackCard: transferPending.attack, sudo: transferPending.sudo }
+      : state.centreAttack
+        ? { attackCard: state.centreAttack.card, sudo: state.centreAttack.sudo }
+        : null)
+  const operationSource = pendingSourceCard?.category === 'operation' ? pendingSourceCard : null
 
   // the release standing at the stage slot while its cost is unpaid — read
   // ONCE, same reason as `pendingDefend` above, and its OWNERSHIP stated here
@@ -1158,49 +1175,48 @@ export default function Board({
       </div>
 
       <div className={kit.decks}>
-        <div className={cls(opening.deckStack, enter)} ref={anchors.decks}>
-          <div className={opening.pileRow}>
-            {decks.main.map((count, i) => (
-              <div
-                // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
-                key={i}
-                className={opening.pileTarget}
-              >
-                <Pile
-                  label={copy.table.deck}
-                  deck="base"
-                  count={count}
-                  width={pileWidthFor(decks.main.length)}
-                  countPos="tl"
-                  boxRef={(el) => anchors.bindPile(i, el)}
-                  pickable={staging.targets.some((t) => t.kind === 'pile' && t.pile === i)}
+        <div className={cls(kit.decksGrid, enter)} ref={anchors.decks}>
+          {decks.main.map((count, i) => (
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
+              key={i}
+              className={opening.pileTarget}
+            >
+              <Pile
+                label={copy.table.deck}
+                deck="base"
+                count={count}
+                width={pileWidthFor(decks.main.length)}
+                countPos="tl"
+                boxRef={(el) => anchors.bindPile(i, el)}
+                pickable={staging.targets.some((t) => t.kind === 'pile' && t.pile === i)}
+              />
+              {staging.targets.some((t) => t.kind === 'pile' && t.pile === i) && (
+                <button
+                  type="button"
+                  className={opening.pilePick}
+                  aria-label={`${copy.table.deck} ${i + 1}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    staging.onTargetPick({ kind: 'pile', pile: i })
+                  }}
                 />
-                {staging.targets.some((t) => t.kind === 'pile' && t.pile === i) && (
-                  <button
-                    type="button"
-                    className={opening.pilePick}
-                    aria-label={`${copy.table.deck} ${i + 1}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      staging.onTargetPick({ kind: 'pile', pile: i })
-                    }}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          {/* The wrapper stretches with the draw-pile row; flights must use
-              the pile's actual card box, especially after a Git split. */}
-          <div data-events-box>
-            <Pile
-              label={copy.table.events}
-              deck="ai"
-              count={decks.events}
-              width={150}
-              countPos="tl"
-              boxRef={anchors.eventsBox}
-            />
-          </div>
+              )}
+            </div>
+          ))}
+          {/* Flights bind the actual card box, not its labelled grid cell. */}
+          {setup.ai !== 'no' && (
+            <div className={kit.eventsPile} data-events-box>
+              <Pile
+                label={copy.table.events}
+                deck="ai"
+                count={decks.events}
+                width={150}
+                countPos="tl"
+                boxRef={anchors.eventsBox}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -1229,6 +1245,7 @@ export default function Board({
           into its zone slot and the attack window opens. */}
       <div
         className={opening.stageSlot}
+        style={centrePlaceStyle('release', 'stage')}
         data-centre-slot="stage"
         ref={anchors.stage}
         {...previewProps(stagedRelease?.card ?? null)}
@@ -1237,6 +1254,7 @@ export default function Board({
       </div>
       <div
         className={opening.costSlot}
+        style={centrePlaceStyle('release', 'cost')}
         data-centre-slot="cost"
         ref={anchors.cost}
         {...previewProps(staging.paidCost?.card ?? null)}
@@ -1246,15 +1264,21 @@ export default function Board({
             on and clears `paidCost` in the same commit (#101, Task 11:
             comboBeat.tsx's `runRelease`) */}
         {staging.paidCost && <Card card={staging.paidCost.card} interactive={false} width="100%" />}
+        {/* Legacy snapshots can still contain giveCard until automatic resolution.
+            Keep the named identity public while that restored pending settles. */}
+        {state.pending?.kind === 'giveCard' &&
+          (() => {
+            const data = cardById(state.pending.requested)
+            if (!data) return null
+            return (
+              <div className={opening.centreCard} data-testid="board-requested-card">
+                <Card card={data} interactive={false} width="100%" />
+              </div>
+            )
+          })()}
       </div>
 
-      {/* THE AI PAIR (#106). The trigger that caused it stands left; the card
-          it pulled stands right, and wider — it is the card of the moment.
-          Positioned from `centrePlaceStyle`, the declared single source for
-          centre geometry, rather than from literals of their own: the four
-          slots above predate that source and still carry copies of its numbers
-          (recorded in the register), and three more copies is how a duplication
-          becomes the house style. */}
+      {/* AI cards use the same named-place contract as the other centre slots. */}
       <div
         className={opening.aiSlot}
         data-centre-slot="cause"
@@ -1294,6 +1318,7 @@ export default function Board({
           defence's own flight to the cover slot. */}
       <div
         className={opening.sudoSlot}
+        style={centrePlaceStyle('defence', 'sudo')}
         data-centre-slot="sudo"
         ref={anchors.sudo}
         {...previewProps(stagedSudo?.card ?? null)}
@@ -1318,6 +1343,7 @@ export default function Board({
           whether the fold has landed. */}
       <div
         className={opening.coverSlot}
+        style={centrePlaceStyle('defence', 'cover')}
         data-centre-slot="cover"
         ref={anchors.cover}
         {...previewProps(stagedCover?.card ?? stagedNeutralize?.card ?? null)}
@@ -1356,12 +1382,13 @@ export default function Board({
           slot sits on top of it too. */}
       <div
         className={opening.centre}
+        style={centrePlaceStyle('defence', 'centre')}
         data-board-centre
         data-centre-slot="attack"
         ref={anchors.centre}
         {...previewProps(
-          pendingDefend
-            ? cardById(pendingDefend.attackCard)
+          centreAttack
+            ? cardById(centreAttack.attackCard)
             : pendingAlarm?.card
               ? cardById(pendingAlarm.card)
               : null,
@@ -1390,12 +1417,12 @@ export default function Board({
             <Card card={soloStaged.card} interactive={false} width="100%" />
           </div>
         )}
-        {pendingDefend &&
+        {centreAttack &&
           (() => {
-            const data = cardById(pendingDefend.attackCard)
+            const data = cardById(centreAttack.attackCard)
             if (!data) return null
             // sudo stands the pair; a plain hit stands the one card, as before.
-            const aux = pendingDefend.sudo ? cardById('support-sudo') : null
+            const aux = centreAttack.sudo ? cardById('support-sudo') : null
             return (
               <div
                 className={opening.centreCard}
@@ -1441,21 +1468,11 @@ export default function Board({
               </div>
             )
           })()}
-        {/* the card that was named, held publicly while the engine waits for it
-            to be handed over. This is what carries it across the gap between
-            `requested` and `handTransfer` — they arrive in different batches,
-            so no beat overlay can span it — and `giveCard` is projected to
-            everyone (fake/attacks.ts:444), so every peer stands the same card. */}
-        {state.pending?.kind === 'giveCard' &&
-          (() => {
-            const data = cardById(state.pending.requested)
-            if (!data) return null
-            return (
-              <div className={opening.centreCard} data-testid="board-requested-card">
-                <Card card={data} interactive={false} width="100%" />
-              </div>
-            )
-          })()}
+        {operationSource && !beats.operationStanding && !staging.staged && (
+          <div className={opening.centreCard} data-testid="board-operation-pending">
+            <Card card={operationSource} interactive={false} width="100%" />
+          </div>
+        )}
       </div>
 
       {/* THE DISCARD GRID (#104) — the excess a turn's end costs, laid out for
@@ -1815,6 +1832,7 @@ export default function Board({
         // …and this one is not a question: the copies differ only by uid, so
         // `_useRequestStaging` answers it and the victim watches the scene
         state.pending.kind !== 'giveCard' &&
+        state.pending.kind !== 'stealCard' &&
         // Both `pickFromDiscard` surfaces replace the generic panel: Inside's
         // row (#106) and Cherry-pick's grid (#108). A panel that unmounts when
         // the pending clears cannot hold a flight, which is what the grid is

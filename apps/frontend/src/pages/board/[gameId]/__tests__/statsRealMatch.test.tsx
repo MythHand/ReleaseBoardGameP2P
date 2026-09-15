@@ -80,7 +80,13 @@ function playedOut(): GameState {
     // err503 tie broke (p1 two, p2 one) exactly as 153's did before it. Swept
     // again for the same four conditions; 86 finishes with err503 1-1 and
     // attackedInto 4-2.
-    seed: 86,
+    // #154 introduces the blind-choice pending and shuffles its private slots.
+    // Re-swept without changing the premises: seed 139 finishes with err503
+    // [1, 1, 0], attackedInto [10, 7, 0], and no DDoS scored.
+    // Random catalogue guesses and blind positions change the bot trajectory.
+    // Seed 274 preserves the same premises: err503 [1, 1, 1], attackedInto
+    // [4, 2, 1], a finished game, and no DDoS scored.
+    seed: 274,
     players: SEATS.map((s) => ({ id: s.playerId, name: s.name })),
     setup: {
       handLimit: 'base',
@@ -161,7 +167,7 @@ it('shows the winner and the counters of a match the engine actually played', ()
 it('gives a tied achievement to nobody, so fewer than five plates render', () => {
   // The rule no fixture test reaches: `leader()` awards a plate only to a SOLE
   // leader, so a tie leaves it off and the row of plates is allowed to come up
-  // short. This match ties on err503 by itself — both p1 and p2 turn up exactly
+  // short. This match ties on err503 by itself — all three players turn up exactly
   // one 503 — so the tie is the engine's, not one this test arranged.
   const engine = createFakeEngine()
   const state = playedOut()

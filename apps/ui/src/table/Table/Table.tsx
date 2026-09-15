@@ -331,7 +331,7 @@ export default function Table({
         </div>
 
         <div className={styles.decks}>
-          <div className={styles.pileRow}>
+          <div className={styles.decksGrid}>
             {decks.main.map((count, i) => (
               <Pile
                 // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and the halves of a split stay where the pile was
@@ -343,14 +343,18 @@ export default function Table({
                 countPos="tl"
               />
             ))}
+            {setup.ai !== 'no' && (
+              <div className={styles.eventsPile}>
+                <Pile
+                  label={copy.table.events}
+                  deck="ai"
+                  count={decks.events}
+                  width={150}
+                  countPos="tl"
+                />
+              </div>
+            )}
           </div>
-          <Pile
-            label={copy.table.events}
-            deck="ai"
-            count={decks.events}
-            width={150}
-            countPos="tl"
-          />
         </div>
 
         {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними

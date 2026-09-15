@@ -1,6 +1,7 @@
 import type { Action, Choice } from '../actions'
-import { rulesFor } from '../cards'
+import { CARD_RULES, rulesFor } from '../cards'
 import type { Engine } from '../engine'
+import { randomAt } from '../rng'
 import {
   type CardUid,
   type GameState,
@@ -20,6 +21,9 @@ const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 // resolves) must not hang the caller — this bounds `runUntilIdle` the same
 // way `DEFEND_MS`/`WINDOW_*_MS` bound a human's clock.
 const MAX_IDLE_ITERATIONS = 500
+const HOLDABLE = Object.entries(CARD_RULES)
+  .filter(([, rule]) => rule.kind !== 'trigger' && rule.kind !== 'ai')
+  .map(([id]) => id)
 
 function firstFilledReleaseUid(release: ReleaseView): CardUid | undefined {
   for (const slot of SLOTS) {
@@ -40,6 +44,8 @@ export function botAction(
   at: number,
 ): Action | null {
   const view = engine.project(state, me)
+  // Public episode entropy preserves replay without consulting hidden cards.
+  const random = randomAt(state.seed, state.eventSeq)
   if (view.over) return null
 
   const pending = view.pending
@@ -70,10 +76,15 @@ export function botAction(
             : { kind: pending.kind, method }
         return { type: 'RESOLVE', player: me, choice, at }
       }
+      case 'stealCard':
+        return {
+          type: 'RESOLVE',
+          player: me,
+          choice: { kind: 'stealCard', index: Math.floor(random * pending.count) },
+          at,
+        }
       case 'requestCard': {
-        // Security Bug's bluff: name a card type actually seen in play — the
-        // only card identity a bot may see about someone else's hand.
-        const card = view.decks.discardTop ?? ''
+        const card = HOLDABLE[Math.floor(random * HOLDABLE.length)]
         return { type: 'RESOLVE', player: me, choice: { kind: 'requestCard', card }, at }
       }
       case 'giveCard': {
