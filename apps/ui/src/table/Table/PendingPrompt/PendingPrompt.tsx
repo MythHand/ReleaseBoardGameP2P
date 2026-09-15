@@ -5,6 +5,7 @@ import Button from '@/primitives/Button'
 import Card from '@/primitives/Card'
 import ScrollArea from '@/primitives/ScrollArea'
 import Typography from '@/primitives/Typography'
+import CardPull from '@/table/CardPull/CardPull'
 import type { ConfirmActionProps } from '@/table/ConfirmAction'
 import ConfirmAction from '@/table/ConfirmAction'
 import type { HandItem } from '@/table/Hand/Hand'
@@ -245,7 +246,7 @@ export default function PendingPrompt({
     setSacrificed(null)
   }, [fingerprint])
 
-  const kindCopy = copy[pending.kind]
+  const kindCopy = copy[pending.kind === 'stealCard' ? 'requestCard' : pending.kind]
   let complete = false
   let confirm: () => void = () => {}
   let options: ReactNode = null
@@ -286,6 +287,29 @@ export default function PendingPrompt({
           hand={hand}
           selected={card === uid}
           onClick={() => setCard(uid)}
+        />
+      ))
+      break
+    }
+    case 'stealCard': {
+      const index = card == null ? -1 : Number(card)
+      complete = Number.isInteger(index) && index >= 0 && index < pending.count
+      confirm = () => {
+        if (complete) onResolve({ kind: 'stealCard', index })
+      }
+      options = Array.from({ length: pending.count }, (_, position) => (
+        <CardPull
+          key={String(position)}
+          card={HOLDABLE[0]}
+          faceDown
+          label={`${kindCopy.action} ${position + 1}`}
+          width={104}
+          selected={index === position}
+          onDrop={() => {
+            setCard(String(position))
+            return true
+          }}
+          onKeyboardPick={() => setCard(String(position))}
         />
       ))
       break

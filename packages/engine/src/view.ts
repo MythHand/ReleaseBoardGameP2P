@@ -90,8 +90,35 @@ export type PendingView =
       // the whole table watched it be revealed.
       source?: CardId
     }
-  | { kind: 'requestCard'; player: PlayerId; target: PlayerId }
-  | { kind: 'giveCard'; player: PlayerId; requested: CardId }
+  | {
+      kind: 'stealCard'
+      player: PlayerId
+      target: PlayerId
+      count: number
+      attack: CardId
+      sudo: boolean
+      openedAt: number
+      deadline: number
+    }
+  | {
+      kind: 'requestCard'
+      player: PlayerId
+      target: PlayerId
+      attack?: CardId
+      sudo?: boolean
+      openedAt?: number
+      deadline?: number
+    }
+  | {
+      kind: 'giveCard'
+      player: PlayerId
+      requested: CardId
+      attacker?: PlayerId
+      attack?: CardId
+      sudo?: boolean
+      openedAt?: number
+      deadline?: number
+    }
   | {
       kind: 'handLimit'
       player: PlayerId

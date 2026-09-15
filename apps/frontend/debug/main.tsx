@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { toBoardOver, toBoardState } from '~/entities/game/board'
 import { useNow } from '~/features/play-game/useNow'
+import { forViewer, rejectionsIn } from '~/network/session/audience'
 import Board from '~/pages/board/[gameId]/_Board'
 import { useDebugCopy } from './copy'
 import { createScenario, engine, SCENARIOS, type Scenario } from './scenarios'
@@ -41,6 +42,7 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
       last: null,
     }),
   )
+  const [viewer, setViewer] = useState('you')
   const [ready, setReady] = useState(false)
   const now = useNow(ready)
   const send = useCallback((intent: Intent) => dispatch({ ...intent, at: Date.now() }), [])
@@ -48,9 +50,10 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
     setReady(true)
     send({ type: 'CLOCK_STARTED' })
   }, [send])
-  const view = useMemo(() => engine.project(run.state, 'you'), [run.state])
+  const view = useMemo(() => engine.project(run.state, viewer), [run.state, viewer])
+  const events = useMemo(() => forViewer(run.events, viewer), [run.events, viewer])
   const labels = t('historyLabels', { returnObjects: true }) as Record<Event['type'], string>
-  const board = useMemo(() => toBoardState(view, run.events, labels), [view, run.events, labels])
+  const board = useMemo(() => toBoardState(view, events, labels), [view, events, labels])
 
   // Only reaction windows have a WINDOW_EXPIRED action. Turn inactivity
   // normally delegates to the keeper; keep debug turns manual for inspection.
@@ -78,6 +81,56 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
             {' · '}
             {pending?.kind ?? debug('idle')}
           </Typography>
+          {run.state.seating.map((id) => (
+            <Button
+              key={id}
+              variant="tech"
+              aria-pressed={viewer === id}
+              onClick={() => setViewer(id)}
+            >
+              {debug(
+                id === 'you' ? 'viewerYou' : id === 'p2' ? 'viewerOpponent' : 'viewerObserver',
+              )}
+            </Button>
+          ))}
+          {pending && ['defend', 'requestCard', 'giveCard', 'stealCard'].includes(pending.kind) && (
+            <Button
+              variant="tech"
+              onClick={() => {
+                if (pending.kind === 'defend')
+                  send({
+                    type: 'RESOLVE',
+                    player: pending.player,
+                    choice: { kind: 'defend', card: null },
+                  })
+                if (pending.kind === 'requestCard')
+                  send({
+                    type: 'RESOLVE',
+                    player: pending.player,
+                    choice: { kind: 'requestCard', card: 'defense-hotfix' },
+                  })
+                if (pending.kind === 'stealCard')
+                  send({
+                    type: 'RESOLVE',
+                    player: pending.player,
+                    choice: { kind: 'stealCard', index: 0 },
+                  })
+                if (pending.kind === 'giveCard') {
+                  const card = run.state.players[pending.player].hand.find(
+                    (c) => c.id === pending.requested,
+                  )
+                  if (card)
+                    send({
+                      type: 'RESOLVE',
+                      player: pending.player,
+                      choice: { kind: 'giveCard', card: card.uid },
+                    })
+                }
+              }}
+            >
+              {debug('advancePending')}
+            </Button>
+          )}
           {opponentOwes && (
             <Button
               variant="tech"
@@ -97,17 +150,40 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
               <Typography variant="footnote">{debug('trace')}</Typography>
             </summary>
             <Typography as="pre" base="code-sm" className={styles.traceContent}>
-              {run.last ? JSON.stringify(run.last, null, 2) : debug('noAction')}
+              {run.last
+                ? JSON.stringify(
+                    {
+                      action:
+                        'player' in run.last.action && run.last.action.player === viewer
+                          ? run.last.action
+                          : {
+                              type: run.last.action.type,
+                              ...('player' in run.last.action
+                                ? { player: run.last.action.player }
+                                : {}),
+                            },
+                      events: [
+                        ...forViewer(run.last.events, viewer),
+                        ...('player' in run.last.action && run.last.action.player === viewer
+                          ? rejectionsIn(run.last.events)
+                          : []),
+                      ],
+                    },
+                    null,
+                    2,
+                  )
+                : debug('noAction')}
             </Typography>
           </details>
         </div>
       </div>
       <div className={styles.board} data-debug-game-id={gameId}>
         <Board
+          key={viewer}
           state={board}
           over={toBoardOver(view)}
           now={now}
-          intro={{ gameId, view, events: run.events, onDone: onIntroDone }}
+          intro={{ gameId: `${gameId}:${viewer}`, view, events, onDone: onIntroDone }}
           room={{
             role: 'host',
             participants: run.state.seating.map((id) => ({
@@ -135,13 +211,13 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
           }}
           actions={{
             onPlay: (card, target, combo) =>
-              send({ type: 'PLAY', player: 'you', card, target, combo }),
-            onResolve: (choice) => send({ type: 'RESOLVE', player: 'you', choice }),
-            onDraw: (pile) => send({ type: 'DRAW', player: 'you', pile }),
-            onPush: () => send({ type: 'PUSH', player: 'you' }),
-            onAttack: (card, combo) => send({ type: 'ATTACK', player: 'you', card, combo }),
-            onPass: () => send({ type: 'PASS', player: 'you' }),
-            onUnpass: () => send({ type: 'UNPASS', player: 'you' }),
+              send({ type: 'PLAY', player: viewer, card, target, combo }),
+            onResolve: (choice) => send({ type: 'RESOLVE', player: viewer, choice }),
+            onDraw: (pile) => send({ type: 'DRAW', player: viewer, pile }),
+            onPush: () => send({ type: 'PUSH', player: viewer }),
+            onAttack: (card, combo) => send({ type: 'ATTACK', player: viewer, card, combo }),
+            onPass: () => send({ type: 'PASS', player: viewer }),
+            onUnpass: () => send({ type: 'UNPASS', player: viewer }),
           }}
         />
       </div>

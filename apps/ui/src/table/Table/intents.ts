@@ -26,6 +26,7 @@ export type TableChoice =
   | { kind: 'crush'; method: NeutralizeMethodId; card?: string }
   | { kind: 'requestCard'; card: string }
   | { kind: 'giveCard'; card: string }
+  | { kind: 'stealCard'; index: number }
   | { kind: 'handLimit'; cards: string[] }
   | { kind: 'pickFromDiscard'; card: string; toDeck?: string }
   // The order committed per pile, index 0 becoming the new top — mirrors the
@@ -79,8 +80,35 @@ export type TablePending =
       methods: NeutralizeMethodId[]
       source?: string
     }
-  | { kind: 'requestCard'; player: string; target: string }
-  | { kind: 'giveCard'; player: string; requested: string }
+  | {
+      kind: 'stealCard'
+      player: string
+      target: string
+      count: number
+      attack: string
+      sudo: boolean
+      openedAt: number
+      deadline: number
+    }
+  | {
+      kind: 'requestCard'
+      player: string
+      target: string
+      attack?: string
+      sudo?: boolean
+      openedAt?: number
+      deadline?: number
+    }
+  | {
+      kind: 'giveCard'
+      player: string
+      requested: string
+      attacker?: string
+      attack?: string
+      sudo?: boolean
+      openedAt?: number
+      deadline?: number
+    }
   | { kind: 'handLimit'; player: string; excess: number; options: string[]; source?: string }
   | {
       kind: 'pickFromDiscard'

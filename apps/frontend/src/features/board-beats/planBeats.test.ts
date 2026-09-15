@@ -2019,3 +2019,126 @@ it('identifies the sudo Upgrade choice by public UID even with matching card fac
     },
   ])
 })
+
+describe('public operation sequence', () => {
+  const operation = (id: number, sudo = false): Event =>
+    ({ id, type: 'operationPlayed', player: 'p2', card: 'operation-git-branch', sudo }) as Event
+  it.each([
+    false,
+    true,
+  ])('enters before pile effects and exits once afterwards (sudo=%s)', (sudo) => {
+    const events = [
+      operation(1, sudo),
+      { id: 2, type: 'pilesChanged', piles: [5, 5] } as Event,
+      discarded(3, { player: 'p2', card: 'operation-git-branch' }),
+      ...(sudo ? [discarded(4, { player: 'p2', card: 'support-sudo' })] : []),
+    ]
+    const plans = planBeats(events, boardBefore())
+    expect(plans.map((p) => p.kind)).toEqual(['operationPlaced', 'piles', 'operationExit'])
+    expect(plans[0]).toMatchObject({ player: 'p2', card: 'operation-git-branch', sudo })
+    expect(plans[2]).toMatchObject({
+      spent: events
+        .slice(2)
+        .map((e) => ({ eventId: e.id, card: (e as Extract<Event, { type: 'discarded' }>).card })),
+    })
+  })
+  it('keeps pending operation visible although its cards are already banked', () => {
+    const opened = {
+      id: 1,
+      type: 'operationPlayed',
+      player: 'p2',
+      card: 'operation-git-rebase',
+      sudo: false,
+    } as Event
+    const pending = {
+      kind: 'reorderTop',
+      player: 'p2',
+      source: 'operation-git-rebase',
+    } as BoardState['pending']
+    const plans = planBeats(
+      [opened, discarded(2, { player: 'p2', card: 'operation-git-rebase' })],
+      boardBefore(),
+      pending,
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['operationPlaced'])
+    expect(plans[0]).toMatchObject({ spent: [{ eventId: 2, card: 'operation-git-rebase' }] })
+    const resolved = planBeats(
+      [{ id: 3, type: 'passed', player: 'p2' } as Event],
+      boardBefore({ pending }),
+      null,
+    )
+    expect(resolved.map((p) => p.kind)).toEqual(['operationExit'])
+  })
+  it('does not coalesce two quick operations into one public card', () => {
+    const plans = planBeats(
+      [
+        operation(1),
+        discarded(2, { player: 'p2', card: 'operation-git-branch' }),
+        operation(3),
+        discarded(4, { player: 'p2', card: 'operation-git-branch' }),
+      ],
+      boardBefore(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual([
+      'operationPlaced',
+      'operationExit',
+      'operationPlaced',
+      'operationExit',
+    ])
+  })
+})
+
+it('finishes an immediate operation before the next attack takes the centre', () => {
+  const events = [
+    { id: 1, type: 'operationPlayed', player: 'p2', card: 'operation-git-branch', sudo: false },
+    { id: 2, type: 'pilesChanged', piles: [5, 5] },
+    discarded(3, { player: 'p2', card: 'operation-git-branch' }),
+    attacked({ id: 4, attacker: 'p2', card: 'attack-bug', sudo: false, target: 'p1' }),
+  ] as Event[]
+  expect(planBeats(events, boardBefore()).map((p) => p.kind)).toEqual([
+    'operationPlaced',
+    'piles',
+    'operationExit',
+    'attackPlaced',
+  ])
+})
+
+it.each([
+  'stealCard',
+  'requestCard',
+  'giveCard',
+])('takes the resolved attack from the centre after %s', (kind) => {
+  const pending = {
+    kind,
+    player: kind === 'giveCard' ? 'p1' : 'p2',
+    attacker: 'p2',
+    target: 'p1',
+    attack: 'attack-bug',
+    sudo: true,
+  } as BoardState['pending']
+  const plans = planBeats(
+    [
+      { id: 1, type: 'handTransfer', from: 'p1', to: 'p2', card: 'release-backend' },
+      discarded(2, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+      discarded(3, { player: 'p2', card: 'support-sudo', reason: 'attackSpent' }),
+    ] as Event[],
+    boardBefore({ pending }),
+    null,
+  )
+  expect(plans.map((p) => p.kind)).toEqual(['handTransfer', 'pairToDiscard'])
+})
+
+it('keeps the reflected attack available to a coalesced transfer exit', () => {
+  const before = boardBefore({ pending: defendPending({ attacker: 'p2', sudo: false }) })
+  const events = [
+    defended({ id: 1, player: 'p1', effect: 'reflect', card: 'defense-works-on-my-machine' }),
+    discarded(2, { player: 'p1', card: 'defense-works-on-my-machine', reason: 'defenceSpent' }),
+    { id: 3, type: 'handTransfer', from: 'p2', to: 'p1', card: 'release-backend' },
+    discarded(4, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+  ] as Event[]
+  expect(planBeats(events, before, null).map((p) => p.kind)).toEqual([
+    'covered',
+    'handTransfer',
+    'pairToDiscard',
+  ])
+})

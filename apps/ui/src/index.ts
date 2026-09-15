@@ -105,6 +105,8 @@ export {
   type CardPreviewSlotProps,
   useCardPreview,
 } from './table/CardPreview'
+export type { CardPullProps } from './table/CardPull/CardPull'
+export { default as CardPull } from './table/CardPull/CardPull'
 export type { ConfirmActionProps } from './table/ConfirmAction'
 export { default as ConfirmAction } from './table/ConfirmAction'
 export { default as GameModes } from './table/GameModes'

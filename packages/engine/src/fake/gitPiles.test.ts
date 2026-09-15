@@ -172,3 +172,21 @@ describe('a pile emptied by a draw (#61 slice B, answer 7)', () => {
     expect(r.state.decks.main).toHaveLength(1)
   })
 })
+
+it('publicly announces the operation before its pile effects', () => {
+  const r = reduce(table([BRANCH, SUDO], [pile('a', 6)]), {
+    type: 'PLAY',
+    player: 'p1',
+    card: BRANCH.uid,
+    combo: SUDO.uid,
+    at: 1000,
+  })
+  expect(r.events[0]).toMatchObject({
+    type: 'operationPlayed',
+    player: 'p1',
+    card: BRANCH.id,
+    sudo: true,
+  })
+  expect(r.events[0].visibleTo).toBeUndefined()
+  expect(r.events.some((e) => e.type === 'pilesChanged')).toBe(true)
+})

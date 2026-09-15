@@ -81,7 +81,10 @@ function playedOut(): GameState {
     // err503 tie broke (p1 two, p2 one) exactly as 153's did before it. Swept
     // again for the same four conditions; 86 finishes with err503 1-1 and
     // attackedInto 4-2.
-    seed: 86,
+    // #154 introduces the blind-choice pending and shuffles its private slots.
+    // Re-swept without changing the premises: seed 139 finishes with err503
+    // [1, 1, 0], attackedInto [10, 7, 0], and no DDoS scored.
+    seed: 139,
     players: SEATS.map((s) => ({ id: s.playerId, name: s.name })),
     setup: {
       handLimit: 'base',

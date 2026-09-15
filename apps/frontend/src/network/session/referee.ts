@@ -1,5 +1,5 @@
 import type { Action, DeckEntry, Engine, Event, GameState, PlayerId, Setup } from '@release/engine'
-import { botAction, drawObligationMet } from '@release/engine/fake'
+import { botAction, DEFEND_MS, drawObligationMet } from '@release/engine/fake'
 import type { Intent, Message } from '../types'
 import { forViewer, rejectionsIn } from './audience'
 
@@ -467,6 +467,45 @@ export function tick(session: Session, now: number): SessionResult {
       { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
       now,
     )
+  }
+
+  // Legacy snapshots spent Security Bug before opening its request, and had
+  // no decision clock. Start the missing clock once without reconstructing
+  // already-discarded cards or changing historical event audiences.
+  if (
+    (pending?.kind === 'requestCard' || pending?.kind === 'giveCard') &&
+    pending.deadline === undefined
+  ) {
+    const next: Session = {
+      ...session,
+      state: {
+        ...session.state,
+        pending: {
+          ...pending,
+          openedAt: now,
+          deadline: now + DEFEND_MS,
+        },
+      },
+    }
+    return { session: next, outgoing: syncAll(next, []) }
+  }
+
+  // These choices suspend the turn clock, so each owns a deadline. The
+  // normal bot uses only a projection and supplies a deterministic legal
+  // fallback, including a blind position rather than a private hand identity.
+  if (
+    pending &&
+    (pending.kind === 'stealCard' ||
+      pending.kind === 'requestCard' ||
+      pending.kind === 'giveCard') &&
+    pending.deadline !== undefined &&
+    now >= pending.deadline
+  ) {
+    const seat = session.seats.find((s) => s.playerId === pending.player)
+    if (!seat?.peerId) return { session, outgoing: [] }
+    const action = botAction(session.engine, session.state, pending.player, now)
+    if (action?.type === 'RESOLVE')
+      return applyIntent(session, seat.peerId, { type: 'RESOLVE', choice: action.choice }, now)
   }
 
   // The turn's inactivity clock. The engine stamps it on every commit that

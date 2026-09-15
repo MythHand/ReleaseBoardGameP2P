@@ -40,3 +40,17 @@ describe('redactFor', () => {
     expect(redactFor(revealed, 'p2')).toBe(revealed)
   })
 })
+
+it('redacts blind transfers only for bystanders while keeping Security Bug transfers public', () => {
+  const transfer: Event = {
+    id: 7,
+    type: 'handTransfer',
+    from: 'p1',
+    to: 'p2',
+    card: 'support-sudo',
+  }
+  expect(redactFor(transfer, 'p1')).toEqual(transfer)
+  expect(redactFor(transfer, 'p2')).toEqual(transfer)
+  expect(redactFor(transfer, 'p3')).toEqual({ id: 7, type: 'handTransfer', from: 'p1', to: 'p2' })
+  expect(redactFor({ ...transfer, publicCard: true }, 'p3')).toMatchObject({ card: 'support-sudo' })
+})

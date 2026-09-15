@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
-import { createScenario, engine, SCENARIOS } from './scenarios'
+import { createScenario, engine, OPERATION_SCENARIOS } from './scenarios'
 
-it.each(SCENARIOS)('starts and plays %s through the engine', (scenario) => {
+it.each(OPERATION_SCENARIOS)('starts and plays %s through the engine', (scenario) => {
   const state = createScenario(scenario, 'debug-one')
   const operation = state.players.you.hand[0]
   const result = engine.reduce(state, {

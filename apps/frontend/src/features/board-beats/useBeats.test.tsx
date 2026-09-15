@@ -887,3 +887,111 @@ it('leaves the alarm dark through an ordinary draw', async () => {
   await flush()
   expect(alarms).not.toContain(true)
 })
+
+it.each([
+  false,
+  true,
+  'with-intro',
+])('finishes a standing Rebase on an eventless pending resolution (restored=%s)', async (restored) => {
+  motion.reduced = false
+  sent.hang = false
+  const anchors = { ...stub, centre: { current: node() } }
+  const events = [
+    { id: 1, type: 'operationPlayed', player: 'p2', card: 'operation-git-rebase', sudo: false },
+    { id: 2, type: 'discarded', player: 'p2', card: 'operation-git-rebase', reason: 'effect' },
+  ] as Event[]
+  const pending = {
+    ...preDiscard,
+    decks: {
+      ...preDiscard.decks,
+      discardCount: 1,
+      discardHeap: [{ uid: 'd2', card: card('operation-git-rebase'), ...scatterAt(2) }],
+    },
+    pending: { kind: 'reorderTop', player: 'p2', source: 'operation-git-rebase' },
+  } as BoardState
+  const restoredIntro: IntroBeat = {
+    key: 'restored-match',
+    shadow: pending,
+    run: async () => {},
+    collapse: () => {},
+  }
+  function OperationProbe({ live, feed }: { live: BoardState; feed: Event[] }) {
+    const beats = useBeats({
+      live,
+      events: feed,
+      anchors,
+      enabled: true,
+      restoredThrough: restored ? 2 : undefined,
+      intro: restored === 'with-intro' ? restoredIntro : undefined,
+    })
+    return (
+      <>
+        <output data-testid="standing-operation">{String(beats.operationStanding)}</output>
+        <output data-testid="operation-heap">
+          {(beats.shadow ?? live).decks.discardHeap?.map((c) => c.uid).join(',')}
+        </output>
+        {beats.overlays}
+      </>
+    )
+  }
+  vi.useFakeTimers()
+  const view = render(
+    <OperationProbe live={restored ? pending : preDiscard} feed={restored ? events : []} />,
+  )
+  view.rerender(<OperationProbe live={pending} feed={events} />)
+  for (let i = 0; i < 50; i++)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20)
+    })
+  expect(view.getByTestId('standing-operation').textContent).toBe('true')
+  expect(view.getByTestId('operation-heap').textContent).toBe('')
+  view.rerender(<OperationProbe live={{ ...pending, pending: null }} feed={events} />)
+  for (let i = 0; i < 50; i++)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20)
+    })
+  expect(view.getByTestId('standing-operation').textContent).toBe('false')
+})
+
+it.each([
+  'operation-git-rebase',
+  'operation-system-upgrade',
+])('keeps %s out of the heap under reduced motion until its pending resolves', (source) => {
+  motion.reduced = true
+  const events = [
+    { id: 1, type: 'operationPlayed', player: 'p2', card: source, sudo: true },
+    { id: 2, type: 'discarded', player: 'p2', card: source, reason: 'effect' },
+    { id: 3, type: 'discarded', player: 'p2', card: 'support-sudo', reason: 'effect' },
+  ] as Event[]
+  const pending = {
+    ...preDiscard,
+    pending:
+      source === 'operation-git-rebase'
+        ? { kind: 'reorderTop', player: 'p2', source }
+        : { kind: 'systemUpgrade', actor: 'p2', source, sudo: true },
+    decks: {
+      ...preDiscard.decks,
+      discardCount: 2,
+      discardHeap: [
+        { uid: 'd2', card: card(source), ...scatterAt(2) },
+        { uid: 'd3', card: card('support-sudo'), ...scatterAt(3) },
+      ],
+    },
+  } as BoardState
+  function ReducedProbe({ live }: { live: BoardState }) {
+    const beats = useBeats({ live, events, anchors: stub, enabled: true })
+    return (
+      <>
+        <output data-testid="reduced-heap">{(beats.shadow ?? live).decks.discardCount}</output>
+        <output data-testid="reduced-running">{String(beats.running)}</output>
+        {beats.overlays}
+      </>
+    )
+  }
+  const view = render(<ReducedProbe live={pending} />)
+  expect(view.getByTestId('reduced-heap').textContent).toBe('0')
+  expect(view.getByTestId('reduced-running').textContent).toBe('false')
+  expect(view.container.querySelector('[data-public-operation]')).toBeNull()
+  view.rerender(<ReducedProbe live={{ ...pending, pending: null }} />)
+  expect(view.getByTestId('reduced-heap').textContent).toBe('2')
+})

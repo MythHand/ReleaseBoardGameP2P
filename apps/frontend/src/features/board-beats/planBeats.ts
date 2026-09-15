@@ -118,6 +118,16 @@ export type AiTail =
   | { kind: 'none' }
 
 export type BeatPlan =
+  | {
+      kind: 'operationPlaced'
+      key: string
+      eventId: number
+      player: string
+      card: string
+      sudo: boolean
+      spent: { eventId: number; card: string }[]
+    }
+  | { kind: 'operationExit'; key: string; spent?: { eventId: number; card: string }[] }
   | { kind: 'draw'; key: string; draws: PlannedDraw[] }
   // An AI trigger's whole scene, claimed from the pile onward — the card-less
   // `drawn` that turned it up, its own reveal, and its own exit, folded into
@@ -229,6 +239,7 @@ export type BeatPlan =
       to: string
       card?: string
       role: TransferRole
+      index?: number
       named: boolean
       donorHand: number
     }
@@ -664,6 +675,10 @@ export function planBeats(
   // tail must not be re-planned by the ordinary release branch either.
   const owned = new Set<number>()
   const plans: BeatPlan[] = []
+  let operation: Extract<BeatPlan, { kind: 'operationPlaced' }> | null = null
+  const operationSource = (p: TablePending | null | undefined) =>
+    p && 'source' in p && p.source && cardById(p.source)?.category === 'operation' ? p.source : null
+  let pendingOperation = owed === undefined ? null : operationSource(before.pending)
   let piles = before.decks.main
   let openAttack: OpenAttack | null =
     before.pending?.kind === 'defend'
@@ -673,6 +688,24 @@ export function planBeats(
           sudo: before.pending.sudo,
         }
       : null
+
+  const transferPending = before.pending
+  if (
+    transferPending &&
+    (transferPending.kind === 'stealCard' ||
+      transferPending.kind === 'requestCard' ||
+      transferPending.kind === 'giveCard') &&
+    transferPending.attack
+  ) {
+    const attacker =
+      transferPending.kind === 'giveCard' ? transferPending.attacker : transferPending.player
+    if (attacker)
+      openAttack = {
+        attacker,
+        attackCard: transferPending.attack,
+        sudo: transferPending.sudo === true,
+      }
+  }
 
   // A run of one kind coalesces into one beat; anything else closes it. That is
   // what makes a hand-limit discard of three read as one gesture while a discard
@@ -728,8 +761,57 @@ export function planBeats(
     elimination = null
   }
 
+  const closeOperation = () => {
+    if (!operation && !pendingOperation) return
+    flush()
+    plans.push({
+      kind: 'operationExit',
+      key: `operationExit:${operation?.eventId ?? events[0]?.id}`,
+      ...(operation ? { spent: operation.spent } : {}),
+    })
+    operation = null
+    pendingOperation = null
+  }
+
   for (let i = 0; i < events.length; i++) {
     const e = events[i]
+    if (
+      e.type === 'attacked' ||
+      e.type === 'released' ||
+      e.type === 'placed' ||
+      e.type === 'gameOver'
+    )
+      closeOperation()
+    if (e.type === 'operationPlayed') {
+      closeOperation()
+      flush()
+      const needed = new Set([e.card, ...(e.sudo ? ['support-sudo'] : [])])
+      const spent: { eventId: number; card: string }[] = []
+      for (let j = i + 1; j < events.length && needed.size > 0; j++) {
+        const next = events[j]
+        if (next.type === 'operationPlayed') break
+        if (
+          next.type === 'discarded' &&
+          next.player === e.player &&
+          next.reason === 'effect' &&
+          needed.delete(next.card)
+        ) {
+          spent.push({ eventId: next.id, card: next.card })
+          owned.add(next.id)
+        }
+      }
+      operation = {
+        kind: 'operationPlaced',
+        key: `operation:${e.id}`,
+        eventId: e.id,
+        player: e.player,
+        card: e.card,
+        sudo: e.sudo,
+        spent,
+      }
+      plans.push(operation)
+      continue
+    }
     if (e.type === 'upgradeTaken' && before.pending?.kind === 'systemUpgrade') {
       const pending = before.pending
       const tail = events.slice(i + 1, i + pending.thrown.length)
@@ -974,7 +1056,8 @@ export function planBeats(
         spent,
         ...(e.effect === 'return' ? { returnTo: ownSudo ? e.player : p.attacker } : {}),
       })
-      openAttack = null // answered — nothing is standing at the centre now
+      if (e.effect !== 'reflect' || spent.some((card) => card.reason === 'attackSpent'))
+        openAttack = null
       i = j - 1 // the discards this plan claimed are consumed
       continue
     }
@@ -1033,7 +1116,7 @@ export function planBeats(
       // `giveCard` pending and returned, and the transfer arrives from the
       // victim's own RESOLVE — a separate reduction. The projection the batch
       // animates away from is what still knows, and it knows publicly.
-      const named = before.pending?.kind === 'giveCard'
+      const named = e.publicCard === true || before.pending?.kind === 'giveCard'
       const role: TransferRole =
         e.to === before.selfId ? 'taker' : e.from === before.selfId ? 'victim' : 'watcher'
       // I1 — the donor's fan as it stands ON SCREEN. `live` has already lost
@@ -1055,6 +1138,7 @@ export function planBeats(
         role,
         named,
         donorHand,
+        ...(e.index === undefined ? {} : { index: e.index }),
       })
       continue
     }
@@ -1298,5 +1382,7 @@ export function planBeats(
     flush()
   }
   flush()
+  if (operationSource(owed) !== (operation?.card ?? pendingOperation) || !operationSource(owed))
+    closeOperation()
   return plans
 }

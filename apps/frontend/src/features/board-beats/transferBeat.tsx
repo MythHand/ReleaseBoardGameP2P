@@ -76,6 +76,14 @@ function offerPoses(count: number, centre: Rect): Rect[] {
   }))
 }
 
+function centreAttackOf(base: BoardState): BoardState['centreAttack'] {
+  const pending = base.pending
+  if (pending?.kind === 'defend') return { card: pending.attackCard, sudo: pending.sudo }
+  if (pending && 'attack' in pending && pending.attack)
+    return { card: pending.attack, sudo: pending.sudo === true }
+  return base.centreAttack
+}
+
 export function useTransferBeat(anchors: BoardAnchors) {
   const { overlay: flyerOverlay, raise, pin, patch, drop, elOf } = useFlyer()
 
@@ -147,7 +155,7 @@ export function useTransferBeat(anchors: BoardAnchors) {
   const clearPending = useCallback(() => {
     const c = ctx.current
     if (!c) return
-    const next: BoardState = { ...c.base, pending: null }
+    const next: BoardState = { ...c.base, pending: null, centreAttack: centreAttackOf(c.base) }
     c.base = next
     c.publish(next)
   }, [])
@@ -162,7 +170,9 @@ export function useTransferBeat(anchors: BoardAnchors) {
       ctx.current = beat
       try {
         const a = latest.current.anchors
-        const centre = rectOf(a.centre.current)
+        const centre = rectOf(
+          centreAttackOf(beat.base) ? (a.cost?.current ?? a.centre.current) : a.centre.current,
+        )
         const card = cardById(plan.card)
         if (!centre || !card) return
         // The named card, face-up, at the centre — for EVERY peer, asker
@@ -197,6 +207,10 @@ export function useTransferBeat(anchors: BoardAnchors) {
                 kind: 'giveCard' as const,
                 player: plan.target,
                 requested: plan.card,
+                attacker: plan.attacker,
+                ...(centreAttackOf(c.base)
+                  ? { attack: centreAttackOf(c.base)?.card, sudo: centreAttackOf(c.base)?.sudo }
+                  : {}),
               },
             }
             c.base = next
@@ -244,7 +258,9 @@ export function useTransferBeat(anchors: BoardAnchors) {
         if (plan.role === 'taker') {
           const a = latest.current.anchors
           const seat = a.seatBox(plan.from)
-          const centre = rectOf(a.centre.current)
+          const centre = rectOf(
+            centreAttackOf(beat.base) ? (a.cost?.current ?? a.centre.current) : a.centre.current,
+          )
           const card = plan.card ? cardById(plan.card) : null
           // A taker always knows what they took — but a missing rect or an
           // unknown id ends the leg and lets the projection stand, which is the
@@ -252,11 +268,27 @@ export function useTransferBeat(anchors: BoardAnchors) {
           if (!seat || !centre || !card) return
           // out of the seat's own card box (I6), at the size a card is while it
           // is inside a hidden hand — the exact box `dealToSeat` sinks into
-          const from = cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          const root = a.centre.current?.parentElement
+          const picked =
+            plan.index === undefined
+              ? null
+              : root?.querySelector<HTMLElement>('[data-transfer-picked]')
+          const chosen =
+            plan.index === undefined
+              ? null
+              : Array.from(
+                  root?.querySelectorAll<HTMLElement>('[data-transfer-choice]') ?? [],
+                ).find((slot) => slot.dataset.transferChoice === String(plan.index))
+          const from = rectOf(picked ?? chosen ?? null) ?? cardBoxIn(seat, CARD_W * SEAT_SHRINK)
           // A random steal offers the donor's hand first: the suspense is real,
           // because the card genuinely is random. A named one has no question
           // left in it — the table watched the asker choose.
-          if (!plan.named && plan.donorHand > 0) {
+          if (
+            !plan.named &&
+            plan.index === undefined &&
+            beat.base.pending?.kind !== 'stealCard' &&
+            plan.donorHand > 0
+          ) {
             const poses = offerPoses(plan.donorHand, centre)
             const backs = poses.map((_, i) => ({
               key: `offer${i}`,
@@ -286,7 +318,7 @@ export function useTransferBeat(anchors: BoardAnchors) {
             )
             for (let i = 0; i < backs.length; i++) drop(`offer${i}`)
           }
-          const [el] = await raise([{ key: KEY, card, at: from, faceDown: true }])
+          const raised = raise([{ key: KEY, card, at: from, faceDown: true }])
           // TAKEOFF: our own flyer now holds the card (still at the seat, not
           // yet at the centre — but the pending is not standing in for a
           // position, it is standing in for OWNERSHIP of this card's render,
@@ -295,6 +327,7 @@ export function useTransferBeat(anchors: BoardAnchors) {
           // `_Board.tsx`'s static `giveCard` render doubling this same card
           // at the centre while the flyer is still crossing to it.
           clearPending()
+          const [el] = await raised
           if (el) {
             const anim = play('takeFromSeat', el, { from, to: centre })
             if (anim) await anim.finished
@@ -316,7 +349,9 @@ export function useTransferBeat(anchors: BoardAnchors) {
         }
         if (plan.role === 'victim') {
           const a = latest.current.anchors
-          const centre = rectOf(a.centre.current)
+          const centre = rectOf(
+            centreAttackOf(beat.base) ? (a.cost?.current ?? a.centre.current) : a.centre.current,
+          )
           const seat = a.seatBox(plan.to)
           const card = plan.card ? cardById(plan.card) : null
           if (!centre || !seat || !card) return
@@ -326,10 +361,15 @@ export function useTransferBeat(anchors: BoardAnchors) {
           // resolved here. Matching on the card ID is what the engine itself
           // matched on (`onGiveCard` checks `card.id === pending.requested`);
           // copies are interchangeable, so the first is as right as any.
-          const index = beat.base.you.hand.findIndex((h) => h.card.id === plan.card)
-          const slot = index >= 0 ? rectOf(a.handSlotAt(index)) : null
+          const picked =
+            a.centre.current?.parentElement?.querySelector<HTMLElement>('[data-transfer-picked]')
+          const uid = picked?.dataset.transferUid
+          const index = beat.base.you.hand.findIndex((h) =>
+            uid ? h.uid === uid : h.card.id === plan.card,
+          )
+          const slot = rectOf(picked ?? null) ?? (index >= 0 ? rectOf(a.handSlotAt(index)) : null)
           if (!slot) return
-          const [el] = await raise([{ key: KEY, card, at: slot, faceDown: false }])
+          const raised = raise([{ key: KEY, card, at: slot, faceDown: false }])
           // your fan closes the gap while the card is in the air, and the
           // `giveCard` pending clears in the same publish: our own flyer now
           // holds the card, so `_Board.tsx`'s static centre render has
@@ -339,10 +379,16 @@ export function useTransferBeat(anchors: BoardAnchors) {
           const c0 = ctx.current
           if (c0) {
             const hand = c0.base.you.hand.filter((_, i) => i !== index)
-            const next = { ...c0.base, pending: null, you: { ...c0.base.you, hand } }
+            const next = {
+              ...c0.base,
+              pending: null,
+              centreAttack: centreAttackOf(c0.base),
+              you: { ...c0.base.you, hand },
+            }
             c0.base = next
             c0.publish(next)
           }
+          const [el] = await raised
           if (el) {
             const anim = play('playToCenter', el, { from: slot, to: centre })
             if (anim) await anim.finished
@@ -363,23 +409,21 @@ export function useTransferBeat(anchors: BoardAnchors) {
           bumpRecipient(plan.to)
           return
         }
-        // A watcher. `plan.card` is absent — not "unknown to us", absent from
-        // the event — so there is nothing to turn over and nothing to hold at
-        // the centre to be read. It crosses closed, and the two counts are the
-        // only thing that actually changes. This leg is currently unreachable in
-        // production: the engine tags every `handTransfer` event with
-        // `visibleTo: [from, to]`, and non-parties never receive the event. The
-        // leg ships because it expresses the "never widen a redacted event"
-        // property, and it will stay passing after `handTransfer` becomes public
-        // with `card` redacted the way `drawn` already is.
+        // Public named requests may reveal the card; blind observer events
+        // contain no identity and keep the carrier closed throughout.
         const a = latest.current.anchors
         const fromSeat = a.seatBox(plan.from)
         const toSeat = a.seatBox(plan.to)
-        const centre = rectOf(a.centre.current)
+        const centre = rectOf(
+          centreAttackOf(beat.base) ? (a.cost?.current ?? a.centre.current) : a.centre.current,
+        )
         if (!fromSeat || !toSeat || !centre) return
         const from = cardBoxIn(fromSeat, CARD_W * SEAT_SHRINK)
         const to = cardBoxIn(toSeat, CARD_W * SEAT_SHRINK)
-        const [el] = await raise([{ key: KEY, card: COVER, at: from, faceDown: true }])
+        const publicCard = plan.card ? cardById(plan.card) : null
+        const [el] = await raise([
+          { key: KEY, card: publicCard ?? COVER, at: from, faceDown: !publicCard },
+        ])
         // TAKEOFF, watcher leg: the `giveCard` pending is public even to a
         // watcher (`pendingView`'s `requested` carries no `mine` gate — the
         // request was named aloud), so a watcher's board is standing the same
@@ -391,6 +435,10 @@ export function useTransferBeat(anchors: BoardAnchors) {
           if (out) await out.finished
           pin(KEY, centre)
           dropFromDonor(plan.from)
+          if (publicCard) {
+            await wait(REVEAL_HOLD)
+            patch(KEY, { faceDown: true })
+          }
           const home = play('dealToSeat', el, { from: centre, to })
           if (home) await home.finished
         }

@@ -23,6 +23,7 @@ export type Choice =
   // Security Bug names a card TYPE the opponent might hold — that is the bluff.
   | { kind: 'requestCard'; card: CardId }
   | { kind: 'giveCard'; card: CardUid }
+  | { kind: 'stealCard'; index: number }
   // An array: Memory Problem can leave a hand several cards over the limit.
   | { kind: 'handLimit'; cards: CardUid[] }
   // `toDeck` is the sudo second pick, placed on top of pile 0 unseen.

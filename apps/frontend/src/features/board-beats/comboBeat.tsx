@@ -489,7 +489,7 @@ export function useComboBeat(
 
   // pairToDiscard: the pending pair at the centre splits into two singles.
   const runPairOut = useCallback(
-    async (plan: Extract<BeatPlan, { kind: 'pairToDiscard' }>, _ctx: BeatRun) => {
+    async (plan: Extract<BeatPlan, { kind: 'pairToDiscard' }>, ctx: BeatRun) => {
       await nextFrames()
       const a = latest.current.anchors
       const el = a.centre.current?.querySelector<HTMLElement>('[data-pending-play]') ?? null
@@ -525,6 +525,7 @@ export function useComboBeat(
             ? [{ key: `p${auxRef.eventId}`, card: aux, from, scatter: scatterAt(auxRef.eventId) }]
             : []
       if (items.length > 0) await latest.current.send(items)
+      if (ctx.base.centreAttack) ctx.publish({ ...ctx.base, centreAttack: undefined })
     },
     [],
   )

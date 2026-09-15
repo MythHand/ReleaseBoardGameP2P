@@ -31,23 +31,6 @@
   opacity: 0;
 }
 
-/* The decks' column lives on an inner node: the kit's own `.decks` holds the
-   block centred, and the opening shifts this node instead. Only the stacking
-   is here; the position stays the kit's. */
-.deckStack {
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-/* the draw piles sit side by side — see the kit's own `.pileRow`. This one is
-   the board's because the opening animates the stack around it. */
-.pileRow {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
 .pileTarget {
   position: relative;
 }
@@ -60,63 +43,14 @@
   border: 0;
 }
 
-/* the centre of the table — a little ABOVE the geometric middle (42%, not 50%):
-   there it does not argue with the hand, nor with the preview that rises out of
-   it. The same value in every scene. Here the player's own cards gather in it
-   before they go into the fan. pointer-events: none — outside the deal it is an
-   empty box and must not catch clicks meant for the table. */
-.centre {
-  position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  z-index: 10;
-  inline-size: 150px;
-  aspect-ratio: var(--card-aspect);
-  transform: translate(-50%, -50%);
-}
-
-/* The five slots the centre of the table is made of, all sharing one box and
-   differing only by where they sit and what lies over what. Quoted from the
-   playground's DefenseReleaseStory — the approved visual source.
-
-   Each slot stays AXIS-ALIGNED and the card's tilt lives on an inner `.pose`
-   element, so a slot's rect is the true card box a flight can aim at (I6). A
-   rotated slot's bounding rect is the box AROUND the tilted card, and aiming
-   at it makes a flight jump on its first frame. */
+/* Every centre place receives position, width and layer from centrePlaceStyle.
+   The anchor stays axis-aligned; each card's own tilt belongs to its inner pose
+   so flight measurements remain the true card box (I6). */
+.centre,
 .stageSlot,
 .costSlot,
 .sudoSlot,
-.coverSlot {
-  position: absolute;
-  inset-block-start: 42%;
-  inset-inline-start: 50%;
-  inline-size: 150px;
-  aspect-ratio: var(--card-aspect);
-}
-
-.stageSlot {
-  transform: translate(calc(-50% - 92px), -50%);
-}
-
-.costSlot {
-  transform: translate(calc(-50% + 92px), -50%);
-}
-
-.sudoSlot {
-  z-index: 9;
-  transform: translate(calc(-50% - 180px), -50%);
-}
-
-/* over the attack: the defence covers it, so it must lie on top */
-.coverSlot {
-  z-index: 11;
-  transform: translate(-50%, -50%);
-}
-
-/* The AI pair's slots (#106). Position, width and layer all arrive inline from
-   `centrePlaceStyle` — the single source in `TableCentre/centre.ts`. What stays
-   here is only what every centre place shares, plus the rule that an empty one
-   is not a target. */
+.coverSlot,
 .aiSlot {
   position: absolute;
   aspect-ratio: var(--card-aspect);

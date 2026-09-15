@@ -33,6 +33,7 @@ export type Event = EventBase &
     | { type: 'dealt'; player: PlayerId; count: number; open?: CardId[] }
     | { type: 'drawn'; player: PlayerId; card?: CardId; pile: number; deckSize: number }
     | { type: 'released'; player: PlayerId; slot: ReleaseSlot; card: CardId; codeReview?: CardId }
+    | { type: 'operationPlayed'; player: PlayerId; card: CardId; sudo: boolean }
     | { type: 'placed'; player: PlayerId; card: CardId }
     | { type: 'discarded'; player: PlayerId; card: CardId; reason: DiscardReason }
     | { type: 'windowOpened'; player: PlayerId; slot: ReleaseSlot; round: number; deadline: number }
@@ -46,7 +47,14 @@ export type Event = EventBase &
     | { type: 'releaseStolen'; from: PlayerId; to: PlayerId; slot: ReleaseSlot; card: CardId }
     | { type: 'releaseReturned'; player: PlayerId; slot: ReleaseSlot; card: CardId }
     | { type: 'monitoringDestroyed'; player: PlayerId; card: CardId }
-    | { type: 'handTransfer'; from: PlayerId; to: PlayerId; card?: CardId }
+    | {
+        type: 'handTransfer'
+        from: PlayerId
+        to: PlayerId
+        card?: CardId
+        publicCard?: true
+        index?: number
+      }
     | { type: 'requested'; attacker: PlayerId; target: PlayerId; card: CardId; hit: boolean }
     | { type: 'revealed'; player: PlayerId; card: CardId }
     | { type: 'aiRevealed'; player: PlayerId; aiCard: CardId; eventCard: CardId }

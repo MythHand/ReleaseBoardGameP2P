@@ -287,7 +287,13 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       //
       // Ahead of `returning` as well as of the exit: a Rollback's attack flies
       // to a hand, and the centre must not still be claiming to hold it.
-      ctx.publish({ ...ctx.base, pending: null })
+      const reflected =
+        plan.effect === 'reflect' && !plan.spent.some((card) => card.reason === 'attackSpent')
+      ctx.publish({
+        ...ctx.base,
+        pending: null,
+        ...(reflected ? { centreAttack: { card: plan.attackCard, sudo: plan.attackSudo } } : {}),
+      })
       // Together, not in sequence: the exchange leaving for the discard and
       // the attack leaving for its hand are one moment, not two gestures.
       await Promise.all([items.length > 0 ? latest.current.send(items) : undefined, returning])

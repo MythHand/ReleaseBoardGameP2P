@@ -7,7 +7,7 @@ export { botAction, runUntilIdle } from './bots'
 // The keeper's absent-seat fallback needs the same answer the engine gives
 // itself about whether a turn still owes a draw — one predicate, so the
 // keeper and the reducer cannot disagree about when a turn may end.
-export { drawObligationMet, TURN_ACTION_MS } from './core'
+export { DEFEND_MS, drawObligationMet, TURN_ACTION_MS } from './core'
 
 // Quantities mirror apps/ui/src/cards/catalogue.ts. Every id the fake
 // implements appears — nothing is deferred any more — and createGame filters

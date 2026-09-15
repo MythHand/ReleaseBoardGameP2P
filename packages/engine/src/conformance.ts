@@ -96,6 +96,13 @@ function resolvePendingAction(state: GameState, n: number): Action | null {
       const card = pending.canDefendWith[0] ?? null
       return { type: 'RESOLVE', player: pending.player, choice: { kind: 'defend', card }, at }
     }
+    case 'stealCard':
+      return {
+        type: 'RESOLVE',
+        player: pending.player,
+        choice: { kind: 'stealCard', index: 0 },
+        at,
+      }
     case 'requestCard': {
       // Guess the target's first held card's type if any, otherwise a fixed
       // id that is certain to miss — either way the pending resolves in one step.
@@ -424,6 +431,10 @@ function realCardUids(state: GameState): string[] {
   // game, so a stream that simply ends while one is open must not read as a
   // loss — that is a snapshot artefact, not a leaked card.
   if (state.pending?.kind === 'defend') uids.push(state.pending.attack)
+  if (state.pending && 'context' in state.pending && state.pending.context) {
+    uids.push(state.pending.context.attack.uid)
+    if (state.pending.context.combo) uids.push(state.pending.context.combo.uid)
+  }
   // The Sudo that rode that attack, held on the same pending for the same
   // reason and in the same mid-air state — out of the attacker's hand and in no
   // pile until the exchange resolves. Counted here, and nowhere else: the test
@@ -579,13 +590,11 @@ export function describeEngine(
       })
 
       it('shows the tally to a viewer only once the match is over', () => {
+        // The explicit blind-position decision changes the fuzz trajectory.
+        // Seed 2 reaches gameOver at step 1305; the remaining stream verifies finality.
         const engine = make()
-        let state = engine.createGame(configFor(options, 3))
+        let state = engine.createGame(configFor(options, 2))
         let sawOpen = false
-        // 4800, not 3200: #108 added System Upgrade to FAKE_DECK and seed 3's
-        // game now ends at step 3945 (measured, not assumed — see 'ends
-        // exactly once'). Budget raised rather than seed swept, so the run is
-        // the same trajectory this test has always walked, only far enough.
         for (let n = 0; n < 4800; n += 1) {
           const view = engine.project(state, state.seating[0])
           if (state.over) {
@@ -595,11 +604,9 @@ export function describeEngine(
             expect(view.tally).toBeNull()
             sawOpen = true
           }
-          state = engine.reduce(state, fuzzAction(state, 3, n)).state
+          state = engine.reduce(state, fuzzAction(state, 2, n)).state
         }
         expect(sawOpen).toBe(true)
-        // Seed 3 reaches gameOver at step 3945 (see 'ends exactly once'), so
-        // the non-null half above is genuinely exercised.
         expect(state.over).not.toBeNull()
       })
     })
@@ -1157,7 +1164,7 @@ export function describeEngine(
         // and deterministic. PASS/UNPASS are then issued by hand, since no bot
         // policy ever calls UNPASS.
         const engine = make()
-        let state = engine.createGame(configFor(options, 6767))
+        let state = engine.createGame(configFor(options, 1))
         const at = 1
         for (let i = 0; i < 200 && !state.window && !state.over; i += 1) {
           const seat = seatOwing(state.pending) ?? state.turn.player
@@ -1230,7 +1237,9 @@ export function describeEngine(
         // half and the actual property here — was false for every seed 1-120
         // in the sweep, so the choice is not what makes it pass.
         const engine = make()
-        const result = driveProtectedReleaseAndDdos(engine, options, 6, 1500)
+        // Blind-position decisions change the trajectory again: a seed 1–20
+        // sweep measured both positive witnesses at seed 9 within this budget.
+        const result = driveProtectedReleaseAndDdos(engine, options, 9, 1500)
         expect(
           result.sawNonDdosZoneTarget,
           'a non-DDoS attack was offered a release or Monitoring target',
@@ -1240,20 +1249,13 @@ export function describeEngine(
       })
 
       it('ends exactly once and then accepts nothing', () => {
-        // Fuzz-driven: reaching gameOver at all, then continuing to throw
-        // actions at the ended game, is exactly what the stream already does
-        // for free over a long enough run. Every card added to FAKE_DECK moves
-        // where that happens, because a longer deck consumes a different amount
-        // of the shuffle's RNG stream: Git Rebase (#108) pushed this seed's end
-        // from step 1821 to 2592, and System Upgrade (#108, the same issue)
-        // pushed it on to 3945 — each measured directly, not assumed. 4800
-        // keeps roughly the proportion of headroom the old budgets did, so the
-        // next card added does not immediately re-break this.
+        // The explicit blind-position decision changes the fuzz trajectory.
+        // Seed 2 reaches gameOver at step 1305; the remaining stream verifies finality.
         const engine = make()
-        let state = engine.createGame(configFor(options, 3))
+        let state = engine.createGame(configFor(options, 2))
         let overAt = -1
         for (let n = 0; n < 4800; n += 1) {
-          const r = engine.reduce(state, fuzzAction(state, 3, n))
+          const r = engine.reduce(state, fuzzAction(state, 2, n))
           if (r.state.over && overAt < 0) overAt = n
           if (overAt >= 0 && n > overAt) {
             expect(r.events.every((e) => e.type === 'rejected')).toBe(true)

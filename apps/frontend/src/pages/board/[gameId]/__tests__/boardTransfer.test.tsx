@@ -41,57 +41,29 @@ it('answers a requestCard on the table, not through the panel', () => {
   expect(queryByTestId('board-request-band')).not.toBeNull()
 })
 
-it('hands the card over without asking, once, per pending episode', () => {
-  // The copies differ only by uid — the engine itself matches on `card.id`
-  // (fake/handAttacks.ts `onGiveCard`) — so there is nothing to choose.
-  //
-  // The guard is per-EPISODE, not per-mount and not permanent: it fires once
-  // for a `giveCard` pending, stays silent for a re-render of that SAME
-  // pending, and is free to fire again once the pending has gone away (the
-  // engine cleared it — a real, later episode) even if the next one is an
-  // identical `giveCard` for the same player, card and copy. A latch keyed
-  // only on player+card+uid and never cleared would swallow that SECOND
-  // request outright, and a second Security Bug in one match is an ordinary
-  // thing.
-  //
-  // `held` is read from `base.state.you.hand`, the SAME hand every pending
-  // below is built against — `makeHand`'s own uid counter is a shared,
-  // ever-incrementing module state (`apps/ui/src/mocks/hand.ts`), so a second,
-  // independent `makeBoardProps()` call hands out different uids for the same
-  // catalogue position and would make the dispatched uid assertion flaky.
+it('waits for a drag and gives the selected matching copy exactly once', () => {
   const onResolve = vi.fn()
   const base = makeBoardProps()
   const held = base.state.you.hand[0]
-  const boardWith = (pending: TablePending | null) => ({
-    ...base,
-    state: { ...base.state, selfId: 'you', pending },
-  })
-
-  // Episode 1: the first `giveCard` pending owed to us.
-  const first = boardWith({ kind: 'giveCard', player: 'you', requested: held.card.id })
-  const { rerender } = render(<Board {...first} actions={{ onResolve }} />)
+  const hand = [
+    { ...held, uid: 'first' },
+    { ...held, uid: 'second' },
+  ]
+  const props = withPending(
+    { kind: 'giveCard', player: 'you', requested: held.card.id },
+    { you: { ...base.state.you, hand } },
+  )
+  const { rerender } = render(<Board {...props} actions={{ onResolve }} />)
+  expect(onResolve).not.toHaveBeenCalled()
+  const slots = document.querySelectorAll('[data-hand-slot]')
+  fireEvent.click(slots[1])
+  expect(onResolve).not.toHaveBeenCalled()
+  fireEvent.mouseDown(slots[1], { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'giveCard', card: 'second' })
+  rerender(<Board {...props} actions={{ onResolve }} />)
   expect(onResolve).toHaveBeenCalledTimes(1)
-  expect(onResolve.mock.calls[0][0]).toMatchObject({ kind: 'giveCard', card: held.uid })
-
-  // The SAME episode, re-rendered with a NEW pending object carrying the exact
-  // same values (a real projection rebuild, not a referential no-op) — the
-  // guard must recognise it as the episode already answered and stay silent.
-  const sameAgain = boardWith({ kind: 'giveCard', player: 'you', requested: held.card.id })
-  rerender(<Board {...sameAgain} actions={{ onResolve }} />)
-  expect(onResolve).toHaveBeenCalledTimes(1)
-
-  // The episode ends: the engine cleared the pending (it was answered).
-  const cleared = boardWith(null)
-  rerender(<Board {...cleared} actions={{ onResolve }} />)
-  expect(onResolve).toHaveBeenCalledTimes(1)
-
-  // A fresh episode — a new `giveCard`, identical in every field to the first
-  // — must be answered again. This is the case a permanent, never-cleared
-  // fingerprint would get wrong.
-  const second = boardWith({ kind: 'giveCard', player: 'you', requested: held.card.id })
-  rerender(<Board {...second} actions={{ onResolve }} />)
-  expect(onResolve).toHaveBeenCalledTimes(2)
-  expect(onResolve.mock.calls[1][0]).toMatchObject({ kind: 'giveCard', card: held.uid })
 })
 
 it('stands the named card at the centre for a peer who is not a party', () => {
@@ -105,10 +77,7 @@ it('stands the named card at the centre for a peer who is not a party', () => {
   expect(queryByTestId('board-requested-card')).not.toBeNull()
 })
 
-it('still hands the card over under reduced motion', () => {
-  // Every beat collapses here. The hand-over is a game action, not
-  // choreography — a victim who prefers reduced motion must not stall the
-  // engine waiting for an animation that will never play.
+it('requires the same give gesture under reduced motion', () => {
   window.matchMedia = ((q: string) => ({
     matches: q.includes('reduce'),
     media: q,
@@ -116,20 +85,33 @@ it('still hands the card over under reduced motion', () => {
     removeEventListener: () => {},
   })) as unknown as typeof window.matchMedia
   const onResolve = vi.fn()
-  const held = makeBoardProps().state.you.hand[0]
-  const props = withPending({ kind: 'giveCard', player: 'you', requested: held.card.id })
+  const base = makeBoardProps()
+  const held = base.state.you.hand[0]
+  const props = withPending(
+    { kind: 'giveCard', player: 'you', requested: held.card.id },
+    { you: base.state.you },
+  )
   render(<Board {...props} actions={{ onResolve }} />)
-  expect(onResolve).toHaveBeenCalledTimes(1)
+  expect(onResolve).not.toHaveBeenCalled()
+  const slot = document.querySelector('[data-hand-slot]')
+  if (!slot) throw new Error('missing hand slot')
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'giveCard', card: held.uid })
 })
 
-it('names a catalogue card only after confirmation', () => {
+it('names a catalogue card after keyboard selection and confirmation', () => {
   const onResolve = vi.fn()
   const props = withPending({ kind: 'requestCard', player: 'you', target: 'p2' })
   const { getByTestId } = render(<Board {...props} actions={{ onResolve }} />)
   const band = within(getByTestId('board-request-band'))
   const confirm = band.getByRole('button', { name: /confirm/i }) as HTMLButtonElement
   expect(confirm.disabled).toBe(true)
-  fireEvent.click(band.getByRole('button', { name: /Support Code Review/i }))
+  const option = band.getByRole('button', { name: /Code Review/i })
+  fireEvent.click(option)
+  expect(confirm.disabled).toBe(true)
+  fireEvent.keyDown(option, { key: 'Enter' })
   expect(onResolve).not.toHaveBeenCalled()
   expect(confirm.disabled).toBe(false)
   fireEvent.click(confirm)
@@ -137,4 +119,53 @@ it('names a catalogue card only after confirmation', () => {
     kind: 'requestCard',
     card: 'support-code-review',
   })
+})
+
+it('offers anonymous positions and requires a drag to choose a closed card', () => {
+  const onResolve = vi.fn()
+  const props = withPending({
+    kind: 'stealCard',
+    player: 'you',
+    target: 'p2',
+    count: 3,
+    attack: 'attack-bug',
+    sudo: false,
+    openedAt: 0,
+    deadline: 15000,
+  })
+  const { getByTestId } = render(<Board {...props} actions={{ onResolve }} />)
+  const offer = getByTestId('board-transfer-offer')
+  const root = getByTestId('board-request-band').parentElement
+  if (!root) throw new Error('missing board')
+  vi.spyOn(root, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1280, 720))
+  const cards = within(offer).getAllByRole('button')
+  expect(cards).toHaveLength(3)
+  fireEvent.click(cards[1])
+  expect(onResolve).not.toHaveBeenCalled()
+  fireEvent.pointerDown(cards[1], { button: 0, pointerId: 1, clientX: 0, clientY: 0 })
+  fireEvent.pointerMove(window, { pointerId: 1, clientX: 0, clientY: 200 })
+  fireEvent.pointerUp(window, { pointerId: 1, clientX: 0, clientY: 200 })
+  expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'stealCard', index: 1 })
+})
+
+it.each([
+  'requestCard',
+  'giveCard',
+  'stealCard',
+] as const)('keeps the spent attack visible during %s', (kind) => {
+  const common = {
+    player: 'p2',
+    attack: 'attack-security-bug',
+    sudo: true,
+    openedAt: 0,
+    deadline: 15000,
+  }
+  const pending =
+    kind === 'giveCard'
+      ? { ...common, kind, requested: 'defense-hotfix' }
+      : kind === 'stealCard'
+        ? { ...common, kind, target: 'you', count: 3 }
+        : { ...common, kind, target: 'you' }
+  const { getByTestId } = render(<Board {...withPending(pending)} />)
+  expect(getByTestId('board-centre-pending').textContent).toMatch(/Security Bug/)
 })

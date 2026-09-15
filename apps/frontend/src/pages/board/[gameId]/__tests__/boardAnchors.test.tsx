@@ -106,3 +106,22 @@ it.each([
   // at it enlarges the returning card instead of landing on the 150px pile.
   expect(captured.anchors?.eventsBox.current).toBe(cardBox)
 })
+
+it.each([
+  { main: [36] },
+  { main: [18, 18] },
+  { main: [12, 12, 12] },
+])('binds each draw flight to its own card box for piles $main', ({ main }) => {
+  const props = makeBoardProps()
+  render(<Board {...props} state={{ ...props.state, decks: { ...props.state.decks, main } }} />)
+  const grid = captured.anchors?.decks.current
+  const cells = Array.from(grid?.children ?? []).filter(
+    (cell) => !cell.hasAttribute('data-events-box'),
+  )
+  expect(cells).toHaveLength(main.length)
+  cells.forEach((cell, index) => {
+    const cardBox = cell.querySelector('[class*="stack"]')
+    expect(cardBox).toBeTruthy()
+    expect(captured.anchors?.pileBox(index)).toBe(cardBox)
+  })
+})

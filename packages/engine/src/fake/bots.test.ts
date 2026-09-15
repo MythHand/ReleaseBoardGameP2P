@@ -53,7 +53,7 @@ it('drives the table back to the human without hanging', () => {
 })
 
 it('reaches a finished game when every seat is driven', () => {
-  let state = engine.createGame(config())
+  let state = engine.createGame({ ...config(), seed: 1 })
   for (let n = 0; n < 2000 && !state.over; n += 1) {
     const seat = seatOwing(state.pending) ?? state.turn.player
     const action = botAction(engine, state, seat, 1000 + n * 100)

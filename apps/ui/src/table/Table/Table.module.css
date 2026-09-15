@@ -45,18 +45,23 @@
   position: absolute;
   inset-block-start: 50%;
   inset-inline-start: 26px;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
   transform: translateY(-50%);
 }
 
-/* the draw piles sit side by side: a split can put three of them out, and a
-   column would run off the top and bottom of a vertically-centred block */
-.pileRow {
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
+/* DeckAnimationsStory: fill two rows down each column. An inner grid lets the
+   opening animate the decks without replacing the outer centring transform. */
+.decksGrid {
+  display: grid;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  gap: 22px;
+  align-items: start;
+}
+
+/* Reserve bottom-left only while the events deck exists (No AI omits it). */
+.eventsPile {
+  grid-row: 2;
+  grid-column: 1;
 }
 
 .discard {

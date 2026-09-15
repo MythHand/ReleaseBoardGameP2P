@@ -70,10 +70,12 @@ export function botAction(
             : { kind: pending.kind, method }
         return { type: 'RESOLVE', player: me, choice, at }
       }
+      case 'stealCard':
+        return { type: 'RESOLVE', player: me, choice: { kind: 'stealCard', index: 0 }, at }
       case 'requestCard': {
         // Security Bug's bluff: name a card type actually seen in play — the
         // only card identity a bot may see about someone else's hand.
-        const card = view.decks.discardTop ?? ''
+        const card = view.decks.discardTop ?? pending.attack ?? 'attack-security-bug'
         return { type: 'RESOLVE', player: me, choice: { kind: 'requestCard', card }, at }
       }
       case 'giveCard': {
