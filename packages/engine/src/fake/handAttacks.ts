@@ -3,7 +3,16 @@ import { CARD_RULES } from '../cards'
 import type { Reduction } from '../engine'
 import { shuffle } from '../rng'
 import type { CardInstance, GameState, HandAttackContext, PlayerId } from '../state'
-import { bankToDiscard, createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
+import {
+  bankToDiscard,
+  createLog,
+  DEFEND_MS,
+  defencesFor,
+  HAND_CHOICE_MS,
+  type Log,
+  reject,
+  setHand,
+} from './core'
 
 const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
 
@@ -51,7 +60,7 @@ export function openHandChoice(
   context: HandAttackContext,
   at: number,
 ): GameState {
-  const timing = { openedAt: at, deadline: at + DEFEND_MS }
+  const timing = { openedAt: at, deadline: at + HAND_CHOICE_MS }
   if (context.attack.id === 'attack-security-bug') {
     return {
       ...state,
@@ -250,23 +259,21 @@ export function onRequestCard(state: GameState, action: Action & { type: 'RESOLV
     card: choice.card,
     hit: true,
   })
-  // The holder chooses which copy to surrender.
-  return {
-    state: {
-      ...state,
-      pending: {
-        kind: 'giveCard',
-        player: pending.target,
-        requested: choice.card,
-        attacker: pending.player,
-        context: pending.context,
-        openedAt: action.at,
-        deadline: action.at + DEFEND_MS,
-      },
-      eventSeq: log.seq,
-    },
-    events: log.events,
-  }
+  const card = held[0]
+  log.add({
+    type: 'handTransfer',
+    from: pending.target,
+    to: pending.player,
+    card: card.id,
+    publicCard: true,
+  })
+  const stripped = setHand(
+    state,
+    pending.target,
+    state.players[pending.target].hand.filter((c) => c.uid !== card.uid),
+  )
+  const moved = setHand(stripped, pending.player, [...stripped.players[pending.player].hand, card])
+  return { state: finishHandAttack(moved, log, pending.context), events: log.events }
 }
 
 export function onGiveCard(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {

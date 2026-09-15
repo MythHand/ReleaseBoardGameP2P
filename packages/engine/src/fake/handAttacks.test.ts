@@ -295,7 +295,7 @@ it('asks Security Bug for a card type, and misses when it is absent', () => {
 })
 
 it('surrenders the requested card on a hit, moving it from target to attacker', () => {
-  const attacked = reduce(table([SEC], [SUDO2]), {
+  const attacked = reduce(table([SEC], [SUDO2, SUDO]), {
     type: 'PLAY',
     player: 'p1',
     card: SEC.uid,
@@ -314,17 +314,11 @@ it('surrenders the requested card on a hit, moving it from target to attacker', 
     choice: { kind: 'requestCard', card: 'support-sudo' },
     at: 1002,
   })
-  expect(hit.state.pending).toMatchObject({ kind: 'giveCard', player: 'p2', attacker: 'p1' })
-  expect(hit.events.some((e) => e.type === 'requested' && e.hit === true)).toBe(true)
-
-  const r = reduce(hit.state, {
-    type: 'RESOLVE',
-    player: 'p2',
-    choice: { kind: 'giveCard', card: SUDO2.uid },
-    at: 1003,
-  })
-  expect(r.state.pending).toBeNull()
-  expect(r.state.players.p2.hand).toEqual([])
+  expect(hit.state.pending).toBeNull()
+  expect(hit.events.map((e) => e.type)).toEqual(['requested', 'handTransfer', 'discarded'])
+  expect(hit.events[0]).toMatchObject({ hit: true })
+  const r = hit
+  expect(r.state.players.p2.hand).toEqual([SUDO])
   expect(r.state.players.p1.hand.map((c) => c.uid)).toEqual([SUDO2.uid])
   const transfer = r.events.find((e) => e.type === 'handTransfer')
   expect(transfer).toMatchObject({ from: 'p2', to: 'p1', card: 'support-sudo' })
@@ -550,7 +544,7 @@ it('holds the attack and sudo until a blind position is chosen, without projecti
   expect(resolved.events.find((e) => e.type === 'handTransfer')?.visibleTo).toBeUndefined()
 })
 
-it('keeps Security Bug in the centre through request and give, then publicly transfers its known card', () => {
+it('keeps Security Bug in the centre until the request immediately transfers its known card', () => {
   const attacked = reduce(table([SEC], [SUDO2]), {
     type: 'PLAY',
     player: 'p1',
@@ -565,18 +559,11 @@ it('keeps Security Bug in the centre through request and give, then publicly tra
     at: 1001,
   })
   expect(requested.state.decks.discard).not.toContainEqual(SEC)
-  const give = reduce(requested.state, {
+  const done = reduce(requested.state, {
     type: 'RESOLVE',
     player: 'p1',
     choice: { kind: 'requestCard', card: SUDO2.id },
     at: 1002,
-  })
-  expect(give.state.decks.discard).not.toContainEqual(SEC)
-  const done = reduce(give.state, {
-    type: 'RESOLVE',
-    player: 'p2',
-    choice: { kind: 'giveCard', card: SUDO2.uid },
-    at: 1003,
   })
   expect(done.events.find((e) => e.type === 'handTransfer')).toMatchObject({
     publicCard: true,
@@ -696,15 +683,12 @@ it.each([
   expect(reflected.state.decks.discard).toEqual([WORKS])
   const done =
     attack.id === SEC.id
-      ? reduce(
-          reduce(reflected.state, {
-            type: 'RESOLVE',
-            player: 'p2',
-            choice: { kind: 'requestCard', card: SUDO2.id },
-            at: 3,
-          }).state,
-          { type: 'RESOLVE', player: 'p1', choice: { kind: 'giveCard', card: SUDO2.uid }, at: 4 },
-        )
+      ? reduce(reflected.state, {
+          type: 'RESOLVE',
+          player: 'p2',
+          choice: { kind: 'requestCard', card: SUDO2.id },
+          at: 3,
+        })
       : reduce(reflected.state, {
           type: 'RESOLVE',
           player: 'p2',
@@ -719,10 +703,10 @@ it.each([
     { player: 'p1', card: attack.id, reason: 'attackSpent' },
     { player: 'p1', card: SUDO.id, reason: 'attackSpent' },
   ])
-  expect(done.events[0]).toMatchObject({ type: 'handTransfer', from: 'p1', to: 'p2' })
+  expect(done.events.find((e) => e.type === 'handTransfer')).toMatchObject({ from: 'p1', to: 'p2' })
 })
 
-it('lets the Security Bug holder select a copy while rejecting another card without losing the prompt', () => {
+it('resolves a legacy giveCard snapshot while rejecting another card without losing the prompt', () => {
   const played = reduce(table([SEC], [SUDO, SUDO2, SPARE]), {
     type: 'PLAY',
     player: 'p1',
@@ -736,12 +720,19 @@ it('lets the Security Bug holder select a copy while rejecting another card with
     choice: { kind: 'defend', card: null },
     at: 2,
   })
-  const give = reduce(request.state, {
-    type: 'RESOLVE',
-    player: 'p1',
-    choice: { kind: 'requestCard', card: SUDO.id },
-    at: 3,
-  })
+  const give = {
+    state: {
+      ...request.state,
+      pending: {
+        kind: 'giveCard' as const,
+        player: 'p2',
+        attacker: 'p1',
+        requested: SUDO.id,
+        context:
+          request.state.pending?.kind === 'requestCard' ? request.state.pending.context : undefined,
+      },
+    },
+  }
   const wrong = reduce(give.state, {
     type: 'RESOLVE',
     player: 'p2',
@@ -758,4 +749,31 @@ it('lets the Security Bug holder select a copy while rejecting another card with
   expect(done.state.players.p1.hand).toEqual([SUDO2])
   expect(done.state.players.p2.hand).toEqual([SUDO, SPARE])
   expect(done.state.decks.discard).toEqual([SEC])
+})
+
+it.each([
+  BUG,
+  SEC,
+])('opens a 25 second choice after a 15 second defence for $id, including reflection', (attack) => {
+  for (const reflection of [false, true]) {
+    const played = reduce(table([attack, SPARE], [WORKS, SUDO2]), {
+      type: 'PLAY',
+      player: 'p1',
+      card: attack.uid,
+      target: { kind: 'player', player: 'p2' },
+      at: 1000,
+    })
+    expect(played.state.pending).toMatchObject({ openedAt: 1000, deadline: 16000 })
+    const opened = reduce(played.state, {
+      type: 'RESOLVE',
+      player: 'p2',
+      choice: { kind: 'defend', card: reflection ? WORKS.uid : null },
+      at: 2000,
+    })
+    expect(opened.state.pending).toMatchObject({
+      player: reflection ? 'p2' : 'p1',
+      openedAt: 2000,
+      deadline: 27000,
+    })
+  }
 })

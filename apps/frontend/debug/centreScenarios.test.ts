@@ -17,12 +17,12 @@ it('starts Security Bug after taking the hit, with duplicate named copies still 
   expect(requested.events).toContainEqual(expect.objectContaining({ type: 'requested', hit: true }))
 })
 
-it('starts a named hit with the actual requested pending and two copies', () => {
+it('starts the duplicate-hit preset before naming a card', () => {
   const state = createScenario('securityGive', 'give')
   expect(state.pending).toMatchObject({
-    kind: 'giveCard',
-    player: 'p2',
-    requested: 'defense-hotfix',
+    kind: 'requestCard',
+    player: 'you',
+    target: 'p2',
   })
   expect(state.players.p2.hand.filter((c) => c.id === 'defense-hotfix')).toHaveLength(2)
 })
@@ -96,19 +96,19 @@ it('gives the blind-transfer observer the public event without the stolen identi
   expect(receiver).toHaveProperty('card')
 })
 
-it('lets the giver send the second duplicate and exposes the named card to the observer', () => {
+it('automatically transfers the first duplicate and exposes the named card to the observer', () => {
   const state = createScenario('securityGive', 'second-copy')
   const copies = state.players.p2.hand.filter((card) => card.id === 'defense-hotfix')
   const result = engine.reduce(state, {
     type: 'RESOLVE',
-    player: 'p2',
-    choice: { kind: 'giveCard', card: copies[1].uid },
+    player: 'you',
+    choice: { kind: 'requestCard', card: 'defense-hotfix' },
     at: Date.now(),
   })
   expect(result.events.some((event) => event.type === 'rejected')).toBe(false)
-  expect(result.state.players.p2.hand).toContainEqual(copies[0])
-  expect(result.state.players.p2.hand).not.toContainEqual(copies[1])
-  expect(result.state.players.you.hand).toContainEqual(copies[1])
+  expect(result.state.players.p2.hand).toContainEqual(copies[1])
+  expect(result.state.players.p2.hand).not.toContainEqual(copies[0])
+  expect(result.state.players.you.hand).toContainEqual(copies[0])
   expect(forViewer(result.events, 'p3')).toContainEqual(
     expect.objectContaining({
       type: 'handTransfer',

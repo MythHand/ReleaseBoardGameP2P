@@ -164,13 +164,5 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
   })
   if (scenario === 'handDefense') return state
   apply({ type: 'RESOLVE', player: 'p2', choice: { kind: 'defend', card: null }, at })
-  if (scenario === 'securityGive') {
-    apply({
-      type: 'RESOLVE',
-      player: 'you',
-      choice: { kind: 'requestCard', card: 'defense-hotfix' },
-      at,
-    })
-  }
   return state
 }

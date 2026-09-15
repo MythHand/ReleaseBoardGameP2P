@@ -24,7 +24,7 @@ const en = {
   securityRequestHint:
     'Request Hotfix. The opponent holds two copies. Change viewer to inspect each role.',
   securityGiveHint:
-    'A Hotfix request has hit. Switch to the opponent and pull either matching copy out of the hand; restart to inspect the other roles.',
+    'Name Hotfix to transfer the first matching copy automatically. Restart as observer and resolve the pending to inspect the public transfer.',
   blindStealHint:
     'Pick a position in the opponent closed fan. The observer must never learn the stolen face.',
   handDefenseHint:

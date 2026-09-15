@@ -111,7 +111,7 @@ function resolvePendingAction(state: GameState, n: number): Action | null {
       return { type: 'RESOLVE', player: pending.player, choice: { kind: 'requestCard', card }, at }
     }
     case 'giveCard': {
-      // onRequestCard only opens this pending once it has confirmed the holder
+      // Legacy snapshots only open this pending after confirming the holder
       // has a matching card, so this lookup cannot fail.
       const hand = state.players[pending.player].hand
       const match = hand.find((c) => c.id === pending.requested)
@@ -775,12 +775,8 @@ export function describeEngine(
         let maxPendingStreak = 0
         let windowStreak = 0
         let maxWindowStreak = 0
-        // 900 steps, not 400: Security Bug's hand-scope miss opens a three-deep
-        // decision chain (defend -> requestCard -> giveCard, see below), and
-        // reaching all three under this seed needs roughly 650 steps to first
-        // draw, play and miss a Security Bug at all. A shorter run would never
-        // exercise `requestCard`/`giveCard` here, silently hiding a regression
-        // in either from this property.
+        // Keep enough steps to draw and play Security Bug under this seed,
+        // exercising its defence and card-type request in the progress check.
         for (let n = 0; n < 900; n += 1) {
           state = engine.reduce(state, fuzzAction(state, seed, n)).state
           pendingStreak = state.pending ? pendingStreak + 1 : 0
@@ -796,12 +792,8 @@ export function describeEngine(
           BASE_SETUP,
           2468,
         )
-        // A lone decision resolves in the one step it is genuinely open. Security
-        // Bug's hand-scope miss is the deepest legitimate chain: defend (open) ->
-        // requestCard (the attacker names a type) -> giveCard (the holder
-        // surrenders a copy), three consecutive steps each requiring a different
-        // player's input, not a stall. A real stall still stands out sharply from
-        // 3: it holds `pending` for the rest of the run (hundreds of steps).
+        // Allow chained decisions (and legacy giveCard snapshots), while a
+        // stalled pending would persist for hundreds of steps.
         expect(maxPendingStreak).toBeLessThanOrEqual(3)
         // A window legitimately stays open for several steps while responders
         // decide, so `<= 1` is the wrong bound here, unlike for `pending`. The

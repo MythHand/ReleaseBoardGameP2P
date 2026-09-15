@@ -42,10 +42,11 @@ new attack animation. Restart resets the same card identities into a new game.
 
 - **Security Bug: request:** name Hotfix and confirm. The attack must remain at
   the centre throughout the request and successful handover.
-- **Security Bug: duplicate hit:** starts immediately after a successful Hotfix
-  request. Switch to **View: opponent**, pull either matching Hotfix from the
-  hand, and verify the other copy remains. The selected copy flies publicly
-  through the centre to the attacker. No closed fan chooses this known card.
+- **Security Bug: duplicate hit:** starts at the request with two Hotfix copies.
+  Name Hotfix and confirm: the first matching copy transfers automatically and
+  the other stays in the opponent hand. Restart, select **View: observer**, then
+  use **Resolve pending as its owner** to verify the named card flies publicly
+  through the centre to the attacker without a donor gesture.
 - **Bug: blind pick:** the attacker picks a position from the closed opponent fan.
   The attack remains staged until that pick resolves. Restart, select **View:
   observer**, then use **Resolve pending as its owner**: the observer sees the

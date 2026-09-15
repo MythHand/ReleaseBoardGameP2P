@@ -1,5 +1,5 @@
 import type { Event } from '@release/engine'
-import type { HandCardState, HandPlayDrop, TableActions } from '@release/ui'
+import type { HandPlayDrop, TableActions } from '@release/ui'
 import {
   CARDS,
   Card,
@@ -23,7 +23,7 @@ export function useRequestStaging(args: {
   state: BoardState
   events?: Event[]
   actions?: TableActions
-  copy: { prompt: string; action: string; confirm: string; steal: string; give: string }
+  copy: { prompt: string; action: string; confirm: string; steal: string }
   enabled: boolean
   matchKey: string | null
 }) {
@@ -39,7 +39,7 @@ export function useRequestStaging(args: {
       : null
   const [named, setNamed] = useState<string | null>(null)
   const [confirmed, setConfirmed] = useState(false)
-  const [picked, setPicked] = useState<{ index?: number; uid?: string; rect: DOMRect } | null>(null)
+  const [picked, setPicked] = useState<{ index: number; rect: DOMRect } | null>(null)
   const locked = useRef(false)
   const band = useRef<HTMLDivElement>(null)
   const fan = useRef<HTMLDivElement>(null)
@@ -63,23 +63,22 @@ export function useRequestStaging(args: {
       (drop.x >= box.left && drop.x <= box.right && drop.y >= box.top && drop.y <= box.bottom)
     )
   }
-  const onHandPlay = (uid: string, drop: HandPlayDrop) => {
-    if (!enabled || !giving || pending?.kind !== 'giveCard' || locked.current) return false
-    const item = state.you.hand.find((h) => h.uid === uid)
-    if (!item || item.card.id !== pending.requested) return false
+  // Restored legacy snapshots may still owe a giveCard. Copies are equivalent:
+  // resolve the first matching card without a donor decision or gesture.
+  useEffect(() => {
+    if (
+      !enabled ||
+      !giving ||
+      pending?.kind !== 'giveCard' ||
+      locked.current ||
+      !actions?.onResolve
+    )
+      return
+    const card = state.you.hand.find((item) => item.card.id === pending.requested)
+    if (!card) return
     locked.current = true
-    if (drop.rect) setPicked({ uid, rect: drop.rect })
-    resolve({ kind: 'giveCard', card: uid })
-    return true
-  }
-  const stateAt = (index: number): HandCardState =>
-    enabled &&
-    giving &&
-    pending?.kind === 'giveCard' &&
-    !locked.current &&
-    state.you.hand[index]?.card.id === pending.requested
-      ? 'playable'
-      : 'idle'
+    resolve({ kind: 'giveCard', card: card.uid })
+  }, [enabled, giving, pending, state.you.hand, actions?.onResolve, resolve])
 
   const pickBack = (index: number, drop?: HandPlayDrop) => {
     if (
@@ -98,14 +97,9 @@ export function useRequestStaging(args: {
     resolve({ kind: 'stealCard', index })
     return true
   }
-  const pickedCard = picked?.uid ? state.you.hand.find((h) => h.uid === picked.uid)?.card : BACK
   return {
-    giving,
-    onHandPlay,
-    stateAt,
-    hiddenUid: picked?.uid,
     band:
-      asking || stealing || giving ? (
+      asking || stealing ? (
         <div className={styles.requestBand} data-testid="board-request-band" ref={band}>
           {asking && (
             <>
@@ -172,19 +166,18 @@ export function useRequestStaging(args: {
               })}
             </div>
           )}
-          {(giving || stealing) && !confirmed && (
+          {stealing && !confirmed && (
             <Typography className={styles.hint} base="label-sm" tk="tk-16">
-              {giving ? copy.give : copy.steal}
+              {copy.steal}
             </Typography>
           )}
-          {picked && pickedCard && (
+          {picked && (
             <div
               className={styles.picked}
               data-transfer-picked
-              data-transfer-uid={picked.uid}
               style={{ left: picked.rect.left, top: picked.rect.top, width: picked.rect.width }}
             >
-              <Card card={pickedCard} faceDown={!picked.uid} width="100%" interactive={false} />
+              <Card card={BACK} faceDown width="100%" interactive={false} />
             </div>
           )}
         </div>

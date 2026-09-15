@@ -1112,10 +1112,8 @@ export function planBeats(
     }
     if (e.type === 'handTransfer') {
       flush()
-      // `named` cannot come from this batch: `requested{hit:true}` opened the
-      // `giveCard` pending and returned, and the transfer arrives from the
-      // victim's own RESOLVE — a separate reduction. The projection the batch
-      // animates away from is what still knows, and it knows publicly.
+      // Current named requests transfer in the same batch and mark the face
+      // public. The pending fallback supports legacy separate handovers.
       const named = e.publicCard === true || before.pending?.kind === 'giveCard'
       const role: TransferRole =
         e.to === before.selfId ? 'taker' : e.from === before.selfId ? 'victim' : 'watcher'

@@ -8,10 +8,11 @@
 // panel at all — the copies differ only by uid, so there is nothing to choose.
 
 import type { TablePending } from '@release/ui'
-import { fireEvent, render, within } from '@testing-library/react'
+import { fireEvent, render, renderHook, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
 import Board from '../_Board'
+import { useRequestStaging } from '../_useRequestStaging'
 import { makeBoardProps } from './fixture'
 
 const withPending = (pending: TablePending | null, over: Partial<BoardState> = {}) => {
@@ -41,7 +42,7 @@ it('answers a requestCard on the table, not through the panel', () => {
   expect(queryByTestId('board-request-band')).not.toBeNull()
 })
 
-it('waits for a drag and gives the selected matching copy exactly once', () => {
+it('automatically resolves a legacy giveCard with the first matching copy exactly once', () => {
   const onResolve = vi.fn()
   const base = makeBoardProps()
   const held = base.state.you.hand[0]
@@ -54,14 +55,8 @@ it('waits for a drag and gives the selected matching copy exactly once', () => {
     { you: { ...base.state.you, hand } },
   )
   const { rerender } = render(<Board {...props} actions={{ onResolve }} />)
-  expect(onResolve).not.toHaveBeenCalled()
-  const slots = document.querySelectorAll('[data-hand-slot]')
-  fireEvent.click(slots[1])
-  expect(onResolve).not.toHaveBeenCalled()
-  fireEvent.mouseDown(slots[1], { clientX: 0, clientY: 0 })
-  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
-  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
-  expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'giveCard', card: 'second' })
+  expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'giveCard', card: 'first' })
+  expect(document.querySelector('[data-testid="board-request-band"]')).toBeNull()
   rerender(<Board {...props} actions={{ onResolve }} />)
   expect(onResolve).toHaveBeenCalledTimes(1)
 })
@@ -77,7 +72,7 @@ it('stands the named card at the centre for a peer who is not a party', () => {
   expect(queryByTestId('board-requested-card')).not.toBeNull()
 })
 
-it('requires the same give gesture under reduced motion', () => {
+it('automatically resolves a legacy giveCard under reduced motion', () => {
   window.matchMedia = ((q: string) => ({
     matches: q.includes('reduce'),
     media: q,
@@ -92,12 +87,6 @@ it('requires the same give gesture under reduced motion', () => {
     { you: base.state.you },
   )
   render(<Board {...props} actions={{ onResolve }} />)
-  expect(onResolve).not.toHaveBeenCalled()
-  const slot = document.querySelector('[data-hand-slot]')
-  if (!slot) throw new Error('missing hand slot')
-  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
-  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
-  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
   expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'giveCard', card: held.uid })
 })
 
@@ -168,4 +157,21 @@ it.each([
         : { ...common, kind, target: 'you' }
   const { getByTestId } = render(<Board {...withPending(pending)} />)
   expect(getByTestId('board-centre-pending').textContent).toMatch(/Security Bug/)
+})
+
+it('does not resolve the visual giveCard pending while transfer beats own the board', () => {
+  const onResolve = vi.fn()
+  const base = makeBoardProps()
+  const held = base.state.you.hand[0]
+  const props = withPending({ kind: 'giveCard', player: 'you', requested: held.card.id })
+  renderHook(() =>
+    useRequestStaging({
+      state: props.state,
+      actions: { onResolve },
+      copy: { prompt: '', action: '', confirm: '', steal: '' },
+      enabled: false,
+      matchKey: 'visual-transfer',
+    }),
+  )
+  expect(onResolve).not.toHaveBeenCalled()
 })

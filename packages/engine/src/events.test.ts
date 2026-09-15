@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Action } from './actions'
 import { parseEventLog } from './events'
 import { botAction, createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './fake'
 import { redactFor } from './redact'
@@ -52,6 +53,83 @@ describe('parseEventLog engine compatibility', () => {
     expect(journal.some((event) => event.type === 'discarded')).toBe(true)
     expect(journal.some((event) => event.type === 'gameOver')).toBe(true)
   })
+})
+
+it('round-trips real-engine blind theft, automatic requested transfer and operation journals', () => {
+  const engine = createFakeEngine()
+  let state = engine.createGame({
+    gameId: 'choreography-journal',
+    seed: 1,
+    players: [
+      { id: 'p1', name: 'Alice' },
+      { id: 'p2', name: 'Bob' },
+    ],
+    setup: {
+      handLimit: 'base',
+      releases: 'base',
+      releaseCond: 'base',
+      ai: 'base',
+      gitBranch: 'base',
+    },
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const card = (id: string, copy = 0) => ({ id, uid: `${id}#journal-${copy}` })
+  const bug = card('attack-bug')
+  const security = card('attack-security-bug')
+  const branch = card('operation-git-branch')
+  const sudo = card('support-sudo')
+  state = {
+    ...state,
+    players: {
+      ...state.players,
+      p1: { ...state.players.p1, hand: [bug, security, branch, sudo] },
+      p2: { ...state.players.p2, hand: [card('support-sudo', 1), card('support-sudo', 2)] },
+    },
+  }
+  const journal = engine.setupEvents(state)
+  const actions: Action[] = [
+    { type: 'PLAY', player: 'p1', card: bug.uid, target: { kind: 'player', player: 'p2' }, at: 1 },
+    { type: 'RESOLVE', player: 'p2', choice: { kind: 'defend', card: null }, at: 2 },
+    { type: 'RESOLVE', player: 'p1', choice: { kind: 'stealCard', index: 1 }, at: 3 },
+    {
+      type: 'PLAY',
+      player: 'p1',
+      card: security.uid,
+      target: { kind: 'player', player: 'p2' },
+      at: 4,
+    },
+    { type: 'RESOLVE', player: 'p2', choice: { kind: 'defend', card: null }, at: 5 },
+    { type: 'RESOLVE', player: 'p1', choice: { kind: 'requestCard', card: 'support-sudo' }, at: 6 },
+    { type: 'PLAY', player: 'p1', card: branch.uid, combo: sudo.uid, at: 7 },
+  ]
+  for (const action of actions) {
+    const result = engine.reduce(state, action)
+    expect(
+      result.events.some((e) => e.type === 'rejected'),
+      JSON.stringify(action),
+    ).toBe(false)
+    journal.push(...result.events)
+    state = result.state
+    expect(parseEventLog(JSON.parse(JSON.stringify(journal)))).toEqual(journal)
+  }
+  expect(journal.filter((e) => e.type === 'attacked').map((e) => e.card)).toEqual([
+    bug.id,
+    security.id,
+  ])
+  expect(journal.filter((e) => e.type === 'handTransfer')).toMatchObject([
+    { index: 1, card: 'support-sudo' },
+    { publicCard: true, card: 'support-sudo' },
+  ])
+  expect(journal).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ type: 'requested', hit: true }),
+      expect.objectContaining({ type: 'operationPlayed', card: branch.id, sudo: true }),
+      expect.objectContaining({ type: 'pilesChanged' }),
+    ]),
+  )
+  const observer = journal.map((e) => redactFor(e, 'observer')).filter((e) => e !== null)
+  expect(parseEventLog(JSON.parse(JSON.stringify(observer)))).toEqual(observer)
 })
 
 describe('parseEventLog privacy invariants', () => {

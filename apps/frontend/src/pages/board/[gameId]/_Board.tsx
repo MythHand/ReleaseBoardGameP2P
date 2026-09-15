@@ -443,7 +443,7 @@ export default function Board({
   })
 
   // naming a card, and losing one (#105). The band replaces the panel for
-  // `requestCard`; the owner gives a matching copy by pulling it from the hand.
+  // `requestCard`; a successful name transfers the first matching copy automatically.
   const requesting = useRequestStaging({
     state,
     events: intro?.events ?? [],
@@ -451,7 +451,6 @@ export default function Board({
     copy: {
       prompt: copy.pending.requestCard.prompt,
       steal: copy.table.stealCard,
-      give: copy.pending.giveCard.prompt,
       action: copy.pending.requestCard.action,
       confirm: copy.pending.confirm,
     },
@@ -1265,11 +1264,8 @@ export default function Board({
             on and clears `paidCost` in the same commit (#101, Task 11:
             comboBeat.tsx's `runRelease`) */}
         {staging.paidCost && <Card card={staging.paidCost.card} interactive={false} width="100%" />}
-        {/* the card that was named, held publicly while the engine waits for it
-            to be handed over. This is what carries it across the gap between
-            `requested` and `handTransfer` — they arrive in different batches,
-            so no beat overlay can span it — and `giveCard` is projected to
-            everyone (fake/attacks.ts:444), so every peer stands the same card. */}
+        {/* Legacy snapshots can still contain giveCard until automatic resolution.
+            Keep the named identity public while that restored pending settles. */}
         {state.pending?.kind === 'giveCard' &&
           (() => {
             const data = cardById(state.pending.requested)
@@ -1662,15 +1658,13 @@ export default function Board({
                 // while a step is waiting on a choice from the fan, and only
                 // on the cards that answer it.
                 stateAt={
-                  requesting.giving
-                    ? requesting.stateAt
-                    : discarding
-                      ? handLimit.stateAt
-                      : defenseOwnsHand
-                        ? defenseStaging.stateAt
-                        : neutralizeOwnsHand
-                          ? neutralizing.stateAt
-                          : staging.stateAt
+                  discarding
+                    ? handLimit.stateAt
+                    : defenseOwnsHand
+                      ? defenseStaging.stateAt
+                      : neutralizeOwnsHand
+                        ? neutralizing.stateAt
+                        : staging.stateAt
                 }
                 // no fan accent while a 503 is open: `neutralizing.accentAt`
                 // answers for a ZONE slot, and the fan's own lighting is
@@ -1700,7 +1694,7 @@ export default function Board({
                 // dispatches the play and never tells the stage machine, so the
                 // card stood nowhere for the whole step that followed.
                 onCardClick={
-                  deal.active || discarding || upgrade.asked || requesting.giving
+                  deal.active || discarding || upgrade.asked
                     ? undefined
                     : defenseOwnsHand
                       ? (i) => defenseStaging.onCardClick(i)
@@ -1718,17 +1712,15 @@ export default function Board({
                 onPlay={
                   deal.active || (discarding && handLimit.carrying)
                     ? undefined
-                    : requesting.giving
-                      ? requesting.onHandPlay
-                      : upgrade.asked
-                        ? upgrade.onHandPlay
-                        : discarding
-                          ? handLimit.onHandPlay
-                          : defenseOwnsHand
-                            ? defenseStaging.onHandPlay
-                            : neutralizeOwnsHand
-                              ? neutralizing.onHandPlay
-                              : staging.onHandPlay
+                    : upgrade.asked
+                      ? upgrade.onHandPlay
+                      : discarding
+                        ? handLimit.onHandPlay
+                        : defenseOwnsHand
+                          ? defenseStaging.onHandPlay
+                          : neutralizeOwnsHand
+                            ? neutralizing.onHandPlay
+                            : staging.onHandPlay
                 }
                 // the reorder gesture's commit — without it the kit settles the
                 // card into its new slot and the next projection render snaps
@@ -1752,31 +1744,19 @@ export default function Board({
                         )
                 }
                 renderFace={
-                  requesting.hiddenUid
-                    ? (item, ctx) =>
-                        item.uid === requesting.hiddenUid ? null : (
-                          <Card
-                            card={item.card}
-                            interactive={false}
-                            width={ctx.width}
-                            state={ctx.state}
-                            tilt={ctx.tilt}
-                            accent={ctx.accent}
-                          />
-                        )
-                    : deal.active
-                      ? (item, ctx) => (
-                          <Card
-                            card={item.card}
-                            faceDown={deal.faceDown(item.uid)}
-                            interactive={false}
-                            tilt={ctx.tilt}
-                            width={ctx.width}
-                            state={ctx.state}
-                            accent={ctx.accent}
-                          />
-                        )
-                      : undefined
+                  deal.active
+                    ? (item, ctx) => (
+                        <Card
+                          card={item.card}
+                          faceDown={deal.faceDown(item.uid)}
+                          interactive={false}
+                          tilt={ctx.tilt}
+                          width={ctx.width}
+                          state={ctx.state}
+                          accent={ctx.accent}
+                        />
+                      )
+                    : undefined
                 }
               />
             </div>

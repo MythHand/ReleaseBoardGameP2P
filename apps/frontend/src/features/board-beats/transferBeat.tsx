@@ -190,10 +190,9 @@ export function useTransferBeat(anchors: BoardAnchors) {
         }
 
         if (plan.hit) {
-          // Hand it to the projection. `giveCard` is public (fake/attacks.ts:444
-          // projects it with no `mine` gate), so the board's own centre render
-          // takes this exact spot — and it has to, because the transfer arrives
-          // in a LATER batch and no overlay of this beat's can span the gap.
+          // Keep the named card in a visual-only handover state until the
+          // following transfer beat takes over. Current engine requests and
+          // transfers arrive together; legacy saves can span two batches.
           //
           // Publish first, drop second: the board renders this beat's shadow
           // while it runs, so the static render is up before the carrier lets
