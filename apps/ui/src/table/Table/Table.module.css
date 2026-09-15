@@ -118,6 +118,25 @@
   user-select: text;
 }
 
+/* A panel that takes the whole drawer and scrolls inside itself.
+   The drawer is a flex column, so a wrapper around a panel is a flex item with
+   `min-block-size: auto` — and the automatic minimum of such an item IS its
+   content, so it never shrinks below it and grows to the full length of the
+   list. The panel's own `flex: 1; min-block-size: 0` (MoveHistory's `.box`)
+   then resolves against THAT height instead of the drawer's: the scroll area
+   comes out exactly as tall as its content (`clientHeight === scrollHeight`),
+   there is nothing left to scroll, and the table's `overflow: hidden` simply
+   cuts off everything past the fold (#158). The wrapper has to be a column with
+   a zero minimum itself — only then does the drawer set the height.
+   `.chatPanel` below is the same shape: the chat arrives as a ready block and
+   keeps that rule of its own. */
+.panelFill {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
 /* контент, который сам по себе длинный (правила) — прокручивается внутри
    drawer. Прокрутку и полосу над содержимым ведёт ScrollArea; sticky-строка
    поиска внутри правил остаётся липкой — она внутри того же прокручиваемого

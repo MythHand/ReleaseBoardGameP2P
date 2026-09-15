@@ -1,6 +1,9 @@
-/* Выезжающая поверхность, прижатая к краю (side-sheet). Закрытая — уезжает за
-   край на свою ширину + опциональный зазор `--drawer-offset` (например, под
-   ширину рейла, который стоит у того же края). */
+/* A sliding surface pinned to an edge (side-sheet).
+   `--drawer-offset` is the strip the panel comes out OF: the width of the rail
+   standing at that same edge. It does two jobs at once — the open panel stops a
+   strip short of the edge, so the rail keeps its place, and the closed panel
+   parks exactly under that strip. With no rail (offset 0) the closed panel sits
+   flush past the edge, as it always did. */
 .drawer {
   position: absolute;
   inset-block: 0;
@@ -10,25 +13,52 @@
   padding: 20px;
   background: color-mix(in srgb, var(--surface-1) 92%, var(--bg));
 
-  /* inline-size анимируется вместе со сдвигом — плавная смена ширины контента */
-  transition: transform 320ms var(--ease-soft), inline-size 320ms var(--ease-soft);
+  /* inline-size анимируется вместе со сдвигом — плавная смена ширины контента.
+     box-shadow travels with them because the closed panel drops it entirely —
+     see `.drawer:not(.open)` below. */
+  transition: transform 320ms var(--ease-soft), inline-size 320ms var(--ease-soft),
+    box-shadow 320ms var(--ease-soft);
 }
 
+/* Closed, the panel is parked BEHIND the rail: translated by its own width and
+   nothing more, so its edge comes to rest flush with the near edge of the rail's
+   strip (`inset-inline-end` already holds it a strip short of the edge). That is
+   the whole point — the panel has to come out from behind the rail rather than
+   travel in from off-screen past it (#153). Adding the offset to this translate
+   is what used to park it a full rail-width BEYOND the table; the rail — opaque
+   and above the panel by `--z-rail` — then merely hid the first stretch of an
+   arrival that had already begun outside the table. */
 .right {
   inset-inline-end: var(--drawer-offset, 0);
   border-inline-start: 1px solid var(--white-10);
   box-shadow: -24px 0 48px var(--black-55);
-  transform: translateX(calc(100% + var(--drawer-offset, 0px)));
+  transform: translateX(100%);
 }
 
 .left {
   inset-inline-start: var(--drawer-offset, 0);
   border-inline-end: 1px solid var(--white-10);
   box-shadow: 24px 0 48px var(--black-55);
-  transform: translateX(calc(-100% - var(--drawer-offset, 0px)));
+  transform: translateX(-100%);
 }
 
 /* открытое состояние перебивает закрытый сдвиг обоих краёв */
 .open {
   transform: translateX(0);
+}
+
+/* Parked behind a 56px rail, the panel's own shadow reaches some 48px further
+   than the rail can cover, and would sit on the table as a dark band beside a
+   panel nobody opened. The shadow belongs to a panel that is out: it fades with
+   the slide (it is in the transition above) and is gone once the panel is away. */
+.drawer:not(.open) {
+  box-shadow: none;
+}
+
+/* The slide is decoration — the panel's contents are the point, and they are the
+   same at either end of it. Reduced motion gets the end state without travel. */
+@media (prefers-reduced-motion: reduce) {
+  .drawer {
+    transition: none;
+  }
 }

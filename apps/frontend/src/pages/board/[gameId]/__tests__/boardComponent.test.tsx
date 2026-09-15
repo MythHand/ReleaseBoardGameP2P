@@ -11,6 +11,7 @@
 import { restTransform } from '@release/ui/animations'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { vi } from 'vitest'
+import kit from '@/table/Table/Table.module.css'
 import { ATTACK_POSE } from '~/entities/game/board'
 import { mockReducedMotion } from '~/test/reducedMotion'
 import Board from '../_Board'
@@ -347,4 +348,25 @@ it('stands the pair at the centre for a sudo defence pending', () => {
   expect(pending.hasAttribute('data-pending-play')).toBe(true)
   expect(pending.querySelector('[data-main]')).toBeTruthy()
   expect(pending.querySelector('[data-aux]')).toBeTruthy()
+})
+
+// #158: the board carried the kit's bug across the fork — the history panel
+// hung off a BARE `<div>` inside the drawer. The drawer is a flex column, so
+// that wrapper was a flex item with `min-block-size: auto`: its automatic
+// minimum is its content, so it never shrank and grew to the full length of the
+// log. `MoveHistory`'s own `flex: 1; min-block-size: 0` then resolved against
+// THAT height, its scroll viewport came out exactly as tall as its content
+// (`clientHeight === scrollHeight`, `scrollTop` stuck at 0), and the table's
+// `overflow: hidden` cut off every move past the fold.
+//
+// Structural half only, for the reason written up in `boardAnchors.test.tsx`:
+// Vitest stubs a `.module.css` import to an empty value even with `?raw`, and
+// mints a hashed name for any key asked of it — so a test here can pin that the
+// panel is laid out by this class, but neither that the class exists nor what it
+// declares. The rule itself is verified in the browser.
+it('lays the history panel out to fill the drawer, so its own list can scroll', () => {
+  const props = makeBoardProps()
+  const { getByRole, getByTestId } = render(<Board {...props} />)
+  fireEvent.click(getByRole('button', { name: props.copy.table.tabHistory }))
+  expect(getByTestId('panel-history').className).toContain(kit.panelFill)
 })

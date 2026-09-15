@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { vi } from 'vitest'
 import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
 import Table from './Table'
+import styles from './Table.module.css'
 import { makeTableProps } from './testFixture'
 
 it('renders the local player name and every opponent seat', () => {
@@ -319,4 +320,28 @@ it('shows no countdown readout for a pending that carries no deadline', () => {
   })
   render(<Table {...props} />)
   expect(screen.queryByTestId('ring-value')).toBeNull()
+})
+
+// #158: the history panel used to hang off a BARE `<div>` inside the drawer.
+// The drawer is a flex column, so that wrapper was a flex item with
+// `min-block-size: auto` — its automatic minimum is its content, so it refused
+// to shrink and grew to the full length of the log. `MoveHistory`'s own
+// `flex: 1; min-block-size: 0` then resolved against THAT height instead of the
+// drawer's, the scroll viewport came out exactly as tall as its content
+// (`clientHeight === scrollHeight`, `scrollTop` stuck at 0), and the table's
+// `overflow: hidden` simply cut off everything past the fold: a long match's
+// last moves were unreachable by wheel, trackpad or scrollbar.
+//
+// This pins the structural half only — that the panel is laid out by a class
+// meant to fill the drawer rather than by nothing at all. It cannot check that
+// the class EXISTS, let alone what it declares: Vitest stubs a `.module.css`
+// import to an empty value even with `?raw` appended (so the stylesheet's text
+// is unreadable from a test here — the same limit is written up in the
+// frontend's `boardAnchors.test.tsx`) and mints a hashed name for any key asked
+// of it, present in the file or not. The rule itself is verified in the browser.
+it('lays the history panel out to fill the drawer, so its own list can scroll', () => {
+  const props = makeTableProps()
+  const { getByRole, getByTestId } = render(<Table {...props} />)
+  fireEvent.click(getByRole('button', { name: props.copy.table.tabHistory }))
+  expect(getByTestId('panel-history').className).toContain(styles.panelFill)
 })

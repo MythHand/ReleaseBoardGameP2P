@@ -545,7 +545,7 @@ export default function Table({
             </div>
           )}
           {panel === 'history' && (
-            <div data-testid="panel-history">
+            <div className={styles.panelFill} data-testid="panel-history">
               <MoveHistory entries={history} copy={copy.history} />
             </div>
           )}
