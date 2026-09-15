@@ -199,10 +199,17 @@ interface MoveHistoryProps {
   copy: MoveHistoryCopy
 }
 
+const latestEntryId = (entries: HistoryEntry[]): number =>
+  entries.reduce(
+    (latest, entry) => Math.max(latest, entry.id, latestEntryId(entry.children ?? [])),
+    0,
+  )
+
 // История: слева — карта/действие (+ связка/цель/возврат), справа — кто;
 // реакции и последствия вложены иерархией; слева фон-градиент из цвета типа.
 export default function MoveHistory({ entries = [], copy }: MoveHistoryProps) {
   const area = useRef<ScrollAreaHandle>(null)
+  const latestId = latestEntryId(entries)
 
   // The scrolling element is overlayscrollbars' own viewport, not a div in this
   // file — `ScrollAreaHandle.viewport()` is the only way to reach it.
@@ -230,8 +237,8 @@ export default function MoveHistory({ entries = [], copy }: MoveHistoryProps) {
   // exists (built by the mount pass above), so this can run in a layout
   // effect and land before paint — no visible frame where the new row sits
   // off the fold before the panel catches up to it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the dependency is a row arriving, not a value read in the body — entries.length is exactly what the follow should re-run after
-  useLayoutEffect(follow, [entries.length])
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the dependency is the recursively latest row arriving, not a value read in the body
+  useLayoutEffect(follow, [latestId])
 
   return (
     <div className={styles.box}>

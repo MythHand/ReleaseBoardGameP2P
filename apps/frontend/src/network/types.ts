@@ -27,10 +27,6 @@ export type Where = 'game' | 'stats' | 'lobby'
 
 export interface PeerInfo {
   id: string
-  // Stable across a reload, unlike `id` — a PeerJS peer id dies with the tab.
-  // This is what lets the host recognise a returning player and hand back the
-  // seat it kept for them (shared/lib/persistence.ts).
-  clientId: string
   name: string
   role: Role
   ready: boolean
@@ -45,10 +41,6 @@ export interface PeerInfo {
 export interface Seat {
   playerId: PlayerId
   peerId: string
-  // The seat's durable owner. `peerId` is whichever tab currently holds this
-  // seat and is rewritten by every rebind; `clientId` is who that tab belongs
-  // to and never changes for the life of the match.
-  clientId: string
   name: string
   // A seat the engine plays itself. It holds no connection, so every reader
   // that treats "no peer in the roster" as "this player dropped" has to know
@@ -60,13 +52,12 @@ export interface Seat {
 // Discriminated union of every protocol message ({ type, payload }).
 export type Message =
   // --- Lobby ---
-  | { type: 'JOIN_REQUEST'; payload: { name: string; clientId: string } }
+  | { type: 'JOIN_REQUEST'; payload: { name: string; resumeToken: string } }
   | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: Role } }
   | {
       type: 'PEER_JOINED'
       payload: {
         id: string
-        clientId: string
         name: string
         role: Role
         ready: boolean

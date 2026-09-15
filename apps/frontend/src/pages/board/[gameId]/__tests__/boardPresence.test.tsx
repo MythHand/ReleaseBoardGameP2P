@@ -82,7 +82,6 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       peers: {
         me: {
           id: 'me',
-          clientId: 'client-me',
           name: 'Ann',
           role: 'host',
           ready: true,
@@ -91,8 +90,8 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       },
     },
     seats: [
-      { playerId: 'p1', peerId: 'me', clientId: 'client-me', name: 'Ann' },
-      { playerId: 'p2', peerId: 'gone', clientId: 'client-bo', name: 'Bo' },
+      { playerId: 'p1', peerId: 'me', name: 'Ann' },
+      { playerId: 'p2', peerId: 'gone', name: 'Bo' },
     ],
     gameSync: { view: realView('p1'), events: [] },
   } as Partial<UseLobby>)
@@ -111,8 +110,8 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
 it('never marks a bot seat offline', async () => {
   sessionValue = session({
     seats: [
-      { playerId: 'p1', peerId: 'me', clientId: 'c-me', name: 'Ann' },
-      { playerId: 'p2', peerId: 'bot:1', clientId: 'bot:1', name: 'Бот 1', bot: true },
+      { playerId: 'p1', peerId: 'me', name: 'Ann' },
+      { playerId: 'p2', peerId: 'bot:1', name: 'Бот 1', bot: true },
     ],
     state: {
       selfId: 'me',
@@ -121,7 +120,7 @@ it('never marks a bot seat offline', async () => {
       bots: 1,
       setup: {},
       peers: {
-        me: { id: 'me', clientId: 'c-me', name: 'Ann', role: 'host', ready: true, where: 'game' },
+        me: { id: 'me', name: 'Ann', role: 'host', ready: true, where: 'game' },
       },
     },
     gameSync: { view: realView('p1', ['Ann', 'Бот 1']), events: [] },
@@ -160,7 +159,6 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
       peers: {
         me: {
           id: 'me',
-          clientId: 'client-me',
           name: 'Ann',
           role: 'host',
           ready: true,
@@ -168,7 +166,7 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
         },
       },
     },
-    seats: [{ playerId: 'p1', peerId: 'me', clientId: 'client-me', name: 'Ann' }],
+    seats: [{ playerId: 'p1', peerId: 'me', name: 'Ann' }],
   } as Partial<UseLobby>)
   renderBoardWith()
   expect(screen.queryByText(/^(reconnecting…|переподключение…)$/i)).toBeNull()

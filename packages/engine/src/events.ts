@@ -86,3 +86,277 @@ export type DiscardReason =
 export type DefenceEffect = 'cancel' | 'return' | 'reflect' | 'take'
 
 export type EventType = Event['type']
+
+type UnknownRecord = Record<string, unknown>
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasString(value: UnknownRecord, key: string): boolean {
+  return typeof value[key] === 'string' && value[key].length > 0
+}
+
+function hasOptionalString(value: UnknownRecord, key: string): boolean {
+  return value[key] === undefined || hasString(value, key)
+}
+
+function hasFiniteNumber(value: UnknownRecord, key: string): boolean {
+  return typeof value[key] === 'number' && Number.isFinite(value[key])
+}
+
+function hasNonNegativeInteger(value: UnknownRecord, key: string): boolean {
+  return Number.isSafeInteger(value[key]) && (value[key] as number) >= 0
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((entry) => typeof entry === 'string' && entry.length > 0) &&
+    new Set(value).size === value.length
+  )
+}
+
+function hasOptionalStringArray(value: UnknownRecord, key: string): boolean {
+  return value[key] === undefined || isStringArray(value[key])
+}
+
+const BASE_EVENT_KEYS = ['id', 'type', 'parent', 'visibleTo'] as const
+
+const EVENT_PAYLOAD_KEYS: Record<EventType, readonly string[]> = {
+  dealt: ['player', 'count', 'open'],
+  drawn: ['player', 'card', 'pile', 'deckSize'],
+  released: ['player', 'slot', 'card', 'codeReview'],
+  placed: ['player', 'card'],
+  discarded: ['player', 'card', 'reason'],
+  windowOpened: ['player', 'slot', 'round', 'deadline'],
+  windowClosed: ['player', 'slot'],
+  passed: ['player'],
+  unpassed: ['player'],
+  attacked: ['attacker', 'card', 'sudo', 'target'],
+  defended: ['player', 'card', 'effect'],
+  tookHit: ['player'],
+  releaseDestroyed: ['player', 'slot', 'card'],
+  releaseStolen: ['from', 'to', 'slot', 'card'],
+  releaseReturned: ['player', 'slot', 'card'],
+  monitoringDestroyed: ['player', 'card'],
+  handTransfer: ['from', 'to', 'card'],
+  requested: ['attacker', 'target', 'card', 'hit'],
+  revealed: ['player', 'card'],
+  aiRevealed: ['player', 'aiCard', 'eventCard'],
+  neutralized: ['player', 'method'],
+  eliminated: ['player'],
+  turnStarted: ['player', 'index'],
+  turnEnded: ['player'],
+  gameOver: ['winner', 'condition'],
+  rejected: ['action', 'reason'],
+  takenFromDiscard: ['player', 'card', 'to'],
+  upgradeThrown: ['player', 'card'],
+  upgradeTaken: ['player', 'card'],
+  deckReshuffled: ['cards'],
+  pilesChanged: ['piles'],
+}
+
+function hasOnlyEventKeys(event: UnknownRecord): boolean {
+  if (!isOneOf(event.type, Object.keys(EVENT_PAYLOAD_KEYS) as EventType[])) return false
+  const allowed = new Set<string>([...BASE_EVENT_KEYS, ...EVENT_PAYLOAD_KEYS[event.type]])
+  return Object.keys(event).every((key) => allowed.has(key))
+}
+
+function hasExactAudience(value: unknown, expected: string[]): boolean {
+  return (
+    isStringArray(value) &&
+    value.length === expected.length &&
+    expected.every((id) => value.includes(id))
+  )
+}
+
+function hasCanonicalAudience(event: UnknownRecord): boolean {
+  if (event.type === 'handTransfer') {
+    return (
+      hasString(event, 'card') &&
+      hasExactAudience(event.visibleTo, [event.from as string, event.to as string])
+    )
+  }
+  if (event.type === 'takenFromDiscard' && event.to === 'deck') {
+    return hasExactAudience(event.visibleTo, [event.player as string])
+  }
+  return event.visibleTo === undefined
+}
+
+function isOneOf<T extends string>(value: unknown, choices: readonly T[]): value is T {
+  return typeof value === 'string' && choices.includes(value as T)
+}
+
+function hasEventShape(event: UnknownRecord): boolean {
+  switch (event.type) {
+    case 'dealt':
+      return (
+        hasString(event, 'player') &&
+        hasNonNegativeInteger(event, 'count') &&
+        hasOptionalStringArray(event, 'open')
+      )
+    case 'drawn':
+      return (
+        hasString(event, 'player') &&
+        hasOptionalString(event, 'card') &&
+        hasNonNegativeInteger(event, 'pile') &&
+        hasNonNegativeInteger(event, 'deckSize')
+      )
+    case 'released':
+      return (
+        hasString(event, 'player') &&
+        isOneOf(event.slot, ['frontend', 'backend', 'database']) &&
+        hasString(event, 'card') &&
+        hasOptionalString(event, 'codeReview')
+      )
+    case 'placed':
+    case 'monitoringDestroyed':
+    case 'revealed':
+    case 'upgradeThrown':
+    case 'upgradeTaken':
+      return hasString(event, 'player') && hasString(event, 'card')
+    case 'discarded':
+      return (
+        hasString(event, 'player') &&
+        hasString(event, 'card') &&
+        isOneOf(event.reason, [
+          'releaseCost',
+          'handLimit',
+          'attackSpent',
+          'defenceSpent',
+          'destroyed',
+          'neutralized',
+          'trigger',
+          'effect',
+        ])
+      )
+    case 'windowOpened':
+      return (
+        hasString(event, 'player') &&
+        isOneOf(event.slot, ['frontend', 'backend', 'database']) &&
+        hasNonNegativeInteger(event, 'round') &&
+        hasFiniteNumber(event, 'deadline')
+      )
+    case 'windowClosed':
+      return hasString(event, 'player') && isOneOf(event.slot, ['frontend', 'backend', 'database'])
+    case 'passed':
+    case 'unpassed':
+    case 'tookHit':
+    case 'eliminated':
+    case 'turnEnded':
+      return hasString(event, 'player')
+    case 'attacked':
+      return (
+        hasString(event, 'attacker') &&
+        hasString(event, 'card') &&
+        typeof event.sudo === 'boolean' &&
+        hasString(event, 'target')
+      )
+    case 'defended':
+      return (
+        hasString(event, 'player') &&
+        hasString(event, 'card') &&
+        isOneOf(event.effect, ['cancel', 'return', 'reflect', 'take'])
+      )
+    case 'releaseDestroyed':
+    case 'releaseReturned':
+      return (
+        hasString(event, 'player') &&
+        isOneOf(event.slot, ['frontend', 'backend', 'database']) &&
+        hasString(event, 'card')
+      )
+    case 'releaseStolen':
+      return (
+        hasString(event, 'from') &&
+        hasString(event, 'to') &&
+        isOneOf(event.slot, ['frontend', 'backend', 'database']) &&
+        hasString(event, 'card')
+      )
+    case 'handTransfer':
+      return hasString(event, 'from') && hasString(event, 'to') && hasOptionalString(event, 'card')
+    case 'requested':
+      return (
+        hasString(event, 'attacker') &&
+        hasString(event, 'target') &&
+        hasString(event, 'card') &&
+        typeof event.hit === 'boolean'
+      )
+    case 'aiRevealed':
+      return (
+        hasString(event, 'player') && hasString(event, 'aiCard') && hasString(event, 'eventCard')
+      )
+    case 'neutralized':
+      return (
+        hasString(event, 'player') && isOneOf(event.method, ['debugger', 'monitoring', 'sacrifice'])
+      )
+    case 'turnStarted':
+      return hasString(event, 'player') && hasNonNegativeInteger(event, 'index')
+    case 'gameOver':
+      return hasString(event, 'winner') && isOneOf(event.condition, ['release', 'lastStanding'])
+    case 'rejected':
+      return (
+        isRecord(event.action) &&
+        isOneOf(event.action.type, [
+          'DRAW',
+          'PLAY',
+          'PUSH',
+          'ATTACK',
+          'PASS',
+          'UNPASS',
+          'WINDOW_EXPIRED',
+          'CLOCK_STARTED',
+          'RESOLVE',
+        ]) &&
+        hasFiniteNumber(event.action, 'at') &&
+        hasString(event, 'reason')
+      )
+    case 'takenFromDiscard':
+      return (
+        hasString(event, 'player') &&
+        hasString(event, 'card') &&
+        isOneOf(event.to, ['hand', 'deck'])
+      )
+    case 'deckReshuffled':
+      return hasNonNegativeInteger(event, 'cards')
+    case 'pilesChanged':
+      return (
+        Array.isArray(event.piles) &&
+        event.piles.every((pile) => Number.isSafeInteger(pile) && pile >= 0)
+      )
+    default:
+      return false
+  }
+}
+
+export function parseEventLog(value: unknown): Event[] | null {
+  if (!Array.isArray(value)) return null
+  const events: Event[] = []
+  let previousId = 0
+  for (const entry of value) {
+    if (!isRecord(entry)) return null
+    if (!Number.isSafeInteger(entry.id) || (entry.id as number) <= previousId) return null
+    if (
+      entry.parent !== undefined &&
+      (!Number.isSafeInteger(entry.parent) ||
+        (entry.parent as number) <= 0 ||
+        (entry.parent as number) >= (entry.id as number))
+    ) {
+      return null
+    }
+    if (
+      !hasOptionalStringArray(entry, 'visibleTo') ||
+      !hasEventShape(entry) ||
+      !hasOnlyEventKeys(entry) ||
+      !hasCanonicalAudience(entry)
+    ) {
+      return null
+    }
+    previousId = entry.id as number
+    events.push({
+      ...entry,
+      ...(Array.isArray(entry.visibleTo) && { visibleTo: [...entry.visibleTo] }),
+    } as Event)
+  }
+  return events
+}

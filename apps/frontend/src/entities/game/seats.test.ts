@@ -1,14 +1,8 @@
 import type { PeerInfo } from '~/network'
-import { botSeats, seatOf, seatsFor } from './seats'
+import { botSeats, privateSeatsFor, publicSeats, seatOf, seatsFor } from './seats'
 
-const peer = (
-  id: string,
-  name: string,
-  role: PeerInfo['role'],
-  clientId = `client-${id}`,
-): PeerInfo => ({
+const peer = (id: string, name: string, role: PeerInfo['role']): PeerInfo => ({
   id,
-  clientId,
   name,
   role,
   ready: true,
@@ -58,14 +52,41 @@ it('seats the same roster the same way however it is enumerated', () => {
   expect(seatsFor(roster(a, b, c))).toEqual(seatsFor(roster(c, a, b)))
 })
 
-it('carries each peer clientId onto the seat it is dealt', () => {
-  const seats = seatsFor(
-    roster(peer('peer-a', 'Ann', 'host', 'client-a'), peer('peer-b', 'Bo', 'player', 'client-b')),
-  )
-  expect(seats).toEqual([
-    { playerId: 'p1', peerId: 'peer-a', clientId: 'client-a', name: 'Ann' },
-    { playerId: 'p2', peerId: 'peer-b', clientId: 'client-b', name: 'Bo' },
-  ])
+it('builds host-private seats and strips credentials for the wire', () => {
+  const peers = roster(peer('peer-a', 'Ann', 'host'))
+  const seats = seatsFor(peers)
+  const privateSeats = privateSeatsFor(seats, new Map([['peer-a', 'resume-a']]))
+  expect(privateSeats[0]).toEqual({
+    seat: { playerId: 'p1', peerId: 'peer-a', name: 'Ann' },
+    resumeToken: 'resume-a',
+  })
+  expect(publicSeats(privateSeats)[0]).toEqual({ playerId: 'p1', peerId: 'peer-a', name: 'Ann' })
+})
+
+it('refuses to start with a player whose private credential is missing', () => {
+  const peers = roster(peer('peer-a', 'Ann', 'host'))
+  expect(() => privateSeatsFor(seatsFor(peers), new Map())).toThrow('missing resume token')
+})
+
+it('keeps bot seats in the saved roster without assigning them resume credentials', () => {
+  const humans = seatsFor(roster(peer('peer-a', 'Ann', 'host')))
+  const seats = [...humans, ...botSeats(2, humans.length, ['Bot 1', 'Bot 2'])]
+  const privateSeats = privateSeatsFor(seats, new Map([['peer-a', 'resume-a']]))
+  expect(privateSeats.map(({ resumeToken }) => resumeToken)).toEqual(['resume-a', null, null])
+  expect(publicSeats(privateSeats)).toEqual(seats)
+})
+
+it('refuses to start with duplicate private credentials', () => {
+  const peers = roster(peer('peer-a', 'Ann', 'host'), peer('peer-b', 'Bo', 'player'))
+  expect(() =>
+    privateSeatsFor(
+      seatsFor(peers),
+      new Map([
+        ['peer-a', 'duplicate-token'],
+        ['peer-b', 'duplicate-token'],
+      ]),
+    ),
+  ).toThrow('duplicate resume token')
 })
 
 // Bot seats continue the same p1..pN sequence the humans are numbered in,
@@ -83,7 +104,6 @@ it('numbers bot seats after the humans', () => {
 it('gives a bot an address nothing can dial', () => {
   const [seat] = botSeats(1, 1, ['Бот 1'])
   expect(seat.peerId).toContain(':')
-  expect(seat.peerId).toBe(seat.clientId)
 })
 
 it('asks for no seats when no bots were asked for', () => {

@@ -6,6 +6,7 @@ class FakeConn {
   peer: string
   private handlers: Record<string, ((arg: unknown) => void)[]> = {}
   sent: string[] = []
+  closed = false
   constructor(peer: string) {
     this.peer = peer
   }
@@ -19,7 +20,9 @@ class FakeConn {
   send(data: string) {
     this.sent.push(data)
   }
-  close() {}
+  close() {
+    this.closed = true
+  }
 }
 
 // Records every outbound connection by peer id so tests can inspect what was sent.
@@ -62,6 +65,7 @@ beforeEach(async () => {
 afterEach(() => {
   vi.clearAllMocks()
   outboundConns.clear()
+  lastPeer = null
 })
 
 it('resolves with an id when the peer opens', async () => {
@@ -93,13 +97,17 @@ it('send serializes an envelope to the target connection', async () => {
   expect(frame.from).toBe(t.id)
 })
 
-it('attributes an incoming frame to the connection it arrived on', async () => {
+it('attributes an authenticated incoming frame to the connection it arrived on', async () => {
   const received: WireMessage[] = []
-  await createTransport({ peerId: 'host-1', onMessage: (m) => received.push(m) })
+  const transport = await createTransport({
+    peerId: 'host-1',
+    onMessage: (message) => received.push(message),
+  })
 
   const conn = new FakeConn('peer-2')
   lastPeer?.emit('connection', conn)
   conn.emit('open')
+  transport.authenticate('peer-2')
   // 'peer-2' claims to be 'peer-9'. The keeper resolves a seat from `from`, so
   // honouring that claim would let any peer act as any other.
   conn.emit('data', JSON.stringify({ type: 'PLAYER_READY', payload: {}, from: 'peer-9', seq: 4 }))
@@ -107,6 +115,102 @@ it('attributes an incoming frame to the connection it arrived on', async () => {
   expect(received).toHaveLength(1)
   expect(received[0].from).toBe('peer-2')
   expect(received[0].seq).toBe(4)
+})
+
+it('admits only the join handshake until the active inbound connection is authenticated', async () => {
+  const received: WireMessage[] = []
+  const transport = await createTransport({
+    peerId: 'host-1',
+    onMessage: (message) => received.push(message),
+  })
+  const connection = new FakeConn('peer-2')
+  lastPeer?.emit('connection', connection)
+  connection.emit('open')
+
+  connection.emit(
+    'data',
+    JSON.stringify({
+      type: 'INTENT',
+      payload: { intent: { type: 'DRAW' } },
+      from: 'peer-2',
+      seq: 1,
+    }),
+  )
+  connection.emit(
+    'data',
+    JSON.stringify({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'resume-bo' },
+      from: 'peer-2',
+      seq: 2,
+    }),
+  )
+
+  expect(received.map((message) => message.type)).toEqual(['JOIN_REQUEST'])
+
+  transport.authenticate('peer-2')
+  connection.emit(
+    'data',
+    JSON.stringify({
+      type: 'INTRO_READY',
+      payload: { gameId: 'g1' },
+      from: 'peer-2',
+      seq: 3,
+    }),
+  )
+
+  expect(received.map((message) => message.type)).toEqual(['JOIN_REQUEST', 'INTRO_READY'])
+})
+
+it('retires an overlapping same-id generation and ignores stale data and close events', async () => {
+  const received: WireMessage[] = []
+  const lifecycle: string[] = []
+  const transport = await createTransport({
+    peerId: 'host-1',
+    onMessage: (message) => received.push(message),
+    onConnection: (peerId) => lifecycle.push(`connected:${peerId}`),
+    onDisconnect: (peerId) => lifecycle.push(`disconnected:${peerId}`),
+  })
+  const first = new FakeConn('peer-2')
+  lastPeer?.emit('connection', first)
+  first.emit('open')
+
+  const replacement = new FakeConn('peer-2')
+  lastPeer?.emit('connection', replacement)
+  replacement.emit('open')
+
+  expect(first.closed).toBe(true)
+  expect(lifecycle).toEqual(['connected:peer-2', 'disconnected:peer-2', 'connected:peer-2'])
+  expect(transport.connectedIds()).toEqual(['peer-2'])
+
+  first.emit(
+    'data',
+    JSON.stringify({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Stale', resumeToken: 'stale-token' },
+      from: 'peer-2',
+      seq: 1,
+    }),
+  )
+  replacement.emit(
+    'data',
+    JSON.stringify({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Current', resumeToken: 'current-token' },
+      from: 'peer-2',
+      seq: 2,
+    }),
+  )
+  expect(received).toHaveLength(1)
+  expect(received[0].type === 'JOIN_REQUEST' && received[0].payload.name).toBe('Current')
+
+  first.emit('close')
+  expect(lifecycle).toHaveLength(3)
+  expect(transport.connectedIds()).toEqual(['peer-2'])
+
+  replacement.emit('close')
+  expect(lifecycle.at(-1)).toBe('disconnected:peer-2')
+  expect(transport.connectedIds()).toEqual([])
 })
 
 it('relay forwards a wire frame verbatim, preserving the original sender', async () => {

@@ -60,7 +60,7 @@ it('builds one name per effective bot, in seat order, from the catalog key', () 
       peers: {
         host: {
           id: 'host',
-          clientId: 'c1',
+
           name: 'Ann',
           role: 'host',
           ready: true,
