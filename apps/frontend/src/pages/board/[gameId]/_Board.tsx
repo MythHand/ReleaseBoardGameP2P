@@ -1977,7 +1977,7 @@ export default function Board({
           </div>
         )}
         {panel === 'history' && (
-          <div data-testid="panel-history">
+          <div className={kit.panelFill} data-testid="panel-history">
             <MoveHistory entries={history} copy={copy.history} />
           </div>
         )}
