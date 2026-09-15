@@ -534,7 +534,7 @@ export function useLobby(): UseLobby {
           commit(r.state)
           dispatch(r.outgoing)
 
-          const seat = seating?.find((s) => s.clientId === msg.payload.clientId)
+          const seat = seating?.find((s) => !s.bot && s.clientId === msg.payload.clientId)
           if (seat && liveGameId) {
             // Captured before the seating is patched: this is the dead peer
             // id the returner is replacing.
@@ -544,7 +544,7 @@ export function useLobby(): UseLobby {
             // send the whole thing: GAME_STARTING is what `useFollowGameStart`
             // watches, so it is also what puts the returner back on its board.
             const rebound = seatsRef.current.map((s) =>
-              s.clientId === msg.payload.clientId ? { ...s, peerId: msg.from } : s,
+              s.playerId === seat.playerId ? { ...s, peerId: msg.from } : s,
             )
             applySeats(rebound)
             dispatch([

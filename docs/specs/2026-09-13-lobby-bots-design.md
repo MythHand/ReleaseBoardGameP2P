@@ -1,164 +1,107 @@
-# Bots move into the lobby — a number that fills the empty seats
+# Bots fill the free seats in the lobby
 
-**Date:** 2026-09-13
+**Date:** 2026-09-13; updated after PR #142 review on 2026-09-15.
 **Project:** ReleaseBoardGameP2P ("Release любой ценой")
-**Issue:** none
-**Scope:** The way a player asks for bots. Bot setup leaves the start screen and the create-game
-form and becomes a second slider in the lobby, beside the capacity one. The roomless solo session
-is deleted. How a bot *plays* does not change.
+**Scope:** Add bots to the existing networked lobby and play them through the keeper.
 
-> Supersedes decisions 1, 3, 4 and 5 of
-> [`2026-09-09-solo-bot-mode-design.md`](./2026-09-09-solo-bot-mode-design.md), whose engine-facing
-> half stands untouched: `Seat.bot`, the `driveUnattended` driver, `restoreSeats`' bot branch and
-> the stall warning are all kept exactly as they are. That design's open pacing question
-> (its decision 8) is untouched too, and is discussed at the end.
+## Decision history
 
-## The goal
+The first implementation on this branch used a separate roomless solo session. It was
+replaced before merge. That flow never existed in `main`; its removal is branch history,
+not a change delivered to users by this PR. Decisions 1, 3, 4 and 5 of
+[the first design](./2026-09-09-solo-bot-mode-design.md) remain superseded.
 
-Asking for bots currently means a separate front door: a start-screen entry, a second submit on the
-create-game form, and a whole session type behind it that has no room, no broker and no peers. It
-works, but it splits the app in two at the very first screen, and a player who wants "a game with
-two friends and a bot to fill the table" has no way to say so.
+The 2026-09-13 draft specified a `БОТОВ` slider and a matching playground slider
+(decisions 1 and 10). Commit `d8069c33` superseded those two decisions with an
+**Add bot button in every free slot** and **Remove bot in each bot row's menu**.
+The implementation plan records the earlier steps; the decisions below describe the final UI.
 
-Putting bots in the lobby says it in one place. The lobby is already where you decide how big the
-table is and which modes it plays; how many of those seats are bots belongs on the same screen. And
-because the lobby is the same screen whether you end up alone or with four friends, one flow covers
-both.
+## Current decisions
 
-The price, chosen deliberately, is that playing bots now needs a room — and opening a room needs the
-signaling broker once. There is no longer any way to play this game with no network at all.
+| # | Decision | Behavior |
+|---|----------|----------|
+| 1 | Add/remove controls | Host clicks Add bot in a free slot, or Remove bot in a bot row's menu. No bot slider. |
+| 2 | Entry point | The ordinary networked lobby. Creating a room needs the signaling broker; offline play is outside this feature. |
+| 3 | Capacity | Humans + effective bots ≤ capacity, between 2 and 6 seats. |
+| 4 | Lobby identity | Bots are a count in lobby config, not connected peers. |
+| 5 | Displacement | Before Start, humans take seats first. The stored count is a ceiling; a bot can reappear when a human leaves. |
+| 6 | Frozen seating | Start assigns the human and bot seats once. New arrivals during a match are spectators; returning humans retain their existing seat. A bot is never a returnable human seat. |
+| 7 | Board presence | `bot` travels on the wire seat. Bots are shown as connected and never as disconnected players. |
+| 8 | Names | `useStartGame` supplies localized names from the catalog to `startGame`. |
+| 9 | Minimum players | One ready host with at least one effective bot can start. Every human must still be ready. |
+| 10 | Kit parity | The reference Lobby uses the same row controls. ButtonsKit shows the new `pill` button in normal and disabled states. The app header uses LobbyCode's separate link/code buttons. |
 
-## Decisions
+## Lobby count and controls
 
-| # | Decision | Choice |
-|---|----------|--------|
-| 1 | Where bots are asked for | **A `БОТОВ` slider in the lobby, under the capacity slider,** and hidden for guests exactly as the capacity slider already is. Guests read the count off the bot rows in the player column instead. |
-| 2 | The old front door | **Deleted.** The start-screen entry, the create-form slider and its second submit, and the whole roomless session behind them. |
-| 3 | What capacity means | **The whole table.** Humans + bots ≤ capacity, and capacity stays 2–6 as the rules require. |
-| 4 | What a bot *is*, in the lobby | **A number, not a roster member.** One field in the lobby config, beside `maxPlayers` and `setup`. |
-| 5 | The number's meaning | **A ceiling, not a reservation.** Everything reads `min(bots, capacity − humans)`, so arriving friends push bots aside and departing ones bring them back. |
-| 6 | When bot seats become real | **At Start,** where the seating is already built and broadcast. |
-| 7 | How the board knows a seat is a bot | **`bot` travels on the wire `Seat`,** and three readers learn to check it. This reverses the old decision 5 — see "Why the roster is no longer the answer". |
-| 8 | Where bot names come from | **The catalog, passed into `startGame` by the features layer,** because `network/` may not import i18next. |
-| 9 | Starting alone | **Allowed with at least one bot.** `canStart` counts humans + effective bots and still requires two seats. |
-| 10 | The kit | **The kit's `Lobby` screen and `LobbyStory` get the same slider,** per the rule that `apps/ui/src/screens/` is the visual source of truth. |
+`bots` travels in `LOBBY_CONFIG_UPDATED` with `maxPlayers` and `setup`. The host-only
+setter clamps it to 0–5. Every reader uses:
 
-## What survives, and what goes
-
-Everything about how a bot plays survives, because none of it knew where bots came from:
-`Seat.bot` and the `driveUnattended` driver (`network/session/referee.ts`), `restoreSeats`' bot
-early-return, the stall warning and its threshold, and `createSession`'s per-player `bot` flag.
-
-What goes is the front door and the session type behind it — 348 lines of dedicated files plus the
-parts living inside shared ones:
-
-| Deleted | Why |
-|---|---|
-| `network/transport/loopback.ts` (+ test) | Nothing plays without a room any more. |
-| `network/session/solo.ts` (+ test), `soloPlay.test.ts` | The solo table is built by the lobby now. |
-| `features/start-game/useStartSolo.ts` (+ test) | Replaced by `startGame`'s new argument. |
-| `startSolo`, `restoreSolo` and the mount branch in `useLobby.ts` | No separate session to start or restore. |
-| `role: 'solo'` and the nullable `roomCode` in `persistence.ts` | Every session has a room again — which also removes the two nullability guards that change forced. |
-| The start-screen `MenuButton`, the create-form slider and second submit | One front door. |
-| `Form.tsx`'s submitter merge (+ its two tests) | It existed only to tell two submit buttons apart. With one submit, the Safari 15 defect it fixed cannot occur. |
-| `start.soloCta`, `start.soloNote` | No longer said anywhere. |
-
-`start.botsLabel` and `start.botName` survive their owner and move to `lobbyScreen.bots` and
-`lobbyScreen.botName`, which is where they are now read.
-
-## The bot count is a ceiling
-
-`bots` joins `maxPlayers` and `setup` as a third field of the lobby config: in `LobbyState`, in
-`applyConfig`, and in the `LOBBY_CONFIG_UPDATED` payload that already carries the other two. A
-host-only `setBots` applies it locally and broadcasts, mirroring `setMaxPlayers` line for line.
-
-Nothing stores which seats are bots, because storing that is what creates work. Every reader derives
-it:
-
-```
-effectiveBots = min(state.bots, capacity − humans)
+```text
+effectiveBots = max(0, min(bots, capacity − humans))
 ```
 
-That single expression is the whole displacement policy. A friend joining reduces it; a friend
-leaving restores it; lowering capacity squeezes it; and `assignRole`, which decides whether a
-joiner is a player or a spectator, needs no change at all — it counts peers, and bots are not
-peers, so a bot can never cost a person their seat.
+The rows and header show this effective count. Add/remove operate on that visible count,
+not on the stored ceiling. For example, two humans in a three-seat room with a stored
+request for five bots show one bot; Remove bot sets the request to zero. The clicked bot
+row has no durable identity, so removal always reduces the count and removes the last row.
 
-`canStart` gains the bots: `humans + effectiveBots ≥ 2`, with every human ready. A host alone with
-one bot can start; a host alone with none still cannot. `setMaxPlayers`' demotion loop is untouched:
-it demotes over-capacity *players*, and there is nothing to demote for a number.
+Before the match, joining humans can displace bots. Once seating is frozen, new arrivals
+are spectators even if the connected-human count is below capacity. A synthetic `bot:N`
+client id cannot claim a bot seat or trigger `SEAT_REBOUND`/`GAME_STARTING` for a newcomer.
 
-## Why the roster is no longer the answer
+## Starting and restoring a match
 
-The superseded design put a synthetic `PeerInfo` in the roster for each bot, so that the board's
-three readings — `disconnected` (`pages/board/[gameId]/index.tsx:77`), `participants`' `connected`
-flag, and `toStatPlayers`' `location` — would treat a bot as a present player with no bot-specific
-check anywhere. That was the right trade when solo built its own roster wholesale at match start.
+`seatsFor` builds the humans; `botSeats` continues their `p1…pN` numbering. Wire seats use
+`bot:N` for stable display keys. The referee receives `peerId: null, bot: true`, so its
+unattended-seat driver plays the bot immediately instead of waiting through human absence grace.
+Only human seats participate in the opening gate.
 
-It is the wrong trade here. Bots are a number until Start, so synthetic peers would have to be
-minted at Start, broadcast to every guest through a roster message that is currently per-recipient,
-and then cleaned out of the roster again when the table returns to the lobby — or the lobby would
-show phantom players who are not there.
+Snapshots retain both the referee seats and the wire seating, including the bot flags.
+On reload `restoreSeats` preserves bots without adding an absence timestamp. Returning humans
+are treated separately. The start/restore tests are also merge guards for PR #149: its future
+private-seat/token validation must preserve this bot representation and must not require a
+human resume token for a bot. PR #149 is still separate; the second branch merged must run
+these tests against the combined implementation.
 
-So `bot?: boolean` travels on the wire `Seat` instead, which `GAME_STARTING` already broadcasts to
-everyone, and the three readers each gain one clause: a bot seat is connected, is never listed as
-disconnected, and reports its location as in-game. Seat names already fall back to `seat.name`, so
-bot rows read "Бот 1" with no further change.
+## Delivery and pacing
 
-## Starting a match
+A keeper timer can expire a window or human turn and then drive a bot. `advanceSession`
+returns one final projection with all events from those reductions. This avoids losing the
+first batch when React batches synchronous updates to the host's session state. Recipient
+visibility still goes through the referee's normal event audience filtering.
 
-`startGame` mints the seating at `useLobby.ts:1560` with `seatsFor(current.peers)`. It appends
-`effectiveBots` seats after the human ones — ids continuing the same `p1…pN` sequence, `bot: true`,
-and names supplied by the caller.
+Bot decisions still run on the keeper's 250ms ticker. The board's animations can take longer,
+so its displayed turn can lag behind the authoritative clock. This remains an open pacing
+issue, recorded in Interaction audit and `docs/animations/backlog.md`. It is distinct from
+lost events. Changing the shared ticker interval would also change deadline and absence checks;
+a future pacing fix must control bot actions separately or coordinate board readiness.
 
-That last part is the one boundary worth naming. `network/` may not import i18next, so bot display
-names cannot be built where the seats are. `startGame` takes `botNames: string[]`, and
-`useStartGame` — which lives in `features/` and already wraps the call — builds them from
-`t('lobbyScreen.botName', { n })`. It is the same seam `useStartSolo` used; the seam outlives the
-function that introduced it.
+## Verification
 
-## The UI
+- Count clamping, human readiness, guest config updates, add/remove controls and copying.
+- New mid-match clients, including `bot:1`, remain spectators without rebinding the bot.
+- A lobby-started bot acts through the keeper; start gate waits only for humans.
+- A host reload preserves and continues the bot seats.
+- Host history retains window closure and timeout draw/turn events when a bot acts on the same tick.
+- Board and statistics do not mark bots as disconnected.
 
-In the frontend's lobby (`pages/lobby/_LobbyView.tsx`), a `Slider` directly under the capacity one,
-`min={0}`, `max={5}`, rendered only for the host — the capacity slider beside it is already written
-`{isHost && …}`, and a guest reads the count off the rows instead. The player column already fills
-its free positions with `EmptySlot`; the first `effectiveBots` of those become `PlayerSlot` rows
-carrying a badge and no dropdown — a bot cannot be kicked, only counted down.
+## Gameplay reports checked during review
 
-The slider's own maximum stays a flat 5 rather than tracking `capacity − humans`, and this is
-deliberate: the stored number is what the host **asked for**, and the seats show what the table can
-currently **give**. When four friends fill a six-seat table, the slider still reads 3 and only one
-bot row shows; when two of them leave, the other two bots come back without the host touching
-anything. A slider that clamped itself on every arrival would lose that, and would also move under
-the host's hand as people join.
+- **Release after DRAW:** a human-only real-engine test confirms the first release is
+  playable after drawing and reaches the zone after payment. The reported failure is
+  not reproduced by this scenario.
+- **AI Inside:** a human-only engine projection with two different releases in discard
+  renders both choices on Board; selecting and confirming one resolves the pending.
+  This uses reduced motion, not a browser animation/WebRTC end-to-end run, so the
+  original full-game stall remains unconfirmed. Both cases live in `pr142Gameplay.test.tsx`.
+- **503 elimination:** a three-human fixture with two piles confirms that the eliminated
+  current player keeps the turn. Bot policy continues to propose DRAW, but the draw
+  sequence refuses to deal to an eliminated player, leaving the same turn and action
+  again. The extra card receipt was not reproduced. This is existing engine behavior
+  on `main`, reserved for the separate engine fix requested in the review.
+- **DDoS freeze:** the engine excludes frozen cards from playable, but Board does not
+  render a specific frozen indicator. Recorded as a separate open finding in the
+  animation backlog and Interaction audit.
 
-The kit's `Lobby` screen already renders two sliders of its own (capacity and the spectator limit,
-both `styles.capRow`); it gains a third beside the capacity one, its `copy` interface gains `bots`,
-and `LobbyStory` gains the control so the playground still shows the screen as it really is.
-
-## Testing
-
-- **Lobby rules** (`network/lobby/host.test.ts`, `state.test.ts`): the ceiling clamps when humans
-  arrive, when capacity drops, and back up when a human leaves; `canStart` at both sides of the
-  two-seat boundary; a guest's `setBots` is refused.
-- **Seating** (`useLobby.test.ts`): N bots produce N seats after the humans, each `bot: true`, with
-  the supplied names; zero bots changes nothing about today's seating.
-- **The lobby view** (`pages/lobby/__tests__/`): the slider is absent for a guest; the preview rows
-  track arrivals and capacity.
-- **The three board readers**: a bot seat is never reported disconnected, and reads as in-game on
-  the results screen.
-- Deleted paths take their tests with them, and the suite should shrink accordingly rather than
-  leaving tests that assert a flow nobody can reach.
-
-## Known and deliberately not fixed here
-
-- **Pacing is still open, and this makes it matter more.** The keeper commits a bot action every
-  250ms while the board animates one beat over roughly 1–4s, so a bot-heavy round can consume a
-  human's 30s turn before their board shows it. Solo made that one player's problem; a room full of
-  people watching the same bots makes it everyone's. The fix, and the reason the ticker interval is
-  not the lever, are set out in the earlier design's decision 8 and its follow-up discussion.
-- **No offline play.** Accepted in decision 2. Opening a room needs the broker once, so the game can
-  no longer be played with no network at all.
-- **The `driveAbsent` rename still collides with `feat/108-git-cards`.** That branch adds a test
-  calling `driveAbsent`, which this work's branch renamed to `driveUnattended`. The two merge cleanly
-  as text and then fail to typecheck. Whichever lands second renames that one call.
+The engine reducers, Board and Inside staging inspected here match `origin/main`
+(`287fd6e8`); the fake-engine entry point only differs by window-duration exports.

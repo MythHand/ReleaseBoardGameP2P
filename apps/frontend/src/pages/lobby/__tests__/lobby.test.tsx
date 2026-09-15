@@ -10,7 +10,13 @@ import LobbyPage from '../[lobbyId]'
 // mock has to hand back a shape for those keys rather than echoing the key —
 // otherwise their labels render blank and assertions on them are meaningless.
 const OBJECT_COPY: Record<string, unknown> = {
-  lobbyCode: { label: 'lobbyCode.label', copy: 'lobbyCode.copy', copied: 'lobbyCode.copied' },
+  lobbyCode: {
+    label: 'lobbyCode.label',
+    copy: 'lobbyCode.copy',
+    copied: 'lobbyCode.copied',
+    copyLink: 'lobbyCode.copyLink',
+    copyCode: 'lobbyCode.copyCode',
+  },
 }
 
 vi.mock('@release/translation', () => ({
@@ -181,7 +187,7 @@ it('Continue reveals the live session view (room code, roster, copy)', () => {
   expect(screen.getByText('ABC-23D')).toBeTruthy()
   expect(screen.getByText('Host')).toBeTruthy()
   expect(screen.getByText('Pat')).toBeTruthy()
-  expect(screen.getByText('lobbyCode.copy')).toBeTruthy()
+  expect(screen.getByText('lobbyCode.copyLink')).toBeTruthy()
 })
 
 it('LobbyView guest Leave tears the session down', () => {
@@ -252,14 +258,13 @@ it('LobbyView renders spectator section when guests present', () => {
 // The HUD tone is the lobby's "ready to go" signal. It rides on the same
 // canStart the Start button uses, so the green background and an enabled Start
 // can never disagree — a mismatch there is exactly what a host would query.
-// The copy button hands over the invite LINK, not the bare code — that link is
-// what opens the invite screen with the code pre-filled. @release/ui's LobbyCode
-// block copies the code, which is why this markup is rendered locally.
+// The link opens the invite screen with the code pre-filled.
 it('LobbyView copies the invite link rather than the code', () => {
+  writeText.mockClear()
   sessionValue = inSession()
   const { container } = renderInRouter(<LobbyView />)
   const copyBtn = [...container.querySelectorAll('button')].find(
-    (b) => b.textContent === 'lobbyCode.copy',
+    (b) => b.textContent === 'lobbyCode.copyLink',
   )
   expect(copyBtn).toBeTruthy()
   expect(screen.getByText('ABC-23D')).toBeTruthy()
@@ -420,4 +425,12 @@ it('hides the bot controls from a guest but not the bots', () => {
   expect(screen.queryByText('lobbyScreen.addBot')).toBeNull()
   expect(screen.queryByText('lobbyScreen.removeBot')).toBeNull()
   expect(screen.getAllByText('lobbyScreen.botName')).toHaveLength(1)
+})
+
+it('copies the bare room code through its separate header button', () => {
+  writeText.mockClear()
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  fireEvent.click(screen.getByText('lobbyCode.copyCode'))
+  expect(writeText).toHaveBeenCalledWith('ABC-23D')
 })

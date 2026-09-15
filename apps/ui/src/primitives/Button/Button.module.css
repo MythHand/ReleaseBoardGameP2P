@@ -190,9 +190,7 @@
   }
 }
 
-/* пилюля — вид off-состояния Toggle, но действие, а не переключатель: строка
-   лобби, где кнопка стоит там же, где у игрока стоит [готов]. Вид общий с
-   Toggle намеренно: в одной колонке не должно быть двух разных пилюль. */
+/* The same resting appearance as Toggle, for an action in a lobby row. */
 .pill {
   padding: 7px 14px;
   color: var(--white-60);

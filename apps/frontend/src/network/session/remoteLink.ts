@@ -3,10 +3,10 @@ import type { Transport } from '../transport/peer'
 import type { Intent, WireMessage } from '../types'
 import { type GameLink, intervalTicker, type Sync, type Ticker } from './link'
 import {
+  advanceSession,
   applyIntent,
   commit,
   disconnect,
-  driveUnattended,
   handover,
   type Outgoing,
   rebind,
@@ -14,7 +14,6 @@ import {
   type SessionRef,
   seatOfPeer,
   syncAll,
-  tick,
 } from './referee'
 import type { StartGate } from './startGate'
 
@@ -206,8 +205,7 @@ export function attachKeeper(args: {
     // mid-animation is the move nobody at the table could see coming.
     if (gated()) return
     const now = args.now()
-    save(tick(args.ref.current, now))
-    save(driveUnattended(args.ref.current, now))
+    save(advanceSession(args.ref.current, now))
   })
 
   // One rule for host and guest: the seat comes from the connection, never from

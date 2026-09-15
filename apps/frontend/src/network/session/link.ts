@@ -1,13 +1,12 @@
 import type { Event, PlayerId, PlayerView } from '@release/engine'
 import type { Intent } from '../types'
 import {
+  advanceSession,
   applyIntent,
   commit,
-  driveUnattended,
   type Outgoing,
   rebind,
   type SessionRef,
-  tick,
 } from './referee'
 
 export interface Sync {
@@ -104,8 +103,7 @@ export function createLocalLink(args: {
 
   ticker.start(() => {
     const now = args.now()
-    commit(args.ref, tick(args.ref.current, now), deliver)
-    commit(args.ref, driveUnattended(args.ref.current, now), deliver)
+    commit(args.ref, advanceSession(args.ref.current, now), deliver)
   })
 
   return {

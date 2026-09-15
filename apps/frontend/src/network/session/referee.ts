@@ -367,6 +367,21 @@ export function driveUnattended(session: Session, now: number): SessionResult {
   return { session, outgoing: [] }
 }
 
+// A timer callback may expire a window/turn and immediately let a bot act.
+// Publish one final projection with both event batches: React consumers keep
+// only the last state update from that callback. syncAll still filters each
+// recipient's events through the normal audience boundary.
+export function advanceSession(session: Session, now: number): SessionResult {
+  const timed = tick(session, now)
+  const driven = driveUnattended(timed.session, now)
+  if (driven.session === timed.session) return timed
+  if (timed.session === session) return driven
+  return {
+    session: driven.session,
+    outgoing: syncAll(driven.session, driven.session.log.slice(session.log.length)),
+  }
+}
+
 // The action types a peer is allowed to ask for. `Intent` already excludes
 // WINDOW_EXPIRED, but only in TypeScript: what arrives here is parsed JSON from
 // a connection, and `parseEnvelope` validates the envelope, never the payload.

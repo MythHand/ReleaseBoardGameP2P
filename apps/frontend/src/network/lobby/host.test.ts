@@ -278,9 +278,9 @@ it('does not demote a returning player when the room has filled behind them', ()
   expect(r.state.peers['fresh-peer'].role).toBe('player')
 })
 
-it('treats an unknown clientId as an ordinary join', () => {
+it('keeps an unknown clientId spectating during a match', () => {
   const r = handleJoinRequest(returningBase(), 'newcomer', 'Cy', 'client-new', seating)
-  expect(r.state.peers.newcomer.role).toBe('player')
+  expect(r.state.peers.newcomer.role).toBe('guest')
   expect(r.outgoing.some((o) => o.message.type === 'SEAT_REBOUND')).toBe(false)
 })
 
@@ -329,4 +329,19 @@ it('still refuses to start while a human is not ready', () => {
     peers: { ...two.peers, p1: { ...two.peers.p1, ready: false } },
   }
   expect(canStart(notReady)).toBe(false)
+})
+
+const botSeating = [
+  { playerId: 'p1', peerId: 'h', clientId: 'c0', name: 'Host' },
+  { playerId: 'p2', peerId: 'bot:1', clientId: 'bot:1', name: 'Bot 1', bot: true },
+]
+
+it.each(['new-client', 'bot:1'])('seats a mid-match join as a spectator for %s', (clientId) => {
+  const joined = handleJoinRequest(table(6, 1, 1), 'new-peer', 'Newcomer', clientId, botSeating)
+  expect(joined.state.peers['new-peer']).toMatchObject({
+    role: 'guest',
+    ready: false,
+    where: 'lobby',
+  })
+  expect(joined.outgoing.some((o) => o.message.type === 'SEAT_REBOUND')).toBe(false)
 })

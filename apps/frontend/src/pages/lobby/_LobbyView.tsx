@@ -2,11 +2,11 @@ import { useTranslation } from '@release/translation'
 import {
   Badge,
   Button,
-  CopyButton,
   EmptySlot,
   GameSettings,
   HudBackground,
   LangSwitcher,
+  LobbyCode,
   Modal,
   PlayerSlot,
   Slider,
@@ -142,25 +142,11 @@ export default function LobbyView() {
           </Typography>
         </div>
         <div className={styles.headRight}>
-          <div className={styles.codeBox}>
-            <Typography base="label-sm" tk="tk-16" as="span" className={styles.codeLabel}>
-              {t('lobbyCode.label')}
-            </Typography>
-            <div className={styles.codeRow}>
-              {/* Copies the invite link, not the bare code — that link is what
-                  opens the invite screen with the code already filled in. */}
-              <CopyButton
-                variant="tech"
-                copyValue={shareUrl}
-                copiedChildren={t('lobbyCode.copied')}
-              >
-                {t('lobbyCode.copy')}
-              </CopyButton>
-              <Typography variant="code" className={styles.codeValue}>
-                {session.roomCode}
-              </Typography>
-            </div>
-          </div>
+          <LobbyCode
+            code={session.roomCode ?? ''}
+            link={shareUrl}
+            copy={t('lobbyCode', { returnObjects: true })}
+          />
           <LangSwitcher
             value={i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'}
             onChange={(lang) => i18n.changeLanguage(lang)}

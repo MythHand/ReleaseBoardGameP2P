@@ -36,12 +36,18 @@ export function handleJoinRequest(
   // host pruned its old peer id the instant the channel dropped, so it arrives
   // looking exactly like a newcomer — the clientId is the only thing that says
   // otherwise.
-  const seat = seats?.find((s) => s.clientId === clientId)
+  const seat = seats?.find((s) => !s.bot && s.clientId === clientId)
 
   // Role comes from the seat, never from assignRole. A returning player whose
   // room filled up behind them would otherwise be handed 'guest' and silently
   // demoted out of a match they are still seated in.
-  const role: Role = seat ? (fromId === state.hostId ? 'host' : 'player') : assignRole(state)
+  const role: Role = seat
+    ? fromId === state.hostId
+      ? 'host'
+      : 'player'
+    : seats
+      ? 'guest'
+      : assignRole(state)
 
   const peer: PeerInfo = {
     id: fromId,

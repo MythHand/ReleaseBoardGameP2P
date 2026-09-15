@@ -1,5 +1,10 @@
 # Lobby bots — implementation plan
 
+> Historical implementation plan. The slider steps were superseded by the row controls in
+> `d8069c33`. See [the updated design](./2026-09-13-lobby-bots-design.md) for the current UI,
+> join policy and delivery contract. The earlier steps below are preserved as history.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.

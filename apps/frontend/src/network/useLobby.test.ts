@@ -2138,3 +2138,133 @@ it("retry() firing while an earlier attempt's dial is still inside createTranspo
   // transport) succeeded.
   expect(result.current.reconnect.status).toBe('idle')
 })
+
+it('does not rebind or route a newcomer claiming a bot client id into the match', async () => {
+  const { result, unmount } = renderHook(() => useLobby())
+  try {
+    await act(async () => {
+      await result.current.createRoom('Host', 6)
+    })
+    act(() => result.current.setBots(1))
+    act(() => result.current.startGame(['Bot 1']))
+    const seating = result.current.seats
+    transports[0].send.mockClear()
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'JOIN_REQUEST',
+        from: 'new-peer',
+        payload: { name: 'Newcomer', clientId: 'bot:1' },
+      } as WireMessage)
+    })
+    expect(result.current.state?.peers['new-peer'].role).toBe('guest')
+    expect(result.current.seats).toEqual(seating)
+    expect(
+      transports[0].send.mock.calls.some(([, message]) => message.type === 'GAME_STARTING'),
+    ).toBe(false)
+  } finally {
+    unmount()
+  }
+})
+
+it('restores a host with a bot and continues its turn without human absence grace', async () => {
+  vi.useFakeTimers()
+  vi.setSystemTime(1_000_000)
+  const engine = createFakeEngine()
+  const { session } = createSession({
+    gameId: 'g1',
+    keeperId: 'p1',
+    engine,
+    seed: 17,
+    players: [
+      { playerId: 'p1', peerId: 'peer0', name: 'Host' },
+      { playerId: 'p2', peerId: null, name: 'Bot 1', bot: true },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  const drawn = engine.reduce(session.state, { type: 'DRAW', player: 'p1', at: Date.now() })
+  const pushed = engine.reduce(drawn.state, { type: 'PUSH', player: 'p1', at: Date.now() })
+  expect(pushed.state.turn.player).toBe('p2')
+  storedHostSession('g1')
+  const botSeat = { playerId: 'p2', peerId: 'bot:1', clientId: 'bot:1', name: 'Bot 1', bot: true }
+  sessionStorage.setItem(
+    KEEPER_KEY,
+    JSON.stringify({
+      gameId: 'g1',
+      keeperId: 'p1',
+      state: pushed.state,
+      seats: session.seats,
+      lobbySeats: [
+        { playerId: 'p1', peerId: 'peer0', clientId: getClientId(), name: 'Host' },
+        botSeat,
+      ],
+      log: [...session.log, ...drawn.events, ...pushed.events],
+      savedAt: Date.now(),
+    } satisfies StoredKeeper),
+  )
+  const { result, unmount } = renderHook(() => useLobby())
+  try {
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(result.current.gameId).toBe('g1')
+    expect(result.current.seats).toContainEqual(botSeat)
+    expect(result.current.gameSync?.view.turn.player).toBe('p2')
+    expect(result.current.gameSync?.events).toEqual([])
+    act(() => {
+      vi.advanceTimersByTime(250)
+    })
+    expect(result.current.gameSync?.view.pending).toMatchObject({
+      kind: 'discardForRelease',
+      player: 'p2',
+    })
+    act(() => {
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+    const restored = JSON.parse(sessionStorage.getItem(KEEPER_KEY) ?? '{}') as StoredKeeper
+    expect(restored.seats).toContainEqual({
+      playerId: 'p2',
+      peerId: null,
+      absentSince: null,
+      bot: true,
+    })
+  } finally {
+    unmount()
+    vi.useRealTimers()
+  }
+})
+
+it('rebinds only the human seat when its client id collides with a bot id', async () => {
+  const { result, unmount } = renderHook(() => useLobby())
+  try {
+    await act(async () => {
+      await result.current.createRoom('Host', 6)
+    })
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'JOIN_REQUEST',
+        from: GUEST,
+        payload: { name: 'Human', clientId: 'bot:1' },
+      } as WireMessage)
+    })
+    act(() => result.current.setBots(1))
+    act(() => result.current.startGame(['Bot 1']))
+    const botSeat = result.current.seats.find((seat) => seat.bot)
+    expect(botSeat?.clientId).toBe('bot:1')
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'JOIN_REQUEST',
+        from: RETURNED,
+        payload: { name: 'Human', clientId: 'bot:1' },
+      } as WireMessage)
+    })
+    expect(result.current.seats.find((seat) => seat.bot)).toEqual(botSeat)
+    expect(
+      result.current.seats.find((seat) => !seat.bot && seat.clientId === 'bot:1')?.peerId,
+    ).toBe(RETURNED)
+    expect(sentTo(RETURNED).some((message) => message.type === 'SYNC')).toBe(true)
+  } finally {
+    unmount()
+  }
+})
