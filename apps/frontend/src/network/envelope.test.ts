@@ -3,14 +3,14 @@ import type { Intent, Message, WireMessage } from './types'
 
 const joinMsg: Message = {
   type: 'JOIN_REQUEST',
-  payload: { name: 'Ann', clientId: 'client-ann' },
+  payload: { name: 'Ann', resumeToken: 'resume-ann' },
 }
 
 it('wraps a message into an envelope with from + seq', () => {
   const env = createEnvelope(joinMsg, 'peer-1', 7)
   expect(env).toEqual({
     type: 'JOIN_REQUEST',
-    payload: { name: 'Ann', clientId: 'client-ann' },
+    payload: { name: 'Ann', resumeToken: 'resume-ann' },
     from: 'peer-1',
     seq: 7,
   })

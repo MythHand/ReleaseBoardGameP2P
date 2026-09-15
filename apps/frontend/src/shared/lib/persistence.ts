@@ -1,11 +1,14 @@
+import { type Event, parseEventLog } from '@release/engine'
+
 // What survives a reload. Four records, all under a `release:` prefix.
 //
 // Plain functions rather than a store: the keeper snapshot is written from
 // `referee.ts`, which is a pure module with no React in it — and keeping it
-// that way is what lets solo play, the playground and every headless test
-// exercise the same code the network does (network/session/link.ts).
+// that way is what lets the playground and every headless test exercise the
+// same code the network does (network/session/link.ts).
 
-const CLIENT_KEY = 'release:clientId'
+const RESUME_CREDENTIAL_KEY = 'release:resumeCredential'
+const LEGACY_RESUME_TOKEN_KEY = 'release:resumeToken'
 const SESSION_KEY = 'release:session'
 const KEEPER_KEY = 'release:keeper'
 const LOG_KEY = 'release:log'
@@ -90,14 +93,23 @@ function readJson<T>(key: string): T | null {
   }
 }
 
-// Deliberately NOT cleared by leaving a room: this is the thing that outlives
-// the tab, and a player returning to the same room should be recognised.
-export function getClientId(): string {
-  const existing = read(CLIENT_KEY)
-  if (existing) return existing
+interface StoredResumeCredential {
+  roomCode: string
+  token: string
+}
+
+export function getResumeToken(roomCode: string): string {
+  const existing = readJson<StoredResumeCredential>(RESUME_CREDENTIAL_KEY)
+  if (existing?.roomCode === roomCode && existing.token) return existing.token
   const minted = crypto.randomUUID()
-  write(CLIENT_KEY, minted)
+  write(RESUME_CREDENTIAL_KEY, JSON.stringify({ roomCode, token: minted }))
+  remove(LEGACY_RESUME_TOKEN_KEY)
   return minted
+}
+
+function clearResumeCredential(): void {
+  remove(RESUME_CREDENTIAL_KEY)
+  remove(LEGACY_RESUME_TOKEN_KEY)
 }
 
 export interface StoredSession {
@@ -110,9 +122,12 @@ export interface StoredSession {
 
 export function readSession(now: number = Date.now()): StoredSession | null {
   const stored = readJson<StoredSession>(SESSION_KEY)
-  if (!stored) return null
+  if (!stored) {
+    clearResumeCredential()
+    return null
+  }
   if (now - stored.joinedAt > RESTORE_TTL_MS) {
-    remove(SESSION_KEY)
+    clearSession()
     return null
   }
   return stored
@@ -124,29 +139,27 @@ export function writeSession(s: StoredSession): void {
 
 export function clearSession(): void {
   remove(SESSION_KEY)
+  clearResumeCredential()
 }
 
 // `state` and `seats` are held as `unknown` on purpose: importing GameState
 // here would tie a storage module to the engine's shape, and the only caller
 // that reads them (the host restore) casts once, where the engine types are
 // already in scope.
+export interface StoredLobbyConfig {
+  maxPlayers: number
+  setup: unknown
+}
+
 export interface StoredKeeper {
   gameId: string
   keeperId: string
   state: unknown
-  // The referee's own seats: `{ playerId, peerId, absentSince }`.
   seats: unknown
-  // The lobby's seating: `{ playerId, peerId, clientId, name }`. Held
-  // separately because the referee never carries `clientId` or `name`, and a
-  // restore needs both — one to recognise a returning player, one to label a
-  // seat whose peer is gone. Reconstructing them from the referee's seats is
-  // not possible; they were never there.
-  lobbySeats: unknown
-  // The match's own event log, so a host reload restores the history as well as
-  // the position. `unknown[]` for the same reason `state` is `unknown`: storage
-  // does not import engine types.
+  privateSeats: unknown
   log: unknown[]
   savedAt: number
+  lobbyConfig?: StoredLobbyConfig
 }
 
 export function readKeeper(now: number = Date.now()): StoredKeeper | null {
@@ -180,7 +193,7 @@ export interface StoredLog {
   savedAt: number
 }
 
-export function readLog(gameId: string, now: number = Date.now()): unknown[] | null {
+export function readLog(gameId: string, now: number = Date.now()): Event[] | null {
   const stored = readJson<StoredLog>(LOG_KEY)
   if (!stored) return null
   if (stored.gameId !== gameId) return null
@@ -188,7 +201,12 @@ export function readLog(gameId: string, now: number = Date.now()): unknown[] | n
     remove(LOG_KEY)
     return null
   }
-  return stored.events
+  const events = parseEventLog(stored.events)
+  if (!events) {
+    remove(LOG_KEY)
+    return null
+  }
+  return events
 }
 
 export function writeLog(l: StoredLog): void {

@@ -9,7 +9,14 @@ export {
 } from './cards'
 export { type ConformanceOptions, describeEngine } from './conformance'
 export type { DeckEntry, Engine, GameConfig, Reduction } from './engine'
-export type { DefenceEffect, DiscardReason, Event, EventBase, EventType } from './events'
+export {
+  type DefenceEffect,
+  type DiscardReason,
+  type Event,
+  type EventBase,
+  type EventType,
+  parseEventLog,
+} from './events'
 export { redactFor } from './redact'
 export { randomAt, shuffle } from './rng'
 export type {

@@ -14,14 +14,13 @@ const tally = (over: Partial<PlayerTally> = {}): PlayerTally => ({
 })
 
 const seats = [
-  { playerId: 'p1', peerId: 'peer-a', clientId: 'client-a', name: 'Ann' },
-  { playerId: 'p2', peerId: 'peer-b', clientId: 'client-b', name: 'Bo' },
+  { playerId: 'p1', peerId: 'peer-a', name: 'Ann' },
+  { playerId: 'p2', peerId: 'peer-b', name: 'Bo' },
 ]
 
 const peers: Record<string, PeerInfo> = {
   'peer-a': {
     id: 'peer-a',
-    clientId: 'client-a',
     name: 'Ann',
     role: 'host',
     ready: true,
@@ -29,7 +28,6 @@ const peers: Record<string, PeerInfo> = {
   },
   'peer-b': {
     id: 'peer-b',
-    clientId: 'client-b',
     name: 'Bo',
     role: 'player',
     ready: true,
@@ -82,14 +80,13 @@ it('a seat that lost its peer keeps its own counters, and so does everyone else'
   // surviving roster would renumber Cid to p2 and print Bo's counters under
   // Cid's name while Bo vanished from the match entirely.
   const dealt = [
-    { playerId: 'p1', peerId: 'aaa', clientId: 'client-aaa', name: 'Ann' },
-    { playerId: 'p2', peerId: 'bbb', clientId: 'client-bbb', name: 'Bo' },
-    { playerId: 'p3', peerId: 'ccc', clientId: 'client-ccc', name: 'Cid' },
+    { playerId: 'p1', peerId: 'aaa', name: 'Ann' },
+    { playerId: 'p2', peerId: 'bbb', name: 'Bo' },
+    { playerId: 'p3', peerId: 'ccc', name: 'Cid' },
   ]
   const survivors: Record<string, PeerInfo> = {
     aaa: {
       id: 'aaa',
-      clientId: 'client-aaa',
       name: 'Ann',
       role: 'host',
       ready: true,
@@ -97,7 +94,6 @@ it('a seat that lost its peer keeps its own counters, and so does everyone else'
     },
     ccc: {
       id: 'ccc',
-      clientId: 'client-ccc',
       name: 'Cid',
       role: 'player',
       ready: true,
@@ -159,4 +155,28 @@ it('gives a seat with no counters a row of zeros rather than dropping it', () =>
 
 it('has no rows when nobody was seated', () => {
   expect(toStatPlayers({ tally: {}, seats: [], peers })).toEqual([])
+})
+
+// A bot is in no roster, and absence is how this module spells "offline" —
+// so without the check a bot would be reported as a player who left.
+it('reports a bot seat as being in the game, not offline', () => {
+  const rows = toStatPlayers({
+    tally: {},
+    seats: [
+      { playerId: 'p1', peerId: 'peer-a', name: 'Ann' },
+      { playerId: 'p2', peerId: 'bot:1', name: 'Бот 1', bot: true },
+    ],
+    peers: {
+      'peer-a': {
+        id: 'peer-a',
+
+        name: 'Ann',
+        role: 'host',
+        ready: true,
+        where: 'stats',
+      },
+    },
+  })
+  expect(rows.map((r) => r.location)).toEqual(['stats', 'game'])
+  expect(rows[1].name).toBe('Бот 1')
 })

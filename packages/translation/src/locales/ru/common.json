@@ -351,6 +351,7 @@
   "lobbyScreen": {
     "title": "Лобби",
     "subtitle": "Ожидание игроков…",
+    "botName": "Бот {{n}}",
     "language": "язык",
     "disband": "расформировать",
     "rules": "правила",
@@ -359,6 +360,9 @@
     "modesLockedHint": "настраивает host",
     "players": "Игроки",
     "capacity": "Вместимость",
+    "addBot": "Добавить бота",
+    "removeBot": "Убрать бота",
+    "roleBot": "бот",
     "chat": "чат",
     "spectators": "Зрители",
     "specLimit": "Лимит",

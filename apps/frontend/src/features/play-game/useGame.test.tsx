@@ -130,6 +130,26 @@ it('has the restored feed by the first layout effect that sees a projection', ()
   expect(seen[0].events.map((e) => e.id)).toEqual([1, 3])
 })
 
+it('loads the stored feed when restore supplies gameId after mount', () => {
+  writeLog({ gameId: 'g1', events: [dealt('p1'), drawn('p1')], savedAt: Date.now() })
+  session = { gameLink: null, gameSync: null, gameId: null }
+  const seen: { events: Event[]; restoredThrough: number }[] = []
+  function Watch() {
+    const game = useGame()
+    useLayoutEffect(() => {
+      if (game.view) seen.push({ events: game.events, restoredThrough: game.restoredThrough })
+    }, [game.view, game.events, game.restoredThrough])
+    return null
+  }
+  const { rerender } = render(<Watch />)
+
+  session = { gameLink: null, gameSync: { view: view(), events: [] }, gameId: 'g1' }
+  rerender(<Watch />)
+
+  expect(seen[0].events.map((event) => event.id)).toEqual([1, 3])
+  expect(seen[0].restoredThrough).toBe(3)
+})
+
 it('reports the restored feed as already seen, so nothing replays', () => {
   writeLog({ gameId: 'g1', events: [dealt('p1'), drawn('p1')], savedAt: Date.now() })
   session = { gameLink: null, gameSync: { view: view(), events: [] }, gameId: 'g1' }

@@ -351,6 +351,7 @@
   "lobbyScreen": {
     "title": "Lobby",
     "subtitle": "Waiting for players…",
+    "botName": "Bot {{n}}",
     "language": "language",
     "disband": "disband",
     "rules": "rules",
@@ -359,6 +360,9 @@
     "modesLockedHint": "set by host",
     "players": "Players",
     "capacity": "Capacity",
+    "addBot": "Add bot",
+    "removeBot": "Remove bot",
+    "roleBot": "bot",
     "chat": "chat",
     "spectators": "Spectators",
     "specLimit": "Limit",

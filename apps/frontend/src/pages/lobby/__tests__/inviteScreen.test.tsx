@@ -51,6 +51,7 @@ function base(): UseLobby {
     setWhere: vi.fn(),
     kick: vi.fn(),
     setMaxPlayers: vi.fn(),
+    setBots: vi.fn(),
     startGame: vi.fn(),
     introReady: vi.fn(),
     transferHost: vi.fn(),

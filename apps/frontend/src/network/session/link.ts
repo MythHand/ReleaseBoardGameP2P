@@ -1,13 +1,12 @@
 import type { Event, PlayerId, PlayerView } from '@release/engine'
 import type { Intent } from '../types'
 import {
+  advanceSession,
   applyIntent,
   commit,
-  driveAbsent,
   type Outgoing,
   rebind,
   type SessionRef,
-  tick,
 } from './referee'
 
 export interface Sync {
@@ -72,10 +71,10 @@ export function createLocalLink(args: {
   // peer id under a link that outlives it.
   const myPeerId = () => args.ref.current.seats.find((s) => s.playerId === args.me)?.peerId ?? null
 
-  // Bind an unconnected seat to its local address. Solo play and the playground
-  // build sessions whose seats hold no connection at all; a seat that does hold
-  // one (a keeper that is also a player, driving its own seat through a local
-  // link) keeps it.
+  // Bind an unconnected seat to its local address. The playground builds
+  // sessions whose seats hold no connection at all — this is the path that
+  // gives such a seat one; a seat that does hold one already (a keeper that
+  // is also a player, driving its own seat through a local link) keeps it.
   if (args.ref.current.seats.some((s) => s.playerId === args.me && s.peerId === null)) {
     // `0` for the clock: this is the startup self-bind, before the table is
     // live — no deadline exists yet, so the re-stamp branch cannot fire, and
@@ -104,8 +103,7 @@ export function createLocalLink(args: {
 
   ticker.start(() => {
     const now = args.now()
-    commit(args.ref, tick(args.ref.current, now), deliver)
-    commit(args.ref, driveAbsent(args.ref.current, now), deliver)
+    commit(args.ref, advanceSession(args.ref.current, now), deliver)
   })
 
   return {

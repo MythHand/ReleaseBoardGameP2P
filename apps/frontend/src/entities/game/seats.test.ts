@@ -1,14 +1,8 @@
 import type { PeerInfo } from '~/network'
-import { seatOf, seatsFor } from './seats'
+import { botSeats, privateSeatsFor, publicSeats, seatOf, seatsFor } from './seats'
 
-const peer = (
-  id: string,
-  name: string,
-  role: PeerInfo['role'],
-  clientId = `client-${id}`,
-): PeerInfo => ({
+const peer = (id: string, name: string, role: PeerInfo['role']): PeerInfo => ({
   id,
-  clientId,
   name,
   role,
   ready: true,
@@ -58,12 +52,60 @@ it('seats the same roster the same way however it is enumerated', () => {
   expect(seatsFor(roster(a, b, c))).toEqual(seatsFor(roster(c, a, b)))
 })
 
-it('carries each peer clientId onto the seat it is dealt', () => {
-  const seats = seatsFor(
-    roster(peer('peer-a', 'Ann', 'host', 'client-a'), peer('peer-b', 'Bo', 'player', 'client-b')),
-  )
-  expect(seats).toEqual([
-    { playerId: 'p1', peerId: 'peer-a', clientId: 'client-a', name: 'Ann' },
-    { playerId: 'p2', peerId: 'peer-b', clientId: 'client-b', name: 'Bo' },
-  ])
+it('builds host-private seats and strips credentials for the wire', () => {
+  const peers = roster(peer('peer-a', 'Ann', 'host'))
+  const seats = seatsFor(peers)
+  const privateSeats = privateSeatsFor(seats, new Map([['peer-a', 'resume-a']]))
+  expect(privateSeats[0]).toEqual({
+    seat: { playerId: 'p1', peerId: 'peer-a', name: 'Ann' },
+    resumeToken: 'resume-a',
+  })
+  expect(publicSeats(privateSeats)[0]).toEqual({ playerId: 'p1', peerId: 'peer-a', name: 'Ann' })
+})
+
+it('refuses to start with a player whose private credential is missing', () => {
+  const peers = roster(peer('peer-a', 'Ann', 'host'))
+  expect(() => privateSeatsFor(seatsFor(peers), new Map())).toThrow('missing resume token')
+})
+
+it('keeps bot seats in the saved roster without assigning them resume credentials', () => {
+  const humans = seatsFor(roster(peer('peer-a', 'Ann', 'host')))
+  const seats = [...humans, ...botSeats(2, humans.length, ['Bot 1', 'Bot 2'])]
+  const privateSeats = privateSeatsFor(seats, new Map([['peer-a', 'resume-a']]))
+  expect(privateSeats.map(({ resumeToken }) => resumeToken)).toEqual(['resume-a', null, null])
+  expect(publicSeats(privateSeats)).toEqual(seats)
+})
+
+it('refuses to start with duplicate private credentials', () => {
+  const peers = roster(peer('peer-a', 'Ann', 'host'), peer('peer-b', 'Bo', 'player'))
+  expect(() =>
+    privateSeatsFor(
+      seatsFor(peers),
+      new Map([
+        ['peer-a', 'duplicate-token'],
+        ['peer-b', 'duplicate-token'],
+      ]),
+    ),
+  ).toThrow('duplicate resume token')
+})
+
+// Bot seats continue the same p1..pN sequence the humans are numbered in,
+// because the engine seats a table, not two kinds of player.
+it('numbers bot seats after the humans', () => {
+  const seats = botSeats(2, 3, ['Бот 1', 'Бот 2'])
+  expect(seats.map((s) => s.playerId)).toEqual(['p4', 'p5'])
+  expect(seats.map((s) => s.name)).toEqual(['Бот 1', 'Бот 2'])
+  expect(seats.every((s) => s.bot)).toBe(true)
+})
+
+// A bot holds no connection, so its ids exist only to be a stable key. They
+// carry a colon so they can never collide with a PeerJS id, which is drawn
+// from an alphabet that has none.
+it('gives a bot an address nothing can dial', () => {
+  const [seat] = botSeats(1, 1, ['Бот 1'])
+  expect(seat.peerId).toContain(':')
+})
+
+it('asks for no seats when no bots were asked for', () => {
+  expect(botSeats(0, 2, [])).toEqual([])
 })

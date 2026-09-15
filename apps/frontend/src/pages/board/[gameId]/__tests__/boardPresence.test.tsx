@@ -20,7 +20,7 @@ vi.mock('~/app/providers/SessionProvider', () => ({
 // set them, because nothing in the page read them yet.
 function session(overrides: Partial<UseLobby> = {}): UseLobby {
   return {
-    state: { selfId: 'me', hostId: 'me', maxPlayers: 6, setup: {}, peers: {} },
+    state: { selfId: 'me', hostId: 'me', maxPlayers: 6, bots: 0, setup: {}, peers: {} },
     status: 'in-lobby',
     roomCode: 'YTG-N2Q',
     isHost: true,
@@ -48,15 +48,18 @@ function renderBoardWith(path = '/board/g1') {
 }
 
 // A real projection, built the same way the other board tests build one — the
-// point is a live table with an actual opponent seat, not a mock shape.
-function realView(playerId: 'p1' | 'p2' = 'p1') {
+// point is a live table with an actual opponent seat, not a mock shape. Names
+// default to the pair the other tests in this file were written against;
+// the bot presence test below overrides them so the on-table seat carries the
+// bot's own display name, the same as it would wear a human opponent's.
+function realView(playerId: 'p1' | 'p2' = 'p1', names: [string, string] = ['Ann', 'Bo']) {
   const engine = createFakeEngine()
   const state = engine.createGame({
     gameId: 'g1',
     seed: 7,
     players: [
-      { id: 'p1', name: 'Ann' },
-      { id: 'p2', name: 'Bo' },
+      { id: 'p1', name: names[0] },
+      { id: 'p2', name: names[1] },
     ],
     setup: {},
     deck: FAKE_DECK,
@@ -74,11 +77,11 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      bots: 0,
       setup: {},
       peers: {
         me: {
           id: 'me',
-          clientId: 'client-me',
           name: 'Ann',
           role: 'host',
           ready: true,
@@ -87,8 +90,8 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       },
     },
     seats: [
-      { playerId: 'p1', peerId: 'me', clientId: 'client-me', name: 'Ann' },
-      { playerId: 'p2', peerId: 'gone', clientId: 'client-bo', name: 'Bo' },
+      { playerId: 'p1', peerId: 'me', name: 'Ann' },
+      { playerId: 'p2', peerId: 'gone', name: 'Bo' },
     ],
     gameSync: { view: realView('p1'), events: [] },
   } as Partial<UseLobby>)
@@ -100,6 +103,32 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
   // Matched bilingually (real catalogs, no i18n mock — matching board.test.tsx's
   // own idiom) rather than pinned to one language's string.
   expect(await screen.findByText(/^(offline|нет связи)$/i)).toBeTruthy()
+})
+
+// A bot holds no connection, and absence is how this board spells "dropped" —
+// so without the check a bot would wear the offline marker for the whole match.
+it('never marks a bot seat offline', async () => {
+  sessionValue = session({
+    seats: [
+      { playerId: 'p1', peerId: 'me', name: 'Ann' },
+      { playerId: 'p2', peerId: 'bot:1', name: 'Бот 1', bot: true },
+    ],
+    state: {
+      selfId: 'me',
+      hostId: 'me',
+      maxPlayers: 6,
+      bots: 1,
+      setup: {},
+      peers: {
+        me: { id: 'me', name: 'Ann', role: 'host', ready: true, where: 'game' },
+      },
+    },
+    gameSync: { view: realView('p1', ['Ann', 'Бот 1']), events: [] },
+  } as Partial<UseLobby>)
+  renderBoardWith()
+
+  expect(await screen.findByText('Бот 1')).toBeTruthy()
+  expect(screen.queryByText(/^(offline|нет связи)$/i)).toBeNull()
 })
 
 it('shows the reconnect overlay while the host is restoring the match', async () => {
@@ -125,11 +154,11 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      bots: 0,
       setup: {},
       peers: {
         me: {
           id: 'me',
-          clientId: 'client-me',
           name: 'Ann',
           role: 'host',
           ready: true,
@@ -137,7 +166,7 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
         },
       },
     },
-    seats: [{ playerId: 'p1', peerId: 'me', clientId: 'client-me', name: 'Ann' }],
+    seats: [{ playerId: 'p1', peerId: 'me', name: 'Ann' }],
   } as Partial<UseLobby>)
   renderBoardWith()
   expect(screen.queryByText(/^(reconnecting…|переподключение…)$/i)).toBeNull()

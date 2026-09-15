@@ -65,6 +65,11 @@ export interface LobbyCopy {
   modesLockedHint: string
   players: string
   capacity: string
+  addBot: string
+  removeBot: string
+  // Interpolated with the bot's number, the way the frontend's catalog does it.
+  botName: string
+  roleBot: string
   // заголовок колонки чата — сам блок чата своего заголовка не имеет
   chat: string
   spectators: string
@@ -133,6 +138,7 @@ export default function Lobby({
   const [setup, setSetup] = useState<Setup>(initialSetup)
   const [players, setPlayers] = useState<Player[]>(initialPlayers)
   const [capacity, setCapacity] = useState(initialCapacity)
+  const [bots, setBots] = useState(0)
   const [spectators, setSpectators] = useState<Spectator[]>(MOCK_SPECTATORS)
   const [specCapacity, setSpecCapacity] = useState(8)
   const [disbandOpen, setDisbandOpen] = useState(false)
@@ -177,7 +183,20 @@ export default function Lobby({
   const playersFull = players.length >= capacity
   const spectatorsFull = spectators.length >= specCapacity
 
-  const slots: (Player | null)[] = [...players]
+  // The same ceiling the app applies: people take the seats first, and the
+  // number says how many of whatever is left should be bots.
+  const shownBots = Math.max(0, Math.min(bots, capacity - players.length))
+
+  // Both act on the number on screen, not on the stored ask — the screen shows
+  // no control for the ask, so a click that changed only it would look broken.
+  const addBot = () => setBots(shownBots + 1)
+  const removeBot = () => setBots(shownBots - 1)
+
+  // A row is a player, a bot (carrying its number), or an empty seat.
+  const slots: (Player | { bot: number } | null)[] = [
+    ...players,
+    ...Array.from({ length: shownBots }, (_, i) => ({ bot: i + 1 })),
+  ]
   while (slots.length < capacity) slots.push(null)
 
   const renderStatus = (p: Player) => {
@@ -236,7 +255,10 @@ export default function Lobby({
             <h2 className={styles.h}>
               {copy.players}
               <span className={styles.count}>
-                {players.length} / {capacity}
+                {/* The count describes the table that will be dealt: people and the bots
+                    that fit, matching the slots shown below. With 4 players in a 5-seat
+                    table, it reads 5 / 5 (one bot), not 4 / 5. */}
+                {players.length + shownBots} / {capacity}
               </span>
             </h2>
 
@@ -253,7 +275,7 @@ export default function Lobby({
 
             <div className={styles.list}>
               {slots.map((p, i) =>
-                p ? (
+                p && 'id' in p ? (
                   <PlayerSlot
                     key={p.id}
                     name={p.name}
@@ -283,9 +305,33 @@ export default function Lobby({
                         : undefined
                     }
                   />
+                ) : p && 'bot' in p ? (
+                  <PlayerSlot
+                    key={`bot-${p.bot}`}
+                    name={copy.botName.replace('{{n}}', String(p.bot))}
+                    badge={
+                      <Badge tone="muted" size="sm" outlined>
+                        {copy.roleBot}
+                      </Badge>
+                    }
+                    status={<Badge tone="success">{copy.ready}</Badge>}
+                    dropdownLabel={copy.actions}
+                    dropdown={isHost ? [{ label: copy.removeBot, onClick: removeBot }] : undefined}
+                  />
                 ) : (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: пустые слоты — позиционные заглушки без стабильного id
-                  <EmptySlot key={`empty-${i}`}>{copy.freeSlot}</EmptySlot>
+                  <EmptySlot
+                    // biome-ignore lint/suspicious/noArrayIndexKey: пустые слоты — позиционные заглушки без стабильного id
+                    key={`empty-${i}`}
+                    action={
+                      isHost ? (
+                        <Button variant="pill" onClick={addBot}>
+                          {copy.addBot}
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    {copy.freeSlot}
+                  </EmptySlot>
                 ),
               )}
             </div>

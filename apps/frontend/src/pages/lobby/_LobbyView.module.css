@@ -78,26 +78,9 @@
 /* Game code block. Mirrors @release/ui's LobbyCode, but rendered here because
    that block copies the bare code — what's actually worth sharing is the invite
    link, which is the whole point of the invite screen. */
-.codeBox {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
-}
 
-.codeLabel {
-  color: var(--white-45);
-}
 
-.codeRow {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
 
-.codeValue {
-  color: var(--mint);
-}
 
 /* ===== content: modes on the left, players on the right ===== */
 .grid {

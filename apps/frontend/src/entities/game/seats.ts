@@ -5,6 +5,11 @@ import type { PeerInfo, Seat } from '~/network'
 // re-exported here so every reader still asks the seating module for it.
 export type { Seat }
 
+export interface PrivateSeat {
+  seat: Seat
+  resumeToken: string | null
+}
+
 // PlayerId and peer id are distinct spaces that are both `string`, which is
 // exactly what hides a mix-up (network/session/remoteLink.ts:34). Minting
 // `p1…pN` rather than reusing the peer id keeps them visibly different, so a
@@ -24,10 +29,50 @@ export function seatsFor(peers: Record<string, PeerInfo>): Seat[] {
   return Object.values(peers)
     .filter((p) => p.role === 'host' || p.role === 'player')
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((p, i) => ({ playerId: seatId(i), peerId: p.id, clientId: p.clientId, name: p.name }))
+    .map((p, i) => ({ playerId: seatId(i), peerId: p.id, name: p.name }))
 }
+
+export function privateSeatsFor(
+  seats: Seat[],
+  tokensByPeer: ReadonlyMap<string, string>,
+): PrivateSeat[] {
+  const privateSeats = seats.map((seat) => {
+    if (seat.bot) return { seat, resumeToken: null }
+    const resumeToken = tokensByPeer.get(seat.peerId)
+    if (!resumeToken) throw new Error(`missing resume token for ${seat.peerId}`)
+    return { seat, resumeToken }
+  })
+  const tokens = privateSeats.flatMap(({ resumeToken }) =>
+    resumeToken === null ? [] : [resumeToken],
+  )
+  if (new Set(tokens).size !== tokens.length) {
+    throw new Error('duplicate resume token')
+  }
+  return privateSeats
+}
+
+export const publicSeats = (seats: PrivateSeat[]): Seat[] => seats.map(({ seat }) => seat)
 
 // The seat a given peer got, or null if it is watching rather than playing.
 export function seatOf(seats: Seat[], peerId: string): Seat | null {
   return seats.find((s) => s.peerId === peerId) ?? null
+}
+
+// A bot's address. It holds no connection, so this exists only to be a stable
+// key for the row and the seat — nothing is ever sent to it. The colon keeps it
+// out of the PeerJS id space, whose alphabet has none, so a synthetic address
+// can never collide with a real peer.
+const botAddress = (n: number) => `bot:${n}`
+
+// The seats the bots take, continuing the human numbering. `afterHumans` is how
+// many seats the people already took, and `names` must hold exactly `count`
+// entries: they are display copy and cannot be built here, because this module
+// is below the i18n boundary (see useStartGame).
+export function botSeats(count: number, afterHumans: number, names: string[]): Seat[] {
+  return Array.from({ length: count }, (_, i) => ({
+    playerId: seatId(afterHumans + i),
+    peerId: botAddress(i + 1),
+    name: names[i] ?? '',
+    bot: true,
+  }))
 }

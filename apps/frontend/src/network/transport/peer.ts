@@ -15,6 +15,7 @@ import type { Message, WireMessage } from '../types'
 export interface Transport {
   id: string
   connectTo(peerId: string): void
+  authenticate(peerId: string): void
   send(to: string, message: Message): void
   broadcast(message: Message): void
   // Forward an already-received wire frame to the given peers verbatim. Unlike
@@ -77,17 +78,30 @@ export function createTransport(args: {
     const peer = args.peerId
       ? new Peer(args.peerId, peerOptions())
       : new Peer(undefined as never, peerOptions())
-    const connections = new Map<string, DataConnection>()
+    interface ConnectionGeneration {
+      connection: DataConnection
+      authenticated: boolean
+    }
+    const connections = new Map<string, ConnectionGeneration>()
     let opened = false
 
-    const wire = (conn: DataConnection) => {
+    const wire = (conn: DataConnection, authenticated = false) => {
+      const generation: ConnectionGeneration = { connection: conn, authenticated }
       conn.on('open', () => {
-        connections.set(conn.peer, conn)
+        const previous = connections.get(conn.peer)
+        if (previous?.connection === conn) return
+        connections.set(conn.peer, generation)
+        if (previous) {
+          previous.connection.close()
+          args.onDisconnect?.(conn.peer)
+        }
         args.onConnection?.(conn.peer)
       })
       conn.on('data', (data) => {
+        if (connections.get(conn.peer) !== generation) return
         try {
           const frame = parseEnvelope(typeof data === 'string' ? data : JSON.stringify(data))
+          if (!generation.authenticated && frame.type !== 'JOIN_REQUEST') return
           // `from` is overwritten with the connection it arrived on, never read
           // from the payload: the sender wrote that field and could write any
           // peer id into it, and the keeper resolves a seat from it. The
@@ -100,10 +114,13 @@ export function createTransport(args: {
         }
       })
       conn.on('close', () => {
+        if (connections.get(conn.peer) !== generation) return
         connections.delete(conn.peer)
         args.onDisconnect?.(conn.peer)
       })
       conn.on('error', (e) => {
+        const active = connections.get(conn.peer)
+        if (active && active !== generation) return
         args.onError?.({ type: 'connection', message: (e as Error)?.message ?? String(e) })
       })
     }
@@ -122,20 +139,24 @@ export function createTransport(args: {
       resolve({
         id: id as string,
         connectTo(peerId) {
-          wire(peer.connect(peerId))
+          wire(peer.connect(peerId), true)
+        },
+        authenticate(peerId) {
+          const generation = connections.get(peerId)
+          if (generation) generation.authenticated = true
         },
         send(to, message) {
           connections
             .get(to)
-            ?.send(JSON.stringify(createEnvelope(message, id as string, nextSeq())))
+            ?.connection.send(JSON.stringify(createEnvelope(message, id as string, nextSeq())))
         },
         broadcast(message) {
           const frame = JSON.stringify(createEnvelope(message, id as string, nextSeq()))
-          for (const conn of connections.values()) conn.send(frame)
+          for (const { connection } of connections.values()) connection.send(frame)
         },
         relay(toIds, frame) {
           const serialized = JSON.stringify(frame)
-          for (const to of toIds) connections.get(to)?.send(serialized)
+          for (const to of toIds) connections.get(to)?.connection.send(serialized)
         },
         connectedIds() {
           return [...connections.keys()]

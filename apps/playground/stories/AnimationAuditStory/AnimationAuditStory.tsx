@@ -1478,6 +1478,36 @@ const ISSUES: Issue[] = [
     },
     status: 'open',
   },
+  {
+    what: {
+      ru: 'Боты опережают анимации и видимый таймер хода',
+      en: 'Bots outrun the animations and the displayed turn clock',
+    },
+    problem: {
+      ru: 'PR #142: бот принимает решение каждые 250 мс, а доска проигрывает события последовательно, по 1–4 с. Ход человека может начаться и частично истечь, пока доска ещё показывает ботов. Объединение SYNC сохраняет события, но не решает темп. Нужно отдельно ограничить действия ботов или согласовать готовность доски; общий тикер также обслуживает дедлайны и ожидание отключённых игроков.',
+      en: 'PR #142: bots act every 250ms while board beats take roughly 1–4s each. A human turn can start and partly expire while the board still shows bots. Combining SYNC events prevents event loss but does not solve pacing. Pace bot actions separately or coordinate board readiness; the shared ticker also owns deadlines and disconnected-seat grace.',
+    },
+    where: {
+      ru: 'network/session/referee.ts + remoteLink.ts; features/board-beats/useBeats.ts',
+      en: 'network/session/referee.ts + remoteLink.ts; features/board-beats/useBeats.ts',
+    },
+    status: 'open',
+  },
+  {
+    what: {
+      ru: 'Вернувшийся после DDoS релиз не показывает заморозку',
+      en: 'A release returned by DDoS has no frozen indicator',
+    },
+    problem: {
+      ru: 'Ревью PR #142: движок передаёт frozen и исключает карту из playable, но Board не использует frozen при отрисовке руки. Карта выглядит как обычная неактивная карта, причина запрета не видна. Это существующий пробел main, отдельный от ботов. Закроет: согласованное состояние заморозки в Hand/Card и сценарий DDoS с проверкой снятия заморозки.',
+      en: 'PR #142 review: the engine exposes frozen and excludes the card from playable, but Board does not use frozen when rendering the hand. The card looks like any inactive card, hiding why it cannot be played. This predates bots on main. Closed by: a shared frozen Hand/Card state and a DDoS scenario verifying that the indicator clears with the freeze.',
+    },
+    where: {
+      ru: 'fake/project.ts; entities/game/board/toBoardState.ts; Board + Hand/Card',
+      en: 'fake/project.ts; entities/game/board/toBoardState.ts; Board + Hand/Card',
+    },
+    status: 'open',
+  },
 ]
 
 // Section headings, notes, legend and table headers.

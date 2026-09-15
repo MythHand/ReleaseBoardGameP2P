@@ -1875,6 +1875,40 @@ describe('planBeats — a Release comes back out of the discard (#106, Task 11)'
     })
   })
 
+  it('does not send Git Cherry-pick to the AI deck after taking a discard', () => {
+    const before = boardBefore({
+      pending: {
+        kind: 'pickFromDiscard',
+        player: 'p1',
+        options: [],
+        picks: 1,
+        source: 'operation-git-cherry-pick',
+      },
+    } as Partial<BoardState>)
+    const plans = planBeats(
+      [{ id: 20, type: 'takenFromDiscard', player: 'p1', card: 'release-frontend', to: 'hand' }],
+      before,
+    )
+    expect(plans[0]).not.toHaveProperty('homeward')
+  })
+
+  it('does not plan an AI homeward beat for a missing source card', () => {
+    const before = boardBefore({
+      pending: {
+        kind: 'pickFromDiscard',
+        player: 'p1',
+        options: [],
+        picks: 1,
+        source: 'missing-card',
+      },
+    } as Partial<BoardState>)
+    const plans = planBeats(
+      [{ id: 20, type: 'takenFromDiscard', player: 'p1', card: 'release-frontend', to: 'hand' }],
+      before,
+    )
+    expect(plans[0]).not.toHaveProperty('homeward')
+  })
+
   it('reads `mine` off the projection, not off the player who acted', () => {
     // `before.selfId` is 'p1' (`boardBefore`'s own default) — a card taken by
     // 'p2' is public (`takenFromDiscard` carries no `visibleTo`), and every

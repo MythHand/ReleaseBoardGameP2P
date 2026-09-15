@@ -45,7 +45,6 @@ beforeEach(() => {
   peers = {
     'peer-a': {
       id: 'peer-a',
-      clientId: 'client-a',
       name: 'Ann',
       role: 'host',
       ready: true,
@@ -53,7 +52,6 @@ beforeEach(() => {
     },
     'peer-b': {
       id: 'peer-b',
-      clientId: 'client-b',
       name: 'Bo',
       role: 'player',
       ready: true,
@@ -61,8 +59,8 @@ beforeEach(() => {
     },
   }
   seats = [
-    { playerId: 'p1', peerId: 'peer-a', clientId: 'client-a', name: 'Ann' },
-    { playerId: 'p2', peerId: 'peer-b', clientId: 'client-b', name: 'Bo' },
+    { playerId: 'p1', peerId: 'peer-a', name: 'Ann' },
+    { playerId: 'p2', peerId: 'peer-b', name: 'Bo' },
   ]
   view = {
     over: { winner: 'p1', condition: 'release' },
@@ -84,14 +82,13 @@ it('reads the seating the match was dealt with, not the roster still connected',
   // seat p3 unresolved so the winner block would not render at all.
   selfId = 'aaa'
   seats = [
-    { playerId: 'p1', peerId: 'aaa', clientId: 'client-aaa', name: 'Ann' },
-    { playerId: 'p2', peerId: 'bbb', clientId: 'client-bbb', name: 'Bo' },
-    { playerId: 'p3', peerId: 'ccc', clientId: 'client-ccc', name: 'Cid' },
+    { playerId: 'p1', peerId: 'aaa', name: 'Ann' },
+    { playerId: 'p2', peerId: 'bbb', name: 'Bo' },
+    { playerId: 'p3', peerId: 'ccc', name: 'Cid' },
   ]
   peers = {
     aaa: {
       id: 'aaa',
-      clientId: 'client-aaa',
       name: 'Ann',
       role: 'host',
       ready: true,
@@ -99,7 +96,6 @@ it('reads the seating the match was dealt with, not the roster still connected',
     },
     ccc: {
       id: 'ccc',
-      clientId: 'client-ccc',
       name: 'Cid',
       role: 'player',
       ready: true,

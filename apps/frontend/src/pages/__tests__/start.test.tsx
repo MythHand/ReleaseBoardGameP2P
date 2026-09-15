@@ -47,11 +47,11 @@ it('shows an interactive continue session button when session is active', () => 
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
+      bots: 0,
       setup: {},
       peers: {
         h: {
           id: 'h',
-          clientId: 'client-h',
           name: 'Host',
           role: 'host',
           ready: true,
