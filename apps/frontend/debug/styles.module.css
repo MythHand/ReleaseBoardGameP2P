@@ -1,0 +1,69 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  block-size: 100dvh;
+  color: var(--fg);
+  background: var(--surface-0);
+}
+
+.toolbar,
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.toolbar {
+  padding-block: 8px;
+  padding-inline: 12px;
+  background: var(--surface-1);
+  border-block-end: 1px solid var(--white-12);
+}
+
+.toolbar button[aria-pressed='true'] {
+  outline: 1px solid var(--mint);
+  outline-offset: 2px;
+}
+
+.status {
+  display: grid;
+  gap: 6px;
+  padding-block: 8px;
+  padding-inline: 12px;
+  background: var(--surface-1);
+}
+
+.board {
+  position: relative;
+  flex: 1;
+  min-block-size: 520px;
+}
+
+.trace {
+  position: relative;
+  margin-inline-start: auto;
+}
+
+.trace summary {
+  cursor: pointer;
+}
+
+.trace summary > * {
+  display: inline;
+}
+
+.traceContent {
+  position: absolute;
+  inset-block-start: 24px;
+  inset-inline-end: 0;
+  z-index: 100;
+  inline-size: min(580px, 85vw);
+  max-block-size: 340px;
+  padding: 12px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  background: var(--surface-1);
+  border: 1px solid var(--white-12);
+}
