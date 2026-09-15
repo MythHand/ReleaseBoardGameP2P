@@ -155,6 +155,31 @@ Styling is uniform across all packages: **CSS Modules + design tokens.**
 
 ---
 
+## Branch Naming Rule
+
+- **A branch is named `<type>/<task-number>/<task-description>`** — three segments, separated by
+  slashes.
+- **`<type>` is `fix` or `feature`.** Nothing else. `fix` is a defect in what already works;
+  `feature` is everything that adds or changes behaviour (including refactors, docs, CI and
+  chores — pick the nearer of the two rather than inventing a third prefix).
+- **`<task-number>` is the GitHub issue number, digits only** — `158`, not `#158` and not
+  `issue-158`. The number is what ties the branch to the task, so a branch without one means the
+  task is missing: open the issue first.
+- **`<task-description>` is a short kebab-case slug in English** — a few words on what the branch
+  does, lowercase, no dots or underscores: `history-panel-scroll`, not `Fix_History_Panel`.
+
+```
+fix/158/history-panel-scroll
+feature/19/stats-page
+```
+
+- **One branch per task.** Work that closes two issues takes the number of the one it is primarily
+  about and names the rest in the PR body.
+- Branches already merged use an older shape (`feat/19-stats-page`, `fix/97-draw-landing`) — that is
+  history, not precedent. Do not rename them; name new ones by the rule above.
+
+---
+
 ## i18n Rule
 
 - **`@release/translation` is the single i18n surface.** It owns the i18next init,
