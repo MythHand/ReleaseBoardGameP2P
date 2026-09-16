@@ -655,6 +655,36 @@ describe('the discard heap', () => {
     expect(first[0]).toMatchObject(scatterAt(7))
   })
 
+  // On the table the support is tucked UNDER the card it paid for, and the
+  // layer a card had is what decides the order it joins the heap. The feed
+  // reports the support a moment after its main, so folding in feed order
+  // would rest it on top — and the two halves would swap the instant the
+  // split-out flight ended.
+  it('rests a sudo under the card it paid for', () => {
+    // the play NAMES its support — that is what makes these two a pair, and
+    // what keeps a support swept out of a hand from being tucked under
+    // whatever happened to be filed before it
+    const log = [
+      {
+        id: 101,
+        type: 'operationPlayed',
+        player: 'you',
+        card: 'operation-git-cherry-pick',
+        sudo: true,
+      },
+      discardedEvent(102, 'operation-git-cherry-pick'),
+      discardedEvent(103, 'support-sudo'),
+    ] as Event[]
+    // the engine banked the sudo LAST, so it is the projection's own top — and
+    // the fold still counts as ending on the top, or it would add a stand-in
+    // copy of it above the pair at a pose nothing flew to
+    const heap =
+      toBoardState(withDecks({ discardCount: 2, discardTop: 'support-sudo' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual(['support-sudo', 'operation-git-cherry-pick'])
+    expect(heap.map((c) => c.uid)).toEqual(['d103', 'd102'])
+  })
+
   // The WHOLE pile, not just the part that shows: `Pile` draws the top
   // `heapShow` of the heap over the depth of the rest, and a card flying back
   // into the discard (Cherry-pick's unpicked cards) lands on its own resting

@@ -452,11 +452,19 @@ into the release zone.
 - `state.comboOptions[uid]` — the engine's own legal-partner list (`PlayerView.self.combos`, keyed
   support-first), replacing ComboStory's mocked `validComboTarget` (`mockLegality.ts`, its functions
   retired from the board, kept only to run the playground story).
-- `slotBox(index, total)` — the partner's own FAN geometry, not a slot's rotated bounding rect
-  (**I6**) — `anchors.hand`'s rect + `slotPlacement`, standing in for ComboStory's `refs[uid]`.
-- `pairRef` — the persistent pair-flyer node `_Board.tsx` mounts (`data-testid="board-pair-staged"`);
-  `CardPair` renders inside it only once `staged.merged`, painted frame by frame on its
-  `[data-main]` / `[data-aux]` children — the same idiom as ComboStory's own `flyRef`.
+- `anchors.handSlotAt(index)` — the partner's card WHERE IT IS DRAWN at the moment it is clicked,
+  hover lift included, trimmed back to a card box by `cardBoxIn` because the slot is rotated
+  (**I6**). This is ComboStory's own `refs[uid]`: the scene folds from the card itself. The board
+  used to substitute `slotBox(index, total)` — the fan's RESTING geometry (`anchors.hand`'s rect +
+  `slotPlacement`) — and since the card being clicked is the hovered one, lifted out of that line,
+  the pair's half started where the player's card had never been: it read as the clicked card
+  vanishing and a different one flying to the sudo. `slotBox` stays as the fallback for when there
+  is no node to measure.
+- `usePairFold` — the step owns the pair's node; the gesture reaches it through `pairNode()` and
+  renders it with its other carriers (`staging.overlay`). The board mounted a node of its own until
+  #168, and revealed it two frames after the fan had already let the card go — the card was nowhere
+  on screen in between, which read as the clicked card being swapped for another. The step reveals
+  the pair in the SAME tick its halves get their entry poses, which is what closes that gap.
 - `foldingRef` — true from the click that commits the fold until `finish()` (or an early bail)
   clears it in a `finally`; `cancel()` and a second `onCardClick` both refuse while it holds.
 - `StagedHandoff` (`entities/game/board/types.ts`) — the seam to the beat: `mainUid`, `supportUid?`,
@@ -465,24 +473,22 @@ into the release zone.
 
 **Sequence** (`onCardClick`, once a support already stands at the centre)
 1. Validate the click against `state.comboOptions[support.uid]`; a miss calls `cancel()` and stops.
-2. Measure — **[I1]**: `mainHand = slotBox(index, handItems.length)`, `cRect = anchors.centre`.
+2. Measure — **[I1]**: `mainHand` = the clicked card's own drawn box (`anchors.handSlotAt(index)`
+   through `cardBoxIn`, `slotBox(index, handItems.length)` as the fallback), `cRect = anchors.centre`.
+   Measured BEFORE the commit below takes the card out of the fan.
 3. `arrowCtl.stop()` — the choice is made; commit `{ support, main, phase: 'partner', merged: true }`;
    `foldingRef.current = true`.
-4. Reduced motion (or no fan geometry to fold from): pin `pairRef`'s `left/top/width/opacity` to
-   `cRect` directly and call `finish()` at once — `CardPair`'s own inline pose (main identity, aux
-   `PAIR_AUX_POSE`) already IS the pair at rest, nothing to paint frame by frame.
-5. Otherwise: `await nextFrames()` — **[I2]**, the just-mounted `CardPair` has painted. Cancel
-   leftover animations on `pairRef` (`getAnimations({ subtree: true })`) — **[I3]**. Pin `pairRef` to
-   `cRect`; paint the first frame with `enterPose(mainHand, cRect)` on `[data-main]` and
-   `enterPose(cRect, cRect)` on `[data-aux]` — the support's own entry pose is the degenerate
-   identity case (it is already at the centre), no separate branch. `await nextFrames()` again.
-6. **The fold** — `play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: 620 })` and
-   `play('foldIntoPair', auxEl, { from: cRect, box: cRect, pose: PAIR_AUX_POSE, dur: 620, snap: true })`
-   in parallel; `await Promise.all([a1?.finished, a2?.finished])`.
+4. `fold({ main, aux, mainFrom: mainHand, auxFrom: cRect, box: cRect, dur })` — the step does the
+   rest: mounts the pair invisible, paints both halves at their entry poses and reveals them in that
+   same tick, then folds them together over `dur` (620). The support is already at the centre, so
+   `auxFrom === box` makes its entry pose the degenerate identity case — no branch for it.
+5. Reduced motion: the same call with `dur: 0`, and `finish()` runs in the SAME tick rather than
+   awaiting it — a game action never waits on an animation nobody plays.
 
-   > **Steps 5–6 are now a step of their own: `usePairFold`.** The scenes call it (Combo, Defense
-   > Release); the board still carries this hand-written version in three places, and replacing them
-   > is a call, not a rewrite. The step also mounts the pair invisible and reveals it in the same
+   > **Steps 5–6 ARE the step `usePairFold`**, and this gesture calls it (#168) — as the scenes do
+   > (Combo, Defense Release) and as the board's own defence gesture already did. One hand-written
+   > copy is left, in `comboBeat.tsx`: it also carries an attack pair across the table and hands its
+   > carrier on to the pending render, which the step does not do. The step also mounts the pair invisible and reveals it in the same
    > tick the entry poses are set, which is what the flyer form cannot do — `raise` waits for a paint
    > before it hands the node back, so the pair shows up already folded for a frame or two.
 7. `finish()` — wrapped in `try`/`finally` so every exit clears `foldingRef`, not only this one —

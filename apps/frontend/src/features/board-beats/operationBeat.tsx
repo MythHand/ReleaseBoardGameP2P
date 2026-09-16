@@ -250,7 +250,15 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       if (run !== epoch.current) return
       const heap = [...(ctx.base.decks.discardHeap ?? [])]
       let added = 0
-      for (const spent of plan.spent ?? operation.spent) {
+      // the support half first: it lay UNDER the card it paid for, and that is
+      // the order it joins the heap in (the same the projection's own fold
+      // keeps, so the handover from this publish to `live` moves nothing)
+      const filed = [...(plan.spent ?? operation.spent)].sort(
+        (a, b) =>
+          Number(cardById(b.card)?.category === 'support') -
+          Number(cardById(a.card)?.category === 'support'),
+      )
+      for (const spent of filed) {
         const card = cardById(spent.card)
         if (!card || heap.some((entry) => entry.uid === `d${spent.eventId}`)) continue
         heap.push({ uid: `d${spent.eventId}`, card, ...scatterAt(spent.eventId) })

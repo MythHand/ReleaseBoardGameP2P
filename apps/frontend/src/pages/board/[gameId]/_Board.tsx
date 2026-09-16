@@ -688,8 +688,15 @@ export default function Board({
   // The Cherry-pick grid closes it too, for as long as the grid is up — the
   // scene's own rule: while cards are dealt out and flying in, the hand's
   // zoom-on-hover must not fire under them.
+  // The scene's own rule (`ComboStory`: `merged || playing`): while the play is
+  // ON THE TABLE — a pair standing at the centre, or anything of this gesture
+  // still in the air — the fan stops answering the cursor, so its hover lift,
+  // its spread and its zoom preview cannot rise into the play. The one thing
+  // that keeps it live is a cost owed: that answer is a click in the fan.
   const handInert =
-    (Boolean(staging.staged?.merged) && staging.costOptions.length === 0) || Boolean(cherry.grid)
+    (staging.costOptions.length === 0 &&
+      (Boolean(staging.staged?.merged) || staging.overlay.length > 0)) ||
+    Boolean(cherry.grid)
 
   const stagedRelease = staging.stageStanding
     ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
@@ -714,7 +721,7 @@ export default function Board({
       handoffRef.current = {
         mainUid: dispatched.main.uid,
         supportUid: dispatched.support?.uid,
-        el: dispatched.merged ? staging.pairRef.current : soloStagedRef.current,
+        el: dispatched.merged ? staging.pairNode() : soloStagedRef.current,
         release: staging.release,
       }
     }
@@ -817,7 +824,7 @@ export default function Board({
         ? {
             mainUid: s.main.uid,
             supportUid: s.support?.uid,
-            el: s.merged ? staging.pairRef.current : soloStagedRef.current,
+            el: s.merged ? staging.pairNode() : soloStagedRef.current,
             release: staging.release,
           }
         : null
@@ -837,7 +844,7 @@ export default function Board({
     neutralizing.release,
     you.releaseUid,
     staging.staged,
-    staging.pairRef,
+    staging.pairNode,
     staging.release,
   ])
 
@@ -2101,25 +2108,9 @@ export default function Board({
       {upgrade.overlay}
       {previewOverlay}
 
-      {/* the pair flyer — a persistent node (I10: position: fixed against the
-          viewport, no containing block above it, same as every other flight
-          carrier). The fold paints frame by frame directly on its
-          [data-main]/[data-aux] children; the CardPair mount just needs to
-          exist for that to have something to grab. */}
-      <div
-        className={opening.pairFlyer}
-        ref={staging.pairRef}
-        aria-hidden="true"
-        data-testid="board-pair-staged"
-      >
-        {staging.staged?.merged && staging.staged.support && staging.staged.main && (
-          <CardPair
-            main={staging.staged.main.card}
-            aux={staging.staged.support.card}
-            width="100%"
-          />
-        )}
-      </div>
+      {/* The pair the fold step carries (`usePairFold`) rides in `staging.overlay`
+          with the gesture's other carriers — the board no longer mounts a node
+          of its own for it. */}
     </div>
   )
 }

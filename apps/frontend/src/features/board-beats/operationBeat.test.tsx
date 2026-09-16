@@ -67,8 +67,11 @@ it.each([
     },
   )
   expect(exited.published.at(-1)?.decks.discardCount).toBe(sudo ? 2 : 1)
+  // the support half (d4) joins the heap UNDER the card it paid for (d3) — the
+  // layer it had on the table, and the same order the projection's own fold
+  // keeps, so nothing swaps when this publish hands over to `live`
   expect(exited.published.at(-1)?.decks.discardHeap?.map((c) => c.uid)).toEqual(
-    sudo ? ['d3', 'd4'] : ['d3'],
+    sudo ? ['d4', 'd3'] : ['d3'],
   )
   expect(anchors.exitSpy.mock.calls[0][0]).toHaveLength(sudo ? 2 : 1)
   expect(result.current.standing).toBe(false)

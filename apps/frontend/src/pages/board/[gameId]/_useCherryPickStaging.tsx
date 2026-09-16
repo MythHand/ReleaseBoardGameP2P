@@ -357,12 +357,22 @@ export function useCherryPickStaging(args: {
           await wait(DECK_HOLD)
         })()
         const remaining = ours.options.filter((o) => o.uid !== hand && o.uid !== deck)
-        const resting = new Map<string, NonNullable<BoardState['decks']['discardHeap']>[number]>()
-        const heap = [...(after.decks.discardHeap ?? [])]
+        // Where each unpicked card ENDS UP in the pile — its own entry in the
+        // heap the projection has after this answer. One scatter drives both
+        // the flight and the rest (I7), and the place in that array is the
+        // layer the card travels on (I9): its depth there is what decides
+        // whether it lands in the open or sinks under the visible top, so a
+        // card never lands in full view and then drops out of it the moment
+        // the operation card settles above — which is the pile rearranging
+        // itself after everything had already landed.
+        const heap = after.decks.discardHeap ?? []
+        const claimed = new Set<number>()
+        const resting = new Map<string, { rest: (typeof heap)[number]; depth: number }>()
         for (const option of [...remaining].reverse()) {
           for (let i = heap.length - 1; i >= 0; i--) {
-            if (heap[i].card.id !== option.id) continue
-            resting.set(option.uid, heap.splice(i, 1)[0])
+            if (claimed.has(i) || heap[i].card.id !== option.id) continue
+            claimed.add(i)
+            resting.set(option.uid, { rest: heap[i], depth: i })
             break
           }
         }
@@ -370,16 +380,16 @@ export function useCherryPickStaging(args: {
           remaining.flatMap((o, i) => {
             const card = cardById(o.id)
             if (!card) return []
-            const rest = resting.get(o.uid)
+            const found = resting.get(o.uid)
             return [
               {
                 key: o.uid,
                 card,
                 node: cellRefs.current.get(o.uid),
-                scatter: rest ?? scatterAt(i, 116),
-                fade: !rest || i < remaining.length - HEAP_SHOW,
+                scatter: found?.rest ?? scatterAt(i, 116),
+                fade: found ? found.depth < heap.length - HEAP_SHOW : true,
                 delay: Math.min(i, STAGGER_CAP) * 14,
-                layer: i,
+                layer: found?.depth ?? i,
               },
             ]
           }),

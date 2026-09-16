@@ -171,7 +171,7 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
     handoffRef.current = {
       mainUid: dispatchedPlay.main.uid,
       supportUid: dispatchedPlay.support?.uid,
-      el: dispatchedPlay.merged ? staging.pairRef.current : soloStagedRef.current,
+      el: dispatchedPlay.merged ? staging.pairNode() : soloStagedRef.current,
       release: staging.release,
     }
   }
@@ -183,11 +183,11 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
         ? {
             mainUid: s.main.uid,
             supportUid: s.support?.uid,
-            el: s.merged ? staging.pairRef.current : soloStagedRef.current,
+            el: s.merged ? staging.pairNode() : soloStagedRef.current,
             release: staging.release,
           }
         : null
-  }, [staging.staged, staging.pairRef, staging.release])
+  }, [staging.staged, staging.pairNode, staging.release])
 
   const soloStaged =
     staging.staged && !staging.staged.merged && staging.staged.main?.card.category !== 'release'
@@ -294,15 +294,8 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
         player={state.selfId}
         slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
       />
-      <div ref={staging.pairRef} data-testid="pair-flyer">
-        {staging.staged?.merged && staging.staged.support && staging.staged.main && (
-          <CardPair
-            main={staging.staged.main.card}
-            aux={staging.staged.support.card}
-            width="100%"
-          />
-        )}
-      </div>
+      {/* the pair rides in `staging.overlay` below — the fold step owns its own
+          node now (`usePairFold`), exactly as `_Board.tsx` renders it */}
       {staging.overlay}
       {beats.overlays}
     </div>

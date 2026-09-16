@@ -351,6 +351,20 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
   // for the rest of the match.
   if (count === 0) return []
   const heap: HeapCard[] = []
+  // the `discarded` event folded just before this one — a pair's two halves
+  // arrive back to back, and the second of them is the one that lay under
+  let previous: Event | null = null
+  // The support THIS play named, if the play it belongs to named one: a sudo
+  // behind an attack or an operation, a Code Review under a release. Without
+  // it the rule below would read ANY support card filed after another discard
+  // as half of a pair — a Code Review swept out of a hand, say — and move it
+  // under a card it was never played with, which scrambles the pile's own
+  // sequence.
+  let pairing: { player: string; support: string } | null = null
+  // the support just tucked under its main, if the last step did that: the
+  // projection's own top is THAT card (the engine banked it last), so the fold
+  // still ends on the top even though the top is not the last entry
+  let tucked: string | null = null
   for (const e of log) {
     if (e.type === 'takenFromDiscard') {
       // Events identify the public card type, not a physical uid. Removing one
@@ -362,13 +376,47 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
       }
       continue
     }
+    if (e.type === 'operationPlayed' || e.type === 'attacked') {
+      const player = e.type === 'attacked' ? e.attacker : e.player
+      pairing = e.sudo ? { player, support: 'support-sudo' } : null
+      continue
+    }
+    if (e.type === 'released') {
+      pairing = e.codeReview ? { player: e.player, support: e.codeReview } : null
+      continue
+    }
     if (e.type !== 'discarded') continue
     // The event id IS the stable integer `scatterAt` asks for — the engine's own
     // monotonic sequence, identical on every peer. No stringifying: `scatterAt`
     // hashes the number arithmetically.
-    heap.push({ uid: `d${e.id}`, card: cardOrPlaceholder(e.card), ...scatterAt(e.id) })
+    const entry = { uid: `d${e.id}`, card: cardOrPlaceholder(e.card), ...scatterAt(e.id) }
+    // A pair's AUX lies under its main here too. On the table the support is
+    // tucked under the card it paid for (`PAIR_AUX`), and the layer a card had
+    // is what decides the order it joins the heap (README, `useDiscardExit`).
+    // The feed reports the support a moment AFTER its main — both spent by the
+    // same effect, same player — so folding in feed order would rest it ON TOP
+    // and the two halves would swap places the instant their flight ended.
+    const under =
+      e.reason === 'effect' &&
+      pairing != null &&
+      pairing.player === e.player &&
+      pairing.support === e.card &&
+      previous?.type === 'discarded' &&
+      previous.reason === 'effect' &&
+      previous.player === e.player
+    if (under) {
+      heap.splice(heap.length - 1, 0, entry)
+      tucked = entry.uid
+    } else {
+      heap.push(entry)
+      tucked = null
+    }
+    previous = e
   }
-  if (top && heap.at(-1)?.card.id !== top.id) {
+  const endsOnTop =
+    heap.at(-1)?.card.id === top?.id ||
+    (tucked != null && heap.at(-2)?.uid === tucked && heap.at(-2)?.card.id === top?.id)
+  if (top && !endsOnTop) {
     // The stand-in for however many cards were banked in silence. Its identity is
     // the COUNT, not the heap's length: the count is what actually moved when
     // that happened, so this card keeps one pose for as long as it is really the
