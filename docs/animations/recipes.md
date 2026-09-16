@@ -2177,8 +2177,8 @@ and flies onto the draw deck; the unpicked cards return to the pile in their ori
    `DEAL_STEP` (capped at `STAGGER_CAP`), `DEAL_DUR` each; → `setPhase('choose')`.
 2. Pick (base 1 / sudo 2) under the trigger rule above.
 3. `resolve` (`setPhase('resolve')`): the hand card flies to the centre (`REVEAL_W`, `REVEAL_DUR`), holds
-   `REVEAL_HOLD`, then `useHandArrival` into the fan; a sudo deck card `flipCard` face-down (`FLIP_DUR`), holds
-   `DECK_HOLD`, then `play('returnToDeck', {from, to: deckRect})` (`DECK_DUR`); the rest return to the pile via
+   `REVEAL_HOLD`, then `useHandArrival` into the fan; a sudo deck card `flipCard` face-down (`FLIP_DUR`), then
+   `play('returnToDeck', {from, to: deckRect})` (`DECK_DUR`), and the round holds `DECK_HOLD` after it lands; the rest return to the pile via
    `play('centerToDiscard', toDiscardParams(from, pileRect, scatterAt(...), !visible))`, staggered `RETURN_STEP`
    (`RETURN_DUR`), keeping order. → `setPhase('done')`.
 
@@ -2190,7 +2190,7 @@ and flies onto the draw deck; the unpicked cards return to the pile in their ori
 | flip before deck flight / hold | `FLIP_DUR = 420`, `DECK_HOLD = 360` |
 | deck flight | `DECK_DUR = 480` (`returnToDeck`) |
 | reveal → hand | `REVEAL_W = 220`, `REVEAL_DUR = 460`, `REVEAL_HOLD = 560` |
-| grid / pile width | `GRID_W = 150`, `PILE_W = 132` |
+| grid / pile width | `GRID_W = 150`, `PILE_W = 116` |
 
 **Invariants**
 - Extracting cards **must not reshuffle** the discard — the rest keep their order (`scatterAt` is deterministic by
@@ -2320,6 +2320,19 @@ us. Inside's row (`ai-inside`) is the OTHER surface over the same pending kind; 
   the card, above its face. Role/lock badges and selection glow exist only while choosing;
   confirmation clears them immediately, and rejection restores the choice. The scroll box
   reserves space for the outer glow. Keep scrolling and the transform-free flight ancestor.
+  As in the scene: badges, selection glow and the confirm bar wait for the deal to finish;
+  the scene's scrim dims the table while dealing and choosing and is gone for the flights; the
+  hand is closed to the pointer while the grid is up; a hovered cell lifts 6px, a selected one
+  sits above its neighbours, an untakeable one is at 0.72 opacity. The grid stands in the
+  scene's own band — 27px below the top, 150px above the bottom (the confirm bar's own height,
+  reserved so it never travels over the last row), 210px in from each side, rows anchored to
+  the top and centred across, gaps 26/20. The padding inside it is the board's own: it keeps
+  the selection glow and the badges within the scrollable content box.
+- **The Cherry-pick card rests UNDER the grid.** It lands at the centre, holds
+  `PLACED_HOLD 420`, and only then does the grid deal out over it. Once landed it is drawn by
+  the table (`operationLanded`), not by the carrier — the carrier is the flight layer, above
+  every surface an effect opens. It goes to the heap last: after every flight has landed, it
+  holds `CENTER_HOLD 420`. The same holds for every operation card with a surface.
 - **The two sudo roles come from the engine**, not from click order: `openPickFromDiscard` withholds triggers from
   a base offer and `onPickFromDiscard` refuses one the hand slot, so a trigger in `options` can only be the deck
   card.
@@ -2327,7 +2340,7 @@ us. Inside's row (`ai-inside`) is the OTHER surface over the same pending kind; 
 
 **Sequence.** Deal out of the discard box into the grid (`DEAL_DUR 360` / `DEAL_STEP 16`, cap `STAGGER_CAP 40`) →
 pick → the hand card to the centre (`REVEAL_W 220` / `REVEAL_DUR 460`), hold `REVEAL_HOLD 560`, `useHandArrival`
-into the fan; a sudo deck card `flipCard` (`FLIP_DUR 420`) then `returnToDeck` (`DECK_DUR 480`) after `DECK_HOLD 360`.
+into the fan; a sudo deck card `flipCard` (`FLIP_DUR 420`) then `returnToDeck` (`DECK_DUR 480`), then holds `DECK_HOLD 360`.
 
 **Where.** `pages/board/[gameId]/_useCherryPickStaging.tsx`, `pages/board/[gameId]/_Board.tsx`.
 

@@ -685,12 +685,40 @@ export default function Board({
   // mousedown guard that go with it can never drift (the same discipline
   // `pendingDefend` and `costPending` above are read once for). See the hand
   // wrapper below for what each half of it is.
-  const handInert = Boolean(staging.staged?.merged) && staging.costOptions.length === 0
+  // The Cherry-pick grid closes it too, for as long as the grid is up — the
+  // scene's own rule: while cards are dealt out and flying in, the hand's
+  // zoom-on-hover must not fire under them.
+  const handInert =
+    (Boolean(staging.staged?.merged) && staging.costOptions.length === 0) || Boolean(cherry.grid)
 
   const stagedRelease = staging.stageStanding
     ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
       stagedReleaseLocal)
     : undefined
+
+  // A DRAGGED play and the batch it produces can land in ONE commit (#168): a
+  // local host answers its own action synchronously, so the dispatch's own
+  // `staged: 'dispatched'` and the projection that accepted it arrive together
+  // — and `useBeats`'s layout effect, which runs BEFORE this component's own
+  // (it is called higher up), starts the beat inside that commit. The effect
+  // below would then write the handoff one commit too late: the beat has
+  // already read `null` and flown a second copy of the card the player just
+  // dragged onto the table, out of the hand slot it had left. So the turn
+  // side's handoff is ALSO written during render — the carry-forward ref write
+  // this file uses elsewhere. Only ever SET here: the clears, and the order
+  // the other three claimants (upgrade, defence, neutralize) are resolved in,
+  // stay in the effect below.
+  if (!upgrade.stagedUid && !answering && !neutralizeOwnsHand) {
+    const dispatched = staging.staged
+    if (dispatched?.phase === 'dispatched' && dispatched.main) {
+      handoffRef.current = {
+        mainUid: dispatched.main.uid,
+        supportUid: dispatched.support?.uid,
+        el: dispatched.merged ? staging.pairRef.current : soloStagedRef.current,
+        release: staging.release,
+      }
+    }
+  }
 
   // The staging → beat handoff (#100): kept current in a layout effect,
   // because `el` has to be the DOM node as THIS render actually committed it —
@@ -1473,6 +1501,28 @@ export default function Board({
             <Card card={operationSource} interactive={false} width="100%" />
           </div>
         )}
+        {/* The operation card once it has landed: resting on the table, so the
+            effect's own surface (a pick grid, a row) opens OVER it. The beat
+            keeps it here across batches until its exit takes it to the heap. */}
+        {beats.operationLanded &&
+          (() => {
+            const main = cardById(beats.operationLanded.card)
+            const aux = beats.operationLanded.sudo ? cardById('support-sudo') : undefined
+            if (!main) return null
+            return (
+              <div
+                className={opening.centreCard}
+                data-testid="board-operation-standing"
+                data-public-operation=""
+              >
+                {aux ? (
+                  <CardPair main={main} aux={aux} width="100%" />
+                ) : (
+                  <Card card={main} interactive={false} width="100%" />
+                )}
+              </div>
+            )
+          })()}
       </div>
 
       {/* THE DISCARD GRID (#104) — the excess a turn's end costs, laid out for

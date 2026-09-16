@@ -1,4 +1,4 @@
-import type { Action, CardInstance, GameState } from '@release/engine'
+import type { Action, CardInstance, Event, GameState } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 
 export const engine = createFakeEngine()
@@ -165,4 +165,25 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
   if (scenario === 'handDefense') return state
   apply({ type: 'RESOLVE', player: 'p2', choice: { kind: 'defend', card: null }, at })
   return state
+}
+
+// A preset drops its discard straight into the state, but the board folds the
+// HEAP out of the event feed — one `discarded` event per card, each card's
+// scatter keyed by that event's id. With no feed behind it the pile draws as a
+// single card and a returning Cherry-pick card has no resting pose to land on,
+// so it dissolves instead of lying down. So a seeded pile comes with the
+// history a played match would have left it: ids below the engine's own
+// sequence (`eventSeq` starts the presets at 100), reported to the board as
+// already reflected so its queue plays none of them.
+export function seedLog(state: GameState): Event[] {
+  return state.decks.discard.map(
+    (card, i) =>
+      ({
+        id: i + 1,
+        type: 'discarded',
+        player: 'you',
+        card: card.id,
+        reason: 'effect',
+      }) as Event,
+  )
 }

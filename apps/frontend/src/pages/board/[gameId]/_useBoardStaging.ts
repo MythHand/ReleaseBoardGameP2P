@@ -1040,8 +1040,26 @@ export function useBoardStaging({
   useEffect(() => {
     const s = stagedRef.current
     if (s?.phase !== 'dispatched' || !s.main) return
+    // NOT while our own pending still stands on the very card just played
+    // (#168). The beat that ADOPTS the play (`operationBeat`) starts a commit
+    // LATER than the projection that accepted it, and clearing here breaks the
+    // hand-over twice over: the beat reads no handoff, so it flies a second
+    // copy of a card the player has already dragged to the centre; and the fan
+    // stops filtering, so under the beat's own shadow — the projection from
+    // BEFORE the batch, where the card is still in the hand — the played card
+    // pops back into the fan, which is where that second flight comes out of.
+    // The beat's own `release()` is the designed end of the staging. Under
+    // reduced motion no beat runs at all, so there is nothing to wait for.
+    const pending = state.pending
+    const adoptedByABeat =
+      !reduced &&
+      pending != null &&
+      'source' in pending &&
+      pending.source === s.main.card.id &&
+      ('actor' in pending ? pending.actor : pending.player) === state.selfId
+    if (adoptedByABeat) return
     if (!state.you.hand.some((c) => c.uid === s.main?.uid)) commitStaged(null)
-  }, [state.you.hand])
+  }, [state.you.hand, state.pending, state.selfId, reduced])
 
   // A solo release's own projection catch-up: `discardForRelease` pauses on a
   // decision rather than removing anything, so the hand never loses the card

@@ -162,6 +162,20 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
   api.staging = staging
   takeStagedReleaseRef.current = staging.takeStagedRelease
 
+  // `_Board.tsx`'s render-time write of the same handoff (#168), mirrored here
+  // for the same reason the effect below is: a dispatch and the batch it
+  // produces can land in ONE commit, and `useBeats`'s layout effect starts the
+  // beat before this component's effects run.
+  const dispatchedPlay = staging.staged
+  if (dispatchedPlay?.phase === 'dispatched' && dispatchedPlay.main) {
+    handoffRef.current = {
+      mainUid: dispatchedPlay.main.uid,
+      supportUid: dispatchedPlay.support?.uid,
+      el: dispatchedPlay.merged ? staging.pairRef.current : soloStagedRef.current,
+      release: staging.release,
+    }
+  }
+
   useLayoutEffect(() => {
     const s = staging.staged
     handoffRef.current =
@@ -1283,4 +1297,94 @@ it('never shows the played release back in the fan, at any point in the beat', a
     maxFan: 1,
     frames: 0,
   })
+})
+
+// THE ACTOR'S OWN OPERATION CARD (#168). Dragging Git Cherry-pick to the centre
+// puts the card there — that IS the play, and the board must not perform it a
+// second time: no flight of its own, and the played card never back in the fan.
+//
+// What this pins is that contract, not the race behind the report it came from.
+// The projection that accepts a play and the batch that carries its beat do not
+// have to arrive in one commit, and in the gap the hand-watching catch-up in
+// `_useBoardStaging.ts` used to throw the staging away — leaving the beat with
+// no handoff to adopt. This harness cannot show that: the hand slots are not
+// bound to the anchors here, so a beat that DID lose its handoff has nowhere to
+// fly from and returns early. The fix for it lives in that catch-up (it now
+// waits while our own pending still stands on the played card); the proof is
+// the board itself, on `/debug.html`.
+const operationBefore: BoardState = {
+  ...before,
+  you: {
+    name: 'You',
+    hand: [{ uid: 'u-op', card: card('operation-git-cherry-pick') }],
+    release: {},
+  },
+  playable: ['u-op'],
+  targets: {},
+} as unknown as BoardState
+
+const operationPlayedEvent: Event = {
+  id: 1,
+  type: 'operationPlayed',
+  player: 'p1',
+  card: 'operation-git-cherry-pick',
+  sudo: false,
+} as Event
+
+const operationAfter: BoardState = {
+  ...operationBefore,
+  you: { ...operationBefore.you, hand: [] },
+  pending: {
+    kind: 'pickFromDiscard',
+    player: 'p1',
+    source: 'operation-git-cherry-pick',
+    picks: 1,
+    options: [{ uid: 'd1', id: 'attack-bug' }],
+  },
+} as unknown as BoardState
+
+it('stands the actor’s own operation card where they dropped it, with no second flight', async () => {
+  played.names = []
+  const fanCount = () => document.querySelectorAll('[data-hand-slot]').length
+  const seen: number[] = []
+  vi.useFakeTimers()
+  try {
+    const { rerender } = render(<Harness live={operationBefore} events={[]} />)
+    // the gesture: the card is pulled out of the fan and put down at the centre
+    act(() => {
+      api.staging?.onHandPlay('u-op', { x: 0, y: 0 })
+    })
+    // a plain play holds at the centre (`SHOW_HOLD`) before it is dispatched
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1400)
+    })
+    expect(api.staging?.staged?.phase).toBe('dispatched')
+    expect(api.handoffRef?.current?.mainUid).toBe('u-op')
+    expect(fanCount()).toBe(0)
+
+    // whatever the gesture itself flew is already behind us — count from here
+    const flownByTheGesture = played.names.filter((n) => n === 'playToCenter').length
+
+    // The engine answers: the card is out of the hand and the pick is owed.
+    // The projection can land BEFORE the batch that carries the beat — the two
+    // do not have to arrive in one commit — and that gap is where the staging
+    // used to be thrown away, leaving the beat with no handoff to adopt.
+    rerender(<Harness live={operationAfter} events={[]} />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20)
+    })
+    rerender(<Harness live={operationAfter} events={[operationPlayedEvent]} />)
+    for (let i = 0; i < 60; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+      seen.push(fanCount())
+    }
+    // the beat adopted the standing card: it flew nothing, and nothing put the
+    // played card back into the fan on the way
+    expect(played.names.filter((n) => n === 'playToCenter').length).toBe(flownByTheGesture)
+  } finally {
+    vi.useRealTimers()
+  }
+  expect(Math.max(...seen)).toBe(0)
 })

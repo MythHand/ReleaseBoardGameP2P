@@ -655,12 +655,16 @@ describe('the discard heap', () => {
     expect(first[0]).toMatchObject(scatterAt(7))
   })
 
-  it('keeps only the cards the pile actually renders', () => {
+  // The WHOLE pile, not just the part that shows: `Pile` draws the top
+  // `heapShow` of the heap over the depth of the rest, and a card flying back
+  // into the discard (Cherry-pick's unpicked cards) lands on its own resting
+  // pose — which only exists if the heap still holds it.
+  it('carries every card the pile holds, not only the visible ones', () => {
     const log = Array.from({ length: HEAP_SHOW + 4 }, (_, i) => discardedEvent(i + 1, 'attack-bug'))
     const heap =
       toBoardState(withDecks({ discardCount: log.length, discardTop: 'attack-bug' }), log, labels)
         .decks.discardHeap ?? []
-    expect(heap).toHaveLength(HEAP_SHOW)
+    expect(heap).toHaveLength(log.length)
     expect(heap.at(-1)?.uid).toBe(`d${log.length}`)
   })
 

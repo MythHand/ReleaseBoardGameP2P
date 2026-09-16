@@ -54,7 +54,9 @@ it.each([
   expect(animationsTrace.params[0]).toMatchObject({ to: { left: 400, top: 300, width: 150 } })
   expect(published.at(-1)?.opponents[0].handCount).toBe(sudo ? 1 : 2)
   expect(result.current.standing).toBe(true)
-  expect(view.container.querySelector('[data-public-operation]')).not.toBeNull()
+  // landed: the table draws it now — the carrier (the flight layer) is down
+  expect(result.current.landed).toEqual({ card: 'operation-git-branch', sudo })
+  expect(view.container.querySelector('[data-public-operation]')).toBeNull()
   expect(anchors.exitSpy).not.toHaveBeenCalled()
   const exited = await runBeat(
     result.current.runExit,
@@ -70,6 +72,7 @@ it.each([
   )
   expect(anchors.exitSpy.mock.calls[0][0]).toHaveLength(sudo ? 2 : 1)
   expect(result.current.standing).toBe(false)
+  expect(result.current.landed).toBeNull()
 })
 it('adopts a local stage without replaying entrance or leaving its hand copy', async () => {
   const anchors = anchorsFixture()

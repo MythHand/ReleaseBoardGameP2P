@@ -2,7 +2,7 @@ import type { Event, PlayerView, ReleaseView } from '@release/engine'
 import type { HeapCard, HistoryEntry, ReleaseSupport } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
 import type { Scatter } from '@release/ui/animations'
-import { HEAP_SHOW, scatterAt } from '@release/ui/animations'
+import { scatterAt } from '@release/ui/animations'
 import type { BoardState } from './types'
 
 // One label per member of the engine's Event union — the adapter maps event
@@ -386,7 +386,15 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
   // Never more cards than the pile says it holds: after a partial take the fold
   // still remembers every card that ever went in, and a heap deeper than the
   // count is a stack drawn over a number that contradicts it.
-  return heap.slice(-Math.min(HEAP_SHOW, count))
+  //
+  // But the WHOLE pile, not just the part that shows. `Pile` takes the heap and
+  // draws the top `heapShow` of it over the depth of the rest — that is the
+  // module's own contract, and the scene it came from hands it every card it
+  // holds. Cutting the fold down to `HEAP_SHOW` here made the heap a sliding
+  // window of six: it re-assembled into a different stack on every discard,
+  // and a card flying back into it (Cherry-pick's unpicked cards) found no
+  // resting pose of its own to land on, so it dissolved instead of lying down.
+  return heap.slice(-count)
 }
 
 /**

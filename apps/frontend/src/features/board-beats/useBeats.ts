@@ -20,7 +20,7 @@ import { useDrawBeat } from './drawBeat'
 import { useEliminateBeat } from './eliminateBeat'
 import { useGameEndBeat } from './gameEndBeat'
 import { useHandLimitBeat } from './handLimitBeat'
-import { useOperationBeat, withoutPendingOperation } from './operationBeat'
+import { type OperationLanded, useOperationBeat, withoutPendingOperation } from './operationBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
 import { useTransferBeat } from './transferBeat'
@@ -102,6 +102,8 @@ interface Beat {
 
 export interface Beats {
   operationStanding: boolean
+  /** the operation card resting at the centre — the table draws it, under any surface */
+  operationLanded: OperationLanded | null
   shadow: BoardState | null
   overlays: ReactNode[]
   exclusive: boolean
@@ -734,6 +736,7 @@ export function useBeats(args: {
   const reducedPending = reduced ? withoutPendingOperation(live, events) : live
   return {
     operationStanding: operations.standing,
+    operationLanded: operations.landed,
     // The shadow is what the running beat has published, or its own base while
     // it has published nothing yet. The one exception is the opening, which
     // publishes a whole shape of its own rather than animating away from a
