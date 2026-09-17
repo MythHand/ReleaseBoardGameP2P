@@ -663,8 +663,14 @@ export function useBoardStaging({
       void (async () => {
         const to = anchors.centre.current?.getBoundingClientRect()
         if (!reduced && from && to) {
-          const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
-          if (el) await play('playToCenter', el, { from, to })?.finished
+          try {
+            const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
+            if (el) await play('playToCenter', el, { from, to })?.finished
+          } catch {
+            // A `void`ed body is watched by nobody: let it reject and the whole
+            // app gets an unhandled rejection. The card is staged either way —
+            // the flight is how it got there, not whether it did.
+          }
           flyer.drop('stage')
         }
         aimFromCentre()
@@ -969,6 +975,12 @@ export function useBoardStaging({
           // degenerate identity case — the step needs no branch for it.
           await folding
           finish()
+        } catch {
+          // The step refused — nothing folded, so there is nothing to finish.
+          // Swallowed rather than rethrown for the same reason as the flight
+          // above: this body is `void`ed, and a rejection out of it is an
+          // unhandled rejection with no one to answer it. The lock is cleared
+          // by the `finally` below, which is what this exit is for.
         } finally {
           // every exit clears the lock — the early returns above (`pairRef`
           // gone, the CardPair's own markers missing) and a rejecting

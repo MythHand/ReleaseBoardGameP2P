@@ -619,14 +619,14 @@ it('a target press mid-fold is refused; the same seat still dispatches once the 
 // `finish()`, so the fold's OTHER exits — the pair flyer's own `[data-main]`/
 // `[data-aux]` markers missing, `pairRef` gone, a rejecting `.finished` —
 // bypassed it and left the lock stuck forever (worse than pre-fix: those
-// conditions used to leave a recoverable stall). Of the three, only the
-// "markers missing" bail is honestly reachable here: `pairRef.current` is a
-// permanently-mounted node with no test-facing way to null it, and jsdom's
-// own WAAPI stub (test-setup.ts) always resolves `.finished`, never rejects
-// it. This one bail simulates the same condition `if (!mainEl || !auxEl)
-// return` checks, by shadowing the pair flyer's OWN `querySelector` (an
-// instance override — nothing else in the suite's shared jsdom document is
-// touched) rather than fabricating an unrelated failure.
+// conditions used to leave a recoverable stall). Since the fold became the
+// shared step (`usePairFold`), those bails live inside it and the way it can
+// fail from out here is the animation itself refusing — so that is what this
+// reproduces, by making `Element.prototype.animate` throw for the span of the
+// gesture. The mock is deliberately blunt: it takes down every flight this
+// flow starts, not just the fold, which is exactly how it caught the two
+// `void`ed bodies in `_useBoardStaging` that used to let such a failure escape
+// as an unhandled rejection.
 it('a fold whose pair-flyer markers go missing still clears the lock — Escape cancels normally after', async () => {
   const onPlay = vi.fn()
   comboOut = []
