@@ -2,7 +2,6 @@ import type { Event } from '@release/engine'
 import type { HandItem, TableActions } from '@release/ui'
 import { Card, ConfirmAction, cardById, Typography } from '@release/ui'
 import {
-  HEAP_SHOW,
   nextFrames,
   play,
   scatterAt,
@@ -33,6 +32,7 @@ const REVEAL_DUR = 460 // fly-to-centre duration
 const REVEAL_HOLD = 560 // pause in the centre before dropping into the hand
 const FLIP_DUR = 420 // = the flipCard preset duration (flip before the deck flight)
 const DECK_HOLD = 360 // deck card holds face-down before it merges
+const RETURN_STEP = 14 // per-card stagger, returning to the pile
 
 // centre-to-centre translate + scale to move an element from one rect to
 // another — the story's own `between()`, ported verbatim.
@@ -387,8 +387,13 @@ export function useCherryPickStaging(args: {
                 card,
                 node: cellRefs.current.get(o.uid),
                 scatter: found?.rest ?? scatterAt(i, 116),
-                fade: found ? found.depth < heap.length - HEAP_SHOW : true,
-                delay: Math.min(i, STAGGER_CAP) * 14,
+                // Nothing dissolves on the way: the pile draws every card it
+                // holds (`_Board.tsx`'s discard has no `heapShow`), so a card
+                // that faded out mid-flight would still be there at rest — it
+                // would simply appear, already lying, instead of landing. Only
+                // a card the pile has no place for at all sinks out of sight.
+                fade: !found,
+                delay: Math.min(i, STAGGER_CAP) * RETURN_STEP,
                 layer: found?.depth ?? i,
               },
             ]

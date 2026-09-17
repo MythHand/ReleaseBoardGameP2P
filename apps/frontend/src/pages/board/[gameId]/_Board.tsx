@@ -48,7 +48,7 @@ import {
   Typography,
   useCardPreview,
 } from '@release/ui'
-import { HEAP_SHOW, restTransform } from '@release/ui/animations'
+import { restTransform } from '@release/ui/animations'
 import type React from 'react'
 import {
   type ReactNode,
@@ -1255,8 +1255,14 @@ export default function Board({
         </div>
       </div>
 
-      {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними
-          «глубина» стопки, счётчик показывает весь сброс */}
+      {/* сброс — наброшенная куча, как на столе; счётчик показывает весь сброс.
+          Куча рисуется ЦЕЛИКОМ, без среза по верхним `HEAP_SHOW` (#168): срез —
+          это скользящее окно, и каждая новая карта выбивала из него самую
+          глубокую, подставляя на её место другую — с другим наклоном. На экране
+          это читалось как «нижние карты сами повернулись», хотя ничего не
+          двигалось. Карта, которая легла, остаётся на своём месте; новые
+          ложатся сверху. `Pile` поддерживает обе формы, и целая куча — его
+          собственная по умолчанию. */}
       <div className={kit.discard}>
         <div className={enter} ref={anchors.discard}>
           <Pile
@@ -1266,7 +1272,6 @@ export default function Board({
                 ? []
                 : decks.discardHeap?.filter((c) => c.uid !== `d${state.aiCause?.eventId}`)
             }
-            heapShow={HEAP_SHOW}
             topCard={cherry.grid || state.aiCause ? null : decks.discard}
             count={cherry.grid ? 0 : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))}
             width={116}
