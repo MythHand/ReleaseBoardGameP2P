@@ -688,15 +688,22 @@ export default function Board({
   // The Cherry-pick grid closes it too, for as long as the grid is up — the
   // scene's own rule: while cards are dealt out and flying in, the hand's
   // zoom-on-hover must not fire under them.
+  // A SURFACE THAT TAKES THE TABLE OVER closes the fan. Cherry-pick's grid, the
+  // Rebase row, Inside's row and the card request all answer on the surface
+  // itself: the hand has no part in them, and under their dimming it must not
+  // keep lifting cards, spreading them and raising its zoom preview at the
+  // cursor. System Upgrade is the exception and stays live — its answer IS a
+  // card pulled out of the fan.
+  const surfaceOwnsTable = [cherry.grid, rebase.row, inside.row, requesting.band].some(Boolean)
   // The scene's own rule (`ComboStory`: `merged || playing`): while the play is
   // ON THE TABLE — a pair standing at the centre, or anything of this gesture
-  // still in the air — the fan stops answering the cursor, so its hover lift,
-  // its spread and its zoom preview cannot rise into the play. The one thing
-  // that keeps it live is a cost owed: that answer is a click in the fan.
+  // still in the air — the fan stops answering the cursor for the same reason.
+  // The one thing that keeps it live is a cost owed: that answer is a click in
+  // the fan.
   const handInert =
     (staging.costOptions.length === 0 &&
       (Boolean(staging.staged?.merged) || staging.overlay.length > 0)) ||
-    Boolean(cherry.grid)
+    surfaceOwnsTable
 
   const stagedRelease = staging.stageStanding
     ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
