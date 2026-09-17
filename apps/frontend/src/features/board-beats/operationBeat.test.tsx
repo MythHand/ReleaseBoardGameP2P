@@ -54,7 +54,9 @@ it.each([
   expect(animationsTrace.params[0]).toMatchObject({ to: { left: 400, top: 300, width: 150 } })
   expect(published.at(-1)?.opponents[0].handCount).toBe(sudo ? 1 : 2)
   expect(result.current.standing).toBe(true)
-  expect(view.container.querySelector('[data-public-operation]')).not.toBeNull()
+  // landed: the table draws it now — the carrier (the flight layer) is down
+  expect(result.current.landed).toEqual({ card: 'operation-git-branch', sudo })
+  expect(view.container.querySelector('[data-public-operation]')).toBeNull()
   expect(anchors.exitSpy).not.toHaveBeenCalled()
   const exited = await runBeat(
     result.current.runExit,
@@ -65,11 +67,15 @@ it.each([
     },
   )
   expect(exited.published.at(-1)?.decks.discardCount).toBe(sudo ? 2 : 1)
+  // the support half (d4) joins the heap UNDER the card it paid for (d3) — the
+  // layer it had on the table, and the same order the projection's own fold
+  // keeps, so nothing swaps when this publish hands over to `live`
   expect(exited.published.at(-1)?.decks.discardHeap?.map((c) => c.uid)).toEqual(
-    sudo ? ['d3', 'd4'] : ['d3'],
+    sudo ? ['d4', 'd3'] : ['d3'],
   )
   expect(anchors.exitSpy.mock.calls[0][0]).toHaveLength(sudo ? 2 : 1)
   expect(result.current.standing).toBe(false)
+  expect(result.current.landed).toBeNull()
 })
 it('adopts a local stage without replaying entrance or leaving its hand copy', async () => {
   const anchors = anchorsFixture()

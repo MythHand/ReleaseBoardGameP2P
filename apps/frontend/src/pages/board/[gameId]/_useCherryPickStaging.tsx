@@ -2,7 +2,6 @@ import type { Event } from '@release/engine'
 import type { HandItem, TableActions } from '@release/ui'
 import { Card, ConfirmAction, cardById, Typography } from '@release/ui'
 import {
-  HEAP_SHOW,
   nextFrames,
   play,
   scatterAt,
@@ -33,6 +32,7 @@ const REVEAL_DUR = 460 // fly-to-centre duration
 const REVEAL_HOLD = 560 // pause in the centre before dropping into the hand
 const FLIP_DUR = 420 // = the flipCard preset duration (flip before the deck flight)
 const DECK_HOLD = 360 // deck card holds face-down before it merges
+const RETURN_STEP = 14 // per-card stagger, returning to the pile
 
 // centre-to-centre translate + scale to move an element from one rect to
 // another — the story's own `between()`, ported verbatim.
@@ -99,6 +99,14 @@ export function useCherryPickStaging(args: {
   // change across re-renders (a projection tick) without the offer itself
   // changing, and re-running the deal would fly the same cards a second time.
   const dealtKey = useRef<string | null>(null)
+  // The offer this hook has already answered and flown. The queue keeps
+  // drawing the projection its NEXT beat moves away from — the one where this
+  // pending is still open — for as long as the operation card's own exit runs,
+  // so without this the whole picker comes back over the centre for a second,
+  // reading as "pick again", and the card underneath it looks like it jumps
+  // before it leaves. Cleared when the offer itself goes (below) and when a
+  // RESOLVE is refused, because then the choice really is open again.
+  const answeredKey = useRef<string | null>(null)
   const timers = useRef<number[]>([])
   const later = (fn: () => void, ms: number) => {
     timers.current.push(window.setTimeout(fn, ms))
@@ -129,6 +137,8 @@ export function useCherryPickStaging(args: {
 
   const resolve = useResolveFeedback(args.events ?? [], state.selfId, actions, () => {
     args.handoff.current = null
+    // refused: this offer is open again, whatever we flew for it
+    answeredKey.current = null
     setManualRetry(true)
     if (ours?.options.length === 1) setPicks([ours.options[0].uid])
     setConfirmed(false)
@@ -176,9 +186,10 @@ export function useCherryPickStaging(args: {
   useLayoutEffect(() => {
     if (!ours) {
       dealtKey.current = null
+      answeredKey.current = null
       return
     }
-    const key = `${ours.player}:${ours.source}:${ours.options.map((o) => o.uid).join(',')}`
+    const key = offerKey(ours)
     if (dealtKey.current === key) return
     dealtKey.current = key
     if (reduced) return
@@ -346,12 +357,22 @@ export function useCherryPickStaging(args: {
           await wait(DECK_HOLD)
         })()
         const remaining = ours.options.filter((o) => o.uid !== hand && o.uid !== deck)
-        const resting = new Map<string, NonNullable<BoardState['decks']['discardHeap']>[number]>()
-        const heap = [...(after.decks.discardHeap ?? [])]
+        // Where each unpicked card ENDS UP in the pile — its own entry in the
+        // heap the projection has after this answer. One scatter drives both
+        // the flight and the rest (I7), and the place in that array is the
+        // layer the card travels on (I9): its depth there is what decides
+        // whether it lands in the open or sinks under the visible top, so a
+        // card never lands in full view and then drops out of it the moment
+        // the operation card settles above — which is the pile rearranging
+        // itself after everything had already landed.
+        const heap = after.decks.discardHeap ?? []
+        const claimed = new Set<number>()
+        const resting = new Map<string, { rest: (typeof heap)[number]; depth: number }>()
         for (const option of [...remaining].reverse()) {
           for (let i = heap.length - 1; i >= 0; i--) {
-            if (heap[i].card.id !== option.id) continue
-            resting.set(option.uid, heap.splice(i, 1)[0])
+            if (claimed.has(i) || heap[i].card.id !== option.id) continue
+            claimed.add(i)
+            resting.set(option.uid, { rest: heap[i], depth: i })
             break
           }
         }
@@ -359,21 +380,57 @@ export function useCherryPickStaging(args: {
           remaining.flatMap((o, i) => {
             const card = cardById(o.id)
             if (!card) return []
-            const rest = resting.get(o.uid)
+            const found = resting.get(o.uid)
             return [
               {
                 key: o.uid,
                 card,
                 node: cellRefs.current.get(o.uid),
-                scatter: rest ?? scatterAt(i, 116),
-                fade: !rest || i < remaining.length - HEAP_SHOW,
-                delay: Math.min(i, STAGGER_CAP) * 14,
-                layer: i,
+                scatter: found?.rest ?? scatterAt(i, 116),
+                // Nothing dissolves on the way: the pile draws every card it
+                // holds (`_Board.tsx`'s discard has no `heapShow`), so a card
+                // that faded out mid-flight would still be there at rest — it
+                // would simply appear, already lying, instead of landing. Only
+                // a card the pile has no place for at all sinks out of sight.
+                fade: !found,
+                delay: Math.min(i, STAGGER_CAP) * RETURN_STEP,
+                layer: found?.depth ?? i,
               },
             ]
           }),
         )
         await Promise.all([handFlight, deckFlight, returnFlight])
+        // The picked cards have LEFT the pile. The projection says so a batch
+        // later; until then the queue draws the shadow — the table as it was
+        // BEFORE the answer — so without this the heap comes back the moment
+        // the grid goes, with the card the player just took lying in it.
+        const takenIds = [hand, deck].flatMap((uid) => {
+          const id = uid ? (ours.options.find((o) => o.uid === uid)?.id ?? '') : ''
+          return id ? [id] : []
+        })
+        const heapLeft = [...(ctx.base.decks.discardHeap ?? [])]
+        let taken = 0
+        for (const id of takenIds) {
+          for (let i = heapLeft.length - 1; i >= 0; i--) {
+            if (heapLeft[i].card.id !== id) continue
+            heapLeft.splice(i, 1)
+            taken++
+            break
+          }
+        }
+        if (taken > 0) {
+          ctx.base = {
+            ...ctx.base,
+            decks: {
+              ...ctx.base.decks,
+              discardHeap: heapLeft,
+              discard: heapLeft.at(-1)?.card,
+              discardCount: Math.max(0, ctx.base.decks.discardCount - taken),
+            },
+          }
+          ctx.publish(ctx.base)
+        }
+        answeredKey.current = offerKey(ours)
         taking.current = null
         setFlying(false)
         setConfirmed(false)
@@ -389,10 +446,15 @@ export function useCherryPickStaging(args: {
     !flying &&
     ((!ours && !confirmed) ||
       (confirmed && reduced) ||
+      (ours != null && answeredKey.current === offerKey(ours)) ||
       (ours?.picks === 1 && ours.options.length < 2 && !manualRetry))
   ) {
     return { grid: null, overlay, ...gaps }
   }
+
+  // The scene's `phase === 'choose'`: the deal has finished and nothing is
+  // confirmed yet. Selection states, badges and the confirm bar live only here.
+  const choosing = !confirmed && !dealing
 
   return {
     grid: (
@@ -401,6 +463,7 @@ export function useCherryPickStaging(args: {
       // actual card row) and the confirm bar re-enable their own pointer
       // events, so clicks pass through everywhere else on this layer.
       <div className={styles.grid} data-testid="board-cherry-grid">
+        {!confirmed && <div className={styles.scrim} data-testid="board-cherry-scrim" />}
         <div className={`${styles.cells} ${dealing ? styles.dealing : ''}`}>
           {options.map((o) => {
             const data = cardById(o.id)
@@ -408,7 +471,7 @@ export function useCherryPickStaging(args: {
             const handRole = roles.hand === o.uid
             const deckRole = roles.deck === o.uid
             const selected = handRole || deckRole
-            const blocked = !confirmed && !selected && !canSelect(o.uid)
+            const blocked = choosing && !selected && !canSelect(o.uid)
             return (
               <button
                 key={o.uid}
@@ -418,7 +481,9 @@ export function useCherryPickStaging(args: {
                 }}
                 type="button"
                 data-testid={`cherry-cell-${o.uid}`}
-                className={`${styles.cell} ${blocked ? styles.blocked : ''}`}
+                className={`${styles.cell} ${selected ? styles.selected : ''} ${
+                  blocked ? styles.blocked : ''
+                }`}
                 onClick={() => {
                   if (confirmed) return
                   setPicks((p) => nextPicks(p, o.uid))
@@ -429,22 +494,24 @@ export function useCherryPickStaging(args: {
                   interactive={false}
                   width="100%"
                   faceDown={flipped.has(o.uid)}
-                  state={!confirmed && selected ? 'selected' : 'idle'}
+                  state={choosing && selected ? 'selected' : 'idle'}
                   // one out of a set — the uniform selection colour, never the
                   // per-category accent
                   accent="var(--select-accent)"
                 />
-                {!confirmed && handRole && (
+                {choosing && handRole && (
                   <Typography base="overline" tk="tk-10" className={styles.roleTag}>
                     {copy.toHand}
                   </Typography>
                 )}
-                {!confirmed && deckRole && (
+                {choosing && deckRole && (
                   <Typography base="overline" tk="tk-10" className={styles.roleTag}>
                     {copy.toDeck}
                   </Typography>
                 )}
-                {!confirmed && !sudo && isTrigger(o.id) && (
+                {/* a trigger never takes the hand slot — in sudo too, where it
+                    can still be the deck card (the scene marks it in both) */}
+                {choosing && !selected && isTrigger(o.id) && (
                   <Typography base="overline" tk="tk-10" className={styles.lockTag}>
                     {copy.noHand}
                   </Typography>
@@ -454,7 +521,9 @@ export function useCherryPickStaging(args: {
           })}
         </div>
         <ConfirmAction
-          open={!confirmed}
+          // After the deal, never with it: the cards are read first, and the
+          // bar arrives once the offer is all on the table (owner, 16.09).
+          open={choosing}
           label={copy.confirm}
           caption={sudo ? copy.sudoPrompt : copy.prompt}
           disabled={!ready}
@@ -466,6 +535,10 @@ export function useCherryPickStaging(args: {
     ...gaps,
   }
 }
+
+/** one offer's identity: who owes it, what raised it, and the cards in it */
+const offerKey = (pending: { player: string; source?: string; options: { uid: string }[] }) =>
+  `${pending.player}:${pending.source}:${pending.options.map((o) => o.uid).join(',')}`
 
 const idOfOption = (options: { uid: string; id: string }[], uid: string) =>
   options.find((o) => o.uid === uid)?.id ?? ''

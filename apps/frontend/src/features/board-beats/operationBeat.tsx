@@ -10,7 +10,17 @@ import { withoutFlown } from './withoutFlown'
 // DeckAnimationsStory.playSequence keeps the public play up throughout the
 // effect and holds it for another 420ms before splitting it into the heap.
 const CENTER_HOLD = 420
+// The pause between the card settling at the centre and its effect's own
+// surface (a pick grid, a row) opening over it — the same hold it keeps
+// before it leaves.
+const PLACED_HOLD = CENTER_HOLD
 const KEY = 'public-operation'
+
+/** The operation card resting at the centre, drawn by the table itself. */
+export interface OperationLanded {
+  card: string
+  sudo: boolean
+}
 const rectOf = (el: Element | null): Rect | null => {
   if (!el) return null
   const { left, top, width, height } = el.getBoundingClientRect()
@@ -103,6 +113,10 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
   const flyer = useFlyer()
   const exit = useDiscardExit(anchors.discardBox)
   const [standing, setStanding] = useState(false)
+  // A card that has landed rests on the TABLE, not on the carrier: the carrier
+  // is the flight layer, above every surface the effect then opens (useFlyer's
+  // own contract — the resting card takes over and the node is dropped).
+  const [landed, setLanded] = useState<OperationLanded | null>(null)
   const held = useRef<Extract<BeatPlan, { kind: 'operationPlaced' }> | null>(null)
   const epoch = useRef(0)
   const latest = useRef({ anchors, staging, exit })
@@ -111,37 +125,19 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
     epoch.current++
     held.current = null
     setStanding(false)
+    setLanded(null)
     flyer.drop()
     latest.current.exit.reset()
   }, [flyer.drop])
 
-  const restore = useCallback(
-    (state: BoardState, events: Event[]) => {
-      const plan = pendingOperation(state, events)
-      const at = rectOf(latest.current.anchors.centre.current)
-      const main = plan ? cardById(plan.card) : null
-      if (!plan || !main || !at) return
-      const aux = plan.sudo ? cardById('support-sudo') : null
-      held.current = plan
-      setStanding(true)
-      void flyer.raise([
-        {
-          key: KEY,
-          at,
-          content: (
-            <div data-public-operation="">
-              {aux ? (
-                <CardPair main={main} aux={aux} width="100%" />
-              ) : (
-                <Card card={main} width="100%" />
-              )}
-            </div>
-          ),
-        },
-      ])
-    },
-    [flyer.raise],
-  )
+  // Nothing travels on a restore: the card is already resting at the centre.
+  const restore = useCallback((state: BoardState, events: Event[]) => {
+    const plan = pendingOperation(state, events)
+    if (!plan || !cardById(plan.card)) return
+    held.current = plan
+    setStanding(true)
+    setLanded({ card: plan.card, sudo: plan.sudo === true })
+  }, [])
 
   const runPlaced = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'operationPlaced' }>, ctx: BeatRun) => {
@@ -207,9 +203,13 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       if (run !== epoch.current) return
       if (!handoff && el) await play('playToCenter', el, { from, to })?.finished
       if (run !== epoch.current) return
-      flyer.pin(KEY, to)
+      // Landed: the table's own render takes the card over in the same commit
+      // the carrier goes down in, so no frame shows both or neither.
+      setLanded({ card: plan.card, sudo: plan.sudo === true })
+      flyer.drop(KEY)
+      await wait(PLACED_HOLD)
     },
-    [flyer.raise, flyer.pin],
+    [flyer.raise, flyer.drop],
   )
 
   const runExit = useCallback(
@@ -220,12 +220,14 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       await wait(CENTER_HOLD)
       if (run !== epoch.current) return
       const centre = rectOf(latest.current.anchors.centre.current)
-      const el = flyer.elOf(KEY)
-      if (!centre || !el) {
+      if (!centre) {
         reset()
         return
       }
-      const aux = el.querySelector<HTMLElement>('[data-aux]')
+      // the resting render at the centre — the sudo half starts from where it is seen
+      const aux = latest.current.anchors.centre.current?.querySelector<HTMLElement>(
+        '[data-public-operation] [data-aux]',
+      )
       const items: Leaving[] = (plan.spent ?? operation.spent).flatMap((c) => {
         const card = cardById(c.card)
         if (!card) return []
@@ -241,12 +243,22 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
         ]
       })
       const sent = latest.current.exit.send(items)
+      // the exit's carriers go up in this same commit as the resting card goes
+      setLanded(null)
       flyer.drop()
       await sent
       if (run !== epoch.current) return
       const heap = [...(ctx.base.decks.discardHeap ?? [])]
       let added = 0
-      for (const spent of plan.spent ?? operation.spent) {
+      // the support half first: it lay UNDER the card it paid for, and that is
+      // the order it joins the heap in (the same the projection's own fold
+      // keeps, so the handover from this publish to `live` moves nothing)
+      const filed = [...(plan.spent ?? operation.spent)].sort(
+        (a, b) =>
+          Number(cardById(b.card)?.category === 'support') -
+          Number(cardById(a.card)?.category === 'support'),
+      )
+      for (const spent of filed) {
         const card = cardById(spent.card)
         if (!card || heap.some((entry) => entry.uid === `d${spent.eventId}`)) continue
         heap.push({ uid: `d${spent.eventId}`, card, ...scatterAt(spent.eventId) })
@@ -267,7 +279,7 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       held.current = null
       setStanding(false)
     },
-    [flyer.elOf, flyer.drop, reset],
+    [flyer.drop, reset],
   )
   const withoutHeld = useCallback((state: BoardState): BoardState => {
     return withoutSpent(state, held.current?.spent ?? [])
@@ -277,6 +289,7 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
     withoutHeld,
     overlay: [...flyer.overlay, ...exit.overlay],
     standing,
+    landed,
     runPlaced,
     runExit,
     reset,

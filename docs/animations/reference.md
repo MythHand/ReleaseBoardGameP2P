@@ -168,7 +168,7 @@ so no scene writes them again. It does not know where to fly or which preset.
 
 | Name | Signature | What it does |
 |---|---|---|
-| `useFlyer` | `useFlyer()` → `{ overlay, raise, pin, glide, patch, drop, elOf }` | `raise(items)` mounts N flyers at their rects, paints them there and returns their elements; `pin(key, rect)` fixes one where it landed; `glide(key, rect, ms)` moves one with a transition; `patch(key, next)` changes what it shows without moving it; `drop(key?)` takes one or all down; `elOf(key)` is the node |
+| `useFlyer` | `useFlyer()` → `{ overlay, raise, pin, glide, patch, drop, elOf }` | `raise(items)` mounts N flyers at their rects, paints them there and returns their elements; `pin(key, rect)` fixes one where it landed, for the next flight — a card that then RESTS on the table through an effect is handed to the table's own render and its node dropped, since the carrier rides the flight layer above every surface (`operationBeat`); `glide(key, rect, ms)` moves one with a transition; `patch(key, next)` changes what it shows without moving it; `drop(key?)` takes one or all down; `elOf(key)` is the node |
 | `Raise` | `{ key, at, card?, faceDown?, content?, pose?, layer? }` | one key is one flyer — raising a live key replaces it. `card` is the common case; `content` is the scene's own element (a pair, a card mid-morph) when the node has to carry more than a card; `pose` is the tilt it rests at; `layer` rides on top of the flight rung (**I9**) |
 
 **I4 is the one a scene may decline.** A flight whose landing pose lives in the filled WAAPI

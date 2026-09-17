@@ -48,7 +48,7 @@ import {
   Typography,
   useCardPreview,
 } from '@release/ui'
-import { HEAP_SHOW, restTransform } from '@release/ui/animations'
+import { restTransform } from '@release/ui/animations'
 import type React from 'react'
 import {
   type ReactNode,
@@ -685,12 +685,47 @@ export default function Board({
   // mousedown guard that go with it can never drift (the same discipline
   // `pendingDefend` and `costPending` above are read once for). See the hand
   // wrapper below for what each half of it is.
-  const handInert = Boolean(staging.staged?.merged) && staging.costOptions.length === 0
+  // The Cherry-pick grid closes it too, for as long as the grid is up — the
+  // scene's own rule: while cards are dealt out and flying in, the hand's
+  // zoom-on-hover must not fire under them.
+  // The scene's own rule (`ComboStory`: `merged || playing`): while the play is
+  // ON THE TABLE — a pair standing at the centre, or anything of this gesture
+  // still in the air — the fan stops answering the cursor, so its hover lift,
+  // its spread and its zoom preview cannot rise into the play. The one thing
+  // that keeps it live is a cost owed: that answer is a click in the fan.
+  const handInert =
+    (staging.costOptions.length === 0 &&
+      (Boolean(staging.staged?.merged) || staging.overlay.length > 0)) ||
+    Boolean(cherry.grid)
 
   const stagedRelease = staging.stageStanding
     ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
       stagedReleaseLocal)
     : undefined
+
+  // A DRAGGED play and the batch it produces can land in ONE commit (#168): a
+  // local host answers its own action synchronously, so the dispatch's own
+  // `staged: 'dispatched'` and the projection that accepted it arrive together
+  // — and `useBeats`'s layout effect, which runs BEFORE this component's own
+  // (it is called higher up), starts the beat inside that commit. The effect
+  // below would then write the handoff one commit too late: the beat has
+  // already read `null` and flown a second copy of the card the player just
+  // dragged onto the table, out of the hand slot it had left. So the turn
+  // side's handoff is ALSO written during render — the carry-forward ref write
+  // this file uses elsewhere. Only ever SET here: the clears, and the order
+  // the other three claimants (upgrade, defence, neutralize) are resolved in,
+  // stay in the effect below.
+  if (!upgrade.stagedUid && !answering && !neutralizeOwnsHand) {
+    const dispatched = staging.staged
+    if (dispatched?.phase === 'dispatched' && dispatched.main) {
+      handoffRef.current = {
+        mainUid: dispatched.main.uid,
+        supportUid: dispatched.support?.uid,
+        el: dispatched.merged ? staging.pairNode() : soloStagedRef.current,
+        release: staging.release,
+      }
+    }
+  }
 
   // The staging → beat handoff (#100): kept current in a layout effect,
   // because `el` has to be the DOM node as THIS render actually committed it —
@@ -789,7 +824,7 @@ export default function Board({
         ? {
             mainUid: s.main.uid,
             supportUid: s.support?.uid,
-            el: s.merged ? staging.pairRef.current : soloStagedRef.current,
+            el: s.merged ? staging.pairNode() : soloStagedRef.current,
             release: staging.release,
           }
         : null
@@ -809,7 +844,7 @@ export default function Board({
     neutralizing.release,
     you.releaseUid,
     staging.staged,
-    staging.pairRef,
+    staging.pairNode,
     staging.release,
   ])
 
@@ -1220,8 +1255,14 @@ export default function Board({
         </div>
       </div>
 
-      {/* сброс — наброшенная куча, как на столе: видны верхние карты, под ними
-          «глубина» стопки, счётчик показывает весь сброс */}
+      {/* сброс — наброшенная куча, как на столе; счётчик показывает весь сброс.
+          Куча рисуется ЦЕЛИКОМ, без среза по верхним `HEAP_SHOW` (#168): срез —
+          это скользящее окно, и каждая новая карта выбивала из него самую
+          глубокую, подставляя на её место другую — с другим наклоном. На экране
+          это читалось как «нижние карты сами повернулись», хотя ничего не
+          двигалось. Карта, которая легла, остаётся на своём месте; новые
+          ложатся сверху. `Pile` поддерживает обе формы, и целая куча — его
+          собственная по умолчанию. */}
       <div className={kit.discard}>
         <div className={enter} ref={anchors.discard}>
           <Pile
@@ -1231,7 +1272,6 @@ export default function Board({
                 ? []
                 : decks.discardHeap?.filter((c) => c.uid !== `d${state.aiCause?.eventId}`)
             }
-            heapShow={HEAP_SHOW}
             topCard={cherry.grid || state.aiCause ? null : decks.discard}
             count={cherry.grid ? 0 : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))}
             width={116}
@@ -1473,6 +1513,28 @@ export default function Board({
             <Card card={operationSource} interactive={false} width="100%" />
           </div>
         )}
+        {/* The operation card once it has landed: resting on the table, so the
+            effect's own surface (a pick grid, a row) opens OVER it. The beat
+            keeps it here across batches until its exit takes it to the heap. */}
+        {beats.operationLanded &&
+          (() => {
+            const main = cardById(beats.operationLanded.card)
+            const aux = beats.operationLanded.sudo ? cardById('support-sudo') : undefined
+            if (!main) return null
+            return (
+              <div
+                className={opening.centreCard}
+                data-testid="board-operation-standing"
+                data-public-operation=""
+              >
+                {aux ? (
+                  <CardPair main={main} aux={aux} width="100%" />
+                ) : (
+                  <Card card={main} interactive={false} width="100%" />
+                )}
+              </div>
+            )
+          })()}
       </div>
 
       {/* THE DISCARD GRID (#104) — the excess a turn's end costs, laid out for
@@ -2051,25 +2113,9 @@ export default function Board({
       {upgrade.overlay}
       {previewOverlay}
 
-      {/* the pair flyer — a persistent node (I10: position: fixed against the
-          viewport, no containing block above it, same as every other flight
-          carrier). The fold paints frame by frame directly on its
-          [data-main]/[data-aux] children; the CardPair mount just needs to
-          exist for that to have something to grab. */}
-      <div
-        className={opening.pairFlyer}
-        ref={staging.pairRef}
-        aria-hidden="true"
-        data-testid="board-pair-staged"
-      >
-        {staging.staged?.merged && staging.staged.support && staging.staged.main && (
-          <CardPair
-            main={staging.staged.main.card}
-            aux={staging.staged.support.card}
-            width="100%"
-          />
-        )}
-      </div>
+      {/* The pair the fold step carries (`usePairFold`) rides in `staging.overlay`
+          with the gesture's other carriers — the board no longer mounts a node
+          of its own for it. */}
     </div>
   )
 }

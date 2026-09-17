@@ -10,7 +10,7 @@ import { useNow } from '~/features/play-game/useNow'
 import { forViewer, rejectionsIn } from '~/network/session/audience'
 import Board from '~/pages/board/[gameId]/_Board'
 import { useDebugCopy } from './copy'
-import { createScenario, engine, SCENARIOS, type Scenario } from './scenarios'
+import { createScenario, engine, SCENARIOS, type Scenario, seedLog } from './scenarios'
 import styles from './styles.module.css'
 
 type Intent = Action extends infer A ? (A extends Action ? Omit<A, 'at'> : never) : never
@@ -33,16 +33,16 @@ function reduceRun(run: Run, action: Action): Run {
 function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string }) {
   const { t, i18n } = useTranslation()
   const debug = useDebugCopy()
-  const [run, dispatch] = useReducer(
-    reduceRun,
-    undefined,
-    (): Run => ({
-      state: createScenario(scenario, gameId),
-      events: [],
-      last: null,
-    }),
-  )
+  const [run, dispatch] = useReducer(reduceRun, undefined, (): Run => {
+    const state = createScenario(scenario, gameId)
+    // The seeded discard's own history, so the board can fold a heap out of
+    // it (`seedLog`). Reported as already reflected below, so the queue
+    // treats it as a table it arrived at rather than moves to replay.
+    return { state, events: seedLog(state), last: null }
+  })
   const [viewer, setViewer] = useState('you')
+  // the last seeded event: everything at or below it is the starting table
+  const [seeded] = useState(() => run.events.at(-1)?.id ?? 0)
   const [ready, setReady] = useState(false)
   const now = useNow(ready)
   const send = useCallback((intent: Intent) => dispatch({ ...intent, at: Date.now() }), [])
@@ -183,7 +183,14 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
           state={board}
           over={toBoardOver(view)}
           now={now}
-          intro={{ gameId: `${gameId}:${viewer}`, view, events, onDone: onIntroDone }}
+          intro={{
+            gameId: `${gameId}:${viewer}`,
+            view,
+            events,
+            // the seeded discard is where this table STARTS, not something it plays
+            restoredThrough: seeded,
+            onDone: onIntroDone,
+          }}
           room={{
             role: 'host',
             participants: run.state.seating.map((id) => ({

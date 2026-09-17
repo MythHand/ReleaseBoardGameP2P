@@ -19,24 +19,42 @@
   position: absolute;
   inset: 0;
   z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   pointer-events: none;
+}
+
+/* The scene's backing under the picker (GitCards.module.css `.scrim`, same
+   values): dims the table while the discard is dealt out and chosen from, and
+   is gone for the flights. `z-index: -1` puts it under `.cells` inside this
+   layer; it inherits `pointer-events: none`, so the table's own controls stay
+   live, as they are with the grid up. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--black-60);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
 }
 
 /* the actual card row — owns the scroll box `.grid` used to before this fix.
    `overflow-y: auto` does NOT establish a containing block for
    `position: fixed` (only `transform`/`filter`/`backdrop-filter`/
    `perspective`/`contain`/`will-change` do), so pinning a cell still escapes
-   this clip exactly as intended. */
+   this clip exactly as intended.
+
+   The scene's own band (`GitCards.module.css` `.gridWrap` + `.grid`), 1:1: the
+   rows start at the TOP of it and are centred across, and its bottom 150px are
+   the confirm bar's — reserved, so the bar never travels over the last row.
+   Board-only: the padding, which keeps the selection glow and the badges inside
+   the scrollable content box. */
 .cells {
+  position: absolute;
+  inset-block: 27px 150px;
+  inset-inline: 210px;
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
-  align-items: flex-end;
-  justify-content: center;
-  max-block-size: 56vh;
+  gap: 26px 20px;
+  place-content: flex-start center;
 
   /* Selection glow and labels must fit inside the scrollable content box. */
   padding-block: 24px 32px;
@@ -58,11 +76,27 @@
   cursor: pointer;
   background: none;
   border: 0;
+  transition: transform 180ms var(--ease-out);
 }
 
+/* the scene's hover and selection (GitCards.module.css `.cell`), 1:1 */
+.cell:hover {
+  z-index: 5;
+  transform: translateY(-6px);
+}
+
+.selected {
+  z-index: 8;
+}
+
+/* can't be taken — dimmed and not-allowed, but still fully readable */
 .blocked {
   cursor: not-allowed;
-  opacity: 0.45;
+  opacity: 0.72;
+}
+
+.blocked:hover {
+  transform: none;
 }
 
 .roleTag,

@@ -28,20 +28,18 @@ import type {
   TableActions,
   TableTarget,
 } from '@release/ui'
-import { CARD_RATIO, CARD_W, centerOf, PAIR_AUX_POSE, slotPlacement, useArrow } from '@release/ui'
+import { CARD_RATIO, CARD_W, centerOf, slotPlacement, useArrow } from '@release/ui'
 import {
   type Arriving,
-  enterPose,
-  nextFrames,
   play,
   type Rect,
   useFlyer,
   useHandArrival,
+  usePairFold,
   wait,
 } from '@release/ui/animations'
 import {
   type ReactNode,
-  type RefObject,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -108,7 +106,8 @@ export interface BoardStaging {
    * the turn side is actually waiting on (today: a standing release's cost),
    * 'selected' for a waiting support's own partners, 'idle' at rest */
   stateAt: (index: number) => HandCardState
-  pairRef: RefObject<HTMLDivElement | null> // the persistent pair-flyer node _Board mounts
+  /** the pair the fold step is carrying, while it carries one (`usePairFold`) */
+  pairNode: () => HTMLDivElement | null
   onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
   /** a click in the fan: the partner pick (the fold), the cost pick, or a
    * release played at rest. Returns whether this gesture TOOK the click — false
@@ -208,7 +207,16 @@ export function useBoardStaging({
   // the pair's own persistent DOM node — CardPair mounts inside it (_Board.tsx)
   // and the fold paints frame-by-frame on its `[data-main]`/`[data-aux]`
   // children, same as ComboStory's own `flyRef`.
-  const pairRef = useRef<HTMLDivElement>(null)
+  // THE step, not a copy of it (`usePairFold`): two cards become a pair on the
+  // table. It owns the node, mounts it invisible and reveals it in the SAME
+  // tick its halves get their entry poses — which is the frame the fan lets the
+  // card go in, so the handover is a swap and never a blink. The board carried
+  // its own six lines here until #168; the defence gesture already called the
+  // step, and this is the second of the three copies the module was packed out
+  // of. Held in a ref as well, for the long-lived callbacks below (I8).
+  const pair = usePairFold()
+  const pairApi = useRef(pair)
+  pairApi.current = pair
 
   // handlers below run after an await (or after the SAME click bubbles past a
   // target that did not stop propagation — Seat's own onClick does not) —
@@ -432,11 +440,11 @@ export function useBoardStaging({
       const merged = stagedRef.current
       if (merged?.merged && merged.support && merged.main) {
         const cRect = anchors.centre.current?.getBoundingClientRect()
-        const el = pairRef.current
+        const el = pairApi.current.node()
         if (reduced || !cRect) {
           // no flight, so nothing will land to clear this later — the machine
           // has to be put back by hand, or the fan never becomes live again
-          if (el) el.style.opacity = '0'
+          pairApi.current.release()
           commitStaged(null)
           return
         }
@@ -461,11 +469,12 @@ export function useBoardStaging({
           ],
           merged.support.index,
         )
-        // measured while it was still visible, hidden now — ComboStory's own
-        // `hideFlyer`, and the same order the plain merged cancel below uses.
+        // measured while it was still up (`arrive` reads every source rect
+        // before it awaits anything), taken down now — the step's own node goes
+        // with `release()`, the same order the plain merged cancel below uses.
         // `staged` itself is cleared by the arrival's own landing, which is
         // what keeps both halves out of the fan for the whole flight.
-        if (el) el.style.opacity = '0'
+        pairApi.current.release()
         return
       }
       // A SOLO release: `staged` is already null, and the card is standing at
@@ -496,7 +505,7 @@ export function useBoardStaging({
     arrowCtl.stop()
     const cRect = anchors.centre.current?.getBoundingClientRect()
     if (reduced || !cRect) {
-      if (pairRef.current) pairRef.current.style.opacity = '0'
+      pairApi.current.release()
       commitStaged(null)
       return
     }
@@ -508,7 +517,7 @@ export function useBoardStaging({
     cancellingRef.current = true
     setCancelling(true)
     if (s.merged && s.support && s.main) {
-      const el = pairRef.current
+      const el = pairApi.current.node()
       flyHome(
         [
           { key: s.support.uid, card: s.support.card, el, anchor: 'aux' as const, from: cRect },
@@ -517,10 +526,10 @@ export function useBoardStaging({
         s.support.index,
       )
       // `arrive`'s own geometry pass (above) measured the pair while it was
-      // still visible — hide it now so the flight overlay's own copies are
+      // still up — take it down now so the flight overlay's own copies are
       // the only thing on screen (ComboStory's `hideFlyer`, called right
       // after starting the same flight).
-      if (el) el.style.opacity = '0'
+      pairApi.current.release()
       return
     }
     const only = s.support ?? s.main
@@ -654,8 +663,14 @@ export function useBoardStaging({
       void (async () => {
         const to = anchors.centre.current?.getBoundingClientRect()
         if (!reduced && from && to) {
-          const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
-          if (el) await play('playToCenter', el, { from, to })?.finished
+          try {
+            const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
+            if (el) await play('playToCenter', el, { from, to })?.finished
+          } catch {
+            // A `void`ed body is watched by nobody: let it reject and the whole
+            // app gets an unhandled rejection. The card is staged either way —
+            // the flight is how it got there, not whether it did.
+          }
           flyer.drop('stage')
         }
         aimFromCentre()
@@ -928,50 +943,44 @@ export function useBoardStaging({
         }
       }
 
-      const el = pairRef.current
-      const mainHand = reduced ? undefined : slotBox(index, handItems.length)
-      if (reduced || !mainHand) {
-        // reduced motion (or no fan geometry to fold from) places instantly —
-        // CardPair's own inline pose (identity main, PAIR_AUX_POSE aux) IS the
-        // pair at rest, nothing to paint frame by frame.
-        if (el) {
-          el.style.left = `${cRect.left}px`
-          el.style.top = `${cRect.top}px`
-          el.style.width = `${cRect.width}px`
-          el.style.transform = 'none'
-          el.style.opacity = '1'
-        }
+      // The partner's own fan slot — the scene's own source (I6: a slot is
+      // rotated, so its bounding rect is the box AROUND the tilted card).
+      const mainHand = slotBox(index, handItems.length)
+      if (!mainHand) {
+        finish()
+        return true
+      }
+      const folding = pairApi.current.fold({
+        main: main.card,
+        aux: support.card,
+        mainFrom: mainHand,
+        auxFrom: cRect,
+        box: cRect,
+        dur: reduced ? 0 : MERGE_MS,
+      })
+      // A game action never waits on an animation nobody plays: under reduced
+      // motion the pair is mounted at its resting pose and the play dispatches
+      // in this same tick, rather than a frame after the step's own mount.
+      if (reduced) {
+        void folding
+        foldingRef.current = false
         finish()
         return true
       }
       void (async () => {
         try {
-          await nextFrames() // the CardPair React just mounted has painted (I2)
-          if (!el) return
-          for (const anim of el.getAnimations?.({ subtree: true }) ?? []) anim.cancel() // I3
-          el.style.left = `${cRect.left}px`
-          el.style.top = `${cRect.top}px`
-          el.style.width = `${cRect.width}px`
-          el.style.transform = 'none'
-          const mainEl = el.querySelector<HTMLElement>('[data-main]')
-          const auxEl = el.querySelector<HTMLElement>('[data-aux]')
-          if (!mainEl || !auxEl) return
-          mainEl.style.transform = enterPose(mainHand, cRect)
-          auxEl.style.transform = enterPose(cRect, cRect)
-          el.style.opacity = '1'
-          await nextFrames()
-
-          // MERGING AT THE CENTRE — the partner arrives and the pair folds together
-          const a1 = play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: MERGE_MS })
-          const a2 = play('foldIntoPair', auxEl, {
-            from: cRect,
-            box: cRect,
-            pose: PAIR_AUX_POSE,
-            dur: MERGE_MS,
-            snap: true,
-          })
-          await Promise.all([a1?.finished, a2?.finished])
+          // MERGING AT THE CENTRE — the partner arrives from its own slot and
+          // the two fold together. The support is already standing at the
+          // centre, so its place IS the pair's frame and its entry pose is the
+          // degenerate identity case — the step needs no branch for it.
+          await folding
           finish()
+        } catch {
+          // The step refused — nothing folded, so there is nothing to finish.
+          // Swallowed rather than rethrown for the same reason as the flight
+          // above: this body is `void`ed, and a rejection out of it is an
+          // unhandled rejection with no one to answer it. The lock is cleared
+          // by the `finally` below, which is what this exit is for.
         } finally {
           // every exit clears the lock — the early returns above (`pairRef`
           // gone, the CardPair's own markers missing) and a rejecting
@@ -1040,8 +1049,26 @@ export function useBoardStaging({
   useEffect(() => {
     const s = stagedRef.current
     if (s?.phase !== 'dispatched' || !s.main) return
+    // NOT while our own pending still stands on the very card just played
+    // (#168). The beat that ADOPTS the play (`operationBeat`) starts a commit
+    // LATER than the projection that accepted it, and clearing here breaks the
+    // hand-over twice over: the beat reads no handoff, so it flies a second
+    // copy of a card the player has already dragged to the centre; and the fan
+    // stops filtering, so under the beat's own shadow — the projection from
+    // BEFORE the batch, where the card is still in the hand — the played card
+    // pops back into the fan, which is where that second flight comes out of.
+    // The beat's own `release()` is the designed end of the staging. Under
+    // reduced motion no beat runs at all, so there is nothing to wait for.
+    const pending = state.pending
+    const adoptedByABeat =
+      !reduced &&
+      pending != null &&
+      'source' in pending &&
+      pending.source === s.main.card.id &&
+      ('actor' in pending ? pending.actor : pending.player) === state.selfId
+    if (adoptedByABeat) return
     if (!state.you.hand.some((c) => c.uid === s.main?.uid)) commitStaged(null)
-  }, [state.you.hand])
+  }, [state.you.hand, state.pending, state.selfId, reduced])
 
   // A solo release's own projection catch-up: `discardForRelease` pauses on a
   // decision rather than removing anything, so the hand never loses the card
@@ -1137,7 +1164,7 @@ export function useBoardStaging({
     setCancelling(false)
     setStage('none')
     setPaidCost(null)
-    if (pairRef.current) pairRef.current.style.opacity = '0'
+    pairApi.current.release()
     arrowCtl.stop()
     flyer.drop()
     arrival.reset()
@@ -1150,8 +1177,14 @@ export function useBoardStaging({
   // `cancel()`: the beat only ever calls this once ITS OWN read of the handoff
   // says the staged node is the one standing at the centre, so there is
   // nothing here left to double-check.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
-  const release = useCallback(() => commitStaged(null), [])
+  // The beat has taken the play over: the staging ends with no flight, and the
+  // step's node goes with it — whatever renders the pair at rest now owns it
+  // (`usePairFold`: the node stays up until `release()`).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged and the pair API are read through refs, stable by construction
+  const release = useCallback(() => {
+    pairApi.current.release()
+    commitStaged(null)
+  }, [])
 
   // the combo beat's own clear of `paidCost` (#101, Task 11) — same shape as
   // `release` above (no flight, just done), but a DIFFERENT piece of state:
@@ -1179,13 +1212,16 @@ export function useBoardStaging({
     dispatched: staged?.phase === 'dispatched',
     targets,
     arrow: arrowCtl,
-    overlay: [...flyer.overlay, ...arrival.overlay],
+    // the fold's own node only while it is carrying one: consumers read this
+    // array's LENGTH to know whether a carrier is up (`_Board.tsx`'s own solo
+    // staged render), so an always-present empty slot would read as one
+    overlay: [...flyer.overlay, ...arrival.overlay, ...(pair.overlay ? [pair.overlay] : [])],
     gapAt: arrival.gapAt,
     gapSize: arrival.gapSize,
     handItems,
     accentAt,
     stateAt,
-    pairRef,
+    pairNode: pair.node,
     onHandPlay,
     onCardClick,
     onTargetPick,

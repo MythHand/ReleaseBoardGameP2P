@@ -41,11 +41,23 @@
   transform: translateX(-50%);
 }
 
+/* Centred by a full-height column and NOT by a transform — the rule the Git
+   cards scene states in its own `.deckPile`: a transform here is a stacking
+   context, and `Pile`'s counter (a rung ABOVE the flight, so an arriving card
+   passes under it) would be trapped inside it — a card landing on the deck
+   would paint over the number instead. The column lets clicks through; the
+   piles inside it take their own. */
 .decks {
   position: absolute;
-  inset-block-start: 50%;
+  inset-block: 0;
   inset-inline-start: 26px;
-  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.decks > * {
+  pointer-events: auto;
 }
 
 /* DeckAnimationsStory: fill two rows down each column. An inner grid lets the

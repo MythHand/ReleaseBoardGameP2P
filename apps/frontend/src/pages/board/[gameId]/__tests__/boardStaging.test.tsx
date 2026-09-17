@@ -619,14 +619,14 @@ it('a target press mid-fold is refused; the same seat still dispatches once the 
 // `finish()`, so the fold's OTHER exits — the pair flyer's own `[data-main]`/
 // `[data-aux]` markers missing, `pairRef` gone, a rejecting `.finished` —
 // bypassed it and left the lock stuck forever (worse than pre-fix: those
-// conditions used to leave a recoverable stall). Of the three, only the
-// "markers missing" bail is honestly reachable here: `pairRef.current` is a
-// permanently-mounted node with no test-facing way to null it, and jsdom's
-// own WAAPI stub (test-setup.ts) always resolves `.finished`, never rejects
-// it. This one bail simulates the same condition `if (!mainEl || !auxEl)
-// return` checks, by shadowing the pair flyer's OWN `querySelector` (an
-// instance override — nothing else in the suite's shared jsdom document is
-// touched) rather than fabricating an unrelated failure.
+// conditions used to leave a recoverable stall). Since the fold became the
+// shared step (`usePairFold`), those bails live inside it and the way it can
+// fail from out here is the animation itself refusing — so that is what this
+// reproduces, by making `Element.prototype.animate` throw for the span of the
+// gesture. The mock is deliberately blunt: it takes down every flight this
+// flow starts, not just the fold, which is exactly how it caught the two
+// `void`ed bodies in `_useBoardStaging` that used to let such a failure escape
+// as an unhandled rejection.
 it('a fold whose pair-flyer markers go missing still clears the lock — Escape cancels normally after', async () => {
   const onPlay = vi.fn()
   comboOut = []
@@ -636,13 +636,16 @@ it('a fold whose pair-flyer markers go missing still clears the lock — Escape 
       { onPlay },
     ),
   )
-  const pairFlyer = document.querySelector<HTMLElement>('[data-testid="board-pair-staged"]')
-  if (!pairFlyer) throw new Error('pair flyer node not found')
-  const qs = vi.spyOn(pairFlyer, 'querySelector').mockReturnValue(null)
+  // The fold is the shared step now (`usePairFold`), so the way it can fail is
+  // the animation itself refusing — the step throws out of `fold()` and the
+  // gesture's own `finally` is all that clears the lock.
+  const animate = vi.spyOn(Element.prototype, 'animate').mockImplementation(() => {
+    throw new Error('no animation here')
+  })
   await pullFromComboFan('support-code-review#0')
-  await clickComboFanCard('release-frontend#0') // bails at `if (!mainEl || !auxEl) return` — finish() never runs
+  await clickComboFanCard('release-frontend#0') // the fold throws — finish() never runs
   expect(onPlay).not.toHaveBeenCalled()
-  qs.mockRestore() // back to the real DOM before asserting through it below
+  animate.mockRestore() // back to a working DOM before asserting through it below
   // the lock still cleared despite the bail — a plain cancel works normally
   fireEvent.keyDown(window, { key: 'Escape' })
   await waitFor(() => {
@@ -694,7 +697,7 @@ it('a click during a cancel-in-flight does not start a new fold', async () => {
   await act(async () => {
     await new Promise((r) => setTimeout(r, 50))
   })
-  expect(document.querySelector('[data-testid="board-pair-staged"] [data-main]')).toBeNull()
+  expect(document.querySelector('[data-main]')).toBeNull()
   await act(async () => {
     await new Promise((r) => setTimeout(r, 700))
   })
@@ -745,7 +748,7 @@ it('reduced motion folds a pair without flights', () => {
   // release has no target and no open window — dispatches at once, same phase
   // outcome the animated path reaches after its own flights settle
   expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, 'support-code-review#0')
-  expect(document.querySelector('[data-testid="board-pair-staged"] [data-main]')).toBeTruthy()
+  expect(document.querySelector('[data-main]')).toBeTruthy()
   mm.mockRestore()
 })
 
@@ -764,12 +767,12 @@ it('a dispatched pair survives a projection tick without flicker', async () => {
   await pullFromComboFan('support-code-review#0')
   await clickComboFanCard('release-frontend#0') // dispatches at once — no target, no window
   expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, 'support-code-review#0')
-  expect(document.querySelectorAll('[data-testid="board-pair-staged"] [data-main]').length).toBe(1)
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
 
   // the projection tick: a fresh render built from scratch (`comboBoardWith`
   // calls `makeBoardProps()` anew), while `COMBO_HAND` — and so the dispatched
   // play itself — stays byte-for-byte the array it already was.
   rerender(comboBoardWith(overrides, { onPlay }))
-  expect(document.querySelectorAll('[data-testid="board-pair-staged"] [data-main]').length).toBe(1)
-  expect(document.querySelectorAll('[data-testid="board-pair-staged"] [data-aux]').length).toBe(1)
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
+  expect(document.querySelectorAll('[data-aux]').length).toBe(1)
 })
