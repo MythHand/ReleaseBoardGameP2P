@@ -101,6 +101,12 @@ interface Beat {
 }
 
 export interface Beats {
+  /** the pile a split has mounted but not yet flown in — drawn invisible until
+   * the flight that brings it starts, so it is never seen standing where it has
+   * not arrived */
+  splittingPile: number | null
+  /** the discard is collecting itself into one stack before it leaves */
+  gatheringDiscard: boolean
   operationStanding: boolean
   /** the operation card resting at the centre — the table draws it, under any surface */
   operationLanded: OperationLanded | null
@@ -738,6 +744,9 @@ export function useBeats(args: {
 
   const reducedPending = reduced ? withoutPendingOperation(live, events) : live
   return {
+    /** the pile a split has mounted but not yet flown in — it stays invisible */
+    splittingPile: decks.splitting,
+    gatheringDiscard: decks.gathering,
     operationStanding: operations.standing,
     operationLanded: operations.landed,
     // The shadow is what the running beat has published, or its own base while

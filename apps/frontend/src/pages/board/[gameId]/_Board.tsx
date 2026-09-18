@@ -1242,6 +1242,11 @@ export default function Board({
               // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
               key={i}
               className={opening.pileTarget}
+              // A pile a split has just mounted is not on screen yet: it is
+              // shown by the flight that brings it, in that flight's own first
+              // frame. Seen a frame earlier, it blinks at the place it has not
+              // arrived at.
+              style={beats.splittingPile === i ? { opacity: 0 } : undefined}
             >
               <Pile
                 label={copy.table.deck}
@@ -1299,7 +1304,18 @@ export default function Board({
                 : decks.discardHeap?.filter((c) => c.uid !== `d${state.aiCause?.eventId}`)
             }
             topCard={cherry.grid || state.aiCause ? null : decks.discard}
-            count={cherry.grid ? 0 : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))}
+            // THE WHOLE DISCARD LEAVES, not its top card. Before it flies to a
+            // pile the heap collects itself into a straight stack and its
+            // counter goes — that gathering IS the pile becoming one thing, and
+            // without it the scattered heap simply vanishes while a single card
+            // travels (`DeckAnimationsStory`: `gathered` with `showCount: false`,
+            // which is its own `count={0}`).
+            count={
+              cherry.grid || beats.gatheringDiscard
+                ? 0
+                : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))
+            }
+            gathered={beats.gatheringDiscard || undefined}
             width={116}
             boxRef={anchors.discardBox}
           />
