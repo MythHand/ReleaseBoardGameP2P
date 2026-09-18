@@ -50,8 +50,18 @@ it.each([
   const anchors = anchorsFixture()
   const { result, view } = renderBeat(() => useOperationBeat(anchors))
   const { published } = await runBeat(result.current.runPlaced, placed(sudo), anchors, { base })
-  expect(animationsTrace.played).toEqual(['playToCenter'])
-  expect(animationsTrace.params[0]).toMatchObject({ to: { left: 400, top: 300, width: 150 } })
+  // Paid for with a sudo, TWO cards travel and land in the two places of the
+  // centre's row — the sudo enhances the card beside it and stays its own card,
+  // so there is no pair to carry. Alone, one card lands in the middle.
+  expect(animationsTrace.played).toEqual(sudo ? ['playToCenter', 'playToCenter'] : ['playToCenter'])
+  expect(animationsTrace.params[0]).toMatchObject(
+    sudo ? { to: { top: 300, width: 150 } } : { to: { left: 400, top: 300, width: 150 } },
+  )
+  // the row is centred on the middle the single card would have taken
+  if (sudo) {
+    const lands = animationsTrace.params.map((p) => (p?.to as { left: number }).left)
+    expect((lands[0] + lands[1]) / 2).toBeCloseTo(400)
+  }
   expect(published.at(-1)?.opponents[0].handCount).toBe(sudo ? 1 : 2)
   expect(result.current.standing).toBe(true)
   // landed: the table draws it now — the carrier (the flight layer) is down

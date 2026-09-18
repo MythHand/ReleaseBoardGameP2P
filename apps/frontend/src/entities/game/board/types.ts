@@ -223,7 +223,6 @@ export interface BoardChromeCopy {
   // answered, and the sudo actor's pick from what everyone threw.
   stealCard: string
   upgradePrompt: string
-  upgradeWaiting: string
   upgradeTakePrompt: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение

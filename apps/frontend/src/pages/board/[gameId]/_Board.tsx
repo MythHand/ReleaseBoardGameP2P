@@ -38,6 +38,7 @@ import {
   type ReleaseSlots,
   ReleaseZone,
   Rules,
+  rowPlaceStyle,
   Seat,
   Slider,
   type TableActions,
@@ -515,7 +516,6 @@ export default function Board({
     actions,
     copy: {
       prompt: copy.table.upgradePrompt,
-      waiting: copy.table.upgradeWaiting,
       takePrompt: copy.table.upgradeTakePrompt,
       confirm: copy.pending.confirm,
     },
@@ -605,6 +605,32 @@ export default function Board({
   // its own node, for the staging → beat handoff below — a plain aim/support
   // never merges, so it never gets the pair flyer's persistent node instead.
   const soloStagedRef = useRef<HTMLDivElement>(null)
+  // A PLAY BEING ASSEMBLED stands in the centre's ROW, not in its middle. The
+  // middle is where a card that has been played stands; a yellow support that
+  // has been pulled out has not been played yet — it is waiting to be told what
+  // it goes with, and the empty place kept beside it is that question
+  // (`DeckAnimationsStory`, the scene this is transcribed from). A card that is
+  // aiming HAS been played and keeps the middle.
+  // …and once a sudo has been told what it enhances, that card takes the place
+  // kept for it: the two stand side by side and no pair is formed. A Code Review
+  // folds instead, and a folded pair owns the centre through the pair flyer, so
+  // `merged` ends the row for it.
+  // The row lives from the pull until the play LEAVES the table: a sudo and the
+  // card it enhances keep standing in it while that card aims at what it hits,
+  // which is the whole point of enhancing it before aiming.
+  //
+  // WHAT ENDS THE ROW IS THE STAGING ENDING, not a phase inside it. Read off
+  // the phases, this stopped one step early — at `dispatched` the row came down
+  // while `staged` was still standing, so for the two frames until the beat
+  // adopted the play, `soloStaged` drew the sudo in the MIDDLE of the table and
+  // the card it enhances was drawn nowhere at all: the sudo jumped out of its
+  // place and back, which is the blink at the centre (#168). The staging's own
+  // end is the beat's `release()`, and that is the same commit the beat's own
+  // carriers go up in — so the row hands over with no frame in between.
+  const assembling =
+    staging.staged?.support && !staging.staged.merged
+      ? { support: staging.staged.support, main: staging.staged.main }
+      : null
 
   // The card the arrow leaves FROM, whichever hook armed it — a waiting
   // support if there is one, the aimed card otherwise. Its category is the
@@ -696,14 +722,54 @@ export default function Board({
   // card pulled out of the fan.
   const surfaceOwnsTable = [cherry.grid, rebase.row, inside.row, requesting.band].some(Boolean)
   // The scene's own rule (`ComboStory`: `merged || playing`): while the play is
-  // ON THE TABLE — a pair standing at the centre, or anything of this gesture
-  // still in the air — the fan stops answering the cursor for the same reason.
-  // The one thing that keeps it live is a cost owed: that answer is a click in
-  // the fan.
+  // ON THE TABLE — standing at the centre, or anything of this gesture still in
+  // the air — the fan stops answering the cursor for the same reason. The one
+  // thing that keeps it live is a cost owed: that answer is a click in the fan.
+  //
+  // ASSEMBLED, not merged. `merged` used to be the same question, because every
+  // combo folded into a pair; a sudo does not fold — it stands beside the card
+  // it enhances — so asking about the pair let the fan wake up under a play that
+  // is on the table, and the slot the second card came out of raised its zoom
+  // preview right under the cursor that had just dropped it there.
+  const playStanding =
+    staging.staged?.merged === true ||
+    staging.staged?.phase === 'target' ||
+    staging.staged?.phase === 'dispatched'
   const handInert =
-    (staging.costOptions.length === 0 &&
-      (Boolean(staging.staged?.merged) || staging.overlay.length > 0)) ||
+    (staging.costOptions.length === 0 && (playStanding || staging.overlay.length > 0)) ||
     surfaceOwnsTable
+
+  // WHAT THE FAN SHOWS — the owner's own list, minus the cards the turn staging
+  // is holding at the centre. Which hook owns the hand changes with the step,
+  // and each of them builds its list straight off the projection; only the turn
+  // staging knows what is standing in the centre's row. While a beat runs, that
+  // projection is the SHADOW — the board from BEFORE the play — so an owner
+  // without this subtraction draws a card that is lying at the centre back into
+  // the fan, and the fan raises its zoom preview for it under a cursor that
+  // never moved (#168, the sudo's ghost).
+  //
+  // Applied HERE, once, rather than in five hooks: the fan has one set of items
+  // whoever filled it, so the rule belongs where that choice is made. It is a
+  // no-op while the turn staging owns the fan — that list is already filtered —
+  // and it empties the moment the cards come home, so a cancel's own return
+  // into the fan is untouched.
+  const fanOwnerItems =
+    upgrade.asked || upgrade.stagedUid
+      ? upgrade.handItems
+      : discarding
+        ? handLimit.handItems
+        : defenseOwnsHand
+          ? defenseStaging.handItems
+          : neutralizeOwnsHand
+            ? neutralizing.handItems
+            : staging.handItems
+  const fanItems = useMemo(
+    () =>
+      staging.handOut.size === 0
+        ? fanOwnerItems
+        : fanOwnerItems.filter((c) => !staging.handOut.has(c.uid)),
+    [fanOwnerItems, staging.handOut],
+  )
 
   const stagedRelease = staging.stageStanding
     ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
@@ -1223,6 +1289,11 @@ export default function Board({
               // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
               key={i}
               className={opening.pileTarget}
+              // A pile a split has just mounted is not on screen yet: it is
+              // shown by the flight that brings it, in that flight's own first
+              // frame. Seen a frame earlier, it blinks at the place it has not
+              // arrived at.
+              style={beats.splittingPile === i ? { opacity: 0 } : undefined}
             >
               <Pile
                 label={copy.table.deck}
@@ -1275,12 +1346,25 @@ export default function Board({
           <Pile
             label={copy.table.discard}
             heap={
-              cherry.grid
+              cherry.grid || beats.discardOut === 'taken'
                 ? []
                 : decks.discardHeap?.filter((c) => c.uid !== `d${state.aiCause?.eventId}`)
             }
-            topCard={cherry.grid || state.aiCause ? null : decks.discard}
-            count={cherry.grid ? 0 : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))}
+            topCard={
+              cherry.grid || state.aiCause || beats.discardOut === 'taken' ? null : decks.discard
+            }
+            // THE WHOLE DISCARD LEAVES, not its top card. Before it flies to a
+            // pile the heap collects itself into a straight stack and its
+            // counter goes — that gathering IS the pile becoming one thing, and
+            // without it the scattered heap simply vanishes while a single card
+            // travels (`DeckAnimationsStory`: `gathered` with `showCount: false`,
+            // which is its own `count={0}`).
+            count={
+              cherry.grid || beats.discardOut
+                ? 0
+                : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))
+            }
+            gathered={beats.discardOut === 'gathering' || undefined}
             width={116}
             boxRef={anchors.discardBox}
           />
@@ -1420,6 +1504,37 @@ export default function Board({
         })()}
       </div>
 
+      {/* THE ROW A PLAY IS ASSEMBLED IN — two places from the centre module
+          (`rowPlaceStyle`), mounted only while a pulled support is waiting for
+          the card it goes with. The first holds it; the second is kept empty,
+          and that gap is how the table asks what it goes with. Both places are
+          real nodes, because the flight out of the fan aims at the first one
+          and the static render fills the same node it aimed at. */}
+      {assembling &&
+        [assembling.support, assembling.main].map((card, i) => (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: the index IS the place — a place keeps its identity while what stands in it changes
+            key={i}
+            className={`${opening.rowSlot} ${card ? '' : opening.rowEmpty}`}
+            style={rowPlaceStyle('staging', 2, i)}
+            data-stage-slot={i}
+            {...(i === 0 ? { 'data-testid': 'board-stage-row' } : {})}
+          >
+            {/* a place draws its card unless a carrier is holding THAT card —
+                "something is flying" blanked the sudo while the card it
+                enhances was still on its way in */}
+            {card && !staging.carrying.includes(card.uid) && (
+              <div
+                ref={i === 0 ? soloStagedRef : undefined}
+                className={opening.centreCard}
+                data-testid={i === 0 ? 'board-centre-staged' : 'board-centre-partner'}
+              >
+                <Card card={card.card} interactive={false} width="100%" />
+              </div>
+            )}
+          </div>
+        ))}
+
       {/* the attack slot — where cards stand while the table is looking at them:
           the player's own cards gather here during the opening, and every drawn
           card stages here for the rest of the match. Mounted for the whole life
@@ -1459,7 +1574,7 @@ export default function Board({
             the carrier or a return flight still holds it, the static render
             would double it (ComboStory.tsx's own guard on this). Once a
             partner folds in, the pair flyer below owns the centre instead. */}
-        {soloStaged && staging.overlay.length === 0 && (
+        {soloStaged && !assembling && staging.overlay.length === 0 && (
           <div ref={soloStagedRef} className={opening.centreCard} data-testid="board-centre-staged">
             <Card card={soloStaged.card} interactive={false} width="100%" />
           </div>
@@ -1526,23 +1641,51 @@ export default function Board({
         {beats.operationLanded &&
           (() => {
             const main = cardById(beats.operationLanded.card)
-            const aux = beats.operationLanded.sudo ? cardById('support-sudo') : undefined
-            if (!main) return null
+            // A sudo does NOT lie under the card it paid for: it stands beside
+            // it, in its own place of the centre's row — the same two places the
+            // play was assembled in, so standing is where assembling left it.
+            // The row is rendered outside this slot, below.
+            if (!main || beats.operationLanded.sudo) return null
             return (
               <div
                 className={opening.centreCard}
                 data-testid="board-operation-standing"
                 data-public-operation=""
               >
-                {aux ? (
-                  <CardPair main={main} aux={aux} width="100%" />
-                ) : (
-                  <Card card={main} interactive={false} width="100%" />
-                )}
+                <Card card={main} interactive={false} width="100%" />
               </div>
             )
           })()}
       </div>
+
+      {/* AN OPERATION PAID FOR WITH SUDO STANDS AS TWO CARDS, side by side, in
+          the same two places of the centre's row the play was assembled in: the
+          sudo enhances the card next to it and stays its own card. Rendered here
+          rather than inside the attack slot, because a place of the row carries
+          its own position. The operation keeps `data-public-operation` — its own
+          exit finds it by that — and the sudo is named beside it, so that exit
+          can take it from where it actually stands. */}
+      {beats.operationLanded?.sudo &&
+        (() => {
+          const main = cardById(beats.operationLanded.card)
+          const aux = cardById('support-sudo')
+          if (!main || !aux) return null
+          return [aux, main].map((card, i) => (
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: the index IS the place — the sudo's and the card it paid for
+              key={i}
+              className={opening.rowSlot}
+              style={rowPlaceStyle('staging', 2, i)}
+              {...(i === 0
+                ? { 'data-operation-support': '' }
+                : { 'data-public-operation': '', 'data-testid': 'board-operation-standing' })}
+            >
+              <div className={opening.centreCard}>
+                <Card card={card} interactive={false} width="100%" />
+              </div>
+            </div>
+          ))
+        })()}
 
       {/* THE DISCARD GRID (#104) — the excess a turn's end costs, laid out for
           the whole table to read. The cells are a fixed shape chosen before the
@@ -1683,17 +1826,7 @@ export default function Board({
               <Hand
                 // Keep the same owner for items and index-based handlers,
                 // including the exit after the defense prompt closes.
-                items={
-                  upgrade.asked || upgrade.stagedUid
-                    ? upgrade.handItems
-                    : discarding
-                      ? handLimit.handItems
-                      : defenseOwnsHand
-                        ? defenseStaging.handItems
-                        : neutralizeOwnsHand
-                          ? neutralizing.handItems
-                          : staging.handItems
-                }
+                items={fanItems}
                 // the fan opens room for the arriving heap while it travels —
                 // the deal wins the tie against every other beat the same way
                 // it already wins the shadow's, and the staging gesture's own
@@ -1798,19 +1931,7 @@ export default function Board({
                 onReorder={
                   deal.active || (discarding && handLimit.carrying)
                     ? undefined
-                    : (uid, to) =>
-                        handOrder.commit(
-                          you.hand,
-                          discarding
-                            ? handLimit.handItems
-                            : defenseOwnsHand
-                              ? defenseStaging.handItems
-                              : neutralizeOwnsHand
-                                ? neutralizing.handItems
-                                : staging.handItems,
-                          uid,
-                          to,
-                        )
+                    : (uid, to) => handOrder.commit(you.hand, fanItems, uid, to)
                 }
                 renderFace={
                   deal.active

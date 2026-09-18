@@ -776,3 +776,41 @@ it('a dispatched pair survives a projection tick without flicker', async () => {
   expect(document.querySelectorAll('[data-main]').length).toBe(1)
   expect(document.querySelectorAll('[data-aux]').length).toBe(1)
 })
+
+// THE CENTRE'S ROW, NOT ITS MIDDLE. The middle is where a card that has been
+// PLAYED stands. A yellow support pulled out of the fan has not been played yet
+// — it is waiting to be told what it goes with — so it stands in the assembling
+// row from the centre module, and the place kept empty beside it is that
+// question (`DeckAnimationsStory`, the scene this is transcribed from).
+it('stands a pulled support in the centre row and keeps the place beside it empty', async () => {
+  render(comboBoardWith({ comboOptions: { 'support-code-review#0': ['release-frontend#0'] } }))
+  await pullFromComboFan('support-code-review#0')
+  const first = document.querySelector('[data-stage-slot="0"]')
+  const second = document.querySelector('[data-stage-slot="1"]')
+  expect(first).toBeTruthy()
+  expect(second).toBeTruthy()
+  expect(first?.querySelector('[data-testid="board-centre-staged"]')).toBeTruthy()
+  // the ask is a place with nothing in it
+  expect(second?.childElementCount).toBe(0)
+  // …and the middle is left alone
+  const centre = document.querySelector('[data-board-centre]')
+  expect(centre?.querySelector('[data-testid="board-centre-staged"]')).toBeFalsy()
+})
+
+// …and the place it kept open is what the partner lands in. A sudo ENHANCES the
+// card beside it and stays its own card, so the two stand side by side and no
+// pair is formed — the situation decides, and the other yellow (Code Review,
+// which RIDES the release it pays for) folds instead (owner, 18.09).
+it('stands the card a sudo enhances in the place kept beside it, unfolded', async () => {
+  render(
+    comboBoardWith({ targets: BUG_TARGETS, comboOptions: { 'support-sudo#0': ['attack-bug#0'] } }),
+  )
+  await pullFromComboFan('support-sudo#0')
+  await clickComboFanCard('attack-bug#0')
+  const first = document.querySelector('[data-stage-slot="0"]')
+  const second = document.querySelector('[data-stage-slot="1"]')
+  expect(first?.querySelector('[data-testid="board-centre-staged"]')).toBeTruthy()
+  expect(second?.querySelector('[data-testid="board-centre-partner"]')).toBeTruthy()
+  // nothing folded: the pair flyer never took the centre over
+  expect(document.querySelector('[data-testid="board-pair-flyer"]')).toBeFalsy()
+})

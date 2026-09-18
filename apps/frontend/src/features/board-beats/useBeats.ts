@@ -101,6 +101,14 @@ interface Beat {
 }
 
 export interface Beats {
+  /** the pile a split has mounted but not yet flown in — drawn invisible until
+   * the flight that brings it starts, so it is never seen standing where it has
+   * not arrived */
+  splittingPile: number | null
+  /** where the discard is while it leaves for a pile: still lying there and
+   * collecting itself into one stack, or already held by a carrier and gone
+   * from its own spot */
+  discardOut: 'gathering' | 'taken' | null
   operationStanding: boolean
   /** the operation card resting at the centre — the table draws it, under any surface */
   operationLanded: OperationLanded | null
@@ -196,8 +204,11 @@ export function useBeats(args: {
   const handLimits = useHandLimitBeat(anchors, handLimit)
   const transfers = useTransferBeat(anchors)
   const ais = useAiBeat(anchors)
-  const upgrades = useUpgradeBeat(anchors, staging)
+  // The operation beat first: System Upgrade's centre holds both its answers and
+  // the operation card itself, and they leave together in the answers' own send
+  // rather than in a beat of their own behind them.
   const operations = useOperationBeat(anchors, staging)
+  const upgrades = useUpgradeBeat(anchors, staging, operations.handOver)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -735,6 +746,9 @@ export function useBeats(args: {
 
   const reducedPending = reduced ? withoutPendingOperation(live, events) : live
   return {
+    /** the pile a split has mounted but not yet flown in — it stays invisible */
+    splittingPile: decks.splitting,
+    discardOut: decks.discardOut,
     operationStanding: operations.standing,
     operationLanded: operations.landed,
     // The shadow is what the running beat has published, or its own base while
