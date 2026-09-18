@@ -1,6 +1,6 @@
 import type { Event } from '@release/engine'
 import type { HandPlayDrop, TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardById, Typography } from '@release/ui'
+import { Card, ConfirmAction, cardById, rowPlaceStyle, Typography } from '@release/ui'
 import { play, useFlyer } from '@release/ui/animations'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
@@ -129,20 +129,36 @@ export function useUpgradeStaging(args: {
   }
   if (!pending || !enabled) return { surface: null, ...interaction }
 
+  // One place per seat this pending is owed to or has heard from, in a row from
+  // the centre module (`rowPlaceStyle`) rather than a flex row of this hook's
+  // own: the centre of the table is one geometry, declared once, and a row of
+  // open cards is the shape it comes in when the count is what decides it. The
+  // seat order is the row's order, so a seat's place never moves under it when
+  // another one answers.
+  const seats = [...new Set([...pending.owed, ...pending.thrown.map((t) => t.player)])].sort()
   const centre = (
-    <div className={styles.centre}>
-      {[...new Set([...pending.owed, ...pending.thrown.map((t) => t.player)])]
-        .sort()
-        .map((player) => {
-          const t = pending.thrown.find((entry) => entry.player === player)
-          if (!t) return <div key={player} data-upgrade-slot={player} className={styles.cell} />
-          const data = cardById(t.card.id)
-          if (!data) return null
+    <>
+      {seats.map((player, i) => {
+        const place = rowPlaceStyle('upgrade', seats.length, i)
+        const t = pending.thrown.find((entry) => entry.player === player)
+        if (!t)
           return (
+            <div key={player} data-upgrade-slot={player} className={styles.cell} style={place} />
+          )
+        const data = cardById(t.card.id)
+        if (!data) return null
+        // THE PLACE AND THE CARD ARE TWO NODES, never one. A place positions
+        // itself with a transform, and a flight's very first frame sets its own
+        // transform from zero — so a card that IS its place loses that
+        // positioning the instant it takes off and flies from half a card away.
+        // The module says the same thing from the other side: the place stays
+        // the true card box so flights can aim at it (I6), and everything a card
+        // does to itself lives on the node inside it.
+        return (
+          <div key={player} data-upgrade-slot={player} className={styles.cell} style={place}>
             <button
-              key={player}
-              data-upgrade-slot={player}
               type="button"
+              data-upgrade-card=""
               data-testid={`upgrade-thrown-${t.card.uid}`}
               className={styles.thrown}
               disabled={!picking}
@@ -157,9 +173,10 @@ export function useUpgradeStaging(args: {
                 accent="var(--select-accent)"
               />
             </button>
-          )
-        })}
-    </div>
+          </div>
+        )
+      })}
+    </>
   )
 
   if (confirmed) return { surface: centre, ...interaction }

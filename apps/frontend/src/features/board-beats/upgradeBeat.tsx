@@ -11,7 +11,7 @@ import {
 } from '@release/ui/animations'
 import { type RefObject, useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
-import { upgradeSlot } from '~/entities/game/board/upgradeSlot'
+import { upgradeCard, upgradeSlot } from '~/entities/game/board/upgradeSlot'
 import type { BeatPlan } from './planBeats'
 
 const THROW_DUR = 460
@@ -102,7 +102,7 @@ export function useUpgradeBeat(
         const clear = async () => {
           const items = (plan.clear ?? []).flatMap((t) => {
             const restCard = cardById(t.card)
-            const node = upgradeSlot(a, t.player)
+            const node = upgradeCard(a, t.player)
             return restCard && node
               ? [
                   {
@@ -214,7 +214,7 @@ export function useUpgradeBeat(
       // one after another they read as several separate discards (owner, 17.09).
       const items = plan.clear.flatMap((t) => {
         const card = cardById(t.card)
-        const node = upgradeSlot(a, t.player)
+        const node = upgradeCard(a, t.player)
         return card && node
           ? [
               {

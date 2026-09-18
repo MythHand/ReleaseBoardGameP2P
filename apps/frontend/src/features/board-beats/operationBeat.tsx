@@ -1,5 +1,5 @@
 import type { Event } from '@release/engine'
-import { Card, CardPair, cardBoxIn, cardById, PAIR_AUX } from '@release/ui'
+import { Card, cardById, rowCells } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
 import { type RefObject, useCallback, useRef, useState } from 'react'
@@ -140,10 +140,15 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
     ) => {
       const centre = rectOf(latest.current.anchors.centre.current)
       if (!centre) return null
-      // the resting render at the centre — the sudo half starts from where it is seen
-      const aux = latest.current.anchors.centre.current?.querySelector<HTMLElement>(
-        '[data-public-operation] [data-aux]',
-      )
+      // EACH HALF LEAVES FROM WHERE IT STANDS. Paid for with a sudo, the two are
+      // two cards in two places of the centre's row — the sudo enhances the card
+      // beside it and stays its own card — so neither of them is at the middle
+      // and neither is tucked under the other. The places are found the way the
+      // row's places always are, by what they are rather than by position.
+      const root = latest.current.anchors.centre.current?.parentElement
+      const mainBox =
+        rectOf(root?.querySelector<HTMLElement>('[data-public-operation]') ?? null) ?? centre
+      const auxBox = rectOf(root?.querySelector<HTMLElement>('[data-operation-support]') ?? null)
       const items: Leaving[] = (spent ?? operation.spent).flatMap((c) => {
         const card = cardById(c.card)
         if (!card) return []
@@ -152,9 +157,11 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
           {
             key: `operation-exit:${c.eventId}`,
             card,
-            from: support && aux ? cardBoxIn(aux.getBoundingClientRect(), centre.width) : centre,
+            from: support ? (auxBox ?? mainBox) : mainBox,
             scatter: scatterAt(c.eventId),
-            ...(support ? { pose: { rot: PAIR_AUX.rot, dx: 0, dy: 0 }, layer: 0 } : { layer: 1 }),
+            // the layer is the order they join the HEAP in, where the support
+            // does lie under the card it paid for — that much is unchanged
+            layer: support ? 0 : 1,
           },
         ]
       })
@@ -237,35 +244,77 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
         : ((hand?.kind === 'hand' ? rectOf(a.handSlotAt(hand.index)) : null) ??
           a.seatBox(plan.player))
       if (!from) return
-      const raised = flyer.raise([
-        {
-          key: KEY,
-          at: from,
-          content: (
-            <div data-public-operation="">
-              {aux ? (
-                <CardPair main={main} aux={aux} width="100%" />
-              ) : (
-                <Card card={main} width="100%" />
-              )}
-            </div>
-          ),
-        },
-      ])
+      // PAID FOR WITH SUDO: two cards, not one pair. They fly to the two places
+      // of the centre's row they will stand in — asked of the module rather than
+      // measured, because those places are mounted by the landing this flight is
+      // on its way to. The row's own point is the middle of the table, which is
+      // what the centre place is.
+      const places = aux
+        ? rowCells('staging', 2).map((cell) => ({
+            left: from.left + from.width / 2 + cell.dx - cell.w / 2,
+            top: to.top + to.height / 2 - cell.h / 2,
+            width: cell.w,
+            height: cell.h,
+          }))
+        : null
+      const lands = aux
+        ? rowCells('staging', 2).map((cell) => ({
+            left: to.left + to.width / 2 + cell.dx - cell.w / 2,
+            top: to.top + to.height / 2 - cell.h / 2,
+            width: cell.w,
+            height: cell.h,
+          }))
+        : null
+      const raised = flyer.raise(
+        aux && places
+          ? [
+              { key: `${KEY}:aux`, at: places[0], content: <Card card={aux} width="100%" /> },
+              {
+                key: KEY,
+                at: places[1],
+                content: (
+                  <div data-public-operation="">
+                    <Card card={main} width="100%" />
+                  </div>
+                ),
+              },
+            ]
+          : [
+              {
+                key: KEY,
+                at: from,
+                content: (
+                  <div data-public-operation="">
+                    <Card card={main} width="100%" />
+                  </div>
+                ),
+              },
+            ],
+      )
       // The new carrier and the source removal commit together, including local
       // staging ownership. No intermediate frame renders both copies.
       ctx.publish(withoutFlown(ctx.base, flown))
       handoff?.release()
       held.current = plan
       setStanding(true)
-      const [el] = await raised
+      const els = await raised
       if (run !== epoch.current) return
-      if (!handoff && el) await play('playToCenter', el, { from, to })?.finished
+      if (!handoff) {
+        if (aux && places && lands) {
+          await Promise.all(
+            els.map((el, i) =>
+              el ? play('playToCenter', el, { from: places[i], to: lands[i] })?.finished : null,
+            ),
+          )
+        } else if (els[0]) {
+          await play('playToCenter', els[0], { from, to })?.finished
+        }
+      }
       if (run !== epoch.current) return
       // Landed: the table's own render takes the card over in the same commit
       // the carrier goes down in, so no frame shows both or neither.
       setLanded({ card: plan.card, sudo: plan.sudo === true })
-      flyer.drop(KEY)
+      flyer.drop()
       await wait(PLACED_HOLD)
     },
     [flyer.raise, flyer.drop],

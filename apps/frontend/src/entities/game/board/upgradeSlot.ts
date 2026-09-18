@@ -10,3 +10,11 @@ export function upgradeSlot(anchors: BoardAnchors, player: string): HTMLElement 
     ) ?? null
   )
 }
+
+// The CARD standing in that place — its own node inside it. A flight takes this
+// one over: the place positions itself with a transform, and a flight's first
+// frame writes a transform of its own, so flying the place would throw away the
+// positioning that put it there.
+export function upgradeCard(anchors: BoardAnchors, player: string): HTMLElement | null {
+  return upgradeSlot(anchors, player)?.querySelector<HTMLElement>('[data-upgrade-card]') ?? null
+}

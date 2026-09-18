@@ -17,20 +17,25 @@
   pointer-events: none;
 }
 
-.centre {
+/* Every place comes from the centre module (`rowPlaceStyle`): height, offset and
+   width are its, and what stays here is only what every place shares. There is
+   no row element any more — and no `transform` on one either, which is what used
+   to make this row a containing block for anything `position: fixed` inside it. */
+
+/* The place itself: position, offset and width come from the centre module, and
+   it is never pressable — a seat that has not answered keeps an empty one, and
+   the card standing in a filled one takes the pointer back (`.thrown`). */
+.cell {
   position: absolute;
-  inset-block-start: 42%;
-  inset-inline: 0;
-  display: flex;
-  gap: 24px;
-  align-items: flex-end;
-  justify-content: center;
-  transform: translateY(-50%);
+  aspect-ratio: var(--card-aspect);
+  pointer-events: none;
 }
 
-.thrown,
-.cell {
-  inline-size: 150px;
+/* the card standing in it — its own node, so a flight can take it over without
+   taking the place's positioning with it */
+.thrown {
+  position: absolute;
+  inset: 0;
   padding: 0;
   pointer-events: auto;
   cursor: pointer;
@@ -42,7 +47,3 @@
   cursor: default;
 }
 
-.cell {
-  aspect-ratio: var(--card-aspect);
-  pointer-events: none;
-}

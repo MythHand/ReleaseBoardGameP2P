@@ -75,11 +75,18 @@ function harness(
   const root = node()
   const centre = node()
   root.append(centre)
+  // The place and the card inside it, as the surface really renders them: the
+  // place carries the row's own positioning and the card is the node a flight
+  // takes over, so the two are never the same element.
   for (const [index, player] of ['p2', 'p3'].entries()) {
     const slot = node()
     slot.dataset.upgradeSlot = player
     slot.getBoundingClientRect = () =>
       ({ left: 100 + index * 174, top: 200, width: 150, height: 210 }) as DOMRect
+    const card = node()
+    card.dataset.upgradeCard = ''
+    card.getBoundingClientRect = slot.getBoundingClientRect
+    slot.append(card)
     root.append(slot)
   }
   const anchors = {
@@ -324,7 +331,14 @@ it.each([
   expect(timeline.exits).toHaveBeenCalledWith([
     expect.objectContaining({
       key: 'upgrade-exit:2',
-      node: expect.objectContaining({ dataset: expect.objectContaining({ upgradeSlot: 'p3' }) }),
+      // the CARD leaves, not the place it stands in: the place carries the row's
+      // own positioning, and a flight's first frame would write that away
+      node: expect.objectContaining({
+        dataset: expect.objectContaining({ upgradeCard: '' }),
+        parentElement: expect.objectContaining({
+          dataset: expect.objectContaining({ upgradeSlot: 'p3' }),
+        }),
+      }),
     }),
   ])
   const result = ctx.publish.mock.lastCall?.[0] as BoardState

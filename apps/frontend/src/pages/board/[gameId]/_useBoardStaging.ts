@@ -48,6 +48,7 @@ import {
   useState,
 } from 'react'
 import { type BoardAnchors, type BoardState, MERGE_MS, SHOW_HOLD } from '~/entities/game/board'
+import { stageSlot } from '~/entities/game/board/stageSlot'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 
 // Moved verbatim from the pre-#99 `_useBoardInteractions.ts` — the comparison a
@@ -108,6 +109,9 @@ export interface BoardStaging {
   stateAt: (index: number) => HandCardState
   /** the pair the fold step is carrying, while it carries one (`usePairFold`) */
   pairNode: () => HTMLDivElement | null
+  /** the uids a carrier is holding right now — a place draws its card unless it
+   * is the one travelling */
+  carrying: string[]
   onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
   /** a click in the fan: the partner pick (the fold), the cost pick, or a
    * release played at rest. Returns whether this gesture TOOK the click — false
@@ -201,6 +205,12 @@ export function useBoardStaging({
   // the seat the card was aimed at stays live for that whole glide and
   // dispatches a play for a card that is already on its way back to the fan.
   const [cancelling, setCancelling] = useState(false)
+  // WHOSE CARD IS IN THE AIR, by uid. A place of the centre's row draws the card
+  // standing in it unless a carrier is holding that very card — the row has two
+  // places and only one of them travels at a time, so "something is flying" is
+  // not an answer: it blanked the sudo while the card it enhances was still on
+  // its way in.
+  const [carrying, setCarrying] = useState<string[]>([])
   const reduced = useReducedMotion()
   const arrowCtl = useArrow()
   const flyer = useFlyer()
@@ -395,10 +405,13 @@ export function useBoardStaging({
   const flyHome = useCallback(
     (items: Arriving[], at?: number) => {
       const airborne = arrival.busy
+      // every card of this flight is in the air, so no place draws it
+      setCarrying(items.map((it) => it.key))
       void arrival.arrive(items, handItems.length, at).then((flew) => {
         if (flew || airborne) return
         cancellingRef.current = false
         setCancelling(false)
+        setCarrying([])
         commitStaged(null)
         setStage((s) => (s === 'leaving' ? 'none' : s))
       })
@@ -532,9 +545,27 @@ export function useBoardStaging({
       pairApi.current.release()
       return
     }
+    // Two cards that never folded — a sudo and the card it enhances, each in its
+    // own place of the row. They go home from where they actually stand: the
+    // middle holds neither of them.
+    if (s.support && s.main) {
+      const first = stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect
+      const second = stageSlot(anchors, 1)?.getBoundingClientRect() ?? cRect
+      flyHome(
+        [
+          { key: s.support.uid, card: s.support.card, from: first },
+          { key: s.main.uid, card: s.main.card, from: second },
+        ],
+        s.support.index,
+      )
+      return
+    }
     const only = s.support ?? s.main
     if (!only) return
-    flyHome([{ key: only.uid, card: only.card, from: cRect }], only.index)
+    // A waiting support stands in the row's first place; a card that AIMS stands
+    // in the middle. Either way it leaves from where it is.
+    const home = s.support ? (stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect) : cRect
+    flyHome([{ key: only.uid, card: only.card, from: home }], only.index)
   }, [
     reduced,
     flyHome,
@@ -661,22 +692,30 @@ export function useBoardStaging({
       )
       setStage('none')
       void (async () => {
-        const to = anchors.centre.current?.getBoundingClientRect()
-        if (!reduced && from && to) {
+        if (!reduced && from) {
+          setCarrying([card.uid])
           try {
             const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
-            if (el) await play('playToCenter', el, { from, to })?.finished
+            // MEASURED AFTER THE RAISE, not before it. A support waiting for its
+            // partner flies to the first place of the centre's assembling ROW,
+            // and that place is mounted by the commit above — it does not exist
+            // yet when this body starts. A card that AIMS has been played, and
+            // keeps the middle it always had.
+            const place = hasTarget ? anchors.centre.current : stageSlot(anchors, 0)
+            const to = (place ?? anchors.centre.current)?.getBoundingClientRect()
+            if (el && to) await play('playToCenter', el, { from, to })?.finished
           } catch {
             // A `void`ed body is watched by nobody: let it reject and the whole
             // app gets an unhandled rejection. The card is staged either way —
             // the flight is how it got there, not whether it did.
           }
           flyer.drop('stage')
+          setCarrying([])
         }
         aimFromCentre()
       })()
     },
-    [anchors.centre, reduced, flyer.raise, flyer.drop, aimFromCentre],
+    [anchors, reduced, flyer.raise, flyer.drop, aimFromCentre],
   )
 
   // A standalone play is read at the centre before its effect is sent.
@@ -886,7 +925,15 @@ export function useBoardStaging({
       arrowCtl.stop() // the choice is made — nothing is pointed at while the pair folds
       const mainIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
       const main: StagedCard = { uid: item.uid, card: item.card, index: mainIndex }
-      commitStaged({ support, main, phase: 'partner', merged: true })
+      // HOW THE TWO STAND IS THE SITUATION'S, not one rule for both yellows. A
+      // sudo ENHANCES the card beside it and stays its own card: the two take
+      // the two places of the centre's row and nothing folds. A Code Review
+      // RIDES the release it pays for: they lie one on the other, as they will
+      // lie in the heap (owner, 18.09). `merged` says a PAIR owns the centre, so
+      // it stays false all the way through for the side-by-side one.
+      const sideBySide = support.card.id === 'support-sudo'
+      const merged = !sideBySide
+      commitStaged({ support, main, phase: 'partner', merged })
       // the fold is committed — irrevocable until `finish()` runs (ComboStory's
       // own `playing`); `cancel()` and a second click both refuse while this is
       // true, so nothing can race the automatic dispatch that follows the fold.
@@ -916,17 +963,17 @@ export function useBoardStaging({
         if (stagedRef.current?.phase === 'dispatched') return
         const windowOpen = Boolean(state.window?.canAttackWith?.includes(main.uid))
         if (windowOpen) {
-          commitStaged({ support, main, phase: 'dispatched', merged: true })
+          commitStaged({ support, main, phase: 'dispatched', merged })
           dispatchWatermarkRef.current = eventsRef.current.length
           actions?.onAttack?.(main.uid, support.uid)
         } else if (
           (state.targets?.[main.uid] ?? []).length > 0 &&
           !rebaseAllPiles(main.card, support.card)
         ) {
-          commitStaged({ support, main, phase: 'target', merged: true })
+          commitStaged({ support, main, phase: 'target', merged })
           aimFromCentre()
         } else {
-          commitStaged({ support, main, phase: 'dispatched', merged: true })
+          commitStaged({ support, main, phase: 'dispatched', merged })
           dispatchWatermarkRef.current = eventsRef.current.length
           // A COMBO release — the other way a release reaches the table, and
           // the one the stage machine must be told about explicitly (#101,
@@ -950,12 +997,41 @@ export function useBoardStaging({
         finish()
         return true
       }
+      // A sudo takes the place kept open beside it, and nothing folds.
+      if (sideBySide) {
+        const place = stageSlot(anchors, 1)?.getBoundingClientRect()
+        if (reduced || !place) {
+          foldingRef.current = false
+          finish()
+          return true
+        }
+        setCarrying([main.uid])
+        void (async () => {
+          try {
+            const [el] = await flyer.raise([{ key: 'stage-main', card: main.card, at: mainHand }])
+            if (el) await play('playToCenter', el, { from: mainHand, to: place })?.finished
+          } catch {
+            // a `void`ed body answers for its own failure — the card is staged
+            // either way, the flight is only how it got there
+          }
+          flyer.drop('stage-main')
+          setCarrying([])
+          foldingRef.current = false
+          finish()
+        })()
+        return true
+      }
+      // The pair folds where the support STANDS. Its own place is the frame, so
+      // the aux's entry pose is the degenerate identity case and the fold needs
+      // no branch for it — the same thing that used to be true of the middle,
+      // back when a pulled support stood there.
+      const box = stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect
       const folding = pairApi.current.fold({
         main: main.card,
         aux: support.card,
         mainFrom: mainHand,
-        auxFrom: cRect,
-        box: cRect,
+        auxFrom: box,
+        box,
         dur: reduced ? 0 : MERGE_MS,
       })
       // A game action never waits on an animation nobody plays: under reduced
@@ -1222,6 +1298,7 @@ export function useBoardStaging({
     accentAt,
     stateAt,
     pairNode: pair.node,
+    carrying,
     onHandPlay,
     onCardClick,
     onTargetPick,
