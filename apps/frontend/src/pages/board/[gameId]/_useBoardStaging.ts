@@ -102,6 +102,10 @@ export interface BoardStaging {
   gapAt: number | null // fan gap while a cancel returns cards
   gapSize: number
   handItems: HandItem[] // you.hand minus the staged card(s)
+  /** the uids that are NOT in the fan right now — standing at the centre, or
+   * held there while a cost is owed. Whoever fills the fan subtracts this, so a
+   * card lying at the centre is never drawn in the hand as well (#168). */
+  handOut: ReadonlySet<string>
   accentAt: (index: number) => string | undefined // partner lighting while a support awaits one
   /** what a fan slot reads as — 'playable' for the cards that answer the step
    * the turn side is actually waiting on (today: a standing release's cost),
@@ -349,20 +353,54 @@ export function useBoardStaging({
   // moves it on (`clearPaidCost`).
   const [paidCost, setPaidCost] = useState<{ uid: string; card: CardData } | null>(null)
 
-  const handItems = useMemo(() => {
-    const out = new Set(
-      [staged?.support?.uid, staged?.main?.uid, cost?.release].filter((uid): uid is string =>
-        Boolean(uid),
+  // WHAT IS NOT IN THE FAN RIGHT NOW — the staged halves, and the release held
+  // at the centre while its cost is owed. Exported rather than kept private,
+  // because the fan's items do NOT always come from this hook: whichever hook
+  // owns the hand builds its own list straight off the projection, and while a
+  // beat runs that projection is the SHADOW — the board from BEFORE the play,
+  // where these cards are still in the hand. An owner that does not subtract
+  // this draws a card that is standing at the centre back into the fan, and the
+  // fan then raises its zoom preview for it (#168).
+  //
+  // A SET THAT EMPTIES, never a memory of what has left: a refusal, an invalid
+  // partner and Escape all send these cards home again, and that return is the
+  // gesture working rather than a card escaping. So this says where the cards
+  // are now, and says nothing at all the moment they are back in the hand.
+  const handOut = useMemo(
+    () =>
+      new Set(
+        [staged?.support?.uid, staged?.main?.uid, cost?.release].filter((uid): uid is string =>
+          Boolean(uid),
+        ),
       ),
-    )
-    if (out.size === 0) return state.you.hand
-    return state.you.hand.filter((c) => !out.has(c.uid))
-  }, [state.you.hand, staged, cost])
+    [staged, cost],
+  )
 
-  const aimFromCentre = useCallback(() => {
-    const el = anchors.centre.current
-    if (el) arrowCtl.aim(centerOf(el))
-  }, [anchors.centre, arrowCtl.aim])
+  const handItems = useMemo(
+    () => (handOut.size === 0 ? state.you.hand : state.you.hand.filter((c) => !handOut.has(c.uid))),
+    [state.you.hand, handOut],
+  )
+
+  // THE ARROW LEAVES THE CARD THAT IS ASKING, not the middle of the table. The
+  // two were the same thing for as long as a played card stood in the middle,
+  // and stopped being the same when the centre grew a ROW: a support waiting
+  // for its partner stands in the row's first place and the card it enhances in
+  // the second, so the middle BETWEEN them is empty table — and an arrow drawn
+  // from `anchors.centre` came out of that gap instead of out of the card.
+  //
+  // WHERE A CARD STANDS IS THE CENTRE MODULE'S ANSWER, asked the way every
+  // flight into the row asks it (`stageSlot`). `place` is null for a card that
+  // owns the middle — one that is aiming, or a folded pair — so that case
+  // resolves to the very element this always used, with no branch of its own.
+  // `Table`'s own arrow anchors to its source card the same way, and re-derives
+  // it on every phase change rather than aiming once (apps/ui/src/table/Table).
+  const aimFromPlay = useCallback(
+    (place: number | null) => {
+      const el = (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
+      if (el) arrowCtl.aim(centerOf(el))
+    },
+    [anchors, arrowCtl.aim],
+  )
 
   // the card box of a hand card, from the FAN's own geometry, NOT a slot's
   // rotated bounding rect — a slot is rotated, so its bounding rect is the box
@@ -701,8 +739,10 @@ export function useBoardStaging({
             // and that place is mounted by the commit above — it does not exist
             // yet when this body starts. A card that AIMS has been played, and
             // keeps the middle it always had.
-            const place = hasTarget ? anchors.centre.current : stageSlot(anchors, 0)
-            const to = (place ?? anchors.centre.current)?.getBoundingClientRect()
+            const place = hasTarget ? null : 0
+            const to = (
+              (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
+            )?.getBoundingClientRect()
             if (el && to) await play('playToCenter', el, { from, to })?.finished
           } catch {
             // A `void`ed body is watched by nobody: let it reject and the whole
@@ -712,10 +752,12 @@ export function useBoardStaging({
           flyer.drop('stage')
           setCarrying([])
         }
-        aimFromCentre()
+        // out of the place it has just landed in — the same one the flight
+        // above aimed at, so the arrow starts where the card ended
+        aimFromPlay(hasTarget ? null : 0)
       })()
     },
-    [anchors, reduced, flyer.raise, flyer.drop, aimFromCentre],
+    [anchors, reduced, flyer.raise, flyer.drop, aimFromPlay],
   )
 
   // A standalone play is read at the centre before its effect is sent.
@@ -971,7 +1013,10 @@ export function useBoardStaging({
           !rebaseAllPiles(main.card, support.card)
         ) {
           commitStaged({ support, main, phase: 'target', merged })
-          aimFromCentre()
+          // The card that aims is the MAIN one, and where it stands depends on
+          // how the two were put down: side by side it took the row's second
+          // place, folded it owns the middle with the support under it.
+          aimFromPlay(sideBySide ? 1 : null)
         } else {
           commitStaged({ support, main, phase: 'dispatched', merged })
           dispatchWatermarkRef.current = eventsRef.current.length
@@ -1081,7 +1126,7 @@ export function useBoardStaging({
       reduced,
       slotBox,
       arrowCtl.stop,
-      aimFromCentre,
+      aimFromPlay,
       stageSoloRelease,
       stageAtCentre,
       actions,
@@ -1295,6 +1340,7 @@ export function useBoardStaging({
     gapAt: arrival.gapAt,
     gapSize: arrival.gapSize,
     handItems,
+    handOut,
     accentAt,
     stateAt,
     pairNode: pair.node,

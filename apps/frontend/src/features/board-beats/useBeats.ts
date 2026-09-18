@@ -105,8 +105,10 @@ export interface Beats {
    * the flight that brings it starts, so it is never seen standing where it has
    * not arrived */
   splittingPile: number | null
-  /** the discard is collecting itself into one stack before it leaves */
-  gatheringDiscard: boolean
+  /** where the discard is while it leaves for a pile: still lying there and
+   * collecting itself into one stack, or already held by a carrier and gone
+   * from its own spot */
+  discardOut: 'gathering' | 'taken' | null
   operationStanding: boolean
   /** the operation card resting at the centre — the table draws it, under any surface */
   operationLanded: OperationLanded | null
@@ -746,7 +748,7 @@ export function useBeats(args: {
   return {
     /** the pile a split has mounted but not yet flown in — it stays invisible */
     splittingPile: decks.splitting,
-    gatheringDiscard: decks.gathering,
+    discardOut: decks.discardOut,
     operationStanding: operations.standing,
     operationLanded: operations.landed,
     // The shadow is what the running beat has published, or its own base while

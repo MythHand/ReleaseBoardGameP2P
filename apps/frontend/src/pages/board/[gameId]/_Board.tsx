@@ -618,10 +618,17 @@ export default function Board({
   // The row lives from the pull until the play LEAVES the table: a sudo and the
   // card it enhances keep standing in it while that card aims at what it hits,
   // which is the whole point of enhancing it before aiming.
+  //
+  // WHAT ENDS THE ROW IS THE STAGING ENDING, not a phase inside it. Read off
+  // the phases, this stopped one step early — at `dispatched` the row came down
+  // while `staged` was still standing, so for the two frames until the beat
+  // adopted the play, `soloStaged` drew the sudo in the MIDDLE of the table and
+  // the card it enhances was drawn nowhere at all: the sudo jumped out of its
+  // place and back, which is the blink at the centre (#168). The staging's own
+  // end is the beat's `release()`, and that is the same commit the beat's own
+  // carriers go up in — so the row hands over with no frame in between.
   const assembling =
-    staging.staged?.support &&
-    !staging.staged.merged &&
-    (staging.staged.phase === 'partner' || staging.staged.phase === 'target')
+    staging.staged?.support && !staging.staged.merged
       ? { support: staging.staged.support, main: staging.staged.main }
       : null
 
@@ -715,14 +722,54 @@ export default function Board({
   // card pulled out of the fan.
   const surfaceOwnsTable = [cherry.grid, rebase.row, inside.row, requesting.band].some(Boolean)
   // The scene's own rule (`ComboStory`: `merged || playing`): while the play is
-  // ON THE TABLE — a pair standing at the centre, or anything of this gesture
-  // still in the air — the fan stops answering the cursor for the same reason.
-  // The one thing that keeps it live is a cost owed: that answer is a click in
-  // the fan.
+  // ON THE TABLE — standing at the centre, or anything of this gesture still in
+  // the air — the fan stops answering the cursor for the same reason. The one
+  // thing that keeps it live is a cost owed: that answer is a click in the fan.
+  //
+  // ASSEMBLED, not merged. `merged` used to be the same question, because every
+  // combo folded into a pair; a sudo does not fold — it stands beside the card
+  // it enhances — so asking about the pair let the fan wake up under a play that
+  // is on the table, and the slot the second card came out of raised its zoom
+  // preview right under the cursor that had just dropped it there.
+  const playStanding =
+    staging.staged?.merged === true ||
+    staging.staged?.phase === 'target' ||
+    staging.staged?.phase === 'dispatched'
   const handInert =
-    (staging.costOptions.length === 0 &&
-      (Boolean(staging.staged?.merged) || staging.overlay.length > 0)) ||
+    (staging.costOptions.length === 0 && (playStanding || staging.overlay.length > 0)) ||
     surfaceOwnsTable
+
+  // WHAT THE FAN SHOWS — the owner's own list, minus the cards the turn staging
+  // is holding at the centre. Which hook owns the hand changes with the step,
+  // and each of them builds its list straight off the projection; only the turn
+  // staging knows what is standing in the centre's row. While a beat runs, that
+  // projection is the SHADOW — the board from BEFORE the play — so an owner
+  // without this subtraction draws a card that is lying at the centre back into
+  // the fan, and the fan raises its zoom preview for it under a cursor that
+  // never moved (#168, the sudo's ghost).
+  //
+  // Applied HERE, once, rather than in five hooks: the fan has one set of items
+  // whoever filled it, so the rule belongs where that choice is made. It is a
+  // no-op while the turn staging owns the fan — that list is already filtered —
+  // and it empties the moment the cards come home, so a cancel's own return
+  // into the fan is untouched.
+  const fanOwnerItems =
+    upgrade.asked || upgrade.stagedUid
+      ? upgrade.handItems
+      : discarding
+        ? handLimit.handItems
+        : defenseOwnsHand
+          ? defenseStaging.handItems
+          : neutralizeOwnsHand
+            ? neutralizing.handItems
+            : staging.handItems
+  const fanItems = useMemo(
+    () =>
+      staging.handOut.size === 0
+        ? fanOwnerItems
+        : fanOwnerItems.filter((c) => !staging.handOut.has(c.uid)),
+    [fanOwnerItems, staging.handOut],
+  )
 
   const stagedRelease = staging.stageStanding
     ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
@@ -1299,11 +1346,13 @@ export default function Board({
           <Pile
             label={copy.table.discard}
             heap={
-              cherry.grid
+              cherry.grid || beats.discardOut === 'taken'
                 ? []
                 : decks.discardHeap?.filter((c) => c.uid !== `d${state.aiCause?.eventId}`)
             }
-            topCard={cherry.grid || state.aiCause ? null : decks.discard}
+            topCard={
+              cherry.grid || state.aiCause || beats.discardOut === 'taken' ? null : decks.discard
+            }
             // THE WHOLE DISCARD LEAVES, not its top card. Before it flies to a
             // pile the heap collects itself into a straight stack and its
             // counter goes — that gathering IS the pile becoming one thing, and
@@ -1311,11 +1360,11 @@ export default function Board({
             // travels (`DeckAnimationsStory`: `gathered` with `showCount: false`,
             // which is its own `count={0}`).
             count={
-              cherry.grid || beats.gatheringDiscard
+              cherry.grid || beats.discardOut
                 ? 0
                 : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))
             }
-            gathered={beats.gatheringDiscard || undefined}
+            gathered={beats.discardOut === 'gathering' || undefined}
             width={116}
             boxRef={anchors.discardBox}
           />
@@ -1777,17 +1826,7 @@ export default function Board({
               <Hand
                 // Keep the same owner for items and index-based handlers,
                 // including the exit after the defense prompt closes.
-                items={
-                  upgrade.asked || upgrade.stagedUid
-                    ? upgrade.handItems
-                    : discarding
-                      ? handLimit.handItems
-                      : defenseOwnsHand
-                        ? defenseStaging.handItems
-                        : neutralizeOwnsHand
-                          ? neutralizing.handItems
-                          : staging.handItems
-                }
+                items={fanItems}
                 // the fan opens room for the arriving heap while it travels —
                 // the deal wins the tie against every other beat the same way
                 // it already wins the shadow's, and the staging gesture's own
@@ -1892,19 +1931,7 @@ export default function Board({
                 onReorder={
                   deal.active || (discarding && handLimit.carrying)
                     ? undefined
-                    : (uid, to) =>
-                        handOrder.commit(
-                          you.hand,
-                          discarding
-                            ? handLimit.handItems
-                            : defenseOwnsHand
-                              ? defenseStaging.handItems
-                              : neutralizeOwnsHand
-                                ? neutralizing.handItems
-                                : staging.handItems,
-                          uid,
-                          to,
-                        )
+                    : (uid, to) => handOrder.commit(you.hand, fanItems, uid, to)
                 }
                 renderFace={
                   deal.active

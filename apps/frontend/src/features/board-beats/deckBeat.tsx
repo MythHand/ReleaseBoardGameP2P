@@ -37,8 +37,12 @@ export function useDeckBeat(anchors: BoardAnchors) {
   // it has not flown to yet — a blink at the very spot it is about to arrive at.
   // So it is born invisible and shown in the same breath the flight starts.
   const [splitting, setSplitting] = useState<number | null>(null)
-  // the discard collecting itself into one stack before it leaves for a pile
-  const [gathering, setGathering] = useState(false)
+  // WHERE THE DISCARD IS while it leaves for a pile. 'gathering' — it is still
+  // lying there, collecting itself into one straight stack. 'taken' — a carrier
+  // holds it and it is gone from its own spot: the scene empties the heap in the
+  // very moment it raises that carrier, or the pile that just flew away is still
+  // drawn sitting where it was.
+  const [discardOut, setDiscardOut] = useState<'gathering' | 'taken' | null>(null)
   const latest = useRef({ anchors })
   latest.current = { anchors }
 
@@ -61,9 +65,10 @@ export function useDeckBeat(anchors: BoardAnchors) {
       // stack. Raised after the gathering rather than before it: the flyer
       // stands on the top card, and until the stack is straight the top card is
       // lying at its own scattered angle.
-      setGathering(true)
+      setDiscardOut('gathering')
       await wait(GATHER_MS)
       const [el] = await raise([{ key: 'pile', card: top, at: from }])
+      setDiscardOut('taken')
       if (el) {
         const anim = play('gatherToDeck', el, { from, to: cardAreaOf(toCell), duration: 560 })
         if (anim) await anim.finished
@@ -75,7 +80,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
       // down in — neither a frame with both of them nor one with neither
       reveal?.()
       drop('pile')
-      setGathering(false)
+      setDiscardOut(null)
     },
     [raise, patch, drop],
   )
@@ -233,7 +238,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
   // the recycled pile), so dropping it is the whole of it.
   const reset = useCallback(() => drop(), [drop])
 
-  return { overlay, runReshuffle, runPiles, reset, splitting, gathering }
+  return { overlay, runReshuffle, runPiles, reset, splitting, discardOut }
 }
 
 // The board with a different row of piles — published to the queue AND written
