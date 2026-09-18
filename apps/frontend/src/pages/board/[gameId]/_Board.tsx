@@ -515,7 +515,6 @@ export default function Board({
     actions,
     copy: {
       prompt: copy.table.upgradePrompt,
-      waiting: copy.table.upgradeWaiting,
       takePrompt: copy.table.upgradeTakePrompt,
       confirm: copy.pending.confirm,
     },

@@ -2,6 +2,7 @@
 // the cards already at the centre are the projection's, so what is worth
 // pinning here is that each throw flies, and that several inside one batch are
 // staggered rather than landing on top of each other.
+import { cardById } from '@release/ui'
 import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
@@ -64,7 +65,13 @@ const base = {
   frozen: [],
 } as unknown as BoardState
 
-function harness(opts: { seats?: boolean; local?: StagedHandoff } = {}) {
+function harness(
+  opts: {
+    seats?: boolean
+    local?: StagedHandoff
+    handOver?: Parameters<typeof useUpgradeBeat>[2]
+  } = {},
+) {
   const root = node()
   const centre = node()
   root.append(centre)
@@ -90,7 +97,7 @@ function harness(opts: { seats?: boolean; local?: StagedHandoff } = {}) {
   } as unknown as BoardAnchors
   const api: { beat?: ReturnType<typeof useUpgradeBeat> } = {}
   function Probe() {
-    api.beat = useUpgradeBeat(anchors, { current: opts.local ?? null })
+    api.beat = useUpgradeBeat(anchors, { current: opts.local ?? null }, opts.handOver)
     return <>{api.beat.overlay}</>
   }
   render(<Probe />)
@@ -147,6 +154,58 @@ it('staggers two answers that arrive in one batch', async () => {
   // THROW_STEP is 260; the second card must not start with the first. Compared
   // with a margin because the drive loop advances the clock in 20ms steps.
   expect(timeline.starts[1] - timeline.starts[0]).toBeGreaterThanOrEqual(240)
+})
+
+// The other half of the same question, and the opposite answer: seats ANSWER
+// one after another (they are separate decisions), but the centre EMPTIES in one
+// go. Sent with a per-card delay the cards read as several discards instead of
+// the centre going to the pile, which is the step's own stated rule.
+it('empties the centre into the discard with no per-card delay', async () => {
+  timeline.exits.mockClear()
+  const { api, ctx } = harness()
+  const run = {
+    ...plan([
+      { eventId: 1, player: 'p2', card: 'attack-bug' },
+      { eventId: 2, player: 'p3', card: 'defense-hotfix' },
+    ]),
+    clear: [
+      { eventId: 3, player: 'p2', card: 'attack-bug' },
+      { eventId: 4, player: 'p3', card: 'defense-hotfix' },
+    ],
+  }
+  await drive(() => api.beat?.run(run, ctx))
+  const items = timeline.exits.mock.calls.at(-1)?.[0] as { delay?: number }[]
+  expect(items).toHaveLength(2)
+  for (const item of items) expect(item.delay ?? 0).toBe(0)
+})
+
+// …and the System Upgrade card standing in that same centre goes with them. It
+// has a beat of its own, and the queue plays beats one after another, so on that
+// beat it could only start once these had landed — a visible second discard.
+it('carries the operation card out in the same send as the row', async () => {
+  timeline.exits.mockClear()
+  const takeOff = vi.fn()
+  const settle = vi.fn()
+  const upgradeCard = cardById('operation-system-upgrade')
+  if (!upgradeCard) throw new Error('no System Upgrade card')
+  const { api, ctx } = harness({
+    handOver: () => ({
+      items: [{ key: 'operation-exit:9', card: upgradeCard, layer: 1 }],
+      takeOff,
+      settle,
+    }),
+  })
+  const run = {
+    ...plan([{ eventId: 1, player: 'p2', card: 'attack-bug' }]),
+    clear: [{ eventId: 3, player: 'p2', card: 'attack-bug' }],
+  }
+  await drive(() => api.beat?.run(run, ctx))
+  const items = timeline.exits.mock.calls.at(-1)?.[0] as { key: string; layer?: number }[]
+  // the operation's own halves keep the bottom layers; the answers stack above
+  expect(items.map((entry) => entry.key)).toEqual(['operation-exit:9', 'upgrade-exit:3'])
+  expect(items.at(-1)?.layer).toBe(2)
+  expect(takeOff).toHaveBeenCalledTimes(1)
+  expect(settle).toHaveBeenCalledTimes(1)
 })
 
 it('flies nothing for a seat the board cannot aim at', async () => {

@@ -130,6 +130,65 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
     latest.current.exit.reset()
   }, [flyer.drop])
 
+  // What the standing card's own exit looks like — one builder, because the
+  // card can leave in two ways: on its own beat (`runExit`), or carried out by
+  // the beat that is emptying the same centre (`handOver`).
+  const exitItems = useCallback(
+    (
+      operation: Extract<BeatPlan, { kind: 'operationPlaced' }>,
+      spent: { eventId: number; card: string }[] | undefined,
+    ) => {
+      const centre = rectOf(latest.current.anchors.centre.current)
+      if (!centre) return null
+      // the resting render at the centre — the sudo half starts from where it is seen
+      const aux = latest.current.anchors.centre.current?.querySelector<HTMLElement>(
+        '[data-public-operation] [data-aux]',
+      )
+      const items: Leaving[] = (spent ?? operation.spent).flatMap((c) => {
+        const card = cardById(c.card)
+        if (!card) return []
+        const support = operation.sudo && c.card === 'support-sudo'
+        return [
+          {
+            key: `operation-exit:${c.eventId}`,
+            card,
+            from: support && aux ? cardBoxIn(aux.getBoundingClientRect(), centre.width) : centre,
+            scatter: scatterAt(c.eventId),
+            ...(support ? { pose: { rot: PAIR_AUX.rot, dx: 0, dy: 0 }, layer: 0 } : { layer: 1 }),
+          },
+        ]
+      })
+      return items
+    },
+    [],
+  )
+
+  // THE CARD LEAVES WITH THE CENTRE IT STANDS IN. An effect whose own cards go
+  // to the discard empties the same centre this card rests in, and two beats
+  // cannot empty it together — the queue plays them one after the other, so the
+  // card would follow the rest after a visible gap. So the beat that owns that
+  // centre takes this card into its own send instead. The two halves are the
+  // same two moments `runExit` has internally: `takeOff` in the commit the
+  // carriers go up, `settle` once they have landed.
+  const handOver = useCallback(() => {
+    const operation = held.current
+    if (!operation) return null
+    const items = exitItems(operation, operation.spent)
+    if (!items || items.length === 0) return null
+    return {
+      items,
+      spent: operation.spent,
+      takeOff: () => {
+        setLanded(null)
+        flyer.drop()
+      },
+      settle: () => {
+        held.current = null
+        setStanding(false)
+      },
+    }
+  }, [exitItems, flyer.drop])
+
   // Nothing travels on a restore: the card is already resting at the centre.
   const restore = useCallback((state: BoardState, events: Event[]) => {
     const plan = pendingOperation(state, events)
@@ -219,29 +278,11 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       const run = epoch.current
       await wait(CENTER_HOLD)
       if (run !== epoch.current) return
-      const centre = rectOf(latest.current.anchors.centre.current)
-      if (!centre) {
+      const items = exitItems(operation, plan.spent)
+      if (!items) {
         reset()
         return
       }
-      // the resting render at the centre — the sudo half starts from where it is seen
-      const aux = latest.current.anchors.centre.current?.querySelector<HTMLElement>(
-        '[data-public-operation] [data-aux]',
-      )
-      const items: Leaving[] = (plan.spent ?? operation.spent).flatMap((c) => {
-        const card = cardById(c.card)
-        if (!card) return []
-        const support = operation.sudo && c.card === 'support-sudo'
-        return [
-          {
-            key: `operation-exit:${c.eventId}`,
-            card,
-            from: support && aux ? cardBoxIn(aux.getBoundingClientRect(), centre.width) : centre,
-            scatter: scatterAt(c.eventId),
-            ...(support ? { pose: { rot: PAIR_AUX.rot, dx: 0, dy: 0 }, layer: 0 } : { layer: 1 }),
-          },
-        ]
-      })
       const sent = latest.current.exit.send(items)
       // the exit's carriers go up in this same commit as the resting card goes
       setLanded(null)
@@ -279,7 +320,7 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       held.current = null
       setStanding(false)
     },
-    [flyer.drop, reset],
+    [exitItems, flyer.drop, reset],
   )
   const withoutHeld = useCallback((state: BoardState): BoardState => {
     return withoutSpent(state, held.current?.spent ?? [])
@@ -287,6 +328,7 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
   return {
     restore,
     withoutHeld,
+    handOver,
     overlay: [...flyer.overlay, ...exit.overlay],
     standing,
     landed,

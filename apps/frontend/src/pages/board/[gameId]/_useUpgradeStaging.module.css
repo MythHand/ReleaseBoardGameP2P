@@ -1,10 +1,19 @@
 /* Everyone's answers, open at the centre (#108). The band the AI pair uses
    (`centre.ts`'s CENTRE_TOP, 42%), because these cards ARE the centre of the
    table for as long as the effect runs — not a question hovering over it. */
+
+/* ABOVE the band the flights ride in, not below it. The operation card stands
+   UNDER this row on the table and lands UNDER it in the heap — the engine
+   discarded it first — but it leaves on a carrier, and a carrier rides the
+   flight band. With this row on a lower layer of its own, that one card jumped
+   on top of the answers the instant it took off and dropped back under them the
+   instant they landed: two teleports, one wrong layer. Above the band the order
+   they have on the table is the order they keep the whole way; the pile counter
+   (`Pile`'s `.count`, `+40`) still clears them, and the arrow above that. */
 .surface {
   position: absolute;
   inset: 0;
-  z-index: 40;
+  z-index: calc(var(--z-flight) + 10);
   pointer-events: none;
 }
 

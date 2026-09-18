@@ -196,8 +196,11 @@ export function useBeats(args: {
   const handLimits = useHandLimitBeat(anchors, handLimit)
   const transfers = useTransferBeat(anchors)
   const ais = useAiBeat(anchors)
-  const upgrades = useUpgradeBeat(anchors, staging)
+  // The operation beat first: System Upgrade's centre holds both its answers and
+  // the operation card itself, and they leave together in the answers' own send
+  // rather than in a beat of their own behind them.
   const operations = useOperationBeat(anchors, staging)
+  const upgrades = useUpgradeBeat(anchors, staging, operations.handOver)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
