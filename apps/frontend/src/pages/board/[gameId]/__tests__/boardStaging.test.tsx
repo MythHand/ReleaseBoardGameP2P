@@ -440,6 +440,29 @@ it('a pulled support lights its partners and a click folds the pair', async () =
   )
 })
 
+// THE HUE IS THE CARD THE LINE LEAVES, and after a sudo has been told what it
+// enhances, that card is the one aiming — so the colour changes hands with the
+// aim. It used to be re-derived from `staged` by a rule of the board's own
+// ("the support, if there is one"), which outlived the handover: the arrow came
+// out of the attack and stayed the sudo's yellow (#168). Armed together now, so
+// the origin and the colour cannot name two different cards.
+it('hands the arrow’s hue over with the aim, from the sudo to the card it enhances', async () => {
+  comboOut = []
+  render(
+    comboBoardWith({
+      comboOptions: { 'support-sudo#0': ['attack-bug#0'] },
+      targets: BUG_SEAT_TARGET,
+    }),
+  )
+  const hue = () =>
+    document.querySelector<SVGElement>(`.${arrowStyles.svg}`)?.style.getPropertyValue('--arrow') ??
+    null
+  await pullFromComboFan('support-sudo#0')
+  expect(hue()).toBe('var(--cat-support)') // the sudo stands alone, asking for a partner
+  await clickComboFanCard('attack-bug#0')
+  expect(hue()).toBe('var(--cat-attack)') // the attack aims; the sudo only enhances it
+})
+
 it('a release partner dispatches without a target', async () => {
   const onPlay = vi.fn()
   comboOut = []

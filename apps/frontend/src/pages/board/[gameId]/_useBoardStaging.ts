@@ -103,7 +103,9 @@ export interface BoardStaging {
   staged: StagedPlay | null
   dispatched: boolean // derived: staged?.phase === 'dispatched'
   targets: TableTarget[] // the staged card's — [] when nothing staged
-  arrow: { from: Point | null; to: Point | null; active: boolean }
+  // `color` is the hue the aim was armed with — the category of the card the
+  // line leaves; undefined while nothing is aiming.
+  arrow: { from: Point | null; to: Point | null; color?: string; active: boolean }
   overlay: ReactNode[] // flyer + return-flight overlays
   gapAt: number | null // fan gap while a cancel returns cards
   gapSize: number
@@ -407,10 +409,16 @@ export function useBoardStaging({
       ? { rotate: ATTACK_POSE.rot, dx: ATTACK_POSE.dx, dy: ATTACK_POSE.dy }
       : {}
 
+  // THE CARD IS THE ARGUMENT, not just its place: the same card decides where
+  // the line starts and what colour it is drawn in, so both are said in one
+  // call. Splitting them is how the hue went stale — the board re-derived it
+  // from `staged` with a rule of its own ("the support, if there is one"),
+  // which outlived the moment a sudo hands the aim over to the card it
+  // enhances: the arrow left the attack and stayed the sudo's yellow (#168).
   const aimFromPlay = useCallback(
-    (place: number | null) => {
+    (card: StagedCard, place: number | null) => {
       const el = (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
-      if (el) arrowCtl.aim(centerOf(el))
+      if (el) arrowCtl.aim(centerOf(el), undefined, `var(--cat-${card.card.category})`)
     },
     [anchors, arrowCtl.aim],
   )
@@ -768,7 +776,7 @@ export function useBoardStaging({
         }
         // out of the place it has just landed in — the same one the flight
         // above aimed at, so the arrow starts where the card ended
-        aimFromPlay(hasTarget ? null : 0)
+        aimFromPlay(card, hasTarget ? null : 0)
       })()
     },
     [anchors, reduced, flyer.raise, flyer.drop, aimFromPlay],
@@ -1034,8 +1042,10 @@ export function useBoardStaging({
           commitStaged({ support, main, phase: 'target', merged })
           // The card that aims is the MAIN one, and where it stands depends on
           // how the two were put down: side by side it took the row's second
-          // place, folded it owns the middle with the support under it.
-          aimFromPlay(sideBySide ? 1 : null)
+          // place, folded it owns the middle with the support under it. It is
+          // also the card the arrow is COLOURED by, for the same reason — the
+          // aim is its own now, the support only enhances it.
+          aimFromPlay(main, sideBySide ? 1 : null)
         } else {
           commitStaged({ support, main, phase: 'dispatched', merged })
           dispatchWatermarkRef.current = eventsRef.current.length

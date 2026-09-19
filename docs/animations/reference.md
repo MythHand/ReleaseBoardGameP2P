@@ -90,7 +90,7 @@ letting it flash in place first).
 |---|---|---|
 | `Arrow` | `<Arrow from={Point} to={Point} color? />` | quadratic-Bézier aiming arrow in viewport coords |
 | `centerOf` | `centerOf(el)` → `Point` | element center in viewport coords (`clientX/Y`) |
-| `useArrow` | `useArrow()` → `{ from, to, active, aim, stop }` | holds arrow endpoints, tracks the cursor while active; `aim(origin, at?)` starts, `stop()` ends |
+| `useArrow` | `useArrow()` → `{ from, to, color, active, aim, stop }` | holds arrow endpoints and the hue it was armed with, tracks the cursor while active; `aim(origin, at?, color?)` starts, `stop()` ends. The colour is armed WITH the origin because both belong to the card the arrow leaves — pass it to `<Arrow color>` from here rather than deriving it a second time, or the two drift apart when the aim changes hands |
 | `Point` | `{ x, y }` | viewport point (the arrow's coordinate shape) |
 
 ---

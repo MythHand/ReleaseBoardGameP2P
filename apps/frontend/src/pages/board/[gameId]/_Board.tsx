@@ -643,15 +643,12 @@ export default function Board({
       ? { support: staging.staged.support, main: staging.staged.main }
       : null
 
-  // The card the arrow leaves FROM, whichever hook armed it — a waiting
-  // support if there is one, the aimed card otherwise. Its category is the
-  // arrow's hue (#101, Fix B, Defect 5): the defence side only ever aims with
-  // the Sudo, which is how it comes out as the scene's own `--cat-support`
-  // without naming that token here.
-  const aimingCard = answering
-    ? defenseStaging.staged?.support?.card
-    : (staging.staged?.support ?? staging.staged?.main)?.card
-  const arrowColor = aimingCard ? `var(--cat-${aimingCard.category})` : undefined
+  // The hue the arrow was ARMED with (#101, Fix B, Defect 5): whichever hook
+  // aimed it named the colour of the card the line leaves, in the same call
+  // that said where it starts. The board no longer re-derives that from
+  // `staged` — one card, one arming, so the origin and the colour cannot say
+  // two different cards (#168).
+  const arrowColor = answering ? defenseStaging.arrow.color : staging.arrow.color
   // Which draw pile the cursor is over while the arrow is asking. A pile is not
   // a card and has no hover of its own, so the answer it gives the arrow is
   // rendered rather than styled: it comes back to `Pile` as `selected` (see the
@@ -1278,8 +1275,9 @@ export default function Board({
           thing the approved scene says with a literal
           `color="var(--cat-support)"`, read off the card actually standing
           rather than hardcoded, since the turn side aims with every category
-          there is. No card standing means no arrow to colour, and Arrow's own
-          default takes over. */}
+          there is. It comes armed with the aim itself (`useArrow`), so it is
+          always the card the line leaves. Nothing armed means no colour, and
+          Arrow's own default takes over. */}
       <Arrow
         from={answering ? defenseStaging.arrow.from : staging.arrow.from}
         to={answering ? defenseStaging.arrow.to : staging.arrow.to}

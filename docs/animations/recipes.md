@@ -670,7 +670,10 @@ the cursor; hovering a target zone lights it in the same color; clicking empty s
 
 **Elements / refs**
 - `refs[card.id]` — the source card spot (arrow origin via `centerOf`).
-- `useArrow()` → `{ from, to, active, aim, stop }` — holds endpoints, tracks the cursor while active.
+- `useArrow()` → `{ from, to, color, active, aim, stop }` — holds endpoints and the armed hue, tracks
+  the cursor while active. A scene that aims with one kind of card all the way through may pass the
+  colour straight to `<Arrow>` (this one does); a scene where the aim changes hands mid-play arms it
+  with `aim(origin, at?, color?)`, so the origin and the hue always name the same card.
 - Target zones: `lit = active && hovered === id`, highlighted via `--hl: color`.
 
 **Sequence**
