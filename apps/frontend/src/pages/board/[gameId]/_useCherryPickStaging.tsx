@@ -73,6 +73,10 @@ export function useCherryPickStaging(args: {
     confirm: string
   }
   enabled: boolean
+  /** a pick another seat is offering but has not confirmed */
+  pickPreview?: { player: string; card: string | null } | null
+  /** this seat's own offer, on its way to the others */
+  onPickPreview?: (card: string | null) => void
 }): { grid: ReactNode | null; overlay: ReactNode[]; gapAt: number | null; gapSize: number } {
   const { state, anchors, actions, copy, enabled } = args
   const reduced = useReducedMotion()
@@ -294,6 +298,30 @@ export function useCherryPickStaging(args: {
     if (idA && isTrigger(idA)) return { hand: b, deck: a }
     return { hand: a, deck: b }
   })()
+
+  // WHAT THE SURFACE MARKS, on either side of the table. The actor marks its own
+  // roles; a watching seat marks the card the actor's surface says it is
+  // offering — and only that one. The deck pick never travels (the rules place
+  // that card unseen), so across the table there is no deck role to mark.
+  const watchedHand =
+    theirs && args.pickPreview?.player === theirs.player && args.pickPreview.card
+      ? (watched.find((o) => o.id === args.pickPreview?.card)?.uid ?? null)
+      : null
+  const handUid = ours ? roles.hand : watchedHand
+  const deckUid = ours ? roles.deck : null
+
+  // …and it is told. Sent whenever the local offer changes, and cleared when
+  // the surface goes: a highlight left standing on a pick nobody is making any
+  // more is worse than none.
+  const sentRef = useRef<string | null>(null)
+  const send = args.onPickPreview
+  useEffect(() => {
+    if (!send) return
+    const card = ours && roles.hand ? idOfOption(options, roles.hand) : null
+    if (sentRef.current === card) return
+    sentRef.current = card
+    send(card)
+  }, [send, ours, roles.hand, options])
 
   const max = ours?.picks ?? (sudo ? 2 : 1)
 
@@ -632,6 +660,9 @@ export function useCherryPickStaging(args: {
   // Only the seat that can ANSWER chooses. Across the table the same cards are
   // up in the same places and nothing else: no lighting, no role tags, no bar.
   const choosing = ours != null && !confirmed && !dealing
+  // The MARKS are both seats': one shows what it is choosing, the other watches
+  // that choice being made. Only the controls are the actor's alone.
+  const marking = !confirmed && !dealing
 
   return {
     grid: (
@@ -653,8 +684,8 @@ export function useCherryPickStaging(args: {
           {options.map((o) => {
             const data = cardById(o.id)
             if (!data) return null
-            const handRole = roles.hand === o.uid
-            const deckRole = roles.deck === o.uid
+            const handRole = handUid === o.uid
+            const deckRole = deckUid === o.uid
             const selected = handRole || deckRole
             const blocked = choosing && !selected && !canSelect(o.uid)
             return (
@@ -680,17 +711,17 @@ export function useCherryPickStaging(args: {
                   interactive={false}
                   width="100%"
                   faceDown={flipped.has(o.uid)}
-                  state={choosing && selected ? 'selected' : 'idle'}
+                  state={marking && selected ? 'selected' : 'idle'}
                   // one out of a set — the uniform selection colour, never the
                   // per-category accent
                   accent="var(--select-accent)"
                 />
-                {choosing && handRole && (
+                {marking && handRole && (
                   <Typography base="overline" tk="tk-10" className={styles.roleTag}>
                     {copy.toHand}
                   </Typography>
                 )}
-                {choosing && deckRole && (
+                {marking && deckRole && (
                   <Typography base="overline" tk="tk-10" className={styles.roleTag}>
                     {copy.toDeck}
                   </Typography>

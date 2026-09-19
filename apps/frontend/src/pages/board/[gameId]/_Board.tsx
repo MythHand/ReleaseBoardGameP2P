@@ -180,6 +180,8 @@ export default function Board({
   panel: panelProp,
   onPanelChange,
   intro,
+  pickPreview,
+  onPickPreview,
 }: BoardProps) {
   // ===== the opening =====
   // Every node a flight aims at or leaves from — the board's own registry, not
@@ -489,6 +491,8 @@ export default function Board({
       confirm: copy.pending.confirm,
     },
     enabled: !(deal.active || beats.exclusive),
+    pickPreview,
+    onPickPreview,
   })
   // Git Rebase's private row (#108) — the same band and the same gate as the
   // grid above, because both are the same kind of question asked over the same
