@@ -290,13 +290,17 @@ export function useHandLimitBeat(
       // go to the discard while the AI card returns to its deck. Clear the
       // standing pair in the same commit that mounts those exit carriers.
       const causeItems = aiCauseExit(plan.causeward, a)
-      if (plan.homeward || plan.causeward) {
+      // the standing pair goes in the same commit that mounts those exit
+      // carriers — the step's own `takeOff`, which is where that ordering lives
+      const clearStanding = () => {
+        if (!plan.homeward && !plan.causeward) return
         const next = withoutAiCause(flown, causeItems.length > 0 ? plan.causeward : undefined)
         ctx.base = next
         ctx.publish(next)
       }
+      if (items.length + causeItems.length === 0) clearStanding()
       await Promise.all([
-        latest.current.send([...items, ...causeItems]).then(() => {
+        latest.current.send([...items, ...causeItems], clearStanding).then(() => {
           if (isStale() || causeItems.length === 0) return
           const next = { ...ctx.base, decks: flown.decks }
           ctx.base = next

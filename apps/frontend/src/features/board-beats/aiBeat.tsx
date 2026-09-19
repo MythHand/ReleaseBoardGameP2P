@@ -179,14 +179,19 @@ export function useAiBeat(anchors: BoardAnchors) {
       const triggerOut =
         plan.triggerDiscardId >= 0
           ? latest.current.exit
-              .send([
-                {
-                  key: `d${plan.triggerDiscardId}`,
-                  card: trigger,
-                  node: elOf(TRIG),
-                  scatter: scatterAt(plan.triggerDiscardId),
-                },
-              ])
+              .send(
+                [
+                  {
+                    key: `d${plan.triggerDiscardId}`,
+                    card: trigger,
+                    node: elOf(TRIG),
+                    scatter: scatterAt(plan.triggerDiscardId),
+                  },
+                ],
+                // nothing stands: the trigger is handed over as its own `node`,
+                // and the carrier holding it comes down once it has landed
+                null,
+              )
               .then(() => drop(TRIG))
           : Promise.resolve()
 
@@ -271,7 +276,8 @@ export function useAiBeat(anchors: BoardAnchors) {
         // split, for the same reason, `defenseBeat`'s sacrifice leg makes.
         const auxOut = aux
           ? latest.current.exit
-              .send([{ key: CRUSHED_AUX, card: aux, node: elOf(CRUSHED_AUX) }])
+              // nothing stands: handed over as its own `node`
+              .send([{ key: CRUSHED_AUX, card: aux, node: elOf(CRUSHED_AUX) }], null)
               .then(() => drop(CRUSHED_AUX))
           : Promise.resolve()
         const mainOut = (async () => {
@@ -285,14 +291,20 @@ export function useAiBeat(anchors: BoardAnchors) {
             drop(CRUSHED)
             return
           }
-          await latest.current.exit.send([
-            {
-              key: CRUSHED,
-              card,
-              node: elOf(CRUSHED),
-              ...(plan.tail.kind === 'crush' && plan.tail.rest ? { scatter: plan.tail.rest } : {}),
-            },
-          ])
+          await latest.current.exit.send(
+            [
+              {
+                key: CRUSHED,
+                card,
+                node: elOf(CRUSHED),
+                ...(plan.tail.kind === 'crush' && plan.tail.rest
+                  ? { scatter: plan.tail.rest }
+                  : {}),
+              },
+            ],
+            // nothing stands: handed over as its own `node`
+            null,
+          )
           drop(CRUSHED)
         })()
         await Promise.all([mainOut, auxOut])
@@ -379,14 +391,18 @@ export function useAiBeat(anchors: BoardAnchors) {
         // about to fly away from that same rect.
         const c = ctx.current
         const decks = c?.base.decks
-        if (c) {
+        // what the table was drawing goes in the commit the carriers go up —
+        // the step's own `takeOff`; with nothing to fly it has to happen anyway
+        const letGoOfTheCause = () => {
+          if (!c) return
           const next = withoutAiCause(c.base, causeItems.length > 0 ? plan.causeward : undefined)
           c.base = next
           c.publish(next)
         }
+        if (causeItems.length === 0) letGoOfTheCause()
         const causeOut =
           causeItems.length > 0
-            ? latest.current.exit.send(causeItems).then(() => {
+            ? latest.current.exit.send(causeItems, letGoOfTheCause).then(() => {
                 if (!c || !decks || ctx.current !== c) return
                 const next = { ...c.base, decks }
                 c.base = next

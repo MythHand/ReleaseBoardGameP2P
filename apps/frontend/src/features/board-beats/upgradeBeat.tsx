@@ -61,10 +61,12 @@ export function useUpgradeBeat(
   const emptyCentre = useCallback(async (items: Leaving[]) => {
     const op = latest.current.operationHandOver?.()
     const all = op ? [...op.items, ...items.map((it, i) => ({ ...it, layer: 2 + i }))] : items
-    const sent = latest.current.exit.send(all)
-    // the carriers are up in this commit; the resting card goes down in it too
-    op?.takeOff()
-    await sent
+    // the resting card goes down in the commit the carriers go up — the step's
+    // own `takeOff`. The answers themselves stand nowhere: the grid they were
+    // thrown into is what these carriers are raised out of.
+    await latest.current.exit.send(all, () => {
+      op?.takeOff()
+    })
     op?.settle()
   }, [])
 

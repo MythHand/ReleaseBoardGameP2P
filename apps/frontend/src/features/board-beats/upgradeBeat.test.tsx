@@ -21,7 +21,13 @@ const timeline = vi.hoisted(() => ({
 }))
 vi.mock('@release/ui/animations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@release/ui/animations')>()),
-  useDiscardExit: () => ({ send: timeline.exits, overlay: [] }),
+  useDiscardExit: () => ({
+    send: (items: unknown, takeOff?: (() => void) | null) => {
+      takeOff?.()
+      return timeline.exits(items)
+    },
+    overlay: [],
+  }),
   useHandArrival: (
     _ref: unknown,
     landed: (gap: number, cards: { key: string; card: unknown }[]) => void,

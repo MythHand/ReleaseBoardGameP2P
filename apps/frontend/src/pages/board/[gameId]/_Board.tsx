@@ -788,7 +788,29 @@ export default function Board({
   // this file uses elsewhere. Only ever SET here: the clears, and the order
   // the other three claimants (upgrade, defence, neutralize) are resolved in,
   // stay in the effect below.
-  if (!upgrade.stagedUid && !answering && !neutralizeOwnsHand) {
+  //
+  // THE DEFENCE SIDE HAS THE SAME RACE, and it is the same one commit: the
+  // defender drags a cover onto the attack, the host answers synchronously, and
+  // `defenseBeat.runCovered` reads this ref BEFORE its first await. Its own
+  // `!(mine && handoff)` branch then reads "nobody staged this" and flies a
+  // SECOND copy of the card out of the fan slot it has already left — the
+  // duplicate the defender sees beside the card they pulled. Asked in the same
+  // order the effect below asks it: a dispatched defence claims the handoff
+  // ahead of `answering`, which flickers false for exactly the commit that
+  // carries the engine's answer (#101, Fix D round 4).
+  const defenceDispatched =
+    defenseStaging.staged?.phase === 'dispatched' && defenseStaging.staged.main
+      ? defenseStaging.staged
+      : null
+  if (!upgrade.stagedUid && defenceDispatched?.main) {
+    handoffRef.current = {
+      mainUid: defenceDispatched.main.uid,
+      supportUid: defenceDispatched.support?.uid,
+      el: coverStagedRef.current,
+      release: defenseStaging.release,
+      whenLanded: defenseStaging.whenLanded,
+    }
+  } else if (!upgrade.stagedUid && !answering && !neutralizeOwnsHand) {
     const dispatched = staging.staged
     if (dispatched?.phase === 'dispatched' && dispatched.main) {
       handoffRef.current = {

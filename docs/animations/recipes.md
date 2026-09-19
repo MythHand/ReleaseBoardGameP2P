@@ -1977,9 +1977,21 @@ nothing leaves. `restart` clears the timers, rebuilds your hand and zeroes `take
 
 Driven by `requested` and `handTransfer`, planned by `planBeats` and run by `transferBeat`
 (`useTransferBeat`). The two recipes above are its playground originals, and the board **translates**
-them rather than transcribing them: there is no opponent fan here — an opponent's hand is a `Seat` and
-a count — so the named steal and the random one both come out of the donor's seat. The gesture
-survives; the geometry belonged to a stage with no seats in it.
+them rather than transcribing them: an opponent's hand is a `Seat` and a count, so a steal that nobody
+chooses comes out of the donor's seat. The gesture survives; the geometry belonged to a stage with no
+seats in it.
+
+**The blind pick is the exception, and it transcribes the scene rather than translating it** (#154–155,
+straightened out in #168). There is still no opponent fan on this table: an opponent's hand is a `Seat`
+and a count, and it stays one. The fan is SITUATIONAL — it exists for one step and nothing else, the
+blind pick of a random card out of a hand, and it is gone the moment that pick is made. After a Pass the
+engine opens a choice of position, and for as long as that choice is open `_useRequestStaging` offers it
+as the `Hand` component itself — backs up, inside a container turned `180deg`, coming down from above the
+screen and going back up on the pick, 520 ms each way. A position is taken by CLICKING it; there is no drag and no keyboard pick
+(owner, 18.09). What the taker's leg then does with that card is the scene's own sequence, and the one
+place it needed a new brick is the straightening: `takeFromSeat` is given `rotateFrom: 180`, because the
+card is lying turned and a carrier's `pose` cannot survive the animation's first keyframe. It is held at
+`cardBoxIn(centre, 220)` — the scene's reading width — rather than at the centre slot's own.
 
 **When to call**
 Never directly. `useBeats` plans a `requested` beat from the engine's `requested` event and a

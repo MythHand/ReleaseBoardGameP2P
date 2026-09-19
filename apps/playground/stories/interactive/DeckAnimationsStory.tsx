@@ -328,7 +328,8 @@ export default function DeckAnimationsStory() {
       }))
       .filter((e): e is { key: string; card: CardData; from: DOMRect } => e.from != null)
     setStaged([])
-    await sendToDiscard(leaving)
+    // nothing stands: the stage was cleared just above
+    await sendToDiscard(leaving, null)
   }
 
   // the staged cards are complete and the target is known — run the effect and

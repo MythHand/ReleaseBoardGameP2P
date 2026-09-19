@@ -21,6 +21,14 @@ import styles from './transferBeat.module.css'
 // a hand leaks.
 
 const REVEAL_HOLD = 820 // face-up at the centre before it drops into the fan
+// The width a card taken out of the closed fan reaches at the centre. It is
+// held there to be READ, and a card at the slot's own width is not being shown
+// to anybody — `PickOpponentCardStory`'s own REVEAL_W.
+const REVEAL_W = 220
+// That fan is held out across the table, drawn inside a container turned 180°,
+// so a card taken out of it starts upside down and straightens over the flight
+// — the same half turn the scene's own reveal makes on its way in.
+const OFFER_TURN = 180
 const CENTER_HOLD = 820 // face-down at the centre before it sinks into the seat
 const SEAT_SHRINK = 0.7 // how small a card is inside a seat — `drawBeat`'s own value
 const REQUEST_HOLD = 820 // the named card stands at the centre before the outcome
@@ -278,7 +286,14 @@ export function useTransferBeat(anchors: BoardAnchors) {
               : Array.from(
                   root?.querySelectorAll<HTMLElement>('[data-transfer-choice]') ?? [],
                 ).find((slot) => slot.dataset.transferChoice === String(plan.index))
-          const from = rectOf(picked ?? chosen ?? null) ?? cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          // OUT OF THE CLOSED FAN, or out of the donor's seat — two different
+          // scenes sharing one flight. Only the fan is held out turned around,
+          // and only what came out of it is held at reading size on arrival:
+          // the seat's own steal has never been chosen by anybody, so there is
+          // nothing to show the taker that they do not already know.
+          const offerBox = rectOf(picked ?? chosen ?? null)
+          const from = offerBox ?? cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          const held = offerBox ? cardBoxIn(centre, REVEAL_W) : centre
           // A random steal offers the donor's hand first: the suspense is real,
           // because the card genuinely is random. A named one has no question
           // left in it — the table watched the asker choose.
@@ -328,9 +343,13 @@ export function useTransferBeat(anchors: BoardAnchors) {
           clearPending()
           const [el] = await raised
           if (el) {
-            const anim = play('takeFromSeat', el, { from, to: centre })
+            const anim = play('takeFromSeat', el, {
+              from,
+              to: held,
+              rotateFrom: offerBox ? OFFER_TURN : 0,
+            })
             if (anim) await anim.finished
-            pin(KEY, centre) // I4 — it IS at the centre now
+            pin(KEY, held) // I4 — it IS at the centre now
           }
           dropFromDonor(plan.from)
           patch(KEY, { faceDown: false }) // Card plays its own flipCard

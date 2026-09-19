@@ -214,7 +214,8 @@ export default function DrawCardStory() {
   // the trigger leaves to the discard face up, landing scattered (like the other
   // stories) — the same scatter `j` is stored so the resting heap matches
   const leaveTrigger = async (card: CardType, j: Scatter) => {
-    await sendToDiscard([{ key: 'trigger', card, node: elOf('trig'), scatter: j }])
+    // nothing stands: the trigger is handed over as its own `node`
+    await sendToDiscard([{ key: 'trigger', card, node: elOf('trig'), scatter: j }], null)
   }
 
   // the effect first flips back-up IN PLACE (consistent with cards entering

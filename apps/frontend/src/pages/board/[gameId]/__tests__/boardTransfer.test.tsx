@@ -110,7 +110,11 @@ it('names a catalogue card after keyboard selection and confirmation', () => {
   })
 })
 
-it('offers anonymous positions and requires a drag to choose a closed card', () => {
+// The closed offer is the `Hand` component itself, and a position is taken by
+// CLICKING it — the scene's own gesture (`PickOpponentCardStory`), and the
+// owner's call (18.09): no drag, no keyboard pick. What the positions are is
+// still anonymous — a count, not the donor's hand.
+it('offers anonymous positions and takes one on a click', () => {
   const onResolve = vi.fn()
   const props = withPending({
     kind: 'stealCard',
@@ -124,16 +128,11 @@ it('offers anonymous positions and requires a drag to choose a closed card', () 
   })
   const { getByTestId } = render(<Board {...props} actions={{ onResolve }} />)
   const offer = getByTestId('board-transfer-offer')
-  const root = getByTestId('board-request-band').parentElement
-  if (!root) throw new Error('missing board')
-  vi.spyOn(root, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1280, 720))
-  const cards = within(offer).getAllByRole('button')
-  expect(cards).toHaveLength(3)
-  fireEvent.click(cards[1])
-  expect(onResolve).not.toHaveBeenCalled()
-  fireEvent.pointerDown(cards[1], { button: 0, pointerId: 1, clientX: 0, clientY: 0 })
-  fireEvent.pointerMove(window, { pointerId: 1, clientX: 0, clientY: 200 })
-  fireEvent.pointerUp(window, { pointerId: 1, clientX: 0, clientY: 200 })
+  const choices = offer.querySelectorAll<HTMLElement>('[data-transfer-choice]')
+  expect(choices).toHaveLength(3)
+  // pressed, not clicked: the fan turns a press into its own gesture, and with
+  // no drag armed that IS the click (`Hand`'s `onSlotDown`)
+  fireEvent.mouseDown(choices[1])
   expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'stealCard', index: 1 })
 })
 

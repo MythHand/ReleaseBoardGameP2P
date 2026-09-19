@@ -39,6 +39,7 @@ The words that flow into a preset as `params`.
 |---|---|---|
 | `from` / `to` | `Rect` = `{ left, top, width, height }` | source / target geometry for a travel preset |
 | `rotate` | number (deg) | final rotation of the flyer at landing |
+| `rotateFrom` | number (deg) | travel presets: the rotation the flight STARTS at, so a card that is already lying turned straightens over the flight instead of snapping upright in its first frame. `180` is the one live value — a card taken out of a closed fan held out across the table, which is drawn inside a container turned `180deg`. Not a substitute for `pose` on `useFlyer`: a carrier's inline transform is overridden by the animation's own first keyframe, so the start angle has to be inside the travel |
 | `dx` / `dy` | number (px) | travel presets: extra final offset (land in the exact pose, no post-jump). `hudIn` and `confettiFly` read them differently — see below |
 | `fade` | boolean | dissolve opacity during the flight (baked into `absorbToDeck` / `dealToSeat`) |
 | `duration` | number (ms) | override the default time — **travel presets only** |

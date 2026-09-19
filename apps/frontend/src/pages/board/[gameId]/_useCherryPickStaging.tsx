@@ -398,6 +398,9 @@ export function useCherryPickStaging(args: {
               },
             ]
           }),
+          // nothing stands: every card is handed over as its own grid cell
+          // (`node`), so the step flies those very nodes
+          null,
         )
         await Promise.all([handFlight, deckFlight, returnFlight])
         // The picked cards have LEFT the pile. The projection says so a batch

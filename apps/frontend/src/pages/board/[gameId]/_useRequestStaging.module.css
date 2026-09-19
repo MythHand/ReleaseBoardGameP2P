@@ -22,25 +22,41 @@
   block-size: auto;
 }
 
+/* the opponent's closed fan at the top edge: it comes down from above the
+   screen and goes back up the same way. The slide is the OUTER box's, so the
+   180° turn on the inner one never has to be folded into it — the values are
+   PickOpponentCardStory's own. */
 .offer {
   position: absolute;
   inset-block-start: 12px;
   inset-inline: 0;
-  block-size: 224px;
   pointer-events: none;
+  transition: transform 520ms var(--ease-soft);
+  will-change: transform;
 }
 
+.offer[data-in="false"] {
+  transform: translateY(-160%);
+}
+
+.offer[data-in="true"] {
+  transform: translateY(0);
+}
+
+/* the hand turned to face you — the arc hangs downward, the way a fan held out
+   across the table does */
+.offerInner {
+  transform: rotate(180deg);
+}
+
+/* the fan's own box stays transparent to the pointer (it spans the whole width
+   at the top of the table); a card in it does not */
 .offerCard {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 50%;
   pointer-events: auto;
-  transition: opacity 320ms var(--ease-soft);
 }
 
 .offer[data-in="false"] .offerCard {
   pointer-events: none;
-  opacity: 0;
 }
 
 .hint {
@@ -51,8 +67,13 @@
   text-align: center;
 }
 
+/* the clicked position, standing where it stood until the beat's own carrier
+   takes it over. Turned the same 180° the fan is, so the card does not
+   straighten before its flight has even started — the flight is what
+   straightens it (`takeFromSeat` with `rotateFrom`). */
 .picked {
   position: fixed;
   z-index: var(--z-flight);
   pointer-events: none;
+  transform: rotate(180deg);
 }

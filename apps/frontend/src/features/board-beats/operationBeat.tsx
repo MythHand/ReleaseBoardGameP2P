@@ -332,11 +332,12 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
         reset()
         return
       }
-      const sent = latest.current.exit.send(items)
-      // the exit's carriers go up in this same commit as the resting card goes
-      setLanded(null)
-      flyer.drop()
-      await sent
+      // the resting card goes in the same commit the exit's carriers go up —
+      // the step's own `takeOff`, which is where this ordering now lives
+      await latest.current.exit.send(items, () => {
+        setLanded(null)
+        flyer.drop()
+      })
       if (run !== epoch.current) return
       const heap = [...(ctx.base.decks.discardHeap ?? [])]
       let added = 0

@@ -16,7 +16,10 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     },
     useDiscardExit: () => ({
       overlay: [],
-      send: (items: unknown[]) => animationsTrace.exitSpy(items),
+      send: (items: unknown[], takeOff?: (() => void) | null) => {
+        takeOff?.()
+        return animationsTrace.exitSpy(items)
+      },
       reset: () => {},
     }),
   }
