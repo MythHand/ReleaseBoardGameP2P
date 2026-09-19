@@ -4,8 +4,10 @@ Run the frontend dev server (`pnpm dev`) and open `/debug.html` on its local URL
 This separate Vite HTML entry is for development; the normal production build
 starts at `index.html` and does not include it.
 
-The toolbar provides base and Sudo variants of Cherry-pick, Rebase, and System
-Upgrade, plus three no-effect cases. Follow the instruction beneath the toolbar
+The toolbar provides Cherry-pick, Rebase and System Upgrade, plus three
+no-effect cases. Sudo sits in the hand of every preset whose card is still there
+to be played, so one run covers the card with and without it — Cherry-pick and
+Rebase had a second button each for exactly that and no longer need one. Follow the instruction beneath the toolbar
 and use the real board gestures. For Upgrade, the opponent discard button appears
 only when that opponent owes a card. The action/event disclosure shows the last
 command and the engine's response, including rejections.
@@ -44,6 +46,14 @@ in the opponent hand. The four attack presets add a third participant, Observer.
 Their prelude is already settled when the Board mounts; it is not replayed as a
 new attack animation. Restart resets the same card identities into a new game.
 
+- **Security Bug: attack a fresh release:** the opponent has just played a release
+  and its window is open; Security Bug is still in your hand. Attack the release
+  with it — it moves into your own zone. The other half of the card, and the one
+  the older presets could not reach: a release seeded into a zone has no reaction
+  window, so there is nothing there to attack.
+- **Security Bug: take a card from a hand:** your turn, nothing in any zone, the
+  card in your hand. Play it at the opponent's hand and name a card — they hand
+  it over, or they do not have it and the attack is simply spent.
 - **Security Bug: request:** name Hotfix and confirm. The attack must remain at
   the centre throughout the request and successful handover.
 - **Security Bug: duplicate hit:** starts at the request with two Hotfix copies.

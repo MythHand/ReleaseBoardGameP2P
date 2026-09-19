@@ -47,7 +47,13 @@ import {
   useRef,
   useState,
 } from 'react'
-import { type BoardAnchors, type BoardState, MERGE_MS, SHOW_HOLD } from '~/entities/game/board'
+import {
+  ATTACK_POSE,
+  type BoardAnchors,
+  type BoardState,
+  MERGE_MS,
+  SHOW_HOLD,
+} from '~/entities/game/board'
 import { stageSlot } from '~/entities/game/board/stageSlot'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 
@@ -394,6 +400,13 @@ export function useBoardStaging({
   // resolves to the very element this always used, with no branch of its own.
   // `Table`'s own arrow anchors to its source card the same way, and re-derives
   // it on every phase change rather than aiming once (apps/ui/src/table/Table).
+  // An attack rests tilted; everything else rests square. Handed to a flight so
+  // it arrives already in that pose instead of turning once it is down.
+  const attackPose = (card: CardData) =>
+    card.category === 'attack'
+      ? { rotate: ATTACK_POSE.rot, dx: ATTACK_POSE.dx, dy: ATTACK_POSE.dy }
+      : {}
+
   const aimFromPlay = useCallback(
     (place: number | null) => {
       const el = (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
@@ -743,7 +756,8 @@ export function useBoardStaging({
             const to = (
               (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
             )?.getBoundingClientRect()
-            if (el && to) await play('playToCenter', el, { from, to })?.finished
+            if (el && to)
+              await play('playToCenter', el, { from, to, ...attackPose(card.card) })?.finished
           } catch {
             // A `void`ed body is watched by nobody: let it reject and the whole
             // app gets an unhandled rejection. The card is staged either way —
@@ -789,7 +803,12 @@ export function useBoardStaging({
         if (to && from) {
           const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
           if (!current()) return
-          if (el) await play('playToCenter', el, { from, to })?.finished
+          // INTO THE POSE IT WILL REST IN, not into a flat landing it then
+          // corrects. An attack lies tilted at the centre (I11: the tilt is
+          // what says it has been PLAYED), so the flight ends already turned —
+          // the same `rotate`/`dx`/`dy` the combo and defence flights pass, for
+          // the same reason.
+          if (el) await play('playToCenter', el, { from, to, ...attackPose(card.card) })?.finished
           if (!current()) return
           flyer.drop('stage')
         }

@@ -15,6 +15,8 @@ const en = {
   advancePending: 'Resolve pending as its owner',
   branch: 'Branch → 2 piles',
   branchSudo: 'Branch + Sudo → 3 piles',
+  securityRelease: 'Security Bug: attack a fresh release',
+  securityHand: 'Security Bug: take a card from a hand',
   securityRequest: 'Security Bug: request',
   securityGive: 'Security Bug: duplicate hit',
   blindStealPlay: 'Bug: play and pick',
@@ -22,31 +24,31 @@ const en = {
   handDefense: 'Attack / defence centre',
   branchHint: 'Pull Branch out of your hand: one draw pile splits into two.',
   branchSudoHint: 'Combine Branch with Sudo: the split and flipped discard produce three piles.',
+  securityReleaseHint:
+    'The opponent has just played a release and its window is open. Attack it with Security Bug: the release moves into your own zone.',
+  securityHandHint:
+    'Your turn, nothing in any zone. Play Security Bug at the opponent hand and name a card — they hand it over, or they do not have it and the attack is spent.',
   securityRequestHint:
     'Request Hotfix. The opponent holds two copies. Change viewer to inspect each role.',
   securityGiveHint:
     'Name Hotfix to transfer the first matching copy automatically. Restart as observer and resolve the pending to inspect the public transfer.',
   blindStealPlayHint:
-    'Pull Bug out of your hand onto the opponent, then pass for them with the pending control: their closed fan opens for you to pick from.',
+    'Pull Bug out of your hand onto the opponent, then pass for them with the pending control: their closed fan opens for you to pick from. Sudo is in the hand too.',
   blindStealHint:
     'Pick a position in the opponent closed fan. The observer must never learn the stolen face.',
   handDefenseHint:
     'Switch to the opponent and pull Hotfix over the staged attack, or take the hit.',
   cherry: 'Cherry-pick',
-  cherrySudo: 'Cherry-pick + Sudo',
   rebase: 'Rebase',
-  rebaseSudo: 'Rebase + Sudo',
   upgrade: 'Upgrade',
   upgradeSudo: 'Upgrade + Sudo',
   cherryFizzle: 'Cherry-pick: triggers only',
   rebaseFizzle: 'Rebase: empty pile',
   upgradeFizzle: 'Upgrade: empty opponent hand',
-  cherryHint: 'Pull Cherry-pick out of your hand, then choose a card from the discard grid.',
-  cherrySudoHint:
-    'Combine Sudo with Cherry-pick, then choose a card for your hand and another for the deck.',
-  rebaseHint: 'Pull Rebase out of your hand, reorder the offered top cards, then confirm.',
-  rebaseSudoHint:
-    'Combine Sudo with Rebase, reorder the offered top cards from both piles, then confirm.',
+  cherryHint:
+    'Pull Cherry-pick out of your hand, then choose a card from the discard grid. Sudo is in the hand too — combine them to choose a second card for the deck.',
+  rebaseHint:
+    'Pull Rebase out of your hand, reorder the offered top cards, then confirm. Sudo is in the hand too — combine them to reach every pile.',
   upgradeHint:
     'Pull Upgrade out of your hand, then use the opponent discard control to complete the effect.',
   upgradeSudoHint:
@@ -72,6 +74,8 @@ const ru: Record<keyof typeof en, string> = {
   advancePending: 'Выполнить решение за его владельца',
   branch: 'Branch → 2 колоды',
   branchSudo: 'Branch + Sudo → 3 колоды',
+  securityRelease: 'Security Bug: атака свежего релиза',
+  securityHand: 'Security Bug: забрать карту с руки',
   securityRequest: 'Security Bug: запрос',
   securityGive: 'Security Bug: две копии',
   blindStealPlay: 'Bug: розыгрыш и выбор',
@@ -79,28 +83,30 @@ const ru: Record<keyof typeof en, string> = {
   handDefense: 'Атака / защита в центре',
   branchHint: 'Вытяните Branch из руки: одна колода разделится на две.',
   branchSudoHint: 'Объедините Branch с Sudo: разделение и переворот сброса дадут три колоды.',
+  securityReleaseHint:
+    'Соперник только что выложил релиз, окно по нему открыто. Ударьте по нему Security Bug: релиз переедет в вашу зону.',
+  securityHandHint:
+    'Ваш ход, в зонах пусто. Разыграйте Security Bug по руке соперника и назовите карту — он её отдаст, либо её у него нет и атака просто тратится.',
   securityRequestHint:
     'Запросите Hotfix. У соперника две копии. Меняйте вид для проверки всех ролей.',
   securityGiveHint:
     'Запрос Hotfix успешен. Переключитесь на соперника и вытяните одну из двух копий из руки; перезапустите для проверки других ролей.',
   blindStealPlayHint:
-    'Вытяните Bug из руки на соперника, затем выполните за него решение «пас» — откроется его закрытый веер для выбора.',
+    'Вытяните Bug из руки на соперника, затем выполните за него решение «пас» — откроется его закрытый веер для выбора. Sudo тоже в руке.',
   blindStealHint:
     'Выберите позицию в закрытом веере соперника. Наблюдатель не должен узнать украденную карту.',
   handDefenseHint: 'Переключитесь на соперника и вытяните Hotfix поверх атаки или примите удар.',
   cherry: 'Cherry-pick',
-  cherrySudo: 'Cherry-pick + Sudo',
   rebase: 'Rebase',
-  rebaseSudo: 'Rebase + Sudo',
   upgrade: 'Upgrade',
   upgradeSudo: 'Upgrade + Sudo',
   cherryFizzle: 'Cherry-pick: только триггеры',
   rebaseFizzle: 'Rebase: пустая колода',
   upgradeFizzle: 'Upgrade: пустая рука соперника',
-  cherryHint: 'Вытяните Cherry-pick из руки, затем выберите карту в сетке сброса.',
-  cherrySudoHint: 'Объедините Sudo с Cherry-pick, затем выберите карту в руку и другую на колоду.',
-  rebaseHint: 'Вытяните Rebase из руки, упорядочьте предложенные верхние карты и подтвердите.',
-  rebaseSudoHint: 'Объедините Sudo с Rebase, упорядочьте верхние карты обеих колод и подтвердите.',
+  cherryHint:
+    'Вытяните Cherry-pick из руки, затем выберите карту в сетке сброса. Sudo тоже в руке — объедините их, чтобы выбрать вторую карту на колоду.',
+  rebaseHint:
+    'Вытяните Rebase из руки, упорядочьте предложенные верхние карты и подтвердите. Sudo тоже в руке — объедините их, чтобы достать все колоды.',
   upgradeHint:
     'Вытяните Upgrade из руки, затем нажмите кнопку сброса соперника для завершения эффекта.',
   upgradeSudoHint:

@@ -4,9 +4,7 @@ import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 export const engine = createFakeEngine()
 export const OPERATION_SCENARIOS = [
   'cherry',
-  'cherrySudo',
   'rebase',
-  'rebaseSudo',
   'upgrade',
   'upgradeSudo',
   'cherryFizzle',
@@ -17,6 +15,8 @@ export const SCENARIOS = [
   ...OPERATION_SCENARIOS,
   'branch',
   'branchSudo',
+  'securityRelease',
+  'securityHand',
   'securityRequest',
   'securityGive',
   'blindStealPlay',
@@ -65,6 +65,8 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
     deck: FAKE_DECK,
     events: FAKE_EVENTS,
   })
+  if (scenario === 'securityRelease' || scenario === 'securityHand')
+    return createSecurityScenario(initial, scenario)
   if (transfer) return createTransferScenario(initial, scenario)
   const operation = scenario.startsWith('branch')
     ? 'operation-git-branch'
@@ -73,8 +75,11 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
       : scenario.startsWith('rebase')
         ? 'operation-git-rebase'
         : 'operation-system-upgrade'
-  const hand = [instance(operation, 0)]
-  if (scenario.endsWith('Sudo')) hand.push(instance('support-sudo', 1))
+  // SUDO IS ALWAYS IN THE HAND, and whether the play uses it is the player's to
+  // decide at the table — which is what a preset is for. Cherry-pick and Rebase
+  // used to have a second button each for the same board with this one card
+  // added; the same run covers both now (owner, 19.09).
+  const hand = [instance(operation, 0), instance('support-sudo', 1)]
   hand.push(instance('attack-bug', 2), instance('defense-hotfix', 3))
 
   const state: GameState = {
@@ -115,6 +120,78 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   return state
 }
 
+// SECURITY BUG HAS TWO EFFECTS, and they are two different moments at the table
+// — so they are two presets rather than one board you have to steer into the
+// half you meant. Both start with the card in YOUR hand and nothing played for
+// you: what you aim it at is the whole question.
+//
+//   securityRelease — the opponent has just put a release down and paid for it,
+//     so its reaction window is open. That window IS the fresh release the card
+//     attacks; a release seeded straight into a zone has no window and nothing
+//     to attack (`resolution.md` §1, `fake/window.ts`).
+//   securityHand — your own turn, the opponent holding cards, nothing in any
+//     zone: the only thing to aim at is the hand, which is the other effect —
+//     name a card and they hand it over, or they do not have it and the attack
+//     is simply spent.
+function createSecurityScenario(initial: GameState, scenario: Scenario): GameState {
+  const attack = instance('attack-security-bug', 0)
+  const cost = instance('defense-hotfix', 3)
+  let state: GameState = {
+    ...initial,
+    eventSeq: 100,
+    window: null,
+    pending: null,
+    // The release path needs the OPPONENT on turn — a release is played on its
+    // owner's turn, and the window it opens is what the attacker answers.
+    turn: {
+      ...initial.turn,
+      player: scenario === 'securityRelease' ? 'p2' : 'you',
+      drawnFrom: [0],
+    },
+    decks: { ...initial.decks, discard: [] },
+    players: {
+      ...initial.players,
+      you: {
+        ...initial.players.you,
+        hand: [attack, instance('protection-debugger', 1)],
+        release: {},
+        openedAtDeal: [],
+      },
+      p2: {
+        ...initial.players.p2,
+        hand: [instance('release-frontend', 2), cost, instance('defense-hotfix', 4)],
+        release: {},
+        openedAtDeal: [],
+      },
+    },
+  }
+  if (scenario === 'securityHand') return state
+  const at = Date.now()
+  const apply = (action: Action) => {
+    const result = engine.reduce(state, action)
+    const refused = result.events.find((event) => event.type === 'rejected')
+    // the reason, not just the fact: a preset that stops building is a question
+    // about the rules, and the engine already answered it
+    if (refused)
+      throw new Error(
+        `Invalid debug preset: ${scenario} — ${'reason' in refused ? refused.reason : 'rejected'}`,
+      )
+    state = result.state
+  }
+  apply({ type: 'PLAY', player: 'p2', card: instance('release-frontend', 2).uid, at })
+  // Its cost, when the setup charges one. `releaseCond` decides, so this asks
+  // the state rather than assuming: a preset that hardcodes a step the rules
+  // did not take is the fixture inventing a pending again.
+  if (state.pending?.kind === 'discardForRelease')
+    apply({
+      type: 'RESOLVE',
+      player: 'p2',
+      choice: { kind: 'discardForRelease', card: cost.uid },
+      at,
+    })
+  return state
+}
+
 // Enter an intermediate decision through real actions, so a fixture cannot
 // invent a pending shape that the current engine no longer produces.
 function createTransferScenario(initial: GameState, scenario: Scenario): GameState {
@@ -131,7 +208,12 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
       ...initial.players,
       you: {
         ...initial.players.you,
-        hand: [attack, instance('protection-debugger', 1)],
+        // Sudo rides along wherever the attack is still in hand to be played:
+        // one preset, both readings of the card (owner, 19.09).
+        hand:
+          scenario === 'blindStealPlay'
+            ? [attack, instance('support-sudo', 6), instance('protection-debugger', 1)]
+            : [attack, instance('protection-debugger', 1)],
         release: {},
         openedAtDeal: [],
       },

@@ -117,3 +117,31 @@ it('automatically transfers the first duplicate and exposes the named card to th
     }),
   )
 })
+
+// SECURITY BUG'S TWO EFFECTS ARE TWO PRESETS, and what separates them is not a
+// flag on the board — it is whether there is a fresh release to attack at all.
+// A release seeded straight into a zone has no reaction window and nothing to
+// hit, so the release preset has to REACH one through the opponent's own play.
+it('opens a fresh release window the attacker may answer with Security Bug', () => {
+  const state = createScenario('securityRelease', 'secrel')
+  expect(state.window).toMatchObject({ target: { player: 'p2', slot: 'frontend' } })
+  expect(state.players.p2.release.frontend?.card.id).toBe('release-frontend')
+  // …and the card is still in the attacker's hand: the preset plays nothing for
+  // them, which is the whole point of it
+  expect(state.players.you.hand.some((c) => c.id === 'attack-security-bug')).toBe(true)
+  const view = engine.project(state, 'you')
+  expect(view.window?.canAttackWith ?? []).toContain(
+    state.players.you.hand.find((c) => c.id === 'attack-security-bug')?.uid,
+  )
+})
+
+it('leaves the hand effect with nothing in any zone, so the only aim is a hand', () => {
+  const state = createScenario('securityHand', 'sechand')
+  expect(state.window).toBeNull()
+  expect(state.pending).toBeNull()
+  expect(state.turn.player).toBe('you')
+  expect(state.players.p2.release).toEqual({})
+  expect(state.players.you.release).toEqual({})
+  expect(state.players.p2.hand.length).toBeGreaterThan(0)
+  expect(state.players.you.hand.some((c) => c.id === 'attack-security-bug')).toBe(true)
+})

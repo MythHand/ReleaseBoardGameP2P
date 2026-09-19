@@ -1,26 +1,38 @@
-/* The full-table layer keeps ConfirmAction pinned to the table bottom. Only
-   the catalogue scrolls; its cards must not sit underneath the confirm bar. */
+/* A SURFACE LIKE THE OTHER TWO, and it took until #168 for it to say so: it
+   stood on a layer of its own (40) with no dimming at all, so the table stayed
+   bright and live-looking under a band that had taken it over. Both states and
+   the backing now come from the one place that owns them. */
 .requestBand {
-  position: absolute;
-  inset: 0;
-  z-index: 40;
-  pointer-events: none;
+  composes: over from './_tableSurface.module.css';
 }
 
+.scrim {
+  composes: scrim from './_tableSurface.module.css';
+}
+
+/* answered: what is left is cards travelling, and they belong under the pile
+   counters like every other flight */
+.flight {
+  composes: flying from './_tableSurface.module.css';
+}
+
+/* THE CARDS ARE LAID OVER THE WHOLE TABLE, not into a strip of it. The cell you
+   point at grows to be read (`CardCatalog`: `scale(1.9)` on hover, `1.7` for the
+   one you named), and this box used to SCROLL — so the growing was cut off at
+   its edge, and the card you were trying to read was the one being clipped. The
+   catalogue's own grid is built to fill whatever area it is handed and to spill
+   nothing (`overflow: visible`, and the block's own comment says the area is the
+   consumer's to place); the padding existed only to buy room inside the clip.
+   The insets keep it clear of the seats above, the confirm bar below and the
+   rail on the right — that is all they are for. */
 .catalog {
   position: absolute;
   inset-block: 160px 170px;
   inset-inline: 24px 72px;
-  padding: 64px 48px;
-  overflow: auto;
+  overflow: visible;
   pointer-events: auto;
 }
 
-/* CardCatalog normally fills its parent's height. Here its rows determine the
-   scrollable height, with padding around them for the enlarged hover card. */
-.catalog > div {
-  block-size: auto;
-}
 
 /* the opponent's closed fan at the top edge: it comes down from above the
    screen and goes back up the same way. The slide is the OUTER box's, so the

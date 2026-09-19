@@ -418,6 +418,33 @@ export interface BoardProps {
  * is not its own and the engine tells it which card was taken in the very beat
  * this answers, which is why `run` is handed that card.
  */
+/**
+ * The request surface holds the named card while its beat plays — so the beat
+ * stops raising a copy of it at the centre. Every seat has this surface now
+ * (the request is public and the catalogue is the game's own, not a hand), so
+ * every seat is already showing the card the beat used to have to introduce.
+ *
+ * `release` is the beat letting the surface go, once it has held for as long as
+ * the scene holds and the outcome has been shown.
+ */
+export interface RequestPickHandoff {
+  /** the beat naming the card and asking the surface to keep holding it — the
+   *  chosen card standing while the rest of the catalogue leaves, on every
+   *  board at once, which is the scene's own `PICK_BEAT` */
+  hold: (card: string) => void
+  /** the catalogue is done: the named card goes with the rest of it */
+  release: () => void
+  /** the defender's fan slides back up — at the moment the card leaves it */
+  close: () => void
+  /**
+   * Where the named card comes OUT of — a place in the defender's own closed
+   * fan, which the surface has been holding out since the request opened. The
+   * scene flies it from there rather than from a seat, because there IS a hand
+   * on screen to fly it from (`PickSpecificCardStory`). Null when no fan is up.
+   */
+  slot: () => DOMRect | null
+}
+
 export interface DiscardPickHandoff {
   card?: string
   run: (ctx: BeatRun, card: string) => Promise<void>

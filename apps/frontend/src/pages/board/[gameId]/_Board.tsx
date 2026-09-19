@@ -73,6 +73,7 @@ import type {
   DiscardPickHandoff,
   HandLimitHandoff,
   Panel,
+  RequestPickHandoff,
   StagedHandoff,
 } from '~/entities/game/board/types'
 import { useBeats, useEliminationPreload } from '~/features/board-beats'
@@ -227,6 +228,8 @@ export default function Board({
   // queue needs at this point; the layout effect that keeps `.current` current
   // runs after every hook regardless of where it sits in the function.
   const discardPickRef = useRef<DiscardPickHandoff | null>(null)
+  // the request surface's own hold, for the beat that plays a `requested`
+  const requestPickRef = useRef<RequestPickHandoff | null>(null)
   const handoffRef = useRef<StagedHandoff | null>(null)
   // The hand limit's own handoff (#104), a ref for the same reason `handoffRef`
   // is one: the beat reads it once at run start (I8), not a render's worth of
@@ -258,6 +261,7 @@ export default function Board({
   const beats = useBeats({
     live,
     discardPick: discardPickRef,
+    requestPick: requestPickRef,
     events: intro?.events ?? [],
     anchors,
     enabled: introOver || intro == null,
@@ -459,6 +463,9 @@ export default function Board({
     },
     enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
+    pickPreview,
+    onPickPreview,
+    handoff: requestPickRef,
   })
   // taking a Release back out of the discard (#106, `ai-inside`) — the row
   // over the discard replaces the panel, the same way the band above
@@ -1623,8 +1630,21 @@ export default function Board({
             would double it (ComboStory.tsx's own guard on this). Once a
             partner folds in, the pair flyer below owns the centre instead. */}
         {soloStaged && !assembling && staging.overlay.length === 0 && (
+          // IT LANDS IN THE POSE IT WILL KEEP. An attack rests at the centre
+          // tilted (`ATTACK_POSE`, and I11: the tilt is what marks a card as
+          // PLAYED), and this render used to be straight — so the card flew in
+          // flat, stood there flat, and turned only when the projection's own
+          // standing render took over. The turn read as the card correcting
+          // itself after it had already landed. The tilt lives on an INNER
+          // element, so the node the beat measures stays the true card box (I6).
           <div ref={soloStagedRef} className={opening.centreCard} data-testid="board-centre-staged">
-            <Card card={soloStaged.card} interactive={false} width="100%" />
+            {soloStaged.card.category === 'attack' ? (
+              <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+                <Card card={soloStaged.card} interactive={false} width="100%" />
+              </div>
+            ) : (
+              <Card card={soloStaged.card} interactive={false} width="100%" />
+            )}
           </div>
         )}
         {centreAttack &&
