@@ -382,6 +382,15 @@ export interface BoardProps {
   // `onPanelChange` — which is how the page binds the drawer to the URL.
   panel?: Panel | null
   onPanelChange?: (panel: Panel | null) => void
+  /**
+   * A pick another seat is offering but has not confirmed — the table watches
+   * the choice being made, not only its result. Absent wherever there is no
+   * session to carry it (the debug stand, the tests): the surface simply shows
+   * nothing selected, which is what it showed before.
+   */
+  pickPreview?: { player: string; card: string | null } | null
+  /** the local surface's own offer, on its way to the other seats */
+  onPickPreview?: (card: string | null) => void
   // The opening. Present only on a fresh entry; the board renders the intro's
   // shadow of `state` while it runs and the live `state` afterwards.
   intro?: {
@@ -399,7 +408,17 @@ export interface BoardProps {
   }
 }
 
+/**
+ * The Cherry-pick surface owns the choreography of its own pick, so the queue
+ * plays this instead of the generic "a card comes back out of the discard".
+ *
+ * Both seats at the table set one. The ACTOR knows which card it flew before
+ * the event arrives — its own answer — and names it, so a beat for somebody
+ * else's pick is left alone. The seat that only WATCHES names none: the choice
+ * is not its own and the engine tells it which card was taken in the very beat
+ * this answers, which is why `run` is handed that card.
+ */
 export interface DiscardPickHandoff {
-  card: string
-  run: (ctx: BeatRun) => Promise<void>
+  card?: string
+  run: (ctx: BeatRun, card: string) => Promise<void>
 }

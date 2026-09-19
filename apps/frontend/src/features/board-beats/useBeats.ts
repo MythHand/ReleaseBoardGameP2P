@@ -456,9 +456,14 @@ export function useBeats(args: {
           alarm: false,
           run: (ctx) => {
             const local = discardPick?.current
-            if (discardPick && plan.mine && local?.card === plan.card) {
+            // The surface that laid this pick out plays it, whichever side of
+            // the table this seat is on: the actor's handoff names the card it
+            // answered with, a watching seat's names none and is handed the
+            // card the event carried. `mine` is not asked — the hook that set
+            // the handoff is the one that knows whose pick it is.
+            if (discardPick && local && (local.card === undefined || local.card === plan.card)) {
               discardPick.current = null
-              return local.run(ctx)
+              return local.run(ctx, plan.card)
             }
             return ais.runTaken(plan, ctx)
           },
