@@ -399,7 +399,17 @@ export interface BoardProps {
   }
 }
 
+/**
+ * The Cherry-pick surface owns the choreography of its own pick, so the queue
+ * plays this instead of the generic "a card comes back out of the discard".
+ *
+ * Both seats at the table set one. The ACTOR knows which card it flew before
+ * the event arrives — its own answer — and names it, so a beat for somebody
+ * else's pick is left alone. The seat that only WATCHES names none: the choice
+ * is not its own and the engine tells it which card was taken in the very beat
+ * this answers, which is why `run` is handed that card.
+ */
 export interface DiscardPickHandoff {
-  card: string
-  run: (ctx: BeatRun) => Promise<void>
+  card?: string
+  run: (ctx: BeatRun, card: string) => Promise<void>
 }
