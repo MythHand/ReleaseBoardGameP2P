@@ -16,16 +16,15 @@
    `GitCards.module.css` (the playground scene this ports from). Do NOT put a
    transform back on this element. */
 .grid {
-  position: absolute;
-  inset: 0;
+  /* Both of its states — standing over the table, and dropping to the flight
+     band once the answer is committed and its cards are only flying home —
+     come from `_tableSurface.module.css`. Rebase had the second one and this
+     did not, which is why its cards landed ON the pile counters (#168). */
+  composes: over from './_tableSurface.module.css';
+}
 
-  /* The surface TAKES THE TABLE OVER, so it stands above everything the table
-     draws — including the band the flights ride in and the pile counters that
-     sit a rung above them (`Pile`'s own `.count`, `--z-flight + 40`). At the
-     table's own 40 the counters stuck out through the dimming below. Still
-     under the arrow (`--z-arrow`), which is a gesture and not a surface. */
-  z-index: calc(var(--z-flight) + 45);
-  pointer-events: none;
+.flight {
+  composes: flying from './_tableSurface.module.css';
 }
 
 /* The scene's backing under the picker (GitCards.module.css `.scrim`, same

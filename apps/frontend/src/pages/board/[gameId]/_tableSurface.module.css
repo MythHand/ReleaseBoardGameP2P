@@ -1,0 +1,35 @@
+/* A SURFACE THAT TAKES THE TABLE OVER — and the band its cards drop into once
+   they are no longer being read but flying home. Two states of one thing, and
+   they live here because they were written twice and then drifted.
+
+   While the answer is being given, the surface stands above everything the
+   table draws: above the band the flights ride in, and above the pile counters
+   that sit a rung over that band (`Pile`'s own `.count`, `--z-flight + 40`).
+   At the table's own 40 the counters stuck out through the dimming. Still
+   under the arrow (`--z-arrow`), which is a gesture and not a surface.
+
+   The moment the answer is COMMITTED there is no surface any more — only cards
+   flying home in it — so it drops to the band a travelling card belongs in.
+   Under the counter, so a card arriving at its pile tucks beneath the badge
+   instead of landing on top of it. Every other flight on this board rides that
+   band already, because it rides a carrier; these surfaces carry their own
+   nodes, so the band is handed to them here.
+
+   Rebase had both states. Cherry-pick had only the first, so its cards flew
+   home OVER the pile counters while Rebase's tucked under them (#168) — one
+   rule, written in one CSS file, and the second scene never got it.
+
+   NO TRANSFORM on either, ever: these surfaces pin their card nodes to
+   `position: fixed` at viewport rects, and a transformed ancestor becomes the
+   containing block for a fixed descendant — every card would jump the instant
+   it is pinned. Centre with flex instead. */
+.over {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--z-flight) + 45);
+  pointer-events: none;
+}
+
+.flying {
+  z-index: var(--z-flight);
+}

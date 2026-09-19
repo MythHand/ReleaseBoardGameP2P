@@ -1,14 +1,6 @@
 import type { Event } from '@release/engine'
 import type { HandPlayDrop, TableActions } from '@release/ui'
-import {
-  CARDS,
-  Card,
-  CardCatalog,
-  CardPull,
-  ConfirmAction,
-  slotPlacement,
-  Typography,
-} from '@release/ui'
+import { CARDS, Card, CardCatalog, ConfirmAction, Hand, Typography } from '@release/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { BoardState } from '~/entities/game/board'
 import styles from './_useRequestStaging.module.css'
@@ -40,6 +32,12 @@ export function useRequestStaging(args: {
   const [named, setNamed] = useState<string | null>(null)
   const [confirmed, setConfirmed] = useState(false)
   const [picked, setPicked] = useState<{ index: number; rect: DOMRect } | null>(null)
+  // The fan comes down FROM ABOVE THE SCREEN, so it has to be mounted out of
+  // sight first and moved in a frame later — a transform set on the mounting
+  // commit has nothing to animate from. Two frames, the same arming
+  // `PickOpponentCardStory` uses, and it goes back up the moment the pick is
+  // confirmed.
+  const [shown, setShown] = useState(false)
   const locked = useRef(false)
   const band = useRef<HTMLDivElement>(null)
   const fan = useRef<HTMLDivElement>(null)
@@ -55,6 +53,21 @@ export function useRequestStaging(args: {
     setConfirmed(false)
     setPicked(null)
   }, [episode])
+
+  useEffect(() => {
+    if (!stealing) {
+      setShown(false)
+      return
+    }
+    let second = 0
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setShown(true))
+    })
+    return () => {
+      cancelAnimationFrame(first)
+      cancelAnimationFrame(second)
+    }
+  }, [stealing])
 
   const insideTable = (drop: HandPlayDrop) => {
     const box = band.current?.parentElement?.getBoundingClientRect()
@@ -80,7 +93,10 @@ export function useRequestStaging(args: {
     resolve({ kind: 'giveCard', card: card.uid })
   }, [enabled, giving, pending, state.you.hand, actions?.onResolve, resolve])
 
-  const pickBack = (index: number, drop?: HandPlayDrop) => {
+  // A position is taken by CLICKING it, the scene's own gesture: the fan goes
+  // back up and the card leaves for you on its own. `rect` is where it stood
+  // when it was clicked — the flight out of the fan starts there.
+  const pickBack = (index: number, rect?: DOMRect) => {
     if (
       !enabled ||
       !stealing ||
@@ -89,10 +105,8 @@ export function useRequestStaging(args: {
       index >= pending.count
     )
       return false
-    const box = fan.current?.getBoundingClientRect()
-    if (drop && (!insideTable(drop) || (box && drop.y < box.bottom - 32))) return false
     locked.current = true
-    if (drop?.rect) setPicked({ index, rect: drop.rect })
+    if (rect) setPicked({ index, rect })
     setConfirmed(true)
     resolve({ kind: 'stealCard', index })
     return true
@@ -137,33 +151,49 @@ export function useRequestStaging(args: {
               className={styles.offer}
               ref={fan}
               data-testid="board-transfer-offer"
-              data-in={!confirmed}
+              data-in={shown && !confirmed}
             >
-              {Array.from({ length: pending.count }, (_, index) => {
-                const place = slotPlacement(index, pending.count)
-                return (
-                  <div
-                    // biome-ignore lint/suspicious/noArrayIndexKey: anonymous positions are the stable identity of a closed offer
-                    key={index}
-                    data-transfer-choice={index}
-                    className={styles.offerCard}
-                    style={{
-                      transform: `translateX(-50%) translateX(${place.x}px) translateY(${-place.y}px) rotate(${180 + place.rotate}deg)`,
-                      zIndex: place.z,
-                      visibility: picked?.index === index ? 'hidden' : undefined,
-                    }}
-                  >
-                    <CardPull
-                      card={BACK}
-                      faceDown
-                      label={`${copy.steal} ${index + 1}`}
-                      disabled={!enabled || confirmed}
-                      onDrop={(drop) => pickBack(index, drop)}
-                      onKeyboardPick={() => pickBack(index)}
-                    />
-                  </div>
-                )
-              })}
+              {/* THE OPPONENT'S OWN HAND, held out to you — the same `Hand`,
+                  backs up, turned to face you. Not a fan re-laid by hand: the
+                  arc, the lift under the cursor and the neighbours parting are
+                  the hand's, and a copy of its geometry drifted from it (the
+                  places used to be mirrored vertically but not horizontally,
+                  which straightened the arc into a line). The slide down from
+                  above the screen lives on the outer box and the 180° turn on
+                  the inner one, exactly as `PickOpponentCardStory` does it.
+
+                  A position is taken by CLICKING it, and `data-transfer-choice`
+                  stays on the card box the transfer beat measures. */}
+              <div className={styles.offerInner}>
+                <Hand
+                  items={Array.from({ length: pending.count }, (_, index) => ({
+                    uid: String(index),
+                    card: BACK,
+                  }))}
+                  faceDown
+                  onCardClick={
+                    enabled && !confirmed
+                      ? (index, el) => pickBack(index, el.getBoundingClientRect())
+                      : undefined
+                  }
+                  renderFace={(item, ctx) => {
+                    const index = Number(item.uid)
+                    return (
+                      <div data-transfer-choice={index} className={styles.offerCard}>
+                        {picked?.index === index ? null : (
+                          <Card
+                            card={item.card}
+                            faceDown={ctx.faceDown}
+                            interactive={false}
+                            tilt={ctx.tilt}
+                            width={ctx.width}
+                          />
+                        )}
+                      </div>
+                    )
+                  }}
+                />
+              </div>
             </div>
           )}
           {stealing && !confirmed && (

@@ -19,6 +19,7 @@ export const SCENARIOS = [
   'branchSudo',
   'securityRequest',
   'securityGive',
+  'blindStealPlay',
   'blindSteal',
   'handDefense',
 ] as const
@@ -39,9 +40,13 @@ const instance = (id: string, n: number): CardInstance => ({ uid: `${id}#debug${
 // Deliberately stable card UIDs: restarting must reset the board's private
 // arrangement even when every card identity appears again in the next run.
 export function createScenario(scenario: Scenario, gameId: string): GameState {
-  const transfer = ['securityRequest', 'securityGive', 'blindSteal', 'handDefense'].includes(
-    scenario,
-  )
+  const transfer = [
+    'securityRequest',
+    'securityGive',
+    'blindStealPlay',
+    'blindSteal',
+    'handDefense',
+  ].includes(scenario)
   const initial = engine.createGame({
     gameId,
     seed: 42,
@@ -148,6 +153,12 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
       },
     },
   }
+  // NOTHING APPLIED: the attack is still in the hand, so the scene runs from
+  // the gesture that starts it rather than from the decision it leads to. Every
+  // other preset here enters its decision through real actions for the same
+  // reason a fixture never writes a pending by hand — this one simply starts a
+  // step earlier, at the card.
+  if (scenario === 'blindStealPlay') return state
   const at = Date.now()
   const apply = (action: Action) => {
     const result = engine.reduce(state, action)

@@ -248,12 +248,14 @@ export default function AiCardsStory() {
       }
       return
     }
-    await sendToDiscard([{ key: 'crushed', card, node: el }])
+    // nothing stands: the card is handed over as its own `node`
+    await sendToDiscard([{ key: 'crushed', card, node: el }], null)
   }
 
   // the AI trigger leaves to the common discard, landing scattered
   const triggerToDiscard = async (card: CardType, j: Scatter) => {
-    await sendToDiscard([{ key: 'trigger', card, node: elOf('trig'), scatter: j }])
+    // nothing stands: the trigger is handed over as its own `node`
+    await sendToDiscard([{ key: 'trigger', card, node: elOf('trig'), scatter: j }], null)
   }
 
   const confirmInside = () => {
@@ -332,6 +334,9 @@ export default function AiCardsStory() {
           scatter: e,
           layer: i,
         })),
+        // nothing stands: the backs are handed over as their own nodes, and the
+        // carriers holding them come down once they have landed
+        null,
       )
       drop()
     }
@@ -527,8 +532,9 @@ export default function AiCardsStory() {
     await Promise.all([
       resolveGeneric(trig, ai),
       chosen
-        ? sendToDiscard([{ key: 'picked', card: chosen.card, node: elOf('picked') }]).then(() =>
-            drop('picked'),
+        ? // nothing stands: handed over as its own `node`
+          sendToDiscard([{ key: 'picked', card: chosen.card, node: elOf('picked') }], null).then(
+            () => drop('picked'),
           )
         : Promise.resolve(),
     ])

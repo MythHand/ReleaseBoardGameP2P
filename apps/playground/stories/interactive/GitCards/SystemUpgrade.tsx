@@ -248,6 +248,8 @@ export default function SystemUpgrade({ selector }: { selector: ReactNode }) {
         delay: i * CLEAR_STEP,
         layer: i,
       })),
+      // nothing stands: every card is handed over as its own `node`
+      null,
     )
 
     const clearDone = RETURN_DUR + Math.max(0, rest.length - 1) * CLEAR_STEP

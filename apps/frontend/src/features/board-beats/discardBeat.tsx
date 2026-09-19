@@ -153,7 +153,10 @@ export function useDiscardBeat(anchors: BoardAnchors, staging?: RefObject<Staged
           flyer.drop()
         }
       }
-      await latest.current.send(items)
+      // nothing stands: the fan let go of these cards at the TAKEOFF publish
+      // above, which has to happen there and not here — the sweep runs in
+      // between, and it gathers the very cards this send then scatters.
+      await latest.current.send(items, null)
     },
     [toLeaving, flyer.raise, flyer.patch, flyer.glide, flyer.drop],
   )

@@ -51,7 +51,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
   // Sudo step are the same movement — one shuffles and the other does not, and
   // neither is visible from outside.
   const discardOntoPile = useCallback(
-    async (pile: number, top: CardData | undefined, reveal?: () => void) => {
+    async (ctx: BeatRun, pile: number, top: CardData | undefined, reveal?: () => void) => {
       const a = latest.current.anchors
       const fromCell = rectOf(a.discardBox.current)
       const toCell = rectOf(a.pileBox(pile))
@@ -68,7 +68,15 @@ export function useDeckBeat(anchors: BoardAnchors) {
       setDiscardOut('gathering')
       await wait(GATHER_MS)
       const [el] = await raise([{ key: 'pile', card: top, at: from }])
+      // GONE FROM THE PROJECTION, not only from the render — in the same commit
+      // the carrier takes it. `discardOut` is this beat's own state and dies
+      // with it; what the beat PUBLISHES is the board it hands over to (see
+      // `useBeats`), and the beat behind it reads that heap. Git Branch + Sudo
+      // is where the two came apart: the operation's own exit runs next, found
+      // the discard still standing in the base it was handed, and the centre's
+      // cards flew towards a heap that had already left to become a pile.
       setDiscardOut('taken')
+      emptyDiscard(ctx)
       if (el) {
         const anim = play('gatherToDeck', el, { from, to: cardAreaOf(toCell), duration: 560 })
         if (anim) await anim.finished
@@ -98,7 +106,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
       // only when every pile is empty and replaces `main` with a single one.
       // The card that carries the flight is the discard's own top, from the
       // projection the board is still showing — never a chosen one.
-      await discardOntoPile(0, ctx.base.decks.discard ?? undefined)
+      await discardOntoPile(ctx, 0, ctx.base.decks.discard ?? undefined)
     },
     [discardOntoPile],
   )
@@ -199,7 +207,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
       setSplitting(s.at)
       advance(ctx, s.piles)
       await nextFrames()
-      await discardOntoPile(s.at, top, () => setSplitting(null))
+      await discardOntoPile(ctx, s.at, top, () => setSplitting(null))
     },
     [discardOntoPile],
   )
@@ -248,5 +256,18 @@ export function useDeckBeat(anchors: BoardAnchors) {
 // row that no longer exists.
 function advance(ctx: BeatRun, piles: number[]): void {
   ctx.base = { ...ctx.base, decks: { ...ctx.base.decks, main: piles } }
+  ctx.publish(ctx.base)
+}
+
+// The discard has left to become a pile — so the board this beat hands on has
+// no discard. Written back into the run's own base as well as published, for
+// the same reason `advance` does it: the step behind this one has to work
+// against the table this one left, and a heap that is still there in the base
+// comes back as cards nobody put down.
+function emptyDiscard(ctx: BeatRun): void {
+  ctx.base = {
+    ...ctx.base,
+    decks: { ...ctx.base.decks, discard: null, discardHeap: [], discardCount: 0 },
+  }
   ctx.publish(ctx.base)
 }

@@ -165,6 +165,8 @@ export default function HandLimitStory() {
         layer: p.slot,
         delay: p.slot * CLEAR_STEP,
       })),
+      // nothing stands: every cell is handed over as its own `node`
+      null,
     )
     if (runId.current !== run) return
     claimed.current.clear()

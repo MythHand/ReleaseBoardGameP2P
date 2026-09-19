@@ -17,6 +17,7 @@ const en = {
   branchSudo: 'Branch + Sudo → 3 piles',
   securityRequest: 'Security Bug: request',
   securityGive: 'Security Bug: duplicate hit',
+  blindStealPlay: 'Bug: play and pick',
   blindSteal: 'Bug: blind pick',
   handDefense: 'Attack / defence centre',
   branchHint: 'Pull Branch out of your hand: one draw pile splits into two.',
@@ -25,6 +26,8 @@ const en = {
     'Request Hotfix. The opponent holds two copies. Change viewer to inspect each role.',
   securityGiveHint:
     'Name Hotfix to transfer the first matching copy automatically. Restart as observer and resolve the pending to inspect the public transfer.',
+  blindStealPlayHint:
+    'Pull Bug out of your hand onto the opponent, then pass for them with the pending control: their closed fan opens for you to pick from.',
   blindStealHint:
     'Pick a position in the opponent closed fan. The observer must never learn the stolen face.',
   handDefenseHint:
@@ -71,6 +74,7 @@ const ru: Record<keyof typeof en, string> = {
   branchSudo: 'Branch + Sudo → 3 колоды',
   securityRequest: 'Security Bug: запрос',
   securityGive: 'Security Bug: две копии',
+  blindStealPlay: 'Bug: розыгрыш и выбор',
   blindSteal: 'Bug: закрытый выбор',
   handDefense: 'Атака / защита в центре',
   branchHint: 'Вытяните Branch из руки: одна колода разделится на две.',
@@ -79,6 +83,8 @@ const ru: Record<keyof typeof en, string> = {
     'Запросите Hotfix. У соперника две копии. Меняйте вид для проверки всех ролей.',
   securityGiveHint:
     'Запрос Hotfix успешен. Переключитесь на соперника и вытяните одну из двух копий из руки; перезапустите для проверки других ролей.',
+  blindStealPlayHint:
+    'Вытяните Bug из руки на соперника, затем выполните за него решение «пас» — откроется его закрытый веер для выбора.',
   blindStealHint:
     'Выберите позицию в закрытом веере соперника. Наблюдатель не должен узнать украденную карту.',
   handDefenseHint: 'Переключитесь на соперника и вытяните Hotfix поверх атаки или примите удар.',

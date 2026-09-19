@@ -398,6 +398,9 @@ export function useCherryPickStaging(args: {
               },
             ]
           }),
+          // nothing stands: every card is handed over as its own grid cell
+          // (`node`), so the step flies those very nodes
+          null,
         )
         await Promise.all([handFlight, deckFlight, returnFlight])
         // The picked cards have LEFT the pile. The projection says so a batch
@@ -462,7 +465,15 @@ export function useCherryPickStaging(args: {
       // header comment on `.grid` in the module CSS for why. `.cells` (the
       // actual card row) and the confirm bar re-enable their own pointer
       // events, so clicks pass through everywhere else on this layer.
-      <div className={styles.grid} data-testid="board-cherry-grid">
+      //
+      // Committed: there is no surface left to read, only cards flying home in
+      // it — so it drops to the band a travelling card rides in, under the pile
+      // counters. Keyed on the same flag the scrim leaves on, so the switch
+      // happens before anything moves (Rebase's own `answered`, same rule).
+      <div
+        className={`${styles.grid} ${confirmed ? styles.flight : ''}`}
+        data-testid="board-cherry-grid"
+      >
         {!confirmed && <div className={styles.scrim} data-testid="board-cherry-scrim" />}
         <div className={`${styles.cells} ${dealing ? styles.dealing : ''}`}>
           {options.map((o) => {

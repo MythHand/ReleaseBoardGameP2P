@@ -195,20 +195,25 @@ export function useComboBeat(
           ctx.publish({ ...ctx.base, you: { ...ctx.base.you, hand } })
           handoff?.release()
         }
-        flyer.drop('fold')
         if (from && main && mainSpent) {
-          await latest.current.send([
-            {
-              key: `instant:${mainSpent.eventId}`,
-              card: main,
-              aux: auxSpent ? cardById(auxSpent.card) : null,
-              el,
-              from,
-              pose: ATTACK_POSE,
-              scatter: scatterAt(mainSpent.eventId),
-              auxScatter: auxSpent ? scatterAt(auxSpent.eventId) : undefined,
-            },
-          ])
+          await latest.current.send(
+            [
+              {
+                key: `instant:${mainSpent.eventId}`,
+                card: main,
+                aux: auxSpent ? cardById(auxSpent.card) : null,
+                el,
+                from,
+                pose: ATTACK_POSE,
+                scatter: scatterAt(mainSpent.eventId),
+                auxScatter: auxSpent ? scatterAt(auxSpent.eventId) : undefined,
+              },
+            ],
+            // the pair flyer was holding it until now
+            () => flyer.drop('fold'),
+          )
+        } else {
+          flyer.drop('fold')
         }
         return
       }
@@ -387,16 +392,20 @@ export function useComboBeat(
           // discard. Each call is a no-op for the path that does not apply —
           // `clearPaidCost` for a remote player's cost, `drop('cost')` for
           // the actor's (nothing was ever raised under that key).
-          latest.current.clearPaidCost?.current?.()
-          flyer.drop('cost')
-          await latest.current.send([
-            {
-              key: `c${plan.cost.eventId}`,
-              card: costCard,
-              from: costBox,
-              scatter: scatterAt(plan.cost.eventId),
+          await latest.current.send(
+            [
+              {
+                key: `c${plan.cost.eventId}`,
+                card: costCard,
+                from: costBox,
+                scatter: scatterAt(plan.cost.eventId),
+              },
+            ],
+            () => {
+              latest.current.clearPaidCost?.current?.()
+              flyer.drop('cost')
             },
-          ])
+          )
         }
       }
 
@@ -524,8 +533,13 @@ export function useComboBeat(
           : aux && auxRef
             ? [{ key: `p${auxRef.eventId}`, card: aux, from, scatter: scatterAt(auxRef.eventId) }]
             : []
-      if (items.length > 0) await latest.current.send(items)
-      if (ctx.base.centreAttack) ctx.publish({ ...ctx.base, centreAttack: undefined })
+      // The centre stops holding it in the same commit the carriers go up —
+      // published through `takeOff` rather than after the flight, which is
+      // what left the card standing there while its own copy flew away.
+      if (items.length > 0)
+        await latest.current.send(items, () => {
+          if (ctx.base.centreAttack) ctx.publish({ ...ctx.base, centreAttack: undefined })
+        })
     },
     [],
   )

@@ -51,6 +51,9 @@ new attack animation. Restart resets the same card identities into a new game.
   the other stays in the opponent hand. Restart, select **View: observer**, then
   use **Resolve pending as its owner** to verify the named card flies publicly
   through the centre to the attacker without a donor gesture.
+- **Bug: play and pick:** the same scene one step earlier — nothing is applied, so
+  Bug is still in your hand. Pull it onto the opponent, then use **Resolve pending
+  as its owner** to pass for them; their closed fan opens for you to pick from.
 - **Bug: blind pick:** the attacker picks a position from the closed opponent fan.
   The attack remains staged until that pick resolves. Restart, select **View:
   observer**, then use **Resolve pending as its owner**: the observer sees the

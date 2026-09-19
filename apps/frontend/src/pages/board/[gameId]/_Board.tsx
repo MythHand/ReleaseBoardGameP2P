@@ -641,6 +641,12 @@ export default function Board({
     ? defenseStaging.staged?.support?.card
     : (staging.staged?.support ?? staging.staged?.main)?.card
   const arrowColor = aimingCard ? `var(--cat-${aimingCard.category})` : undefined
+  // Which draw pile the cursor is over while the arrow is asking. A pile is not
+  // a card and has no hover of its own, so the answer it gives the arrow is
+  // rendered rather than styled: it comes back to `Pile` as `selected` (see the
+  // pile row below). Kept even when nothing is being aimed — a stale index is
+  // harmless, because the lighting is gated on the pile being a target at all.
+  const [hoveredPile, setHoveredPile] = useState<number | null>(null)
 
   // the pending "defend" the attack slot answers for — read ONCE so the hover
   // preview below and the paint further down can never drift on what counts
@@ -788,7 +794,29 @@ export default function Board({
   // this file uses elsewhere. Only ever SET here: the clears, and the order
   // the other three claimants (upgrade, defence, neutralize) are resolved in,
   // stay in the effect below.
-  if (!upgrade.stagedUid && !answering && !neutralizeOwnsHand) {
+  //
+  // THE DEFENCE SIDE HAS THE SAME RACE, and it is the same one commit: the
+  // defender drags a cover onto the attack, the host answers synchronously, and
+  // `defenseBeat.runCovered` reads this ref BEFORE its first await. Its own
+  // `!(mine && handoff)` branch then reads "nobody staged this" and flies a
+  // SECOND copy of the card out of the fan slot it has already left — the
+  // duplicate the defender sees beside the card they pulled. Asked in the same
+  // order the effect below asks it: a dispatched defence claims the handoff
+  // ahead of `answering`, which flickers false for exactly the commit that
+  // carries the engine's answer (#101, Fix D round 4).
+  const defenceDispatched =
+    defenseStaging.staged?.phase === 'dispatched' && defenseStaging.staged.main
+      ? defenseStaging.staged
+      : null
+  if (!upgrade.stagedUid && defenceDispatched?.main) {
+    handoffRef.current = {
+      mainUid: defenceDispatched.main.uid,
+      supportUid: defenceDispatched.support?.uid,
+      el: coverStagedRef.current,
+      release: defenseStaging.release,
+      whenLanded: defenseStaging.whenLanded,
+    }
+  } else if (!upgrade.stagedUid && !answering && !neutralizeOwnsHand) {
     const dispatched = staging.staged
     if (dispatched?.phase === 'dispatched' && dispatched.main) {
       handoffRef.current = {
@@ -1284,39 +1312,53 @@ export default function Board({
 
       <div className={kit.decks}>
         <div className={cls(kit.decksGrid, enter)} ref={anchors.decks}>
-          {decks.main.map((count, i) => (
-            <div
-              // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
-              key={i}
-              className={opening.pileTarget}
-              // A pile a split has just mounted is not on screen yet: it is
-              // shown by the flight that brings it, in that flight's own first
-              // frame. Seen a frame earlier, it blinks at the place it has not
-              // arrived at.
-              style={beats.splittingPile === i ? { opacity: 0 } : undefined}
-            >
-              <Pile
-                label={copy.table.deck}
-                deck="base"
-                count={count}
-                width={pileWidthFor(decks.main.length)}
-                countPos="tl"
-                boxRef={(el) => anchors.bindPile(i, el)}
-                pickable={staging.targets.some((t) => t.kind === 'pile' && t.pile === i)}
-              />
-              {staging.targets.some((t) => t.kind === 'pile' && t.pile === i) && (
-                <button
-                  type="button"
-                  className={opening.pilePick}
-                  aria-label={`${copy.table.deck} ${i + 1}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    staging.onTargetPick({ kind: 'pile', pile: i })
-                  }}
+          {decks.main.map((count, i) => {
+            const aimedAt = staging.targets.some((t) => t.kind === 'pile' && t.pile === i)
+            return (
+              <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
+                key={i}
+                className={opening.pileTarget}
+                // A pile a split has just mounted is not on screen yet: it is
+                // shown by the flight that brings it, in that flight's own first
+                // frame. Seen a frame earlier, it blinks at the place it has not
+                // arrived at.
+                style={beats.splittingPile === i ? { opacity: 0 } : undefined}
+              >
+                <Pile
+                  label={copy.table.deck}
+                  deck="base"
+                  count={count}
+                  width={pileWidthFor(decks.main.length)}
+                  countPos="tl"
+                  boxRef={(el) => anchors.bindPile(i, el)}
+                  // A PILE ANSWERS THE ARROW THE WAY A CARD DOES. `pickable`
+                  // says a choice is open and this is one of the places it can
+                  // land; `selected` says the cursor is on THIS one, and it
+                  // lights in the colour of the card the arrow leaves —
+                  // `arrowColor`, the same value the arrow itself is drawn
+                  // with, so the question and its answer are one colour
+                  // (`DeckAnimationsStory`: `pickable` + `selected` + `accent`).
+                  pickable={aimedAt}
+                  selected={aimedAt && hoveredPile === i}
+                  accent={arrowColor}
                 />
-              )}
-            </div>
-          ))}
+                {aimedAt && (
+                  <button
+                    type="button"
+                    className={opening.pilePick}
+                    aria-label={`${copy.table.deck} ${i + 1}`}
+                    onMouseEnter={() => setHoveredPile(i)}
+                    onMouseLeave={() => setHoveredPile((h) => (h === i ? null : h))}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      staging.onTargetPick({ kind: 'pile', pile: i })
+                    }}
+                  />
+                )}
+              </div>
+            )
+          })}
           {/* Flights bind the actual card box, not its labelled grid cell. */}
           {setup.ai !== 'no' && (
             <div className={kit.eventsPile} data-events-box>
@@ -1353,17 +1395,19 @@ export default function Board({
             topCard={
               cherry.grid || state.aiCause || beats.discardOut === 'taken' ? null : decks.discard
             }
+            // THE NUMBER IS ALWAYS THE TRUTH, including when it is zero. An
+            // empty discard says `// 0` — that is what tells you it is empty,
+            // and it is what a card returning to it passes under.
+            //
+            // The cherry grid holds the discard's own cards, so the pile it
+            // left really is empty and says so.
+            count={cherry.grid ? 0 : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))}
             // THE WHOLE DISCARD LEAVES, not its top card. Before it flies to a
-            // pile the heap collects itself into a straight stack and its
-            // counter goes — that gathering IS the pile becoming one thing, and
-            // without it the scattered heap simply vanishes while a single card
-            // travels (`DeckAnimationsStory`: `gathered` with `showCount: false`,
-            // which is its own `count={0}`).
-            count={
-              cherry.grid || beats.discardOut
-                ? 0
-                : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))
-            }
+            // pile the heap collects itself into a straight stack and the
+            // counter goes WITH it — that gathering IS the pile becoming one
+            // thing (`DeckAnimationsStory`: `gathered` with `showCount: false`).
+            // The one case where the number is carried rather than shown.
+            showCount={!beats.discardOut}
             gathered={beats.discardOut === 'gathering' || undefined}
             width={116}
             boxRef={anchors.discardBox}
