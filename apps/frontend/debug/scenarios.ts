@@ -153,7 +153,9 @@ function createSecurityScenario(initial: GameState, scenario: Scenario): GameSta
       ...initial.players,
       you: {
         ...initial.players.you,
-        hand: [attack, instance('protection-debugger', 1)],
+        // Sudo rides along here too: the attack is still in the hand, so one
+        // run covers the card with and without it (owner, 19.09).
+        hand: [attack, instance('support-sudo', 5), instance('protection-debugger', 1)],
         release: {},
         openedAtDeal: [],
       },
