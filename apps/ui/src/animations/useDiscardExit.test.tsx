@@ -147,3 +147,42 @@ it('falls back to a fresh scatter for the aux half when the caller has none', as
   expect(auxParams).toBeDefined()
   expect(typeof auxParams?.rotate).toBe('number')
 })
+
+// THE SUPPORT LIES UNDER THE CARD IT WAS PLAYED WITH, and a heap is built by
+// appending — so the one that lay under has to reach it FIRST or the stack lands
+// inverted. This is one half of that rule; the other is the heap folded out of
+// the event feed on the board (`toBoardState.toDiscardHeap`, which tucks the
+// support under its main for the same reason). The two are written separately
+// and must agree: a pair that flies the right way up and then swaps the instant
+// the heap takes over is exactly the defect that comes of them drifting (#168,
+// docs/animations/backlog.md).
+it('lands a split pair bottom-up, the tucked half first', async () => {
+  calls.params = []
+  const landed: string[] = []
+  const box = { current: document.createElement('div') }
+  const local: { step?: ReturnType<typeof useDiscardExit> } = {}
+  function Local() {
+    local.step = useDiscardExit(box, (cards) => {
+      for (const c of cards) landed.push(c.card.id)
+    })
+    return <>{local.step.overlay}</>
+  }
+  render(<Local />)
+  const pairEl = document.createElement('div')
+  pairEl.innerHTML = '<div data-aux></div><div data-main></div>'
+  const item: Leaving = {
+    key: 'p20',
+    card,
+    aux: auxCard,
+    el: pairEl,
+    from: { left: 0, top: 0, width: 120, height: 168 },
+    scatter: scatterAt(20),
+    auxScatter: scatterAt(21),
+  }
+  await act(async () => {
+    const run = local.step?.send([item], null)
+    for (let i = 0; i < 12; i++) await Promise.resolve()
+    await run
+  })
+  expect(landed).toEqual(['support-sudo', 'attack-bug'])
+})

@@ -11,7 +11,6 @@ import {
   Badge,
   Button,
   Card,
-  type CardData,
   CardPair,
   cardById,
   centrePlaceStyle,
@@ -679,30 +678,6 @@ export default function Board({
         ? { attackCard: state.centreAttack.card, sudo: state.centreAttack.sudo }
         : null)
   const operationSource = pendingSourceCard?.category === 'operation' ? pendingSourceCard : null
-
-  // WHAT IS STANDING AT THE CENTRE, named once for anything that needs to say
-  // which card is there rather than draw it — today the card preview, which is
-  // how a card on the table is read at all.
-  //
-  // It used to be named inline at the preview's own call, and it named two
-  // cases: an attack, and a 503 alarm. Every other card that stands in this slot
-  // was simply unreadable — an operation waiting for its effect, an operation
-  // resting after it, both of them the git cards anyone at the table might want
-  // to read, and nobody could (#168). One list beside the renders it mirrors, so
-  // a card that stands here is a card that can be read.
-  //
-  // A card being STAGED is not on this list. It is the actor's own card, mid
-  // gesture, out of their own hand — and the aim runs across this very spot, so
-  // a preview opening under the arrow would be in the way of the gesture rather
-  // than in service of reading the table.
-  const centreStanding: CardData | null =
-    (centreAttack ? cardById(centreAttack.attackCard) : null) ??
-    (pendingAlarm?.card ? cardById(pendingAlarm.card) : null) ??
-    operationSource ??
-    (beats.operationLanded && !beats.operationLanded.sudo
-      ? cardById(beats.operationLanded.card)
-      : null) ??
-    null
 
   // the release standing at the stage slot while its cost is unpaid — read
   // ONCE, same reason as `pendingDefend` above, and its OWNERSHIP stated here
@@ -1626,7 +1601,13 @@ export default function Board({
         data-board-centre
         data-centre-slot="attack"
         ref={anchors.centre}
-        {...previewProps(centreStanding)}
+        // THE SLOT ANSWERS FOR ITSELF: whatever card is drawn in it is the card
+        // that can be read. It used to be handed a list of what might stand
+        // here, and the list named an attack and a 503 alarm — so the git
+        // operations that stand in this very slot, waiting for their effect or
+        // resting after it, could not be read by anybody (#168). A list is
+        // something a new render can be added without; the slot is not.
+        {...previewProps()}
       >
         {intro &&
           deal.staged.map((s) => {
