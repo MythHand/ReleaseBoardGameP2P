@@ -35,6 +35,34 @@ it('reads the card standing at the centre when the pointer is on its slot', () =
   expect(preview?.querySelector('[data-card]')?.getAttribute('data-card')).toBe('attack-bug')
 })
 
+// …AND EVERY OTHER CARD THAT STANDS THERE. The slot used to name two cases,
+// an attack and a 503 alarm, so an operation waiting at the centre for its own
+// effect — a git card, which anyone at the table might want to read — could not
+// be read by anybody (#168). What the preview offers is now whatever is
+// standing, named once beside the renders that put it there.
+it('reads a git operation standing at the centre while its effect is open', () => {
+  const base = makeBoardProps()
+  const props = makeBoardProps({
+    state: {
+      ...base.state,
+      pending: {
+        kind: 'pickFromDiscard',
+        player: 'p2',
+        source: 'operation-git-cherry-pick',
+        picks: 1,
+        options: [],
+      },
+    },
+  })
+  render(<Board {...props} />)
+  const slot = document.querySelector('[data-centre-slot="attack"]') as HTMLElement
+  fireEvent.mouseEnter(slot)
+  const preview = document.querySelector('[data-card-preview]')
+  expect(preview?.querySelector('[data-card]')?.getAttribute('data-card')).toBe(
+    'operation-git-cherry-pick',
+  )
+})
+
 it('reads nothing from an empty slot', () => {
   render(<Board {...makeBoardProps()} />)
   const slot = document.querySelector('[data-centre-slot="cover"]') as HTMLElement

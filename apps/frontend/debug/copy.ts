@@ -33,11 +33,20 @@ const en = {
   securityGiveHint:
     'Name Hotfix to transfer the first matching copy automatically. Restart as observer and resolve the pending to inspect the public transfer.',
   blindStealPlayHint:
-    'Pull Bug out of your hand onto the opponent, then pass for them with the pending control: their closed fan opens for you to pick from. Sudo is in the hand too.',
+    'Pull Bug out of your hand onto the opponent, then pass for them with the pending control: their closed fan opens for you to pick from. Legacy Code and Out of Memory are in the hand too — the same effect on three cards — and so is Sudo.',
   blindStealHint:
     'Pick a position in the opponent closed fan. The observer must never learn the stolen face.',
   handDefenseHint:
-    'Switch to the opponent and pull Hotfix over the staged attack, or take the hit.',
+    'Switch to the opponent and pull a defence over the staged attack, or take the hit. Their hand holds every defence card, one copy each.',
+  release: 'Release into a zone',
+  alarm503: 'Error 503: the alarm',
+  aiTrigger: 'AI trigger: a Crush',
+  releaseHint:
+    'Your turn, zones empty. Put the release down — pay its cost if one is charged, or play it with Code Review so the cost rides it instead. Monitoring is in the hand too: it goes into its own slot in the zone.',
+  alarm503Hint:
+    'Nothing drawn yet. Take a card from the pile: Error 503 turns up and the alarm stands. Answer it with the Debugger in hand or by sacrificing the release in your zone.',
+  aiTriggerHint:
+    'Nothing drawn yet. Take a card from the pile: the AI trigger reveals a Crush aimed at the release in your zone. Answer it with the Debugger, or sacrifice the release.',
   cherry: 'Cherry-pick',
   rebase: 'Rebase',
   upgrade: 'Upgrade',
@@ -92,10 +101,20 @@ const ru: Record<keyof typeof en, string> = {
   securityGiveHint:
     'Запрос Hotfix успешен. Переключитесь на соперника и вытяните одну из двух копий из руки; перезапустите для проверки других ролей.',
   blindStealPlayHint:
-    'Вытяните Bug из руки на соперника, затем выполните за него решение «пас» — откроется его закрытый веер для выбора. Sudo тоже в руке.',
+    'Вытяните Bug из руки на соперника, затем выполните за него решение «пас» — откроется его закрытый веер для выбора. Legacy Code и Out of Memory тоже в руке — это тот же эффект на трёх картах, — и Sudo там же.',
   blindStealHint:
     'Выберите позицию в закрытом веере соперника. Наблюдатель не должен узнать украденную карту.',
-  handDefenseHint: 'Переключитесь на соперника и вытяните Hotfix поверх атаки или примите удар.',
+  handDefenseHint:
+    'Переключитесь на соперника и вытяните защиту поверх атаки или примите удар. В его руке все карты защиты, по одной копии.',
+  release: 'Релиз в зону',
+  alarm503: 'Error 503: тревога',
+  aiTrigger: 'Триггер AI: Crush',
+  releaseHint:
+    'Ваш ход, зоны пусты. Выложите релиз — оплатите стоимость, если её берут, либо разыграйте его с Code Review, и тогда он ляжет под релиз вместо оплаты. Мониторинг тоже в руке: он занимает свой слот в зоне.',
+  alarm503Hint:
+    'Добора ещё не было. Возьмите карту из колоды: выпадет Error 503 и тревога встанет. Ответьте Debugger из руки или пожертвуйте релизом из своей зоны.',
+  aiTriggerHint:
+    'Добора ещё не было. Возьмите карту из колоды: триггер AI откроет Crush, нацеленный на релиз в вашей зоне. Ответьте Debugger или пожертвуйте релизом.',
   cherry: 'Cherry-pick',
   rebase: 'Rebase',
   upgrade: 'Upgrade',

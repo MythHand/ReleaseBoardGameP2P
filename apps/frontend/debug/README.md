@@ -1,5 +1,20 @@
 # Board debug
 
+## How a pass on this stand is reported
+
+Every report about work done on this stand ends with two lists, and nothing
+between them but the lists themselves (owner, 20.09):
+
+1. **Modules not checked yet** — the animation modules whose use on the board has
+   not been gone through. A module can be on it for two reasons, and they are not
+   the same thing: nobody has looked at it, or it has been looked at and does not
+   work. Say which.
+2. **Card plays not reviewed yet** — the cards whose play has not been walked
+   through on this stand against its playground scene.
+
+No prose around either list. They are the state of the work, not an argument
+about it: what is still open, at a glance, in the same place every time.
+
 Run the frontend dev server (`pnpm dev`) and open `/debug.html` on its local URL.
 This separate Vite HTML entry is for development; the normal production build
 starts at `index.html` and does not include it.
@@ -71,6 +86,27 @@ new attack animation. Restart resets the same card identities into a new game.
 - **Attack / defence centre:** switch to the opponent and pull Hotfix onto the
   attack. Check that the empty cover slot does not intercept the attack hover;
   the played defence lands above it, with its own card tilt.
+- **Release into a zone:** your turn, zones empty. Put the release down — pay its
+  cost if the setup charges one, or play it with Code Review so the cost rides it
+  instead. Monitoring is in the hand too, for the other thing that goes into a
+  zone. The opponent holds a Bug and a Sudo, so the window the fresh release
+  opens has something to answer it.
+- **Error 503: the alarm / AI trigger: a Crush:** nothing has been drawn yet, and
+  the trigger sits on top of the pile — both cards fire on the draw and never
+  reach a hand. The 503 alarm stands because there are two ways to answer it, a
+  Debugger in hand and a release to sacrifice. The AI preset seeds the events
+  deck with a single card, so every run reveals the same Crush, aimed at the
+  release standing in the zone.
+- **Defences in the defender's hand:** every preset that throws an attack gives
+  the defender every defence card, one copy each — Hotfix, Rubber ducky, PR
+  approved, Rollback, Not a bug, Works on my machine. A stand is where you reach
+  for the card you want to look at, so a card whose outcome some other card
+  covers is not a card you can reach. The Security Bug presets keep their second
+  Hotfix copy on top of that, for the duplicate-hit case.
+- **The Bug family in the attacker's hand:** the play-and-pick preset carries
+  Legacy Code and Out of Memory beside Bug. The rules give all three one effect,
+  so the play is the same whichever is thrown — they are there to be thrown by
+  name.
 - **Branch → 2 piles / Branch + Sudo → 3 piles:** start with one main pile and
   use the normal hand gestures. After resolution, main piles fill two rows down
   each column and AI stays bottom-left. All pile card boxes retain 150px width.
