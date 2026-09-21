@@ -207,6 +207,10 @@
      панелью — она накрывает стол целиком и главнее чтения одной карты. */
   --z-card-preview: 320;
 
+  /* Private card choices cover the public table, while history and rules
+     remain accessible from the rail and its drawer. */
+  --z-card-choice: 330;
+
   /* выезжающая панель у края (Drawer): она НАКРЫВАЕТ стол, поэтому идёт выше
      всей полосы полёта — включая счётчик стопки на +40 — и выше стрелки: пока
      панель открыта, целиться всё равно некуда. Ниже окна реакции: оно про ход

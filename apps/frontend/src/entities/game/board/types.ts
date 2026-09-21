@@ -174,32 +174,7 @@ export interface BoardChromeCopy {
   // заголовок группы управления хоста + подпись поля лимита зрителей
   hostTitle: string
   specLimit: string
-  // The ask under the centre of the table (#101) — one line per step that
-  // waits on a card from the fan and has no panel to speak for it: the
-  // standing release's own price, an attack owed an answer, and (fix round 1)
-  // the defender's own Sudo waiting for the defence it will enhance. That
-  // last one is a separate line and not a phrasing of `askDefend`, because it
-  // is a separate GESTURE: an open attack is answered by pulling a card out,
-  // a waiting Sudo by clicking one — and a pull in that state is refused
-  // outright (`resolveLegal`/`resolveSudo` both bail while anything is
-  // staged), so one line covering both would name a gesture that does nothing.
-  askCost: string
-  askDefend: string
-  askPartner: string
-  // An Error 503 owed an answer (#102). One line for all three methods rather
-  // than one per method: they are three GESTURES but one question, and what
-  // may answer is the projection's own set — so the line points at what is lit
-  // instead of naming a gesture that a pending offering only Monitoring (or
-  // only a sacrifice) would not have.
-  askNeutralize: string
-  // The hand is over the limit and the fan is the picker (#104). Count-free on
-  // interpolation to put a number into — and the grid's own empty cells already
-  // show how many are owed.
-  askHandLimit: string
-  // Inside's own caption (#106, `pickFromDiscard`) — the row over the
-  // discard asks this one, the same way the fan itself asks the four lines
-  // above it. Shared with Git Cherry-pick once #61 lands: the two effects
-  // resolve through the same pending, so they read the same line.
+  // Caption for the private Inside discard picker.
   insidePrompt: string
   // Git Cherry-pick's own grid (#108, `pickFromDiscard`, `operation-git-
   // cherry-pick`) — its own captions, not Inside's `insidePrompt`: a base

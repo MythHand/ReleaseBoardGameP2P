@@ -1,10 +1,11 @@
 /* A private decision sits above the public operation's flight carrier. Keep
-   the rows and confirmation in the same layer, and catch background presses.
+   the rows and confirmation in the same layer, below the drawer and rail,
+   and catch background presses.
    No transform/filter here: returning cards use viewport coordinates. */
 .overlay {
   position: absolute;
   inset: 0;
-  z-index: var(--z-reaction);
+  z-index: var(--z-card-choice);
   background: var(--black-72);
 }
 

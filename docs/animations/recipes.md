@@ -2361,8 +2361,9 @@ per card in the committed order (`BACK_DUR 600` / `BACK_STEP 90`); the answer go
 **Where.** `pages/board/[gameId]/_useRebaseStaging.tsx`, `pages/board/[gameId]/_Board.tsx`.
 
 **Layout.** Per the owner's 2026-09-21 decision, the private choice is an overlay above the
-table. The numbered rows and `ConfirmAction` share the reaction layer above the public
-operation carrier, with a dim background that intercepts table presses. The operation remains
+table. The numbered rows and `ConfirmAction` share `--z-card-choice` (330), above the public
+operation carrier and below the drawer (350) and rail (360). History and rules remain accessible;
+a dim background intercepts table presses. The operation remains
 held underneath until the effect finishes. The rows scroll independently of the confirmation
 bar at the board bottom. Neither wrapper has a transform or filter, so returning cards use
 viewport coordinates without acquiring a different containing block.
@@ -2648,7 +2649,9 @@ for the heap going into the fan.
 
 **Sequence — 1. the interface arrives.** Every beat is one `play('hudIn', el, …)`, separated by
 `BEAT`. Nothing here measures anything: the blocks are in place, they only fade and shift in.
-1. The rail slides in from its own edge (`dx: 44`, `RAIL_MS`).
+1. The rail slides in from its own edge (`dx: 44`, `RAIL_MS`). Its animated wrapper owns
+   `--z-rail`: a filled HUD animation creates a stacking context even after its visible
+   motion finishes, and the closed drawer parked behind the rail must stay underneath.
 2. The table layer with its grid — a plain fade (`dx/dy: 0`, `BG_MS`). No movement on purpose: the
    ambience does not arrive from a direction, it is switched on.
 3. The decks from the left (`dx: -34`) and the discard from the right (`dx: 34`), the second one

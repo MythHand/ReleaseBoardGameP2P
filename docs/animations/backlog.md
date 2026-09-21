@@ -19,6 +19,21 @@ so that is where a finding has to show up, in one line with a status. This file 
 in full: what it costs and what would close it. Enter it in both — the page so it is seen, here so
 it can be acted on.
 
+## Board instruction pills and missing navigation — closed 2026-09-21
+
+The owner requested removal of the extra instruction pills and restoration of the right-hand
+tabs. The frontend's shared ask band and duplicate decline button are removed for defence,
+Sudo pairing, release cost, neutralization and hand-limit discards. TurnDock Pass remains the
+way to decline an attack, as in DefenseReleaseStory; both pointer and keyboard activation
+return an unpaired Sudo. The playground cost-only AskLine demonstration remains unchanged.
+This supersedes the earlier proposal to port AskLine onto the live Board.
+
+The rail was present in the DOM but covered after opening: hudIn's filled animation leaves
+its wrapper as a stacking context, so the closed Drawer at 350 painted over the descendant
+TabRail at 360. Reproduced in Chromium with the production preset and an elementFromPoint
+hit test. The animated wrapper now owns the rail layer. Rebase choices use a separate layer
+at 330, above public cards and below navigation, so panels remain usable during the choice.
+
 ## Rebase choice covered by its public operation — closed 2026-09-21
 
 The retained `operationBeat` carrier painted Git Rebase on the flight layer (250), above
@@ -26,7 +41,7 @@ the private reorder rows (40), obscuring the middle offered card. Reproduced thr
 real debug Board with a two-pile Rebase.
 
 **Owner decision, 2026-09-21:** the card-choice screen goes above the rest of the table.
-The rows and confirmation now share a full-board overlay on the reaction layer (400),
+The rows and confirmation now share a full-board overlay on the card-choice layer (330),
 with a dim background that catches presses outside the cards. The played operation stays
 underneath until resolution; its lifecycle and the private projection remain unchanged.
 The wrapper has no transform/filter, preserving viewport-relative return flights.
@@ -879,6 +894,11 @@ rect назначения → `nextFrames` → `foldIntoPair` на каждую 
 `_useBoardStaging` и `comboBeat`. Их миграция остаётся открытой.
 
 ### Строка-подсказка под центром стола написана дважды
+
+**Закрыто 21.09.2026 — новое решение владельца.** Плашек в игре быть не должно.
+Копия борда удалена вместе с дополнительной кнопкой отказа; отказ остаётся в доке.
+Перенос AskLine на борд больше не требуется. Ниже сохранены исходная находка и
+предыдущий ответ; новое решение их заменяет. Компонент и сцена оплаты в плейграунде остаются.
 
 **Что не хватает.** «Строка о том, чего стол ждёт» — всегда смонтированная плашка под центром,
 которая проявляется и гаснет переходом (`opacity` + сдвиг 132px → 146px за 260ms `--ease-out`), —

@@ -611,12 +611,10 @@ it('hands off when onResolve synchronously advances to the accepted projection',
   }
 })
 
-it('asks for the discard in the ask line and offers no panel', () => {
+it('offers the discard grid without an instruction pill or a panel', () => {
   render(boardOverLimit(2))
   const copy = makeBoardProps().copy
-  const ask = screen.getByTestId('board-ask')
-  expect(ask.getAttribute('data-shown')).toBe('true')
-  expect(ask.textContent).toBe(copy.table.askHandLimit)
+  expect(screen.queryByTestId('board-ask')).toBeNull()
   // the cards on the table are the question — a panel would ask it twice, and
   // would cover the grid it is asking about
   expect(screen.queryByText(copy.pending.handLimit.prompt)).toBeNull()

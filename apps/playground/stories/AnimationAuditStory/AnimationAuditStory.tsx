@@ -752,8 +752,8 @@ const ISSUES: Issue[] = [
       en: 'Git Rebase covered the middle reorder card',
     },
     problem: {
-      ru: 'Исправлено по решению владельца от 21.09.2026: экран выбора находится поверх стола. Ряды и подтверждение объединены в слой реакции с затемнением; публичная операция остаётся под ним до завершения эффекта. Обёртка не меняет систему координат обратных полётов.',
-      en: 'Fixed per the owner decision of 2026-09-21: the choice screen sits above the table. Rows and confirmation share the reaction layer with a dim background; the public operation stays underneath until its effect finishes. The wrapper preserves viewport coordinates for return flights.',
+      ru: 'Исправлено по решению владельца от 21.09.2026: экран выбора находится поверх стола. Ряды и подтверждение объединены в слой выбора карт (330) с затемнением, ниже правых вкладок и панели; публичная операция остаётся под ним до завершения эффекта. Обёртка не меняет систему координат обратных полётов.',
+      en: 'Fixed per the owner decision of 2026-09-21: the choice screen sits above the table. Rows and confirmation share the card-choice layer (330) below the rail and drawer, with a dim background; the public operation stays underneath until its effect finishes. The wrapper preserves viewport coordinates for return flights.',
     },
     where: {
       ru: 'pages/board/[gameId]/_useRebaseStaging.tsx + _useRebaseStaging.module.css',
@@ -1270,18 +1270,18 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
-      ru: 'Строка-подсказка под центром стола написана дважды',
-      en: 'The ask line under the centre of the table is written twice',
+      ru: 'ЗАКРЫТО: лишние плашки и пропавшие правые вкладки на борде',
+      en: 'CLOSED: extra instruction pills and missing right tabs on the Board',
     },
     problem: {
-      ru: 'Всегда смонтированная плашка «чего стол ждёт», проявляющаяся и гаснущая переходом (opacity + сдвиг 132px → 146px за 260ms --ease-out), написана отдельным CSS два раза: .ask в DefenseReleaseStory.module.css (одобренный источник) и .ask в _Board.module.css — борд получил её в #101 (Fix B) вместе с отменой панели на defend. Значения совпадают до пикселя только потому, что вторая копия процитирована с первой. Это переход CSS, а не play(), поэтому словарь animations/ его и не покрывал: там полёты по координатам, а не состояние смонтированного элемента, — модуля под «поверхность, которая проявляется на месте» в проекте нет вовсе. Отдельно разошлось prefers-reduced-motion: у копии борда переход погашен, у копии сцены нет. Закроет либо класс-утилита рядом с токенами, либо (если таких поверхностей наберётся больше одной) маленький шаг в apps/ui со своей строкой в reference.md — но раньше кода стоит решение, считается ли поверхность на месте частью словаря «полётов». — ОТВЕТ ВЛАДЕЛЬЦА: словарь полётов написан для КАРТ, а не для текстов; на узкие экраны игра сама по себе не рассчитана, так что ширина не предмет. СДЕЛАНО НА НАШЕЙ СТОРОНЕ: строка стала одним компонентом кита — AskLine (table/TableCentre/AskLine.tsx), со своей страницей Ask line в блоках; висит она не на своей высоте, а на высоте центра (CENTRE_TOP плюс смещение), и 14px между скрытым и видимым положением это всё её движение. Сцена DefenseRelease переведена на компонент, её копия CSS удалена. Осталась копия борда.',
-      en: 'The always-mounted "what the table is waiting for" line, fading in and out by transition (opacity + a 132px → 146px shift over 260ms --ease-out), is written as separate CSS twice: `.ask` in DefenseReleaseStory.module.css (the approved source) and `.ask` in _Board.module.css — the board got it in #101 (Fix B) along with dropping the panel for a defend. The values match to the pixel only because the second copy was quoted off the first. It is a CSS transition rather than a play(), which is why the animations/ vocabulary never covered it: that vocabulary is flights by coordinates, not the state of a mounted element — there is no module for "a surface that appears in place" at all. prefers-reduced-motion has already diverged too: the board copy kills the transition, the scene copy does not. What closes it is either a utility class beside the tokens or, if more than one such surface turns up, a small step in apps/ui with its own row in reference.md — but ahead of the code sits the decision whether an in-place surface belongs to a vocabulary of flights. — OWNER: the flight vocabulary is written for CARDS, not for text; the game is not built for narrow screens in the first place, so the width is not the subject. DONE ON OUR SIDE: the line is now one kit component — AskLine (table/TableCentre/AskLine.tsx) with its own Ask line page in the blocks; it holds no height of its own but hangs off the centre (CENTRE_TOP plus an offset), and the 14px between hidden and shown is its whole movement. The DefenseRelease scene now calls the component and its CSS copy is gone. The board copy remains.',
+      ru: 'Решение владельца от 21.09.2026 заменяет прежний план переноса AskLine: плашки и отдельная кнопка отказа удалены из игры, отказ остаётся в TurnDock. Компонент AskLine и сцена оплаты в плейграунде сохранены. Вкладки накрывала закрытая панель после hudIn: слой рейла теперь задан на его анимированной обёртке. История и правила доступны и поверх выбора Rebase.',
+      en: 'The owner decision of 2026-09-21 supersedes the planned AskLine migration: instruction pills and the extra decline button are removed from the live game; TurnDock owns declining. AskLine and the playground cost scene remain. The closed drawer covered the tabs after hudIn: the animated rail wrapper now owns its layer. History and rules also remain accessible above Rebase choices.',
     },
     where: {
-      ru: 'frontend: pages/board/[gameId]/_Board.module.css (.ask) + playground: interactive/DefenseReleaseStory.module.css (.ask)',
-      en: 'frontend: pages/board/[gameId]/_Board.module.css (.ask) + playground: interactive/DefenseReleaseStory.module.css (.ask)',
+      ru: 'frontend: pages/board/[gameId]/_Board.tsx + _Board.module.css; история решения: docs/animations/backlog.md',
+      en: 'frontend: pages/board/[gameId]/_Board.tsx + _Board.module.css; decision history: docs/animations/backlog.md',
     },
-    status: 'rework',
+    status: 'ok',
   },
   {
     what: {
