@@ -90,6 +90,20 @@ it('shows the invite screen when there is no session', () => {
   expect(screen.getByText('invite.joinCta')).toBeTruthy()
 })
 
+it.each([true, false])('allows only the host to select two starting piles (host: %s)', (isHost) => {
+  sessionValue = { ...inSession(), isHost }
+  renderInRouter(<LobbyView />)
+  fireEvent.click(screen.getByRole('button', { name: '2' }))
+  if (isHost) {
+    expect(sessionValue.setSetup).toHaveBeenCalledWith({
+      ...sessionValue.state?.setup,
+      startingDecks: 'two',
+    })
+  } else {
+    expect(sessionValue.setSetup).not.toHaveBeenCalled()
+  }
+})
+
 it('pre-fills the code from a shared /lobby/:lobbyId link', () => {
   sessionValue = base()
   render(

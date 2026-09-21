@@ -342,6 +342,13 @@
         "base": "Draw from all decks",
         "strategic": "Draw from one deck only"
       }
+    },
+    "startingDecks": {
+      "title": "Starting draw decks",
+      "options": {
+        "base": "One deck after dealing",
+        "two": "Split the remaining cards into two decks"
+      }
     }
   },
   "rulesBlock": {

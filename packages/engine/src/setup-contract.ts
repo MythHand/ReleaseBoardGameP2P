@@ -10,6 +10,7 @@ export const SETUP_AXES = {
   releaseCond: ['base', 'easy'],
   ai: ['base', 'less', 'no'],
   gitBranch: ['base', 'strategic'],
+  startingDecks: ['base', 'two'],
 } as const satisfies Record<string, readonly string[]>
 
 export type SetupAxis = keyof typeof SETUP_AXES

@@ -2686,6 +2686,12 @@ after every `wait`, so restarting mid-deal does not leave a half-sequence runnin
 opponents' hands, the deck is down by what was dealt, the zone is on screen. Restart clears the
 `started` ref, drops every flyer and re-runs the scene by `key`.
 
+**Two starting draw piles (#150).** The live board reconstructs one pre-deal pile using the sum
+of the final draw piles plus the dealt cards. During dealing and `HEAP_HOLD`, only that one pile
+is shown. At `settling`, both final piles appear together, with the projection's own counts;
+the second pile must never be shown beside the reconstructed total. Skipping the intro exposes
+the final projection directly.
+
 **Live reference.** `Game Deal` (interactive group).
 
 ---

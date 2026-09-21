@@ -147,38 +147,57 @@ it('opens on the pre-deal table and keeps the gate shut', () => {
   expect(onDone).not.toHaveBeenCalled()
 })
 
-it('counts down pile 0 only — every other pile passes through untouched', () => {
+it('deals from one reconstructed pile and exposes the final split only after dealing', async () => {
+  vi.useFakeTimers()
   const onDone = vi.fn()
-  // A second pile the deal never draws from (a fresh game always opens on one
-  // pile; this is a synthetic multi-pile projection, exercised the way Git
-  // Branch would leave the table by the time a LATER opening — if one ever
-  // ran mid-match — read it). `live.decks.main[1]` is deliberately a value
-  // `view.decks.piles[1]` does NOT share, so a passing assertion can only mean
-  // the shadow took it from `live` untouched, not recomputed it from `view` or
-  // folded it into the deckBefore total.
-  const multiView: PlayerView = { ...view(), decks: { ...view().decks, piles: [96, 50] } }
-  const multiLive: BoardState = { ...live(), decks: { ...live().decks, main: [96, 77] } }
-  const { result } = renderHook(() =>
+  const multiView: PlayerView = { ...view(), decks: { ...view().decks, piles: [50, 50] } }
+  const multiLive: BoardState = { ...live(), decks: { ...live().decks, main: [50, 50] } }
+  const anchors = refs()
+  const box = document.createElement('div')
+  anchors.centre.current = box
+  const { result, unmount } = renderHook(() =>
     useDealIntro({
       live: multiLive,
       gameId: 'g1',
       view: multiView,
       events: events(),
-      refs: refs(),
+      refs: { ...anchors, pileBox: () => box, seatOf: () => box },
       onDone,
     }),
   )
-  act(() => {
-    void result.current.beat?.run(noopCtx())
-  })
-  const shadow = result.current.shadow
-  // Pile 0 is the one the deal counts down: deckBefore (planDeal.ts) is the
-  // whole base pile as it stood before the deal — what both piles hold, plus
-  // what already went out (4 cards across the two `dealt` events).
-  expect(shadow?.decks.main[0]).toBe(96 + 50 + 4)
-  // Pile 1 is not part of the deal at all — it must come through as `live`
-  // holds it, not the pre-deal `view` value and not left stale.
-  expect(shadow?.decks.main[1]).toBe(77)
+  try {
+    act(() => {
+      void result.current.beat?.run(noopCtx())
+    })
+    expect(result.current.shadow?.decks.main).toEqual([104])
+    let sawDealtRemainder = false
+    for (
+      let frame = 0;
+      frame < 400 && result.current.shadow?.introPhase !== 'settling';
+      frame += 1
+    ) {
+      const shadow = result.current.shadow
+      expect(shadow?.decks.main).toHaveLength(1)
+      // During the heap hold all remaining cards still belong to one pile.
+      expect(shadow?.decks.main[0]).toBeGreaterThanOrEqual(100)
+      if (shadow?.decks.main[0] === 100) sawDealtRemainder = true
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(50)
+      })
+    }
+    expect(sawDealtRemainder).toBe(true)
+    expect(result.current.shadow?.introPhase).toBe('settling')
+    expect(result.current.shadow?.decks.main).toEqual([50, 50])
+    expect(onDone).not.toHaveBeenCalled()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10000)
+    })
+    expect(result.current.active).toBe(false)
+    expect(onDone).toHaveBeenCalledOnce()
+  } finally {
+    unmount()
+    vi.useRealTimers()
+  }
 })
 
 it('collapses on a skip, reporting once', () => {
