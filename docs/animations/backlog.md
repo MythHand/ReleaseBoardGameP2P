@@ -2060,3 +2060,21 @@ request. The board had enabled the catalogue’s drag mode, which ignored ordina
 It now uses the same click-to-select, then ConfirmAction interaction as `PickSpecificCardStory`.
 The Board regression covers selecting and changing the choice without dispatch, followed by
 exactly one confirmation. Anonymous opponent-card selection retains its drag interaction.
+
+
+## 2026-09-21 — #180: local drag replayed from the hand
+
+**Resolved.** A synchronous engine response commits the gesture and its accepted
+batch together. Board published `StagedHandoff` after `useBeats` had already started
+the runner in an earlier layout effect. The runner captured `null` and replayed
+the hand-to-centre flight alongside the gesture's card.
+
+The Board now publishes the committed gesture before the queue's layout effects.
+Every commit refreshes the handoff, including DOM refs that bind on landing.
+The local gesture owns its placement; accepted events only run the outcome. Remote
+players and observers retain their incoming flight. This is shared by turn plays,
+defense, neutralization and Upgrade contributions, without per-runner delays.
+
+The real-engine Board regression covers immediate and delayed local responses,
+the opponent and a third observer. Browser evidence uses `Attack / defence centre`
+→ `View: opponent` and records the actual WAAPI flight sources.
