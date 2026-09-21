@@ -94,6 +94,16 @@
   padding: 32px 0;
 }
 
+.gridChat {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) 320px;
+}
+
+.chatCol {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
 .h {
   display: flex;
   gap: 12px;
@@ -129,6 +139,14 @@
   gap: 22px;
   padding-inline-end: 8px;
   overflow-y: auto;
+}
+
+.gridChat .modes {
+  margin-block-end: -80px;
+}
+
+.gridChat .modeList {
+  padding-block-end: 64px;
 }
 
 /* ===== players column ===== */

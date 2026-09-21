@@ -36,6 +36,7 @@ Object.defineProperty(navigator, 'clipboard', {
 // All the lobby pieces read the session through useSession, so a single mock
 // here drives create/join/roster/start behavior.
 let sessionValue: UseLobby
+const sendChat = vi.fn(() => true)
 vi.mock('~/app/providers/SessionProvider', () => ({
   useSession: () => sessionValue,
 }))
@@ -129,6 +130,7 @@ function inSession(): UseLobby {
     status: 'in-lobby',
     roomCode: 'ABC-23D',
     isHost: true,
+    chat: { entries: [], selfMemberId: 'member-h', send: sendChat },
     state: {
       selfId: 'h',
       hostId: 'h',
@@ -162,6 +164,23 @@ function inSession(): UseLobby {
     },
   }
 }
+
+it('renders the room chat as the third lobby column', () => {
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  expect(screen.getByText('lobbyScreen.chat')).toBeTruthy()
+  expect(screen.getByPlaceholderText('chat.placeholder')).toBeTruthy()
+})
+
+it('submits a lobby message through the session chat model', () => {
+  sendChat.mockClear()
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  const field = screen.getByPlaceholderText('chat.placeholder')
+  fireEvent.change(field, { target: { value: 'hello' } })
+  fireEvent.keyDown(field, { key: 'Enter' })
+  expect(sendChat).toHaveBeenCalledWith('hello')
+})
 
 it('offers Continue/Leave when arriving with an active session', () => {
   sessionValue = inSession()
