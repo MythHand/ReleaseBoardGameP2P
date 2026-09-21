@@ -154,11 +154,21 @@ export default function Pile({
           {/* выделение обложки — поверх стопки, по краям карты */}
           {!emptyDiscard && <span className={styles.glow} aria-hidden="true" />}
         </div>
-        {showCount && (
-          <span className={`${styles.count} ${countPos === 'tl' ? styles.tl : styles.br}`}>
-            {count}
-          </span>
-        )}
+        {/* THE COUNTER FADES, it does not blink out. It says how deep the pile
+            is, and that is worth showing and hiding rather than switching: a
+            heap gathering itself to leave puts its counter away mid-movement,
+            and mounting it in and out made that read as a glitch beside a
+            travel everything else on the table animates (owner, 21.09). Kept in
+            the markup and hidden by opacity, so the fade has both ends to run
+            between; `aria-hidden` while it is away, because a number nobody can
+            see is not a number to read out. */}
+        <span
+          className={`${styles.count} ${countPos === 'tl' ? styles.tl : styles.br}`}
+          data-shown={showCount}
+          aria-hidden={!showCount}
+        >
+          {count}
+        </span>
       </div>
       {label && <div className={styles.label}>{label}</div>}
     </div>

@@ -9,7 +9,7 @@ import type {
   IntroBeat,
   StagedHandoff,
 } from '~/entities/game/board'
-import type { DiscardPickHandoff } from '~/entities/game/board/types'
+import type { DiscardPickHandoff, RequestPickHandoff } from '~/entities/game/board/types'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useAiBeat } from './aiBeat'
 import { useComboBeat } from './comboBeat'
@@ -135,6 +135,8 @@ export interface Beats {
 
 export function useBeats(args: {
   discardPick?: RefObject<DiscardPickHandoff | null>
+  /** the request surface's own hold — see `RequestPickHandoff` */
+  requestPick?: RefObject<RequestPickHandoff | null>
   live: BoardState
   events: Event[]
   anchors: BoardAnchors
@@ -175,6 +177,7 @@ export function useBeats(args: {
     takeStagedRelease,
     handLimit,
     discardPick,
+    requestPick,
   } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
@@ -202,7 +205,7 @@ export function useBeats(args: {
   const elimination = useEliminateBeat()
   const gameEnd = useGameEndBeat()
   const handLimits = useHandLimitBeat(anchors, handLimit)
-  const transfers = useTransferBeat(anchors)
+  const transfers = useTransferBeat(anchors, requestPick)
   const ais = useAiBeat(anchors)
   // The operation beat first: System Upgrade's centre holds both its answers and
   // the operation card itself, and they leave together in the answers' own send
@@ -456,9 +459,14 @@ export function useBeats(args: {
           alarm: false,
           run: (ctx) => {
             const local = discardPick?.current
-            if (discardPick && plan.mine && local?.card === plan.card) {
+            // The surface that laid this pick out plays it, whichever side of
+            // the table this seat is on: the actor's handoff names the card it
+            // answered with, a watching seat's names none and is handed the
+            // card the event carried. `mine` is not asked — the hook that set
+            // the handoff is the one that knows whose pick it is.
+            if (discardPick && local && (local.card === undefined || local.card === plan.card)) {
               discardPick.current = null
-              return local.run(ctx)
+              return local.run(ctx, plan.card)
             }
             return ais.runTaken(plan, ctx)
           },

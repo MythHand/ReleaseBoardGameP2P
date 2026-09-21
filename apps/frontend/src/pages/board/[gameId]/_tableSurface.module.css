@@ -33,3 +33,22 @@
 .flying {
   z-index: var(--z-flight);
 }
+
+/* THE DIMMING a surface puts over the table while it is being read. Written
+   three times before it lived here — Cherry-pick's, Rebase's, and not at all on
+   the request band, which is how a surface ended up standing over an undimmed
+   table (#168). Its WEIGHT is the surface's own: Rebase goes heavier, because
+   there the reorder is the only thing to read and the draw piles go under it
+   too. So the tint is a variable and everything else is shared.
+
+   `z-index: -1` puts it under the surface's own content while staying inside
+   the surface's layer; it inherits `pointer-events: none`, so the table's own
+   controls stay live under it, as they already were. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--surface-scrim, var(--black-60));
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}

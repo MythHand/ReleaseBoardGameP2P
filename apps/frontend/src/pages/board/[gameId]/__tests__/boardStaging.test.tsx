@@ -320,11 +320,16 @@ it('anchors the targeting arrow at the centre it stands in, not the hand slot it
 const sudo = cardById('support-sudo')!
 // biome-ignore lint/style/noNonNullAssertion: both ids are known catalogue entries
 const codeReview = cardById('support-code-review')!
+// biome-ignore lint/style/noNonNullAssertion: a known catalogue entry
+const cherryPick = cardById('operation-git-cherry-pick')!
 const COMBO_HAND: { uid: string; card: CardData }[] = [
   { uid: 'support-sudo#0', card: sudo },
   { uid: 'attack-bug#0', card: bug },
   { uid: 'support-code-review#0', card: codeReview },
   { uid: 'release-frontend#0', card: frontend },
+  // the sudo's OTHER partner: what it enhances decides how the two stand, so
+  // the hand has to hold one of each kind for both to be reachable (#168)
+  { uid: 'operation-git-cherry-pick#0', card: cherryPick },
 ]
 
 function comboBoardWith(
@@ -438,6 +443,29 @@ it('a pulled support lights its partners and a click folds the pair', async () =
     { kind: 'player', player: 'p2' },
     'support-sudo#0',
   )
+})
+
+// THE HUE IS THE CARD THE LINE LEAVES, and after a sudo has been told what it
+// enhances, that card is the one aiming — so the colour changes hands with the
+// aim. It used to be re-derived from `staged` by a rule of the board's own
+// ("the support, if there is one"), which outlived the handover: the arrow came
+// out of the attack and stayed the sudo's yellow (#168). Armed together now, so
+// the origin and the colour cannot name two different cards.
+it('hands the arrow’s hue over with the aim, from the sudo to the card it enhances', async () => {
+  comboOut = []
+  render(
+    comboBoardWith({
+      comboOptions: { 'support-sudo#0': ['attack-bug#0'] },
+      targets: BUG_SEAT_TARGET,
+    }),
+  )
+  const hue = () =>
+    document.querySelector<SVGElement>(`.${arrowStyles.svg}`)?.style.getPropertyValue('--arrow') ??
+    null
+  await pullFromComboFan('support-sudo#0')
+  expect(hue()).toBe('var(--cat-support)') // the sudo stands alone, asking for a partner
+  await clickComboFanCard('attack-bug#0')
+  expect(hue()).toBe('var(--cat-attack)') // the attack aims; the sudo only enhances it
 })
 
 it('a release partner dispatches without a target', async () => {
@@ -797,20 +825,42 @@ it('stands a pulled support in the centre row and keeps the place beside it empt
   expect(centre?.querySelector('[data-testid="board-centre-staged"]')).toBeFalsy()
 })
 
-// …and the place it kept open is what the partner lands in. A sudo ENHANCES the
-// card beside it and stays its own card, so the two stand side by side and no
-// pair is formed — the situation decides, and the other yellow (Code Review,
-// which RIDES the release it pays for) folds instead (owner, 18.09).
-it('stands the card a sudo enhances in the place kept beside it, unfolded', async () => {
+// …and the place it kept open is what the partner lands in — for the sudo that
+// enhances a GIT OPERATION. It stays its own card there: the two stand side by
+// side and no pair is formed (owner, 18.09), which is the row the scene shows.
+it('stands a git operation a sudo enhances in the place kept beside it, unfolded', async () => {
+  comboOut = []
+  render(
+    comboBoardWith({
+      comboOptions: { 'support-sudo#0': ['operation-git-cherry-pick#0'] },
+    }),
+  )
+  await pullFromComboFan('support-sudo#0')
+  await clickComboFanCard('operation-git-cherry-pick#0')
+  const first = document.querySelector('[data-stage-slot="0"]')
+  const second = document.querySelector('[data-stage-slot="1"]')
+  expect(first?.querySelector('[data-testid="board-centre-staged"]')).toBeTruthy()
+  expect(second?.querySelector('[data-testid="board-centre-partner"]')).toBeTruthy()
+  // nothing folded: no pair took the centre over
+  expect(document.querySelector('[data-aux]')).toBeFalsy()
+})
+
+// AN ATTACK IS THE OTHER WAY, and the same sudo does both (owner, 20.09). The
+// attack lies ON the sudo, a stack at the middle — which is where a played
+// attack stands, and exactly how the centre draws that play once the engine
+// answers (`centreAttack` renders the same `CardPair` there). Standing them in a
+// row while the play was assembled and in a stack the moment it was made told
+// the same picture two ways.
+it('folds a sudo and the attack it enhances into a stack at the middle', async () => {
   render(
     comboBoardWith({ targets: BUG_TARGETS, comboOptions: { 'support-sudo#0': ['attack-bug#0'] } }),
   )
   await pullFromComboFan('support-sudo#0')
   await clickComboFanCard('attack-bug#0')
-  const first = document.querySelector('[data-stage-slot="0"]')
-  const second = document.querySelector('[data-stage-slot="1"]')
-  expect(first?.querySelector('[data-testid="board-centre-staged"]')).toBeTruthy()
-  expect(second?.querySelector('[data-testid="board-centre-partner"]')).toBeTruthy()
-  // nothing folded: the pair flyer never took the centre over
-  expect(document.querySelector('[data-testid="board-pair-flyer"]')).toBeFalsy()
+  // the pair: the attack on top, the sudo tucked under it
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
+  expect(document.querySelectorAll('[data-aux]').length).toBe(1)
+  // and the assembling row is over — neither half stands in it any more
+  expect(document.querySelector('[data-stage-slot="0"]')).toBeFalsy()
+  expect(document.querySelector('[data-testid="board-centre-partner"]')).toBeFalsy()
 })
