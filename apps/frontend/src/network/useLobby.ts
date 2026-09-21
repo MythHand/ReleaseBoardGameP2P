@@ -2055,6 +2055,7 @@ export function useLobby(): UseLobby {
       errorKind,
       chat: {
         entries: chatSession.entries,
+        notificationEntryIds: chatSession.notificationEntryIds,
         selfMemberId: chatSession.selfMemberId,
         send: sendChat,
       },
@@ -2091,6 +2092,7 @@ export function useLobby(): UseLobby {
       error,
       errorKind,
       chatSession.entries,
+      chatSession.notificationEntryIds,
       chatSession.selfMemberId,
       sendChat,
       createRoom,

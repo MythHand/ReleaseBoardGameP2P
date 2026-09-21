@@ -202,6 +202,7 @@ it('the host canonicalizes a guest send from the admitted connection', async () 
     text: 'hello',
     sequence: expect.any(Number),
   })
+  expect(result.current.chat.notificationEntryIds).toEqual([result.current.chat.entries.at(-1)?.id])
   expect(transports[0].broadcast).toHaveBeenCalledWith({
     type: 'CHAT_ENTRY',
     payload: { entry: result.current.chat.entries.at(-1) },
@@ -250,6 +251,7 @@ it('history plus an overlapping live entry stays ordered and unique', async () =
       seq: 1,
     }),
   )
+  expect(result.current.chat.notificationEntryIds).toEqual([])
   act(() =>
     transports[0].onMessage?.({
       type: 'CHAT_ENTRY',
@@ -258,6 +260,7 @@ it('history plus an overlapping live entry stays ordered and unique', async () =
       seq: 2,
     }),
   )
+  expect(result.current.chat.notificationEntryIds).toEqual([])
   act(() =>
     transports[0].onMessage?.({
       type: 'CHAT_ENTRY',
@@ -272,6 +275,7 @@ it('history plus an overlapping live entry stays ordered and unique', async () =
     'chat-2',
     'chat-3',
   ])
+  expect(result.current.chat.notificationEntryIds).toEqual(['chat-3'])
   expect(result.current.chat.selfMemberId).toBe('member-b')
 })
 
@@ -550,6 +554,7 @@ it('restores full host history, member mapping, and the next sequence', async ()
   const { result } = renderHook(() => useLobby())
   await act(async () => Promise.resolve())
   expect(result.current.chat.entries.map((entry) => entry.id)).toEqual(['chat-7'])
+  expect(result.current.chat.notificationEntryIds).toEqual([])
   expect(result.current.chat.selfMemberId).toBe('member-host')
   expect(result.current.state?.peers.peer0.memberId).toBe('member-host')
 
@@ -560,6 +565,7 @@ it('restores full host history, member mapping, and the next sequence', async ()
     author: { memberId: 'member-host' },
     text: 'after reload',
   })
+  expect(result.current.chat.notificationEntryIds).toEqual(['chat-8'])
 })
 
 it('leaveGame retains chat while leaveSession clears it', async () => {

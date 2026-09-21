@@ -126,9 +126,15 @@ export default function BoardPage() {
   // here would let the two drift, and the countdown would freeze for whichever
   // state they stopped agreeing about.
   const now = useNow(isCounting(state, state.selfId))
+  const notificationEntryIds = new Set(chat.notificationEntryIds)
   const toastItems = chat.messages
     .filter((message) =>
-      Boolean(!message.system && message.memberId && message.memberId !== chat.selfMemberId),
+      Boolean(
+        notificationEntryIds.has(message.id) &&
+          !message.system &&
+          message.memberId &&
+          message.memberId !== chat.selfMemberId,
+      ),
     )
     .map((message) => ({
       id: message.id,

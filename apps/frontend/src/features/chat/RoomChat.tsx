@@ -7,6 +7,7 @@ import { toChatMessages } from './model'
 
 export interface RoomChatView {
   messages: ChatMessage[]
+  notificationEntryIds: string[]
   selfMemberId: MemberId | null
   copy: ChatCopy
   send(text: string): boolean
@@ -93,6 +94,7 @@ export function useRoomChatView(): RoomChatView {
 
   return {
     messages,
+    notificationEntryIds: session.chat.notificationEntryIds,
     selfMemberId: session.chat.selfMemberId,
     copy: {
       placeholder: t('chat.placeholder'),

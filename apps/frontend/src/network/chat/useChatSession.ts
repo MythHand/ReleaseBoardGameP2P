@@ -19,6 +19,7 @@ export interface ChatAdmission {
 
 export interface ChatSessionModel {
   entries: ChatEntry[]
+  notificationEntryIds: string[]
   selfMemberId: MemberId | null
   startHost(roomCode: string, clientId: string): MemberId
   restoreHost(roomCode: string, clientId: string): MemberId
@@ -33,12 +34,14 @@ export interface ChatSessionModel {
 
 export interface RoomChatState {
   entries: ChatEntry[]
+  notificationEntryIds: string[]
   selfMemberId: MemberId | null
   send(text: string): boolean
 }
 
 export function useChatSession(): ChatSessionModel {
   const [entries, setEntries] = useState<ChatEntry[]>([])
+  const [notificationEntryIds, setNotificationEntryIds] = useState<string[]>([])
   const [selfMemberId, setSelfMemberId] = useState<MemberId | null>(null)
   const journalRef = useRef<ChatJournal>(emptyChatJournal())
   const hostRoomCodeRef = useRef<string | null>(null)
@@ -68,6 +71,7 @@ export function useChatSession(): ChatSessionModel {
       hostRoomCodeRef.current = roomCode
       const admission = admitMember(emptyChatJournal(), clientId)
       publish(admission.journal)
+      setNotificationEntryIds([])
       setSelfMemberId(admission.memberId)
       persistHost(admission.journal)
       return admission.memberId
@@ -83,6 +87,7 @@ export function useChatSession(): ChatSessionModel {
       if (stored && !restored) clearChat()
       const admission = admitMember(restored ?? emptyChatJournal(), clientId)
       publish(admission.journal)
+      setNotificationEntryIds([])
       setSelfMemberId(admission.memberId)
       persistHost(admission.journal)
       return admission.memberId
@@ -107,6 +112,7 @@ export function useChatSession(): ChatSessionModel {
       const appended = appendUserMessage(journalRef.current, author, text, Date.now())
       if (!appended) return null
       publish(appended.journal)
+      setNotificationEntryIds((current) => [...current, appended.entry.id])
       persistHost(appended.journal)
       return appended.entry
     },
@@ -142,10 +148,14 @@ export function useChatSession(): ChatSessionModel {
     (incoming: ChatEntry) => {
       const parsed = parseChatEntries([incoming])
       if (!parsed) return
+      const isNew = !journalRef.current.entries.some((entry) => entry.id === parsed[0].id)
       publish({
         ...journalRef.current,
         entries: mergeChatEntries(journalRef.current.entries, parsed),
       })
+      if (isNew && parsed[0].kind === 'message') {
+        setNotificationEntryIds((current) => [...current, parsed[0].id])
+      }
     },
     [publish],
   )
@@ -154,11 +164,13 @@ export function useChatSession(): ChatSessionModel {
     clearChat()
     hostRoomCodeRef.current = null
     publish(emptyChatJournal())
+    setNotificationEntryIds([])
     setSelfMemberId(null)
   }, [publish])
 
   return {
     entries,
+    notificationEntryIds,
     selfMemberId,
     startHost,
     restoreHost,

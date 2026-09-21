@@ -25,7 +25,12 @@ function session(overrides: Partial<UseLobby> = {}): UseLobby {
     roomCode: 'YTG-N2Q',
     isHost: true,
     seats: [],
-    chat: { entries: [], selfMemberId: 'member-me', send: vi.fn(() => true) },
+    chat: {
+      entries: [],
+      notificationEntryIds: [],
+      selfMemberId: 'member-me',
+      send: vi.fn(() => true),
+    },
     restoring: false,
     reconnect: {
       attempt: 0,

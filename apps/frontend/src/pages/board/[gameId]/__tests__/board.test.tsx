@@ -25,6 +25,7 @@ const chatMock = vi.hoisted(
   (): { view: RoomChatView; setView: ((view: RoomChatView) => void) | null } => ({
     view: {
       messages: [],
+      notificationEntryIds: [],
       selfMemberId: 'member-me',
       copy: { placeholder: 'message', send: 'send', empty: 'empty' },
       send: () => true,
@@ -77,6 +78,7 @@ beforeEach(() => {
   sessionValue = session()
   chatMock.view = {
     messages: [],
+    notificationEntryIds: [],
     selfMemberId: 'member-me',
     copy: { placeholder: 'message', send: 'send', empty: 'empty' },
     send: () => true,
@@ -99,7 +101,7 @@ function renderBoard(path = '/board/g1') {
   return { router, ...render(<RouterProvider router={router} />) }
 }
 
-it('notifies only for new remote messages and opens their chat', async () => {
+it('does not replay async history as notifications, then opens chat for a live remote message', async () => {
   const initial = {
     id: 'initial',
     memberId: 'member-remote',
@@ -107,12 +109,14 @@ it('notifies only for new remote messages and opens their chat', async () => {
     text: 'initial history message',
     role: 'player' as const,
   }
-  chatMock.view = { ...chatMock.view, messages: [initial] }
   renderBoard()
+
+  act(() => chatMock.setView?.({ ...chatMock.view, messages: [initial] }))
   expect(screen.queryByText('initial history message')).toBeNull()
 
   const nextView: RoomChatView = {
     ...chatMock.view,
+    notificationEntryIds: ['remote-new', 'self-new'],
     messages: [
       initial,
       {

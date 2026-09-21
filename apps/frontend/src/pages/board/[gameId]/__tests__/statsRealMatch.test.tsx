@@ -40,7 +40,12 @@ vi.mock('~/app/providers/SessionProvider', () => ({
     state: { selfId, peers, hostId: 'peer-a' },
     roomCode: 'ROOM',
     seats,
-    chat: { entries: [], selfMemberId: 'member-peer-a', send: vi.fn(() => true) },
+    chat: {
+      entries: [],
+      notificationEntryIds: [],
+      selfMemberId: 'member-peer-a',
+      send: vi.fn(() => true),
+    },
     leaveGame: vi.fn(),
     setWhere: vi.fn(),
   }),

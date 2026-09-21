@@ -62,7 +62,7 @@ function base(): UseLobby {
     seats: [],
     error: null,
     errorKind: null,
-    chat: { entries: [], selfMemberId: null, send: vi.fn() },
+    chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
     ready: vi.fn(),
@@ -130,7 +130,7 @@ function inSession(): UseLobby {
     status: 'in-lobby',
     roomCode: 'ABC-23D',
     isHost: true,
-    chat: { entries: [], selfMemberId: 'member-h', send: sendChat },
+    chat: { entries: [], notificationEntryIds: [], selfMemberId: 'member-h', send: sendChat },
     state: {
       selfId: 'h',
       hostId: 'h',

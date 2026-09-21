@@ -30,7 +30,7 @@ vi.mock('~/app/providers/SessionProvider', () => ({
     // The seating frozen at the deal, as the session holds it (#19) — not
     // something this page derives from a roster that changes under it.
     seats,
-    chat: { entries: [], selfMemberId: 'member-a', send: sendChat },
+    chat: { entries: [], notificationEntryIds: [], selfMemberId: 'member-a', send: sendChat },
     leaveGame,
     setWhere,
   }),
