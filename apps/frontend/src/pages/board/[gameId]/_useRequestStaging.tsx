@@ -82,7 +82,21 @@ export function useRequestStaging(args: {
       release: () => setHeld(null),
       // … and the fan goes separately, at the moment the card leaves it
       close: () => setShown(false),
+      // WHICH PLACE THE CARD LEAVES, answered by the fan itself — it is the only
+      // party that knows whether a place was chosen in it.
+      //
+      // A blind pick is a choice OF A PLACE: the card comes out of the back the
+      // finger landed on, or pointing at one back out of a row of identical ones
+      // had no consequence anyone can see. A named request had no such choice —
+      // the fan is anonymous backs and the card was named, not pointed at — so
+      // it comes out of the MIDDLE, where it is seen leaving rather than
+      // slipping off an edge.
+      //
+      // Both used to be decided by the beat, which asked for the middle first
+      // and so gave it to both questions: every blind pick flew out of the
+      // middle whichever back was pressed (#168). One question, one owner.
       slot: () => {
+        if (picked) return picked.rect
         const el = fan.current?.querySelector<HTMLElement>('[data-request-slot]')
         return el?.getBoundingClientRect() ?? null
       },
@@ -96,6 +110,21 @@ export function useRequestStaging(args: {
     setConfirmed(false)
     setPicked(null)
   }, [episode])
+
+  // THE MATCH ENDING IS A DIFFERENT BOUNDARY, and the held card belongs to it
+  // rather than to the one above. What the beat asked us to hold outlives the
+  // pending on purpose — the pending clears the moment the engine answers and
+  // the card goes on standing while the beat plays the outcome — so clearing it
+  // whenever an episode ends would take the card off the table mid-scene.
+  //
+  // Only the beat's own callback releases it, which is right while a beat is
+  // running and nothing at all when one is cut short: a match ending mid-hold
+  // left the request's catalogue standing, and it was still standing in the
+  // next match.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the match is the boundary and the only dependency this may have
+  useEffect(() => {
+    setHeld(null)
+  }, [matchKey])
 
   // THE DEFENDER'S OWN HAND, held out closed — for a named request as much as
   // for a blind pick. The blind pick makes you choose a position in it; a named

@@ -28,11 +28,12 @@ import type {
   TableActions,
   TableTarget,
 } from '@release/ui'
-import { CARD_RATIO, CARD_W, centerOf, slotPlacement, useArrow } from '@release/ui'
+import { CARD_RATIO, CARD_W, cardBoxIn, centerOf, slotPlacement, useArrow } from '@release/ui'
 import {
   type Arriving,
   play,
   type Rect,
+  restTransform,
   useFlyer,
   useHandArrival,
   usePairFold,
@@ -289,6 +290,13 @@ export function useBoardStaging({
     cancellingRef.current = false
     setCancelling(false)
     commitStaged(null)
+    // NOTHING IS IN THE AIR ANY MORE, so no place is holding its card back. The
+    // refusal path cleared this and the landing path did not, because it left
+    // the clearing to whatever staged next — and every animated staging does
+    // overwrite it, which is why this never showed. A staging that runs without
+    // a flight does not (reduced motion), and there the place of the row stayed
+    // empty with the card standing in it. A landing clears what it started.
+    setCarrying([])
     // The outgoing flight this callback belongs to has landed, so a release
     // that was `leaving` is now simply gone. Conditional, unlike the clears
     // above: this fires for EVERY arrival landing, and a plain aim's own
@@ -995,12 +1003,21 @@ export function useBoardStaging({
       const mainIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
       const main: StagedCard = { uid: item.uid, card: item.card, index: mainIndex }
       // HOW THE TWO STAND IS THE SITUATION'S, not one rule for both yellows. A
-      // sudo ENHANCES the card beside it and stays its own card: the two take
-      // the two places of the centre's row and nothing folds. A Code Review
-      // RIDES the release it pays for: they lie one on the other, as they will
-      // lie in the heap (owner, 18.09). `merged` says a PAIR owns the centre, so
-      // it stays false all the way through for the side-by-side one.
-      const sideBySide = support.card.id === 'support-sudo'
+      // Code Review RIDES the release it pays for: they lie one on the other, as
+      // they will lie in the heap (owner, 18.09).
+      //
+      // A SUDO GOES BOTH WAYS, and what it enhances decides which (owner,
+      // 20.09). Beside a git operation it stays its own card: the two take the
+      // two places of the centre's row and nothing folds — the row the scene
+      // shows, unchanged. Under an ATTACK it is a stack: the attack lies on top
+      // of it, the way the centre already draws a played attack with a sudo
+      // (`centreAttack`, a `CardPair` at the middle) and the way the two will
+      // lie in the heap. That the staging stood them in a row and the play then
+      // stood them in a stack was the same picture told twice.
+      //
+      // `merged` says a PAIR owns the centre, so it is false only for the row.
+      const stacked = support.card.id === 'support-sudo' && main.card.category === 'attack'
+      const sideBySide = support.card.id === 'support-sudo' && !stacked
       const merged = !sideBySide
       commitStaged({ support, main, phase: 'partner', merged })
       // the fold is committed — irrevocable until `finish()` runs (ComboStory's
@@ -1064,9 +1081,17 @@ export function useBoardStaging({
         }
       }
 
-      // The partner's own fan slot — the scene's own source (I6: a slot is
-      // rotated, so its bounding rect is the box AROUND the tilted card).
-      const mainHand = slotBox(index, handItems.length)
+      // THE CARD WHERE IT IS DRAWN, not where its slot rests. The scene folds
+      // from the card itself, and the card being clicked is the HOVERED one —
+      // lifted out of the fan's resting line. Measuring `slotBox` instead (the
+      // fan's rect plus `slotPlacement`) started the pair's half at a place the
+      // player's card had never been, so it read as the clicked card vanishing
+      // and a different one flying to the sudo. The slot is rotated, so its
+      // bounding rect is the box AROUND the tilted card — `cardBoxIn` trims it
+      // back (I6). `slotBox` stays the fallback for when there is no node to
+      // measure (reduced motion, a hand that has not painted yet).
+      const liveSlot = anchors.handSlotAt(index)?.getBoundingClientRect()
+      const mainHand = liveSlot ? cardBoxIn(liveSlot, CARD_W) : slotBox(index, handItems.length)
       if (!mainHand) {
         finish()
         return true
@@ -1095,17 +1120,28 @@ export function useBoardStaging({
         })()
         return true
       }
-      // The pair folds where the support STANDS. Its own place is the frame, so
-      // the aux's entry pose is the degenerate identity case and the fold needs
-      // no branch for it — the same thing that used to be true of the middle,
-      // back when a pulled support stood there.
-      const box = stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect
+      // WHERE THE PAIR FOLDS IS WHERE IT THEN STANDS.
+      //
+      // A Code Review folds where the support ALREADY STANDS: its own place is
+      // the frame, so the aux's entry pose is the degenerate identity case and
+      // the fold needs no branch for it — the same thing that used to be true of
+      // the middle, back when a pulled support stood there.
+      //
+      // A sudo under an attack folds at the MIDDLE, because that is where a
+      // played attack stands: the sudo glides out of its place in the row into
+      // the middle while the attack comes down onto it from the fan. It lands at
+      // the tilt a played attack rests at, which is the very pose the centre's
+      // own pending render then draws the same pair at — so the handover from
+      // the fold's last frame to the static render changes nothing on screen.
+      const standing = stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect
+      const box = stacked ? cRect : standing
       const folding = pairApi.current.fold({
         main: main.card,
         aux: support.card,
         mainFrom: mainHand,
-        auxFrom: box,
+        auxFrom: standing,
         box,
+        pose: stacked ? restTransform(ATTACK_POSE) : undefined,
         dur: reduced ? 0 : MERGE_MS,
       })
       // A game action never waits on an animation nobody plays: under reduced

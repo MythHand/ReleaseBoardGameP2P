@@ -331,11 +331,22 @@ export function useTransferBeat(
           // where it flew from while there was no hand on screen to fly it out
           // of. The surface is released in the same breath, so the fan slides
           // back up as the card leaves it.
+          // WHICH PLACE IT LEAVES IS THE FAN'S OWN ANSWER. The surface holding
+          // the fan is the only party that knows whether a place was chosen in
+          // it — a blind pick points at one back, a named request points at
+          // nothing — so it answers once, for both, and this asks rather than
+          // arbitrates. Asking for the middle first and the pressed place second
+          // gave the middle to both questions, and every blind pick flew out of
+          // the middle whichever back was pressed (#168).
+          //
+          // The DOM markers below answer for a board with no surface up at all:
+          // a watcher's, where the offer is rendered but no hook owns it.
           const asked = latest.current.requestPick?.current ?? null
           const askedSlot = asked?.slot() ?? null
           const offerBox = askedSlot ?? rectOf(picked ?? chosen ?? null)
           const from = offerBox ?? cardBoxIn(seat, CARD_W * SEAT_SHRINK)
           const held = offerBox ? cardBoxIn(centre, REVEAL_W) : centre
+          // …and the fan it came out of goes back up with it
           if (askedSlot) asked?.close()
           // A random steal offers the donor's hand first: the suspense is real,
           // because the card genuinely is random. A named one has no question

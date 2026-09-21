@@ -14,7 +14,6 @@ export const OPERATION_SCENARIOS = [
 export const SCENARIOS = [
   ...OPERATION_SCENARIOS,
   'branch',
-  'branchSudo',
   'securityRelease',
   'securityHand',
   'securityRequest',
@@ -22,6 +21,9 @@ export const SCENARIOS = [
   'blindStealPlay',
   'blindSteal',
   'handDefense',
+  'release',
+  'alarm503',
+  'aiTrigger',
 ] as const
 export type Scenario = (typeof SCENARIOS)[number]
 
@@ -36,6 +38,31 @@ const cards = [
   'attack-ddos',
 ]
 const instance = (id: string, n: number): CardInstance => ({ uid: `${id}#debug${n}`, id })
+
+// WHAT THE DEFENDER HOLDS while an attack is aimed at them. Every preset where
+// a card is thrown puts these in that player's hand, so a defence can actually
+// be answered with instead of only watched (owner, 20.09).
+//
+// EVERY defence card, one copy each, by name (owner, 20.09) — a stand is where
+// you reach for the card you want to look at, so having the outcome covered by
+// some other card is not the same as having this card in hand.
+const DEFENCES: CardInstance[] = [
+  instance('defense-hotfix', 10), // cancel
+  instance('defense-rubber-ducky', 11), // cancel
+  instance('defense-pr-approved', 12), // cancel
+  instance('defense-rollback', 13), // cancel, and the attack goes back to its hand
+  instance('defense-not-a-bug', 14), // unicorn — works under sudo
+  instance('defense-works-on-my-machine', 15), // unicorn
+]
+
+// The Bug family, one copy each: three cards with one effect (`cards.md`, the
+// `c.bug` key), so whichever is thrown the play is the same one. They ride
+// along wherever the attack is still in hand, for the same reason the defences
+// do — to be reachable by name rather than by proxy (owner, 20.09).
+const BUG_VARIANTS: CardInstance[] = [
+  instance('attack-legacy-code', 16),
+  instance('attack-out-of-memory', 17),
+]
 
 // Deliberately stable card UIDs: restarting must reset the board's private
 // arrangement even when every card identity appears again in the next run.
@@ -68,6 +95,9 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   if (scenario === 'securityRelease' || scenario === 'securityHand')
     return createSecurityScenario(initial, scenario)
   if (transfer) return createTransferScenario(initial, scenario)
+  if (scenario === 'release') return createReleaseScenario(initial)
+  if (scenario === 'alarm503' || scenario === 'aiTrigger')
+    return createTriggerScenario(initial, scenario)
   const operation = scenario.startsWith('branch')
     ? 'operation-git-branch'
     : scenario.startsWith('cherry')
@@ -79,8 +109,28 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   // decide at the table — which is what a preset is for. Cherry-pick and Rebase
   // used to have a second button each for the same board with this one card
   // added; the same run covers both now (owner, 19.09).
+  // TWO COPIES OF THE OPERATION, so the same card can be played TWICE in one
+  // run. A turn counts only releases, so nothing stops it — and the board used
+  // to: it identified an offer by its contents, so a second Rebase with the same
+  // piles in the same order looked like the one it had already answered and the
+  // row never dealt (#168). It is checkable only with a second copy in hand.
+  // …and the second copy goes at the END, not beside the first: the operation is
+  // the hand's first card and the sudo its second, and both this stand's own
+  // checks and the instruction beneath the toolbar read them by that position.
   const hand = [instance(operation, 0), instance('support-sudo', 1)]
-  hand.push(instance('attack-bug', 2), instance('defense-hotfix', 3))
+  hand.push(instance('attack-bug', 2), instance('defense-hotfix', 3), instance(operation, 18))
+  // THE PILE CARDS ARE ONE SCENE, not three buttons. Branch splits a pile, Merge
+  // puts every pile back together, and Sudo changes what each of them does — so
+  // the hand carries enough of all three to drive the row of piles up and down
+  // several times in one run, which is the only way the shape of that row gets
+  // any real pressure (owner, 21.09). Two Branch and one Merge with three Sudo:
+  // split, split again, and put it all back, with or without the sudo each time.
+  if (scenario === 'branch')
+    hand.push(
+      instance('operation-git-merge', 19),
+      instance('support-sudo', 20),
+      instance('support-sudo', 21),
+    )
 
   const state: GameState = {
     ...initial,
@@ -161,7 +211,7 @@ function createSecurityScenario(initial: GameState, scenario: Scenario): GameSta
       },
       p2: {
         ...initial.players.p2,
-        hand: [instance('release-frontend', 2), cost, instance('defense-hotfix', 4)],
+        hand: [instance('release-frontend', 2), cost, ...DEFENCES],
         release: {},
         openedAtDeal: [],
       },
@@ -214,18 +264,21 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
         // one preset, both readings of the card (owner, 19.09).
         hand:
           scenario === 'blindStealPlay'
-            ? [attack, instance('support-sudo', 6), instance('protection-debugger', 1)]
+            ? [
+                attack,
+                ...BUG_VARIANTS,
+                instance('support-sudo', 6),
+                instance('protection-debugger', 1),
+              ]
             : [attack, instance('protection-debugger', 1)],
         release: {},
         openedAtDeal: [],
       },
       p2: {
         ...initial.players.p2,
-        hand: [
-          instance('defense-hotfix', 2),
-          instance('defense-hotfix', 3),
-          instance('release-backend', 4),
-        ],
+        // Two Hotfix copies on purpose — the duplicate-hit preset is built on
+        // them — and then one of every OTHER way a defence answers.
+        hand: [instance('defense-hotfix', 2), ...DEFENCES, instance('release-backend', 4)],
         release: {},
         openedAtDeal: [],
       },
@@ -260,6 +313,100 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
   if (scenario === 'handDefense') return state
   apply({ type: 'RESOLVE', player: 'p2', choice: { kind: 'defend', card: null }, at })
   return state
+}
+
+// THE ORDINARY TURN, and the one that had no preset at all: every board here
+// started with an operation or an attack in the hand, while the move a player
+// actually makes every round — putting a release down — had nowhere to be
+// played. The cost is paid if the setup charges one, so the hand carries a card
+// to pay with, and Code Review is there as the other way to pay: it rides the
+// release instead of being spent.
+//
+// Monitoring comes along because it is the OTHER thing that goes into a zone,
+// and nothing else on this stand ever puts one there (owner, 20.09).
+function createReleaseScenario(initial: GameState): GameState {
+  return {
+    ...initial,
+    eventSeq: 100,
+    window: null,
+    pending: null,
+    turn: { ...initial.turn, player: 'you', drawnFrom: [0, 1] },
+    decks: { ...initial.decks, discard: [] },
+    players: {
+      ...initial.players,
+      you: {
+        ...initial.players.you,
+        hand: [
+          instance('release-frontend', 0),
+          instance('protection-monitoring', 1),
+          instance('support-code-review', 2),
+          instance('defense-hotfix', 3),
+        ],
+        release: {},
+        openedAtDeal: [],
+      },
+      // The window a fresh release opens is answered by somebody, so the
+      // opponent holds something to answer it with.
+      p2: {
+        ...initial.players.p2,
+        hand: [instance('attack-bug', 8), instance('support-sudo', 9)],
+        release: {},
+        openedAtDeal: [],
+      },
+    },
+  }
+}
+
+// THE TRIGGERS ARE DRAWN, NEVER PLAYED — both fire the moment they turn up
+// (`fireTrigger`), and neither ever reaches a hand. So their presets put one on
+// TOP of a draw pile and leave the turn's draw still owed: the scene starts
+// with the gesture that finds the card, which is the whole point of it.
+//
+//   alarm503 — the alarm STANDS, because there is something to answer it with:
+//     a Debugger in hand and a release in the zone are two of the three methods
+//     (`neutralizeOptions`), so the board asks instead of eliminating on the
+//     spot. The third, a standing Monitoring, would answer inside the draw
+//     itself and show nothing — that case belongs to the release preset, where
+//     a Monitoring can actually be put down first.
+//   aiTrigger — the AI card reveals ONE event, picked out of the events deck by
+//     the seed. The deck is seeded with a single card so the preset shows the
+//     same event every run: a Crush aimed at the release standing in the zone,
+//     which is the AI effect that asks a question rather than passing by.
+function createTriggerScenario(initial: GameState, scenario: Scenario): GameState {
+  const alarm = scenario === 'alarm503'
+  const trigger = instance(alarm ? 'trigger-error-503' : 'trigger-ai', 30)
+  return {
+    ...initial,
+    eventSeq: 100,
+    window: null,
+    pending: null,
+    // NOT drawn yet — the draw is the gesture this preset is about
+    turn: { ...initial.turn, player: 'you', drawnFrom: [] },
+    decks: {
+      ...initial.decks,
+      // the trigger on top, and cards under it so the pile is not left empty
+      main: [[trigger, ...cards.slice(0, 3).map((id, i) => instance(id, i + 40))]],
+      discard: [],
+      events: alarm ? initial.decks.events : [instance('ai-crush-frontend', 31)],
+    },
+    players: {
+      ...initial.players,
+      you: {
+        ...initial.players.you,
+        hand: [instance('protection-debugger', 0), instance('defense-hotfix', 1)],
+        // the release both presets need: the 503's `sacrifice` method, and the
+        // slot a Crush aims at
+        release: { frontend: { card: instance('release-frontend', 32) } },
+        openedAtDeal: [],
+      },
+      p2: {
+        ...initial.players.p2,
+        hand: [instance('attack-bug', 8)],
+        release: {},
+        openedAtDeal: [],
+      },
+    },
+  }
 }
 
 // A preset drops its discard straight into the state, but the board folds the

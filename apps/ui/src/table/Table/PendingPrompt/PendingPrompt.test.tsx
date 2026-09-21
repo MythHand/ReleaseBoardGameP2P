@@ -200,6 +200,7 @@ it('offers every discard option and resolves the single pick', () => {
     <PendingPrompt
       pending={{
         kind: 'pickFromDiscard',
+        raisedAt: 1,
         player: 'you',
         options: discardOptions,
         picks: 1,
@@ -229,6 +230,7 @@ it('asks for the deck card only after the hand card, and resolves once with both
     <PendingPrompt
       pending={{
         kind: 'pickFromDiscard',
+        raisedAt: 1,
         player: 'you',
         options: discardOptions,
         picks: 2,
@@ -324,6 +326,7 @@ it('cannot resolve a stale discard pick once a new pickFromDiscard pending for t
   const onResolve = vi.fn()
   const first: TablePending = {
     kind: 'pickFromDiscard',
+    raisedAt: 1,
     player: 'you',
     options: discardOptions,
     picks: 1,
@@ -331,6 +334,7 @@ it('cannot resolve a stale discard pick once a new pickFromDiscard pending for t
   }
   const second: TablePending = {
     kind: 'pickFromDiscard',
+    raisedAt: 1,
     player: 'you',
     options: [{ uid: 'c#1', id: 'release-backend' }],
     picks: 1,
@@ -358,6 +362,7 @@ it('drops a discard pick when the pending kind changes and later offers the same
   const onResolve = vi.fn()
   const picking: TablePending = {
     kind: 'pickFromDiscard',
+    raisedAt: 1,
     player: 'you',
     options: discardOptions,
     picks: 1,
