@@ -65,8 +65,9 @@ export function useRebaseStaging(args: {
   actions?: TableActions
   copy: { prompt: string; position: string; confirm: string }
   enabled: boolean
+  suspended?: boolean
 }): { row: ReactNode | null } {
-  const { state, anchors, actions, copy, enabled } = args
+  const { state, anchors, actions, copy, enabled, suspended = false } = args
   const reduced = useReducedMotion()
   const pending = state.pending
   const ours =
@@ -97,7 +98,7 @@ export function useRebaseStaging(args: {
     ? `${ours.player}:${ours.piles.map((entry) => `${entry.pile}/${entry.cards.map((c) => c.uid).join(',')}`).join('|')}`
     : null
   const reorder = useCardReorder({
-    enabled: Boolean(ours) && ready && !confirmed,
+    enabled: Boolean(ours) && ready && !confirmed && !suspended,
     step: 180,
     rows: piles.map((entry) => ({
       id: entry.pile,
@@ -206,7 +207,7 @@ export function useRebaseStaging(args: {
   if ((!ours && !flying) || (confirmed && !flying)) return { row: null }
 
   const confirm = () => {
-    if (!ours || confirmed || !ready || reorder.drag) return
+    if (!ours || confirmed || !ready || reorder.drag || suspended) return
     // Committed against THIS render's offer: every offered pile, answered
     // exactly once, or the engine rejects it.
     const committed = ours.piles.map((e) => ({
@@ -267,7 +268,12 @@ export function useRebaseStaging(args: {
 
   return {
     row: (
-      <>
+      <div
+        className={styles.overlay}
+        data-testid="board-rebase-overlay"
+        data-suspended={suspended ? '' : undefined}
+        inert={suspended}
+      >
         <div className={styles.rows} data-testid="board-rebase-row">
           {piles.map((entry) => (
             <div
@@ -319,12 +325,12 @@ export function useRebaseStaging(args: {
           ))}
         </div>
         <ConfirmAction
-          open={!confirmed && ready}
+          open={!confirmed && ready && !suspended}
           label={copy.confirm}
           caption={copy.prompt}
           onConfirm={confirm}
         />
-      </>
+      </div>
     ),
   }
 }

@@ -748,6 +748,21 @@ const SCENARIOS: Scenario[] = [
 const ISSUES: Issue[] = [
   {
     what: {
+      ru: 'Git Rebase перекрывал среднюю карту выбора порядка',
+      en: 'Git Rebase covered the middle reorder card',
+    },
+    problem: {
+      ru: 'Исправлено по решению владельца от 21.09.2026: экран выбора находится поверх стола. Ряды и подтверждение объединены в слой реакции с затемнением; публичная операция остаётся под ним до завершения эффекта. Обёртка не меняет систему координат обратных полётов.',
+      en: 'Fixed per the owner decision of 2026-09-21: the choice screen sits above the table. Rows and confirmation share the reaction layer with a dim background; the public operation stays underneath until its effect finishes. The wrapper preserves viewport coordinates for return flights.',
+    },
+    where: {
+      ru: 'pages/board/[gameId]/_useRebaseStaging.tsx + _useRebaseStaging.module.css',
+      en: 'pages/board/[gameId]/_useRebaseStaging.tsx + _useRebaseStaging.module.css',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
       ru: 'ЗАКРЫТО: для победы последнего выжившего нет утверждённой сцены',
       en: 'CLOSED: a last-standing victory has no approved scene',
     },

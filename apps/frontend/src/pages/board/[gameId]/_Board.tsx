@@ -503,6 +503,7 @@ export default function Board({
       confirm: copy.pending.confirm,
     },
     enabled: !(deal.active || beats.exclusive),
+    suspended: paused || room.connection === 'reconnecting' || over != null,
   })
   // System Upgrade's centre (#108) — the one pending owed to several seats at
   // once. Its standing cards are read off the projection rather than held by a

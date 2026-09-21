@@ -181,3 +181,52 @@ it('reopens a rejected reorder so the player can retry', () => {
   fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
   expect(onResolve).toHaveBeenCalledTimes(2)
 })
+
+it.each([
+  'reconnecting',
+  'paused',
+] as const)('yields to %s without losing the chosen order', (reason) => {
+  mockReducedMotion(true)
+  const onResolve = vi.fn()
+  const base = makeBoardProps()
+  const state = {
+    ...base.state,
+    pending: rebasePending([
+      { uid: 'first', id: 'attack-bug' },
+      { uid: 'second', id: 'release-frontend' },
+    ]),
+  }
+  const board = (suspended: boolean) => (
+    <Board
+      {...base}
+      state={state}
+      actions={{ onResolve }}
+      room={{
+        ...base.room,
+        ...(reason === 'paused'
+          ? { paused: suspended }
+          : { connection: suspended ? 'reconnecting' : 'online' }),
+      }}
+    />
+  )
+  const { rerender } = render(board(false))
+  const second = screen.getByTestId('rebase-card-second')
+  second.getBoundingClientRect = () => new DOMRect(580, 200, 150, 210)
+  if (second.parentElement)
+    second.parentElement.getBoundingClientRect = () => new DOMRect(400, 200, 330, 210)
+  fireEvent.pointerDown(second, { button: 0, clientX: 600, clientY: 230 })
+  fireEvent.pointerMove(window, { clientX: 420, clientY: 230 })
+  fireEvent.pointerUp(window, { clientX: 420, clientY: 230 })
+
+  rerender(board(true))
+  expect(screen.getByTestId('board-rebase-overlay').hasAttribute('inert')).toBe(true)
+  expect(onResolve).not.toHaveBeenCalled()
+
+  rerender(board(false))
+  expect(screen.getByTestId('board-rebase-overlay').hasAttribute('inert')).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'reorderTop',
+    order: [{ pile: 0, cards: ['second', 'first'] }],
+  })
+})

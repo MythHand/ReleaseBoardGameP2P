@@ -1,3 +1,20 @@
+/* A private decision sits above the public operation's flight carrier. Keep
+   the rows and confirmation in the same layer, and catch background presses.
+   No transform/filter here: returning cards use viewport coordinates. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-reaction);
+  background: var(--black-72);
+}
+
+/* Preserve the private order and flight geometry while recovery or pause owns
+   the screen. Unmounting/reseeding the choice would lose the player's work. */
+.overlay[data-suspended] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* The top of a pile, laid out for its owner only (#108). One row per pile
    under sudo, sharing the single 1-2-3 numbering — the numbers name positions,
    and every pile has the same three. Keep the confirm bar outside this scroll

@@ -19,6 +19,20 @@ so that is where a finding has to show up, in one line with a status. This file 
 in full: what it costs and what would close it. Enter it in both — the page so it is seen, here so
 it can be acted on.
 
+## Rebase choice covered by its public operation — closed 2026-09-21
+
+The retained `operationBeat` carrier painted Git Rebase on the flight layer (250), above
+the private reorder rows (40), obscuring the middle offered card. Reproduced through the
+real debug Board with a two-pile Rebase.
+
+**Owner decision, 2026-09-21:** the card-choice screen goes above the rest of the table.
+The rows and confirmation now share a full-board overlay on the reaction layer (400),
+with a dim background that catches presses outside the cards. The played operation stays
+underneath until resolution; its lifecycle and the private projection remain unchanged.
+The wrapper has no transform/filter, preserving viewport-relative return flights.
+Pause, reconnect and match completion hide and disable the choice surface while retaining
+its rows and order, so the overlay cannot cover recovery controls or reset unfinished choices.
+
 ## Resolved board regressions (2026-09-07)
 
 ### Clicking Code Review did not start pairing — closed 2026-09-07

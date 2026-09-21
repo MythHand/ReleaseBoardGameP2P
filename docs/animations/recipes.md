@@ -2360,9 +2360,14 @@ per card in the committed order (`BACK_DUR 600` / `BACK_STEP 90`); the answer go
 
 **Where.** `pages/board/[gameId]/_useRebaseStaging.tsx`, `pages/board/[gameId]/_Board.tsx`.
 
-**Layout.** The numbered rows scroll independently of the confirmation bar. `ConfirmAction`
-is their sibling at the board bottom; the row wrapper has no transform so returning cards
-can use viewport coordinates without acquiring a different containing block.
+**Layout.** Per the owner's 2026-09-21 decision, the private choice is an overlay above the
+table. The numbered rows and `ConfirmAction` share the reaction layer above the public
+operation carrier, with a dim background that intercepts table presses. The operation remains
+held underneath until the effect finishes. The rows scroll independently of the confirmation
+bar at the board bottom. Neither wrapper has a transform or filter, so returning cards use
+viewport coordinates without acquiring a different containing block.
+Pause, connection recovery and match completion suspend this overlay without unmounting its
+rows. The hidden surface is inert; resuming the same pending preserves the chosen order.
 
 ---
 
