@@ -23,12 +23,11 @@
    too. It leaves on the commit, ahead of the cards: they travel over a table
    that is already back to normal, and land in it rather than over it. */
 .scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--black-72);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  composes: scrim from './_tableSurface.module.css';
+
+  /* heavier than the shared default: here the reorder is the only thing to read
+     and the draw piles go under it too */
+  --surface-scrim: var(--black-72);
 }
 
 .rows {

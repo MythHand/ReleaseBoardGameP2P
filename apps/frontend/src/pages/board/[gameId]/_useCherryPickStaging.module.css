@@ -33,12 +33,7 @@
    layer; it inherits `pointer-events: none`, so the table's own controls stay
    live, as they are with the grid up. */
 .scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--black-60);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  composes: scrim from './_tableSurface.module.css';
 }
 
 /* the actual card row — owns the scroll box `.grid` used to before this fix.

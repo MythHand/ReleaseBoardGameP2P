@@ -73,6 +73,7 @@ import type {
   DiscardPickHandoff,
   HandLimitHandoff,
   Panel,
+  RequestPickHandoff,
   StagedHandoff,
 } from '~/entities/game/board/types'
 import { useBeats, useEliminationPreload } from '~/features/board-beats'
@@ -227,6 +228,8 @@ export default function Board({
   // queue needs at this point; the layout effect that keeps `.current` current
   // runs after every hook regardless of where it sits in the function.
   const discardPickRef = useRef<DiscardPickHandoff | null>(null)
+  // the request surface's own hold, for the beat that plays a `requested`
+  const requestPickRef = useRef<RequestPickHandoff | null>(null)
   const handoffRef = useRef<StagedHandoff | null>(null)
   // The hand limit's own handoff (#104), a ref for the same reason `handoffRef`
   // is one: the beat reads it once at run start (I8), not a render's worth of
@@ -258,6 +261,7 @@ export default function Board({
   const beats = useBeats({
     live,
     discardPick: discardPickRef,
+    requestPick: requestPickRef,
     events: intro?.events ?? [],
     anchors,
     enabled: introOver || intro == null,
@@ -459,6 +463,9 @@ export default function Board({
     },
     enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
+    pickPreview,
+    onPickPreview,
+    handoff: requestPickRef,
   })
   // taking a Release back out of the discard (#106, `ai-inside`) — the row
   // over the discard replaces the panel, the same way the band above
@@ -636,15 +643,12 @@ export default function Board({
       ? { support: staging.staged.support, main: staging.staged.main }
       : null
 
-  // The card the arrow leaves FROM, whichever hook armed it — a waiting
-  // support if there is one, the aimed card otherwise. Its category is the
-  // arrow's hue (#101, Fix B, Defect 5): the defence side only ever aims with
-  // the Sudo, which is how it comes out as the scene's own `--cat-support`
-  // without naming that token here.
-  const aimingCard = answering
-    ? defenseStaging.staged?.support?.card
-    : (staging.staged?.support ?? staging.staged?.main)?.card
-  const arrowColor = aimingCard ? `var(--cat-${aimingCard.category})` : undefined
+  // The hue the arrow was ARMED with (#101, Fix B, Defect 5): whichever hook
+  // aimed it named the colour of the card the line leaves, in the same call
+  // that said where it starts. The board no longer re-derives that from
+  // `staged` — one card, one arming, so the origin and the colour cannot say
+  // two different cards (#168).
+  const arrowColor = answering ? defenseStaging.arrow.color : staging.arrow.color
   // Which draw pile the cursor is over while the arrow is asking. A pile is not
   // a card and has no hover of its own, so the answer it gives the arrow is
   // rendered rather than styled: it comes back to `Pile` as `selected` (see the
@@ -1271,8 +1275,9 @@ export default function Board({
           thing the approved scene says with a literal
           `color="var(--cat-support)"`, read off the card actually standing
           rather than hardcoded, since the turn side aims with every category
-          there is. No card standing means no arrow to colour, and Arrow's own
-          default takes over. */}
+          there is. It comes armed with the aim itself (`useArrow`), so it is
+          always the card the line leaves. Nothing armed means no colour, and
+          Arrow's own default takes over. */}
       <Arrow
         from={answering ? defenseStaging.arrow.from : staging.arrow.from}
         to={answering ? defenseStaging.arrow.to : staging.arrow.to}
@@ -1323,6 +1328,13 @@ export default function Board({
                 // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
                 key={i}
                 className={opening.pileTarget}
+                // WHAT TRAVELS IS THE WHOLE PILE, label and counter included —
+                // the scene animates this very box (`DeckAnimationsStory`'s own
+                // deck wrapper). The registry holds the CARD box inside it,
+                // because that is what a flight aims AT (I6), and moving only
+                // that left the label standing where the pile no longer was
+                // until the row re-rendered it out of existence (owner, 21.09).
+                data-pile-box
                 // A pile a split has just mounted is not on screen yet: it is
                 // shown by the flight that brings it, in that flight's own first
                 // frame. Seen a frame earlier, it blinks at the place it has not
@@ -1596,13 +1608,13 @@ export default function Board({
         data-board-centre
         data-centre-slot="attack"
         ref={anchors.centre}
-        {...previewProps(
-          centreAttack
-            ? cardById(centreAttack.attackCard)
-            : pendingAlarm?.card
-              ? cardById(pendingAlarm.card)
-              : null,
-        )}
+        // THE SLOT ANSWERS FOR ITSELF: whatever card is drawn in it is the card
+        // that can be read. It used to be handed a list of what might stand
+        // here, and the list named an attack and a 503 alarm — so the git
+        // operations that stand in this very slot, waiting for their effect or
+        // resting after it, could not be read by anybody (#168). A list is
+        // something a new render can be added without; the slot is not.
+        {...previewProps()}
       >
         {intro &&
           deal.staged.map((s) => {
@@ -1623,8 +1635,21 @@ export default function Board({
             would double it (ComboStory.tsx's own guard on this). Once a
             partner folds in, the pair flyer below owns the centre instead. */}
         {soloStaged && !assembling && staging.overlay.length === 0 && (
+          // IT LANDS IN THE POSE IT WILL KEEP. An attack rests at the centre
+          // tilted (`ATTACK_POSE`, and I11: the tilt is what marks a card as
+          // PLAYED), and this render used to be straight — so the card flew in
+          // flat, stood there flat, and turned only when the projection's own
+          // standing render took over. The turn read as the card correcting
+          // itself after it had already landed. The tilt lives on an INNER
+          // element, so the node the beat measures stays the true card box (I6).
           <div ref={soloStagedRef} className={opening.centreCard} data-testid="board-centre-staged">
-            <Card card={soloStaged.card} interactive={false} width="100%" />
+            {soloStaged.card.category === 'attack' ? (
+              <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+                <Card card={soloStaged.card} interactive={false} width="100%" />
+              </div>
+            ) : (
+              <Card card={soloStaged.card} interactive={false} width="100%" />
+            )}
           </div>
         )}
         {centreAttack &&
@@ -1724,6 +1749,10 @@ export default function Board({
               key={i}
               className={opening.rowSlot}
               style={rowPlaceStyle('staging', 2, i)}
+              // each place of the row is its own slot, outside the centre's, so
+              // each says what stands in it — both halves are on the table and
+              // both are readable, the sudo as much as the card it paid for
+              {...previewProps(card)}
               {...(i === 0
                 ? { 'data-operation-support': '' }
                 : { 'data-public-operation': '', 'data-testid': 'board-operation-standing' })}

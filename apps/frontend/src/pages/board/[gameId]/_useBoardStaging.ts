@@ -28,11 +28,12 @@ import type {
   TableActions,
   TableTarget,
 } from '@release/ui'
-import { CARD_RATIO, CARD_W, centerOf, slotPlacement, useArrow } from '@release/ui'
+import { CARD_RATIO, CARD_W, cardBoxIn, centerOf, slotPlacement, useArrow } from '@release/ui'
 import {
   type Arriving,
   play,
   type Rect,
+  restTransform,
   useFlyer,
   useHandArrival,
   usePairFold,
@@ -47,7 +48,13 @@ import {
   useRef,
   useState,
 } from 'react'
-import { type BoardAnchors, type BoardState, MERGE_MS, SHOW_HOLD } from '~/entities/game/board'
+import {
+  ATTACK_POSE,
+  type BoardAnchors,
+  type BoardState,
+  MERGE_MS,
+  SHOW_HOLD,
+} from '~/entities/game/board'
 import { stageSlot } from '~/entities/game/board/stageSlot'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 
@@ -97,7 +104,9 @@ export interface BoardStaging {
   staged: StagedPlay | null
   dispatched: boolean // derived: staged?.phase === 'dispatched'
   targets: TableTarget[] // the staged card's — [] when nothing staged
-  arrow: { from: Point | null; to: Point | null; active: boolean }
+  // `color` is the hue the aim was armed with — the category of the card the
+  // line leaves; undefined while nothing is aiming.
+  arrow: { from: Point | null; to: Point | null; color?: string; active: boolean }
   overlay: ReactNode[] // flyer + return-flight overlays
   gapAt: number | null // fan gap while a cancel returns cards
   gapSize: number
@@ -281,6 +290,13 @@ export function useBoardStaging({
     cancellingRef.current = false
     setCancelling(false)
     commitStaged(null)
+    // NOTHING IS IN THE AIR ANY MORE, so no place is holding its card back. The
+    // refusal path cleared this and the landing path did not, because it left
+    // the clearing to whatever staged next — and every animated staging does
+    // overwrite it, which is why this never showed. A staging that runs without
+    // a flight does not (reduced motion), and there the place of the row stayed
+    // empty with the card standing in it. A landing clears what it started.
+    setCarrying([])
     // The outgoing flight this callback belongs to has landed, so a release
     // that was `leaving` is now simply gone. Conditional, unlike the clears
     // above: this fires for EVERY arrival landing, and a plain aim's own
@@ -394,10 +410,23 @@ export function useBoardStaging({
   // resolves to the very element this always used, with no branch of its own.
   // `Table`'s own arrow anchors to its source card the same way, and re-derives
   // it on every phase change rather than aiming once (apps/ui/src/table/Table).
+  // An attack rests tilted; everything else rests square. Handed to a flight so
+  // it arrives already in that pose instead of turning once it is down.
+  const attackPose = (card: CardData) =>
+    card.category === 'attack'
+      ? { rotate: ATTACK_POSE.rot, dx: ATTACK_POSE.dx, dy: ATTACK_POSE.dy }
+      : {}
+
+  // THE CARD IS THE ARGUMENT, not just its place: the same card decides where
+  // the line starts and what colour it is drawn in, so both are said in one
+  // call. Splitting them is how the hue went stale — the board re-derived it
+  // from `staged` with a rule of its own ("the support, if there is one"),
+  // which outlived the moment a sudo hands the aim over to the card it
+  // enhances: the arrow left the attack and stayed the sudo's yellow (#168).
   const aimFromPlay = useCallback(
-    (place: number | null) => {
+    (card: StagedCard, place: number | null) => {
       const el = (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
-      if (el) arrowCtl.aim(centerOf(el))
+      if (el) arrowCtl.aim(centerOf(el), undefined, `var(--cat-${card.card.category})`)
     },
     [anchors, arrowCtl.aim],
   )
@@ -743,7 +772,8 @@ export function useBoardStaging({
             const to = (
               (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
             )?.getBoundingClientRect()
-            if (el && to) await play('playToCenter', el, { from, to })?.finished
+            if (el && to)
+              await play('playToCenter', el, { from, to, ...attackPose(card.card) })?.finished
           } catch {
             // A `void`ed body is watched by nobody: let it reject and the whole
             // app gets an unhandled rejection. The card is staged either way —
@@ -754,7 +784,7 @@ export function useBoardStaging({
         }
         // out of the place it has just landed in — the same one the flight
         // above aimed at, so the arrow starts where the card ended
-        aimFromPlay(hasTarget ? null : 0)
+        aimFromPlay(card, hasTarget ? null : 0)
       })()
     },
     [anchors, reduced, flyer.raise, flyer.drop, aimFromPlay],
@@ -789,7 +819,12 @@ export function useBoardStaging({
         if (to && from) {
           const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
           if (!current()) return
-          if (el) await play('playToCenter', el, { from, to })?.finished
+          // INTO THE POSE IT WILL REST IN, not into a flat landing it then
+          // corrects. An attack lies tilted at the centre (I11: the tilt is
+          // what says it has been PLAYED), so the flight ends already turned —
+          // the same `rotate`/`dx`/`dy` the combo and defence flights pass, for
+          // the same reason.
+          if (el) await play('playToCenter', el, { from, to, ...attackPose(card.card) })?.finished
           if (!current()) return
           flyer.drop('stage')
         }
@@ -968,12 +1003,21 @@ export function useBoardStaging({
       const mainIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
       const main: StagedCard = { uid: item.uid, card: item.card, index: mainIndex }
       // HOW THE TWO STAND IS THE SITUATION'S, not one rule for both yellows. A
-      // sudo ENHANCES the card beside it and stays its own card: the two take
-      // the two places of the centre's row and nothing folds. A Code Review
-      // RIDES the release it pays for: they lie one on the other, as they will
-      // lie in the heap (owner, 18.09). `merged` says a PAIR owns the centre, so
-      // it stays false all the way through for the side-by-side one.
-      const sideBySide = support.card.id === 'support-sudo'
+      // Code Review RIDES the release it pays for: they lie one on the other, as
+      // they will lie in the heap (owner, 18.09).
+      //
+      // A SUDO GOES BOTH WAYS, and what it enhances decides which (owner,
+      // 20.09). Beside a git operation it stays its own card: the two take the
+      // two places of the centre's row and nothing folds — the row the scene
+      // shows, unchanged. Under an ATTACK it is a stack: the attack lies on top
+      // of it, the way the centre already draws a played attack with a sudo
+      // (`centreAttack`, a `CardPair` at the middle) and the way the two will
+      // lie in the heap. That the staging stood them in a row and the play then
+      // stood them in a stack was the same picture told twice.
+      //
+      // `merged` says a PAIR owns the centre, so it is false only for the row.
+      const stacked = support.card.id === 'support-sudo' && main.card.category === 'attack'
+      const sideBySide = support.card.id === 'support-sudo' && !stacked
       const merged = !sideBySide
       commitStaged({ support, main, phase: 'partner', merged })
       // the fold is committed — irrevocable until `finish()` runs (ComboStory's
@@ -1015,8 +1059,10 @@ export function useBoardStaging({
           commitStaged({ support, main, phase: 'target', merged })
           // The card that aims is the MAIN one, and where it stands depends on
           // how the two were put down: side by side it took the row's second
-          // place, folded it owns the middle with the support under it.
-          aimFromPlay(sideBySide ? 1 : null)
+          // place, folded it owns the middle with the support under it. It is
+          // also the card the arrow is COLOURED by, for the same reason — the
+          // aim is its own now, the support only enhances it.
+          aimFromPlay(main, sideBySide ? 1 : null)
         } else {
           commitStaged({ support, main, phase: 'dispatched', merged })
           dispatchWatermarkRef.current = eventsRef.current.length
@@ -1035,9 +1081,17 @@ export function useBoardStaging({
         }
       }
 
-      // The partner's own fan slot — the scene's own source (I6: a slot is
-      // rotated, so its bounding rect is the box AROUND the tilted card).
-      const mainHand = slotBox(index, handItems.length)
+      // THE CARD WHERE IT IS DRAWN, not where its slot rests. The scene folds
+      // from the card itself, and the card being clicked is the HOVERED one —
+      // lifted out of the fan's resting line. Measuring `slotBox` instead (the
+      // fan's rect plus `slotPlacement`) started the pair's half at a place the
+      // player's card had never been, so it read as the clicked card vanishing
+      // and a different one flying to the sudo. The slot is rotated, so its
+      // bounding rect is the box AROUND the tilted card — `cardBoxIn` trims it
+      // back (I6). `slotBox` stays the fallback for when there is no node to
+      // measure (reduced motion, a hand that has not painted yet).
+      const liveSlot = anchors.handSlotAt(index)?.getBoundingClientRect()
+      const mainHand = liveSlot ? cardBoxIn(liveSlot, CARD_W) : slotBox(index, handItems.length)
       if (!mainHand) {
         finish()
         return true
@@ -1066,17 +1120,28 @@ export function useBoardStaging({
         })()
         return true
       }
-      // The pair folds where the support STANDS. Its own place is the frame, so
-      // the aux's entry pose is the degenerate identity case and the fold needs
-      // no branch for it — the same thing that used to be true of the middle,
-      // back when a pulled support stood there.
-      const box = stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect
+      // WHERE THE PAIR FOLDS IS WHERE IT THEN STANDS.
+      //
+      // A Code Review folds where the support ALREADY STANDS: its own place is
+      // the frame, so the aux's entry pose is the degenerate identity case and
+      // the fold needs no branch for it — the same thing that used to be true of
+      // the middle, back when a pulled support stood there.
+      //
+      // A sudo under an attack folds at the MIDDLE, because that is where a
+      // played attack stands: the sudo glides out of its place in the row into
+      // the middle while the attack comes down onto it from the fan. It lands at
+      // the tilt a played attack rests at, which is the very pose the centre's
+      // own pending render then draws the same pair at — so the handover from
+      // the fold's last frame to the static render changes nothing on screen.
+      const standing = stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect
+      const box = stacked ? cRect : standing
       const folding = pairApi.current.fold({
         main: main.card,
         aux: support.card,
         mainFrom: mainHand,
-        auxFrom: box,
+        auxFrom: standing,
         box,
+        pose: stacked ? restTransform(ATTACK_POSE) : undefined,
         dur: reduced ? 0 : MERGE_MS,
       })
       // A game action never waits on an animation nobody plays: under reduced

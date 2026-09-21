@@ -137,6 +137,7 @@ const handItem = (uid: string, id: string) => {
 
 const cherryPending = (options: { uid: string; id: string }[], picks: 1 | 2 = 1) => ({
   kind: 'pickFromDiscard' as const,
+  raisedAt: 1,
   player: 'you',
   options,
   picks,

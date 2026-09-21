@@ -476,3 +476,58 @@ it('reveals the transferred card beside the retained attack in the shared cost s
   expect(played.takes[0]).toMatchObject({ to: { left: 750, top: 320, width: 150, height: 210 } })
   anchors.cost = previous
 })
+
+// WHICH PLACE THE CARD LEAVES IS THE FAN'S OWN ANSWER — the surface holding it
+// is the only party that knows whether a place was chosen in it. The beat asks;
+// it does not arbitrate between two sources. It used to ask for the middle first
+// and the pressed place second, which gave the middle to both questions and flew
+// every blind pick out of the middle whichever back was pressed (#168).
+it('takes the card out of the place the fan names, not one of its own choosing', async () => {
+  const root = document.createElement('div')
+  root.appendChild(centreNode)
+  document.body.appendChild(root)
+  // a marker in the DOM saying something else entirely: the beat must not
+  // arbitrate between the two, it must ask the surface that owns the fan
+  const strayEl = document.createElement('div')
+  strayEl.setAttribute('data-transfer-picked', '')
+  strayEl.getBoundingClientRect = () => ({ left: 999, top: 999, width: 90, height: 126 }) as DOMRect
+  root.appendChild(strayEl)
+  const named = { left: 120, top: 640, width: 90, height: 126 } as DOMRect
+  const requestPick = {
+    current: {
+      hold: () => {},
+      release: () => {},
+      close: () => {},
+      slot: () => named,
+    },
+  }
+  const pickedRect = named
+  const started: { run: (() => Promise<void>) | null } = { run: null }
+  function Probe() {
+    const beat = useTransferBeat(anchors, requestPick as never)
+    started.run = () =>
+      beat.runTransfer(transferPlan({ index: 3, named: false }), {
+        base,
+        publish: () => {},
+      })
+    return <>{beat.overlay}</>
+  }
+  render(<Probe />)
+  vi.useFakeTimers()
+  try {
+    let done = false
+    const finished = started.run?.().then(() => {
+      done = true
+    })
+    while (!done) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+    }
+    await finished
+  } finally {
+    vi.useRealTimers()
+    root.remove()
+  }
+  expect(played.takes[0]).toMatchObject({ from: pickedRect })
+})
