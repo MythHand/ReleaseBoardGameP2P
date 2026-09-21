@@ -755,9 +755,18 @@ export function useCherryPickStaging(args: {
   }
 }
 
-/** one offer's identity: who owes it, what raised it, and the cards in it */
-const offerKey = (pending: { player: string; source?: string; options: { uid: string }[] }) =>
-  `${pending.player}:${pending.source}:${pending.options.map((o) => o.uid).join(',')}`
+/**
+ * ONE OFFER'S IDENTITY: who owes it, and WHICH OCCASION it is.
+ *
+ * It used to be who owes it and the cards in it — and a card of the same kind
+ * may be played any number of times, so the same player can be offered the same
+ * cards twice in one match. Keyed by its contents the second offer is byte for
+ * byte the first, which this hook has already marked answered, so the second
+ * Cherry-pick would never deal its grid. The same defect was found live on
+ * Rebase, which carried the same key (#168).
+ */
+const offerKey = (pending: { player: string; raisedAt: number }) =>
+  `${pending.player}:${pending.raisedAt}`
 
 const idOfOption = (options: { uid: string; id: string }[], uid: string) =>
   options.find((o) => o.uid === uid)?.id ?? ''

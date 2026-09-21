@@ -241,10 +241,22 @@ export function useDeckBeat(anchors: BoardAnchors) {
     [step],
   )
 
-  // A new match cancels what is in the air: the only carrier this beat ever
-  // raises is the one flyer `discardOntoPile` puts up (the gathered discard, or
-  // the recycled pile), so dropping it is the whole of it.
-  const reset = useCallback(() => drop(), [drop])
+  // A new match cancels what is in the air — the one flyer `discardOntoPile`
+  // puts up (the gathered discard, or the recycled pile) — AND everything this
+  // beat has hidden while that flew.
+  //
+  // Dropping the carrier alone was the whole of it, and that was half the job:
+  // `splitting` blanks a pile while its half flies out of it, and `discardOut`
+  // takes the discard's counter down while the heap is on its way to a deck.
+  // Both are cleared on the way out of the step that set them, so a match that
+  // ends mid-step never cleared either — and the next match opened with a pile
+  // that draws nothing or a discard with no counter, for good. What a beat
+  // hides, its reset shows again.
+  const reset = useCallback(() => {
+    drop()
+    setSplitting(null)
+    setDiscardOut(null)
+  }, [drop])
 
   return { overlay, runReshuffle, runPiles, reset, splitting, discardOut }
 }

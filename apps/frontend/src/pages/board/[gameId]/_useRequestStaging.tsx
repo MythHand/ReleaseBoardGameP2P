@@ -111,6 +111,21 @@ export function useRequestStaging(args: {
     setPicked(null)
   }, [episode])
 
+  // THE MATCH ENDING IS A DIFFERENT BOUNDARY, and the held card belongs to it
+  // rather than to the one above. What the beat asked us to hold outlives the
+  // pending on purpose — the pending clears the moment the engine answers and
+  // the card goes on standing while the beat plays the outcome — so clearing it
+  // whenever an episode ends would take the card off the table mid-scene.
+  //
+  // Only the beat's own callback releases it, which is right while a beat is
+  // running and nothing at all when one is cut short: a match ending mid-hold
+  // left the request's catalogue standing, and it was still standing in the
+  // next match.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the match is the boundary and the only dependency this may have
+  useEffect(() => {
+    setHeld(null)
+  }, [matchKey])
+
   // THE DEFENDER'S OWN HAND, held out closed — for a named request as much as
   // for a blind pick. The blind pick makes you choose a position in it; a named
   // request does not, but it is the same hand and the card asked for comes OUT

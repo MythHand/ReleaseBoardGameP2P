@@ -216,6 +216,7 @@ it('renders the row that takes a card out of the discard from the real catalog',
     ...projected,
     pending: {
       kind: 'pickFromDiscard' as const,
+      raisedAt: 1,
       player: 'p1',
       options: [
         { uid: 'release-frontend#d0', id: 'release-frontend' },

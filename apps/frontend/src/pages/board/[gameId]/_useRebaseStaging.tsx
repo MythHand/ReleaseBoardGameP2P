@@ -108,9 +108,14 @@ export function useRebaseStaging(args: {
   if (ours) pilesRef.current = ours.piles
   const piles: Pile[] = ours ? ours.piles : pilesRef.current
 
-  const offerKey = ours
-    ? `${ours.player}:${ours.piles.map((entry) => `${entry.pile}/${entry.cards.map((c) => c.uid).join(',')}`).join('|')}`
-    : null
+  // WHICH OCCASION THIS IS, not what is in it. A card of the same kind may be
+  // played any number of times, so the same player can be offered the same
+  // piles in the same order twice in one match — and keyed by its CONTENTS the
+  // second offer is byte for byte the first, which this hook has already marked
+  // answered. It refused to deal the row, and Rebase simply could not be played
+  // a second time (#168). The engine now says when a decision was raised, so the
+  // key says which offer this is and the contents say nothing about identity.
+  const offerKey = ours ? `${ours.player}:${ours.raisedAt}` : null
   const reorder = useCardReorder({
     enabled: Boolean(ours) && ready && !answered,
     step: 180,
