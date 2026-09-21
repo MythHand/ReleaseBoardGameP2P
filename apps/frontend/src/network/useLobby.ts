@@ -1,10 +1,4 @@
-import {
-  type Engine,
-  type Event,
-  type GameState,
-  type PlayerId,
-  parseEventLog,
-} from '@release/engine'
+import type { PlayerId } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { DEFAULT_SETUP } from '@release/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -24,10 +18,8 @@ import {
   getResumeToken,
   readKeeper,
   readSession,
-  type StoredKeeper,
   type StoredLobbyConfig,
   type StoredSession,
-  writeKeeper,
   writeSession,
 } from '~/shared/lib/persistence'
 import { normalizeChatText } from './chat/journal'
@@ -39,7 +31,6 @@ import {
   handleReady,
   handleWhereabouts,
   kick as kickFn,
-  MAX_BOTS,
   setBots as setBotsFn,
   setMaxPlayers as setMaxPlayersFn,
   transferHost as transferHostFn,
@@ -70,14 +61,14 @@ import {
   type LobbyState,
 } from './lobby/state'
 import type { GameLink, Sync } from './session/link'
-import { backoffMs, MAX_RECONNECT_ATTEMPTS, type ReconnectEvent } from './session/reconnect'
 import {
-  adoptSession,
-  createSession,
-  type Seat as RefereeSeat,
-  type Session,
-  type SessionRef,
-} from './session/referee'
+  createKeeperWriter,
+  matchSeqAfterRestore,
+  normalizeKeeperSnapshot,
+  normalizeLobbyConfig,
+} from './session/persistence'
+import { backoffMs, MAX_RECONNECT_ATTEMPTS, type ReconnectEvent } from './session/reconnect'
+import { adoptSession, createSession, type Session, type SessionRef } from './session/referee'
 import { isRelayable, relayTargets } from './session/relay'
 import { attachKeeper, createRemoteLink } from './session/remoteLink'
 import { restoreSeats } from './session/restore'
@@ -110,38 +101,11 @@ function lastKnownChatRole(entries: ChatEntry[], memberId: string): ChatRole | u
 }
 
 export { formatRoomCode, makeRoomCode, parseRoomCode } from './lobby/roomCode'
-
-// What `matchSeqRef` must be seeded to after a restore, so the NEXT startGame
-// mints an id that was never used. `gameId` is always `${hostId}-${seq}`
-// (startGame), and the host id itself never contains a dash (room codes are
-// drawn from ROOM_CODE_ALPHABET, which has none), so the numeric suffix after
-// the last dash is the sequence number that produced this exact match.
-//
-// A restore starting a fresh `useRef(0)` and leaving it there is the bug this
-// guards: the very next startGame would mint the SAME id as the match just
-// restored — the id `matchSeqRef`'s own comment already warns a repeat would
-// be "silently taken for the same game" by every gameId-keyed consumer
-// (useGame's move-history feed among them). Parsed defensively: a suffix that
-// is not a positive integer for any reason must not silently leave the
-// counter at 0 and reproduce the exact collision this exists to prevent, so
-// it falls back to the clock instead — a value no realistic sequence of
-// startGame calls could ever collide with.
-export function matchSeqAfterRestore(gameId: string): number {
-  const suffix = gameId.slice(gameId.lastIndexOf('-') + 1)
-  const parsed = Number(suffix)
-  return Number.isInteger(parsed) && parsed >= 1 ? parsed : Date.now()
-}
+export { KEEPER_SAVE_MS, matchSeqAfterRestore } from './session/persistence'
 
 // How long to keep the transport alive after broadcasting LOBBY_DISBANDED, so
 // the buffered frame can flush over the DataChannels before peer.destroy().
 const DISBAND_FLUSH_MS = 200
-
-// How long the keeper snapshot trails the commit that produced it. The keeper
-// offers up every state it commits, and its ticker commits twice every 250ms
-// whether or not the table moved — while each write serializes a whole
-// GameState. Matching the ticker's own cadence means a burst of resolution
-// events costs one serialization rather than ten.
-export const KEEPER_SAVE_MS = 250
 
 export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'disbanded' | 'error'
 
@@ -164,208 +128,6 @@ function parseJoinRequestPayload(value: unknown): { name: string; resumeToken: s
   const { name, resumeToken } = value as { name?: unknown; resumeToken?: unknown }
   if (!isNonEmptyString(name) || !isNonEmptyString(resumeToken)) return null
   return { name, resumeToken }
-}
-
-function normalizePrivateSeats(value: unknown): PrivateSeat[] | null {
-  if (!Array.isArray(value) || value.length === 0) return null
-  const privateSeats: PrivateSeat[] = []
-  const playerIds = new Set<string>()
-  const peerIds = new Set<string>()
-  const resumeTokens = new Set<string>()
-  for (const entry of value) {
-    if (typeof entry !== 'object' || entry === null) return null
-    const { seat, resumeToken } = entry as { seat?: unknown; resumeToken?: unknown }
-    if (typeof seat !== 'object' || seat === null) return null
-    const { playerId, peerId, name, bot } = seat as {
-      playerId?: unknown
-      peerId?: unknown
-      name?: unknown
-      bot?: unknown
-    }
-    if (bot !== undefined && typeof bot !== 'boolean') return null
-    if (bot ? resumeToken !== null : !isNonEmptyString(resumeToken)) return null
-    if (!isNonEmptyString(playerId) || !isNonEmptyString(peerId) || !isNonEmptyString(name))
-      return null
-    if (playerIds.has(playerId) || peerIds.has(peerId)) return null
-    if (typeof resumeToken === 'string' && resumeTokens.has(resumeToken)) return null
-    playerIds.add(playerId)
-    peerIds.add(peerId)
-    if (typeof resumeToken === 'string') resumeTokens.add(resumeToken)
-    const normalizedSeat: Seat = { playerId, peerId, name }
-    if (bot) normalizedSeat.bot = true
-    privateSeats.push({
-      seat: normalizedSeat,
-      resumeToken: typeof resumeToken === 'string' ? resumeToken : null,
-    })
-  }
-  return privateSeats
-}
-
-function normalizeRefereeSeats(value: unknown): RefereeSeat[] | null {
-  if (!Array.isArray(value) || value.length === 0) return null
-  const seats: RefereeSeat[] = []
-  const playerIds = new Set<string>()
-  const peerIds = new Set<string>()
-  for (const entry of value) {
-    if (typeof entry !== 'object' || entry === null) return null
-    const { playerId, peerId, absentSince, bot } = entry as {
-      playerId?: unknown
-      peerId?: unknown
-      absentSince?: unknown
-      bot?: unknown
-    }
-    if (bot !== undefined && typeof bot !== 'boolean') return null
-    if (!isNonEmptyString(playerId)) return null
-    if (peerId !== null && !isNonEmptyString(peerId)) return null
-    if (absentSince !== null && (typeof absentSince !== 'number' || !Number.isFinite(absentSince)))
-      return null
-    if (bot) {
-      if (peerId !== null || absentSince !== null) return null
-    } else if ((peerId === null) !== (typeof absentSince === 'number')) return null
-    if (playerIds.has(playerId) || (typeof peerId === 'string' && peerIds.has(peerId))) return null
-    playerIds.add(playerId)
-    if (typeof peerId === 'string') peerIds.add(peerId)
-    const normalizedSeat: RefereeSeat = { playerId, peerId, absentSince }
-    if (bot) normalizedSeat.bot = true
-    seats.push(normalizedSeat)
-  }
-  return seats
-}
-
-interface NormalizedLobbyConfig {
-  maxPlayers: number
-  setup: Setup
-  bots: number
-}
-
-function normalizeLobbyConfig(value: unknown): NormalizedLobbyConfig | null {
-  if (typeof value !== 'object' || value === null) return null
-  const { maxPlayers, setup, bots } = value as {
-    maxPlayers?: unknown
-    setup?: unknown
-    bots?: unknown
-  }
-  if (
-    typeof maxPlayers !== 'number' ||
-    !Number.isInteger(maxPlayers) ||
-    maxPlayers < 2 ||
-    maxPlayers > 6
-  ) {
-    return null
-  }
-  if (
-    bots !== undefined &&
-    (typeof bots !== 'number' || !Number.isInteger(bots) || bots < 0 || bots > MAX_BOTS)
-  ) {
-    return null
-  }
-  if (typeof setup !== 'object' || setup === null || Array.isArray(setup)) return null
-  const entries = Object.entries(setup)
-  if (!entries.every(([, option]) => typeof option === 'string')) return null
-  return { maxPlayers, setup: Object.fromEntries(entries), bots: bots ?? 0 }
-}
-
-interface NormalizedKeeperSnapshot {
-  gameId: string
-  keeperId: PlayerId
-  state: GameState
-  seats: RefereeSeat[]
-  privateSeats: PrivateSeat[]
-  log: Event[]
-  lobbyConfig?: NormalizedLobbyConfig
-}
-
-function normalizeKeeperSnapshot(
-  snapshot: StoredKeeper,
-  expectedGameId: string,
-  hostPeerId: string,
-  engine: Engine,
-): NormalizedKeeperSnapshot | null {
-  if (
-    !isNonEmptyString(snapshot.gameId) ||
-    snapshot.gameId !== expectedGameId ||
-    !isNonEmptyString(snapshot.keeperId) ||
-    !Number.isFinite(snapshot.savedAt)
-  ) {
-    return null
-  }
-  const log = parseEventLog(snapshot.log)
-  if (!log) return null
-  const privateSeats = normalizePrivateSeats(snapshot.privateSeats)
-  const seats = normalizeRefereeSeats(snapshot.seats)
-  if (!privateSeats || !seats || privateSeats.length !== seats.length) return null
-  let lobbyConfig: NormalizedLobbyConfig | undefined
-  if (snapshot.lobbyConfig !== undefined) {
-    const normalizedLobbyConfig = normalizeLobbyConfig(snapshot.lobbyConfig)
-    if (!normalizedLobbyConfig) return null
-    lobbyConfig = normalizedLobbyConfig
-  }
-
-  const privateByPlayer = new Map(
-    privateSeats.map((privateSeat) => [privateSeat.seat.playerId, privateSeat]),
-  )
-  for (let index = 0; index < seats.length; index += 1) {
-    const seat = seats[index]
-    const privateSeat = privateByPlayer.get(seat.playerId)
-    if (!privateSeat || privateSeats[index].seat.playerId !== seat.playerId) return null
-    if (Boolean(seat.bot) !== Boolean(privateSeat.seat.bot)) return null
-    if (seat.peerId !== null && privateSeat.seat.peerId !== seat.peerId) return null
-  }
-
-  const hostPrivateSeat = privateSeats.find(({ seat }) => seat.peerId === hostPeerId)
-  const hostRefereeSeat = seats.find(({ peerId }) => peerId === hostPeerId)
-  if (
-    !hostPrivateSeat ||
-    !hostRefereeSeat ||
-    hostPrivateSeat.seat.playerId !== snapshot.keeperId ||
-    hostRefereeSeat.playerId !== snapshot.keeperId
-  ) {
-    return null
-  }
-
-  if (typeof snapshot.state !== 'object' || snapshot.state === null) return null
-  const state = snapshot.state as Record<string, unknown>
-  const playerIds = seats.map(({ playerId }) => playerId)
-  if (
-    state.gameId !== snapshot.gameId ||
-    !Array.isArray(state.seating) ||
-    state.seating.length !== playerIds.length ||
-    !state.seating.every((playerId, index) => playerId === playerIds[index]) ||
-    typeof state.players !== 'object' ||
-    state.players === null
-  ) {
-    return null
-  }
-  const players = state.players as Record<string, unknown>
-  if (Object.keys(players).length !== playerIds.length) return null
-  for (const playerId of playerIds) {
-    const player = players[playerId]
-    const privateSeat = privateByPlayer.get(playerId)
-    if (
-      typeof player !== 'object' ||
-      player === null ||
-      (player as { id?: unknown }).id !== playerId ||
-      (player as { name?: unknown }).name !== privateSeat?.seat.name
-    ) {
-      return null
-    }
-  }
-
-  try {
-    for (const playerId of playerIds) engine.project(snapshot.state as GameState, playerId)
-  } catch {
-    return null
-  }
-
-  return {
-    gameId: snapshot.gameId,
-    keeperId: snapshot.keeperId,
-    state: snapshot.state as GameState,
-    seats,
-    privateSeats,
-    log,
-    lobbyConfig,
-  }
 }
 
 // The outcome of one dial's connection to the HOST — not this browser's own
@@ -537,13 +299,7 @@ export function useLobby(): UseLobby {
   const seatsRef = useRef<Seat[]>([])
   const resumeTokensRef = useRef(new Map<string, string>())
   const privateSeatsRef = useRef<PrivateSeat[]>([])
-  // The keeper snapshot waiting to be serialized, and the trailing-edge timer
-  // that will do it. `lastSavedRef` holds the session object already queued: a
-  // Session is immutable, so an idle tick hands back that very object and is
-  // dropped before the throttle is even reached.
-  const lastSavedRef = useRef<Session | null>(null)
-  const pendingKeeperRef = useRef<StoredKeeper | null>(null)
-  const keeperSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const keeperWriter = useMemo(() => createKeeperWriter(), [])
   // Bumped on every teardown (leaveSession). joinRoom captures it before its
   // createTransport await so a teardown that lands mid-await (e.g. Cancel / Home
   // on the invite screen, whose leaveSession runs while transportRef is still
@@ -646,40 +402,19 @@ export function useLobby(): UseLobby {
   // a trailing write landing afterwards would put the abandoned match straight
   // back.
   const cancelKeeperSave = useCallback(() => {
-    if (keeperSaveTimerRef.current !== null) clearTimeout(keeperSaveTimerRef.current)
-    keeperSaveTimerRef.current = null
-    pendingKeeperRef.current = null
-    lastSavedRef.current = null
-  }, [])
+    keeperWriter.cancel()
+  }, [keeperWriter])
 
   // Queue one keeper commit for persistence. Two guards, cheapest first: a
   // commit that changed nothing hands back the session object already queued
   // and is skipped outright, and whatever survives that is coalesced onto a
   // trailing edge one ticker cadence wide.
-  const persistKeeper = useCallback((session: Session) => {
-    if (session === lastSavedRef.current) return
-    lastSavedRef.current = session
-    const lobby = stateRef.current
-    pendingKeeperRef.current = {
-      gameId: session.gameId,
-      keeperId: session.keeperId,
-      state: session.state,
-      seats: session.seats,
-      privateSeats: privateSeatsRef.current,
-      log: session.log,
-      savedAt: Date.now(),
-      lobbyConfig: lobby
-        ? { maxPlayers: lobby.maxPlayers, setup: lobby.setup, bots: lobby.bots }
-        : undefined,
-    }
-    if (keeperSaveTimerRef.current !== null) return
-    keeperSaveTimerRef.current = setTimeout(() => {
-      keeperSaveTimerRef.current = null
-      const snapshot = pendingKeeperRef.current
-      pendingKeeperRef.current = null
-      if (snapshot) writeKeeper(snapshot)
-    }, KEEPER_SAVE_MS)
-  }, [])
+  const persistKeeper = useCallback(
+    (session: Session) => {
+      keeperWriter.queue(session, privateSeatsRef.current, stateRef.current)
+    },
+    [keeperWriter],
+  )
 
   // The room is stored the moment it is entered; the match id lands on top of
   // that record when one starts. Without it a restore knows the room but not
