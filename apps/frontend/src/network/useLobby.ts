@@ -10,7 +10,7 @@ import {
   seatOf,
   seatsFor,
 } from '~/entities/game/seats'
-import type { ChatEntry, ChatRole } from '~/shared/chat/types'
+import type { ChatEntry } from '~/shared/chat/types'
 import {
   clearKeeper,
   clearLog,
@@ -22,33 +22,23 @@ import {
   type StoredSession,
   writeSession,
 } from '~/shared/lib/persistence'
-import { normalizeChatText } from './chat/journal'
+import { createChatController, toChatRole } from './chat/controller'
 import { type RoomChatState, useChatSession } from './chat/useChatSession'
+import { createLobbyActionsController } from './lobby/actionsController'
 import {
   canStart as canStartFn,
-  disbandLobby as disbandLobbyFn,
   handleJoinRequest,
   handleReady,
   handleWhereabouts,
-  kick as kickFn,
-  setBots as setBotsFn,
-  setMaxPlayers as setMaxPlayersFn,
-  transferHost as transferHostFn,
 } from './lobby/host'
 import {
-  chatEntry as chatEntryMessage,
-  chatHistory,
-  chatSend as chatSendMessage,
   dispatchOutgoing,
   gameStarting,
   introReady as introReadyMessage,
   joinRequest,
-  lobbyConfigUpdated,
   type Outgoing,
   pickPreview as pickPreviewMessage,
   playerKicked,
-  playerReady,
-  whereabouts,
 } from './lobby/messages'
 import { formatRoomCode, makeRoomCode, parseRoomCode } from './lobby/roomCode'
 import { createRoomRuntime, type PickPreview } from './lobby/runtime'
@@ -77,36 +67,8 @@ import { createStartGate } from './session/startGate'
 import { createTransport, type Transport } from './transport/peer'
 import type { PeerInfo, Seat, Setup, Where, WireMessage } from './types'
 
-const toChatRole = (role: PeerInfo['role']): ChatRole => (role === 'guest' ? 'spectator' : role)
-
-function lastKnownChatRole(entries: ChatEntry[], memberId: string): ChatRole | undefined {
-  let role: ChatRole | undefined
-  for (const entry of entries) {
-    if (entry.kind === 'message' && entry.author.memberId === memberId) {
-      role = entry.author.role
-    } else if (
-      entry.kind === 'system' &&
-      entry.event.kind === 'memberJoined' &&
-      entry.event.memberId === memberId
-    ) {
-      role = entry.event.role
-    } else if (
-      entry.kind === 'system' &&
-      entry.event.kind === 'roleChanged' &&
-      entry.event.memberId === memberId
-    ) {
-      role = entry.event.role
-    }
-  }
-  return role
-}
-
 export { formatRoomCode, makeRoomCode, parseRoomCode } from './lobby/roomCode'
 export { KEEPER_SAVE_MS, matchSeqAfterRestore } from './session/persistence'
-
-// How long to keep the transport alive after broadcasting LOBBY_DISBANDED, so
-// the buffered frame can flush over the DataChannels before peer.destroy().
-const DISBAND_FLUSH_MS = 200
 
 export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'disbanded' | 'error'
 
@@ -473,15 +435,35 @@ export function useLobby(): UseLobby {
     [runtime],
   )
 
-  const broadcastChatEntries = useCallback(
-    (entries: ChatEntry[]) => {
-      const outgoing: Outgoing[] = []
-      for (const entry of entries) {
-        outgoing.push(chatEntryMessage(entry))
-      }
-      dispatch(outgoing)
-    },
-    [dispatch],
+  const canSendAsGuest = useCallback(() => hostConnectedRef.current, [])
+  const chatController = useMemo(
+    () =>
+      createChatController({
+        runtime,
+        session: {
+          admit: chatSession.admit,
+          appendSystem: chatSession.appendSystem,
+          appendUser: chatSession.appendUser,
+          clearRoom: chatSession.clearRoom,
+          history: chatSession.history,
+          receiveEntry: chatSession.receiveEntry,
+          receiveHistory: chatSession.receiveHistory,
+        },
+        dispatch,
+        canSendAsGuest,
+      }),
+    [
+      canSendAsGuest,
+      chatSession.admit,
+      chatSession.appendSystem,
+      chatSession.appendUser,
+      chatSession.clearRoom,
+      chatSession.history,
+      chatSession.receiveEntry,
+      chatSession.receiveHistory,
+      dispatch,
+      runtime,
+    ],
   )
 
   // A peer (or the host) dropping its DataChannel must update the roster, or the
@@ -510,16 +492,13 @@ export function useLobby(): UseLobby {
         // `rebind` refuses a seat whose peerId is not null.
         runtime.matchResources.keeper?.peerLeft(peerId)
         const next = applyPeerLeft(current, peerId)
-        const entry = Object.values(next.peers).some((peer) => peer.memberId === leaving.memberId)
-          ? null
-          : chatSession.appendSystem({
-              kind: 'memberLeft',
-              memberId: leaving.memberId,
-              name: leaving.name,
-            })
+        const stillConnected = Object.values(next.peers).some(
+          (peer) => peer.memberId === leaving.memberId,
+        )
+        const entry = stillConnected ? null : chatController.appendLeft(leaving)
         commit(next)
         dispatch([playerKicked(peerId)])
-        if (entry) broadcastChatEntries([entry])
+        if (entry) chatController.broadcast([entry])
       } else if (peerId === current.hostId) {
         // The guest can't proceed without the host. Only call it "host left" if
         // we were actually connected; a channel that never opened means the
@@ -557,7 +536,7 @@ export function useLobby(): UseLobby {
         commit(applyPeerLeft(current, peerId))
       }
     },
-    [broadcastChatEntries, chatSession, commit, dispatch, runtime],
+    [chatController, commit, dispatch, runtime],
   )
 
   const onMessage = useCallback(
@@ -604,12 +583,12 @@ export function useLobby(): UseLobby {
             resumeTokens.set(msg.from, payload.resumeToken)
             runtime.replaceResumeTokens(resumeTokens)
           }
-          const admission = chatSession.admit(payload.resumeToken)
+          const admission = chatController.admit(payload.resumeToken)
           const previousRole = replacedLobbyPeer
             ? toChatRole(replacedLobbyPeer.role)
             : privateSeat
               ? 'player'
-              : lastKnownChatRole(chatSession.history(), admission.memberId)
+              : chatController.lastKnownRole(admission.memberId)
           const r = handleJoinRequest(joinState, msg.from, admission.memberId, payload.name, {
             matchRunning: Boolean(liveGameId),
             returningSeat: privateSeat?.seat,
@@ -617,31 +596,11 @@ export function useLobby(): UseLobby {
           })
           const admittedPeer = r.state.peers[msg.from]
           const nextRole = toChatRole(admittedPeer.role)
-          const chatEntries = [
-            chatSession.appendSystem(
-              admission.isNew
-                ? {
-                    kind: 'memberJoined',
-                    memberId: admittedPeer.memberId,
-                    name: admittedPeer.name,
-                    role: nextRole,
-                  }
-                : {
-                    kind: 'memberReconnected',
-                    memberId: admittedPeer.memberId,
-                    name: admittedPeer.name,
-                  },
-            ),
+          const chatEntries: ChatEntry[] = [
+            chatController.appendJoin(admittedPeer, admission.isNew),
           ]
           if (!admission.isNew && previousRole !== nextRole) {
-            chatEntries.push(
-              chatSession.appendSystem({
-                kind: 'roleChanged',
-                memberId: admittedPeer.memberId,
-                name: admittedPeer.name,
-                role: nextRole,
-              }),
-            )
+            chatEntries.push(chatController.appendRoleChange(admittedPeer))
           }
           commit(r.state)
           const outgoing: Outgoing[] = []
@@ -651,11 +610,9 @@ export function useLobby(): UseLobby {
           for (const frame of r.outgoing) {
             outgoing.push(frame)
           }
-          outgoing.push(chatHistory(msg.from, chatSession.history(), admission.memberId))
-          for (const entry of chatEntries) {
-            outgoing.push(chatEntryMessage(entry))
-          }
+          outgoing.push(chatController.history(msg.from, admission.memberId))
           dispatch(outgoing)
+          chatController.broadcast(chatEntries)
 
           const seat = privateSeat?.seat
           if (seat && liveGameId) {
@@ -711,14 +668,9 @@ export function useLobby(): UseLobby {
           dispatch(r.outgoing)
         } else if (msg.type === 'CHAT_SEND') {
           const peer = current.peers[msg.from]
-          if (!peer || typeof msg.payload.text !== 'string') return
-          const entry = chatSession.appendUser(
-            { memberId: peer.memberId, name: peer.name, role: toChatRole(peer.role) },
-            msg.payload.text,
-          )
-          if (entry) {
-            dispatch([chatEntryMessage(entry)])
-          }
+          if (!peer) return
+          const entry = chatController.appendUser(peer, msg.payload.text)
+          if (entry) chatController.broadcast([entry])
         } else if (msg.type === 'INTENT' || msg.type === 'INTRO_READY') {
           // The only party that calls into the engine. `applyIntent` resolves the
           // seat from the sender's peer id and stamps the player itself, so a
@@ -769,11 +721,11 @@ export function useLobby(): UseLobby {
           break
         case 'CHAT_HISTORY':
           if (fromHost) {
-            chatSession.receiveHistory(msg.payload.entries, msg.payload.selfMemberId)
+            chatController.receiveHistory(msg.payload.entries, msg.payload.selfMemberId)
           }
           break
         case 'CHAT_ENTRY':
-          if (fromHost) chatSession.receiveEntry(msg.payload.entry)
+          if (fromHost) chatController.receiveEntry(msg.payload.entry)
           break
         case 'PLAYER_KICKED':
           if (!fromHost) break
@@ -847,7 +799,16 @@ export function useLobby(): UseLobby {
           break
       }
     },
-    [chatSession, clearChatRoom, commit, dispatch, applySeats, forgetStored, rememberGame, runtime],
+    [
+      chatController,
+      clearChatRoom,
+      commit,
+      dispatch,
+      applySeats,
+      forgetStored,
+      rememberGame,
+      runtime,
+    ],
   )
 
   const createRoom = useCallback(
@@ -1435,144 +1396,6 @@ export function useLobby(): UseLobby {
     })()
   }, [restoreHost, runGuestReconnect])
 
-  const ready = useCallback(() => {
-    const t = runtime.transport
-    const current = runtime.lobby
-    if (!t || !current) return
-    if (runtime.isHost) {
-      const r = handleReady(current, current.selfId)
-      commit(r.state)
-      dispatch(r.outgoing)
-    } else {
-      dispatch([playerReady(current.hostId)])
-    }
-  }, [commit, dispatch, runtime])
-
-  const sendChat = useCallback(
-    (rawText: string): boolean => {
-      const text = normalizeChatText(rawText)
-      const t = runtime.transport
-      const current = runtime.lobby
-      if (!text || !t || !current) return false
-
-      if (runtime.isHost) {
-        const peer = current.peers[current.selfId]
-        if (!peer) return false
-        const entry = chatSession.appendUser(
-          { memberId: peer.memberId, name: peer.name, role: toChatRole(peer.role) },
-          text,
-        )
-        if (!entry) return false
-        dispatch([chatEntryMessage(entry)])
-        return true
-      }
-
-      if (!hostConnectedRef.current) return false
-      dispatch([chatSendMessage(current.hostId, text)])
-      return true
-    },
-    [chatSession, dispatch, runtime],
-  )
-
-  // Where this peer now is. The host applies its own move locally; a guest sends
-  // it and learns the result from the broadcast that comes back — the same split
-  // `ready` makes, for the same reason: only the host's roster is authoritative.
-  const setWhere = useCallback(
-    (where: Where) => {
-      const t = runtime.transport
-      const current = runtime.lobby
-      if (!t || !current) return
-      if (runtime.isHost) {
-        const r = handleWhereabouts(current, current.selfId, where)
-        commit(r.state)
-        dispatch(r.outgoing)
-      } else {
-        dispatch([whereabouts(current.hostId, where)])
-      }
-    },
-    [commit, dispatch, runtime],
-  )
-
-  const kick = useCallback(
-    (peerId: string) => {
-      const current = runtime.lobby
-      if (!current || !runtime.isHost) return
-      const peer = current.peers[peerId]
-      if (!peer) return
-      const resumeTokens = new Map(runtime.resumeTokens)
-      resumeTokens.delete(peerId)
-      runtime.replaceResumeTokens(resumeTokens)
-      const r = kickFn(current, peerId)
-      const entry = chatSession.appendSystem({
-        kind: 'memberKicked',
-        memberId: peer.memberId,
-        name: peer.name,
-      })
-      commit(r.state)
-      dispatch(r.outgoing)
-      broadcastChatEntries([entry])
-    },
-    [broadcastChatEntries, chatSession, commit, dispatch, runtime],
-  )
-
-  const setMaxPlayers = useCallback(
-    (n: number) => {
-      const current = runtime.lobby
-      if (!current || !runtime.isHost) return
-      const r = setMaxPlayersFn(current, n)
-      const changedMembers = new Set<string>()
-      const entries: ChatEntry[] = []
-      for (const peer of Object.values(r.state.peers)) {
-        if (changedMembers.has(peer.memberId)) continue
-        const previous = Object.values(current.peers).find(
-          (candidate) => candidate.memberId === peer.memberId,
-        )
-        if (!previous || previous.role === peer.role) continue
-        changedMembers.add(peer.memberId)
-        entries.push(
-          chatSession.appendSystem({
-            kind: 'roleChanged',
-            memberId: peer.memberId,
-            name: peer.name,
-            role: toChatRole(peer.role),
-          }),
-        )
-      }
-      commit(r.state)
-      rememberLobbyConfig(r.state)
-      dispatch(r.outgoing)
-      broadcastChatEntries(entries)
-    },
-    [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig, runtime],
-  )
-
-  const setBots = useCallback(
-    (n: number) => {
-      const current = runtime.lobby
-      if (!current || !runtime.isHost) return
-      const r = setBotsFn(current, n)
-      commit(r.state)
-      rememberLobbyConfig(r.state)
-      dispatch(r.outgoing)
-    },
-    [commit, dispatch, rememberLobbyConfig, runtime],
-  )
-
-  // NOTE: transferHost currently only broadcasts the intent (TRANSFER_HOST).
-  // The actual host handoff — reconnecting peers to the new host and sending the
-  // HOST_TRANSFERRED confirmation — is not implemented yet; it belongs to the
-  // page wiring in #18. Moving the host is only moving the relay: the keeper
-  // keeps playing and its state does not travel, so no game state is involved.
-  const transferHost = useCallback(
-    (id: string) => {
-      const current = runtime.lobby
-      if (!current || !runtime.isHost) return
-      const r = transferHostFn(current, id)
-      dispatch(r.outgoing)
-    },
-    [dispatch, runtime],
-  )
-
   // Tear the session down: close the PeerJS transport and reset to idle. Without
   // this, navigating away leaves the connection open and the state alive, so the
   // user is bounced back into their old session. `flushMs` defers only the
@@ -1585,6 +1408,21 @@ export function useLobby(): UseLobby {
     [teardownSession],
   )
   leaveSessionRef.current = leaveSession
+
+  const actionsController = useMemo(
+    () =>
+      createLobbyActionsController({
+        runtime,
+        chat: chatController,
+        dispatch,
+        rememberLobbyConfig,
+        leaveSession,
+      }),
+    [chatController, dispatch, leaveSession, rememberLobbyConfig, runtime],
+  )
+  const sendChat = chatController.send
+  const { ready, setWhere, kick, setMaxPlayers, setBots, transferHost, setSetup, disband } =
+    actionsController
 
   // Leaving the match without leaving the room. Only the local match id goes —
   // it is what useFollowGameStart watches, so a peer walking back to the lobby
@@ -1629,30 +1467,6 @@ export function useLobby(): UseLobby {
     // `gameId: null` keeps it restorable.
     rememberGame(null)
   }, [cancelKeeperSave, rememberGame, runtime])
-
-  const setSetup = useCallback(
-    (setup: Setup) => {
-      const current = runtime.lobby
-      if (!current || !runtime.isHost) return
-      const entries: ChatEntry[] = []
-      for (const setting of Object.keys(setup)) {
-        if (current.setup[setting] === setup[setting]) continue
-        entries.push(
-          chatSession.appendSystem({
-            kind: 'modeChanged',
-            setting,
-            value: setup[setting],
-          }),
-        )
-      }
-      const next = applyConfig(current, { setup })
-      commit(next)
-      rememberLobbyConfig(next)
-      dispatch([lobbyConfigUpdated('broadcast', { setup })])
-      broadcastChatEntries(entries)
-    },
-    [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig, runtime],
-  )
 
   // What `startGame` needs to bring a match into being: mint a seed, create
   // the engine, seat the referee, gate the opening behind whichever seats
@@ -1835,18 +1649,6 @@ export function useLobby(): UseLobby {
     },
     [dispatch, runtime],
   )
-
-  const disband = useCallback(() => {
-    const current = runtime.lobby
-    if (!current || !runtime.isHost) return
-    const r = disbandLobbyFn(current)
-    dispatch(r.outgoing)
-    // Defer the transport teardown so the just-queued LOBBY_DISBANDED frame can
-    // flush over the DataChannels before peer.destroy() closes them — otherwise
-    // guests may never receive it and would only notice via the host-disconnect
-    // path. Local state still resets immediately.
-    leaveSession(DISBAND_FLUSH_MS)
-  }, [dispatch, leaveSession, runtime])
 
   // Dismiss a sticky error (e.g. a failed join) without tearing down a live
   // session. Returns the status to idle only when it was 'error', so calling
