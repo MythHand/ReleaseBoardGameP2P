@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { cardById } from '@/cards/catalogue'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
 import styles from './CardPreview.module.css'
@@ -37,13 +38,38 @@ const OWN_ATTR = 'data-card-preview'
 const KEEP = `[${SRC_ATTR}], [${OWN_ATTR}]`
 
 export interface CardPreviewSlotProps {
-  onMouseEnter: () => void
+  onMouseEnter: (e: { currentTarget: HTMLElement }) => void
   [SRC_ATTR]: true
 }
 
+// THE CARD STANDING IN A SLOT, read off what is actually drawn in it. The LAST
+// one, because document order is paint order: a pair draws the tucked half
+// first and the card it belongs to over it, and the one on top is the one being
+// looked at. A back is skipped — `Card` says which side it shows, and an id
+// alone would hand out a face nobody at this seat has been shown.
+const standingIn = (slot: HTMLElement): CardType | null => {
+  const faces = slot.querySelectorAll<HTMLElement>('[data-card]:not([data-face-down])')
+  const id = faces[faces.length - 1]?.dataset.card
+  return (id ? cardById(id) : null) ?? null
+}
+
 export interface CardPreview {
-  /** Spread on a slot that holds a readable card. `null` — nothing to read. */
-  slotProps: (card: CardType | null | undefined, faceDown?: boolean) => CardPreviewSlotProps
+  /**
+   * Spread on a slot that holds a readable card. Three ways to answer, and the
+   * difference between the last two is the point:
+   *   • a card — read THIS one;
+   *   • `null` — nothing to read here;
+   *   • nothing at all — read WHATEVER IS STANDING in the slot, off the card
+   *     actually rendered inside it.
+   *
+   * The third exists because a slot that several different renders take turns
+   * filling was being told what it holds by a list kept next to them, and a list
+   * is something a new render can be added without. That is exactly what
+   * happened on the board: the centre named an attack and an alarm, and the git
+   * operations standing in the same slot could not be read by anybody (#168).
+   * A slot that answers for itself cannot fall behind what it draws.
+   */
+  slotProps: (card?: CardType | null, faceDown?: boolean) => CardPreviewSlotProps
   /** Render inside the scene. */
   overlay: ReactNode
 }
@@ -65,16 +91,24 @@ export function useCardPreview(): CardPreview {
   }, [stop])
 
   const slotProps = useCallback(
-    (c: CardType | null | undefined, faceDown?: boolean): CardPreviewSlotProps => ({
-      [SRC_ATTR]: true,
-      onMouseEnter: () => {
-        // a back has nothing to read, and somebody else's closed card has no
-        // identity to read even if we wanted one
-        if (!c || faceDown) return
-        stop()
-        setCard(c)
-      },
-    }),
+    (...given: [card?: CardType | null, faceDown?: boolean]): CardPreviewSlotProps => {
+      const [c, faceDown] = given
+      // told nothing is NOT the same as told there is nothing: the first means
+      // "read what is standing here", the second means "here stands nothing"
+      const askTheSlot = given.length === 0
+      return {
+        [SRC_ATTR]: true,
+        onMouseEnter: (e) => {
+          // a back has nothing to read, and somebody else's closed card has no
+          // identity to read even if we wanted one
+          if (faceDown) return
+          const read = c ?? (askTheSlot ? standingIn(e.currentTarget) : null)
+          if (!read) return
+          stop()
+          setCard(read)
+        },
+      }
+    },
     [stop],
   )
 

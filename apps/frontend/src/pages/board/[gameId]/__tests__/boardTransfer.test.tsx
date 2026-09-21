@@ -11,6 +11,7 @@ import type { TablePending } from '@release/ui'
 import { fireEvent, render, renderHook, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
+import type { RequestPickHandoff } from '~/entities/game/board/types'
 import Board from '../_Board'
 import { useRequestStaging } from '../_useRequestStaging'
 import { makeBoardProps } from './fixture'
@@ -177,4 +178,52 @@ it('does not resolve the visual giveCard pending while transfer beats own the bo
     }),
   )
   expect(onResolve).not.toHaveBeenCalled()
+})
+
+// WHICH PLACE THE CARD LEAVES IS THE FAN'S OWN ANSWER. A blind pick is a choice
+// OF A PLACE, so the fan names the back that was pressed; a named request chose
+// no place at all, so it names its middle, where the card is seen leaving rather
+// than slipping off an edge. One owner, one answer — the transfer beat asks and
+// does not arbitrate, which is what flew every blind pick out of the middle
+// whichever back was pressed (#168).
+it('names the pressed back as the place the card leaves', () => {
+  const handoff: { current: RequestPickHandoff | null } = { current: null }
+  const props = withPending({
+    kind: 'stealCard',
+    player: 'you',
+    target: 'p2',
+    count: 3,
+    attack: 'attack-bug',
+    sudo: false,
+    openedAt: 0,
+    deadline: 15000,
+  })
+  const { result } = renderHook(() =>
+    useRequestStaging({
+      state: props.state,
+      actions: {},
+      copy: { prompt: '', action: '', confirm: '', steal: '' },
+      enabled: true,
+      matchKey: 'pressed-back',
+      handoff,
+    }),
+  )
+  const { getByTestId } = render(result.current.band)
+  const offer = getByTestId('board-transfer-offer')
+  const choices = offer.querySelectorAll<HTMLElement>('[data-transfer-choice]')
+  // jsdom measures everything as zero, so the pressed back is given a rect of
+  // its own — otherwise "the middle" and "the one pressed" are the same numbers
+  const pressed = { left: 120, top: 640, width: 90, height: 126 } as DOMRect
+  // the fan hands its own element over, so the whole of that back reports the
+  // rect rather than guessing which node the gesture measures
+  const mark = (el: Element) => {
+    ;(el as HTMLElement).getBoundingClientRect = () => pressed
+  }
+  mark(choices[0])
+  for (const child of choices[0].querySelectorAll('*')) mark(child)
+  for (let p = choices[0].parentElement; p && p !== offer; p = p.parentElement) mark(p)
+  // before anything is pressed the fan names its middle, not this
+  expect(handoff.current?.slot()).not.toMatchObject({ left: 120, top: 640 })
+  fireEvent.mouseDown(choices[0])
+  expect(handoff.current?.slot()).toMatchObject({ left: 120, top: 640 })
 })

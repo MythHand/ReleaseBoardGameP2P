@@ -365,7 +365,13 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
   // as half of a pair — a Code Review swept out of a hand, say — and move it
   // under a card it was never played with, which scrambles the pile's own
   // sequence.
-  let pairing: { player: string; support: string } | null = null
+  //
+  // It names BOTH halves, and it is spent the moment it is used. Naming only the
+  // support left the rule hanging: it stayed armed from the play until the next
+  // one, so any later pair of discards that happened to end on that support —
+  // two cards going out to a hand limit, say — was read as this play's own and
+  // tucked. The pile then re-sorted itself behind the player's back (#168).
+  let pairing: { player: string; main: string; support: string } | null = null
   // the support just tucked under its main, if the last step did that: the
   // projection's own top is THAT card (the engine banked it last), so the fold
   // still ends on the top even though the top is not the last entry
@@ -383,11 +389,11 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     }
     if (e.type === 'operationPlayed' || e.type === 'attacked') {
       const player = e.type === 'attacked' ? e.attacker : e.player
-      pairing = e.sudo ? { player, support: 'support-sudo' } : null
+      pairing = e.sudo ? { player, main: e.card, support: 'support-sudo' } : null
       continue
     }
     if (e.type === 'released') {
-      pairing = e.codeReview ? { player: e.player, support: e.codeReview } : null
+      pairing = e.codeReview ? { player: e.player, main: e.card, support: e.codeReview } : null
       continue
     }
     if (e.type !== 'discarded') continue
@@ -416,10 +422,13 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
       pairing.support === e.card &&
       previous?.type === 'discarded' &&
       previous.player === e.player &&
+      previous.card === pairing.main &&
       previous.reason === e.reason
     if (under) {
       heap.splice(heap.length - 1, 0, entry)
       tucked = entry.uid
+      // spent: a play names ONE pair, and both its halves are now in the heap
+      pairing = null
     } else {
       heap.push(entry)
       tucked = null

@@ -1328,6 +1328,13 @@ export default function Board({
                 // biome-ignore lint/suspicious/noArrayIndexKey: a pile IS its index — the engine names it that way in `drawn.pile`, and a split leaves the halves where the pile was
                 key={i}
                 className={opening.pileTarget}
+                // WHAT TRAVELS IS THE WHOLE PILE, label and counter included —
+                // the scene animates this very box (`DeckAnimationsStory`'s own
+                // deck wrapper). The registry holds the CARD box inside it,
+                // because that is what a flight aims AT (I6), and moving only
+                // that left the label standing where the pile no longer was
+                // until the row re-rendered it out of existence (owner, 21.09).
+                data-pile-box
                 // A pile a split has just mounted is not on screen yet: it is
                 // shown by the flight that brings it, in that flight's own first
                 // frame. Seen a frame earlier, it blinks at the place it has not
@@ -1601,13 +1608,13 @@ export default function Board({
         data-board-centre
         data-centre-slot="attack"
         ref={anchors.centre}
-        {...previewProps(
-          centreAttack
-            ? cardById(centreAttack.attackCard)
-            : pendingAlarm?.card
-              ? cardById(pendingAlarm.card)
-              : null,
-        )}
+        // THE SLOT ANSWERS FOR ITSELF: whatever card is drawn in it is the card
+        // that can be read. It used to be handed a list of what might stand
+        // here, and the list named an attack and a 503 alarm — so the git
+        // operations that stand in this very slot, waiting for their effect or
+        // resting after it, could not be read by anybody (#168). A list is
+        // something a new render can be added without; the slot is not.
+        {...previewProps()}
       >
         {intro &&
           deal.staged.map((s) => {
@@ -1742,6 +1749,10 @@ export default function Board({
               key={i}
               className={opening.rowSlot}
               style={rowPlaceStyle('staging', 2, i)}
+              // each place of the row is its own slot, outside the centre's, so
+              // each says what stands in it — both halves are on the table and
+              // both are readable, the sudo as much as the card it paid for
+              {...previewProps(card)}
               {...(i === 0
                 ? { 'data-operation-support': '' }
                 : { 'data-public-operation': '', 'data-testid': 'board-operation-standing' })}

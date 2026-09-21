@@ -63,7 +63,13 @@ function stateWithReorderTop(): GameState {
   ]
   return {
     ...base,
-    pending: { kind: 'reorderTop', player: 'p1', piles, source: 'operation-git-rebase' },
+    pending: {
+      kind: 'reorderTop',
+      player: 'p1',
+      piles,
+      source: 'operation-git-rebase',
+      raisedAt: 1,
+    },
   }
 }
 
@@ -83,6 +89,7 @@ it("gives the owner's own projection the full pile contents", () => {
   const ownerView = engine.project(state, 'p1')
   expect(ownerView.pending).toMatchObject({
     kind: 'reorderTop',
+    raisedAt: 1,
     player: 'p1',
     piles: [
       {

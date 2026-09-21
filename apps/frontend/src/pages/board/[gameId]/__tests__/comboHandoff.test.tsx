@@ -1329,6 +1329,7 @@ const operationAfter: BoardState = {
   you: { ...operationBefore.you, hand: [] },
   pending: {
     kind: 'pickFromDiscard',
+    raisedAt: 1,
     player: 'p1',
     source: 'operation-git-cherry-pick',
     picks: 1,
