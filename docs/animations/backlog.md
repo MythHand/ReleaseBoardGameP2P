@@ -2053,3 +2053,10 @@ The default `PickSpecificCardStory` catalogue retains its existing in-place zoom
 Regression checks cover edge geometry, a smaller available area, neighbouring
 choices, scroll cleanup, keyboard selection, and drag start. Actual browser
 scroll/viewport coverage is recorded with the issue’s verification evidence.
+
+
+**Follow-up, 2026-09-21.** The owner requires mouse-click selection for the Security Bug
+request. The board had enabled the catalogue’s drag mode, which ignored ordinary clicks.
+It now uses the same click-to-select, then ConfirmAction interaction as `PickSpecificCardStory`.
+The Board regression covers selecting and changing the choice without dispatch, followed by
+exactly one confirmation. Anonymous opponent-card selection retains its drag interaction.

@@ -2862,7 +2862,9 @@ The `requestCard` catalogue and ConfirmAction share a full-table layer. The cata
 own scroll area above the bottom confirmation bar, with room for hover enlargement and the
 right rail. ConfirmAction must not be positioned inside a vertically centered catalogue:
 that anchors the bar to the card rows and hides choices (including the final wrapped row).
-Selection only arms the requested card; confirmation sends `requestCard` with its catalogue ID.
+A click selects the requested card and another click can change that choice; confirmation sends
+`requestCard` with its catalogue ID. This face-up catalogue uses buttons, not the drag interaction
+used to take an anonymous card from the opponent.
 The existing `requested` / `handTransfer` beats handle the public reveal, transfer, and miss.
 
 

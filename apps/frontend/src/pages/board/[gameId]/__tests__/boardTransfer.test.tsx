@@ -90,7 +90,7 @@ it('automatically resolves a legacy giveCard under reduced motion', () => {
   expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'giveCard', card: held.uid })
 })
 
-it('names a catalogue card after keyboard selection and confirmation', () => {
+it('selects and changes a requested catalogue card by mouse click before confirmation', () => {
   const onResolve = vi.fn()
   const props = withPending({ kind: 'requestCard', player: 'you', target: 'p2' })
   const { getByTestId } = render(<Board {...props} actions={{ onResolve }} />)
@@ -98,16 +98,21 @@ it('names a catalogue card after keyboard selection and confirmation', () => {
   const confirm = band.getByRole('button', { name: /confirm/i }) as HTMLButtonElement
   expect(confirm.disabled).toBe(true)
   const option = band.getByRole('button', { name: /Code Review/i })
-  fireEvent.click(option)
-  expect(confirm.disabled).toBe(true)
-  fireEvent.keyDown(option, { key: 'Enter' })
-  expect(onResolve).not.toHaveBeenCalled()
+  fireEvent.click(option, { detail: 1 })
+  expect(option.getAttribute('aria-pressed')).toBe('true')
   expect(confirm.disabled).toBe(false)
+  const other = band.getByRole('button', { name: /Hotfix/i })
+  fireEvent.click(other, { detail: 1 })
+  expect(other.getAttribute('aria-pressed')).toBe('true')
+  expect(option.getAttribute('aria-pressed')).toBe('false')
+  expect(onResolve).not.toHaveBeenCalled()
   fireEvent.click(confirm)
   expect(onResolve).toHaveBeenCalledExactlyOnceWith({
     kind: 'requestCard',
-    card: 'support-code-review',
+    card: 'defense-hotfix',
   })
+  fireEvent.click(confirm)
+  expect(onResolve).toHaveBeenCalledTimes(1)
 })
 
 it('offers anonymous positions and requires a drag to choose a closed card', () => {

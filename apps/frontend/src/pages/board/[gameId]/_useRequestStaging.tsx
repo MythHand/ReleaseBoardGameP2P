@@ -112,11 +112,6 @@ export function useRequestStaging(args: {
                   selected={named}
                   chosen={confirmed ? named : null}
                   onPick={(card) => setNamed(card.id)}
-                  onDrop={(card, drop) => {
-                    if (!enabled || confirmed || !insideTable(drop)) return false
-                    setNamed(card.id)
-                    return true
-                  }}
                 />
               </div>
               <div className={styles.catalogPreview} ref={catalogPreview} />
