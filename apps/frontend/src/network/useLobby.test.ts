@@ -378,7 +378,7 @@ it('sends a late joiner the complete history including its one join event', asyn
   const peerCMemberId = result.current.state?.peers['peer-c'].memberId
   expect(result.current.chat.entries.at(-1)).toMatchObject({
     kind: 'system',
-    event: { kind: 'memberJoined', memberId: peerCMemberId, name: 'Cy' },
+    event: { kind: 'memberJoined', memberId: peerCMemberId, name: 'Cy', role: 'player' },
   })
   expect(
     systemEvents(result.current).filter(
@@ -477,6 +477,36 @@ it('records a changed role when a disconnected player returns as a spectator', a
     { kind: 'memberReconnected', memberId, name: 'Bo' },
     { kind: 'roleChanged', memberId, name: 'Bo', role: 'spectator' },
   ])
+})
+
+it('does not record a role change when a silent player reconnects to the same role', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 3))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-old',
+      seq: 1,
+    }),
+  )
+  const memberId = result.current.state?.peers['peer-old'].memberId
+  act(() => transports[0].onDisconnect?.('peer-old'))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-new',
+      seq: 2,
+    }),
+  )
+
+  expect(result.current.state?.peers['peer-new']).toMatchObject({ memberId, role: 'player' })
+  expect(
+    systemEvents(result.current)
+      .filter((event) => 'memberId' in event && event.memberId === memberId)
+      .map((event) => event.kind),
+  ).toEqual(['memberJoined', 'memberLeft', 'memberReconnected'])
 })
 
 it('emits kicked without a later duplicate left event', async () => {

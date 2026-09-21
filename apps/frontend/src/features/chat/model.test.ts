@@ -82,7 +82,12 @@ describe('toChatMessages', () => {
   })
 
   it('renders system entries through the injected translator', () => {
-    const event = { kind: 'memberJoined' as const, memberId: 'member-a', name: 'Ann' }
+    const event = {
+      kind: 'memberJoined' as const,
+      memberId: 'member-a',
+      name: 'Ann',
+      role: 'player' as const,
+    }
     const systemText = vi.fn(() => 'Ann joined')
     const messages = toChatMessages({
       entries: [{ kind: 'system', id: 'chat-2', sequence: 2, createdAt: 2, event }],

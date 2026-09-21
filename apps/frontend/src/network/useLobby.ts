@@ -79,6 +79,12 @@ function lastKnownChatRole(entries: ChatEntry[], memberId: string): ChatRole | u
       role = entry.author.role
     } else if (
       entry.kind === 'system' &&
+      entry.event.kind === 'memberJoined' &&
+      entry.event.memberId === memberId
+    ) {
+      role = entry.event.role
+    } else if (
+      entry.kind === 'system' &&
       entry.event.kind === 'roleChanged' &&
       entry.event.memberId === memberId
     ) {
@@ -898,14 +904,23 @@ export function useLobby(): UseLobby {
             returningLobbyPeer: replacedLobbyPeer,
           })
           const admittedPeer = r.state.peers[msg.from]
-          const chatEntries = [
-            chatSession.appendSystem({
-              kind: admission.isNew ? 'memberJoined' : 'memberReconnected',
-              memberId: admittedPeer.memberId,
-              name: admittedPeer.name,
-            }),
-          ]
           const nextRole = toChatRole(admittedPeer.role)
+          const chatEntries = [
+            chatSession.appendSystem(
+              admission.isNew
+                ? {
+                    kind: 'memberJoined',
+                    memberId: admittedPeer.memberId,
+                    name: admittedPeer.name,
+                    role: nextRole,
+                  }
+                : {
+                    kind: 'memberReconnected',
+                    memberId: admittedPeer.memberId,
+                    name: admittedPeer.name,
+                  },
+            ),
+          ]
           if (!admission.isNew && previousRole !== nextRole) {
             chatEntries.push(
               chatSession.appendSystem({

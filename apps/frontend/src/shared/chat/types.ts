@@ -8,7 +8,7 @@ export interface ChatAuthor {
 }
 
 export type ChatSystemEvent =
-  | { kind: 'memberJoined'; memberId: MemberId; name: string }
+  | { kind: 'memberJoined'; memberId: MemberId; name: string; role: ChatRole }
   | { kind: 'memberLeft'; memberId: MemberId; name: string }
   | { kind: 'memberReconnected'; memberId: MemberId; name: string }
   | { kind: 'memberKicked'; memberId: MemberId; name: string }

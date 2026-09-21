@@ -36,8 +36,9 @@ export function admitMember(
   clientId: string,
   mint: () => MemberId = () => crypto.randomUUID(),
 ): { journal: ChatJournal; memberId: MemberId; isNew: boolean } {
-  const existing = journal.memberIdsByClientId[clientId]
-  if (existing) return { journal, memberId: existing, isNew: false }
+  if (Object.hasOwn(journal.memberIdsByClientId, clientId)) {
+    return { journal, memberId: journal.memberIdsByClientId[clientId], isNew: false }
+  }
 
   const memberId = mint()
   return {
@@ -171,13 +172,17 @@ function isSystemEvent(value: unknown): value is ChatSystemEvent {
   if (value.kind === 'modeChanged') {
     return isNonEmptyString(value.setting) && isNonEmptyString(value.value)
   }
+  if (value.kind === 'memberJoined') {
+    return (
+      isNonEmptyString(value.memberId) && isNonEmptyString(value.name) && isChatRole(value.role)
+    )
+  }
   if (value.kind === 'roleChanged') {
     return (
       isNonEmptyString(value.memberId) && isNonEmptyString(value.name) && isChatRole(value.role)
     )
   }
   if (
-    value.kind === 'memberJoined' ||
     value.kind === 'memberLeft' ||
     value.kind === 'memberReconnected' ||
     value.kind === 'memberKicked'

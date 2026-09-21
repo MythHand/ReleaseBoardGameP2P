@@ -43,6 +43,17 @@ describe('chat journal', () => {
     expect(second).toMatchObject({ memberId: 'member-a', isNew: false })
   })
 
+  it.each([
+    'constructor',
+    'toString',
+    '__proto__',
+  ])('mints a member id for the hostile client id %s', (clientId) => {
+    const admitted = admitMember(emptyChatJournal(), clientId, () => 'member-hostile')
+
+    expect(admitted).toMatchObject({ memberId: 'member-hostile', isNew: true })
+    expect(admitted.journal.memberIdsByClientId).toHaveProperty(clientId, 'member-hostile')
+  })
+
   it('assigns one canonical sequence and id per accepted entry without mutating input', () => {
     const initial = emptyChatJournal()
     const first = appendUserMessage(initial, author, 'hello', 100)
@@ -128,13 +139,25 @@ describe('chat runtime validation', () => {
         },
       ],
     ],
+    [
+      'a joined event without its canonical role',
+      [
+        {
+          kind: 'system',
+          id: 'chat-2',
+          sequence: 2,
+          createdAt: 200,
+          event: { kind: 'memberJoined', memberId: 'member-a', name: 'Ann' },
+        },
+      ],
+    ],
   ])('rejects %s', (_case, value) => {
     expect(parseChatEntries(value)).toBeNull()
   })
 
   it('accepts every semantic system-event shape', () => {
     const events = [
-      { kind: 'memberJoined', memberId: 'member-a', name: 'Ann' },
+      { kind: 'memberJoined', memberId: 'member-a', name: 'Ann', role: 'player' },
       { kind: 'memberLeft', memberId: 'member-a', name: 'Ann' },
       { kind: 'memberReconnected', memberId: 'member-a', name: 'Ann' },
       { kind: 'memberKicked', memberId: 'member-a', name: 'Ann' },

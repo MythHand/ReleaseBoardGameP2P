@@ -94,7 +94,7 @@ export interface ChatAuthor {
 }
 
 export type ChatSystemEvent =
-  | { kind: 'memberJoined'; memberId: MemberId; name: string }
+  | { kind: 'memberJoined'; memberId: MemberId; name: string; role: ChatRole }
   | { kind: 'memberLeft'; memberId: MemberId; name: string }
   | { kind: 'memberReconnected'; memberId: MemberId; name: string }
   | { kind: 'memberKicked'; memberId: MemberId; name: string }
@@ -670,7 +670,7 @@ For `JOIN_REQUEST`:
 
 1. retain Task 4's `ChatAdmission` result;
 2. derive the admitted peer from `r.state.peers[msg.from]`;
-3. append `memberJoined` when `isNew`, otherwise `memberReconnected`;
+3. append `memberJoined` with the assigned role when `isNew`, otherwise `memberReconnected`;
 4. dispatch the normal lobby frames;
 5. send `CHAT_HISTORY { entries: chat.history(), selfMemberId }` directly to the joiner;
 6. broadcast that same canonical system entry as `CHAT_ENTRY`.
