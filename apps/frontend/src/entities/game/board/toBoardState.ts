@@ -332,14 +332,19 @@ export const standInScatter = (discardCount: number): Scatter => scatterAt(-1 - 
 // peer folds the same heap, and the beat that flies a card into it reads the
 // SAME Scatter, so the card lands exactly where it then lies (I7).
 //
-// It runs BEHIND the count, knowingly: a card spent on an attack or a defence
-// reaches the discard through the engine's `bankToDiscard` with no event at all
-// (`attackSpent` / `defenceSpent` are declared in the DiscardReason union and
-// never emitted — docs/animations/backlog.md). Two consequences are handled
-// here rather than hidden: the count stays the projection's own, which is
-// authoritative; and because `Pile` ignores `topCard` the moment a heap is
-// present, a fold that does not end on the projection's top would leave a stale
-// card showing as the top of the discard — so the real top is appended.
+// It runs BEHIND the count, knowingly. This used to say that a card spent on an
+// attack or a defence reaches the discard with no event at all — that was true
+// when it was written and is not any more: `attackSpent` and `defenceSpent` are
+// emitted (`bankSpent`, engine `fake/attacks.ts`), closed in #117 and #125. What
+// is left is a different cause: a card with an `event` of its own goes HOME to
+// the events deck rather than to the discard, and still says `discarded`, so the
+// feed names a top the discard does not hold (docs/animations/backlog.md).
+//
+// Two consequences are handled here rather than hidden: the count stays the
+// projection's own, which is authoritative; and because `Pile` ignores `topCard`
+// the moment a heap is present, a fold that does not end on the projection's top
+// would leave a stale card showing as the top of the discard — so the real top
+// is appended.
 function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): HeapCard[] {
   // The pile can EMPTY, and the feed does not say so card by card: a `discarded`
   // event is never retracted, but `refillFromDiscard` recycles the whole pile
@@ -360,7 +365,13 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
   // as half of a pair — a Code Review swept out of a hand, say — and move it
   // under a card it was never played with, which scrambles the pile's own
   // sequence.
-  let pairing: { player: string; support: string } | null = null
+  //
+  // It names BOTH halves, and it is spent the moment it is used. Naming only the
+  // support left the rule hanging: it stayed armed from the play until the next
+  // one, so any later pair of discards that happened to end on that support —
+  // two cards going out to a hand limit, say — was read as this play's own and
+  // tucked. The pile then re-sorted itself behind the player's back (#168).
+  let pairing: { player: string; main: string; support: string } | null = null
   // the support just tucked under its main, if the last step did that: the
   // projection's own top is THAT card (the engine banked it last), so the fold
   // still ends on the top even though the top is not the last entry
@@ -378,11 +389,11 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     }
     if (e.type === 'operationPlayed' || e.type === 'attacked') {
       const player = e.type === 'attacked' ? e.attacker : e.player
-      pairing = e.sudo ? { player, support: 'support-sudo' } : null
+      pairing = e.sudo ? { player, main: e.card, support: 'support-sudo' } : null
       continue
     }
     if (e.type === 'released') {
-      pairing = e.codeReview ? { player: e.player, support: e.codeReview } : null
+      pairing = e.codeReview ? { player: e.player, main: e.card, support: e.codeReview } : null
       continue
     }
     if (e.type !== 'discarded') continue
@@ -396,17 +407,28 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     // The feed reports the support a moment AFTER its main — both spent by the
     // same effect, same player — so folding in feed order would rest it ON TOP
     // and the two halves would swap places the instant their flight ended.
+    //
+    // WHAT MAKES THE TWO A PAIR IS THE PLAY THAT NAMED THE SUPPORT, and how
+    // they were spent is only the proof that they went together: both halves
+    // are banked by one effect, so they carry the SAME reason, back to back.
+    // Pinning that reason to `effect` was reading one spend path as the rule —
+    // an operation's. An attack banks its own with `attackSpent`, so a sudo
+    // under a Bug matched nothing and was folded ON TOP of the card it was
+    // played with: the pair landed in the discard the right way up and then
+    // swapped the instant the heap took over (#168).
     const under =
-      e.reason === 'effect' &&
       pairing != null &&
       pairing.player === e.player &&
       pairing.support === e.card &&
       previous?.type === 'discarded' &&
-      previous.reason === 'effect' &&
-      previous.player === e.player
+      previous.player === e.player &&
+      previous.card === pairing.main &&
+      previous.reason === e.reason
     if (under) {
       heap.splice(heap.length - 1, 0, entry)
       tucked = entry.uid
+      // spent: a play names ONE pair, and both its halves are now in the heap
+      pairing = null
     } else {
       heap.push(entry)
       tucked = null

@@ -365,6 +365,8 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
         delay: Math.min(i, STAGGER_CAP) * RETURN_STEP,
         layer: i,
       })),
+      // nothing stands: every card is handed over as its own `node`
+      null,
     )
 
     const returnDone = RETURN_DUR + Math.min(remaining.length, STAGGER_CAP) * RETURN_STEP

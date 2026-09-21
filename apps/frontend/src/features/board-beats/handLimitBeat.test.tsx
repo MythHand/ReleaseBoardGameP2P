@@ -54,7 +54,8 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     },
     useDiscardExit: () => ({
       overlay: [],
-      send: (items: Leaving[]) => {
+      send: (items: Leaving[], takeOff?: (() => void) | null) => {
+        takeOff?.()
         order.calls.push('send')
         exits.items.push(...items)
         exits.startedAt = Date.now()

@@ -685,6 +685,67 @@ describe('the discard heap', () => {
     expect(heap.map((c) => c.uid)).toEqual(['d103', 'd102'])
   })
 
+  // …and the same for an ATTACK played with a sudo, which is the case the rule
+  // did not cover. An attack banks its spent cards with `attackSpent`, not
+  // `effect`, so a rule keyed on one spend path read the pair as two unrelated
+  // discards and rested the sudo ON TOP of the Bug it was played with — the
+  // stack landed the right way up and swapped the instant the heap took over.
+  // What makes the two a pair is the play that named the support; the reason is
+  // only the proof they were spent together, so it has to MATCH, not be one
+  // particular value (#168).
+  it('rests a sudo under the attack it was played with, however that attack was spent', () => {
+    const log = [
+      { id: 201, type: 'attacked', attacker: 'you', card: 'attack-bug', sudo: true, target: 'p2' },
+      discardedEvent(202, 'attack-bug', 'attackSpent'),
+      discardedEvent(203, 'support-sudo', 'attackSpent'),
+    ] as Event[]
+    const heap =
+      toBoardState(withDecks({ discardCount: 2, discardTop: 'support-sudo' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual(['support-sudo', 'attack-bug'])
+    expect(heap.map((c) => c.uid)).toEqual(['d203', 'd202'])
+  })
+
+  // …and two discards that merely follow one another are still not a pair: the
+  // play has to have NAMED the support, or a card swept out of a hand would be
+  // tucked under whatever happened to be filed before it.
+  it('leaves a support the play never named on top, where it landed', () => {
+    const log = [
+      { id: 301, type: 'attacked', attacker: 'you', card: 'attack-bug', sudo: false, target: 'p2' },
+      discardedEvent(302, 'attack-bug', 'attackSpent'),
+      discardedEvent(303, 'support-sudo', 'attackSpent'),
+    ] as Event[]
+    const heap =
+      toBoardState(withDecks({ discardCount: 2, discardTop: 'support-sudo' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual(['attack-bug', 'support-sudo'])
+  })
+
+  // …and the pair is the PLAY'S OWN two cards, spent once. The rule used to
+  // name only the support, and stayed armed from the play until the next one —
+  // so a later pair of discards that happened to end on that same support (two
+  // cards going out to a hand limit, here) was read as this play's own and
+  // tucked, and the pile re-sorted itself behind the player's back (#168).
+  it('does not tuck a later discard of the same support under whatever precedes it', () => {
+    const log = [
+      { id: 401, type: 'attacked', attacker: 'you', card: 'attack-bug', sudo: true, target: 'p2' },
+      discardedEvent(402, 'attack-bug', 'attackSpent'),
+      discardedEvent(403, 'support-sudo', 'attackSpent'),
+      // later, and nothing to do with that attack: the turn ends over the limit
+      discardedEvent(404, 'defense-hotfix', 'handLimit'),
+      discardedEvent(405, 'support-sudo', 'handLimit'),
+    ] as Event[]
+    const heap =
+      toBoardState(withDecks({ discardCount: 4, discardTop: 'support-sudo' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual([
+      'support-sudo', // the attack's own, tucked under it
+      'attack-bug',
+      'defense-hotfix',
+      'support-sudo', // this one simply lands on top, where it fell
+    ])
+  })
+
   // The WHOLE pile, not just the part that shows: `Pile` draws the top
   // `heapShow` of the heap over the depth of the rest, and a card flying back
   // into the discard (Cherry-pick's unpicked cards) lands on its own resting

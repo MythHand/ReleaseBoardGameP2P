@@ -9,7 +9,7 @@ import type {
   IntroBeat,
   StagedHandoff,
 } from '~/entities/game/board'
-import type { DiscardPickHandoff } from '~/entities/game/board/types'
+import type { DiscardPickHandoff, RequestPickHandoff } from '~/entities/game/board/types'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useAiBeat } from './aiBeat'
 import { useComboBeat } from './comboBeat'
@@ -101,6 +101,14 @@ interface Beat {
 }
 
 export interface Beats {
+  /** the pile a split has mounted but not yet flown in — drawn invisible until
+   * the flight that brings it starts, so it is never seen standing where it has
+   * not arrived */
+  splittingPile: number | null
+  /** where the discard is while it leaves for a pile: still lying there and
+   * collecting itself into one stack, or already held by a carrier and gone
+   * from its own spot */
+  discardOut: 'gathering' | 'taken' | null
   operationStanding: boolean
   /** the operation card resting at the centre — the table draws it, under any surface */
   operationLanded: OperationLanded | null
@@ -127,6 +135,8 @@ export interface Beats {
 
 export function useBeats(args: {
   discardPick?: RefObject<DiscardPickHandoff | null>
+  /** the request surface's own hold — see `RequestPickHandoff` */
+  requestPick?: RefObject<RequestPickHandoff | null>
   live: BoardState
   events: Event[]
   anchors: BoardAnchors
@@ -167,6 +177,7 @@ export function useBeats(args: {
     takeStagedRelease,
     handLimit,
     discardPick,
+    requestPick,
   } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
@@ -194,10 +205,13 @@ export function useBeats(args: {
   const elimination = useEliminateBeat()
   const gameEnd = useGameEndBeat()
   const handLimits = useHandLimitBeat(anchors, handLimit)
-  const transfers = useTransferBeat(anchors)
+  const transfers = useTransferBeat(anchors, requestPick)
   const ais = useAiBeat(anchors)
-  const upgrades = useUpgradeBeat(anchors, staging)
+  // The operation beat first: System Upgrade's centre holds both its answers and
+  // the operation card itself, and they leave together in the answers' own send
+  // rather than in a beat of their own behind them.
   const operations = useOperationBeat(anchors, staging)
+  const upgrades = useUpgradeBeat(anchors, staging, operations.handOver)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -445,9 +459,14 @@ export function useBeats(args: {
           alarm: false,
           run: (ctx) => {
             const local = discardPick?.current
-            if (discardPick && plan.mine && local?.card === plan.card) {
+            // The surface that laid this pick out plays it, whichever side of
+            // the table this seat is on: the actor's handoff names the card it
+            // answered with, a watching seat's names none and is handed the
+            // card the event carried. `mine` is not asked — the hook that set
+            // the handoff is the one that knows whose pick it is.
+            if (discardPick && local && (local.card === undefined || local.card === plan.card)) {
               discardPick.current = null
-              return local.run(ctx)
+              return local.run(ctx, plan.card)
             }
             return ais.runTaken(plan, ctx)
           },
@@ -735,6 +754,9 @@ export function useBeats(args: {
 
   const reducedPending = reduced ? withoutPendingOperation(live, events) : live
   return {
+    /** the pile a split has mounted but not yet flown in — it stays invisible */
+    splittingPile: decks.splitting,
+    discardOut: decks.discardOut,
     operationStanding: operations.standing,
     operationLanded: operations.landed,
     // The shadow is what the running beat has published, or its own base while

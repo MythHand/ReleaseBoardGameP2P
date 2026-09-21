@@ -236,12 +236,15 @@ export default function ComboStory() {
       // as it starts. Only then is the staging cleared: the centre slot renders
       // the source whenever the pair is gone, so hiding first would put the
       // source card back on the table for the whole flight.
-      const leaving = sendToDiscard([
-        { key: 'combo', card: main.card, aux: aux.card, el, from: cRect, layer: 0 },
-      ])
-      setStaged([])
-      hideFlyer()
-      await leaving
+      await sendToDiscard(
+        [{ key: 'combo', card: main.card, aux: aux.card, el, from: cRect, layer: 0 }],
+        // the pair stops being drawn in the commit the step's carriers go up —
+        // the ordering this comment describes, now kept by the step itself
+        () => {
+          setStaged([])
+          hideFlyer()
+        },
+      )
     }
     setLog(
       targetLabel

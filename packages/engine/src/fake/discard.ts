@@ -58,7 +58,14 @@ export function openPickFromDiscard(
   const picks = Math.min(combo ? 2 : 1, options.length) as 1 | 2
   return {
     ...spentState,
-    pending: { kind: 'pickFromDiscard', player, options, picks, source: card.id },
+    pending: {
+      kind: 'pickFromDiscard',
+      player,
+      options,
+      picks,
+      source: card.id,
+      raisedAt: log.seq,
+    },
     eventSeq: log.seq,
   }
 }
