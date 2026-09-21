@@ -2,7 +2,9 @@ import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, WINDOW_FIRST_MS } from '@rele
 import { act, renderHook as renderTestingHook } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import type { PrivateSeat } from '~/entities/game/seats'
+import type { UserChatEntry } from '~/shared/chat/types'
 import {
+  clearChat,
   clearKeeper,
   clearSession,
   type StoredKeeper,
@@ -111,7 +113,17 @@ beforeEach(() => {
   sessionStorage.clear()
   clearSession()
   clearKeeper()
+  clearChat()
 })
+
+function userChatEntry(input: Pick<UserChatEntry, 'id' | 'sequence' | 'text'>): UserChatEntry {
+  return {
+    kind: 'message',
+    createdAt: input.sequence * 1_000,
+    author: { memberId: 'member-b', name: 'Bo', role: 'player' },
+    ...input,
+  }
+}
 
 afterEach(() => {
   act(() => {
@@ -137,6 +149,184 @@ it('parseRoomCode inverts formatRoomCode for a host-id-sized code', () => {
 it('parseRoomCode tolerates user-entered separators and casing', () => {
   expect(parseRoomCode('ABC-23D')).toBe('abc23d')
   expect(parseRoomCode(' abc 23d ')).toBe('abc23d')
+})
+
+it('a guest sends text intent only and waits for the canonical entry', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('F96-NMT', 'Bo'))
+  const hostId = parseRoomCode('F96-NMT')
+  act(() => transports[0].onConnection?.(hostId))
+
+  act(() => expect(result.current.chat.send('  hello\nroom  ')).toBe(true))
+
+  expect(transports[0].send).toHaveBeenCalledWith(hostId, {
+    type: 'CHAT_SEND',
+    payload: { text: 'hello\nroom' },
+  })
+  expect(result.current.chat.entries).toEqual([])
+})
+
+it('the host canonicalizes a guest send from the admitted connection', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 4))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-b',
+      seq: 1,
+    }),
+  )
+  const admitted = result.current.state?.peers['peer-b']
+  expect(admitted?.memberId).toBeTruthy()
+  transports[0].broadcast.mockClear()
+
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_SEND',
+      payload: { text: 'hello' },
+      from: 'peer-b',
+      seq: 2,
+    }),
+  )
+
+  expect(result.current.chat.entries.at(-1)).toMatchObject({
+    kind: 'message',
+    author: { memberId: admitted?.memberId, name: 'Bo', role: 'player' },
+    text: 'hello',
+    sequence: expect.any(Number),
+  })
+  expect(transports[0].broadcast).toHaveBeenCalledWith({
+    type: 'CHAT_ENTRY',
+    payload: { entry: result.current.chat.entries.at(-1) },
+  })
+})
+
+it('the host ignores malformed text intent from an admitted connection', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 4))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-b',
+      seq: 1,
+    }),
+  )
+
+  expect(() =>
+    act(() =>
+      transports[0].onMessage?.({
+        type: 'CHAT_SEND',
+        payload: { text: 42 },
+        from: 'peer-b',
+        seq: 2,
+      } as unknown as WireMessage),
+    ),
+  ).not.toThrow()
+  expect(result.current.chat.entries).toEqual([])
+})
+
+it('history plus an overlapping live entry stays ordered and unique', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('F96-NMT', 'Bo'))
+  const hostId = parseRoomCode('F96-NMT')
+  const one = userChatEntry({ id: 'chat-1', sequence: 1, text: 'one' })
+  const two = userChatEntry({ id: 'chat-2', sequence: 2, text: 'two' })
+  const three = userChatEntry({ id: 'chat-3', sequence: 3, text: 'three' })
+
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_HISTORY',
+      payload: { entries: [one, two], selfMemberId: 'member-b' },
+      from: hostId,
+      seq: 1,
+    }),
+  )
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_ENTRY',
+      payload: { entry: two },
+      from: hostId,
+      seq: 2,
+    }),
+  )
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_ENTRY',
+      payload: { entry: three },
+      from: hostId,
+      seq: 3,
+    }),
+  )
+
+  expect(result.current.chat.entries.map((entry) => entry.id)).toEqual([
+    'chat-1',
+    'chat-2',
+    'chat-3',
+  ])
+  expect(result.current.chat.selfMemberId).toBe('member-b')
+})
+
+it('ignores history and canonical entries not authored by the host', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('F96-NMT', 'Bo'))
+  const forged = userChatEntry({ id: 'chat-1', sequence: 1, text: 'forged' })
+
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_HISTORY',
+      payload: { entries: [forged], selfMemberId: 'attacker' },
+      from: 'peer-attacker',
+      seq: 1,
+    }),
+  )
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_ENTRY',
+      payload: { entry: forged },
+      from: 'peer-attacker',
+      seq: 2,
+    }),
+  )
+
+  expect(result.current.chat.entries).toEqual([])
+  expect(result.current.chat.selfMemberId).toBeNull()
+})
+
+it('ignores a malformed canonical entry even when it names the host', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('F96-NMT', 'Bo'))
+  const hostId = parseRoomCode('F96-NMT')
+
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_ENTRY',
+      payload: { entry: { id: 'bad', text: 42 } },
+      from: hostId,
+      seq: 1,
+    } as unknown as WireMessage),
+  )
+
+  expect(result.current.chat.entries).toEqual([])
+})
+
+it('ignores malformed history identity even when it names the host', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('F96-NMT', 'Bo'))
+  const hostId = parseRoomCode('F96-NMT')
+
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_HISTORY',
+      payload: { entries: [], selfMemberId: 7 },
+      from: hostId,
+      seq: 1,
+    } as unknown as WireMessage),
+  )
+
+  expect(result.current.chat.entries).toEqual([])
+  expect(result.current.chat.selfMemberId).toBeNull()
 })
 
 it('classifies a peer-unavailable error as not-found', async () => {

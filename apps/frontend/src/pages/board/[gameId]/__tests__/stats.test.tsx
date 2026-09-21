@@ -45,6 +45,7 @@ beforeEach(() => {
   peers = {
     'peer-a': {
       id: 'peer-a',
+      memberId: 'member-a',
       name: 'Ann',
       role: 'host',
       ready: true,
@@ -52,6 +53,7 @@ beforeEach(() => {
     },
     'peer-b': {
       id: 'peer-b',
+      memberId: 'member-b',
       name: 'Bo',
       role: 'player',
       ready: true,
@@ -89,6 +91,7 @@ it('reads the seating the match was dealt with, not the roster still connected',
   peers = {
     aaa: {
       id: 'aaa',
+      memberId: 'member-aaa',
       name: 'Ann',
       role: 'host',
       ready: true,
@@ -96,6 +99,7 @@ it('reads the seating the match was dealt with, not the roster still connected',
     },
     ccc: {
       id: 'ccc',
+      memberId: 'member-ccc',
       name: 'Cid',
       role: 'player',
       ready: true,

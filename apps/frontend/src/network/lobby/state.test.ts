@@ -12,6 +12,7 @@ import {
 
 const host = {
   id: 'h',
+  memberId: 'member-h',
   name: 'Host',
   role: 'host' as const,
   ready: false,
@@ -26,6 +27,7 @@ it('counts host + players, not guests', () => {
   let s = base(4)
   s = applyPeerJoined(s, {
     id: 'p1',
+    memberId: 'member-p1',
     name: 'P1',
     role: 'player',
     ready: false,
@@ -33,6 +35,7 @@ it('counts host + players, not guests', () => {
   })
   s = applyPeerJoined(s, {
     id: 'g1',
+    memberId: 'member-g1',
     name: 'G1',
     role: 'guest',
     ready: false,
@@ -46,6 +49,7 @@ it('assigns player while slots remain, guest once full', () => {
   expect(assignRole(s)).toBe('player')
   s = applyPeerJoined(s, {
     id: 'p1',
+    memberId: 'member-p1',
     name: 'P1',
     role: 'player',
     ready: false,
@@ -58,6 +62,7 @@ it('removes a peer on leave', () => {
   let s = base(4)
   s = applyPeerJoined(s, {
     id: 'p1',
+    memberId: 'member-p1',
     name: 'P1',
     role: 'player',
     ready: false,
@@ -71,6 +76,7 @@ it('does not mutate the input state', () => {
   const s = base(4)
   const next = applyPeerJoined(s, {
     id: 'p1',
+    memberId: 'member-p1',
     name: 'P1',
     role: 'player',
     ready: false,
@@ -121,6 +127,7 @@ it('applyPeerList preserves setup', () => {
   const setup = { handLimit: 'fast' }
   const hostPeer = {
     id: 'h',
+    memberId: 'member-h',
     name: 'Host',
     role: 'host' as const,
     ready: false,
@@ -138,7 +145,7 @@ it('applyPeerList preserves setup', () => {
 it('applyPeerList preserves bots', () => {
   const hostPeer = {
     id: 'h',
-
+    memberId: 'member-h',
     name: 'Host',
     role: 'host' as const,
     ready: false,
@@ -163,7 +170,7 @@ const table = (maxPlayers: number, bots: number, humans: number): LobbyState =>
     bots,
     peers: Array.from({ length: humans }, (_, i) => ({
       id: i === 0 ? 'h' : `p${i}`,
-
+      memberId: `member-${i}`,
       name: `P${i}`,
       role: i === 0 ? ('host' as const) : ('player' as const),
       ready: true,

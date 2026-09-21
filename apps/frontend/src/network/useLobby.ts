@@ -16,6 +16,7 @@ import {
   seatOf,
   seatsFor,
 } from '~/entities/game/seats'
+import type { ChatRole } from '~/shared/chat/types'
 import {
   clearKeeper,
   clearLog,
@@ -28,6 +29,8 @@ import {
   writeKeeper,
   writeSession,
 } from '~/shared/lib/persistence'
+import { normalizeChatText } from './chat/journal'
+import { type RoomChatState, useChatSession } from './chat/useChatSession'
 import {
   canStart as canStartFn,
   disbandLobby as disbandLobbyFn,
@@ -64,6 +67,8 @@ import { restoreSeats } from './session/restore'
 import { createStartGate, type StartGate } from './session/startGate'
 import { createTransport, type Transport } from './transport/peer'
 import type { PeerInfo, Seat, Setup, Where, WireMessage } from './types'
+
+const toChatRole = (role: PeerInfo['role']): ChatRole => (role === 'guest' ? 'spectator' : role)
 
 // Room codes double as the host's PeerJS id, so the displayed code is exactly
 // what a joiner connects to — formatRoomCode/parseRoomCode are inverses.
@@ -395,6 +400,7 @@ export interface UseLobby {
   seats: Seat[]
   error: string | null
   errorKind: ErrorKind
+  chat: RoomChatState
   createRoom(name: string, maxPlayers: number, setup?: Setup): Promise<string>
   joinRoom(code: string, name: string): Promise<string>
   ready(): void
@@ -433,6 +439,7 @@ export interface UseLobby {
 }
 
 export function useLobby(): UseLobby {
+  const chatSession = useChatSession()
   const [state, setState] = useState<LobbyState | null>(null)
   const [status, setStatus] = useState<LobbyStatus>('idle')
   // The host's half of the reconnect overlay (see the interface doc). Set for
@@ -806,12 +813,25 @@ export function useLobby(): UseLobby {
             return
           }
           if (!liveGameId) resumeTokensRef.current.set(msg.from, payload.resumeToken)
-          const r = handleJoinRequest(current, msg.from, payload.name, {
+          const admission = chatSession.admit(payload.resumeToken)
+          const r = handleJoinRequest(current, msg.from, admission.memberId, payload.name, {
             matchRunning: Boolean(liveGameId),
             returningSeat: privateSeat?.seat,
           })
           commit(r.state)
-          dispatch(r.outgoing)
+          dispatch([
+            ...r.outgoing,
+            {
+              to: msg.from,
+              message: {
+                type: 'CHAT_HISTORY',
+                payload: {
+                  entries: chatSession.history(),
+                  selfMemberId: admission.memberId,
+                },
+              },
+            },
+          ])
 
           const seat = privateSeat?.seat
           if (seat && liveGameId) {
@@ -868,6 +888,16 @@ export function useLobby(): UseLobby {
           const r = handleWhereabouts(current, msg.from, msg.payload.where)
           commit(r.state)
           dispatch(r.outgoing)
+        } else if (msg.type === 'CHAT_SEND') {
+          const peer = current.peers[msg.from]
+          if (!peer || typeof msg.payload.text !== 'string') return
+          const entry = chatSession.appendUser(
+            { memberId: peer.memberId, name: peer.name, role: toChatRole(peer.role) },
+            msg.payload.text,
+          )
+          if (entry) {
+            dispatch([{ to: 'broadcast', message: { type: 'CHAT_ENTRY', payload: { entry } } }])
+          }
         } else if (msg.type === 'INTENT' || msg.type === 'INTRO_READY') {
           // The only party that calls into the engine. `applyIntent` resolves the
           // seat from the sender's peer id and stamps the player itself, so a
@@ -905,6 +935,14 @@ export function useLobby(): UseLobby {
         }
         case 'LOBBY_CONFIG_UPDATED':
           if (fromHost) commit(applyConfig(current, msg.payload))
+          break
+        case 'CHAT_HISTORY':
+          if (fromHost) {
+            chatSession.receiveHistory(msg.payload.entries, msg.payload.selfMemberId)
+          }
+          break
+        case 'CHAT_ENTRY':
+          if (fromHost) chatSession.receiveEntry(msg.payload.entry)
           break
         case 'PLAYER_KICKED':
           if (!fromHost) break
@@ -978,7 +1016,7 @@ export function useLobby(): UseLobby {
           break
       }
     },
-    [commit, dispatch, applySeats, forgetStored, rememberGame],
+    [chatSession, commit, dispatch, applySeats, forgetStored, rememberGame],
   )
 
   const createRoom = useCallback(
@@ -1019,14 +1057,25 @@ export function useLobby(): UseLobby {
         setIsHost(true)
         const nextRoomCode = formatRoomCode(t.id)
         setRoomCode(nextRoomCode)
-        resumeTokensRef.current = new Map([[t.id, getResumeToken(nextRoomCode)]])
+        const hostResumeToken = getResumeToken(nextRoomCode)
+        const hostMemberId = chatSession.startHost(nextRoomCode, hostResumeToken)
+        resumeTokensRef.current = new Map([[t.id, hostResumeToken]])
         privateSeatsRef.current = []
         const initial = createLobbyState({
           selfId: t.id,
           hostId: t.id,
           maxPlayers,
           setup: setup ?? DEFAULT_SETUP,
-          peers: [{ id: t.id, name, role: 'host', ready: true, where: 'lobby' }],
+          peers: [
+            {
+              id: t.id,
+              memberId: hostMemberId,
+              name,
+              role: 'host',
+              ready: true,
+              where: 'lobby',
+            },
+          ],
         })
         commit(initial)
         // What a reload has to find its way back with. `gameId: null` because
@@ -1055,7 +1104,7 @@ export function useLobby(): UseLobby {
         throw err
       }
     },
-    [onMessage, onError, onDisconnect, commit, surfaceSetupError, teardownSession],
+    [chatSession, onMessage, onError, onDisconnect, commit, surfaceSetupError, teardownSession],
   )
 
   const joinRoom = useCallback(
@@ -1151,6 +1200,7 @@ export function useLobby(): UseLobby {
             peers: [
               {
                 id: t.id,
+                memberId: t.id,
                 name,
                 role: 'guest',
                 ready: false,
@@ -1328,6 +1378,7 @@ export function useLobby(): UseLobby {
           peers: [
             {
               id: t.id,
+              memberId: t.id,
               name: stored.name,
               role: 'host',
               ready: true,
@@ -1525,6 +1576,32 @@ export function useLobby(): UseLobby {
       t.send(current.hostId, { type: 'PLAYER_READY', payload: {} })
     }
   }, [commit, dispatch])
+
+  const sendChat = useCallback(
+    (rawText: string): boolean => {
+      const text = normalizeChatText(rawText)
+      const t = transportRef.current
+      const current = stateRef.current
+      if (!text || !t || !current) return false
+
+      if (isHostRef.current) {
+        const peer = current.peers[current.selfId]
+        if (!peer) return false
+        const entry = chatSession.appendUser(
+          { memberId: peer.memberId, name: peer.name, role: toChatRole(peer.role) },
+          text,
+        )
+        if (!entry) return false
+        dispatch([{ to: 'broadcast', message: { type: 'CHAT_ENTRY', payload: { entry } } }])
+        return true
+      }
+
+      if (!hostConnectedRef.current) return false
+      t.send(current.hostId, { type: 'CHAT_SEND', payload: { text } })
+      return true
+    },
+    [chatSession, dispatch],
+  )
 
   // Where this peer now is. The host applies its own move locally; a guest sends
   // it and learns the result from the broadcast that comes back — the same split
@@ -1892,6 +1969,11 @@ export function useLobby(): UseLobby {
       seats,
       error,
       errorKind,
+      chat: {
+        entries: chatSession.entries,
+        selfMemberId: chatSession.selfMemberId,
+        send: sendChat,
+      },
       createRoom,
       joinRoom,
       ready,
@@ -1924,6 +2006,9 @@ export function useLobby(): UseLobby {
       seats,
       error,
       errorKind,
+      chatSession.entries,
+      chatSession.selfMemberId,
+      sendChat,
       createRoom,
       joinRoom,
       ready,

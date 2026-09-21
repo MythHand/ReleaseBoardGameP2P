@@ -28,6 +28,7 @@ export type Where = 'game' | 'stats' | 'lobby'
 
 export interface PeerInfo {
   id: string
+  memberId: MemberId
   name: string
   role: Role
   ready: boolean
@@ -59,6 +60,7 @@ export type Message =
       type: 'PEER_JOINED'
       payload: {
         id: string
+        memberId: MemberId
         name: string
         role: Role
         ready: boolean

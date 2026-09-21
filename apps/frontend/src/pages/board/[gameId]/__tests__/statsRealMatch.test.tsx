@@ -48,6 +48,7 @@ vi.mock('~/features/play-game/useGame', () => ({ useGame: () => ({ view, events:
 
 const peer = (id: string, name: string, where: PeerInfo['where']): PeerInfo => ({
   id,
+  memberId: `member-${id}`,
   name,
   role: id === 'peer-a' ? 'host' : 'player',
   ready: true,

@@ -61,6 +61,7 @@ function base(): UseLobby {
     seats: [],
     error: null,
     errorKind: null,
+    chat: { entries: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
     ready: vi.fn(),
@@ -143,6 +144,7 @@ function inSession(): UseLobby {
       peers: {
         h: {
           id: 'h',
+          memberId: 'member-h',
           name: 'Host',
           role: 'host',
           ready: true,
@@ -150,6 +152,7 @@ function inSession(): UseLobby {
         },
         p1: {
           id: 'p1',
+          memberId: 'member-p1',
           name: 'Pat',
           role: 'player',
           ready: false,
@@ -231,6 +234,7 @@ it('LobbyView renders spectator section when guests present', () => {
       peers: {
         h: {
           id: 'h',
+          memberId: 'member-h',
           name: 'Host',
           role: 'host',
           ready: true,
@@ -238,6 +242,7 @@ it('LobbyView renders spectator section when guests present', () => {
         },
         g1: {
           id: 'g1',
+          memberId: 'member-g1',
           name: 'Gus',
           role: 'guest',
           ready: false,
