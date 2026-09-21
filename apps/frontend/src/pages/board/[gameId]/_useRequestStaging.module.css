@@ -16,10 +16,20 @@
   pointer-events: auto;
 }
 
-/* CardCatalog normally fills its parent's height. Here its rows determine the
-   scrollable height, with padding around them for the enlarged hover card. */
+/* CardCatalog normally fills its parent's height. Here rows determine the
+   scrollable height; their reading preview lives outside this clipping box. */
 .catalog > div {
   block-size: auto;
+}
+
+/* The preview can clear either scroll edge while staying above confirmation
+   and left of the rail. Its transparent hit area leaves every choice reachable. */
+.catalogPreview {
+  position: absolute;
+  inset-block: 12px 170px;
+  inset-inline: 24px 72px;
+  z-index: 20;
+  pointer-events: none;
 }
 
 .offer {

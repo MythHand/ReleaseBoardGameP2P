@@ -42,6 +42,7 @@ export function useRequestStaging(args: {
   const [picked, setPicked] = useState<{ index: number; rect: DOMRect } | null>(null)
   const locked = useRef(false)
   const band = useRef<HTMLDivElement>(null)
+  const catalogPreview = useRef<HTMLDivElement>(null)
   const fan = useRef<HTMLDivElement>(null)
   const resolve = useResolveFeedback(args.events ?? [], state.selfId, actions, () => {
     locked.current = false
@@ -106,6 +107,7 @@ export function useRequestStaging(args: {
               <div className={styles.catalog}>
                 <CardCatalog
                   cards={HOLDABLE}
+                  previewRoot={catalogPreview}
                   open={enabled && !confirmed}
                   selected={named}
                   chosen={confirmed ? named : null}
@@ -117,6 +119,7 @@ export function useRequestStaging(args: {
                   }}
                 />
               </div>
+              <div className={styles.catalogPreview} ref={catalogPreview} />
               <ConfirmAction
                 open={!confirmed}
                 label={copy.confirm}

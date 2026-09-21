@@ -306,3 +306,97 @@ it('retains the animated local handoff until the accepted beat releases it', () 
     motion.mockRestore()
   }
 })
+
+it.each([false, true])('lights only an unanswered Upgrade contribution (sudo=%s)', async (sudo) => {
+  const motion = mockReducedMotion(true)
+  const base = makeBoardProps()
+  const onResolve = vi.fn()
+  const state = {
+    ...base.state,
+    playable: [],
+    pending: upgradePending({ sudo }),
+    you: {
+      ...base.state.you,
+      hand: [
+        { uid: 'h1', card: card('attack-bug') },
+        { uid: 'h2', card: card('defense-hotfix') },
+      ],
+    },
+  }
+  const props = { ...base, state, actions: { onResolve } }
+  const board = render(<Board {...props} />)
+  const states = () =>
+    Array.from(board.container.querySelectorAll('[data-hand-slot] [data-card]'), (el) =>
+      el.getAttribute('data-state'),
+    )
+  const pull = () => {
+    const slot = board.container.querySelector('[data-hand-slot]')
+    if (!slot) throw new Error('missing hand slot')
+    fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+    fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+    fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  }
+  try {
+    expect(states()).toEqual(['playable', 'playable'])
+    const slot = board.container.querySelector('[data-hand-slot]')
+    if (!slot) throw new Error('missing hand slot')
+    fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+    fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+    expect(onResolve).not.toHaveBeenCalled()
+    pull()
+    expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'upgradeDiscard', card: 'h1' })
+    expect(states()).toEqual(['idle'])
+    pull()
+    expect(onResolve).toHaveBeenCalledTimes(1)
+    const rejected = {
+      id: 1,
+      type: 'rejected',
+      action: { type: 'RESOLVE', player: 'you', choice: { kind: 'upgradeDiscard', card: 'h1' } },
+      reason: 'retry',
+    } as import('@release/engine').Event
+    board.rerender(
+      <Board
+        {...props}
+        intro={{ gameId: null, view: null, events: [rejected], onDone: () => {} }}
+      />,
+    )
+    await vi.waitFor(() => expect(states()).toEqual(['playable', 'playable']))
+    pull()
+    expect(onResolve).toHaveBeenCalledTimes(2)
+    board.rerender(
+      <Board
+        {...props}
+        state={{
+          ...state,
+          pending: upgradePending({ sudo, owed: ['p3'] }),
+          you: { ...state.you, hand: state.you.hand.slice(1) },
+        }}
+      />,
+    )
+    expect(states()).toEqual(['idle'])
+    board.rerender(<Board {...props} state={{ ...state, pending: null }} />)
+    expect(states()).toEqual(['idle', 'idle'])
+  } finally {
+    board.unmount()
+    motion.mockRestore()
+  }
+})
+
+it.each(['p3', 'spectator'])('does not light an Upgrade hand for an unowed seat (%s)', (selfId) => {
+  const base = makeBoardProps()
+  const board = render(
+    <Board
+      {...base}
+      state={{
+        ...base.state,
+        selfId,
+        playable: [],
+        pending: upgradePending(),
+        you: { ...base.state.you, hand: [{ uid: 'h1', card: card('attack-bug') }] },
+      }}
+    />,
+  )
+  expect(
+    board.container.querySelector('[data-hand-slot] [data-card]')?.getAttribute('data-state'),
+  ).toBe('idle')
+})

@@ -55,7 +55,12 @@ let currentHand: { uid: string; card: CardData }[] = HAND
 // `scope: 'release'`, a fixed attacker/attackCard, sudo false, and `options`
 // from `over` (legality is the projection's answer, never re-derived here).
 function defenceBoard(
-  over: { options: string[]; combos?: Record<string, string[]>; hand?: typeof HAND },
+  over: {
+    options: string[]
+    combos?: Record<string, string[]>
+    hand?: typeof HAND
+    sudo?: boolean
+  },
   actions: TableActions = {},
   // routed through `intro.events`, same as boardStaging.test.tsx's own
   // `boardWith` — Board only ever sees the feed that way.
@@ -82,7 +87,7 @@ function defenceBoard(
         player: base.state.selfId,
         attacker: 'p2',
         attackCard: 'attack-bug',
-        sudo: false,
+        sudo: over.sudo ?? false,
         options: over.options,
         openedAt: 0,
         deadline: 15_000,
@@ -101,7 +106,7 @@ function defenceBoard(
 // Action). A RESOLVE action has no top-level `card` — the card lives inside
 // `action.choice`, which is why the hook's own watcher cannot reuse
 // `_useBoardStaging`'s `'card' in e.action` check.
-function rejectedDefendEvent(card: string): Event {
+function rejectedDefendEvent(card: string | null): Event {
   return {
     id: 9,
     type: 'rejected',
@@ -284,23 +289,39 @@ it('raises no panel over the attack — the fan is the picker', () => {
   expect(screen.getByTestId('board-centre-pending')).toBeTruthy()
 })
 
-it('lets the attack through from the board’s own decline', () => {
-  const onResolve = vi.fn()
-  render(defenceBoard({ options: ['defense-hotfix#0'] }, { onResolve }))
-  fireEvent.click(screen.getByTestId('board-decline'))
-  expect(onResolve).toHaveBeenCalledWith({ kind: 'defend', card: null })
-})
-
-it('lets the attack through from the dock Pass key', async () => {
+it.each([false, true])('uses only dock Pass during defense (sudo=%s)', async (enhanced) => {
   const onResolve = vi.fn()
   const onPass = vi.fn()
-  render(defenceBoard({ options: ['defense-hotfix#0'] }, { onResolve, onPass }))
+  render(defenceBoard({ options: ['defense-hotfix#0'], sudo: enhanced }, { onResolve, onPass }))
+  expect(screen.queryByTestId('board-decline')).toBeNull()
+  expect(screen.getByTestId('board-ask').getAttribute('data-shown')).toBe('false')
+  fireEvent.click(screen.getByTestId('dock-key'))
+  expect(onResolve).not.toHaveBeenCalled()
   await act(async () => {
     await new Promise((r) => setTimeout(r, 350))
   })
   fireEvent.click(screen.getByTestId('dock-key'))
-  expect(onResolve).toHaveBeenCalledWith({ kind: 'defend', card: null })
+  fireEvent.click(screen.getByTestId('dock-key'))
+  expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'defend', card: null })
   expect(onPass).not.toHaveBeenCalled()
+  await pullCardFromFan('defense-hotfix#0')
+  expect(onResolve).toHaveBeenCalledTimes(1)
+})
+
+it('restores defense after a rejected Pass without replaying the rejection', async () => {
+  const onResolve = vi.fn()
+  const options = { options: ['defense-hotfix#0'] }
+  const board = render(defenceBoard(options, { onResolve }))
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 350))
+  })
+  fireEvent.click(screen.getByTestId('dock-key'))
+  const rejection = rejectedDefendEvent(null)
+  board.rerender(defenceBoard(options, { onResolve }, [rejection]))
+  fireEvent.click(screen.getByTestId('dock-key'))
+  board.rerender(defenceBoard(options, { onResolve }, [rejection]))
+  fireEvent.click(screen.getByTestId('dock-key'))
+  expect(onResolve).toHaveBeenCalledTimes(2)
 })
 
 it('does not pass after a defense card has already answered', async () => {
@@ -314,27 +335,7 @@ it('does not pass after a defense card has already answered', async () => {
   expect(onPass).not.toHaveBeenCalled()
 })
 
-// Fix B (#101), Defect 3 — the ask sits with the cards. With no panel and no
-// line of copy, an attack stands at the centre with nothing saying what is
-// owed for it.
-it('says what the attack is waiting for', () => {
-  const { copy } = makeBoardProps()
-  render(defenceBoard({ options: ['defense-hotfix#0'] }))
-  const ask = screen.getByTestId('board-ask')
-  expect(ask.getAttribute('data-shown')).toBe('true')
-  expect(ask.textContent).toContain(copy.table.askDefend)
-})
-
-// Fix B, fix round 1 (M1): the ask was gated on `answering` alone, so a Sudo
-// standing at its own slot still read "pull one out of the hand" — while the
-// only gesture that answers there is a CLICK, and a pull is refused outright
-// (`resolveLegal`/`resolveSudo` both bail on `stagedRef.current`, so the card
-// flops straight back into the fan). That is the exact failure Defect 3 was
-// written to prevent, one step further in, and this round is what newly lights
-// that state. It gets its own words rather than silence: the step is waiting
-// on the fan, and a waiting step that says nothing is Defect 3 itself.
-it('names the click, not the pull, once the Sudo stands waiting', async () => {
-  const { copy } = makeBoardProps()
+it('keeps the centre free while a Sudo waits for its defense partner', async () => {
   render(
     defenceBoard({
       options: ['defense-hotfix#0'],
@@ -342,26 +343,8 @@ it('names the click, not the pull, once the Sudo stands waiting', async () => {
     }),
   )
   await pullFromFan('support-sudo#0')
-  const ask = screen.getByTestId('board-ask')
-  expect(ask.getAttribute('data-shown')).toBe('true')
-  expect(ask.textContent).toContain(copy.table.askPartner)
-  // the pull instruction is gone — naming it here names the one gesture that
-  // does nothing
-  expect(ask.textContent).not.toContain(copy.table.askDefend)
-})
-
-// Fix B, fix round 1 (L1): the decline was gated on `answering` alone too, so
-// it stayed live between a defence's dispatch and the projection clearing the
-// pending — a second RESOLVE the engine silently rejects. The codebase's own
-// standard is `dock.ts`'s: "a key is only ever offered where the action behind
-// it is legal RIGHT NOW", the same standard that stripped the dead PASS key.
-it('takes the decline away once a defence has already answered', async () => {
-  render(defenceBoard({ options: ['defense-hotfix#0'] }))
-  expect(screen.getByTestId('board-decline')).toBeTruthy()
-  await pullCardFromFan('defense-hotfix#0')
-  expect(screen.queryByTestId('board-decline')).toBeNull()
-  // …and the ask goes quiet with it: the decision is no longer ours to make
   expect(screen.getByTestId('board-ask').getAttribute('data-shown')).toBe('false')
+  expect(screen.queryByTestId('board-decline')).toBeNull()
 })
 
 // A waiting Sudo has dispatched NOTHING, so declining there is still legal —
@@ -391,7 +374,7 @@ it('takes the waiting Sudo home on the same press that declines', async () => {
   // left the fan would satisfy the return assertion below just as well
   expect(fanUids()).not.toContain('support-sudo#0')
 
-  const decline = screen.getByTestId('board-decline')
+  const decline = screen.getByTestId('dock-key')
   fireEvent.mouseDown(decline, { clientX: 0, clientY: 0 })
   fireEvent.mouseUp(decline, { clientX: 0, clientY: 0 })
   fireEvent.click(decline)

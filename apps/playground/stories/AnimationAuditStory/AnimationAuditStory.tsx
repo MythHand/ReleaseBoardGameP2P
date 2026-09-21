@@ -422,8 +422,8 @@ const MODULES: Module[] = [
   {
     mod: 'CardCatalog',
     what: {
-      ru: 'Каталог выбора карты: набор карт лицом вверх, из которого называют одну. Не веер и не куча — карты разложены, чтобы их прочитали и сравнили, поэтому по ховеру ячейка ВЫРАСТАЕТ до читаемого размера, а не поднимается. Жизнь каталога — два пропса: open (выбор идёт: все ячейки живые) и chosen (названная держится увеличенной, пока остальные уезжают вниз); selected — то, на чём выбор заряжен, но ещё не подтверждён. Появление — стаггером по ячейкам. Подтверждение снаружи, обычно ConfirmAction: назвать карту необратимо. ГДЕ каталог стоит — дело сцены, блок занимает выданную область.',
-      en: 'The card-pick catalog: a set of face-up cards to name one from. Not a fan and not a heap — the cards are laid out to be read and compared, so on hover a cell GROWS to a readable size instead of lifting. Its life is two props: open (the choice is on: every cell alive) and chosen (the named one holds enlarged while the rest slide away); selected is what the choice is armed on but not yet committed. Entrance — a per-cell stagger. Confirmation lives outside, usually ConfirmAction: naming a card is irreversible. WHERE the catalog stands is the scene’s business; the block fills the area it is given.',
+      ru: 'Каталог выбора карты: набор карт лицом вверх, из которого называют одну. Не веер и не куча — карты разложены, чтобы их прочитали и сравнили, поэтому по ховеру ячейка ВЫРАСТАЕТ до читаемого размера, а не поднимается. Жизнь каталога — два пропса: open (выбор идёт: все ячейки живые) и chosen (названная держится увеличенной, пока остальные уезжают вниз); selected — то, на чём выбор заряжен, но ещё не подтверждён. Появление — стаггером по ячейкам. Подтверждение снаружи, обычно ConfirmAction: назвать карту необратимо. ГДЕ каталог стоит — дело сцены, блок занимает выданную область. В прокручиваемом каталоге борда (#160) previewRoot выносит увеличенную копию за overflow, сохраняя размер зон выбора; отдельная область ограничивает карту со свечением перед ConfirmAction и правой панелью. Прокрутка убирает прежнее ховер-превью, клавиатурный фокус также открывает чтение.',
+      en: 'The card-pick catalog: a set of face-up cards to name one from. Not a fan and not a heap — the cards are laid out to be read and compared, so on hover a cell GROWS to a readable size instead of lifting. Its life is two props: open (the choice is on: every cell alive) and chosen (the named one holds enlarged while the rest slide away); selected is what the choice is armed on but not yet committed. Entrance — a per-cell stagger. Confirmation lives outside, usually ConfirmAction: naming a card is irreversible. WHERE the catalog stands is the scene’s business; the block fills the area it is given. In the board’s scrolling catalogue (#160), previewRoot places an enlarged visual copy outside overflow while choice hit targets stay fixed. Its reserved area keeps the card and glow clear of ConfirmAction and the right rail. Scrolling clears the old hover preview; keyboard focus also opens it.',
     },
     where: {
       ru: 'table/CardCatalog → PickSpecific, OpponentTakes',
@@ -665,8 +665,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'System Upgrade', en: 'System Upgrade' },
     from: {
-      ru: 'На борде свой взнос вытягивается из настоящей руки и летит в центр до RESOLVE; принятый такт подхватывает этот носитель. Отказ возвращает карту в веер. Без анимации принятый ответ снимает блокировку без ожидания такта: следующий Upgrade снова принимает вытягивание. Чужие взносы летят от места игрока. pending.thrown сохраняет стоящие карты между батчами; sudo позволяет выбрать одну в руку. Все полёты используют измеренные слоты ряда шириной 150 px. Финальный base-такт держит ряд 2500 мс и сам отправляет его в сброс через useDiscardExit со стаггером 90 мс. Sudo-такт ведёт выбранную карту через центр в руку (useHandArrival) или к месту актёра; остальные узлы ряда уходят в сброс, без повторного общего такта.',
-      en: 'On the board, pull your contribution from the real hand; it reaches the centre before RESOLVE and the accepted beat adopts that carrier. Rejection restores the card to the fan. Reduced motion clears the accepted contribution lock without waiting for a beat, so the next Upgrade accepts another pull. Remote contributions fly from their seat. pending.thrown retains standing cards across batches; sudo offers one to take into the hand. All flights use measured 150 px row slots. The final base beat holds the row for 2500 ms and owns its useDiscardExit to the heap with a 90 ms stagger. The sudo beat carries the chosen card through the centre into the hand (useHandArrival) or to the actor’s seat; the remaining row nodes exit to discard without a repeated generic beat.',
+      ru: 'В #162 все карты руки обязанного игрока подсвечены до взноса; после отказа подсветка возвращается. На борде свой взнос вытягивается из настоящей руки и летит в центр до RESOLVE; принятый такт подхватывает этот носитель. Отказ возвращает карту в веер. Без анимации принятый ответ снимает блокировку без ожидания такта: следующий Upgrade снова принимает вытягивание. Чужие взносы летят от места игрока. pending.thrown сохраняет стоящие карты между батчами; sudo позволяет выбрать одну в руку. Все полёты используют измеренные слоты ряда шириной 150 px. Финальный base-такт держит ряд 2500 мс и сам отправляет его в сброс через useDiscardExit со стаггером 90 мс. Sudo-такт ведёт выбранную карту через центр в руку (useHandArrival) или к месту актёра; остальные узлы ряда уходят в сброс, без повторного общего такта.',
+      en: 'In #162, every card in the owed hand is highlighted until submission; rejection restores the highlight. On the board, pull your contribution from the real hand; it reaches the centre before RESOLVE and the accepted beat adopts that carrier. Rejection restores the card to the fan. Reduced motion clears the accepted contribution lock without waiting for a beat, so the next Upgrade accepts another pull. Remote contributions fly from their seat. pending.thrown retains standing cards across batches; sudo offers one to take into the hand. All flights use measured 150 px row slots. The final base beat holds the row for 2500 ms and owns its useDiscardExit to the heap with a 90 ms stagger. The sudo beat carries the chosen card through the centre into the hand (useHandArrival) or to the actor’s seat; the remaining row nodes exit to discard without a repeated generic beat.',
     },
     where: 'GitCards/SystemUpgrade',
     board:
@@ -746,6 +746,21 @@ const SCENARIOS: Scenario[] = [
 //     it — is in docs/animations/backlog.md; here they are visible, there they
 //     are actionable.
 const ISSUES: Issue[] = [
+  {
+    what: {
+      ru: 'ЗАКРЫТО #163: дублирующая подсказка защиты в центре',
+      en: 'CLOSED #163: duplicate defense prompt at the centre',
+    },
+    problem: {
+      ru: 'Решение #163 заменяет прежний центральный вопрос #101: в base и sudo защите остаются карты руки и только Pass в доке. Блокировка случайного нажатия сохранена; повторный ответ заблокирован до принятия или отказа движка. Подсказки других решений сохранены.',
+      en: 'Decision #163 supersedes the #101 central question: base and sudo defense use the hand and only dock Pass. The accidental-click lockout remains; duplicate answers are blocked until engine acceptance or rejection. Other pending instructions remain.',
+    },
+    where: {
+      ru: 'pages/board/[gameId]/_Board.tsx, _useDefenseStaging.tsx',
+      en: 'pages/board/[gameId]/_Board.tsx, _useDefenseStaging.tsx',
+    },
+    status: 'ok',
+  },
   {
     what: {
       ru: 'ЗАКРЫТО: для победы последнего выжившего нет утверждённой сцены',

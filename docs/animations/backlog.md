@@ -19,6 +19,23 @@ so that is where a finding has to show up, in one line with a status. This file 
 in full: what it costs and what would close it. Enter it in both — the page so it is seen, here so
 it can be acted on.
 
+## Resolved pending feedback (2026-09-21)
+
+### System Upgrade contributions were not highlighted — #162
+
+The Board selected Upgrade hand items and drag handling, but left visual state with ordinary
+turn staging. Upgrade now provides both playable state and the shared discard accent while
+this seat owes a contribution. A local submission clears the highlight; rejection restores it.
+Base and Sudo use the same behavior. Answered players and observers are not prompted.
+
+### Defense instructions duplicated the dock — #163
+
+The earlier #101 decision placed defense instructions and a decline button under the centre
+cards. Issue #163 supersedes that presentation: base and Sudo defense now use the hand and
+only Pass in the dock. Instructions for release payment, hand limit and 503 remain.
+Pass retains the dock lockout, submits once, and blocks another defense until accepted or
+rejected. Rejection permits a fresh answer; a waiting Sudo returns to the hand when passing.
+
 ## Resolved board regressions (2026-09-07)
 
 ### Clicking Code Review did not start pairing — closed 2026-09-07
@@ -2017,3 +2034,22 @@ AI-триггера) и не означает полного выполнени�
 **Что закроет.** Общее состояние заморозки Hand/Card, сценарий DDoS в playground и
 проверка, что индикатор исчезает вместе с ограничением. В PR #142 визуальное поведение
 не меняется. Та же открытая находка записана в Interaction audit.
+
+
+## 2026-09-21 — #160: Security Bug catalogue hover clipped by scrolling
+
+**Resolved.** The board’s request catalogue uses `overflow: auto` so wrapped
+rows remain reachable above `ConfirmAction`. Scaling its interactive cells by
+1.9 clipped enlarged faces and selected glows at the scrollport edges;
+additional padding could not protect rows after scrolling.
+
+`CardCatalog.previewRoot` now lets this consumer reserve a separate, non-scrolling
+reading layer. The enlarged hover/focus copy stays inside that area with room
+for the glow and cannot intercept neighbouring choices. The board bounds this
+layer above confirmation and left of the rail. Scrolling clears the previous
+hover copy, starting a drag removes it, and a confirmed choice can hold there.
+The default `PickSpecificCardStory` catalogue retains its existing in-place zoom.
+
+Regression checks cover edge geometry, a smaller available area, neighbouring
+choices, scroll cleanup, keyboard selection, and drag start. Actual browser
+scroll/viewport coverage is recorded with the issue’s verification evidence.

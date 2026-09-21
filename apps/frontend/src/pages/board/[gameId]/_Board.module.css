@@ -178,11 +178,6 @@
   box-shadow: 0 6px 20px var(--black-45);
 }
 
-/* the one thing in the ask that is pressed rather than read */
-.askDecline {
-  pointer-events: auto;
-}
-
 /* the same end state, with no travel — the ask appears and disappears rather
    than sliding, since nothing here depends on the motion to be understood */
 @media (prefers-reduced-motion: reduce) {

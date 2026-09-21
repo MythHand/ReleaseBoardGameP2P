@@ -521,6 +521,7 @@ export default function Board({
     },
     enabled: !(deal.active || beats.exclusive),
   })
+  const upgradeOwnsHand = upgrade.asked || upgrade.stagedUid != null
   const neutralizeOwnsHand = alarmMineOpen || neutralizing.staged != null
   // the answer once its own flight has landed (or at once under reduced
   // motion) — the same gate, and the same reason, as `stagedCover` above.
@@ -991,41 +992,16 @@ export default function Board({
     staging.cancel()
   }
 
-  // What the table is waiting on, in words, and where the words go (#101,
-  // Fix B). Two steps ask the fan for a card and neither had a voice: the
-  // release's cost, whose panel is suppressed on purpose (a panel would be a
-  // second asker), and — from this round — the `defend`, whose panel used to
-  // cover the very attack it was asking about. The ask is its own line under
-  // the centre instead, quoting the approved scene's own placement: "the ask
-  // sits with the cards, not only in the dev bar — a release parked at the
-  // centre with no explanation reads as a stuck play."
-  //
-  // The scene's own COPY is deliberately not ported: it says "pull any of
-  // them out of the hand", and a pull is impossible here — the engine returns
-  // no playable cards while a pending is open, so the pull finds no target
-  // and the card flops back into the fan. On the board the cost is a click.
-  //
-  // A defend is not ONE step, which the first cut of this missed (fix round 1,
-  // M1): a Sudo standing at its own slot is answered by CLICKING the defence
-  // it will enhance, and a pull there is refused outright (`resolveLegal` and
-  // `resolveSudo` both bail while anything is staged). So the phase picks the
-  // words — same discipline as not porting the scene's cost line, applied to
-  // a state this round is what newly lights. Silence was the other option and
-  // is the wrong one: a step waiting on the fan with nothing saying so is
-  // Defect 3 itself, one level in.
-  //
-  // `undefined` here means we are not answering at all; `null` means we are
-  // and nothing is staged yet.
+  // Defense uses the hand and dock Pass only (#163). Other pending kinds
+  // retain their own instructions at the centre.
   const defencePhase = answering ? (defenseStaging.staged?.phase ?? null) : undefined
-  // Still ours to decide. A dispatched defence (or one in the instant between
-  // a rejection and its return flight) has already answered, so nothing is
-  // being asked and nothing may be offered — the standard `dock.ts` states for
-  // its own keys: offered only where the action behind it is legal RIGHT NOW.
-  const unanswered = answering && defencePhase !== 'dispatched' && defencePhase !== 'rejected'
+  const unanswered =
+    answering &&
+    !defenseStaging.declined &&
+    defencePhase !== 'dispatched' &&
+    defencePhase !== 'rejected'
   let ask: string | null = null
-  if (unanswered) {
-    ask = defencePhase === 'partner' ? copy.table.askPartner : copy.table.askDefend
-  } else if (costPending) {
+  if (costPending) {
     ask = copy.table.askCost
   } else if (discarding && handLimit.owed > 0) {
     ask = copy.table.askHandLimit
@@ -1040,20 +1016,6 @@ export default function Board({
   // double render produces the identical result.
   const lastAsk = useRef<string | null>(null)
   if (ask) lastAsk.current = ask
-
-  // Declining an attack — "I could block this and I choose not to". The only
-  // thing `PendingPrompt` did for a `defend` that the fan does not do, so it
-  // is the only thing that outlived it here. A real button, so it is the one
-  // affordance in this exchange a keyboard can reach.
-  //
-  // Offered exactly while `unanswered` (fix round 1, L1) — the panel had no
-  // such gate and neither did the first cut of this, so between a defence's
-  // dispatch and the projection clearing the pending it could fire a second
-  // RESOLVE onto a decision that is already closing. A waiting Sudo is NOT
-  // excluded: nothing has been dispatched there, so declining is legal, and
-  // it already does the right thing — the partner-phase mousedown listener
-  // above sends the Sudo home on the very press that fires this.
-  const declineAttack = () => actions?.onResolve?.({ kind: 'defend', card: null })
 
   const isHost = role === 'host'
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
@@ -1615,7 +1577,7 @@ export default function Board({
                 // Keep the same owner for items and index-based handlers,
                 // including the exit after the defense prompt closes.
                 items={
-                  upgrade.asked || upgrade.stagedUid
+                  upgradeOwnsHand
                     ? upgrade.handItems
                     : discarding
                       ? handLimit.handItems
@@ -1658,25 +1620,29 @@ export default function Board({
                 // while a step is waiting on a choice from the fan, and only
                 // on the cards that answer it.
                 stateAt={
-                  discarding
-                    ? handLimit.stateAt
-                    : defenseOwnsHand
-                      ? defenseStaging.stateAt
-                      : neutralizeOwnsHand
-                        ? neutralizing.stateAt
-                        : staging.stateAt
+                  upgradeOwnsHand
+                    ? upgrade.stateAt
+                    : discarding
+                      ? handLimit.stateAt
+                      : defenseOwnsHand
+                        ? defenseStaging.stateAt
+                        : neutralizeOwnsHand
+                          ? neutralizing.stateAt
+                          : staging.stateAt
                 }
                 // no fan accent while a 503 is open: `neutralizing.accentAt`
                 // answers for a ZONE slot, and the fan's own lighting is
                 // entirely `stateAt`'s (the Debugger, or nothing).
                 accentAt={
-                  discarding
-                    ? handLimit.accentAt
-                    : defenseOwnsHand
-                      ? defenseStaging.accentAt
-                      : neutralizeOwnsHand
-                        ? undefined
-                        : staging.accentAt
+                  upgradeOwnsHand
+                    ? upgrade.accentAt
+                    : discarding
+                      ? handLimit.accentAt
+                      : defenseOwnsHand
+                        ? defenseStaging.accentAt
+                        : neutralizeOwnsHand
+                          ? undefined
+                          : staging.accentAt
                 }
                 // while the deal runs the hand is held: no clicks reach either
                 // gesture machine, and the cards that travelled closed stay
@@ -1785,7 +1751,9 @@ export default function Board({
             paused={paused}
             onDraw={actions?.onDraw ? () => dockKey(actions.onDraw) : undefined}
             onPush={actions?.onPush ? () => dockKey(actions.onPush) : undefined}
-            onPass={answering ? (unanswered ? declineAttack : undefined) : actions?.onPass}
+            onPass={
+              answering ? (unanswered ? defenseStaging.onDecline : undefined) : actions?.onPass
+            }
           />
         </div>
         {/* you already passed on the open window — TurnDock has no notion of
@@ -1811,7 +1779,7 @@ export default function Board({
           so the attack being asked about was behind the question, and a card
           flying to or from the cover slot (a carrier at `--z-flight`, 250)
           vanished the instant it landed. What only the panel could do —
-          decline — is the board's own affordance now, in the ask below. */}
+          decline — now belongs to Pass in the dock. */}
       {state.pending &&
         // "owed to you" is a predicate now, not a comparison: a `systemUpgrade`
         // is owed to every seat on its roster at once while it is discarding,
@@ -1877,15 +1845,7 @@ export default function Board({
           />
         )}
 
-      {/* what the table is waiting for, under the cards it is waiting on.
-          Always mounted, so it can fade OUT as well as in — and `inert` while
-          it says nothing, which keeps the fading-out line out of the
-          accessibility tree rather than guarding the decline: the decline
-          renders only under `unanswered`, and `unanswered` implies the line
-          says something, so there is never a button inside to protect (fix
-          round 1, L4 — the first version of this comment claimed otherwise).
-          Under prefers-reduced-motion the module CSS drops the transition and
-          it simply appears; there is no `play()` here to gate. */}
+      {/* Instructions for non-defense decisions stay mounted for their fade. */}
       <div
         className={opening.ask}
         data-shown={ask != null}
@@ -1895,16 +1855,6 @@ export default function Board({
         <Typography as="div" base="label-sm" tk="tk-16" className={opening.askLine}>
           {lastAsk.current}
         </Typography>
-        {unanswered && (
-          <Button
-            variant="tech"
-            className={opening.askDecline}
-            data-testid="board-decline"
-            onClick={declineAttack}
-          >
-            {copy.pending.decline}
-          </Button>
-        )}
       </div>
 
       {/* вертикальный рейл у правого края — переключает панели drawer. Слой
