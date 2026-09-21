@@ -65,7 +65,10 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     },
     useDiscardExit: () => ({
       overlay: [],
-      send: (items: unknown[]) => animationsTrace.exitSpy(items),
+      send: (items: unknown[], takeOff?: (() => void) | null) => {
+        takeOff?.()
+        return animationsTrace.exitSpy(items)
+      },
       reset: () => {},
       FLIGHT_MS: 420,
     }),
@@ -503,6 +506,7 @@ describe('runTaken — a Release comes back out of the discard (#106, Task 11)',
             aiCause: { card: 'trigger-ai', eventId: 3 },
             pending: {
               kind: 'pickFromDiscard',
+              raisedAt: 1,
               picks: 1,
               player: 'p1',
               options: [],

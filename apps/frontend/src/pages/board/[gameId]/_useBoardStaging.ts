@@ -28,11 +28,12 @@ import type {
   TableActions,
   TableTarget,
 } from '@release/ui'
-import { CARD_RATIO, CARD_W, centerOf, slotPlacement, useArrow } from '@release/ui'
+import { CARD_RATIO, CARD_W, cardBoxIn, centerOf, slotPlacement, useArrow } from '@release/ui'
 import {
   type Arriving,
   play,
   type Rect,
+  restTransform,
   useFlyer,
   useHandArrival,
   usePairFold,
@@ -47,7 +48,14 @@ import {
   useRef,
   useState,
 } from 'react'
-import { type BoardAnchors, type BoardState, MERGE_MS, SHOW_HOLD } from '~/entities/game/board'
+import {
+  ATTACK_POSE,
+  type BoardAnchors,
+  type BoardState,
+  MERGE_MS,
+  SHOW_HOLD,
+} from '~/entities/game/board'
+import { stageSlot } from '~/entities/game/board/stageSlot'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 
 // Moved verbatim from the pre-#99 `_useBoardInteractions.ts` — the comparison a
@@ -96,11 +104,17 @@ export interface BoardStaging {
   staged: StagedPlay | null
   dispatched: boolean // derived: staged?.phase === 'dispatched'
   targets: TableTarget[] // the staged card's — [] when nothing staged
-  arrow: { from: Point | null; to: Point | null; active: boolean }
+  // `color` is the hue the aim was armed with — the category of the card the
+  // line leaves; undefined while nothing is aiming.
+  arrow: { from: Point | null; to: Point | null; color?: string; active: boolean }
   overlay: ReactNode[] // flyer + return-flight overlays
   gapAt: number | null // fan gap while a cancel returns cards
   gapSize: number
   handItems: HandItem[] // you.hand minus the staged card(s)
+  /** the uids that are NOT in the fan right now — standing at the centre, or
+   * held there while a cost is owed. Whoever fills the fan subtracts this, so a
+   * card lying at the centre is never drawn in the hand as well (#168). */
+  handOut: ReadonlySet<string>
   accentAt: (index: number) => string | undefined // partner lighting while a support awaits one
   /** what a fan slot reads as — 'playable' for the cards that answer the step
    * the turn side is actually waiting on (today: a standing release's cost),
@@ -108,6 +122,9 @@ export interface BoardStaging {
   stateAt: (index: number) => HandCardState
   /** the pair the fold step is carrying, while it carries one (`usePairFold`) */
   pairNode: () => HTMLDivElement | null
+  /** the uids a carrier is holding right now — a place draws its card unless it
+   * is the one travelling */
+  carrying: string[]
   onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
   /** a click in the fan: the partner pick (the fold), the cost pick, or a
    * release played at rest. Returns whether this gesture TOOK the click — false
@@ -201,6 +218,12 @@ export function useBoardStaging({
   // the seat the card was aimed at stays live for that whole glide and
   // dispatches a play for a card that is already on its way back to the fan.
   const [cancelling, setCancelling] = useState(false)
+  // WHOSE CARD IS IN THE AIR, by uid. A place of the centre's row draws the card
+  // standing in it unless a carrier is holding that very card — the row has two
+  // places and only one of them travels at a time, so "something is flying" is
+  // not an answer: it blanked the sudo while the card it enhances was still on
+  // its way in.
+  const [carrying, setCarrying] = useState<string[]>([])
   const reduced = useReducedMotion()
   const arrowCtl = useArrow()
   const flyer = useFlyer()
@@ -267,6 +290,13 @@ export function useBoardStaging({
     cancellingRef.current = false
     setCancelling(false)
     commitStaged(null)
+    // NOTHING IS IN THE AIR ANY MORE, so no place is holding its card back. The
+    // refusal path cleared this and the landing path did not, because it left
+    // the clearing to whatever staged next — and every animated staging does
+    // overwrite it, which is why this never showed. A staging that runs without
+    // a flight does not (reduced motion), and there the place of the row stayed
+    // empty with the card standing in it. A landing clears what it started.
+    setCarrying([])
     // The outgoing flight this callback belongs to has landed, so a release
     // that was `leaving` is now simply gone. Conditional, unlike the clears
     // above: this fires for EVERY arrival landing, and a plain aim's own
@@ -339,20 +369,67 @@ export function useBoardStaging({
   // moves it on (`clearPaidCost`).
   const [paidCost, setPaidCost] = useState<{ uid: string; card: CardData } | null>(null)
 
-  const handItems = useMemo(() => {
-    const out = new Set(
-      [staged?.support?.uid, staged?.main?.uid, cost?.release].filter((uid): uid is string =>
-        Boolean(uid),
+  // WHAT IS NOT IN THE FAN RIGHT NOW — the staged halves, and the release held
+  // at the centre while its cost is owed. Exported rather than kept private,
+  // because the fan's items do NOT always come from this hook: whichever hook
+  // owns the hand builds its own list straight off the projection, and while a
+  // beat runs that projection is the SHADOW — the board from BEFORE the play,
+  // where these cards are still in the hand. An owner that does not subtract
+  // this draws a card that is standing at the centre back into the fan, and the
+  // fan then raises its zoom preview for it (#168).
+  //
+  // A SET THAT EMPTIES, never a memory of what has left: a refusal, an invalid
+  // partner and Escape all send these cards home again, and that return is the
+  // gesture working rather than a card escaping. So this says where the cards
+  // are now, and says nothing at all the moment they are back in the hand.
+  const handOut = useMemo(
+    () =>
+      new Set(
+        [staged?.support?.uid, staged?.main?.uid, cost?.release].filter((uid): uid is string =>
+          Boolean(uid),
+        ),
       ),
-    )
-    if (out.size === 0) return state.you.hand
-    return state.you.hand.filter((c) => !out.has(c.uid))
-  }, [state.you.hand, staged, cost])
+    [staged, cost],
+  )
 
-  const aimFromCentre = useCallback(() => {
-    const el = anchors.centre.current
-    if (el) arrowCtl.aim(centerOf(el))
-  }, [anchors.centre, arrowCtl.aim])
+  const handItems = useMemo(
+    () => (handOut.size === 0 ? state.you.hand : state.you.hand.filter((c) => !handOut.has(c.uid))),
+    [state.you.hand, handOut],
+  )
+
+  // THE ARROW LEAVES THE CARD THAT IS ASKING, not the middle of the table. The
+  // two were the same thing for as long as a played card stood in the middle,
+  // and stopped being the same when the centre grew a ROW: a support waiting
+  // for its partner stands in the row's first place and the card it enhances in
+  // the second, so the middle BETWEEN them is empty table — and an arrow drawn
+  // from `anchors.centre` came out of that gap instead of out of the card.
+  //
+  // WHERE A CARD STANDS IS THE CENTRE MODULE'S ANSWER, asked the way every
+  // flight into the row asks it (`stageSlot`). `place` is null for a card that
+  // owns the middle — one that is aiming, or a folded pair — so that case
+  // resolves to the very element this always used, with no branch of its own.
+  // `Table`'s own arrow anchors to its source card the same way, and re-derives
+  // it on every phase change rather than aiming once (apps/ui/src/table/Table).
+  // An attack rests tilted; everything else rests square. Handed to a flight so
+  // it arrives already in that pose instead of turning once it is down.
+  const attackPose = (card: CardData) =>
+    card.category === 'attack'
+      ? { rotate: ATTACK_POSE.rot, dx: ATTACK_POSE.dx, dy: ATTACK_POSE.dy }
+      : {}
+
+  // THE CARD IS THE ARGUMENT, not just its place: the same card decides where
+  // the line starts and what colour it is drawn in, so both are said in one
+  // call. Splitting them is how the hue went stale — the board re-derived it
+  // from `staged` with a rule of its own ("the support, if there is one"),
+  // which outlived the moment a sudo hands the aim over to the card it
+  // enhances: the arrow left the attack and stayed the sudo's yellow (#168).
+  const aimFromPlay = useCallback(
+    (card: StagedCard, place: number | null) => {
+      const el = (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
+      if (el) arrowCtl.aim(centerOf(el), undefined, `var(--cat-${card.card.category})`)
+    },
+    [anchors, arrowCtl.aim],
+  )
 
   // the card box of a hand card, from the FAN's own geometry, NOT a slot's
   // rotated bounding rect — a slot is rotated, so its bounding rect is the box
@@ -395,10 +472,13 @@ export function useBoardStaging({
   const flyHome = useCallback(
     (items: Arriving[], at?: number) => {
       const airborne = arrival.busy
+      // every card of this flight is in the air, so no place draws it
+      setCarrying(items.map((it) => it.key))
       void arrival.arrive(items, handItems.length, at).then((flew) => {
         if (flew || airborne) return
         cancellingRef.current = false
         setCancelling(false)
+        setCarrying([])
         commitStaged(null)
         setStage((s) => (s === 'leaving' ? 'none' : s))
       })
@@ -532,9 +612,27 @@ export function useBoardStaging({
       pairApi.current.release()
       return
     }
+    // Two cards that never folded — a sudo and the card it enhances, each in its
+    // own place of the row. They go home from where they actually stand: the
+    // middle holds neither of them.
+    if (s.support && s.main) {
+      const first = stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect
+      const second = stageSlot(anchors, 1)?.getBoundingClientRect() ?? cRect
+      flyHome(
+        [
+          { key: s.support.uid, card: s.support.card, from: first },
+          { key: s.main.uid, card: s.main.card, from: second },
+        ],
+        s.support.index,
+      )
+      return
+    }
     const only = s.support ?? s.main
     if (!only) return
-    flyHome([{ key: only.uid, card: only.card, from: cRect }], only.index)
+    // A waiting support stands in the row's first place; a card that AIMS stands
+    // in the middle. Either way it leaves from where it is.
+    const home = s.support ? (stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect) : cRect
+    flyHome([{ key: only.uid, card: only.card, from: home }], only.index)
   }, [
     reduced,
     flyHome,
@@ -661,22 +759,35 @@ export function useBoardStaging({
       )
       setStage('none')
       void (async () => {
-        const to = anchors.centre.current?.getBoundingClientRect()
-        if (!reduced && from && to) {
+        if (!reduced && from) {
+          setCarrying([card.uid])
           try {
             const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
-            if (el) await play('playToCenter', el, { from, to })?.finished
+            // MEASURED AFTER THE RAISE, not before it. A support waiting for its
+            // partner flies to the first place of the centre's assembling ROW,
+            // and that place is mounted by the commit above — it does not exist
+            // yet when this body starts. A card that AIMS has been played, and
+            // keeps the middle it always had.
+            const place = hasTarget ? null : 0
+            const to = (
+              (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
+            )?.getBoundingClientRect()
+            if (el && to)
+              await play('playToCenter', el, { from, to, ...attackPose(card.card) })?.finished
           } catch {
             // A `void`ed body is watched by nobody: let it reject and the whole
             // app gets an unhandled rejection. The card is staged either way —
             // the flight is how it got there, not whether it did.
           }
           flyer.drop('stage')
+          setCarrying([])
         }
-        aimFromCentre()
+        // out of the place it has just landed in — the same one the flight
+        // above aimed at, so the arrow starts where the card ended
+        aimFromPlay(card, hasTarget ? null : 0)
       })()
     },
-    [anchors.centre, reduced, flyer.raise, flyer.drop, aimFromCentre],
+    [anchors, reduced, flyer.raise, flyer.drop, aimFromPlay],
   )
 
   // A standalone play is read at the centre before its effect is sent.
@@ -708,7 +819,12 @@ export function useBoardStaging({
         if (to && from) {
           const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
           if (!current()) return
-          if (el) await play('playToCenter', el, { from, to })?.finished
+          // INTO THE POSE IT WILL REST IN, not into a flat landing it then
+          // corrects. An attack lies tilted at the centre (I11: the tilt is
+          // what says it has been PLAYED), so the flight ends already turned —
+          // the same `rotate`/`dx`/`dy` the combo and defence flights pass, for
+          // the same reason.
+          if (el) await play('playToCenter', el, { from, to, ...attackPose(card.card) })?.finished
           if (!current()) return
           flyer.drop('stage')
         }
@@ -886,7 +1002,24 @@ export function useBoardStaging({
       arrowCtl.stop() // the choice is made — nothing is pointed at while the pair folds
       const mainIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
       const main: StagedCard = { uid: item.uid, card: item.card, index: mainIndex }
-      commitStaged({ support, main, phase: 'partner', merged: true })
+      // HOW THE TWO STAND IS THE SITUATION'S, not one rule for both yellows. A
+      // Code Review RIDES the release it pays for: they lie one on the other, as
+      // they will lie in the heap (owner, 18.09).
+      //
+      // A SUDO GOES BOTH WAYS, and what it enhances decides which (owner,
+      // 20.09). Beside a git operation it stays its own card: the two take the
+      // two places of the centre's row and nothing folds — the row the scene
+      // shows, unchanged. Under an ATTACK it is a stack: the attack lies on top
+      // of it, the way the centre already draws a played attack with a sudo
+      // (`centreAttack`, a `CardPair` at the middle) and the way the two will
+      // lie in the heap. That the staging stood them in a row and the play then
+      // stood them in a stack was the same picture told twice.
+      //
+      // `merged` says a PAIR owns the centre, so it is false only for the row.
+      const stacked = support.card.id === 'support-sudo' && main.card.category === 'attack'
+      const sideBySide = support.card.id === 'support-sudo' && !stacked
+      const merged = !sideBySide
+      commitStaged({ support, main, phase: 'partner', merged })
       // the fold is committed — irrevocable until `finish()` runs (ComboStory's
       // own `playing`); `cancel()` and a second click both refuse while this is
       // true, so nothing can race the automatic dispatch that follows the fold.
@@ -916,17 +1049,22 @@ export function useBoardStaging({
         if (stagedRef.current?.phase === 'dispatched') return
         const windowOpen = Boolean(state.window?.canAttackWith?.includes(main.uid))
         if (windowOpen) {
-          commitStaged({ support, main, phase: 'dispatched', merged: true })
+          commitStaged({ support, main, phase: 'dispatched', merged })
           dispatchWatermarkRef.current = eventsRef.current.length
           actions?.onAttack?.(main.uid, support.uid)
         } else if (
           (state.targets?.[main.uid] ?? []).length > 0 &&
           !rebaseAllPiles(main.card, support.card)
         ) {
-          commitStaged({ support, main, phase: 'target', merged: true })
-          aimFromCentre()
+          commitStaged({ support, main, phase: 'target', merged })
+          // The card that aims is the MAIN one, and where it stands depends on
+          // how the two were put down: side by side it took the row's second
+          // place, folded it owns the middle with the support under it. It is
+          // also the card the arrow is COLOURED by, for the same reason — the
+          // aim is its own now, the support only enhances it.
+          aimFromPlay(main, sideBySide ? 1 : null)
         } else {
-          commitStaged({ support, main, phase: 'dispatched', merged: true })
+          commitStaged({ support, main, phase: 'dispatched', merged })
           dispatchWatermarkRef.current = eventsRef.current.length
           // A COMBO release — the other way a release reaches the table, and
           // the one the stage machine must be told about explicitly (#101,
@@ -943,19 +1081,67 @@ export function useBoardStaging({
         }
       }
 
-      // The partner's own fan slot — the scene's own source (I6: a slot is
-      // rotated, so its bounding rect is the box AROUND the tilted card).
-      const mainHand = slotBox(index, handItems.length)
+      // THE CARD WHERE IT IS DRAWN, not where its slot rests. The scene folds
+      // from the card itself, and the card being clicked is the HOVERED one —
+      // lifted out of the fan's resting line. Measuring `slotBox` instead (the
+      // fan's rect plus `slotPlacement`) started the pair's half at a place the
+      // player's card had never been, so it read as the clicked card vanishing
+      // and a different one flying to the sudo. The slot is rotated, so its
+      // bounding rect is the box AROUND the tilted card — `cardBoxIn` trims it
+      // back (I6). `slotBox` stays the fallback for when there is no node to
+      // measure (reduced motion, a hand that has not painted yet).
+      const liveSlot = anchors.handSlotAt(index)?.getBoundingClientRect()
+      const mainHand = liveSlot ? cardBoxIn(liveSlot, CARD_W) : slotBox(index, handItems.length)
       if (!mainHand) {
         finish()
         return true
       }
+      // A sudo takes the place kept open beside it, and nothing folds.
+      if (sideBySide) {
+        const place = stageSlot(anchors, 1)?.getBoundingClientRect()
+        if (reduced || !place) {
+          foldingRef.current = false
+          finish()
+          return true
+        }
+        setCarrying([main.uid])
+        void (async () => {
+          try {
+            const [el] = await flyer.raise([{ key: 'stage-main', card: main.card, at: mainHand }])
+            if (el) await play('playToCenter', el, { from: mainHand, to: place })?.finished
+          } catch {
+            // a `void`ed body answers for its own failure — the card is staged
+            // either way, the flight is only how it got there
+          }
+          flyer.drop('stage-main')
+          setCarrying([])
+          foldingRef.current = false
+          finish()
+        })()
+        return true
+      }
+      // WHERE THE PAIR FOLDS IS WHERE IT THEN STANDS.
+      //
+      // A Code Review folds where the support ALREADY STANDS: its own place is
+      // the frame, so the aux's entry pose is the degenerate identity case and
+      // the fold needs no branch for it — the same thing that used to be true of
+      // the middle, back when a pulled support stood there.
+      //
+      // A sudo under an attack folds at the MIDDLE, because that is where a
+      // played attack stands: the sudo glides out of its place in the row into
+      // the middle while the attack comes down onto it from the fan. It lands at
+      // the tilt a played attack rests at, which is the very pose the centre's
+      // own pending render then draws the same pair at — so the handover from
+      // the fold's last frame to the static render changes nothing on screen.
+      const standing = stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect
+      const box = stacked ? cRect : standing
       const folding = pairApi.current.fold({
         main: main.card,
         aux: support.card,
         mainFrom: mainHand,
-        auxFrom: cRect,
-        box: cRect,
+        auxFrom: standing,
+        box,
+        pose: stacked ? restTransform(ATTACK_POSE) : undefined,
         dur: reduced ? 0 : MERGE_MS,
       })
       // A game action never waits on an animation nobody plays: under reduced
@@ -1005,7 +1191,7 @@ export function useBoardStaging({
       reduced,
       slotBox,
       arrowCtl.stop,
-      aimFromCentre,
+      aimFromPlay,
       stageSoloRelease,
       stageAtCentre,
       actions,
@@ -1219,9 +1405,11 @@ export function useBoardStaging({
     gapAt: arrival.gapAt,
     gapSize: arrival.gapSize,
     handItems,
+    handOut,
     accentAt,
     stateAt,
     pairNode: pair.node,
+    carrying,
     onHandPlay,
     onCardClick,
     onTargetPick,

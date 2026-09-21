@@ -194,6 +194,21 @@ export type Pending =
       options: CardInstance[]
       picks: 1 | 2
       source: CardId
+      /**
+       * WHICH OCCASION THIS IS — the event sequence the decision was raised at.
+       *
+       * A card of the same kind may be played any number of times, so the same
+       * player can be offered the same cards twice in one match, and the two
+       * offers are then identical in every other field. A reader that has to
+       * tell one from the other — the board, which must not mistake a fresh
+       * offer for the one it has already answered — has nothing else to go on
+       * (#168). The timed pendings carry `openedAt` for their countdown and get
+       * this for free; these two are untimed, so they say it outright.
+       *
+       * The engine's own sequence rather than a clock: monotonic, and identical
+       * on every peer, which a timestamp taken per peer would not be.
+       */
+      raisedAt: number
     }
   // Git Rebase. The offered cards are private to the player using it — "не
   // показывая другим" — so pendingView gates `piles` behind `mine` exactly as
@@ -205,6 +220,8 @@ export type Pending =
       player: PlayerId
       piles: { pile: number; cards: CardInstance[] }[]
       source: CardId
+      /** which occasion this is — see `pickFromDiscard.raisedAt` */
+      raisedAt: number
     }
   // System Upgrade — the first pending owed to SEVERAL seats at once. It
   // carries no `player`, deliberately: every other variant has one, so the

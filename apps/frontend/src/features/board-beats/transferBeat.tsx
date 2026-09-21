@@ -3,8 +3,10 @@ import type { CardData } from '@release/ui'
 import { CARD_W, cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
 import { nextFrames, play, useFlyer, useHandArrival, wait } from '@release/ui/animations'
+import type { RefObject } from 'react'
 import { useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
+import type { RequestPickHandoff } from '~/entities/game/board/types'
 import type { BeatPlan } from './planBeats'
 import styles from './transferBeat.module.css'
 
@@ -21,9 +23,20 @@ import styles from './transferBeat.module.css'
 // a hand leaks.
 
 const REVEAL_HOLD = 820 // face-up at the centre before it drops into the fan
+// The width a card taken out of the closed fan reaches at the centre. It is
+// held there to be READ, and a card at the slot's own width is not being shown
+// to anybody — `PickOpponentCardStory`'s own REVEAL_W.
+const REVEAL_W = 220
+// That fan is held out across the table, drawn inside a container turned 180°,
+// so a card taken out of it starts upside down and straightens over the flight
+// — the same half turn the scene's own reveal makes on its way in.
+const OFFER_TURN = 180
 const CENTER_HOLD = 820 // face-down at the centre before it sinks into the seat
 const SEAT_SHRINK = 0.7 // how small a card is inside a seat — `drawBeat`'s own value
 const REQUEST_HOLD = 820 // the named card stands at the centre before the outcome
+// The chosen card holds while the rest of the catalogue leaves — the scene's own
+// beat between the confirm and the outcome (`PickSpecificCardStory`).
+const PICK_BEAT = 620
 const MISS_HOLD = 1620 // the flinch and the note, before the scene clears
 // A whole seat (or a whole fan) flinching, not the 7px `settle` sized for an
 // input field — the story's own values.
@@ -84,7 +97,10 @@ function centreAttackOf(base: BoardState): BoardState['centreAttack'] {
   return base.centreAttack
 }
 
-export function useTransferBeat(anchors: BoardAnchors) {
+export function useTransferBeat(
+  anchors: BoardAnchors,
+  requestPick?: RefObject<RequestPickHandoff | null>,
+) {
   const { overlay: flyerOverlay, raise, pin, patch, drop, elOf } = useFlyer()
 
   // The run's own context, held in a ref because the whole beat is one closure
@@ -108,8 +124,8 @@ export function useTransferBeat(anchors: BoardAnchors) {
     c.publish(next)
   })
 
-  const latest = useRef({ anchors, arrive })
-  latest.current = { anchors, arrive }
+  const latest = useRef({ anchors, arrive, requestPick })
+  latest.current = { anchors, arrive, requestPick }
 
   // The donor is one card lighter the moment it leaves them. Published as its
   // own step rather than folded into the landing, because the two ends of a
@@ -175,18 +191,29 @@ export function useTransferBeat(anchors: BoardAnchors) {
         )
         const card = cardById(plan.card)
         if (!centre || !card) return
-        // The named card, face-up, at the centre — for EVERY peer, asker
-        // included. `requested` carries no `visibleTo`: the rules make the
-        // request public on a hit and a miss alike (docs/rules/cards.md:125).
-        const [el] = await raise([{ key: KEY, card, at: centre, faceDown: false }])
-        if (el) {
-          // It APPEARS rather than travels. The one candidate origin — the
-          // catalog cell the asker named it in — belongs to a hook this beat
-          // cannot see (Task 8) and cannot measure, so no peer gets a flight:
-          // every board, asker included, gets the same pop into the reserved
-          // centre slot.
-          const anim = play('popIn', el)
-          if (anim) await anim.finished
+        // THE SURFACE IS ALREADY SHOWING IT. The request is public — the rules
+        // make it public on a hit and a miss alike — and the list it is made
+        // from is the game's own catalogue rather than anybody's hand, so every
+        // seat has that surface up and the named card is standing on every
+        // board. This beat used to introduce the card instead, popping a copy
+        // of it into the centre; for the seat that named it that was the same
+        // card twice on screen at once.
+        //
+        // So it HOLDS rather than introduces: `PICK_BEAT` is the scene's own
+        // hold (`PickSpecificCardStory`) — the chosen card standing while the
+        // rest of the catalogue leaves — and the surface plays it on every
+        // board at once. The pop stays as the answer for a board with no
+        // surface at all (reduced motion takes the band down).
+        const surface = latest.current.requestPick?.current ?? null
+        if (surface) {
+          surface.hold(plan.card)
+          await wait(PICK_BEAT)
+        } else {
+          const [el] = await raise([{ key: KEY, card, at: centre, faceDown: false }])
+          if (el) {
+            const anim = play('popIn', el)
+            if (anim) await anim.finished
+          }
         }
 
         if (plan.hit) {
@@ -198,7 +225,14 @@ export function useTransferBeat(anchors: BoardAnchors) {
           // while it runs, so the static render is up before the carrier lets
           // go and the slot is never blank for a frame. Same ordering, and the
           // same reason, as the standing trigger in `drawBeat`.
-          const c = ctx.current
+          //
+          // NOT WITH A SURFACE UP. That standing render is a bridge across two
+          // batches, and with the request surface there is nothing to bridge:
+          // the catalogue holds the card, the defender's fan is still out, and
+          // the transfer's own flight comes out of that fan. Published anyway,
+          // it left the card standing at the centre between the hold and the
+          // flight — the card the player had just watched leave.
+          const c = surface ? null : ctx.current
           if (c) {
             const next: BoardState = {
               ...c.base,
@@ -216,7 +250,7 @@ export function useTransferBeat(anchors: BoardAnchors) {
             c.publish(next)
           }
           await nextFrames() // the publish above has committed (I2)
-          drop(KEY)
+          surface ? surface.release() : drop(KEY)
           return
         }
 
@@ -231,6 +265,9 @@ export function useTransferBeat(anchors: BoardAnchors) {
         // mounted showing the same card underneath this flyer for the whole
         // hold, shake and note, then vanish with no animation when the queue
         // drains.
+        // With a surface holding the card this no longer takes anything over —
+        // it only stops the projection claiming a request that has been
+        // answered. The surface holds through the flinch and the note.
         clearPending()
         await wait(REQUEST_HOLD)
         // Rendered as the target actually appears: a Seat to everyone watching,
@@ -242,7 +279,10 @@ export function useTransferBeat(anchors: BoardAnchors) {
         setMissed(true)
         await wait(MISS_HOLD)
         setMissed(false)
-        drop(KEY)
+        if (surface) {
+          surface.release()
+          surface.close()
+        } else drop(KEY)
       } finally {
         ctx.current = null
       }
@@ -278,7 +318,36 @@ export function useTransferBeat(anchors: BoardAnchors) {
               : Array.from(
                   root?.querySelectorAll<HTMLElement>('[data-transfer-choice]') ?? [],
                 ).find((slot) => slot.dataset.transferChoice === String(plan.index))
-          const from = rectOf(picked ?? chosen ?? null) ?? cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          // OUT OF THE CLOSED FAN, or out of the donor's seat — two different
+          // scenes sharing one flight. Only the fan is held out turned around,
+          // and only what came out of it is held at reading size on arrival:
+          // the seat's own steal has never been chosen by anybody, so there is
+          // nothing to show the taker that they do not already know.
+          //
+          // A NAMED REQUEST HAS A FAN TOO. The request surface has been holding
+          // the defender's closed hand out since the question was asked, so the
+          // card that was asked for comes out of THAT — the scene's own move
+          // (`PickSpecificCardStory`) — rather than out of a seat, which is
+          // where it flew from while there was no hand on screen to fly it out
+          // of. The surface is released in the same breath, so the fan slides
+          // back up as the card leaves it.
+          // WHICH PLACE IT LEAVES IS THE FAN'S OWN ANSWER. The surface holding
+          // the fan is the only party that knows whether a place was chosen in
+          // it — a blind pick points at one back, a named request points at
+          // nothing — so it answers once, for both, and this asks rather than
+          // arbitrates. Asking for the middle first and the pressed place second
+          // gave the middle to both questions, and every blind pick flew out of
+          // the middle whichever back was pressed (#168).
+          //
+          // The DOM markers below answer for a board with no surface up at all:
+          // a watcher's, where the offer is rendered but no hook owns it.
+          const asked = latest.current.requestPick?.current ?? null
+          const askedSlot = asked?.slot() ?? null
+          const offerBox = askedSlot ?? rectOf(picked ?? chosen ?? null)
+          const from = offerBox ?? cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          const held = offerBox ? cardBoxIn(centre, REVEAL_W) : centre
+          // …and the fan it came out of goes back up with it
+          if (askedSlot) asked?.close()
           // A random steal offers the donor's hand first: the suspense is real,
           // because the card genuinely is random. A named one has no question
           // left in it — the table watched the asker choose.
@@ -328,9 +397,13 @@ export function useTransferBeat(anchors: BoardAnchors) {
           clearPending()
           const [el] = await raised
           if (el) {
-            const anim = play('takeFromSeat', el, { from, to: centre })
+            const anim = play('takeFromSeat', el, {
+              from,
+              to: held,
+              rotateFrom: offerBox ? OFFER_TURN : 0,
+            })
             if (anim) await anim.finished
-            pin(KEY, centre) // I4 — it IS at the centre now
+            pin(KEY, held) // I4 — it IS at the centre now
           }
           dropFromDonor(plan.from)
           patch(KEY, { faceDown: false }) // Card plays its own flipCard

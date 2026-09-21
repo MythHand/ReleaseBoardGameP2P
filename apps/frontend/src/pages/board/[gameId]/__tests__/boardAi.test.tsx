@@ -132,6 +132,7 @@ describe('the AI pair at the centre', () => {
 describe('the row that takes a Release out of the discard (ai-inside)', () => {
   const pickingPending = (options: { uid: string; id: string }[], player = 'you') => ({
     kind: 'pickFromDiscard' as const,
+    raisedAt: 1,
     player,
     options,
     picks: 1 as const,
@@ -242,6 +243,7 @@ describe('the row that takes a Release out of the discard (ai-inside)', () => {
 describe("the grid that answers Git Cherry-pick's own pick", () => {
   const cherryPending = (options: { uid: string; id: string }[], picks: 1 | 2 = 1) => ({
     kind: 'pickFromDiscard' as const,
+    raisedAt: 1,
     player: 'you',
     options,
     picks,

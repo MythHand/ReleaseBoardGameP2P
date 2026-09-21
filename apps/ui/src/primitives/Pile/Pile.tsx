@@ -49,6 +49,19 @@ interface PileProps {
   heapShow?: number
   /** куча собирается в ровную стопку — сброс превращается в колоду */
   gathered?: boolean
+  /**
+   * РИСОВАТЬ ЛИ СЧЁТЧИК ВООБЩЕ — не то же самое, что «в стопке ноль карт».
+   * Пустая стопка это пустая стопка, и её `// 0` — такой же факт, как любой
+   * другой: он говорит, что здесь ничего нет, и именно из-под него карта
+   * прилетает обратно.
+   *
+   * Скрывать счётчик нужно ровно в одном случае: его содержимое сейчас НЕСУТ —
+   * куча собралась и улетает целиком, и число уезжает вместе с ней. Оба
+   * потребителя выражали это через `count={0}`, потому что сказать иначе было
+   * нечем: счётчик пропадал и там, где стопка честно пуста, а прилетающим
+   * картам было не подо что подныривать (#168).
+   */
+  showCount?: boolean
   /** DOM-узел коробки карты — в него целятся полёты в эту стопку */
   boxRef?: Ref<HTMLDivElement>
 }
@@ -69,6 +82,7 @@ export default function Pile({
   heap,
   heapShow,
   gathered,
+  showCount = true,
   boxRef,
 }: PileProps) {
   const cards = heap ?? []
@@ -140,11 +154,21 @@ export default function Pile({
           {/* выделение обложки — поверх стопки, по краям карты */}
           {!emptyDiscard && <span className={styles.glow} aria-hidden="true" />}
         </div>
-        {count > 0 && (
-          <span className={`${styles.count} ${countPos === 'tl' ? styles.tl : styles.br}`}>
-            {count}
-          </span>
-        )}
+        {/* THE COUNTER FADES, it does not blink out. It says how deep the pile
+            is, and that is worth showing and hiding rather than switching: a
+            heap gathering itself to leave puts its counter away mid-movement,
+            and mounting it in and out made that read as a glitch beside a
+            travel everything else on the table animates (owner, 21.09). Kept in
+            the markup and hidden by opacity, so the fade has both ends to run
+            between; `aria-hidden` while it is away, because a number nobody can
+            see is not a number to read out. */}
+        <span
+          className={`${styles.count} ${countPos === 'tl' ? styles.tl : styles.br}`}
+          data-shown={showCount}
+          aria-hidden={!showCount}
+        >
+          {count}
+        </span>
       </div>
       {label && <div className={styles.label}>{label}</div>}
     </div>

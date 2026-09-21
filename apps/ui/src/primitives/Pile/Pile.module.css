@@ -111,6 +111,18 @@
   composes: mono-lg tk-02 from '../../design/typography.module.css';
   position: absolute;
   z-index: calc(var(--z-flight) + 40);
+  transition: opacity var(--t-base) var(--ease-soft);
+}
+
+/* away while the pile it counts is on the move — see Pile.tsx */
+.count[data-shown="false"] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .count {
+    transition: none;
+  }
 }
 
 .count::before {

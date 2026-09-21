@@ -16,10 +16,15 @@
    `GitCards.module.css` (the playground scene this ports from). Do NOT put a
    transform back on this element. */
 .grid {
-  position: absolute;
-  inset: 0;
-  z-index: 40;
-  pointer-events: none;
+  /* Both of its states — standing over the table, and dropping to the flight
+     band once the answer is committed and its cards are only flying home —
+     come from `_tableSurface.module.css`. Rebase had the second one and this
+     did not, which is why its cards landed ON the pile counters (#168). */
+  composes: over from './_tableSurface.module.css';
+}
+
+.flight {
+  composes: flying from './_tableSurface.module.css';
 }
 
 /* The scene's backing under the picker (GitCards.module.css `.scrim`, same
@@ -28,12 +33,7 @@
    layer; it inherits `pointer-events: none`, so the table's own controls stay
    live, as they are with the grid up. */
 .scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--black-60);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  composes: scrim from './_tableSurface.module.css';
 }
 
 /* the actual card row — owns the scroll box `.grid` used to before this fix.
