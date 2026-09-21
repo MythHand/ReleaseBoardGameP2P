@@ -48,6 +48,28 @@ describe('toChatMessages', () => {
     })
   })
 
+  it('keeps the latest recorded role after the author leaves', () => {
+    const roleChanged: ChatEntry = {
+      kind: 'system',
+      id: 'chat-2',
+      sequence: 2,
+      createdAt: 2,
+      event: {
+        kind: 'roleChanged',
+        memberId: 'member-a',
+        name: 'old',
+        role: 'spectator',
+      },
+    }
+
+    expect(map([entry, roleChanged])[0]).toMatchObject({
+      memberId: 'member-a',
+      who: 'old',
+      role: 'spectator',
+      gone: true,
+    })
+  })
+
   it('keeps equal display names distinct through member identity', () => {
     const second: UserChatEntry = {
       ...entry,

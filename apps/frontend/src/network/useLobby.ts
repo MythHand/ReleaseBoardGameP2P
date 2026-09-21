@@ -25,6 +25,7 @@ import {
   readKeeper,
   readSession,
   type StoredKeeper,
+  type StoredLobbyConfig,
   type StoredSession,
   writeKeeper,
   writeSession,
@@ -645,6 +646,16 @@ export function useLobby(): UseLobby {
     if (stored) writeSession({ ...stored, gameId: id })
   }, [])
 
+  const rememberLobbyConfig = useCallback((lobby: Pick<LobbyState, 'maxPlayers' | 'setup'>) => {
+    const stored = readSession()
+    if (stored?.role !== 'host') return
+    const lobbyConfig: StoredLobbyConfig = {
+      maxPlayers: lobby.maxPlayers,
+      setup: lobby.setup,
+    }
+    writeSession({ ...stored, lobbyConfig })
+  }, [])
+
   // Everything this browser stored about a session it is leaving. The pending
   // snapshot goes first, or clearing the record and then letting the trailing
   // write land would restore exactly what was just discarded.
@@ -772,18 +783,16 @@ export function useLobby(): UseLobby {
         // from peer-unavailable) — preserve it the same way the message is
         // preserved, or the two would disagree and 'not-found' would become
         // unreachable.
-        // Mid-match, a lost host is not the end of the session — it is the
-        // other way a peer ends up off the table, and the one a reload cannot
-        // help with because this tab never went away. It happens routinely:
-        // when the HOST reloads, every guest's channel dies under it. Left as
-        // an error, the guest sat on a frozen board with no dial running and
-        // recovered only if the player happened to reload too.
+        // In an active room, a lost host is not the end of the session — it is
+        // what every guest observes while the host reloads, in the lobby as
+        // well as during a match. Left as an error, the guest has no dial
+        // running and recovers only if the player happens to reload too.
         //
         // Only once the channel had actually opened: a channel that never
         // opened is a failed join, not a lost session, and keeps its more
         // specific error below.
         const stored = readSession()
-        if (gameIdRef.current && hostConnectedRef.current && stored?.role === 'guest') {
+        if (hostConnectedRef.current && stored?.role === 'guest') {
           reconnectSessionRef.current = stored
           void runGuestReconnectRef.current?.()
           return
@@ -1122,6 +1131,7 @@ export function useLobby(): UseLobby {
           role: 'host',
           gameId: null,
           joinedAt: Date.now(),
+          lobbyConfig: { maxPlayers: initial.maxPlayers, setup: initial.setup },
         })
         setStatus('in-lobby')
         // The room code is the host peer id — known synchronously, so callers can
@@ -1286,17 +1296,21 @@ export function useLobby(): UseLobby {
     const stored = readSession()
     const snapshot = readKeeper()
     if (stored?.role !== 'host') return false
-    if (!stored.gameId) return false
     const rejectStoredMatch = () => {
       clearKeeper()
       clearSession()
       return false
     }
-    if (!snapshot || !isNonEmptyString(stored.roomCode)) return rejectStoredMatch()
+    if (!isNonEmptyString(stored.roomCode)) return rejectStoredMatch()
     const hostPeerId = parseRoomCode(stored.roomCode)
-    const engine = createFakeEngine()
-    const normalized = normalizeKeeperSnapshot(snapshot, stored.gameId, hostPeerId, engine)
-    if (!normalized) return rejectStoredMatch()
+    if (!hostPeerId) return rejectStoredMatch()
+    const engine = stored.gameId ? createFakeEngine() : null
+    const normalized =
+      stored.gameId && snapshot && engine
+        ? normalizeKeeperSnapshot(snapshot, stored.gameId, hostPeerId, engine)
+        : null
+    if (stored.gameId && !normalized) return rejectStoredMatch()
+    if (!stored.gameId) clearKeeper()
     const generation = ++transportGenerationRef.current
     const epoch = sessionEpochRef.current
     let owner: Transport | null = null
@@ -1361,9 +1375,45 @@ export function useLobby(): UseLobby {
       isHostRef.current = true
       setIsHost(true)
       setRoomCode(stored.roomCode)
+      const hostResumeToken = getResumeToken(stored.roomCode)
+      const hostMemberId = chatSession.restoreHost(stored.roomCode, hostResumeToken)
+
+      if (!stored.gameId) {
+        const lobbyConfig = normalizeLobbyConfig(stored.lobbyConfig)
+        privateSeatsRef.current = []
+        applySeats([])
+        resumeTokensRef.current = new Map([[t.id, hostResumeToken]])
+        const restoredLobby = createLobbyState({
+          selfId: t.id,
+          hostId: t.id,
+          maxPlayers: lobbyConfig?.maxPlayers ?? 6,
+          setup: lobbyConfig?.setup ?? DEFAULT_SETUP,
+          peers: [
+            {
+              id: t.id,
+              memberId: hostMemberId,
+              name: stored.name,
+              role: 'host',
+              ready: true,
+              where: 'lobby',
+            },
+          ],
+        })
+        commit(restoredLobby)
+        rememberLobbyConfig(restoredLobby)
+        gameIdRef.current = null
+        setGameId(null)
+        matchSeqRef.current = 0
+        setStatus('in-lobby')
+        return true
+      }
+
+      if (!normalized || !engine) {
+        t.close()
+        return rejectStoredMatch()
+      }
       privateSeatsRef.current = normalized.privateSeats
       applySeats(publicSeats(privateSeatsRef.current))
-      const hostMemberId = chatSession.restoreHost(stored.roomCode, getResumeToken(stored.roomCode))
       resumeTokensRef.current = new Map(
         privateSeatsRef.current.flatMap(({ seat, resumeToken }) =>
           resumeToken === null ? [] : [[seat.peerId, resumeToken] as const],
@@ -1454,6 +1504,7 @@ export function useLobby(): UseLobby {
     commit,
     applySeats,
     persistKeeper,
+    rememberLobbyConfig,
     surfaceSetupError,
   ])
 
@@ -1711,10 +1762,11 @@ export function useLobby(): UseLobby {
         ]
       })
       commit(r.state)
+      rememberLobbyConfig(r.state)
       dispatch(r.outgoing)
       broadcastChatEntries(entries)
     },
-    [broadcastChatEntries, chatSession, commit, dispatch],
+    [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig],
   )
 
   const setBots = useCallback(
@@ -1816,11 +1868,13 @@ export function useLobby(): UseLobby {
               }),
             ],
       )
-      commit(applyConfig(current, { setup }))
+      const next = applyConfig(current, { setup })
+      commit(next)
+      rememberLobbyConfig(next)
       dispatch([{ to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { setup } } }])
       broadcastChatEntries(entries)
     },
-    [broadcastChatEntries, chatSession, commit, dispatch],
+    [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig],
   )
 
   // What `startGame` needs to bring a match into being: mint a seed, create

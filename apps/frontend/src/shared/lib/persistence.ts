@@ -119,6 +119,7 @@ export interface StoredSession {
   role: 'host' | 'guest'
   gameId: string | null
   joinedAt: number
+  lobbyConfig?: StoredLobbyConfig
 }
 
 export function readSession(now: number = Date.now()): StoredSession | null {

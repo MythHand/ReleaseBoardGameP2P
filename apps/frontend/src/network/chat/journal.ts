@@ -104,6 +104,7 @@ export function parseChatJournal(value: unknown): ChatJournal | null {
   const sequences = new Set<number>()
   let maxSequence = 0
   for (const entry of entries) {
+    if (entry.id !== `chat-${entry.sequence}`) return null
     if (ids.has(entry.id) || sequences.has(entry.sequence)) return null
     ids.add(entry.id)
     sequences.add(entry.sequence)

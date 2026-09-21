@@ -662,7 +662,7 @@ it('preserves a not-found errorKind when the never-opened channel then disconnec
   expect(result.current.errorKind).toBe('not-found')
 })
 
-it('reports connection for a host disconnect after a successful connection, even over a stale kind', async () => {
+it('reconnects after a host disconnect instead of keeping a stale error', async () => {
   const { result } = renderHook(() => useLobby())
   await act(async () => {
     await result.current.joinRoom('F96-NMT', 'Dimbo')
@@ -677,11 +677,14 @@ it('reports connection for a host disconnect after a successful connection, even
   act(() => {
     transports[0].onConnection?.(hostId)
   })
-  act(() => {
+  await act(async () => {
     transports[0].onDisconnect?.(hostId)
+    await Promise.resolve()
   })
-  expect(result.current.status).toBe('error')
-  expect(result.current.errorKind).toBe('connection')
+  expect(transports).toHaveLength(2)
+  expect(result.current.status).toBe('connecting')
+  expect(result.current.error).toBeNull()
+  expect(result.current.errorKind).toBeNull()
 })
 
 // --- leaving the lobby for the board, together ---
@@ -1657,6 +1660,27 @@ it('persists the session when a room is created', async () => {
   })
 })
 
+it('keeps the latest host lobby configuration in the stored room session', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.createRoom('Ann', 6)
+  })
+  const setup: Setup = {
+    handLimit: '8bit',
+    releases: 'fast',
+    releaseCond: 'easy',
+    ai: 'no',
+    gitBranch: 'strategic',
+  }
+
+  act(() => {
+    result.current.setMaxPlayers(3)
+    result.current.setSetup(setup)
+  })
+
+  expect(storedSession()?.lobbyConfig).toEqual({ maxPlayers: 3, setup })
+})
+
 it('persists the session when a room is joined', async () => {
   const { result } = renderHook(() => useLobby())
   await act(async () => {
@@ -2369,7 +2393,7 @@ it('a snapshot still on its trailing edge cannot survive walking back to the lob
 
 // --- host restore ---
 
-function storedHostSession(gameId: string | null): void {
+function storedHostSession(gameId: string | null, lobbyConfig?: StoredLobbyConfig): void {
   sessionStorage.setItem(
     SESSION_KEY,
     JSON.stringify({
@@ -2378,6 +2402,7 @@ function storedHostSession(gameId: string | null): void {
       role: 'host',
       gameId,
       joinedAt: Date.now(),
+      ...(lobbyConfig && { lobbyConfig }),
     } satisfies StoredSession),
   )
 }
@@ -2963,15 +2988,63 @@ it('hands a stored guest session to the guest reconnect path, not the host resto
   expect(result.current.roomCode).toBe('ABC-123')
 })
 
-it('does not restore a stored room with no match running', async () => {
-  storedHostSession(null)
-  storedKeeperSnapshot('peer0')
+it('restores a stored host room and its chat when no match is running', async () => {
+  const roomCode = formatRoomCode('peer0')
+  const setup: Setup = {
+    handLimit: 'memory',
+    releases: 'fast',
+    releaseCond: 'easy',
+    ai: 'less',
+    gitBranch: 'strategic',
+  }
+  storedHostSession(null, { maxPlayers: 3, setup })
+  sessionStorage.setItem(
+    'release:resumeCredential',
+    JSON.stringify({ roomCode, token: HOST_RESUME_TOKEN }),
+  )
+  writeChat({
+    roomCode,
+    entries: [
+      {
+        kind: 'message',
+        id: 'chat-7',
+        sequence: 7,
+        createdAt: 700,
+        author: { memberId: 'member-host', name: 'Dimbo', role: 'host' },
+        text: 'before lobby reload',
+      },
+    ],
+    nextSequence: 8,
+    members: [{ clientId: HOST_RESUME_TOKEN, memberId: 'member-host' }],
+    savedAt: Date.now(),
+  })
 
-  renderHook(() => useLobby())
+  const { result } = renderHook(() => useLobby())
   await act(async () => {
     await Promise.resolve()
   })
-  expect(transports).toHaveLength(0)
+
+  expect(transports).toHaveLength(1)
+  expect(result.current.status).toBe('in-lobby')
+  expect(result.current.isHost).toBe(true)
+  expect(result.current.roomCode).toBe(roomCode)
+  expect(result.current.gameId).toBeNull()
+  expect(result.current.state).toMatchObject({ maxPlayers: 3, setup })
+  expect(result.current.state?.peers.peer0).toMatchObject({
+    memberId: 'member-host',
+    name: 'Dimbo',
+    role: 'host',
+    where: 'lobby',
+  })
+  expect(result.current.chat.entries.map((entry) => entry.id)).toEqual(['chat-7'])
+
+  act(() => expect(result.current.chat.send('after lobby reload')).toBe(true))
+  expect(result.current.chat.entries.at(-1)).toMatchObject({
+    id: 'chat-8',
+    sequence: 8,
+    author: { memberId: 'member-host' },
+  })
+  expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
 })
 
 it('does not restore when the keeper snapshot belongs to a different match', async () => {
@@ -3308,6 +3381,28 @@ it('re-dials the stored room when the reload happened in the lobby', async () =>
   expect(join?.type === 'JOIN_REQUEST' && join.payload.resumeToken).toBeTruthy()
   // A successful reconnect must not leave the overlay up over a working table.
   expect(result.current.reconnect.status).toBe('idle')
+})
+
+it('re-dials when an established lobby connection loses the restoring host', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('ABC-123', 'Bo')
+  })
+  const hostId = parseRoomCode('ABC-123')
+  const first = transports[0]
+  act(() => {
+    first.onConnection?.(hostId)
+  })
+  expect(result.current.gameId).toBeNull()
+
+  await act(async () => {
+    first.onDisconnect?.(hostId)
+    await Promise.resolve()
+  })
+
+  expect(transports).toHaveLength(2)
+  expect(result.current.reconnect.status).toBe('trying')
+  expect(result.current.status).toBe('connecting')
 })
 
 it('does not run the guest reconnect when the host restore already succeeded', async () => {

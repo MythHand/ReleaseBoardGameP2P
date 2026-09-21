@@ -13,6 +13,15 @@ export function toChatMessages(args: {
   const peersByMemberId = new Map<MemberId, PeerInfo>(
     args.peers.map((peer) => [peer.memberId, peer]),
   )
+  const latestRoles = new Map<MemberId, { name: string; role: ChatRole }>()
+  for (const entry of args.entries) {
+    if (entry.kind === 'system' && entry.event.kind === 'roleChanged') {
+      latestRoles.set(entry.event.memberId, {
+        name: entry.event.name,
+        role: entry.event.role,
+      })
+    }
+  }
 
   return args.entries.map((entry) => {
     if (entry.kind === 'system') {
@@ -20,13 +29,14 @@ export function toChatMessages(args: {
     }
 
     const peer = peersByMemberId.get(entry.author.memberId)
+    const latestRole = latestRoles.get(entry.author.memberId)
     return {
       id: entry.id,
       memberId: entry.author.memberId,
-      who: peer?.name ?? entry.author.name,
+      who: peer?.name ?? latestRole?.name ?? entry.author.name,
       text: entry.text,
       time: args.formatTime(entry.createdAt),
-      role: peer ? toChatRole(peer.role) : entry.author.role,
+      role: peer ? toChatRole(peer.role) : (latestRole?.role ?? entry.author.role),
       gone: !peer,
     }
   })

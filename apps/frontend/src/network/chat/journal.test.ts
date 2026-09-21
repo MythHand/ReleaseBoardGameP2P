@@ -162,6 +162,16 @@ describe('chat runtime validation', () => {
     expect(parseChatJournal(value)).toEqual(value)
   })
 
+  it('rejects an entry whose canonical id does not match its sequence', () => {
+    expect(
+      parseChatJournal({
+        entries: [{ ...firstMessage, id: 'chat-2', sequence: 1 }],
+        nextSequence: 2,
+        memberIdsByClientId: { 'client-a': 'member-a' },
+      }),
+    ).toBeNull()
+  })
+
   it.each([
     ['duplicate ids', [firstMessage, { ...firstMessage, sequence: 2 }], 3],
     ['duplicate sequences', [firstMessage, { ...firstMessage, id: 'chat-2' }], 3],
