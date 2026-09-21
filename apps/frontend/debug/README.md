@@ -91,6 +91,11 @@ new attack animation. Restart resets the same card identities into a new game.
   instead. Monitoring is in the hand too, for the other thing that goes into a
   zone. The opponent holds a Bug and a Sudo, so the window the fresh release
   opens has something to answer it.
+- **Release: pay a card:** the same hand with `releaseCond: base`. Pull Frontend
+  onto the table, then click Hotfix (or another available hand card) to pay.
+  The selected card leaves the hand when its flight starts, stands beside the
+  release, then goes to discard. It must never appear in the hand during that
+  flight or while waiting for the engine response.
 - **Error 503: the alarm / AI trigger: a Crush:** nothing has been drawn yet, and
   the trigger sits on top of the pile — both cards fire on the draw and never
   reach a hand. The 503 alarm stands because there are two ways to answer it, a

@@ -2159,3 +2159,21 @@ remote live selection and held-card/fan handoff alongside the bounded preview.
 independent scroll position hides its row. The updated anonymous fan uses click
 selection. The shared early staging handoff also covers Debugger/503; that
 real-engine regression reproduces the gap in main’s render-time workaround.
+
+
+## 2026-09-22 — #182: clicked release cost remained in the hand
+
+`onCostPick` flew the chosen card beside the release but only recorded `paidCost`
+after landing. Neither the flight nor that standing card was excluded from
+`handItems`, so the same card stayed in the fan until the engine caught up.
+
+The payment now owns the chosen uid from takeoff until the animated hand
+projection no longer contains it. Clearing the standing card for its discard
+flight does not put it back in the fan. The pending payment blocks another pick
+or cancellation; rejection restores the choice, and a rematch invalidates an
+unfinished flight. A newer projection that has already spent the card also removes
+its unfinished carrier. The existing flight presets and engine rules are unchanged.
+
+The debug preset **Release: pay a card** uses `releaseCond: base`, making the
+payment reachable beside the existing free-release preset. Board regressions
+cover an unfinished flight, delayed acceptance and rejected-payment retry.

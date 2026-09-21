@@ -57,6 +57,7 @@ import {
 } from '~/entities/game/board'
 import { stageSlot } from '~/entities/game/board/stageSlot'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
+import { useResolveFeedback } from './_useResolveFeedback'
 
 // Moved verbatim from the pre-#99 `_useBoardInteractions.ts` — the comparison a
 // target pick still needs, structural and order-independent so a click site
@@ -368,6 +369,22 @@ export function useBoardStaging({
   // open beside the release rather than discarded on the spot; the combo beat
   // moves it on (`clearPaidCost`).
   const [paidCost, setPaidCost] = useState<{ uid: string; card: CardData } | null>(null)
+  // The cost leaves the fan at takeoff, before it becomes the standing
+  // paidCost. Keep it out until the animated hand catches up to acceptance.
+  const [payingCost, setPayingCost] = useState<string | null>(null)
+  const costPayment = useRef<{ uid: string } | null>(null)
+  const resetCostPayment = useCallback(() => {
+    costPayment.current = null
+    setPayingCost(null)
+    setPaidCost(null)
+    flyer.drop('cost')
+  }, [flyer.drop])
+  const resolveCost = useResolveFeedback(events, state.selfId, actions, resetCostPayment)
+  useLayoutEffect(() => {
+    if (payingCost && !state.you.hand.some((card) => card.uid === payingCost)) {
+      resetCostPayment()
+    }
+  }, [payingCost, state.you.hand, resetCostPayment])
 
   // WHAT IS NOT IN THE FAN RIGHT NOW — the staged halves, and the release held
   // at the centre while its cost is owed. Exported rather than kept private,
@@ -385,11 +402,11 @@ export function useBoardStaging({
   const handOut = useMemo(
     () =>
       new Set(
-        [staged?.support?.uid, staged?.main?.uid, cost?.release].filter((uid): uid is string =>
-          Boolean(uid),
+        [staged?.support?.uid, staged?.main?.uid, cost?.release, payingCost].filter(
+          (uid): uid is string => Boolean(uid),
         ),
       ),
-    [staged, cost],
+    [staged, cost, payingCost],
   )
 
   const handItems = useMemo(
@@ -504,6 +521,7 @@ export function useBoardStaging({
     // catch-up effect above clears it the moment the pending echoes back), so
     // this branch cannot be folded into the `s`-based cancel that follows.
     if (cost) {
+      if (costPayment.current) return
       arrowCtl.stop()
       actions?.onResolve?.({ kind: 'cancelRelease' })
       // A COMBO release is still staged at this point and a solo one is not,
@@ -925,7 +943,7 @@ export function useBoardStaging({
   // `drop('cost')` two lines below).
   const onCostPick = useCallback(
     (uid: string) => {
-      if (!enabled || !costOptions.includes(uid)) return
+      if (!enabled || costPayment.current || !costOptions.includes(uid)) return
       // measured against `handItems` — the array the fan actually RENDERS
       // (the staged release is already excluded from it) — not `you.hand`,
       // which still carries it and so is one slot short of what is on screen:
@@ -935,9 +953,12 @@ export function useBoardStaging({
       const index = handItems.findIndex((c) => c.uid === uid)
       const item = handItems[index]
       if (!item) return
+      const to = anchors.cost.current?.getBoundingClientRect()
+      const from = reduced ? undefined : slotBox(index, handItems.length)
+      const attempt = { uid }
+      costPayment.current = attempt
+      setPayingCost(uid)
       void (async () => {
-        const to = anchors.cost.current?.getBoundingClientRect()
-        const from = reduced ? undefined : slotBox(index, handItems.length)
         if (!reduced && from && to) {
           const [el] = await flyer.raise([{ key: 'cost', card: item.card, at: from }])
           if (el) await play('playToCenter', el, { from, to })?.finished
@@ -945,10 +966,13 @@ export function useBoardStaging({
         // the swap from carrier to static render happens in the SAME commit —
         // the approved source's own `payCost` idiom (`setCost` / `drop('fly')`
         // together) — so there is never a frame with neither on screen.
+        if (costPayment.current !== attempt) return
         setPaidCost({ uid, card: item.card })
         flyer.drop('cost')
-        actions?.onResolve?.({ kind: 'discardForRelease', card: uid })
-      })()
+        resolveCost({ kind: 'discardForRelease', card: uid })
+      })().catch(() => {
+        if (costPayment.current === attempt) resetCostPayment()
+      })
     },
     [
       enabled,
@@ -959,7 +983,8 @@ export function useBoardStaging({
       anchors.cost,
       flyer.raise,
       flyer.drop,
-      actions,
+      resolveCost,
+      resetCostPayment,
     ],
   )
 
@@ -1349,13 +1374,14 @@ export function useBoardStaging({
     dispatchWatermarkRef.current = 0
     setCancelling(false)
     setStage('none')
-    setPaidCost(null)
+    resetCostPayment()
     pairApi.current.release()
     arrowCtl.stop()
     flyer.drop()
     arrival.reset()
     return () => {
       plainAttempt.current += 1
+      costPayment.current = null
     }
   }, [matchKey])
 

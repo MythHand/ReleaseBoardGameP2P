@@ -162,3 +162,28 @@ it('leaves the hand effect with nothing in any zone, so the only aim is a hand',
   expect(state.players.p2.hand.length).toBeGreaterThan(0)
   expect(state.players.you.hand.some((c) => c.id === 'attack-security-bug')).toBe(true)
 })
+
+it('offers a release scenario whose card payment is an actual pending decision', () => {
+  const state = createScenario('releaseCost', 'release-cost')
+  const release = state.players.you.hand.find((card) => card.id === 'release-frontend')
+  const cost = state.players.you.hand.find((card) => card.id === 'defense-hotfix')
+  expect(release).toBeDefined()
+  expect(cost).toBeDefined()
+  if (!release || !cost) throw new Error('missing release payment fixture')
+  const placed = engine.reduce(state, {
+    type: 'PLAY',
+    player: 'you',
+    card: release.uid,
+    at: Date.now(),
+  })
+  expect(placed.state.pending).toMatchObject({ kind: 'discardForRelease', release: release.uid })
+  expect(placed.state.players.you.release.frontend).toBeUndefined()
+  const paid = engine.reduce(placed.state, {
+    type: 'RESOLVE',
+    player: 'you',
+    choice: { kind: 'discardForRelease', card: cost.uid },
+    at: Date.now(),
+  })
+  expect(paid.state.players.you.release.frontend?.card.uid).toBe(release.uid)
+  expect(paid.state.decks.discard.map((card) => card.uid)).toContain(cost.uid)
+})

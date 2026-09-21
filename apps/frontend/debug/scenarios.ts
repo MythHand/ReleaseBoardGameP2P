@@ -22,6 +22,7 @@ export const SCENARIOS = [
   'blindSteal',
   'handDefense',
   'release',
+  'releaseCost',
   'alarm503',
   'aiTrigger',
 ] as const
@@ -85,7 +86,7 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
     setup: {
       handLimit: 'base',
       releases: 'base',
-      releaseCond: 'easy',
+      releaseCond: scenario === 'releaseCost' ? 'base' : 'easy',
       ai: 'base',
       gitBranch: 'strategic',
     },
@@ -95,7 +96,7 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   if (scenario === 'securityRelease' || scenario === 'securityHand')
     return createSecurityScenario(initial, scenario)
   if (transfer) return createTransferScenario(initial, scenario)
-  if (scenario === 'release') return createReleaseScenario(initial)
+  if (scenario === 'release' || scenario === 'releaseCost') return createReleaseScenario(initial)
   if (scenario === 'alarm503' || scenario === 'aiTrigger')
     return createTriggerScenario(initial, scenario)
   const operation = scenario.startsWith('branch')

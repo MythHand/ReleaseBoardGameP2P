@@ -100,12 +100,15 @@ function costPending(options: string[]): TablePending {
   return { kind: 'discardForRelease', player: 'you', release: 'release-frontend#0', options }
 }
 
-function releaseBoard(overrides: { pending?: TablePending }, actions: TableActions = {}) {
+function releaseBoard(
+  overrides: { pending?: TablePending; hand?: typeof HAND },
+  actions: TableActions = {},
+) {
   const base = makeBoardProps()
   const props = makeBoardProps({
     state: {
       ...base.state,
-      you: { ...base.state.you, hand: HAND },
+      you: { ...base.state.you, hand: overrides.hand ?? HAND },
       turn: base.state.selfId,
       hasDrawn: true,
       playable: HAND.map((c) => c.uid),
@@ -1030,6 +1033,20 @@ it('the standing release stays visible while its own cost is still flying to pay
   }
 })
 
+it('takes the clicked cost out of the hand while it flies beside the release', async () => {
+  const { rerender } = render(releaseBoard({}, {}))
+  await pullCardFromFan('release-frontend#0')
+  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  const animateSpy = holdFlightsOpen()
+  try {
+    await clickFanCard('attack-bug#0')
+    expect(document.querySelector('[data-hand-slot] [data-card="attack-bug"]')).toBeNull()
+    expect(document.querySelector('[class*="_flyer_"] [data-card="attack-bug"]')).toBeTruthy()
+  } finally {
+    animateSpy.mockRestore()
+  }
+})
+
 // Reduced motion's own safety net (#101, Task 11): `useBeats.ts` never runs a
 // beat at all under reduced motion, so the combo beat's own clear of
 // `paidCost` (comboBeat.tsx's `runRelease`) never fires either — without
@@ -1234,5 +1251,74 @@ it('reduced motion stands the release and settles it with no beat involved', asy
     expect(stage.querySelector('[data-card]')).toBeNull()
   } finally {
     mm.mockRestore()
+  }
+})
+
+it('keeps a paid cost out of the fan until the accepted hand projection arrives', async () => {
+  const onResolve = vi.fn()
+  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
+  await clickFanCard('attack-bug#0')
+  await vi.waitFor(() => expect(onResolve).toHaveBeenCalledTimes(1))
+  expect(document.querySelector('[data-centre-slot="cost"] [data-card="attack-bug"]')).toBeTruthy()
+  expect(document.querySelector('[data-hand-slot] [data-card="attack-bug"]')).toBeNull()
+  act(() => placing.staging?.clearPaidCost())
+  expect(document.querySelector('[data-hand-slot] [data-card="attack-bug"]')).toBeNull()
+})
+
+it('restores a rejected cost choice and lets it be retried without duplicate submissions', () => {
+  const base = makeBoardProps()
+  const onResolve = vi.fn()
+  const { result, rerender } = renderHook(
+    ({ events }: { events: import('@release/engine').Event[] }) =>
+      useBoardStaging({
+        state: {
+          ...base.state,
+          you: { ...base.state.you, hand: HAND },
+          pending: costPending(['attack-bug#0']),
+        },
+        anchors: useBoardAnchors(),
+        events,
+        enabled: true,
+        actions: { onResolve },
+      }),
+    { initialProps: { events: [] as import('@release/engine').Event[] } },
+  )
+  act(() => {
+    result.current.onCostPick('attack-bug#0')
+    result.current.onCostPick('attack-bug#0')
+  })
+  expect(onResolve).toHaveBeenCalledTimes(1)
+  expect(result.current.handItems).toHaveLength(0)
+  rerender({
+    events: [
+      {
+        id: 1,
+        type: 'rejected',
+        reason: 'retry',
+        action: {
+          at: 0,
+          type: 'RESOLVE',
+          player: 'you',
+          choice: { kind: 'discardForRelease', card: 'attack-bug#0' },
+        },
+      },
+    ],
+  })
+  expect(result.current.handItems.map((card) => card.uid)).toEqual(['attack-bug#0'])
+  expect(result.current.paidCost).toBeNull()
+  act(() => result.current.onCostPick('attack-bug#0'))
+  expect(onResolve).toHaveBeenCalledTimes(2)
+})
+
+it('removes the in-flight cost when a newer hand projection has already spent it', async () => {
+  const { rerender } = render(releaseBoard({ pending: costPending(['attack-bug#0']) }))
+  const animateSpy = holdFlightsOpen()
+  try {
+    await clickFanCard('attack-bug#0')
+    expect(document.querySelector('[class*="_flyer_"] [data-card="attack-bug"]')).toBeTruthy()
+    rerender(releaseBoard({ hand: [] }))
+    expect(document.querySelector('[class*="_flyer_"] [data-card="attack-bug"]')).toBeNull()
+  } finally {
+    animateSpy.mockRestore()
   }
 })

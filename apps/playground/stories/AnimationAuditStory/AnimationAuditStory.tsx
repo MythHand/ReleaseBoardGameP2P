@@ -778,6 +778,21 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
+      ru: 'Карта оплаты релиза оставалась в руке во время перелёта',
+      en: 'A clicked release cost stayed in the hand during its flight',
+    },
+    problem: {
+      ru: 'Исправлено: выбранная карта исключается из руки с начала перелёта и до обновления проекции. Повторная оплата блокируется; отказ движка возвращает карту для повторного выбора. Debug-сценарий Release: pay a card включает обязательную оплату.',
+      en: 'Fixed: the chosen cost leaves the hand at takeoff and stays out until the hand projection catches up. A second payment is blocked; rejection restores the choice. The Release: pay a card debug preset requires payment.',
+    },
+    where: {
+      ru: 'pages/board/[gameId]/_useBoardStaging.ts + debug/scenarios.ts',
+      en: 'pages/board/[gameId]/_useBoardStaging.ts + debug/scenarios.ts',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
       ru: 'После drag карта повторно летела из руки в центр (#180)',
       en: 'A local drag replayed the hand-to-centre flight (#180)',
     },
