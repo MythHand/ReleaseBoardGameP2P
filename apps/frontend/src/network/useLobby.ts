@@ -16,7 +16,7 @@ import {
   seatOf,
   seatsFor,
 } from '~/entities/game/seats'
-import type { ChatRole } from '~/shared/chat/types'
+import type { ChatEntry, ChatRole } from '~/shared/chat/types'
 import {
   clearKeeper,
   clearLog,
@@ -440,6 +440,7 @@ export interface UseLobby {
 
 export function useLobby(): UseLobby {
   const chatSession = useChatSession()
+  const clearChatRoom = chatSession.clearRoom
   const [state, setState] = useState<LobbyState | null>(null)
   const [status, setStatus] = useState<LobbyStatus>('idle')
   // The host's half of the reconnect overlay (see the interface doc). Set for
@@ -696,12 +697,13 @@ export function useLobby(): UseLobby {
       privateSeatsRef.current = []
       applySeats([])
       forgetStored()
+      clearChatRoom()
       clearLog()
       if (!transport) return
       if (flushMs) setTimeout(() => transport.close(), flushMs)
       else transport.close()
     },
-    [applySeats, forgetStored, resetRemoteLink],
+    [applySeats, clearChatRoom, forgetStored, resetRemoteLink],
   )
 
   const dispatch = useCallback((outgoing: Outgoing[]) => {
@@ -712,6 +714,18 @@ export function useLobby(): UseLobby {
       else t.send(o.to, o.message)
     }
   }, [])
+
+  const broadcastChatEntries = useCallback(
+    (entries: ChatEntry[]) => {
+      dispatch(
+        entries.map((entry) => ({
+          to: 'broadcast' as const,
+          message: { type: 'CHAT_ENTRY' as const, payload: { entry } },
+        })),
+      )
+    },
+    [dispatch],
+  )
 
   // A peer (or the host) dropping its DataChannel must update the roster, or the
   // lobby keeps counting a ghost player toward canStart()/turn rotation.
@@ -727,7 +741,8 @@ export function useLobby(): UseLobby {
       if (!current) return
       if (isHostRef.current) {
         // Host owns the roster: prune the peer and tell everyone else.
-        if (!current.peers[peerId]) return
+        const leaving = current.peers[peerId]
+        if (!leaving) return
         resumeTokensRef.current.delete(peerId)
         // The roster and the keeper are separate books and both have to be
         // told. Without this the seat stays bound to a dead peer id: its SYNCs
@@ -735,8 +750,17 @@ export function useLobby(): UseLobby {
         // period, and a returning player finds their own seat occupied —
         // `rebind` refuses a seat whose peerId is not null.
         keeperRef.current?.peerLeft(peerId)
-        commit(applyPeerLeft(current, peerId))
+        const next = applyPeerLeft(current, peerId)
+        const entry = Object.values(next.peers).some((peer) => peer.memberId === leaving.memberId)
+          ? null
+          : chatSession.appendSystem({
+              kind: 'memberLeft',
+              memberId: leaving.memberId,
+              name: leaving.name,
+            })
+        commit(next)
         dispatch([{ to: 'broadcast', message: { type: 'PLAYER_KICKED', payload: { peerId } } }])
+        if (entry) broadcastChatEntries([entry])
       } else if (peerId === current.hostId) {
         // The guest can't proceed without the host. Only call it "host left" if
         // we were actually connected; a channel that never opened means the
@@ -776,7 +800,7 @@ export function useLobby(): UseLobby {
         commit(applyPeerLeft(current, peerId))
       }
     },
-    [commit, dispatch],
+    [broadcastChatEntries, chatSession, commit, dispatch],
   )
 
   const onMessage = useCallback(
@@ -804,19 +828,26 @@ export function useLobby(): UseLobby {
             ? privateSeatsRef.current.find(({ resumeToken }) => resumeToken === payload.resumeToken)
             : undefined
           if (liveGameId && !privateSeat) keeperRef.current?.peerLeft(msg.from)
-          if (
-            !liveGameId &&
-            [...resumeTokensRef.current].some(
+          if (!liveGameId) {
+            const liveCredentialPeer = [...resumeTokensRef.current].find(
               ([peerId, resumeToken]) => peerId !== msg.from && resumeToken === payload.resumeToken,
             )
-          ) {
-            return
+            if (liveCredentialPeer) {
+              const existing = current.peers[liveCredentialPeer[0]]
+              if (!existing || existing.name !== payload.name) return
+            }
           }
           if (!liveGameId) resumeTokensRef.current.set(msg.from, payload.resumeToken)
           const admission = chatSession.admit(payload.resumeToken)
           const r = handleJoinRequest(current, msg.from, admission.memberId, payload.name, {
             matchRunning: Boolean(liveGameId),
             returningSeat: privateSeat?.seat,
+          })
+          const admittedPeer = r.state.peers[msg.from]
+          const chatEntry = chatSession.appendSystem({
+            kind: admission.isNew ? 'memberJoined' : 'memberReconnected',
+            memberId: admittedPeer.memberId,
+            name: admittedPeer.name,
           })
           commit(r.state)
           dispatch([
@@ -830,6 +861,10 @@ export function useLobby(): UseLobby {
                   selfMemberId: admission.memberId,
                 },
               },
+            },
+            {
+              to: 'broadcast',
+              message: { type: 'CHAT_ENTRY', payload: { entry: chatEntry } },
             },
           ])
 
@@ -951,6 +986,7 @@ export function useLobby(): UseLobby {
             // A stored record here would offer to walk the kicked player
             // straight back into the room that just removed them.
             forgetStored()
+            clearChatRoom()
           } else commit(applyPeerLeft(current, msg.payload.peerId))
           break
         case 'GAME_STARTING': {
@@ -1016,7 +1052,7 @@ export function useLobby(): UseLobby {
           break
       }
     },
-    [chatSession, commit, dispatch, applySeats, forgetStored, rememberGame],
+    [chatSession, clearChatRoom, commit, dispatch, applySeats, forgetStored, rememberGame],
   )
 
   const createRoom = useCallback(
@@ -1327,6 +1363,7 @@ export function useLobby(): UseLobby {
       setRoomCode(stored.roomCode)
       privateSeatsRef.current = normalized.privateSeats
       applySeats(publicSeats(privateSeatsRef.current))
+      const hostMemberId = chatSession.restoreHost(stored.roomCode, getResumeToken(stored.roomCode))
       resumeTokensRef.current = new Map(
         privateSeatsRef.current.flatMap(({ seat, resumeToken }) =>
           resumeToken === null ? [] : [[seat.peerId, resumeToken] as const],
@@ -1378,7 +1415,7 @@ export function useLobby(): UseLobby {
           peers: [
             {
               id: t.id,
-              memberId: t.id,
+              memberId: hostMemberId,
               name: stored.name,
               role: 'host',
               ready: true,
@@ -1409,7 +1446,16 @@ export function useLobby(): UseLobby {
     } finally {
       setRestoring(false)
     }
-  }, [onMessage, onError, onDisconnect, commit, applySeats, persistKeeper, surfaceSetupError])
+  }, [
+    chatSession,
+    onMessage,
+    onError,
+    onDisconnect,
+    commit,
+    applySeats,
+    persistKeeper,
+    surfaceSetupError,
+  ])
 
   const pushReconnectEvent = useCallback((kind: ReconnectEvent['kind'], attempt: number) => {
     setReconnectEvents((prev) => [...prev, { kind, attempt, at: Date.now() }])
@@ -1626,12 +1672,20 @@ export function useLobby(): UseLobby {
     (peerId: string) => {
       const current = stateRef.current
       if (!current || !isHostRef.current) return
+      const peer = current.peers[peerId]
+      if (!peer) return
       resumeTokensRef.current.delete(peerId)
       const r = kickFn(current, peerId)
+      const entry = chatSession.appendSystem({
+        kind: 'memberKicked',
+        memberId: peer.memberId,
+        name: peer.name,
+      })
       commit(r.state)
       dispatch(r.outgoing)
+      broadcastChatEntries([entry])
     },
-    [commit, dispatch],
+    [broadcastChatEntries, chatSession, commit, dispatch],
   )
 
   const setMaxPlayers = useCallback(
@@ -1639,10 +1693,28 @@ export function useLobby(): UseLobby {
       const current = stateRef.current
       if (!current || !isHostRef.current) return
       const r = setMaxPlayersFn(current, n)
+      const changedMembers = new Set<string>()
+      const entries = Object.values(r.state.peers).flatMap((peer) => {
+        if (changedMembers.has(peer.memberId)) return []
+        const previous = Object.values(current.peers).find(
+          (candidate) => candidate.memberId === peer.memberId,
+        )
+        if (!previous || previous.role === peer.role) return []
+        changedMembers.add(peer.memberId)
+        return [
+          chatSession.appendSystem({
+            kind: 'roleChanged',
+            memberId: peer.memberId,
+            name: peer.name,
+            role: toChatRole(peer.role),
+          }),
+        ]
+      })
       commit(r.state)
       dispatch(r.outgoing)
+      broadcastChatEntries(entries)
     },
-    [commit, dispatch],
+    [broadcastChatEntries, chatSession, commit, dispatch],
   )
 
   const setBots = useCallback(
@@ -1733,10 +1805,22 @@ export function useLobby(): UseLobby {
     (setup: Setup) => {
       const current = stateRef.current
       if (!current || !isHostRef.current) return
+      const entries = Object.keys(setup).flatMap((setting) =>
+        current.setup[setting] === setup[setting]
+          ? []
+          : [
+              chatSession.appendSystem({
+                kind: 'modeChanged',
+                setting,
+                value: setup[setting],
+              }),
+            ],
+      )
       commit(applyConfig(current, { setup }))
       dispatch([{ to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { setup } } }])
+      broadcastChatEntries(entries)
     },
-    [commit, dispatch],
+    [broadcastChatEntries, chatSession, commit, dispatch],
   )
 
   // What `startGame` needs to bring a match into being: mint a seed, create

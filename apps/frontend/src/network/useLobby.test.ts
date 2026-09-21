@@ -2,14 +2,16 @@ import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, WINDOW_FIRST_MS } from '@rele
 import { act, renderHook as renderTestingHook } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import type { PrivateSeat } from '~/entities/game/seats'
-import type { UserChatEntry } from '~/shared/chat/types'
+import type { ChatSystemEvent, UserChatEntry } from '~/shared/chat/types'
 import {
   clearChat,
   clearKeeper,
   clearSession,
+  readChat,
   type StoredKeeper,
   type StoredLobbyConfig,
   type StoredSession,
+  writeChat,
 } from '~/shared/lib/persistence'
 import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
 import { createSession, type Seat as RefereeSeat } from './session/referee'
@@ -125,6 +127,10 @@ function userChatEntry(input: Pick<UserChatEntry, 'id' | 'sequence' | 'text'>): 
   }
 }
 
+function systemEvents(lobby: UseLobby): ChatSystemEvent[] {
+  return lobby.chat.entries.flatMap((entry) => (entry.kind === 'system' ? [entry.event] : []))
+}
+
 afterEach(() => {
   act(() => {
     for (const rendered of renderedLobbies) rendered.result.current.leaveSession()
@@ -213,6 +219,7 @@ it('the host ignores malformed text intent from an admitted connection', async (
       seq: 1,
     }),
   )
+  const beforeMalformedIntent = result.current.chat.entries
 
   expect(() =>
     act(() =>
@@ -224,7 +231,7 @@ it('the host ignores malformed text intent from an admitted connection', async (
       } as unknown as WireMessage),
     ),
   ).not.toThrow()
-  expect(result.current.chat.entries).toEqual([])
+  expect(result.current.chat.entries).toEqual(beforeMalformedIntent)
 })
 
 it('history plus an overlapping live entry stays ordered and unique', async () => {
@@ -327,6 +334,245 @@ it('ignores malformed history identity even when it names the host', async () =>
 
   expect(result.current.chat.entries).toEqual([])
   expect(result.current.chat.selfMemberId).toBeNull()
+})
+
+it('sends a late joiner the complete history including its one join event', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 6))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-b',
+      seq: 1,
+    }),
+  )
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_SEND',
+      payload: { text: 'before Cy' },
+      from: 'peer-b',
+      seq: 2,
+    }),
+  )
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Cy', resumeToken: 'client-c' },
+      from: 'peer-c',
+      seq: 3,
+    }),
+  )
+
+  const history = transports[0].send.mock.calls
+    .filter(([to]) => to === 'peer-c')
+    .map(([, message]) => message as Message)
+    .find((message) => message.type === 'CHAT_HISTORY')
+  expect(
+    history?.type === 'CHAT_HISTORY' && history.payload.entries.map((entry) => entry.id),
+  ).toEqual(result.current.chat.entries.map((entry) => entry.id))
+  const peerCMemberId = result.current.state?.peers['peer-c'].memberId
+  expect(result.current.chat.entries.at(-1)).toMatchObject({
+    kind: 'system',
+    event: { kind: 'memberJoined', memberId: peerCMemberId, name: 'Cy' },
+  })
+  expect(
+    systemEvents(result.current).filter(
+      (event) =>
+        'memberId' in event && event.memberId === peerCMemberId && event.kind === 'memberJoined',
+    ),
+  ).toHaveLength(1)
+})
+
+it('reuses memberId and emits reconnected when join beats the stale disconnect', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 6))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-old',
+      seq: 1,
+    }),
+  )
+  const memberId = result.current.state?.peers['peer-old'].memberId
+
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-new',
+      seq: 2,
+    }),
+  )
+  expect(result.current.state?.peers['peer-new'].memberId).toBe(memberId)
+  act(() => transports[0].onDisconnect?.('peer-old'))
+
+  expect(result.current.state?.peers['peer-old']).toBeUndefined()
+  expect(result.current.state?.peers['peer-new'].memberId).toBe(memberId)
+  expect(
+    systemEvents(result.current)
+      .filter((event) => 'memberId' in event && event.memberId === memberId)
+      .map((event) => event.kind),
+  ).toEqual(['memberJoined', 'memberReconnected'])
+})
+
+it('emits kicked without a later duplicate left event', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 6))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-b',
+      seq: 1,
+    }),
+  )
+  const memberId = result.current.state?.peers['peer-b'].memberId
+
+  act(() => result.current.kick('peer-b'))
+  act(() => transports[0].onDisconnect?.('peer-b'))
+
+  expect(
+    systemEvents(result.current)
+      .filter((event) => 'memberId' in event && event.memberId === memberId)
+      .map((event) => event.kind),
+  ).toEqual(['memberJoined', 'memberKicked'])
+})
+
+it('emits left for an ordinary disconnect and retains earlier authored messages', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 6))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-b',
+      seq: 1,
+    }),
+  )
+  const memberId = result.current.state?.peers['peer-b'].memberId
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'CHAT_SEND',
+      payload: { text: 'still here' },
+      from: 'peer-b',
+      seq: 2,
+    }),
+  )
+  act(() => transports[0].onDisconnect?.('peer-b'))
+
+  expect(result.current.chat.entries).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'message',
+        author: expect.objectContaining({ memberId }),
+        text: 'still here',
+      }),
+      expect.objectContaining({
+        kind: 'system',
+        event: { kind: 'memberLeft', memberId, name: 'Bo' },
+      }),
+    ]),
+  )
+  expect(result.current.chat.entries.at(-1)).toMatchObject({
+    kind: 'system',
+    event: { kind: 'memberLeft', memberId },
+  })
+})
+
+it('emits one roleChanged entry for each capacity demotion', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 6))
+  for (const [index, name] of ['Bo', 'Cy', 'Di'].entries()) {
+    act(() =>
+      transports[0].onMessage?.({
+        type: 'JOIN_REQUEST',
+        payload: { name, resumeToken: `client-${name}` },
+        from: `peer-${index + 1}`,
+        seq: index + 1,
+      }),
+    )
+  }
+  const before = result.current.state
+  act(() => result.current.setMaxPlayers(2))
+
+  const demotedMemberIds = Object.values(result.current.state?.peers ?? {})
+    .filter((peer) => peer.role === 'guest' && before?.peers[peer.id]?.role === 'player')
+    .map((peer) => peer.memberId)
+    .sort()
+  const changed = systemEvents(result.current).filter(
+    (event): event is Extract<ChatSystemEvent, { kind: 'roleChanged' }> =>
+      event.kind === 'roleChanged',
+  )
+  expect(changed.map((event) => event.memberId).sort()).toEqual(demotedMemberIds)
+  expect(changed.every((event) => event.role === 'spectator')).toBe(true)
+})
+
+it('emits modeChanged only for setup keys whose value changed', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 6))
+  const setup = { ...result.current.state?.setup, gitBranch: 'strategic' }
+
+  act(() => result.current.setSetup(setup))
+  act(() => result.current.setSetup(setup))
+
+  expect(systemEvents(result.current).filter((event) => event.kind === 'modeChanged')).toEqual([
+    { kind: 'modeChanged', setting: 'gitBranch', value: 'strategic' },
+  ])
+})
+
+it('restores full host history, member mapping, and the next sequence', async () => {
+  const roomCode = formatRoomCode('peer0')
+  storedHostSession('g1')
+  storedKeeperSnapshot('peer0')
+  sessionStorage.setItem(
+    'release:resumeCredential',
+    JSON.stringify({ roomCode, token: HOST_RESUME_TOKEN }),
+  )
+  writeChat({
+    roomCode,
+    entries: [
+      {
+        kind: 'message',
+        id: 'chat-7',
+        sequence: 7,
+        createdAt: 700,
+        author: { memberId: 'member-host', name: 'Dimbo', role: 'host' },
+        text: 'before reload',
+      },
+    ],
+    nextSequence: 8,
+    members: [{ clientId: HOST_RESUME_TOKEN, memberId: 'member-host' }],
+    savedAt: Date.now(),
+  })
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => Promise.resolve())
+  expect(result.current.chat.entries.map((entry) => entry.id)).toEqual(['chat-7'])
+  expect(result.current.chat.selfMemberId).toBe('member-host')
+  expect(result.current.state?.peers.peer0.memberId).toBe('member-host')
+
+  act(() => expect(result.current.chat.send('after reload')).toBe(true))
+  expect(result.current.chat.entries.at(-1)).toMatchObject({
+    id: 'chat-8',
+    sequence: 8,
+    author: { memberId: 'member-host' },
+    text: 'after reload',
+  })
+})
+
+it('leaveGame retains chat while leaveSession clears it', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 4))
+  const roomCode = result.current.roomCode ?? ''
+  act(() => expect(result.current.chat.send('hello')).toBe(true))
+
+  act(() => result.current.leaveGame())
+  expect(readChat(roomCode)).not.toBeNull()
+
+  act(() => result.current.leaveSession())
+  expect(readChat(roomCode)).toBeNull()
 })
 
 it('classifies a peer-unavailable error as not-found', async () => {
