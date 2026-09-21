@@ -3,7 +3,6 @@ import { createFakeEngine } from '@release/engine/fake'
 import { DEFAULT_SETUP } from '@release/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PrivateSeat } from '~/entities/game/seats'
-import type { ChatEntry } from '~/shared/chat/types'
 import {
   clearKeeper,
   clearLog,
@@ -15,26 +14,15 @@ import {
   type StoredSession,
   writeSession,
 } from '~/shared/lib/persistence'
-import { createChatController, toChatRole } from './chat/controller'
+import { createChatController } from './chat/controller'
 import { type RoomChatState, useChatSession } from './chat/useChatSession'
 import { createLobbyActionsController } from './lobby/actionsController'
-import {
-  canStart as canStartFn,
-  handleJoinRequest,
-  handleReady,
-  handleWhereabouts,
-} from './lobby/host'
-import { dispatchOutgoing, joinRequest, type Outgoing, playerKicked } from './lobby/messages'
+import { canStart as canStartFn } from './lobby/host'
+import { createMessageController } from './lobby/messageController'
+import { dispatchOutgoing, joinRequest, type Outgoing } from './lobby/messages'
 import { formatRoomCode, makeRoomCode, parseRoomCode } from './lobby/roomCode'
 import { createRoomRuntime, type PickPreview } from './lobby/runtime'
-import {
-  applyConfig,
-  applyPeerJoined,
-  applyPeerLeft,
-  applyPeerList,
-  createLobbyState,
-  type LobbyState,
-} from './lobby/state'
+import { applyPeerLeft, createLobbyState, type LobbyState } from './lobby/state'
 import type { GameLink, Sync } from './session/link'
 import { createMatchController } from './session/matchController'
 import {
@@ -43,9 +31,8 @@ import {
   normalizeLobbyConfig,
 } from './session/persistence'
 import { backoffMs, MAX_RECONNECT_ATTEMPTS, type ReconnectEvent } from './session/reconnect'
-import { isRelayable, relayTargets } from './session/relay'
 import { createTransport, type Transport } from './transport/peer'
-import type { PeerInfo, Seat, Setup, Where, WireMessage } from './types'
+import type { Seat, Setup, Where, WireMessage } from './types'
 
 export { formatRoomCode, makeRoomCode, parseRoomCode } from './lobby/roomCode'
 export { KEEPER_SAVE_MS, matchSeqAfterRestore } from './session/persistence'
@@ -64,13 +51,6 @@ function classify(type?: string): Exclude<ErrorKind, null> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
-}
-
-function parseJoinRequestPayload(value: unknown): { name: string; resumeToken: string } | null {
-  if (typeof value !== 'object' || value === null) return null
-  const { name, resumeToken } = value as { name?: unknown; resumeToken?: unknown }
-  if (!isNonEmptyString(name) || !isNonEmptyString(resumeToken)) return null
-  return { name, resumeToken }
 }
 
 // The outcome of one dial's connection to the HOST — not this browser's own
@@ -439,6 +419,19 @@ export function useLobby(): UseLobby {
       }),
     [dispatch, keeperWriter, rememberGame, runtime],
   )
+  const messageController = useMemo(
+    () =>
+      createMessageController({
+        runtime,
+        chat: chatController,
+        match: matchController,
+        dispatch,
+        forgetStored,
+        setStatus,
+        leaveSession: () => leaveSessionRef.current(),
+      }),
+    [chatController, dispatch, forgetStored, matchController, runtime],
+  )
 
   // A peer (or the host) dropping its DataChannel must update the roster, or the
   // lobby keeps counting a ghost player toward canStart()/turn rotation.
@@ -453,26 +446,7 @@ export function useLobby(): UseLobby {
       const current = runtime.lobby
       if (!current) return
       if (runtime.isHost) {
-        // Host owns the roster: prune the peer and tell everyone else.
-        const leaving = current.peers[peerId]
-        if (!leaving) return
-        const resumeTokens = new Map(runtime.resumeTokens)
-        resumeTokens.delete(peerId)
-        runtime.replaceResumeTokens(resumeTokens)
-        // The roster and the keeper are separate books and both have to be
-        // told. Without this the seat stays bound to a dead peer id: its SYNCs
-        // are addressed into the void, `driveUnattended` never starts its grace
-        // period, and a returning player finds their own seat occupied —
-        // `rebind` refuses a seat whose peerId is not null.
-        matchController.peerLeft(peerId)
-        const next = applyPeerLeft(current, peerId)
-        const stillConnected = Object.values(next.peers).some(
-          (peer) => peer.memberId === leaving.memberId,
-        )
-        const entry = stillConnected ? null : chatController.appendLeft(leaving)
-        commit(next)
-        dispatch([playerKicked(peerId)])
-        if (entry) chatController.broadcast([entry])
+        messageController.hostPeerDisconnected(peerId)
       } else if (peerId === current.hostId) {
         // The guest can't proceed without the host. Only call it "host left" if
         // we were actually connected; a channel that never opened means the
@@ -510,207 +484,12 @@ export function useLobby(): UseLobby {
         commit(applyPeerLeft(current, peerId))
       }
     },
-    [chatController, commit, dispatch, matchController, runtime],
+    [commit, messageController, runtime],
   )
 
   const onMessage = useCallback(
-    (msg: WireMessage) => {
-      const current = runtime.lobby
-      if (!current) return
-      if (runtime.isHost) {
-        if (msg.type === 'JOIN_REQUEST') {
-          const liveGameId = runtime.gameId
-          const payload = parseJoinRequestPayload((msg as { payload?: unknown }).payload)
-          if (!payload) {
-            if (liveGameId) matchController.peerLeft(msg.from)
-            return
-          }
-          // The frozen seating is what tells a return from a first join, so it
-          // has to be the live one — the ref, never a closed-over copy.
-          //
-          // And only while a match is actually running. The seating deliberately
-          // outlives `leaveGame` (a results screen still mounted reads it), so
-          // the match id is what says whether there is anything to come back to:
-          // without this gate a player who left the match and rejoined the room
-          // would be recognised as a returner and seated back into a match they
-          // walked out of — arriving in the lobby already `ready`, in `game`.
-          const privateSeat = liveGameId
-            ? runtime.privateSeats.find(({ resumeToken }) => resumeToken === payload.resumeToken)
-            : undefined
-          if (liveGameId && !privateSeat) matchController.peerLeft(msg.from)
-          let joinState = current
-          let replacedLobbyPeer: PeerInfo | undefined
-          if (!liveGameId) {
-            const liveCredentialPeer = [...runtime.resumeTokens].find(
-              ([peerId, resumeToken]) => peerId !== msg.from && resumeToken === payload.resumeToken,
-            )
-            if (liveCredentialPeer) {
-              const existing = current.peers[liveCredentialPeer[0]]
-              if (!existing || existing.name !== payload.name) return
-              replacedLobbyPeer = existing
-              joinState = applyPeerLeft(current, existing.id)
-              const resumeTokens = new Map(runtime.resumeTokens)
-              resumeTokens.delete(existing.id)
-              runtime.replaceResumeTokens(resumeTokens)
-            }
-            const resumeTokens = new Map(runtime.resumeTokens)
-            resumeTokens.set(msg.from, payload.resumeToken)
-            runtime.replaceResumeTokens(resumeTokens)
-          }
-          const admission = chatController.admit(payload.resumeToken)
-          const previousRole = replacedLobbyPeer
-            ? toChatRole(replacedLobbyPeer.role)
-            : privateSeat
-              ? 'player'
-              : chatController.lastKnownRole(admission.memberId)
-          const r = handleJoinRequest(joinState, msg.from, admission.memberId, payload.name, {
-            matchRunning: Boolean(liveGameId),
-            returningSeat: privateSeat?.seat,
-            returningLobbyPeer: replacedLobbyPeer,
-          })
-          const admittedPeer = r.state.peers[msg.from]
-          const nextRole = toChatRole(admittedPeer.role)
-          const chatEntries: ChatEntry[] = [
-            chatController.appendJoin(admittedPeer, admission.isNew),
-          ]
-          if (!admission.isNew && previousRole !== nextRole) {
-            chatEntries.push(chatController.appendRoleChange(admittedPeer))
-          }
-          commit(r.state)
-          const outgoing: Outgoing[] = []
-          if (replacedLobbyPeer) {
-            outgoing.push(playerKicked(replacedLobbyPeer.id))
-          }
-          for (const frame of r.outgoing) {
-            outgoing.push(frame)
-          }
-          outgoing.push(chatController.history(msg.from, admission.memberId))
-          dispatch(outgoing)
-          chatController.broadcast(chatEntries)
-
-          const seat = privateSeat?.seat
-          if (seat && liveGameId) {
-            matchController.returnSeat({
-              seat,
-              peerId: msg.from,
-              resumeToken: payload.resumeToken,
-            })
-          }
-          if (!liveGameId || seat) runtime.transport?.authenticate(msg.from)
-        } else if (msg.type === 'PLAYER_READY') {
-          const r = handleReady(current, msg.from)
-          commit(r.state)
-          dispatch(r.outgoing)
-        } else if (msg.type === 'WHEREABOUTS') {
-          const r = handleWhereabouts(current, msg.from, msg.payload.where)
-          commit(r.state)
-          dispatch(r.outgoing)
-        } else if (msg.type === 'CHAT_SEND') {
-          const peer = current.peers[msg.from]
-          if (!peer) return
-          const entry = chatController.appendUser(peer, msg.payload.text)
-          if (entry) chatController.broadcast([entry])
-        } else if (msg.type === 'INTENT' || msg.type === 'INTRO_READY') {
-          // The only party that calls into the engine. `applyIntent` resolves the
-          // seat from the sender's peer id and stamps the player itself, so a
-          // peer cannot act for anyone but itself however it labels the frame.
-          // A seat's INTRO_READY is resolved the same way, off the connection —
-          // and like an intent it is addressed to the keeper, never relayed.
-          runtime.matchResources.keeper?.handleMessage(msg)
-        } else {
-          // The host is a SEAT as well as the relay: a frame everybody watches
-          // has to reach its own board too, and it still goes on to the others
-          // below rather than stopping here.
-          if (msg.type === 'PICK_PREVIEW') runtime.commitPickPreview(msg.payload)
-          // Star topology: the host forwards any other peer-originated message
-          // to every other connected peer (never back to the sender or itself),
-          // preserving the original sender via relay() rather than re-stamping.
-          const t = runtime.transport
-          if (!t || !isRelayable(msg.type)) return
-          const targets = relayTargets({
-            connectedPeerIds: t.connectedIds(),
-            hostId: current.hostId,
-            from: msg.from,
-          })
-          t.relay(targets, msg)
-        }
-        return
-      }
-      // Guest-side application of host broadcasts. Only the host is authoritative
-      // for the roster, so ignore PEER_LIST/PEER_JOINED that don't come from it.
-      const fromHost = msg.from === current.hostId
-      switch (msg.type) {
-        // Whoever it came from: a preview names its own player, and the host
-        // relays it with the original sender intact. Nothing about the table
-        // moves on it — it only says which card somebody's surface is offering.
-        case 'PICK_PREVIEW':
-          runtime.commitPickPreview(msg.payload)
-          break
-        case 'PEER_LIST':
-          if (fromHost) commit(applyPeerList(current, msg.payload.peers))
-          break
-        case 'PEER_JOINED': {
-          if (!fromHost) break
-          const peer: PeerInfo = { ...msg.payload }
-          commit(applyPeerJoined(current, peer))
-          break
-        }
-        case 'LOBBY_CONFIG_UPDATED':
-          if (fromHost) commit(applyConfig(current, msg.payload))
-          break
-        case 'CHAT_HISTORY':
-          if (fromHost) {
-            chatController.receiveHistory(msg.payload.entries, msg.payload.selfMemberId)
-          }
-          break
-        case 'CHAT_ENTRY':
-          if (fromHost) chatController.receiveEntry(msg.payload.entry)
-          break
-        case 'PLAYER_KICKED':
-          if (!fromHost) break
-          if (msg.payload.peerId === current.selfId) {
-            setStatus('kicked')
-            // A stored record here would offer to walk the kicked player
-            // straight back into the room that just removed them.
-            forgetStored()
-            clearChatRoom()
-          } else commit(applyPeerLeft(current, msg.payload.peerId))
-          break
-        case 'GAME_STARTING': {
-          // The host has left for the board; follow it. The id is carried rather
-          // than derived so a future host handover can rename the room without
-          // every guest recomputing it.
-          if (!fromHost) break
-          matchController.followStart(msg.payload.gameId, msg.payload.seats ?? [])
-          break
-        }
-        case 'SEAT_REBOUND': {
-          // The host's word, exactly like every roster patch above. A forged
-          // one would repoint a seat at a peer id of the forger's choosing, and
-          // that seat's private fan-out follows the peer id.
-          if (!fromHost) break
-          matchController.reboundSeat(msg.payload.playerId, msg.payload.peerId)
-          break
-        }
-        case 'SYNC':
-        case 'KEEPER_CHANGED':
-          // The remote link re-checks the sender against the keeper it knows, so
-          // this is a route rather than a trust decision.
-          matchController.receiveSync(msg)
-          break
-        case 'LOBBY_DISBANDED':
-          if (fromHost) {
-            leaveSessionRef.current()
-            // leaveSession sets status to 'idle'; this override is batched in the
-            // same React update, so 'disbanded' wins in the final render.
-            setStatus('disbanded')
-          }
-          break
-        default:
-          break
-      }
-    },
-    [chatController, clearChatRoom, commit, dispatch, forgetStored, matchController, runtime],
+    (message: WireMessage) => messageController.handle(message),
+    [messageController],
   )
 
   const createRoom = useCallback(

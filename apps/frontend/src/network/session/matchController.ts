@@ -22,6 +22,7 @@ export interface MatchController {
   followStart(gameId: string, seats: Seat[]): void
   reboundSeat(playerId: PlayerId, peerId: string): void
   receiveSync(message: Extract<WireMessage, { type: 'SYNC' | 'KEEPER_CHANGED' }>): void
+  receiveKeeperMessage(message: Extract<WireMessage, { type: 'INTENT' | 'INTRO_READY' }>): void
   attachRestored(input: {
     snapshot: NormalizedKeeperSnapshot
     engine: Engine
@@ -150,6 +151,10 @@ export function createMatchController({
 
     receiveSync(message) {
       runtime.matchResources.remote?.handleMessage(message)
+    },
+
+    receiveKeeperMessage(message) {
+      runtime.matchResources.keeper?.handleMessage(message)
     },
 
     attachRestored({ snapshot, engine, transport }) {
