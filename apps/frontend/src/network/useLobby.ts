@@ -40,11 +40,26 @@ import {
   handleWhereabouts,
   kick as kickFn,
   MAX_BOTS,
-  type Outgoing,
   setBots as setBotsFn,
   setMaxPlayers as setMaxPlayersFn,
   transferHost as transferHostFn,
 } from './lobby/host'
+import {
+  chatEntry as chatEntryMessage,
+  chatHistory,
+  chatSend as chatSendMessage,
+  dispatchOutgoing,
+  gameStarting,
+  introReady as introReadyMessage,
+  joinRequest,
+  lobbyConfigUpdated,
+  type Outgoing,
+  pickPreview as pickPreviewMessage,
+  playerKicked,
+  playerReady,
+  whereabouts,
+} from './lobby/messages'
+import { formatRoomCode, makeRoomCode, parseRoomCode } from './lobby/roomCode'
 import {
   applyConfig,
   applyPeerJoined,
@@ -94,27 +109,7 @@ function lastKnownChatRole(entries: ChatEntry[], memberId: string): ChatRole | u
   return role
 }
 
-// Room codes double as the host's PeerJS id, so the displayed code is exactly
-// what a joiner connects to — formatRoomCode/parseRoomCode are inverses.
-// Ambiguous characters (0/o/1/l/i) are omitted from the alphabet.
-const ROOM_CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'
-
-export function makeRoomCode(): string {
-  const bytes = new Uint8Array(6)
-  crypto.getRandomValues(bytes)
-  return Array.from(bytes, (b) => ROOM_CODE_ALPHABET[b % ROOM_CODE_ALPHABET.length]).join('')
-}
-
-export function formatRoomCode(peerId: string): string {
-  const head = peerId.slice(0, 6).toUpperCase()
-  return head.length > 3 ? `${head.slice(0, 3)}-${head.slice(3)}` : head
-}
-
-// Inverse of formatRoomCode: strip the separator/whitespace and lowercase back
-// to the host peer id a joiner can connect to.
-export function parseRoomCode(code: string): string {
-  return code.replace(/[^a-z0-9]/gi, '').toLowerCase()
-}
+export { formatRoomCode, makeRoomCode, parseRoomCode } from './lobby/roomCode'
 
 // What `matchSeqRef` must be seeded to after a restore, so the NEXT startGame
 // mints an id that was never used. `gameId` is always `${hostId}-${seq}`
@@ -196,8 +191,10 @@ function normalizePrivateSeats(value: unknown): PrivateSeat[] | null {
     playerIds.add(playerId)
     peerIds.add(peerId)
     if (typeof resumeToken === 'string') resumeTokens.add(resumeToken)
+    const normalizedSeat: Seat = { playerId, peerId, name }
+    if (bot) normalizedSeat.bot = true
     privateSeats.push({
-      seat: { playerId, peerId, name, ...(bot ? { bot: true } : {}) },
+      seat: normalizedSeat,
       resumeToken: typeof resumeToken === 'string' ? resumeToken : null,
     })
   }
@@ -228,7 +225,9 @@ function normalizeRefereeSeats(value: unknown): RefereeSeat[] | null {
     if (playerIds.has(playerId) || (typeof peerId === 'string' && peerIds.has(peerId))) return null
     playerIds.add(playerId)
     if (typeof peerId === 'string') peerIds.add(peerId)
-    seats.push({ playerId, peerId, absentSince, ...(bot ? { bot: true } : {}) })
+    const normalizedSeat: RefereeSeat = { playerId, peerId, absentSince }
+    if (bot) normalizedSeat.bot = true
+    seats.push(normalizedSeat)
   }
   return seats
 }
@@ -770,22 +769,16 @@ export function useLobby(): UseLobby {
   )
 
   const dispatch = useCallback((outgoing: Outgoing[]) => {
-    const t = transportRef.current
-    if (!t) return
-    for (const o of outgoing) {
-      if (o.to === 'broadcast') t.broadcast(o.message)
-      else t.send(o.to, o.message)
-    }
+    dispatchOutgoing(transportRef.current, outgoing)
   }, [])
 
   const broadcastChatEntries = useCallback(
     (entries: ChatEntry[]) => {
-      dispatch(
-        entries.map((entry) => ({
-          to: 'broadcast' as const,
-          message: { type: 'CHAT_ENTRY' as const, payload: { entry } },
-        })),
-      )
+      const outgoing: Outgoing[] = []
+      for (const entry of entries) {
+        outgoing.push(chatEntryMessage(entry))
+      }
+      dispatch(outgoing)
     },
     [dispatch],
   )
@@ -822,7 +815,7 @@ export function useLobby(): UseLobby {
               name: leaving.name,
             })
         commit(next)
-        dispatch([{ to: 'broadcast', message: { type: 'PLAYER_KICKED', payload: { peerId } } }])
+        dispatch([playerKicked(peerId)])
         if (entry) broadcastChatEntries([entry])
       } else if (peerId === current.hostId) {
         // The guest can't proceed without the host. Only call it "host left" if
@@ -944,34 +937,18 @@ export function useLobby(): UseLobby {
             )
           }
           commit(r.state)
-          dispatch([
-            ...(replacedLobbyPeer
-              ? [
-                  {
-                    to: 'broadcast' as const,
-                    message: {
-                      type: 'PLAYER_KICKED' as const,
-                      payload: { peerId: replacedLobbyPeer.id },
-                    },
-                  },
-                ]
-              : []),
-            ...r.outgoing,
-            {
-              to: msg.from,
-              message: {
-                type: 'CHAT_HISTORY',
-                payload: {
-                  entries: chatSession.history(),
-                  selfMemberId: admission.memberId,
-                },
-              },
-            },
-            ...chatEntries.map((entry) => ({
-              to: 'broadcast',
-              message: { type: 'CHAT_ENTRY' as const, payload: { entry } },
-            })),
-          ])
+          const outgoing: Outgoing[] = []
+          if (replacedLobbyPeer) {
+            outgoing.push(playerKicked(replacedLobbyPeer.id))
+          }
+          for (const frame of r.outgoing) {
+            outgoing.push(frame)
+          }
+          outgoing.push(chatHistory(msg.from, chatSession.history(), admission.memberId))
+          for (const entry of chatEntries) {
+            outgoing.push(chatEntryMessage(entry))
+          }
+          dispatch(outgoing)
 
           const seat = privateSeat?.seat
           if (seat && liveGameId) {
@@ -993,12 +970,7 @@ export function useLobby(): UseLobby {
             resumeTokensRef.current.delete(stalePeerId)
             resumeTokensRef.current.set(msg.from, payload.resumeToken)
             applySeats(rebound)
-            dispatch([
-              {
-                to: msg.from,
-                message: { type: 'GAME_STARTING', payload: { gameId: liveGameId, seats: rebound } },
-              },
-            ])
+            dispatch([gameStarting(msg.from, liveGameId, rebound)])
             // Belt-and-braces ordering fix: WebRTC disconnect detection can
             // lag a fast manual reload, so this JOIN_REQUEST can land before
             // onDisconnect fires for the dead connection it replaces. Left
@@ -1036,7 +1008,7 @@ export function useLobby(): UseLobby {
             msg.payload.text,
           )
           if (entry) {
-            dispatch([{ to: 'broadcast', message: { type: 'CHAT_ENTRY', payload: { entry } } }])
+            dispatch([chatEntryMessage(entry)])
           }
         } else if (msg.type === 'INTENT' || msg.type === 'INTRO_READY') {
           // The only party that calls into the engine. `applyIntent` resolves the
@@ -1325,10 +1297,7 @@ export function useLobby(): UseLobby {
             // a bad/expired code never opens and surfaces as a PeerJS error.
             if (peerId === hostId) {
               hostConnectedRef.current = true
-              owner?.send(hostId, {
-                type: 'JOIN_REQUEST',
-                payload: { name, resumeToken: getResumeToken(nextRoomCode) },
-              })
+              dispatchOutgoing(owner, [joinRequest(hostId, name, getResumeToken(nextRoomCode))])
               setStatus('in-lobby')
               onDialOutcome?.({ ok: true })
             }
@@ -1525,11 +1494,11 @@ export function useLobby(): UseLobby {
       }
       privateSeatsRef.current = normalized.privateSeats
       applySeats(publicSeats(privateSeatsRef.current))
-      resumeTokensRef.current = new Map(
-        privateSeatsRef.current.flatMap(({ seat, resumeToken }) =>
-          resumeToken === null ? [] : [[seat.peerId, resumeToken] as const],
-        ),
-      )
+      const restoredResumeTokens = new Map<string, string>()
+      for (const { seat, resumeToken } of privateSeatsRef.current) {
+        if (resumeToken !== null) restoredResumeTokens.set(seat.peerId, resumeToken)
+      }
+      resumeTokensRef.current = restoredResumeTokens
 
       // The absence-clock trap: a stored `absentSince` describes time that
       // passed while nothing was keeping the table. Restored as-is, the first
@@ -1782,7 +1751,7 @@ export function useLobby(): UseLobby {
       commit(r.state)
       dispatch(r.outgoing)
     } else {
-      t.send(current.hostId, { type: 'PLAYER_READY', payload: {} })
+      dispatch([playerReady(current.hostId)])
     }
   }, [commit, dispatch])
 
@@ -1801,12 +1770,12 @@ export function useLobby(): UseLobby {
           text,
         )
         if (!entry) return false
-        dispatch([{ to: 'broadcast', message: { type: 'CHAT_ENTRY', payload: { entry } } }])
+        dispatch([chatEntryMessage(entry)])
         return true
       }
 
       if (!hostConnectedRef.current) return false
-      t.send(current.hostId, { type: 'CHAT_SEND', payload: { text } })
+      dispatch([chatSendMessage(current.hostId, text)])
       return true
     },
     [chatSession, dispatch],
@@ -1825,7 +1794,7 @@ export function useLobby(): UseLobby {
         commit(r.state)
         dispatch(r.outgoing)
       } else {
-        t.send(current.hostId, { type: 'WHEREABOUTS', payload: { where } })
+        dispatch([whereabouts(current.hostId, where)])
       }
     },
     [commit, dispatch],
@@ -1857,22 +1826,23 @@ export function useLobby(): UseLobby {
       if (!current || !isHostRef.current) return
       const r = setMaxPlayersFn(current, n)
       const changedMembers = new Set<string>()
-      const entries = Object.values(r.state.peers).flatMap((peer) => {
-        if (changedMembers.has(peer.memberId)) return []
+      const entries: ChatEntry[] = []
+      for (const peer of Object.values(r.state.peers)) {
+        if (changedMembers.has(peer.memberId)) continue
         const previous = Object.values(current.peers).find(
           (candidate) => candidate.memberId === peer.memberId,
         )
-        if (!previous || previous.role === peer.role) return []
+        if (!previous || previous.role === peer.role) continue
         changedMembers.add(peer.memberId)
-        return [
+        entries.push(
           chatSession.appendSystem({
             kind: 'roleChanged',
             memberId: peer.memberId,
             name: peer.name,
             role: toChatRole(peer.role),
           }),
-        ]
-      })
+        )
+      }
       commit(r.state)
       rememberLobbyConfig(r.state)
       dispatch(r.outgoing)
@@ -1970,21 +1940,21 @@ export function useLobby(): UseLobby {
     (setup: Setup) => {
       const current = stateRef.current
       if (!current || !isHostRef.current) return
-      const entries = Object.keys(setup).flatMap((setting) =>
-        current.setup[setting] === setup[setting]
-          ? []
-          : [
-              chatSession.appendSystem({
-                kind: 'modeChanged',
-                setting,
-                value: setup[setting],
-              }),
-            ],
-      )
+      const entries: ChatEntry[] = []
+      for (const setting of Object.keys(setup)) {
+        if (current.setup[setting] === setup[setting]) continue
+        entries.push(
+          chatSession.appendSystem({
+            kind: 'modeChanged',
+            setting,
+            value: setup[setting],
+          }),
+        )
+      }
       const next = applyConfig(current, { setup })
       commit(next)
       rememberLobbyConfig(next)
-      dispatch([{ to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { setup } } }])
+      dispatch([lobbyConfigUpdated('broadcast', { setup })])
       broadcastChatEntries(entries)
     },
     [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig],
@@ -2133,12 +2103,7 @@ export function useLobby(): UseLobby {
       // Tell the table to follow before dealing, so a guest has built its remote
       // link by the time its projection arrives. DataChannels preserve order, so
       // GAME_STARTING is always ahead of the SYNC that follows it.
-      dispatch([
-        {
-          to: 'broadcast',
-          message: { type: 'GAME_STARTING', payload: { gameId: id, seats: dealt } },
-        },
-      ])
+      dispatch([gameStarting('broadcast', id, dealt)])
       gameIdRef.current = id
       setGameId(id)
       rememberGame(id)
@@ -2171,7 +2136,7 @@ export function useLobby(): UseLobby {
       if (t) keeperRef.current?.introReady(t.id)
       return
     }
-    dispatch([{ to: current.hostId, message: { type: 'INTRO_READY', payload: { gameId: id } } }])
+    dispatch([introReadyMessage(current.hostId, id)])
   }, [dispatch])
 
   // The local surface is offering this card. Straight out to everyone when this
@@ -2182,8 +2147,8 @@ export function useLobby(): UseLobby {
       const id = gameIdRef.current
       const current = stateRef.current
       if (!id || !current) return
-      const message = { type: 'PICK_PREVIEW' as const, payload: { gameId: id, player, card } }
-      dispatch([{ to: isHostRef.current ? 'broadcast' : current.hostId, message }])
+      const target = isHostRef.current ? 'broadcast' : current.hostId
+      dispatch([pickPreviewMessage(target, id, player, card)])
     },
     [dispatch],
   )
