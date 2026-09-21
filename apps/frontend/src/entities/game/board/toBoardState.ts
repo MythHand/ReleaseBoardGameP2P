@@ -462,6 +462,7 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
   return {
     you: {
       name: view.self.name,
+      eliminated: view.self.eliminated,
       hand: view.self.hand.map((c) => ({ uid: c.uid, card: cardOrPlaceholder(c.id) })),
       release: toReleaseSlots(view.self.release),
       releaseId: toReleaseIds(view.self.release),

@@ -19,6 +19,19 @@ so that is where a finding has to show up, in one line with a status. This file 
 in full: what it costs and what would close it. Enter it in both — the page so it is seen, here so
 it can be acted on.
 
+## Error 503 left the eliminated viewer on turn — closed 2026-09-21
+
+With a human and two bots, a fatal 503 emptied the human's cards and played the clip, but
+the engine retained that seat as `turn.player`. The bots could not act. Separately, the
+projection carried elimination only for opponents: the Board never received the viewer's
+own status, so it displayed an empty hand and an active Draw dock instead of the out badge.
+
+`eliminate` now ends the current turn when multiple survivors remain. `self.eliminated`
+travels through the projection and Board adapter independently of the event log. The
+connected human remains a viewer and keeper; bots finish the match through the existing
+ticker. Main/AI 503, voluntary decline, the last-standing end, turn order, projection and
+two-bot keeper progression have regression coverage. Debug preset: `503 → watch survivors`.
+
 ## Board instruction pills and missing navigation — closed 2026-09-21
 
 The owner requested removal of the extra instruction pills and restoration of the right-hand

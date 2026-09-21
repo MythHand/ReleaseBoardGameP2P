@@ -55,6 +55,7 @@ const refs = () => ({
 // these satisfy PlayerView / BoardState outright, so drift is a compile error.
 const view = (): PlayerView => ({
   self: {
+    eliminated: false,
     id: 'p1',
     name: 'One',
     hand: [

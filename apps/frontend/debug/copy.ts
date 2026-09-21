@@ -19,6 +19,10 @@ const en = {
   securityGive: 'Security Bug: duplicate hit',
   blindSteal: 'Bug: blind pick',
   handDefense: 'Attack / defence centre',
+  elimination: '503 → watch survivors',
+  eliminationHint:
+    'Draw Error 503. After the clip, advance the remaining bots one action at a time to finish the match.',
+  nextBot: 'Next bot action',
   branchHint: 'Pull Branch out of your hand: one draw pile splits into two.',
   branchSudoHint: 'Combine Branch with Sudo: the split and flipped discard produce three piles.',
   securityRequestHint:
@@ -55,6 +59,10 @@ const en = {
   upgradeFizzleHint: 'Pull Upgrade out of your hand. The opponent has no cards to discard.',
 }
 const ru: Record<keyof typeof en, string> = {
+  elimination: '503 → наблюдать за оставшимися',
+  eliminationHint:
+    'Доберите Error 503. После ролика выполняйте следующие действия ботов, чтобы доиграть партию.',
+  nextBot: 'Следующее действие бота',
   title: 'Отладка стола',
   restart: 'Перезапустить сценарий',
   ready: 'Готово',

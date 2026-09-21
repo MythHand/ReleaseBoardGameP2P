@@ -50,6 +50,7 @@ const refs = () => ({
 
 const view = (): PlayerView => ({
   self: {
+    eliminated: false,
     id: 'p1',
     name: 'One',
     hand: [

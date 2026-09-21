@@ -1478,6 +1478,12 @@ replaced by the "you are out" badge — and the clip comes up over the whole sta
 loops until `ELIM_MIN_MS`, finishes the loop it is in, and is gone at once. What it uncovers is the
 state that was already there.
 
+If at least two players survive, the eliminated seat stays connected as a viewer. Its own
+`self.eliminated` projection reaches `you.eliminated` without relying on the event log, so
+rejoining also shows the badge and does not offer reactions. The engine ends the eliminated
+player's turn; surviving bots keep advancing through the keeper even when the human keeper
+is out. `GameOver` is shown only when the match actually ends, after queued clips finish.
+
 **The state under it is the projection's, not the beat's**
 The beat **publishes nothing**. `eliminated` is folded by the engine's own projection
 (`fake/project.ts` → `toBoardState`), so the seat, the hand and the zone read as out because the

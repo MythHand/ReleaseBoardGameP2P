@@ -1,6 +1,7 @@
 import '@release/ui/tokens.css'
 import '@release/ui/global.css'
 import type { Action, Event } from '@release/engine'
+import { botAction } from '@release/engine/fake'
 import { useTranslation } from '@release/translation'
 import { Button, Typography } from '@release/ui'
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
@@ -64,6 +65,15 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
   }, [deadline, now, ready, run.state.over, run.state.pending, send])
 
   const pending = run.state.pending
+  // Deliberately manual, like the other debug scenarios: inspect the eliminated
+  // viewer between beats, then let each remaining seat take its next real action.
+  const nextBot =
+    scenario === 'elimination'
+      ? run.state.seating
+          .filter((id) => id !== 'you')
+          .map((id) => botAction(engine, run.state, id, now))
+          .find((action) => action != null)
+      : undefined
   const opponentCard = run.state.players.p2.hand[0]
   const opponentOwes =
     pending?.kind === 'systemUpgrade' &&
@@ -81,6 +91,17 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
             {' · '}
             {pending?.kind ?? debug('idle')}
           </Typography>
+          {scenario === 'elimination' && (
+            <Button
+              variant="tech"
+              disabled={!nextBot}
+              onClick={() => {
+                if (nextBot) send(nextBot)
+              }}
+            >
+              {debug('nextBot')}
+            </Button>
+          )}
           {run.state.seating.map((id) => (
             <Button
               key={id}

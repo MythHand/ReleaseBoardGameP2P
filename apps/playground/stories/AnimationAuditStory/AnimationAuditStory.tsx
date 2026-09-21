@@ -748,6 +748,21 @@ const SCENARIOS: Scenario[] = [
 const ISSUES: Issue[] = [
   {
     what: {
+      ru: 'ЗАКРЫТО: после выбывания человека боты не продолжали партию',
+      en: 'CLOSED: bots stopped after the human was eliminated',
+    },
+    problem: {
+      ru: 'Fatal Error 503 оставлял ход за выбывшим, а его собственный флаг выбывания терялся в проекции. Теперь ход передаётся следующему живому игроку, self.eliminated доходит до борда: вместо руки показано «Вы выбыли из игры», человек наблюдает, keeper продолжает вести ботов до итогового экрана.',
+      en: 'A fatal Error 503 kept the turn on the eliminated seat, while the projection omitted its own elimination status. The turn now passes to the next survivor and self.eliminated reaches the Board: the out badge replaces the hand, the human watches and the keeper drives bots through to the result screen.',
+    },
+    where: {
+      ru: 'engine: fake/triggers.ts, fake/project.ts; frontend: entities/game/board/toBoardState.ts; debug: 503 → watch survivors',
+      en: 'engine: fake/triggers.ts, fake/project.ts; frontend: entities/game/board/toBoardState.ts; debug: 503 → watch survivors',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
       ru: 'Git Rebase перекрывал среднюю карту выбора порядка',
       en: 'Git Rebase covered the middle reorder card',
     },

@@ -78,6 +78,7 @@ export function introFixture(): { gameId: string; view: PlayerView; events: Even
     gameId: 'g1',
     view: {
       self: {
+        eliminated: false,
         id: 'p1',
         name: 'One',
         hand: [

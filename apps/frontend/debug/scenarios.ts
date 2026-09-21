@@ -21,6 +21,7 @@ export const SCENARIOS = [
   'securityGive',
   'blindSteal',
   'handDefense',
+  'elimination',
 ] as const
 export type Scenario = (typeof SCENARIOS)[number]
 
@@ -48,7 +49,7 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
     players: [
       { id: 'you', name: 'You' },
       { id: 'p2', name: 'Opponent' },
-      ...(transfer ? [{ id: 'p3', name: 'Observer' }] : []),
+      ...(transfer || scenario === 'elimination' ? [{ id: 'p3', name: 'Observer' }] : []),
     ],
     setup: {
       handLimit: 'base',
@@ -60,6 +61,34 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
     deck: FAKE_DECK,
     events: FAKE_EVENTS,
   })
+  if (scenario === 'elimination') {
+    return {
+      ...initial,
+      eventSeq: 100,
+      players: Object.fromEntries(
+        Object.entries(initial.players).map(([id, player]) => [
+          id,
+          {
+            ...player,
+            hand: id === 'you' ? [instance('attack-bug', 0)] : [],
+            release: {},
+            openedAtDeal: [],
+          },
+        ]),
+      ),
+      decks: {
+        ...initial.decks,
+        main: [
+          [
+            instance('trigger-error-503', 40),
+            instance('defense-hotfix', 41),
+            instance('trigger-error-503', 42),
+          ],
+        ],
+        discard: [],
+      },
+    }
+  }
   if (transfer) return createTransferScenario(initial, scenario)
   const operation = scenario.startsWith('branch')
     ? 'operation-git-branch'
