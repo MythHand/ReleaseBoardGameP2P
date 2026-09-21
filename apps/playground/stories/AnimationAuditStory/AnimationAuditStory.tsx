@@ -778,6 +778,21 @@ const ISSUES: Issue[] = [
   },
   {
     what: {
+      ru: 'После drag карта повторно летела из руки в центр (#180)',
+      en: 'A local drag replayed the hand-to-centre flight (#180)',
+    },
+    problem: {
+      ru: 'Исправлено: Board публикует handoff текущего жеста перед layout effects очереди. Мгновенный ответ движка больше не запускает второй перенос из руки. Локальный drag владеет картой до передачи анимации результата; другие игроки и наблюдатели видят обычный вход. Регрессия использует настоящий движок и проверяет мгновенный/поздний ответ и удалённые роли.',
+      en: 'Fixed: Board publishes the current gesture handoff before the queue layout effects. A synchronous engine response no longer starts another flight from the hand. The local drag owns placement until the outcome takes over; other players and observers retain their incoming flight. Real-engine regression covers immediate/delayed responses and remote roles.',
+    },
+    where: {
+      ru: 'pages/board/[gameId]/_Board.tsx + __tests__/boardLocalHandoff.test.tsx',
+      en: 'pages/board/[gameId]/_Board.tsx + __tests__/boardLocalHandoff.test.tsx',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
       ru: 'Сыгранная защита возвращалась в веер во время сброса',
       en: 'Played defenses reappeared in the fan during discard',
     },
