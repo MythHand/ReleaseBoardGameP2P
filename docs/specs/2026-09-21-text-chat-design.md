@@ -94,7 +94,7 @@ type ChatSystemEvent =
   | { kind: 'memberReconnected'; memberId: MemberId; name: string }
   | { kind: 'memberKicked'; memberId: MemberId; name: string }
   | { kind: 'roleChanged'; memberId: MemberId; name: string; role: ChatRole }
-  | { kind: 'modeChanged'; mode: string }
+  | { kind: 'modeChanged'; setting: string; value: string }
 
 interface SystemChatEntry {
   kind: 'system'
@@ -224,9 +224,10 @@ therefore receives the event inside `CHAT_HISTORY`; already connected peers rece
 the same entry live through `CHAT_ENTRY`. One canonical entry exists in both cases,
 and an overlapping delivery remains harmless because merging is idempotent.
 
-The wire stores semantic data only. The frontend adapter maps it through
-`@release/translation`, so changing language immediately rerenders the full
-history in that language.
+The wire stores semantic data only. A mode change carries the configuration
+axis (`setting`) and selected option (`value`) as catalog keys, never rendered
+labels. The frontend adapter maps every event through `@release/translation`,
+so changing language immediately rerenders the full history in that language.
 
 ## Frontend ownership
 
