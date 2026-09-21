@@ -7,6 +7,7 @@ import StatsPage from '../stats'
 const goToLobby = vi.fn()
 const leaveGame = vi.fn()
 const setWhere = vi.fn()
+const sendChat = vi.fn(() => true)
 
 let view: PlayerView | null
 let peers: Record<string, PeerInfo>
@@ -29,6 +30,7 @@ vi.mock('~/app/providers/SessionProvider', () => ({
     // The seating frozen at the deal, as the session holds it (#19) — not
     // something this page derives from a roster that changes under it.
     seats,
+    chat: { entries: [], selfMemberId: 'member-a', send: sendChat },
     leaveGame,
     setWhere,
   }),
@@ -41,6 +43,7 @@ beforeEach(() => {
   goToLobby.mockClear()
   leaveGame.mockClear()
   setWhere.mockClear()
+  sendChat.mockClear()
   selfId = 'peer-a'
   peers = {
     'peer-a': {
@@ -68,6 +71,14 @@ beforeEach(() => {
     over: { winner: 'p1', condition: 'release' },
     tally: { p1: { ...zero, attack: 5 }, p2: { ...zero, defense: 3 } },
   } as unknown as PlayerView
+})
+
+it('renders the persistent results chat and sends through the room session', () => {
+  render(<StatsPage />)
+  const field = screen.getByPlaceholderText('chat.placeholder')
+  fireEvent.change(field, { target: { value: 'gg' } })
+  fireEvent.keyDown(field, { key: 'Enter' })
+  expect(sendChat).toHaveBeenCalledWith('gg')
 })
 
 it('names the winner by resolving the engine seat back to a peer', () => {

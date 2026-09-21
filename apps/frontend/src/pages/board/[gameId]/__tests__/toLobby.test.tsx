@@ -66,6 +66,7 @@ function makeSession(over: Partial<UseLobby> = {}): UseLobby {
     gameLink: null,
     gameSync: null,
     seats: SEATS,
+    chat: { entries: [], selfMemberId: 'member-h', send: vi.fn(() => true) },
     error: null,
     errorKind: null,
     createRoom: vi.fn(),
