@@ -1,6 +1,6 @@
 import type { Event } from '@release/engine'
 import type { TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardById, Typography } from '@release/ui'
+import { Card, ConfirmAction, cardAreaOf, cardById, Typography } from '@release/ui'
 import { play, useCardReorder } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -44,10 +44,20 @@ const FLIP_DUR = 420 // = the flipCard preset (flip face-down before flying back
 const FLIP_HOLD = 260 // hold face-down before the flight
 const BACK_DUR = 600 // = the returnToDeck flight
 const BACK_STEP = 90 // per-card stagger flying back
+// the scene's own slack between the last landing and the row going away
+// (`Rebase.tsx`: `+ 280` on top of the last flight)
+const BACK_SETTLE = 280
+
+interface Box {
+  left: number
+  top: number
+  width: number
+  height: number
+}
 
 // centre-to-centre translate + scale — the same helper the sibling hook keeps
 // privately, copied rather than imported across staging hooks.
-function between(from: DOMRect, to: DOMRect): string {
+function between(from: Box, to: Box): string {
   const dx = to.left + to.width / 2 - (from.left + from.width / 2)
   const dy = to.top + to.height / 2 - (from.top + from.height / 2)
   return `translate(${dx}px, ${dy}px) scale(${to.width / from.width})`
@@ -86,6 +96,11 @@ export function useRebaseStaging(args: {
   const [flying, setFlying] = useState(false)
   const [faceDown, setFaceDown] = useState(false)
   const [ready, setReady] = useState(reduced)
+  // Answered — from the click through the last landing. `confirmed` alone is not
+  // that span: an accepted answer clears the pending, and the reseeding effect
+  // drops `confirmed` while the cards are still on their way home, which would
+  // put the dimming and the confirm bar back up over a finished reorder.
+  const answered = confirmed || flying
 
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   // The last offer this hook actually saw, read during render — the flight
@@ -94,11 +109,16 @@ export function useRebaseStaging(args: {
   if (ours) pilesRef.current = ours.piles
   const piles: Pile[] = ours ? ours.piles : pilesRef.current
 
-  const offerKey = ours
-    ? `${ours.player}:${ours.piles.map((entry) => `${entry.pile}/${entry.cards.map((c) => c.uid).join(',')}`).join('|')}`
-    : null
+  // WHICH OCCASION THIS IS, not what is in it. A card of the same kind may be
+  // played any number of times, so the same player can be offered the same
+  // piles in the same order twice in one match — and keyed by its CONTENTS the
+  // second offer is byte for byte the first, which this hook has already marked
+  // answered. It refused to deal the row, and Rebase simply could not be played
+  // a second time (#168). The engine now says when a decision was raised, so the
+  // key says which offer this is and the contents say nothing about identity.
+  const offerKey = ours ? `${ours.player}:${ours.raisedAt}` : null
   const reorder = useCardReorder({
-    enabled: Boolean(ours) && ready && !confirmed && !suspended,
+    enabled: Boolean(ours) && ready && !answered && !suspended,
     step: 180,
     rows: piles.map((entry) => ({
       id: entry.pile,
@@ -108,6 +128,15 @@ export function useRebaseStaging(args: {
   })
 
   const dealtKey = useRef<string | null>(null)
+  // The offer we have already answered. The queue drops its shadow only when it
+  // drains, so between the answer and the end of the operation card's own exit
+  // the board goes back to drawing the projection that beat moves away from —
+  // the one where this pending is still OPEN. Without this latch the row takes
+  // that as a fresh offer: it deals the cards out of the pile a second time and
+  // reads as the card being played again. `_useCherryPickStaging` carries the
+  // same latch for the same board behaviour. Cleared only by a refusal, because
+  // only then is the choice really open again.
+  const answeredKey = useRef<string | null>(null)
   const timers = useRef<number[]>([])
   const later = (fn: () => void, ms: number) => {
     timers.current.push(window.setTimeout(fn, ms))
@@ -144,8 +173,8 @@ export function useRebaseStaging(args: {
       dealtKey.current = null
       return
     }
-    const key = `${ours.player}:${ours.piles.map((e) => `${e.pile}/${e.cards.map((c) => c.uid).join(',')}`).join('|')}`
-    if (dealtKey.current === key) return
+    const key = offerKey
+    if (dealtKey.current === key || answeredKey.current === key) return
     dealtKey.current = key
     setReady(reduced)
     if (reduced) return
@@ -156,8 +185,13 @@ export function useRebaseStaging(args: {
         DEAL_HOLD,
     )
     for (const entry of ours.piles) {
-      const pileRect = anchors.pileBox(entry.pile)?.getBoundingClientRect()
-      if (!pileRect) continue
+      const cell = anchors.pileBox(entry.pile)?.getBoundingClientRect()
+      if (!cell) continue
+      // I6: a pile cell carries its label under the card, so both legs aim at
+      // the card box inside it — the scene's own `cardAreaOf(deckEl.rect)`, and
+      // what every other flight on this board already does (`defenseBeat`,
+      // `deckBeat`). Aimed at the whole cell, a card lands low, over the label.
+      const pileRect = cardAreaOf(cell)
       const els = entry.cards.map((c) => cardRefs.current.get(c.uid))
       const rests = els.map((el) => el?.style.transform ?? '')
       for (const el of els) {
@@ -190,6 +224,8 @@ export function useRebaseStaging(args: {
   }, [ours, reduced, anchors])
 
   const resolve = useResolveFeedback(args.events ?? [], state.selfId, actions, () => {
+    // refused: this offer is open again, whatever we flew for it
+    answeredKey.current = null
     setConfirmed(false)
     setFlying(false)
     setFaceDown(false)
@@ -197,17 +233,29 @@ export function useRebaseStaging(args: {
     clearTimers()
     for (const el of cardRefs.current.values()) {
       for (const animation of el.getAnimations?.() ?? []) animation.cancel()
-      el.style.cssText = ''
+      // A refusal can arrive at a card that is already pinned over the pile.
+      // Clearing the pin alone hands it back to `.slot`'s own 300ms transform
+      // transition, and it GLIDES all the way from the pile back to its slot —
+      // the row visibly pulling its cards out to the centre a second time.
+      // Suppress the transition across the switch, reflow, then hand it back:
+      // the scene's own move when it releases a dealt card back into the row.
+      el.style.cssText = 'transition: none'
+      void el.offsetWidth
+      el.style.transition = ''
     }
     setOrder(
       Object.fromEntries((ours?.piles ?? []).map((e) => [e.pile, e.cards.map((c) => c.uid)])),
     )
   })
 
-  if ((!ours && !flying) || (confirmed && !flying)) return { row: null }
+  if (!flying && (!ours || confirmed || (ours != null && answeredKey.current === offerKey)))
+    return { row: null }
 
   const confirm = () => {
     if (!ours || confirmed || !ready || reorder.drag || suspended) return
+    // Answered from this click on: the row never reopens for this offer, and the
+    // deal never replays it, whichever projection the queue hands over next.
+    answeredKey.current = offerKey
     // Committed against THIS render's offer: every offered pile, answered
     // exactly once, or the engine rejects it.
     const committed = ours.piles.map((e) => ({
@@ -233,7 +281,8 @@ export function useRebaseStaging(args: {
     later(() => {
       let last = 0
       for (const entry of committed) {
-        const pileRect = anchors.pileBox(entry.pile)?.getBoundingClientRect()
+        const cell = anchors.pileBox(entry.pile)?.getBoundingClientRect()
+        const pileRect = cell ? cardAreaOf(cell) : null
         entry.cards.forEach((uid, i) => {
           const el = cardRefs.current.get(uid)
           if (!el) return
@@ -258,22 +307,31 @@ export function useRebaseStaging(args: {
       }
       // The answer goes when the last card is home — see the divergence note
       // in this file's header for why this one waits and Cherry-pick's does not.
-      later(() => {
-        setFlying(false)
-        setFaceDown(false)
-        resolve(choice)
-      }, last + BACK_DUR)
+      later(() => resolve(choice), last + BACK_DUR)
+      // The row itself goes a beat later, the scene's own slack: taking it away
+      // on the very frame the last card lands cuts the arrival off mid-motion.
+      later(
+        () => {
+          setFlying(false)
+          setFaceDown(false)
+        },
+        last + BACK_DUR + BACK_SETTLE,
+      )
     }, FLIP_DUR + FLIP_HOLD)
   }
 
   return {
     row: (
       <div
-        className={styles.overlay}
+        className={`${styles.surface} ${answered ? styles.flight : ''}`}
         data-testid="board-rebase-overlay"
         data-suspended={suspended ? '' : undefined}
         inert={suspended}
       >
+        {/* The table goes under the reorder while it is being read and answered,
+            and comes back the moment it IS answered — ahead of the cards, so
+            they fly home over a normal table and land in it (owner, 17.09). */}
+        {!answered && <div className={styles.scrim} data-testid="board-rebase-scrim" />}
         <div className={styles.rows} data-testid="board-rebase-row">
           {piles.map((entry) => (
             <div
@@ -285,7 +343,7 @@ export function useRebaseStaging(args: {
                 <Typography
                   key={c.uid}
                   variant="tag"
-                  className={styles.position}
+                  className={`${styles.position} ${answered ? styles.chromeOut : styles.chromeIn}`}
                   style={{ insetInlineStart: i * 180 }}
                 >
                   {i + 1}
@@ -309,7 +367,7 @@ export function useRebaseStaging(args: {
                     }}
                   >
                     <Card card={data} interactive={false} width="100%" faceDown={faceDown} />
-                    {!confirmed && (
+                    {!answered && (
                       <button
                         type="button"
                         data-testid={`rebase-move-${uid}`}
@@ -325,7 +383,7 @@ export function useRebaseStaging(args: {
           ))}
         </div>
         <ConfirmAction
-          open={!confirmed && ready && !suspended}
+          open={!answered && ready && !suspended}
           label={copy.confirm}
           caption={copy.prompt}
           onConfirm={confirm}

@@ -452,11 +452,19 @@ into the release zone.
 - `state.comboOptions[uid]` — the engine's own legal-partner list (`PlayerView.self.combos`, keyed
   support-first), replacing ComboStory's mocked `validComboTarget` (`mockLegality.ts`, its functions
   retired from the board, kept only to run the playground story).
-- `slotBox(index, total)` — the partner's own FAN geometry, not a slot's rotated bounding rect
-  (**I6**) — `anchors.hand`'s rect + `slotPlacement`, standing in for ComboStory's `refs[uid]`.
-- `pairRef` — the persistent pair-flyer node `_Board.tsx` mounts (`data-testid="board-pair-staged"`);
-  `CardPair` renders inside it only once `staged.merged`, painted frame by frame on its
-  `[data-main]` / `[data-aux]` children — the same idiom as ComboStory's own `flyRef`.
+- `anchors.handSlotAt(index)` — the partner's card WHERE IT IS DRAWN at the moment it is clicked,
+  hover lift included, trimmed back to a card box by `cardBoxIn` because the slot is rotated
+  (**I6**). This is ComboStory's own `refs[uid]`: the scene folds from the card itself. The board
+  used to substitute `slotBox(index, total)` — the fan's RESTING geometry (`anchors.hand`'s rect +
+  `slotPlacement`) — and since the card being clicked is the hovered one, lifted out of that line,
+  the pair's half started where the player's card had never been: it read as the clicked card
+  vanishing and a different one flying to the sudo. `slotBox` stays as the fallback for when there
+  is no node to measure.
+- `usePairFold` — the step owns the pair's node; the gesture reaches it through `pairNode()` and
+  renders it with its other carriers (`staging.overlay`). The board mounted a node of its own until
+  #168, and revealed it two frames after the fan had already let the card go — the card was nowhere
+  on screen in between, which read as the clicked card being swapped for another. The step reveals
+  the pair in the SAME tick its halves get their entry poses, which is what closes that gap.
 - `foldingRef` — true from the click that commits the fold until `finish()` (or an early bail)
   clears it in a `finally`; `cancel()` and a second `onCardClick` both refuse while it holds.
 - `StagedHandoff` (`entities/game/board/types.ts`) — the seam to the beat: `mainUid`, `supportUid?`,
@@ -465,24 +473,22 @@ into the release zone.
 
 **Sequence** (`onCardClick`, once a support already stands at the centre)
 1. Validate the click against `state.comboOptions[support.uid]`; a miss calls `cancel()` and stops.
-2. Measure — **[I1]**: `mainHand = slotBox(index, handItems.length)`, `cRect = anchors.centre`.
+2. Measure — **[I1]**: `mainHand` = the clicked card's own drawn box (`anchors.handSlotAt(index)`
+   through `cardBoxIn`, `slotBox(index, handItems.length)` as the fallback), `cRect = anchors.centre`.
+   Measured BEFORE the commit below takes the card out of the fan.
 3. `arrowCtl.stop()` — the choice is made; commit `{ support, main, phase: 'partner', merged: true }`;
    `foldingRef.current = true`.
-4. Reduced motion (or no fan geometry to fold from): pin `pairRef`'s `left/top/width/opacity` to
-   `cRect` directly and call `finish()` at once — `CardPair`'s own inline pose (main identity, aux
-   `PAIR_AUX_POSE`) already IS the pair at rest, nothing to paint frame by frame.
-5. Otherwise: `await nextFrames()` — **[I2]**, the just-mounted `CardPair` has painted. Cancel
-   leftover animations on `pairRef` (`getAnimations({ subtree: true })`) — **[I3]**. Pin `pairRef` to
-   `cRect`; paint the first frame with `enterPose(mainHand, cRect)` on `[data-main]` and
-   `enterPose(cRect, cRect)` on `[data-aux]` — the support's own entry pose is the degenerate
-   identity case (it is already at the centre), no separate branch. `await nextFrames()` again.
-6. **The fold** — `play('foldIntoPair', mainEl, { from: mainHand, box: cRect, dur: 620 })` and
-   `play('foldIntoPair', auxEl, { from: cRect, box: cRect, pose: PAIR_AUX_POSE, dur: 620, snap: true })`
-   in parallel; `await Promise.all([a1?.finished, a2?.finished])`.
+4. `fold({ main, aux, mainFrom: mainHand, auxFrom: cRect, box: cRect, dur })` — the step does the
+   rest: mounts the pair invisible, paints both halves at their entry poses and reveals them in that
+   same tick, then folds them together over `dur` (620). The support is already at the centre, so
+   `auxFrom === box` makes its entry pose the degenerate identity case — no branch for it.
+5. Reduced motion: the same call with `dur: 0`, and `finish()` runs in the SAME tick rather than
+   awaiting it — a game action never waits on an animation nobody plays.
 
-   > **Steps 5–6 are now a step of their own: `usePairFold`.** The scenes call it (Combo, Defense
-   > Release); the board still carries this hand-written version in three places, and replacing them
-   > is a call, not a rewrite. The step also mounts the pair invisible and reveals it in the same
+   > **Steps 5–6 ARE the step `usePairFold`**, and this gesture calls it (#168) — as the scenes do
+   > (Combo, Defense Release) and as the board's own defence gesture already did. One hand-written
+   > copy is left, in `comboBeat.tsx`: it also carries an attack pair across the table and hands its
+   > carrier on to the pending render, which the step does not do. The step also mounts the pair invisible and reveals it in the same
    > tick the entry poses are set, which is what the flyer form cannot do — `raise` waits for a paint
    > before it hands the node back, so the pair shows up already folded for a frame or two.
 7. `finish()` — wrapped in `try`/`finally` so every exit clears `foldingRef`, not only this one —
@@ -664,7 +670,10 @@ the cursor; hovering a target zone lights it in the same color; clicking empty s
 
 **Elements / refs**
 - `refs[card.id]` — the source card spot (arrow origin via `centerOf`).
-- `useArrow()` → `{ from, to, active, aim, stop }` — holds endpoints, tracks the cursor while active.
+- `useArrow()` → `{ from, to, color, active, aim, stop }` — holds endpoints and the armed hue, tracks
+  the cursor while active. A scene that aims with one kind of card all the way through may pass the
+  colour straight to `<Arrow>` (this one does); a scene where the aim changes hands mid-play arms it
+  with `aim(origin, at?, color?)`, so the origin and the hue always name the same card.
 - Target zones: `lit = active && hovered === id`, highlighted via `--hl: color`.
 
 **Sequence**
@@ -1977,9 +1986,21 @@ nothing leaves. `restart` clears the timers, rebuilds your hand and zeroes `take
 
 Driven by `requested` and `handTransfer`, planned by `planBeats` and run by `transferBeat`
 (`useTransferBeat`). The two recipes above are its playground originals, and the board **translates**
-them rather than transcribing them: there is no opponent fan here — an opponent's hand is a `Seat` and
-a count — so the named steal and the random one both come out of the donor's seat. The gesture
-survives; the geometry belonged to a stage with no seats in it.
+them rather than transcribing them: an opponent's hand is a `Seat` and a count, so a steal that nobody
+chooses comes out of the donor's seat. The gesture survives; the geometry belonged to a stage with no
+seats in it.
+
+**The blind pick is the exception, and it transcribes the scene rather than translating it** (#154–155,
+straightened out in #168). There is still no opponent fan on this table: an opponent's hand is a `Seat`
+and a count, and it stays one. The fan is SITUATIONAL — it exists for one step and nothing else, the
+blind pick of a random card out of a hand, and it is gone the moment that pick is made. After a Pass the
+engine opens a choice of position, and for as long as that choice is open `_useRequestStaging` offers it
+as the `Hand` component itself — backs up, inside a container turned `180deg`, coming down from above the
+screen and going back up on the pick, 520 ms each way. A position is taken by CLICKING it; there is no drag and no keyboard pick
+(owner, 18.09). What the taker's leg then does with that card is the scene's own sequence, and the one
+place it needed a new brick is the straightening: `takeFromSeat` is given `rotateFrom: 180`, because the
+card is lying turned and a carrier's `pose` cannot survive the animation's first keyframe. It is held at
+`cardBoxIn(centre, 220)` — the scene's reading width — rather than at the centre slot's own.
 
 **When to call**
 Never directly. `useBeats` plans a `requested` beat from the engine's `requested` event and a
@@ -2183,8 +2204,8 @@ and flies onto the draw deck; the unpicked cards return to the pile in their ori
    `DEAL_STEP` (capped at `STAGGER_CAP`), `DEAL_DUR` each; → `setPhase('choose')`.
 2. Pick (base 1 / sudo 2) under the trigger rule above.
 3. `resolve` (`setPhase('resolve')`): the hand card flies to the centre (`REVEAL_W`, `REVEAL_DUR`), holds
-   `REVEAL_HOLD`, then `useHandArrival` into the fan; a sudo deck card `flipCard` face-down (`FLIP_DUR`), holds
-   `DECK_HOLD`, then `play('returnToDeck', {from, to: deckRect})` (`DECK_DUR`); the rest return to the pile via
+   `REVEAL_HOLD`, then `useHandArrival` into the fan; a sudo deck card `flipCard` face-down (`FLIP_DUR`), then
+   `play('returnToDeck', {from, to: deckRect})` (`DECK_DUR`), and the round holds `DECK_HOLD` after it lands; the rest return to the pile via
    `play('centerToDiscard', toDiscardParams(from, pileRect, scatterAt(...), !visible))`, staggered `RETURN_STEP`
    (`RETURN_DUR`), keeping order. → `setPhase('done')`.
 
@@ -2196,7 +2217,7 @@ and flies onto the draw deck; the unpicked cards return to the pile in their ori
 | flip before deck flight / hold | `FLIP_DUR = 420`, `DECK_HOLD = 360` |
 | deck flight | `DECK_DUR = 480` (`returnToDeck`) |
 | reveal → hand | `REVEAL_W = 220`, `REVEAL_DUR = 460`, `REVEAL_HOLD = 560` |
-| grid / pile width | `GRID_W = 150`, `PILE_W = 132` |
+| grid / pile width | `GRID_W = 150`, `PILE_W = 116` |
 
 **Invariants**
 - Extracting cards **must not reshuffle** the discard — the rest keep their order (`scatterAt` is deterministic by
@@ -2326,6 +2347,19 @@ us. Inside's row (`ai-inside`) is the OTHER surface over the same pending kind; 
   the card, above its face. Role/lock badges and selection glow exist only while choosing;
   confirmation clears them immediately, and rejection restores the choice. The scroll box
   reserves space for the outer glow. Keep scrolling and the transform-free flight ancestor.
+  As in the scene: badges, selection glow and the confirm bar wait for the deal to finish;
+  the scene's scrim dims the table while dealing and choosing and is gone for the flights; the
+  hand is closed to the pointer while the grid is up; a hovered cell lifts 6px, a selected one
+  sits above its neighbours, an untakeable one is at 0.72 opacity. The grid stands in the
+  scene's own band — 27px below the top, 150px above the bottom (the confirm bar's own height,
+  reserved so it never travels over the last row), 210px in from each side, rows anchored to
+  the top and centred across, gaps 26/20. The padding inside it is the board's own: it keeps
+  the selection glow and the badges within the scrollable content box.
+- **The Cherry-pick card rests UNDER the grid.** It lands at the centre, holds
+  `PLACED_HOLD 420`, and only then does the grid deal out over it. Once landed it is drawn by
+  the table (`operationLanded`), not by the carrier — the carrier is the flight layer, above
+  every surface an effect opens. It goes to the heap last: after every flight has landed, it
+  holds `CENTER_HOLD 420`. The same holds for every operation card with a surface.
 - **The two sudo roles come from the engine**, not from click order: `openPickFromDiscard` withholds triggers from
   a base offer and `onPickFromDiscard` refuses one the hand slot, so a trigger in `options` can only be the deck
   card.
@@ -2333,7 +2367,7 @@ us. Inside's row (`ai-inside`) is the OTHER surface over the same pending kind; 
 
 **Sequence.** Deal out of the discard box into the grid (`DEAL_DUR 360` / `DEAL_STEP 16`, cap `STAGGER_CAP 40`) →
 pick → the hand card to the centre (`REVEAL_W 220` / `REVEAL_DUR 460`), hold `REVEAL_HOLD 560`, `useHandArrival`
-into the fan; a sudo deck card `flipCard` (`FLIP_DUR 420`) then `returnToDeck` (`DECK_DUR 480`) after `DECK_HOLD 360`.
+into the fan; a sudo deck card `flipCard` (`FLIP_DUR 420`) then `returnToDeck` (`DECK_DUR 480`), then holds `DECK_HOLD 360`.
 
 **Where.** `pages/board/[gameId]/_useCherryPickStaging.tsx`, `pages/board/[gameId]/_Board.tsx`.
 
@@ -2369,12 +2403,16 @@ per card in the committed order (`BACK_DUR 600` / `BACK_STEP 90`); the answer go
 **Layout.** Per the owner's 2026-09-21 decision, the private choice is an overlay above the
 table. The numbered rows and `ConfirmAction` share `--z-card-choice` (330), above the public
 operation carrier and below the drawer (350) and rail (360). History and rules remain accessible;
-a dim background intercepts table presses. The operation remains
-held underneath until the effect finishes. The rows scroll independently of the confirmation
+a dim background intercepts table presses. On confirmation the dimming leaves and the cards
+drop to the flight layer (250), landing below the pile counters. The operation remains
+held until the effect finishes. The rows scroll independently of the confirmation
 bar at the board bottom. Neither wrapper has a transform or filter, so returning cards use
 viewport coordinates without acquiring a different containing block.
 Pause, connection recovery and match completion suspend this overlay without unmounting its
 rows. The hidden surface is inert; resuming the same pending preserves the chosen order.
+Both the deal and answer guards identify the offer by `player:raisedAt`. A queue shadow
+restoring an answered pending during return-flight settling must not deal its cards again;
+a later Rebase with identical pile contents is a new offer and deals normally.
 
 ---
 

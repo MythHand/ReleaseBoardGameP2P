@@ -415,6 +415,10 @@ export interface UseLobby {
   // The local seat has finished its opening deal. A no-op outside a game, and
   // for a spectator, whose report the host's gate is not waiting on.
   introReady(): void
+  /** the card the local Cherry-pick surface is offering, or null — broadcast */
+  previewPick(player: PlayerId, card: string | null): void
+  /** the pick another seat's surface is offering right now, if any */
+  pickPreview: { gameId: string; player: PlayerId; card: string | null } | null
   disband(): void
   leaveSession(): void
   // Leaving the match without leaving the room. The local match id goes — it is
@@ -443,6 +447,14 @@ export function useLobby(): UseLobby {
   const [restoring, setRestoring] = useState(false)
   const [isHost, setIsHost] = useState(false)
   const [roomCode, setRoomCode] = useState<string | null>(null)
+  // The pick somebody's surface is currently offering to confirm — see
+  // PICK_PREVIEW. Held beside the game and never inside it: nothing here is
+  // engine state, and a stale one costs a highlight on a surface that is gone.
+  const [pickPreview, setPickPreview] = useState<{
+    gameId: string
+    player: PlayerId
+    card: string | null
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [errorKind, setErrorKind] = useState<ErrorKind>(null)
   const [gameId, setGameId] = useState<string | null>(null)
@@ -876,6 +888,10 @@ export function useLobby(): UseLobby {
           // and like an intent it is addressed to the keeper, never relayed.
           keeperRef.current?.handleMessage(msg)
         } else {
+          // The host is a SEAT as well as the relay: a frame everybody watches
+          // has to reach its own board too, and it still goes on to the others
+          // below rather than stopping here.
+          if (msg.type === 'PICK_PREVIEW') setPickPreview(msg.payload)
           // Star topology: the host forwards any other peer-originated message
           // to every other connected peer (never back to the sender or itself),
           // preserving the original sender via relay() rather than re-stamping.
@@ -894,6 +910,12 @@ export function useLobby(): UseLobby {
       // for the roster, so ignore PEER_LIST/PEER_JOINED that don't come from it.
       const fromHost = msg.from === current.hostId
       switch (msg.type) {
+        // Whoever it came from: a preview names its own player, and the host
+        // relays it with the original sender intact. Nothing about the table
+        // moves on it — it only says which card somebody's surface is offering.
+        case 'PICK_PREVIEW':
+          setPickPreview(msg.payload)
+          break
         case 'PEER_LIST':
           if (fromHost) commit(applyPeerList(current, msg.payload.peers))
           break
@@ -1844,6 +1866,20 @@ export function useLobby(): UseLobby {
     dispatch([{ to: current.hostId, message: { type: 'INTRO_READY', payload: { gameId: id } } }])
   }, [dispatch])
 
+  // The local surface is offering this card. Straight out to everyone when this
+  // seat is the host (it IS the relay), through the host otherwise — the same
+  // split, for the same reason, `introReady` makes.
+  const previewPick = useCallback(
+    (player: PlayerId, card: string | null) => {
+      const id = gameIdRef.current
+      const current = stateRef.current
+      if (!id || !current) return
+      const message = { type: 'PICK_PREVIEW' as const, payload: { gameId: id, player, card } }
+      dispatch([{ to: isHostRef.current ? 'broadcast' : current.hostId, message }])
+    },
+    [dispatch],
+  )
+
   const disband = useCallback(() => {
     const current = stateRef.current
     if (!current || !isHostRef.current) return
@@ -1901,6 +1937,8 @@ export function useLobby(): UseLobby {
       setSetup,
       startGame,
       introReady,
+      previewPick,
+      pickPreview,
       disband,
       leaveSession,
       leaveGame,
@@ -1933,6 +1971,8 @@ export function useLobby(): UseLobby {
       setSetup,
       startGame,
       introReady,
+      previewPick,
+      pickPreview,
       disband,
       leaveSession,
       leaveGame,

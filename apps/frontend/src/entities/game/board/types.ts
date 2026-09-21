@@ -198,7 +198,6 @@ export interface BoardChromeCopy {
   // answered, and the sudo actor's pick from what everyone threw.
   stealCard: string
   upgradePrompt: string
-  upgradeWaiting: string
   upgradeTakePrompt: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
@@ -358,6 +357,15 @@ export interface BoardProps {
   // `onPanelChange` — which is how the page binds the drawer to the URL.
   panel?: Panel | null
   onPanelChange?: (panel: Panel | null) => void
+  /**
+   * A pick another seat is offering but has not confirmed — the table watches
+   * the choice being made, not only its result. Absent wherever there is no
+   * session to carry it (the debug stand, the tests): the surface simply shows
+   * nothing selected, which is what it showed before.
+   */
+  pickPreview?: { player: string; card: string | null } | null
+  /** the local surface's own offer, on its way to the other seats */
+  onPickPreview?: (card: string | null) => void
   // The opening. Present only on a fresh entry; the board renders the intro's
   // shadow of `state` while it runs and the live `state` afterwards.
   intro?: {
@@ -375,7 +383,44 @@ export interface BoardProps {
   }
 }
 
+/**
+ * The Cherry-pick surface owns the choreography of its own pick, so the queue
+ * plays this instead of the generic "a card comes back out of the discard".
+ *
+ * Both seats at the table set one. The ACTOR knows which card it flew before
+ * the event arrives — its own answer — and names it, so a beat for somebody
+ * else's pick is left alone. The seat that only WATCHES names none: the choice
+ * is not its own and the engine tells it which card was taken in the very beat
+ * this answers, which is why `run` is handed that card.
+ */
+/**
+ * The request surface holds the named card while its beat plays — so the beat
+ * stops raising a copy of it at the centre. Every seat has this surface now
+ * (the request is public and the catalogue is the game's own, not a hand), so
+ * every seat is already showing the card the beat used to have to introduce.
+ *
+ * `release` is the beat letting the surface go, once it has held for as long as
+ * the scene holds and the outcome has been shown.
+ */
+export interface RequestPickHandoff {
+  /** the beat naming the card and asking the surface to keep holding it — the
+   *  chosen card standing while the rest of the catalogue leaves, on every
+   *  board at once, which is the scene's own `PICK_BEAT` */
+  hold: (card: string) => void
+  /** the catalogue is done: the named card goes with the rest of it */
+  release: () => void
+  /** the defender's fan slides back up — at the moment the card leaves it */
+  close: () => void
+  /**
+   * Where the named card comes OUT of — a place in the defender's own closed
+   * fan, which the surface has been holding out since the request opened. The
+   * scene flies it from there rather than from a seat, because there IS a hand
+   * on screen to fly it from (`PickSpecificCardStory`). Null when no fan is up.
+   */
+  slot: () => DOMRect | null
+}
+
 export interface DiscardPickHandoff {
-  card: string
-  run: (ctx: BeatRun) => Promise<void>
+  card?: string
+  run: (ctx: BeatRun, card: string) => Promise<void>
 }

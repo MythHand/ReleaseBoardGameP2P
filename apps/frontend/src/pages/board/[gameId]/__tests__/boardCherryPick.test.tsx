@@ -45,6 +45,16 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
   }
 })
 
+// The deal out of the discard comes first — the scene's own `deal` phase — and
+// the selection states, badges and the confirm bar wait for it to finish.
+const DEAL_WAIT = 800
+async function afterDeal() {
+  await act(async () => {
+    if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(DEAL_WAIT)
+    else await new Promise((resolve) => setTimeout(resolve, DEAL_WAIT))
+  })
+}
+
 it.each([
   1, 2,
 ] as const)('keeps a Cherry-pick arrival in its landing slot across projections (%s picks)', async (picks) => {
@@ -72,6 +82,7 @@ it.each([
     const intro = { gameId: 'cherry-arrival', view: null, onDone: () => {}, events: [] }
     const props = { ...base, state, intro, actions: { onResolve: vi.fn() } }
     const { container, rerender } = render(<Board {...props} />)
+    await afterDeal()
     fireEvent.click(screen.getByTestId('cherry-cell-picked'))
     if (picks === 2) fireEvent.click(screen.getByTestId('cherry-cell-deck'))
     fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
@@ -126,6 +137,7 @@ const handItem = (uid: string, id: string) => {
 
 const cherryPending = (options: { uid: string; id: string }[], picks: 1 | 2 = 1) => ({
   kind: 'pickFromDiscard' as const,
+  raisedAt: 1,
   player: 'you',
   options,
   picks,
@@ -148,7 +160,7 @@ function renderBoard(over: { pending: ReturnType<typeof cherryPending>; actions?
 }
 
 describe("the grid that answers Git Cherry-pick's own pick", () => {
-  it('gives an operation-git-cherry-pick pending the grid, not the panel', () => {
+  it('gives an operation-git-cherry-pick pending the grid, not the panel', async () => {
     const onResolve = vi.fn()
     renderBoard({
       pending: cherryPending([
@@ -160,12 +172,13 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
     expect(screen.getByTestId('board-cherry-grid')).not.toBeNull()
     expect(screen.queryByTestId('board-inside-row')).toBeNull()
 
+    await afterDeal()
     fireEvent.click(screen.getByTestId('cherry-cell-c2'))
     fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
     expect(onResolve).toHaveBeenCalledWith({ kind: 'pickFromDiscard', card: 'c2' })
   })
 
-  it('names both roles under a sudo pick and sends toDeck', () => {
+  it('names both roles under a sudo pick and sends toDeck', async () => {
     const onResolve = vi.fn()
     renderBoard({
       pending: cherryPending(
@@ -177,6 +190,7 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
       ),
       actions: { onResolve },
     })
+    await afterDeal()
     fireEvent.click(screen.getByTestId('cherry-cell-c1'))
     fireEvent.click(screen.getByTestId('cherry-cell-c2'))
     fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
@@ -187,7 +201,7 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
     })
   })
 
-  it('clears sudo selection marks on confirm and restores them after rejection', () => {
+  it('clears sudo selection marks on confirm and restores them after rejection', async () => {
     mockReducedMotion(false)
     const base = makeBoardProps()
     const pending = cherryPending(
@@ -204,6 +218,7 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
       actions: { onResolve: vi.fn() },
     }
     const { rerender } = render(<Board {...props} />)
+    await afterDeal()
     const handCell = screen.getByTestId('cherry-cell-hand')
     const deckCell = screen.getByTestId('cherry-cell-deck')
     const cardState = (cell: HTMLElement) =>
@@ -269,7 +284,7 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
     mm.mockRestore()
   })
 
-  it('does not return unpicked cards before the engine accepts the choice', () => {
+  it('does not return unpicked cards before the engine accepts the choice', async () => {
     exits.items = []
     const onResolve = vi.fn()
     renderBoard({
@@ -279,6 +294,7 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
       ]),
       actions: { onResolve },
     })
+    await afterDeal()
     fireEvent.click(screen.getByTestId('cherry-cell-c2'))
     fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
     expect(onResolve).toHaveBeenCalledWith({ kind: 'pickFromDiscard', card: 'c2' })
@@ -292,7 +308,7 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
 // notice that clicking the CHOSEN card releases it. On the deployed
 // playground that reads as a dead grid, which is how it was reported.
 describe('changing a pick before confirming', () => {
-  it('moves the single pick to the card clicked next', () => {
+  it('moves the single pick to the card clicked next', async () => {
     const onResolve = vi.fn()
     renderBoard({
       pending: cherryPending([
@@ -301,6 +317,7 @@ describe('changing a pick before confirming', () => {
       ]),
       actions: { onResolve },
     })
+    await afterDeal()
     fireEvent.click(screen.getByTestId('cherry-cell-c1'))
     fireEvent.click(screen.getByTestId('cherry-cell-c2'))
     fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
@@ -309,7 +326,7 @@ describe('changing a pick before confirming', () => {
 
   // Two slots full: the new card takes the OLDEST one's place, so the pick
   // that survives is the one chosen most recently.
-  it('replaces the oldest of two sudo picks', () => {
+  it('replaces the oldest of two sudo picks', async () => {
     const onResolve = vi.fn()
     renderBoard({
       pending: cherryPending(
@@ -322,6 +339,7 @@ describe('changing a pick before confirming', () => {
       ),
       actions: { onResolve },
     })
+    await afterDeal()
     fireEvent.click(screen.getByTestId('cherry-cell-c1'))
     fireEvent.click(screen.getByTestId('cherry-cell-c2'))
     fireEvent.click(screen.getByTestId('cherry-cell-c3'))
@@ -336,7 +354,7 @@ describe('changing a pick before confirming', () => {
   // The swap is not a licence to reach an illegal pair. A trigger may only
   // ever hold the DECK slot, so a base pick — whose only slot is the hand —
   // still refuses one, full or not.
-  it('refuses to swap a trigger into the single hand slot', () => {
+  it('refuses to swap a trigger into the single hand slot', async () => {
     const onResolve = vi.fn()
     renderBoard({
       pending: cherryPending([
@@ -345,6 +363,7 @@ describe('changing a pick before confirming', () => {
       ]),
       actions: { onResolve },
     })
+    await afterDeal()
     fireEvent.click(screen.getByTestId('cherry-cell-c1'))
     fireEvent.click(screen.getByTestId('cherry-cell-c2'))
     fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
@@ -363,6 +382,7 @@ it('returns unpicked cards only after the engine accepts the local pick', async 
   ])
   const props = { ...base, state: { ...base.state, pending }, actions: { onResolve } }
   const { rerender } = render(<Board {...props} />)
+  await afterDeal()
   fireEvent.click(screen.getByTestId('cherry-cell-b'))
   fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
   expect(exits.items.flat()).not.toContain('a')

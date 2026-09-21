@@ -91,7 +91,8 @@ export default function CardPlayStory() {
     const card = center
     const fromRect = centerRef.current?.getBoundingClientRect()
     setCenter(null)
-    if (fromRect) await sendToDiscard([{ key: 'played', card, from: fromRect }])
+    // nothing stands: the centre was cleared just above
+    if (fromRect) await sendToDiscard([{ key: 'played', card, from: fromRect }], null)
     setBusy(false)
   }
 

@@ -138,6 +138,8 @@ export type PendingView =
       options: CardInstance[]
       picks: 1 | 2
       source: CardId
+      /** which occasion this is — see the same field in `state.ts` */
+      raisedAt: number
     }
   // Full card identity, gated behind `mine` in pendingView (attacks.ts) — the
   // whole of what "не показывая другим" needs, since a deck's contents are
@@ -147,6 +149,8 @@ export type PendingView =
       player: PlayerId
       piles: { pile: number; cards: CardInstance[] }[]
       source: CardId
+      /** which occasion this is — see the same field in `state.ts` */
+      raisedAt: number
     }
   // The one pending with nothing private in it, so it mirrors state.ts's
   // variant field for field with no `mine` gate anywhere: the rules put the

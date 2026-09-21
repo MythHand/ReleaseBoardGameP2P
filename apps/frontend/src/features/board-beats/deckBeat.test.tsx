@@ -259,13 +259,25 @@ it('runs the fromDiscard half of a split+fromDiscard batch against the split’s
     ],
   } as Extract<BeatPlan, { kind: 'piles' }>
   await drive(() => api.beat?.runPiles(plan, ctx))
-  // Two publishes, in order: the split's own row first, then that SAME row
-  // with the discard appended — not the pre-batch row with a pile invented on
-  // top of it.
+  // The rows, in order: the split's own first, then that SAME row with the
+  // discard appended — not the pre-batch row with a pile invented on top of it.
+  // The third publish is the discard leaving (below) and repeats the row it
+  // does not touch.
   expect(published.map((s) => s.decks.main)).toEqual([
     [12, 12],
     [12, 12, 6],
+    [12, 12, 6],
   ])
+  // AND THE DISCARD IS GONE from the board this beat hands on. It has just
+  // become that third pile, so a heap left standing in the published state is
+  // cards nobody put down — which is exactly what the beat behind this one
+  // (the operation's own exit, on Git Branch + Sudo) would fly towards and
+  // file its own cards on top of.
+  expect(published.at(-1)?.decks).toMatchObject({
+    discard: null,
+    discardHeap: [],
+    discardCount: 0,
+  })
   // The split's flight, then the discard's landing on the pile it just grew.
   const flyFromIndex = timeline.events.indexOf('play:flyFrom')
   const gatherIndex = timeline.events.indexOf('play:gatherToDeck')

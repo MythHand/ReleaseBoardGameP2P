@@ -36,7 +36,8 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
       const [flying, setFlying] = useState(false)
       return {
         overlay: flying ? ['flight'] : [],
-        send: (items: unknown[]) => {
+        send: (items: unknown[], takeOff?: (() => void) | null) => {
+          takeOff?.()
           sent.calls.push(items)
           if (!sent.hang) return Promise.resolve()
           setFlying(true)

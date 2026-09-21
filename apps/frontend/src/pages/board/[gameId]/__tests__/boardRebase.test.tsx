@@ -14,6 +14,7 @@ import { makeBoardProps } from './fixture'
 // cards — for everybody else. `null` here is that second case.
 const rebasePending = (cards: { uid: string; id: string }[] | null, player = 'you') => ({
   kind: 'reorderTop' as const,
+  raisedAt: 1,
   player,
   piles: cards ? [{ pile: 0, cards }] : [],
   source: 'operation-git-rebase',
@@ -229,4 +230,67 @@ it.each([
     kind: 'reorderTop',
     order: [{ pile: 0, cards: ['second', 'first'] }],
   })
+})
+
+// A CARD OF THE SAME KIND MAY BE PLAYED ANY NUMBER OF TIMES, so the same player
+// can be offered the same piles in the same order twice in one match. Keyed by
+// its CONTENTS the second offer was byte for byte the first — which this hook
+// had already marked answered — so the row never dealt and Rebase could not be
+// played again at all (#168). The offer's identity is the occasion it was
+// raised at, which the engine now says outright.
+it('deals the row again for a second, identical Rebase', () => {
+  mockReducedMotion(true)
+  const onResolve = vi.fn()
+  const base = makeBoardProps()
+  const cards = [
+    { uid: 'a', id: 'attack-bug' },
+    { uid: 'b', id: 'release-frontend' },
+  ]
+  const first = { ...base.state, pending: rebasePending(cards) }
+  const { rerender } = render(<Board {...base} state={first} actions={{ onResolve }} />)
+  expect(screen.queryByTestId('board-rebase-row')).not.toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
+  expect(onResolve).toHaveBeenCalledTimes(1)
+
+  // the answer lands: no pending at all for a moment
+  rerender(<Board {...base} state={{ ...base.state, pending: null }} actions={{ onResolve }} />)
+  expect(screen.queryByTestId('board-rebase-row')).toBeNull()
+
+  // …and the card is played a second time, on the same piles in the same order.
+  // Everything about this offer repeats except the occasion it was raised at.
+  const again = {
+    ...base.state,
+    pending: { ...rebasePending(cards), raisedAt: 2 },
+  }
+  rerender(<Board {...base} state={again} actions={{ onResolve }} />)
+  expect(screen.queryByTestId('board-rebase-row')).not.toBeNull()
+})
+
+it('does not redeal an answered offer restored by the queue while its return settles', async () => {
+  mockReducedMotion(false)
+  const onResolve = vi.fn()
+  const base = makeBoardProps()
+  const state = {
+    ...base.state,
+    pending: rebasePending([{ uid: 'settling', id: 'attack-bug' }]),
+  }
+  const { rerender } = render(<Board {...base} state={state} actions={{ onResolve }} />)
+  await vi.waitFor(
+    () => expect(screen.getByRole('button', { name: /confirm|подтвердить/i })).toBeTruthy(),
+    { timeout: 2000 },
+  )
+  fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
+  await vi.waitFor(() => expect(onResolve).toHaveBeenCalledTimes(1), { timeout: 3000 })
+
+  // The live pending clears, then the operation beat's shadow supplies the
+  // earlier projection before BACK_SETTLE has unmounted the returning cards.
+  const card = screen.getByTestId('rebase-card-settling')
+  expect(card.style.position).toBe('fixed')
+  rerender(<Board {...base} state={{ ...state, pending: null }} actions={{ onResolve }} />)
+  rerender(<Board {...base} state={state} actions={{ onResolve }} />)
+  expect(screen.getByTestId('rebase-card-settling')).toBe(card)
+  expect(card.style.opacity).not.toBe('0')
+  expect(screen.queryByTestId('board-rebase-scrim')).toBeNull()
+  await vi.waitFor(() => expect(screen.queryByTestId('board-rebase-row')).toBeNull())
+  expect(onResolve).toHaveBeenCalledTimes(1)
 })

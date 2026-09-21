@@ -60,6 +60,36 @@ async function drive(run: () => Promise<void> | undefined) {
   }
 }
 
+// THE HANDOVER, pinned by the machine rather than by a comment beside four
+// call sites. `takeOff` is what stops being drawn because these carriers now
+// hold it, and it has to run in the commit they go up in — a caller that put
+// its own version of this line BELOW its `await` left the card standing at the
+// centre for the whole flight while a copy of it flew away (#168). Both halves
+// matter: it runs before the flight, and it does not run at all when nothing
+// flies, because then nothing has been taken over.
+it('takes the standing render down as the carriers go up, and not when nothing flies', async () => {
+  calls.params = []
+  render(<Probe />)
+  const order: string[] = []
+  const item: Leaving = {
+    key: 'x1',
+    card,
+    from: { left: 0, top: 0, width: 120, height: 168 },
+    scatter: scatterAt(1),
+  }
+  await drive(() =>
+    api.step?.send([item], () => {
+      order.push('takeOff')
+    }),
+  )
+  order.push('landed')
+  expect(order).toEqual(['takeOff', 'landed'])
+  // nothing to fly → nothing was taken over, so whatever stands keeps standing
+  const empty = vi.fn()
+  await drive(() => api.step?.send([], empty))
+  expect(empty).not.toHaveBeenCalled()
+})
+
 // The bug this pins: `expand()` used to hardcode `scatter: jitter()` for the
 // AUX half regardless of what the caller knew — so a pair split (comboBeat.tsx)
 // flew its aux to a random rest and then snapped to its REAL one (I7's own
@@ -80,7 +110,7 @@ it('flies the aux half of a split pair onto its OWN scatter, not a random jitter
     scatter: scatterAt(10),
     auxScatter: scatterAt(11),
   }
-  await drive(() => api.step?.send([item]))
+  await drive(() => api.step?.send([item], null))
   // two flights fired: the aux (under its main, per `expand()`'s own order)
   // and the main — both hit `play('centerToDiscard', …)`.
   expect(calls.params).toHaveLength(2)
@@ -108,7 +138,7 @@ it('falls back to a fresh scatter for the aux half when the caller has none', as
     from: { left: 0, top: 0, width: 120, height: 168 },
     scatter: scatterAt(20),
   }
-  await drive(() => api.step?.send([item]))
+  await drive(() => api.step?.send([item], null))
   expect(calls.params).toHaveLength(2)
   const mainWant = scatterAt(20)
   const auxParams = calls.params.find((p) => p.rotate !== mainWant.rot)
@@ -116,4 +146,43 @@ it('falls back to a fresh scatter for the aux half when the caller has none', as
   // main's own), and not `undefined`
   expect(auxParams).toBeDefined()
   expect(typeof auxParams?.rotate).toBe('number')
+})
+
+// THE SUPPORT LIES UNDER THE CARD IT WAS PLAYED WITH, and a heap is built by
+// appending — so the one that lay under has to reach it FIRST or the stack lands
+// inverted. This is one half of that rule; the other is the heap folded out of
+// the event feed on the board (`toBoardState.toDiscardHeap`, which tucks the
+// support under its main for the same reason). The two are written separately
+// and must agree: a pair that flies the right way up and then swaps the instant
+// the heap takes over is exactly the defect that comes of them drifting (#168,
+// docs/animations/backlog.md).
+it('lands a split pair bottom-up, the tucked half first', async () => {
+  calls.params = []
+  const landed: string[] = []
+  const box = { current: document.createElement('div') }
+  const local: { step?: ReturnType<typeof useDiscardExit> } = {}
+  function Local() {
+    local.step = useDiscardExit(box, (cards) => {
+      for (const c of cards) landed.push(c.card.id)
+    })
+    return <>{local.step.overlay}</>
+  }
+  render(<Local />)
+  const pairEl = document.createElement('div')
+  pairEl.innerHTML = '<div data-aux></div><div data-main></div>'
+  const item: Leaving = {
+    key: 'p20',
+    card,
+    aux: auxCard,
+    el: pairEl,
+    from: { left: 0, top: 0, width: 120, height: 168 },
+    scatter: scatterAt(20),
+    auxScatter: scatterAt(21),
+  }
+  await act(async () => {
+    const run = local.step?.send([item], null)
+    for (let i = 0; i < 12; i++) await Promise.resolve()
+    await run
+  })
+  expect(landed).toEqual(['support-sudo', 'attack-bug'])
 })
