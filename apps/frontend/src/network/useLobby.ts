@@ -39,6 +39,7 @@ import {
   handleReady,
   handleWhereabouts,
   kick as kickFn,
+  MAX_BOTS,
   type Outgoing,
   setBots as setBotsFn,
   setMaxPlayers as setMaxPlayersFn,
@@ -70,6 +71,22 @@ import { createTransport, type Transport } from './transport/peer'
 import type { PeerInfo, Seat, Setup, Where, WireMessage } from './types'
 
 const toChatRole = (role: PeerInfo['role']): ChatRole => (role === 'guest' ? 'spectator' : role)
+
+function lastKnownChatRole(entries: ChatEntry[], memberId: string): ChatRole | undefined {
+  let role: ChatRole | undefined
+  for (const entry of entries) {
+    if (entry.kind === 'message' && entry.author.memberId === memberId) {
+      role = entry.author.role
+    } else if (
+      entry.kind === 'system' &&
+      entry.event.kind === 'roleChanged' &&
+      entry.event.memberId === memberId
+    ) {
+      role = entry.event.role
+    }
+  }
+  return role
+}
 
 // Room codes double as the host's PeerJS id, so the displayed code is exactly
 // what a joiner connects to — formatRoomCode/parseRoomCode are inverses.
@@ -213,11 +230,16 @@ function normalizeRefereeSeats(value: unknown): RefereeSeat[] | null {
 interface NormalizedLobbyConfig {
   maxPlayers: number
   setup: Setup
+  bots: number
 }
 
 function normalizeLobbyConfig(value: unknown): NormalizedLobbyConfig | null {
   if (typeof value !== 'object' || value === null) return null
-  const { maxPlayers, setup } = value as { maxPlayers?: unknown; setup?: unknown }
+  const { maxPlayers, setup, bots } = value as {
+    maxPlayers?: unknown
+    setup?: unknown
+    bots?: unknown
+  }
   if (
     typeof maxPlayers !== 'number' ||
     !Number.isInteger(maxPlayers) ||
@@ -226,10 +248,16 @@ function normalizeLobbyConfig(value: unknown): NormalizedLobbyConfig | null {
   ) {
     return null
   }
+  if (
+    bots !== undefined &&
+    (typeof bots !== 'number' || !Number.isInteger(bots) || bots < 0 || bots > MAX_BOTS)
+  ) {
+    return null
+  }
   if (typeof setup !== 'object' || setup === null || Array.isArray(setup)) return null
   const entries = Object.entries(setup)
   if (!entries.every(([, option]) => typeof option === 'string')) return null
-  return { maxPlayers, setup: Object.fromEntries(entries) }
+  return { maxPlayers, setup: Object.fromEntries(entries), bots: bots ?? 0 }
 }
 
 interface NormalizedKeeperSnapshot {
@@ -623,7 +651,9 @@ export function useLobby(): UseLobby {
       privateSeats: privateSeatsRef.current,
       log: session.log,
       savedAt: Date.now(),
-      lobbyConfig: lobby ? { maxPlayers: lobby.maxPlayers, setup: lobby.setup } : undefined,
+      lobbyConfig: lobby
+        ? { maxPlayers: lobby.maxPlayers, setup: lobby.setup, bots: lobby.bots }
+        : undefined,
     }
     if (keeperSaveTimerRef.current !== null) return
     keeperSaveTimerRef.current = setTimeout(() => {
@@ -646,15 +676,19 @@ export function useLobby(): UseLobby {
     if (stored) writeSession({ ...stored, gameId: id })
   }, [])
 
-  const rememberLobbyConfig = useCallback((lobby: Pick<LobbyState, 'maxPlayers' | 'setup'>) => {
-    const stored = readSession()
-    if (stored?.role !== 'host') return
-    const lobbyConfig: StoredLobbyConfig = {
-      maxPlayers: lobby.maxPlayers,
-      setup: lobby.setup,
-    }
-    writeSession({ ...stored, lobbyConfig })
-  }, [])
+  const rememberLobbyConfig = useCallback(
+    (lobby: Pick<LobbyState, 'maxPlayers' | 'setup' | 'bots'>) => {
+      const stored = readSession()
+      if (stored?.role !== 'host') return
+      const lobbyConfig: StoredLobbyConfig = {
+        maxPlayers: lobby.maxPlayers,
+        setup: lobby.setup,
+        bots: lobby.bots,
+      }
+      writeSession({ ...stored, lobbyConfig })
+    },
+    [],
+  )
 
   // Everything this browser stored about a session it is leaving. The pending
   // snapshot goes first, or clearing the record and then letting the trailing
@@ -837,6 +871,8 @@ export function useLobby(): UseLobby {
             ? privateSeatsRef.current.find(({ resumeToken }) => resumeToken === payload.resumeToken)
             : undefined
           if (liveGameId && !privateSeat) keeperRef.current?.peerLeft(msg.from)
+          let joinState = current
+          let replacedLobbyPeer: PeerInfo | undefined
           if (!liveGameId) {
             const liveCredentialPeer = [...resumeTokensRef.current].find(
               ([peerId, resumeToken]) => peerId !== msg.from && resumeToken === payload.resumeToken,
@@ -844,22 +880,55 @@ export function useLobby(): UseLobby {
             if (liveCredentialPeer) {
               const existing = current.peers[liveCredentialPeer[0]]
               if (!existing || existing.name !== payload.name) return
+              replacedLobbyPeer = existing
+              joinState = applyPeerLeft(current, existing.id)
+              resumeTokensRef.current.delete(existing.id)
             }
+            resumeTokensRef.current.set(msg.from, payload.resumeToken)
           }
-          if (!liveGameId) resumeTokensRef.current.set(msg.from, payload.resumeToken)
           const admission = chatSession.admit(payload.resumeToken)
-          const r = handleJoinRequest(current, msg.from, admission.memberId, payload.name, {
+          const previousRole = replacedLobbyPeer
+            ? toChatRole(replacedLobbyPeer.role)
+            : privateSeat
+              ? 'player'
+              : lastKnownChatRole(chatSession.history(), admission.memberId)
+          const r = handleJoinRequest(joinState, msg.from, admission.memberId, payload.name, {
             matchRunning: Boolean(liveGameId),
             returningSeat: privateSeat?.seat,
+            returningLobbyPeer: replacedLobbyPeer,
           })
           const admittedPeer = r.state.peers[msg.from]
-          const chatEntry = chatSession.appendSystem({
-            kind: admission.isNew ? 'memberJoined' : 'memberReconnected',
-            memberId: admittedPeer.memberId,
-            name: admittedPeer.name,
-          })
+          const chatEntries = [
+            chatSession.appendSystem({
+              kind: admission.isNew ? 'memberJoined' : 'memberReconnected',
+              memberId: admittedPeer.memberId,
+              name: admittedPeer.name,
+            }),
+          ]
+          const nextRole = toChatRole(admittedPeer.role)
+          if (!admission.isNew && previousRole !== nextRole) {
+            chatEntries.push(
+              chatSession.appendSystem({
+                kind: 'roleChanged',
+                memberId: admittedPeer.memberId,
+                name: admittedPeer.name,
+                role: nextRole,
+              }),
+            )
+          }
           commit(r.state)
           dispatch([
+            ...(replacedLobbyPeer
+              ? [
+                  {
+                    to: 'broadcast' as const,
+                    message: {
+                      type: 'PLAYER_KICKED' as const,
+                      payload: { peerId: replacedLobbyPeer.id },
+                    },
+                  },
+                ]
+              : []),
             ...r.outgoing,
             {
               to: msg.from,
@@ -871,10 +940,10 @@ export function useLobby(): UseLobby {
                 },
               },
             },
-            {
+            ...chatEntries.map((entry) => ({
               to: 'broadcast',
-              message: { type: 'CHAT_ENTRY', payload: { entry: chatEntry } },
-            },
+              message: { type: 'CHAT_ENTRY' as const, payload: { entry } },
+            })),
           ])
 
           const seat = privateSeat?.seat
@@ -1131,7 +1200,11 @@ export function useLobby(): UseLobby {
           role: 'host',
           gameId: null,
           joinedAt: Date.now(),
-          lobbyConfig: { maxPlayers: initial.maxPlayers, setup: initial.setup },
+          lobbyConfig: {
+            maxPlayers: initial.maxPlayers,
+            setup: initial.setup,
+            bots: initial.bots,
+          },
         })
         setStatus('in-lobby')
         // The room code is the host peer id — known synchronously, so callers can
@@ -1387,6 +1460,7 @@ export function useLobby(): UseLobby {
           selfId: t.id,
           hostId: t.id,
           maxPlayers: lobbyConfig?.maxPlayers ?? 6,
+          bots: lobbyConfig?.bots ?? 0,
           setup: lobbyConfig?.setup ?? DEFAULT_SETUP,
           peers: [
             {
@@ -1461,6 +1535,7 @@ export function useLobby(): UseLobby {
           selfId: t.id,
           hostId: t.id,
           maxPlayers: lobbyConfig?.maxPlayers ?? 6,
+          bots: lobbyConfig?.bots ?? 0,
           setup: (lobbyConfig?.setup as Setup | undefined) ?? normalized.state.setup,
           peers: [
             {
@@ -1775,9 +1850,10 @@ export function useLobby(): UseLobby {
       if (!current || !isHostRef.current) return
       const r = setBotsFn(current, n)
       commit(r.state)
+      rememberLobbyConfig(r.state)
       dispatch(r.outgoing)
     },
-    [commit, dispatch],
+    [commit, dispatch, rememberLobbyConfig],
   )
 
   // NOTE: transferHost currently only broadcasts the intent (TRANSFER_HOST).

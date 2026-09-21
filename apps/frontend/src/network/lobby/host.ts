@@ -28,7 +28,11 @@ export function handleJoinRequest(
   fromId: string,
   memberId: string,
   name: string,
-  options: { matchRunning: boolean; returningSeat?: Seat },
+  options: {
+    matchRunning: boolean
+    returningSeat?: Seat
+    returningLobbyPeer?: Pick<PeerInfo, 'role' | 'ready'>
+  },
 ): Result {
   // Role comes from the seat, never from assignRole. A returning player whose
   // room filled up behind them would otherwise be handed 'guest' and silently
@@ -37,9 +41,11 @@ export function handleJoinRequest(
     ? fromId === state.hostId
       ? 'host'
       : 'player'
-    : options.matchRunning
-      ? 'guest'
-      : assignRole(state)
+    : options.returningLobbyPeer
+      ? options.returningLobbyPeer.role
+      : options.matchRunning
+        ? 'guest'
+        : assignRole(state)
 
   const peer: PeerInfo = {
     id: fromId,
@@ -48,7 +54,7 @@ export function handleJoinRequest(
     role,
     // A returner is mid-match, so it is past readiness; the lobby is the only
     // place to join from, so a newcomer starts there and is not ready.
-    ready: Boolean(options.returningSeat),
+    ready: options.returningSeat ? true : (options.returningLobbyPeer?.ready ?? false),
     where: options.returningSeat ? 'game' : 'lobby',
   }
   const next = applyPeerJoined(state, peer)

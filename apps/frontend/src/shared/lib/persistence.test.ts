@@ -118,6 +118,7 @@ it('round-trips a keeper snapshot lobby configuration', () => {
   const lobbyConfig = {
     maxPlayers: 3,
     setup: { ai: 'no', releases: 'fast' },
+    bots: 2,
   } satisfies StoredLobbyConfig
   writeKeeper({
     gameId: 'g1',
@@ -176,6 +177,26 @@ describe('the room chat record', () => {
     clearChat()
 
     expect(readChat('ABC-123', 11)).toBeNull()
+  })
+
+  it.each([
+    ['missing', undefined],
+    ['string', '1000'],
+    ['null', null],
+  ])('drops chat with a %s savedAt timestamp', (_case, savedAt) => {
+    sessionStorage.setItem(
+      'release:chat',
+      JSON.stringify({
+        roomCode: 'ABC-123',
+        entries: [],
+        nextSequence: 1,
+        members: [],
+        ...(savedAt !== undefined && { savedAt }),
+      }),
+    )
+
+    expect(readChat('ABC-123', 1_000)).toBeNull()
+    expect(sessionStorage.getItem('release:chat')).toBeNull()
   })
 })
 

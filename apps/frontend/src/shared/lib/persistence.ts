@@ -157,7 +157,12 @@ export interface StoredChat {
 export function readChat(roomCode: string, now: number = Date.now()): StoredChat | null {
   const stored = readJson<StoredChat>(CHAT_KEY)
   if (!stored) return null
-  if (stored.roomCode !== roomCode || now - stored.savedAt > RESTORE_TTL_MS) {
+  if (
+    typeof stored.savedAt !== 'number' ||
+    !Number.isFinite(stored.savedAt) ||
+    stored.roomCode !== roomCode ||
+    now - stored.savedAt > RESTORE_TTL_MS
+  ) {
     remove(CHAT_KEY)
     return null
   }
@@ -179,6 +184,7 @@ export function clearChat(): void {
 export interface StoredLobbyConfig {
   maxPlayers: number
   setup: unknown
+  bots?: number
 }
 
 export interface StoredKeeper {

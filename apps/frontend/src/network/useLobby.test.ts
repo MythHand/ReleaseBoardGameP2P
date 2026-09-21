@@ -390,7 +390,7 @@ it('sends a late joiner the complete history including its one join event', asyn
 
 it('reuses memberId and emits reconnected when join beats the stale disconnect', async () => {
   const { result } = renderHook(() => useLobby())
-  await act(async () => result.current.createRoom('Ann', 6))
+  await act(async () => result.current.createRoom('Ann', 2))
   act(() =>
     transports[0].onMessage?.({
       type: 'JOIN_REQUEST',
@@ -400,16 +400,33 @@ it('reuses memberId and emits reconnected when join beats the stale disconnect',
     }),
   )
   const memberId = result.current.state?.peers['peer-old'].memberId
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'PLAYER_READY',
+      payload: {},
+      from: 'peer-old',
+      seq: 2,
+    }),
+  )
 
   act(() =>
     transports[0].onMessage?.({
       type: 'JOIN_REQUEST',
       payload: { name: 'Bo', resumeToken: 'client-b' },
       from: 'peer-new',
-      seq: 2,
+      seq: 3,
     }),
   )
-  expect(result.current.state?.peers['peer-new'].memberId).toBe(memberId)
+  expect(result.current.state?.peers['peer-old']).toBeUndefined()
+  expect(result.current.state?.peers['peer-new']).toMatchObject({
+    memberId,
+    role: 'player',
+    ready: true,
+  })
+  expect(transports[0].broadcast).toHaveBeenCalledWith({
+    type: 'PLAYER_KICKED',
+    payload: { peerId: 'peer-old' },
+  })
   act(() => transports[0].onDisconnect?.('peer-old'))
 
   expect(result.current.state?.peers['peer-old']).toBeUndefined()
@@ -419,6 +436,47 @@ it('reuses memberId and emits reconnected when join beats the stale disconnect',
       .filter((event) => 'memberId' in event && event.memberId === memberId)
       .map((event) => event.kind),
   ).toEqual(['memberJoined', 'memberReconnected'])
+})
+
+it('records a changed role when a disconnected player returns as a spectator', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 2))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-old',
+      seq: 1,
+    }),
+  )
+  const memberId = result.current.state?.peers['peer-old'].memberId
+  act(() => transports[0].onDisconnect?.('peer-old'))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Cy', resumeToken: 'client-c' },
+      from: 'peer-c',
+      seq: 2,
+    }),
+  )
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'client-b' },
+      from: 'peer-new',
+      seq: 3,
+    }),
+  )
+
+  expect(result.current.state?.peers['peer-new']).toMatchObject({ memberId, role: 'guest' })
+  expect(
+    systemEvents(result.current)
+      .filter((event) => 'memberId' in event && event.memberId === memberId)
+      .slice(-2),
+  ).toEqual([
+    { kind: 'memberReconnected', memberId, name: 'Bo' },
+    { kind: 'roleChanged', memberId, name: 'Bo', role: 'spectator' },
+  ])
 })
 
 it('emits kicked without a later duplicate left event', async () => {
@@ -1676,9 +1734,10 @@ it('keeps the latest host lobby configuration in the stored room session', async
   act(() => {
     result.current.setMaxPlayers(3)
     result.current.setSetup(setup)
+    result.current.setBots(2)
   })
 
-  expect(storedSession()?.lobbyConfig).toEqual({ maxPlayers: 3, setup })
+  expect(storedSession()?.lobbyConfig).toEqual({ maxPlayers: 3, setup, bots: 2 })
 })
 
 it('persists the session when a room is joined', async () => {
@@ -1884,6 +1943,7 @@ it("stores private seating beside the referee's public seats", async () => {
   try {
     const { result } = await hostWithGuest()
     act(() => {
+      result.current.setBots(2)
       result.current.startGame([])
     })
     act(() => {
@@ -1899,6 +1959,7 @@ it("stores private seating beside the referee's public seats", async () => {
     expect(stored?.lobbyConfig).toEqual({
       maxPlayers: result.current.state?.maxPlayers,
       setup: result.current.state?.setup,
+      bots: 2,
     })
     expect(stored?.seats).toEqual([
       { playerId: 'p1', peerId: 'peer0', absentSince: null },
@@ -2628,6 +2689,30 @@ const invalidKeeperSnapshots: [string, (snapshot: StoredKeeper) => void][] = [
       snapshot.lobbyConfig = { maxPlayers: 3, setup: [] }
     },
   ],
+  [
+    'non-numeric lobby bot count',
+    (snapshot) => {
+      snapshot.lobbyConfig = { maxPlayers: 3, setup: {}, bots: '2' as unknown as number }
+    },
+  ],
+  [
+    'negative lobby bot count',
+    (snapshot) => {
+      snapshot.lobbyConfig = { maxPlayers: 3, setup: {}, bots: -1 }
+    },
+  ],
+  [
+    'fractional lobby bot count',
+    (snapshot) => {
+      snapshot.lobbyConfig = { maxPlayers: 3, setup: {}, bots: 1.5 }
+    },
+  ],
+  [
+    'above-maximum lobby bot count',
+    (snapshot) => {
+      snapshot.lobbyConfig = { maxPlayers: 3, setup: {}, bots: 6 }
+    },
+  ],
   ['malformed state', (snapshot) => (snapshot.state = {})],
   [
     'state for another game',
@@ -2997,7 +3082,7 @@ it('restores a stored host room and its chat when no match is running', async ()
     ai: 'less',
     gitBranch: 'strategic',
   }
-  storedHostSession(null, { maxPlayers: 3, setup })
+  storedHostSession(null, { maxPlayers: 3, setup, bots: 2 })
   sessionStorage.setItem(
     'release:resumeCredential',
     JSON.stringify({ roomCode, token: HOST_RESUME_TOKEN }),
@@ -3029,7 +3114,7 @@ it('restores a stored host room and its chat when no match is running', async ()
   expect(result.current.isHost).toBe(true)
   expect(result.current.roomCode).toBe(roomCode)
   expect(result.current.gameId).toBeNull()
-  expect(result.current.state).toMatchObject({ maxPlayers: 3, setup })
+  expect(result.current.state).toMatchObject({ maxPlayers: 3, setup, bots: 2 })
   expect(result.current.state?.peers.peer0).toMatchObject({
     memberId: 'member-host',
     name: 'Dimbo',
