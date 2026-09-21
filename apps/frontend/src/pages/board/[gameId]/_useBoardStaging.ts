@@ -28,7 +28,7 @@ import type {
   TableActions,
   TableTarget,
 } from '@release/ui'
-import { CARD_RATIO, CARD_W, centerOf, slotPlacement, useArrow } from '@release/ui'
+import { CARD_RATIO, CARD_W, cardBoxIn, centerOf, slotPlacement, useArrow } from '@release/ui'
 import {
   type Arriving,
   play,
@@ -290,6 +290,13 @@ export function useBoardStaging({
     cancellingRef.current = false
     setCancelling(false)
     commitStaged(null)
+    // NOTHING IS IN THE AIR ANY MORE, so no place is holding its card back. The
+    // refusal path cleared this and the landing path did not, because it left
+    // the clearing to whatever staged next — and every animated staging does
+    // overwrite it, which is why this never showed. A staging that runs without
+    // a flight does not (reduced motion), and there the place of the row stayed
+    // empty with the card standing in it. A landing clears what it started.
+    setCarrying([])
     // The outgoing flight this callback belongs to has landed, so a release
     // that was `leaving` is now simply gone. Conditional, unlike the clears
     // above: this fires for EVERY arrival landing, and a plain aim's own
@@ -1074,9 +1081,17 @@ export function useBoardStaging({
         }
       }
 
-      // The partner's own fan slot — the scene's own source (I6: a slot is
-      // rotated, so its bounding rect is the box AROUND the tilted card).
-      const mainHand = slotBox(index, handItems.length)
+      // THE CARD WHERE IT IS DRAWN, not where its slot rests. The scene folds
+      // from the card itself, and the card being clicked is the HOVERED one —
+      // lifted out of the fan's resting line. Measuring `slotBox` instead (the
+      // fan's rect plus `slotPlacement`) started the pair's half at a place the
+      // player's card had never been, so it read as the clicked card vanishing
+      // and a different one flying to the sudo. The slot is rotated, so its
+      // bounding rect is the box AROUND the tilted card — `cardBoxIn` trims it
+      // back (I6). `slotBox` stays the fallback for when there is no node to
+      // measure (reduced motion, a hand that has not painted yet).
+      const liveSlot = anchors.handSlotAt(index)?.getBoundingClientRect()
+      const mainHand = liveSlot ? cardBoxIn(liveSlot, CARD_W) : slotBox(index, handItems.length)
       if (!mainHand) {
         finish()
         return true

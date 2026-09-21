@@ -47,6 +47,7 @@ it('reads a git operation standing at the centre while its effect is open', () =
       ...base.state,
       pending: {
         kind: 'pickFromDiscard',
+        raisedAt: 1,
         player: 'p2',
         source: 'operation-git-cherry-pick',
         picks: 1,

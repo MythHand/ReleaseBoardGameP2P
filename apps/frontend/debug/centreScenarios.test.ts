@@ -59,25 +59,42 @@ it('offers a real defence against the staged attack', () => {
   )
 })
 
+// ONE BOARD, BOTH OUTCOMES. These used to be two presets, and the difference
+// between them was a single card in hand — so the stand carried two buttons for
+// one scene. The pile cards now share a hand deep enough to play them several
+// times over, and whether a Sudo rides along is decided at the table.
 it.each([
-  { scenario: 'branch' as const, count: 2 },
-  { scenario: 'branchSudo' as const, count: 3 },
-])('plays $scenario to produce $count draw piles', ({ scenario, count }) => {
-  const state = createScenario(scenario, 'branch')
+  { sudo: false, count: 2 },
+  { sudo: true, count: 3 },
+])('plays Branch (sudo: $sudo) to produce $count draw piles', ({ sudo, count }) => {
+  const state = createScenario('branch', 'branch')
   const branch = state.players.you.hand.find((c) => c.id === 'operation-git-branch')
   if (!branch) throw new Error('Missing Branch fixture')
   const result = engine.reduce(state, {
     type: 'PLAY',
     player: 'you',
     card: branch.uid,
-    combo:
-      scenario === 'branchSudo'
-        ? state.players.you.hand.find((c) => c.id === 'support-sudo')?.uid
-        : undefined,
+    combo: sudo ? state.players.you.hand.find((c) => c.id === 'support-sudo')?.uid : undefined,
     at: Date.now(),
   })
   expect(result.events.some((e) => e.type === 'rejected')).toBe(false)
   expect(result.state.decks.main).toHaveLength(count)
+})
+
+// …and Merge puts them back, which no preset could reach before: the hand holds
+// enough to split and then gather in one run.
+it('plays Merge after a split to bring every pile back into one', () => {
+  const state = createScenario('branch', 'branch')
+  const hand = state.players.you.hand
+  const branch = hand.find((c) => c.id === 'operation-git-branch')
+  const merge = hand.find((c) => c.id === 'operation-git-merge')
+  if (!branch || !merge) throw new Error('Missing Branch/Merge fixture')
+  const at = Date.now()
+  const split = engine.reduce(state, { type: 'PLAY', player: 'you', card: branch.uid, at })
+  expect(split.state.decks.main).toHaveLength(2)
+  const merged = engine.reduce(split.state, { type: 'PLAY', player: 'you', card: merge.uid, at })
+  expect(merged.events.some((e) => e.type === 'rejected')).toBe(false)
+  expect(merged.state.decks.main).toHaveLength(1)
 })
 
 it('gives the blind-transfer observer the public event without the stolen identity', () => {

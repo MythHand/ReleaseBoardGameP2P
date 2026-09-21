@@ -13,8 +13,7 @@ const en = {
   viewerOpponent: 'View: opponent',
   viewerObserver: 'View: observer',
   advancePending: 'Resolve pending as its owner',
-  branch: 'Branch → 2 piles',
-  branchSudo: 'Branch + Sudo → 3 piles',
+  branch: 'Branch + Merge + Sudo',
   securityRelease: 'Security Bug: attack a fresh release',
   securityHand: 'Security Bug: take a card from a hand',
   securityRequest: 'Security Bug: request',
@@ -22,8 +21,8 @@ const en = {
   blindStealPlay: 'Bug: play and pick',
   blindSteal: 'Bug: blind pick',
   handDefense: 'Attack / defence centre',
-  branchHint: 'Pull Branch out of your hand: one draw pile splits into two.',
-  branchSudoHint: 'Combine Branch with Sudo: the split and flipped discard produce three piles.',
+  branchHint:
+    'The pile cards, all in one hand: two Branch, one Merge and three Sudo. Split the pile, split it again, then put every pile back together — with or without a Sudo each time. Branch with Sudo also turns the discard into a pile of its own; Merge with Sudo takes the discard back in before shuffling.',
   securityReleaseHint:
     'The opponent has just played a release and its window is open. Attack it with Security Bug: the release moves into your own zone.',
   securityHandHint:
@@ -81,8 +80,7 @@ const ru: Record<keyof typeof en, string> = {
   viewerOpponent: 'Вид: соперник',
   viewerObserver: 'Вид: наблюдатель',
   advancePending: 'Выполнить решение за его владельца',
-  branch: 'Branch → 2 колоды',
-  branchSudo: 'Branch + Sudo → 3 колоды',
+  branch: 'Branch + Merge + Sudo',
   securityRelease: 'Security Bug: атака свежего релиза',
   securityHand: 'Security Bug: забрать карту с руки',
   securityRequest: 'Security Bug: запрос',
@@ -90,8 +88,8 @@ const ru: Record<keyof typeof en, string> = {
   blindStealPlay: 'Bug: розыгрыш и выбор',
   blindSteal: 'Bug: закрытый выбор',
   handDefense: 'Атака / защита в центре',
-  branchHint: 'Вытяните Branch из руки: одна колода разделится на две.',
-  branchSudoHint: 'Объедините Branch с Sudo: разделение и переворот сброса дадут три колоды.',
+  branchHint:
+    'Карты колод в одной руке: два Branch, один Merge и три Sudo. Разделите колоду, разделите ещё раз, потом соберите все колоды обратно — каждый раз с Sudo или без. Branch с Sudo ещё и превращает сброс в отдельную колоду; Merge с Sudo забирает сброс в общую стопку перед перемешиванием.',
   securityReleaseHint:
     'Соперник только что выложил релиз, окно по нему открыто. Ударьте по нему Security Bug: релиз переедет в вашу зону.',
   securityHandHint:

@@ -14,7 +14,6 @@ export const OPERATION_SCENARIOS = [
 export const SCENARIOS = [
   ...OPERATION_SCENARIOS,
   'branch',
-  'branchSudo',
   'securityRelease',
   'securityHand',
   'securityRequest',
@@ -110,8 +109,28 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   // decide at the table — which is what a preset is for. Cherry-pick and Rebase
   // used to have a second button each for the same board with this one card
   // added; the same run covers both now (owner, 19.09).
+  // TWO COPIES OF THE OPERATION, so the same card can be played TWICE in one
+  // run. A turn counts only releases, so nothing stops it — and the board used
+  // to: it identified an offer by its contents, so a second Rebase with the same
+  // piles in the same order looked like the one it had already answered and the
+  // row never dealt (#168). It is checkable only with a second copy in hand.
+  // …and the second copy goes at the END, not beside the first: the operation is
+  // the hand's first card and the sudo its second, and both this stand's own
+  // checks and the instruction beneath the toolbar read them by that position.
   const hand = [instance(operation, 0), instance('support-sudo', 1)]
-  hand.push(instance('attack-bug', 2), instance('defense-hotfix', 3))
+  hand.push(instance('attack-bug', 2), instance('defense-hotfix', 3), instance(operation, 18))
+  // THE PILE CARDS ARE ONE SCENE, not three buttons. Branch splits a pile, Merge
+  // puts every pile back together, and Sudo changes what each of them does — so
+  // the hand carries enough of all three to drive the row of piles up and down
+  // several times in one run, which is the only way the shape of that row gets
+  // any real pressure (owner, 21.09). Two Branch and one Merge with three Sudo:
+  // split, split again, and put it all back, with or without the sudo each time.
+  if (scenario === 'branch')
+    hand.push(
+      instance('operation-git-merge', 19),
+      instance('support-sudo', 20),
+      instance('support-sudo', 21),
+    )
 
   const state: GameState = {
     ...initial,
