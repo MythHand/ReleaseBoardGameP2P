@@ -123,7 +123,9 @@ export interface DefenseStaging {
   handItems: HandItem[]
   // the arrow armed from the waiting Sudo's own slot, following the cursor —
   // `_Board.tsx` renders it in place of `staging.arrow` while `answering`.
-  arrow: { from: Point | null; to: Point | null; active: boolean }
+  // `color` is the hue the aim was armed with — here always the Sudo's, the
+  // only card the defence aims with; undefined while nothing is aiming.
+  arrow: { from: Point | null; to: Point | null; color?: string; active: boolean }
   // the hand cards a waiting Sudo may fold with light with its own category
   // accent — mirrors `_useBoardStaging`'s own `accentAt`. Undefined outside
   // `phase: 'partner'`.
@@ -418,9 +420,17 @@ export function useDefenseStaging({
         // staging happens to call `stop()`.
         if (!stillCurrent()) return
         // the arrow starts where the Sudo now stands and follows the cursor —
-        // the ported source's own `stageDefSudo`
+        // the ported source's own `stageDefSudo`. The defence only ever aims
+        // with the Sudo, so the card that arms the arrow is also the one whose
+        // colour it takes, named here rather than re-derived by the board: the
+        // scene's own `color="var(--cat-support)"`, read off the card standing.
         const box = anchors.sudo.current?.getBoundingClientRect()
-        if (box) arrowCtl.aim({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, dropped)
+        if (box)
+          arrowCtl.aim(
+            { x: box.left + box.width / 2, y: box.top + box.height / 2 },
+            dropped,
+            `var(--cat-${card.category})`,
+          )
       })()
     },
     [anchors.sudo, arrowCtl.aim, sudoFlight.fly],

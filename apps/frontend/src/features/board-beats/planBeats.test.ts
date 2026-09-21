@@ -1854,6 +1854,7 @@ describe('planBeats — a Release comes back out of the discard (#106, Task 11)'
     const before = boardBefore({
       pending: {
         kind: 'pickFromDiscard',
+        raisedAt: 1,
         player: 'p1',
         options: [],
         picks: 1,
@@ -1879,6 +1880,7 @@ describe('planBeats — a Release comes back out of the discard (#106, Task 11)'
     const before = boardBefore({
       pending: {
         kind: 'pickFromDiscard',
+        raisedAt: 1,
         player: 'p1',
         options: [],
         picks: 1,
@@ -1896,6 +1898,7 @@ describe('planBeats — a Release comes back out of the discard (#106, Task 11)'
     const before = boardBefore({
       pending: {
         kind: 'pickFromDiscard',
+        raisedAt: 1,
         player: 'p1',
         options: [],
         picks: 1,
@@ -2086,6 +2089,7 @@ describe('public operation sequence', () => {
     } as Event
     const pending = {
       kind: 'reorderTop',
+      raisedAt: 1,
       player: 'p2',
       source: 'operation-git-rebase',
     } as BoardState['pending']

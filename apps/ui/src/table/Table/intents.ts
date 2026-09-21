@@ -116,12 +116,23 @@ export type TablePending =
       options: { uid: string; id: string }[]
       picks: 1 | 2
       source: string
+      /**
+       * WHICH OCCASION THIS IS. The same player can be offered the same cards
+       * twice in one match — a card of the same kind may be played any number
+       * of times — and the two offers are then identical in every other field.
+       * A reader that must not mistake a fresh offer for the one it has already
+       * answered has nothing else to tell them apart by. Mirrors the engine's
+       * own field: its event sequence, not a clock.
+       */
+      raisedAt: number
     }
   | {
       kind: 'reorderTop'
       player: string
       piles: { pile: number; cards: { uid: string; id: string }[] }[]
       source: string
+      /** which occasion this is — see `pickFromDiscard.raisedAt` */
+      raisedAt: number
     }
   // System Upgrade — the one pending owed to SEVERAL seats at once, and so the
   // one with no `player`. Mirrors the engine's PendingView field for field

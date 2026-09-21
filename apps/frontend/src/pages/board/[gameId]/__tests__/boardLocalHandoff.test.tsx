@@ -16,7 +16,8 @@ it.each([
   'local-delayed',
   'remote',
   'observer',
-] as const)('%s defense has one incoming carrier', async (viewer) => {
+  'local-neutralize',
+] as const)('%s answer has one incoming carrier', async (viewer) => {
   vi.useFakeTimers()
   const geometry = vi
     .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
@@ -29,7 +30,7 @@ it.each([
     options?: number | KeyframeAnimationOptions,
   ) {
     if (
-      this.textContent?.includes('Hotfix') &&
+      this.textContent?.includes(viewer === 'local-neutralize' ? 'Debugger' : 'Hotfix') &&
       Array.isArray(frames) &&
       frames.some((frame) => String(frame.transform).includes('rotate(6deg)'))
     )
@@ -38,9 +39,17 @@ it.each([
   })
   const accepted = vi.fn()
   try {
-    const initial = createScenario('handDefense', 'local-handoff')
-    const local = viewer === 'local' || viewer === 'local-delayed'
-    const selfId = local ? 'p2' : viewer === 'observer' ? 'p3' : 'you'
+    const neutralize = viewer === 'local-neutralize'
+    const initial = neutralize
+      ? engine.reduce(createScenario('alarm503', 'local-handoff'), {
+          type: 'DRAW',
+          player: 'you',
+          pile: 0,
+          at: Date.now(),
+        }).state
+      : createScenario('handDefense', 'local-handoff')
+    const local = viewer === 'local' || viewer === 'local-delayed' || neutralize
+    const selfId = neutralize ? 'you' : local ? 'p2' : viewer === 'observer' ? 'p3' : 'you'
     function Table() {
       const [run, setRun] = useState({ state: initial, events: [] as Event[] })
       const view = engine.project(run.state, selfId)
@@ -48,9 +57,11 @@ it.each([
       const resolve = () => {
         const result = engine.reduce(run.state, {
           type: 'RESOLVE',
-          player: 'p2',
+          player: neutralize ? 'you' : 'p2',
           at: Date.now(),
-          choice: { kind: 'defend', card: initial.players.p2.hand[0].uid },
+          choice: neutralize
+            ? { kind: 'neutralize503', method: 'debugger' }
+            : { kind: 'defend', card: initial.players.p2.hand[0].uid },
         })
         accepted(result.events)
         const accept = () => setRun({ state: result.state, events: result.events })
@@ -90,7 +101,9 @@ it.each([
       })
     }
     expect(accepted).toHaveBeenCalledTimes(1)
-    expect(accepted.mock.calls[0][0]).toContainEqual(expect.objectContaining({ type: 'defended' }))
+    expect(accepted.mock.calls[0][0]).toContainEqual(
+      expect.objectContaining({ type: neutralize ? 'neutralized' : 'defended' }),
+    )
     expect(incoming).toHaveLength(1)
     if (local) expect(document.querySelector('[data-testid="board-cover-staged"]')).not.toBeNull()
   } finally {

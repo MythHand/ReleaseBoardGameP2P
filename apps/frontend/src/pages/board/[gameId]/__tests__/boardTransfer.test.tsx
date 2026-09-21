@@ -11,6 +11,7 @@ import type { TablePending } from '@release/ui'
 import { fireEvent, render, renderHook, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
+import type { RequestPickHandoff } from '~/entities/game/board/types'
 import Board from '../_Board'
 import { useRequestStaging } from '../_useRequestStaging'
 import { makeBoardProps } from './fixture'
@@ -115,7 +116,11 @@ it('selects and changes a requested catalogue card by mouse click before confirm
   expect(onResolve).toHaveBeenCalledTimes(1)
 })
 
-it('offers anonymous positions and requires a drag to choose a closed card', () => {
+// The closed offer is the `Hand` component itself, and a position is taken by
+// CLICKING it — the scene's own gesture (`PickOpponentCardStory`), and the
+// owner's call (18.09): no drag, no keyboard pick. What the positions are is
+// still anonymous — a count, not the donor's hand.
+it('offers anonymous positions and takes one on a click', () => {
   const onResolve = vi.fn()
   const props = withPending({
     kind: 'stealCard',
@@ -129,16 +134,11 @@ it('offers anonymous positions and requires a drag to choose a closed card', () 
   })
   const { getByTestId } = render(<Board {...props} actions={{ onResolve }} />)
   const offer = getByTestId('board-transfer-offer')
-  const root = getByTestId('board-request-band').parentElement
-  if (!root) throw new Error('missing board')
-  vi.spyOn(root, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1280, 720))
-  const cards = within(offer).getAllByRole('button')
-  expect(cards).toHaveLength(3)
-  fireEvent.click(cards[1])
-  expect(onResolve).not.toHaveBeenCalled()
-  fireEvent.pointerDown(cards[1], { button: 0, pointerId: 1, clientX: 0, clientY: 0 })
-  fireEvent.pointerMove(window, { pointerId: 1, clientX: 0, clientY: 200 })
-  fireEvent.pointerUp(window, { pointerId: 1, clientX: 0, clientY: 200 })
+  const choices = offer.querySelectorAll<HTMLElement>('[data-transfer-choice]')
+  expect(choices).toHaveLength(3)
+  // pressed, not clicked: the fan turns a press into its own gesture, and with
+  // no drag armed that IS the click (`Hand`'s `onSlotDown`)
+  fireEvent.mouseDown(choices[1])
   expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'stealCard', index: 1 })
 })
 
@@ -179,4 +179,87 @@ it('does not resolve the visual giveCard pending while transfer beats own the bo
     }),
   )
   expect(onResolve).not.toHaveBeenCalled()
+})
+
+// WHICH PLACE THE CARD LEAVES IS THE FAN'S OWN ANSWER. A blind pick is a choice
+// OF A PLACE, so the fan names the back that was pressed; a named request chose
+// no place at all, so it names its middle, where the card is seen leaving rather
+// than slipping off an edge. One owner, one answer — the transfer beat asks and
+// does not arbitrate, which is what flew every blind pick out of the middle
+// whichever back was pressed (#168).
+it('names the pressed back as the place the card leaves', () => {
+  const handoff: { current: RequestPickHandoff | null } = { current: null }
+  const props = withPending({
+    kind: 'stealCard',
+    player: 'you',
+    target: 'p2',
+    count: 3,
+    attack: 'attack-bug',
+    sudo: false,
+    openedAt: 0,
+    deadline: 15000,
+  })
+  const { result } = renderHook(() =>
+    useRequestStaging({
+      state: props.state,
+      actions: {},
+      copy: { prompt: '', action: '', confirm: '', steal: '' },
+      enabled: true,
+      matchKey: 'pressed-back',
+      handoff,
+    }),
+  )
+  const { getByTestId } = render(result.current.band)
+  const offer = getByTestId('board-transfer-offer')
+  const choices = offer.querySelectorAll<HTMLElement>('[data-transfer-choice]')
+  // jsdom measures everything as zero, so the pressed back is given a rect of
+  // its own — otherwise "the middle" and "the one pressed" are the same numbers
+  const pressed = { left: 120, top: 640, width: 90, height: 126 } as DOMRect
+  // the fan hands its own element over, so the whole of that back reports the
+  // rect rather than guessing which node the gesture measures
+  const mark = (el: Element) => {
+    ;(el as HTMLElement).getBoundingClientRect = () => pressed
+  }
+  mark(choices[0])
+  for (const child of choices[0].querySelectorAll('*')) mark(child)
+  for (let p = choices[0].parentElement; p && p !== offer; p = p.parentElement) mark(p)
+  // before anything is pressed the fan names its middle, not this
+  expect(handoff.current?.slot()).not.toMatchObject({ left: 120, top: 640 })
+  fireEvent.mouseDown(choices[0])
+  expect(handoff.current?.slot()).toMatchObject({ left: 120, top: 640 })
+})
+
+it.each([
+  'you',
+  'p3',
+])('shows the public request selection to target %s without allowing an answer', (target) => {
+  const geometry = vi
+    .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    .mockReturnValue(new DOMRect(0, 0, 1000, 700))
+  try {
+    const onResolve = vi.fn()
+    const props = withPending({ kind: 'requestCard', player: 'p2', target })
+    const { getByTestId } = render(
+      <Board
+        {...props}
+        actions={{ onResolve }}
+        pickPreview={{ player: 'p2', card: 'support-code-review' }}
+      />,
+    )
+    const band = within(getByTestId('board-request-band'))
+    expect(band.queryByRole('button', { name: /confirm/i })).toBeNull()
+    expect(band.getByRole('button', { name: /Code Review/i }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+    expect(
+      document.querySelector('[data-catalog-preview] [data-card]')?.getAttribute('data-card'),
+    ).toBe('support-code-review')
+    fireEvent.click(band.getByRole('button', { name: /Hotfix/i }), { detail: 1 })
+    expect(onResolve).not.toHaveBeenCalled()
+    expect(band.getByRole('button', { name: /Code Review/i }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+  } finally {
+    geometry.mockRestore()
+  }
 })

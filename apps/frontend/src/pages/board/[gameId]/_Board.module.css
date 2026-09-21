@@ -51,9 +51,19 @@
 .costSlot,
 .sudoSlot,
 .coverSlot,
-.aiSlot {
+.aiSlot,
+.rowSlot {
   position: absolute;
   aspect-ratio: var(--card-aspect);
+}
+
+/* A place of a centre ROW (`rowPlaceStyle`) that nothing stands in yet — the
+   scene draws the ask this way and nothing else: the gap where the second card
+   of a play goes IS the question about what the first one goes with
+   (`DeckAnimationsStory`: `.stageEmpty`, values verbatim). */
+.rowEmpty {
+  border: 1px dashed var(--white-12);
+  border-radius: 8px;
 }
 
 .aiCard {

@@ -37,6 +37,8 @@ export interface CardCatalogProps {
   stagger?: number
   // A positioned, non-scrolling layer reserved by the consumer for reading.
   previewRoot?: RefObject<HTMLElement | null>
+  // Keep a remote selection readable even outside this viewer’s scrollport.
+  previewSelected?: boolean
 }
 
 export default function CardCatalog({
@@ -49,6 +51,7 @@ export default function CardCatalog({
   width = 100,
   stagger = 18,
   previewRoot,
+  previewSelected = false,
 }: CardCatalogProps) {
   const cells = useRef(new Map<string, HTMLDivElement>())
   const [reading, setReading] = useState<string | null>(null)
@@ -59,7 +62,7 @@ export default function CardCatalog({
     top: number
     width: number
   } | null>(null)
-  const active = open ? reading : chosen
+  const active = open ? (reading ?? (previewSelected ? selected : null)) : chosen
 
   useLayoutEffect(() => {
     const root = previewRoot?.current

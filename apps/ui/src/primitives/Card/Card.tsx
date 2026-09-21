@@ -93,6 +93,11 @@ export default function Card({
       // card by id; the preview and any test that needs to know WHICH card is
       // on screen reads this rather than matching on localized display text.
       data-card={card?.id}
+      // …and WHICH SIDE IS SHOWING, because the id alone does not say. Anything
+      // reading a card off the table has to know the difference: a back has
+      // nothing to read, and reading one anyway would show a face nobody at
+      // this seat has been shown (`useCardPreview`).
+      data-face-down={faceDown ? '' : undefined}
       style={
         {
           '--accent': accent,

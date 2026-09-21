@@ -453,7 +453,14 @@ export function resolveAiEvent(
       if (options.length === 0) return { ...state, eventSeq: log.seq }
       return {
         ...state,
-        pending: { kind: 'pickFromDiscard', player, options, picks: 1, source: event.id },
+        pending: {
+          kind: 'pickFromDiscard',
+          player,
+          options,
+          picks: 1,
+          source: event.id,
+          raisedAt: log.seq,
+        },
         eventSeq: log.seq,
       }
     }

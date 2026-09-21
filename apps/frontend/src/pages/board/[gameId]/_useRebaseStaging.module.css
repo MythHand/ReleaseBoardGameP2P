@@ -3,11 +3,37 @@
    and every pile has the same three. Keep the confirm bar outside this scroll
    area, at the table's bottom. No transform: return flights pin the card nodes
    against viewport coordinates, so this must not become their containing block. */
+
+/* The surface the reorder owns while it is up: the dimming, the rows and the
+   confirm bar are ONE layer, so the bar is never swallowed by its own scrim.
+   Both of its states — standing over the table, and dropping to the flight band
+   on the commit — come from `_tableSurface.module.css`, which owns that rule
+   for every surface that carries its own card nodes home. */
+.surface {
+  composes: over from './_tableSurface.module.css';
+}
+
+.flight {
+  composes: flying from './_tableSurface.module.css';
+}
+
+/* The scene's own backing while the cards are being read and reordered
+   (`GitCards.module.css`: `.scrim` + `.scrimOver`) — the heavier of its two,
+   because here the reorder is the only thing to read and the decks go under it
+   too. It leaves on the commit, ahead of the cards: they travel over a table
+   that is already back to normal, and land in it rather than over it. */
+.scrim {
+  composes: scrim from './_tableSurface.module.css';
+
+  /* heavier than the shared default: here the reorder is the only thing to read
+     and the draw piles go under it too */
+  --surface-scrim: var(--black-72);
+}
+
 .rows {
   position: absolute;
   inset-block: 8px 0;
   inset-inline: 0;
-  z-index: 40;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -39,6 +65,38 @@
   inset-block-start: -26px;
   inline-size: 150px;
   text-align: center;
+}
+
+/* The numbering fades rather than blinks, both ways — the scene's own chrome
+   (`GitCards.module.css`: `chrome-in` / `chrome-out`, 340ms, applied to its
+   1-2-3 header), values verbatim. It leaves on the commit, so the numbers are
+   already going while the cards are still turning their backs. */
+@keyframes chrome-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chrome-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+.chromeIn {
+  animation: chrome-in 340ms var(--ease-out) both;
+}
+
+.chromeOut {
+  animation: chrome-out 340ms var(--ease-out) both;
 }
 
 .move {

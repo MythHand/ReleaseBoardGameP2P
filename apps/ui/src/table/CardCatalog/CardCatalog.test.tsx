@@ -19,7 +19,12 @@ function setup(cardRect = source, hostRect = bounds) {
   ) {
     return this.hasAttribute('data-preview-host') ? hostRect : cardRect
   })
-  const scene = (open = true, selected: string | null = null, chosen: string | null = null) => (
+  const scene = (
+    open = true,
+    selected: string | null = null,
+    chosen: string | null = null,
+    previewSelected = false,
+  ) => (
     <>
       <div data-preview-host ref={previewRoot} />
       <div data-testid="scrolling-catalog" style={{ overflow: 'auto' }}>
@@ -29,6 +34,7 @@ function setup(cardRect = source, hostRect = bounds) {
           selected={selected}
           chosen={chosen}
           previewRoot={previewRoot}
+          previewSelected={previewSelected}
           onPick={onPick}
           onDrop={onDrop}
         />
@@ -119,4 +125,19 @@ it('reduces the preview only when the available reading area cannot fit the norm
   fireEvent.focus(choice())
   expect(Number.parseFloat(preview()?.style.width ?? '')).toBeCloseTo(122.9, 1)
   expect(preview()?.style.top).toBe('24px')
+})
+
+it('keeps a public selected card readable even when its source is outside the scrollport', () => {
+  const { rerender, scene, preview, choice } = setup(new DOMRect(40, 900, 100, 140))
+  rerender(scene(true, cards[2].id, null, true))
+  expect(preview()?.querySelector('[data-card]')?.getAttribute('data-card')).toBe(cards[2].id)
+  expect(Number.parseFloat(preview()?.style.top ?? '')).toBeCloseTo(110.1, 1)
+  fireEvent.mouseEnter(choice())
+  expect(preview()?.querySelector('[data-card]')?.getAttribute('data-card')).toBe(cards[0].id)
+  fireEvent.mouseLeave(choice())
+  expect(preview()?.querySelector('[data-card]')?.getAttribute('data-card')).toBe(cards[2].id)
+  fireEvent.scroll(screen.getByTestId('scrolling-catalog'))
+  expect(preview()?.querySelector('[data-card]')?.getAttribute('data-card')).toBe(cards[2].id)
+  rerender(scene(true, null, null, true))
+  expect(preview()).toBeNull()
 })

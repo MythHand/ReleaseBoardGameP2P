@@ -10,7 +10,7 @@ import { useNow } from '~/features/play-game/useNow'
 import { forViewer, rejectionsIn } from '~/network/session/audience'
 import Board from '~/pages/board/[gameId]/_Board'
 import { useDebugCopy } from './copy'
-import { createScenario, engine, SCENARIOS, type Scenario } from './scenarios'
+import { createScenario, engine, SCENARIOS, type Scenario, seedLog } from './scenarios'
 import styles from './styles.module.css'
 
 type Intent = Action extends infer A ? (A extends Action ? Omit<A, 'at'> : never) : never
@@ -33,16 +33,16 @@ function reduceRun(run: Run, action: Action): Run {
 function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string }) {
   const { t, i18n } = useTranslation()
   const debug = useDebugCopy()
-  const [run, dispatch] = useReducer(
-    reduceRun,
-    undefined,
-    (): Run => ({
-      state: createScenario(scenario, gameId),
-      events: [],
-      last: null,
-    }),
-  )
+  const [run, dispatch] = useReducer(reduceRun, undefined, (): Run => {
+    const state = createScenario(scenario, gameId)
+    // The seeded discard's own history, so the board can fold a heap out of
+    // it (`seedLog`). Reported as already reflected below, so the queue
+    // treats it as a table it arrived at rather than moves to replay.
+    return { state, events: seedLog(state), last: null }
+  })
   const [viewer, setViewer] = useState('you')
+  // the last seeded event: everything at or below it is the starting table
+  const [seeded] = useState(() => run.events.at(-1)?.id ?? 0)
   const [ready, setReady] = useState(false)
   const now = useNow(ready)
   const send = useCallback((intent: Intent) => dispatch({ ...intent, at: Date.now() }), [])
@@ -74,13 +74,56 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
   return (
     <>
       <div className={styles.status}>
-        <Typography variant="footnote">{debug(`${scenario}Hint`)}</Typography>
         <div className={styles.controls}>
+          {/* The instruction shares the controls' row instead of owning one of
+              its own: it is a sentence, and a sentence is the cheapest thing on
+              this bar to give up height for. The whole of it stays reachable —
+              `title` carries it when the row is too narrow to show it all. */}
+          <Typography variant="footnote" className={styles.hint} title={debug(`${scenario}Hint`)}>
+            {debug(`${scenario}Hint`)}
+          </Typography>
           <Typography variant="footnote" data-status>
             {ready ? debug('ready') : debug('opening')}
             {' · '}
             {pending?.kind ?? debug('idle')}
           </Typography>
+          <details className={styles.trace}>
+            <summary>
+              <Typography variant="footnote">{debug('trace')}</Typography>
+            </summary>
+            <Typography as="pre" base="code-sm" className={styles.traceContent}>
+              {run.last
+                ? JSON.stringify(
+                    {
+                      action:
+                        'player' in run.last.action && run.last.action.player === viewer
+                          ? run.last.action
+                          : {
+                              type: run.last.action.type,
+                              ...('player' in run.last.action
+                                ? { player: run.last.action.player }
+                                : {}),
+                            },
+                      events: [
+                        ...forViewer(run.last.events, viewer),
+                        ...('player' in run.last.action && run.last.action.player === viewer
+                          ? rejectionsIn(run.last.events)
+                          : []),
+                      ],
+                    },
+                    null,
+                    2,
+                  )
+                : debug('noAction')}
+            </Typography>
+          </details>
+        </div>
+        {/* EVERYTHING YOU PRESS IS ON ITS OWN LINE, and the line above is
+            everything you read: what the scenario asks of you, where the game
+            is, and the trace. Mixed, the row changed height and slid its buttons
+            sideways under the cursor every time a pending opened or closed —
+            and the buttons are the half you are aiming at. */}
+        <div className={styles.actions}>
           {run.state.seating.map((id) => (
             <Button
               key={id}
@@ -145,36 +188,6 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
               {debug('opponentDiscard')}
             </Button>
           )}
-          <details className={styles.trace}>
-            <summary>
-              <Typography variant="footnote">{debug('trace')}</Typography>
-            </summary>
-            <Typography as="pre" base="code-sm" className={styles.traceContent}>
-              {run.last
-                ? JSON.stringify(
-                    {
-                      action:
-                        'player' in run.last.action && run.last.action.player === viewer
-                          ? run.last.action
-                          : {
-                              type: run.last.action.type,
-                              ...('player' in run.last.action
-                                ? { player: run.last.action.player }
-                                : {}),
-                            },
-                      events: [
-                        ...forViewer(run.last.events, viewer),
-                        ...('player' in run.last.action && run.last.action.player === viewer
-                          ? rejectionsIn(run.last.events)
-                          : []),
-                      ],
-                    },
-                    null,
-                    2,
-                  )
-                : debug('noAction')}
-            </Typography>
-          </details>
         </div>
       </div>
       <div className={styles.board} data-debug-game-id={gameId}>
@@ -183,7 +196,14 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
           state={board}
           over={toBoardOver(view)}
           now={now}
-          intro={{ gameId: `${gameId}:${viewer}`, view, events, onDone: onIntroDone }}
+          intro={{
+            gameId: `${gameId}:${viewer}`,
+            view,
+            events,
+            // the seeded discard is where this table STARTS, not something it plays
+            restoredThrough: seeded,
+            onDone: onIntroDone,
+          }}
           room={{
             role: 'host',
             participants: run.state.seating.map((id) => ({

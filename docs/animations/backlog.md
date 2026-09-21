@@ -2008,6 +2008,24 @@ AI-триггера) и не означает полного выполнени�
 
 ---
 
+### Карта операции стояла в слое полёта над выбором — исправлено (#168)
+
+**Что было.** `operationBeat` держал приземлившуюся карту операции на перевозчике (`useFlyer.pin`)
+всё время эффекта. Перевозчик — слой полёта (`--z-flight`, 250), выше любой поверхности выбора
+(сетка Cherry-pick, ряд Rebase, раскладка System Upgrade — 40). Карта стояла над сеткой, а
+выбранная карта Cherry-pick увеличивалась в центре под ней. Сетка открывалась в тот же миг,
+как карта села.
+
+**Что сделано.** Приземлившуюся карту перенимает рисунок стола в центре (`operationLanded`),
+перевозчик снимается в том же коммите — контракт `useFlyer`: закрепление нужно следующему
+полёту, покоящуюся карту рисует стол. После посадки — пауза `PLACED_HOLD` (420), потом
+открывается поверхность эффекта, поверх карты. Уход в сброс — как был: после всех полётов,
+`CENTER_HOLD` (420), из прямоугольника центра.
+
+**Статус.** Исправлено в коде и тестах; визуальная сверка — владелец, на `/debug.html`.
+
+---
+
 ### Боты опережают анимации и видимый таймер хода
 
 **Что не хватает.** PR #142 запускает действия ботов на тике хоста каждые 250 мс.
@@ -2059,7 +2077,9 @@ scroll/viewport coverage is recorded with the issue’s verification evidence.
 request. The board had enabled the catalogue’s drag mode, which ignored ordinary clicks.
 It now uses the same click-to-select, then ConfirmAction interaction as `PickSpecificCardStory`.
 The Board regression covers selecting and changing the choice without dispatch, followed by
-exactly one confirmation. Anonymous opponent-card selection retains its drag interaction.
+exactly one confirmation. At this point anonymous opponent-card selection retained its drag interaction.
+The newer #168 scene, retained during the main merge, selects a closed position
+by click and preserves the public request preview and fan handoff.
 
 
 ## 2026-09-21 — #180: local drag replayed from the hand
@@ -2078,3 +2098,64 @@ defense, neutralization and Upgrade contributions, without per-runner delays.
 The real-engine Board regression covers immediate and delayed local responses,
 the opponent and a third observer. Browser evidence uses `Attack / defence centre`
 → `View: opponent` and records the actual WAAPI flight sources.
+
+
+### «Опора лежит под своей картой» записано дважды — открыто, 2026-09-20
+
+Один и тот же факт выражен в двух местах и двумя разными способами:
+
+- в полёте — порядком слоёв: `useDiscardExit.expand()` сам решает, что вспомогательная
+  половина пары идёт слоем ниже, и `onLanded` отдаёт карты снизу вверх;
+- в куче — сводом ленты: `toBoardState.toDiscardHeap` подкладывает опору под карту, с
+  которой её разыграли, потому что лента сообщает её на шаг ПОЗЖЕ.
+
+**Чем грозит.** Ровно тем, что уже случилось (#168): вторая запись была привязана к одной
+причине сброса (`effect`) и не знала про `attackSpent`, которым списывает свои карты атака.
+Пара Bug + Sudo летела и приземлялась верно, а в момент, когда куча забирала её себе,
+переворачивалась. Пока правило живёт в двух местах, любая правка одной стороны может
+разойтись со второй, и расхождение видно только глазами на живой партии.
+
+**Что закрыто сейчас.** Обе стороны приведены к одному поведению и закреплены тестами
+порознь: посадка пары снизу вверх (`useDiscardExit.test.tsx`) и подкладка опоры в куче для
+всех способов списания (`toBoardState.test.ts`). Тесты ссылаются друг на друга словами, но
+машина их согласие не проверяет.
+
+**Что закроет.** Один источник порядка на обе стороны: либо модуль перестаёт решать сам и
+принимает порядок половин от вызывающего, либо такт спрашивает будущую кучу и передаёт
+модулю уже готовый порядок. Плюс перекрёстная проверка, роняющая тест при расхождении.
+
+**Статус.** `открыто`. Строка в реестре Interaction audit не заведена — страница в
+плейграунде, правка по слову владельца.
+
+### Плавающий тест вступления под StrictMode — открыто, 2026-09-21
+
+`boardIntro.test.tsx`, случай «still reports the opening when StrictMode mounts the board twice».
+В одиночку файл проходит стабильно (проверено трижды), в полном прогоне падает примерно раз на
+пять. Сам случай тяжёлый — около девяти секунд, — и завязан на время.
+
+**Чем грозит.** Красный прогон, не связанный с правкой, приучает не смотреть на падения. Пока тест
+плавает, любое настоящее падение в этом файле будет списано на него.
+
+**Что закроет.** Разобраться, на что он опирается по времени: под StrictMode эффекты монтирования
+проходят дважды, и если ожидание считает кадры или таймер, второе монтирование смещает отсчёт.
+Либо привязать проверку к состоянию, а не к сроку.
+
+**Это класс, а не один случай.** 21.09 в том же полном прогоне упала другая пара — «lights the
+alarm while a gathered sweep runs» и «leaves the alarm dark through an ordinary, ungathered
+discard» (`useBeats.test.tsx`). Оба тоже держатся на сроках: беат паркуется вручную, отпускается и
+проверяется через ожидание в 80 мс. В одиночку файл проходит трижды подряд, в полном прогоне падает
+изредка. Считать такие падения «тем самым плавающим тестом» нельзя — их несколько, и каждый раз
+падает другой.
+
+**Статус.** `открыто`. Имя первого случая зафиксировано после трёх встреч за 20–21.09.2026, второго
+— 21.09. Замеры: на правках шесть полных прогонов, из них один с падением; на той же базе без правок
+три прогона чисто. Этого мало, чтобы назвать причину, и достаточно, чтобы не списывать падения на
+случайность молча.
+
+
+**PR #178 main merge, 2026-09-21.** Preserved #168’s public request catalogue,
+remote live selection and held-card/fan handoff alongside the bounded preview.
+`previewSelected` keeps the named card readable to other viewers even if their
+independent scroll position hides its row. The updated anonymous fan uses click
+selection. The shared early staging handoff also covers Debugger/503; that
+real-engine regression reproduces the gap in main’s render-time workaround.

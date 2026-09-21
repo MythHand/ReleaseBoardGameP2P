@@ -891,9 +891,11 @@ it('keeps the combo pair standing at the centre while its cost is owed', async (
     document.querySelectorAll<HTMLElement>('[data-hand-slot] [data-card]'),
   ).map((el) => el.getAttribute('data-card'))
   expect(faces).toEqual(['attack-bug'])
-  const pair = screen.getByTestId('board-pair-staged')
-  expect(pair.querySelector('[data-card="release-frontend"]')).toBeTruthy()
-  expect(pair.querySelector('[data-card="support-code-review"]')).toBeTruthy()
+  // the pair rides on the fold step's own node (`usePairFold`), found by the
+  // halves `CardPair` marks
+  const pairMain = document.querySelector('[data-main]')?.parentElement
+  expect(pairMain?.querySelector('[data-card="release-frontend"]')).toBeTruthy()
+  expect(pairMain?.querySelector('[data-card="support-code-review"]')).toBeTruthy()
   // and it does NOT also stand at the stage slot — that slot is for a release
   // standing alone (Fix C, finding 5: the stage machine must not carry over
   // from an earlier release)
