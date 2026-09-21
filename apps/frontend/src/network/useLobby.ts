@@ -51,6 +51,7 @@ import {
   whereabouts,
 } from './lobby/messages'
 import { formatRoomCode, makeRoomCode, parseRoomCode } from './lobby/roomCode'
+import { createRoomRuntime, type PickPreview } from './lobby/runtime'
 import {
   applyConfig,
   applyPeerJoined,
@@ -72,7 +73,7 @@ import { adoptSession, createSession, type Session, type SessionRef } from './se
 import { isRelayable, relayTargets } from './session/relay'
 import { attachKeeper, createRemoteLink } from './session/remoteLink'
 import { restoreSeats } from './session/restore'
-import { createStartGate, type StartGate } from './session/startGate'
+import { createStartGate } from './session/startGate'
 import { createTransport, type Transport } from './transport/peer'
 import type { PeerInfo, Seat, Setup, Where, WireMessage } from './types'
 
@@ -254,58 +255,42 @@ export function useLobby(): UseLobby {
   // The pick somebody's surface is currently offering to confirm — see
   // PICK_PREVIEW. Held beside the game and never inside it: nothing here is
   // engine state, and a stale one costs a highlight on a surface that is gone.
-  const [pickPreview, setPickPreview] = useState<{
-    gameId: string
-    player: PlayerId
-    card: string | null
-  } | null>(null)
+  const [pickPreview, setPickPreview] = useState<PickPreview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [errorKind, setErrorKind] = useState<ErrorKind>(null)
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameLink, setGameLink] = useState<GameLink | null>(null)
   const [gameSync, setGameSync] = useState<Sync | null>(null)
   const [seats, setSeats] = useState<Seat[]>([])
-  const transportRef = useRef<Transport | null>(null)
-  const transportGenerationRef = useRef(0)
-  // The keeper's session, held only by the host. `sessionRef` is the state the
-  // referee reduces; `keeperRef` and `remoteRef` are the two mutually exclusive
-  // ends of the wire — a peer is one or the other, never both.
-  const sessionRef = useRef<SessionRef | null>(null)
-  const keeperRef = useRef<ReturnType<typeof attachKeeper> | null>(null)
-  const remoteRef = useRef<ReturnType<typeof createRemoteLink> | null>(null)
-  // The host's start gate, born with the keeper and dying with it: it holds a
-  // pending cap timer, so it must never outlive the session it gates.
-  const gateRef = useRef<StartGate | null>(null)
-  // `gameId` as a ref, so reporting readiness reads the live value instead of
-  // whichever render closed over it.
-  const gameIdRef = useRef<string | null>(null)
+  const keeperWriter = useMemo(() => createKeeperWriter(), [])
+  const runtime = useMemo(
+    () =>
+      createRoomRuntime(
+        {
+          lobby: setState,
+          host: setIsHost,
+          roomCode: setRoomCode,
+          gameId: setGameId,
+          seats: setSeats,
+          gameLink: setGameLink,
+          gameSync: setGameSync,
+          pickPreview: setPickPreview,
+        },
+        keeperWriter,
+      ),
+    [keeperWriter],
+  )
   // Counts matches within one session. The room's identity is the host's peer
   // id and never changes, but a match's must: every reset downstream keys on
   // gameId — the follower's navigation, useGame's event feed, the deal intro —
   // and a rematch that reused the id would silently be taken for the same game.
   const matchSeqRef = useRef(0)
-  const stateRef = useRef<LobbyState | null>(null)
-  const isHostRef = useRef(false)
   // Whether the guest's DataChannel to the host ever opened. Distinguishes a
   // host that genuinely left (channel was up, then dropped) from a connection
   // that never established (ICE/negotiation failure) — so the two report
   // different, accurate errors.
   const hostConnectedRef = useRef(false)
   const leaveSessionRef = useRef<() => void>(() => {})
-  // `seats` as a ref, for exactly the reason `gameIdRef` is one: the message
-  // handler is a closure and would otherwise read whichever render's seating it
-  // captured — and a returning player is recognised against that seating. Every
-  // write goes through `applySeats`, so the ref and the state cannot drift.
-  const seatsRef = useRef<Seat[]>([])
-  const resumeTokensRef = useRef(new Map<string, string>())
-  const privateSeatsRef = useRef<PrivateSeat[]>([])
-  const keeperWriter = useMemo(() => createKeeperWriter(), [])
-  // Bumped on every teardown (leaveSession). joinRoom captures it before its
-  // createTransport await so a teardown that lands mid-await (e.g. Cancel / Home
-  // on the invite screen, whose leaveSession runs while transportRef is still
-  // null) is detected below — otherwise the resolved transport would be assigned
-  // over the ref and resurrect the very session the user just cancelled.
-  const sessionEpochRef = useRef(0)
 
   // The guest's half of the reconnect overlay (see ReconnectState).
   const [reconnectStatus, setReconnectStatus] = useState<'idle' | 'trying' | 'failed'>('idle')
@@ -316,11 +301,6 @@ export function useLobby(): UseLobby {
   // loop itself rather than threaded through as a parameter — retry() has no
   // fresher one to offer.
   const reconnectSessionRef = useRef<StoredSession | null>(null)
-  // Bumped at the start of every run (mount-triggered or retry()). A run
-  // checks this after every await and bails the instant it no longer matches,
-  // so a retry() fired mid-backoff supersedes the run it interrupts instead of
-  // running alongside it.
-  const reconnectEpochRef = useRef(0)
   // Round 1 (retry() mid-dial) and round 2 (an earlier attempt's belated
   // event landing during the next one, same run) were both caused by the
   // same shape: a per-attempt outcome living in one shared, hook-level ref,
@@ -383,19 +363,23 @@ export function useLobby(): UseLobby {
     setStatus('error')
   }, [])
 
-  const commit = useCallback((next: LobbyState) => {
-    stateRef.current = next
-    setState(next)
-  }, [])
+  const commit = useCallback(
+    (next: LobbyState) => {
+      runtime.commitLobby(next)
+    },
+    [runtime],
+  )
 
   // The only way the seating is ever written. The page reads the state and the
   // message handler reads the ref, so setting one without the other is a bug
   // that only shows up under real timing — a returning player measured against
   // a seating one frame out of date.
-  const applySeats = useCallback((next: Seat[]) => {
-    seatsRef.current = next
-    setSeats(next)
-  }, [])
+  const applySeats = useCallback(
+    (next: Seat[], privateSeats?: PrivateSeat[]) => {
+      runtime.commitSeats(next, privateSeats)
+    },
+    [runtime],
+  )
 
   // Drop a snapshot that has not been serialized yet, and forget what was last
   // queued. Called from every teardown: the stored record is cleared there, and
@@ -411,9 +395,9 @@ export function useLobby(): UseLobby {
   // trailing edge one ticker cadence wide.
   const persistKeeper = useCallback(
     (session: Session) => {
-      keeperWriter.queue(session, privateSeatsRef.current, stateRef.current)
+      keeperWriter.queue(session, runtime.privateSeats, runtime.lobby)
     },
-    [keeperWriter],
+    [keeperWriter, runtime],
   )
 
   // The room is stored the moment it is entered; the match id lands on top of
@@ -451,48 +435,27 @@ export function useLobby(): UseLobby {
     clearKeeper()
   }, [cancelKeeperSave])
 
-  const resetRemoteLink = useCallback(() => {
-    remoteRef.current?.link.close()
-    remoteRef.current = null
-    setGameLink(null)
-  }, [])
-
   const teardownSession = useCallback(
     (flushMs?: number) => {
-      const transport = transportRef.current
-      transportGenerationRef.current += 1
-      sessionEpochRef.current += 1
-      reconnectEpochRef.current += 1
+      const transport = runtime.invalidateSession()
       reconnectSessionRef.current = null
       reconnectPendingRef.current?.settle({ ok: false, error: new Error('session left') })
       reconnectPendingRef.current = null
       setReconnectStatus('idle')
       setReconnectAttempt(0)
       setReconnectEvents([])
-      transportRef.current = null
-      stateRef.current = null
-      isHostRef.current = false
       hostConnectedRef.current = false
-      gameIdRef.current = null
       matchSeqRef.current = 0
-      setState(null)
+      runtime.commitLobby(null)
       setStatus('idle')
       setRestoring(false)
-      setRoomCode(null)
+      runtime.commitRoomCode(null)
       setError(null)
       setErrorKind(null)
-      setIsHost(false)
-      setGameId(null)
-      gateRef.current?.cancel()
-      gateRef.current = null
-      keeperRef.current?.close()
-      keeperRef.current = null
-      resetRemoteLink()
-      sessionRef.current = null
-      setGameSync(null)
-      resumeTokensRef.current.clear()
-      privateSeatsRef.current = []
-      applySeats([])
+      runtime.commitGameId(null)
+      runtime.closeMatchResources({ clearView: true })
+      runtime.replaceResumeTokens(new Map())
+      runtime.commitSeats([], [])
       forgetStored()
       clearChatRoom()
       clearLog()
@@ -500,12 +463,15 @@ export function useLobby(): UseLobby {
       if (flushMs) setTimeout(() => transport.close(), flushMs)
       else transport.close()
     },
-    [applySeats, clearChatRoom, forgetStored, resetRemoteLink],
+    [clearChatRoom, forgetStored, runtime],
   )
 
-  const dispatch = useCallback((outgoing: Outgoing[]) => {
-    dispatchOutgoing(transportRef.current, outgoing)
-  }, [])
+  const dispatch = useCallback(
+    (outgoing: Outgoing[]) => {
+      dispatchOutgoing(runtime.transport, outgoing)
+    },
+    [runtime],
+  )
 
   const broadcastChatEntries = useCallback(
     (entries: ChatEntry[]) => {
@@ -528,19 +494,21 @@ export function useLobby(): UseLobby {
 
   const onDisconnect = useCallback(
     (peerId: string) => {
-      const current = stateRef.current
+      const current = runtime.lobby
       if (!current) return
-      if (isHostRef.current) {
+      if (runtime.isHost) {
         // Host owns the roster: prune the peer and tell everyone else.
         const leaving = current.peers[peerId]
         if (!leaving) return
-        resumeTokensRef.current.delete(peerId)
+        const resumeTokens = new Map(runtime.resumeTokens)
+        resumeTokens.delete(peerId)
+        runtime.replaceResumeTokens(resumeTokens)
         // The roster and the keeper are separate books and both have to be
         // told. Without this the seat stays bound to a dead peer id: its SYNCs
         // are addressed into the void, `driveUnattended` never starts its grace
         // period, and a returning player finds their own seat occupied —
         // `rebind` refuses a seat whose peerId is not null.
-        keeperRef.current?.peerLeft(peerId)
+        runtime.matchResources.keeper?.peerLeft(peerId)
         const next = applyPeerLeft(current, peerId)
         const entry = Object.values(next.peers).some((peer) => peer.memberId === leaving.memberId)
           ? null
@@ -589,19 +557,19 @@ export function useLobby(): UseLobby {
         commit(applyPeerLeft(current, peerId))
       }
     },
-    [broadcastChatEntries, chatSession, commit, dispatch],
+    [broadcastChatEntries, chatSession, commit, dispatch, runtime],
   )
 
   const onMessage = useCallback(
     (msg: WireMessage) => {
-      const current = stateRef.current
+      const current = runtime.lobby
       if (!current) return
-      if (isHostRef.current) {
+      if (runtime.isHost) {
         if (msg.type === 'JOIN_REQUEST') {
-          const liveGameId = gameIdRef.current
+          const liveGameId = runtime.gameId
           const payload = parseJoinRequestPayload((msg as { payload?: unknown }).payload)
           if (!payload) {
-            if (liveGameId) keeperRef.current?.peerLeft(msg.from)
+            if (liveGameId) runtime.matchResources.keeper?.peerLeft(msg.from)
             return
           }
           // The frozen seating is what tells a return from a first join, so it
@@ -614,13 +582,13 @@ export function useLobby(): UseLobby {
           // would be recognised as a returner and seated back into a match they
           // walked out of — arriving in the lobby already `ready`, in `game`.
           const privateSeat = liveGameId
-            ? privateSeatsRef.current.find(({ resumeToken }) => resumeToken === payload.resumeToken)
+            ? runtime.privateSeats.find(({ resumeToken }) => resumeToken === payload.resumeToken)
             : undefined
-          if (liveGameId && !privateSeat) keeperRef.current?.peerLeft(msg.from)
+          if (liveGameId && !privateSeat) runtime.matchResources.keeper?.peerLeft(msg.from)
           let joinState = current
           let replacedLobbyPeer: PeerInfo | undefined
           if (!liveGameId) {
-            const liveCredentialPeer = [...resumeTokensRef.current].find(
+            const liveCredentialPeer = [...runtime.resumeTokens].find(
               ([peerId, resumeToken]) => peerId !== msg.from && resumeToken === payload.resumeToken,
             )
             if (liveCredentialPeer) {
@@ -628,9 +596,13 @@ export function useLobby(): UseLobby {
               if (!existing || existing.name !== payload.name) return
               replacedLobbyPeer = existing
               joinState = applyPeerLeft(current, existing.id)
-              resumeTokensRef.current.delete(existing.id)
+              const resumeTokens = new Map(runtime.resumeTokens)
+              resumeTokens.delete(existing.id)
+              runtime.replaceResumeTokens(resumeTokens)
             }
-            resumeTokensRef.current.set(msg.from, payload.resumeToken)
+            const resumeTokens = new Map(runtime.resumeTokens)
+            resumeTokens.set(msg.from, payload.resumeToken)
+            runtime.replaceResumeTokens(resumeTokens)
           }
           const admission = chatSession.admit(payload.resumeToken)
           const previousRole = replacedLobbyPeer
@@ -694,17 +666,19 @@ export function useLobby(): UseLobby {
             // everyone else with the SEAT_REBOUND it just dispatched — then
             // send the whole thing: GAME_STARTING is what `useFollowGameStart`
             // watches, so it is also what puts the returner back on its board.
-            const rebound = seatsRef.current.map((candidate) =>
+            const rebound = runtime.seats.map((candidate) =>
               candidate.playerId === seat.playerId ? { ...candidate, peerId: msg.from } : candidate,
             )
-            privateSeatsRef.current = privateSeatsRef.current.map((candidate) =>
+            const reboundPrivateSeats = runtime.privateSeats.map((candidate) =>
               candidate.seat.playerId === seat.playerId
                 ? { ...candidate, seat: { ...candidate.seat, peerId: msg.from } }
                 : candidate,
             )
-            resumeTokensRef.current.delete(stalePeerId)
-            resumeTokensRef.current.set(msg.from, payload.resumeToken)
-            applySeats(rebound)
+            const resumeTokens = new Map(runtime.resumeTokens)
+            resumeTokens.delete(stalePeerId)
+            resumeTokens.set(msg.from, payload.resumeToken)
+            runtime.replaceResumeTokens(resumeTokens)
+            applySeats(rebound, reboundPrivateSeats)
             dispatch([gameStarting(msg.from, liveGameId, rebound)])
             // Belt-and-braces ordering fix: WebRTC disconnect detection can
             // lag a fast manual reload, so this JOIN_REQUEST can land before
@@ -718,15 +692,15 @@ export function useLobby(): UseLobby {
             // `disconnect` is a no-op for a peer id the referee does not
             // know, so this is harmless when onDisconnect already ran first.
             if (stalePeerId !== msg.from) {
-              keeperRef.current?.peerLeft(stalePeerId)
+              runtime.matchResources.keeper?.peerLeft(stalePeerId)
             }
             // Called after GAME_STARTING on purpose: DataChannels preserve
             // order, so the catch-up projection this produces lands behind the
             // frame that routes the peer to its board — which is where that
             // peer builds the remote link the projection needs to arrive on.
-            keeperRef.current?.peerReturned(seat.playerId, msg.from)
+            runtime.matchResources.keeper?.peerReturned(seat.playerId, msg.from)
           }
-          if (!liveGameId || seat) transportRef.current?.authenticate(msg.from)
+          if (!liveGameId || seat) runtime.transport?.authenticate(msg.from)
         } else if (msg.type === 'PLAYER_READY') {
           const r = handleReady(current, msg.from)
           commit(r.state)
@@ -751,16 +725,16 @@ export function useLobby(): UseLobby {
           // peer cannot act for anyone but itself however it labels the frame.
           // A seat's INTRO_READY is resolved the same way, off the connection —
           // and like an intent it is addressed to the keeper, never relayed.
-          keeperRef.current?.handleMessage(msg)
+          runtime.matchResources.keeper?.handleMessage(msg)
         } else {
           // The host is a SEAT as well as the relay: a frame everybody watches
           // has to reach its own board too, and it still goes on to the others
           // below rather than stopping here.
-          if (msg.type === 'PICK_PREVIEW') setPickPreview(msg.payload)
+          if (msg.type === 'PICK_PREVIEW') runtime.commitPickPreview(msg.payload)
           // Star topology: the host forwards any other peer-originated message
           // to every other connected peer (never back to the sender or itself),
           // preserving the original sender via relay() rather than re-stamping.
-          const t = transportRef.current
+          const t = runtime.transport
           if (!t || !isRelayable(msg.type)) return
           const targets = relayTargets({
             connectedPeerIds: t.connectedIds(),
@@ -779,7 +753,7 @@ export function useLobby(): UseLobby {
         // relays it with the original sender intact. Nothing about the table
         // moves on it — it only says which card somebody's surface is offering.
         case 'PICK_PREVIEW':
-          setPickPreview(msg.payload)
+          runtime.commitPickPreview(msg.payload)
           break
         case 'PEER_LIST':
           if (fromHost) commit(applyPeerList(current, msg.payload.peers))
@@ -816,15 +790,15 @@ export function useLobby(): UseLobby {
           // than derived so a future host handover can rename the room without
           // every guest recomputing it.
           if (!fromHost) break
-          const t = transportRef.current
-          if (t && !remoteRef.current) {
+          const t = runtime.transport
+          if (t && !runtime.matchResources.remote) {
             // The keeper is the host today. `keeperPeerId` is a peer id, never a
             // PlayerId — the two spaces are both `string`, so the distinction has
             // to be kept by hand (session/remoteLink.ts:34).
             const remote = createRemoteLink({ transport: t, keeperPeerId: current.hostId })
-            remoteRef.current = remote
-            remote.link.subscribe(setGameSync)
-            setGameLink(() => remote.link)
+            runtime.setMatchResources({ ...runtime.matchResources, remote })
+            remote.link.subscribe(runtime.commitGameSync)
+            runtime.commitGameLink(remote.link)
           }
           // A rematch arrives as two separate DataChannel events — this frame,
           // then the new match's first SYNC — and React commits the navigation
@@ -834,13 +808,12 @@ export function useLobby(): UseLobby {
           // is never played (the old game-over overlay paints for that commit
           // too). The host has no such window because `startGame` batches its
           // state into one update.
-          if (msg.payload.gameId !== gameIdRef.current) setGameSync(null)
+          if (msg.payload.gameId !== runtime.gameId) runtime.commitGameSync(null)
           // The seating is the host's, taken as given: recomputing it locally is
           // the defect this payload exists to close. `?? []` only covers a peer
           // running an older build — the page then falls back to seatsFor.
           applySeats(msg.payload.seats ?? [])
-          gameIdRef.current = msg.payload.gameId
-          setGameId(msg.payload.gameId)
+          runtime.commitGameId(msg.payload.gameId)
           rememberGame(msg.payload.gameId)
           break
         }
@@ -850,7 +823,7 @@ export function useLobby(): UseLobby {
           // that seat's private fan-out follows the peer id.
           if (!fromHost) break
           applySeats(
-            seatsRef.current.map((s) =>
+            runtime.seats.map((s) =>
               s.playerId === msg.payload.playerId ? { ...s, peerId: msg.payload.peerId } : s,
             ),
           )
@@ -860,7 +833,7 @@ export function useLobby(): UseLobby {
         case 'KEEPER_CHANGED':
           // The remote link re-checks the sender against the keeper it knows, so
           // this is a route rather than a trust decision.
-          remoteRef.current?.handleMessage(msg)
+          runtime.matchResources.remote?.handleMessage(msg)
           break
         case 'LOBBY_DISBANDED':
           if (fromHost) {
@@ -874,19 +847,15 @@ export function useLobby(): UseLobby {
           break
       }
     },
-    [chatSession, clearChatRoom, commit, dispatch, applySeats, forgetStored, rememberGame],
+    [chatSession, clearChatRoom, commit, dispatch, applySeats, forgetStored, rememberGame, runtime],
   )
 
   const createRoom = useCallback(
     async (name: string, maxPlayers: number, setup?: Setup) => {
       teardownSession()
-      const generation = ++transportGenerationRef.current
-      const epoch = sessionEpochRef.current
+      const attempt = runtime.beginTransportAttempt()
       let owner: Transport | null = null
-      const ownsTransport = () =>
-        transportGenerationRef.current === generation && transportRef.current === owner
-      const cancelled = () =>
-        sessionEpochRef.current !== epoch || transportGenerationRef.current !== generation
+      const ownsTransport = () => runtime.ownsTransport(attempt, owner)
       setStatus('connecting')
       setError(null)
       setErrorKind(null)
@@ -906,19 +875,16 @@ export function useLobby(): UseLobby {
           },
         })
         owner = t
-        if (cancelled()) {
+        if (!runtime.attachTransport(attempt, t, true)) {
           t.close()
           throw new Error('create cancelled')
         }
-        transportRef.current = t
-        isHostRef.current = true
-        setIsHost(true)
         const nextRoomCode = formatRoomCode(t.id)
-        setRoomCode(nextRoomCode)
+        runtime.commitRoomCode(nextRoomCode)
         const hostResumeToken = getResumeToken(nextRoomCode)
         const hostMemberId = chatSession.startHost(nextRoomCode, hostResumeToken)
-        resumeTokensRef.current = new Map([[t.id, hostResumeToken]])
-        privateSeatsRef.current = []
+        runtime.replaceResumeTokens(new Map([[t.id, hostResumeToken]]))
+        runtime.commitSeats([], [])
         const initial = createLobbyState({
           selfId: t.id,
           hostId: t.id,
@@ -955,7 +921,7 @@ export function useLobby(): UseLobby {
         // navigate straight to /lobby/:code without awaiting a roster round-trip.
         return nextRoomCode
       } catch (err) {
-        if (cancelled()) {
+        if (!runtime.ownsTransport(attempt, owner)) {
           if (err instanceof Error && err.message === 'create cancelled') throw err
           throw new Error('create cancelled')
         }
@@ -967,7 +933,16 @@ export function useLobby(): UseLobby {
         throw err
       }
     },
-    [chatSession, onMessage, onError, onDisconnect, commit, surfaceSetupError, teardownSession],
+    [
+      chatSession,
+      onMessage,
+      onError,
+      onDisconnect,
+      commit,
+      surfaceSetupError,
+      teardownSession,
+      runtime,
+    ],
   )
 
   const joinRoom = useCallback(
@@ -984,15 +959,16 @@ export function useLobby(): UseLobby {
       preserveSession = false,
     ) => {
       if (preserveSession) {
-        transportGenerationRef.current += 1
-        resetRemoteLink()
-        const previousTransport = transportRef.current
-        transportRef.current = null
+        const resources = runtime.matchResources
+        resources.remote?.link.close()
+        runtime.setMatchResources({ ...resources, remote: null })
+        runtime.commitGameLink(null)
+        const previousTransport = runtime.detachTransport()
         previousTransport?.close()
       } else {
         teardownSession()
       }
-      const generation = ++transportGenerationRef.current
+      const attempt = runtime.beginTransportAttempt()
       setStatus('connecting')
       setError(null)
       setErrorKind(null)
@@ -1001,11 +977,9 @@ export function useLobby(): UseLobby {
       const nextRoomCode = formatRoomCode(hostId)
       // Snapshot the session generation so a Cancel/Home (leaveSession) during
       // the createTransport round-trip is detectable below.
-      const epoch = sessionEpochRef.current
+      let owner: Transport | null = null
       try {
-        let owner: Transport | null = null
-        const ownsTransport = () =>
-          transportGenerationRef.current === generation && transportRef.current === owner
+        const ownsTransport = () => runtime.ownsTransport(attempt, owner)
         const t = await createTransport({
           onMessage: (msg) => {
             if (ownsTransport()) onMessage(msg)
@@ -1043,14 +1017,11 @@ export function useLobby(): UseLobby {
         // discard the freshly-opened peer instead of committing it, or the
         // cancelled attempt resurrects — leaking a live peer and re-arming the
         // /start "continue game" button for a session the user just left.
-        if (sessionEpochRef.current !== epoch || transportGenerationRef.current !== generation) {
+        if (!runtime.attachTransport(attempt, t, false)) {
           t.close()
           throw new Error('join cancelled')
         }
-        transportRef.current = t
-        isHostRef.current = false
-        setIsHost(false)
-        setRoomCode(nextRoomCode)
+        runtime.commitRoomCode(nextRoomCode)
         commit(
           createLobbyState({
             selfId: t.id,
@@ -1075,7 +1046,7 @@ export function useLobby(): UseLobby {
           roomCode: nextRoomCode,
           name,
           role: 'guest',
-          gameId: preserveSession ? (gameIdRef.current ?? readSession()?.gameId ?? null) : null,
+          gameId: preserveSession ? (runtime.gameId ?? readSession()?.gameId ?? null) : null,
           joinedAt: Date.now(),
         })
         t.connectTo(hostId)
@@ -1087,8 +1058,7 @@ export function useLobby(): UseLobby {
         // A cancellation (epoch bumped) already reset the session to idle — don't
         // overwrite that with an error state; just propagate so the caller skips
         // the post-await navigate.
-        if (sessionEpochRef.current !== epoch || transportGenerationRef.current !== generation)
-          throw err
+        if (!runtime.ownsTransport(attempt, owner)) throw err
         // Peer setup failed before opening (bad code, signaling unreachable);
         // surface it instead of leaving the form stuck on 'connecting', and
         // re-throw so the caller skips the post-await navigate.
@@ -1096,7 +1066,7 @@ export function useLobby(): UseLobby {
         throw err
       }
     },
-    [onMessage, onError, onDisconnect, commit, resetRemoteLink, surfaceSetupError, teardownSession],
+    [onMessage, onError, onDisconnect, commit, surfaceSetupError, teardownSession, runtime],
   )
 
   // Runs once on mount, before anything else can create a transport. A stored
@@ -1125,11 +1095,9 @@ export function useLobby(): UseLobby {
         : null
     if (stored.gameId && !normalized) return rejectStoredMatch()
     if (!stored.gameId) clearKeeper()
-    const generation = ++transportGenerationRef.current
-    const epoch = sessionEpochRef.current
+    const transportAttempt = runtime.beginTransportAttempt()
     let owner: Transport | null = null
-    const ownsTransport = () =>
-      transportGenerationRef.current === generation && transportRef.current === owner
+    const ownsTransport = () => runtime.ownsTransport(transportAttempt, owner)
 
     setStatus('connecting')
     setError(null)
@@ -1173,30 +1141,24 @@ export function useLobby(): UseLobby {
         // Every attempt spent without going through onError (a rejected
         // createTransport bypasses it), so surface it here or 'connecting'
         // spins forever.
-        if (sessionEpochRef.current === epoch && transportGenerationRef.current === generation) {
-          surfaceSetupError(lastErr)
-        }
+        if (runtime.ownsTransport(transportAttempt, owner)) surfaceSetupError(lastErr)
         return false
       }
-      if (sessionEpochRef.current !== epoch || transportGenerationRef.current !== generation) {
+      if (!runtime.attachTransport(transportAttempt, t, true)) {
         // Torn down while this was retrying: discard the freshly-opened peer
         // instead of committing it, or the abandoned attempt resurrects.
         t.close()
         return false
       }
 
-      transportRef.current = t
-      isHostRef.current = true
-      setIsHost(true)
-      setRoomCode(stored.roomCode)
+      runtime.commitRoomCode(stored.roomCode)
       const hostResumeToken = getResumeToken(stored.roomCode)
       const hostMemberId = chatSession.restoreHost(stored.roomCode, hostResumeToken)
 
       if (!stored.gameId) {
         const lobbyConfig = normalizeLobbyConfig(stored.lobbyConfig)
-        privateSeatsRef.current = []
-        applySeats([])
-        resumeTokensRef.current = new Map([[t.id, hostResumeToken]])
+        applySeats([], [])
+        runtime.replaceResumeTokens(new Map([[t.id, hostResumeToken]]))
         const restoredLobby = createLobbyState({
           selfId: t.id,
           hostId: t.id,
@@ -1216,8 +1178,7 @@ export function useLobby(): UseLobby {
         })
         commit(restoredLobby)
         rememberLobbyConfig(restoredLobby)
-        gameIdRef.current = null
-        setGameId(null)
+        runtime.commitGameId(null)
         matchSeqRef.current = 0
         setStatus('in-lobby')
         return true
@@ -1227,13 +1188,12 @@ export function useLobby(): UseLobby {
         t.close()
         return rejectStoredMatch()
       }
-      privateSeatsRef.current = normalized.privateSeats
-      applySeats(publicSeats(privateSeatsRef.current))
+      applySeats(publicSeats(normalized.privateSeats), normalized.privateSeats)
       const restoredResumeTokens = new Map<string, string>()
-      for (const { seat, resumeToken } of privateSeatsRef.current) {
+      for (const { seat, resumeToken } of normalized.privateSeats) {
         if (resumeToken !== null) restoredResumeTokens.set(seat.peerId, resumeToken)
       }
-      resumeTokensRef.current = restoredResumeTokens
+      runtime.replaceResumeTokens(restoredResumeTokens)
 
       // The absence-clock trap: a stored `absentSince` describes time that
       // passed while nothing was keeping the table. Restored as-is, the first
@@ -1252,7 +1212,6 @@ export function useLobby(): UseLobby {
         log: normalized.log,
       })
       const ref: SessionRef = { current: session }
-      sessionRef.current = ref
 
       // No gate: the start gate holds the table until every seat reports
       // INTRO_READY, and mid-match nobody ever will — passing one here would
@@ -1264,9 +1223,9 @@ export function useLobby(): UseLobby {
         now: () => Date.now(),
         onCommit: persistKeeper,
       })
-      keeperRef.current = keeper
-      keeper.link.subscribe(setGameSync)
-      setGameLink(() => keeper.link)
+      runtime.setMatchResources({ sessionRef: ref, keeper, remote: null, gate: null })
+      keeper.link.subscribe(runtime.commitGameSync)
+      runtime.commitGameLink(keeper.link)
 
       // Only the host is here; everyone else re-dials. Their JOIN_REQUEST
       // carries the resume token that puts them back in their seat.
@@ -1302,8 +1261,7 @@ export function useLobby(): UseLobby {
       // statement of where the game stands rather than an account of how it got
       // there, so the board's intro finds no deal and hands over at once.
       keeper.resync()
-      gameIdRef.current = normalized.gameId
-      setGameId(normalized.gameId)
+      runtime.commitGameId(normalized.gameId)
       // Or the next startGame (a rematch, no reload in between) would mint
       // this exact id again — see matchSeqAfterRestore.
       matchSeqRef.current = matchSeqAfterRestore(normalized.gameId)
@@ -1322,6 +1280,7 @@ export function useLobby(): UseLobby {
     persistKeeper,
     rememberLobbyConfig,
     surfaceSetupError,
+    runtime,
   ])
 
   const pushReconnectEvent = useCallback((kind: ReconnectEvent['kind'], attempt: number) => {
@@ -1344,14 +1303,13 @@ export function useLobby(): UseLobby {
     // reads it back after each await. `sessionEpoch` is the separate teardown
     // guard: leaveSession() must stop this loop the same way it stops
     // restoreHost's, even though nothing here mutates the ref directly.
-    const runEpoch = ++reconnectEpochRef.current
-    const sessionEpoch = sessionEpochRef.current
+    const reconnect = runtime.beginReconnectAttempt()
     setReconnectStatus('trying')
     setReconnectAttempt(0)
     setReconnectEvents([])
 
     for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
-      if (reconnectEpochRef.current !== runEpoch || sessionEpochRef.current !== sessionEpoch) return
+      if (!runtime.ownsReconnect(reconnect)) return
       setReconnectAttempt(attempt)
       pushReconnectEvent('dialing', attempt)
 
@@ -1394,7 +1352,7 @@ export function useLobby(): UseLobby {
       let connected = false
       try {
         await joinRoom(stored.roomCode, stored.name, settleAttempt, true)
-        if (reconnectEpochRef.current === runEpoch && sessionEpochRef.current === sessionEpoch) {
+        if (runtime.ownsReconnect(reconnect)) {
           await settled
           connected = true
         }
@@ -1414,7 +1372,7 @@ export function useLobby(): UseLobby {
         }
       }
 
-      if (reconnectEpochRef.current !== runEpoch || sessionEpochRef.current !== sessionEpoch) return
+      if (!runtime.ownsReconnect(reconnect)) return
 
       if (connected) {
         pushReconnectEvent('channel-open', attempt)
@@ -1441,7 +1399,7 @@ export function useLobby(): UseLobby {
       pushReconnectEvent('backoff', attempt)
       await new Promise((resolve) => setTimeout(resolve, backoffMs(attempt)))
     }
-  }, [joinRoom, pushReconnectEvent])
+  }, [joinRoom, pushReconnectEvent, runtime])
 
   // Starts a fresh run from attempt 1. Guarded to only actually start one
   // while the previous run is 'trying' or 'failed' — the overlay's retry
@@ -1478,26 +1436,26 @@ export function useLobby(): UseLobby {
   }, [restoreHost, runGuestReconnect])
 
   const ready = useCallback(() => {
-    const t = transportRef.current
-    const current = stateRef.current
+    const t = runtime.transport
+    const current = runtime.lobby
     if (!t || !current) return
-    if (isHostRef.current) {
+    if (runtime.isHost) {
       const r = handleReady(current, current.selfId)
       commit(r.state)
       dispatch(r.outgoing)
     } else {
       dispatch([playerReady(current.hostId)])
     }
-  }, [commit, dispatch])
+  }, [commit, dispatch, runtime])
 
   const sendChat = useCallback(
     (rawText: string): boolean => {
       const text = normalizeChatText(rawText)
-      const t = transportRef.current
-      const current = stateRef.current
+      const t = runtime.transport
+      const current = runtime.lobby
       if (!text || !t || !current) return false
 
-      if (isHostRef.current) {
+      if (runtime.isHost) {
         const peer = current.peers[current.selfId]
         if (!peer) return false
         const entry = chatSession.appendUser(
@@ -1513,7 +1471,7 @@ export function useLobby(): UseLobby {
       dispatch([chatSendMessage(current.hostId, text)])
       return true
     },
-    [chatSession, dispatch],
+    [chatSession, dispatch, runtime],
   )
 
   // Where this peer now is. The host applies its own move locally; a guest sends
@@ -1521,10 +1479,10 @@ export function useLobby(): UseLobby {
   // `ready` makes, for the same reason: only the host's roster is authoritative.
   const setWhere = useCallback(
     (where: Where) => {
-      const t = transportRef.current
-      const current = stateRef.current
+      const t = runtime.transport
+      const current = runtime.lobby
       if (!t || !current) return
-      if (isHostRef.current) {
+      if (runtime.isHost) {
         const r = handleWhereabouts(current, current.selfId, where)
         commit(r.state)
         dispatch(r.outgoing)
@@ -1532,16 +1490,18 @@ export function useLobby(): UseLobby {
         dispatch([whereabouts(current.hostId, where)])
       }
     },
-    [commit, dispatch],
+    [commit, dispatch, runtime],
   )
 
   const kick = useCallback(
     (peerId: string) => {
-      const current = stateRef.current
-      if (!current || !isHostRef.current) return
+      const current = runtime.lobby
+      if (!current || !runtime.isHost) return
       const peer = current.peers[peerId]
       if (!peer) return
-      resumeTokensRef.current.delete(peerId)
+      const resumeTokens = new Map(runtime.resumeTokens)
+      resumeTokens.delete(peerId)
+      runtime.replaceResumeTokens(resumeTokens)
       const r = kickFn(current, peerId)
       const entry = chatSession.appendSystem({
         kind: 'memberKicked',
@@ -1552,13 +1512,13 @@ export function useLobby(): UseLobby {
       dispatch(r.outgoing)
       broadcastChatEntries([entry])
     },
-    [broadcastChatEntries, chatSession, commit, dispatch],
+    [broadcastChatEntries, chatSession, commit, dispatch, runtime],
   )
 
   const setMaxPlayers = useCallback(
     (n: number) => {
-      const current = stateRef.current
-      if (!current || !isHostRef.current) return
+      const current = runtime.lobby
+      if (!current || !runtime.isHost) return
       const r = setMaxPlayersFn(current, n)
       const changedMembers = new Set<string>()
       const entries: ChatEntry[] = []
@@ -1583,19 +1543,19 @@ export function useLobby(): UseLobby {
       dispatch(r.outgoing)
       broadcastChatEntries(entries)
     },
-    [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig],
+    [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig, runtime],
   )
 
   const setBots = useCallback(
     (n: number) => {
-      const current = stateRef.current
-      if (!current || !isHostRef.current) return
+      const current = runtime.lobby
+      if (!current || !runtime.isHost) return
       const r = setBotsFn(current, n)
       commit(r.state)
       rememberLobbyConfig(r.state)
       dispatch(r.outgoing)
     },
-    [commit, dispatch, rememberLobbyConfig],
+    [commit, dispatch, rememberLobbyConfig, runtime],
   )
 
   // NOTE: transferHost currently only broadcasts the intent (TRANSFER_HOST).
@@ -1605,12 +1565,12 @@ export function useLobby(): UseLobby {
   // keeps playing and its state does not travel, so no game state is involved.
   const transferHost = useCallback(
     (id: string) => {
-      const current = stateRef.current
-      if (!current || !isHostRef.current) return
+      const current = runtime.lobby
+      if (!current || !runtime.isHost) return
       const r = transferHostFn(current, id)
       dispatch(r.outgoing)
     },
-    [dispatch],
+    [dispatch, runtime],
   )
 
   // Tear the session down: close the PeerJS transport and reset to idle. Without
@@ -1662,19 +1622,18 @@ export function useLobby(): UseLobby {
   // a finished game, so its commits are reference-identical and never queue a
   // write.
   const leaveGame = useCallback(() => {
-    gameIdRef.current = null
-    setGameId(null)
+    runtime.commitGameId(null)
     cancelKeeperSave()
     clearKeeper()
     // A room outlives the match played in it, so walking the record back to
     // `gameId: null` keeps it restorable.
     rememberGame(null)
-  }, [cancelKeeperSave, rememberGame])
+  }, [cancelKeeperSave, rememberGame, runtime])
 
   const setSetup = useCallback(
     (setup: Setup) => {
-      const current = stateRef.current
-      if (!current || !isHostRef.current) return
+      const current = runtime.lobby
+      if (!current || !runtime.isHost) return
       const entries: ChatEntry[] = []
       for (const setting of Object.keys(setup)) {
         if (current.setup[setting] === setup[setting]) continue
@@ -1692,7 +1651,7 @@ export function useLobby(): UseLobby {
       dispatch([lobbyConfigUpdated('broadcast', { setup })])
       broadcastChatEntries(entries)
     },
-    [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig],
+    [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig, runtime],
   )
 
   // What `startGame` needs to bring a match into being: mint a seed, create
@@ -1740,10 +1699,8 @@ export function useLobby(): UseLobby {
         events: FAKE_EVENTS,
       })
       const ref: SessionRef = { current: session }
-      sessionRef.current = ref
 
       const gate = createStartGate({ expect: gateExpect })
-      gateRef.current = gate
 
       const keeper = attachKeeper({
         ref,
@@ -1752,13 +1709,13 @@ export function useLobby(): UseLobby {
         gate,
         onCommit: persistKeeper,
       })
-      keeperRef.current = keeper
-      keeper.link.subscribe(setGameSync)
-      setGameLink(() => keeper.link)
+      runtime.setMatchResources({ sessionRef: ref, keeper, remote: null, gate })
+      keeper.link.subscribe(runtime.commitGameSync)
+      runtime.commitGameLink(keeper.link)
 
       return { engine, session, keeper }
     },
-    [persistKeeper],
+    [persistKeeper, runtime],
   )
 
   // Host-only: tell the table to follow, then move. The board route is keyed by
@@ -1769,9 +1726,9 @@ export function useLobby(): UseLobby {
   // component must not be what the others are waiting on.
   const startGame = useCallback(
     (botNames: string[]) => {
-      const current = stateRef.current
-      const t = transportRef.current
-      if (!current || !t || !isHostRef.current) return
+      const current = runtime.lobby
+      const t = runtime.transport
+      if (!current || !t || !runtime.isHost) return
       matchSeqRef.current += 1
       const id = `${current.hostId}-${matchSeqRef.current}`
 
@@ -1801,7 +1758,7 @@ export function useLobby(): UseLobby {
       // a bot's peerId is nulled back out, which is what gets it actually
       // driven from the first tick instead of waiting out a human's grace
       // period it was never subject to.
-      const privateSeats = privateSeatsFor(dealt, resumeTokensRef.current)
+      const privateSeats = privateSeatsFor(dealt, runtime.resumeTokens)
       const refereeSeats = dealt.map((s) => (s.bot ? { ...s, peerId: null } : s))
 
       // A rematch reassigns all three refs `attachNewMatch` sets below.
@@ -1810,14 +1767,7 @@ export function useLobby(): UseLobby {
       // set, and the previous gate's pending cap would fire into a match that no
       // longer exists. Same order leaveSession uses — the gate first, because it
       // must never outlive its session.
-      gateRef.current?.cancel()
-      gateRef.current = null
-      keeperRef.current?.close()
-      keeperRef.current = null
-      // The previous match's snapshot may still be waiting on its trailing edge.
-      // Left queued it would be written under the new match's lobby seating, and
-      // the new keeper's own first commit would then have to overwrite it.
-      cancelKeeperSave()
+      runtime.closeMatchResources({ clearView: false })
 
       // Every seat, including the host's own: one rule for the table. Spectators
       // hold no seat and are never waited on — they have no projection to replay,
@@ -1834,18 +1784,16 @@ export function useLobby(): UseLobby {
         gateExpect: humans.map((s) => s.playerId),
       })
 
-      privateSeatsRef.current = privateSeats
       // Tell the table to follow before dealing, so a guest has built its remote
       // link by the time its projection arrives. DataChannels preserve order, so
       // GAME_STARTING is always ahead of the SYNC that follows it.
       dispatch([gameStarting('broadcast', id, dealt)])
-      gameIdRef.current = id
-      setGameId(id)
+      runtime.commitGameId(id)
       rememberGame(id)
       // The same array the engine was seated with, held rather than recomputed —
       // see the `seats` member above. Before `resync` below, because the snapshot
       // that commit produces stores this seating alongside the referee's.
-      applySeats(dealt)
+      applySeats(dealt, privateSeats)
       // The deal travels with the first projection. `createSession` also returns it
       // as `outgoing`, but that array is unreachable from here — the keeper owns
       // delivery — so it is asked of the engine again and handed to the fan-out.
@@ -1854,7 +1802,7 @@ export function useLobby(): UseLobby {
       // on a blank.
       keeper.resync(engine.setupEvents(session.state))
     },
-    [dispatch, applySeats, cancelKeeperSave, rememberGame, attachNewMatch],
+    [dispatch, applySeats, rememberGame, attachNewMatch, runtime],
   )
 
   // The local seat has finished its opening. The host reports into its own
@@ -1862,35 +1810,35 @@ export function useLobby(): UseLobby {
   // from the connection it arrived on — the same path an intent takes, so a
   // peer cannot report for somebody else.
   const introReady = useCallback(() => {
-    const id = gameIdRef.current
-    const current = stateRef.current
+    const id = runtime.gameId
+    const current = runtime.lobby
     // No game means nothing to report into: send nothing, touch nothing.
     if (!id || !current) return
-    if (isHostRef.current) {
-      const t = transportRef.current
-      if (t) keeperRef.current?.introReady(t.id)
+    if (runtime.isHost) {
+      const t = runtime.transport
+      if (t) runtime.matchResources.keeper?.introReady(t.id)
       return
     }
     dispatch([introReadyMessage(current.hostId, id)])
-  }, [dispatch])
+  }, [dispatch, runtime])
 
   // The local surface is offering this card. Straight out to everyone when this
   // seat is the host (it IS the relay), through the host otherwise — the same
   // split, for the same reason, `introReady` makes.
   const previewPick = useCallback(
     (player: PlayerId, card: string | null) => {
-      const id = gameIdRef.current
-      const current = stateRef.current
+      const id = runtime.gameId
+      const current = runtime.lobby
       if (!id || !current) return
-      const target = isHostRef.current ? 'broadcast' : current.hostId
+      const target = runtime.isHost ? 'broadcast' : current.hostId
       dispatch([pickPreviewMessage(target, id, player, card)])
     },
-    [dispatch],
+    [dispatch, runtime],
   )
 
   const disband = useCallback(() => {
-    const current = stateRef.current
-    if (!current || !isHostRef.current) return
+    const current = runtime.lobby
+    if (!current || !runtime.isHost) return
     const r = disbandLobbyFn(current)
     dispatch(r.outgoing)
     // Defer the transport teardown so the just-queued LOBBY_DISBANDED frame can
@@ -1898,7 +1846,7 @@ export function useLobby(): UseLobby {
     // guests may never receive it and would only notice via the host-disconnect
     // path. Local state still resets immediately.
     leaveSession(DISBAND_FLUSH_MS)
-  }, [dispatch, leaveSession])
+  }, [dispatch, leaveSession, runtime])
 
   // Dismiss a sticky error (e.g. a failed join) without tearing down a live
   // session. Returns the status to idle only when it was 'error', so calling
