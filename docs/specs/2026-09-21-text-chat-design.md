@@ -1,7 +1,7 @@
 # Room text chat — Design
 
-**Date:** 2026-09-21  
-**Project:** ReleaseBoardGameP2P ("Release любой ценой")  
+**Date:** 2026-09-21
+**Project:** ReleaseBoardGameP2P ("Release любой ценой")
 **Scope:** A host-authoritative text chat shared by the lobby, game table, and
 results screen. Closes [#90](https://github.com/MythHand/ReleaseBoardGameP2P/issues/90).
 
