@@ -107,9 +107,15 @@ new attack animation. Restart resets the same card identities into a new game.
   Legacy Code and Out of Memory beside Bug. The rules give all three one effect,
   so the play is the same whichever is thrown — they are there to be thrown by
   name.
-- **Branch → 2 piles / Branch + Sudo → 3 piles:** start with one main pile and
-  use the normal hand gestures. After resolution, main piles fill two rows down
-  each column and AI stays bottom-left. All pile card boxes retain 150px width.
+- **Branch + Merge + Sudo:** the pile cards in one hand — two Branch, one Merge
+  and three Sudo — starting from a single main pile, played with the normal hand
+  gestures. Split the pile, split it again, then put every pile back together,
+  with or without a Sudo each time: Branch with Sudo also turns the discard into
+  a pile of its own, and Merge with Sudo takes the discard back in before
+  shuffling. Two buttons used to cover the split alone, and Merge had no preset
+  at all; the row of piles gets real pressure only when it goes up and down
+  several times in one run. After resolution, main piles fill two rows down each
+  column and AI stays bottom-left. All pile card boxes retain 150px width.
 
 Viewer controls keep the same engine state but remount the Board from that
 viewer's projection. Every event sent to the Board and the trace uses the same

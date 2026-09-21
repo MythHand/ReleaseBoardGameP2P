@@ -14,7 +14,6 @@ export const OPERATION_SCENARIOS = [
 export const SCENARIOS = [
   ...OPERATION_SCENARIOS,
   'branch',
-  'branchSudo',
   'securityRelease',
   'securityHand',
   'securityRequest',
@@ -120,6 +119,18 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   // checks and the instruction beneath the toolbar read them by that position.
   const hand = [instance(operation, 0), instance('support-sudo', 1)]
   hand.push(instance('attack-bug', 2), instance('defense-hotfix', 3), instance(operation, 18))
+  // THE PILE CARDS ARE ONE SCENE, not three buttons. Branch splits a pile, Merge
+  // puts every pile back together, and Sudo changes what each of them does — so
+  // the hand carries enough of all three to drive the row of piles up and down
+  // several times in one run, which is the only way the shape of that row gets
+  // any real pressure (owner, 21.09). Two Branch and one Merge with three Sudo:
+  // split, split again, and put it all back, with or without the sudo each time.
+  if (scenario === 'branch')
+    hand.push(
+      instance('operation-git-merge', 19),
+      instance('support-sudo', 20),
+      instance('support-sudo', 21),
+    )
 
   const state: GameState = {
     ...initial,

@@ -29,6 +29,12 @@ const rectOf = (el: Element | null): Rect | null => {
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
+// THE WHOLE PILE, not the card box inside it. The registry holds the card box
+// because a flight aims at a card area (I6); what MOVES is the pile with its
+// label and counter, which is the element the scene animates.
+const wholePile = (el: HTMLElement | null): HTMLElement | null =>
+  el?.closest<HTMLElement>('[data-pile-box]') ?? el
+
 export function useDeckBeat(anchors: BoardAnchors) {
   const { overlay, raise, patch, drop } = useFlyer()
   // THE PILE THAT HAS NOT ARRIVED YET, by index. A split is a FLIP: the new pile
@@ -140,7 +146,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
           // Every pile but the survivor, and each from its OWN rect. The target
           // is measured once — only the sources differ.
           for (let i = 1; i < ctx.base.decks.main.length; i++) {
-            const el = a.pileBox(i)
+            const el = wholePile(a.pileBox(i))
             if (!el) continue
             const anim = play('absorbToDeck', el, {
               from: rectOf(el),
@@ -149,11 +155,26 @@ export function useDeckBeat(anchors: BoardAnchors) {
             })
             if (anim) flights.push(anim.finished)
           }
-          if (s.withDiscard) {
-            const heap = a.discardBox.current
-            if (heap) {
-              const anim = play('absorbToDeck', heap, {
-                from: rectOf(heap),
+          // THE DISCARD IS CARRIED, NOT ANIMATED WHERE IT LIES. The piles above
+          // are about to unmount — the row becomes one — so moving them in place
+          // costs nothing. The discard is not: it stays on the table for the
+          // rest of the match, and every travel preset lands `fill: 'forwards'`.
+          // Animating the real heap left it permanently shifted to the deck and
+          // faded out, which is three defects in one: the discard drew empty
+          // though it held cards, and every later flight AIMED AT IT measured
+          // that shifted box — so the cards spent on the Merge itself flew into
+          // the draw pile (owner, 21.09). A carrier is what the rest of this
+          // beat already uses, and it takes its residue with it when dropped.
+          const top = ctx.base.decks.discard
+          if (s.withDiscard && top && rectOf(a.discardBox.current)) {
+            const heapBox = cardAreaOf(rectOf(a.discardBox.current) as Rect)
+            const [el] = await raise([{ key: 'merge', card: top, at: heapBox }])
+            // gone from its own spot in the same commit the carrier takes it
+            setDiscardOut('taken')
+            emptyDiscard(ctx)
+            if (el) {
+              const anim = play('absorbToDeck', el, {
+                from: heapBox,
                 to,
                 duration: PILE_MERGE_MS,
               })
@@ -162,6 +183,8 @@ export function useDeckBeat(anchors: BoardAnchors) {
           }
         }
         await Promise.all(flights)
+        drop('merge')
+        setDiscardOut(null)
         advance(ctx, s.piles)
         return
       }
@@ -175,22 +198,39 @@ export function useDeckBeat(anchors: BoardAnchors) {
         // batch left (`pileWidthFor` gives 120 at two piles where the pile being
         // split had 150), and the half would fly out of a rect the pile never
         // had.
-        const from = rectOf(a.pileBox(s.at))
+        // EVERY PILE THAT WAS STANDING TRAVELS, not only the new one. A row one
+        // pile longer is a row laid out differently: the cards narrow and every
+        // place shifts. Flying the new half alone left the others to jump into
+        // their new places in a single frame, which reads as the table clearing
+        // room rather than as a pile being split off (owner, 21.09). Measured
+        // here, before the publish that re-lays the row, and flown after it —
+        // the same FLIP the new half has always used, over the whole row.
+        const before = ctx.base.decks.main.map((_, i) => rectOf(wholePile(a.pileBox(i))))
+        const from = before[s.at]
         // Named before the publish, so the pile is invisible from the very
         // commit that mounts it — see `splitting` above for what that is for.
         setSplitting(s.at + 1)
         advance(ctx, s.piles)
         await nextFrames()
-        const el = a.pileBox(s.at + 1)
+        const flights: Promise<unknown>[] = []
+        // where each pile ended up: the split inserts its half right after the
+        // pile it came from, so everything past that point moves up one place
+        for (const [i, was] of before.entries()) {
+          if (!was) continue
+          const moved = wholePile(a.pileBox(i <= s.at ? i : i + 1))
+          if (!moved) continue
+          const anim = play('flyFrom', moved, { from: was, duration: PILE_SPLIT_MS })
+          if (anim) flights.push(anim.finished)
+        }
+        const el = wholePile(a.pileBox(s.at + 1))
         if (el && from) {
           // shown and moved together: the first frame anyone sees of this pile
           // is already one of the flight
           const anim = play('flyFrom', el, { from, duration: PILE_SPLIT_MS })
-          setSplitting(null)
-          if (anim) await anim.finished
-        } else {
-          setSplitting(null)
+          if (anim) flights.push(anim.finished)
         }
+        setSplitting(null)
+        await Promise.all(flights)
         return
       }
 
@@ -209,7 +249,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
       await nextFrames()
       await discardOntoPile(ctx, s.at, top, () => setSplitting(null))
     },
-    [discardOntoPile],
+    [discardOntoPile, raise, drop],
   )
 
   const runPiles = useCallback(
