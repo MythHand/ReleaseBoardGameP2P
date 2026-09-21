@@ -1,5 +1,5 @@
 import { cardById } from '@release/ui'
-import type { Rect } from '@release/ui/animations'
+import type { Leaving, Rect } from '@release/ui/animations'
 import {
   nextFrames,
   play,
@@ -11,7 +11,7 @@ import {
 } from '@release/ui/animations'
 import { type RefObject, useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
-import { upgradeSlot } from '~/entities/game/board/upgradeSlot'
+import { upgradeCard, upgradeSlot } from '~/entities/game/board/upgradeSlot'
 import type { BeatPlan } from './planBeats'
 
 const THROW_DUR = 460
@@ -25,7 +25,19 @@ const rectOf = (el: Element | null): Rect | null => {
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
-export function useUpgradeBeat(anchors: BoardAnchors, staging?: RefObject<StagedHandoff | null>) {
+/** What the operation card standing at this centre hands over — `operationBeat`'s
+ *  `handOver()`, so its card can leave WITH the row instead of on its own beat. */
+type OperationHandOver = () => {
+  items: Leaving[]
+  takeOff: () => void
+  settle: () => void
+} | null
+
+export function useUpgradeBeat(
+  anchors: BoardAnchors,
+  staging?: RefObject<StagedHandoff | null>,
+  operationHandOver?: OperationHandOver,
+) {
   const { overlay, raise, drop, pin, elOf } = useFlyer()
   const exit = useDiscardExit(anchors.discardBox)
   const taking = useRef<BeatRun | null>(null)
@@ -37,8 +49,26 @@ export function useUpgradeBeat(anchors: BoardAnchors, staging?: RefObject<Staged
     ctx.base = { ...ctx.base, you: { ...ctx.base.you, hand } }
     ctx.publish(ctx.base)
   })
-  const latest = useRef({ anchors, staging, exit, arrival })
-  latest.current = { anchors, staging, exit, arrival }
+  const latest = useRef({ anchors, staging, exit, arrival, operationHandOver })
+  latest.current = { anchors, staging, exit, arrival, operationHandOver }
+
+  // THE WHOLE CENTRE LEAVES IN ONE SEND. The System Upgrade card stands in the
+  // same centre the answers do, so it goes to the discard WITH them rather than
+  // on its own beat behind them (owner, 17.09) — the queue plays beats one after
+  // another, so its own beat could only start once these had landed. Its halves
+  // keep layers 0/1 and the answers stack above, which is the order the engine
+  // discarded them in and therefore the order the heap already holds (I9).
+  const emptyCentre = useCallback(async (items: Leaving[]) => {
+    const op = latest.current.operationHandOver?.()
+    const all = op ? [...op.items, ...items.map((it, i) => ({ ...it, layer: 2 + i }))] : items
+    // the resting card goes down in the commit the carriers go up — the step's
+    // own `takeOff`. The answers themselves stand nowhere: the grid they were
+    // thrown into is what these carriers are raised out of.
+    await latest.current.exit.send(all, () => {
+      op?.takeOff()
+    })
+    op?.settle()
+  }, [])
 
   const run = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'upgrade' }>, beat: BeatRun) => {
@@ -72,9 +102,9 @@ export function useUpgradeBeat(anchors: BoardAnchors, staging?: RefObject<Staged
         if (el) await play('playToCenter', el, { from, to: centre, duration: THROW_DUR })?.finished
         pin(key, centre)
         const clear = async () => {
-          const items = (plan.clear ?? []).flatMap((t, i) => {
+          const items = (plan.clear ?? []).flatMap((t) => {
             const restCard = cardById(t.card)
-            const node = upgradeSlot(a, t.player)
+            const node = upgradeCard(a, t.player)
             return restCard && node
               ? [
                   {
@@ -82,12 +112,11 @@ export function useUpgradeBeat(anchors: BoardAnchors, staging?: RefObject<Staged
                     card: restCard,
                     node,
                     scatter: scatterAt(t.eventId),
-                    delay: i * 90,
                   },
                 ]
               : []
           })
-          await latest.current.exit.send(items)
+          await emptyCentre(items)
         }
         const receive = async () => {
           await wait(560)
@@ -181,9 +210,13 @@ export function useUpgradeBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       if (!plan.clear) return
       await nextFrames()
       await wait(HOLD_MS)
-      const items = plan.clear.flatMap((t, i) => {
+      // THE CENTRE EMPTIES IN ONE GO. No per-card delay: the step's own rule is
+      // that cards leave for the discard one by one but ALL AT ONCE, and it is
+      // the simultaneity that reads as "the centre went to the discard". Sent
+      // one after another they read as several separate discards (owner, 17.09).
+      const items = plan.clear.flatMap((t) => {
         const card = cardById(t.card)
-        const node = upgradeSlot(a, t.player)
+        const node = upgradeCard(a, t.player)
         return card && node
           ? [
               {
@@ -191,16 +224,15 @@ export function useUpgradeBeat(anchors: BoardAnchors, staging?: RefObject<Staged
                 card,
                 node,
                 scatter: scatterAt(t.eventId),
-                delay: i * 90,
               },
             ]
           : []
       })
       // The shared exit takes over the measured nodes before pending clears.
-      await latest.current.exit.send(items)
+      await emptyCentre(items)
       beat.publish({ ...landed, pending: null, decks: beat.after?.decks ?? landed.decks })
     },
-    [raise, drop, pin, elOf],
+    [raise, drop, pin, elOf, emptyCentre],
   )
 
   return {

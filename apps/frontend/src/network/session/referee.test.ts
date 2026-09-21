@@ -94,6 +94,7 @@ it('complains once an unattended seat`s stall has stood for the threshold', () =
         options: [],
         picks: 1,
         source: 'operation-git-cherry-pick',
+        raisedAt: 1,
       },
     } as GameState,
   }

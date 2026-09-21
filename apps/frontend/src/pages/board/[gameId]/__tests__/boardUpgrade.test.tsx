@@ -77,7 +77,12 @@ describe('the centre a System Upgrade fills', () => {
     )
   })
 
-  it('asks this seat for nothing once it has answered', () => {
+  // …and says nothing either. The surface used to stand a "waiting for the
+  // others" line under the centre: the only broadcast about OTHER seats the
+  // board had, with no counterpart in the scene, and it stayed up past the last
+  // answer because it watched this seat rather than the debt. What the centre is
+  // doing is read off the centre (owner, 17.09).
+  it('asks this seat for nothing once it has answered, and says nothing', () => {
     renderBoard({
       pending: upgradePending({
         owed: ['p3'],
@@ -85,10 +90,10 @@ describe('the centre a System Upgrade fills', () => {
       }),
     })
     expect(screen.queryByTestId('board-upgrade-ask')).toBeNull()
-    const prompt = screen.getByRole('status')
-    expect(prompt.textContent).toBe(makeBoardProps().copy.table.upgradeWaiting)
-    expect(isInaccessible(prompt)).toBe(false)
-    expect(prompt.getAttribute('data-shown')).toBe('true')
+    // the board's own ask line stays mounted and silent; nothing may be SHOWN
+    for (const line of screen.queryAllByRole('status')) {
+      expect(line.getAttribute('data-shown')).not.toBe('true')
+    }
     // The thrown card stands at the centre for everyone, from the projection —
     // no beat is holding it.
     expect(screen.getByTestId('upgrade-thrown-h1')).not.toBeNull()
@@ -132,7 +137,7 @@ function stagingProbe() {
     anchors: { centre: { current: centre } } as BoardAnchors,
     actions: { onResolve },
     events: [] as import('@release/engine').Event[],
-    copy: { prompt: '', waiting: '', takePrompt: '', confirm: '' },
+    copy: { prompt: '', takePrompt: '', confirm: '' },
     enabled: true,
   }
   return { args, onResolve }

@@ -522,6 +522,8 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         options: mine ? [...p.options] : [],
         picks: p.picks,
         source: p.source,
+        // public: it says WHEN the decision was raised, not what is in it
+        raisedAt: p.raisedAt,
       }
     case 'reorderTop':
       // A deck's contents are never public, so this is `mine` or nothing —
@@ -531,6 +533,8 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         player: p.player,
         piles: mine ? p.piles.map((e) => ({ pile: e.pile, cards: [...e.cards] })) : [],
         source: p.source,
+        // public: it says WHEN the decision was raised, not what is in it
+        raisedAt: p.raisedAt,
       }
     case 'systemUpgrade':
       // Nothing here is private: the rules put the thrown cards face up at the

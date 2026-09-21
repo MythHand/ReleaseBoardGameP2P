@@ -35,7 +35,8 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     },
     useDiscardExit: () => ({
       overlay: [],
-      send: (items: Leaving[]) => {
+      send: (items: Leaving[], takeOff?: (() => void) | null) => {
+        takeOff?.()
         exits.items.push(...items)
         return Promise.resolve()
       },

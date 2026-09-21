@@ -289,14 +289,23 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       // to a hand, and the centre must not still be claiming to hold it.
       const reflected =
         plan.effect === 'reflect' && !plan.spent.some((card) => card.reason === 'attackSpent')
-      ctx.publish({
-        ...ctx.base,
-        pending: null,
-        ...(reflected ? { centreAttack: { card: plan.attackCard, sudo: plan.attackSudo } } : {}),
-      })
       // Together, not in sequence: the exchange leaving for the discard and
       // the attack leaving for its hand are one moment, not two gestures.
-      await Promise.all([items.length > 0 ? latest.current.send(items) : undefined, returning])
+      // What the centre was drawing off the pending goes down in the commit
+      // the exit's carriers go up — the step's own `takeOff`.
+      const letGoOfThePending = () =>
+        ctx.publish({
+          ...ctx.base,
+          pending: null,
+          ...(reflected ? { centreAttack: { card: plan.attackCard, sudo: plan.attackSudo } } : {}),
+        })
+      // nothing flies, so the step never runs it — but the pending still has to
+      // be let go of, or the answered attack keeps standing at the centre
+      if (items.length === 0) letGoOfThePending()
+      await Promise.all([
+        items.length > 0 ? latest.current.send(items, letGoOfThePending) : undefined,
+        returning,
+      ])
       flyer.drop('cover')
     },
     [flyer.raise, flyer.drop],
@@ -464,11 +473,16 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       // still had the alarm standing on it (#103 testing, problem 1).
       const cause = aiCauseExit(plan.causeward, a)
       const decks = ctx.base.decks
-      ctx.base = withoutAiCause(ctx.base, cause.length > 0 ? plan.causeward : undefined)
-      ctx.publish(ctx.base)
+      // what the table was drawing goes in the commit the carriers go up — the
+      // step's own `takeOff`; with nothing to fly it has to happen anyway
+      const letGoOfTheCause = () => {
+        ctx.base = withoutAiCause(ctx.base, cause.length > 0 ? plan.causeward : undefined)
+        ctx.publish(ctx.base)
+      }
+      if (items.length + cause.length === 0) letGoOfTheCause()
       await Promise.all([
         items.length + cause.length > 0
-          ? latest.current.send([...items, ...cause]).then(() => {
+          ? latest.current.send([...items, ...cause], letGoOfTheCause).then(() => {
               if (cause.length === 0) return
               ctx.base = { ...ctx.base, decks }
               ctx.publish(ctx.base)

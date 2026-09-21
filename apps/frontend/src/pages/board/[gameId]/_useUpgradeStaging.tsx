@@ -1,6 +1,6 @@
 import type { Event } from '@release/engine'
 import type { HandPlayDrop, TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardById, Typography } from '@release/ui'
+import { Card, ConfirmAction, cardById, rowPlaceStyle, Typography } from '@release/ui'
 import { play, useFlyer } from '@release/ui/animations'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
@@ -15,8 +15,15 @@ import styles from './_useUpgradeStaging.module.css'
 //
 //   owed, discarding  → this seat is being asked; pull one card and commit
 //   picking, actor    → the open cards become a choice
-//   anything else     → the open cards stand, read-only, and the caption says
-//                       what the table is still waiting for
+//   anything else     → the open cards stand, read-only, and nothing is said
+//
+// Nothing is said on purpose. The board's one line under the centre names what
+// the table wants FROM YOU when nothing else can say it — a defence, a cost, a
+// discard down to the limit. It never reports what other seats are doing, and
+// the scene has no such line at all: what the centre is doing is read off the
+// centre. A standing "waiting for the others" was here until 17.09 and was the
+// only broadcast of its kind on the board; it also outlived what it described,
+// since it did not watch whether anyone still owed a card.
 //
 // The standing cards come from `pending.thrown`, which is public and survives
 // every batch boundary. The beat hands its arrivals over to these same slots
@@ -26,7 +33,7 @@ export function useUpgradeStaging(args: {
   anchors: BoardAnchors
   events?: Event[]
   actions?: TableActions
-  copy: { prompt: string; waiting: string; takePrompt: string; confirm: string }
+  copy: { prompt: string; takePrompt: string; confirm: string }
   enabled: boolean
 }) {
   const { state, actions, copy, enabled } = args
@@ -122,20 +129,36 @@ export function useUpgradeStaging(args: {
   }
   if (!pending || !enabled) return { surface: null, ...interaction }
 
+  // One place per seat this pending is owed to or has heard from, in a row from
+  // the centre module (`rowPlaceStyle`) rather than a flex row of this hook's
+  // own: the centre of the table is one geometry, declared once, and a row of
+  // open cards is the shape it comes in when the count is what decides it. The
+  // seat order is the row's order, so a seat's place never moves under it when
+  // another one answers.
+  const seats = [...new Set([...pending.owed, ...pending.thrown.map((t) => t.player)])].sort()
   const centre = (
-    <div className={styles.centre}>
-      {[...new Set([...pending.owed, ...pending.thrown.map((t) => t.player)])]
-        .sort()
-        .map((player) => {
-          const t = pending.thrown.find((entry) => entry.player === player)
-          if (!t) return <div key={player} data-upgrade-slot={player} className={styles.cell} />
-          const data = cardById(t.card.id)
-          if (!data) return null
+    <>
+      {seats.map((player, i) => {
+        const place = rowPlaceStyle('upgrade', seats.length, i)
+        const t = pending.thrown.find((entry) => entry.player === player)
+        if (!t)
           return (
+            <div key={player} data-upgrade-slot={player} className={styles.cell} style={place} />
+          )
+        const data = cardById(t.card.id)
+        if (!data) return null
+        // THE PLACE AND THE CARD ARE TWO NODES, never one. A place positions
+        // itself with a transform, and a flight's very first frame sets its own
+        // transform from zero — so a card that IS its place loses that
+        // positioning the instant it takes off and flies from half a card away.
+        // The module says the same thing from the other side: the place stays
+        // the true card box so flights can aim at it (I6), and everything a card
+        // does to itself lives on the node inside it.
+        return (
+          <div key={player} data-upgrade-slot={player} className={styles.cell} style={place}>
             <button
-              key={player}
-              data-upgrade-slot={player}
               type="button"
+              data-upgrade-card=""
               data-testid={`upgrade-thrown-${t.card.uid}`}
               className={styles.thrown}
               disabled={!picking}
@@ -150,9 +173,10 @@ export function useUpgradeStaging(args: {
                 accent="var(--select-accent)"
               />
             </button>
-          )
-        })}
-    </div>
+          </div>
+        )
+      })}
+    </>
   )
 
   if (confirmed) return { surface: centre, ...interaction }
@@ -195,19 +219,6 @@ export function useUpgradeStaging(args: {
     }
   }
 
-  // Answered, or never asked: the cards stand and the caption says why nothing
-  // is being asked of this seat.
-  return {
-    ...interaction,
-    surface: (
-      <div className={styles.surface}>
-        {centre}
-        <div className={opening.ask} data-shown="true" role="status">
-          <Typography as="div" base="label-sm" tk="tk-16" className={opening.askLine}>
-            {copy.waiting}
-          </Typography>
-        </div>
-      </div>
-    ),
-  }
+  // Answered, or never asked: the cards simply stand.
+  return { ...interaction, surface: <div className={styles.surface}>{centre}</div> }
 }

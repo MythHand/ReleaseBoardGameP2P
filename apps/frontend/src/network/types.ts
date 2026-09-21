@@ -97,6 +97,21 @@ export type Message =
   // said this (or the cap expires) — see session/startGate.ts.
   | { type: 'INTRO_READY'; payload: { gameId: string } }
   | { type: 'INTENT'; payload: { intent: Intent } }
+  // A pick that has NOT been made — the card the actor's Cherry-pick surface is
+  // currently offering to confirm, so the rest of the table watches the choice
+  // being made rather than only its result. Broadcast like any other
+  // peer-originated frame, and deliberately NOT handed to the keeper: the
+  // engine knows nothing of an answer until it is submitted, and this is not
+  // one. A lie changes nothing — it moves a highlight on somebody else's
+  // surface and no state at all.
+  //
+  // The HAND pick alone, never the one that goes on the deck under sudo: the
+  // rules place that card unseen, and the engine already marks its event
+  // private to the actor. `card` is null when nothing is selected.
+  | {
+      type: 'PICK_PREVIEW'
+      payload: { gameId: string; player: PlayerId; card: string | null }
+    }
   // Private, per recipient — one projection plus that viewer's events. Never broadcast.
   // `resync` marks a REPLAY of what this seat already ought to know — the full
   // visible log, handed to a peer that rejoined. It is folded into history and

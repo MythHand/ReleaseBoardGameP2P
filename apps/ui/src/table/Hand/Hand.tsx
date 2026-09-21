@@ -143,6 +143,16 @@ interface HandProps {
   // because what the cursor is over is exactly the question being asked. So this
   // is a prop a scene opts into, not a rule the hand infers.
   carrying?: boolean
+  /**
+   * The fan is SHOWN, not offered: there is nothing in it to choose. A closed
+   * hand held out while somebody names a card out of a catalogue is the case —
+   * the cards are there to be counted and watched, and a hand that lifts and
+   * parts under the cursor is promising a pick that does not exist.
+   *
+   * Separate from `carrying`, which says the pointer is already holding
+   * something: that is about the cursor, this is about the hand.
+   */
+  readOnly?: boolean
 }
 
 interface DragState {
@@ -181,6 +191,7 @@ export default function Hand({
   onReorder,
   renderFace = defaultFace,
   carrying = false,
+  readOnly = false,
 }: HandProps) {
   // ховер по UID (не по индексу) — при удалении карты индекс «съезжает» на
   // соседа и та вспыхивает фантомом; uid этого не допускает.
@@ -206,7 +217,7 @@ export default function Hand({
   // presentational reactions below (hover, zoom preview) suppress on it.
   const dragEnabled = Boolean(onPlay ?? onReorder)
   // ховер подавлен во время перетаскивания — своего или чужого (carrying)
-  const hovered = drag || carrying ? null : hoveredUid
+  const hovered = drag || carrying || readOnly ? null : hoveredUid
   const hoveredIndex = hovered ? items.findIndex((it) => it.uid === hovered) : -1
 
   // индекс слота в веере, куда целится курсор (для перестановки)
@@ -410,7 +421,7 @@ export default function Hand({
     }
     clearHide()
     // no zoom for a face-down hand (a card back has nothing to read) or mid-drag
-    if (faceDown || drag || carrying || !hoveredUid) {
+    if (faceDown || drag || carrying || readOnly || !hoveredUid) {
       setZoomShown(false)
       zoomHide.current = window.setTimeout(() => setZoomView(null), ZOOM_HIDE_MS)
       return clearHide
@@ -443,7 +454,7 @@ export default function Hand({
     }
     // `carrying` is #112's: the preview must re-evaluate while a card is being
     // carried back into the fan.
-  }, [hoveredUid, drag, carrying, items, faceDown])
+  }, [hoveredUid, drag, carrying, readOnly, items, faceDown])
 
   // placement per uid — with the dragged card lifted out and (in-band) a gap at
   // `preview`; otherwise the usual layout (with optional insert gapAt).
@@ -476,7 +487,7 @@ export default function Hand({
         // hover: gentle lift + straighten, neighbours part — that's all. No
         // in-place scale, no jump to the top layer (card stays in its fan layer;
         // readability is on the zoom preview).
-        if (hoveredIndex >= 0 && gapAt == null && !drag && !carrying) {
+        if (hoveredIndex >= 0 && gapAt == null && !drag && !carrying && !readOnly) {
           if (hoveredIndex === i) {
             rotate = 0
             y -= HOVER_LIFT
