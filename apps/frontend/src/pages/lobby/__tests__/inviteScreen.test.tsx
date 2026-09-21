@@ -60,6 +60,8 @@ function base(): UseLobby {
     disband: vi.fn(),
     leaveSession: vi.fn(),
     leaveGame: vi.fn(),
+    previewPick: vi.fn(),
+    pickPreview: null,
     clearError: vi.fn(),
   }
 }

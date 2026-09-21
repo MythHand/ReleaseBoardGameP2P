@@ -111,14 +111,19 @@ export function useDrawBeat(anchors: BoardAnchors) {
             // It leaves from the centre on the same scatter the heap already
             // rests it on (I7) — the flyer IS the card, so the step flies the
             // node rather than mounting a copy of it.
-            await latest.current.exit.send([
-              {
-                key: `d${d.reveal.discardId}`,
-                card,
-                node: elOf('draw'),
-                scatter: scatterAt(d.reveal.discardId),
-              },
-            ])
+            await latest.current.exit.send(
+              [
+                {
+                  key: `d${d.reveal.discardId}`,
+                  card,
+                  node: elOf('draw'),
+                  scatter: scatterAt(d.reveal.discardId),
+                },
+              ],
+              // nothing stands: the flyer IS the card, handed over as `node`,
+              // so the step flies that very node and there is no copy to hide
+              null,
+            )
             drop('draw')
             continue
           }

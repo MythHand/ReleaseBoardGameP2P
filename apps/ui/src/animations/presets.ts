@@ -32,6 +32,12 @@ interface MoveParams {
   from?: Rect
   to?: Rect
   rotate?: number
+  // Разворот, С КОТОРОГО начинается перелёт. Нужен, когда карта уже лежит
+  // повёрнутой и выпрямляется ПО ДОРОГЕ: веер соперника протянут к тебе и
+  // развёрнут на 180°, и взятая из него карта не должна дёргаться прямой в
+  // первом же кадре. Позой носителя (`useFlyer` → `Raise.pose`) это не
+  // решается: первый кадр анимации перекрывает inline-transform узла.
+  rotateFrom?: number
   dx?: number
   dy?: number
   // растворение по ходу полёта (для «поглощения» стопки целевой колодой)
@@ -44,7 +50,7 @@ interface MoveParams {
 // в правильной конечной позиции, без последующего рывка). fade — гасит opacity.
 const move = (
   el: Element,
-  { from, to, rotate = 0, dx = 0, dy = 0, fade = false }: MoveParams = {},
+  { from, to, rotate = 0, rotateFrom = 0, dx = 0, dy = 0, fade = false }: MoveParams = {},
   duration = 460,
   easing = EASE,
 ): Animation | null => {
@@ -52,7 +58,7 @@ const move = (
   const mx = to.left + to.width / 2 - (from.left + from.width / 2) + dx
   const my = to.top + to.height / 2 - (from.top + from.height / 2) + dy
   const scale = to.width / from.width
-  const start: Keyframe = { transform: 'translate(0, 0) scale(1) rotate(0deg)' }
+  const start: Keyframe = { transform: `translate(0, 0) scale(1) rotate(${rotateFrom}deg)` }
   const end: Keyframe = {
     transform: `translate(${mx}px, ${my}px) scale(${scale}) rotate(${rotate}deg)`,
   }

@@ -320,11 +320,16 @@ it('anchors the targeting arrow at the centre it stands in, not the hand slot it
 const sudo = cardById('support-sudo')!
 // biome-ignore lint/style/noNonNullAssertion: both ids are known catalogue entries
 const codeReview = cardById('support-code-review')!
+// biome-ignore lint/style/noNonNullAssertion: a known catalogue entry
+const cherryPick = cardById('operation-git-cherry-pick')!
 const COMBO_HAND: { uid: string; card: CardData }[] = [
   { uid: 'support-sudo#0', card: sudo },
   { uid: 'attack-bug#0', card: bug },
   { uid: 'support-code-review#0', card: codeReview },
   { uid: 'release-frontend#0', card: frontend },
+  // the sudo's OTHER partner: what it enhances decides how the two stand, so
+  // the hand has to hold one of each kind for both to be reachable (#168)
+  { uid: 'operation-git-cherry-pick#0', card: cherryPick },
 ]
 
 function comboBoardWith(
@@ -438,6 +443,29 @@ it('a pulled support lights its partners and a click folds the pair', async () =
     { kind: 'player', player: 'p2' },
     'support-sudo#0',
   )
+})
+
+// THE HUE IS THE CARD THE LINE LEAVES, and after a sudo has been told what it
+// enhances, that card is the one aiming — so the colour changes hands with the
+// aim. It used to be re-derived from `staged` by a rule of the board's own
+// ("the support, if there is one"), which outlived the handover: the arrow came
+// out of the attack and stayed the sudo's yellow (#168). Armed together now, so
+// the origin and the colour cannot name two different cards.
+it('hands the arrow’s hue over with the aim, from the sudo to the card it enhances', async () => {
+  comboOut = []
+  render(
+    comboBoardWith({
+      comboOptions: { 'support-sudo#0': ['attack-bug#0'] },
+      targets: BUG_SEAT_TARGET,
+    }),
+  )
+  const hue = () =>
+    document.querySelector<SVGElement>(`.${arrowStyles.svg}`)?.style.getPropertyValue('--arrow') ??
+    null
+  await pullFromComboFan('support-sudo#0')
+  expect(hue()).toBe('var(--cat-support)') // the sudo stands alone, asking for a partner
+  await clickComboFanCard('attack-bug#0')
+  expect(hue()).toBe('var(--cat-attack)') // the attack aims; the sudo only enhances it
 })
 
 it('a release partner dispatches without a target', async () => {
@@ -619,14 +647,14 @@ it('a target press mid-fold is refused; the same seat still dispatches once the 
 // `finish()`, so the fold's OTHER exits — the pair flyer's own `[data-main]`/
 // `[data-aux]` markers missing, `pairRef` gone, a rejecting `.finished` —
 // bypassed it and left the lock stuck forever (worse than pre-fix: those
-// conditions used to leave a recoverable stall). Of the three, only the
-// "markers missing" bail is honestly reachable here: `pairRef.current` is a
-// permanently-mounted node with no test-facing way to null it, and jsdom's
-// own WAAPI stub (test-setup.ts) always resolves `.finished`, never rejects
-// it. This one bail simulates the same condition `if (!mainEl || !auxEl)
-// return` checks, by shadowing the pair flyer's OWN `querySelector` (an
-// instance override — nothing else in the suite's shared jsdom document is
-// touched) rather than fabricating an unrelated failure.
+// conditions used to leave a recoverable stall). Since the fold became the
+// shared step (`usePairFold`), those bails live inside it and the way it can
+// fail from out here is the animation itself refusing — so that is what this
+// reproduces, by making `Element.prototype.animate` throw for the span of the
+// gesture. The mock is deliberately blunt: it takes down every flight this
+// flow starts, not just the fold, which is exactly how it caught the two
+// `void`ed bodies in `_useBoardStaging` that used to let such a failure escape
+// as an unhandled rejection.
 it('a fold whose pair-flyer markers go missing still clears the lock — Escape cancels normally after', async () => {
   const onPlay = vi.fn()
   comboOut = []
@@ -636,13 +664,16 @@ it('a fold whose pair-flyer markers go missing still clears the lock — Escape 
       { onPlay },
     ),
   )
-  const pairFlyer = document.querySelector<HTMLElement>('[data-testid="board-pair-staged"]')
-  if (!pairFlyer) throw new Error('pair flyer node not found')
-  const qs = vi.spyOn(pairFlyer, 'querySelector').mockReturnValue(null)
+  // The fold is the shared step now (`usePairFold`), so the way it can fail is
+  // the animation itself refusing — the step throws out of `fold()` and the
+  // gesture's own `finally` is all that clears the lock.
+  const animate = vi.spyOn(Element.prototype, 'animate').mockImplementation(() => {
+    throw new Error('no animation here')
+  })
   await pullFromComboFan('support-code-review#0')
-  await clickComboFanCard('release-frontend#0') // bails at `if (!mainEl || !auxEl) return` — finish() never runs
+  await clickComboFanCard('release-frontend#0') // the fold throws — finish() never runs
   expect(onPlay).not.toHaveBeenCalled()
-  qs.mockRestore() // back to the real DOM before asserting through it below
+  animate.mockRestore() // back to a working DOM before asserting through it below
   // the lock still cleared despite the bail — a plain cancel works normally
   fireEvent.keyDown(window, { key: 'Escape' })
   await waitFor(() => {
@@ -694,7 +725,7 @@ it('a click during a cancel-in-flight does not start a new fold', async () => {
   await act(async () => {
     await new Promise((r) => setTimeout(r, 50))
   })
-  expect(document.querySelector('[data-testid="board-pair-staged"] [data-main]')).toBeNull()
+  expect(document.querySelector('[data-main]')).toBeNull()
   await act(async () => {
     await new Promise((r) => setTimeout(r, 700))
   })
@@ -745,7 +776,7 @@ it('reduced motion folds a pair without flights', () => {
   // release has no target and no open window — dispatches at once, same phase
   // outcome the animated path reaches after its own flights settle
   expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, 'support-code-review#0')
-  expect(document.querySelector('[data-testid="board-pair-staged"] [data-main]')).toBeTruthy()
+  expect(document.querySelector('[data-main]')).toBeTruthy()
   mm.mockRestore()
 })
 
@@ -764,12 +795,72 @@ it('a dispatched pair survives a projection tick without flicker', async () => {
   await pullFromComboFan('support-code-review#0')
   await clickComboFanCard('release-frontend#0') // dispatches at once — no target, no window
   expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, 'support-code-review#0')
-  expect(document.querySelectorAll('[data-testid="board-pair-staged"] [data-main]').length).toBe(1)
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
 
   // the projection tick: a fresh render built from scratch (`comboBoardWith`
   // calls `makeBoardProps()` anew), while `COMBO_HAND` — and so the dispatched
   // play itself — stays byte-for-byte the array it already was.
   rerender(comboBoardWith(overrides, { onPlay }))
-  expect(document.querySelectorAll('[data-testid="board-pair-staged"] [data-main]').length).toBe(1)
-  expect(document.querySelectorAll('[data-testid="board-pair-staged"] [data-aux]').length).toBe(1)
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
+  expect(document.querySelectorAll('[data-aux]').length).toBe(1)
+})
+
+// THE CENTRE'S ROW, NOT ITS MIDDLE. The middle is where a card that has been
+// PLAYED stands. A yellow support pulled out of the fan has not been played yet
+// — it is waiting to be told what it goes with — so it stands in the assembling
+// row from the centre module, and the place kept empty beside it is that
+// question (`DeckAnimationsStory`, the scene this is transcribed from).
+it('stands a pulled support in the centre row and keeps the place beside it empty', async () => {
+  render(comboBoardWith({ comboOptions: { 'support-code-review#0': ['release-frontend#0'] } }))
+  await pullFromComboFan('support-code-review#0')
+  const first = document.querySelector('[data-stage-slot="0"]')
+  const second = document.querySelector('[data-stage-slot="1"]')
+  expect(first).toBeTruthy()
+  expect(second).toBeTruthy()
+  expect(first?.querySelector('[data-testid="board-centre-staged"]')).toBeTruthy()
+  // the ask is a place with nothing in it
+  expect(second?.childElementCount).toBe(0)
+  // …and the middle is left alone
+  const centre = document.querySelector('[data-board-centre]')
+  expect(centre?.querySelector('[data-testid="board-centre-staged"]')).toBeFalsy()
+})
+
+// …and the place it kept open is what the partner lands in — for the sudo that
+// enhances a GIT OPERATION. It stays its own card there: the two stand side by
+// side and no pair is formed (owner, 18.09), which is the row the scene shows.
+it('stands a git operation a sudo enhances in the place kept beside it, unfolded', async () => {
+  comboOut = []
+  render(
+    comboBoardWith({
+      comboOptions: { 'support-sudo#0': ['operation-git-cherry-pick#0'] },
+    }),
+  )
+  await pullFromComboFan('support-sudo#0')
+  await clickComboFanCard('operation-git-cherry-pick#0')
+  const first = document.querySelector('[data-stage-slot="0"]')
+  const second = document.querySelector('[data-stage-slot="1"]')
+  expect(first?.querySelector('[data-testid="board-centre-staged"]')).toBeTruthy()
+  expect(second?.querySelector('[data-testid="board-centre-partner"]')).toBeTruthy()
+  // nothing folded: no pair took the centre over
+  expect(document.querySelector('[data-aux]')).toBeFalsy()
+})
+
+// AN ATTACK IS THE OTHER WAY, and the same sudo does both (owner, 20.09). The
+// attack lies ON the sudo, a stack at the middle — which is where a played
+// attack stands, and exactly how the centre draws that play once the engine
+// answers (`centreAttack` renders the same `CardPair` there). Standing them in a
+// row while the play was assembled and in a stack the moment it was made told
+// the same picture two ways.
+it('folds a sudo and the attack it enhances into a stack at the middle', async () => {
+  render(
+    comboBoardWith({ targets: BUG_TARGETS, comboOptions: { 'support-sudo#0': ['attack-bug#0'] } }),
+  )
+  await pullFromComboFan('support-sudo#0')
+  await clickComboFanCard('attack-bug#0')
+  // the pair: the attack on top, the sudo tucked under it
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
+  expect(document.querySelectorAll('[data-aux]').length).toBe(1)
+  // and the assembling row is over — neither half stands in it any more
+  expect(document.querySelector('[data-stage-slot="0"]')).toBeFalsy()
+  expect(document.querySelector('[data-testid="board-centre-partner"]')).toBeFalsy()
 })

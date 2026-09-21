@@ -170,6 +170,16 @@ export default function BoardPage() {
               }
             : undefined
         }
+        // A pick another seat is offering but has not confirmed — it belongs to
+        // the session, not to the game: the engine is told nothing until the
+        // answer is submitted. Scoped to THIS match, so a frame that outlived
+        // its own game cannot light a card up in the next one.
+        pickPreview={
+          session.pickPreview && session.pickPreview.gameId === session.gameId
+            ? { player: session.pickPreview.player, card: session.pickPreview.card }
+            : null
+        }
+        onPickPreview={(card) => session.previewPick(state.selfId, card)}
         room={{
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,

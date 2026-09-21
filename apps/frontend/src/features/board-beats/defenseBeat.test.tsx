@@ -97,7 +97,8 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
       const [flying, setFlying] = useState(false)
       return {
         overlay: flying ? ['flight'] : [],
-        send: (items: Leaving[]) => {
+        send: (items: Leaving[], takeOff?: (() => void) | null) => {
+          takeOff?.()
           played.names.push('centerToDiscard')
           exits.items.push(...items)
           if (!hang.on) return Promise.resolve()

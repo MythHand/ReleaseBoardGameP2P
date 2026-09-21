@@ -143,14 +143,37 @@ export function useDiscardExit(
     ]
   }
 
-  const send = async (items: Leaving[]) => {
+  /**
+   * Fly these cards to the discard.
+   *
+   * `takeOff` is WHAT STOPS BEING DRAWN because these carriers now hold it —
+   * the standing render at the centre, a pending the table keys a card off, a
+   * flyer that was holding it until now. It is run inside the same commit the
+   * carriers go up in, so there is never a frame with the card in two places
+   * and never one with it in neither.
+   *
+   * REQUIRED, and that is the whole point of it. It used to be the caller's
+   * own business, written as a line next to the call and correct only while
+   * that line happened to sit above it — until one caller put it BELOW its
+   * `await` and the card it was carrying stood at the centre for the whole
+   * flight while a copy of it flew away (`comboBeat.runPairOut`, #168). A rule
+   * that lives in a comment beside three call sites is a rule the fourth does
+   * not have. Pass `null` to say nothing stands: the caller handed its own
+   * nodes over through `node`, or its render came down earlier because a step
+   * of its own runs in between — both are answers, and neither is silence.
+   */
+  const send = async (items: Leaving[], takeOff: (() => void) | null) => {
+    // measured BEFORE anything is taken down — `expand` reads the live nodes
     const to = boxRef.current?.getBoundingClientRect()
     const list = items.flatMap(expand)
+    // nothing flies, so nothing has been taken over: whatever is standing
+    // stays standing, and `takeOff` is not run
     if (list.length === 0) return
     // only the ones that need a flyer of their own get mounted
     const mounted = list.filter((f) => !f.node)
     setFlights(mounted)
     setStraight(false)
+    takeOff?.()
     await nextFrames() // I2 — let them paint at their source before moving
     setStraight(true) // the table tilt unwinds while they travel
     await Promise.all(

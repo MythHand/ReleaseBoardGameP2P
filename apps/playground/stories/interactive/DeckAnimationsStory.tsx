@@ -328,7 +328,8 @@ export default function DeckAnimationsStory() {
       }))
       .filter((e): e is { key: string; card: CardData; from: DOMRect } => e.from != null)
     setStaged([])
-    await sendToDiscard(leaving)
+    // nothing stands: the stage was cleared just above
+    await sendToDiscard(leaving, null)
   }
 
   // the staged cards are complete and the target is known — run the effect and
@@ -562,7 +563,11 @@ export default function DeckAnimationsStory() {
         <div className={styles.discard}>
           <Pile
             heap={discard.cards}
-            count={discard.showCount ? discard.cards.length : 0}
+            count={discard.cards.length}
+            // the scene's own flag, said to the pile directly now that it can
+            // hear it — it used to be spelled `count={0}`, which also hid the
+            // counter of a discard that was honestly empty
+            showCount={discard.showCount}
             gathered={discard.gathered}
             width={116}
             boxRef={discardRef}

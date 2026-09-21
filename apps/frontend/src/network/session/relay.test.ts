@@ -50,6 +50,16 @@ it('never relays chat intent, history, or canonical entries', () => {
   expect(isRelayable('CHAT_ENTRY')).toBe(false)
 })
 
+it('forwards a pick that has not been made — the table watches it being made', () => {
+  // The one frame here that is MEANT to reach everybody: the card a seat's
+  // Cherry-pick surface is offering to confirm. It is not an answer, so the
+  // keeper never sees it, and it carries only what the surface already shows —
+  // the hand pick, never the one the rules place unseen on the deck. Denying
+  // it the relay would leave the rest of the table watching a surface where
+  // nothing ever gets chosen.
+  expect(isRelayable('PICK_PREVIEW')).toBe(true)
+})
+
 it('forwards to all peers except the sender and the host', () => {
   const targets = relayTargets({ connectedPeerIds: ['h', 'a', 'b', 'c'], hostId: 'h', from: 'a' })
   expect(targets.sort()).toEqual(['b', 'c'])

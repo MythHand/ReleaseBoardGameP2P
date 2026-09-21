@@ -177,6 +177,14 @@ export {
   centreTransform,
 } from './table/TableCentre/centre'
 export {
+  CENTRE_ROWS,
+  type CentreRow,
+  type RowCell,
+  type RowShape,
+  rowCells,
+  rowPlaceStyle,
+} from './table/TableCentre/centreRow'
+export {
   GRID_CARD_W,
   GRID_GAP,
   GRID_TOP,

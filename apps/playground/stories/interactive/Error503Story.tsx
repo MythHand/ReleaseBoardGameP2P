@@ -326,8 +326,10 @@ export default function Error503Story() {
         pose: gather ? { rot: heap[i].rot, dx: 0, dy: 0 } : undefined,
         layer: i,
       })),
+      // the scene's own carriers come down as the step's go up — the same
+      // turn, now guaranteed by the step rather than by the next line
+      drop,
     )
-    drop()
     await gone
   }
 
@@ -439,7 +441,8 @@ export default function Error503Story() {
     // the answer leaves from the pose it was standing in, so the step unwinds the
     // tilt during the flight instead of straightening the card on hand-off
     leaving.push({ key: 'def', card: answer, aux, el, from, pose: COVER_POSE, layer: 1 })
-    return sendToDiscard(leaving)
+    // nothing stands here: the caller clears the centre around this call
+    return sendToDiscard(leaving, null)
   }
 
   // Debugger played from the hand: it flies to the centre and covers the 503 —
