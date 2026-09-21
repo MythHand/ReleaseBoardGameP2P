@@ -106,6 +106,30 @@ it('canStart requires >=2 players all ready', () => {
   expect(canStart(withReady)).toBe(true)
 })
 
+it('does not start while a ready player is still viewing the previous match', () => {
+  const state = handleJoinRequest(base(4), 'p1', 'Pam', { matchRunning: false }).state
+  state.peers.p1 = { ...state.peers.p1, ready: true, where: 'stats' }
+  expect(canStart(state)).toBe(false)
+})
+
+it('ignores readiness sent from outside the lobby', () => {
+  const state = handleJoinRequest(base(4), 'p1', 'Pam', { matchRunning: false }).state
+  state.peers.p1.where = 'stats'
+  expect(handleReady(state, 'p1')).toEqual({ state, outgoing: [] })
+})
+
+it('resets a returning player only once and preserves their next confirmation', () => {
+  const state = handleJoinRequest(base(4), 'p1', 'Pam', { matchRunning: false }).state
+  state.peers.p1 = { ...state.peers.p1, ready: true, where: 'game' }
+  const returned = handleWhereabouts(state, 'p1', 'lobby')
+  expect(returned.state.peers.p1.ready).toBe(false)
+  const confirmed = handleReady(returned.state, 'p1').state
+  expect(confirmed.peers.p1.ready).toBe(true)
+  const remounted = handleWhereabouts(confirmed, 'p1', 'lobby')
+  expect(remounted.state).toBe(confirmed)
+  expect(canStart(remounted.state)).toBe(true)
+})
+
 it('disbandLobby broadcasts LOBBY_DISBANDED without mutating state', () => {
   const s = base(4)
   const { state, outgoing } = disbandLobby(s)

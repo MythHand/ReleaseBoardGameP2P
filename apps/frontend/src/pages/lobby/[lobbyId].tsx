@@ -1,6 +1,6 @@
 import { useTranslation } from '@release/translation'
 import { Button, Typography } from '@release/ui'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import InviteScreen from './_InviteScreen'
@@ -24,12 +24,15 @@ export default function LobbyPage() {
   )
 
   // Clear a stale error left by a previous visit (e.g. a failed join) when the
-  // lobby mounts, so arriving fresh shows the form, not an old error banner.
-  // clearError is a no-op for a live session, so this is safe on every mount.
+  // invitation is visited, including navigation that reuses this route. A kick
+  // during this visit stays visible until the next navigation.
   const { clearError } = session
+  const clearedVisit = useRef<string | null>(null)
   useEffect(() => {
+    if (clearedVisit.current === location.key) return
+    clearedVisit.current = location.key
     clearError()
-  }, [clearError])
+  }, [clearError, location.key])
 
   if (session.status === 'kicked' || session.status === 'disbanded') {
     return (

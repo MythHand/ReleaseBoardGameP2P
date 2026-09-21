@@ -1308,6 +1308,128 @@ it('forgets what it stored when the host kicks this peer', async () => {
   expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
 })
 
+it('tears down a kicked session and ignores its callbacks after a fresh join', async () => {
+  const { result } = renderHook(() => useLobby())
+  const hostId = parseRoomCode('F96-NMT')
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Bo')
+  })
+  const old = transports[0]
+  const selfId = result.current.state?.selfId ?? ''
+  act(() => {
+    old.onConnection?.(hostId)
+    old.onMessage?.({
+      seq: 1,
+      type: 'GAME_STARTING',
+      from: hostId,
+      payload: { gameId: 'old', seats: SEATING },
+    })
+    old.onMessage?.({ seq: 1, type: 'PLAYER_KICKED', from: hostId, payload: { peerId: selfId } })
+  })
+  expect.soft(result.current.status).toBe('kicked')
+  expect.soft(result.current.state).toBeNull()
+  expect.soft(result.current.roomCode).toBeNull()
+  expect.soft(result.current.gameId).toBeNull()
+  expect.soft(result.current.gameLink).toBeNull()
+  expect.soft(result.current.gameSync).toBeNull()
+  expect.soft(result.current.seats).toEqual([])
+  expect.soft(old.close).toHaveBeenCalledOnce()
+  expect(storedSession()).toBeNull()
+
+  const fireStaleCallbacks = () => {
+    old.onMessage?.({
+      seq: 1,
+      type: 'GAME_STARTING',
+      from: hostId,
+      payload: { gameId: 'late', seats: SEATING },
+    })
+    old.onDisconnect?.(hostId)
+    old.onError?.({ type: 'network', message: 'late failure' })
+    old.onConnection?.(hostId)
+  }
+  act(fireStaleCallbacks)
+  expect.soft(result.current.status).toBe('kicked')
+  expect.soft(result.current.gameId).toBeNull()
+  expect.soft(result.current.reconnect.status).toBe('idle')
+
+  await act(async () => {
+    await result.current.joinRoom('ABC-23D', 'Bo')
+  })
+  act(() => transports[1].onConnection?.(parseRoomCode('ABC-23D')))
+  const freshState = result.current.state
+  act(fireStaleCallbacks)
+  expect(result.current.status).toBe('in-lobby')
+  expect(result.current.roomCode).toBe('ABC-23D')
+  expect(result.current.state).toBe(freshState)
+  expect(result.current.gameId).toBeNull()
+  expect(result.current.error).toBeNull()
+})
+
+it('dismisses an old kick notice when entering an invitation again', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Bo')
+  })
+  act(() =>
+    transports[0].onMessage?.({
+      seq: 1,
+      type: 'PLAYER_KICKED',
+      from: parseRoomCode('F96-NMT'),
+      payload: { peerId: result.current.state?.selfId ?? '' },
+    }),
+  )
+  expect(result.current.status).toBe('kicked')
+  act(() => result.current.clearError())
+  expect(result.current.status).toBe('idle')
+  expect(result.current.state).toBeNull()
+})
+
+it('requires fresh readiness from each returning player without disrupting the remaining results', async () => {
+  const { result } = await hostWithGuest()
+  const guestWhere = (where: 'game' | 'stats' | 'lobby') => {
+    transports[0].onMessage?.({ seq: 1, type: 'WHEREABOUTS', from: GUEST, payload: { where } })
+  }
+  act(() => transports[0].onMessage?.({ seq: 1, type: 'PLAYER_READY', from: GUEST, payload: {} }))
+  expect(result.current.canStart).toBe(true)
+  act(() => {
+    result.current.startGame([])
+    result.current.setWhere('game')
+    guestWhere('game')
+    result.current.setWhere('stats')
+    guestWhere('stats')
+  })
+  const sync = result.current.gameSync
+  const seats = result.current.seats
+  const link = result.current.gameLink
+  act(() => {
+    result.current.leaveGame()
+    result.current.setWhere('lobby')
+  })
+  const hostId = result.current.state?.selfId ?? ''
+  expect.soft(result.current.state?.peers[hostId].ready).toBe(false)
+  expect.soft(result.current.canStart).toBe(false)
+  expect(result.current.gameSync).toBe(sync)
+  expect(result.current.seats).toBe(seats)
+  expect(result.current.gameLink).toBe(link)
+  act(() => result.current.ready())
+  expect.soft(result.current.state?.peers[hostId].ready).toBe(true)
+  expect.soft(result.current.canStart).toBe(false)
+  act(() => guestWhere('lobby'))
+  expect.soft(result.current.state?.peers[GUEST].ready).toBe(false)
+  expect.soft(result.current.state?.peers[hostId].ready).toBe(true)
+  expect.soft(result.current.canStart).toBe(false)
+  act(() => {
+    transports[0].onMessage?.({ seq: 1, type: 'PLAYER_READY', from: GUEST, payload: {} })
+    result.current.setWhere('lobby')
+    guestWhere('lobby')
+  })
+  expect(result.current.canStart).toBe(true)
+  expect(transports[0].broadcast).toHaveBeenCalledWith({
+    type: 'PEER_JOINED',
+    payload: expect.objectContaining({ id: GUEST, ready: false, where: 'lobby' }),
+  })
+})
+
 it('coalesces a burst of keeper commits into one serialization', async () => {
   vi.useFakeTimers()
   const writes = vi.spyOn(Storage.prototype, 'setItem')

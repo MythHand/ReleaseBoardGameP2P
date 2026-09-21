@@ -909,10 +909,8 @@ export function useLobby(): UseLobby {
         case 'PLAYER_KICKED':
           if (!fromHost) break
           if (msg.payload.peerId === current.selfId) {
+            teardownSession()
             setStatus('kicked')
-            // A stored record here would offer to walk the kicked player
-            // straight back into the room that just removed them.
-            forgetStored()
           } else commit(applyPeerLeft(current, msg.payload.peerId))
           break
         case 'GAME_STARTING': {
@@ -978,7 +976,7 @@ export function useLobby(): UseLobby {
           break
       }
     },
-    [commit, dispatch, applySeats, forgetStored, rememberGame],
+    [commit, dispatch, applySeats, teardownSession, rememberGame],
   )
 
   const createRoom = useCallback(
@@ -1859,12 +1857,12 @@ export function useLobby(): UseLobby {
   }, [dispatch, leaveSession])
 
   // Dismiss a sticky error (e.g. a failed join) without tearing down a live
-  // session. Returns the status to idle only when it was 'error', so calling
-  // this on mount can't kill an in-lobby session.
+  // session. Terminal notices are dismissed on the next invitation visit;
+  // their transports and stored sessions have already been torn down.
   const clearError = useCallback(() => {
     setError(null)
     setErrorKind(null)
-    setStatus((s) => (s === 'error' ? 'idle' : s))
+    setStatus((s) => (s === 'error' || s === 'kicked' || s === 'disbanded' ? 'idle' : s))
   }, [])
 
   // Memoized so the value handed to the root SessionContext keeps a stable

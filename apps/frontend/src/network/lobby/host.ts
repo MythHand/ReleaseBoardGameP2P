@@ -95,7 +95,7 @@ export function handleJoinRequest(
 // spotting a wrong setting), matching the Toggle control in the lobby UI.
 export function handleReady(state: LobbyState, fromId: string): Result {
   const existing = state.peers[fromId]
-  if (!existing) return { state, outgoing: [] }
+  if (existing?.where !== 'lobby') return { state, outgoing: [] }
   const updated: PeerInfo = { ...existing, ready: !existing.ready }
   const next = applyPeerJoined(state, updated)
   return {
@@ -127,7 +127,13 @@ export function handleWhereabouts(state: LobbyState, fromId: string, where: Wher
   // Every screen announces on mount, so a remount would otherwise cost the
   // whole table a broadcast that changed nothing.
   if (existing.where === where) return { state, outgoing: [] }
-  const updated: PeerInfo = { ...existing, where }
+  // Returning from a match requires a new confirmation. The identical-location
+  // guard above keeps remounts from retracting that new confirmation.
+  const updated: PeerInfo = {
+    ...existing,
+    where,
+    ready: where === 'lobby' ? false : existing.ready,
+  }
   return {
     state: applyPeerJoined(state, updated),
     outgoing: [
@@ -234,7 +240,7 @@ export function canStart(state: LobbyState): boolean {
   if (playerCount(state) + effectiveBots(state) < 2) return false
   return Object.values(state.peers)
     .filter((p) => p.role === 'host' || p.role === 'player')
-    .every((p) => p.ready)
+    .every((p) => p.ready && p.where === 'lobby')
 }
 
 export function disbandLobby(state: LobbyState): Result {
