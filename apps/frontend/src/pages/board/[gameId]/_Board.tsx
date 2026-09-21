@@ -225,8 +225,8 @@ export default function Board({
   // once at run start (I8), not a render's worth of state it would have to
   // wait on. Built below, once `useBoardStaging` exists to build it FROM — but
   // declared here, ahead of `useBeats`, because the ref's IDENTITY is all the
-  // queue needs at this point. Publish its value before the queue's layout
-  // effects start consuming this commit's engine events.
+  // queue needs at this point; the layout effect that keeps `.current` current
+  // runs after every hook regardless of where it sits in the function.
   const discardPickRef = useRef<DiscardPickHandoff | null>(null)
   // the request surface's own hold, for the beat that plays a `requested`
   const requestPickRef = useRef<RequestPickHandoff | null>(null)
@@ -258,10 +258,6 @@ export default function Board({
   // over, the events that produced the board's first projection are the deal's
   // own, and replaying them as discards would fly cards that never left a hand
   // on screen.
-  // The host can accept a drag in the same commit as staging it. Publish
-  // ownership before the queue starts, or the runner replays a second card
-  // from the hand. Every commit refreshes DOM refs that bind on landing.
-  useLayoutEffect(publishStagingHandoff)
   const beats = useBeats({
     live,
     discardPick: discardPickRef,
@@ -794,12 +790,91 @@ export default function Board({
       stagedReleaseLocal)
     : undefined
 
-  // Read this render's staging after DOM refs bind. Register this function
-  // before useBeats so every runner inherits the same committed gesture,
-  // including neutralization and Upgrade, without writes during render.
-  function publishStagingHandoff() {
-    // Dispatched gestures retain ownership until their runner takes over,
-    // including the commit where the engine has already removed the pending.
+  // A DRAGGED play and the batch it produces can land in ONE commit (#168): a
+  // local host answers its own action synchronously, so the dispatch's own
+  // `staged: 'dispatched'` and the projection that accepted it arrive together
+  // — and `useBeats`'s layout effect, which runs BEFORE this component's own
+  // (it is called higher up), starts the beat inside that commit. The effect
+  // below would then write the handoff one commit too late: the beat has
+  // already read `null` and flown a second copy of the card the player just
+  // dragged onto the table, out of the hand slot it had left. So the turn
+  // side's handoff is ALSO written during render — the carry-forward ref write
+  // this file uses elsewhere. Only ever SET here: the clears, and the order
+  // the other three claimants (upgrade, defence, neutralize) are resolved in,
+  // stay in the effect below.
+  //
+  // THE DEFENCE SIDE HAS THE SAME RACE, and it is the same one commit: the
+  // defender drags a cover onto the attack, the host answers synchronously, and
+  // `defenseBeat.runCovered` reads this ref BEFORE its first await. Its own
+  // `!(mine && handoff)` branch then reads "nobody staged this" and flies a
+  // SECOND copy of the card out of the fan slot it has already left — the
+  // duplicate the defender sees beside the card they pulled. Asked in the same
+  // order the effect below asks it: a dispatched defence claims the handoff
+  // ahead of `answering`, which flickers false for exactly the commit that
+  // carries the engine's answer (#101, Fix D round 4).
+  const defenceDispatched =
+    defenseStaging.staged?.phase === 'dispatched' && defenseStaging.staged.main
+      ? defenseStaging.staged
+      : null
+  if (!upgrade.stagedUid && defenceDispatched?.main) {
+    handoffRef.current = {
+      mainUid: defenceDispatched.main.uid,
+      supportUid: defenceDispatched.support?.uid,
+      el: coverStagedRef.current,
+      release: defenseStaging.release,
+      whenLanded: defenseStaging.whenLanded,
+    }
+  } else if (!upgrade.stagedUid && !answering && !neutralizeOwnsHand) {
+    const dispatched = staging.staged
+    if (dispatched?.phase === 'dispatched' && dispatched.main) {
+      handoffRef.current = {
+        mainUid: dispatched.main.uid,
+        supportUid: dispatched.support?.uid,
+        el: dispatched.merged ? staging.pairNode() : soloStagedRef.current,
+        release: staging.release,
+      }
+    }
+  }
+
+  // The staging → beat handoff (#100): kept current in a layout effect,
+  // because `el` has to be the DOM node as THIS render actually committed it —
+  // the pair flyer once a partner has folded in, the solo staged node
+  // otherwise. `release` is the hook's own no-flight clear; the combo beat
+  // calls it once its own read of this says the staged play is the one
+  // standing where it is about to fold one in (I8).
+  //
+  // One ref, whichever hook is live (#101, Task 16): `answering` picks the
+  // source the same way every other call site does, so `defenseBeat.runCovered`
+  // reads OUR defence's own handoff for a `covered` beat, never a stale one
+  // left over from the turn hook. `coverStagedRef` only binds once
+  // `defenseStaging.landed` is true (both deps below), so `el` is non-null
+  // exactly when the static cover render is what is actually standing there —
+  // never a flyer that a reduced-motion path never raised (Carry #2).
+  //
+  // `defenseStaging.landed`/`.overlay` do not appear inside this effect's own
+  // body — biome's static check reads them as removable — but they are what
+  // makes it RE-RUN once `coverStagedRef.current` actually binds: `landed`
+  // flips true (and `overlay` drops back to `[]`) on the SAME render the
+  // static cover child mounts, and only a re-run of this effect, AFTER that
+  // commit, ever reads the ref's freshly-bound value. Dropping either
+  // dependency leaves `handoffRef.current.el` stuck at whatever it was the
+  // last time `staged`/`release` changed identity — typically null, from the
+  // instant right after the pull, before the ref had anything to bind to.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: landed/overlay gate a ref read, not a value the effect body itself references
+  useLayoutEffect(() => {
+    // The DEFENCE's own dispatched play claims the handoff first, and is asked
+    // about before `answering` rather than inside it (#101, Fix D round 4). The
+    // commit that carries the engine's answer renders `live` — `beats.shadow` is
+    // not set until the beat starts — so `answering` flickers false for exactly
+    // that one commit, and keying the branch on it wrote `null` here from the
+    // TURN side, which has nothing staged while a pending is open. A beat
+    // planned on the next commit would then read no handoff at all and treat our
+    // own defence as a rejoin, flying it in from the fan. Asking "does the
+    // defence gesture have a dispatched play" cannot flicker: it is the hook's
+    // own state, and it now survives that commit (`_useDefenseStaging`'s
+    // catch-up waits for its carrier). The two hooks are never both staged —
+    // the engine suspends normal play while a pending is open — so this cannot
+    // steal the turn side's handoff either.
     if (upgrade.stagedUid) {
       handoffRef.current = {
         mainUid: upgrade.stagedUid,
@@ -862,7 +937,25 @@ export default function Board({
             release: staging.release,
           }
         : null
-  }
+  }, [
+    upgrade.stagedUid,
+    upgrade.overlay,
+    answering,
+    defenseStaging.staged,
+    defenseStaging.landed,
+    defenseStaging.overlay,
+    defenseStaging.release,
+    alarmMineOpen,
+    neutralizeOwnsHand,
+    neutralizing.staged,
+    neutralizing.landed,
+    neutralizing.overlay,
+    neutralizing.release,
+    you.releaseUid,
+    staging.staged,
+    staging.pairNode,
+    staging.release,
+  ])
 
   // The grid, offered to the beat exactly while there IS one to take: the
   // RESOLVE is out (so the grid is complete and locked) and the cells are still

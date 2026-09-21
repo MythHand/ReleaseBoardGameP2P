@@ -2062,23 +2062,3 @@ AI-триггера) и не означает полного выполнени�
 
 **Статус.** `открыто`. Строка в реестре Interaction audit не заведена — страница в
 плейграунде, правка по слову владельца.
-
-
-## 2026-09-21 — #180: local drag replayed from the hand
-
-**Resolved.** A synchronous engine response commits the gesture and its accepted
-batch together. Board published `StagedHandoff` after `useBeats` had already started
-the runner in an earlier layout effect. The runner captured `null` and replayed
-the hand-to-centre flight alongside the gesture's card.
-
-The Board now publishes the committed gesture before the queue's layout effects.
-Every commit refreshes the handoff, including DOM refs that bind on landing.
-The local gesture owns its placement; accepted events only run the outcome. Remote
-players and observers retain their incoming flight. This is shared by turn plays,
-defense, neutralization and Upgrade contributions, without per-runner delays.
-
-The real-engine Board regression covers immediate and delayed local responses,
-the opponent and a third observer. On `fix/168-board-animations-8`, the existing
-render-time workaround covered turn plays and defense only; the Debugger/503
-regression reproduced the remaining duplicate before the shared fix. Browser evidence uses `Attack / defence centre`
-→ `View: opponent` and records the actual WAAPI flight sources.

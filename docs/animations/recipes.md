@@ -2910,14 +2910,3 @@ Local defense and neutralization beats await the staged carrier's `whenLanded` b
 Defense pair staging calls shared `usePairFold`; `_useBoardStaging` and `comboBeat` still have local
 fold implementations (see backlog). These notes describe code paths, not full browser parity
 between the board and playground.
-
-
-### Local drag handoff before event playback (#180)
-
-The actor has already carried the card onto the table. Publish its `StagedHandoff`
-in a layout effect registered **before** `useBeats`, after DOM refs bind but before
-any runner captures ownership. The host can accept the action in the same React
-commit as the drag. Publishing afterwards makes the runner see a remote play and
-start a duplicate hand-to-centre flight. Refresh on every commit, including the
-landing that binds the standing node. Other viewers, who have no local gesture,
-still animate the incoming card. Result animations continue for every viewer.
