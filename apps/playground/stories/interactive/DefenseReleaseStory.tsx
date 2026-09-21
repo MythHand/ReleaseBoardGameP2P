@@ -318,7 +318,8 @@ export default function DefenseReleaseStory() {
   // the flyer leaves for the discard from wherever it currently is — the same
   // shared step, flying the element that is already on screen
   const toDiscard = async (card: CardType) => {
-    await sendToDiscard([{ key: 'spent', card, node: elOf('fly') }])
+    // nothing stands: the flyer's own node IS what travels
+    await sendToDiscard([{ key: 'spent', card, node: elOf('fly') }], null)
     drop('fly')
   }
 
@@ -577,7 +578,8 @@ export default function DefenseReleaseStory() {
 
     if (attBox && defBox) {
       await Promise.all([
-        sendToDiscard(exiting),
+        // nothing stands: the scene cleared its own cover render just above
+        sendToDiscard(exiting, null),
         // …and the returned attack travels at the same time
         returns
           ? (async () => {
@@ -657,7 +659,8 @@ export default function DefenseReleaseStory() {
 
     if (centre && slot) {
       await Promise.all([
-        sendToDiscard(exiting),
+        // nothing stands: the target and the zone slot were cleared just above
+        sendToDiscard(exiting, null),
         // the taken release crosses to the attacker's zone at the same time
         relCard && takes && takeBox && by
           ? // it is crossing into an OPPONENT's zone, where cards are read as

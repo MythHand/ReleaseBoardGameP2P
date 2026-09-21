@@ -6,19 +6,36 @@
   background: var(--surface-0);
 }
 
+/* THE BAR IS NOT THE POINT OF THIS PAGE — the board under it is. Both rows are
+   kept as short as their contents allow: the scenario list only grows, and every
+   pixel it takes is one the table does not get. */
 .toolbar,
-.controls {
+.controls,
+.actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
 }
 
 .toolbar {
-  padding-block: 8px;
-  padding-inline: 12px;
+  padding-block: 4px;
+  padding-inline: 10px;
   background: var(--surface-1);
   border-block-end: 1px solid var(--white-12);
+}
+
+/* The debug entry sizes its own controls down: these are a developer's switches
+   over a board, not the game's own buttons, and at the game's size a list this
+   long costs three rows of the table. */
+.toolbar button,
+.controls button,
+.actions button,
+.controls summary {
+  padding-block: 2px;
+  padding-inline: 7px;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .toolbar button[aria-pressed='true'] {
@@ -27,11 +44,30 @@
 }
 
 .status {
-  display: grid;
-  gap: 6px;
-  padding-block: 8px;
-  padding-inline: 12px;
+  padding-block: 4px;
+  padding-inline: 10px;
   background: var(--surface-1);
+}
+
+/* THE ACTIONS GET A LINE OF THEIR OWN, and it costs nothing while the table has
+   nothing to be pushed through. */
+.actions {
+  padding-block-start: 4px;
+}
+
+.actions:empty {
+  display: none;
+}
+
+/* the instruction rides in the controls' row and gives way to them: it takes
+   what is left and ends in an ellipsis rather than wrapping into a second row */
+.hint {
+  flex: 1 1 220px;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--white-45);
+  white-space: nowrap;
 }
 
 .board {

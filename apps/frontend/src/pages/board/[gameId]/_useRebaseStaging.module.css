@@ -6,27 +6,15 @@
 
 /* The surface the reorder owns while it is up: the dimming, the rows and the
    confirm bar are ONE layer, so the bar is never swallowed by its own scrim.
-   It takes the table over, so it stands above the band the flights ride in and
-   above the pile counters a rung over them (`Pile`'s `.count`), and under the
-   arrow. No transform here: the return flights pin their cards against viewport
-   coordinates and this must not become their containing block. */
+   Both of its states — standing over the table, and dropping to the flight band
+   on the commit — come from `_tableSurface.module.css`, which owns that rule
+   for every surface that carries its own card nodes home. */
 .surface {
-  position: absolute;
-  inset: 0;
-  z-index: calc(var(--z-flight) + 45);
-  pointer-events: none;
+  composes: over from './_tableSurface.module.css';
 }
 
-/* Committed: there is no surface any more, only cards flying home in it. So it
-   DROPS to the band a travelling card belongs in — under the pile counter that
-   sits a rung above that band (`Pile`'s own `.count`, `+40`), so a card arriving
-   at its pile tucks beneath the badge instead of landing on top of it, and the
-   table is read normally while they travel.
-   Every other flight on this board rides that band already, because it rides a
-   carrier; this one carries its own row nodes, so the band is handed to it here.
-   The switch happens the moment the answer is committed — before anything moves. */
 .flight {
-  z-index: var(--z-flight);
+  composes: flying from './_tableSurface.module.css';
 }
 
 /* The scene's own backing while the cards are being read and reordered
@@ -35,12 +23,11 @@
    too. It leaves on the commit, ahead of the cards: they travel over a table
    that is already back to normal, and land in it rather than over it. */
 .scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--black-72);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  composes: scrim from './_tableSurface.module.css';
+
+  /* heavier than the shared default: here the reorder is the only thing to read
+     and the draw piles go under it too */
+  --surface-scrim: var(--black-72);
 }
 
 .rows {
