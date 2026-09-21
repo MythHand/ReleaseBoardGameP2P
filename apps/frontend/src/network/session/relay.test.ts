@@ -44,6 +44,12 @@ it('never forwards the host`s repointing of a seat', () => {
   expect(isRelayable('SEAT_REBOUND')).toBe(false)
 })
 
+it('never relays chat intent, history, or canonical entries', () => {
+  expect(isRelayable('CHAT_SEND')).toBe(false)
+  expect(isRelayable('CHAT_HISTORY')).toBe(false)
+  expect(isRelayable('CHAT_ENTRY')).toBe(false)
+})
+
 it('forwards to all peers except the sender and the host', () => {
   const targets = relayTargets({ connectedPeerIds: ['h', 'a', 'b', 'c'], hostId: 'h', from: 'a' })
   expect(targets.sort()).toEqual(['b', 'c'])

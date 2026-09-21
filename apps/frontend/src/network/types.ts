@@ -1,4 +1,5 @@
 import type { Action, Event, GameState, PlayerId, PlayerView, Setup } from '@release/engine'
+import type { ChatEntry, MemberId } from '~/shared/chat/types'
 
 // A plain Omit over a union collapses it to its common members, so it has to
 // distribute. `player` and `at` are stripped because the keeper decides both:
@@ -90,6 +91,15 @@ export type Message =
   // peer id that no longer exists. The returning peer does not need it — it
   // was sent the whole seating.
   | { type: 'SEAT_REBOUND'; payload: { playerId: PlayerId; peerId: string } }
+  // --- Chat ---
+  // A peer contributes text intent only. The host resolves its author from the
+  // live connection and is the sole source of canonical history and entries.
+  | { type: 'CHAT_SEND'; payload: { text: string } }
+  | {
+      type: 'CHAT_HISTORY'
+      payload: { entries: ChatEntry[]; selfMemberId: MemberId }
+    }
+  | { type: 'CHAT_ENTRY'; payload: { entry: ChatEntry } }
   // --- Game ---
   | { type: 'GAME_STARTED'; payload: { gameId: string; keeperId: PlayerId } }
   // A seat has finished its opening animation and is ready for the game to
