@@ -561,11 +561,12 @@ it('flies a plain Rollback’s attack back to the seat that threw it', async () 
   await drive(() => api.beat?.runCovered(rollbackPlan({ returnTo: 'p2' }), ctx))
   // it went to a seat, not into our fan
   expect(arrivals.handLengths).toHaveLength(0)
-  // TWO playToCenters: the cover lying over the attack, AND the attack's own
-  // return flight — `toContain` alone would already be satisfied by the
-  // cover's, which fires regardless of the return leg this test is actually
-  // about, so the count is what makes this discriminating.
-  expect(played.calls.filter((c) => c.name === 'playToCenter')).toHaveLength(2)
+  // The return flight is `dealToSeat` — the preset that DISSOLVES a card into
+  // a hidden hand, the one every other "card goes to a player" motion uses.
+  // Named separately from the cover's own `playToCenter`, which fires
+  // regardless of the return leg this test is actually about.
+  expect(played.calls.filter((c) => c.name === 'dealToSeat')).toHaveLength(1)
+  expect(played.calls.filter((c) => c.name === 'playToCenter')).toHaveLength(1)
   // and it was never banked: only the defence left for the discard
   expect(exits.items.map((i) => i.card.id)).toEqual(['defense-rollback'])
 })

@@ -1129,8 +1129,15 @@ export function describeEngine(
         // 38 and a round-2+ one at 44 (both measured), and runs to step 2759
         // before the game ends — so the budget still bounds the loop rather
         // than the witness.
+        //
+        // Seed 4, not 24: a reflected attack now keeps its defence on the table
+        // until the exchange ends instead of banking it at once, so the discard
+        // differs from that moment on and no fixed seed keeps its old
+        // trajectory — the same class of shift as every sweep above. Swept
+        // again: 4 sees both rounds and runs to step 2955 before the game ends,
+        // so the budget still bounds the loop rather than the witness.
         const engine = make()
-        let state = engine.createGame(configFor(options, 24))
+        let state = engine.createGame(configFor(options, 4))
         let sawRound1 = false
         let sawLaterRound = false
         for (let n = 0; n < 3600 && !state.over; n += 1) {

@@ -677,6 +677,20 @@ export default function Board({
       : state.centreAttack
         ? { attackCard: state.centreAttack.card, sudo: state.centreAttack.sudo }
         : null)
+  // THE DEFENCE STILL LYING OVER THAT ATTACK — a Works on my Machine that turned
+  // the hit back on its author. Read from the pending for exactly the reason the
+  // attack above it is: the engine keeps both on the table until the exchange
+  // ends (`HandAttackContext.cover`), so every seat can draw them from the
+  // projection and no beat has to carry them from one pending to the next.
+  const standingCover = (() => {
+    const held =
+      (!staging.staged && transferPending?.cover
+        ? { card: transferPending.cover, sudo: transferPending.coverSudo === true }
+        : null) ?? state.centreCover
+    const cover = held ? cardById(held.card) : null
+    if (!held || !cover) return null
+    return { card: cover, aux: held.sudo ? cardById('support-sudo') : null }
+  })()
   const operationSource = pendingSourceCard?.category === 'operation' ? pendingSourceCard : null
 
   // the release standing at the stage slot while its cost is unpaid — read
@@ -1537,22 +1551,31 @@ export default function Board({
         style={centrePlaceStyle('defence', 'cover')}
         data-centre-slot="cover"
         ref={anchors.cover}
-        {...previewProps(stagedCover?.card ?? stagedNeutralize?.card ?? null)}
+        {...previewProps(
+          stagedCover?.card ?? stagedNeutralize?.card ?? standingCover?.card ?? null,
+        )}
       >
         {/* One slot, two answers — a defence covering an attack, or a 503's own
             answer (#102, Task 9). They are never both staged: a pending has one
             kind and it suspends normal play. The pair reading is shared: a
             sudo-backed defence, or a sacrificed release with its Code Review. */}
         {(() => {
-          const main = stagedCover?.card ?? stagedNeutralize?.card
-          const aux = stagedCoverSudo?.card ?? stagedNeutralize?.aux
+          // …and a THIRD answer: the defence that reflected the attack and is
+          // still lying over it while the exchange it started plays out. It is
+          // nobody's staging — it comes off the projection — so it takes
+          // neither the handoff ref (no flight is landing into it; the beat
+          // that eventually flies it out measures the SLOT) nor the staged
+          // test id.
+          const main = stagedCover?.card ?? stagedNeutralize?.card ?? standingCover?.card
+          const aux = stagedCoverSudo?.card ?? stagedNeutralize?.aux ?? standingCover?.aux
           if (!main) return null
+          const staged = Boolean(stagedCover?.card ?? stagedNeutralize?.card)
           return (
             <div
-              ref={coverStagedRef}
+              ref={staged ? coverStagedRef : undefined}
               className={opening.pose}
               style={{ transform: restTransform(COVER_POSE) }}
-              data-testid="board-cover-staged"
+              data-testid={staged ? 'board-cover-staged' : 'board-cover-standing'}
             >
               {aux ? (
                 <CardPair main={main} aux={aux} width="100%" />

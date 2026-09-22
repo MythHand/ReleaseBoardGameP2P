@@ -678,9 +678,12 @@ it.each([
   })
   expect(reflected.state.pending).toMatchObject({
     player: 'p2',
-    context: { owner: 'p1', attack, combo: SUDO },
+    context: { owner: 'p1', attack, combo: SUDO, cover: { player: 'p2', cards: [WORKS] } },
   })
-  expect(reflected.state.decks.discard).toEqual([WORKS])
+  // the defence is LYING ON THE TABLE, not spent: it stays over the attack it
+  // answered until that attack leaves, and goes to the discard with it
+  expect(reflected.state.decks.discard).toEqual([])
+  expect(reflected.events.filter((e) => e.type === 'discarded')).toEqual([])
   const done =
     attack.id === SEC.id
       ? reduce(reflected.state, {
@@ -698,10 +701,13 @@ it.each([
   expect(done.state.pending).toBeNull()
   expect(done.state.players.p2.hand).toHaveLength(1)
   expect(done.state.players.p1.hand).toHaveLength(1)
-  expect(done.state.decks.discard).toEqual([WORKS, attack, SUDO])
+  // …and here it leaves, in the same breath as the attack: the attacker's
+  // cards first, the defender's after, the order every resolution banks in
+  expect(done.state.decks.discard).toEqual([attack, SUDO, WORKS])
   expect(done.events.filter((e) => e.type === 'discarded')).toMatchObject([
     { player: 'p1', card: attack.id, reason: 'attackSpent' },
     { player: 'p1', card: SUDO.id, reason: 'attackSpent' },
+    { player: 'p2', card: WORKS.id, reason: 'defenceSpent' },
   ])
   expect(done.events.find((e) => e.type === 'handTransfer')).toMatchObject({ from: 'p1', to: 'p2' })
 })

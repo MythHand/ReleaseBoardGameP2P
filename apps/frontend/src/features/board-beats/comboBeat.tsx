@@ -16,6 +16,7 @@ import {
   ATTACK_POSE,
   type BeatRun,
   type BoardAnchors,
+  COVER_POSE,
   MERGE_MS,
   SHOW_HOLD,
   type StagedHandoff,
@@ -533,12 +534,37 @@ export function useComboBeat(
           : aux && auxRef
             ? [{ key: `p${auxRef.eventId}`, card: aux, from, scatter: scatterAt(auxRef.eventId) }]
             : []
+      // THE COVER LEAVES WITH IT — the defence that reflected this attack and has
+      // been lying over it since. Measured off the cover SLOT, which is
+      // axis-aligned by design (its tilt lives on an inner node), so the rect is
+      // the true card box a flight starts from (I6); `pose: COVER_POSE` is the
+      // table tilt it starts AT, the same value the exchange in `defenseBeat`
+      // hands the exit. Its own layer above the attack's, because that is how
+      // the two lie on the table (I9).
+      const coverRef = plan.cover
+      const coverAuxRef = plan.coverAux
+      const cover = coverRef ? cardById(coverRef.card) : null
+      const coverBox = cover ? rectOf(a.cover.current) : null
+      if (cover && coverRef && coverBox)
+        items.push({
+          key: `p${coverRef.eventId}`,
+          card: cover,
+          aux: coverAuxRef ? cardById(coverAuxRef.card) : null,
+          el: a.cover.current,
+          from: coverBox,
+          layer: 1,
+          pose: COVER_POSE,
+          scatter: scatterAt(coverRef.eventId),
+          auxScatter: coverAuxRef ? scatterAt(coverAuxRef.eventId) : undefined,
+        })
       // The centre stops holding it in the same commit the carriers go up —
       // published through `takeOff` rather than after the flight, which is
-      // what left the card standing there while its own copy flew away.
+      // what left the card standing there while its own copy flew away. Both
+      // halves of the centre go down together: the attack and what covered it.
       if (items.length > 0)
         await latest.current.send(items, () => {
-          if (ctx.base.centreAttack) ctx.publish({ ...ctx.base, centreAttack: undefined })
+          if (ctx.base.centreAttack || ctx.base.centreCover)
+            ctx.publish({ ...ctx.base, centreAttack: undefined, centreCover: undefined })
         })
     },
     [],

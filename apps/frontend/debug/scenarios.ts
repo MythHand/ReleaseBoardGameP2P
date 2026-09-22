@@ -53,6 +53,11 @@ const DEFENCES: CardInstance[] = [
   instance('defense-rollback', 13), // cancel, and the attack goes back to its hand
   instance('defense-not-a-bug', 14), // unicorn — works under sudo
   instance('defense-works-on-my-machine', 15), // unicorn
+  // …and the sudo that backs one of them (owner, 22.09). A defence has a sudo
+  // effect of its own — a sudo Rollback keeps the attack for the defender
+  // instead of handing it back — and without this card in the same hand that
+  // half of every defence is unreachable from the stand.
+  instance('support-sudo', 22),
 ]
 
 // The Bug family, one copy each: three cards with one effect (`cards.md`, the

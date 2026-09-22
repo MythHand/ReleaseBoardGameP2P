@@ -295,6 +295,12 @@ export type BeatPlan =
       key: string
       main?: { eventId: number; card: string }
       aux?: { eventId: number; card: string }
+      // The defence that reflected this attack and has been lying over it ever
+      // since, leaving in the same gesture — "a defence goes to the discard with
+      // what it defended from" (owner, 22.09). Its own sudo half rides in
+      // `coverAux`, the way `aux` carries the attack's.
+      cover?: { eventId: number; card: string }
+      coverAux?: { eventId: number; card: string }
     }
   // A defence answers the attack standing at the centre. `effect` decides what
   // happens next, and the plan carries everything the runner needs to play it
@@ -707,6 +713,22 @@ export function planBeats(
       }
   }
 
+  // WHAT IS LYING OVER THAT ATTACK — the defence that reflected it. Read from
+  // the same two places the standing attack is: the pending while the exchange
+  // is open, the board's own carry once a beat has let the pending go. Its
+  // `defenceSpent` discards are claimed below into the same exit the attack
+  // takes, so the two leave as one gesture instead of the cover falling through
+  // to `sourceOf` (which could never find it: it is in no hand and no zone) and
+  // silently never flying at all.
+  // …and from the reflect itself, when both ends land in ONE batch: an attacker
+  // with an empty hand has nothing to pick from, so the engine finishes the
+  // exchange on the spot and the defence's own discard arrives further down this
+  // same walk, before any pending could have told us about it.
+  let openCover: { card: string; sudo: boolean } | null =
+    transferPending && 'cover' in transferPending && transferPending.cover
+      ? { card: transferPending.cover, sudo: transferPending.coverSudo === true }
+      : (before.centreCover ?? null)
+
   // A run of one kind coalesces into one beat; anything else closes it. That is
   // what makes a hand-limit discard of three read as one gesture while a discard
   // on the far side of a draw stays a gesture of its own.
@@ -1058,6 +1080,14 @@ export function planBeats(
       })
       if (e.effect !== 'reflect' || spent.some((card) => card.reason === 'attackSpent'))
         openAttack = null
+      // A reflect that did NOT bank the attack leaves this defence lying over it
+      // — the exchange goes on. Recorded here as well as off the pending, so a
+      // batch carrying the whole thing end to end still knows what is on the
+      // table by the time the closing discards arrive. Guarded on the attack
+      // still being open, because a reflect that DID bank it resolved the whole
+      // exchange, and then its own exit above takes both halves and nothing is
+      // left lying anywhere.
+      if (openAttack && e.effect === 'reflect') openCover = { card: e.card, sudo: ownSudo != null }
       i = j - 1 // the discards this plan claimed are consumed
       continue
     }
@@ -1326,6 +1356,21 @@ export function planBeats(
           main: { eventId: e.id, card: e.card },
         }
         continue
+      }
+      // The reflecting defence, and then its own sudo — claimed for the exit the
+      // attack it covered is taking. Same reason the attack card is claimed
+      // above: the centre is where it stands, and `sourceOf` looks only in hands
+      // and zones. The cover half is matched before the sudo half so a sudo-
+      // backed Works on my Machine cannot have its own card read as the sudo.
+      if (openCover && e.reason === 'defenceSpent' && pairOut) {
+        if (e.card === openCover.card && !pairOut.cover) {
+          pairOut.cover = { eventId: e.id, card: e.card }
+          continue
+        }
+        if (openCover.sudo && e.card === 'support-sudo' && !pairOut.coverAux) {
+          pairOut.coverAux = { eventId: e.id, card: e.card }
+          continue
+        }
       }
       const source = sourceOf(e, before, claimed)
       // No source means the card is not where the board can see it — a case the

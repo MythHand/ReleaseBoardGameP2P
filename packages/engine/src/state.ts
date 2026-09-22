@@ -79,6 +79,15 @@ export interface HandAttackContext {
   combo?: CardInstance
   owner: PlayerId
   parent?: number
+  /**
+   * The defence that turned this attack back on its author (Works on my
+   * Machine), with the sudo that backed it. It is LYING ON THE TABLE over the
+   * attack it answered — not spent — for the same reason the attack above it
+   * is: the exchange it belongs to has not finished. It is banked together
+   * with the attack when the exchange does, which is what "a defence goes to
+   * the discard with what it defended from" means (owner, 22.09).
+   */
+  cover?: { player: PlayerId; cards: CardInstance[] }
 }
 
 export type Pending =
