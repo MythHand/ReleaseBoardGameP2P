@@ -106,6 +106,7 @@ const DRAWER_WIDTH: Record<Panel, number> = {
   participants: 420, // участники — как история
   modes: 680, // режимы — как правила
   rules: 680, // правила — сильно шире
+  chat: 420, // чат — как история
 }
 
 // The board while the intro runs: nothing the player does may reach the game.
@@ -314,6 +315,8 @@ export default function Board({
     onKickSpectator,
     lang,
     onLangChange,
+    chatToasts = true,
+    onChatToastsChange,
     paused = false,
     onPauseChange,
     pausePlayers = [],
@@ -1204,7 +1207,9 @@ export default function Board({
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
   const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
   const hostControls = canLimitSpectators || canPause
-  const hasUpperSettings = Boolean(lang && onLangChange) || Boolean(code)
+  const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
+  const canChatToasts = hasChat && Boolean(onChatToastsChange) && Boolean(copy.table.chatToasts)
+  const hasUpperSettings = Boolean(lang && onLangChange) || Boolean(code) || canChatToasts
 
   // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
   const textTabs: TabRailItem[] = [
@@ -1212,11 +1217,13 @@ export default function Board({
     { id: 'participants', label: copy.table.tabParticipants },
     { id: 'rules', label: copy.table.tabRules },
     { id: 'modes', label: copy.table.tabModes },
+    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '', height: 155 }] : []),
   ]
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
   // (свитчер языка и/или код игры); служебный слот под визуальные опции
-  const hasSettings = Boolean(onLangChange) || Boolean(code) || Boolean(hostControls)
+  const hasSettings =
+    Boolean(onLangChange) || Boolean(code) || canChatToasts || Boolean(hostControls)
   const railItems: TabRailItem[] = hasSettings
     ? [{ id: 'settings', label: copy.table.settings, icon: <GearIcon /> }, ...textTabs]
     : textTabs
@@ -2174,6 +2181,10 @@ export default function Board({
         )}
       </div>
 
+      {slots?.toasts && panel !== 'chat' && chatToasts && (
+        <div className={kit.toasts}>{slots.toasts}</div>
+      )}
+
       {/* вертикальный рейл у правого края — переключает панели drawer. Слой
           нужен только чтобы вести его появление, не трогая его собственный
           transform (the rail is the first thing the opening brings in). */}
@@ -2209,6 +2220,14 @@ export default function Board({
                       reverse
                       showLabel={false}
                     />
+                  </SettingsField>
+                )}
+                {canChatToasts && (
+                  <SettingsField label={copy.table.chatToasts} hint={copy.table.chatToastsHint}>
+                    <Toggle on={chatToasts} onChange={(on) => onChatToastsChange?.(on)}>
+                      {(chatToasts ? copy.table.chatToastsOn : copy.table.chatToastsOff) ??
+                        copy.table.chatToasts}
+                    </Toggle>
                   </SettingsField>
                 )}
               </SettingsGroup>
@@ -2263,6 +2282,7 @@ export default function Board({
           </div>
         )}
         {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
+        {panel === 'chat' && <div className={kit.chatPanel}>{slots?.chat}</div>}
       </Drawer>
 
       {/* pause window — over the play area, below the right-hand nav (its own

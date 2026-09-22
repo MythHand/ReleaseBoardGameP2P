@@ -244,7 +244,21 @@
   "chat": {
     "placeholder": "message",
     "send": "send",
-    "empty": "quiet so far"
+    "empty": "quiet so far",
+    "system": {
+      "memberJoined": "{{name}} joined",
+      "memberLeft": "{{name}} left the room",
+      "memberReconnected": "{{name}} reconnected",
+      "memberKicked": "{{name}} was removed",
+      "roleChanged": "{{name}} is now {{role}}",
+      "modeChanged": "host changed {{setting}}: {{value}}",
+      "modeChangedUnknown": "host changed the game settings"
+    },
+    "roles": {
+      "host": "host",
+      "player": "player",
+      "spectator": "spectator"
+    }
   },
   "toasts": {
     "hide": "hide"
@@ -288,6 +302,10 @@
     "tabRules": "rules",
     "tabModes": "game mode",
     "tabChat": "chat",
+    "chatToasts": "chat notifications",
+    "chatToastsOn": "On",
+    "chatToastsOff": "Off",
+    "chatToastsHint": "new messages surface in the corner while the chat is closed",
     "stealCard": "drag a card from the closed hand"
   },
   "lobbyCode": {

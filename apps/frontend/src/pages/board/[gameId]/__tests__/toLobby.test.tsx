@@ -33,8 +33,8 @@ Object.defineProperty(navigator, 'clipboard', {
 })
 
 const PEERS: Record<string, PeerInfo> = {
-  h: { id: 'h', name: 'Ann', role: 'host', ready: true, where: 'stats' },
-  g: { id: 'g', name: 'Bo', role: 'player', ready: true, where: 'game' },
+  h: { id: 'h', memberId: 'member-h', name: 'Ann', role: 'host', ready: true, where: 'stats' },
+  g: { id: 'g', memberId: 'member-g', name: 'Bo', role: 'player', ready: true, where: 'game' },
 }
 const SEATS: Seat[] = [
   { playerId: 'p1', peerId: 'g', name: 'Bo' },
@@ -66,6 +66,12 @@ function makeSession(over: Partial<UseLobby> = {}): UseLobby {
     gameLink: null,
     gameSync: null,
     seats: SEATS,
+    chat: {
+      entries: [],
+      notificationEntryIds: [],
+      selfMemberId: 'member-h',
+      send: vi.fn(() => true),
+    },
     error: null,
     errorKind: null,
     createRoom: vi.fn(),
