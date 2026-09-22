@@ -66,6 +66,30 @@ pnpm lint       # Biome (JS/TS) + Stylelint (CSS) across the workspace
 pnpm format     # Biome format --write
 ```
 
+## CI and publishing
+
+The Actions sidebar lists workflows; each workflow can contain several jobs.
+
+| Workflow | When it runs | Purpose |
+|----------|--------------|---------|
+| [CI](.github/workflows/ci.yml) | Pull requests and pushes to `main` | Biome + Stylelint, type checking, tests, builds, and REUSE licence checks |
+| [Deploy to GitHub Pages](.github/workflows/deploy.yml) | Manual | Build and publish the frontend and playground; optional `ref` selects a tag, branch, or SHA |
+| [Release](.github/workflows/release.yml) | Manual | Use semantic-release on `main` to create the version tag and GitHub release |
+| [PeerServer image](.github/workflows/peerserver.yml) | Relevant pull requests, `peerserver-v*` tags, or manual | Build the signaling server container; publish to GHCR only for tags and manual runs |
+| [Claude Code Review](.github/workflows/claude-code-review.yml) | Manual | Invoke Claude review using `ANTHROPIC_API_KEY` |
+
+CI runs its checks in parallel so a failure in one does not hide the results of
+the others. Their check names are preserved when moving lint and REUSE into CI.
+Release, website deployment, and container publishing are separate operations.
+
+GitHub may also show its historical `pages-build-deployment` workflow. It is
+managed by GitHub, not a YAML file in this repository. With Pages configured to
+use **GitHub Actions**, use **Deploy to GitHub Pages** to publish the site.
+
+The Node version selected by `setup-node` applies to shell commands such as
+`pnpm build`. JavaScript actions declare their own runtime, so Node deprecation
+warnings require updating the relevant `uses:` versions too.
+
 ## Stack
 
 - **pnpm workspaces**, **TypeScript 6**, **Vite**, **React 19**
