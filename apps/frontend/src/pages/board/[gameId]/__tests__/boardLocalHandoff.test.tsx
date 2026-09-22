@@ -11,6 +11,9 @@ import { makeBoardProps } from './fixture'
 
 // A host answers in the same React commit as the drag. Keep the real engine,
 // Board, queue and carriers; only record the browser animation boundary.
+// This pins Board's publish-before-useBeats layout-effect contract. Moving
+// publishStagingHandoff below useBeats makes the immediate local and 503
+// cases record two incoming carriers; delayed/remote roles remain controls.
 it.each([
   'local',
   'local-delayed',
@@ -104,7 +107,10 @@ it.each([
     expect(accepted.mock.calls[0][0]).toContainEqual(
       expect.objectContaining({ type: neutralize ? 'neutralized' : 'defended' }),
     )
-    expect(incoming).toHaveLength(1)
+    expect(
+      incoming,
+      'Committed staging must reach the queue before its first runner starts',
+    ).toHaveLength(1)
     if (local) expect(document.querySelector('[data-testid="board-cover-staged"]')).not.toBeNull()
   } finally {
     movement.mockRestore()

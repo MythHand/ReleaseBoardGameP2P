@@ -2099,6 +2099,14 @@ The real-engine Board regression covers immediate and delayed local responses,
 the opponent and a third observer. Browser evidence uses `Attack / defence centre`
 → `View: opponent` and records the actual WAAPI flight sources.
 
+**PR #178 review check, 2026-09-22.** The publication intentionally stays in the
+commit phase, before `useBeats` starts its layout-effect runners: the handoff
+contains DOM refs, and a render that never commits must not publish a gesture.
+Moving `useLayoutEffect(publishStagingHandoff)` below `useBeats` makes the existing
+`boardLocalHandoff.test.tsx` local and local-neutralize cases fail (two incoming
+carriers instead of one); restoring it makes all five cases pass. This ordering
+is a tested contract, not an unverified placement convention.
+
 
 ### «Опора лежит под своей картой» записано дважды — открыто, 2026-09-20
 

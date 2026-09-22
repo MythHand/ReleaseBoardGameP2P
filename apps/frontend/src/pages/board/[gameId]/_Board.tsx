@@ -261,8 +261,13 @@ export default function Board({
   // Publish before the queue starts a runner in its own layout effect. A
   // synchronous host response can commit the drag and engine events together;
   // publishing later makes every runner mistake that local play for a remote
-  // one and fly another copy from the hand. Run on every commit so landing DOM
-  // refs are refreshed even when the staged card's identity has not changed.
+  // one and fly another copy from the hand. Keep this before useBeats: the
+  // local and local-neutralize cases in boardLocalHandoff.test.tsx fail with
+  // two incoming carriers if it moves below the queue's layout effects.
+  // Publish in commit, not render: the handoff includes DOM nodes which bind
+  // during commit, and an abandoned render must not replace a running beat's
+  // handoff. Run on every commit so landing refs refresh even when the staged
+  // card's identity has not changed.
   useLayoutEffect(publishStagingHandoff)
   const beats = useBeats({
     live,
