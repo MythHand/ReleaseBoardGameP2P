@@ -73,6 +73,43 @@ it('does not update itself when `panel` is supplied', () => {
   expect(queryByTestId('panel-history')).toBeNull()
 })
 
+it('adds the chat tab only for a chat slot and opens it in a 420px drawer', () => {
+  const props = makeBoardProps()
+  const { getByRole, queryByRole, getByText, rerender } = render(<Board {...props} />)
+  expect(queryByRole('button', { name: props.copy.table.tabChat })).toBeNull()
+
+  rerender(
+    <Board {...props} slots={{ chat: <div>chat slot</div>, toasts: <div>toast slot</div> }} />,
+  )
+  expect(getByText('toast slot')).toBeTruthy()
+  fireEvent.click(getByRole('button', { name: props.copy.table.tabChat }))
+  const chat = getByText('chat slot')
+  expect(chat).toBeTruthy()
+  expect((chat.closest('[aria-hidden]') as HTMLElement).style.inlineSize).toBe('420px')
+  expect(screen.queryByText('toast slot')).toBeNull()
+})
+
+it('shows the chat notification preference only with its handler and copy', () => {
+  const props = makeBoardProps()
+  const withoutHandler = render(<Board {...props} slots={{ chat: <div>chat slot</div> }} />)
+  fireEvent.click(withoutHandler.getByRole('button', { name: props.copy.table.settings }))
+  expect(withoutHandler.queryByText(props.copy.table.chatToasts ?? '')).toBeNull()
+  withoutHandler.unmount()
+
+  const onChatToastsChange = vi.fn()
+  render(
+    <Board
+      {...props}
+      room={{ ...props.room, chatToasts: true, onChatToastsChange }}
+      slots={{ chat: <div>chat slot</div> }}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: props.copy.table.settings }))
+  expect(screen.getByText(props.copy.table.chatToasts ?? '')).toBeTruthy()
+  fireEvent.click(screen.getByText(props.copy.table.chatToastsOn ?? ''))
+  expect(onChatToastsChange).toHaveBeenCalledWith(false)
+})
+
 it('reports null when the active tab is clicked again', () => {
   const props = makeBoardProps()
   const onPanelChange = vi.fn()
