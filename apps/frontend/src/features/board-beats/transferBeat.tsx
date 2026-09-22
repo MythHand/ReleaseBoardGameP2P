@@ -119,7 +119,7 @@ export function useTransferBeat(
    * projection puts it back where the engine appended it: the end of the fan.
    * The same seam the System Upgrade and Cherry-pick arrivals go through.
    */
-  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay: flyerOverlay, raise, pin, patch, drop, elOf } = useFlyer()
 

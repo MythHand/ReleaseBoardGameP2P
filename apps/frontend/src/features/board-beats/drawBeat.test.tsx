@@ -1,6 +1,7 @@
 import type { Leaving } from '@release/ui/animations'
 import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
+import { useState } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { useDrawBeat } from './drawBeat'
@@ -103,8 +104,12 @@ const base = {
 } as unknown as BoardState
 
 const node = () => document.createElement('div')
+// The fan is RENDERED by the probe below and the step measures it — the same
+// way it does on the board. A detached node with no slots would leave the step
+// with nothing to count, which is a different scene from the one under test.
+const handRef: { current: HTMLDivElement | null } = { current: null }
 const anchors = {
-  hand: { current: node() },
+  hand: handRef,
   centre: { current: node() },
   discardBox: { current: node() },
   pileBox: () => node(),
@@ -134,7 +139,10 @@ function run(draws: PlannedDraw[], after?: BoardState) {
   const commits: { uid: string; at: number }[] = []
   let start: (() => Promise<void>) | null = null
   function Probe() {
-    const beat = useDrawBeat(anchors, (_hand, uid, at) => commits.push({ uid, at }))
+    // what the fan is showing, kept from what the beat publishes — the board's
+    // own arrangement in miniature
+    const [fan, setFan] = useState<string[]>(base.you.hand.map((c) => c.uid))
+    const beat = useDrawBeat(anchors, (_order, uid, at) => commits.push({ uid, at }))
     start = () =>
       beat.run(
         { kind: 'draw', key: 'draw:4', draws },
@@ -143,6 +151,7 @@ function run(draws: PlannedDraw[], after?: BoardState) {
           after,
           publish: (s) => {
             published.push(s)
+            setFan(s.you.hand.map((c) => c.uid))
             // A pending-carrying publish is the one shadow this beat commits
             // before it drops the carrier — that's the moment the ordering
             // test cares about, not every publish a run makes.
@@ -150,7 +159,16 @@ function run(draws: PlannedDraw[], after?: BoardState) {
           },
         },
       )
-    return <>{beat.overlay}</>
+    return (
+      <>
+        <div ref={handRef}>
+          {fan.map((uid) => (
+            <div key={uid} data-hand-slot={uid} />
+          ))}
+        </div>
+        {beat.overlay}
+      </>
+    )
   }
   render(<Probe />)
   return {

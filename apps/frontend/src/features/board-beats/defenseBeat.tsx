@@ -1,4 +1,3 @@
-import type { CardData } from '@release/ui'
 import { Card, CardPair, cardBoxIn, cardById, PAIR_AUX } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
 import { nextFrames, play, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
@@ -29,7 +28,7 @@ const rectOf = (el: Element | null): Rect | null => {
 export function useDefenseBeat(
   anchors: BoardAnchors,
   staging?: RefObject<StagedHandoff | null>,
-  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
@@ -532,6 +531,11 @@ export function useDefenseBeat(
 
   return {
     overlay: [...exitOverlay, ...flyer.overlay, ...arrival.overlay],
+    // THE ROOM THE FAN MAKES for the card this beat is flying into it. Without
+    // it the fan never parts, the card crosses the table and simply appears
+    // among the others — an arrival with no insert (owner, 22.09).
+    gapAt: arrival.gapAt,
+    gapSize: arrival.gapSize,
     runCovered,
     runNeutralized,
     runStolen,

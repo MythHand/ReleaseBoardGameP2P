@@ -1,20 +1,12 @@
-import type { CardData } from '@release/ui'
 import { cardById } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
-import {
-  nextFrames,
-  play,
-  scatterAt,
-  useDiscardExit,
-  useFlyer,
-  useHandArrival,
-  wait,
-} from '@release/ui/animations'
+import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
 import { type RefObject, useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
 import { upgradeCard, upgradeSlot } from '~/entities/game/board/upgradeSlot'
 import type { BeatPlan } from './planBeats'
 import { SEAT_SHRINK } from './seat'
+import { useToHand } from './toHand'
 
 const THROW_DUR = 460
 const THROW_STEP = 260
@@ -45,26 +37,13 @@ export function useUpgradeBeat(
    * projection puts it back wherever the engine happened to append it — which
    * the player sees as the card teleporting the moment it has settled.
    */
-  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay, raise, drop, pin, elOf } = useFlyer()
   const exit = useDiscardExit(anchors.discardBox)
-  const taking = useRef<BeatRun | null>(null)
-  const arrival = useHandArrival(anchors.hand, (gap, cards) => {
-    const ctx = taking.current
-    if (!ctx) return
-    const hand = [...ctx.base.you.hand]
-    hand.splice(gap, 0, ...cards.map((card) => ({ uid: card.key, card: card.card })))
-    // AND THE SLOT IS COMMITTED, not only drawn. The insert lands a new card in
-    // the MIDDLE of the fan — that is what the module is for — but the next
-    // projection re-derives the hand from the engine, which simply appended it,
-    // so the card jumped from where it had just landed to the end of the fan.
-    // The board keeps a private order for exactly this; Cherry-pick's own
-    // arrival commits to it and does not jump (owner, 22.09).
-    latest.current.onHandArrival?.(hand, cards[0].key, gap)
-    ctx.base = { ...ctx.base, you: { ...ctx.base.you, hand } }
-    ctx.publish(ctx.base)
-  })
+  // The card into the fan, whole — uid, the middle of the fan, the committed
+  // slot and the run's own base, all of it the shared movement's (`toHand`).
+  const arrival = useToHand(anchors.hand, onHandArrival)
   const latest = useRef({ anchors, staging, exit, arrival, operationHandOver, onHandArrival })
   latest.current = { anchors, staging, exit, arrival, operationHandOver, onHandArrival }
 
@@ -112,7 +91,6 @@ export function useUpgradeBeat(
             },
           },
         }
-        taking.current = ctx
         beat.publish(ctx.base)
         const [el] = await raised
         if (el) await play('playToCenter', el, { from, to: centre, duration: THROW_DUR })?.finished
@@ -138,10 +116,12 @@ export function useUpgradeBeat(
           await wait(560)
           const chosen = elOf(key)
           if (take.player === beat.base.selfId) {
-            await latest.current.arrival.arrive(
-              [{ key: take.uid, card, el: chosen, from: centre }],
-              ctx.base.you.hand.length,
-            )
+            await latest.current.arrival.land(ctx, {
+              card,
+              el: chosen,
+              from: centre,
+              fallbackKey: take.uid,
+            })
           } else {
             const seat = a.seatBox(take.player)
             if (chosen && seat)
@@ -158,7 +138,6 @@ export function useUpgradeBeat(
         }
         await Promise.all([clear(), receive()])
         beat.publish({ ...ctx.base, pending: null, decks: beat.after?.decks ?? ctx.base.decks })
-        taking.current = null
         return
       }
       const local = latest.current.staging?.current

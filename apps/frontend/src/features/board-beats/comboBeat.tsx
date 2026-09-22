@@ -1,4 +1,3 @@
-import type { CardData } from '@release/ui'
 import { CardPair, cardBoxIn, cardById, PAIR_AUX, PAIR_AUX_POSE } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import {
@@ -72,7 +71,7 @@ export function useComboBeat(
   // because the two fire ~SHOW_HOLD apart and for different cards — the cost
   // leaves first, the release itself last.
   takeStagedRelease?: RefObject<(() => void) | null>,
-  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
@@ -804,6 +803,9 @@ export function useComboBeat(
   const overlay = exitOverlay.concat(flyer.overlay, pulled.overlay, arrival.overlay)
   return {
     overlay,
+    // the room the fan makes for a card flying home into it — see `defenseBeat`
+    gapAt: arrival.gapAt,
+    gapSize: arrival.gapSize,
     runAttack,
     runRelease,
     runPairOut,

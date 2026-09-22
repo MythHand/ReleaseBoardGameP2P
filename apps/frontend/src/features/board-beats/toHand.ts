@@ -1,5 +1,5 @@
 import type { CardData } from '@release/ui'
-import type { Rect } from '@release/ui/animations'
+import type { Arriving, Rect } from '@release/ui/animations'
 import { useHandArrival } from '@release/ui/animations'
 import { type RefObject, useCallback, useRef } from 'react'
 import type { BeatRun, BoardState } from '~/entities/game/board'
@@ -65,26 +65,75 @@ function arrivingUid(base: BoardState, after: BoardState | undefined, fallback: 
 export function useToHand(
   hand: RefObject<HTMLDivElement | null>,
   /** the private hand order's commit — see THE SLOT, KEPT above */
-  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
-  // The run the current landing belongs to. A ref because a beat is one
-  // closure and the fan it lands in is the one THIS run has grown.
+  // What the landing belongs to: a beat's run (the card comes off the table and
+  // the run's base grows by it), or a gesture bringing its own card home (the
+  // projection never lost it, so there is nothing to grow — only the gesture to
+  // end). One landing path, two things it can be handed.
   const run = useRef<BeatRun | null>(null)
+  const coming = useRef<{
+    done?: (gap: number, landed: { key: string; card: CardData }[]) => void
+  } | null>(null)
   const commit = useRef(onHandArrival)
   commit.current = onHandArrival
 
-  const { overlay, gapAt, gapSize, arrive, reset } = useHandArrival(hand, (gap, landed) => {
-    const c = run.current
-    if (!c) return
-    const held = new Set(c.base.you.hand.map((h) => h.uid))
-    const fresh = landed.filter((it) => !held.has(it.key))
-    const next = [...c.base.you.hand]
-    next.splice(gap, 0, ...fresh.map((it) => ({ uid: it.key, card: it.card })))
-    commit.current?.(next, landed[0].key, gap)
-    const state = { ...c.base, you: { ...c.base.you, hand: next } }
-    c.base = state
-    c.publish(state)
-  })
+  const { overlay, gapAt, gapSize, arrive, reset } = useHandArrival(
+    hand,
+    (gap, landed, fan = []) => {
+      const back = coming.current
+      const c = run.current
+
+      // THE ORDER IS COMMITTED AGAINST THE FAN THE CARD LANDED IN — the one the
+      // step measured on screen, not a list the caller happened to be holding.
+      // The two are not the same hand whenever the exchange that brought this
+      // card also took cards out of the hand: the projection this beat animates
+      // away from still holds the cards that were just played, and an order
+      // recorded against it places every card one or two slots off, which the
+      // next projection then corrects in one jump (the sudo Rollback, owner
+      // 22.09).
+      // NOTHING MEASURED, NOTHING CLAIMED. An empty fan with cards in the hand
+      // means the slots could not be read, and an order built from that would be
+      // the landed card alone — every other card of the fan pushed behind it. The
+      // player's own arrangement is not something to rewrite on a guess.
+      if (fan.length > 0 || (c?.base.you.hand.length ?? 0) === 0) {
+        const order = [...fan]
+        order.splice(gap, 0, ...landed.map((it) => it.key))
+        commit.current?.(order, landed[0].key, gap)
+      }
+
+      if (back) {
+        coming.current = null
+        back.done?.(gap, landed)
+        return
+      }
+      if (!c) return
+      // …and the run's own base grows by what landed, so the beat's last frame is
+      // the projection it hands over to.
+      //
+      // AT THE SLOT IT LANDED IN, translated out of the fan's own numbering: the
+      // board draws this shadow as it stands — the private order is applied to
+      // the projection, not to what a beat publishes — so a card appended at the
+      // end here would sit at the end of the fan for the rest of the beat and
+      // move only once the projection caught up. The card to the right of the
+      // gap is what the slot means, and where that card sits in the projection's
+      // hand is where this one goes in.
+      const held = new Set(c.base.you.hand.map((h) => h.uid))
+      const fresh = landed.filter((it) => !held.has(it.key))
+      if (fresh.length === 0) return
+      const rightOf = fan[gap]
+      const before = rightOf ? c.base.you.hand.findIndex((h) => h.uid === rightOf) : -1
+      const next = [...c.base.you.hand]
+      next.splice(
+        before < 0 ? next.length : before,
+        0,
+        ...fresh.map((it) => ({ uid: it.key, card: it.card })),
+      )
+      const state = { ...c.base, you: { ...c.base.you, hand: next } }
+      c.base = state
+      c.publish(state)
+    },
+  )
 
   /**
    * Fly one card into the fan and settle everything that follows from it.
@@ -111,5 +160,43 @@ export function useToHand(
     [arrive],
   )
 
-  return { overlay, gapAt, gapSize, land, reset }
+  /**
+   * THE CARD COMES HOME — a gesture's own card, pulled out of the fan and going
+   * back into it: a play that was cancelled, one the engine refused, an answer
+   * the player took back.
+   *
+   * The same movement as an arrival off the table, and deliberately not a second
+   * one: the fan does not care where a card is flying from. It lands in the
+   * MIDDLE like everything else (owner, 22.09) — which is why the slot is
+   * committed here too, or the next projection would put it back where it used to
+   * sit — and the gesture that blanked the card hears whether the flight was
+   * taken, because a refusal is the one case where nothing else will ever put it
+   * back.
+   *
+   * How big the fan is, and what is in it, the step counts for itself — a
+   * gesture's own list and the fan on screen are not always the same hand.
+   * `done` is the gesture's ending, run when the card is in, and handed the
+   * slot and what landed for a gesture that has to tell one landing from
+   * another.
+   */
+  const home = useCallback(
+    (
+      items: Arriving[],
+      done?: (gap: number, landed: { key: string; card: CardData }[]) => void,
+      /**
+       * THE SLOT THE PLAYER POINTED AT — and only that. Dragging a card into a
+       * place in the fan is a placement, not an arrival: the cursor named the
+       * spot and the fan has to keep it. Everything else leaves this out and
+       * lands in the middle, which is what an arrival means.
+       */
+      at?: number,
+    ): Promise<boolean> => {
+      run.current = null
+      coming.current = { done }
+      return arrive(items, undefined, at)
+    },
+    [arrive],
+  )
+
+  return { overlay, gapAt, gapSize, land, home, reset }
 }

@@ -1,4 +1,3 @@
-import type { CardData } from '@release/ui'
 import { cardAreaOf, cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
 import { nextFrames, play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
@@ -48,7 +47,7 @@ const rectOf = (el: Element | null): Rect | null => {
 
 export function useAiBeat(
   anchors: BoardAnchors,
-  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay: flyerOverlay, patch, drop, elOf, raise, toSlot } = useToCentre()
   const exit = useDiscardExit(anchors.discardBox)

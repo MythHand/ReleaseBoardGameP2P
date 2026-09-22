@@ -1,5 +1,4 @@
 import type { Event } from '@release/engine'
-import type { CardData } from '@release/ui'
 import type { ReactNode, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type {
@@ -171,7 +170,7 @@ export function useBeats(args: {
    * wherever the engine appended it and the card teleports out of the place the
    * player just watched it settle into.
    */
-  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void
+  onHandArrival?: (order: string[], uid: string, at: number) => void
 }): Beats {
   const {
     live,
@@ -221,6 +220,9 @@ export function useBeats(args: {
   // rather than in a beat of their own behind them.
   const operations = useOperationBeat(anchors, staging)
   const upgrades = useUpgradeBeat(anchors, staging, operations.handOver, onHandArrival)
+  // Every beat that can land a card in the player's own fan, and the room the
+  // one that is flying has made in it — see `gapAt` in the returned object.
+  const fanGap = [draws, transfers, ais, upgrades, defense, combo].find((b) => b.gapAt != null)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -811,14 +813,13 @@ export function useBeats(args: {
     // out of the discard (#106) — and never more than one of them is open at
     // once, because one beat runs at a time. So this is a choice between
     // them, not a merge of them.
-    gapAt: draws.gapAt ?? transfers.gapAt ?? ais.gapAt ?? upgrades.gapAt,
-    gapSize:
-      draws.gapAt == null
-        ? transfers.gapAt == null
-          ? ais.gapAt == null
-            ? upgrades.gapSize
-            : ais.gapSize
-          : transfers.gapSize
-        : draws.gapSize,
+    // THE ROOM THE FAN MAKES, from whichever beat is flying a card into it.
+    // One beat runs at a time, so the first with a gap is the one — and every
+    // beat that lands a card in the hand is in this list, by construction: they
+    // all go through the same movement (`toHand`), and one left out of here is
+    // a card that crosses the table and appears in the fan without it ever
+    // parting (the sudo Rollback, owner 22.09).
+    gapAt: fanGap?.gapAt ?? null,
+    gapSize: fanGap?.gapSize ?? 1,
   }
 }

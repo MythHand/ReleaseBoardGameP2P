@@ -50,7 +50,7 @@ export function useDrawBeat(
    * has no place of its own, so it lands in the middle; committing the slot is
    * what keeps the next projection from moving it to the end.
    */
-  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay: flyerOverlay, patch, drop, elOf, toSlot } = useToCentre()
   const exit = useDiscardExit(anchors.discardBox)

@@ -260,7 +260,7 @@ export default function Board({
   const beats = useBeats({
     // a card that lands IN the fan keeps the slot it landed in — see the queue's
     // own note; without it the card teleports the moment it has settled
-    onHandArrival: (hand, uid, at) => handOrder.commit(hand, hand, uid, at),
+    onHandArrival: (order) => handOrder.place(order),
     live,
     discardPick: discardPickRef,
     requestPick: requestPickRef,
@@ -345,6 +345,8 @@ export default function Board({
     actions,
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
+    onHandArrival: (order) => handOrder.place(order),
+
     // the match boundary (#101, Fix C, finding 3) — `<Board>` is not remounted
     // for a rematch, so the gestures need the same wipe `useBeats` already
     // takes on this key.
@@ -380,6 +382,7 @@ export default function Board({
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
+    onHandArrival: (order) => handOrder.place(order),
   })
   // The defense still owns its hand exclusions after the beat closes the
   // prompt: its exit is flying the spent cards while the shadow holds the
@@ -396,16 +399,7 @@ export default function Board({
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
-    onReturned: (uid, slot) => {
-      const item = you.hand.find((card) => card.uid === uid)
-      if (!item) return
-      // The card never left `you.hand`, so this is a placement, not an
-      // arrival: rebuild the fan as it will look with the card back at the
-      // slot the pointer named, and commit that order.
-      const visible = [...handLimit.handItems]
-      visible.splice(slot, 0, item)
-      handOrder.commit(you.hand, visible, uid, slot)
-    },
+    onHandArrival: (order) => handOrder.place(order),
   })
   // The alarm standing at the centre. Read ONCE, same reason and same shape as
   // `pendingDefend` above. `staging.staged` does not gate it: an answer to a
@@ -457,6 +451,7 @@ export default function Board({
     events: intro?.events ?? [],
     enabled: alarmMineOpen && !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
+    onHandArrival: (order) => handOrder.place(order),
   })
 
   // naming a card, and losing one (#105). The band replaces the panel for
@@ -498,7 +493,7 @@ export default function Board({
     events: intro?.events ?? [],
     anchors,
     actions,
-    onHandArrival: (hand, uid, at) => handOrder.commit(hand, hand, uid, at),
+    onHandArrival: (order) => handOrder.place(order),
     copy: {
       prompt: copy.table.cherryPickPrompt,
       sudoPrompt: copy.table.cherryPickSudoPrompt,
