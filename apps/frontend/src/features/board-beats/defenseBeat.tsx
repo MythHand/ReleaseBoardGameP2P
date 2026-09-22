@@ -272,7 +272,15 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
               const to = a.seatBox(plan.returnTo as string)
               if (!to) return
               const [el] = await flyer.raise([{ key: 'back', at: attackBox, card: attackCard }])
-              if (el) await play('playToCenter', el, { from: attackBox, to })?.finished
+              // `dealToSeat`, not `playToCenter`: a card entering somebody's
+              // hand DISSOLVES into it — the hand is hidden, so there is
+              // nothing for the card to become once it arrives. Under
+              // `playToCenter` the travel ended with the card still fully
+              // drawn at the seat and the carrier then dropped it, which reads
+              // as a blink rather than an arrival (owner, 22.09). The same
+              // preset every other "card goes to a player" motion uses:
+              // the deal, the hand limit, a card handed over.
+              if (el) await play('dealToSeat', el, { from: attackBox, to })?.finished
               flyer.drop('back')
             })()
           : undefined

@@ -97,6 +97,17 @@ function centreAttackOf(base: BoardState): BoardState['centreAttack'] {
   return base.centreAttack
 }
 
+// …and the defence lying over it, carried the same way and for the same reason:
+// letting go of the pending must not take a card off the table that the rules
+// still have standing there. Only a reflected attack has one (`cover` on the
+// exchange's context), so this is null for every other exchange.
+function centreCoverOf(base: BoardState): BoardState['centreCover'] {
+  const pending = base.pending
+  if (pending && 'cover' in pending && pending.cover)
+    return { card: pending.cover, sudo: pending.coverSudo === true }
+  return base.centreCover
+}
+
 export function useTransferBeat(
   anchors: BoardAnchors,
   requestPick?: RefObject<RequestPickHandoff | null>,
@@ -171,7 +182,12 @@ export function useTransferBeat(
   const clearPending = useCallback(() => {
     const c = ctx.current
     if (!c) return
-    const next: BoardState = { ...c.base, pending: null, centreAttack: centreAttackOf(c.base) }
+    const next: BoardState = {
+      ...c.base,
+      pending: null,
+      centreAttack: centreAttackOf(c.base),
+      centreCover: centreCoverOf(c.base),
+    }
     c.base = next
     c.publish(next)
   }, [])
@@ -455,6 +471,7 @@ export function useTransferBeat(
               ...c0.base,
               pending: null,
               centreAttack: centreAttackOf(c0.base),
+              centreCover: centreCoverOf(c0.base),
               you: { ...c0.base.you, hand },
             }
             c0.base = next

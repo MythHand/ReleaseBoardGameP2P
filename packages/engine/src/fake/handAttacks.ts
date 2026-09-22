@@ -98,7 +98,19 @@ function finishHandAttack(state: GameState, log: Log, context?: HandAttackContex
       { type: 'discarded', player: context.owner, card: card.id, reason: 'attackSpent' },
       context.parent,
     )
-  return { ...discard(state, cards), pending: null, eventSeq: log.seq }
+  // …and the defence that reflected this attack leaves with it, after it and
+  // under its own reason. The order is the one every other resolution already
+  // banks in — the attacker's cards, then the defender's — so nothing that
+  // reads these discards has to learn a second shape.
+  const cover = context.cover
+  if (cover)
+    for (const card of cover.cards)
+      log.add(
+        { type: 'discarded', player: cover.player, card: card.id, reason: 'defenceSpent' },
+        context.parent,
+      )
+  const leaving = [...cards, ...(cover?.cards ?? [])]
+  return { ...discard(state, leaving), pending: null, eventSeq: log.seq }
 }
 
 export function onStealCard(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
