@@ -6,7 +6,6 @@ export const OPERATION_SCENARIOS = [
   'cherry',
   'rebase',
   'upgrade',
-  'upgradeSudo',
   'cherryFizzle',
   'rebaseFizzle',
   'upgradeFizzle',

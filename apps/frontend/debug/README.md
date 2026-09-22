@@ -1,5 +1,9 @@
 # Board debug
 
+> **Working on this stand?** Read [WORKFLOW.md](./WORKFLOW.md) first — the loop,
+> how decisions are split, and how a pass is reported. This file is the stand
+> itself; that one is how the work on it runs.
+
 ## The rule this stand exists for: NOTHING HERE IS ITS OWN
 
 The stand mounts the real `Board`, the real engine and the real projection. It
@@ -70,7 +74,8 @@ starts at `index.html` and does not include it.
 The toolbar provides Cherry-pick, Rebase and System Upgrade, plus three
 no-effect cases. Sudo sits in the hand of every preset whose card is still there
 to be played, so one run covers the card with and without it — Cherry-pick and
-Rebase had a second button each for exactly that and no longer need one. Follow the instruction beneath the toolbar
+Rebase had a second button each for exactly that, and System Upgrade kept its
+one until 22.09; none of them needs it. Follow the instruction beneath the toolbar
 and use the real board gestures. For Upgrade, the opponent discard button appears
 only when that opponent owes a card. The action/event disclosure shows the last
 command and the engine's response, including rejections.

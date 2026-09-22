@@ -1,6 +1,14 @@
 import type { Event } from '@release/engine'
 import type { TableActions } from '@release/ui'
-import { CARDS, Card, CardCatalog, ConfirmAction, Hand, Typography } from '@release/ui'
+import {
+  CARDS,
+  Card,
+  CardCatalog,
+  ConfirmAction,
+  Hand,
+  TableSurface,
+  Typography,
+} from '@release/ui'
 import type { RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import type { BoardState } from '~/entities/game/board'
@@ -221,20 +229,21 @@ export function useRequestStaging(args: {
   return {
     band:
       asking || watching != null || stealing || held != null ? (
-        <div
-          className={`${styles.requestBand} ${confirmed ? styles.flight : ''}`}
-          data-testid="board-request-band"
-          ref={band}
+        // THE DIMMING BELONGS TO THE CHOOSING, and the surface outlives it. Keyed
+        // on `confirmed` alone the dimming came BACK: that flag resets the moment
+        // the pending it belonged to goes, and the surface is still up then — the
+        // beat is holding it through the outcome — so the dim switched on again
+        // over a choice that had already been made. `held` is the beat's hold,
+        // and while it is on there is nothing left to choose. The table stays
+        // BLOCKED throughout either way: the card is being shown, and the surface
+        // is what is showing it.
+        <TableSurface
+          committed={confirmed}
+          dim={held == null ? 'base' : 'none'}
+          testId="board-request-band"
+          blockTestId="board-request-scrim"
+          surfaceRef={band}
         >
-          {/* THE DIMMING BELONGS TO THE CHOOSING. Keyed on `confirmed` alone it
-              came BACK: that flag resets the moment the pending it belonged to
-              goes, and the surface is still up then — the beat is holding it
-              through the outcome — so the scrim switched on again over a choice
-              that had already been made. `held` is the beat's hold, and while
-              it is on there is nothing left to choose. */}
-          {!confirmed && held == null && (
-            <div className={styles.scrim} data-testid="board-request-scrim" />
-          )}
           {(Boolean(asking) || watching != null || held != null) && (
             <>
               <div className={styles.catalog}>
@@ -357,7 +366,7 @@ export function useRequestStaging(args: {
               <Card card={BACK} faceDown width="100%" interactive={false} />
             </div>
           )}
-        </div>
+        </TableSurface>
       ) : null,
   }
 }

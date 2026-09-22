@@ -74,9 +74,28 @@ export interface CardPreview {
   overlay: ReactNode
 }
 
-export function useCardPreview(): CardPreview {
+export interface CardPreviewOptions {
+  /**
+   * NOTHING IS READ WHILE THE TABLE IS MOVING. A card at the centre is read by
+   * standing still and looking at it; while cards are flying in and out of that
+   * same place, slots mount and unmount under a cursor that has not moved, and
+   * every one of them fires an enter. The preview then opens and closes on its
+   * own, which reads as a blink rather than as a reading (owner, 22.09).
+   *
+   * The consumer is what knows the table is busy — it owns the queue that makes
+   * it busy — so it says so, and this stays quiet: it opens nothing, and what
+   * is already open closes.
+   */
+  quiet?: boolean
+}
+
+export function useCardPreview({ quiet = false }: CardPreviewOptions = {}): CardPreview {
   const [card, setCard] = useState<CardType | null>(null)
   const closing = useRef<number | null>(null)
+  // read inside the enter handler, which is created once and must see the
+  // CURRENT answer rather than the one that was true when it was made
+  const quietRef = useRef(quiet)
+  quietRef.current = quiet
 
   const stop = useCallback(() => {
     if (closing.current) {
@@ -101,7 +120,7 @@ export function useCardPreview(): CardPreview {
         onMouseEnter: (e) => {
           // a back has nothing to read, and somebody else's closed card has no
           // identity to read even if we wanted one
-          if (faceDown) return
+          if (faceDown || quietRef.current) return
           const read = c ?? (askTheSlot ? standingIn(e.currentTarget) : null)
           if (!read) return
           stop()
@@ -111,6 +130,15 @@ export function useCardPreview(): CardPreview {
     },
     [stop],
   )
+
+  // …and it closes the moment the table starts moving, whatever the pointer is
+  // doing: the card being read is about to be somewhere else.
+  useEffect(() => {
+    if (quiet) {
+      stop()
+      setCard(null)
+    }
+  }, [quiet, stop])
 
   // ONE rule closes it: the pointer moved somewhere that is neither a readable
   // slot nor the preview. It replaces a pile of mouseleave handlers and covers

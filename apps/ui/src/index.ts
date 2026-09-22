@@ -193,5 +193,9 @@ export {
   gridCells,
   gridOf,
 } from './table/TableCentre/discardGrid'
+export {
+  default as TableSurface,
+  type TableSurfaceProps,
+} from './table/TableCentre/TableSurface'
 export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'
 export { default as TurnDock } from './table/TurnDock/TurnDock'

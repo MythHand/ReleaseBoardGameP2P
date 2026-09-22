@@ -1,4 +1,5 @@
 import type { Event } from '@release/engine'
+import type { CardData } from '@release/ui'
 import type { ReactNode, RefObject } from 'react'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type {
@@ -164,6 +165,13 @@ export function useBeats(args: {
   // hand, read once at the start of a `handLimit` beat so the runner flies the
   // cells that are standing instead of a fan the cards left long ago.
   handLimit?: RefObject<HandLimitHandoff | null>
+  /**
+   * The board's own private hand order. A beat that lands a card IN the fan
+   * commits the slot it landed in, or the next projection draws the card
+   * wherever the engine appended it and the card teleports out of the place the
+   * player just watched it settle into.
+   */
+  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void
 }): Beats {
   const {
     live,
@@ -178,6 +186,7 @@ export function useBeats(args: {
     handLimit,
     discardPick,
     requestPick,
+    onHandArrival,
   } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
@@ -211,7 +220,7 @@ export function useBeats(args: {
   // the operation card itself, and they leave together in the answers' own send
   // rather than in a beat of their own behind them.
   const operations = useOperationBeat(anchors, staging)
-  const upgrades = useUpgradeBeat(anchors, staging, operations.handOver)
+  const upgrades = useUpgradeBeat(anchors, staging, operations.handOver, onHandArrival)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the

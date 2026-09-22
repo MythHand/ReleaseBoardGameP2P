@@ -1,6 +1,6 @@
 import type { Event } from '@release/engine'
 import type { CardData, HandItem, TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardById, Typography } from '@release/ui'
+import { Card, ConfirmAction, cardById, TableSurface, Typography } from '@release/ui'
 import {
   nextFrames,
   play,
@@ -677,11 +677,11 @@ export function useCherryPickStaging(args: {
       // it — so it drops to the band a travelling card rides in, under the pile
       // counters. Keyed on the same flag the scrim leaves on, so the switch
       // happens before anything moves (Rebase's own `answered`, same rule).
-      <div
-        className={`${styles.grid} ${confirmed ? styles.flight : ''}`}
-        data-testid="board-cherry-grid"
+      <TableSurface
+        committed={confirmed}
+        testId="board-cherry-grid"
+        blockTestId="board-cherry-scrim"
       >
-        {!confirmed && <div className={styles.scrim} data-testid="board-cherry-scrim" />}
         <div className={`${styles.cells} ${dealing ? styles.dealing : ''}`}>
           {options.map((o) => {
             const data = cardById(o.id)
@@ -750,7 +750,7 @@ export function useCherryPickStaging(args: {
           disabled={!ready}
           onConfirm={confirmPick}
         />
-      </div>
+      </TableSurface>
     ),
     overlay,
     ...gaps,

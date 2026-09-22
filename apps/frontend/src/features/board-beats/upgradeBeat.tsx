@@ -1,3 +1,4 @@
+import type { CardData } from '@release/ui'
 import { cardById } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import {
@@ -38,6 +39,13 @@ export function useUpgradeBeat(
   anchors: BoardAnchors,
   staging?: RefObject<StagedHandoff | null>,
   operationHandOver?: OperationHandOver,
+  /**
+   * The board's own private hand order. A card that ARRIVES in the fan lands in
+   * the middle of it, and the slot it landed in has to be committed or the next
+   * projection puts it back wherever the engine happened to append it — which
+   * the player sees as the card teleporting the moment it has settled.
+   */
+  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void,
 ) {
   const { overlay, raise, drop, pin, elOf } = useFlyer()
   const exit = useDiscardExit(anchors.discardBox)
@@ -47,11 +55,18 @@ export function useUpgradeBeat(
     if (!ctx) return
     const hand = [...ctx.base.you.hand]
     hand.splice(gap, 0, ...cards.map((card) => ({ uid: card.key, card: card.card })))
+    // AND THE SLOT IS COMMITTED, not only drawn. The insert lands a new card in
+    // the MIDDLE of the fan — that is what the module is for — but the next
+    // projection re-derives the hand from the engine, which simply appended it,
+    // so the card jumped from where it had just landed to the end of the fan.
+    // The board keeps a private order for exactly this; Cherry-pick's own
+    // arrival commits to it and does not jump (owner, 22.09).
+    latest.current.onHandArrival?.(hand, cards[0].key, gap)
     ctx.base = { ...ctx.base, you: { ...ctx.base.you, hand } }
     ctx.publish(ctx.base)
   })
-  const latest = useRef({ anchors, staging, exit, arrival, operationHandOver })
-  latest.current = { anchors, staging, exit, arrival, operationHandOver }
+  const latest = useRef({ anchors, staging, exit, arrival, operationHandOver, onHandArrival })
+  latest.current = { anchors, staging, exit, arrival, operationHandOver, onHandArrival }
 
   // THE WHOLE CENTRE LEAVES IN ONE SEND. The System Upgrade card stands in the
   // same centre the answers do, so it goes to the discard WITH them rather than

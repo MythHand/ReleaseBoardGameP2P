@@ -52,18 +52,15 @@ const en = {
   cherry: 'Cherry-pick',
   rebase: 'Rebase',
   upgrade: 'Upgrade',
-  upgradeSudo: 'Upgrade + Sudo',
   cherryFizzle: 'Cherry-pick: triggers only',
   rebaseFizzle: 'Rebase: empty pile',
-  upgradeFizzle: 'Upgrade: empty opponent hand',
+  upgradeFizzle: 'Upgrade: empty opponent hands',
   cherryHint:
     'Pull Cherry-pick out of your hand, then choose a card from the discard grid. Sudo is in the hand too — combine them to choose a second card for the deck.',
   rebaseHint:
     'Pull Rebase out of your hand, reorder the offered top cards, then confirm. Sudo is in the hand too — combine them to reach every pile.',
   upgradeHint:
-    'Pull Upgrade out of your hand, then use the opponent discard control to complete the effect.',
-  upgradeSudoHint:
-    'Combine Sudo with Upgrade, use the opponent discard control, then choose the thrown card.',
+    'Pull Upgrade out of your hand — with or without the Sudo beside it, both are in the hand — then use the opponent discard control: every seat that owes a card gives one, and you choose from what they threw.',
   cherryFizzleHint:
     'Pull Cherry-pick out of your hand. The discard contains only a trigger, so there is no legal hand pick.',
   rebaseFizzleHint:
@@ -122,22 +119,19 @@ const ru: Record<keyof typeof en, string> = {
   cherry: 'Cherry-pick',
   rebase: 'Rebase',
   upgrade: 'Upgrade',
-  upgradeSudo: 'Upgrade + Sudo',
   cherryFizzle: 'Cherry-pick: только триггеры',
   rebaseFizzle: 'Rebase: пустая колода',
-  upgradeFizzle: 'Upgrade: пустая рука соперника',
+  upgradeFizzle: 'Upgrade: пустые руки соперников',
   cherryHint:
     'Вытяните Cherry-pick из руки, затем выберите карту в сетке сброса. Sudo тоже в руке — объедините их, чтобы выбрать вторую карту на колоду.',
   rebaseHint:
     'Вытяните Rebase из руки, упорядочьте предложенные верхние карты и подтвердите. Sudo тоже в руке — объедините их, чтобы достать все колоды.',
   upgradeHint:
-    'Вытяните Upgrade из руки, затем нажмите кнопку сброса соперника для завершения эффекта.',
-  upgradeSudoHint:
-    'Объедините Sudo с Upgrade, нажмите кнопку сброса соперника, затем выберите сброшенную карту.',
+    'Вытяните Upgrade из руки — с Sudo рядом или без него, обе карты в руке, — затем нажмите кнопку сброса: каждый обязанный соперник отдаёт карту, и вы выбираете из сброшенного.',
   cherryFizzleHint:
     'Вытяните Cherry-pick из руки. В сбросе только триггер, поэтому взять карту в руку нельзя.',
   rebaseFizzleHint: 'Вытяните Rebase из руки. Колода пуста, переставлять нечего.',
-  upgradeFizzleHint: 'Вытяните Upgrade из руки. У соперника нет карт для сброса.',
+  upgradeFizzleHint: 'Вытяните Upgrade из руки. Ни у кого из соперников нет карт для сброса.',
 }
 
 i18n.addResourceBundle('en', 'debug', en)
