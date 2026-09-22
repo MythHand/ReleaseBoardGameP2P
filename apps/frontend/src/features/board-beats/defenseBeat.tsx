@@ -1,13 +1,7 @@
+import type { CardData } from '@release/ui'
 import { Card, CardPair, cardBoxIn, cardById, PAIR_AUX } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import {
-  nextFrames,
-  play,
-  useDiscardExit,
-  useFlyer,
-  useHandArrival,
-  wait,
-} from '@release/ui/animations'
+import { nextFrames, play, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
 import type { RefObject } from 'react'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
@@ -16,6 +10,7 @@ import { aiCauseExit, withoutAiCause } from './aiCauseExit'
 import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
 import { toEventsDeck } from './toEventsDeck'
+import { useToHand } from './toHand'
 
 // The answer to an attack (#101): a defence covers what is standing at the
 // centre, and the whole exchange leaves together. `_useDefenseStaging.ts` is
@@ -31,7 +26,11 @@ const rectOf = (el: Element | null): Rect | null => {
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
-export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<StagedHandoff | null>) {
+export function useDefenseBeat(
+  anchors: BoardAnchors,
+  staging?: RefObject<StagedHandoff | null>,
+  onHandArrival?: (hand: { uid: string; card: CardData }[], uid: string, at: number) => void,
+) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
   // ROLLBACK's own destination, when the returned attack lands in the local
@@ -39,7 +38,7 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
   // unlike a draw (drawBeat.tsx), the engine already put the card into the
   // hand by mutating state (see the comment at `returning` below), so the
   // NEXT projection already carries it — this beat only has to fly it there.
-  const arrival = useHandArrival(anchors.hand, () => {})
+  const arrival = useToHand(anchors.hand, onHandArrival)
   const latest = useRef({ anchors, staging, send, arrival })
   latest.current = { anchors, staging, send, arrival }
 
@@ -229,10 +228,11 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
                 // mounted until the hook's own reset), but a second `arrive()`
                 // landing in that window would hit `flights.length > 0` and
                 // silently no-op.
-                await latest.current.arrival.arrive(
-                  [{ key: `back${plan.eventId}`, card: attackCard, from: attackBox }],
-                  ctx.base.you.hand.length,
-                )
+                await latest.current.arrival.land(ctx, {
+                  card: attackCard,
+                  from: attackBox,
+                  fallbackKey: `back${plan.eventId}`,
+                })
                 return
               }
               // `anchors.seatBox` resolves null for the LOCAL player — never

@@ -207,15 +207,15 @@ export function useBeats(args: {
   const [advanced, setAdvanced] = useState<BoardState | null>(null)
 
   const discards = useDiscardBeat(anchors, staging)
-  const draws = useDrawBeat(anchors)
+  const draws = useDrawBeat(anchors, onHandArrival)
   const decks = useDeckBeat(anchors)
-  const combo = useComboBeat(anchors, staging, clearPaidCost, takeStagedRelease)
-  const defense = useDefenseBeat(anchors, staging)
+  const combo = useComboBeat(anchors, staging, clearPaidCost, takeStagedRelease, onHandArrival)
+  const defense = useDefenseBeat(anchors, staging, onHandArrival)
   const elimination = useEliminateBeat()
   const gameEnd = useGameEndBeat()
   const handLimits = useHandLimitBeat(anchors, handLimit)
-  const transfers = useTransferBeat(anchors, requestPick)
-  const ais = useAiBeat(anchors)
+  const transfers = useTransferBeat(anchors, requestPick, onHandArrival)
+  const ais = useAiBeat(anchors, onHandArrival)
   // The operation beat first: System Upgrade's centre holds both its answers and
   // the operation card itself, and they leave together in the answers' own send
   // rather than in a beat of their own behind them.
