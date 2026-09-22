@@ -1,19 +1,13 @@
 import type { CardData } from '@release/ui'
 import { cardAreaOf, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import {
-  nextFrames,
-  play,
-  scatterAt,
-  useDiscardExit,
-  useHandArrival,
-  wait,
-} from '@release/ui/animations'
+import { nextFrames, play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { BeatPlan, PlannedDraw } from './planBeats'
 import { seatCardBox } from './seat'
 import { TABLE_HOLD, useToCentre } from './toCentre'
+import { useToHand } from './toHand'
 
 // A card is drawn. One flight to the centre, then a branch on who drew it and
 // what it turned out to be — the scene is `DrawCardStory`, driven here by the
@@ -48,7 +42,16 @@ const rectOf = (el: Element | null): Rect | null => {
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
-export function useDrawBeat(anchors: BoardAnchors) {
+export function useDrawBeat(
+  anchors: BoardAnchors,
+  /**
+   * The fan's own order, for the card this beat lands in it — the same seam the
+   * System Upgrade, Cherry-pick and transfer arrivals go through. A drawn card
+   * has no place of its own, so it lands in the middle; committing the slot is
+   * what keeps the next projection from moving it to the end.
+   */
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
+) {
   const { overlay: flyerOverlay, patch, drop, elOf, toSlot } = useToCentre()
   const exit = useDiscardExit(anchors.discardBox)
 
@@ -57,27 +60,19 @@ export function useDrawBeat(anchors: BoardAnchors) {
   // give every card after the first the fan the batch STARTED with.
   const ctx = useRef<BeatRun | null>(null)
 
+  // The card into the fan, whole: the uid the projection will know it by, the
+  // middle of the fan, the slot committed, and the run's own base grown so the
+  // next card of the batch aims at the fan this one made (I8).
   const {
     overlay: handOverlay,
     gapAt,
     gapSize,
-    arrive,
+    land,
     reset: resetArrival,
-  } = useHandArrival(anchors.hand, (gap, landed) => {
-    const c = ctx.current
-    if (!c) return
-    const hand = [...c.base.you.hand]
-    hand.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
-    // The published state becomes the base the NEXT card aims at — the board
-    // really has that many cards in the fan now, and the last frame of this beat
-    // has to equal the projection it hands over to.
-    const next = { ...c.base, you: { ...c.base.you, hand } }
-    c.base = next
-    c.publish(next)
-  })
+  } = useToHand(anchors.hand, onHandArrival)
 
-  const latest = useRef({ anchors, arrive, exit })
-  latest.current = { anchors, arrive, exit }
+  const latest = useRef({ anchors, land, exit })
+  latest.current = { anchors, land, exit }
 
   // deck -> centre, face down. The one leg every draw has, whoever drew it.
   const toCentre = useCallback(
@@ -168,20 +163,11 @@ export function useDrawBeat(anchors: BoardAnchors) {
           const card = cardById(d.card)
           const at = rectOf(elOf('draw'))
           drop('draw')
-          // How many cards the fan holds RIGHT NOW — `ctx.current.base`, not the
-          // projection the batch started with, so every card after the first
-          // aims at the fan the one before it grew (I8).
-          const grown = ctx.current?.base.you.hand.length ?? 0
-          // …and it lands at the END of that fan, not in its middle. The step
-          // defaults to the middle because a drawn card has no place of its own
-          // in a scene that owns its hand array — but on the board the
-          // projection owns it, and the engine APPENDS what it drew
-          // (fake/reduce.ts:126), an order `toBoardState` passes through
-          // untouched. Landing anywhere else makes the last frame of this beat
-          // disagree with the projection it hands over to, and the card visibly
-          // jumps from the middle of the fan to its end on the handover.
-          if (card && at)
-            await latest.current.arrive([{ key: `h${d.eventId}`, card, from: at }], grown, grown)
+          // The run is what the landing is measured against — the fan it has
+          // already grown, not the projection the batch started with (I8).
+          const c = ctx.current
+          if (card && at && c)
+            await latest.current.land(c, { card, from: at, fallbackKey: `h${d.eventId}` })
           continue
         }
 

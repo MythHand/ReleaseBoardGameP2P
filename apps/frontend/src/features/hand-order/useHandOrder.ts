@@ -27,6 +27,14 @@ export interface HandOrder {
    * is the whole displayed hand, so a card standing off the fan keeps its slot.
    */
   commit: (full: HandItem[], visible: HandItem[], uid: string, to: number) => void
+  /**
+   * The fan's order, named outright. A card arriving from the table lands in a
+   * fan the flight step measured on screen, and that fan is the order — there
+   * is nothing to recompute and no card data to look up, which is the whole
+   * difference from `commit` above: the reorder gesture moves ONE card inside a
+   * hand it holds, an arrival hands over the finished list.
+   */
+  place: (fan: string[]) => void
 }
 
 export function useHandOrder(gameKey: string | null): HandOrder {
@@ -84,5 +92,7 @@ export function useHandOrder(gameKey: string | null): HandOrder {
     setOrder(full.map((c) => (visSet.has(c.uid) ? vis[i++] : c.uid)))
   }, [])
 
-  return useMemo(() => ({ arrange, commit }), [arrange, commit])
+  const place = useCallback((fan: string[]) => setOrder(fan), [])
+
+  return useMemo(() => ({ arrange, commit, place }), [arrange, commit, place])
 }

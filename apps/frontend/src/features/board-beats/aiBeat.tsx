@@ -1,13 +1,6 @@
 import { cardAreaOf, cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import {
-  nextFrames,
-  play,
-  scatterAt,
-  useDiscardExit,
-  useHandArrival,
-  wait,
-} from '@release/ui/animations'
+import { nextFrames, play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
@@ -15,6 +8,7 @@ import type { BeatPlan } from './planBeats'
 import { SEAT_SHRINK } from './seat'
 import { HALLUCINATION_HOLD, TABLE_HOLD, useToCentre } from './toCentre'
 import { toEventsDeck } from './toEventsDeck'
+import { useToHand } from './toHand'
 
 // AN AI CARD, from the pile to whatever it turns out to mean.
 //
@@ -51,29 +45,25 @@ const rectOf = (el: Element | null): Rect | null => {
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
-export function useAiBeat(anchors: BoardAnchors) {
+export function useAiBeat(
+  anchors: BoardAnchors,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
+) {
   const { overlay: flyerOverlay, patch, drop, elOf, raise, toSlot } = useToCentre()
   const exit = useDiscardExit(anchors.discardBox)
   const ctx = useRef<BeatRun | null>(null)
 
+  // The card into the fan, whole — see `toHand`.
   const {
     overlay: handOverlay,
     gapAt,
     gapSize,
-    arrive,
+    land,
     reset: resetArrival,
-  } = useHandArrival(anchors.hand, (gap, landed) => {
-    const c = ctx.current
-    if (!c) return
-    const hand = [...c.base.you.hand]
-    hand.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
-    const next = { ...c.base, you: { ...c.base.you, hand } }
-    c.base = next
-    c.publish(next)
-  })
+  } = useToHand(anchors.hand, onHandArrival)
 
-  const latest = useRef({ anchors, exit, arrive })
-  latest.current = { anchors, exit, arrive }
+  const latest = useRef({ anchors, exit, land })
+  latest.current = { anchors, exit, land }
 
   // A card leaves the table for the events deck. It turns face down first — the
   // way every card entering play turns face up first — and then shrinks back
@@ -345,10 +335,7 @@ export function useAiBeat(anchors: BoardAnchors) {
       const from = rectOf(elOf(EFF))
       if (plan.mine && from) {
         drop(EFF)
-        await latest.current.arrive(
-          [{ key: `ins${plan.eventId}`, card, from }],
-          beat.base.you.hand.length,
-        )
+        await latest.current.land(beat, { card, from, fallbackKey: `ins${plan.eventId}` })
       } else {
         const seat = a.seatBox(plan.player)
         const el = elOf(EFF)
