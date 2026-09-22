@@ -1,7 +1,7 @@
 import type { GameConfig } from '../engine'
 import type { CardInstance, GameState, Setup } from '../state'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
-import { playableFor, project } from './project'
+import { project } from './project'
 import { reduce } from './reduce'
 
 const engine = createFakeEngine()
@@ -377,13 +377,14 @@ it("discards an eliminated player's hand, parented to the eliminated event", () 
   expect(discarded).toMatchObject({ player: 'p1', reason: 'effect', parent: eliminated?.id })
 })
 
-// --- Review finding: an ai-release-* placement must remain a plain, playable
-// release once it is bounced back to hand — not stuck as an unplayable 'ai'
-// card. Exercised end to end: AI event places it, DDoS returns it to hand and
-// freezes it for one round, the freeze lifts when the owner's own turn ends,
-// and only then is it playable again. ---
+// --- An `ai-release-*` placement wears the plain, playable `release-<slot>` id
+// rather than the event's own — and when a DDoS takes it out of the zone it goes
+// back to the events deck it came from, not to its owner's hand: "релиз от
+// `ai-release-*` в руку не идёт — уходит в колоду событий" (`cards.md`, the
+// `c.ddos` key). An AI card always returns to its own deck, whatever took it off
+// the table, so there is no bounce to hand and nothing to freeze. ---
 
-it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
+it('sends an AI-placed release home to the events deck when a DDoS takes it', () => {
   const events: GameConfig['events'] = [{ id: 'ai-release-frontend', qty: 1 }]
   const cfg: GameConfig = {
     gameId: 'g2',
@@ -398,10 +399,6 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
   }
   const base = engine.createGame(cfg)
   const ai: CardInstance = { uid: 'trigger-ai#0', id: 'trigger-ai' }
-  // `releaseCond: 'base'` makes a release cost a second card, so p1 holds one
-  // spare for the final assertion to be about the thaw rather than the cost.
-  // Code Review is never playable on its own, so it cannot itself appear in the
-  // `playableFor` results checked below.
   const spare: CardInstance = { uid: 'support-code-review#0', id: 'support-code-review' }
   const s: GameState = {
     ...base,
@@ -415,6 +412,7 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
   // p1 draws the AI trigger; the single-entry event deck deterministically
   // pulls ai-release-frontend regardless of the rng cursor.
   const drawn = reduce(s, { type: 'DRAW', player: 'p1', at: 1000 })
+  // the PLAIN catalogue id, so it reads and plays as an ordinary release
   expect(drawn.state.players.p1.release.frontend?.card.id).toBe('release-frontend')
   const placedUid = drawn.state.players.p1.release.frontend?.card.uid as string
 
@@ -429,7 +427,7 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
   const p1Pushed = reduce(settled.state, { type: 'PUSH', player: 'p1', at: 1001 })
   expect(p1Pushed.state.turn.player).toBe('p2')
 
-  // p2 DDoS's the placed release: it bounces to p1's hand and freezes.
+  // p2 DDoS's the placed release.
   const ddos: CardInstance = { uid: 'attack-ddos#0', id: 'attack-ddos' }
   const p2Armed: GameState = {
     ...p1Pushed.state,
@@ -443,29 +441,12 @@ it('keeps an AI-placed release playable after a DDoS bounce and thaw', () => {
     at: 1002,
   })
   expect(bounced.state.players.p1.release.frontend).toBeUndefined()
-  expect(bounced.state.players.p1.hand.map((c) => c.uid)).toContain(placedUid)
-  expect(bounced.state.players.p1.frozen).toContain(placedUid)
-
-  // p2 ends their turn (skip drawing — hasDrawn is set directly, as `withTop`-
-  // style helpers elsewhere in this file already construct state directly).
-  const p2Done: GameState = { ...bounced.state, turn: { ...bounced.state.turn, drawnFrom: [0] } }
-  const toP1 = reduce(p2Done, { type: 'PUSH', player: 'p2', at: 1003 })
-  expect(toP1.state.turn.player).toBe('p1')
-  expect(toP1.state.players.p1.frozen).toContain(placedUid)
-
-  // p1's turn while still frozen: not playable yet.
-  expect(playableFor(toP1.state, 'p1')).not.toContain(placedUid)
-
-  // p1 ends this turn — the freeze lifts as their own turn ends.
-  const p1Done: GameState = { ...toP1.state, turn: { ...toP1.state.turn, drawnFrom: [0] } }
-  const toP2 = reduce(p1Done, { type: 'PUSH', player: 'p1', at: 1004 })
-  expect(toP2.state.players.p1.frozen).toEqual([])
-
-  // Back to p2, then back to p1: now it must be playable.
-  const p2Done2: GameState = { ...toP2.state, turn: { ...toP2.state.turn, drawnFrom: [0] } }
-  const backToP1 = reduce(p2Done2, { type: 'PUSH', player: 'p2', at: 1005 })
-  expect(backToP1.state.turn.player).toBe('p1')
-  expect(playableFor(backToP1.state, 'p1')).toContain(placedUid)
+  // home to the events deck, as the event card it stood in for…
+  expect(bounced.state.decks.events.map((c) => c.uid)).toContain(placedUid)
+  // …and so: not in a hand, not in the discard, and nothing frozen
+  expect(bounced.state.players.p1.hand.map((c) => c.uid)).not.toContain(placedUid)
+  expect(bounced.state.decks.discard.map((c) => c.uid)).not.toContain(placedUid)
+  expect(bounced.state.players.p1.frozen).toEqual([])
 })
 
 // ===== declining a 503 (#103 testing, problem 4) =====

@@ -201,6 +201,11 @@ export function useAiBeat(anchors: BoardAnchors) {
           const target = rectOf(a.releaseSlot(plan.player, plan.tail.slot))
           const el = elOf(EFF)
           if (el && target) {
+            // …reading the way the zone it is entering reads, from the frame the
+            // travel starts — another seat's zone is the at-a-glance one, ours
+            // stays full. Same rule, and same reason, as a played release
+            // arriving in a zone (`comboBeat.runRelease`).
+            if (plan.player !== beat.base.selfId) patch(EFF, { lod: true })
             const anim = play('playToReleaseZone', el, { from: effect, to: target })
             if (anim) await anim.finished
           }

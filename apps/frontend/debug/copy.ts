@@ -38,8 +38,11 @@ const en = {
   handDefenseHint:
     'Switch to the opponent and pull a defence over the staged attack, or take the hit. Their hand holds every defence card, one copy each.',
   release: 'Release into a zone',
+  ddos: 'DDoS: the standing zone',
   alarm503: 'Error 503: the alarm',
   aiTrigger: 'AI trigger: a Crush',
+  ddosHint:
+    'Your turn, five DDoS in hand, both opponent zones already standing. The first holds a Monitoring, a bare release and a release under Code Review; the second holds the AI pair — an AI Monitoring and an AI release. Throw one at each: a Monitoring is destroyed, a release goes back to its owner hand frozen for a round, a Code Review is discarded with the release it rode — and the AI cards go home to the events deck instead of the discard.',
   releaseHint:
     'Your turn, zones empty. Put the release down — pay its cost if one is charged, or play it with Code Review so the cost rides it instead. Monitoring is in the hand too: it goes into its own slot in the zone.',
   alarm503Hint:
@@ -105,8 +108,11 @@ const ru: Record<keyof typeof en, string> = {
   handDefenseHint:
     'Переключитесь на соперника и вытяните защиту поверх атаки или примите удар. В его руке все карты защиты, по одной копии.',
   release: 'Релиз в зону',
+  ddos: 'DDoS: зона соперника',
   alarm503: 'Error 503: тревога',
   aiTrigger: 'Триггер AI: Crush',
+  ddosHint:
+    'Ваш ход, пять DDoS в руке, зоны обоих соперников уже стоят. У первого мониторинг, обычный релиз и релиз под Code Review; у второго пара AI — мониторинг AI и релиз AI. Бросьте по одной в каждую цель: мониторинг уничтожается, релиз уходит владельцу в руку и заморожен на раунд, Code Review уходит в сброс вместе с релизом, а карты AI возвращаются в колоду событий, а не в сброс.',
   releaseHint:
     'Ваш ход, зоны пусты. Выложите релиз — оплатите стоимость, если её берут, либо разыграйте его с Code Review, и тогда он ляжет под релиз вместо оплаты. Мониторинг тоже в руке: он занимает свой слот в зоне.',
   alarm503Hint:
