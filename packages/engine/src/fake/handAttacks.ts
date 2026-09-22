@@ -177,10 +177,21 @@ export function resolveDdos(
     // feed a card behind the projection's discardCount — the board's heap had
     // a stand-in for exactly this. Parented to the destruction, the way
     // triggers.ts parents a destroyed release's spoils.
-    log.add(
-      { type: 'discarded', player: target.player, card: mon.id, reason: 'destroyed' },
-      destroyedId,
-    )
+    //
+    // …UNLESS IT IS AN AI MONITORING, which does not go to the discard at all:
+    // it goes back to the events deck, its own condition (`bankToDiscard`
+    // routes it there). Saying `discarded` for it put a card in every reader's
+    // heap that the discard does not hold, and the board then had to paper over
+    // the mismatch with a stand-in for its top — a stand-in keyed to the COUNT,
+    // so every later discard re-posed it and cards that were lying still
+    // appeared to turn. `destroySlot` has always been silent for this same
+    // reason (triggers.ts): the destruction is the event, and where the card
+    // goes is the card's own business.
+    if (mon.event === undefined)
+      log.add(
+        { type: 'discarded', player: target.player, card: mon.id, reason: 'destroyed' },
+        destroyedId,
+      )
     const zone = { ...state.players[target.player].release }
     delete zone.monitoring
     return {
@@ -209,18 +220,30 @@ export function resolveDdos(
   const zone = { ...state.players[target.player].release }
   delete zone[target.slot]
   const owner = state.players[target.player]
-  const bounced: GameState = {
+  const zoned: GameState = {
     ...state,
-    players: {
-      ...state.players,
-      [target.player]: {
-        ...owner,
-        release: zone,
-        hand: [...owner.hand, released.card],
-        frozen: [...owner.frozen, released.card.uid],
-      },
-    },
+    players: { ...state.players, [target.player]: { ...owner, release: zone } },
   }
+  // A RELEASE FROM THE EVENTS DECK DOES NOT GO TO A HAND. "Релиз от
+  // `ai-release-*` в руку не идёт — уходит в колоду событий" (`cards.md`, the
+  // `c.ddos` key): an AI card always goes back to its own deck, whatever took it
+  // off the table. `bankToDiscard` is what knows that road, and there is nothing
+  // to freeze on this branch — freezing bars a card from being played out of a
+  // hand, and this one is not in a hand.
+  const bounced: GameState =
+    released.card.event === undefined
+      ? {
+          ...zoned,
+          players: {
+            ...zoned.players,
+            [target.player]: {
+              ...zoned.players[target.player],
+              hand: [...owner.hand, released.card],
+              frozen: [...owner.frozen, released.card.uid],
+            },
+          },
+        }
+      : discard(zoned, [released.card])
   // The release itself bounces to hand, but a Code Review under it does not
   // follow it there — it goes to the discard, and that was the second card
   // this function banked in silence.

@@ -126,6 +126,14 @@ export interface PresetData {
 
 export type Preset = PresetFn | PresetData
 
+/**
+ * HOW LONG A CARD SPENDS TURNING OVER — `flipCard`'s own duration, exported
+ * because the flip belongs to the CARD (`Card` plays it on a `faceDown` change),
+ * so a caller that has to wait it out has no animation handle to await and can
+ * only wait the clock. Three beats had copied the number by hand.
+ */
+export const FLIP_MS = 420
+
 export const PRESETS: Record<string, Preset> = {
   // Переворот карты лицо↔рубашка. Используется самим компонентом Card.
   flipCard: (el: Element, { faceDown = false }: { faceDown?: boolean } = {}): Animation =>
@@ -134,7 +142,7 @@ export const PRESETS: Record<string, Preset> = {
         { transform: `rotateY(${faceDown ? 0 : 180}deg)` },
         { transform: `rotateY(${faceDown ? 180 : 0}deg)` },
       ],
-      { duration: 420, easing: EASE, fill: 'forwards' },
+      { duration: FLIP_MS, easing: EASE, fill: 'forwards' },
     ),
 
   // FLIP-вылет: элемент уже стоит на новом месте, анимируем его «из» прошлого
