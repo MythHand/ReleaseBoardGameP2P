@@ -25,6 +25,12 @@ function session(overrides: Partial<UseLobby> = {}): UseLobby {
     roomCode: 'YTG-N2Q',
     isHost: true,
     seats: [],
+    chat: {
+      entries: [],
+      notificationEntryIds: [],
+      selfMemberId: 'member-me',
+      send: vi.fn(() => true),
+    },
     restoring: false,
     reconnect: {
       attempt: 0,
@@ -82,6 +88,7 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       peers: {
         me: {
           id: 'me',
+          memberId: 'member-me',
           name: 'Ann',
           role: 'host',
           ready: true,
@@ -120,7 +127,14 @@ it('never marks a bot seat offline', async () => {
       bots: 1,
       setup: {},
       peers: {
-        me: { id: 'me', name: 'Ann', role: 'host', ready: true, where: 'game' },
+        me: {
+          id: 'me',
+          memberId: 'member-me',
+          name: 'Ann',
+          role: 'host',
+          ready: true,
+          where: 'game',
+        },
       },
     },
     gameSync: { view: realView('p1', ['Ann', 'Бот 1']), events: [] },
@@ -159,6 +173,7 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
       peers: {
         me: {
           id: 'me',
+          memberId: 'member-me',
           name: 'Ann',
           role: 'host',
           ready: true,

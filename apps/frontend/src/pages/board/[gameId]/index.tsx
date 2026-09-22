@@ -1,11 +1,12 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
-import { DEFAULT_SETUP, isCounting } from '@release/ui'
-import { useEffect } from 'react'
+import { DEFAULT_SETUP, isCounting, Message, ToastStack } from '@release/ui'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
-import { toBoardOver, toBoardState } from '~/entities/game/board'
+import { type Panel, toBoardOver, toBoardState } from '~/entities/game/board'
 import { seatsFor } from '~/entities/game/seats'
+import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
 import Board from './_Board'
@@ -34,9 +35,12 @@ export default function BoardPage() {
   // sub-block, matching the @release/ui prop names.
   const { t, i18n } = useTranslation()
   const session = useSession()
+  const chat = useRoomChatView()
   const game = useGame()
   const navigate = useNavigate()
   const { gameId } = useParams()
+  const [panel, setPanel] = useState<Panel | null>(null)
+  const [chatToasts, setChatToasts] = useState(true)
 
   // Where this peer is, for everyone else's results table.
   const { setWhere } = session
@@ -122,6 +126,27 @@ export default function BoardPage() {
   // here would let the two drift, and the countdown would freeze for whichever
   // state they stopped agreeing about.
   const now = useNow(isCounting(state, state.selfId))
+  const notificationEntryIds = new Set(chat.notificationEntryIds)
+  const toastItems = chat.messages
+    .filter((message) =>
+      Boolean(
+        notificationEntryIds.has(message.id) &&
+          !message.system &&
+          message.memberId &&
+          message.memberId !== chat.selfMemberId,
+      ),
+    )
+    .map((message) => ({
+      id: message.id,
+      node: (
+        <Message
+          text={message.text}
+          who={message.who}
+          time={message.time}
+          authorRole={message.role}
+        />
+      ),
+    }))
 
   return (
     <div className={styles.page} data-testid="board-page">
@@ -129,6 +154,8 @@ export default function BoardPage() {
         state={state}
         over={over}
         now={now}
+        panel={panel}
+        onPanelChange={setPanel}
         // The opening — for a seated peer only (see `seated` above). `onDone`
         // reports this seat to the host's start gate: until every seat has
         // reported (or the cap fires), no peer's action may reach the engine.
@@ -184,6 +211,18 @@ export default function BoardPage() {
           onLangChange: (lang) => {
             void i18n.changeLanguage(lang)
           },
+          chatToasts,
+          onChatToastsChange: setChatToasts,
+        }}
+        slots={{
+          chat: <RoomChat view={chat} />,
+          toasts: (
+            <ToastStack
+              items={toastItems}
+              copy={t('toasts', { returnObjects: true })}
+              onOpen={() => setPanel('chat')}
+            />
+          ),
         }}
         actions={{
           onPlay: game.play,

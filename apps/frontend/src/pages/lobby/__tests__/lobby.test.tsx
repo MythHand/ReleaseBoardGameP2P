@@ -36,6 +36,7 @@ Object.defineProperty(navigator, 'clipboard', {
 // All the lobby pieces read the session through useSession, so a single mock
 // here drives create/join/roster/start behavior.
 let sessionValue: UseLobby
+const sendChat = vi.fn(() => true)
 vi.mock('~/app/providers/SessionProvider', () => ({
   useSession: () => sessionValue,
 }))
@@ -61,6 +62,7 @@ function base(): UseLobby {
     seats: [],
     error: null,
     errorKind: null,
+    chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
     ready: vi.fn(),
@@ -144,6 +146,7 @@ function inSession(): UseLobby {
     status: 'in-lobby',
     roomCode: 'ABC-23D',
     isHost: true,
+    chat: { entries: [], notificationEntryIds: [], selfMemberId: 'member-h', send: sendChat },
     state: {
       selfId: 'h',
       hostId: 'h',
@@ -159,6 +162,7 @@ function inSession(): UseLobby {
       peers: {
         h: {
           id: 'h',
+          memberId: 'member-h',
           name: 'Host',
           role: 'host',
           ready: true,
@@ -166,6 +170,7 @@ function inSession(): UseLobby {
         },
         p1: {
           id: 'p1',
+          memberId: 'member-p1',
           name: 'Pat',
           role: 'player',
           ready: false,
@@ -175,6 +180,23 @@ function inSession(): UseLobby {
     },
   }
 }
+
+it('renders the room chat as the third lobby column', () => {
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  expect(screen.getByText('lobbyScreen.chat')).toBeTruthy()
+  expect(screen.getByPlaceholderText('chat.placeholder')).toBeTruthy()
+})
+
+it('submits a lobby message through the session chat model', () => {
+  sendChat.mockClear()
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  const field = screen.getByPlaceholderText('chat.placeholder')
+  fireEvent.change(field, { target: { value: 'hello' } })
+  fireEvent.keyDown(field, { key: 'Enter' })
+  expect(sendChat).toHaveBeenCalledWith('hello')
+})
 
 it('offers Continue/Leave when arriving with an active session', () => {
   sessionValue = inSession()
@@ -247,6 +269,7 @@ it('LobbyView renders spectator section when guests present', () => {
       peers: {
         h: {
           id: 'h',
+          memberId: 'member-h',
           name: 'Host',
           role: 'host',
           ready: true,
@@ -254,6 +277,7 @@ it('LobbyView renders spectator section when guests present', () => {
         },
         g1: {
           id: 'g1',
+          memberId: 'member-g1',
           name: 'Gus',
           role: 'guest',
           ready: false,

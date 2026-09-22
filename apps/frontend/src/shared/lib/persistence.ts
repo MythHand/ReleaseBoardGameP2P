@@ -1,6 +1,6 @@
 import { type Event, parseEventLog } from '@release/engine'
 
-// What survives a reload. Four records, all under a `release:` prefix.
+// What survives a reload. Five records, all under a `release:` prefix.
 //
 // Plain functions rather than a store: the keeper snapshot is written from
 // `referee.ts`, which is a pure module with no React in it — and keeping it
@@ -12,6 +12,7 @@ const LEGACY_RESUME_TOKEN_KEY = 'release:resumeToken'
 const SESSION_KEY = 'release:session'
 const KEEPER_KEY = 'release:keeper'
 const LOG_KEY = 'release:log'
+const CHAT_KEY = 'release:chat'
 
 // How long a stored record stays restorable. Long enough to cover a reload, a
 // crash, a closed lid and picking a game back up the same evening; short
@@ -117,7 +118,10 @@ export interface StoredSession {
   name: string
   role: 'host' | 'guest'
   gameId: string | null
+  // Retained when returning to the lobby so a reload cannot reuse a match id.
+  lastGameId?: string
   joinedAt: number
+  lobbyConfig?: StoredLobbyConfig
 }
 
 export function readSession(now: number = Date.now()): StoredSession | null {
@@ -142,6 +146,39 @@ export function clearSession(): void {
   clearResumeCredential()
 }
 
+// The chat journal remains untrusted here. Storage owns only room scoping and
+// expiry; the chat boundary validates entries, sequences, and member mappings.
+export interface StoredChat {
+  roomCode: string
+  entries: unknown[]
+  nextSequence: number
+  members: Array<{ clientId: string; memberId: string }>
+  savedAt: number
+}
+
+export function readChat(roomCode: string, now: number = Date.now()): StoredChat | null {
+  const stored = readJson<StoredChat>(CHAT_KEY)
+  if (!stored) return null
+  if (
+    typeof stored.savedAt !== 'number' ||
+    !Number.isFinite(stored.savedAt) ||
+    stored.roomCode !== roomCode ||
+    now - stored.savedAt > RESTORE_TTL_MS
+  ) {
+    remove(CHAT_KEY)
+    return null
+  }
+  return stored
+}
+
+export function writeChat(chat: StoredChat): void {
+  write(CHAT_KEY, JSON.stringify(chat))
+}
+
+export function clearChat(): void {
+  remove(CHAT_KEY)
+}
+
 // `state` and `seats` are held as `unknown` on purpose: importing GameState
 // here would tie a storage module to the engine's shape, and the only caller
 // that reads them (the host restore) casts once, where the engine types are
@@ -149,6 +186,7 @@ export function clearSession(): void {
 export interface StoredLobbyConfig {
   maxPlayers: number
   setup: unknown
+  bots?: number
 }
 
 export interface StoredKeeper {

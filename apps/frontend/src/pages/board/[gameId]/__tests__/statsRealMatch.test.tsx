@@ -40,6 +40,12 @@ vi.mock('~/app/providers/SessionProvider', () => ({
     state: { selfId, peers, hostId: 'peer-a' },
     roomCode: 'ROOM',
     seats,
+    chat: {
+      entries: [],
+      notificationEntryIds: [],
+      selfMemberId: 'member-peer-a',
+      send: vi.fn(() => true),
+    },
     leaveGame: vi.fn(),
     setWhere: vi.fn(),
   }),
@@ -48,6 +54,7 @@ vi.mock('~/features/play-game/useGame', () => ({ useGame: () => ({ view, events:
 
 const peer = (id: string, name: string, where: PeerInfo['where']): PeerInfo => ({
   id,
+  memberId: `member-${id}`,
   name,
   role: id === 'peer-a' ? 'host' : 'player',
   ready: true,
