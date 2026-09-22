@@ -44,7 +44,7 @@ const en = {
   ddosHint:
     'Your turn, five DDoS in hand, both opponent zones already standing. The first holds a Monitoring, a bare release and a release under Code Review; the second holds the AI pair — an AI Monitoring and an AI release. Throw one at each: a Monitoring is destroyed, a release goes back to its owner hand frozen for a round, a Code Review is discarded with the release it rode — and the AI cards go home to the events deck instead of the discard.',
   releaseHint:
-    'Your turn, zones empty. Put the release down — pay its cost if one is charged, or play it with Code Review so the cost rides it instead. Monitoring is in the hand too: it goes into its own slot in the zone.',
+    'Your turn, zones empty. Put the release down: it costs a card, so the table asks which one — it is shown open beside the release, goes to the discard, and only then does the release settle into its slot. Or play the release with Code Review, and that rides it instead of a card being spent. Monitoring is in the hand too: it goes into its own slot in the zone.',
   alarm503Hint:
     'Nothing drawn yet. Take a card from the pile: Error 503 turns up and the alarm stands. Answer it with the Debugger in hand or by sacrificing the release in your zone.',
   aiTriggerHint:
@@ -114,7 +114,7 @@ const ru: Record<keyof typeof en, string> = {
   ddosHint:
     'Ваш ход, пять DDoS в руке, зоны обоих соперников уже стоят. У первого мониторинг, обычный релиз и релиз под Code Review; у второго пара AI — мониторинг AI и релиз AI. Бросьте по одной в каждую цель: мониторинг уничтожается, релиз уходит владельцу в руку и заморожен на раунд, Code Review уходит в сброс вместе с релизом, а карты AI возвращаются в колоду событий, а не в сброс.',
   releaseHint:
-    'Ваш ход, зоны пусты. Выложите релиз — оплатите стоимость, если её берут, либо разыграйте его с Code Review, и тогда он ляжет под релиз вместо оплаты. Мониторинг тоже в руке: он занимает свой слот в зоне.',
+    'Ваш ход, зоны пусты. Выложите релиз: он стоит карту, и стол спросит какую — она ложится открыто рядом с релизом, уходит в сброс, и только после этого релиз садится в свой слот. Либо разыграйте релиз с Code Review — тогда он ляжет под релиз вместо оплаты картой. Мониторинг тоже в руке: он занимает свой слот в зоне.',
   alarm503Hint:
     'Добора ещё не было. Возьмите карту из колоды: выпадет Error 503 и тревога встанет. Ответьте Debugger из руки или пожертвуйте релизом из своей зоны.',
   aiTriggerHint:

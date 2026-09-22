@@ -13,6 +13,7 @@ import { type RefObject, useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
 import { upgradeCard, upgradeSlot } from '~/entities/game/board/upgradeSlot'
 import type { BeatPlan } from './planBeats'
+import { SEAT_SHRINK } from './seat'
 
 const THROW_DUR = 460
 const THROW_STEP = 260
@@ -129,7 +130,8 @@ export function useUpgradeBeat(
           } else {
             const seat = a.seatBox(take.player)
             if (chosen && seat)
-              await play('dealToSeat', chosen, { from: centre, to: seat, scale: 0.7 })?.finished
+              await play('dealToSeat', chosen, { from: centre, to: seat, scale: SEAT_SHRINK })
+                ?.finished
             ctx.base = {
               ...ctx.base,
               opponents: ctx.base.opponents.map((p) =>

@@ -14,6 +14,7 @@ import type { ReactNode, RefObject } from 'react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { DiscardPickHandoff } from '~/entities/game/board/types'
+import { SEAT_SHRINK } from '~/features/board-beats/seat'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import styles from './_useCherryPickStaging.module.css'
 import { useResolveFeedback } from './_useResolveFeedback'
@@ -594,7 +595,8 @@ export function useCherryPickStaging(args: {
           await play('playToCenter', taken, { from: takenFrom, to, duration: REVEAL_DUR })?.finished
           await wait(REVEAL_HOLD)
           const at = taken.getBoundingClientRect()
-          if (seat) await play('dealToSeat', taken, { from: at, to: seat, scale: 0.7 })?.finished
+          if (seat)
+            await play('dealToSeat', taken, { from: at, to: seat, scale: SEAT_SHRINK })?.finished
           taken.style.opacity = '0'
         })()
 
