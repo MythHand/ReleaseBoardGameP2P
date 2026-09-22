@@ -5,6 +5,7 @@ import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@re
 import { type RefObject, useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
 import type { BeatPlan, DiscardCard } from './planBeats'
+import { supportFirst, withLanded, withoutLanded } from './toHeap'
 import { withoutFlown } from './withoutFlown'
 
 // DeckAnimationsStory.playSequence keeps the public play up throughout the
@@ -86,24 +87,9 @@ function pendingOperation(
   }
 }
 
-function withoutSpent(state: BoardState, spent: { eventId: number }[]): BoardState {
-  const ids = new Set(spent.map((c) => `d${c.eventId}`))
-  const heap = state.decks.discardHeap
-  if (!heap || ids.size === 0) return state
-  const remaining = heap.filter((c) => !c.uid || !ids.has(c.uid))
-  const removed = heap.length - remaining.length
-  return removed
-    ? {
-        ...state,
-        decks: {
-          ...state.decks,
-          discardHeap: remaining,
-          discard: remaining.at(-1)?.card,
-          discardCount: Math.max(0, state.decks.discardCount - removed),
-        },
-      }
-    : state
-}
+// the operation's own cards STAND at the centre while the pile already counts
+// them — the shared step's own opposite direction
+const withoutSpent = withoutLanded
 
 export function withoutPendingOperation(state: BoardState, events: Event[]): BoardState {
   return withoutSpent(state, pendingOperation(state, events)?.spent ?? [])
@@ -339,34 +325,17 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
         flyer.drop()
       })
       if (run !== epoch.current) return
-      const heap = [...(ctx.base.decks.discardHeap ?? [])]
-      let added = 0
-      // the support half first: it lay UNDER the card it paid for, and that is
-      // the order it joins the heap in (the same the projection's own fold
-      // keeps, so the handover from this publish to `live` moves nothing)
-      const filed = [...(plan.spent ?? operation.spent)].sort(
-        (a, b) =>
-          Number(cardById(b.card)?.category === 'support') -
-          Number(cardById(a.card)?.category === 'support'),
-      )
-      for (const spent of filed) {
-        const card = cardById(spent.card)
-        if (!card || heap.some((entry) => entry.uid === `d${spent.eventId}`)) continue
-        heap.push({ uid: `d${spent.eventId}`, card, ...scatterAt(spent.eventId) })
-        added++
-      }
+      // the cards go into the heap in the same breath the flight ends, support
+      // under the card it paid for — the shared step owns both rules now
+      const withCards = withLanded(ctx.base, supportFirst(plan.spent ?? operation.spent))
       const pending = ctx.base.pending
-      ctx.publish({
-        ...ctx.base,
+      const settled = {
+        ...withCards,
         pending:
           pending && 'source' in pending && pending.source === operation.card ? null : pending,
-        decks: {
-          ...ctx.base.decks,
-          discardHeap: heap,
-          discard: heap.at(-1)?.card,
-          discardCount: ctx.base.decks.discardCount + added,
-        },
-      })
+      }
+      ctx.base = settled
+      ctx.publish(settled)
       held.current = null
       setStanding(false)
     },

@@ -1,5 +1,5 @@
 import type { CardData } from '@release/ui'
-import { CARD_W, cardAreaOf, cardBoxIn, cardById } from '@release/ui'
+import { cardAreaOf, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
 import {
   nextFrames,
@@ -12,6 +12,7 @@ import {
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { BeatPlan, PlannedDraw } from './planBeats'
+import { seatCardBox } from './seat'
 import { TABLE_HOLD, useToCentre } from './toCentre'
 
 // A card is drawn. One flight to the centre, then a branch on who drew it and
@@ -27,7 +28,6 @@ import { TABLE_HOLD, useToCentre } from './toCentre'
 
 const BEFORE_FLIP = 220 // the card rests at the centre before it turns over
 const AFTER_FLIP = 560 // flipCard is 420; the rest is a pause to read it by
-const SEAT_SHRINK = 0.7 // an opponent's card lands smaller, dissolving into the count
 
 // An opponent's closed card. The projection never says what it is, so nothing
 // here may guess: this carries no face, only the base deck's cover, and it is
@@ -194,7 +194,7 @@ export function useDrawBeat(anchors: BoardAnchors) {
           // `seatBox` already trims the seat to a card box (I6); this is a
           // second, smaller trim — down to `SEAT_SHRINK` of a card width — not
           // a duplicate of the first.
-          const to = cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          const to = seatCardBox(seat)
           const anim = play('dealToSeat', el, { from: centre, to })
           if (anim) await anim.finished
         }

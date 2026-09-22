@@ -1,6 +1,6 @@
 import { useTranslation } from '@release/translation'
 import type { CardData } from '@release/ui'
-import { CARD_W, cardBoxIn, cardById } from '@release/ui'
+import { cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
 import { nextFrames, play, useFlyer, useHandArrival, wait } from '@release/ui/animations'
 import type { RefObject } from 'react'
@@ -8,6 +8,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { RequestPickHandoff } from '~/entities/game/board/types'
 import type { BeatPlan } from './planBeats'
+import { seatCardBox } from './seat'
 import styles from './transferBeat.module.css'
 
 // A card changes hands. One surface seen from three sides — you take a card,
@@ -32,7 +33,6 @@ const REVEAL_W = 220
 // — the same half turn the scene's own reveal makes on its way in.
 const OFFER_TURN = 180
 const CENTER_HOLD = 820 // face-down at the centre before it sinks into the seat
-const SEAT_SHRINK = 0.7 // how small a card is inside a seat — `drawBeat`'s own value
 const REQUEST_HOLD = 820 // the named card stands at the centre before the outcome
 // The chosen card holds while the rest of the catalogue leaves — the scene's own
 // beat between the confirm and the outcome (`PickSpecificCardStory`).
@@ -360,7 +360,7 @@ export function useTransferBeat(
           const asked = latest.current.requestPick?.current ?? null
           const askedSlot = asked?.slot() ?? null
           const offerBox = askedSlot ?? rectOf(picked ?? chosen ?? null)
-          const from = offerBox ?? cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          const from = offerBox ?? seatCardBox(seat)
           const held = offerBox ? cardBoxIn(centre, REVEAL_W) : centre
           // …and the fan it came out of goes back up with it
           if (askedSlot) asked?.close()
@@ -487,7 +487,7 @@ export function useTransferBeat(
           // and a hidden hand is where it is going.
           patch(KEY, { faceDown: true })
           await wait(CENTER_HOLD)
-          const to = cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          const to = seatCardBox(seat)
           const held = elOf(KEY)
           if (held) {
             const anim = play('dealToSeat', held, { from: centre, to })
@@ -507,8 +507,8 @@ export function useTransferBeat(
           centreAttackOf(beat.base) ? (a.cost?.current ?? a.centre.current) : a.centre.current,
         )
         if (!fromSeat || !toSeat || !centre) return
-        const from = cardBoxIn(fromSeat, CARD_W * SEAT_SHRINK)
-        const to = cardBoxIn(toSeat, CARD_W * SEAT_SHRINK)
+        const from = seatCardBox(fromSeat)
+        const to = seatCardBox(toSeat)
         const publicCard = plan.card ? cardById(plan.card) : null
         const [el] = await raise([
           { key: KEY, card: publicCard ?? COVER, at: from, faceDown: !publicCard },

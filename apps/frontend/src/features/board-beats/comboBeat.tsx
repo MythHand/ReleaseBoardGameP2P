@@ -1,10 +1,8 @@
-import type { CardData } from '@release/ui'
-import { CardPair, cardAreaOf, cardBoxIn, cardById, PAIR_AUX, PAIR_AUX_POSE } from '@release/ui'
+import { CardPair, cardBoxIn, cardById, PAIR_AUX, PAIR_AUX_POSE } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import {
   enterPose,
   exitLayer,
-  FLIP_MS,
   nextFrames,
   play,
   restTransform,
@@ -25,8 +23,11 @@ import {
   SHOW_HOLD,
   type StagedHandoff,
 } from '~/entities/game/board'
+import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
 import { useToCentre } from './toCentre'
+import { toEventsDeck } from './toEventsDeck'
+import { settleInto } from './toHeap'
 import { withoutFlown } from './withoutFlown'
 
 // The carrier a DDoS's own effect needs: the card it struck. One card is one
@@ -42,36 +43,6 @@ const STRUCK = 'struck'
 // play is the one arriving, the staged node is already standing exactly where
 // this beat would fold one in, so there is nothing to move — the beat just
 // hands the table back.
-
-// ONE EXCHANGE, ONE SEND — and LAYER COMES FROM POSITION, so a half that is not
-// there must be passed as `null` and filtered here rather than skipped by the
-// caller: a missing half would otherwise silently promote the next one to layer 0
-// and invert the heap. Copied from `defenseBeat` rather than imported, the same
-// rule `rectOf` below follows — a helper shared between two runners by import is
-// how one runner's change starts moving the other's cards.
-interface ExchangeHalf {
-  eventId: number
-  card: CardData
-  aux?: CardData | null
-  auxEventId?: number
-  el: HTMLElement | null
-  from: Rect
-  pose: { rot: number; dx: number; dy: number }
-}
-const exchange = (halves: (ExchangeHalf | null)[]): Leaving[] =>
-  halves
-    .filter((h): h is ExchangeHalf => h !== null)
-    .map((h, layer) => ({
-      key: `x${h.eventId}`,
-      card: h.card,
-      aux: h.aux ?? null,
-      el: h.el,
-      from: h.from,
-      pose: h.pose,
-      layer,
-      scatter: scatterAt(h.eventId),
-      ...(h.auxEventId === undefined ? {} : { auxScatter: scatterAt(h.auxEventId) }),
-    }))
 
 // same 5-line helper discardBeat.tsx keeps privately — copy it, don't import
 // across runners
@@ -385,16 +356,12 @@ export function useComboBeat(
           await split
           const node = pulled.elOf(STRUCK)
           if (hit.home === 'events') {
-            // face down first, then back into the deck — the same two steps, and
-            // the same wait, `aiBeat`'s `goHome` and `defenseBeat`'s
-            // `sacrificedHome` already take. The flip is the card's own, so
-            // there is no handle to await.
-            const deck = rectOf(a.eventsBox.current)
-            if (node && deck) {
-              pulled.patch(STRUCK, { faceDown: true })
-              await wait(FLIP_MS)
-              await play('returnToDeck', node, { from: overThrow, to: cardAreaOf(deck) })?.finished
-            }
+            await toEventsDeck({
+              node,
+              from: overThrow,
+              deck: a.eventsBox.current,
+              turnFaceDown: () => pulled.patch(STRUCK, { faceDown: true }),
+            })
             pulled.drop(STRUCK)
             return
           }
@@ -434,26 +401,7 @@ export function useComboBeat(
           if (hit.codeReview) filed.push(hit.codeReview)
           filed.push({ eventId: hit.discardId, card: hit.card })
         } else if (hit?.codeReview) filed.push(hit.codeReview)
-        const settle = () => {
-          const resting = [...(ctx.base.decks.discardHeap ?? [])]
-          let added = 0
-          for (const item of filed) {
-            const card = cardById(item.card)
-            if (!card || resting.some((entry) => entry.uid === `d${item.eventId}`)) continue
-            resting.push({ uid: `d${item.eventId}`, card, ...scatterAt(item.eventId) })
-            added++
-          }
-          if (added === 0) return
-          ctx.publish({
-            ...ctx.base,
-            decks: {
-              ...ctx.base.decks,
-              discardHeap: resting,
-              discard: resting.at(-1)?.card,
-              discardCount: ctx.base.decks.discardCount + added,
-            },
-          })
-        }
+        const settle = () => settleInto(ctx, filed)
 
         await Promise.all([
           heap.length > 0
@@ -619,10 +567,11 @@ export function useComboBeat(
       // and left it, Task 8) — for everyone else it arrives from the seat
       // now, holds, and then leaves. Either way it leaves through the shared
       // discard exit, on its own `discarded` event's scatter (I7).
-      if (plan.cost) {
+      const paid = plan.cost
+      if (paid) {
         const a = latest.current.anchors
         const costBox = rectOf(a.cost.current)
-        const costCard = cardById(plan.cost.card)
+        const costCard = cardById(paid.card)
         if (costBox && costCard) {
           if (plan.player !== ctx.base.selfId) {
             const from = a.seatBox(plan.player)
@@ -649,10 +598,10 @@ export function useComboBeat(
           await latest.current.send(
             [
               {
-                key: `c${plan.cost.eventId}`,
+                key: `c${paid.eventId}`,
                 card: costCard,
                 from: costBox,
-                scatter: scatterAt(plan.cost.eventId),
+                scatter: scatterAt(paid.eventId),
               },
             ],
             () => {
@@ -660,6 +609,10 @@ export function useComboBeat(
               flyer.drop('cost')
             },
           )
+          // …and the heap takes it in the same breath the flight ends, through
+          // the shared step — without it the carrier comes down while the heap
+          // this beat hands over still knows nothing about the card.
+          settleInto(ctx, [paid])
         }
       }
 
@@ -840,8 +793,13 @@ export function useComboBeat(
     arrival.reset()
   }, [flyer.drop, resetExit, pulled.drop, arrival.reset])
 
+  // Everything this runner has in the air, in one list: its own carrier, the
+  // carrier the shared centre step owns, the discard exit's, and the fan
+  // insert's. A step that is handed a rect mounts its own flyer, and that flyer
+  // only exists if the consumer renders this.
+  const overlay = exitOverlay.concat(flyer.overlay, pulled.overlay, arrival.overlay)
   return {
-    overlay: [...exitOverlay, ...flyer.overlay, ...pulled.overlay, ...arrival.overlay],
+    overlay,
     runAttack,
     runRelease,
     runPairOut,

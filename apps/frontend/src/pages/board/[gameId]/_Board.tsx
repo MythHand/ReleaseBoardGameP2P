@@ -1187,6 +1187,10 @@ export default function Board({
   if (unanswered) {
     ask = defencePhase === 'partner' ? copy.table.askPartner : copy.table.askDefend
   } else if (costPending) {
+    // The line the approved scene shows at this step, worded as it words it: a
+    // PULL. A release parked at the centre with no explanation reads as a stuck
+    // play — which is why `DefenseReleaseStory` puts the ask with the cards
+    // rather than only in its dev bar.
     ask = copy.table.askCost
   } else if (discarding && handLimit.owed > 0) {
     ask = copy.table.askHandLimit
@@ -2029,7 +2033,15 @@ export default function Board({
                           ? defenseStaging.onHandPlay
                           : neutralizeOwnsHand
                             ? neutralizing.onHandPlay
-                            : staging.onHandPlay
+                            : // A release's own cost is PULLED out of the fan,
+                              // the same gesture every other step that asks for
+                              // a card from the hand takes — one gesture per
+                              // step, the discipline the 503's line above keeps.
+                              // While one is owed the fan can do nothing else,
+                              // so the pull is the cost's for that whole step.
+                              costPending
+                              ? staging.onCostPlay
+                              : staging.onHandPlay
                 }
                 // the reorder gesture's commit — without it the kit settles the
                 // card into its new slot and the next projection render snaps

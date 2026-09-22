@@ -83,19 +83,31 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   // DDoS needs a THIRD seat of its own, and not to watch: the AI pair lives
   // there. Two zones side by side is also the only way to see that a DDoS aims
   // across the table rather than at one opponent (owner, 22.09).
-  const third = transfer || scenario === 'ddos'
+  // THREE SEATS ON EVERY PAGE. The stand is the real board or it is nothing, and
+  // a table that is two players wide on one page and three on another is two
+  // different games: everything that depends on a third seat — a relayed batch,
+  // an audience, a roster a pending is owed by — is simply unreachable from the
+  // pages that have only two (owner, 22.09). A preset that wants a seat out of
+  // the way empties its hand; that is a layout decision, which is what a preset
+  // is for.
   const initial = engine.createGame({
     gameId,
     seed: 42,
     players: [
       { id: 'you', name: 'You' },
       { id: 'p2', name: 'Opponent' },
-      ...(third ? [{ id: 'p3', name: scenario === 'ddos' ? 'Second opponent' : 'Observer' }] : []),
+      { id: 'p3', name: scenario === 'ddos' ? 'Second opponent' : 'Observer' },
     ],
     setup: {
       handLimit: 'base',
       releases: 'base',
-      releaseCond: 'easy',
+      // ONE MODE ON EVERY PAGE, and it is the game's own base: a release costs a
+      // card. Under `easy` the engine places a release on the spot and asks
+      // nobody for anything, so the whole paying half of that move — the prompt,
+      // the card given for it, its own exit — did not exist on the pages that
+      // used it. A page that runs a different mode is a different game, and a
+      // fix checked on it proves nothing about the rest (owner, 22.09).
+      releaseCond: 'base',
       ai: 'base',
       gitBranch: 'strategic',
     },
@@ -158,6 +170,17 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
           scenario === 'upgradeFizzle'
             ? []
             : [instance('release-frontend', 8), instance('defense-hotfix', 9)],
+        release: {},
+        openedAtDeal: [],
+      },
+      // The third seat is at every table now, so a preset that is ABOUT an empty
+      // opponent hand has to empty this one too — System Upgrade asks every seat
+      // that holds a card, and one seat still holding one is not a fizzle. The
+      // others leave it with the hand it was dealt: a seat with cards is what a
+      // real table has.
+      p3: {
+        ...initial.players.p3,
+        ...(scenario === 'upgradeFizzle' ? { hand: [] } : {}),
         release: {},
         openedAtDeal: [],
       },

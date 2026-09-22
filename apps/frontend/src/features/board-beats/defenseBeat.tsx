@@ -1,10 +1,8 @@
-import type { CardData } from '@release/ui'
-import { Card, CardPair, cardAreaOf, cardBoxIn, cardById, PAIR_AUX } from '@release/ui'
-import type { Leaving, Rect } from '@release/ui/animations'
+import { Card, CardPair, cardBoxIn, cardById, PAIR_AUX } from '@release/ui'
+import type { Rect } from '@release/ui/animations'
 import {
   nextFrames,
   play,
-  scatterAt,
   useDiscardExit,
   useFlyer,
   useHandArrival,
@@ -15,7 +13,9 @@ import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
 import { ATTACK_POSE, COVER_POSE, SHOW_HOLD } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
+import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
+import { toEventsDeck } from './toEventsDeck'
 
 // The answer to an attack (#101): a defence covers what is standing at the
 // centre, and the whole exchange leaves together. `_useDefenseStaging.ts` is
@@ -30,40 +30,6 @@ const rectOf = (el: Element | null): Rect | null => {
   const r = el.getBoundingClientRect()
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
-
-// One exchange, one send. Each card carries its layer, so the heap keeps the
-// order they lay in on the table (I9), and each lands on its own `discarded`
-// event's scatter (I7). Shared by the two resolutions that have this shape —
-// an attack answered by a defence, and an alarm answered by any of its three
-// methods — because it is one movement and #88's standing rule says one
-// movement is one module.
-//
-// LAYER COMES FROM POSITION, so a half that is not there must be passed as
-// `null` and filtered here rather than skipped by the caller: a missing attack
-// would otherwise silently promote the cover to layer 0 and invert the heap.
-interface ExchangeHalf {
-  eventId: number
-  card: CardData
-  aux?: CardData | null
-  auxEventId?: number
-  el: HTMLElement | null
-  from: Rect
-  pose: { rot: number; dx: number; dy: number }
-}
-const exchange = (halves: (ExchangeHalf | null)[]): Leaving[] =>
-  halves
-    .filter((h): h is ExchangeHalf => h !== null)
-    .map((h, layer) => ({
-      key: `x${h.eventId}`,
-      card: h.card,
-      aux: h.aux ?? null,
-      el: h.el,
-      from: h.from,
-      pose: h.pose,
-      layer,
-      scatter: scatterAt(h.eventId),
-      ...(h.auxEventId === undefined ? {} : { auxScatter: scatterAt(h.auxEventId) }),
-    }))
 
 export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<StagedHandoff | null>) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
@@ -98,10 +64,12 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       // to "it is here already", the same idiom `runCovered`'s cover leg uses
       const [el] = await flyer.raise([{ key: 'homeward', at: from, card }])
       if (!el) return
-      flyer.patch('homeward', { faceDown: true })
-      await wait(420) // `flipCard`'s own duration — matches `aiBeat.tsx`'s `goHome`
-      const anim = play('returnToDeck', el, { from, to: cardAreaOf(deck) })
-      if (anim) await anim.finished
+      await toEventsDeck({
+        node: el,
+        from,
+        deck: a.eventsBox.current,
+        turnFaceDown: () => flyer.patch('homeward', { faceDown: true }),
+      })
       flyer.drop('homeward')
     },
     [flyer.raise, flyer.patch, flyer.drop],
@@ -457,16 +425,16 @@ export function useDefenseBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       // not after it: the whole resolution leaves as one moment.
       const sacrificedHome = (async () => {
         if (!toEvents || !plan.spent[0] || !coverBox || !answer) return
-        const deck = rectOf(a.eventsBox.current)
-        if (!deck) return
         // a no-travel raise at the cover slot — it stands exactly where the
         // pair above was shown, the same idiom the cover leg itself uses
         const [el] = await flyer.raise([{ key: 'sacrificed', at: coverBox, card: answer }])
         if (!el) return
-        flyer.patch('sacrificed', { faceDown: true })
-        await wait(420) // `flipCard`'s own duration — matches `aiBeat.tsx`'s `goHome`
-        const anim = play('returnToDeck', el, { from: coverBox, to: cardAreaOf(deck) })
-        if (anim) await anim.finished
+        await toEventsDeck({
+          node: el,
+          from: coverBox,
+          deck: a.eventsBox.current,
+          turnFaceDown: () => flyer.patch('sacrificed', { faceDown: true }),
+        })
         flyer.drop('sacrificed')
       })()
       // TAKEOFF: the answer has been given and both cards are in the air, so the

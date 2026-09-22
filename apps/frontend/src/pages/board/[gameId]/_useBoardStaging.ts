@@ -56,6 +56,7 @@ import {
   SHOW_HOLD,
 } from '~/entities/game/board'
 import { stageSlot } from '~/entities/game/board/stageSlot'
+import { useToCentre } from '~/features/board-beats/toCentre'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 
 // Moved verbatim from the pre-#99 `_useBoardInteractions.ts` — the comparison a
@@ -136,7 +137,9 @@ export interface BoardStaging {
   /** the hand uids that may pay a staged release's cost — [] when none is owed */
   costOptions: string[]
   /** a click in the fan pays the cost and dispatches the RESOLVE */
-  onCostPick: (uid: string) => void
+  /** the cost is PULLED out of the fan, the same gesture every other "give a
+   *  card" step takes — see `onCostPlay` for why this is not a click */
+  onCostPlay: (uid: string, drop: HandPlayDrop) => boolean
   /** true exactly while the actor's own release is STANDING at the stage slot
    * — the one thing `_Board.tsx`'s static stage-slot render needs to know.
    * Derived from `StageState` below, so the render asks one question instead
@@ -145,7 +148,7 @@ export interface BoardStaging {
   /** the card that paid a staged release's cost, once its own flight has
    * landed — held open beside the release until `clearPaidCost` below moves
    * it on (the combo beat's own job, #101 Task 11) */
-  paidCost: { uid: string; card: CardData } | null
+  paidCost: { uid: string; card: CardData; index: number } | null
   /** the combo beat's own clear of `paidCost` (#101, Task 11), called once
    * its own discard-exit flight takes the cost over — see comboBeat.tsx's
    * `runRelease`. Also fired here directly under reduced motion, where no
@@ -264,7 +267,16 @@ export function useBoardStaging({
   // in between — the same watermark discipline `useBeats` applies to this
   // same array, keyed there by event id; here by length, since it is captured
   // fresh at every dispatch rather than held for a whole match.
+  // THE COST'S OWN CARRIER. Its own rather than the staging flyer's, because the
+  // module owns the carrier it flies on — a carrier passed between owners is how
+  // two gestures end up sharing one overlay by accident.
+  const costCarrier = useToCentre()
   const dispatchWatermarkRef = useRef(0)
+  // The same watermark for the COST, kept apart because the two dispatches are
+  // independent: a release can be staged, refused and re-staged while a cost of
+  // its own is in flight, and one shared mark would let either read the other's
+  // rejection.
+  const costWatermarkRef = useRef(0)
   // ComboStory's own `playing` (its `pickPartner` guard, `cancelStage`'s
   // `cancellable`): true from the moment a partner is picked until the fold's
   // `finish()` runs.
@@ -367,7 +379,35 @@ export function useBoardStaging({
   // so this is the one place that can hold it. By the rules the cost is shown
   // open beside the release rather than discarded on the spot; the combo beat
   // moves it on (`clearPaidCost`).
-  const [paidCost, setPaidCost] = useState<{ uid: string; card: CardData } | null>(null)
+  // `index` is the slot it LEFT. Every return flight on this board names one —
+  // a cancelled defence, a cancelled sudo, a cancelled pair — because a card
+  // coming back from a play that did not happen belongs where it was, not in the
+  // middle of the fan where an ARRIVAL lands. Captured at the pull, since the
+  // fan has been laid out without the card ever since.
+  const [paidCost, setPaidCost] = useState<{ uid: string; card: CardData; index: number } | null>(
+    null,
+  )
+  // THE CARD THAT PAID, FOR THE WHOLE TIME IT IS NOT IN THE HAND — from the
+  // frame the pull takes it until the projection itself stops listing it.
+  //
+  // One piece of state for the whole journey, because the journey has three
+  // legs and the card is off the fan for all of them: travelling to the cost
+  // place, lying open there, and flying to the discard. Splitting it by leg is
+  // what let the card come back: `paidCost` clears the moment the beat takes the
+  // card over, and the board that beat runs against is the SHADOW — the table
+  // from before the engine resolved — where the card is still in the hand. So
+  // the fan drew it again for the length of the discard flight, and only the
+  // heap finally took it away (owner, 22.09).
+  //
+  // A FACT, never a memory: cleared by the projection no longer holding the
+  // card, or by the card flying home when the engine refuses it.
+  const [costGone, setCostGone] = useState<string | null>(null)
+  useEffect(() => {
+    if (costGone && !state.you.hand.some((c) => c.uid === costGone)) setCostGone(null)
+  }, [costGone, state.you.hand])
+  // …and the leg that RENDERS: while the carrier is bringing it to the cost
+  // place, nothing static may draw it.
+  const [paying, setPaying] = useState<string | null>(null)
 
   // WHAT IS NOT IN THE FAN RIGHT NOW — the staged halves, and the release held
   // at the centre while its cost is owed. Exported rather than kept private,
@@ -385,11 +425,18 @@ export function useBoardStaging({
   const handOut = useMemo(
     () =>
       new Set(
-        [staged?.support?.uid, staged?.main?.uid, cost?.release].filter((uid): uid is string =>
-          Boolean(uid),
+        [staged?.support?.uid, staged?.main?.uid, cost?.release, paying, costGone].filter(
+          (uid): uid is string => Boolean(uid),
         ),
       ),
-    [staged, cost],
+    // `paidCost` belongs here as much as the rest: the card lies OPEN BESIDE THE
+    // RELEASE from the moment its flight lands until the beat takes it to the
+    // discard, and for that whole stretch the projection still has it in the
+    // hand — the engine has not resolved yet, and once it has, the shadow the
+    // beat runs against is the board from before it did. Left in, the fan draws
+    // a second copy of a card that is lying on the table, and it stays there
+    // until the discard finally swallows it (owner, 22.09).
+    [staged, cost, paying, costGone],
   )
 
   const handItems = useMemo(
@@ -562,6 +609,7 @@ export function useBoardStaging({
       // out (only `placeRelease` filters the hand, and that runs after the
       // cost is paid) — so it is found there by the uid the pending names.
       const held = state.you.hand.find((c) => c.uid === cost.release)
+      const heldAt = handItems.findIndex((c) => c.uid === cost.release)
       const from = anchors.stage.current?.getBoundingClientRect()
       if (!reduced && from && held) {
         // `state.pending` is a network round trip away from clearing —
@@ -570,7 +618,12 @@ export function useBoardStaging({
         // not-yet-cleared pending) would otherwise stand the release at the
         // slot a second time, on top of this very flight carrying it away.
         setStage('leaving')
-        flyHome([{ key: held.uid, card: held.card, from }])
+        // …to the slot it left, like every other return. `heldAt` is -1 while the
+        // fan is drawn without it (the ordinary case for a standing release), and
+        // the insert reads a missing index as "the middle" — which is what an
+        // ARRIVAL gets and a return should not, so it is passed only when the fan
+        // still knows the place.
+        flyHome([{ key: held.uid, card: held.card, from }], heldAt < 0 ? undefined : heldAt)
         return
       }
       // Reduced motion, or nothing measurable: there is no flight to guard
@@ -689,10 +742,17 @@ export function useBoardStaging({
       // Reachable on a rejoin that replays the opening into a pending already
       // owed to us (fix round 1, L2).
       if (!enabled) return 'idle'
-      if (costOptions.length > 0) return costOptions.includes(item.uid) ? 'playable' : 'idle'
+      // …and the moment a card has been GIVEN, nothing in the fan is payable any
+      // more. The pending is what lights them up and it lives until the engine
+      // resolves — which is long after the player has chosen: the card is in the
+      // air, then lying open at the centre, then on its way to the discard, and
+      // the whole fan stayed lit through all of it (owner, 22.09).
+      if (costOptions.length > 0 && !costGone)
+        return costOptions.includes(item.uid) ? 'playable' : 'idle'
+      if (costOptions.length > 0) return 'idle'
       return accentAt(index) ? 'selected' : 'idle'
     },
-    [enabled, handItems, costOptions, accentAt],
+    [enabled, handItems, costOptions, costGone, accentAt],
   )
 
   // STAGING A RELEASE — the one play that stands at the STAGE slot rather than
@@ -924,7 +984,7 @@ export function useBoardStaging({
   // than adopting this flyer (this hook's own flyer is gone by then anyway —
   // `drop('cost')` two lines below).
   const onCostPick = useCallback(
-    (uid: string) => {
+    (uid: string, at?: DOMRect) => {
       if (!enabled || !costOptions.includes(uid)) return
       // measured against `handItems` — the array the fan actually RENDERS
       // (the staged release is already excluded from it) — not `you.hand`,
@@ -935,18 +995,38 @@ export function useBoardStaging({
       const index = handItems.findIndex((c) => c.uid === uid)
       const item = handItems[index]
       if (!item) return
+      // it leaves the fan NOW, in the commit the carrier takes it: `setPaying`
+      // and `raise` are both plain state writes made before anything awaits, so
+      // React batches them into one render
+      setPaying(uid)
+      setCostGone(uid)
       void (async () => {
         const to = anchors.cost.current?.getBoundingClientRect()
-        const from = reduced ? undefined : slotBox(index, handItems.length)
+        // WHERE IT PHYSICALLY IS — the rect the pull let go at when there is one,
+        // and the card's own fan slot otherwise. A flight that starts where the
+        // card never was jumps on its first frame (I1/I6).
+        const from = reduced ? undefined : (at ?? slotBox(index, handItems.length))
         if (!reduced && from && to) {
-          const [el] = await flyer.raise([{ key: 'cost', card: item.card, at: from }])
-          if (el) await play('playToCenter', el, { from, to })?.finished
+          // THE SHARED JOURNEY — a card travels to a named place at the centre
+          // and stays there, pinned, so whatever moves it on starts from where
+          // it stands. Written out here once, which is one time too many: the
+          // module is what `drawBeat`, `aiBeat` and the DDoS effect all take.
+          await costCarrier.toSlot({
+            key: 'cost',
+            card: item.card,
+            from,
+            to,
+            faceDown: false,
+            motion: 'playToCenter',
+          })
         }
         // the swap from carrier to static render happens in the SAME commit —
         // the approved source's own `payCost` idiom (`setCost` / `drop('fly')`
         // together) — so there is never a frame with neither on screen.
-        setPaidCost({ uid, card: item.card })
-        flyer.drop('cost')
+        setPaidCost({ uid, card: item.card, index })
+        setPaying(null)
+        costCarrier.drop('cost')
+        costWatermarkRef.current = eventsRef.current.length
         actions?.onResolve?.({ kind: 'discardForRelease', card: uid })
       })()
     },
@@ -957,10 +1037,40 @@ export function useBoardStaging({
       reduced,
       slotBox,
       anchors.cost,
-      flyer.raise,
-      flyer.drop,
+      costCarrier.toSlot,
+      costCarrier.drop,
       actions,
     ],
+  )
+
+  // THE COST IS PULLED OUT OF THE HAND, never clicked. Every other step that
+  // asks for a card from the fan takes it the same way — a defence answering an
+  // attack, a Debugger answering a 503, the hand limit, System Upgrade — and the
+  // discipline is written beside the 503's own line: one gesture per step. This
+  // was the one place that still took a click, which made paying for a release
+  // read as a different kind of act from every other card you give up.
+  //
+  // `drop` is where the player let go. Dropping it back over your own hand is
+  // changing your mind, so the card simply stays — the same answer the 503's own
+  // pull gives, and the reason this returns a boolean: false hands the gesture
+  // back to the fan, which settles the card home itself.
+  const onCostPlay = useCallback(
+    (uid: string, drop: HandPlayDrop): boolean => {
+      if (!enabled || !costOptions.includes(uid)) return false
+      // let go over your own hand and nothing is spent — the card settles back
+      // into the fan, which is what the fan does with a refused pull
+      const hand = anchors.hand.current?.getBoundingClientRect()
+      const home =
+        hand &&
+        drop.x >= hand.left &&
+        drop.x <= hand.right &&
+        drop.y >= hand.top &&
+        drop.y <= hand.bottom
+      if (home) return false
+      onCostPick(uid, drop.rect)
+      return true
+    },
+    [enabled, costOptions, anchors.hand, onCostPick],
   )
 
   // the fold — ported from ComboStory's `pickPartner`. The support is ALREADY
@@ -976,15 +1086,12 @@ export function useBoardStaging({
       // `!enabled` that gesture's own actions are inert anyway, so the refusal
       // costs nothing and stays in one place.
       if (!enabled || cancellingRef.current || foldingRef.current) return true
-      // A cost owed routes here too (Board hands every fan click to this
-      // gesture first, rather than picking one by condition): the click names a
-      // fan card by INDEX, resolved against `handItems` — the same rendered
-      // order `onCostPick`'s own caller expects a uid from.
-      if (costOptions.length > 0) {
-        const item = handItems[index]
-        if (item) onCostPick(item.uid)
-        return true
-      }
+      // A COST IS NOT PAID BY CLICKING. It is pulled out of the fan like every
+      // other card given up (`onCostPlay`), so this gesture takes the click and
+      // does nothing with it rather than passing it on: while a cost is owed the
+      // only thing a fan card can do is pay, and handing the click to the plain
+      // play gesture would start a play the engine is about to refuse.
+      if (costOptions.length > 0) return true
       const s = stagedRef.current
       // A click chooses a cost or a combo partner; it never starts a play.
       if (!s) return false
@@ -1197,7 +1304,7 @@ export function useBoardStaging({
       actions,
       cancel,
       costOptions,
-      onCostPick,
+      onCostPlay,
     ],
   )
 
@@ -1287,6 +1394,37 @@ export function useBoardStaging({
     if (!reduced || cost) return
     setPaidCost(null)
   }, [reduced, cost])
+
+  // THE ENGINE SAID NO TO THE COST — the card goes back into the fan, and it
+  // FLIES there, through the shared insert every other card returning to a hand
+  // uses. Nothing brought it home before: the card was simply dropped from the
+  // cost slot and the projection drew it back into the fan on the next render,
+  // which is a card appearing in the hand rather than arriving in it.
+  //
+  // It lands at the middle of the fan, like any arrival: the slot it left is not
+  // its place any more — the fan has been laid out without it ever since the
+  // pull took it.
+  useEffect(() => {
+    const paid = paidCost
+    if (!paid) return
+    const fresh = events.slice(costWatermarkRef.current)
+    const refused = fresh.some(
+      (e) =>
+        e.type === 'rejected' &&
+        'choice' in e.action &&
+        e.action.choice?.kind === 'discardForRelease' &&
+        e.action.choice.card === paid.uid,
+    )
+    if (!refused) return
+    costWatermarkRef.current = events.length
+    setPaidCost(null)
+    // it is coming back, so it is the fan's again — the flight below is what
+    // puts it there, and until it lands the arrival's own carrier draws it
+    setCostGone(null)
+    const at = anchors.cost.current?.getBoundingClientRect()
+    if (reduced || !at) return
+    flyHome([{ key: paid.uid, card: paid.card, from: at }], paid.index)
+  }, [events, paidCost, anchors.cost, reduced, flyHome])
 
   // the engine said no: the staged play returns to the fan. ATTACK's own
   // rejection carries both halves (`card` the main, `combo` the support), so
@@ -1401,7 +1539,12 @@ export function useBoardStaging({
     // the fold's own node only while it is carrying one: consumers read this
     // array's LENGTH to know whether a carrier is up (`_Board.tsx`'s own solo
     // staged render), so an always-present empty slot would read as one
-    overlay: [...flyer.overlay, ...arrival.overlay, ...(pair.overlay ? [pair.overlay] : [])],
+    overlay: [
+      ...flyer.overlay,
+      ...costCarrier.overlay,
+      ...arrival.overlay,
+      ...(pair.overlay ? [pair.overlay] : []),
+    ],
     gapAt: arrival.gapAt,
     gapSize: arrival.gapSize,
     handItems,
@@ -1416,7 +1559,7 @@ export function useBoardStaging({
     cancel,
     release,
     costOptions,
-    onCostPick,
+    onCostPlay,
     stageStanding: stage === 'standing',
     paidCost,
     clearPaidCost,
