@@ -34,12 +34,16 @@ two-bot keeper progression have regression coverage. Debug preset: `503 → watc
 
 ## Board instruction pills and missing navigation — closed 2026-09-21
 
-The owner requested removal of the extra instruction pills and restoration of the right-hand
-tabs. The frontend's shared ask band and duplicate decline button are removed for defence,
-Sudo pairing, release cost, neutralization and hand-limit discards. TurnDock Pass remains the
-way to decline an attack, as in DefenseReleaseStory; both pointer and keyboard activation
+The initial 2026-09-21 implementation removed the whole frontend ask band while restoring
+the right-hand tabs. PR #177 review identified that this also removed the only gesture
+instructions for four decisions whose generic pending panel is suppressed.
+
+**Superseding correction, 2026-09-22:** the owner's request to address that review restores
+`askCost`, `askHandLimit`, `askNeutralize` and `askPartner`, with their RU/EN copy. Each hint
+is shown only while its action is owed and becomes inert while fading out after an answer.
+The ordinary `askDefend` line and duplicate decline button remain removed, as #163 requests.
+TurnDock Pass remains the way to decline an attack; pointer and keyboard activation both
 return an unpaired Sudo. The playground cost-only AskLine demonstration remains unchanged.
-This supersedes the earlier proposal to port AskLine onto the live Board.
 
 The rail was present in the DOM but covered after opening: hudIn's filled animation leaves
 its wrapper as a stacking context, so the closed Drawer at 350 painted over the descendant

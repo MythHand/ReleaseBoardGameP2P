@@ -142,7 +142,47 @@
   pointer-events: none;
 }
 
+/* Gesture hints sit below the staged cards and never intercept input. */
+.ask {
+  position: absolute;
+  inset-block-start: 42%;
+  inset-inline-start: 50%;
+  z-index: 12;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 132px);
+  transition:
+    opacity 260ms var(--ease-out),
+    transform 260ms var(--ease-out);
+}
+
+.ask[data-shown="true"] {
+  opacity: 1;
+  transform: translate(-50%, 146px);
+}
+
+/* the words themselves — a pill, so the line reads against whatever the table
+   happens to be painting behind it */
+.askLine {
+  padding-block: 10px;
+  padding-inline: 18px;
+  color: var(--fg);
+  text-align: center;
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  border: 1px solid var(--white-20);
+  border-radius: 999px;
+  box-shadow: 0 6px 20px var(--black-45);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .ask {
+    transform: translate(-50%, 146px);
+    transition: none;
+  }
+
   .cellCard[data-grabbable="true"] {
     transition: none;
   }

@@ -313,17 +313,23 @@ it('does not pass after a defense card has already answered', async () => {
   expect(onPass).not.toHaveBeenCalled()
 })
 
-// A staged Sudo still waits on the hand, without an extra instruction pill.
-it('keeps Sudo partner selection clear of instruction pills', async () => {
+// A staged Sudo asks for a different gesture: click its defence partner.
+it('explains Sudo partner selection without restoring the generic defence hint', async () => {
   render(
     defenceBoard({
       options: ['defense-hotfix#0'],
       combos: { 'support-sudo#0': ['defense-hotfix#0'] },
     }),
   )
-  await pullFromFan('support-sudo#0')
   expect(screen.queryByTestId('board-ask')).toBeNull()
+  await pullFromFan('support-sudo#0')
+  const ask = screen.getByTestId('board-ask')
+  expect(ask.textContent).toBe(makeBoardProps().copy.table.askPartner)
+  expect(ask.getAttribute('data-shown')).toBe('true')
   expect(screen.queryByTestId('board-decline')).toBeNull()
+  await clickFanCard('defense-hotfix#0')
+  expect(ask.getAttribute('data-shown')).toBe('false')
+  expect(ask.hasAttribute('inert')).toBe(true)
 })
 
 // A waiting Sudo has not answered yet. Both a pointer press and keyboard

@@ -289,14 +289,17 @@ describe.each(['neutralize503', 'crush'] as const)('%s card gestures', (kind) =>
     else expect(screen.queryByTestId('board-centre-alarm')).toBeNull()
   })
 
-  it('keeps the alarm clear of instruction pills before and after answering', async () => {
+  it('explains the alarm response only while an answer is still owed', async () => {
     const { container } = render(
       withAlarm({ methods: ['debugger'], hand: ['protection-debugger'] }),
     )
     layOut(container)
-    expect(screen.queryByTestId('board-ask')).toBeNull()
+    const ask = screen.getByTestId('board-ask')
+    expect(ask.textContent).toBe(makeBoardProps().copy.table.askNeutralize)
+    expect(ask.getAttribute('data-shown')).toBe('true')
     await playFromHand(0, { x: 640, y: 200 })
-    expect(screen.queryByTestId('board-ask')).toBeNull()
+    expect(ask.getAttribute('data-shown')).toBe('false')
+    expect(ask.hasAttribute('inert')).toBe(true)
   })
 
   it('a rejected Debugger comes back to the fan', async () => {

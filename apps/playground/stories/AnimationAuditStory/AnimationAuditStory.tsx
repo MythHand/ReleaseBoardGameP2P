@@ -1289,8 +1289,8 @@ const ISSUES: Issue[] = [
       en: 'CLOSED: extra instruction pills and missing right tabs on the Board',
     },
     problem: {
-      ru: 'Решение владельца от 21.09.2026 заменяет прежний план переноса AskLine: плашки и отдельная кнопка отказа удалены из игры, отказ остаётся в TurnDock. Компонент AskLine и сцена оплаты в плейграунде сохранены. Вкладки накрывала закрытая панель после hudIn: слой рейла теперь задан на его анимированной обёртке. История и правила доступны и поверх выбора Rebase.',
-      en: 'The owner decision of 2026-09-21 supersedes the planned AskLine migration: instruction pills and the extra decline button are removed from the live game; TurnDock owns declining. AskLine and the playground cost scene remain. The closed drawer covered the tabs after hudIn: the animated rail wrapper now owns its layer. History and rules also remain accessible above Rebase choices.',
+      ru: 'Уточнение по ревью PR #177 от 22.09.2026 заменяет полное удаление плашек: убраны только общая подсказка защиты и отдельная кнопка отказа, отказ остаётся в TurnDock. Подсказки оплаты релиза, лимита руки, нейтрализации и выбора защиты для Sudo восстановлены: на этих шагах отдельная панель скрыта. Вкладки накрывала закрытая панель после hudIn; слой рейла задан на анимированной обёртке. История и правила доступны поверх выбора Rebase.',
+      en: 'The PR #177 review correction of 2026-09-22 supersedes removing every hint: only the generic defence hint and duplicate decline button stay removed; TurnDock owns declining. Release cost, hand limit, neutralization and Sudo partner hints are restored because those steps suppress the generic panel. The animated rail wrapper owns its layer above the closed drawer after hudIn. History and rules remain accessible above Rebase choices.',
     },
     where: {
       ru: 'frontend: pages/board/[gameId]/_Board.tsx + _Board.module.css; история решения: docs/animations/backlog.md',

@@ -1145,6 +1145,18 @@ export default function Board({
   // being asked and nothing may be offered — the standard `dock.ts` states for
   // its own keys: offered only where the action behind it is legal RIGHT NOW.
   const unanswered = answering && defencePhase !== 'dispatched' && defencePhase !== 'rejected'
+  // These decisions suppress the generic panel and need their own gesture hint.
+  // Ordinary defence needs no duplicate line; declining remains in the dock.
+  let ask: string | null = null
+  if (unanswered && defencePhase === 'partner') ask = copy.table.askPartner
+  else if (costPending) ask = copy.table.askCost
+  else if (discarding && handLimit.owed > 0) ask = copy.table.askHandLimit
+  else if (alarmMineOpen && !neutralizing.staged && !neutralizing.answered)
+    ask = copy.table.askNeutralize
+  // Keep the last words during fade-out, with the hidden line inert.
+  const lastAsk = useRef<string | null>(null)
+  if (ask) lastAsk.current = ask
+
   const declineAttack = () => {
     // Keyboard activation has no mousedown to send an unpaired Sudo home.
     if (defencePhase === 'partner') defenseStaging.cancel()
@@ -2095,6 +2107,19 @@ export default function Board({
             onResolve={(choice) => actions?.onResolve?.(choice)}
           />
         )}
+
+      {lastAsk.current && (
+        <div
+          className={opening.ask}
+          data-shown={ask != null}
+          data-testid="board-ask"
+          inert={ask == null}
+        >
+          <Typography as="div" base="label-sm" tk="tk-16" className={opening.askLine}>
+            {lastAsk.current}
+          </Typography>
+        </div>
+      )}
 
       {/* вертикальный рейл у правого края — переключает панели drawer. Слой
           нужен только чтобы вести его появление, не трогая его собственный

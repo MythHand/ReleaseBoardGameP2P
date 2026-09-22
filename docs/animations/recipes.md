@@ -2530,6 +2530,13 @@ widths and the cell offsets, quoted from this scene.
 
 ## Defending a release — the whole turn, play through defence
 
+**Live-board gesture hints (#163, PR #177 review).** The ordinary defence instruction and
+extra decline button are absent; TurnDock Pass owns declining. Four decisions still need
+their text below the staged cards because their generic pending panel is suppressed: click
+a hand card to pay a release, pull excess cards for the hand limit, answer an alarm with a lit
+card, and click a defence partner for a staged Sudo. Each line fades out and becomes inert
+once that step is answered. This preserves the specific gestures without duplicating defence.
+
 **When to call.** Turn start with a Release in hand. The turn is a chain: play → cost → attack window
 → answer.
 

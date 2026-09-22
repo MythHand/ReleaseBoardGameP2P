@@ -611,10 +611,17 @@ it('hands off when onResolve synchronously advances to the accepted projection',
   }
 })
 
-it('offers the discard grid without an instruction pill or a panel', () => {
+it('explains excess discards until the hand limit is satisfied without a panel', async () => {
   render(boardOverLimit(2))
   const copy = makeBoardProps().copy
-  expect(screen.queryByTestId('board-ask')).toBeNull()
+  const ask = screen.getByTestId('board-ask')
+  expect(ask.textContent).toBe(copy.table.askHandLimit)
+  expect(ask.getAttribute('data-shown')).toBe('true')
+  await pullCardFromFan(0)
+  expect(ask.getAttribute('data-shown')).toBe('true')
+  await pullCardFromFan(0)
+  expect(ask.getAttribute('data-shown')).toBe('false')
+  expect(ask.hasAttribute('inert')).toBe(true)
   // the cards on the table are the question — a panel would ask it twice, and
   // would cover the grid it is asking about
   expect(screen.queryByText(copy.pending.handLimit.prompt)).toBeNull()

@@ -653,9 +653,15 @@ it('lights nothing while no step is waiting on the fan', () => {
   }
 })
 
-it('keeps the release cost choice clear of instruction pills', () => {
-  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
-  expect(screen.queryByTestId('board-ask')).toBeNull()
+it('explains how to pay a release and hides the hint once payment ends', () => {
+  const { rerender } = render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+  const ask = screen.getByTestId('board-ask')
+  expect(ask.textContent).toBe(makeBoardProps().copy.table.askCost)
+  expect(ask.getAttribute('data-shown')).toBe('true')
+  expect(screen.queryByTestId('pending-prompt')).toBeNull()
+  rerender(releaseBoard({}))
+  expect(ask.getAttribute('data-shown')).toBe('false')
+  expect(ask.hasAttribute('inert')).toBe(true)
 })
 
 // The dock does NOT get a state of its own for the cost (#101, review round 2).

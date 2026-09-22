@@ -174,6 +174,11 @@ export interface BoardChromeCopy {
   // заголовок группы управления хоста + подпись поля лимита зрителей
   hostTitle: string
   specLimit: string
+  // Gesture hints for decisions whose generic panel is suppressed.
+  askCost: string
+  askPartner: string
+  askNeutralize: string
+  askHandLimit: string
   // Caption for the private Inside discard picker.
   insidePrompt: string
   // Git Cherry-pick's own grid (#108, `pickFromDiscard`, `operation-git-
