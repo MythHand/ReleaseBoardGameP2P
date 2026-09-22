@@ -1,20 +1,13 @@
 import type { Event } from '@release/engine'
-import type { CardData, HandItem, TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardById, Typography } from '@release/ui'
-import {
-  nextFrames,
-  play,
-  scatterAt,
-  useDiscardExit,
-  useFlyer,
-  useHandArrival,
-  wait,
-} from '@release/ui/animations'
+import type { CardData, TableActions } from '@release/ui'
+import { Card, ConfirmAction, cardById, TableSurface, Typography } from '@release/ui'
+import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
 import type { ReactNode, RefObject } from 'react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import type { DiscardPickHandoff } from '~/entities/game/board/types'
 import { SEAT_SHRINK } from '~/features/board-beats/seat'
+import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import styles from './_useCherryPickStaging.module.css'
 import { useResolveFeedback } from './_useResolveFeedback'
@@ -64,7 +57,7 @@ export function useCherryPickStaging(args: {
   events?: Event[]
   anchors: BoardAnchors
   actions?: TableActions
-  onHandArrival: (hand: HandItem[], uid: string, at: number) => void
+  onHandArrival: (order: string[], uid: string, at: number) => void
   copy: {
     prompt: string
     sudoPrompt: string
@@ -183,18 +176,10 @@ export function useCherryPickStaging(args: {
   // The one carrier this surface raises itself: the card that goes on the deck
   // as WATCHED — face down, out from under the pile, belonging to nobody's cell.
   const deckFlyer = useFlyer()
-  const taking = useRef<BeatRun | null>(null)
-  const arrival = useHandArrival(anchors.hand, (gap, cards) => {
-    const ctx = taking.current
-    if (!ctx) return
-    const hand = [...ctx.base.you.hand]
-    hand.splice(gap, 0, ...cards.map((card) => ({ uid: card.key, card: card.card })))
-    // Commit the same physical UID and slot to both owners: the queue's
-    // current fan and the private order applied to future wire projections.
-    args.onHandArrival(hand, cards[0].key, gap)
-    ctx.base = { ...ctx.base, you: { ...ctx.base.you, hand } }
-    ctx.publish(ctx.base)
-  })
+  // The card into the fan, whole — the shared movement owns the uid it will be
+  // known by, the middle of the fan, the committed slot and the run's own base
+  // (`toHand`). This surface used to carry all four itself.
+  const arrival = useToHand(anchors.hand, args.onHandArrival)
 
   const resolve = useResolveFeedback(args.events ?? [], state.selfId, actions, () => {
     args.handoff.current = null
@@ -384,7 +369,6 @@ export function useCherryPickStaging(args: {
     args.handoff.current = {
       card: ours.options.find((o) => o.uid === hand)?.id ?? '',
       run: async (ctx) => {
-        taking.current = ctx
         const after = ctx.after ?? ctx.base
         setFlying(true)
         const handData = cardById(ours.options.find((o) => o.uid === hand)?.id ?? '')
@@ -428,7 +412,7 @@ export function useCherryPickStaging(args: {
           await nextFrames()
           await play('playToCenter', el, { from, to, duration: REVEAL_DUR })?.finished
           await wait(REVEAL_HOLD)
-          await arrival.arrive([{ key: hand, card: handData, el }], ctx.base.you.hand.length)
+          await arrival.land(ctx, { card: handData, el, fallbackKey: hand })
         })()
         const deckFlight = (async () => {
           if (!deck || !deckData || !deckRect) return
@@ -519,7 +503,6 @@ export function useCherryPickStaging(args: {
           ctx.publish(ctx.base)
         }
         answeredKey.current = offerKey(ours)
-        taking.current = null
         setFlying(false)
         setConfirmed(false)
       },
@@ -550,9 +533,10 @@ export function useCherryPickStaging(args: {
   useEffect(() => {
     if (!theirs || reduced) return
     args.handoff.current = {
-      run: async (ctx, takenId) => {
+      // the watcher lands nothing in OUR fan — somebody else takes the card —
+      // so it has no run to grow, only its own choreography to play
+      run: async (_ctx, takenId) => {
         const { watched: cells, sudo: two } = watchRef.current
-        taking.current = ctx
         setFlying(true)
         const centre = anchors.centre.current?.getBoundingClientRect()
         const seat = anchors.seatBox(watchRef.current.theirs?.player ?? '')
@@ -638,7 +622,6 @@ export function useCherryPickStaging(args: {
           await wait(DECK_HOLD)
           deckFlyer.drop('to-deck')
         }
-        taking.current = null
         setFlying(false)
       },
     }
@@ -677,11 +660,11 @@ export function useCherryPickStaging(args: {
       // it — so it drops to the band a travelling card rides in, under the pile
       // counters. Keyed on the same flag the scrim leaves on, so the switch
       // happens before anything moves (Rebase's own `answered`, same rule).
-      <div
-        className={`${styles.grid} ${confirmed ? styles.flight : ''}`}
-        data-testid="board-cherry-grid"
+      <TableSurface
+        committed={confirmed}
+        testId="board-cherry-grid"
+        blockTestId="board-cherry-scrim"
       >
-        {!confirmed && <div className={styles.scrim} data-testid="board-cherry-scrim" />}
         <div className={`${styles.cells} ${dealing ? styles.dealing : ''}`}>
           {options.map((o) => {
             const data = cardById(o.id)
@@ -750,7 +733,7 @@ export function useCherryPickStaging(args: {
           disabled={!ready}
           onConfirm={confirmPick}
         />
-      </div>
+      </TableSurface>
     ),
     overlay,
     ...gaps,

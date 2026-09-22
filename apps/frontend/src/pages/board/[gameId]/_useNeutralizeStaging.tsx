@@ -34,7 +34,7 @@ import type {
   TablePending,
 } from '@release/ui'
 import { Card, CardPair } from '@release/ui'
-import { play, type Rect, useFlyer, useHandArrival } from '@release/ui/animations'
+import { play, type Rect, useFlyer } from '@release/ui/animations'
 import {
   Fragment,
   type MouseEvent as ReactMouseEvent,
@@ -48,6 +48,7 @@ import {
 } from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { COVER_POSE } from '~/entities/game/board'
+import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useCoverFlight } from './_useCoverFlight'
 import { useZonePull } from './_useZonePull'
@@ -119,6 +120,12 @@ export interface Options {
   /** the match this staging belongs to — same boundary and the same reason as
    *  `_useBoardStaging.ts`'s and `_useDefenseStaging.tsx`'s own. */
   matchKey?: string | null
+  /**
+   * The fan's private order. A card coming home lands in the MIDDLE of the fan
+   * like every other arrival, so its slot has to be committed or the next
+   * projection puts it back where it used to sit.
+   */
+  onHandArrival?: (order: string[], uid: string, at: number) => void
 }
 
 export function useNeutralizeStaging({
@@ -128,6 +135,7 @@ export function useNeutralizeStaging({
   events,
   enabled,
   matchKey = null,
+  onHandArrival,
 }: Options): NeutralizeStaging {
   const [staged, setStaged] = useState<NeutralizeStaged | null>(null)
   const [answered, setAnswered] = useState(false)
@@ -155,11 +163,14 @@ export function useNeutralizeStaging({
     setStaged(next)
   }
 
-  const arrival = useHandArrival(anchors.hand, () => {
+  // The card comes home through the shared movement (`toHand`) — the middle of
+  // the fan, the committed slot, and this gesture's own ending when it is in.
+  const arrival = useToHand(anchors.hand, onHandArrival)
+  const endReturn = () => {
     returningRef.current = false
     setReturning(false)
     commitStaged(null)
-  })
+  }
 
   // the pending owed to US — read once, so every reader downstream agrees on
   // the same instant of it.
@@ -245,18 +256,10 @@ export function useNeutralizeStaging({
       returningRef.current = true
       setReturning(true)
       void (async () => {
-        const taken = await arrival.arrive(
-          [{ key: home.uid, card: s.card, from }],
-          handItems.length,
-          home.index,
-        )
-        // a refused arrival never calls `onLanded`, so nothing else would ever
-        // put the card back (#101, Fix D, finding 2's own lesson)
-        if (!taken) {
-          returningRef.current = false
-          setReturning(false)
-          commitStaged(null)
-        }
+        const taken = await arrival.home([{ key: home.uid, card: s.card, from }], endReturn)
+        // a refused flight never lands, so nothing else would ever put the card
+        // back (#101, Fix D, finding 2's own lesson)
+        if (!taken) endReturn()
       })()
       return
     }
@@ -283,7 +286,7 @@ export function useNeutralizeStaging({
   }, [
     reduced,
     handItems.length,
-    arrival.arrive,
+    arrival.home,
     anchors.cover,
     anchors.releaseSlot,
     state.selfId,

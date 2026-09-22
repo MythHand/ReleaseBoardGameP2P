@@ -5,7 +5,7 @@ import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@re
 import { type RefObject, useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
 import type { BeatPlan, DiscardCard } from './planBeats'
-import { supportFirst, withLanded, withoutLanded } from './toHeap'
+import { settleInto, withLanded, withoutLanded } from './toHeap'
 import { withoutFlown } from './withoutFlown'
 
 // DeckAnimationsStory.playSequence keeps the public play up throughout the
@@ -119,6 +119,21 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
   // What the standing card's own exit looks like — one builder, because the
   // card can leave in two ways: on its own beat (`runExit`), or carried out by
   // the beat that is emptying the same centre (`handOver`).
+  // WHAT LAY WHERE, for the heap — the very layer `exitItems` carries each half
+  // out on. The heap takes cards as they lay on the table and decides nothing
+  // about them itself, so the side that knows the table is the side that says.
+  const filedAsFlown = useCallback(
+    (
+      operation: Extract<BeatPlan, { kind: 'operationPlaced' }>,
+      spent: { eventId: number; card: string }[] | undefined,
+    ) =>
+      (spent ?? operation.spent).map((c) => ({
+        ...c,
+        layer: operation.sudo && c.card === 'support-sudo' ? 0 : 1,
+      })),
+    [],
+  )
+
   const exitItems = useCallback(
     (
       operation: Extract<BeatPlan, { kind: 'operationPlaced' }>,
@@ -163,24 +178,39 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
   // centre takes this card into its own send instead. The two halves are the
   // same two moments `runExit` has internally: `takeOff` in the commit the
   // carriers go up, `settle` once they have landed.
-  const handOver = useCallback(() => {
-    const operation = held.current
-    if (!operation) return null
-    const items = exitItems(operation, operation.spent)
-    if (!items || items.length === 0) return null
-    return {
-      items,
-      spent: operation.spent,
-      takeOff: () => {
-        setLanded(null)
-        flyer.drop()
-      },
-      settle: () => {
-        held.current = null
-        setStanding(false)
-      },
-    }
-  }, [exitItems, flyer.drop])
+  const handOver = useCallback(
+    (ctx: BeatRun) => {
+      const operation = held.current
+      if (!operation) return null
+      // NO ITEMS IS STILL AN EXIT. A card with nothing to fly — no centre to
+      // measure, no node to carry — still has to stop standing: the only thing
+      // that ever takes it off the table is this settle, so returning nothing
+      // here left it at the centre for the rest of the match, long after its
+      // effect was over (owner, 23.09).
+      const items = exitItems(operation, operation.spent) ?? []
+      return {
+        items,
+        takeOff: () => {
+          setLanded(null)
+          flyer.drop()
+        },
+        settle: () => {
+          // …AND THE CARDS GO INTO THE HEAP, the same call this beat's own exit
+          // makes (`runExit`). While the card stands at the centre the heap is
+          // drawn without it — it cannot be in two places — so whoever takes it
+          // away is the one who has to put it back. Handed over and not filed,
+          // the discard was left one card short of its own count, and the heap
+          // answers that by standing a place-holder on top whose pose is keyed
+          // to the count: every card landing after it re-posed it, which reads
+          // as the whole discard shuffling itself (owner, 23.09).
+          settleInto(ctx, filedAsFlown(operation, operation.spent))
+          held.current = null
+          setStanding(false)
+        },
+      }
+    },
+    [exitItems, filedAsFlown, flyer.drop],
+  )
 
   // Nothing travels on a restore: the card is already resting at the centre.
   const restore = useCallback((state: BoardState, events: Event[]) => {
@@ -327,7 +357,7 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       if (run !== epoch.current) return
       // the cards go into the heap in the same breath the flight ends, support
       // under the card it paid for — the shared step owns both rules now
-      const withCards = withLanded(ctx.base, supportFirst(plan.spent ?? operation.spent))
+      const withCards = withLanded(ctx.base, filedAsFlown(operation, plan.spent))
       const pending = ctx.base.pending
       const settled = {
         ...withCards,
@@ -339,7 +369,7 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       held.current = null
       setStanding(false)
     },
-    [exitItems, flyer.drop, reset],
+    [exitItems, filedAsFlown, flyer.drop, reset],
   )
   const withoutHeld = useCallback((state: BoardState): BoardState => {
     return withoutSpent(state, held.current?.spent ?? [])

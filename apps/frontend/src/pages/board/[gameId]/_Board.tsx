@@ -196,7 +196,6 @@ export default function Board({
   // reading a card that stands at the centre — the shared block from the kit.
   // Five slots here (the release, its cost, the attack, the defender's sudo,
   // the cover), and each of them reads on its own.
-  const { slotProps: previewProps, overlay: previewOverlay } = useCardPreview()
 
   // The player's own sort of their fan, applied to the projection BEFORE the
   // intro, the queue or the staging gesture see it — so every shadow a beat
@@ -260,6 +259,9 @@ export default function Board({
   // own, and replaying them as discards would fly cards that never left a hand
   // on screen.
   const beats = useBeats({
+    // a card that lands IN the fan keeps the slot it landed in — see the queue's
+    // own note; without it the card teleports the moment it has settled
+    onHandArrival: (order) => handOrder.place(order),
     live,
     discardPick: discardPickRef,
     requestPick: requestPickRef,
@@ -272,6 +274,14 @@ export default function Board({
     handLimit: handLimitRef,
     clearPaidCost: clearPaidCostRef,
     takeStagedRelease: takeStagedReleaseRef,
+  })
+
+  // Nothing is read while the table is moving: the queue's own `running` is what
+  // says so, and it stays true across the handover between two beats of one
+  // batch — which is exactly the window where slots mount and unmount under a
+  // still cursor and the preview blinks.
+  const { slotProps: previewProps, overlay: previewOverlay } = useCardPreview({
+    quiet: beats.running,
   })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined
@@ -338,6 +348,8 @@ export default function Board({
     actions,
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
+    onHandArrival: (order) => handOrder.place(order),
+
     // the match boundary (#101, Fix C, finding 3) — `<Board>` is not remounted
     // for a rematch, so the gestures need the same wipe `useBeats` already
     // takes on this key.
@@ -373,6 +385,7 @@ export default function Board({
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
+    onHandArrival: (order) => handOrder.place(order),
   })
   // The defense still owns its hand exclusions after the beat closes the
   // prompt: its exit is flying the spent cards while the shadow holds the
@@ -389,16 +402,7 @@ export default function Board({
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
-    onReturned: (uid, slot) => {
-      const item = you.hand.find((card) => card.uid === uid)
-      if (!item) return
-      // The card never left `you.hand`, so this is a placement, not an
-      // arrival: rebuild the fan as it will look with the card back at the
-      // slot the pointer named, and commit that order.
-      const visible = [...handLimit.handItems]
-      visible.splice(slot, 0, item)
-      handOrder.commit(you.hand, visible, uid, slot)
-    },
+    onHandArrival: (order) => handOrder.place(order),
   })
   // The alarm standing at the centre. Read ONCE, same reason and same shape as
   // `pendingDefend` above. `staging.staged` does not gate it: an answer to a
@@ -450,6 +454,7 @@ export default function Board({
     events: intro?.events ?? [],
     enabled: alarmMineOpen && !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
+    onHandArrival: (order) => handOrder.place(order),
   })
 
   // naming a card, and losing one (#105). The band replaces the panel for
@@ -491,7 +496,7 @@ export default function Board({
     events: intro?.events ?? [],
     anchors,
     actions,
-    onHandArrival: (hand, uid, at) => handOrder.commit(hand, hand, uid, at),
+    onHandArrival: (order) => handOrder.place(order),
     copy: {
       prompt: copy.table.cherryPickPrompt,
       sudoPrompt: copy.table.cherryPickSudoPrompt,
@@ -512,6 +517,9 @@ export default function Board({
     events: intro?.events ?? [],
     anchors,
     actions,
+    // the row's cards stand small to be reordered, and small is not readable —
+    // they take the table's own preview, the same one every other slot reads by
+    preview: previewProps,
     copy: {
       prompt: copy.table.rebasePrompt,
       position: copy.table.rebasePosition,
@@ -749,9 +757,11 @@ export default function Board({
   // Rebase row, Inside's row and the card request all answer on the surface
   // itself: the hand has no part in them, and under their dimming it must not
   // keep lifting cards, spreading them and raising its zoom preview at the
-  // cursor. System Upgrade is the exception and stays live — its answer IS a
-  // card pulled out of the fan.
-  const surfaceOwnsTable = [cherry.grid, rebase.row, inside.row, requesting.band].some(Boolean)
+  // cursor. System Upgrade is in it for the half of its step that is a choice on
+  // the surface — and out of it for the ask, whose answer IS a card pulled out
+  // of the fan.
+  const surfaceOwnsTable =
+    [cherry.grid, rebase.row, inside.row, requesting.band].some(Boolean) || upgrade.answering
   // The scene's own rule (`ComboStory`: `merged || playing`): while the play is
   // ON THE TABLE — standing at the centre, or anything of this gesture still in
   // the air — the fan stops answering the cursor for the same reason. The one
@@ -766,9 +776,29 @@ export default function Board({
     staging.staged?.merged === true ||
     staging.staged?.phase === 'target' ||
     staging.staged?.phase === 'dispatched'
-  const handInert =
-    (staging.costOptions.length === 0 && (playStanding || staging.overlay.length > 0)) ||
-    surfaceOwnsTable
+  // …and the same rule from the other side, which is the one the reference
+  // states outright: WHILE THE TABLE IS BUSY THE FAN ANSWERS NOTHING. Every
+  // playground scene that holds a hand writes it the same way — the hand is live
+  // only when the scene is idle or `done`, and `done` is not the moment the
+  // answer is given but the moment the last card this play put in the air has
+  // landed (`GitCards/*`: `phase === 'idle' || phase === 'done'`;
+  // `GameEndStory`, `DefenseReleaseStory`: `busy`).
+  //
+  // The board's own "busy" is the beat queue plus whatever this seat's gesture
+  // is still holding up. The queue is what the fan was missing: between a
+  // confirm and the flight it produces, nothing of this seat's own was in the
+  // air, so the fan woke up for the length of the answer — long enough to lift a
+  // card and raise its preview under a cursor that had not moved (owner, 22.09).
+  //
+  // THE ONE EXCEPTION is the reference's own (`AiCardsStory`: `busy &&
+  // !handPickMode`): a step whose answer IS a card out of the fan keeps it live,
+  // whatever else is moving. Every such step names itself here — the cost of a
+  // release, the hand limit, the Upgrade's ask, an open defence, an alarm of
+  // ours — because a fan shut over the card it is waiting for is a dead end.
+  const answerLivesInTheFan =
+    staging.costOptions.length > 0 || discarding || upgrade.asked || answering || alarmMineOpen
+  const tableBusy = beats.running || playStanding || staging.overlay.length > 0
+  const handInert = (tableBusy && !answerLivesInTheFan) || surfaceOwnsTable
 
   // WHAT THE FAN SHOWS — the owner's own list, minus the cards the turn staging
   // is holding at the centre. Which hook owns the hand changes with the step,
@@ -1931,7 +1961,13 @@ export default function Board({
               // `docs/animations/backlog.md` and the audit register with the
               // shape that would close it; the deadlock this guard yields for
               // is the worse of the two, which is why it still yields.
-              style={{ pointerEvents: handInert ? 'none' : undefined }}
+              // …said as a STATE, not as a style: this wrapper is deliberately
+              // transparent to the cursor and hands pointer events to its own
+              // child, so a `pointer-events: none` written here was turned
+              // straight back on one level down and the fan stayed live under
+              // every surface (owner, 22.09). The wrapper owns both rules and
+              // reconciles them itself — see `.handWrap[data-inert]`.
+              data-inert={handInert || undefined}
               onMouseDown={handInert ? (e) => e.stopPropagation() : undefined}
             >
               <Hand

@@ -188,14 +188,16 @@ async function foldTheComboRelease() {
   })
 }
 
-// The fan's own wrapper — the element that carries the merged-pair pointer
-// guard. jsdom does NOT hit-test `pointer-events`, so a `fireEvent` click
-// lands whether or not the guard is on: this style read is the load-bearing
-// assertion, and the click assertions beside it pin the routing.
-function handWrapStyle(): string {
+// The fan's own wrapper — the element that carries the merged-pair guard. It is
+// a STATE the wrapper reconciles, not a style written here: the wrapper is
+// deliberately transparent to the cursor and hands pointer events to its child,
+// so a `pointer-events: none` written on it was turned straight back on one
+// level down. jsdom does NOT hit-test pointer events either way, so this read is
+// the load-bearing assertion and the click assertions beside it pin the routing.
+function handInert(): boolean {
   const wrap = document.querySelector<HTMLElement>('[class*="handWrap"]')
   if (!wrap) throw new Error('hand wrapper not rendered')
-  return wrap.style.pointerEvents
+  return wrap.dataset.inert === 'true'
 }
 
 // Drags a card out of the fan the way a real pointer does — the Hand's own
@@ -872,13 +874,13 @@ it('lets a combo release’s cost be paid out of the fan', async () => {
   const { rerender } = render(comboReleaseBoard({}, {}))
   await foldTheComboRelease()
   // the pair is standing, and the fan is inert — #100's guard, doing its job
-  expect(handWrapStyle()).toBe('none')
+  expect(handInert()).toBe(true)
 
   // the engine answers with the ordinary cost pending, `codeReview` riding
   // along invisibly (`pendingView` does not carry it)
   rerender(comboReleaseBoard({ pending: comboCostPending() }, { onResolve }))
   // …and NOW the fan must be live again: it is the only picker there is
-  expect(handWrapStyle()).not.toBe('none')
+  expect(handInert()).toBe(false)
   // the spare is offered, and lit
   const payer = document.querySelector<HTMLElement>('[data-hand-slot] [data-card="attack-bug"]')
   expect(payer?.getAttribute('data-state')).toBe('playable')
@@ -999,7 +1001,7 @@ it('hands the fan back after a reduced-motion cancel, with no flight to do it', 
     expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
     // no flight was raised, and the fan is usable again anyway
     expect(document.querySelector('[class*="arriving"]')).toBeNull()
-    expect(handWrapStyle()).not.toBe('none')
+    expect(handInert()).toBe(false)
 
     // the referee's answer puts both halves back: neither is still hidden
     rerender(comboReleaseBoard({}, { onResolve }))

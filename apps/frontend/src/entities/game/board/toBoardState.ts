@@ -416,14 +416,34 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     // under a Bug matched nothing and was folded ON TOP of the card it was
     // played with: the pair landed in the discard the right way up and then
     // swapped the instant the heap took over (#168).
-    const under =
-      pairing != null &&
-      pairing.player === e.player &&
-      pairing.support === e.card &&
+    //
+    // …AND A PLAY THAT NAMES NOTHING STILL LEAVES THE PROOF. A defence spent
+    // with a sudo is the case the rule above cannot see: its event carries no
+    // support field, so nothing here ever learned the two were one play, the
+    // sudo folded on top, and the pair swapped places a moment after landing
+    // the right way up (owner, 23.09). What the two DO carry is the event that
+    // caused them: both halves are banked by one effect and both name it as
+    // their parent, back to back, by the same player, for the same reason.
+    // That is the same proof, read off the cards themselves instead of off a
+    // play that happened to mention them.
+    const bothFromOneEffect =
+      e.parent !== undefined &&
+      // a PAIR, never a chain: the card before it must be one that is lying
+      // where it fell, not one already tucked under something else
+      tucked == null &&
       previous?.type === 'discarded' &&
+      previous.parent === e.parent &&
       previous.player === e.player &&
-      previous.card === pairing.main &&
       previous.reason === e.reason
+    const under =
+      bothFromOneEffect ||
+      (pairing != null &&
+        pairing.player === e.player &&
+        pairing.support === e.card &&
+        previous?.type === 'discarded' &&
+        previous.player === e.player &&
+        previous.card === pairing.main &&
+        previous.reason === e.reason)
     if (under) {
       heap.splice(heap.length - 1, 0, entry)
       tucked = entry.uid

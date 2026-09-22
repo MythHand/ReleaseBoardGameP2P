@@ -35,7 +35,6 @@ import {
   type Rect,
   restTransform,
   useFlyer,
-  useHandArrival,
   usePairFold,
   wait,
 } from '@release/ui/animations'
@@ -57,6 +56,7 @@ import {
 } from '~/entities/game/board'
 import { stageSlot } from '~/entities/game/board/stageSlot'
 import { useToCentre } from '~/features/board-beats/toCentre'
+import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 
 // Moved verbatim from the pre-#99 `_useBoardInteractions.ts` — the comparison a
@@ -204,6 +204,12 @@ export interface Options {
    * to `useBeats`.
    */
   matchKey?: string | null
+  /**
+   * The fan's private order. A card coming home lands in the MIDDLE of the fan
+   * like every other arrival, so its slot has to be committed or the next
+   * projection puts it back where it used to sit.
+   */
+  onHandArrival?: (order: string[], uid: string, at: number) => void
 }
 
 export function useBoardStaging({
@@ -213,6 +219,7 @@ export function useBoardStaging({
   events,
   enabled,
   matchKey = null,
+  onHandArrival,
 }: Options): BoardStaging {
   const [staged, setStaged] = useState<StagedPlay | null>(null)
   // True from the moment a cancel is ACCEPTED until its return flight lands —
@@ -294,7 +301,9 @@ export function useBoardStaging({
     setStaged(next)
   }
 
-  const arrival = useHandArrival(anchors.hand, () => {
+  // The card comes home through the shared movement (`toHand`): the middle of
+  // the fan, the committed slot, and this gesture's own ending when it is in.
+  const endCancel = () => {
     // The return flight landed: the cancel is over. Synchronous, same reason
     // as `onTargetPick`'s own ref write below — a press landing in THIS tick
     // must see the cancel as already resolved, not wait for the render this
@@ -317,7 +326,8 @@ export function useBoardStaging({
     // other play is staged — but a machine that cannot be corrupted by an
     // unrelated caller is worth more than a comment saying it isn't).
     setStage((s) => (s === 'leaving' ? 'none' : s))
-  })
+  }
+  const arrival = useToHand(anchors.hand, onHandArrival)
 
   const targets = useMemo(
     () =>
@@ -515,22 +525,24 @@ export function useBoardStaging({
   // family of guards exists to prevent. Refused with nothing flying at all:
   // nothing will ever land, so the gesture is put back by hand — the same four
   // clears `onLanded` performs, no more.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
+  // Read through a ref, not closed over: `flyHome` is a dependency of the cancel
+  // effects, so a new identity per render would re-run them — and re-running a
+  // cancel wipes a staging that has just been made.
+  const ending = useRef(endCancel)
+  ending.current = endCancel
   const flyHome = useCallback(
-    (items: Arriving[], at?: number) => {
-      const airborne = arrival.busy
+    (items: Arriving[]) => {
+      const end = ending.current
       // every card of this flight is in the air, so no place draws it
       setCarrying(items.map((it) => it.key))
-      void arrival.arrive(items, handItems.length, at).then((flew) => {
-        if (flew || airborne) return
-        cancellingRef.current = false
-        setCancelling(false)
-        setCarrying([])
-        commitStaged(null)
-        setStage((s) => (s === 'leaving' ? 'none' : s))
+      void arrival.home(items, end).then((flew) => {
+        // nothing will ever land, so the gesture is put back by hand — the same
+        // clears the landing performs, no more. A card waiting its turn behind
+        // another flight is NOT this case: it lands, and ends the gesture then.
+        if (!flew) end()
       })
     },
-    [arrival.arrive, arrival.busy, handItems.length],
+    [arrival.home],
   )
 
   // cancel — a miss, Escape, or an invalid partner pick sends whatever is
@@ -577,25 +589,22 @@ export function useBoardStaging({
         }
         cancellingRef.current = true
         setCancelling(true)
-        flyHome(
-          [
-            {
-              key: merged.support.uid,
-              card: merged.support.card,
-              el,
-              anchor: 'aux' as const,
-              from: cRect,
-            },
-            {
-              key: merged.main.uid,
-              card: merged.main.card,
-              el,
-              anchor: 'main' as const,
-              from: cRect,
-            },
-          ],
-          merged.support.index,
-        )
+        flyHome([
+          {
+            key: merged.support.uid,
+            card: merged.support.card,
+            el,
+            anchor: 'aux' as const,
+            from: cRect,
+          },
+          {
+            key: merged.main.uid,
+            card: merged.main.card,
+            el,
+            anchor: 'main' as const,
+            from: cRect,
+          },
+        ])
         // measured while it was still up (`arrive` reads every source rect
         // before it awaits anything), taken down now — the step's own node goes
         // with `release()`, the same order the plain merged cancel below uses.
@@ -623,7 +632,7 @@ export function useBoardStaging({
         // the insert reads a missing index as "the middle" — which is what an
         // ARRIVAL gets and a return should not, so it is passed only when the fan
         // still knows the place.
-        flyHome([{ key: held.uid, card: held.card, from }], heldAt < 0 ? undefined : heldAt)
+        flyHome([{ key: held.uid, card: held.card, from }])
         return
       }
       // Reduced motion, or nothing measurable: there is no flight to guard
@@ -651,13 +660,10 @@ export function useBoardStaging({
     setCancelling(true)
     if (s.merged && s.support && s.main) {
       const el = pairApi.current.node()
-      flyHome(
-        [
-          { key: s.support.uid, card: s.support.card, el, anchor: 'aux' as const, from: cRect },
-          { key: s.main.uid, card: s.main.card, el, anchor: 'main' as const, from: cRect },
-        ],
-        s.support.index,
-      )
+      flyHome([
+        { key: s.support.uid, card: s.support.card, el, anchor: 'aux' as const, from: cRect },
+        { key: s.main.uid, card: s.main.card, el, anchor: 'main' as const, from: cRect },
+      ])
       // `arrive`'s own geometry pass (above) measured the pair while it was
       // still up — take it down now so the flight overlay's own copies are
       // the only thing on screen (ComboStory's `hideFlyer`, called right
@@ -671,13 +677,10 @@ export function useBoardStaging({
     if (s.support && s.main) {
       const first = stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect
       const second = stageSlot(anchors, 1)?.getBoundingClientRect() ?? cRect
-      flyHome(
-        [
-          { key: s.support.uid, card: s.support.card, from: first },
-          { key: s.main.uid, card: s.main.card, from: second },
-        ],
-        s.support.index,
-      )
+      flyHome([
+        { key: s.support.uid, card: s.support.card, from: first },
+        { key: s.main.uid, card: s.main.card, from: second },
+      ])
       return
     }
     const only = s.support ?? s.main
@@ -685,7 +688,7 @@ export function useBoardStaging({
     // A waiting support stands in the row's first place; a card that AIMS stands
     // in the middle. Either way it leaves from where it is.
     const home = s.support ? (stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect) : cRect
-    flyHome([{ key: only.uid, card: only.card, from: home }], only.index)
+    flyHome([{ key: only.uid, card: only.card, from: home }])
   }, [
     reduced,
     flyHome,
@@ -1423,7 +1426,7 @@ export function useBoardStaging({
     setCostGone(null)
     const at = anchors.cost.current?.getBoundingClientRect()
     if (reduced || !at) return
-    flyHome([{ key: paid.uid, card: paid.card, from: at }], paid.index)
+    flyHome([{ key: paid.uid, card: paid.card, from: at }])
   }, [events, paidCost, anchors.cost, reduced, flyHome])
 
   // the engine said no: the staged play returns to the fan. ATTACK's own

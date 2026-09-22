@@ -164,6 +164,13 @@ export function useBeats(args: {
   // hand, read once at the start of a `handLimit` beat so the runner flies the
   // cells that are standing instead of a fan the cards left long ago.
   handLimit?: RefObject<HandLimitHandoff | null>
+  /**
+   * The board's own private hand order. A beat that lands a card IN the fan
+   * commits the slot it landed in, or the next projection draws the card
+   * wherever the engine appended it and the card teleports out of the place the
+   * player just watched it settle into.
+   */
+  onHandArrival?: (order: string[], uid: string, at: number) => void
 }): Beats {
   const {
     live,
@@ -178,6 +185,7 @@ export function useBeats(args: {
     handLimit,
     discardPick,
     requestPick,
+    onHandArrival,
   } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
@@ -198,20 +206,23 @@ export function useBeats(args: {
   const [advanced, setAdvanced] = useState<BoardState | null>(null)
 
   const discards = useDiscardBeat(anchors, staging)
-  const draws = useDrawBeat(anchors)
+  const draws = useDrawBeat(anchors, onHandArrival)
   const decks = useDeckBeat(anchors)
-  const combo = useComboBeat(anchors, staging, clearPaidCost, takeStagedRelease)
-  const defense = useDefenseBeat(anchors, staging)
+  const combo = useComboBeat(anchors, staging, clearPaidCost, takeStagedRelease, onHandArrival)
+  const defense = useDefenseBeat(anchors, staging, onHandArrival)
   const elimination = useEliminateBeat()
   const gameEnd = useGameEndBeat()
   const handLimits = useHandLimitBeat(anchors, handLimit)
-  const transfers = useTransferBeat(anchors, requestPick)
-  const ais = useAiBeat(anchors)
+  const transfers = useTransferBeat(anchors, requestPick, onHandArrival)
+  const ais = useAiBeat(anchors, onHandArrival)
   // The operation beat first: System Upgrade's centre holds both its answers and
   // the operation card itself, and they leave together in the answers' own send
   // rather than in a beat of their own behind them.
   const operations = useOperationBeat(anchors, staging)
-  const upgrades = useUpgradeBeat(anchors, staging, operations.handOver)
+  const upgrades = useUpgradeBeat(anchors, staging, operations.handOver, onHandArrival)
+  // Every beat that can land a card in the player's own fan, and the room the
+  // one that is flying has made in it — see `gapAt` in the returned object.
+  const fanGap = [draws, transfers, ais, upgrades, defense, combo].find((b) => b.gapAt != null)
 
   // `intro` rides along because the arming effect below reads the beat from here
   // rather than from its own closure: the effect fires on the match key, and the
@@ -802,14 +813,13 @@ export function useBeats(args: {
     // out of the discard (#106) — and never more than one of them is open at
     // once, because one beat runs at a time. So this is a choice between
     // them, not a merge of them.
-    gapAt: draws.gapAt ?? transfers.gapAt ?? ais.gapAt ?? upgrades.gapAt,
-    gapSize:
-      draws.gapAt == null
-        ? transfers.gapAt == null
-          ? ais.gapAt == null
-            ? upgrades.gapSize
-            : ais.gapSize
-          : transfers.gapSize
-        : draws.gapSize,
+    // THE ROOM THE FAN MAKES, from whichever beat is flying a card into it.
+    // One beat runs at a time, so the first with a gap is the one — and every
+    // beat that lands a card in the hand is in this list, by construction: they
+    // all go through the same movement (`toHand`), and one left out of here is
+    // a card that crosses the table and appears in the fan without it ever
+    // parting (the sudo Rollback, owner 22.09).
+    gapAt: fanGap?.gapAt ?? null,
+    gapSize: fanGap?.gapSize ?? 1,
   }
 }

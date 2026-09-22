@@ -571,6 +571,39 @@ it('flies a plain Rollback’s attack back to the seat that threw it', async () 
   expect(exits.items.map((i) => i.card.id)).toEqual(['defense-rollback'])
 })
 
+// …AND THE FAN HAS TO OPEN FOR IT. The room a landing card needs is the step's
+// `gapAt`, and the queue reads it off the beat that is flying — a beat that
+// keeps it to itself lands a card in a fan that never parted, which on screen
+// is a card crossing the table and simply appearing among the others. The
+// queue's own list is what this pins from the beat's side (owner, 22.09).
+it('opens room in the fan while that attack is on its way', async () => {
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const seen: (number | null)[] = []
+  vi.useFakeTimers()
+  try {
+    let done = false
+    const finished = Promise.resolve(
+      api.beat?.runCovered(
+        rollbackPlan({ returnTo: 'p1', defender: 'p1', sudo: 'support-sudo' }),
+        ctx,
+      ),
+    ).then(() => {
+      done = true
+    })
+    while (!done) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+      seen.push(api.beat?.gapAt ?? null)
+    }
+    await finished
+  } finally {
+    vi.useRealTimers()
+  }
+  expect(seen.some((gap) => gap != null)).toBe(true)
+})
+
 it('brings a sudo Rollback’s attack into our own fan', async () => {
   arrivals.handLengths = []
   arrivals.ats = []

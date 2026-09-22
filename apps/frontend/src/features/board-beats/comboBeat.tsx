@@ -27,6 +27,7 @@ import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
 import { useToCentre } from './toCentre'
 import { toEventsDeck } from './toEventsDeck'
+import { useToHand } from './toHand'
 import { settleInto } from './toHeap'
 import { withoutFlown } from './withoutFlown'
 
@@ -71,13 +72,14 @@ export function useComboBeat(
   // because the two fire ~SHOW_HOLD apart and for different cards — the cost
   // leaves first, the release itself last.
   takeStagedRelease?: RefObject<(() => void) | null>,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
   // A release DDoS knocks out of a zone goes back to its owner's hand, and when
-  // that owner is us it enters the fan through the shared insert every other
-  // "a card settles into the hand" motion uses.
-  const arrival = useHandArrival(anchors.hand, () => {})
+  // that owner is us it enters the fan through the shared movement every other
+  // "a card settles into the hand" beat uses — uid, landing, slot and all.
+  const arrival = useToHand(anchors.hand, onHandArrival)
   // THE CARD A DDOS PULLS OUT OF A ZONE rides the shared journey to a place at
   // the centre — its own carrier, owned by that step rather than shared with the
   // fold's, so neither run can take the other's node down.
@@ -373,10 +375,12 @@ export function useComboBeat(
             // card already on screen — it hides our node and carries on from that
             // very frame — so nothing comes down before something else goes up.
             // `rot` is the tilt it rests at, which the step compensates for.
-            await latest.current.arrival.arrive(
-              [{ key: `ddos${hit.eventId}`, card: struckCard, el: node, rot: COVER_POSE.rot }],
-              ctx.base.you.hand.length,
-            )
+            await latest.current.arrival.land(ctx, {
+              card: struckCard,
+              el: node,
+              rot: COVER_POSE.rot,
+              fallbackKey: `ddos${hit.eventId}`,
+            })
             pulled.drop(STRUCK)
             return
           }
@@ -800,6 +804,9 @@ export function useComboBeat(
   const overlay = exitOverlay.concat(flyer.overlay, pulled.overlay, arrival.overlay)
   return {
     overlay,
+    // the room the fan makes for a card flying home into it — see `defenseBeat`
+    gapAt: arrival.gapAt,
+    gapSize: arrival.gapSize,
     runAttack,
     runRelease,
     runPairOut,
