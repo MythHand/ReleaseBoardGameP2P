@@ -18,23 +18,32 @@ import type { BoardState } from '~/entities/game/board'
 export interface Filed {
   eventId: number
   card: string
+  /**
+   * WHERE IT LAY ON THE TABLE — the same number the flight carried it out on.
+   * The heap takes cards exactly as they lay: what was above stays above, what
+   * was under stays under. Cards that lay side by side carry no layer of their
+   * own and keep the order they were put down in, which is the order their
+   * events already have.
+   */
+  layer?: number
 }
 
 /**
- * The order cards join the heap in: A SUPPORT LIES UNDER THE CARD IT PAID FOR.
+ * The order cards join the heap in: THE ORDER THEY LAY IN ON THE TABLE.
  *
- * The feed reports a support a moment AFTER its main — both spent by one effect
- * — so filing in feed order would rest it ON TOP and the two halves would swap
- * places the instant their flight ended. The projection's own fold keeps the
- * same order (`toBoardState`'s tuck rule), which is what makes the handover
- * from this publish to `live` move nothing (I7).
+ * The table is the only place that knows it — which card was over which, and
+ * which two merely stood side by side — and the flight carries that knowledge
+ * out as each card's layer. So the heap does not decide anything about a card
+ * here and does not care what card it is: it takes them bottom-up by the layer
+ * they had, and cards that had none (they lay beside each other, nothing
+ * overlapping) keep the order they were put down in — their own event order.
+ *
+ * It used to sort by CATEGORY instead — a support first, whatever the table
+ * looked like. That is a rule invented here, and it is wrong the moment a
+ * support stands beside its card rather than under it (owner, 23.09).
  */
-export const supportFirst = (spent: Filed[]): Filed[] =>
-  [...spent].sort(
-    (a, b) =>
-      Number(cardById(b.card)?.category === 'support') -
-      Number(cardById(a.card)?.category === 'support'),
-  )
+export const inTableOrder = (filed: Filed[]): Filed[] =>
+  [...filed].sort((a, b) => (a.layer ?? 0) - (b.layer ?? 0) || a.eventId - b.eventId)
 
 /**
  * The board with these cards resting in the heap, each on its own `discarded`
@@ -47,7 +56,7 @@ export const supportFirst = (spent: Filed[]): Filed[] =>
 export function withLanded(state: BoardState, filed: Filed[]): BoardState {
   const heap = [...(state.decks.discardHeap ?? [])]
   let added = 0
-  for (const item of filed) {
+  for (const item of inTableOrder(filed)) {
     const card = cardById(item.card)
     if (!card || heap.some((entry) => entry.uid === `d${item.eventId}`)) continue
     heap.push({ uid: `d${item.eventId}`, card, ...scatterAt(item.eventId) })

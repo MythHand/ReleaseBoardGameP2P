@@ -21,7 +21,7 @@ const rectOf = (el: Element | null): Rect | null => {
 
 /** What the operation card standing at this centre hands over — `operationBeat`'s
  *  `handOver()`, so its card can leave WITH the row instead of on its own beat. */
-type OperationHandOver = () => {
+type OperationHandOver = (ctx: BeatRun) => {
   items: Leaving[]
   takeOff: () => void
   settle: () => void
@@ -53,8 +53,8 @@ export function useUpgradeBeat(
   // another, so its own beat could only start once these had landed. Its halves
   // keep layers 0/1 and the answers stack above, which is the order the engine
   // discarded them in and therefore the order the heap already holds (I9).
-  const emptyCentre = useCallback(async (items: Leaving[]) => {
-    const op = latest.current.operationHandOver?.()
+  const emptyCentre = useCallback(async (ctx: BeatRun, items: Leaving[]) => {
+    const op = latest.current.operationHandOver?.(ctx)
     const all = op ? [...op.items, ...items.map((it, i) => ({ ...it, layer: 2 + i }))] : items
     // the resting card goes down in the commit the carriers go up — the step's
     // own `takeOff`. The answers themselves stand nowhere: the grid they were
@@ -110,7 +110,7 @@ export function useUpgradeBeat(
                 ]
               : []
           })
-          await emptyCentre(items)
+          await emptyCentre(ctx, items)
         }
         const receive = async () => {
           await wait(560)
@@ -225,8 +225,11 @@ export function useUpgradeBeat(
           : []
       })
       // The shared exit takes over the measured nodes before pending clears.
-      await emptyCentre(items)
-      beat.publish({ ...landed, pending: null, decks: beat.after?.decks ?? landed.decks })
+      // Its own run, so what the exit files into the heap is still there in the
+      // publish below — a throwaway would take the filed cards with it.
+      const ctx: BeatRun = { ...beat, base: landed }
+      await emptyCentre(ctx, items)
+      beat.publish({ ...ctx.base, pending: null, decks: beat.after?.decks ?? ctx.base.decks })
     },
     [raise, drop, pin, elOf, emptyCentre],
   )
