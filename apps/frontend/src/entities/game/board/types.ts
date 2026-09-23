@@ -61,6 +61,10 @@ export interface BoardOpponent {
 export interface BoardState {
   // Visual ownership only: an answered attack waits for its discard beat.
   centreAttack?: { card: string; sudo: boolean }
+  // …and the defence lying over it, when a Works on my Machine turned the hit
+  // back on its author: both stay on the table until the exchange ends, so both
+  // survive the moment the board lets go of the pending.
+  centreCover?: { card: string; sudo: boolean }
   aiCause?: { card: string; eventId: number }
   you: {
     name: string

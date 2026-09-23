@@ -1,0 +1,72 @@
+/* A SURFACE THAT TAKES THE TABLE OVER — and the band its cards drop into once
+   they are no longer being read but flying home. Two states of one thing.
+
+   While the answer is being given, the surface stands above everything the
+   table draws: above the band the flights ride in, and above the pile counters
+   that sit a rung over that band (`Pile`'s own `.count`, `--z-flight + 40`). At
+   the table's own 40 the counters stuck out through the dimming. Still under
+   the arrow (`--z-arrow`), which is a gesture and not a surface.
+
+   NO TRANSFORM, ever: these surfaces pin their card nodes to `position: fixed`
+   at viewport rects, and a transformed ancestor becomes the containing block
+   for a fixed descendant — every card would jump the instant it is pinned.
+   Centre with flex instead. */
+.surface {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--z-flight) + 45);
+}
+
+/* The moment the answer is COMMITTED there is no surface any more — only cards
+   flying home in it — so it drops to the band a travelling card belongs in,
+   under the counter, and stops standing in the cursor's way. */
+.flight {
+  z-index: var(--z-flight);
+  pointer-events: none;
+}
+
+/* Preserve mounted content and order, but yield display and input to pause. */
+.surface[data-suspended] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* WHAT ACTUALLY STOPS THE MOUSE, and the reason this is a component rather than
+   a stylesheet. A surface that takes the table over takes the cursor with it:
+   dimming the table while still answering hovers through the dim is the table
+   saying it is unavailable and behaving otherwise — the cards underneath lit
+   up and raised their previews from under it.
+
+   It is its own full-area layer, drawn under the answer's own content, so the
+   guarantee does not depend on what the scene puts inside: a scene whose
+   content box happens to be transparent to the cursor used to leave every point
+   between its cards falling through to the table, and a scene whose box happens
+   to be opaque did not — the same construction behaving two ways (owner,
+   22.09).
+
+   The dimming rides on this same layer. A surface that does not dim still
+   blocks: being unavailable and looking unavailable are two separate things,
+   and only the first is negotiable per scene. */
+.block {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: auto;
+}
+
+.dim {
+  /* behind the answer's own content, and never in the cursor's way — the layer
+     below is what blocks, and it leaves the moment the answer is given while
+     this is still fading out */
+  --overlay-z: -1;
+
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+/* …heavier where the answer is the only thing to read and the draw piles go
+   under it too (the Rebase reorder). */
+.heavy {
+  background: var(--black-72);
+}

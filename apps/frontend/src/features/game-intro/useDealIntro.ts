@@ -7,10 +7,11 @@ import { CARD_W, cardBoxIn, cardById } from '@release/ui'
 // The movement itself comes from the animation layer, which is a separate entry
 // from the components: a vocabulary and its steps, not a thing to render.
 import type { Rect, Scatter } from '@release/ui/animations'
-import { play, scatterAt, useFlyer, useHandArrival, wait } from '@release/ui/animations'
+import { play, scatterAt, useFlyer, wait } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
+import { useToHand } from '~/features/board-beats/toHand'
 import { isOpening } from './isOpening'
 import type { DealPlan } from './planDeal'
 import { planDeal } from './planDeal'
@@ -130,14 +131,12 @@ export function useDealIntro(args: {
   const [zoneIn, setZoneIn] = useState(false)
 
   const { overlay: flyerOverlay, raise, drop } = useFlyer()
-  const {
-    overlay: arrivalOverlay,
-    gapAt,
-    gapSize,
-    arrive,
-  } = useHandArrival(refs.hand, (_gap, list) =>
-    setLanded(list.map((l) => ({ uid: l.key, card: l.card }))),
-  )
+  // The opening's whole hand goes in through the same movement every other card
+  // takes (`toHand`) — there is no second way into the fan. It lands as one
+  // group into a hand that is still empty, so there is no order to keep and
+  // nothing to commit; what it does need is the group itself, which the ending
+  // is handed.
+  const { overlay: arrivalOverlay, gapAt, gapSize, home } = useToHand(refs.hand)
 
   const plan = useMemo<DealPlan | null>(
     () => (view ? planDeal(view, events) : null),
@@ -146,8 +145,8 @@ export function useDealIntro(args: {
 
   // Everything the long-running sequence reads is taken through a ref: it is
   // started once and must not resume against a stale render's values.
-  const latest = useRef({ live, view, plan, refs, arrive, onDone: args.onDone })
-  latest.current = { live, view, plan, refs, arrive, onDone: args.onDone }
+  const latest = useRef({ live, view, plan, refs, home, onDone: args.onDone })
+  latest.current = { live, view, plan, refs, home, onDone: args.onDone }
 
   // Bumped to invalidate the running sequence. Every await in the run checks it,
   // so a cancelled run stops at its next beat and never touches state again.
@@ -425,7 +424,7 @@ export function useDealIntro(args: {
       // hand arrives in view.self.hand's order and never re-sorts.
       const heap = placed.filter((s): s is StagedCard => s != null)
       setStaged([]) // the centre empties in the same commit the flight starts
-      await latest.current.arrive(
+      await latest.current.home(
         heap.map((s) => ({
           key: s.uid,
           card: cardById(s.card) ?? COVER,
@@ -433,7 +432,8 @@ export function useDealIntro(args: {
           from: heapRect(to, s.sc),
           rot: s.sc.rot,
         })),
-        0,
+        (_gap: number, arrived: { key: string; card: CardData }[]) =>
+          setLanded(arrived.map((it) => ({ uid: it.key, card: it.card }))),
       )
       if (halt()) return
 

@@ -416,14 +416,49 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     // under a Bug matched nothing and was folded ON TOP of the card it was
     // played with: the pair landed in the discard the right way up and then
     // swapped the instant the heap took over (#168).
-    const under =
-      pairing != null &&
-      pairing.player === e.player &&
-      pairing.support === e.card &&
+    //
+    // …AND A PLAY THAT NAMES NOTHING STILL LEAVES THE PROOF. A defence spent
+    // with a sudo is the case the rule above cannot see: its event carries no
+    // support field, so nothing here ever learned the two were one play, the
+    // sudo folded on top, and the pair swapped places a moment after landing
+    // the right way up (owner, 23.09).
+    //
+    // What says they are a pair is narrow on purpose, because a shared cause on
+    // its own says far too much: ELIMINATION banks a whole hand under one
+    // event, same player, same reason, card after card, and a rule that read
+    // only that folded an eliminated hand into pairs two at a time (ditayler,
+    // #184). So all three have to hold — and each of them is what a pair IS,
+    // not a symptom of one:
+    //
+    //   • SPENT IN AN EXCHANGE. `attackSpent` / `defenceSpent` are the reasons
+    //     an attack or a defence carries when it is paid for and banked; a hand
+    //     lost to an elimination, a card thrown to the hand limit and an
+    //     operation's own cards all say something else.
+    //   • THE LATER CARD IS THE SUPPORT. A pair is a card and what paid for it,
+    //     in that order — the support cannot be the first half.
+    //   • ONE EFFECT SPENT THEM. Both name the same event as their parent, by
+    //     the same player, back to back.
+    const spentInAnExchange = e.reason === 'attackSpent' || e.reason === 'defenceSpent'
+    const bothFromOneEffect =
+      spentInAnExchange &&
+      cardById(e.card)?.category === 'support' &&
+      e.parent !== undefined &&
+      // a PAIR, never a chain: the card before it must be one that is lying
+      // where it fell, not one already tucked under something else
+      tucked == null &&
       previous?.type === 'discarded' &&
+      previous.parent === e.parent &&
       previous.player === e.player &&
-      previous.card === pairing.main &&
       previous.reason === e.reason
+    const under =
+      bothFromOneEffect ||
+      (pairing != null &&
+        pairing.player === e.player &&
+        pairing.support === e.card &&
+        previous?.type === 'discarded' &&
+        previous.player === e.player &&
+        previous.card === pairing.main &&
+        previous.reason === e.reason)
     if (under) {
       heap.splice(heap.length - 1, 0, entry)
       tucked = entry.uid

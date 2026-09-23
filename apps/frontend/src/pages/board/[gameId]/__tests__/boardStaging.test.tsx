@@ -46,11 +46,6 @@ const BUG_TARGETS: Record<string, TableTarget[]> = {
   'attack-bug#0': [{ kind: 'player', player: 'p2' }],
 }
 
-// The uid the most recent `pullCardFromFan` went after — enough to tell
-// `fanUids()` which uid a real slot-count drop refers to, since only one card
-// can ever be staged at a time.
-let lastPulled: string | null = null
-
 function boardWith(
   overrides: { targets?: Record<string, TableTarget[]> },
   actions: TableActions = {},
@@ -96,9 +91,11 @@ function rejectedEvent(card: string): Event {
 // (Hand's own SETTLE_MS) — so the DOM is in its steady state either way before
 // the caller asserts on it.
 async function pullCardFromFan(uid: string) {
-  const index = HAND.findIndex((c) => c.uid === uid)
-  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
-  lastPulled = uid
+  // by the uid the slot itself names, not by the fixture's order: a card that
+  // has been away and come back lands in the MIDDLE of the fan, so the two
+  // stopped being the same thing (owner, 22.09)
+  const slot = document.querySelector<HTMLElement>(`[data-hand-slot="${uid}"]`)
+  if (!slot) throw new Error(`no fan slot for ${uid}`)
   fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
   fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
   fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
@@ -121,12 +118,12 @@ async function pressSeat(player: string) {
   })
 }
 
-// The fan's current uids: the known, fixed hand minus whichever one a real DOM
-// slot-count drop says actually left (see `lastPulled` above).
+// The fan's current uids, read off the fan itself — each slot names the card
+// standing in it.
 function fanUids(): string[] {
-  const rendered = document.querySelectorAll('[data-hand-slot]').length
-  if (rendered === HAND.length) return HAND.map((c) => c.uid)
-  return HAND.filter((c) => c.uid !== lastPulled).map((c) => c.uid)
+  return [...document.querySelectorAll<HTMLElement>('[data-hand-slot]')].map(
+    (slot) => slot.dataset.handSlot ?? '',
+  )
 }
 
 it('a pulled attack stages at the centre, aims, and a press on the seat dispatches with the target', async () => {
@@ -274,9 +271,8 @@ it('reduced motion stages without flights', () => {
   // helper waits 600ms for a flight that reduced motion never plays, and
   // waiting would hide the very thing this test pins — that staging is
   // already on screen with no wait at all.
-  const index = HAND.findIndex((c) => c.uid === 'attack-bug#0')
-  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
-  lastPulled = 'attack-bug#0'
+  const slot = document.querySelector<HTMLElement>('[data-hand-slot="attack-bug#0"]')
+  if (!slot) throw new Error('no fan slot for attack-bug#0')
   fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
   fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
   fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
@@ -357,7 +353,7 @@ function comboBoardWith(
 }
 
 // which uids the most recent combo pull/fold sent out of the fan — the same
-// role `lastPulled` plays above, sized for a pair. `comboFanUids` still falls
+// role the fan reader plays above, sized for a pair. `comboFanUids` still falls
 // back to the full hand whenever the DOM shows every slot, exactly as
 // `fanUids` does, so a REFUSED pull never needs this cleared first.
 let comboOut: string[] = []

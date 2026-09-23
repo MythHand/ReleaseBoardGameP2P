@@ -1,6 +1,6 @@
 import type { Event } from '@release/engine'
-import type { TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardAreaOf, cardById, Typography } from '@release/ui'
+import type { CardData, CardPreviewSlotProps, TableActions } from '@release/ui'
+import { Card, ConfirmAction, cardAreaOf, cardById, TableSurface, Typography } from '@release/ui'
 import { play, useCardReorder } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -74,10 +74,18 @@ export function useRebaseStaging(args: {
   anchors: BoardAnchors
   actions?: TableActions
   copy: { prompt: string; position: string; confirm: string }
+  /**
+   * READING A CARD IN THE ROW. The cards are laid out to be REORDERED, which
+   * means they are looked at first — and in the row they stand at a fraction of
+   * their own size, too small to read. The board's own preview is what reads a
+   * card standing on the table, so the row takes it rather than growing one:
+   * the same reading, at the same place, as everywhere else (owner, 22.09).
+   */
+  preview: (card?: CardData | null, faceDown?: boolean) => CardPreviewSlotProps
   enabled: boolean
   suspended?: boolean
 }): { row: ReactNode | null } {
-  const { state, anchors, actions, copy, enabled, suspended = false } = args
+  const { state, anchors, actions, copy, preview, enabled, suspended = false } = args
   const reduced = useReducedMotion()
   const pending = state.pending
   const ours =
@@ -321,17 +329,19 @@ export function useRebaseStaging(args: {
   }
 
   return {
+    // The table goes under the reorder while it is being read and answered, and
+    // comes back the moment it IS answered — ahead of the cards, so they fly
+    // home over a normal table and land in it (owner, 17.09). Heavier than the
+    // default: here the reorder is the only thing to read and the draw piles go
+    // under it too.
     row: (
-      <div
-        className={`${styles.surface} ${answered ? styles.flight : ''}`}
-        data-testid="board-rebase-overlay"
-        data-suspended={suspended ? '' : undefined}
-        inert={suspended}
+      <TableSurface
+        committed={answered}
+        dim="heavy"
+        suspended={suspended}
+        testId="board-rebase-overlay"
+        blockTestId="board-rebase-scrim"
       >
-        {/* The table goes under the reorder while it is being read and answered,
-            and comes back the moment it IS answered — ahead of the cards, so
-            they fly home over a normal table and land in it (owner, 17.09). */}
-        {!answered && <div className={styles.scrim} data-testid="board-rebase-scrim" />}
         <div className={styles.rows} data-testid="board-rebase-row">
           {piles.map((entry) => (
             <div
@@ -361,6 +371,7 @@ export function useRebaseStaging(args: {
                     data-testid={`rebase-card-${uid}`}
                     style={{ transform: `translate(${position.x}px, ${position.y}px)` }}
                     onPointerDown={(e) => reorder.onPointerDown(entry.pile, uid, e)}
+                    {...preview(data)}
                     ref={(el) => {
                       if (el) cardRefs.current.set(uid, el)
                       else cardRefs.current.delete(uid)
@@ -388,7 +399,7 @@ export function useRebaseStaging(args: {
           caption={copy.prompt}
           onConfirm={confirm}
         />
-      </div>
+      </TableSurface>
     ),
   }
 }

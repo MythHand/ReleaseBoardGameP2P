@@ -767,8 +767,8 @@ const ISSUES: Issue[] = [
       en: 'Git Rebase covered the middle reorder card',
     },
     problem: {
-      ru: 'Исправлено по решению владельца от 21.09.2026: экран выбора находится поверх стола. Ряды и подтверждение объединены в слой выбора карт (330) с затемнением, ниже правых вкладок и панели. При подтверждении затемнение уходит, карты возвращаются на слое полёта (250) под счётчиками колод. Обёртка сохраняет координаты полётов; общий ключ player:raisedAt не даёт старой проекции повторно раздать уже возвращающиеся карты.',
-      en: 'Fixed per the owner decision of 2026-09-21: rows and confirmation share the dimmed card-choice layer (330), below the rail and drawer. Confirming removes the dimming and returns cards on the flight layer (250), beneath pile counters. The wrapper preserves flight coordinates; a shared player:raisedAt guard prevents an older projection from redealing cards that are already returning.',
+      ru: 'Исправлено по решению владельца от 21.09.2026: экран выбора находится поверх стола. После интеграции #184 ряды и подтверждение используют общий TableSurface (295), ниже превью карт (320), правых вкладок и панели; новая визуальная проверка этого объединения ещё не выполнена. При подтверждении затемнение уходит, карты возвращаются на слое полёта (250) под счётчиками колод. Обёртка сохраняет координаты полётов; общий ключ player:raisedAt не даёт старой проекции повторно раздать уже возвращающиеся карты.',
+      en: 'Fixed per the owner decision of 2026-09-21: after integrating #184, rows and confirmation share TableSurface (295), below card previews (320), the rail and drawer; a new visual walkthrough of this integration is pending. Confirming removes the dimming and returns cards on the flight layer (250), beneath pile counters. The wrapper preserves flight coordinates; a shared player:raisedAt guard prevents an older projection from redealing cards that are already returning.',
     },
     where: {
       ru: 'pages/board/[gameId]/_useRebaseStaging.tsx + _useRebaseStaging.module.css',

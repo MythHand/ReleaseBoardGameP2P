@@ -561,13 +561,47 @@ it('flies a plain Rollback’s attack back to the seat that threw it', async () 
   await drive(() => api.beat?.runCovered(rollbackPlan({ returnTo: 'p2' }), ctx))
   // it went to a seat, not into our fan
   expect(arrivals.handLengths).toHaveLength(0)
-  // TWO playToCenters: the cover lying over the attack, AND the attack's own
-  // return flight — `toContain` alone would already be satisfied by the
-  // cover's, which fires regardless of the return leg this test is actually
-  // about, so the count is what makes this discriminating.
-  expect(played.calls.filter((c) => c.name === 'playToCenter')).toHaveLength(2)
+  // The return flight is `dealToSeat` — the preset that DISSOLVES a card into
+  // a hidden hand, the one every other "card goes to a player" motion uses.
+  // Named separately from the cover's own `playToCenter`, which fires
+  // regardless of the return leg this test is actually about.
+  expect(played.calls.filter((c) => c.name === 'dealToSeat')).toHaveLength(1)
+  expect(played.calls.filter((c) => c.name === 'playToCenter')).toHaveLength(1)
   // and it was never banked: only the defence left for the discard
   expect(exits.items.map((i) => i.card.id)).toEqual(['defense-rollback'])
+})
+
+// …AND THE FAN HAS TO OPEN FOR IT. The room a landing card needs is the step's
+// `gapAt`, and the queue reads it off the beat that is flying — a beat that
+// keeps it to itself lands a card in a fan that never parted, which on screen
+// is a card crossing the table and simply appearing among the others. The
+// queue's own list is what this pins from the beat's side (owner, 22.09).
+it('opens room in the fan while that attack is on its way', async () => {
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const seen: (number | null)[] = []
+  vi.useFakeTimers()
+  try {
+    let done = false
+    const finished = Promise.resolve(
+      api.beat?.runCovered(
+        rollbackPlan({ returnTo: 'p1', defender: 'p1', sudo: 'support-sudo' }),
+        ctx,
+      ),
+    ).then(() => {
+      done = true
+    })
+    while (!done) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+      seen.push(api.beat?.gapAt ?? null)
+    }
+    await finished
+  } finally {
+    vi.useRealTimers()
+  }
+  expect(seen.some((gap) => gap != null)).toBe(true)
 })
 
 it('brings a sudo Rollback’s attack into our own fan', async () => {

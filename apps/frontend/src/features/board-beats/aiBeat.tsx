@@ -1,18 +1,14 @@
 import { cardAreaOf, cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import {
-  nextFrames,
-  play,
-  scatterAt,
-  useDiscardExit,
-  useHandArrival,
-  wait,
-} from '@release/ui/animations'
+import { nextFrames, play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
 import type { BeatPlan } from './planBeats'
+import { SEAT_SHRINK } from './seat'
 import { HALLUCINATION_HOLD, TABLE_HOLD, useToCentre } from './toCentre'
+import { toEventsDeck } from './toEventsDeck'
+import { useToHand } from './toHand'
 
 // AN AI CARD, from the pile to whatever it turns out to mean.
 //
@@ -26,7 +22,6 @@ import { HALLUCINATION_HOLD, TABLE_HOLD, useToCentre } from './toCentre'
 // decided for itself what an `ai-crush-frontend` does would be a second opinion
 // about the rules, free to drift from the first.
 
-const FLIP_MS = 420 // `flipCard`'s own duration
 const BEFORE_FLIP = 220 // the card rests where it landed before it turns over
 const AFTER_FLIP = 560 // the flip, plus a pause to read it by
 // `AiCardsStory`'s own `insideGrab` — how long a card taken from the discard
@@ -50,43 +45,37 @@ const rectOf = (el: Element | null): Rect | null => {
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
-export function useAiBeat(anchors: BoardAnchors) {
+export function useAiBeat(
+  anchors: BoardAnchors,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
+) {
   const { overlay: flyerOverlay, patch, drop, elOf, raise, toSlot } = useToCentre()
   const exit = useDiscardExit(anchors.discardBox)
   const ctx = useRef<BeatRun | null>(null)
 
+  // The card into the fan, whole — see `toHand`.
   const {
     overlay: handOverlay,
     gapAt,
     gapSize,
-    arrive,
+    land,
     reset: resetArrival,
-  } = useHandArrival(anchors.hand, (gap, landed) => {
-    const c = ctx.current
-    if (!c) return
-    const hand = [...c.base.you.hand]
-    hand.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
-    const next = { ...c.base, you: { ...c.base.you, hand } }
-    c.base = next
-    c.publish(next)
-  })
+  } = useToHand(anchors.hand, onHandArrival)
 
-  const latest = useRef({ anchors, exit, arrive })
-  latest.current = { anchors, exit, arrive }
+  const latest = useRef({ anchors, exit, land })
+  latest.current = { anchors, exit, land }
 
   // A card leaves the table for the events deck. It turns face down first — the
   // way every card entering play turns face up first — and then shrinks back
   // into the pile it came from.
   const goHome = useCallback(
-    async (key: string, from: Rect | null) => {
-      patch(key, { faceDown: true })
-      await wait(FLIP_MS)
-      const el = elOf(key)
-      const deck = rectOf(latest.current.anchors.eventsBox.current)
-      if (!el || !from || !deck) return
-      const anim = play('returnToDeck', el, { from, to: cardAreaOf(deck) })
-      if (anim) await anim.finished
-    },
+    (key: string, from: Rect | null) =>
+      toEventsDeck({
+        node: elOf(key),
+        from,
+        deck: latest.current.anchors.eventsBox.current,
+        turnFaceDown: () => patch(key, { faceDown: true }),
+      }),
     [patch, elOf],
   )
 
@@ -201,6 +190,11 @@ export function useAiBeat(anchors: BoardAnchors) {
           const target = rectOf(a.releaseSlot(plan.player, plan.tail.slot))
           const el = elOf(EFF)
           if (el && target) {
+            // …reading the way the zone it is entering reads, from the frame the
+            // travel starts — another seat's zone is the at-a-glance one, ours
+            // stays full. Same rule, and same reason, as a played release
+            // arriving in a zone (`comboBeat.runRelease`).
+            if (plan.player !== beat.base.selfId) patch(EFF, { lod: true })
             const anim = play('playToReleaseZone', el, { from: effect, to: target })
             if (anim) await anim.finished
           }
@@ -341,15 +335,12 @@ export function useAiBeat(anchors: BoardAnchors) {
       const from = rectOf(elOf(EFF))
       if (plan.mine && from) {
         drop(EFF)
-        await latest.current.arrive(
-          [{ key: `ins${plan.eventId}`, card, from }],
-          beat.base.you.hand.length,
-        )
+        await latest.current.land(beat, { card, from, fallbackKey: `ins${plan.eventId}` })
       } else {
         const seat = a.seatBox(plan.player)
         const el = elOf(EFF)
         if (el && seat) {
-          const anim = play('dealToSeat', el, { from: centre, to: seat, scale: 0.7 })
+          const anim = play('dealToSeat', el, { from: centre, to: seat, scale: SEAT_SHRINK })
           if (anim) await anim.finished
         }
         drop(EFF)
@@ -417,10 +408,12 @@ export function useAiBeat(anchors: BoardAnchors) {
           // answer to "it is here already"
           const [el] = await raise([{ key: 'homeward', at: home, card: ai }])
           if (el) {
-            patch('homeward', { faceDown: true })
-            await wait(FLIP_MS)
-            const anim = play('returnToDeck', el, { from: home, to: cardAreaOf(deck) })
-            if (anim) await anim.finished
+            await toEventsDeck({
+              node: el,
+              from: home,
+              deck: a.eventsBox.current,
+              turnFaceDown: () => patch('homeward', { faceDown: true }),
+            })
             drop('homeward')
           }
         }

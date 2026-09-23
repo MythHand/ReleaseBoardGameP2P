@@ -2401,8 +2401,8 @@ per card in the committed order (`BACK_DUR 600` / `BACK_STEP 90`); the answer go
 **Where.** `pages/board/[gameId]/_useRebaseStaging.tsx`, `pages/board/[gameId]/_Board.tsx`.
 
 **Layout.** Per the owner's 2026-09-21 decision, the private choice is an overlay above the
-table. The numbered rows and `ConfirmAction` share `--z-card-choice` (330), above the public
-operation carrier and below the drawer (350) and rail (360). History and rules remain accessible;
+table. The numbered rows and `ConfirmAction` share the common `TableSurface` (295), above the public
+operation carrier and below card previews (320), the drawer (350) and rail (360). History and rules remain accessible;
 a dim background intercepts table presses. On confirmation the dimming leaves and the cards
 drop to the flight layer (250), landing below the pile counters. The operation remains
 held until the effect finishes. The rows scroll independently of the confirmation

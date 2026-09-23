@@ -30,14 +30,16 @@ vi.mock('@release/ui/animations', async (importOriginal) => ({
   }),
   useHandArrival: (
     _ref: unknown,
-    landed: (gap: number, cards: { key: string; card: unknown }[]) => void,
+    landed: (gap: number, cards: { key: string; card: unknown }[], fan: string[]) => void,
   ) => ({
     overlay: [],
     gapAt: null,
     gapSize: 1,
     arrive: (cards: { key: string; card: unknown }[], count: number) => {
       timeline.arrivals(cards, count)
-      landed(0, cards)
+      // the fan the step measured on screen — empty here: this stub renders no
+      // hand, and the step tells its caller so rather than inventing one
+      landed(0, cards, [])
       return Promise.resolve()
     },
   }),

@@ -69,6 +69,18 @@ export interface Leaving {
   delay?: number
 }
 
+/**
+ * WHICH RUNG AN ITEM'S FLIGHT RIDES. An item's `layer` is doubled here, because a
+ * pair becomes two singles and the aux needs a rung of its own underneath the
+ * main: layer N therefore occupies `2N` (aux) and `2N + 1` (main).
+ *
+ * Exported because a caller can have a card of its OWN in the air beside these —
+ * a carrier holding the half that is going somewhere other than the heap — and
+ * that card has to stay in the same order it lies in on the table. Asking here is
+ * what keeps that from being a number copied out of this file by hand.
+ */
+export const exitLayer = (layer: number): number => layer * 2 + 1
+
 interface Flight {
   key: string
   card: CardType
@@ -103,7 +115,7 @@ export function useDiscardExit(
   // a pair becomes two singles: the aux keeps its own place and tilt, and sits
   // one layer under its main card — exactly as they lay on the table
   const expand = (it: Leaving): Flight[] => {
-    const layer = (it.layer ?? 0) * 2
+    const rung = exitLayer(it.layer ?? 0)
     // where it is: its own element's box, or the rect the caller measured
     const box = it.node?.getBoundingClientRect() ?? it.from
     if (!box) return []
@@ -116,7 +128,7 @@ export function useDiscardExit(
       scatter: it.scatter ?? jitter(),
       fade: it.fade ?? false,
       delay: it.delay ?? 0,
-      z: layer + 1,
+      z: rung,
     }
     if (!it.aux || it.node) return [main]
     // I6 — the aux is tilted, so its bounding rect is the box AROUND it; trim it
@@ -137,7 +149,7 @@ export function useDiscardExit(
         scatter: it.auxScatter ?? jitter(),
         fade: main.fade,
         delay: main.delay,
-        z: layer,
+        z: rung - 1,
       },
       main,
     ]

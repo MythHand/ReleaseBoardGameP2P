@@ -1,4 +1,4 @@
-import { cardAreaOf, cardById, GRID_TOP, gridCells } from '@release/ui'
+import { cardById, GRID_TOP, gridCells } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
 import { type RefObject, useCallback, useRef } from 'react'
@@ -6,6 +6,7 @@ import type { BeatRun, BoardAnchors, HandLimitHandoff } from '~/entities/game/bo
 import { CLEAR_STEP, GATHER_HOLD } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
 import type { BeatPlan, DiscardCard } from './planBeats'
+import { toEventsDeck } from './toEventsDeck'
 import { withoutFlown } from './withoutFlown'
 
 // THE HAND LIMIT'S OWN EXIT (#104). The excess does not trickle into the heap
@@ -99,17 +100,17 @@ export function useHandLimitBeat(
       const a = latest.current.anchors
       const card = cardById(id)
       const from = rectOf(a.effect.current)
-      const deck = rectOf(a.eventsBox.current)
-      if (!card || !from || !deck) return
+      if (!card || !from) return
       // a no-travel raise at the card's own standing spot — the honest answer
       // to "it is here already"
       const [el] = await flyer.raise([{ key: 'homeward', at: from, card }])
       if (!el || isStale()) return
-      flyer.patch('homeward', { faceDown: true })
-      await wait(420) // `flipCard`'s own duration — matches `aiBeat.tsx`'s `goHome`
-      if (isStale()) return
-      const anim = play('returnToDeck', el, { from, to: cardAreaOf(deck) })
-      if (anim) await anim.finished
+      await toEventsDeck({
+        node: el,
+        from,
+        deck: a.eventsBox.current,
+        turnFaceDown: () => flyer.patch('homeward', { faceDown: true }),
+      })
       flyer.drop('homeward')
     },
     [flyer.raise, flyer.patch, flyer.drop],

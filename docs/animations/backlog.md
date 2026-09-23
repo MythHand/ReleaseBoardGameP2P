@@ -69,6 +69,13 @@ The wrapper has no transform/filter, preserving viewport-relative return flights
 Pause, reconnect and match completion hide and disable the choice surface while retaining
 its rows and order, so the overlay cannot cover recovery controls or reset unfinished choices.
 
+**Integration follow-up, 2026-09-23 (#184).** The shared `TableSurface` supersedes
+the private layer 330 described above. Rebase now uses its normal layer 295,
+above public flights/counters and below main's new readable card preview at 320;
+the drawer and rail stay above both. Pause/recovery suspension is a property of
+the shared surface. The existing pause/order and answered-offer regressions pass;
+a new browser walkthrough of the combined surface and previews is still pending.
+
 ## Resolved board regressions (2026-09-07)
 
 ### Clicking Code Review did not start pairing — closed 2026-09-07

@@ -1,21 +1,3 @@
-/* A SURFACE LIKE THE OTHER TWO, and it took until #168 for it to say so: it
-   stood on a layer of its own (40) with no dimming at all, so the table stayed
-   bright and live-looking under a band that had taken it over. Both states and
-   the backing now come from the one place that owns them. */
-.requestBand {
-  composes: over from './_tableSurface.module.css';
-}
-
-.scrim {
-  composes: scrim from './_tableSurface.module.css';
-}
-
-/* answered: what is left is cards travelling, and they belong under the pile
-   counters like every other flight */
-.flight {
-  composes: flying from './_tableSurface.module.css';
-}
-
 /* THE CARDS ARE LAID OVER THE WHOLE TABLE, not into a strip of it. The cell you
    point at grows to be read (`CardCatalog`: `scale(1.9)` on hover, `1.7` for the
    one you named), and this box used to SCROLL — so the growing was cut off at
