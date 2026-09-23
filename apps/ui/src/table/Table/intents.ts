@@ -87,6 +87,9 @@ export type TablePending =
       count: number
       attack: string
       sudo: boolean
+      cover?: string
+      coverSudo?: boolean
+      coverBy?: string
       openedAt: number
       deadline: number
     }
@@ -96,6 +99,9 @@ export type TablePending =
       target: string
       attack?: string
       sudo?: boolean
+      cover?: string
+      coverSudo?: boolean
+      coverBy?: string
       openedAt?: number
       deadline?: number
     }
@@ -106,6 +112,9 @@ export type TablePending =
       attacker?: string
       attack?: string
       sudo?: boolean
+      cover?: string
+      coverSudo?: boolean
+      coverBy?: string
       openedAt?: number
       deadline?: number
     }

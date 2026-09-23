@@ -1,21 +1,3 @@
-/* A SURFACE LIKE THE OTHER TWO, and it took until #168 for it to say so: it
-   stood on a layer of its own (40) with no dimming at all, so the table stayed
-   bright and live-looking under a band that had taken it over. Both states and
-   the backing now come from the one place that owns them. */
-.requestBand {
-  composes: over from './_tableSurface.module.css';
-}
-
-.scrim {
-  composes: scrim from './_tableSurface.module.css';
-}
-
-/* answered: what is left is cards travelling, and they belong under the pile
-   counters like every other flight */
-.flight {
-  composes: flying from './_tableSurface.module.css';
-}
-
 /* Keep every row reachable above confirmation. The enlarged reading copy
    lives in catalogPreview outside this scroller, including for other viewers. */
 .catalog {

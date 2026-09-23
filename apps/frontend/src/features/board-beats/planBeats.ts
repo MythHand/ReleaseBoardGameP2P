@@ -270,6 +270,42 @@ export type BeatPlan =
       resolved?: true
       /** Immediate resolutions own their exit; no pending card stands for a later beat. */
       spent?: { eventId: number; card: string }[]
+      /**
+       * WHAT THE THROW STRUCK — a DDoS's own effect, carried on the throw's
+       * plan rather than given a beat of its own, because the table watches it
+       * as ONE event: the card lies at the centre while its target is chosen,
+       * what it struck comes up and stands over it, and only then do the two go
+       * their separate ways (owner, 22.09). Split in two, the throw would leave
+       * before the thing it hit ever arrived.
+       *
+       * `home` is the road that card takes off the table, and it is the plan's
+       * answer rather than the runner's for the same reason `AiTail`'s own
+       * `destination` is: the fact lives on the pre-batch projection (an AI card
+       * standing in a zone goes back to the events deck), which the runner
+       * cannot see. `codeReview` is the card that rode a struck release and does
+       * NOT follow it home — it is discarded whatever happens to what it
+       * protected.
+       */
+      hit?: {
+        eventId: number
+        player: string
+        slot: 'monitoring' | 'frontend' | 'backend' | 'database'
+        card: string
+        /**
+         * THE FACE THE TABLE SEES, which is not always the card the event
+         * names: an AI card standing in a zone wears the plain catalogue id so
+         * it reads and plays as an ordinary one, and only its event id draws the
+         * AI face. The zone paints it that way (`toReleaseSlots`: `event ?? card`),
+         * so a flight that took the event's word for it swapped an AI Monitoring
+         * for a plain one mid-air.
+         */
+        face: string
+        home: 'discard' | 'hand' | 'events'
+        /** its own `discarded` event, when the road home is the heap — the
+         *  scatter it comes to rest on there (I7) */
+        discardId?: number
+        codeReview?: { eventId: number; card: string }
+      }
     }
   // Every release flies into its slot. `codeReview` rides along when the play
   // was a combo; `cost` when the rules made it pay for itself — the card is
@@ -295,6 +331,12 @@ export type BeatPlan =
       key: string
       main?: { eventId: number; card: string }
       aux?: { eventId: number; card: string }
+      // The defence that reflected this attack and has been lying over it ever
+      // since, leaving in the same gesture — "a defence goes to the discard with
+      // what it defended from" (owner, 22.09). Its own sudo half rides in
+      // `coverAux`, the way `aux` carries the attack's.
+      cover?: { eventId: number; card: string }
+      coverAux?: { eventId: number; card: string }
     }
   // A defence answers the attack standing at the centre. `effect` decides what
   // happens next, and the plan carries everything the runner needs to play it
@@ -707,6 +749,22 @@ export function planBeats(
       }
   }
 
+  // WHAT IS LYING OVER THAT ATTACK — the defence that reflected it. Read from
+  // the same two places the standing attack is: the pending while the exchange
+  // is open, the board's own carry once a beat has let the pending go. Its
+  // `defenceSpent` discards are claimed below into the same exit the attack
+  // takes, so the two leave as one gesture instead of the cover falling through
+  // to `sourceOf` (which could never find it: it is in no hand and no zone) and
+  // silently never flying at all.
+  // …and from the reflect itself, when both ends land in ONE batch: an attacker
+  // with an empty hand has nothing to pick from, so the engine finishes the
+  // exchange on the spot and the defence's own discard arrives further down this
+  // same walk, before any pending could have told us about it.
+  let openCover: { card: string; sudo: boolean } | null =
+    transferPending && 'cover' in transferPending && transferPending.cover
+      ? { card: transferPending.cover, sudo: transferPending.coverSudo === true }
+      : (before.centreCover ?? null)
+
   // A run of one kind coalesces into one beat; anything else closes it. That is
   // what makes a hand-limit discard of three read as one gesture while a discard
   // on the far side of a draw stays a gesture of its own.
@@ -946,6 +1004,12 @@ export function planBeats(
       })
       continue
     }
+    // A DDoS effect already claimed by the throw that caused it (see `hit` on
+    // `attackPlaced`). Skipped rather than left to fall through: the default at
+    // the bottom closes every open run, and these two arrive in the middle of
+    // the gesture that owns them.
+    if ((e.type === 'monitoringDestroyed' || e.type === 'releaseReturned') && owned.has(e.id))
+      continue
     if (e.type === 'attacked') {
       // One event, one beat — the pair (or the lone card) reaches the centre
       // as a single gesture, never coalesced with what came before or after.
@@ -966,14 +1030,65 @@ export function planBeats(
         after.card === e.card &&
         after.player === e.attacker
       const spent: { eventId: number; card: string }[] = []
+      let hit: Extract<BeatPlan, { kind: 'attackPlaced' }>['hit']
       if (resolved) {
-        for (let j = i + 1; j < events.length; j++) {
+        let j = i + 1
+        for (; j < events.length; j++) {
           const d = events[j]
           if (d.type !== 'discarded' || d.reason !== 'attackSpent' || d.player !== e.attacker) break
           spent.push({ eventId: d.id, card: d.card })
           owned.add(d.id)
         }
         openAttack = null
+        // …and what the throw struck, claimed into this same plan. Both shapes a
+        // DDoS effect can take land right after the spent run, and each carries
+        // its own tail: a destroyed Monitoring its discard, a returned release
+        // the Code Review that rode it.
+        const struck = events[j]
+        const tail = events[j + 1]
+        if (struck?.type === 'monitoringDestroyed' || struck?.type === 'releaseReturned') {
+          owned.add(struck.id)
+          const slot = struck.type === 'monitoringDestroyed' ? 'monitoring' : struck.slot
+          // An AI card standing in a zone goes back to the events deck when it
+          // leaves — its own condition, and not a road either effect otherwise
+          // takes. The board knows which slots hold one; the event does not say.
+          const fromEvents =
+            releaseEventsOf(before, struck.player)?.[slot as keyof ReleaseSlots] !== undefined
+
+          const burnt =
+            tail?.type === 'discarded' &&
+            tail.reason === 'destroyed' &&
+            tail.player === struck.player
+              ? tail
+              : null
+          if (burnt) owned.add(burnt.id)
+          const event = releaseEventsOf(before, struck.player)?.[slot as keyof ReleaseSlots]
+          hit = {
+            eventId: struck.id,
+            player: struck.player,
+            slot: slot as 'monitoring' | 'frontend' | 'backend' | 'database',
+            card: struck.card,
+            face: event ?? struck.card,
+            // THE ROAD IS WHAT THE ENGINE ACTUALLY DID, never what the card
+            // looks like it should do. A card that came from the events deck
+            // goes back INTO it whatever took it off the table — its own
+            // condition, and the engine banks it that way for both effects. Of
+            // the rest, a destroyed Monitoring goes to the heap and a returned
+            // release to its owner's hand.
+            home: fromEvents
+              ? 'events'
+              : struck.type === 'monitoringDestroyed'
+                ? 'discard'
+                : 'hand',
+            // A Monitoring's tail IS its own discard; a returned release's tail
+            // is the Code Review instead. One field each, so the runner never
+            // has to ask which of the two it is holding.
+            ...(burnt && struck.type === 'monitoringDestroyed' ? { discardId: burnt.id } : {}),
+            ...(burnt && struck.type === 'releaseReturned'
+              ? { codeReview: { eventId: burnt.id, card: burnt.card } }
+              : {}),
+          }
+        }
       }
       plans.push({
         kind: 'attackPlaced',
@@ -984,6 +1099,7 @@ export function planBeats(
         card: e.card,
         sudo: e.sudo,
         ...(resolved ? { resolved: true as const, spent } : {}),
+        ...(hit ? { hit } : {}),
       })
       continue
     }
@@ -1058,6 +1174,14 @@ export function planBeats(
       })
       if (e.effect !== 'reflect' || spent.some((card) => card.reason === 'attackSpent'))
         openAttack = null
+      // A reflect that did NOT bank the attack leaves this defence lying over it
+      // — the exchange goes on. Recorded here as well as off the pending, so a
+      // batch carrying the whole thing end to end still knows what is on the
+      // table by the time the closing discards arrive. Guarded on the attack
+      // still being open, because a reflect that DID bank it resolved the whole
+      // exchange, and then its own exit above takes both halves and nothing is
+      // left lying anywhere.
+      if (openAttack && e.effect === 'reflect') openCover = { card: e.card, sudo: ownSudo != null }
       i = j - 1 // the discards this plan claimed are consumed
       continue
     }
@@ -1326,6 +1450,21 @@ export function planBeats(
           main: { eventId: e.id, card: e.card },
         }
         continue
+      }
+      // The reflecting defence, and then its own sudo — claimed for the exit the
+      // attack it covered is taking. Same reason the attack card is claimed
+      // above: the centre is where it stands, and `sourceOf` looks only in hands
+      // and zones. The cover half is matched before the sudo half so a sudo-
+      // backed Works on my Machine cannot have its own card read as the sudo.
+      if (openCover && e.reason === 'defenceSpent' && pairOut) {
+        if (e.card === openCover.card && !pairOut.cover) {
+          pairOut.cover = { eventId: e.id, card: e.card }
+          continue
+        }
+        if (openCover.sudo && e.card === 'support-sudo' && !pairOut.coverAux) {
+          pairOut.coverAux = { eventId: e.id, card: e.card }
+          continue
+        }
       }
       const source = sourceOf(e, before, claimed)
       // No source means the card is not where the board can see it — a case the

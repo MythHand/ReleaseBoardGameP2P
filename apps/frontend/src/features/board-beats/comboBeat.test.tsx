@@ -127,6 +127,9 @@ function harness() {
   const anchors = {
     hand: { current: node() },
     centre: { current: centre },
+    // the place a defence covers the attack from — measured by the pair-out when
+    // a reflected attack still has one lying over it
+    cover: { current: boxed(CENTRE_BOX.left, CENTRE_BOX.top) },
     stage: { current: stage },
     cost: { current: node() },
     discardBox: { current: node() },
@@ -808,6 +811,59 @@ it('splits the pending pair at the centre into two singles for the discard', asy
     // has no way to learn the aux's discard event id and flies it on a random
     // `jitter()` instead (useDiscardExit.test.tsx pins the consuming side).
     auxScatter: scatterAt(11),
+  })
+})
+
+// "A defence goes to the discard with what it defended from" (owner, 22.09).
+// A Works on my Machine lies over the attack it reflected for the whole exchange
+// that follows — the pick out of the attacker's hand — and leaves in the same
+// gesture the attack does, from its own place and at its own tilt.
+it('takes the reflecting defence out together with the attack it covered', async () => {
+  const { api, Probe, centre } = harness()
+  const pending = node()
+  pending.setAttribute('data-pending-play', '')
+  centre.appendChild(pending)
+  render(<Probe />)
+  exits.items = []
+  const plan: Extract<BeatPlan, { kind: 'pairToDiscard' }> = {
+    kind: 'pairToDiscard',
+    key: 'pairOut:10',
+    main: { eventId: 10, card: 'attack-bug' },
+    aux: { eventId: 11, card: 'support-sudo' },
+    cover: { eventId: 12, card: 'defense-works-on-my-machine' },
+  }
+  await drive(() => api.beat?.runPairOut(plan, ctx))
+  expect(exits.items).toHaveLength(2)
+  expect(exits.items[1]).toMatchObject({
+    key: 'p12',
+    card: expect.objectContaining({ id: 'defense-works-on-my-machine' }),
+    // its own layer above the attack's, the way the two lie on the table (I9),
+    // and its own resting scatter from its own discard event (I7)
+    layer: 1,
+    scatter: scatterAt(12),
+  })
+  // and the attack is still the one that goes first
+  expect(exits.items[0]).toMatchObject({ key: 'p10', layer: 0 })
+})
+
+it('carries the sudo that backed the reflecting defence with it', async () => {
+  const { api, Probe, centre } = harness()
+  const pending = node()
+  pending.setAttribute('data-pending-play', '')
+  centre.appendChild(pending)
+  render(<Probe />)
+  exits.items = []
+  const plan: Extract<BeatPlan, { kind: 'pairToDiscard' }> = {
+    kind: 'pairToDiscard',
+    key: 'pairOut:10',
+    main: { eventId: 10, card: 'attack-bug' },
+    cover: { eventId: 12, card: 'defense-works-on-my-machine' },
+    coverAux: { eventId: 13, card: 'support-sudo' },
+  }
+  await drive(() => api.beat?.runPairOut(plan, ctx))
+  expect(exits.items[1]).toMatchObject({
+    aux: expect.objectContaining({ id: 'support-sudo' }),
+    auxScatter: scatterAt(13),
   })
 })
 

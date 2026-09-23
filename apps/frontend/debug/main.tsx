@@ -1,6 +1,7 @@
 import '@release/ui/tokens.css'
 import '@release/ui/global.css'
-import type { Action, Event } from '@release/engine'
+import type { Action, CardInstance, Event } from '@release/engine'
+import { cardsPresent } from '@release/engine'
 import { useTranslation } from '@release/translation'
 import { Button, Typography } from '@release/ui'
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
@@ -41,6 +42,12 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
     return { state, events: seedLog(state), last: null }
   })
   const [viewer, setViewer] = useState('you')
+  // HOW MANY CARDS THIS GAME HAS, counted once at the scene's own start. The
+  // count itself is the engine's — the same census its conformance check is
+  // built on, which knows every place a card can be, the air between a hand and
+  // the table included. Nothing is counted here; this is the comparison.
+  const [dealt] = useState(() => cardsPresent(run.state).length)
+  const held = cardsPresent(run.state).length
   // the last seeded event: everything at or below it is the starting table
   const [seeded] = useState(() => run.events.at(-1)?.id ?? 0)
   const [ready, setReady] = useState(false)
@@ -64,12 +71,16 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
   }, [deadline, now, ready, run.state.over, run.state.pending, send])
 
   const pending = run.state.pending
-  const opponentCard = run.state.players.p2.hand[0]
-  const opponentOwes =
-    pending?.kind === 'systemUpgrade' &&
-    pending.phase === 'discarding' &&
-    pending.owed.includes('p2') &&
-    opponentCard != null
+  // EVERY SEAT THAT OWES ONE, not the first of them. System Upgrade asks the
+  // whole roster at once, and a shortcut that answers for one opponent shows
+  // only the first card leaving — the scene is the several of them going
+  // together, and with three seats at every table now it is two (owner, 22.09).
+  const owing = (
+    pending?.kind === 'systemUpgrade' && pending.phase === 'discarding' ? pending.owed : []
+  )
+    .filter((id) => id !== 'you')
+    .map((id) => ({ id, card: run.state.players[id]?.hand[0] }))
+    .filter((seat): seat is { id: string; card: CardInstance } => seat.card != null)
 
   return (
     <>
@@ -86,6 +97,18 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
             {ready ? debug('ready') : debug('opening')}
             {' · '}
             {pending?.kind ?? debug('idle')}
+            {/* …AND THE CARDS ADD UP, OR THEY DO NOT. The stand mounts the real
+                board, so it is a game or it is nothing, and a game has the cards
+                it has. Said on every state rather than at the start: a card lost
+                or doubled by a PLAY shows as readily as one written wrong into a
+                scene. Silent while it holds — a number nobody has to read is a
+                number nobody will read when it matters. */}
+            {held !== dealt && (
+              <span data-cards-off>
+                {' · '}
+                {debug('cardsOff')} {held}/{dealt}
+              </span>
+            )}
           </Typography>
           <details className={styles.trace}>
             <summary>
@@ -174,16 +197,17 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
               {debug('advancePending')}
             </Button>
           )}
-          {opponentOwes && (
+          {owing.length > 0 && (
             <Button
               variant="tech"
-              onClick={() =>
-                send({
-                  type: 'RESOLVE',
-                  player: 'p2',
-                  choice: { kind: 'upgradeDiscard', card: opponentCard.uid },
-                })
-              }
+              onClick={() => {
+                for (const seat of owing)
+                  send({
+                    type: 'RESOLVE',
+                    player: seat.id,
+                    choice: { kind: 'upgradeDiscard', card: seat.card.uid },
+                  })
+              }}
             >
               {debug('opponentDiscard')}
             </Button>

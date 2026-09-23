@@ -2185,3 +2185,12 @@ its unfinished carrier. The existing flight presets and engine rules are unchang
 The debug preset **Release: pay a card** uses `releaseCond: base`, making the
 payment reachable beside the existing free-release preset. Board regressions
 cover an unfinished flight, delayed acceptance and rejected-payment retry.
+
+
+**Integration follow-up, 2026-09-23 (#184).** Main supersedes the click-payment
+path described above: payment is now pulled from the fan through the shared
+`useToCentre` carrier, and every debug preset uses the base release cost. The
+`Release: pay a card` shortcut remains, but no longer selects a different mode.
+The merge retains main's animated rejection return through `toHand`, together
+with this PR's synchronous duplicate-payment guard and invalidation of a flight
+on rematch or a newer hand projection. The payment regressions now use pulls.

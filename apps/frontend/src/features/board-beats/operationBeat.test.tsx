@@ -122,3 +122,53 @@ it('adopts a local stage without replaying entrance or leaving its hand copy', a
   await act(async () => result.current.reset())
   expect(result.current.standing).toBe(false)
 })
+
+// THE HAND-OVER IS THE SAME EXIT, and that means both halves of it: the cards
+// go into the heap, and the card stops standing. It is the second exit this
+// beat has — the centre it rests in is sometimes emptied by another beat (the
+// System Upgrade's row leaves with it), and that one used to fly the card and
+// file nothing. The heap is then one card short of its own count, which the
+// discard answers by standing a place-holder on top whose pose follows the
+// count: every later landing re-posed it, and the whole discard looked as if
+// it were shuffling itself (owner, 23.09).
+it.each([false, true])('files the handed-over card into the heap too (sudo=%s)', async (sudo) => {
+  const anchors = anchorsFixture()
+  const { result } = renderBeat(() => useOperationBeat(anchors))
+  const { published } = await runBeat(result.current.runPlaced, placed(sudo), anchors, { base })
+  const standing = published.at(-1) as BoardState
+  const ctx = { base: standing, publish: () => {} }
+  const over = result.current.handOver(ctx)
+  if (!over) throw new Error('nothing handed over')
+  act(() => {
+    over.takeOff()
+    over.settle()
+  })
+  // the same heap the beat's own exit builds: the support under the card it
+  // paid for, and the count moved with it
+  expect(ctx.base.decks.discardHeap?.map((c) => c.uid)).toEqual(sudo ? ['d4', 'd3'] : ['d3'])
+  expect(ctx.base.decks.discardCount).toBe(sudo ? 2 : 1)
+  // …and the card is off the table, which is what the settle is FOR
+  expect(result.current.standing).toBe(false)
+  expect(result.current.landed).toBeNull()
+})
+
+// A card with nothing to fly still has to leave. The only thing that ever takes
+// it off the table is this settle, so a hand-over that answers "nothing" leaves
+// it standing at the centre long after its effect is over.
+it('hands over an exit even when there is nothing to carry', async () => {
+  const anchors = anchorsFixture()
+  const { result } = renderBeat(() => useOperationBeat(anchors))
+  const { published } = await runBeat(result.current.runPlaced, placed(false), anchors, { base })
+  // the card IS standing, and by the time the centre is emptied there is
+  // nothing left to measure it against
+  expect(result.current.standing).toBe(true)
+  anchors.centre.current = null
+  const ctx = { base: (published.at(-1) ?? base) as BoardState, publish: () => {} }
+  const over = result.current.handOver(ctx)
+  expect(over).not.toBeNull()
+  act(() => {
+    over?.takeOff()
+    over?.settle()
+  })
+  expect(result.current.standing).toBe(false)
+})

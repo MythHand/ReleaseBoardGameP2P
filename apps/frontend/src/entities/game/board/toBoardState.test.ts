@@ -625,6 +625,16 @@ const withDecks = (decks: Partial<PlayerView['decks']>): PlayerView => ({
 const discardedEvent = (id: number, card: string, reason = 'effect'): Event =>
   ({ id, type: 'discarded', player: 'you', card, reason }) as Event
 
+// …and the same thing banked BY an effect: both halves name the event that
+// caused them, which is what says they went together.
+const spentEvent = (id: number, card: string, parent: number, reason = 'defenceSpent'): Event =>
+  ({ id, type: 'discarded', player: 'you', card, reason, parent }) as Event
+
+// …and a whole hand lost at once: one event causes every card of it, and the
+// engine says so the same way — same parent, same player, same reason.
+const eliminatedCard = (id: number, card: string, parent: number): Event =>
+  ({ id, type: 'discarded', player: 'you', card, reason: 'effect', parent }) as Event
+
 describe('the discard heap', () => {
   it('is empty when nothing has been discarded and nothing is on top', () => {
     const state = toBoardState(withDecks({ discardCount: 0, discardTop: undefined }), [], labels)
@@ -757,6 +767,72 @@ describe('the discard heap', () => {
         .decks.discardHeap ?? []
     expect(heap).toHaveLength(log.length)
     expect(heap.at(-1)?.uid).toBe(`d${log.length}`)
+  })
+
+  // A DEFENCE SPENT WITH ITS SUDO. Its own event names no support — there is no
+  // such field on it — so nothing here could ever learn the two were one play,
+  // and the sudo folded ON TOP of the card it backed: the pair landed in the
+  // discard the right way up and swapped places a moment later, when the heap
+  // took over from the flight (owner, 23.09).
+  //
+  // The proof is on the cards themselves: both halves are banked by one effect
+  // and both name it as their parent, back to back, same player, same reason.
+  it('tucks a support under the card it was spent with, by the effect that spent them', () => {
+    const log = [spentEvent(11, 'defense-rollback', 9), spentEvent(12, 'support-sudo', 9)]
+    const heap =
+      toBoardState(withDecks({ discardCount: 2, discardTop: 'defense-rollback' }), log, labels)
+        .decks.discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual(['support-sudo', 'defense-rollback'])
+  })
+
+  // AN ELIMINATED HAND IS NOT A ROW OF PAIRS. `eliminate()` banks every card of
+  // it under one event, by one player, with one reason — the very shape a
+  // defence and its sudo have — so a rule that asks only "did one effect spend
+  // them" folds an eliminated hand two cards at a time and stands the pile on
+  // its head (ditayler, #184). What a pair actually is stays: cards spent in an
+  // exchange, the later of the two a support.
+  it('leaves an eliminated hand lying in the order it was banked', () => {
+    const log = [
+      eliminatedCard(11, 'attack-bug', 9),
+      eliminatedCard(12, 'support-sudo', 9),
+      eliminatedCard(13, 'protection-debugger', 9),
+      eliminatedCard(14, 'attack-ddos', 9),
+    ]
+    const heap =
+      toBoardState(withDecks({ discardCount: 4, discardTop: 'attack-ddos' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual([
+      'attack-bug',
+      'support-sudo',
+      'protection-debugger',
+      'attack-ddos',
+    ])
+  })
+
+  // …nor is a card that merely follows a support: a pair is a card and WHAT
+  // PAID FOR IT, in that order.
+  it('does not tuck a card that follows a support', () => {
+    const log = [spentEvent(11, 'support-sudo', 9), spentEvent(12, 'defense-rollback', 9)]
+    const heap =
+      toBoardState(withDecks({ discardCount: 2, discardTop: 'defense-rollback' }), log, labels)
+        .decks.discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual(['support-sudo', 'defense-rollback'])
+  })
+
+  // …and a hand limit is NOT a pair, however many cards one player throws at
+  // once: those carry no cause of their own, so they lie in the order they were
+  // thrown. A rule that read "same player, same reason" alone would stack them
+  // under each other and turn the pile upside down.
+  it('leaves several cards of one discard lying in the order they were thrown', () => {
+    const log = [
+      discardedEvent(11, 'attack-bug', 'handLimit'),
+      discardedEvent(12, 'protection-debugger', 'handLimit'),
+      discardedEvent(13, 'attack-ddos', 'handLimit'),
+    ]
+    const heap =
+      toBoardState(withDecks({ discardCount: 3, discardTop: 'attack-ddos' }), log, labels).decks
+        .discardHeap ?? []
+    expect(heap.map((c) => c.card.id)).toEqual(['attack-bug', 'protection-debugger', 'attack-ddos'])
   })
 
   // The engine banks a spent attack or defence straight into the discard with no

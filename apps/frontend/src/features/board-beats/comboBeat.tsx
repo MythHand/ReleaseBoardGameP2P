@@ -1,7 +1,8 @@
-import { CardPair, cardById, PAIR_AUX_POSE } from '@release/ui'
+import { CardPair, cardBoxIn, cardById, PAIR_AUX, PAIR_AUX_POSE } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
 import {
   enterPose,
+  exitLayer,
   nextFrames,
   play,
   restTransform,
@@ -16,11 +17,23 @@ import {
   ATTACK_POSE,
   type BeatRun,
   type BoardAnchors,
+  COVER_POSE,
   MERGE_MS,
   SHOW_HOLD,
   type StagedHandoff,
 } from '~/entities/game/board'
+import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
+import { useToCentre } from './toCentre'
+import { toEventsDeck } from './toEventsDeck'
+import { useToHand } from './toHand'
+import { settleInto } from './toHeap'
+import { withoutFlown } from './withoutFlown'
+
+// The carrier a DDoS's own effect needs: the card it struck. One card is one
+// carrier, and a release wearing a Code Review is one card — it stands in the
+// zone as a pair and it travels as one.
+const STRUCK = 'struck'
 
 // The event-driven half of the combo pair (#100): an `attacked`/`released`
 // reaching the table, and the pending pair splitting back out to the discard
@@ -58,11 +71,20 @@ export function useComboBeat(
   // because the two fire ~SHOW_HOLD apart and for different cards — the cost
   // leaves first, the release itself last.
   takeStagedRelease?: RefObject<(() => void) | null>,
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
-  const latest = useRef({ anchors, staging, send, clearPaidCost, takeStagedRelease })
-  latest.current = { anchors, staging, send, clearPaidCost, takeStagedRelease }
+  // A release DDoS knocks out of a zone goes back to its owner's hand, and when
+  // that owner is us it enters the fan through the shared movement every other
+  // "a card settles into the hand" beat uses — uid, landing, slot and all.
+  const arrival = useToHand(anchors.hand, onHandArrival)
+  // THE CARD A DDOS PULLS OUT OF A ZONE rides the shared journey to a place at
+  // the centre — its own carrier, owned by that step rather than shared with the
+  // fold's, so neither run can take the other's node down.
+  const pulled = useToCentre()
+  const latest = useRef({ anchors, staging, send, clearPaidCost, takeStagedRelease, arrival })
+  latest.current = { anchors, staging, send, clearPaidCost, takeStagedRelease, arrival }
 
   // Attacks arrive in ATTACK_POSE, including the whole composed Sudo pair,
   // matching DefenseRelease's throwAttack and the pending render underneath.
@@ -180,6 +202,63 @@ export function useComboBeat(
         const main = cardById(plan.card)
         const mainSpent = plan.spent.find((item) => item.card === plan.card)
         const auxSpent = plan.spent.find((item) => item.card === 'support-sudo')
+
+        // WHAT THE THROW STRUCK COMES UP TO THE CENTRE, and stands over the card
+        // that struck it — the `cover` place, the centre module's own name for
+        // "the card lying over the thrown one". Every target makes the same
+        // journey, whatever it is: a Monitoring, a bare release, a release under
+        // Code Review, an AI card. What differs between them is the road they
+        // take afterwards, not whether the table gets to see them.
+        //
+        // The journey itself is `toCentre`'s — travel to a named place and stay
+        // there — so nothing of it is written here. And ONE CARD IS ONE CARRIER:
+        // a release wearing a Code Review stands in the zone as a pair and
+        // travels as one, the way every other pair on this board does.
+        const a = latest.current.anchors
+        const hit = plan.hit
+        // the FACE, not the rules id: an AI card in a zone wears the plain id
+        const struckCard = hit ? cardById(hit.face) : null
+        const struckFrom = hit ? rectOf(a.releaseSlot(hit.player, hit.slot)) : null
+        const overThrow = rectOf(a.cover.current)
+        const rode = hit?.codeReview ? cardById(hit.codeReview.card) : null
+        // ABOVE THE WHOLE EXCHANGE — the order the cards lie in at the centre,
+        // asked of the exit rather than counted out here: the exchange has two
+        // halves, so a carrier that must stay over both rides the rung a third
+        // would have. Counting it by hand tied this beat to how the exit numbers
+        // its own flights.
+        const overExchange = exitLayer(2)
+        if (hit && struckCard && struckFrom && overThrow) {
+          const arriving = pulled.toSlot({
+            key: STRUCK,
+            ...(rode
+              ? { content: <CardPair main={struckCard} aux={rode} width="100%" /> }
+              : { card: struckCard }),
+            from: struckFrom,
+            to: overThrow,
+            faceDown: false,
+            layer: overExchange,
+            motion: 'playToCenter',
+            pose: COVER_POSE,
+          })
+          // THE SAME CARD LEAVES THE ZONE — not a copy beside one still drawn
+          // there. The module raises its carrier before it awaits anything, so
+          // letting the slot go HERE puts both in one React commit. And `base`
+          // MOVES WITH the publish rather than only being sent: everything later
+          // in this beat builds its own publish off `ctx.base`, so leaving the
+          // old one in place put the card back in the zone it had already left.
+          const withoutStruck = withoutFlown(ctx.base, [
+            {
+              key: STRUCK,
+              eventId: hit.eventId,
+              card: hit.card,
+              source: { kind: 'release', player: hit.player, slot: hit.slot },
+            },
+          ])
+          ctx.base = withoutStruck
+          ctx.publish(withoutStruck)
+          await arriving
+        }
+
         await wait(SHOW_HOLD)
         // Hand back the staged node and remove the spent instances from the
         // shadow in the same commit as the discard carrier takes over.
@@ -192,29 +271,155 @@ export function useComboBeat(
             )
             if (at >= 0) hand.splice(at, 1)
           }
-          ctx.publish({ ...ctx.base, you: { ...ctx.base.you, hand } })
+          // `base` moves with it, for the same reason the zone's own publish does:
+          // the heap publish at the end of this beat builds on `ctx.base`, and a
+          // base left behind here put the spent cards back into the fan.
+          const spentHand = { ...ctx.base, you: { ...ctx.base.you, hand } }
+          ctx.base = spentHand
+          ctx.publish(spentHand)
           handoff?.release()
         }
-        if (from && main && mainSpent) {
-          await latest.current.send(
-            [
-              {
-                key: `instant:${mainSpent.eventId}`,
+        // …AND EVERYTHING LEAVES AS ONE EXCHANGE — the same shape, and the same
+        // helper, the defence's own resolution uses. LAYER COMES FROM POSITION,
+        // so a half that is not there goes in as `null`: the heap takes the cards
+        // of one send by their layer, and the order is the engine's — it banks
+        // the throw first, so the throw lies under what it struck.
+        const struckNode = pulled.elOf(STRUCK)
+        // I6 — the aux stands tilted, so its bounding rect is the box AROUND the
+        // card; trim it back to a card box. Read before anything is taken down.
+        const auxFrom = (() => {
+          if (!rode || !struckNode || !overThrow) return null
+          const auxEl = struckNode.querySelector<HTMLElement>('[data-aux]')
+          return auxEl ? cardBoxIn(auxEl.getBoundingClientRect(), overThrow.width) : null
+        })()
+        const heap = exchange([
+          from && main && mainSpent
+            ? {
+                eventId: mainSpent.eventId,
                 card: main,
                 aux: auxSpent ? cardById(auxSpent.card) : null,
+                auxEventId: auxSpent?.eventId,
                 el,
                 from,
                 pose: ATTACK_POSE,
-                scatter: scatterAt(mainSpent.eventId),
-                auxScatter: auxSpent ? scatterAt(auxSpent.eventId) : undefined,
-              },
-            ],
-            // the pair flyer was holding it until now
-            () => flyer.drop('fold'),
-          )
-        } else {
-          flyer.drop('fold')
+              }
+            : null,
+          // What the throw struck, when the heap is where it goes: it leaves as
+          // the pair it travelled as, and `useDiscardExit` splits the pair and
+          // unwinds the aux's own tilt itself.
+          hit && struckCard && overThrow && hit.home === 'discard' && hit.discardId != null
+            ? {
+                eventId: hit.discardId,
+                card: struckCard,
+                aux: rode,
+                auxEventId: hit.codeReview?.eventId,
+                el: struckNode,
+                from: overThrow,
+                pose: COVER_POSE,
+              }
+            : // …or only the Code Review, when the release itself is going
+              // somewhere else: a Code Review is never an events-deck card and
+              // never follows the release home. The pair splits here instead of
+              // leaving as one `aux` — `from`/`pose` mirror exactly what the
+              // exit's own split would have given this half, so the split
+              // changes WHERE the card goes and nothing about how it leaves.
+              // The same split, for the same reason, the sacrifice leg makes.
+              hit && rode && hit.codeReview && overThrow
+              ? {
+                  eventId: hit.codeReview.eventId,
+                  card: rode,
+                  el: struckNode,
+                  from: auxFrom ?? overThrow,
+                  pose: { rot: COVER_POSE.rot + PAIR_AUX.rot, dx: 0, dy: 0 },
+                }
+              : null,
+        ])
+
+        // The pair parts company in the commit the Code Review's exit goes up:
+        // our carrier keeps the release alone, so it is never drawn twice. The
+        // road home WAITS on this same raise — reading the carrier before it has
+        // been replaced hands back the node that is on its way out.
+        const split =
+          hit && struckCard && overThrow && hit.home !== 'discard' && rode
+            ? pulled.raise([
+                {
+                  key: STRUCK,
+                  at: overThrow,
+                  card: struckCard,
+                  layer: overExchange,
+                  pose: restTransform(COVER_POSE),
+                },
+              ])
+            : null
+
+        const homeward = (async () => {
+          if (!hit || !struckCard || !overThrow || hit.home === 'discard') return
+          await split
+          const node = pulled.elOf(STRUCK)
+          if (hit.home === 'events') {
+            await toEventsDeck({
+              node,
+              from: overThrow,
+              deck: a.eventsBox.current,
+              turnFaceDown: () => pulled.patch(STRUCK, { faceDown: true }),
+            })
+            pulled.drop(STRUCK)
+            return
+          }
+          // into our own fan through the shared insert, and into another seat
+          // with `dealToSeat`, where it dissolves — a hidden hand has nothing for
+          // the card to become once it arrives.
+          if (hit.player === ctx.base.selfId) {
+            // HANDED OVER AS THE ELEMENT, not as a rect: the insert takes the
+            // card already on screen — it hides our node and carries on from that
+            // very frame — so nothing comes down before something else goes up.
+            // `rot` is the tilt it rests at, which the step compensates for.
+            await latest.current.arrival.land(ctx, {
+              card: struckCard,
+              el: node,
+              rot: COVER_POSE.rot,
+              fallbackKey: `ddos${hit.eventId}`,
+            })
+            pulled.drop(STRUCK)
+            return
+          }
+          const seat = a.seatBox(hit.player)
+          if (node && seat) await play('dealToSeat', node, { from: overThrow, to: seat })?.finished
+          pulled.drop(STRUCK)
+        })()
+
+        // WHAT LANDS IN THE HEAP IS PUT THERE BY THIS BEAT, in the same breath as
+        // the flight ends. Without it the carriers come down on `reset()` while
+        // the heap this beat hands over still knows nothing about these cards, and
+        // every one of them blinks out for the frames in between. The order is the
+        // engine's own — an aux joins under the card it was played with — so the
+        // handover from this publish to the projection moves nothing (I7). Rebase's
+        // own exit has done exactly this since #103.
+        const filed: { eventId: number; card: string }[] = []
+        if (mainSpent) {
+          if (auxSpent) filed.push(auxSpent)
+          filed.push(mainSpent)
         }
+        if (hit?.home === 'discard' && hit.discardId != null) {
+          if (hit.codeReview) filed.push(hit.codeReview)
+          filed.push({ eventId: hit.discardId, card: hit.card })
+        } else if (hit?.codeReview) filed.push(hit.codeReview)
+        const settle = () => settleInto(ctx, filed)
+
+        await Promise.all([
+          heap.length > 0
+            ? latest.current
+                .send(heap, () => {
+                  // handed over in the commit the exit's own carriers go up: the
+                  // fold that held the throw, and ours when the struck card is
+                  // heap-bound too
+                  flyer.drop('fold')
+                  if (hit?.home === 'discard') pulled.drop(STRUCK)
+                })
+                .then(settle)
+            : Promise.resolve(flyer.drop('fold')),
+          homeward,
+        ])
         return
       }
 
@@ -333,7 +538,7 @@ export function useComboBeat(
       standAttack() // see above — published before the carrier below lets go
       flyer.drop('fold') // the centre pending render takes over (last frame = projection)
     },
-    [foldIn, flyer.drop],
+    [foldIn, flyer.drop, pulled.toSlot, pulled.raise, pulled.patch, pulled.drop, pulled.elOf],
   )
 
   // releasePlaced: the pair flies into the owner's slot; the zone's static
@@ -365,10 +570,11 @@ export function useComboBeat(
       // and left it, Task 8) — for everyone else it arrives from the seat
       // now, holds, and then leaves. Either way it leaves through the shared
       // discard exit, on its own `discarded` event's scatter (I7).
-      if (plan.cost) {
+      const paid = plan.cost
+      if (paid) {
         const a = latest.current.anchors
         const costBox = rectOf(a.cost.current)
-        const costCard = cardById(plan.cost.card)
+        const costCard = cardById(paid.card)
         if (costBox && costCard) {
           if (plan.player !== ctx.base.selfId) {
             const from = a.seatBox(plan.player)
@@ -395,10 +601,10 @@ export function useComboBeat(
           await latest.current.send(
             [
               {
-                key: `c${plan.cost.eventId}`,
+                key: `c${paid.eventId}`,
                 card: costCard,
                 from: costBox,
-                scatter: scatterAt(plan.cost.eventId),
+                scatter: scatterAt(paid.eventId),
               },
             ],
             () => {
@@ -406,6 +612,10 @@ export function useComboBeat(
               flyer.drop('cost')
             },
           )
+          // …and the heap takes it in the same breath the flight ends, through
+          // the shared step — without it the carrier comes down while the heap
+          // this beat hands over still knows nothing about the card.
+          settleInto(ctx, [paid])
         }
       }
 
@@ -533,12 +743,37 @@ export function useComboBeat(
           : aux && auxRef
             ? [{ key: `p${auxRef.eventId}`, card: aux, from, scatter: scatterAt(auxRef.eventId) }]
             : []
+      // THE COVER LEAVES WITH IT — the defence that reflected this attack and has
+      // been lying over it since. Measured off the cover SLOT, which is
+      // axis-aligned by design (its tilt lives on an inner node), so the rect is
+      // the true card box a flight starts from (I6); `pose: COVER_POSE` is the
+      // table tilt it starts AT, the same value the exchange in `defenseBeat`
+      // hands the exit. Its own layer above the attack's, because that is how
+      // the two lie on the table (I9).
+      const coverRef = plan.cover
+      const coverAuxRef = plan.coverAux
+      const cover = coverRef ? cardById(coverRef.card) : null
+      const coverBox = cover ? rectOf(a.cover.current) : null
+      if (cover && coverRef && coverBox)
+        items.push({
+          key: `p${coverRef.eventId}`,
+          card: cover,
+          aux: coverAuxRef ? cardById(coverAuxRef.card) : null,
+          el: a.cover.current,
+          from: coverBox,
+          layer: 1,
+          pose: COVER_POSE,
+          scatter: scatterAt(coverRef.eventId),
+          auxScatter: coverAuxRef ? scatterAt(coverAuxRef.eventId) : undefined,
+        })
       // The centre stops holding it in the same commit the carriers go up —
       // published through `takeOff` rather than after the flight, which is
-      // what left the card standing there while its own copy flew away.
+      // what left the card standing there while its own copy flew away. Both
+      // halves of the centre go down together: the attack and what covered it.
       if (items.length > 0)
         await latest.current.send(items, () => {
-          if (ctx.base.centreAttack) ctx.publish({ ...ctx.base, centreAttack: undefined })
+          if (ctx.base.centreAttack || ctx.base.centreCover)
+            ctx.publish({ ...ctx.base, centreAttack: undefined, centreCover: undefined })
         })
     },
     [],
@@ -554,7 +789,26 @@ export function useComboBeat(
   const reset = useCallback(() => {
     flyer.drop()
     resetExit()
-  }, [flyer.drop, resetExit])
+    // …the card pulled out of a zone, and the parked insert, for the same reason
+    // the carriers are dropped: a release bouncing back into our fan must not
+    // land in the next match's.
+    pulled.drop()
+    arrival.reset()
+  }, [flyer.drop, resetExit, pulled.drop, arrival.reset])
 
-  return { overlay: [...exitOverlay, ...flyer.overlay], runAttack, runRelease, runPairOut, reset }
+  // Everything this runner has in the air, in one list: its own carrier, the
+  // carrier the shared centre step owns, the discard exit's, and the fan
+  // insert's. A step that is handed a rect mounts its own flyer, and that flyer
+  // only exists if the consumer renders this.
+  const overlay = exitOverlay.concat(flyer.overlay, pulled.overlay, arrival.overlay)
+  return {
+    overlay,
+    // the room the fan makes for a card flying home into it — see `defenseBeat`
+    gapAt: arrival.gapAt,
+    gapSize: arrival.gapSize,
+    runAttack,
+    runRelease,
+    runPairOut,
+    reset,
+  }
 }

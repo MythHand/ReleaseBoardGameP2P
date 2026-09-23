@@ -505,7 +505,12 @@ export default function Hand({
           // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only hover-spread / drag pick-up on non-interactive cards; no keyboard affordance implied
           <div
             key={item.uid}
-            data-hand-slot
+            // the slot NAMES the card standing in it: everything that reaches
+            // into the fan from outside (the board's own anchors, a test
+            // reading what the player sees) otherwise has to infer the order
+            // from somewhere else, and an inferred order is wrong the moment a
+            // card arrives anywhere but where it left
+            data-hand-slot={item.uid}
             className={`${styles.slot} ${dragEnabled || onCardClick ? styles.clickable : ''}`}
             style={{ transform, zIndex: z }}
             onMouseEnter={drag ? undefined : () => setHoveredUid(item.uid)}

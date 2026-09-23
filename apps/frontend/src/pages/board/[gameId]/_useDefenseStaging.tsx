@@ -54,13 +54,7 @@ import type {
   TableActions,
 } from '@release/ui'
 import { useArrow } from '@release/ui'
-import {
-  type Rect,
-  restTransform,
-  useFlyer,
-  useHandArrival,
-  usePairFold,
-} from '@release/ui/animations'
+import { type Rect, restTransform, useFlyer, usePairFold } from '@release/ui/animations'
 import {
   Fragment,
   type ReactNode,
@@ -73,6 +67,7 @@ import {
 } from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { COVER_POSE, MERGE_MS, SUDO_POSE } from '~/entities/game/board'
+import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useCoverFlight } from './_useCoverFlight'
 import { useResolveFeedback } from './_useResolveFeedback'
@@ -172,6 +167,12 @@ export interface Options {
    * belonged to the previous match would otherwise stay on the new table.
    */
   matchKey?: string | null
+  /**
+   * The fan's private order. A card coming home lands in the MIDDLE of the fan
+   * like every other arrival, so the slot it lands in has to be committed or
+   * the next projection puts it back where it used to sit.
+   */
+  onHandArrival?: (order: string[], uid: string, at: number) => void
 }
 
 export function useDefenseStaging({
@@ -181,6 +182,7 @@ export function useDefenseStaging({
   events,
   enabled,
   matchKey = null,
+  onHandArrival,
 }: Options): DefenseStaging {
   const [staged, setStaged] = useState<DefenseStagedPlay | null>(null)
   const [cancelling, setCancelling] = useState(false)
@@ -226,11 +228,15 @@ export function useDefenseStaging({
     setStaged(next)
   }
 
-  const arrival = useHandArrival(anchors.hand, () => {
+  // The card comes home through the shared movement (`toHand`): it lands in the
+  // middle of the fan like every other arrival, its slot is committed so the
+  // next projection cannot move it, and the gesture ends when it is in.
+  const arrival = useToHand(anchors.hand, onHandArrival)
+  const endCancel = () => {
     cancellingRef.current = false
     setCancelling(false)
     commitStaged(null)
-  })
+  }
 
   // the pending "defend" owed to us — read once so every reader downstream
   // (options, dispatch, the static render) agrees on the same instant of it.
@@ -491,11 +497,7 @@ export function useDefenseStaging({
       }
       cancellingRef.current = true
       setCancelling(true)
-      void arrival.arrive(
-        [{ key: support.uid, card: support.card, from: sRect }],
-        handItems.length,
-        support.index,
-      )
+      void arrival.home([{ key: support.uid, card: support.card, from: sRect }], endCancel)
       return
     }
 
@@ -513,13 +515,12 @@ export function useDefenseStaging({
       }
       cancellingRef.current = true
       setCancelling(true)
-      void arrival.arrive(
+      void arrival.home(
         [
           { key: support.uid, card: support.card, el, anchor: 'aux' as const, from: cRect },
           { key: main.uid, card: main.card, el, anchor: 'main' as const, from: cRect },
         ],
-        handItems.length,
-        support.index,
+        endCancel,
       )
       return
     }
@@ -535,15 +536,11 @@ export function useDefenseStaging({
     }
     cancellingRef.current = true
     setCancelling(true)
-    void arrival.arrive(
-      [{ key: main.uid, card: main.card, from: cRect }],
-      handItems.length,
-      main.index,
-    )
+    void arrival.home([{ key: main.uid, card: main.card, from: cRect }], endCancel)
   }, [
     reduced,
     handItems.length,
-    arrival.arrive,
+    arrival.home,
     anchors.cover,
     anchors.sudo,
     arrowCtl.stop,

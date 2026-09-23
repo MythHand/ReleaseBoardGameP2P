@@ -2,9 +2,11 @@ import type { Action, Choice } from '../actions'
 import { RELEASE_ATTACKS, rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import {
+  type CardId,
   type CardInstance,
   type CardUid,
   type GameState,
+  type HandAttackContext,
   type Pending,
   type PlayerId,
   pendingOwes,
@@ -264,10 +266,15 @@ function onHandDefend(
   if (effect === 'reflect') {
     // Works on my Machine turns the attack back on its author: the roles swap,
     // so the original target becomes the taker and the attacker the victim.
-    const swapped = bankSpent(next, log, action.player, spentDefence, 'defenceSpent', defendedId)
+    //
+    // The defence is NOT banked here. The attack it answered is still on the
+    // table — the reflected effect has yet to resolve — and a defence lies over
+    // what it defended from until that thing leaves, then goes to the discard
+    // with it. So it rides in the exchange's own context, exactly the way the
+    // attack does, and `finishHandAttack` banks the two together.
     return {
       state: openHandChoice(
-        swapped,
+        next,
         log,
         attacker,
         action.player,
@@ -276,6 +283,7 @@ function onHandDefend(
           combo: pending.combo,
           owner: attacker,
           parent: defendedId,
+          cover: { player: action.player, cards: spentDefence },
         },
         action.at,
       ),
@@ -415,6 +423,19 @@ export function onDefend(state: GameState, action: Action & { type: 'RESOLVE' })
   return { state: { ...reopened, eventSeq: log.seq }, events: log.events }
 }
 
+// WHAT LIES OVER THE ATTACK while the exchange plays out, public the same way
+// the attack itself is: the rules put both face up at the centre, so there is
+// nothing here to gate on the viewer. Absent when nothing reflected the attack,
+// which is every exchange but a Works on my Machine.
+const coverView = (
+  context: HandAttackContext,
+): { cover?: CardId; coverSudo?: boolean; coverBy?: PlayerId } => {
+  const cover = context.cover
+  const [card] = cover?.cards ?? []
+  if (!cover || !card) return {}
+  return { cover: card.id, coverSudo: cover.cards.length > 1, coverBy: cover.player }
+}
+
 // A pending decision is projected to its owner in full; everyone else learns only
 // that the table is waiting on someone.
 export function pendingView(state: GameState, viewerId: PlayerId): PendingView | null {
@@ -471,6 +492,7 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         count: p.slots.length,
         attack: p.context.attack.id,
         sudo: !!p.context.combo,
+        ...coverView(p.context),
         openedAt: p.openedAt,
         deadline: p.deadline,
       }
@@ -479,7 +501,9 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         kind: 'requestCard',
         player: p.player,
         target: p.target,
-        ...(p.context ? { attack: p.context.attack.id, sudo: !!p.context.combo } : {}),
+        ...(p.context
+          ? { attack: p.context.attack.id, sudo: !!p.context.combo, ...coverView(p.context) }
+          : {}),
         openedAt: p.openedAt,
         deadline: p.deadline,
       }
@@ -489,7 +513,9 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         player: p.player,
         requested: p.requested,
         attacker: p.attacker,
-        ...(p.context ? { attack: p.context.attack.id, sudo: !!p.context.combo } : {}),
+        ...(p.context
+          ? { attack: p.context.attack.id, sudo: !!p.context.combo, ...coverView(p.context) }
+          : {}),
         openedAt: p.openedAt,
         deadline: p.deadline,
       }

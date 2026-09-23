@@ -52,6 +52,17 @@ export interface Raise {
   card?: CardType
   faceDown?: boolean
   /**
+   * THE AT-A-GLANCE READING — the same face with the layers a small card does
+   * not need turned off. It belongs on the carrier and not only on the resting
+   * render, because the change between the two readings is a TRAVEL of its own:
+   * the layers ease between full and LOD (`CardParallax.module.css`), so a card
+   * handed this on the frame its flight starts rebuilds itself over that flight
+   * and arrives already reading the way its destination reads. Swapped on
+   * landing instead, it pops — the scene the approved one does it in hands it
+   * at takeoff (`DefenseReleaseStory`'s own `fly`).
+   */
+  lod?: boolean
+  /**
    * …or whatever the scene puts in the node instead: a pair, a card in its
    * at-a-glance reading, a card mid-morph. The node and its five invariants are
    * the carrier's; WHAT rides in it can be the scene's own — including elements
@@ -139,7 +150,7 @@ export function useFlyer() {
 
   // change what the card shows without touching where it is — the flip in place
   const patch = useCallback(
-    (key: string, next: Partial<Pick<Raise, 'card' | 'faceDown' | 'content' | 'pose'>>) =>
+    (key: string, next: Partial<Pick<Raise, 'card' | 'faceDown' | 'lod' | 'content' | 'pose'>>) =>
       setHeld((h) => h.map((it) => (it.key === key ? { ...it, ...next } : it))),
     [],
   )
@@ -172,7 +183,9 @@ export function useFlyer() {
       }}
     >
       {h.content ??
-        (h.card && <Card card={h.card} faceDown={h.faceDown} interactive={false} width="100%" />)}
+        (h.card && (
+          <Card card={h.card} faceDown={h.faceDown} lod={h.lod} interactive={false} width="100%" />
+        ))}
     </div>
   ))
 

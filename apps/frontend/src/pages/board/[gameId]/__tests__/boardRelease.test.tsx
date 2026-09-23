@@ -191,14 +191,16 @@ async function foldTheComboRelease() {
   })
 }
 
-// The fan's own wrapper — the element that carries the merged-pair pointer
-// guard. jsdom does NOT hit-test `pointer-events`, so a `fireEvent` click
-// lands whether or not the guard is on: this style read is the load-bearing
-// assertion, and the click assertions beside it pin the routing.
-function handWrapStyle(): string {
+// The fan's own wrapper — the element that carries the merged-pair guard. It is
+// a STATE the wrapper reconciles, not a style written here: the wrapper is
+// deliberately transparent to the cursor and hands pointer events to its child,
+// so a `pointer-events: none` written on it was turned straight back on one
+// level down. jsdom does NOT hit-test pointer events either way, so this read is
+// the load-bearing assertion and the click assertions beside it pin the routing.
+function handInert(): boolean {
   const wrap = document.querySelector<HTMLElement>('[class*="handWrap"]')
   if (!wrap) throw new Error('hand wrapper not rendered')
-  return wrap.style.pointerEvents
+  return wrap.dataset.inert === 'true'
 }
 
 // Drags a card out of the fan the way a real pointer does — the Hand's own
@@ -214,21 +216,22 @@ async function pullCardFromFan(uid: string) {
   })
 }
 
-// A plain click on a fan card — no movement, Hand's own click contract
-// (mousedown + mouseup at the same point, under the drag threshold). Found by
-// the card's own catalogue id (Card.tsx's `data-card`), not its uid — the
-// standing release has already left `handItems` by the time this runs, so the
-// fan's own slot order no longer lines up with `HAND`'s.
-async function clickFanCard(uid: string) {
+// PAYING A COST — pulled out of the fan and let go over the table, the same
+// gesture every other "give a card from the hand" step takes. Found by the
+// card's own catalogue id rather than by index, for the reason the click helper
+// below gives: the standing release has already left `handItems`, so the fan's
+// slot order no longer lines up with `HAND`'s.
+async function payFromFan(uid: string) {
   const item = HAND.find((c) => c.uid === uid)
   const target = Array.from(document.querySelectorAll<HTMLElement>('[data-hand-slot]')).find((el) =>
     el.querySelector(`[data-card="${item?.card.id}"]`),
   )
   if (!target) throw new Error(`fan slot for ${uid} not found`)
   fireEvent.mouseDown(target, { clientX: 0, clientY: 0 })
-  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
   await act(async () => {
-    await new Promise((r) => setTimeout(r, 50))
+    await new Promise((r) => setTimeout(r, 600))
   })
 }
 
@@ -297,7 +300,7 @@ it('stands the release at the centre and does not land it until the cost is paid
   expect(stage.querySelector('[data-card]')).toBeTruthy()
 
   // the fan is the picker — a click on an eligible card pays
-  await clickFanCard('attack-bug#0')
+  await payFromFan('attack-bug#0')
   expect(onResolve).toHaveBeenCalledWith({
     kind: 'discardForRelease',
     card: 'attack-bug#0',
@@ -367,25 +370,30 @@ it('does not double-render the release while its own stage flight is still carry
   }
 })
 
-// Fix round 1 (post-review, finding 1 — "the cost flight starts from a slot
-// the card never occupied"): `onCostPick` used to measure the flight's origin
-// against `you.hand`, which still carries BOTH cards while a cost is owed —
-// one slot short of the fan `handItems` actually renders (the staged release
-// is excluded from it). `slotPlacement(slot, total)` derives both x and
-// rotation from `slot - (total-1)/2`, so both arguments being wrong moves the
-// origin, not just its label. Pinned directly: with jsdom's default all-zero
-// hand-wrap rect, the ONE eligible card sitting at `slotPlacement(0, 1)` (dead
-// centre) lands at `left: -75px`; the same card measured the old, wrong way —
-// `slotPlacement(1, 2)`, its position in the UN-filtered `you.hand` — would
-// land 68px across at `left: -7px`.
-it('the cost flight originates from the fan slot the card actually occupies', async () => {
+// I1 — THE FLIGHT STARTS WHERE THE CARD ACTUALLY IS. A cost is pulled out of
+// the fan, so that place is the rect the pull let go at, handed over by the
+// Hand's own drop; the carrier mounts there and travels from there.
+//
+// This replaces an older guard (Fix round 1, finding 1: "the cost flight starts
+// from a slot the card never occupied"), whose cause is gone rather than fixed:
+// the origin used to be COMPUTED from the card's index, and computed against
+// `you.hand`, which still carries the standing release and so is one slot longer
+// than the fan actually renders. A pull carries its own rect and derives nothing
+// from an index. The computed slot survives only as the fallback for a pull that
+// reports no rect, and it is measured against `handItems` — the array the fan
+// renders.
+it('the cost flight starts where the pull let the card go', async () => {
   const animateSpy = holdFlightsOpen()
   try {
     render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
-    await clickFanCard('attack-bug#0')
+    await payFromFan('attack-bug#0')
     const flyer = document.querySelector<HTMLElement>('[class*="flyer"]')
     if (!flyer) throw new Error('cost flyer not mounted')
-    expect(flyer.style.left).toBe('-75px')
+    // jsdom measures every element as a zero rect, so the release point IS
+    // 0,0 here — what this pins is that the origin comes from that rect at all,
+    // rather than from a slot worked out of the hand's own order (which would
+    // put it at `left: -75px`, dead centre of a one-card fan).
+    expect(flyer.style.left).toBe('0px')
   } finally {
     animateSpy.mockRestore()
   }
@@ -605,8 +613,8 @@ it('a new match takes the last one’s standing release off the table', async ()
 
 // The PAID COST's own half of the same boundary (#101, Fix D, finding 6). It
 // used to ride along in the test above as `expect(paidCost).toBeNull()`, with
-// nothing behind it: `paidCost` is set only when a cost pick's own flight lands
-// (`_useBoardStaging.ts`'s `onCostPick`), that fixture never picked one, and the
+// nothing behind it: `paidCost` is set only when a cost pull's own flight lands
+// (`_useBoardStaging.ts`'s `onCostPlay`), that fixture never paid one, and the
 // value was null before the rematch as well as after — so `setPaidCost(null)` in
 // the reset could be deleted with the suite still green. Here the cost is
 // actually paid first, which is the state a rematch has to clear: `_Board.tsx`
@@ -620,7 +628,8 @@ it('a new match takes the last one’s paid cost off the table', async () => {
   // the referee answers with the cost pending, and the spare pays it
   rerender({ key: 'g1', pending: costPending(['attack-bug#0']) })
   await act(async () => {
-    result.current.onCostPick('attack-bug#0')
+    // pulled out of the fan and let go over the table, the way a cost is paid
+    result.current.onCostPlay('attack-bug#0', { x: 0, y: 0 })
     await new Promise((r) => setTimeout(r, 50))
   })
   expect(result.current.paidCost?.uid).toBe('attack-bug#0')
@@ -868,17 +877,17 @@ it('lets a combo release’s cost be paid out of the fan', async () => {
   const { rerender } = render(comboReleaseBoard({}, {}))
   await foldTheComboRelease()
   // the pair is standing, and the fan is inert — #100's guard, doing its job
-  expect(handWrapStyle()).toBe('none')
+  expect(handInert()).toBe(true)
 
   // the engine answers with the ordinary cost pending, `codeReview` riding
   // along invisibly (`pendingView` does not carry it)
   rerender(comboReleaseBoard({ pending: comboCostPending() }, { onResolve }))
   // …and NOW the fan must be live again: it is the only picker there is
-  expect(handWrapStyle()).not.toBe('none')
+  expect(handInert()).toBe(false)
   // the spare is offered, and lit
   const payer = document.querySelector<HTMLElement>('[data-hand-slot] [data-card="attack-bug"]')
   expect(payer?.getAttribute('data-state')).toBe('playable')
-  await clickFanCard('attack-bug#0')
+  await payFromFan('attack-bug#0')
   expect(onResolve).toHaveBeenCalledWith({ kind: 'discardForRelease', card: 'attack-bug#0' })
 })
 
@@ -995,7 +1004,7 @@ it('hands the fan back after a reduced-motion cancel, with no flight to do it', 
     expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
     // no flight was raised, and the fan is usable again anyway
     expect(document.querySelector('[class*="arriving"]')).toBeNull()
-    expect(handWrapStyle()).not.toBe('none')
+    expect(handInert()).toBe(false)
 
     // the referee's answer puts both halves back: neither is still hidden
     rerender(comboReleaseBoard({}, { onResolve }))
@@ -1024,7 +1033,7 @@ it('the standing release stays visible while its own cost is still flying to pay
 
   const animateSpy = holdFlightsOpen()
   try {
-    await clickFanCard('attack-bug#0')
+    await payFromFan('attack-bug#0')
     // the cost card is still flying to its own slot — the release itself must
     // still be standing at the stage slot throughout
     expect(stage.querySelector('[data-card]')).toBeTruthy()
@@ -1033,13 +1042,13 @@ it('the standing release stays visible while its own cost is still flying to pay
   }
 })
 
-it('takes the clicked cost out of the hand while it flies beside the release', async () => {
+it('takes the pulled cost out of the hand while it flies beside the release', async () => {
   const { rerender } = render(releaseBoard({}, {}))
   await pullCardFromFan('release-frontend#0')
   rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
   const animateSpy = holdFlightsOpen()
   try {
-    await clickFanCard('attack-bug#0')
+    await payFromFan('attack-bug#0')
     expect(document.querySelector('[data-hand-slot] [data-card="attack-bug"]')).toBeNull()
     expect(document.querySelector('[class*="_flyer_"] [data-card="attack-bug"]')).toBeTruthy()
   } finally {
@@ -1063,7 +1072,7 @@ it('reduced motion clears the paid cost once the pending resolves, with no beat 
     const { rerender } = render(releaseBoard({}, {}))
     await pullCardFromFan('release-frontend#0')
     rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
-    await clickFanCard('attack-bug#0')
+    await payFromFan('attack-bug#0')
     const cost = document.querySelector('[data-centre-slot="cost"]') as HTMLElement
     expect(cost.querySelector('[data-card="attack-bug"]')).toBeTruthy() // shown, same as always
 
@@ -1186,7 +1195,7 @@ it('a pulled release still takes its cost from the fan', async () => {
   const { rerender } = render(releaseBoard({}, { onResolve }))
   await pullCardFromFan('release-frontend#0')
   rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
-  await clickFanCard('attack-bug#0')
+  await payFromFan('attack-bug#0')
   expect(onResolve).toHaveBeenCalledWith({ kind: 'discardForRelease', card: 'attack-bug#0' })
 })
 
@@ -1197,7 +1206,7 @@ it('a click cannot start another play while a release is staged', async () => {
   expect(onPlay).toHaveBeenCalledWith('release-frontend#0', undefined, undefined)
   expect(document.querySelectorAll('[data-hand-slot]').length).toBe(HAND.length - 1)
 
-  await clickFanCard('attack-bug#0')
+  await payFromFan('attack-bug#0')
   expect(onPlay).toHaveBeenCalledTimes(1)
 })
 
@@ -1257,7 +1266,7 @@ it('reduced motion stands the release and settles it with no beat involved', asy
 it('keeps a paid cost out of the fan until the accepted hand projection arrives', async () => {
   const onResolve = vi.fn()
   render(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
-  await clickFanCard('attack-bug#0')
+  await payFromFan('attack-bug#0')
   await vi.waitFor(() => expect(onResolve).toHaveBeenCalledTimes(1))
   expect(document.querySelector('[data-centre-slot="cost"] [data-card="attack-bug"]')).toBeTruthy()
   expect(document.querySelector('[data-hand-slot] [data-card="attack-bug"]')).toBeNull()
@@ -1284,8 +1293,8 @@ it('restores a rejected cost choice and lets it be retried without duplicate sub
     { initialProps: { events: [] as import('@release/engine').Event[] } },
   )
   act(() => {
-    result.current.onCostPick('attack-bug#0')
-    result.current.onCostPick('attack-bug#0')
+    result.current.onCostPlay('attack-bug#0', { x: 0, y: 0 })
+    result.current.onCostPlay('attack-bug#0', { x: 0, y: 0 })
   })
   expect(onResolve).toHaveBeenCalledTimes(1)
   expect(result.current.handItems).toHaveLength(0)
@@ -1306,7 +1315,7 @@ it('restores a rejected cost choice and lets it be retried without duplicate sub
   })
   expect(result.current.handItems.map((card) => card.uid)).toEqual(['attack-bug#0'])
   expect(result.current.paidCost).toBeNull()
-  act(() => result.current.onCostPick('attack-bug#0'))
+  act(() => result.current.onCostPlay('attack-bug#0', { x: 0, y: 0 }))
   expect(onResolve).toHaveBeenCalledTimes(2)
 })
 
@@ -1314,7 +1323,7 @@ it('removes the in-flight cost when a newer hand projection has already spent it
   const { rerender } = render(releaseBoard({ pending: costPending(['attack-bug#0']) }))
   const animateSpy = holdFlightsOpen()
   try {
-    await clickFanCard('attack-bug#0')
+    await payFromFan('attack-bug#0')
     expect(document.querySelector('[class*="_flyer_"] [data-card="attack-bug"]')).toBeTruthy()
     rerender(releaseBoard({ hand: [] }))
     expect(document.querySelector('[class*="_flyer_"] [data-card="attack-bug"]')).toBeNull()
