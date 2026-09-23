@@ -23,6 +23,7 @@ const rowById = (rows: HistoryEntry[], id: number): HistoryEntry | undefined => 
 // that reads the wrong one fails loudly instead of passing by coincidence.
 const view: PlayerView = {
   self: {
+    eliminated: false,
     id: 'you',
     name: 'you',
     hand: [{ uid: 'c1', id: 'attack-bug' }],
@@ -56,6 +57,11 @@ const labels = Object.fromEntries([
 ]) as HistoryLabels
 
 describe('toBoardState', () => {
+  it('keeps the local elimination status without relying on event history', () => {
+    const eliminated = { ...view, self: { ...view.self, eliminated: true, hand: [] } }
+    expect(toBoardState(eliminated, [], labels).you.eliminated).toBe(true)
+  })
+
   // The projection has always carried the piles; the adapter used to sum them
   // because the board could only draw one. It draws them all now, so the shape
   // travels through untouched.

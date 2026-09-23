@@ -183,6 +183,55 @@ it('reopens a rejected reorder so the player can retry', () => {
   expect(onResolve).toHaveBeenCalledTimes(2)
 })
 
+it.each([
+  'reconnecting',
+  'paused',
+] as const)('yields to %s without losing the chosen order', (reason) => {
+  mockReducedMotion(true)
+  const onResolve = vi.fn()
+  const base = makeBoardProps()
+  const state = {
+    ...base.state,
+    pending: rebasePending([
+      { uid: 'first', id: 'attack-bug' },
+      { uid: 'second', id: 'release-frontend' },
+    ]),
+  }
+  const board = (suspended: boolean) => (
+    <Board
+      {...base}
+      state={state}
+      actions={{ onResolve }}
+      room={{
+        ...base.room,
+        ...(reason === 'paused'
+          ? { paused: suspended }
+          : { connection: suspended ? 'reconnecting' : 'online' }),
+      }}
+    />
+  )
+  const { rerender } = render(board(false))
+  const second = screen.getByTestId('rebase-card-second')
+  second.getBoundingClientRect = () => new DOMRect(580, 200, 150, 210)
+  if (second.parentElement)
+    second.parentElement.getBoundingClientRect = () => new DOMRect(400, 200, 330, 210)
+  fireEvent.pointerDown(second, { button: 0, clientX: 600, clientY: 230 })
+  fireEvent.pointerMove(window, { clientX: 420, clientY: 230 })
+  fireEvent.pointerUp(window, { clientX: 420, clientY: 230 })
+
+  rerender(board(true))
+  expect(screen.getByTestId('board-rebase-overlay').hasAttribute('inert')).toBe(true)
+  expect(onResolve).not.toHaveBeenCalled()
+
+  rerender(board(false))
+  expect(screen.getByTestId('board-rebase-overlay').hasAttribute('inert')).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
+  expect(onResolve).toHaveBeenCalledWith({
+    kind: 'reorderTop',
+    order: [{ pile: 0, cards: ['second', 'first'] }],
+  })
+})
+
 // A CARD OF THE SAME KIND MAY BE PLAYED ANY NUMBER OF TIMES, so the same player
 // can be offered the same piles in the same order twice in one match. Keyed by
 // its CONTENTS the second offer was byte for byte the first — which this hook
@@ -215,4 +264,33 @@ it('deals the row again for a second, identical Rebase', () => {
   }
   rerender(<Board {...base} state={again} actions={{ onResolve }} />)
   expect(screen.queryByTestId('board-rebase-row')).not.toBeNull()
+})
+
+it('does not redeal an answered offer restored by the queue while its return settles', async () => {
+  mockReducedMotion(false)
+  const onResolve = vi.fn()
+  const base = makeBoardProps()
+  const state = {
+    ...base.state,
+    pending: rebasePending([{ uid: 'settling', id: 'attack-bug' }]),
+  }
+  const { rerender } = render(<Board {...base} state={state} actions={{ onResolve }} />)
+  await vi.waitFor(
+    () => expect(screen.getByRole('button', { name: /confirm|подтвердить/i })).toBeTruthy(),
+    { timeout: 2000 },
+  )
+  fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
+  await vi.waitFor(() => expect(onResolve).toHaveBeenCalledTimes(1), { timeout: 3000 })
+
+  // The live pending clears, then the operation beat's shadow supplies the
+  // earlier projection before BACK_SETTLE has unmounted the returning cards.
+  const card = screen.getByTestId('rebase-card-settling')
+  expect(card.style.position).toBe('fixed')
+  rerender(<Board {...base} state={{ ...state, pending: null }} actions={{ onResolve }} />)
+  rerender(<Board {...base} state={state} actions={{ onResolve }} />)
+  expect(screen.getByTestId('rebase-card-settling')).toBe(card)
+  expect(card.style.opacity).not.toBe('0')
+  expect(screen.queryByTestId('board-rebase-scrim')).toBeNull()
+  await vi.waitFor(() => expect(screen.queryByTestId('board-rebase-row')).toBeNull())
+  expect(onResolve).toHaveBeenCalledTimes(1)
 })

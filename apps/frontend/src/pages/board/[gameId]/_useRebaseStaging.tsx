@@ -83,8 +83,9 @@ export function useRebaseStaging(args: {
    */
   preview: (card?: CardData | null, faceDown?: boolean) => CardPreviewSlotProps
   enabled: boolean
+  suspended?: boolean
 }): { row: ReactNode | null } {
-  const { state, anchors, actions, copy, preview, enabled } = args
+  const { state, anchors, actions, copy, preview, enabled, suspended = false } = args
   const reduced = useReducedMotion()
   const pending = state.pending
   const ours =
@@ -125,7 +126,7 @@ export function useRebaseStaging(args: {
   // key says which offer this is and the contents say nothing about identity.
   const offerKey = ours ? `${ours.player}:${ours.raisedAt}` : null
   const reorder = useCardReorder({
-    enabled: Boolean(ours) && ready && !answered,
+    enabled: Boolean(ours) && ready && !answered && !suspended,
     step: 180,
     rows: piles.map((entry) => ({
       id: entry.pile,
@@ -180,7 +181,7 @@ export function useRebaseStaging(args: {
       dealtKey.current = null
       return
     }
-    const key = `${ours.player}:${ours.piles.map((e) => `${e.pile}/${e.cards.map((c) => c.uid).join(',')}`).join('|')}`
+    const key = offerKey
     if (dealtKey.current === key || answeredKey.current === key) return
     dealtKey.current = key
     setReady(reduced)
@@ -259,7 +260,7 @@ export function useRebaseStaging(args: {
     return { row: null }
 
   const confirm = () => {
-    if (!ours || confirmed || !ready || reorder.drag) return
+    if (!ours || confirmed || !ready || reorder.drag || suspended) return
     // Answered from this click on: the row never reopens for this offer, and the
     // deal never replays it, whichever projection the queue hands over next.
     answeredKey.current = offerKey
@@ -334,7 +335,13 @@ export function useRebaseStaging(args: {
     // default: here the reorder is the only thing to read and the draw piles go
     // under it too.
     row: (
-      <TableSurface committed={answered} dim="heavy" blockTestId="board-rebase-scrim">
+      <TableSurface
+        committed={answered}
+        dim="heavy"
+        suspended={suspended}
+        testId="board-rebase-overlay"
+        blockTestId="board-rebase-scrim"
+      >
         <div className={styles.rows} data-testid="board-rebase-row">
           {piles.map((entry) => (
             <div
@@ -387,7 +394,7 @@ export function useRebaseStaging(args: {
           ))}
         </div>
         <ConfirmAction
-          open={!answered && ready}
+          open={!answered && ready && !suspended}
           label={copy.confirm}
           caption={copy.prompt}
           onConfirm={confirm}

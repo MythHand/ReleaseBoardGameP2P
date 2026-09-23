@@ -359,6 +359,13 @@ single protocol frame; there is intentionally no room message-count limit.
 - late join receives the complete existing history, then live entries
 - guest reconnect keeps `memberId`, self styling, and history without duplicates
 - host reload restores entries, member mappings, and the next sequence
+- restoring the lobby requires the host to confirm readiness again; a fast guest
+  reconnect preserves readiness only if that guest was already in the lobby
+- the room session retains its last match id when returning from a match, so a
+  lobby reload cannot reuse it for the rematch; older records without this field
+  use the existing timestamp fallback for the match counter
+- kicking the local peer clears chat and rejects late history/live entries, even
+  after that browser joins another room
 - history synchronization produces no notifications
 - message count grows beyond fixture-sized lists without truncation
 

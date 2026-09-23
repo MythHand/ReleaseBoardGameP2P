@@ -87,6 +87,13 @@ export function createGame(config: GameConfig): GameState {
 
   const remaining = shuffle([...skipped, ...rest.slice(i)], seed, cursor)
   cursor = remaining.cursor
+  // Split only after the ordinary deal and shuffle: the same seed still deals
+  // the same hands, and no cards are added or removed by this lobby setting.
+  const midpoint = Math.ceil(remaining.items.length / 2)
+  const main =
+    normalized.setup.startingDecks === 'two'
+      ? [remaining.items.slice(0, midpoint), remaining.items.slice(midpoint)]
+      : [remaining.items]
 
   const eventDeck = shuffle(expand(config.events.filter((e) => SUPPORTED.has(e.id))), seed, cursor)
   cursor = eventDeck.cursor
@@ -108,7 +115,7 @@ export function createGame(config: GameConfig): GameState {
     players,
     eliminated: [],
     turn: { player: seating[0], index: 0, drawnFrom: [], releasesPlayed: 0 },
-    decks: { main: [remaining.items], events: eventDeck.items, discard: [] },
+    decks: { main, events: eventDeck.items, discard: [] },
     drawing: null,
     pending: null,
     window: null,

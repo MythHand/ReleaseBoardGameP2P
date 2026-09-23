@@ -196,6 +196,7 @@ export interface PlayerView {
   self: {
     id: PlayerId
     name: string
+    eliminated: boolean
     hand: CardInstance[]
     release: ReleaseView
     // Legality is the engine's answer, never the UI's.

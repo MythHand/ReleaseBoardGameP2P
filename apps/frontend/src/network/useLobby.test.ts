@@ -1863,6 +1863,156 @@ it('forgets what it stored when the host kicks this peer', async () => {
   expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
 })
 
+it('tears down a kicked session and ignores its callbacks after a fresh join', async () => {
+  const { result } = renderHook(() => useLobby())
+  const hostId = parseRoomCode('F96-NMT')
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Bo')
+  })
+  const old = transports[0]
+  const selfId = result.current.state?.selfId ?? ''
+  const oldEntry = userChatEntry({ id: 'chat-old', sequence: 1, text: 'old room' })
+  const receiveOldChat = () => {
+    old.onMessage?.({
+      seq: 1,
+      type: 'CHAT_HISTORY',
+      from: hostId,
+      payload: { entries: [oldEntry], selfMemberId: 'member-old' },
+    })
+    old.onMessage?.({
+      seq: 2,
+      type: 'CHAT_ENTRY',
+      from: hostId,
+      payload: { entry: userChatEntry({ id: 'chat-live', sequence: 2, text: 'live' }) },
+    })
+  }
+  act(receiveOldChat)
+  expect(result.current.chat.entries).toHaveLength(2)
+  expect(result.current.chat.notificationEntryIds).toEqual(['chat-live'])
+  expect(result.current.chat.selfMemberId).toBe('member-old')
+  act(() => {
+    old.onConnection?.(hostId)
+    old.onMessage?.({
+      seq: 1,
+      type: 'GAME_STARTING',
+      from: hostId,
+      payload: { gameId: 'old', seats: SEATING },
+    })
+    old.onMessage?.({ seq: 1, type: 'PLAYER_KICKED', from: hostId, payload: { peerId: selfId } })
+  })
+  expect.soft(result.current.status).toBe('kicked')
+  expect.soft(result.current.state).toBeNull()
+  expect.soft(result.current.roomCode).toBeNull()
+  expect.soft(result.current.gameId).toBeNull()
+  expect.soft(result.current.gameLink).toBeNull()
+  expect.soft(result.current.gameSync).toBeNull()
+  expect.soft(result.current.seats).toEqual([])
+  expect.soft(old.close).toHaveBeenCalledOnce()
+  expect(storedSession()).toBeNull()
+  expect(result.current.chat.entries).toEqual([])
+  expect(result.current.chat.notificationEntryIds).toEqual([])
+  expect(result.current.chat.selfMemberId).toBeNull()
+
+  const fireStaleCallbacks = () => {
+    receiveOldChat()
+    old.onMessage?.({
+      seq: 1,
+      type: 'GAME_STARTING',
+      from: hostId,
+      payload: { gameId: 'late', seats: SEATING },
+    })
+    old.onDisconnect?.(hostId)
+    old.onError?.({ type: 'network', message: 'late failure' })
+    old.onConnection?.(hostId)
+  }
+  act(fireStaleCallbacks)
+  expect.soft(result.current.status).toBe('kicked')
+  expect.soft(result.current.gameId).toBeNull()
+  expect.soft(result.current.reconnect.status).toBe('idle')
+  expect(result.current.chat.entries).toEqual([])
+  expect(result.current.chat.selfMemberId).toBeNull()
+
+  await act(async () => {
+    await result.current.joinRoom('ABC-23D', 'Bo')
+  })
+  act(() => transports[1].onConnection?.(parseRoomCode('ABC-23D')))
+  const freshState = result.current.state
+  act(fireStaleCallbacks)
+  expect(result.current.status).toBe('in-lobby')
+  expect(result.current.roomCode).toBe('ABC-23D')
+  expect(result.current.state).toBe(freshState)
+  expect(result.current.gameId).toBeNull()
+  expect(result.current.error).toBeNull()
+  expect(result.current.chat.entries).toEqual([])
+  expect(result.current.chat.notificationEntryIds).toEqual([])
+  expect(result.current.chat.selfMemberId).toBeNull()
+})
+
+it('dismisses an old kick notice when entering an invitation again', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Bo')
+  })
+  act(() =>
+    transports[0].onMessage?.({
+      seq: 1,
+      type: 'PLAYER_KICKED',
+      from: parseRoomCode('F96-NMT'),
+      payload: { peerId: result.current.state?.selfId ?? '' },
+    }),
+  )
+  expect(result.current.status).toBe('kicked')
+  act(() => result.current.clearError())
+  expect(result.current.status).toBe('idle')
+  expect(result.current.state).toBeNull()
+})
+
+it('requires fresh readiness from each returning player without disrupting the remaining results', async () => {
+  const { result } = await hostWithGuest()
+  const guestWhere = (where: 'game' | 'stats' | 'lobby') => {
+    transports[0].onMessage?.({ seq: 1, type: 'WHEREABOUTS', from: GUEST, payload: { where } })
+  }
+  act(() => transports[0].onMessage?.({ seq: 1, type: 'PLAYER_READY', from: GUEST, payload: {} }))
+  expect(result.current.canStart).toBe(true)
+  act(() => {
+    result.current.startGame([])
+    result.current.setWhere('game')
+    guestWhere('game')
+    result.current.setWhere('stats')
+    guestWhere('stats')
+  })
+  const sync = result.current.gameSync
+  const seats = result.current.seats
+  const link = result.current.gameLink
+  act(() => {
+    result.current.leaveGame()
+    result.current.setWhere('lobby')
+  })
+  const hostId = result.current.state?.selfId ?? ''
+  expect.soft(result.current.state?.peers[hostId].ready).toBe(false)
+  expect.soft(result.current.canStart).toBe(false)
+  expect(result.current.gameSync).toBe(sync)
+  expect(result.current.seats).toBe(seats)
+  expect(result.current.gameLink).toBe(link)
+  act(() => result.current.ready())
+  expect.soft(result.current.state?.peers[hostId].ready).toBe(true)
+  expect.soft(result.current.canStart).toBe(false)
+  act(() => guestWhere('lobby'))
+  expect.soft(result.current.state?.peers[GUEST].ready).toBe(false)
+  expect.soft(result.current.state?.peers[hostId].ready).toBe(true)
+  expect.soft(result.current.canStart).toBe(false)
+  act(() => {
+    transports[0].onMessage?.({ seq: 1, type: 'PLAYER_READY', from: GUEST, payload: {} })
+    result.current.setWhere('lobby')
+    guestWhere('lobby')
+  })
+  expect(result.current.canStart).toBe(true)
+  expect(transports[0].broadcast).toHaveBeenCalledWith({
+    type: 'PEER_JOINED',
+    payload: expect.objectContaining({ id: GUEST, ready: false, where: 'lobby' }),
+  })
+})
+
 it('coalesces a burst of keeper commits into one serialization', async () => {
   vi.useFakeTimers()
   const writes = vi.spyOn(Storage.prototype, 'setItem')
@@ -2872,6 +3022,7 @@ it('preserves non-default lobby configuration when starting a rematch after rest
       releaseCond: 'easy',
       ai: 'no',
       gitBranch: 'strategic',
+      startingDecks: 'two',
     }
     const restoredGameId = 'peer0-1'
     storedHostSession(restoredGameId)
@@ -2884,6 +3035,7 @@ it('preserves non-default lobby configuration when starting a rematch after rest
     await act(async () => {
       await Promise.resolve()
     })
+    expect(result.current.gameSync?.view.decks.piles).toEqual([47, 47])
     act(() => {
       result.current.leaveGame()
       result.current.startGame([])
@@ -2893,6 +3045,7 @@ it('preserves non-default lobby configuration when starting a rematch after rest
     expect(rematchGameId).toBe('peer0-2')
     expect(result.current.state?.maxPlayers).toBe(3)
     expect(result.current.state?.setup).toEqual(nonDefaultSetup)
+    expect(result.current.gameSync?.view.decks.piles).toHaveLength(2)
 
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
@@ -2905,6 +3058,40 @@ it('preserves non-default lobby configuration when starting a rematch after rest
   }
 })
 
+it('syncs the host starting-pile setting to guests and carries it into consecutive matches', async () => {
+  const hosted = await hostWithGuest()
+  const hostTransport = transports[0]
+  const hostId = hosted.result.current.state?.hostId ?? ''
+  const guest = renderHook(() => useLobby())
+  await act(async () => {
+    await guest.result.current.joinRoom(formatRoomCode(hostId), 'Bo')
+  })
+  // Joining explicitly replaces any transport restored from this test's shared storage.
+  const guestTransport = transports[transports.length - 1]
+  const setup = { ...hosted.result.current.state?.setup, startingDecks: 'two' }
+  act(() => hosted.result.current.setSetup(setup))
+  // A setup change also emits a chat event; route the configuration message.
+  const update = hostTransport.broadcast.mock.calls
+    .map(([message]) => message as Message)
+    .filter((message) => message.type === 'LOBBY_CONFIG_UPDATED')
+    .at(-1)
+  if (!update) throw new Error('missing setup broadcast')
+  expect(update).toEqual({ type: 'LOBBY_CONFIG_UPDATED', payload: { setup } })
+  act(() => guestTransport.onMessage?.({ ...update, from: hostId, seq: 1 }))
+  expect(guest.result.current.state?.setup.startingDecks).toBe('two')
+  act(() => guest.result.current.setSetup({ startingDecks: 'base' }))
+  expect(guest.result.current.state?.setup.startingDecks).toBe('two')
+
+  act(() => hosted.result.current.startGame([]))
+  expect(hosted.result.current.gameSync?.view.decks.piles).toEqual([47, 47])
+  act(() => {
+    hosted.result.current.leaveGame()
+    hosted.result.current.startGame([])
+  })
+  expect(hosted.result.current.gameSync?.view.decks.piles).toEqual([47, 47])
+  expect(hosted.result.current.state?.setup.startingDecks).toBe('two')
+})
+
 it('falls back to the restored game setup for an older snapshot without lobby config', async () => {
   const legacySetup: Setup = {
     handLimit: 'memory',
@@ -2914,7 +3101,11 @@ it('falls back to the restored game setup for an older snapshot without lobby co
     gitBranch: 'strategic',
   }
   storedHostSession('g1')
-  storedKeeperSnapshot('peer0', 'g1', { setup: legacySetup })
+  const snapshot = storedKeeperSnapshot('peer0', 'g1', { setup: legacySetup })
+  // This snapshot predates the new axis, so omit the default that today's
+  // createGame adds. Restore must still accept the historical shape.
+  snapshot.state = { ...(snapshot.state as Record<string, unknown>), setup: legacySetup }
+  sessionStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
 
   const { result } = renderHook(() => useLobby())
   await act(async () => {
@@ -2923,6 +3114,7 @@ it('falls back to the restored game setup for an older snapshot without lobby co
 
   expect(result.current.state?.maxPlayers).toBe(6)
   expect(result.current.state?.setup).toEqual(legacySetup)
+  expect(result.current.gameSync?.view.decks.piles).toEqual([94])
 })
 
 it('normalizes restored private seats before sending rejoin seating', async () => {
@@ -3101,6 +3293,38 @@ it('hands a stored guest session to the guest reconnect path, not the host resto
   // The guest reconnect path re-dials instead of sitting idle on /start.
   expect(transports).toHaveLength(1)
   expect(result.current.roomCode).toBe('ABC-123')
+})
+
+it('restores a rematch lobby without reviving readiness or reusing the previous match id', async () => {
+  const first = renderHook(() => useLobby())
+  await act(async () => first.result.current.createRoom('Ann', 3))
+  act(() => {
+    first.result.current.setBots(2)
+    first.result.current.startGame([])
+    first.result.current.setWhere('game')
+  })
+  const previousId = first.result.current.gameId
+  expect(previousId).not.toBeNull()
+  act(() => {
+    first.result.current.leaveGame()
+    first.result.current.setWhere('lobby')
+  })
+  expect(first.result.current.state?.peers.peer0.ready).toBe(false)
+  first.unmount()
+  // A reload reclaims the same host transport id and retains sessionStorage.
+  transports.length = 0
+  const restored = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(restored.result.current.gameId).toBeNull()
+  expect.soft(restored.result.current.state?.peers.peer0.ready).toBe(false)
+  act(() => {
+    restored.result.current.ready()
+    restored.result.current.startGame([])
+  })
+  expect(restored.result.current.gameId).not.toBeNull()
+  expect(restored.result.current.gameId).not.toBe(previousId)
 })
 
 it('restores a stored host room and its chat when no match is running', async () => {

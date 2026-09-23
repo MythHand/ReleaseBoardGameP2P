@@ -1,4 +1,5 @@
 import type { GameConfig } from '../engine'
+import { createFakeEngine } from './index'
 import { createGame, expand, OPENING_EXCLUDED } from './setup'
 
 const DECK = [
@@ -94,6 +95,68 @@ it('starts with one draw pile, an events deck and an empty discard', () => {
   expect(s.decks.main).toHaveLength(1)
   expect(s.decks.events).toHaveLength(4)
   expect(s.decks.discard).toEqual([])
+})
+
+it.each([
+  'base',
+  'strategic',
+])('splits the remainder after the same deal in %s mode', (gitBranch) => {
+  const original = config({
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: { gitBranch },
+  })
+  const single = createGame(original)
+  const double = createGame({ ...original, setup: { gitBranch, startingDecks: 'two' } })
+  // The 77-card fixture leaves 67 cards after two ordinary five-card hands.
+  expect(double.decks.main.map((pile) => pile.length)).toEqual([34, 33])
+  expect(double.players).toEqual(single.players)
+  expect(double.decks.main.flat()).toEqual(single.decks.main[0])
+  expect(double.decks.events).toEqual(single.decks.events)
+  expect(double.rngCursor).toBe(single.rngCursor)
+  expect(double.ignored.setup).toEqual([])
+  expect(createGame({ ...original, setup: { gitBranch, startingDecks: 'two' } })).toEqual(double)
+})
+
+it.each<Record<string, string>>([
+  {},
+  { startingDecks: 'base' },
+  { startingDecks: 'invalid' },
+])('keeps one starting pile for %j', (setup) => {
+  const state = createGame(config({ setup }))
+  expect(state.decks.main).toHaveLength(1)
+  expect(state.setup.startingDecks).toBe('base')
+})
+
+it.each([
+  ['base', 7, [10, 10]],
+  ['strategic', 6, [11, 10]],
+] as const)('honours %s on the first draw from two starting piles', (gitBranch, handSize, piles) => {
+  const engine = createFakeEngine()
+  const state = engine.createGame(
+    config({
+      players: [
+        { id: 'p1', name: 'Ann' },
+        { id: 'p2', name: 'Bo' },
+      ],
+      setup: { gitBranch, startingDecks: 'two' },
+      // No triggers: the draw completes without any pending decisions.
+      deck: [
+        { id: 'release-frontend', qty: 30 },
+        { id: 'protection-debugger', qty: 2 },
+      ],
+    }),
+  )
+  expect(engine.project(state, 'p1').decks.piles).toEqual([11, 11])
+  const drawn = engine.reduce(state, { type: 'DRAW', player: 'p1', pile: 1, at: 1000 })
+  expect(drawn.events.some((event) => event.type === 'rejected')).toBe(false)
+  expect(drawn.state.players.p1.hand).toHaveLength(handSize)
+  expect(engine.project(drawn.state, 'p1').decks.piles).toEqual(piles)
+  expect(
+    engine.reduce(drawn.state, { type: 'PUSH', player: 'p1', at: 1100 }).state.turn.player,
+  ).toBe('p2')
 })
 
 it('is deterministic for a given seed and divergent across seeds', () => {

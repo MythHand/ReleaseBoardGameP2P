@@ -118,6 +118,8 @@ export interface StoredSession {
   name: string
   role: 'host' | 'guest'
   gameId: string | null
+  // Retained when returning to the lobby so a reload cannot reuse a match id.
+  lastGameId?: string
   joinedAt: number
   lobbyConfig?: StoredLobbyConfig
 }
