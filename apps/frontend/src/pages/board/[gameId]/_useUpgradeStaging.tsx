@@ -1,6 +1,6 @@
 import type { Event } from '@release/engine'
 import type { HandPlayDrop, TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardById, rowPlaceStyle, Typography } from '@release/ui'
+import { Card, ConfirmAction, cardById, rowPlaceStyle, TableSurface, Typography } from '@release/ui'
 import { play, useFlyer } from '@release/ui/animations'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
@@ -118,6 +118,14 @@ export function useUpgradeStaging(args: {
     onHandPlay,
     handItems: state.you.hand.filter((c) => c.uid !== given),
     stagedUid: given,
+    // THE STEP ANSWERS ON THE SURFACE, not in the fan. True from the moment the
+    // cards become a choice and through the whole stretch after the answer is
+    // given, while they are still flying home: the fan takes no part in either,
+    // and the reference keeps its hand shut for exactly that span (the Git-card
+    // scenes hold it closed until the round is `done`). The ask is the opposite
+    // case and stays out of it — there the answer IS a card pulled out of the
+    // fan.
+    answering: Boolean(pending && enabled && (picking || confirmed)),
     el: () => flyer.elOf('upgrade-local'),
     release: () => {
       flyer.drop()
@@ -179,20 +187,29 @@ export function useUpgradeStaging(args: {
     </>
   )
 
-  if (confirmed) return { surface: centre, ...interaction }
+  // THE ANSWER IS GIVEN and the cards are on their way home. The surface stays —
+  // as the module's committed state, which drops it to the flight band, stops
+  // blocking and fades the dimming out instead of cutting it. Returned bare, the
+  // question vanished in one frame and the table woke up under cards that were
+  // still in the air (owner, 22.09).
+  if (confirmed) return { surface: <TableSurface committed>{centre}</TableSurface>, ...interaction }
 
   if (asked) {
     return {
       ...interaction,
+      // WAITING ON THE OTHER SEATS. The step owns the table — the answer is
+      // owed by somebody else and there is nothing here to do — so the surface
+      // blocks. It does not DIM: nothing is being chosen yet, and dimming a
+      // table nobody is choosing on turns a wait into a question.
       surface: (
-        <div className={styles.surface} data-testid="board-upgrade-ask">
+        <TableSurface dim="none" testId="board-upgrade-ask">
           {centre}
           <div className={opening.ask} data-shown="true" role="status">
             <Typography as="div" base="label-sm" tk="tk-16" className={opening.askLine}>
               {copy.prompt}
             </Typography>
           </div>
-        </div>
+        </TableSurface>
       ),
     }
   }
@@ -200,8 +217,12 @@ export function useUpgradeStaging(args: {
   if (picking) {
     return {
       ...interaction,
+      // …AND NOW THERE IS A CHOICE. Everyone has thrown, the cards are all on
+      // the table and one of them is to be taken — so the dimming comes up with
+      // the confirm bar: what is behind it is not part of this question, and
+      // the choice is (owner, 22.09).
       surface: (
-        <div className={styles.surface}>
+        <TableSurface>
           {centre}
           <ConfirmAction
             open
@@ -214,7 +235,7 @@ export function useUpgradeStaging(args: {
               resolve({ kind: 'upgradeTake', card: taken })
             }}
           />
-        </div>
+        </TableSurface>
       ),
     }
   }

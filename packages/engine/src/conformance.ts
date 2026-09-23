@@ -6,6 +6,7 @@ import { botAction } from './fake/bots'
 import { randomAt } from './rng'
 import {
   type CardInstance,
+  cardsPresent,
   type GameState,
   type PlayerId,
   type ReleaseSlot,
@@ -410,55 +411,6 @@ function driveProtectedReleaseAndDdos(
 // to be filtered out or the total would climb legitimately. An event card now
 // *is* the card standing on the table (#93, general.md §6.4), counted once
 // wherever it happens to be.
-function realCardUids(state: GameState): string[] {
-  const uids = [
-    ...state.decks.main.flat(),
-    ...state.decks.discard,
-    ...state.decks.events,
-    ...Object.values(state.players).flatMap((p) => [
-      ...p.hand,
-      // The three release slots hold { card, codeReview? }; `monitoring` holds
-      // the instance itself, so it cannot go through the same branch.
-      ...(['frontend', 'backend', 'database'] as const).flatMap((slot) => {
-        const r = p.release[slot]
-        return r ? [r.card, ...(r.codeReview ? [r.codeReview] : [])] : []
-      }),
-      ...(p.release.monitoring ? [p.release.monitoring] : []),
-    ]),
-  ].map((c) => c.uid)
-  // A thrown attack card is in mid-air while a `defend` is owed: out of the
-  // attacker's hand and not yet anywhere else. It is still very much in the
-  // game, so a stream that simply ends while one is open must not read as a
-  // loss — that is a snapshot artefact, not a leaked card.
-  if (state.pending?.kind === 'defend') uids.push(state.pending.attack)
-  if (state.pending && 'context' in state.pending && state.pending.context) {
-    uids.push(state.pending.context.attack.uid)
-    if (state.pending.context.combo) uids.push(state.pending.context.combo.uid)
-  }
-  // The Sudo that rode that attack, held on the same pending for the same
-  // reason and in the same mid-air state — out of the attacker's hand and in no
-  // pile until the exchange resolves. Counted here, and nowhere else: the test
-  // "counts the Sudo riding an attack while its defence is open" below is what
-  // establishes that, because the fuzz stream never attaches a combo to an
-  // ATTACK and so cannot reach this state on its own.
-  if (state.pending?.kind === 'defend' && state.pending.combo) {
-    uids.push(state.pending.combo.uid)
-  }
-  // The alarm while its answer is being chosen — same mid-air state as a thrown
-  // attack above, and the same reason a stream ending here must not read as a
-  // lost card. Null for the ai-error-503 mimic, which holds no card here.
-  if (state.pending?.kind === 'neutralize503' && state.pending.card) {
-    uids.push(state.pending.card.uid)
-  }
-  // System Upgrade's thrown cards, face up at the centre while the pending
-  // drains — out of every hand and in no pile yet, the same mid-air state as
-  // the two above and counted for the same reason.
-  if (state.pending?.kind === 'systemUpgrade') {
-    for (const t of state.pending.thrown) uids.push(t.card.uid)
-  }
-  return uids.sort()
-}
-
 function drive(engine: Engine, state: GameState, seed: number, steps: number) {
   let current = state
   const events: Event[] = []
@@ -672,9 +624,9 @@ export function describeEngine(
         // draw pile, which is exactly when a stray instance starts circulating.
         const engine = make()
         const start = engine.createGame(configFor(options, 55))
-        const before = realCardUids(start)
+        const before = cardsPresent(start)
         const { state } = drive(engine, start, 23, 300)
-        expect(realCardUids(state)).toEqual(before)
+        expect(cardsPresent(state)).toEqual(before)
       })
 
       it('counts the Sudo riding an attack while its defence is open', () => {
@@ -707,7 +659,7 @@ export function describeEngine(
             [responder]: { ...state.players[responder], hand: [attack, sudo] },
           },
         }
-        const before = realCardUids(armed)
+        const before = cardsPresent(armed)
 
         const r = engine.reduce(armed, {
           type: 'ATTACK',
@@ -722,7 +674,7 @@ export function describeEngine(
         expect(pending.combo, 'the Sudo did not ride the attack').toBeDefined()
         // Both halves of the pair are still in the game, so the census is
         // unchanged across the move that put them mid-air.
-        expect(realCardUids(r.state)).toEqual(before)
+        expect(cardsPresent(r.state)).toEqual(before)
       })
 
       it('never lets a card from the events deck reach the discard', () => {
@@ -1129,8 +1081,15 @@ export function describeEngine(
         // 38 and a round-2+ one at 44 (both measured), and runs to step 2759
         // before the game ends — so the budget still bounds the loop rather
         // than the witness.
+        //
+        // Seed 4, not 24: a reflected attack now keeps its defence on the table
+        // until the exchange ends instead of banking it at once, so the discard
+        // differs from that moment on and no fixed seed keeps its old
+        // trajectory — the same class of shift as every sweep above. Swept
+        // again: 4 sees both rounds and runs to step 2955 before the game ends,
+        // so the budget still bounds the loop rather than the witness.
         const engine = make()
-        let state = engine.createGame(configFor(options, 24))
+        let state = engine.createGame(configFor(options, 4))
         let sawRound1 = false
         let sawLaterRound = false
         for (let n = 0; n < 3600 && !state.over; n += 1) {

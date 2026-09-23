@@ -90,6 +90,12 @@ export type PendingView =
       // the whole table watched it be revealed.
       source?: CardId
     }
+  // THE THREE PENDINGS OF ONE EXCHANGE, and all three carry the same picture of
+  // the centre: `attack`/`sudo` for what was thrown, `cover`/`coverSudo`/`coverBy`
+  // for the defence lying over it after a Works on my Machine turned the attack
+  // back on its author. Both are public — the rules put the thrown cards face up
+  // — and both stay until the exchange ends, which is what lets any table keep
+  // them standing without a beat having to carry them from one to the next.
   | {
       kind: 'stealCard'
       player: PlayerId
@@ -97,6 +103,9 @@ export type PendingView =
       count: number
       attack: CardId
       sudo: boolean
+      cover?: CardId
+      coverSudo?: boolean
+      coverBy?: PlayerId
       openedAt: number
       deadline: number
     }
@@ -106,6 +115,9 @@ export type PendingView =
       target: PlayerId
       attack?: CardId
       sudo?: boolean
+      cover?: CardId
+      coverSudo?: boolean
+      coverBy?: PlayerId
       openedAt?: number
       deadline?: number
     }
@@ -116,6 +128,9 @@ export type PendingView =
       attacker?: PlayerId
       attack?: CardId
       sudo?: boolean
+      cover?: CardId
+      coverSudo?: boolean
+      coverBy?: PlayerId
       openedAt?: number
       deadline?: number
     }

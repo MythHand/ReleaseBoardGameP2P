@@ -2166,17 +2166,55 @@ it.each([
   expect(plans.map((p) => p.kind)).toEqual(['handTransfer', 'pairToDiscard'])
 })
 
+// A reflect banks NOTHING at the moment it happens: the defence stays lying over
+// the attack it turned back, and the two are banked together when the exchange
+// they belong to ends (engine: `HandAttackContext.cover`). Whole exchange in one
+// batch — the attacker's hand was empty, so there was nothing to pick from and
+// the engine finished it on the spot.
 it('keeps the reflected attack available to a coalesced transfer exit', () => {
   const before = boardBefore({ pending: defendPending({ attacker: 'p2', sudo: false }) })
   const events = [
     defended({ id: 1, player: 'p1', effect: 'reflect', card: 'defense-works-on-my-machine' }),
-    discarded(2, { player: 'p1', card: 'defense-works-on-my-machine', reason: 'defenceSpent' }),
     { id: 3, type: 'handTransfer', from: 'p2', to: 'p1', card: 'release-backend' },
     discarded(4, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+    discarded(5, { player: 'p1', card: 'defense-works-on-my-machine', reason: 'defenceSpent' }),
   ] as Event[]
-  expect(planBeats(events, before, null).map((p) => p.kind)).toEqual([
-    'covered',
-    'handTransfer',
-    'pairToDiscard',
-  ])
+  const plans = planBeats(events, before, null)
+  expect(plans.map((p) => p.kind)).toEqual(['covered', 'handTransfer', 'pairToDiscard'])
+  // the attack and what covered it leave in ONE gesture
+  expect(plans[2]).toMatchObject({
+    main: { eventId: 4, card: 'attack-bug' },
+    cover: { eventId: 5, card: 'defense-works-on-my-machine' },
+  })
+})
+
+// …and the ordinary shape: the pick is its own batch, so by the time the closing
+// discards arrive the reflect is long gone from the event stream and the pending
+// is what says a defence is lying at the centre.
+it('takes the lying defence out with the attack after the pick', () => {
+  const pending = {
+    kind: 'stealCard',
+    player: 'p1',
+    target: 'p2',
+    attack: 'attack-bug',
+    sudo: false,
+    cover: 'defense-works-on-my-machine',
+    coverSudo: true,
+  } as BoardState['pending']
+  const plans = planBeats(
+    [
+      { id: 1, type: 'handTransfer', from: 'p2', to: 'p1', card: 'release-backend' },
+      discarded(2, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+      discarded(3, { player: 'p1', card: 'defense-works-on-my-machine', reason: 'defenceSpent' }),
+      discarded(4, { player: 'p1', card: 'support-sudo', reason: 'defenceSpent' }),
+    ] as Event[],
+    boardBefore({ pending }),
+    null,
+  )
+  expect(plans.map((p) => p.kind)).toEqual(['handTransfer', 'pairToDiscard'])
+  expect(plans[1]).toMatchObject({
+    main: { eventId: 2, card: 'attack-bug' },
+    cover: { eventId: 3, card: 'defense-works-on-my-machine' },
+    coverAux: { eventId: 4, card: 'support-sudo' },
+  })
 })
