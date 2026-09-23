@@ -21,7 +21,6 @@ const seats = [
 const peers: Record<string, PeerInfo> = {
   'peer-a': {
     id: 'peer-a',
-    memberId: 'member-a',
     name: 'Ann',
     role: 'host',
     ready: true,
@@ -29,7 +28,6 @@ const peers: Record<string, PeerInfo> = {
   },
   'peer-b': {
     id: 'peer-b',
-    memberId: 'member-b',
     name: 'Bo',
     role: 'player',
     ready: true,
@@ -89,7 +87,6 @@ it('a seat that lost its peer keeps its own counters, and so does everyone else'
   const survivors: Record<string, PeerInfo> = {
     aaa: {
       id: 'aaa',
-      memberId: 'member-aaa',
       name: 'Ann',
       role: 'host',
       ready: true,
@@ -97,7 +94,6 @@ it('a seat that lost its peer keeps its own counters, and so does everyone else'
     },
     ccc: {
       id: 'ccc',
-      memberId: 'member-ccc',
       name: 'Cid',
       role: 'player',
       ready: true,
@@ -173,7 +169,7 @@ it('reports a bot seat as being in the game, not offline', () => {
     peers: {
       'peer-a': {
         id: 'peer-a',
-        memberId: 'member-a',
+
         name: 'Ann',
         role: 'host',
         ready: true,

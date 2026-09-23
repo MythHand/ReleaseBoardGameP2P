@@ -39,7 +39,7 @@ import type {
 } from '@release/ui'
 import type { ReactNode } from 'react'
 
-export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'chat'
+export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes'
 
 export interface BoardOpponent {
   id: string
@@ -143,8 +143,6 @@ export interface BoardRoom {
   onKickSpectator?: (id: string) => void
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
-  chatToasts?: boolean
-  onChatToastsChange?: (on: boolean) => void
   paused?: boolean
   onPauseChange?: (on: boolean) => void
   pausePlayers?: PausePlayer[]
@@ -236,16 +234,11 @@ export interface BoardChromeCopy {
   pauseOn?: string
   pauseOff?: string
   pauseHint?: string
-  chatToasts?: string
-  chatToastsOn?: string
-  chatToastsOff?: string
-  chatToastsHint?: string
   // подписи текстовых вкладок рейла
   tabHistory: string
   tabParticipants: string
   tabRules: string
   tabModes: string
-  tabChat?: string
 }
 
 export interface BoardCopyBundle {
@@ -365,8 +358,6 @@ export interface BoardSlots {
   // match, and the consumer's non-fatal error notice.
   corner?: ReactNode
   banner?: ReactNode
-  chat?: ReactNode
-  toasts?: ReactNode
 }
 
 export interface BoardOver {

@@ -244,21 +244,7 @@
   "chat": {
     "placeholder": "message",
     "send": "send",
-    "empty": "quiet so far",
-    "system": {
-      "memberJoined": "{{name}} joined",
-      "memberLeft": "{{name}} left the room",
-      "memberReconnected": "{{name}} reconnected",
-      "memberKicked": "{{name}} was removed",
-      "roleChanged": "{{name}} is now {{role}}",
-      "modeChanged": "host changed {{setting}}: {{value}}",
-      "modeChangedUnknown": "host changed the game settings"
-    },
-    "roles": {
-      "host": "host",
-      "player": "player",
-      "spectator": "spectator"
-    }
+    "empty": "quiet so far"
   },
   "toasts": {
     "hide": "hide"
@@ -281,7 +267,7 @@
     "codeTitle": "game code",
     "hostTitle": "controls",
     "specLimit": "spectator limit",
-    "askCost": "a release costs one card — click one in the hand",
+    "askCost": "a release costs one card — pull any of them out",
     "askDefend": "answer with a defence — pull one out of the hand",
     "askPartner": "click the defence the sudo will enhance",
     "askNeutralize": "neutralise the alarm — answer with a lit card",
@@ -302,10 +288,6 @@
     "tabRules": "rules",
     "tabModes": "game mode",
     "tabChat": "chat",
-    "chatToasts": "chat notifications",
-    "chatToastsOn": "On",
-    "chatToastsOff": "Off",
-    "chatToastsHint": "new messages surface in the corner while the chat is closed",
     "stealCard": "drag a card from the closed hand"
   },
   "lobbyCode": {

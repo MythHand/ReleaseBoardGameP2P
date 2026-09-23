@@ -26,13 +26,8 @@ function peerList(state: LobbyState): PeerInfo[] {
 export function handleJoinRequest(
   state: LobbyState,
   fromId: string,
-  memberId: string,
   name: string,
-  options: {
-    matchRunning: boolean
-    returningSeat?: Seat
-    returningLobbyPeer?: Pick<PeerInfo, 'role' | 'ready'>
-  },
+  options: { matchRunning: boolean; returningSeat?: Seat },
 ): Result {
   // Role comes from the seat, never from assignRole. A returning player whose
   // room filled up behind them would otherwise be handed 'guest' and silently
@@ -41,20 +36,17 @@ export function handleJoinRequest(
     ? fromId === state.hostId
       ? 'host'
       : 'player'
-    : options.returningLobbyPeer
-      ? options.returningLobbyPeer.role
-      : options.matchRunning
-        ? 'guest'
-        : assignRole(state)
+    : options.matchRunning
+      ? 'guest'
+      : assignRole(state)
 
   const peer: PeerInfo = {
     id: fromId,
-    memberId,
     name,
     role,
     // A returner is mid-match, so it is past readiness; the lobby is the only
     // place to join from, so a newcomer starts there and is not ready.
-    ready: options.returningSeat ? true : (options.returningLobbyPeer?.ready ?? false),
+    ready: Boolean(options.returningSeat),
     where: options.returningSeat ? 'game' : 'lobby',
   }
   const next = applyPeerJoined(state, peer)
@@ -80,7 +72,7 @@ export function handleJoinRequest(
         to: 'broadcast',
         message: {
           type: 'PEER_JOINED',
-          payload: { id: fromId, memberId, name, role, ready: peer.ready, where: peer.where },
+          payload: { id: fromId, name, role, ready: peer.ready, where: peer.where },
         },
       },
       // Everyone else holds the seating with this seat's dead peer id in it.
@@ -115,7 +107,6 @@ export function handleReady(state: LobbyState, fromId: string): Result {
           type: 'PEER_JOINED',
           payload: {
             id: updated.id,
-            memberId: updated.memberId,
             name: updated.name,
             role: updated.role,
             ready: updated.ready,
@@ -146,7 +137,6 @@ export function handleWhereabouts(state: LobbyState, fromId: string, where: Wher
           type: 'PEER_JOINED',
           payload: {
             id: updated.id,
-            memberId: updated.memberId,
             name: updated.name,
             role: updated.role,
             ready: updated.ready,
@@ -208,7 +198,6 @@ export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
           type: 'PEER_JOINED' as const,
           payload: {
             id: peer.id,
-            memberId: peer.memberId,
             name: peer.name,
             role: peer.role,
             ready: peer.ready,

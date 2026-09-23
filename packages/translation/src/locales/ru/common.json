@@ -244,21 +244,7 @@
   "chat": {
     "placeholder": "сообщение",
     "send": "отправить",
-    "empty": "пока тихо",
-    "system": {
-      "memberJoined": "{{name}} теперь в комнате",
-      "memberLeft": "{{name}} покинул комнату",
-      "memberReconnected": "{{name}} снова на связи",
-      "memberKicked": "{{name}} исключён из комнаты",
-      "roleChanged": "{{name}} теперь {{role}}",
-      "modeChanged": "хост изменил {{setting}}: {{value}}",
-      "modeChangedUnknown": "хост изменил настройки игры"
-    },
-    "roles": {
-      "host": "хост",
-      "player": "игрок",
-      "spectator": "зритель"
-    }
+    "empty": "пока тихо"
   },
   "toasts": {
     "hide": "скрыть"
@@ -281,7 +267,7 @@
     "codeTitle": "код игры",
     "hostTitle": "управление",
     "specLimit": "лимит зрителей",
-    "askCost": "релиз стоит одной карты — кликните карту в руке",
+    "askCost": "релиз стоит одной карты — вытащите любую",
     "askDefend": "ответьте защитой — вытащите её из руки",
     "askPartner": "кликните защиту, которую усилит sudo",
     "askNeutralize": "нейтрализуйте тревогу — ответьте подсвеченной картой",
@@ -302,10 +288,6 @@
     "tabRules": "правила",
     "tabModes": "игровой режим",
     "tabChat": "чат",
-    "chatToasts": "уведомления чата",
-    "chatToastsOn": "Вкл",
-    "chatToastsOff": "Выкл",
-    "chatToastsHint": "новые сообщения всплывают в углу, пока чат закрыт",
     "stealCard": "вытащи карту из закрытого веера"
   },
   "lobbyCode": {

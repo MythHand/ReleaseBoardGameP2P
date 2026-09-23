@@ -45,7 +45,6 @@ function base(): UseLobby {
     seats: [],
     error: null,
     errorKind: null,
-    chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
     ready: vi.fn(),

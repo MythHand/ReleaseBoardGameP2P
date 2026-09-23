@@ -38,10 +38,13 @@ const en = {
   handDefenseHint:
     'Switch to the opponent and pull a defence over the staged attack, or take the hit. Their hand holds every defence card, one copy each.',
   release: 'Release into a zone',
+  ddos: 'DDoS: the standing zone',
   alarm503: 'Error 503: the alarm',
   aiTrigger: 'AI trigger: a Crush',
+  ddosHint:
+    'Your turn, five DDoS in hand, both opponent zones already standing. The first holds a Monitoring, a bare release and a release under Code Review; the second holds the AI pair — an AI Monitoring and an AI release. Throw one at each: a Monitoring is destroyed, a release goes back to its owner hand frozen for a round, a Code Review is discarded with the release it rode — and the AI cards go home to the events deck instead of the discard.',
   releaseHint:
-    'Your turn, zones empty. Put the release down — pay its cost if one is charged, or play it with Code Review so the cost rides it instead. Monitoring is in the hand too: it goes into its own slot in the zone.',
+    'Your turn, zones empty. Put the release down: it costs a card, so the table asks which one — it is shown open beside the release, goes to the discard, and only then does the release settle into its slot. Or play the release with Code Review, and that rides it instead of a card being spent. Monitoring is in the hand too: it goes into its own slot in the zone.',
   alarm503Hint:
     'Nothing drawn yet. Take a card from the pile: Error 503 turns up and the alarm stands. Answer it with the Debugger in hand or by sacrificing the release in your zone.',
   aiTriggerHint:
@@ -49,18 +52,15 @@ const en = {
   cherry: 'Cherry-pick',
   rebase: 'Rebase',
   upgrade: 'Upgrade',
-  upgradeSudo: 'Upgrade + Sudo',
   cherryFizzle: 'Cherry-pick: triggers only',
   rebaseFizzle: 'Rebase: empty pile',
-  upgradeFizzle: 'Upgrade: empty opponent hand',
+  upgradeFizzle: 'Upgrade: empty opponent hands',
   cherryHint:
     'Pull Cherry-pick out of your hand, then choose a card from the discard grid. Sudo is in the hand too — combine them to choose a second card for the deck.',
   rebaseHint:
     'Pull Rebase out of your hand, reorder the offered top cards, then confirm. Sudo is in the hand too — combine them to reach every pile.',
   upgradeHint:
-    'Pull Upgrade out of your hand, then use the opponent discard control to complete the effect.',
-  upgradeSudoHint:
-    'Combine Sudo with Upgrade, use the opponent discard control, then choose the thrown card.',
+    'Pull Upgrade out of your hand — with or without the Sudo beside it, both are in the hand — then use the opponent discard control: every seat that owes a card gives one, and you choose from what they threw.',
   cherryFizzleHint:
     'Pull Cherry-pick out of your hand. The discard contains only a trigger, so there is no legal hand pick.',
   rebaseFizzleHint:
@@ -105,10 +105,13 @@ const ru: Record<keyof typeof en, string> = {
   handDefenseHint:
     'Переключитесь на соперника и вытяните защиту поверх атаки или примите удар. В его руке все карты защиты, по одной копии.',
   release: 'Релиз в зону',
+  ddos: 'DDoS: зона соперника',
   alarm503: 'Error 503: тревога',
   aiTrigger: 'Триггер AI: Crush',
+  ddosHint:
+    'Ваш ход, пять DDoS в руке, зоны обоих соперников уже стоят. У первого мониторинг, обычный релиз и релиз под Code Review; у второго пара AI — мониторинг AI и релиз AI. Бросьте по одной в каждую цель: мониторинг уничтожается, релиз уходит владельцу в руку и заморожен на раунд, Code Review уходит в сброс вместе с релизом, а карты AI возвращаются в колоду событий, а не в сброс.',
   releaseHint:
-    'Ваш ход, зоны пусты. Выложите релиз — оплатите стоимость, если её берут, либо разыграйте его с Code Review, и тогда он ляжет под релиз вместо оплаты. Мониторинг тоже в руке: он занимает свой слот в зоне.',
+    'Ваш ход, зоны пусты. Выложите релиз: он стоит карту, и стол спросит какую — она ложится открыто рядом с релизом, уходит в сброс, и только после этого релиз садится в свой слот. Либо разыграйте релиз с Code Review — тогда он ляжет под релиз вместо оплаты картой. Мониторинг тоже в руке: он занимает свой слот в зоне.',
   alarm503Hint:
     'Добора ещё не было. Возьмите карту из колоды: выпадет Error 503 и тревога встанет. Ответьте Debugger из руки или пожертвуйте релизом из своей зоны.',
   aiTriggerHint:
@@ -116,22 +119,19 @@ const ru: Record<keyof typeof en, string> = {
   cherry: 'Cherry-pick',
   rebase: 'Rebase',
   upgrade: 'Upgrade',
-  upgradeSudo: 'Upgrade + Sudo',
   cherryFizzle: 'Cherry-pick: только триггеры',
   rebaseFizzle: 'Rebase: пустая колода',
-  upgradeFizzle: 'Upgrade: пустая рука соперника',
+  upgradeFizzle: 'Upgrade: пустые руки соперников',
   cherryHint:
     'Вытяните Cherry-pick из руки, затем выберите карту в сетке сброса. Sudo тоже в руке — объедините их, чтобы выбрать вторую карту на колоду.',
   rebaseHint:
     'Вытяните Rebase из руки, упорядочьте предложенные верхние карты и подтвердите. Sudo тоже в руке — объедините их, чтобы достать все колоды.',
   upgradeHint:
-    'Вытяните Upgrade из руки, затем нажмите кнопку сброса соперника для завершения эффекта.',
-  upgradeSudoHint:
-    'Объедините Sudo с Upgrade, нажмите кнопку сброса соперника, затем выберите сброшенную карту.',
+    'Вытяните Upgrade из руки — с Sudo рядом или без него, обе карты в руке, — затем нажмите кнопку сброса: каждый обязанный соперник отдаёт карту, и вы выбираете из сброшенного.',
   cherryFizzleHint:
     'Вытяните Cherry-pick из руки. В сбросе только триггер, поэтому взять карту в руку нельзя.',
   rebaseFizzleHint: 'Вытяните Rebase из руки. Колода пуста, переставлять нечего.',
-  upgradeFizzleHint: 'Вытяните Upgrade из руки. У соперника нет карт для сброса.',
+  upgradeFizzleHint: 'Вытяните Upgrade из руки. Ни у кого из соперников нет карт для сброса.',
 }
 
 i18n.addResourceBundle('en', 'debug', en)

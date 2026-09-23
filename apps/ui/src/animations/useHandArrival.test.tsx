@@ -86,28 +86,37 @@ it('says it never took the flight when there is no fan to fly into', async () =>
   expect(landed).toEqual([])
 })
 
-it('says it never took the flight while another arrival is still in the air', async () => {
+// ANOTHER CARD IN THE AIR IS NOT A REASON TO DROP THIS ONE (owner, 22.09). A
+// card's journey into the fan does not depend on what some other card is doing,
+// and the step used to answer "not taken" to anything that arrived while one
+// was flying — which left the caller holding a card with nowhere to be. They
+// queue now: the fan opens one gap at a time and the second card flies when the
+// first has landed.
+it('takes a second arrival too, and lands it after the first', async () => {
   landed.length = 0
   handRef.current = document.createElement('div')
   render(<Probe />)
   vi.useFakeTimers()
   try {
-    // the first flight is started and deliberately left airborne
-    const first = api.step?.arrive([{ key: 'c1', card, from: box }], 3)
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(20)
-    })
+    let first: boolean | undefined
     let second: boolean | undefined
-    await act(async () => {
-      second = await api.step?.arrive([{ key: 'c2', card, from: box }], 3)
+    const a = api.step?.arrive([{ key: 'c1', card, from: box }], 3).then((t) => {
+      first = t
     })
-    expect(second).toBe(false)
-    // the first one is what lands, and it lands alone
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(600)
+    const b = api.step?.arrive([{ key: 'c2', card, from: box }], 4).then((t) => {
+      second = t
     })
-    await first
-    expect(landed).toEqual(['c1'])
+    // enough clock for both flights, one after the other
+    for (let i = 0; i < 4 && second === undefined; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600)
+      })
+    }
+    await Promise.all([a, b])
+    expect(first).toBe(true)
+    expect(second).toBe(true)
+    // …and in the order they were asked for, each landing on its own
+    expect(landed).toEqual(['c1', 'c2'])
   } finally {
     vi.useRealTimers()
   }

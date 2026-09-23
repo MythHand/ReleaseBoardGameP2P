@@ -6,7 +6,6 @@ export const OPERATION_SCENARIOS = [
   'cherry',
   'rebase',
   'upgrade',
-  'upgradeSudo',
   'cherryFizzle',
   'rebaseFizzle',
   'upgradeFizzle',
@@ -22,6 +21,7 @@ export const SCENARIOS = [
   'blindSteal',
   'handDefense',
   'release',
+  'ddos',
   'alarm503',
   'aiTrigger',
 ] as const
@@ -79,18 +79,34 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
     'blindSteal',
     'handDefense',
   ].includes(scenario)
+  // DDoS needs a THIRD seat of its own, and not to watch: the AI pair lives
+  // there. Two zones side by side is also the only way to see that a DDoS aims
+  // across the table rather than at one opponent (owner, 22.09).
+  // THREE SEATS ON EVERY PAGE. The stand is the real board or it is nothing, and
+  // a table that is two players wide on one page and three on another is two
+  // different games: everything that depends on a third seat — a relayed batch,
+  // an audience, a roster a pending is owed by — is simply unreachable from the
+  // pages that have only two (owner, 22.09). A preset that wants a seat out of
+  // the way empties its hand; that is a layout decision, which is what a preset
+  // is for.
   const initial = engine.createGame({
     gameId,
     seed: 42,
     players: [
       { id: 'you', name: 'You' },
       { id: 'p2', name: 'Opponent' },
-      ...(transfer ? [{ id: 'p3', name: 'Observer' }] : []),
+      { id: 'p3', name: scenario === 'ddos' ? 'Second opponent' : 'Observer' },
     ],
     setup: {
       handLimit: 'base',
       releases: 'base',
-      releaseCond: 'easy',
+      // ONE MODE ON EVERY PAGE, and it is the game's own base: a release costs a
+      // card. Under `easy` the engine places a release on the spot and asks
+      // nobody for anything, so the whole paying half of that move — the prompt,
+      // the card given for it, its own exit — did not exist on the pages that
+      // used it. A page that runs a different mode is a different game, and a
+      // fix checked on it proves nothing about the rest (owner, 22.09).
+      releaseCond: 'base',
       ai: 'base',
       gitBranch: 'strategic',
     },
@@ -101,6 +117,7 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
     return createSecurityScenario(initial, scenario)
   if (transfer) return createTransferScenario(initial, scenario)
   if (scenario === 'release') return createReleaseScenario(initial)
+  if (scenario === 'ddos') return createDdosScenario(initial)
   if (scenario === 'alarm503' || scenario === 'aiTrigger')
     return createTriggerScenario(initial, scenario)
   const operation = scenario.startsWith('branch')
@@ -152,6 +169,17 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
           scenario === 'upgradeFizzle'
             ? []
             : [instance('release-frontend', 8), instance('defense-hotfix', 9)],
+        release: {},
+        openedAtDeal: [],
+      },
+      // The third seat is at every table now, so a preset that is ABOUT an empty
+      // opponent hand has to empty this one too — System Upgrade asks every seat
+      // that holds a card, and one seat still holding one is not a fizzle. The
+      // others leave it with the hand it was dealt: a seat with cards is what a
+      // real table has.
+      p3: {
+        ...initial.players.p3,
+        ...(scenario === 'upgradeFizzle' ? { hand: [] } : {}),
         release: {},
         openedAtDeal: [],
       },
@@ -356,6 +384,75 @@ function createReleaseScenario(initial: GameState): GameState {
         ...initial.players.p2,
         hand: [instance('attack-bug', 8), instance('support-sudo', 9)],
         release: {},
+        openedAtDeal: [],
+      },
+    },
+  }
+}
+
+// DDOS — the one attack that aims at what is ALREADY STANDING, and the only one
+// played on your own turn against the table rather than into a reaction window.
+// It has three different targets and one of each is waiting for it: a Monitoring
+// (destroyed), a bare release (returned to its owner's hand, frozen for a round)
+// and a release under Code Review (returned too — DDoS is the only attack that
+// goes through Code Review, and the Code Review is discarded with the move).
+//
+// The zones are written STANDING, not played into place: what this preset is for
+// is the throw, and every card in those zones would otherwise cost a turn of its
+// own to put there (owner, 22.09).
+//
+// FIVE targets across TWO opponents, because the five are not one thing: the
+// second seat holds the AI pair, and an AI card does not go to the discard when
+// it leaves — it goes home to the events deck, which is its own condition and
+// its own road off the table (owner, 22.09). An AI card standing in a zone wears
+// the PLAIN catalogue id with its event id alongside (`resolveAiEvent`), so a
+// bounced release reads and plays as an ordinary one; the preset writes them the
+// same way the engine does rather than inventing a shape of its own.
+//
+// Five DDoS in hand — one per target, so a single run can empty both zones.
+function createDdosScenario(initial: GameState): GameState {
+  const aiRelease: CardInstance = {
+    uid: 'ai-release-database#debug20',
+    id: 'release-database',
+    event: 'ai-release-database',
+  }
+  const aiMonitoring: CardInstance = {
+    uid: 'ai-monitoring#debug21',
+    id: 'protection-monitoring',
+    event: 'ai-monitoring',
+  }
+  return {
+    ...initial,
+    eventSeq: 100,
+    window: null,
+    pending: null,
+    turn: { ...initial.turn, player: 'you', drawnFrom: [0, 1] },
+    decks: { ...initial.decks, discard: [] },
+    players: {
+      ...initial.players,
+      you: {
+        ...initial.players.you,
+        hand: Array.from({ length: 5 }, (_, i) => instance('attack-ddos', i)),
+        release: {},
+        openedAtDeal: [],
+      },
+      p2: {
+        ...initial.players.p2,
+        hand: [],
+        release: {
+          monitoring: instance('protection-monitoring', 10),
+          frontend: { card: instance('release-frontend', 11) },
+          backend: {
+            card: instance('release-backend', 12),
+            codeReview: instance('support-code-review', 13),
+          },
+        },
+        openedAtDeal: [],
+      },
+      p3: {
+        ...initial.players.p3,
+        hand: [],
+        release: { monitoring: aiMonitoring, database: { card: aiRelease } },
         openedAtDeal: [],
       },
     },
