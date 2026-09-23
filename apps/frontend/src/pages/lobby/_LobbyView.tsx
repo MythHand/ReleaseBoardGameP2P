@@ -16,7 +16,6 @@ import {
 import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
-import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
 import { useStartGame } from '~/features/start-game/useStartGame'
 import { effectiveBots } from '~/network'
 import type { PeerInfo } from '~/network/types'
@@ -28,7 +27,6 @@ import styles from './_LobbyView.module.css'
 export default function LobbyView() {
   const { t, i18n } = useTranslation()
   const session = useSession()
-  const chat = useRoomChatView()
   const startGame = useStartGame()
   const navigate = useNavigate()
   // Rules reuse the app-wide `?modal=` router rather than a second local modal,
@@ -157,7 +155,7 @@ export default function LobbyView() {
         </div>
       </header>
 
-      <div className={`${styles.grid} ${styles.gridChat}`}>
+      <div className={styles.grid}>
         {/* Left — match modes */}
         <section className={styles.modes}>
           <Typography variant="sectionTitle" className={styles.h}>
@@ -291,13 +289,6 @@ export default function LobbyView() {
               <Button onClick={leave}>{t('lobbyScreen.leave')}</Button>
             )}
           </div>
-        </section>
-
-        <section className={styles.chatCol}>
-          <Typography variant="sectionTitle" className={styles.h}>
-            {t('lobbyScreen.chat')}
-          </Typography>
-          <RoomChat view={chat} />
         </section>
       </div>
 

@@ -1,9 +1,8 @@
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
-import type { RoomChatView } from '~/features/chat/RoomChat'
 // The board's own style module — the `.enter` class the opening hides blocks
 // with is reached the same way the ported suite reaches Arrow's classnames.
 import boardStyles from '../_Board.module.css'
@@ -20,31 +19,6 @@ import StatsPage from '../stats'
 // unmount. That is fixed at the source now, so this mock is here for the reason
 // above alone.
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => true }))
-
-const chatMock = vi.hoisted(
-  (): { view: RoomChatView; setView: ((view: RoomChatView) => void) | null } => ({
-    view: {
-      messages: [],
-      notificationEntryIds: [],
-      selfMemberId: 'member-me',
-      copy: { placeholder: 'message', send: 'send', empty: 'empty' },
-      send: () => true,
-    },
-    setView: null,
-  }),
-)
-
-vi.mock('~/features/chat/RoomChat', async () => {
-  const { useState } = await vi.importActual<typeof import('react')>('react')
-  return {
-    useRoomChatView: () => {
-      const [view, setView] = useState(chatMock.view)
-      chatMock.setView = setView
-      return view
-    },
-    RoomChat: () => <div data-testid="room-chat">room chat</div>,
-  }
-})
 
 // The board reads the roster through the session, so every test drives it from
 // here rather than through a live transport.
@@ -76,14 +50,6 @@ function session(peers: Record<string, unknown> = {}): UseLobby {
 
 beforeEach(() => {
   sessionValue = session()
-  chatMock.view = {
-    messages: [],
-    notificationEntryIds: [],
-    selfMemberId: 'member-me',
-    copy: { placeholder: 'message', send: 'send', empty: 'empty' },
-    send: () => true,
-  }
-  chatMock.setView = null
 })
 
 // Board and stats are sibling routes (#19), matching the real router.ts, not
@@ -100,52 +66,6 @@ function renderBoard(path = '/board/g1') {
   )
   return { router, ...render(<RouterProvider router={router} />) }
 }
-
-it('does not replay async history as notifications, then opens chat for a live remote message', async () => {
-  const initial = {
-    id: 'initial',
-    memberId: 'member-remote',
-    who: 'Remote',
-    text: 'initial history message',
-    role: 'player' as const,
-  }
-  renderBoard()
-
-  act(() => chatMock.setView?.({ ...chatMock.view, messages: [initial] }))
-  expect(screen.queryByText('initial history message')).toBeNull()
-
-  const nextView: RoomChatView = {
-    ...chatMock.view,
-    notificationEntryIds: ['remote-new', 'self-new'],
-    messages: [
-      initial,
-      {
-        id: 'remote-new',
-        memberId: 'member-remote',
-        who: 'Remote',
-        text: 'new remote message',
-        role: 'player',
-      },
-      {
-        id: 'self-new',
-        memberId: 'member-me',
-        who: 'Me',
-        text: 'self message stays quiet',
-        role: 'host',
-      },
-      { id: 'system-new', system: true, text: 'system event stays quiet' },
-    ],
-  }
-  act(() => chatMock.setView?.(nextView))
-
-  expect(await screen.findByText('new remote message')).toBeTruthy()
-  expect(screen.queryByText('initial history message')).toBeNull()
-  expect(screen.queryByText('self message stays quiet')).toBeNull()
-  expect(screen.queryByText('system event stays quiet')).toBeNull()
-
-  fireEvent.click(screen.getByRole('button', { name: /new remote message/i }))
-  expect(await screen.findByTestId('room-chat')).toBeTruthy()
-})
 
 it('renders the stats route alone, not the board sitting underneath it', async () => {
   renderBoard('/board/g1/stats')

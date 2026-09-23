@@ -1,16 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  clearChat,
   clearLog,
   clearSession,
   getResumeToken,
   RESTORE_TTL_MS,
-  readChat,
   readKeeper,
   readLog,
   readSession,
   type StoredLobbyConfig,
-  writeChat,
   writeKeeper,
   writeLog,
   writeSession,
@@ -18,7 +15,6 @@ import {
 
 beforeEach(() => {
   sessionStorage.clear()
-  clearChat()
 })
 
 const session = (over: Partial<Parameters<typeof writeSession>[0]> = {}) => ({
@@ -118,7 +114,6 @@ it('round-trips a keeper snapshot lobby configuration', () => {
   const lobbyConfig = {
     maxPlayers: 3,
     setup: { ai: 'no', releases: 'fast' },
-    bots: 2,
   } satisfies StoredLobbyConfig
   writeKeeper({
     gameId: 'g1',
@@ -145,61 +140,6 @@ it('clearing removes the record', () => {
   expect(readSession(1_000)).toBeNull()
 })
 
-describe('the room chat record', () => {
-  it('round-trips chat only for its room', () => {
-    writeChat({
-      roomCode: 'ABC-123',
-      entries: [],
-      nextSequence: 1,
-      members: [{ clientId: 'client-a', memberId: 'member-a' }],
-      savedAt: 1_000,
-    })
-
-    expect(readChat('ABC-123', 1_001)?.members).toEqual([
-      { clientId: 'client-a', memberId: 'member-a' },
-    ])
-    expect(readChat('OTHER', 1_001)).toBeNull()
-    expect(sessionStorage.getItem('release:chat')).toBeNull()
-  })
-
-  it('drops chat after the shared 12-hour restore ttl', () => {
-    writeChat({ roomCode: 'ABC-123', entries: [], nextSequence: 1, members: [], savedAt: 10 })
-
-    expect(readChat('ABC-123', 10 + RESTORE_TTL_MS + 1)).toBeNull()
-    expect(sessionStorage.getItem('release:chat')).toBeNull()
-  })
-
-  it('drops malformed chat json and clearChat removes the memory fallback too', () => {
-    sessionStorage.setItem('release:chat', '{broken')
-    expect(readChat('ABC-123')).toBeNull()
-
-    writeChat({ roomCode: 'ABC-123', entries: [], nextSequence: 1, members: [], savedAt: 10 })
-    clearChat()
-
-    expect(readChat('ABC-123', 11)).toBeNull()
-  })
-
-  it.each([
-    ['missing', undefined],
-    ['string', '1000'],
-    ['null', null],
-  ])('drops chat with a %s savedAt timestamp', (_case, savedAt) => {
-    sessionStorage.setItem(
-      'release:chat',
-      JSON.stringify({
-        roomCode: 'ABC-123',
-        entries: [],
-        nextSequence: 1,
-        members: [],
-        ...(savedAt !== undefined && { savedAt }),
-      }),
-    )
-
-    expect(readChat('ABC-123', 1_000)).toBeNull()
-    expect(sessionStorage.getItem('release:chat')).toBeNull()
-  })
-})
-
 describe('when sessionStorage throws (Safari private mode)', () => {
   it('falls back to memory instead of crashing', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
@@ -210,16 +150,6 @@ describe('when sessionStorage throws (Safari private mode)', () => {
     })
     expect(() => writeSession(session())).not.toThrow()
     expect(readSession(1_000)).toEqual(session())
-
-    const chat = {
-      roomCode: 'ABC-123',
-      entries: [],
-      nextSequence: 1,
-      members: [{ clientId: 'client-a', memberId: 'member-a' }],
-      savedAt: 1_000,
-    }
-    expect(() => writeChat(chat)).not.toThrow()
-    expect(readChat('ABC-123', 1_001)).toEqual(chat)
     vi.restoreAllMocks()
   })
 })

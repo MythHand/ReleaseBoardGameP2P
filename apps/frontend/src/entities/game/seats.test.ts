@@ -3,7 +3,6 @@ import { botSeats, privateSeatsFor, publicSeats, seatOf, seatsFor } from './seat
 
 const peer = (id: string, name: string, role: PeerInfo['role']): PeerInfo => ({
   id,
-  memberId: `member-${id}`,
   name,
   role,
   ready: true,
