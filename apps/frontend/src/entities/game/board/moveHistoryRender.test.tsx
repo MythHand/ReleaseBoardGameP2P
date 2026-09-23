@@ -102,3 +102,19 @@ it('names a deck reshuffle instead of showing an unnamed elimination', () => {
   expect(getByText('Deck reshuffled')).toBeTruthy()
   expect(queryByText('is out')).toBeNull()
 })
+
+it('renders each operation and revealed trigger once while keeping a separate later play', () => {
+  const events: Event[] = [
+    { id: 1, type: 'operationPlayed', player: 'you', card: 'operation-git-rebase', sudo: false },
+    { id: 2, type: 'discarded', player: 'you', card: 'operation-git-rebase', reason: 'effect' },
+    { id: 3, type: 'aiRevealed', player: 'you', aiCard: 'trigger-ai', eventCard: 'ai-crush' },
+    { id: 4, type: 'discarded', player: 'you', card: 'trigger-ai', reason: 'trigger', parent: 3 },
+    { id: 5, type: 'operationPlayed', player: 'you', card: 'operation-git-rebase', sudo: false },
+    { id: 6, type: 'discarded', player: 'you', card: 'operation-git-rebase', reason: 'effect' },
+  ]
+  const { history } = toBoardState(view, events, labels)
+  const { queryAllByText } = render(<MoveHistory entries={history} copy={copy} />)
+
+  expect(queryAllByText('Git Rebase')).toHaveLength(2)
+  expect(queryAllByText('AI')).toHaveLength(1)
+})

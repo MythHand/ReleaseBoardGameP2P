@@ -133,6 +133,93 @@ describe('toBoardState', () => {
     expect(history[1].kind).toBe(labels.placed)
   })
 
+  it('shows one history row for each played operation, not its automatic discard', () => {
+    const log: Event[] = [
+      { id: 1, type: 'operationPlayed', player: 'you', card: 'operation-git-rebase', sudo: false },
+      { id: 2, type: 'discarded', player: 'you', card: 'operation-git-rebase', reason: 'effect' },
+      {
+        id: 3,
+        type: 'operationPlayed',
+        player: 'you',
+        card: 'operation-system-upgrade',
+        sudo: false,
+      },
+      {
+        id: 4,
+        type: 'discarded',
+        player: 'you',
+        card: 'operation-system-upgrade',
+        reason: 'effect',
+      },
+      // A real discard of another copy remains visible, even with the same name.
+      {
+        id: 5,
+        type: 'discarded',
+        player: 'you',
+        card: 'operation-git-rebase',
+        reason: 'handLimit',
+      },
+    ]
+    expect(toBoardState(view, log, labels).history.map((row) => row.id)).toEqual([1, 3, 5])
+  })
+
+  it('keeps separate plays of the same card while hiding each spent copy', () => {
+    const log: Event[] = [
+      { id: 1, type: 'operationPlayed', player: 'you', card: 'operation-git-merge', sudo: true },
+      { id: 2, type: 'pilesChanged', piles: [20] },
+      { id: 3, type: 'discarded', player: 'you', card: 'operation-git-merge', reason: 'effect' },
+      { id: 4, type: 'discarded', player: 'you', card: 'support-sudo', reason: 'effect' },
+      { id: 5, type: 'operationPlayed', player: 'you', card: 'operation-git-merge', sudo: false },
+      { id: 6, type: 'pilesChanged', piles: [40] },
+      { id: 7, type: 'discarded', player: 'you', card: 'operation-git-merge', reason: 'effect' },
+    ]
+    expect(toBoardState(view, log, labels).history.map((row) => row.id)).toEqual([1, 2, 5, 6])
+  })
+
+  it('omits automatic trigger and destruction discards that repeat the causal card', () => {
+    const log: Event[] = [
+      { id: 1, type: 'revealed', player: 'you', card: 'trigger-error-503' },
+      {
+        id: 2,
+        type: 'discarded',
+        player: 'you',
+        card: 'trigger-error-503',
+        reason: 'trigger',
+        parent: 1,
+      },
+      { id: 3, type: 'aiRevealed', player: 'you', aiCard: 'trigger-ai', eventCard: 'ai-crush' },
+      { id: 4, type: 'discarded', player: 'you', card: 'trigger-ai', reason: 'trigger', parent: 3 },
+      { id: 5, type: 'neutralized', player: 'you', method: 'sacrifice' },
+      {
+        id: 6,
+        type: 'releaseDestroyed',
+        player: 'you',
+        slot: 'database',
+        card: 'release-database',
+      },
+      {
+        id: 7,
+        type: 'discarded',
+        player: 'you',
+        card: 'release-database',
+        reason: 'neutralized',
+        parent: 5,
+      },
+      // A distinct card paid for a defence is still shown in the history.
+      {
+        id: 8,
+        type: 'discarded',
+        player: 'you',
+        card: 'support-code-review',
+        reason: 'neutralized',
+        parent: 5,
+      },
+    ]
+    const history = toBoardState(view, log, labels).history
+    expect(history.map((row) => row.id)).toEqual([1, 3, 5, 6])
+    expect(history[2].children?.map((row) => row.id)).toEqual([8])
+  })
+
   it('preserves parent so MoveHistory can build its tree', () => {
     const log: Event[] = [
       { id: 1, type: 'drawn', player: 'you', pile: 0, deckSize: 39 },

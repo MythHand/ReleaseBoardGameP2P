@@ -221,7 +221,7 @@ function attackerOf(
   return nameOf.get(parent.attacker) ?? parent.attacker
 }
 
-// One row per event. The switch is exhaustive by construction: the `never`
+// One row per displayed event. The switch is exhaustive by construction: the `never`
 // default means a new member of the engine's Event union fails `pnpm typecheck`
 // here rather than rendering as an unlabelled grey line nobody notices.
 function toHistoryEntry(
@@ -541,6 +541,67 @@ export function buildHistoryTree(entries: HistoryEntry[]): HistoryEntry[] {
   return roots
 }
 
+// The engine must emit every physical discard for the pile and animation, but
+// several of those records only repeat a card whose play or reveal is already
+// in the history. Keep the raw log intact; omit only a discard we can identify
+// from the immediately surrounding causal events. In particular, a later
+// discard of another copy of the same card remains a separate row.
+function historyEvents(events: Event[]): Event[] {
+  const hidden = new Set<number>()
+  const byId = new Map(events.map((event) => [event.id, event]))
+
+  for (let index = 0; index < events.length; index++) {
+    const event = events[index]
+
+    if (event.type === 'operationPlayed') {
+      // Branch and Merge report changed pile sizes between the play and the
+      // automatic spend. Other operations spend on the next event.
+      let spendIndex = index + 1
+      if (events[spendIndex]?.type === 'pilesChanged') spendIndex++
+      const spent = events[spendIndex]
+      if (
+        spent?.type === 'discarded' &&
+        spent.reason === 'effect' &&
+        spent.player === event.player &&
+        spent.card === event.card
+      ) {
+        hidden.add(spent.id)
+        const combo = events[spendIndex + 1]
+        if (
+          event.sudo &&
+          combo?.type === 'discarded' &&
+          combo.reason === 'effect' &&
+          combo.player === event.player &&
+          combo.card === SUDO_ID
+        ) {
+          hidden.add(combo.id)
+        }
+      }
+    }
+
+    if (event.type !== 'discarded') continue
+    const cause = event.parent === undefined ? undefined : byId.get(event.parent)
+    if (
+      event.reason === 'trigger' &&
+      ((cause?.type === 'revealed' && cause.card === event.card) ||
+        (cause?.type === 'aiRevealed' && cause.aiCard === event.card))
+    ) {
+      hidden.add(event.id)
+    }
+    const previous = events[index - 1]
+    if (
+      event.reason === 'neutralized' &&
+      previous?.type === 'releaseDestroyed' &&
+      previous.player === event.player &&
+      previous.card === event.card
+    ) {
+      hidden.add(event.id)
+    }
+  }
+
+  return events.filter((event) => !hidden.has(event.id))
+}
+
 // The projection becomes a table: PlayerView + the event log + translated
 // labels -> everything the kit's Table needs to render. Pure — no React, no
 // clock, no randomness. Total — an unknown card id renders a placeholder
@@ -558,7 +619,9 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
   // an event `forViewer` filtered out would name a player the reader was never
   // shown.
   const byId = new Map(visible.map((e) => [e.id, e]))
-  const history = buildHistoryTree(visible.map((e) => toHistoryEntry(e, labels, nameOf, byId)))
+  const history = buildHistoryTree(
+    historyEvents(visible).map((e) => toHistoryEntry(e, labels, nameOf, byId)),
+  )
 
   const source = view.pending && 'source' in view.pending ? view.pending.source : null
   const reveal =
