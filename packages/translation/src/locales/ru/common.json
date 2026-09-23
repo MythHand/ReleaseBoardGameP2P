@@ -244,7 +244,21 @@
   "chat": {
     "placeholder": "сообщение",
     "send": "отправить",
-    "empty": "пока тихо"
+    "empty": "пока тихо",
+    "system": {
+      "memberJoined": "{{name}} теперь в комнате",
+      "memberLeft": "{{name}} покинул комнату",
+      "memberReconnected": "{{name}} снова на связи",
+      "memberKicked": "{{name}} исключён из комнаты",
+      "roleChanged": "{{name}} теперь {{role}}",
+      "modeChanged": "хост изменил {{setting}}: {{value}}",
+      "modeChangedUnknown": "хост изменил настройки игры"
+    },
+    "roles": {
+      "host": "хост",
+      "player": "игрок",
+      "spectator": "зритель"
+    }
   },
   "toasts": {
     "hide": "скрыть"
@@ -288,6 +302,10 @@
     "tabRules": "правила",
     "tabModes": "игровой режим",
     "tabChat": "чат",
+    "chatToasts": "уведомления чата",
+    "chatToastsOn": "Вкл",
+    "chatToastsOff": "Выкл",
+    "chatToastsHint": "новые сообщения всплывают в углу, пока чат закрыт",
     "stealCard": "вытащи карту из закрытого веера"
   },
   "lobbyCode": {

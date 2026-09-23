@@ -5,6 +5,7 @@ import { useLeaveMatch } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
 import { seatsFor } from '~/entities/game/seats'
 import { toStatPlayers } from '~/entities/game/stats'
+import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
 import { useGame } from '~/features/play-game/useGame'
 import styles from './stats.module.css'
 
@@ -13,6 +14,7 @@ export default function StatsPage() {
   const session = useSession()
   const game = useGame()
   const leaveMatch = useLeaveMatch()
+  const chat = useRoomChatView()
 
   // Tell the table where this peer went, so everyone else's results table can
   // say so. Announced once per mount; the host ignores a repeat of what it
@@ -92,6 +94,7 @@ export default function StatsPage() {
   return (
     <div className={styles.page} data-testid="stats-page">
       <Stats
+        chat={<RoomChat view={chat} />}
         winnerId={winnerId}
         selfId={selfId}
         players={players}
