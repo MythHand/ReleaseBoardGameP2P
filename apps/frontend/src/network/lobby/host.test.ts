@@ -13,7 +13,6 @@ import { createLobbyState, type LobbyState, playerCount } from './state'
 
 const host = {
   id: 'h',
-  memberId: 'member-h',
   name: 'Host',
   role: 'host' as const,
   ready: true,
@@ -25,11 +24,8 @@ function base(maxPlayers: number) {
 }
 
 it('assigns player role and emits PEER_LIST + PEER_JOINED', () => {
-  const { state, outgoing } = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', {
-    matchRunning: false,
-  })
+  const { state, outgoing } = handleJoinRequest(base(4), 'p1', 'Pam', { matchRunning: false })
   expect(state.peers.p1.role).toBe('player')
-  expect(state.peers.p1.memberId).toBe('member-p1')
 
   const list = outgoing.find((o) => o.message.type === 'PEER_LIST')
   expect(list?.to).toBe('p1')
@@ -38,13 +34,10 @@ it('assigns player role and emits PEER_LIST + PEER_JOINED', () => {
   const joined = outgoing.find((o) => o.message.type === 'PEER_JOINED')
   expect(joined?.to).toBe('broadcast')
   expect(joined?.message.type === 'PEER_JOINED' && joined.message.payload.ready).toBe(false)
-  expect(joined?.message.type === 'PEER_JOINED' && joined.message.payload.memberId).toBe(
-    'member-p1',
-  )
 })
 
 it('handleReady broadcasts PEER_JOINED with ready: true', () => {
-  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  const joined = handleJoinRequest(base(4), 'p1', 'Pam', { matchRunning: false }).state
   const { outgoing } = handleReady(joined, 'p1')
   const broadcast = outgoing.find((o) => o.message.type === 'PEER_JOINED')
   expect(broadcast?.to).toBe('broadcast')
@@ -52,7 +45,7 @@ it('handleReady broadcasts PEER_JOINED with ready: true', () => {
 })
 
 it('handleReady toggles readiness back off (reversible)', () => {
-  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  const joined = handleJoinRequest(base(4), 'p1', 'Pam', { matchRunning: false }).state
   const readied = handleReady(joined, 'p1').state // false -> true
   expect(readied.peers.p1.ready).toBe(true)
   const { state, outgoing } = handleReady(readied, 'p1') // true -> false
@@ -62,13 +55,13 @@ it('handleReady toggles readiness back off (reversible)', () => {
 })
 
 it('assigns guest when player slots are full', () => {
-  const { state } = handleJoinRequest(base(2), 'p1', 'member-p1', 'Pam', { matchRunning: false }) // host fills 1, p1 fills 2
-  const second = handleJoinRequest(state, 'p2', 'member-p2', 'Pat', { matchRunning: false })
+  const { state } = handleJoinRequest(base(2), 'p1', 'Pam', { matchRunning: false }) // host fills 1, p1 fills 2
+  const second = handleJoinRequest(state, 'p2', 'Pat', { matchRunning: false })
   expect(second.state.peers.p2.role).toBe('guest')
 })
 
 it('kick removes the peer and broadcasts PLAYER_KICKED', () => {
-  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  const joined = handleJoinRequest(base(4), 'p1', 'Pam', { matchRunning: false }).state
   const { state, outgoing } = kick(joined, 'p1', 'afk')
   expect(state.peers.p1).toBeUndefined()
   expect(outgoing[0].message).toEqual({
@@ -86,9 +79,9 @@ it('setMaxPlayers clamps to 2..6', () => {
 it('setMaxPlayers demotes over-capacity players to guests when lowering the cap', () => {
   // 6-max lobby: host + 3 players all assigned 'player'.
   let s = base(6)
-  s = handleJoinRequest(s, 'p1', 'member-p1', 'P1', { matchRunning: false }).state
-  s = handleJoinRequest(s, 'p2', 'member-p2', 'P2', { matchRunning: false }).state
-  s = handleJoinRequest(s, 'p3', 'member-p3', 'P3', { matchRunning: false }).state
+  s = handleJoinRequest(s, 'p1', 'P1', { matchRunning: false }).state
+  s = handleJoinRequest(s, 'p2', 'P2', { matchRunning: false }).state
+  s = handleJoinRequest(s, 'p3', 'P3', { matchRunning: false }).state
   expect(playerCount(s)).toBe(4)
 
   const { state, outgoing } = setMaxPlayers(s, 2)
@@ -107,9 +100,7 @@ it('setMaxPlayers demotes over-capacity players to guests when lowering the cap'
 it('canStart requires >=2 players all ready', () => {
   const onePlayer = base(4)
   expect(canStart(onePlayer)).toBe(false) // only host
-  const withReady = handleJoinRequest(onePlayer, 'p1', 'member-p1', 'Pam', {
-    matchRunning: false,
-  }).state
+  const withReady = handleJoinRequest(onePlayer, 'p1', 'Pam', { matchRunning: false }).state
   expect(canStart(withReady)).toBe(false) // p1 not ready
   withReady.peers.p1.ready = true
   expect(canStart(withReady)).toBe(true)
@@ -134,13 +125,12 @@ it('records where a peer went and tells the table', () => {
     peers: [
       {
         id: 'host',
-        memberId: 'member-host',
         name: 'Ann',
         role: 'host',
         ready: true,
         where: 'lobby',
       },
-      { id: 'g1', memberId: 'member-g1', name: 'Bo', role: 'player', ready: false, where: 'lobby' },
+      { id: 'g1', name: 'Bo', role: 'player', ready: false, where: 'lobby' },
     ],
   })
 
@@ -154,7 +144,6 @@ it('records where a peer went and tells the table', () => {
         type: 'PEER_JOINED',
         payload: {
           id: 'g1',
-          memberId: 'member-g1',
           name: 'Bo',
           role: 'player',
           ready: false,
@@ -172,9 +161,7 @@ it('says nothing when a peer re-announces where it already is', () => {
     selfId: 'host',
     hostId: 'host',
     maxPlayers: 4,
-    peers: [
-      { id: 'g1', memberId: 'member-g1', name: 'Bo', role: 'player', ready: false, where: 'stats' },
-    ],
+    peers: [{ id: 'g1', name: 'Bo', role: 'player', ready: false, where: 'stats' }],
   })
 
   const r = handleWhereabouts(state, 'g1', 'stats')
@@ -188,9 +175,7 @@ it('ignores a whereabouts from someone not in the room', () => {
     selfId: 'host',
     hostId: 'host',
     maxPlayers: 4,
-    peers: [
-      { id: 'g1', memberId: 'member-g1', name: 'Bo', role: 'player', ready: false, where: 'lobby' },
-    ],
+    peers: [{ id: 'g1', name: 'Bo', role: 'player', ready: false, where: 'lobby' }],
   })
 
   const r = handleWhereabouts(state, 'stranger', 'game')
@@ -207,7 +192,6 @@ it('seats a joiner in the lobby, since that is the only place to join from', () 
     peers: [
       {
         id: 'host',
-        memberId: 'member-host',
         name: 'Ann',
         role: 'host',
         ready: true,
@@ -216,7 +200,7 @@ it('seats a joiner in the lobby, since that is the only place to join from', () 
     ],
   })
 
-  const r = handleJoinRequest(state, 'g1', 'member-g1', 'Bo', { matchRunning: false })
+  const r = handleJoinRequest(state, 'g1', 'Bo', { matchRunning: false })
 
   expect(r.state.peers.g1.where).toBe('lobby')
 })
@@ -231,7 +215,6 @@ const returningBase = () =>
     peers: [
       {
         id: 'host',
-        memberId: 'member-host',
         name: 'Ann',
         role: 'host',
         ready: true,
@@ -242,7 +225,7 @@ const returningBase = () =>
 
 it('rebinds only when the caller supplied an authenticated returning seat', () => {
   const returningSeat = { playerId: 'p2', peerId: 'dead-peer', name: 'Bo' }
-  const result = handleJoinRequest(returningBase(), 'fresh-peer', 'member-bo', 'Bo', {
+  const result = handleJoinRequest(returningBase(), 'fresh-peer', 'Bo', {
     matchRunning: true,
     returningSeat,
   })
@@ -263,7 +246,6 @@ it('does not demote a returning player when the room has filled behind them', ()
     peers: [
       {
         id: 'host',
-        memberId: 'member-host',
         name: 'Ann',
         role: 'host',
         ready: true,
@@ -271,7 +253,6 @@ it('does not demote a returning player when the room has filled behind them', ()
       },
       {
         id: 'squatter',
-        memberId: 'member-squatter',
         name: 'Cy',
         role: 'player',
         ready: true,
@@ -280,15 +261,12 @@ it('does not demote a returning player when the room has filled behind them', ()
     ],
   })
   const returningSeat = { playerId: 'p2', peerId: 'dead-peer', name: 'Bo' }
-  const r = handleJoinRequest(full, 'fresh-peer', 'member-bo', 'Bo', {
-    matchRunning: true,
-    returningSeat,
-  })
+  const r = handleJoinRequest(full, 'fresh-peer', 'Bo', { matchRunning: true, returningSeat })
   expect(r.state.peers['fresh-peer'].role).toBe('player')
 })
 
 it('treats a join with no authenticated seat as ordinary', () => {
-  const result = handleJoinRequest(returningBase(), 'newcomer', 'member-cy', 'Cy', {
+  const result = handleJoinRequest(returningBase(), 'newcomer', 'Cy', {
     matchRunning: true,
   })
   expect(result.state.peers.newcomer.role).toBe('guest')
@@ -296,9 +274,7 @@ it('treats a join with no authenticated seat as ordinary', () => {
 })
 
 it('treats any join as ordinary when no match is running', () => {
-  const r = handleJoinRequest(returningBase(), 'fresh-peer', 'member-bo', 'Bo', {
-    matchRunning: false,
-  })
+  const r = handleJoinRequest(returningBase(), 'fresh-peer', 'Bo', { matchRunning: false })
   expect(r.outgoing.some((o) => o.message.type === 'SEAT_REBOUND')).toBe(false)
 })
 
@@ -312,7 +288,7 @@ const table = (maxPlayers: number, bots: number, humans: number): LobbyState =>
     bots,
     peers: Array.from({ length: humans }, (_, i) => ({
       id: i === 0 ? 'h' : `p${i}`,
-      memberId: `member-${i}`,
+
       name: `P${i}`,
       role: i === 0 ? ('host' as const) : ('player' as const),
       ready: true,
@@ -345,9 +321,7 @@ it('still refuses to start while a human is not ready', () => {
 })
 
 it('seats an unauthenticated mid-match join as a spectator when bots are seated', () => {
-  const joined = handleJoinRequest(table(6, 1, 1), 'new-peer', 'member-new', 'Newcomer', {
-    matchRunning: true,
-  })
+  const joined = handleJoinRequest(table(6, 1, 1), 'new-peer', 'Newcomer', { matchRunning: true })
   expect(joined.state.peers['new-peer']).toMatchObject({
     role: 'guest',
     ready: false,

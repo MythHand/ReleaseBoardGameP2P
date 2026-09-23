@@ -21,7 +21,7 @@ import {
   handStep,
   type TableActions,
 } from '@release/ui'
-import { play, type Rect, useFlyer, useHandArrival } from '@release/ui/animations'
+import { play, type Rect, useFlyer } from '@release/ui/animations'
 import type React from 'react'
 import {
   type ReactNode,
@@ -33,6 +33,7 @@ import {
   useState,
 } from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import styles from './_useHandLimit.module.css'
 
@@ -86,12 +87,11 @@ export interface Options {
   /** the match this gesture belongs to — the same boundary its siblings keep */
   matchKey?: string | null
   /**
-   * A card came back out of the grid and landed in the fan at `slot`. The page
-   * commits the player's own order for it (`useHandOrder`) — the card never
-   * left `you.hand`, so this is a placement, not an arrival, and the slot the
-   * pointer named is the one that must stick.
+   * The fan's private order. A card coming home lands in the MIDDLE of the fan
+   * like every other arrival, so its slot has to be committed or the next
+   * projection puts it back where it used to sit.
    */
-  onReturned?: (uid: string, slot: number) => void
+  onHandArrival?: (order: string[], uid: string, at: number) => void
 }
 
 interface ArrivalEntry {
@@ -119,7 +119,7 @@ export function useHandLimit({
   events,
   enabled,
   matchKey = null,
-  onReturned,
+  onHandArrival,
 }: Options): HandLimitStaging {
   const reduced = useReducedMotion()
   const flyer = useFlyer()
@@ -180,8 +180,8 @@ export function useHandLimit({
   // reads only what came after, or a past rejection of the same decision would
   // cancel a fresh one
   const watermark = useRef(0)
-  const latest = useRef({ actions, events, pending, onReturned })
-  latest.current = { actions, events, pending, onReturned }
+  const latest = useRef({ actions, events, pending })
+  latest.current = { actions, events, pending }
   cellsRef.current = cells
   pickedRef.current = picked
   dispatchedRef.current = dispatched
@@ -203,7 +203,12 @@ export function useHandLimit({
   // The cards return to the fan through one shared step. Its invocation record
   // distinguishes a rejected action (restore its WHOLE choice, even if only
   // some cells had geometry) from one pointer placement (commit its own slot).
-  const arrival = useHandArrival(anchors.hand, (_gap, landedCards) => {
+  const arrival = useToHand(anchors.hand, onHandArrival)
+  // Held in a ref like everything else this hook reads from inside a long
+  // effect: the ending is rebuilt every render, and a dependency on it would
+  // re-run the watchers that use it.
+  const ending = useRef<(gap: number, landed: { key: string }[]) => void>(() => {})
+  const landedBack = (_gap: number, landedCards: { key: string }[]) => {
     const context = arrivalContext.current
     if (!context || context.run !== runId.current) return
     const expected = context.kind === 'placement' ? [context.entry] : context.entries
@@ -219,10 +224,10 @@ export function useHandLimit({
       return
     }
     restorePicked([context.entry.uid])
-    latest.current.onReturned?.(context.entry.uid, context.entry.slot)
     carryActive.current = false
     setPlacementReturning(false)
-  })
+  }
+  ending.current = landedBack
 
   const bindCell = useCallback((slot: number, el: HTMLDivElement | null) => {
     if (el) cellEls.current[slot] = el
@@ -361,7 +366,6 @@ export function useHandLimit({
         // just said where, and landing anywhere else ignores it.
         if (reduced || !rect) {
           restorePicked([back.uid])
-          latest.current.onReturned?.(back.uid, at)
           carryActive.current = false
           return
         }
@@ -377,18 +381,19 @@ export function useHandLimit({
           }
           arrivalContext.current = context
           setPlacementReturning(true)
-          const taken = await arrival.arrive(
+          const taken = await arrival.home(
             [{ key: context.entry.key, card: back.card, from: rect }],
-            handItemsRef.current.length,
+            ending.current,
+            // the cursor named this slot — a placement, not an arrival
             at,
           )
           if (runId.current !== mine || taken) return
           if (arrivalContext.current !== context) return
           arrivalContext.current = null
-          // If the shared step is busy or cannot measure the fan, preserve the
-          // logical return instead of leaving the card absent from both places.
+          // Nothing will ever land — there is no fan to measure — so the
+          // logical return is preserved rather than leaving the card absent
+          // from both places.
           restorePicked([back.uid])
-          latest.current.onReturned?.(back.uid, at)
           carryActive.current = false
           setPlacementReturning(false)
         })()
@@ -540,14 +545,14 @@ export function useHandLimit({
         rejected: [...sent.cards],
       }
       arrivalContext.current = context
-      const taken = await arrival.arrive(entries, handItemsRef.current.length)
+      const taken = await arrival.home(entries, ending.current)
       if (runId.current !== mine) return
       if (taken) return
       if (arrivalContext.current !== context) return
       arrivalContext.current = null
       restorePicked(context.rejected)
     })()
-  }, [dispatched, events, placed, reduced, arrival.arrive, restorePicked])
+  }, [dispatched, events, placed, reduced, arrival.home, restorePicked])
 
   // The pending is gone: the decision is closed and nothing here may outlive
   // it. While a beat runs, the board renders its shadow — which still carries

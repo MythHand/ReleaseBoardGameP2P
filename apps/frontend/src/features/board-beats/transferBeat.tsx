@@ -1,13 +1,15 @@
 import { useTranslation } from '@release/translation'
 import type { CardData } from '@release/ui'
-import { CARD_W, cardBoxIn, cardById } from '@release/ui'
+import { cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import { nextFrames, play, useFlyer, useHandArrival, wait } from '@release/ui/animations'
+import { nextFrames, play, useFlyer, wait } from '@release/ui/animations'
 import type { RefObject } from 'react'
 import { useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { RequestPickHandoff } from '~/entities/game/board/types'
 import type { BeatPlan } from './planBeats'
+import { seatCardBox } from './seat'
+import { useToHand } from './toHand'
 import styles from './transferBeat.module.css'
 
 // A card changes hands. One surface seen from three sides — you take a card,
@@ -32,7 +34,6 @@ const REVEAL_W = 220
 // — the same half turn the scene's own reveal makes on its way in.
 const OFFER_TURN = 180
 const CENTER_HOLD = 820 // face-down at the centre before it sinks into the seat
-const SEAT_SHRINK = 0.7 // how small a card is inside a seat — `drawBeat`'s own value
 const REQUEST_HOLD = 820 // the named card stands at the centre before the outcome
 // The chosen card holds while the rest of the catalogue leaves — the scene's own
 // beat between the confirm and the outcome (`PickSpecificCardStory`).
@@ -111,6 +112,14 @@ function centreCoverOf(base: BoardState): BoardState['centreCover'] {
 export function useTransferBeat(
   anchors: BoardAnchors,
   requestPick?: RefObject<RequestPickHandoff | null>,
+  /**
+   * The fan's own order, for the card this beat lands in it. A card taken off
+   * another hand ARRIVES — nobody pointed at a slot for it — so the module puts
+   * it in the middle, and the slot it landed in has to be committed or the next
+   * projection puts it back where the engine appended it: the end of the fan.
+   * The same seam the System Upgrade and Cherry-pick arrivals go through.
+   */
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay: flyerOverlay, raise, pin, patch, drop, elOf } = useFlyer()
 
@@ -119,24 +128,19 @@ export function useTransferBeat(
   // batch started with.
   const ctx = useRef<BeatRun | null>(null)
 
+  // The card into the fan, whole — the shared movement owns the uid the
+  // projection will know it by, the landing, the committed slot and the run's
+  // own base.
   const {
     overlay: handOverlay,
     gapAt,
     gapSize,
-    arrive,
+    land,
     reset: resetArrival,
-  } = useHandArrival(anchors.hand, (gap, landed) => {
-    const c = ctx.current
-    if (!c) return
-    const hand = [...c.base.you.hand]
-    hand.splice(gap, 0, ...landed.map((it) => ({ uid: it.key, card: it.card })))
-    const next = { ...c.base, you: { ...c.base.you, hand } }
-    c.base = next
-    c.publish(next)
-  })
+  } = useToHand(anchors.hand, onHandArrival)
 
-  const latest = useRef({ anchors, arrive, requestPick })
-  latest.current = { anchors, arrive, requestPick }
+  const latest = useRef({ anchors, land, requestPick })
+  latest.current = { anchors, land, requestPick }
 
   // The donor is one card lighter the moment it leaves them. Published as its
   // own step rather than folded into the landing, because the two ends of a
@@ -360,7 +364,7 @@ export function useTransferBeat(
           const asked = latest.current.requestPick?.current ?? null
           const askedSlot = asked?.slot() ?? null
           const offerBox = askedSlot ?? rectOf(picked ?? chosen ?? null)
-          const from = offerBox ?? cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          const from = offerBox ?? seatCardBox(seat)
           const held = offerBox ? cardBoxIn(centre, REVEAL_W) : centre
           // …and the fan it came out of goes back up with it
           if (askedSlot) asked?.close()
@@ -426,13 +430,12 @@ export function useTransferBeat(
           await wait(REVEAL_HOLD)
           const at = rectOf(elOf(KEY))
           drop(KEY)
-          // The fan as it stands RIGHT NOW, and the card lands at its END —
-          // the engine appends what a hand gains and `toBoardState` passes that
-          // order through untouched, so any other slot makes this beat's last
-          // frame disagree with the projection it hands over to.
-          const grown = ctx.current?.base.you.hand.length ?? 0
-          if (at)
-            await latest.current.arrive([{ key: `t${plan.eventId}`, card, from: at }], grown, grown)
+          // A card taken off somebody's hand ARRIVES — the shared movement puts
+          // it in the middle of the fan and keeps it there, the same as every
+          // reference scene, `PickOpponentCardStory` (this very play) included.
+          const c = ctx.current
+          if (at && c)
+            await latest.current.land(c, { card, from: at, fallbackKey: `t${plan.eventId}` })
           return
         }
         if (plan.role === 'victim') {
@@ -487,7 +490,7 @@ export function useTransferBeat(
           // and a hidden hand is where it is going.
           patch(KEY, { faceDown: true })
           await wait(CENTER_HOLD)
-          const to = cardBoxIn(seat, CARD_W * SEAT_SHRINK)
+          const to = seatCardBox(seat)
           const held = elOf(KEY)
           if (held) {
             const anim = play('dealToSeat', held, { from: centre, to })
@@ -507,8 +510,8 @@ export function useTransferBeat(
           centreAttackOf(beat.base) ? (a.cost?.current ?? a.centre.current) : a.centre.current,
         )
         if (!fromSeat || !toSeat || !centre) return
-        const from = cardBoxIn(fromSeat, CARD_W * SEAT_SHRINK)
-        const to = cardBoxIn(toSeat, CARD_W * SEAT_SHRINK)
+        const from = seatCardBox(fromSeat)
+        const to = seatCardBox(toSeat)
         const publicCard = plan.card ? cardById(plan.card) : null
         const [el] = await raise([
           { key: KEY, card: publicCard ?? COVER, at: from, faceDown: !publicCard },

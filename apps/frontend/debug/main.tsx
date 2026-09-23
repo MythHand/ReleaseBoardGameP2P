@@ -1,6 +1,6 @@
 import '@release/ui/tokens.css'
 import '@release/ui/global.css'
-import type { Action, Event } from '@release/engine'
+import type { Action, CardInstance, Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
 import { Button, Typography } from '@release/ui'
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
@@ -64,12 +64,16 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
   }, [deadline, now, ready, run.state.over, run.state.pending, send])
 
   const pending = run.state.pending
-  const opponentCard = run.state.players.p2.hand[0]
-  const opponentOwes =
-    pending?.kind === 'systemUpgrade' &&
-    pending.phase === 'discarding' &&
-    pending.owed.includes('p2') &&
-    opponentCard != null
+  // EVERY SEAT THAT OWES ONE, not the first of them. System Upgrade asks the
+  // whole roster at once, and a shortcut that answers for one opponent shows
+  // only the first card leaving — the scene is the several of them going
+  // together, and with three seats at every table now it is two (owner, 22.09).
+  const owing = (
+    pending?.kind === 'systemUpgrade' && pending.phase === 'discarding' ? pending.owed : []
+  )
+    .filter((id) => id !== 'you')
+    .map((id) => ({ id, card: run.state.players[id]?.hand[0] }))
+    .filter((seat): seat is { id: string; card: CardInstance } => seat.card != null)
 
   return (
     <>
@@ -174,16 +178,17 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
               {debug('advancePending')}
             </Button>
           )}
-          {opponentOwes && (
+          {owing.length > 0 && (
             <Button
               variant="tech"
-              onClick={() =>
-                send({
-                  type: 'RESOLVE',
-                  player: 'p2',
-                  choice: { kind: 'upgradeDiscard', card: opponentCard.uid },
-                })
-              }
+              onClick={() => {
+                for (const seat of owing)
+                  send({
+                    type: 'RESOLVE',
+                    player: seat.id,
+                    choice: { kind: 'upgradeDiscard', card: seat.card.uid },
+                  })
+              }}
             >
               {debug('opponentDiscard')}
             </Button>

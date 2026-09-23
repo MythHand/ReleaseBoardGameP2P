@@ -1,6 +1,7 @@
 import type { Leaving } from '@release/ui/animations'
 import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
+import { useState } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { useDrawBeat } from './drawBeat'
@@ -103,8 +104,12 @@ const base = {
 } as unknown as BoardState
 
 const node = () => document.createElement('div')
+// The fan is RENDERED by the probe below and the step measures it — the same
+// way it does on the board. A detached node with no slots would leave the step
+// with nothing to count, which is a different scene from the one under test.
+const handRef: { current: HTMLDivElement | null } = { current: null }
 const anchors = {
-  hand: { current: node() },
+  hand: handRef,
   centre: { current: node() },
   discardBox: { current: node() },
   pileBox: () => node(),
@@ -127,18 +132,26 @@ const draw = (over: Partial<PlannedDraw> = {}): PlannedDraw => ({
   ...over,
 })
 
-function run(draws: PlannedDraw[]) {
+function run(draws: PlannedDraw[], after?: BoardState) {
   const published: BoardState[] = []
+  // Every slot the beat COMMITTED to the fan's own order — the seam that lets a
+  // drawn card land in the middle and stay there.
+  const commits: { uid: string; at: number }[] = []
   let start: (() => Promise<void>) | null = null
   function Probe() {
-    const beat = useDrawBeat(anchors)
+    // what the fan is showing, kept from what the beat publishes — the board's
+    // own arrangement in miniature
+    const [fan, setFan] = useState<string[]>(base.you.hand.map((c) => c.uid))
+    const beat = useDrawBeat(anchors, (_order, uid, at) => commits.push({ uid, at }))
     start = () =>
       beat.run(
         { kind: 'draw', key: 'draw:4', draws },
         {
           base,
+          after,
           publish: (s) => {
             published.push(s)
+            setFan(s.you.hand.map((c) => c.uid))
             // A pending-carrying publish is the one shadow this beat commits
             // before it drops the carrier — that's the moment the ordering
             // test cares about, not every publish a run makes.
@@ -146,11 +159,21 @@ function run(draws: PlannedDraw[]) {
           },
         },
       )
-    return <>{beat.overlay}</>
+    return (
+      <>
+        <div ref={handRef}>
+          {fan.map((uid) => (
+            <div key={uid} data-hand-slot={uid} />
+          ))}
+        </div>
+        {beat.overlay}
+      </>
+    )
   }
   render(<Probe />)
   return {
     published,
+    commits,
     // `act(async () => await start())` alone never sees the runner's
     // intermediate DOM: React defers every update scheduled while an async
     // act() scope is open (they queue in `ReactSharedInternals.actQueue`) and
@@ -214,24 +237,52 @@ it('grows the fan between the cards of a multi-draw (I8)', async () => {
 })
 
 // Where the card LANDS, which is a different claim from how big the fan was.
-// `useHandArrival` puts an arrival in the middle of the fan by default, and for
-// a playground scene that is right — the scene owns its hand array and can put
-// the card wherever it just animated it to. The board cannot: the projection
-// owns the hand, and the engine APPENDS a drawn card (fake/reduce.ts:126) in an
-// order `toBoardState` passes straight through. So the slot has to be the end,
-// or the beat's last frame disagrees with the projection it hands to and the
-// card jumps from mid-fan to the end the moment the shadow drops.
-it('lands a drawn card at the end of the fan, where the projection puts it', async () => {
+// A drawn card has no place of its own, so the step puts it in the MIDDLE of
+// the fan and the beat names no slot — the module's own answer, and the one
+// every reference scene takes (`DrawCardStory`).
+//
+// The board used to name the end instead, because the projection owns the hand
+// and the engine APPENDS a drawn card (fake/reduce.ts:126) in an order
+// `toBoardState` passes straight through — so a card landing mid-fan jumped to
+// the end the moment the shadow dropped. What holds it where it landed is the
+// slot being COMMITTED to the fan's own order, the same seam System Upgrade,
+// Cherry-pick and the transfer beat go through (owner, 22.09).
+it('lands a drawn card where the step puts it, and commits that slot', async () => {
   arrivals.handLengths = []
   arrivals.ats = []
-  const { published, go } = run([draw(), draw({ key: 'w5', eventId: 5, card: 'attack-ddos' })])
+  const { published, commits, go } = run([
+    draw(),
+    draw({ key: 'w5', eventId: 5, card: 'attack-ddos' }),
+  ])
   await go()
-  // Each card aims at the slot after everything already in the fan — never the
-  // middle, which for the second card here would be slot 0 (round(1/2)).
-  expect(arrivals.ats).toEqual([0, 1])
-  // And the published hand agrees, in order: the card the beat flew second is
-  // the one the fan holds last.
-  expect(published.at(-1)?.you.hand.map((h) => h.card.id)).toEqual(['attack-bug', 'attack-ddos'])
+  // No slot named, either time: the placement is the step's.
+  expect(arrivals.ats).toEqual([undefined, undefined])
+  // …and every landing is committed, so the next projection cannot move it.
+  expect(commits.map((c) => c.uid)).toEqual(['h4', 'h5'])
+  // The committed slot IS the slot the card ended up in — the claim that makes
+  // the commit worth anything. Asserted on the second card, the one whose slot
+  // the first has already shifted.
+  const hand = published.at(-1)?.you.hand ?? []
+  expect(hand).toHaveLength(2)
+  expect(hand[commits[1].at]?.uid).toBe('h5')
+})
+
+// THE NAME the card lands under, which is what makes the committed slot worth
+// anything. The engine gives a drawn card a uid of its own, and the projection
+// the batch lands on (`BeatRun.after`) already holds it — so the card settles
+// into the fan under THAT uid and not under a key the beat made up. With a
+// made-up one the fan re-keys the card a frame later, the private hand order
+// has nothing to match, and the card slides to the end (owner, 22.09).
+it('lands the card under the uid the projection will know it by', async () => {
+  arrivals.ats = []
+  const after = {
+    ...base,
+    you: { ...base.you, hand: [{ uid: 'p1#7', card: { id: 'attack-bug' } }] },
+  } as unknown as BoardState
+  const { published, commits, go } = run([draw()], after)
+  await go()
+  expect(commits.map((c) => c.uid)).toEqual(['p1#7'])
+  expect(published.at(-1)?.you.hand.map((h) => h.uid)).toEqual(['p1#7'])
 })
 
 it('reveals a trigger at the centre and files it in the discard itself', async () => {

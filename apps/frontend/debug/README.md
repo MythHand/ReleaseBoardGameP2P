@@ -1,5 +1,57 @@
 # Board debug
 
+> **Working on this stand?** Read [WORKFLOW.md](./WORKFLOW.md) first — the loop,
+> how decisions are split, and how a pass is reported. This file is the stand
+> itself; that one is how the work on it runs.
+
+## The rule this stand exists for: NOTHING HERE IS ITS OWN
+
+The stand mounts the real `Board`, the real engine and the real projection. It
+has no code of its own and must never grow any. That is the whole point of it:
+what you see on any page is what a real match does, and a fix made against one
+page is a fix every page inherits on reload.
+
+So a defect found here is **never fixed where it was found**. It is fixed in the
+thing that is shared, and every place that had its own copy of that thing is put
+on the shared one in the same pass (owner, 22.09).
+
+**What a private piece looks like** — three shapes, all of them found on this
+board already:
+
+- a movement written out inside a beat when a module for it exists (a card
+  travelling to a place at the centre, a card leaving for the discard, a card
+  returning to a hand);
+- the same movement written out in two beats, with no module yet — then the
+  module is what the pass produces, and both beats call it;
+- a number copied by hand out of a module (a duration, a layer), instead of the
+  module being asked for it.
+
+**Why the rule is absolute rather than a preference.** A private copy does not
+announce itself. It behaves until the next page opens the same movement from a
+different side, and then the same defect is reported again, as if it had never
+been fixed — which is exactly what it means to fix a copy. The owner pays for
+that twice: once in the session that fixes it, once in the session that finds it
+again.
+
+## Before a fix: the analysis, and what it is compared against
+
+No fix starts before the analysis, and the analysis is not "what I think is
+wrong". It answers, in this order:
+
+1. **What the code actually does now** — read, not remembered, and named by file.
+2. **What the playground does** — the reference scenes are the approved behaviour
+   (`apps/playground/stories/...`). A difference from them is the defect; an
+   agreement with them is not one, however odd it looks. Reworking something the
+   reference already settled is how a fixed scene comes back broken.
+3. **What the spec says** — the rules (`docs/rules/`) for what happens, the
+   animation spec (`docs/animations/`) for how it moves and which module owns it.
+4. **Which shared thing is missing or unused** — the answer the fix is then made
+   in.
+
+A step skipped here is a step paid for later: the last four defects on this stand
+were all one of "the module exists and was not used" or "the reference already
+says otherwise".
+
 ## How a pass on this stand is reported
 
 Every report about work done on this stand ends with two lists, and nothing
@@ -22,7 +74,8 @@ starts at `index.html` and does not include it.
 The toolbar provides Cherry-pick, Rebase and System Upgrade, plus three
 no-effect cases. Sudo sits in the hand of every preset whose card is still there
 to be played, so one run covers the card with and without it — Cherry-pick and
-Rebase had a second button each for exactly that and no longer need one. Follow the instruction beneath the toolbar
+Rebase had a second button each for exactly that, and System Upgrade kept its
+one until 22.09; none of them needs it. Follow the instruction beneath the toolbar
 and use the real board gestures. For Upgrade, the opponent discard button appears
 only when that opponent owes a card. The action/event disclosure shows the last
 command and the engine's response, including rejections.

@@ -52,7 +52,6 @@
    panel nobody opened. The shadow belongs to a panel that is out: it fades with
    the slide (it is in the transition above) and is gone once the panel is away. */
 .drawer:not(.open) {
-  pointer-events: none;
   box-shadow: none;
 }
 

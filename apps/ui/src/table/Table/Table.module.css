@@ -134,6 +134,25 @@
   pointer-events: auto;
 }
 
+/* THE FAN SWITCHED OFF, and switched off all the way down. A surface that takes
+   the table over — the Rebase row, Cherry-pick's grid, Inside's row, a card
+   request — closes the fan: under their dimming it must not keep lifting cards
+   and raising its zoom preview at the cursor.
+
+   The consumer used to say that by turning the pointer off on this wrapper
+   alone, and the rule just above turned it straight back on for the fan itself,
+   which is the only child there is. So the fan stayed live under every surface;
+   it only LOOKED settled under Cherry-pick, whose grid happens to cover the
+   fan's own band, and showed through plainly under the Rebase row, which does
+   not (owner, 22.09).
+
+   A state the consumer declares, rather than a style it writes: the wrapper
+   knows its own two rules, so it is the wrapper that reconciles them. */
+.handWrap[data-inert="true"],
+.handWrap[data-inert="true"] > * {
+  pointer-events: none;
+}
+
 /* ты выбыл — карты ушли в сброс; бейдж (Badge size="lg") в нижней зоне
    (где была рука), приподнят от самого низа */
 .youBadge {

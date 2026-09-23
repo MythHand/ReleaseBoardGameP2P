@@ -88,7 +88,11 @@ export function useHandArrival(
   // into its hand at this index. What landed comes with the call: the step carried
   // them, so it is the one that knows (reading it off state here is the I8 trap —
   // a scene clears its staging the moment the flight starts).
-  onLanded: (gap: number, landed: Landed[]) => void,
+  //
+  // `fan` is the hand the card actually landed IN, by uid, as the step measured
+  // it — for a scene that keeps an order of its own and has to place the card
+  // in the same fan the flight was flown for.
+  onLanded: (gap: number, landed: Landed[], fan: string[]) => void,
 ) {
   const [flights, setFlights] = useState<Flight[]>([])
   const [tucked, setTucked] = useState(false)
@@ -97,11 +101,34 @@ export function useHandArrival(
   const timer = useRef<number | null>(null)
   const nodes = useRef(new Map<string, HTMLDivElement>())
 
-  const reset = () => {
+  // What a queued arrival checks before it starts: a reset means the hand it was
+  // queued for is gone (a new match, a scene torn down), so the card waiting its
+  // turn must not fly into whatever stands there now.
+  const epoch = useRef(0)
+  // The arrivals waiting their turn. A card is never turned away because another
+  // one is in the air — the fan opens ONE gap at a time, so the second card
+  // flies when the first has landed, and the caller's await simply lasts longer.
+  const queue = useRef<Promise<unknown>>(Promise.resolve())
+  // whether a flight is in the air RIGHT NOW — see `fly`
+  const running = useRef(false)
+
+  // After a flight: the fan closes and the step is free. NOT a reset of the
+  // step itself — whatever is waiting its turn is still waiting for this very
+  // hand, and must not be thrown away just because the card ahead of it landed.
+  const clear = () => {
     if (timer.current) window.clearTimeout(timer.current)
+    running.current = false
     setFlights([])
     setTucked(false)
     setGapAt(null)
+  }
+
+  // …and the scene's own reset: the hand this was flying into is GONE (a new
+  // match, a torn-down scene), so what is queued for it is dropped too.
+  const reset = () => {
+    epoch.current += 1
+    queue.current = Promise.resolve()
+    clear()
   }
 
   // where the card physically is right now, and at what tilt
@@ -119,21 +146,62 @@ export function useHandArrival(
     return it.from ? { box: it.from, rot: it.rot ?? 0 } : undefined
   }
 
-  // send any number of cards into a hand of `handLength` cards. `at` names the
-  // slot they open at; without it, the middle.
+  // send any number of cards into the fan. `at` names the slot they open at;
+  // without it, the middle. HOW BIG THE FAN IS the step counts for itself (see
+  // `fly`) — `handLength` is only the fallback for a fan that has no slots on
+  // screen yet.
+  //
+  // ANOTHER CARD IN THE AIR IS NOT A REASON TO DROP THIS ONE. A card's own
+  // journey into the fan does not depend on what some other card is doing, and
+  // the step used to answer "not taken" whenever one was already flying — which
+  // left the caller holding a card with nowhere to be and, more often, left it
+  // nowhere at all (owner, 22.09). Arrivals QUEUE instead: the fan opens one gap
+  // at a time and the next card flies when this one has landed.
   //
   // Answers whether the flight was TAKEN: `true` once it has landed (and
-  // `onLanded` has run), `false` the moment it is refused — there is no fan to
-  // measure, another arrival is already in the air, or nothing here can say
-  // where it is coming from. The refusal used to be silent, and a scene has no
-  // other way to hear it: `onLanded` is the only place most of them clear the
+  // `onLanded` has run), `false` only when there is nothing to do — no cards, no
+  // fan to measure, nothing that can say where they are coming from, or the hand
+  // this was queued for is gone. The refusal used to be silent, and a scene has
+  // no other way to hear it: `onLanded` is the only place most of them clear the
   // staging they blanked for this flight, so a refusal left cards invisible with
   // nothing left that would ever put them back (#101, Fix D, finding 2).
-  const arrive = async (items: Arriving[], handLength: number, at?: number): Promise<boolean> => {
+  const arrive = (items: Arriving[], handLength?: number, at?: number): Promise<boolean> => {
+    const queuedFor = epoch.current
+    // NOTHING IN THE AIR: fly from where the call is, so the fan opens and the
+    // flyers paint inside the caller's own frame. Waiting a microtask even here
+    // would hand every scene a different first frame than it has today.
+    const mine = running.current
+      ? queue.current.then(() => (epoch.current === queuedFor ? fly(items, handLength, at) : false))
+      : fly(items, handLength, at)
+    // EVERY call joins the chain, the immediate one included — otherwise the
+    // card behind it would queue on a promise that has already settled and take
+    // off straight into the flight it was meant to wait for.
+    queue.current = mine.catch(() => false)
+    return mine
+  }
+
+  const fly = async (items: Arriving[], handLength?: number, at?: number): Promise<boolean> => {
     const hr = handRef.current?.getBoundingClientRect()
-    if (items.length === 0 || !hr || flights.length > 0) return false
-    const gap = at == null ? Math.round(handLength / 2) : Math.max(0, Math.min(handLength, at))
-    const total = handLength + items.length
+    if (items.length === 0 || !hr) return false
+    // a ref, not the `flights` state: a second call in this same tick would
+    // read the state this one has not committed yet
+    running.current = true
+    // HOW BIG THE FAN IS — counted, not taken on trust. A caller works from its
+    // own list, and its list and the fan on screen are not always the same hand:
+    // a card arriving in the SAME exchange that took cards out of the hand left
+    // the caller counting the ones already gone, and the flight was then flown
+    // for a fan of a different size than the one it was landing in — the card
+    // settled where that fan's slot would have been and every card jumped when
+    // the gap closed (the sudo Rollback, owner 22.09). The fan is right here and
+    // each slot names its card, so the step asks it.
+    const slots = [...(handRef.current?.querySelectorAll<HTMLElement>('[data-hand-slot]') ?? [])]
+    const fan = slots.map((slot) => slot.dataset.handSlot ?? '')
+    // `handLength` survives as the fallback for a fan that is not on screen yet
+    // — the opening's own first deal, where the slots do not exist until the
+    // cards this very call is flying have landed in them.
+    const held = slots.length > 0 ? slots.length : (handLength ?? 0)
+    const gap = at == null ? Math.round(held / 2) : Math.max(0, Math.min(held, at))
+    const total = held + items.length
     const list = items
       .map((it, i): Flight | null => {
         const src = boxOf(it)
@@ -191,8 +259,9 @@ export function useHandArrival(
     onLanded(
       gap,
       list.map((f) => ({ key: f.key, card: f.card })),
+      fan,
     )
-    reset()
+    clear()
     return true
   }
 

@@ -15,7 +15,11 @@ Read in this order:
 4. **[`glossary.md`](./glossary.md)** — the properties & values you pass and tune: `play(...)`
    parameters, easing tokens, geometry/timing constants, holds. Look up *what a word or number means*.
 5. **[`extending.md`](./extending.md)** — add a new preset/module when nothing fits.
-6. **[`backlog.md`](./backlog.md)** — what is **missing, disputed or temporarily patched**. The other
+6. **[`beat-copies.md`](./beat-copies.md)** — the movements a beat still writes out
+   for itself instead of calling a module, and **what each of those copies knows**.
+   The inventory a module pass is made from; read it before growing a module, so
+   the tuning the copies carry is kept rather than lost.
+7. **[`backlog.md`](./backlog.md)** — what is **missing, disputed or temporarily patched**. The other
    files describe what exists and is verified; this is the only one allowed to describe what does
    not. **Run into a gap — write it there and raise it, do not invent a local way around it.**
 

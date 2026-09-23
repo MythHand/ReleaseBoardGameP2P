@@ -26,7 +26,6 @@ export { default as PhysicalEdition } from './blocks/PhysicalEdition'
 export { default as PlayerSlot, EmptySlot } from './blocks/PlayerSlot'
 export type { RulesCopy, RulesProps, RulesSection } from './blocks/Rules'
 export { default as Rules } from './blocks/Rules'
-export { type ToastItem, ToastStack, type ToastStackCopy } from './blocks/Toast'
 export type { VideoPlayerCopy, VideoPlayerProps } from './blocks/VideoPlayer'
 export { default as VideoPlayer } from './blocks/VideoPlayer'
 export { default as Loader } from './boot'
@@ -194,5 +193,9 @@ export {
   gridCells,
   gridOf,
 } from './table/TableCentre/discardGrid'
+export {
+  default as TableSurface,
+  type TableSurfaceProps,
+} from './table/TableCentre/TableSurface'
 export type { TurnDockCopy, TurnDockState } from './table/TurnDock/TurnDock'
 export { default as TurnDock } from './table/TurnDock/TurnDock'

@@ -92,5 +92,18 @@ export function useToCentre() {
     [raise, pin],
   )
 
-  return { ...flyer, toSlot }
+  // WHAT THIS MODULE OFFERS, named rather than spread. The carrier is the
+  // module's own, and a caller needs exactly these of it: the overlay to render,
+  // the node to reach for, and the three ways to change what it holds. Spreading
+  // the carrier wholesale handed callers its whole surface and widened the
+  // overlay's own type where it was mixed with others'.
+  return {
+    overlay: flyer.overlay,
+    raise: flyer.raise,
+    pin: flyer.pin,
+    patch: flyer.patch,
+    drop: flyer.drop,
+    elOf: flyer.elOf,
+    toSlot,
+  }
 }

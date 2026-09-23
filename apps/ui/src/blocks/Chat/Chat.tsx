@@ -15,8 +15,6 @@ const BOTTOM_SLACK = 24
 
 export interface ChatMessage {
   id: string
-  // стабильная идентичность участника: имена могут совпадать и меняться
-  memberId?: string
   // ник автора — реплика подписана так же, как игрок назван на любом экране.
   // У технической записи автора нет: её пишет не человек.
   who?: string
@@ -42,10 +40,8 @@ interface ChatProps {
   messages: ChatMessage[]
   copy: ChatCopy
   // чьи реплики отмечаются своими; без него не отмечается ни одна
-  selfMemberId?: string
-  // старый контракт для моков playground без memberId
   selfName?: string
-  onSend?: ((text: string) => boolean) | ((text: string) => void)
+  onSend?: (text: string) => void
   className?: string
 }
 
@@ -57,14 +53,7 @@ interface ChatProps {
 // Оформления у блока нет вовсе — ни фона, ни рамок, ни собственного заголовка,
 // как у Rules. Он встаёт в чужое место (колонка экрана, выезжающая панель,
 // окно), и это место рисует себя и называет его само.
-export default function Chat({
-  messages,
-  copy,
-  selfMemberId,
-  selfName,
-  onSend,
-  className = '',
-}: ChatProps) {
+export default function Chat({ messages, copy, selfName, onSend, className = '' }: ChatProps) {
   const [draft, setDraft] = useState('')
   const logRef = useRef<ScrollAreaHandle>(null)
   // прижат ли лог к низу. Это состояние ЧИТАТЬ после прихода сообщения уже
@@ -87,7 +76,8 @@ export default function Chat({
   const send = () => {
     const text = draft.trim()
     if (!text) return
-    if (onSend?.(text) !== false) setDraft('')
+    onSend?.(text)
+    setDraft('')
   }
 
   return (
@@ -106,12 +96,6 @@ export default function Chat({
         {messages.map((m, i) => {
           if (m.system) return <MessageNote key={m.id}>{m.text}</MessageNote>
           const prev = messages[i - 1]
-          const self = selfMemberId ? m.memberId === selfMemberId : m.who === selfName
-          const grouped =
-            !prev?.system &&
-            (m.memberId && prev?.memberId
-              ? m.memberId === prev.memberId
-              : Boolean(m.who && m.who === prev?.who))
           return (
             <Message
               key={m.id}
@@ -119,11 +103,11 @@ export default function Chat({
               who={m.who}
               time={m.time}
               authorRole={m.role}
-              self={self}
+              self={m.who === selfName}
               gone={m.gone}
               // склейка — знание ленты, а не реплики: подряд идущие сообщения
               // одного автора идут одной очередью, а событие её разрывает
-              grouped={grouped}
+              grouped={!prev?.system && prev?.who === m.who}
             />
           )
         })}

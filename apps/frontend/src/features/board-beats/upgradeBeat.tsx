@@ -1,18 +1,12 @@
 import { cardById } from '@release/ui'
 import type { Leaving, Rect } from '@release/ui/animations'
-import {
-  nextFrames,
-  play,
-  scatterAt,
-  useDiscardExit,
-  useFlyer,
-  useHandArrival,
-  wait,
-} from '@release/ui/animations'
+import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
 import { type RefObject, useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
 import { upgradeCard, upgradeSlot } from '~/entities/game/board/upgradeSlot'
 import type { BeatPlan } from './planBeats'
+import { SEAT_SHRINK } from './seat'
+import { useToHand } from './toHand'
 
 const THROW_DUR = 460
 const THROW_STEP = 260
@@ -27,7 +21,7 @@ const rectOf = (el: Element | null): Rect | null => {
 
 /** What the operation card standing at this centre hands over — `operationBeat`'s
  *  `handOver()`, so its card can leave WITH the row instead of on its own beat. */
-type OperationHandOver = () => {
+type OperationHandOver = (ctx: BeatRun) => {
   items: Leaving[]
   takeOff: () => void
   settle: () => void
@@ -37,20 +31,21 @@ export function useUpgradeBeat(
   anchors: BoardAnchors,
   staging?: RefObject<StagedHandoff | null>,
   operationHandOver?: OperationHandOver,
+  /**
+   * The board's own private hand order. A card that ARRIVES in the fan lands in
+   * the middle of it, and the slot it landed in has to be committed or the next
+   * projection puts it back wherever the engine happened to append it — which
+   * the player sees as the card teleporting the moment it has settled.
+   */
+  onHandArrival?: (order: string[], uid: string, at: number) => void,
 ) {
   const { overlay, raise, drop, pin, elOf } = useFlyer()
   const exit = useDiscardExit(anchors.discardBox)
-  const taking = useRef<BeatRun | null>(null)
-  const arrival = useHandArrival(anchors.hand, (gap, cards) => {
-    const ctx = taking.current
-    if (!ctx) return
-    const hand = [...ctx.base.you.hand]
-    hand.splice(gap, 0, ...cards.map((card) => ({ uid: card.key, card: card.card })))
-    ctx.base = { ...ctx.base, you: { ...ctx.base.you, hand } }
-    ctx.publish(ctx.base)
-  })
-  const latest = useRef({ anchors, staging, exit, arrival, operationHandOver })
-  latest.current = { anchors, staging, exit, arrival, operationHandOver }
+  // The card into the fan, whole — uid, the middle of the fan, the committed
+  // slot and the run's own base, all of it the shared movement's (`toHand`).
+  const arrival = useToHand(anchors.hand, onHandArrival)
+  const latest = useRef({ anchors, staging, exit, arrival, operationHandOver, onHandArrival })
+  latest.current = { anchors, staging, exit, arrival, operationHandOver, onHandArrival }
 
   // THE WHOLE CENTRE LEAVES IN ONE SEND. The System Upgrade card stands in the
   // same centre the answers do, so it goes to the discard WITH them rather than
@@ -58,8 +53,8 @@ export function useUpgradeBeat(
   // another, so its own beat could only start once these had landed. Its halves
   // keep layers 0/1 and the answers stack above, which is the order the engine
   // discarded them in and therefore the order the heap already holds (I9).
-  const emptyCentre = useCallback(async (items: Leaving[]) => {
-    const op = latest.current.operationHandOver?.()
+  const emptyCentre = useCallback(async (ctx: BeatRun, items: Leaving[]) => {
+    const op = latest.current.operationHandOver?.(ctx)
     const all = op ? [...op.items, ...items.map((it, i) => ({ ...it, layer: 2 + i }))] : items
     // the resting card goes down in the commit the carriers go up — the step's
     // own `takeOff`. The answers themselves stand nowhere: the grid they were
@@ -96,7 +91,6 @@ export function useUpgradeBeat(
             },
           },
         }
-        taking.current = ctx
         beat.publish(ctx.base)
         const [el] = await raised
         if (el) await play('playToCenter', el, { from, to: centre, duration: THROW_DUR })?.finished
@@ -116,20 +110,23 @@ export function useUpgradeBeat(
                 ]
               : []
           })
-          await emptyCentre(items)
+          await emptyCentre(ctx, items)
         }
         const receive = async () => {
           await wait(560)
           const chosen = elOf(key)
           if (take.player === beat.base.selfId) {
-            await latest.current.arrival.arrive(
-              [{ key: take.uid, card, el: chosen, from: centre }],
-              ctx.base.you.hand.length,
-            )
+            await latest.current.arrival.land(ctx, {
+              card,
+              el: chosen,
+              from: centre,
+              fallbackKey: take.uid,
+            })
           } else {
             const seat = a.seatBox(take.player)
             if (chosen && seat)
-              await play('dealToSeat', chosen, { from: centre, to: seat, scale: 0.7 })?.finished
+              await play('dealToSeat', chosen, { from: centre, to: seat, scale: SEAT_SHRINK })
+                ?.finished
             ctx.base = {
               ...ctx.base,
               opponents: ctx.base.opponents.map((p) =>
@@ -141,7 +138,6 @@ export function useUpgradeBeat(
         }
         await Promise.all([clear(), receive()])
         beat.publish({ ...ctx.base, pending: null, decks: beat.after?.decks ?? ctx.base.decks })
-        taking.current = null
         return
       }
       const local = latest.current.staging?.current
@@ -229,8 +225,11 @@ export function useUpgradeBeat(
           : []
       })
       // The shared exit takes over the measured nodes before pending clears.
-      await emptyCentre(items)
-      beat.publish({ ...landed, pending: null, decks: beat.after?.decks ?? landed.decks })
+      // Its own run, so what the exit files into the heap is still there in the
+      // publish below — a throwaway would take the filed cards with it.
+      const ctx: BeatRun = { ...beat, base: landed }
+      await emptyCentre(ctx, items)
+      beat.publish({ ...ctx.base, pending: null, decks: beat.after?.decks ?? ctx.base.decks })
     },
     [raise, drop, pin, elOf, emptyCentre],
   )
