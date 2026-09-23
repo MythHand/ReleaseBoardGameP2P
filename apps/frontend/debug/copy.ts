@@ -24,6 +24,10 @@ const en = {
   blindStealPlay: 'Bug: play and pick',
   blindSteal: 'Bug: blind pick',
   handDefense: 'Attack / defence centre',
+  elimination: '503 → watch survivors',
+  eliminationHint:
+    'Draw Error 503. After the clip, advance the remaining bots one action at a time to finish the match.',
+  nextBot: 'Next bot action',
   branchHint:
     'The pile cards, all in one hand: two Branch, one Merge and three Sudo. Split the pile, split it again, then put every pile back together — with or without a Sudo each time. Branch with Sudo also turns the discard into a pile of its own; Merge with Sudo takes the discard back in before shuffling.',
   securityReleaseHint:
@@ -74,6 +78,10 @@ const en = {
   upgradeFizzleHint: 'Pull Upgrade out of your hand. The opponent has no cards to discard.',
 }
 const ru: Record<keyof typeof en, string> = {
+  elimination: '503 → наблюдать за оставшимися',
+  eliminationHint:
+    'Доберите Error 503. После ролика выполняйте следующие действия ботов, чтобы доиграть партию.',
+  nextBot: 'Следующее действие бота',
   title: 'Отладка стола',
   restart: 'Перезапустить сценарий',
   ready: 'Готово',

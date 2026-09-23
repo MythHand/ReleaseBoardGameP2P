@@ -50,6 +50,13 @@ export const GAME_MODES: GameMode[] = [
       { value: 'strategic', label: 'Strategic' },
     ],
   },
+  {
+    key: 'startingDecks',
+    options: [
+      { value: 'base', label: '1' },
+      { value: 'two', label: '2' },
+    ],
+  },
 ]
 
 // дефолтный выбор — первый вариант (Base) в каждой группе

@@ -537,6 +537,7 @@ export default function Board({
       confirm: copy.pending.confirm,
     },
     enabled: !(deal.active || beats.exclusive),
+    suspended: paused || room.connection === 'reconnecting' || over != null,
   })
   // System Upgrade's centre (#108) — the one pending owed to several seats at
   // once. Its standing cards are read off the projection rather than held by a
@@ -1106,6 +1107,10 @@ export default function Board({
     defencePhase !== 'rejected'
   let ask: string | null = null
   if (costPending) {
+    // The line the approved scene shows at this step, worded as it words it: a
+    // PULL. A release parked at the centre with no explanation reads as a stuck
+    // play — which is why `DefenseReleaseStory` puts the ask with the cards
+    // rather than only in its dev bar.
     ask = copy.table.askCost
   } else if (discarding && handLimit.owed > 0) {
     ask = copy.table.askHandLimit
@@ -1114,10 +1119,7 @@ export default function Board({
     // below, is silent without this — Defect 3 (#101, Fix B) one pending over.
     ask = copy.table.askNeutralize
   }
-  // The line keeps the words it faded IN with while it fades back OUT — an
-  // empty pill mid-fade reads as a flicker. Written during render on purpose:
-  // it is a pure carry-forward of this render's own value, so a StrictMode
-  // double render produces the identical result.
+  // Keep the last words during fade-out, with the hidden line inert.
   const lastAsk = useRef<string | null>(null)
   if (ask) lastAsk.current = ask
 
@@ -1925,7 +1927,7 @@ export default function Board({
                       : neutralizeOwnsHand
                         ? // a 503 is answered by a PULL, never by a click —
                           // one gesture per step, the same discipline the
-                          // defence's own `askPartner` line records
+                          // defence's partner-selection gesture records
                           undefined
                         : staging.onCardClick
                 }
@@ -2033,7 +2035,7 @@ export default function Board({
           so the attack being asked about was behind the question, and a card
           flying to or from the cover slot (a carrier at `--z-flight`, 250)
           vanished the instant it landed. What only the panel could do —
-          decline — now belongs to Pass in the dock. */}
+          decline — belongs to the TurnDock Pass key. */}
       {state.pending &&
         // "owed to you" is a predicate now, not a comparison: a `systemUpgrade`
         // is owed to every seat on its roster at once while it is discarding,
@@ -2099,17 +2101,19 @@ export default function Board({
           />
         )}
 
-      {/* Instructions for non-defense decisions stay mounted for their fade. */}
-      <div
-        className={opening.ask}
-        data-shown={ask != null}
-        data-testid="board-ask"
-        inert={ask == null}
-      >
-        <Typography as="div" base="label-sm" tk="tk-16" className={opening.askLine}>
-          {lastAsk.current}
-        </Typography>
-      </div>
+      {/* Instructions for non-defense decisions remain mounted for their fade. */}
+      {lastAsk.current && (
+        <div
+          className={opening.ask}
+          data-shown={ask != null}
+          data-testid="board-ask"
+          inert={ask == null}
+        >
+          <Typography as="div" base="label-sm" tk="tk-16" className={opening.askLine}>
+            {lastAsk.current}
+          </Typography>
+        </div>
+      )}
 
       {slots?.toasts && panel !== 'chat' && chatToasts && (
         <div className={kit.toasts}>{slots.toasts}</div>

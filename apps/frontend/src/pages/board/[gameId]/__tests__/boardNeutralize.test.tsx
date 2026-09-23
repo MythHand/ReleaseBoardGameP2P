@@ -289,24 +289,17 @@ describe.each(['neutralize503', 'crush'] as const)('%s card gestures', (kind) =>
     else expect(screen.queryByTestId('board-centre-alarm')).toBeNull()
   })
 
-  it('says what the alarm is waiting for', () => {
-    const { copy } = makeBoardProps()
+  it('explains the alarm response only while an answer is still owed', async () => {
     const { container } = render(
       withAlarm({ methods: ['debugger'], hand: ['protection-debugger'] }),
     )
     layOut(container)
     const ask = screen.getByTestId('board-ask')
+    expect(ask.textContent).toBe(makeBoardProps().copy.table.askNeutralize)
     expect(ask.getAttribute('data-shown')).toBe('true')
-    expect(ask.textContent).toContain(copy.table.askNeutralize)
-  })
-
-  it('goes quiet once an answer has gone out', async () => {
-    const { container } = render(
-      withAlarm({ methods: ['debugger'], hand: ['protection-debugger'] }),
-    )
-    layOut(container)
     await playFromHand(0, { x: 640, y: 200 })
-    expect(screen.getByTestId('board-ask').getAttribute('data-shown')).toBe('false')
+    expect(ask.getAttribute('data-shown')).toBe('false')
+    expect(ask.hasAttribute('inert')).toBe(true)
   })
 
   it('a rejected Debugger comes back to the fan', async () => {

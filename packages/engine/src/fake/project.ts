@@ -185,6 +185,7 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
     self: {
       id: me.id,
       name: me.name,
+      eliminated: state.eliminated.includes(viewerId),
       hand: me.hand.map((c) => ({ ...c })),
       release: releaseView(state, viewerId),
       playable: playableFor(state, viewerId),

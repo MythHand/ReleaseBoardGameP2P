@@ -665,24 +665,21 @@ it('lights nothing while no step is waiting on the fan', () => {
   }
 })
 
-it('says on the table that the release costs a card', () => {
-  const { copy } = makeBoardProps()
-  render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
+it('explains how to pay a release and hides the hint once payment ends', () => {
+  const { rerender } = render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))
   const ask = screen.getByTestId('board-ask')
+  expect(ask.textContent).toBe(makeBoardProps().copy.table.askCost)
   expect(ask.getAttribute('data-shown')).toBe('true')
-  expect(ask.textContent).toContain(copy.table.askCost)
-})
-
-it('says nothing when nothing is owed', () => {
-  render(releaseBoard({}, {}))
-  expect(screen.getByTestId('board-ask').getAttribute('data-shown')).toBe('false')
+  expect(screen.queryByTestId('pending-prompt')).toBeNull()
+  rerender(releaseBoard({}))
+  expect(ask.getAttribute('data-shown')).toBe('false')
+  expect(ask.hasAttribute('inert')).toBe(true)
 })
 
 // The dock does NOT get a state of its own for the cost (#101, review round 2).
 // A release's price is one action inside a turn, not a state of the table: the
 // phase has not changed and the turn is still yours, so the dock keeps saying
-// so. What is wanted of you is said by the ask on the table (asserted just
-// above) — a phase word repeating it adds nothing.
+// so. The lit hand offers the cards that can pay its cost.
 it('the dock keeps the turn its own phase while a release waits to be paid', () => {
   const { copy } = makeBoardProps()
   render(releaseBoard({ pending: costPending(['attack-bug#0']) }, {}))

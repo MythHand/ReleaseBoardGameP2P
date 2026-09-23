@@ -6,6 +6,7 @@ import { isOpening } from './isOpening'
 // drift in the projection becomes a compile error here rather than a silent lie.
 const opening = (): PlayerView => ({
   self: {
+    eliminated: false,
     id: 'p1',
     name: 'One',
     hand: [],

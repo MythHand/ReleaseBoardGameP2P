@@ -64,7 +64,10 @@ export function eliminate(state: GameState, log: Log, player: PlayerId): GameSta
     log.add({ type: 'gameOver', winner: living[0], condition: 'lastStanding' })
     return { ...cleared, over: { winner: living[0], condition: 'lastStanding' }, eventSeq: log.seq }
   }
-  return cleared
+  // A fatal draw ends this seat's turn. Keeping it as the active player leaves
+  // the survivors waiting on someone who can no longer play, including when
+  // the connected keeper is eliminated and all remaining seats are bots.
+  return cleared.turn.player === player ? endTurn(cleared, log) : cleared
 }
 
 // `reason` is only supplied when the destruction is a chosen answer (the

@@ -29,6 +29,8 @@ export interface TableSurfaceProps {
    * it.
    */
   committed?: boolean
+  /** Hide and disable a preserved choice while pause or recovery owns input. */
+  suspended?: boolean
   /**
    * How heavily the table is dimmed under it. `none` still BLOCKS: being
    * unavailable and looking unavailable are separate, and only the second is
@@ -48,6 +50,7 @@ export interface TableSurfaceProps {
 export default function TableSurface({
   committed = false,
   dim = 'base',
+  suspended = false,
   testId,
   blockTestId,
   surfaceRef,
@@ -57,6 +60,8 @@ export default function TableSurface({
     <div
       className={`${styles.surface} ${committed ? styles.flight : ''}`}
       ref={surfaceRef}
+      data-suspended={suspended ? '' : undefined}
+      inert={suspended}
       {...(testId ? { 'data-testid': testId } : {})}
     >
       {/* THE DIMMING IS THE KIT'S OVERLAY, which fades — both ways, since it is

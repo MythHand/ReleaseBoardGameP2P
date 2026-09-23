@@ -277,7 +277,7 @@ it('reduced motion stages without a flight', () => {
 // landed behind it. It was also a SECOND picker for a decision the fan now
 // answers (Task 16's own drag gesture), so the board stops raising it for
 // this one kind and asks with the cards instead. The one thing only the panel
-// could do — declining — moves to the board's own affordance, pinned below.
+// could do — declining — belongs to the TurnDock Pass key.
 //
 // This REPLACES fix round 1's "a defence chosen through the pending panel
 // also covers the attack": that door no longer exists, so the hook's
@@ -294,7 +294,7 @@ it.each([false, true])('uses only dock Pass during defense (sudo=%s)', async (en
   const onPass = vi.fn()
   render(defenceBoard({ options: ['defense-hotfix#0'], sudo: enhanced }, { onResolve, onPass }))
   expect(screen.queryByTestId('board-decline')).toBeNull()
-  expect(screen.getByTestId('board-ask').getAttribute('data-shown')).toBe('false')
+  expect(screen.queryByTestId('board-ask')).toBeNull()
   fireEvent.click(screen.getByTestId('dock-key'))
   expect(onResolve).not.toHaveBeenCalled()
   await act(async () => {
@@ -342,26 +342,21 @@ it('keeps the centre free while a Sudo waits for its defense partner', async () 
       combos: { 'support-sudo#0': ['defense-hotfix#0'] },
     }),
   )
+  expect(screen.queryByTestId('board-ask')).toBeNull()
   await pullFromFan('support-sudo#0')
-  expect(screen.getByTestId('board-ask').getAttribute('data-shown')).toBe('false')
+  expect(screen.queryByTestId('board-ask')).toBeNull()
   expect(screen.queryByTestId('board-decline')).toBeNull()
+  await clickFanCard('defense-hotfix#0')
+  expect(screen.queryByTestId('board-ask')).toBeNull()
 })
 
-// A waiting Sudo has dispatched NOTHING, so declining there is still legal —
-// which is why the L1 gate (the test above) excludes `phase: 'partner'` rather
-// than every staged state. What makes that safe rather than merely legal is an
-// ORDERING: the partner-phase `mousedown` listener in `_Board.tsx` sends the
-// Sudo home on the very press that goes on to fire this button's `onClick`, so
-// one press both retracts the Sudo and lets the attack through — the card is
-// never stranded on the table.
-//
-// Fix round 2: this test used to call `fireEvent.click` alone and assert only
-// the dispatch. `fireEvent.click` dispatches NO `mousedown`, so the listener
-// this comment rests on never ran — the comment claimed a mechanism the test
-// never fired, and the ordering was held up by code review alone. The real
-// press sequence is fired now (down → up → click, the browser's own order),
-// and the Sudo's return is asserted, so breaking either half goes red.
-it('takes the waiting Sudo home on the same press that declines', async () => {
+// A waiting Sudo has not answered yet. Both a pointer press and keyboard
+// activation of Pass must return it, then let the attack through. Keyboard
+// activation dispatches click without mousedown, so the action owns cancellation.
+it.each([
+  'pointer',
+  'keyboard',
+])('returns the waiting Sudo when %s activates Pass', async (input) => {
   const onResolve = vi.fn()
   render(
     defenceBoard(
@@ -375,8 +370,10 @@ it('takes the waiting Sudo home on the same press that declines', async () => {
   expect(fanUids()).not.toContain('support-sudo#0')
 
   const decline = screen.getByTestId('dock-key')
-  fireEvent.mouseDown(decline, { clientX: 0, clientY: 0 })
-  fireEvent.mouseUp(decline, { clientX: 0, clientY: 0 })
+  if (input === 'pointer') {
+    fireEvent.mouseDown(decline, { clientX: 0, clientY: 0 })
+    fireEvent.mouseUp(decline, { clientX: 0, clientY: 0 })
+  }
   fireEvent.click(decline)
 
   // the attack is let through…

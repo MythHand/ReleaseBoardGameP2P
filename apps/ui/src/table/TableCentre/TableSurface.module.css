@@ -25,6 +25,12 @@
   pointer-events: none;
 }
 
+/* Preserve mounted content and order, but yield display and input to pause. */
+.surface[data-suspended] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* WHAT ACTUALLY STOPS THE MOUSE, and the reason this is a component rather than
    a stylesheet. A surface that takes the table over takes the cursor with it:
    dimming the table while still answering hovers through the dim is the table

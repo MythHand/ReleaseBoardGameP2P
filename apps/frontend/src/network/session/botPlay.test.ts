@@ -126,3 +126,42 @@ it('never projects a hand to a seat nobody is holding', () => {
   expect(ref.current.seats.filter((s) => s.bot)).toHaveLength(2)
   expect(ref.current.seats.filter((s) => s.peerId !== null)).toHaveLength(1)
 })
+
+it('lets two bots finish after the connected human keeper is eliminated', () => {
+  const { ref, ticker, keeper } = botGame(2)
+  const state = ref.current.state
+  ref.current = {
+    ...ref.current,
+    state: {
+      ...state,
+      players: Object.fromEntries(
+        Object.entries(state.players).map(([id, player]) => [
+          id,
+          { ...player, hand: [], release: {} },
+        ]),
+      ),
+      decks: {
+        ...state.decks,
+        main: [
+          [
+            { id: 'trigger-error-503', uid: 'human-503' },
+            { id: 'defense-hotfix', uid: 'bot-draw' },
+            { id: 'trigger-error-503', uid: 'bot-503' },
+          ],
+        ],
+      },
+    },
+  }
+  keeper.introReady('peer-me')
+  keeper.link.submit({ type: 'DRAW' })
+  expect(ref.current.state.eliminated).toEqual(['p1'])
+  for (let i = 0; i < 20 && !ref.current.state.over; i += 1) ticker.fire()
+  expect(ref.current.log).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ type: 'turnStarted', player: 'p2' }),
+      expect.objectContaining({ type: 'turnStarted', player: 'p3' }),
+    ]),
+  )
+  expect(ref.current.state.over).toEqual({ winner: 'p2', condition: 'lastStanding' })
+  expect(ref.current.seats.find((s) => s.playerId === 'p1')?.peerId).toBe('peer-me')
+})

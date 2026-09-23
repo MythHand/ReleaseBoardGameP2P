@@ -1487,6 +1487,12 @@ replaced by the "you are out" badge — and the clip comes up over the whole sta
 loops until `ELIM_MIN_MS`, finishes the loop it is in, and is gone at once. What it uncovers is the
 state that was already there.
 
+If at least two players survive, the eliminated seat stays connected as a viewer. Its own
+`self.eliminated` projection reaches `you.eliminated` without relying on the event log, so
+rejoining also shows the badge and does not offer reactions. The engine ends the eliminated
+player's turn; surviving bots keep advancing through the keeper even when the human keeper
+is out. `GameOver` is shown only when the match actually ends, after queued clips finish.
+
 **The state under it is the projection's, not the beat's**
 The beat **publishes nothing**. `eliminated` is folded by the engine's own projection
 (`fake/project.ts` → `toBoardState`), so the seat, the hand and the zone read as out because the
@@ -2394,9 +2400,19 @@ per card in the committed order (`BACK_DUR 600` / `BACK_STEP 90`); the answer go
 
 **Where.** `pages/board/[gameId]/_useRebaseStaging.tsx`, `pages/board/[gameId]/_Board.tsx`.
 
-**Layout.** The numbered rows scroll independently of the confirmation bar. `ConfirmAction`
-is their sibling at the board bottom; the row wrapper has no transform so returning cards
-can use viewport coordinates without acquiring a different containing block.
+**Layout.** Per the owner's 2026-09-21 decision, the private choice is an overlay above the
+table. The numbered rows and `ConfirmAction` share the common `TableSurface` (295), above the public
+operation carrier and below card previews (320), the drawer (350) and rail (360). History and rules remain accessible;
+a dim background intercepts table presses. On confirmation the dimming leaves and the cards
+drop to the flight layer (250), landing below the pile counters. The operation remains
+held until the effect finishes. The rows scroll independently of the confirmation
+bar at the board bottom. Neither wrapper has a transform or filter, so returning cards use
+viewport coordinates without acquiring a different containing block.
+Pause, connection recovery and match completion suspend this overlay without unmounting its
+rows. The hidden surface is inert; resuming the same pending preserves the chosen order.
+Both the deal and answer guards identify the offer by `player:raisedAt`. A queue shadow
+restoring an answered pending during return-flight settling must not deal its cards again;
+a later Rebase with identical pile contents is a new offer and deals normally.
 
 ---
 
@@ -2513,6 +2529,13 @@ widths and the cell offsets, quoted from this scene.
 ---
 
 ## Defending a release — the whole turn, play through defence
+
+**Live-board gesture hints (#163, PR #177 review).** The ordinary defence instruction and
+extra decline button are absent; TurnDock Pass owns declining. Four decisions still need
+their text below the staged cards because their generic pending panel is suppressed: click
+a hand card to pay a release, pull excess cards for the hand limit, answer an alarm with a lit
+card, and click a defence partner for a staged Sudo. Each line fades out and becomes inert
+once that step is answered. This preserves the specific gestures without duplicating defence.
 
 **When to call.** Turn start with a Release in hand. The turn is a chain: play → cost → attack window
 → answer.
@@ -2677,7 +2700,9 @@ for the heap going into the fan.
 
 **Sequence — 1. the interface arrives.** Every beat is one `play('hudIn', el, …)`, separated by
 `BEAT`. Nothing here measures anything: the blocks are in place, they only fade and shift in.
-1. The rail slides in from its own edge (`dx: 44`, `RAIL_MS`).
+1. The rail slides in from its own edge (`dx: 44`, `RAIL_MS`). Its animated wrapper owns
+   `--z-rail`: a filled HUD animation creates a stacking context even after its visible
+   motion finishes, and the closed drawer parked behind the rail must stay underneath.
 2. The table layer with its grid — a plain fade (`dx/dy: 0`, `BG_MS`). No movement on purpose: the
    ambience does not arrive from a direction, it is switched on.
 3. The decks from the left (`dx: -34`) and the discard from the right (`dx: 34`), the second one
@@ -2719,6 +2744,12 @@ after every `wait`, so restarting mid-deal does not leave a half-sequence runnin
 **End state & cleanup.** Five cards face up in the fan, the counters on the seats carry the
 opponents' hands, the deck is down by what was dealt, the zone is on screen. Restart clears the
 `started` ref, drops every flyer and re-runs the scene by `key`.
+
+**Two starting draw piles (#150).** The live board reconstructs one pre-deal pile using the sum
+of the final draw piles plus the dealt cards. During dealing and `HEAP_HOLD`, only that one pile
+is shown. At `settling`, both final piles appear together, with the projection's own counts;
+the second pile must never be shown beside the reconstructed total. Skipping the intro exposes
+the final projection directly.
 
 **Live reference.** `Game Deal` (interactive group).
 

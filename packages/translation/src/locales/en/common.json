@@ -282,7 +282,6 @@
     "hostTitle": "controls",
     "specLimit": "spectator limit",
     "askCost": "a release costs one card — pull any of them out",
-    "askDefend": "answer with a defence — pull one out of the hand",
     "askPartner": "click the defence the sudo will enhance",
     "askNeutralize": "neutralise the alarm — answer with a lit card",
     "askHandLimit": "over the hand limit — pull the excess out of the hand",
@@ -358,6 +357,13 @@
       "options": {
         "base": "Draw from all decks",
         "strategic": "Draw from one deck only"
+      }
+    },
+    "startingDecks": {
+      "title": "Starting draw decks",
+      "options": {
+        "base": "One deck after dealing",
+        "two": "Split the remaining cards into two decks"
       }
     }
   },

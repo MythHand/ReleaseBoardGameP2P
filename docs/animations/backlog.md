@@ -36,6 +36,66 @@ only Pass in the dock. Instructions for release payment, hand limit and 503 rema
 Pass retains the dock lockout, submits once, and blocks another defense until accepted or
 rejected. Rejection permits a fresh answer; a waiting Sudo returns to the hand when passing.
 
+## Error 503 left the eliminated viewer on turn — closed 2026-09-21
+
+With a human and two bots, a fatal 503 emptied the human's cards and played the clip, but
+the engine retained that seat as `turn.player`. The bots could not act. Separately, the
+projection carried elimination only for opponents: the Board never received the viewer's
+own status, so it displayed an empty hand and an active Draw dock instead of the out badge.
+
+`eliminate` now ends the current turn when multiple survivors remain. `self.eliminated`
+travels through the projection and Board adapter independently of the event log. The
+connected human remains a viewer and keeper; bots finish the match through the existing
+ticker. Main/AI 503, voluntary decline, the last-standing end, turn order, projection and
+two-bot keeper progression have regression coverage. Debug preset: `503 → watch survivors`.
+
+## Board instruction pills and missing navigation — closed 2026-09-21
+
+The initial 2026-09-21 implementation removed the whole frontend ask band while restoring
+the right-hand tabs. PR #177 review identified that this also removed the only gesture
+instructions for four decisions whose generic pending panel is suppressed.
+
+**Review correction, 2026-09-22:** the owner's request to address that review restored
+`askCost`, `askHandLimit`, `askNeutralize` and `askPartner`, with their RU/EN copy.
+**Final integration, 2026-09-24 (#163/#178):** the reviewer clarified that restoring the
+Sudo-defense `askPartner` prompt was a mistake. Both base and Sudo defense use only the
+hand and dock Pass; `askCost`, `askHandLimit` and `askNeutralize` remain visible only while
+owed and inert while fading out. The unused `askPartner` translations remain in the catalog.
+The ordinary `askDefend` line and duplicate decline button remain removed.
+TurnDock Pass remains the way to decline an attack; pointer and keyboard activation both
+return an unpaired Sudo. The playground cost-only AskLine demonstration remains unchanged.
+
+The rail was present in the DOM but covered after opening: hudIn's filled animation leaves
+its wrapper as a stacking context, so the closed Drawer at 350 painted over the descendant
+TabRail at 360. Reproduced in Chromium with the production preset and an elementFromPoint
+hit test. The animated wrapper now owns the rail layer. Rebase choices use a separate layer
+at 330, above public cards and below navigation, so panels remain usable during the choice.
+
+## Rebase choice covered by its public operation — closed 2026-09-21
+
+The retained `operationBeat` carrier painted Git Rebase on the flight layer (250), above
+the private reorder rows (40), obscuring the middle offered card. Reproduced through the
+real debug Board with a two-pile Rebase.
+
+**Owner decision, 2026-09-21:** the card-choice screen goes above the rest of the table.
+The rows and confirmation now share a full-board overlay on the card-choice layer (330),
+with a dim background that catches presses outside the cards. The played operation stays
+underneath while the choice is open; its lifecycle and the private projection remain unchanged.
+On confirmation the scrim leaves and returning cards drop to the flight layer (250), beneath
+the pile counters. During integration with main, a regression test exposed mismatched offer
+keys in the deal and answer guards: both now use `player:raisedAt`, so a restored queue
+shadow cannot restart the deal while the accepted return is settling.
+The wrapper has no transform/filter, preserving viewport-relative return flights.
+Pause, reconnect and match completion hide and disable the choice surface while retaining
+its rows and order, so the overlay cannot cover recovery controls or reset unfinished choices.
+
+**Integration follow-up, 2026-09-23 (#184).** The shared `TableSurface` supersedes
+the private layer 330 described above. Rebase now uses its normal layer 295,
+above public flights/counters and below main's new readable card preview at 320;
+the drawer and rail stay above both. Pause/recovery suspension is a property of
+the shared surface. The existing pause/order and answered-offer regressions pass;
+a new browser walkthrough of the combined surface and previews is still pending.
+
 ## Resolved board regressions (2026-09-07)
 
 ### Clicking Code Review did not start pairing — closed 2026-09-07
@@ -882,6 +942,11 @@ rect назначения → `nextFrames` → `foldIntoPair` на каждую 
 `_useBoardStaging` и `comboBeat`. Их миграция остаётся открытой.
 
 ### Строка-подсказка под центром стола написана дважды
+
+**Закрыто 21.09.2026 — новое решение владельца.** Плашек в игре быть не должно.
+Копия борда удалена вместе с дополнительной кнопкой отказа; отказ остаётся в доке.
+Перенос AskLine на борд больше не требуется. Ниже сохранены исходная находка и
+предыдущий ответ; новое решение их заменяет. Компонент и сцена оплаты в плейграунде остаются.
 
 **Что не хватает.** «Строка о том, чего стол ждёт» — всегда смонтированная плашка под центром,
 которая проявляется и гаснет переходом (`opacity` + сдвиг 132px → 146px за 260ms `--ease-out`), —

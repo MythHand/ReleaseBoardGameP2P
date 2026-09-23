@@ -72,9 +72,11 @@ jobs:
         run: cp -r apps/playground/dist apps/frontend/dist/playground
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: ./apps/frontend/dist
+          # Preserve the inclusion of dotfiles from upload-pages-artifact v3.
+          include-hidden-files: true
 
   deploy:
     name: Deploy to GitHub Pages
@@ -89,4 +91,4 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

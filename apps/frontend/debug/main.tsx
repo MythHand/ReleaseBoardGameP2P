@@ -2,6 +2,7 @@ import '@release/ui/tokens.css'
 import '@release/ui/global.css'
 import type { Action, CardInstance, Event } from '@release/engine'
 import { cardsPresent } from '@release/engine'
+import { botAction } from '@release/engine/fake'
 import { useTranslation } from '@release/translation'
 import { Button, Typography } from '@release/ui'
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
@@ -71,6 +72,15 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
   }, [deadline, now, ready, run.state.over, run.state.pending, send])
 
   const pending = run.state.pending
+  // Deliberately manual, like the other debug scenarios: inspect the eliminated
+  // viewer between beats, then let each remaining seat take its next real action.
+  const nextBot =
+    scenario === 'elimination'
+      ? run.state.seating
+          .filter((id) => id !== 'you')
+          .map((id) => botAction(engine, run.state, id, now))
+          .find((action) => action != null)
+      : undefined
   // EVERY SEAT THAT OWES ONE, not the first of them. System Upgrade asks the
   // whole roster at once, and a shortcut that answers for one opponent shows
   // only the first card leaving — the scene is the several of them going
@@ -147,6 +157,17 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
             sideways under the cursor every time a pending opened or closed —
             and the buttons are the half you are aiming at. */}
         <div className={styles.actions}>
+          {scenario === 'elimination' && (
+            <Button
+              variant="tech"
+              disabled={!nextBot}
+              onClick={() => {
+                if (nextBot) send(nextBot)
+              }}
+            >
+              {debug('nextBot')}
+            </Button>
+          )}
           {run.state.seating.map((id) => (
             <Button
               key={id}

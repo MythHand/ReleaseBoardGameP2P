@@ -691,7 +691,8 @@ export function useLobby(): UseLobby {
   // `null` walks it back: the room stays stored, the match on it does not.
   const rememberGame = useCallback((id: string | null) => {
     const stored = readSession()
-    if (stored) writeSession({ ...stored, gameId: id })
+    if (stored)
+      writeSession({ ...stored, gameId: id, lastGameId: id ?? stored.gameId ?? stored.lastGameId })
   }, [])
 
   const rememberLobbyConfig = useCallback(
@@ -1097,11 +1098,8 @@ export function useLobby(): UseLobby {
         case 'PLAYER_KICKED':
           if (!fromHost) break
           if (msg.payload.peerId === current.selfId) {
+            teardownSession()
             setStatus('kicked')
-            // A stored record here would offer to walk the kicked player
-            // straight back into the room that just removed them.
-            forgetStored()
-            clearChatRoom()
           } else commit(applyPeerLeft(current, msg.payload.peerId))
           break
         case 'GAME_STARTING': {
@@ -1167,7 +1165,7 @@ export function useLobby(): UseLobby {
           break
       }
     },
-    [chatSession, clearChatRoom, commit, dispatch, applySeats, forgetStored, rememberGame],
+    [chatSession, commit, dispatch, applySeats, teardownSession, rememberGame],
   )
 
   const createRoom = useCallback(
@@ -1505,7 +1503,8 @@ export function useLobby(): UseLobby {
               memberId: hostMemberId,
               name: stored.name,
               role: 'host',
-              ready: true,
+              // Readiness is not persisted; restoring a room must not approve a rematch.
+              ready: false,
               where: 'lobby',
             },
           ],
@@ -1514,7 +1513,9 @@ export function useLobby(): UseLobby {
         rememberLobbyConfig(restoredLobby)
         gameIdRef.current = null
         setGameId(null)
-        matchSeqRef.current = 0
+        matchSeqRef.current = matchSeqAfterRestore(
+          typeof stored.lastGameId === 'string' ? stored.lastGameId : '',
+        )
         setStatus('in-lobby')
         return true
       }
@@ -2201,12 +2202,12 @@ export function useLobby(): UseLobby {
   }, [dispatch, leaveSession])
 
   // Dismiss a sticky error (e.g. a failed join) without tearing down a live
-  // session. Returns the status to idle only when it was 'error', so calling
-  // this on mount can't kill an in-lobby session.
+  // session. Terminal notices are dismissed on the next invitation visit;
+  // their transports and stored sessions have already been torn down.
   const clearError = useCallback(() => {
     setError(null)
     setErrorKind(null)
-    setStatus((s) => (s === 'error' ? 'idle' : s))
+    setStatus((s) => (s === 'error' || s === 'kicked' || s === 'disbanded' ? 'idle' : s))
   }, [])
 
   // Memoized so the value handed to the root SessionContext keeps a stable

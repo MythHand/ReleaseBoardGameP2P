@@ -192,3 +192,13 @@ debug/centreScenarios.test.ts` from `apps/frontend`; the standard typecheck and
 stylelint commands above also cover these presets. Real browser geometry was
 checked for 1/2/3 main piles with AI and No AI using the Board fixture; No AI mode
 omits the AI grid cell rather than leaving an empty events pile.
+
+## Elimination and surviving bots
+
+The **503 → watch survivors** preset starts with three seats. Wait for **Ready**,
+then Draw: the local player has no answer to Error 503. After the clip the hand
+and zone become **you are out**, with no Draw/Push/Pass offered. The room stays
+open and history remains usable. Use **Next bot action** to advance the two
+surviving seats through their real bot policy until Opponent wins. The debug
+steps are manual so the post-clip state can be inspected; the production keeper
+continues automatically, covered by `src/network/session/botPlay.test.ts`.

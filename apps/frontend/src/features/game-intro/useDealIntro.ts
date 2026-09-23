@@ -406,7 +406,7 @@ export function useDealIntro(args: {
       // minus what we counted". This is the half of the invisible handover that
       // does not depend on the arithmetic above being right.
       const l = latest.current.live
-      setDeckCount(l.decks.main[0] ?? 0)
+      setDeckCount(l.decks.main.reduce((sum, count) => sum + count, 0))
       setDealtTo(Object.fromEntries(l.opponents.map((o) => [o.id, o.handCount])))
       setClosed(travelledClosed)
 
@@ -474,9 +474,9 @@ export function useDealIntro(args: {
         ...live,
         you: { ...live.you, hand: landed, release: zoneIn ? live.you.release : {} },
         opponents: live.opponents.map((o) => ({ ...o, handCount: dealtTo[o.id] ?? 0 })),
-        // Only pile 0 counts down: the opening deals from the single pile a
-        // fresh game starts with, and any others are left exactly as they are.
-        decks: { ...live.decks, main: [deckCount, ...live.decks.main.slice(1)] },
+        // The starting-pile setting splits the remainder after the deal. Show
+        // one pile until the cards have landed, then expose both halves together.
+        decks: { ...live.decks, main: phase === 'settling' ? live.decks.main : [deckCount] },
         introPhase: phase,
       }
     : null

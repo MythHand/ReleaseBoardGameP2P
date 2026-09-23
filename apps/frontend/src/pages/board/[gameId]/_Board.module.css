@@ -142,18 +142,7 @@
   pointer-events: none;
 }
 
-/* What the table is waiting for — UNDER the staged cards, so the ask is where
-   the play is rather than on top of it. Quoted from the playground's
-   DefenseReleaseStory (`.ask`), the approved visual source, including its
-   offsets: the slots above are 150px wide at `--card-aspect`, so their bottom
-   edge sits ~105px below the 42% line and this lands clear of it by ~41px. Its
-   own surface, or the line dissolves into the table; mounted always so it can
-   fade OUT as well as in.
-
-   z 12 puts it over the cover slot (11) and the attack (10) — it never
-   overlaps either, and the flight carriers (`--z-flight`, 250) still pass over
-   everything here. The layer itself is transparent to the pointer: only the
-   decline inside it takes a click. */
+/* Gesture hints sit below the staged cards and never intercept input. */
 .ask {
   position: absolute;
   inset-block-start: 42%;
@@ -239,10 +228,13 @@
 }
 
 /* the right-hand nav's layer: TabRail positions itself against the edge, and
-   this layer exists only to lead its arrival without touching that transform */
+   this layer leads its arrival without touching that transform. The filled
+   hudIn animation creates a stacking context even after landing, so the wrapper
+   itself must sit above the drawer (including its closed parked surface). */
 .railLayer {
   position: absolute;
   inset: 0;
+  z-index: var(--z-rail);
   pointer-events: none;
 }
 
