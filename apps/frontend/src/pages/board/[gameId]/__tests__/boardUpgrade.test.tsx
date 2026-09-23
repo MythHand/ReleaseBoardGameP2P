@@ -62,6 +62,7 @@ describe('the centre a System Upgrade fills', () => {
       actions: { onResolve },
     })
     expect(screen.queryByTestId('upgrade-hand-h1')).toBeNull()
+    expect(document.querySelector('[data-upgrade-discard="true"] [data-hand-slot]')).not.toBeNull()
     const prompt = screen.getByRole('status')
     expect(prompt.textContent).toBe(makeBoardProps().copy.table.upgradePrompt)
     expect(isInaccessible(prompt)).toBe(false)

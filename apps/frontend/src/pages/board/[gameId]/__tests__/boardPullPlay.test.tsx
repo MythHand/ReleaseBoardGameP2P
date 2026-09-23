@@ -98,6 +98,8 @@ describe('starting a play from the hand', () => {
       const state = {
         ...base,
         you: { ...base.you, hand: [{ uid: 'mine', card }] },
+        turn: base.selfId,
+        hasDrawn: true,
         playable: ['mine'],
         targets: {},
         comboOptions: {},

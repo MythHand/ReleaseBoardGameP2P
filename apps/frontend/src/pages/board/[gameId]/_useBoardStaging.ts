@@ -714,6 +714,16 @@ export function useBoardStaging({
     flyer.drop,
   ])
 
+  // A card waiting for a target belongs to the current turn only. When the
+  // timer ends that turn, no table click or Escape arrives to call `cancel`,
+  // so the card otherwise stays over the next player's decisions (including
+  // a System Upgrade discard owed by this seat). A dispatched play belongs to
+  // the beat instead and must keep its existing hand-off path.
+  useEffect(() => {
+    const waiting = stagedRef.current
+    if (waiting && waiting.phase !== 'dispatched' && state.turn !== state.selfId) cancel()
+  }, [state.turn, state.selfId, cancel])
+
   // While a support waits for a partner, the cards it can fold with keep
   // their own category accent — the support's own, per ComboStory (the TYPE
   // is the message). Goes out the moment a partner is picked: the clicked

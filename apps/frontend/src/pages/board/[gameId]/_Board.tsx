@@ -1841,6 +1841,7 @@ export default function Board({
               // every surface (owner, 22.09). The wrapper owns both rules and
               // reconciles them itself — see `.handWrap[data-inert]`.
               data-inert={handInert || undefined}
+              data-upgrade-discard={upgrade.asked || undefined}
               onMouseDown={handInert ? (e) => e.stopPropagation() : undefined}
             >
               <Hand
