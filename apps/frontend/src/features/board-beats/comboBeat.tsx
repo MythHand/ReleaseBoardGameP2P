@@ -9,6 +9,7 @@ import {
   scatterAt,
   useDiscardExit,
   useFlyer,
+  useHandArrival,
   wait,
 } from '@release/ui/animations'
 import type { RefObject } from 'react'

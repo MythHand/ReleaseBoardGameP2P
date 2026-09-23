@@ -42,3 +42,22 @@ it('round-trips an INTENT carrying an engine action', () => {
   expect(parsed.from).toBe('peer-a')
   expect((parsed as Extract<WireMessage, { type: 'INTENT' }>).payload.intent).toEqual(intent)
 })
+
+it('round-trips a canonical multiline chat entry', () => {
+  const message = {
+    type: 'CHAT_ENTRY',
+    payload: {
+      entry: {
+        kind: 'message',
+        id: 'chat-7',
+        sequence: 7,
+        createdAt: 1_000,
+        author: { memberId: 'member-a', name: 'Ann', role: 'player' },
+        text: 'first\nsecond',
+      },
+    },
+  } satisfies Message
+
+  const frame = createEnvelope(message, 'host-a', 8)
+  expect(parseEnvelope(JSON.stringify(frame))).toEqual(frame)
+})

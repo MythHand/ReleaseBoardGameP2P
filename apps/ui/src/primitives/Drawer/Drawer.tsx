@@ -29,6 +29,7 @@ export default function Drawer({
       className={`${styles.drawer} ${styles[side]} ${open ? styles.open : ''} ${className}`}
       style={style}
       aria-hidden={!open}
+      inert={!open}
     >
       {children}
     </div>

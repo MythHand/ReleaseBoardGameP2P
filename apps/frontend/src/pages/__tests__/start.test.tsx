@@ -52,6 +52,7 @@ it('shows an interactive continue session button when session is active', () => 
       peers: {
         h: {
           id: 'h',
+          memberId: 'member-h',
           name: 'Host',
           role: 'host',
           ready: true,

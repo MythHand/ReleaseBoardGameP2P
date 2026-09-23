@@ -618,6 +618,7 @@ export function useBoardStaging({
       // out (only `placeRelease` filters the hand, and that runs after the
       // cost is paid) — so it is found there by the uid the pending names.
       const held = state.you.hand.find((c) => c.uid === cost.release)
+      const heldAt = handItems.findIndex((c) => c.uid === cost.release)
       const from = anchors.stage.current?.getBoundingClientRect()
       if (!reduced && from && held) {
         // `state.pending` is a network round trip away from clearing —
