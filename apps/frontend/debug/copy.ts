@@ -8,6 +8,9 @@ const en = {
   idle: 'No pending decision',
   opponentDiscard: 'Opponent discards first card',
   trace: 'Last action and engine events',
+  // Shown only when they do not: the stand is a game or it is nothing, and a
+  // game has the cards it has.
+  cardsOff: 'cards do not add up',
   noAction: 'No action yet',
   viewerYou: 'View: attacker',
   viewerOpponent: 'View: opponent',
@@ -75,6 +78,7 @@ const ru: Record<keyof typeof en, string> = {
   idle: 'Нет ожидающего решения',
   opponentDiscard: 'Соперник сбрасывает первую карту',
   trace: 'Последнее действие и события движка',
+  cardsOff: 'карты не сходятся',
   noAction: 'Действий пока нет',
   viewerYou: 'Вид: атакующий',
   viewerOpponent: 'Вид: соперник',

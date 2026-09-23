@@ -270,6 +270,97 @@ export type PendingOwnership =
     }
   | { kind: Exclude<Pending['kind'], 'systemUpgrade'>; player: PlayerId }
 
+// EVERY CARD THERE IS, by uid, wherever it happens to be.
+//
+// A card is always somewhere: in a deck, in a hand, standing in a zone — or in
+// the air, which is the part that needs saying. Between a card leaving a hand
+// and arriving anywhere, it belongs to the pending that is holding the
+// exchange open, and a census that looked only at the piles would read that
+// moment as a card lost.
+//
+// One census, every reader. The engine's own conformance check is built on it,
+// and so is the debug stand, which holds every scene it builds to the same
+// count: a fixture is a game or it is nothing, and a scene that writes a card
+// twice is a stand that proves nothing (owner, 23.09).
+export function cardsPresent(state: GameState): CardUid[] {
+  const uids = [
+    ...state.decks.main.flat(),
+    ...state.decks.discard,
+    ...state.decks.events,
+    ...Object.values(state.players).flatMap((p) => [
+      ...p.hand,
+      // The three release slots hold { card, codeReview? }; `monitoring` holds
+      // the instance itself, so it cannot go through the same branch.
+      ...(['frontend', 'backend', 'database'] as const).flatMap((slot) => {
+        const r = p.release[slot]
+        return r ? [r.card, ...(r.codeReview ? [r.codeReview] : [])] : []
+      }),
+      ...(p.release.monitoring ? [p.release.monitoring] : []),
+    ]),
+  ].map((c) => c.uid)
+  // A thrown attack card is in mid-air while a `defend` is owed: out of the
+  // attacker's hand and not yet anywhere else. It is still very much in the
+  // game, so a stream that simply ends while one is open must not read as a
+  // loss — that is a snapshot artefact, not a leaked card.
+  if (state.pending?.kind === 'defend') uids.push(state.pending.attack)
+  if (state.pending && 'context' in state.pending && state.pending.context) {
+    uids.push(state.pending.context.attack.uid)
+    if (state.pending.context.combo) uids.push(state.pending.context.combo.uid)
+    // …and the defence lying OVER that attack, held on the same context until
+    // the exchange ends — the same mid-air state, counted for the same reason
+    // (ditayler, #184).
+    for (const card of state.pending.context.cover?.cards ?? []) uids.push(card.uid)
+  }
+  // The Sudo that rode that attack, held on the same pending for the same
+  // reason and in the same mid-air state — out of the attacker's hand and in no
+  // pile until the exchange resolves. Counted here, and nowhere else: the test
+  // "counts the Sudo riding an attack while its defence is open" below is what
+  // establishes that, because the fuzz stream never attaches a combo to an
+  // ATTACK and so cannot reach this state on its own.
+  if (state.pending?.kind === 'defend' && state.pending.combo) {
+    uids.push(state.pending.combo.uid)
+  }
+  // The alarm while its answer is being chosen — same mid-air state as a thrown
+  // attack above, and the same reason a stream ending here must not read as a
+  // lost card. Null for the ai-error-503 mimic, which holds no card here.
+  if (state.pending?.kind === 'neutralize503' && state.pending.card) {
+    uids.push(state.pending.card.uid)
+  }
+  // System Upgrade's thrown cards, face up at the centre while the pending
+  // drains — out of every hand and in no pile yet, the same mid-air state as
+  // the two above and counted for the same reason.
+  if (state.pending?.kind === 'systemUpgrade') {
+    for (const t of state.pending.thrown) uids.push(t.card.uid)
+  }
+  return uids.sort()
+}
+
+// EVERY AI CARD THERE IS, by the id it goes back to the events deck as.
+//
+// An AI card never leaves the game: it is in the events deck, standing on the
+// table, or being played (`general.md` §6.4, and `CardInstance.event` above).
+// So the same cards are always all there, and the count is a fact anything can
+// check — a fixture that stands one on the table without taking it out of the
+// deck has simply written the same card twice, which is how a stand scene grew
+// the deck every time it sent a card home (ditayler, #185).
+//
+// Counted by the EVENT id, never by the plain one it wears on the table: a
+// standing AI release reads as an ordinary Release and would otherwise be
+// indistinguishable from the real card of that name.
+export function aiCardsPresent(state: GameState): CardId[] {
+  const seen: CardId[] = state.decks.events.map((c) => c.event ?? c.id)
+  for (const player of Object.values(state.players)) {
+    for (const card of player.hand) if (card.event) seen.push(card.event)
+    for (const slot of ['frontend', 'backend', 'database'] as const) {
+      const released = player.release[slot]
+      if (released?.card.event) seen.push(released.card.event)
+      if (released?.codeReview?.event) seen.push(released.codeReview.event)
+    }
+    if (player.release.monitoring?.event) seen.push(player.release.monitoring.event)
+  }
+  return seen
+}
+
 // Who a pending is waiting on. Every variant but `systemUpgrade` waits on one
 // seat; that one waits on its roster while it is discarding, and on the actor
 // once it is picking. One predicate, so the keeper, the bot and the board

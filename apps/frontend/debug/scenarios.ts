@@ -46,28 +46,28 @@ const instance = (id: string, n: number): CardInstance => ({ uid: `${id}#debug${
 // EVERY defence card, one copy each, by name (owner, 20.09) — a stand is where
 // you reach for the card you want to look at, so having the outcome covered by
 // some other card is not the same as having this card in hand.
-const DEFENCES: CardInstance[] = [
-  instance('defense-hotfix', 10), // cancel
-  instance('defense-rubber-ducky', 11), // cancel
-  instance('defense-pr-approved', 12), // cancel
-  instance('defense-rollback', 13), // cancel, and the attack goes back to its hand
-  instance('defense-not-a-bug', 14), // unicorn — works under sudo
-  instance('defense-works-on-my-machine', 15), // unicorn
+//
+// NAMES, not cards: a preset takes these out of the game it was dealt rather
+// than writing copies of them beside it (`fromTheGame`).
+const DEFENCES = [
+  'defense-hotfix', // cancel
+  'defense-rubber-ducky', // cancel
+  'defense-pr-approved', // cancel
+  'defense-rollback', // cancel, and the attack goes back to its hand
+  'defense-not-a-bug', // unicorn — works under sudo
+  'defense-works-on-my-machine', // unicorn
   // …and the sudo that backs one of them (owner, 22.09). A defence has a sudo
   // effect of its own — a sudo Rollback keeps the attack for the defender
   // instead of handing it back — and without this card in the same hand that
   // half of every defence is unreachable from the stand.
-  instance('support-sudo', 22),
+  'support-sudo',
 ]
 
 // The Bug family, one copy each: three cards with one effect (`cards.md`, the
 // `c.bug` key), so whichever is thrown the play is the same one. They ride
 // along wherever the attack is still in hand, for the same reason the defences
 // do — to be reachable by name rather than by proxy (owner, 20.09).
-const BUG_VARIANTS: CardInstance[] = [
-  instance('attack-legacy-code', 16),
-  instance('attack-out-of-memory', 17),
-]
+const BUG_VARIANTS = ['attack-legacy-code', 'attack-out-of-memory']
 
 // Deliberately stable card UIDs: restarting must reset the board's private
 // arrangement even when every card identity appears again in the next run.
@@ -139,8 +139,15 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   // …and the second copy goes at the END, not beside the first: the operation is
   // the hand's first card and the sudo its second, and both this stand's own
   // checks and the instruction beneath the toolbar read them by that position.
-  const hand = [instance(operation, 0), instance('support-sudo', 1)]
-  hand.push(instance('attack-bug', 2), instance('defense-hotfix', 3), instance(operation, 18))
+  // …and the third seat only when this preset empties it: a seat that keeps the
+  // hand it was dealt keeps those cards, and pooling them would stand every one
+  // of them twice.
+  const { take, some } = fromTheGame(
+    initial,
+    scenario === 'upgradeFizzle' ? ['you', 'p2', 'p3'] : ['you', 'p2'],
+  )
+  const hand = [take(operation), take('support-sudo')]
+  hand.push(take('attack-bug'), take('defense-hotfix'), take(operation))
   // THE PILE CARDS ARE ONE SCENE, not three buttons. Branch splits a pile, Merge
   // puts every pile back together, and Sudo changes what each of them does — so
   // the hand carries enough of all three to drive the row of piles up and down
@@ -148,11 +155,7 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   // any real pressure (owner, 21.09). Two Branch and one Merge with three Sudo:
   // split, split again, and put it all back, with or without the sudo each time.
   if (scenario === 'branch')
-    hand.push(
-      instance('operation-git-merge', 19),
-      instance('support-sudo', 20),
-      instance('support-sudo', 21),
-    )
+    hand.push(take('operation-git-merge'), take('support-sudo'), take('support-sudo'))
 
   const state: GameState = {
     ...initial,
@@ -166,9 +169,7 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
       p2: {
         ...initial.players.p2,
         hand:
-          scenario === 'upgradeFizzle'
-            ? []
-            : [instance('release-frontend', 8), instance('defense-hotfix', 9)],
+          scenario === 'upgradeFizzle' ? [] : [take('release-frontend'), take('defense-hotfix')],
         release: {},
         openedAtDeal: [],
       },
@@ -189,14 +190,8 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
       main:
         scenario === 'rebaseFizzle'
           ? [[]]
-          : [
-              cards.slice(0, 4).map((id, i) => instance(id, i + 40)),
-              cards.slice(4).map((id, i) => instance(id, i + 50)),
-            ],
-      discard:
-        scenario === 'cherryFizzle'
-          ? [instance('trigger-error-503', 90)]
-          : cards.map((id, i) => instance(id, i + 20)),
+          : [cards.slice(0, 4).map(take), cards.slice(4).map(take)],
+      discard: scenario === 'cherryFizzle' ? [take('trigger-error-503')] : some(cards.length),
     },
   }
   if (scenario.startsWith('branch')) state.decks.main = [state.decks.main.flat()]
@@ -216,9 +211,48 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
 //     zone: the only thing to aim at is the hand, which is the other effect —
 //     name a card and they hand it over, or they do not have it and the attack
 //     is simply spent.
+// A HAND BUILT OUT OF THE GAME, never on top of it.
+//
+// A preset writes the hands its scene needs, and every card it writes has to
+// come from somewhere: the cards the deal put in hands go back into the pool,
+// the preset takes what it asks for, and whatever is left is the draw pile. A
+// card written as a fresh instance beside a deck left whole is the same card in
+// two places, and the table then holds more cards than the game has — which is
+// exactly what the two Security Bug scenes did (ditayler, #184).
+//
+// Asking for a card the game has run out of throws here rather than quietly
+// standing an extra copy on the table: a preset that cannot be dealt is a
+// question about the scene, and it should be asked out loud.
+// `rebuilt` names the seats whose hands the scene writes itself: ONLY those go
+// back into the pool. A seat the scene leaves alone keeps the hand it was
+// dealt, and putting those cards back would stand every one of them twice.
+function fromTheGame(initial: GameState, rebuilt: string[]) {
+  const pool = [
+    ...initial.decks.main.flat(),
+    ...rebuilt.flatMap((id) => initial.players[id]?.hand ?? []),
+  ]
+  const take = (id: string): CardInstance => {
+    const at = pool.findIndex((c) => c.id === id)
+    if (at < 0) throw new Error(`Invalid debug preset: the game has no ${id} left for the table`)
+    const [card] = pool.splice(at, 1)
+    return card
+  }
+  // …and cards whose NAMES do not matter: a discard heap is there so the pile
+  // is not empty, and what lies in it is nobody's question. Taken off the top
+  // of what is left, so they cost the scene nothing it asked for by name.
+  const some = (n: number): CardInstance[] => pool.splice(0, n)
+  // one pile, the shape a game starts in — what the scene did not take
+  return { take, some, piles: () => [pool] }
+}
+
 function createSecurityScenario(initial: GameState, scenario: Scenario): GameState {
-  const attack = instance('attack-security-bug', 0)
-  const cost = instance('defense-hotfix', 3)
+  const { take, piles } = fromTheGame(initial, ['you', 'p2'])
+  const attack = take('attack-security-bug')
+  const cost = take('defense-hotfix')
+  const sudo = take('support-sudo')
+  const debuggerCard = take('protection-debugger')
+  const release = take('release-frontend')
+  const defences = DEFENCES.map(take)
   let state: GameState = {
     ...initial,
     eventSeq: 100,
@@ -231,20 +265,20 @@ function createSecurityScenario(initial: GameState, scenario: Scenario): GameSta
       player: scenario === 'securityRelease' ? 'p2' : 'you',
       drawnFrom: [0],
     },
-    decks: { ...initial.decks, discard: [] },
+    decks: { ...initial.decks, main: piles(), discard: [] },
     players: {
       ...initial.players,
       you: {
         ...initial.players.you,
         // Sudo rides along here too: the attack is still in the hand, so one
         // run covers the card with and without it (owner, 19.09).
-        hand: [attack, instance('support-sudo', 5), instance('protection-debugger', 1)],
+        hand: [attack, sudo, debuggerCard],
         release: {},
         openedAtDeal: [],
       },
       p2: {
         ...initial.players.p2,
-        hand: [instance('release-frontend', 2), cost, ...DEFENCES],
+        hand: [release, cost, ...defences],
         release: {},
         openedAtDeal: [],
       },
@@ -263,7 +297,7 @@ function createSecurityScenario(initial: GameState, scenario: Scenario): GameSta
       )
     state = result.state
   }
-  apply({ type: 'PLAY', player: 'p2', card: instance('release-frontend', 2).uid, at })
+  apply({ type: 'PLAY', player: 'p2', card: release.uid, at })
   // Its cost, when the setup charges one. `releaseCond` decides, so this asks
   // the state rather than assuming: a preset that hardcodes a step the rules
   // did not take is the fixture inventing a pending again.
@@ -281,14 +315,17 @@ function createSecurityScenario(initial: GameState, scenario: Scenario): GameSta
 // invent a pending shape that the current engine no longer produces.
 function createTransferScenario(initial: GameState, scenario: Scenario): GameState {
   const security = scenario.startsWith('security')
-  const attack = instance(security ? 'attack-security-bug' : 'attack-bug', 0)
+  const { take, piles } = fromTheGame(initial, ['you', 'p2', 'p3'])
+  const attack = take(security ? 'attack-security-bug' : 'attack-bug')
   let state: GameState = {
     ...initial,
     eventSeq: 100,
     window: null,
     pending: null,
     turn: { ...initial.turn, player: 'you', drawnFrom: [0] },
-    decks: { ...initial.decks, discard: [] },
+    // what the scene did not take is the draw pile — cards it wrote into
+    // hands cannot also be lying in it
+    decks: { ...initial.decks, main: piles(), discard: [] },
     players: {
       ...initial.players,
       you: {
@@ -297,13 +334,8 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
         // one preset, both readings of the card (owner, 19.09).
         hand:
           scenario === 'blindStealPlay'
-            ? [
-                attack,
-                ...BUG_VARIANTS,
-                instance('support-sudo', 6),
-                instance('protection-debugger', 1),
-              ]
-            : [attack, instance('protection-debugger', 1)],
+            ? [attack, ...BUG_VARIANTS.map(take), take('support-sudo'), take('protection-debugger')]
+            : [attack, take('protection-debugger')],
         release: {},
         openedAtDeal: [],
       },
@@ -311,13 +343,13 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
         ...initial.players.p2,
         // Two Hotfix copies on purpose — the duplicate-hit preset is built on
         // them — and then one of every OTHER way a defence answers.
-        hand: [instance('defense-hotfix', 2), ...DEFENCES, instance('release-backend', 4)],
+        hand: [take('defense-hotfix'), ...DEFENCES.map(take), take('release-backend')],
         release: {},
         openedAtDeal: [],
       },
       p3: {
         ...initial.players.p3,
-        hand: [instance('release-frontend', 5)],
+        hand: [take('release-frontend')],
         release: {},
         openedAtDeal: [],
       },
@@ -358,22 +390,25 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
 // Monitoring comes along because it is the OTHER thing that goes into a zone,
 // and nothing else on this stand ever puts one there (owner, 20.09).
 function createReleaseScenario(initial: GameState): GameState {
+  const { take, piles } = fromTheGame(initial, ['you', 'p2'])
   return {
     ...initial,
     eventSeq: 100,
     window: null,
     pending: null,
     turn: { ...initial.turn, player: 'you', drawnFrom: [0, 1] },
-    decks: { ...initial.decks, discard: [] },
+    // what the scene did not take is the draw pile — cards it wrote into
+    // hands cannot also be lying in it
+    decks: { ...initial.decks, main: piles(), discard: [] },
     players: {
       ...initial.players,
       you: {
         ...initial.players.you,
         hand: [
-          instance('release-frontend', 0),
-          instance('protection-monitoring', 1),
-          instance('support-code-review', 2),
-          instance('defense-hotfix', 3),
+          take('release-frontend'),
+          take('protection-monitoring'),
+          take('support-code-review'),
+          take('defense-hotfix'),
         ],
         release: {},
         openedAtDeal: [],
@@ -382,7 +417,7 @@ function createReleaseScenario(initial: GameState): GameState {
       // opponent holds something to answer it with.
       p2: {
         ...initial.players.p2,
-        hand: [instance('attack-bug', 8), instance('support-sudo', 9)],
+        hand: [take('attack-bug'), take('support-sudo')],
         release: {},
         openedAtDeal: [],
       },
@@ -410,29 +445,45 @@ function createReleaseScenario(initial: GameState): GameState {
 // same way the engine does rather than inventing a shape of its own.
 //
 // Five DDoS in hand — one per target, so a single run can empty both zones.
+//
+// …AND THEY COME OUT OF THE EVENTS DECK, rather than being made up beside it.
+// An AI card standing in a zone IS one of that deck's own cards — it carries
+// the deck's own uid, and it goes back there when it leaves. Written as fresh
+// instances while the deck was kept whole, the same card stood in two places at
+// once, and every AI card this scene sent home grew the deck past its own
+// supply (ditayler, #185). The deck holds one `ai-release-database` and two
+// `ai-monitoring`; the scene takes one of each, and the deck is one and one
+// shorter for it.
 function createDdosScenario(initial: GameState): GameState {
-  const aiRelease: CardInstance = {
-    uid: 'ai-release-database#debug20',
-    id: 'release-database',
-    event: 'ai-release-database',
+  // the event card itself, standing in for what it grants: its own uid so it
+  // can go home, the plain catalogue id so a bounced release reads and plays as
+  // an ordinary one (`triggers.ts`, where the engine does exactly this)
+  const events = [...initial.decks.events]
+  const standing = (event: string, as: string): CardInstance => {
+    const at = events.findIndex((c) => c.id === event)
+    const [card] = at < 0 ? [] : events.splice(at, 1)
+    return { uid: card?.uid ?? `${event}#debug`, id: as, event }
   }
-  const aiMonitoring: CardInstance = {
-    uid: 'ai-monitoring#debug21',
-    id: 'protection-monitoring',
-    event: 'ai-monitoring',
-  }
+  const aiRelease = standing('ai-release-database', 'release-database')
+  const aiMonitoring = standing('ai-monitoring', 'protection-monitoring')
+  const { take, piles } = fromTheGame(initial, ['you', 'p2', 'p3'])
   return {
     ...initial,
     eventSeq: 100,
     window: null,
     pending: null,
     turn: { ...initial.turn, player: 'you', drawnFrom: [0, 1] },
-    decks: { ...initial.decks, discard: [] },
+    // …and the deck the two of them came out of, that much shorter; the rest
+    // of what the scene did not take is the draw pile
+    decks: { ...initial.decks, main: piles(), events, discard: [] },
     players: {
       ...initial.players,
       you: {
         ...initial.players.you,
-        hand: Array.from({ length: 5 }, (_, i) => instance('attack-ddos', i)),
+        // one per target, so a single run can empty both zones — and every one
+        // of them out of the game's own six, never a sixth copy written beside
+        // them
+        hand: Array.from({ length: 5 }, () => take('attack-ddos')),
         release: {},
         openedAtDeal: [],
       },
@@ -440,11 +491,11 @@ function createDdosScenario(initial: GameState): GameState {
         ...initial.players.p2,
         hand: [],
         release: {
-          monitoring: instance('protection-monitoring', 10),
-          frontend: { card: instance('release-frontend', 11) },
+          monitoring: take('protection-monitoring'),
+          frontend: { card: take('release-frontend') },
           backend: {
-            card: instance('release-backend', 12),
-            codeReview: instance('support-code-review', 13),
+            card: take('release-backend'),
+            codeReview: take('support-code-review'),
           },
         },
         openedAtDeal: [],
