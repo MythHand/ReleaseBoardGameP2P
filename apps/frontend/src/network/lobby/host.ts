@@ -1,4 +1,13 @@
-import type { Message, PeerInfo, Role, Seat, Where } from '../types'
+import type { PeerInfo, Role, Seat, Where } from '../types'
+import {
+  lobbyConfigUpdated,
+  type Outgoing,
+  peerJoined,
+  peerList as peerListMessage,
+  playerKicked,
+  seatRebound,
+  toBroadcast,
+} from './messages'
 import {
   applyConfig,
   applyPeerJoined,
@@ -8,11 +17,6 @@ import {
   type LobbyState,
   playerCount,
 } from './state'
-
-export interface Outgoing {
-  to: string | 'broadcast'
-  message: Message
-}
 
 interface Result {
   state: LobbyState
@@ -58,45 +62,25 @@ export function handleJoinRequest(
     where: options.returningSeat ? 'game' : 'lobby',
   }
   const next = applyPeerJoined(state, peer)
-
-  return {
-    state: next,
-    outgoing: [
-      {
-        to: fromId,
-        message: { type: 'PEER_LIST', payload: { peers: peerList(next), yourRole: role } },
-      },
-      // Seed the joiner with the host's current config so the modes/capacity
-      // panels show the agreed match settings immediately — without this a guest
-      // sees its DEFAULT_SETUP seed until the host happens to change a setting.
-      {
-        to: fromId,
-        message: {
-          type: 'LOBBY_CONFIG_UPDATED',
-          payload: { maxPlayers: state.maxPlayers, setup: state.setup, bots: state.bots },
-        },
-      },
-      {
-        to: 'broadcast',
-        message: {
-          type: 'PEER_JOINED',
-          payload: { id: fromId, memberId, name, role, ready: peer.ready, where: peer.where },
-        },
-      },
-      // Everyone else holds the seating with this seat's dead peer id in it.
-      ...(options.returningSeat
-        ? [
-            {
-              to: 'broadcast' as const,
-              message: {
-                type: 'SEAT_REBOUND' as const,
-                payload: { playerId: options.returningSeat.playerId, peerId: fromId },
-              },
-            },
-          ]
-        : []),
-    ],
+  const outgoing: Outgoing[] = []
+  outgoing.push(peerListMessage(fromId, peerList(next), role))
+  // Seed the joiner with the host's current config so the modes/capacity
+  // panels show the agreed match settings immediately — without this a guest
+  // sees its DEFAULT_SETUP seed until the host happens to change a setting.
+  outgoing.push(
+    lobbyConfigUpdated(fromId, {
+      maxPlayers: state.maxPlayers,
+      setup: state.setup,
+      bots: state.bots,
+    }),
+  )
+  outgoing.push(peerJoined(peer))
+  // Everyone else holds the seating with this seat's dead peer id in it.
+  if (options.returningSeat) {
+    outgoing.push(seatRebound(options.returningSeat.playerId, fromId))
   }
+
+  return { state: next, outgoing }
 }
 
 // Ready is a reversible toggle: a player can retract readiness (e.g. after
@@ -108,22 +92,7 @@ export function handleReady(state: LobbyState, fromId: string): Result {
   const next = applyPeerJoined(state, updated)
   return {
     state: next,
-    outgoing: [
-      {
-        to: 'broadcast',
-        message: {
-          type: 'PEER_JOINED',
-          payload: {
-            id: updated.id,
-            memberId: updated.memberId,
-            name: updated.name,
-            role: updated.role,
-            ready: updated.ready,
-            where: updated.where,
-          },
-        },
-      },
-    ],
+    outgoing: [peerJoined(updated)],
   }
 }
 
@@ -139,22 +108,7 @@ export function handleWhereabouts(state: LobbyState, fromId: string, where: Wher
   const updated: PeerInfo = { ...existing, where }
   return {
     state: applyPeerJoined(state, updated),
-    outgoing: [
-      {
-        to: 'broadcast',
-        message: {
-          type: 'PEER_JOINED',
-          payload: {
-            id: updated.id,
-            memberId: updated.memberId,
-            name: updated.name,
-            role: updated.role,
-            ready: updated.ready,
-            where: updated.where,
-          },
-        },
-      },
-    ],
+    outgoing: [peerJoined(updated)],
   }
 }
 
@@ -162,9 +116,7 @@ export function kick(state: LobbyState, peerId: string, reason?: string): Result
   const next = applyPeerLeft(state, peerId)
   return {
     state: next,
-    outgoing: [
-      { to: 'broadcast', message: { type: 'PLAYER_KICKED', payload: { peerId, reason } } },
-    ],
+    outgoing: [playerKicked(peerId, reason)],
   }
 }
 
@@ -194,36 +146,18 @@ export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
     }
   }
   const next = applyConfig({ ...state, peers }, { maxPlayers: clamped })
-  return {
-    state: next,
-    outgoing: [
-      {
-        to: 'broadcast',
-        message: { type: 'LOBBY_CONFIG_UPDATED', payload: { maxPlayers: clamped } },
-      },
-      // Propagate each demotion so guests' rosters stay consistent with the host.
-      ...demoted.map((peer) => ({
-        to: 'broadcast' as const,
-        message: {
-          type: 'PEER_JOINED' as const,
-          payload: {
-            id: peer.id,
-            memberId: peer.memberId,
-            name: peer.name,
-            role: peer.role,
-            ready: peer.ready,
-            where: peer.where,
-          },
-        },
-      })),
-    ],
+  const outgoing: Outgoing[] = [lobbyConfigUpdated('broadcast', { maxPlayers: clamped })]
+  // Propagate each demotion so guests' rosters stay consistent with the host.
+  for (const peer of demoted) {
+    outgoing.push(peerJoined(peer))
   }
+  return { state: next, outgoing }
 }
 
 export function transferHost(state: LobbyState, newHostId: string): Result {
   return {
     state,
-    outgoing: [{ to: 'broadcast', message: { type: 'TRANSFER_HOST', payload: { newHostId } } }],
+    outgoing: [toBroadcast({ type: 'TRANSFER_HOST', payload: { newHostId } })],
   }
 }
 
@@ -235,9 +169,7 @@ export function setBots(state: LobbyState, bots: number): Result {
   const clamped = Math.min(MAX_BOTS, Math.max(0, Math.trunc(bots)))
   return {
     state: applyConfig(state, { bots: clamped }),
-    outgoing: [
-      { to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { bots: clamped } } },
-    ],
+    outgoing: [lobbyConfigUpdated('broadcast', { bots: clamped })],
   }
 }
 
@@ -251,6 +183,6 @@ export function canStart(state: LobbyState): boolean {
 export function disbandLobby(state: LobbyState): Result {
   return {
     state,
-    outgoing: [{ to: 'broadcast', message: { type: 'LOBBY_DISBANDED', payload: {} } }],
+    outgoing: [toBroadcast({ type: 'LOBBY_DISBANDED', payload: {} })],
   }
 }

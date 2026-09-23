@@ -81,10 +81,9 @@ export function applyConfig(
   state: LobbyState,
   patch: { maxPlayers?: number; setup?: Setup; bots?: number },
 ): LobbyState {
-  return {
-    ...state,
-    ...(patch.maxPlayers !== undefined && { maxPlayers: patch.maxPlayers }),
-    ...(patch.setup !== undefined && { setup: patch.setup }),
-    ...(patch.bots !== undefined && { bots: patch.bots }),
-  }
+  const next = { ...state }
+  if (patch.maxPlayers !== undefined) next.maxPlayers = patch.maxPlayers
+  if (patch.setup !== undefined) next.setup = patch.setup
+  if (patch.bots !== undefined) next.bots = patch.bots
+  return next
 }
