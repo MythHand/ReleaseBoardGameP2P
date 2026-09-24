@@ -318,6 +318,12 @@ export function resolveAiEvent(
       // opening the prompt made a player burn a Debugger, or sacrifice a
       // different release, against a threat that had no legal target.
       if (!state.players[player].release[slot]) return { ...state, eventSeq: log.seq }
+      // Standing Monitoring absorbs Crush automatically, just like Error 503.
+      // Neither the defense nor the threatened release needs to be spent.
+      if (state.players[player].release.monitoring) {
+        log.add({ type: 'neutralized', player, method: 'monitoring' })
+        return { ...state, eventSeq: log.seq }
+      }
       const methods = neutralizeOptions(state, player)
       if (methods.length === 0) return destroySlot(state, log, player, slot)
       return {

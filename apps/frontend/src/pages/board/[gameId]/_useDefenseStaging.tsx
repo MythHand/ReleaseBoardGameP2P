@@ -70,6 +70,7 @@ import { COVER_POSE, MERGE_MS, SUDO_POSE } from '~/entities/game/board'
 import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useCoverFlight } from './_useCoverFlight'
+import { useResolveFeedback } from './_useResolveFeedback'
 
 // same 5-line helper comboBeat.tsx/defenseBeat.tsx each keep privately — copy
 // it, don't import across runners.
@@ -134,6 +135,8 @@ export interface DefenseStaging {
    * `_useBoardStaging`'s own `onCardClick`. */
   onCardClick: (index: number) => void
   cancel: () => void
+  declined: boolean
+  onDecline: () => void
   release: () => void
   /** true once the pulled defence's own flight to the cover slot has landed
    * (or at once, under reduced motion) — gates `_Board.tsx`'s static cover
@@ -183,6 +186,8 @@ export function useDefenseStaging({
 }: Options): DefenseStaging {
   const [staged, setStaged] = useState<DefenseStagedPlay | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [declined, setDeclined] = useState(false)
+  const declinedRef = useRef(false)
   const reduced = useReducedMotion()
   const flyer = useFlyer()
   const pair = usePairFold()
@@ -237,6 +242,17 @@ export function useDefenseStaging({
   // (options, dispatch, the static render) agrees on the same instant of it.
   const pending =
     state.pending?.kind === 'defend' && state.pending.player === state.selfId ? state.pending : null
+  // A Pass is an answer too: lock the hand until the engine accepts it or
+  // rejects that exact attempt. Projection objects may change while it is pending.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset only when the attack identity or match changes
+  useLayoutEffect(() => {
+    declinedRef.current = false
+    setDeclined(false)
+  }, [matchKey, pending?.player, pending?.attacker, pending?.attackCard, pending?.openedAt])
+  const resolveDecline = useResolveFeedback(events, state.selfId, actions, () => {
+    declinedRef.current = false
+    setDeclined(false)
+  })
   // Which cards may answer it — the projection's own answer, read never
   // re-derived. Two readers: `resolveLegal`, which decides whether a pull is
   // legal, and `stateAt`, which lights exactly that set in the fan (#101,
@@ -261,11 +277,11 @@ export function useDefenseStaging({
     (index: number) => {
       const support = staged?.phase === 'partner' ? staged.support : null
       const item = support ? handItems[index] : undefined
-      if (!support || !item) return undefined
+      if (declined || !support || !item) return undefined
       const partners = state.comboOptions?.[support.uid] ?? []
       return partners.includes(item.uid) ? `var(--cat-${support.card.category})` : undefined
     },
-    [staged, handItems, state.comboOptions],
+    [declined, staged, handItems, state.comboOptions],
   )
 
   // Which cards answer the open attack, as the fan draws them (#101, Fix B).
@@ -290,14 +306,14 @@ export function useDefenseStaging({
       // nothing here is pickable, so nothing here may look pickable. Reachable
       // on a rejoin that replays the opening into a pending already owed to
       // us (fix round 1, L2).
-      if (!enabled) return 'idle'
+      if (!enabled || declined) return 'idle'
       if (accentAt(index)) return 'selected'
       if (!pending || staged) return 'idle'
       if (defenceOptions.includes(item.uid)) return 'playable'
       const partners = state.comboOptions?.[item.uid] ?? []
       return item.card.id === 'support-sudo' && partners.length > 0 ? 'playable' : 'idle'
     },
-    [enabled, handItems, accentAt, pending, staged, defenceOptions, state.comboOptions],
+    [enabled, declined, handItems, accentAt, pending, staged, defenceOptions, state.comboOptions],
   )
 
   // The shared guard + lookup both entry points below open with: is this uid
@@ -305,7 +321,7 @@ export function useDefenseStaging({
   // Neither dispatches nor flies anything — just answers "legal, and where".
   const resolveLegal = useCallback(
     (uid: string): { item: CardData; index: number } | null => {
-      if (!enabled || !pending || stagedRef.current) return null
+      if (!enabled || !pending || declinedRef.current || stagedRef.current) return null
       if (!defenceOptions.includes(uid)) return null
       const index = state.you.hand.findIndex((c) => c.uid === uid)
       const item = state.you.hand[index]
@@ -322,7 +338,7 @@ export function useDefenseStaging({
   // any other illegal pull.
   const resolveSudo = useCallback(
     (uid: string): { item: CardData; index: number } | null => {
-      if (!enabled || !pending || stagedRef.current) return null
+      if (!enabled || !pending || declinedRef.current || stagedRef.current) return null
       const index = state.you.hand.findIndex((c) => c.uid === uid)
       const item = state.you.hand[index]
       if (item?.card.id !== 'support-sudo') return null
@@ -540,7 +556,7 @@ export function useDefenseStaging({
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const onCardClick = useCallback(
     (index: number) => {
-      if (!enabled || cancellingRef.current || foldingRef.current) return
+      if (!enabled || declinedRef.current || cancellingRef.current || foldingRef.current) return
       const s = stagedRef.current
       if (s?.phase !== 'partner' || !s.support) return
       const item = handItems[index]
@@ -773,7 +789,26 @@ export function useDefenseStaging({
     arrival.reset()
   }, [matchKey])
 
+  const onDecline = () => {
+    const phase = stagedRef.current?.phase
+    if (
+      !enabled ||
+      !pending ||
+      declinedRef.current ||
+      foldingRef.current ||
+      phase === 'dispatched' ||
+      phase === 'rejected'
+    )
+      return
+    declinedRef.current = true
+    setDeclined(true)
+    cancel()
+    resolveDecline({ kind: 'defend', card: null })
+  }
+
   return {
+    declined,
+    onDecline,
     staged,
     overlay: [
       ...flyer.overlay,

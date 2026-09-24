@@ -17,6 +17,8 @@ function showOperation(id: string, sudo = false) {
       {...base}
       state={{
         ...base.state,
+        turn: base.state.selfId,
+        hasDrawn: true,
         you: {
           ...base.state.you,
           hand: [...(sudo ? [{ uid: 'sudo', card: support }] : []), { uid: 'op', card }],

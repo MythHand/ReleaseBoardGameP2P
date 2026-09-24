@@ -134,6 +134,14 @@
   pointer-events: auto;
 }
 
+/* Upgrade's ask blocks the table but is answered FROM the hand. Its surface
+   sits at --z-flight + 45 and intercepts the pointer over the whole table;
+   lift only the fan above it so the discard gesture can actually start. */
+.handWrap[data-upgrade-discard="true"] {
+  position: relative;
+  z-index: calc(var(--z-flight) + 46);
+}
+
 /* THE FAN SWITCHED OFF, and switched off all the way down. A surface that takes
    the table over — the Rebase row, Cherry-pick's grid, Inside's row, a card
    request — closes the fan: under their dimming it must not keep lifting cards

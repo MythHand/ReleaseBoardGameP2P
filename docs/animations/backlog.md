@@ -19,6 +19,23 @@ so that is where a finding has to show up, in one line with a status. This file 
 in full: what it costs and what would close it. Enter it in both — the page so it is seen, here so
 it can be acted on.
 
+## Resolved pending feedback (2026-09-21)
+
+### System Upgrade contributions were not highlighted — #162
+
+The Board selected Upgrade hand items and drag handling, but left visual state with ordinary
+turn staging. Upgrade now provides both playable state and the shared discard accent while
+this seat owes a contribution. A local submission clears the highlight; rejection restores it.
+Base and Sudo use the same behavior. Answered players and observers are not prompted.
+
+### Defense instructions duplicated the dock — #163
+
+The earlier #101 decision placed defense instructions and a decline button under the centre
+cards. Issue #163 supersedes that presentation: base and Sudo defense now use the hand and
+only Pass in the dock. Instructions for release payment, hand limit and 503 remain.
+Pass retains the dock lockout, submits once, and blocks another defense until accepted or
+rejected. Rejection permits a fresh answer; a waiting Sudo returns to the hand when passing.
+
 ## Error 503 left the eliminated viewer on turn — closed 2026-09-21
 
 With a human and two bots, a fatal 503 emptied the human's cards and played the clip, but
@@ -38,10 +55,13 @@ The initial 2026-09-21 implementation removed the whole frontend ask band while 
 the right-hand tabs. PR #177 review identified that this also removed the only gesture
 instructions for four decisions whose generic pending panel is suppressed.
 
-**Superseding correction, 2026-09-22:** the owner's request to address that review restores
-`askCost`, `askHandLimit`, `askNeutralize` and `askPartner`, with their RU/EN copy. Each hint
-is shown only while its action is owed and becomes inert while fading out after an answer.
-The ordinary `askDefend` line and duplicate decline button remain removed, as #163 requests.
+**Review correction, 2026-09-22:** the owner's request to address that review restored
+`askCost`, `askHandLimit`, `askNeutralize` and `askPartner`, with their RU/EN copy.
+**Final integration, 2026-09-24 (#163/#178):** the reviewer clarified that restoring the
+Sudo-defense `askPartner` prompt was a mistake. Both base and Sudo defense use only the
+hand and dock Pass; `askCost`, `askHandLimit` and `askNeutralize` remain visible only while
+owed and inert while fading out. The unused `askPartner` translations remain in the catalog.
+The ordinary `askDefend` line and duplicate decline button remain removed.
 TurnDock Pass remains the way to decline an attack; pointer and keyboard activation both
 return an unpaired Sudo. The playground cost-only AskLine demonstration remains unchanged.
 
@@ -2098,6 +2118,61 @@ AI-триггера) и не означает полного выполнени�
 проверка, что индикатор исчезает вместе с ограничением. В PR #142 визуальное поведение
 не меняется. Та же открытая находка записана в Interaction audit.
 
+
+## 2026-09-21 — #160: Security Bug catalogue hover clipped by scrolling
+
+**Resolved.** The board’s request catalogue uses `overflow: auto` so wrapped
+rows remain reachable above `ConfirmAction`. Scaling its interactive cells by
+1.9 clipped enlarged faces and selected glows at the scrollport edges;
+additional padding could not protect rows after scrolling.
+
+`CardCatalog.previewRoot` now lets this consumer reserve a separate, non-scrolling
+reading layer. The enlarged hover/focus copy stays inside that area with room
+for the glow and cannot intercept neighbouring choices. The board bounds this
+layer above confirmation and left of the rail. Scrolling clears the previous
+hover copy, starting a drag removes it, and a confirmed choice can hold there.
+The default `PickSpecificCardStory` catalogue retains its existing in-place zoom.
+
+Regression checks cover edge geometry, a smaller available area, neighbouring
+choices, scroll cleanup, keyboard selection, and drag start. Actual browser
+scroll/viewport coverage is recorded with the issue’s verification evidence.
+
+
+**Follow-up, 2026-09-21.** The owner requires mouse-click selection for the Security Bug
+request. The board had enabled the catalogue’s drag mode, which ignored ordinary clicks.
+It now uses the same click-to-select, then ConfirmAction interaction as `PickSpecificCardStory`.
+The Board regression covers selecting and changing the choice without dispatch, followed by
+exactly one confirmation. At this point anonymous opponent-card selection retained its drag interaction.
+The newer #168 scene, retained during the main merge, selects a closed position
+by click and preserves the public request preview and fan handoff.
+
+
+## 2026-09-21 — #180: local drag replayed from the hand
+
+**Resolved.** A synchronous engine response commits the gesture and its accepted
+batch together. Board published `StagedHandoff` after `useBeats` had already started
+the runner in an earlier layout effect. The runner captured `null` and replayed
+the hand-to-centre flight alongside the gesture's card.
+
+The Board now publishes the committed gesture before the queue's layout effects.
+Every commit refreshes the handoff, including DOM refs that bind on landing.
+The local gesture owns its placement; accepted events only run the outcome. Remote
+players and observers retain their incoming flight. This is shared by turn plays,
+defense, neutralization and Upgrade contributions, without per-runner delays.
+
+The real-engine Board regression covers immediate and delayed local responses,
+the opponent and a third observer. Browser evidence uses `Attack / defence centre`
+→ `View: opponent` and records the actual WAAPI flight sources.
+
+**PR #178 review check, 2026-09-22.** The publication intentionally stays in the
+commit phase, before `useBeats` starts its layout-effect runners: the handoff
+contains DOM refs, and a render that never commits must not publish a gesture.
+Moving `useLayoutEffect(publishStagingHandoff)` below `useBeats` makes the existing
+`boardLocalHandoff.test.tsx` local and local-neutralize cases fail (two incoming
+carriers instead of one); restoring it makes all five cases pass. This ordering
+is a tested contract, not an unverified placement convention.
+
+
 ### «Опора лежит под своей картой» записано дважды — открыто, 2026-09-20
 
 Один и тот же факт выражен в двух местах и двумя разными способами:
@@ -2149,3 +2224,38 @@ discard» (`useBeats.test.tsx`). Оба тоже держатся на срок�
 — 21.09. Замеры: на правках шесть полных прогонов, из них один с падением; на той же базе без правок
 три прогона чисто. Этого мало, чтобы назвать причину, и достаточно, чтобы не списывать падения на
 случайность молча.
+
+
+**PR #178 main merge, 2026-09-21.** Preserved #168’s public request catalogue,
+remote live selection and held-card/fan handoff alongside the bounded preview.
+`previewSelected` keeps the named card readable to other viewers even if their
+independent scroll position hides its row. The updated anonymous fan uses click
+selection. The shared early staging handoff also covers Debugger/503; that
+real-engine regression reproduces the gap in main’s render-time workaround.
+
+
+## 2026-09-22 — #182: clicked release cost remained in the hand
+
+`onCostPick` flew the chosen card beside the release but only recorded `paidCost`
+after landing. Neither the flight nor that standing card was excluded from
+`handItems`, so the same card stayed in the fan until the engine caught up.
+
+The payment now owns the chosen uid from takeoff until the animated hand
+projection no longer contains it. Clearing the standing card for its discard
+flight does not put it back in the fan. The pending payment blocks another pick
+or cancellation; rejection restores the choice, and a rematch invalidates an
+unfinished flight. A newer projection that has already spent the card also removes
+its unfinished carrier. The existing flight presets and engine rules are unchanged.
+
+The debug preset **Release: pay a card** uses `releaseCond: base`, making the
+payment reachable beside the existing free-release preset. Board regressions
+cover an unfinished flight, delayed acceptance and rejected-payment retry.
+
+
+**Integration follow-up, 2026-09-23 (#184).** Main supersedes the click-payment
+path described above: payment is now pulled from the fan through the shared
+`useToCentre` carrier, and every debug preset uses the base release cost. The
+`Release: pay a card` shortcut remains, but no longer selects a different mode.
+The merge retains main's animated rejection return through `toHand`, together
+with this PR's synchronous duplicate-payment guard and invalidation of a flight
+on rematch or a newer hand projection. The payment regressions now use pulls.

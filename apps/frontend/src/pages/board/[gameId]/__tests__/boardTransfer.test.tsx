@@ -91,28 +91,29 @@ it('automatically resolves a legacy giveCard under reduced motion', () => {
   expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'giveCard', card: held.uid })
 })
 
-// A CARD IS NAMED BY CLICKING IT, and confirmed on the bar — the scene's own
-// gesture (`PickSpecificCardStory`). This used to assert the opposite: that a
-// click left the bar disabled and only Enter armed it. That was not a rule, it
-// was the catalogue's DRAG form written down — the board had handed it an
-// `onDrop`, which turns every cell into a pull and drops the click entirely, so
-// the choice was on screen with no way to make it (#168).
-it('names a catalogue card on a click, and asks only once it is confirmed', () => {
+it('selects and changes a requested catalogue card by mouse click before confirmation', () => {
   const onResolve = vi.fn()
   const props = withPending({ kind: 'requestCard', player: 'you', target: 'p2' })
   const { getByTestId } = render(<Board {...props} actions={{ onResolve }} />)
   const band = within(getByTestId('board-request-band'))
   const confirm = band.getByRole('button', { name: /confirm/i }) as HTMLButtonElement
   expect(confirm.disabled).toBe(true)
-  fireEvent.click(band.getByRole('button', { name: /Code Review/i }))
-  // named, and nothing asked yet: the bar is what asks
-  expect(onResolve).not.toHaveBeenCalled()
+  const option = band.getByRole('button', { name: /Code Review/i })
+  fireEvent.click(option, { detail: 1 })
+  expect(option.getAttribute('aria-pressed')).toBe('true')
   expect(confirm.disabled).toBe(false)
+  const other = band.getByRole('button', { name: /Hotfix/i })
+  fireEvent.click(other, { detail: 1 })
+  expect(other.getAttribute('aria-pressed')).toBe('true')
+  expect(option.getAttribute('aria-pressed')).toBe('false')
+  expect(onResolve).not.toHaveBeenCalled()
   fireEvent.click(confirm)
   expect(onResolve).toHaveBeenCalledExactlyOnceWith({
     kind: 'requestCard',
-    card: 'support-code-review',
+    card: 'defense-hotfix',
   })
+  fireEvent.click(confirm)
+  expect(onResolve).toHaveBeenCalledTimes(1)
 })
 
 // The closed offer is the `Hand` component itself, and a position is taken by
@@ -226,4 +227,39 @@ it('names the pressed back as the place the card leaves', () => {
   expect(handoff.current?.slot()).not.toMatchObject({ left: 120, top: 640 })
   fireEvent.mouseDown(choices[0])
   expect(handoff.current?.slot()).toMatchObject({ left: 120, top: 640 })
+})
+
+it.each([
+  'you',
+  'p3',
+])('shows the public request selection to target %s without allowing an answer', (target) => {
+  const geometry = vi
+    .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    .mockReturnValue(new DOMRect(0, 0, 1000, 700))
+  try {
+    const onResolve = vi.fn()
+    const props = withPending({ kind: 'requestCard', player: 'p2', target })
+    const { getByTestId } = render(
+      <Board
+        {...props}
+        actions={{ onResolve }}
+        pickPreview={{ player: 'p2', card: 'support-code-review' }}
+      />,
+    )
+    const band = within(getByTestId('board-request-band'))
+    expect(band.queryByRole('button', { name: /confirm/i })).toBeNull()
+    expect(band.getByRole('button', { name: /Code Review/i }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+    expect(
+      document.querySelector('[data-catalog-preview] [data-card]')?.getAttribute('data-card'),
+    ).toBe('support-code-review')
+    fireEvent.click(band.getByRole('button', { name: /Hotfix/i }), { detail: 1 })
+    expect(onResolve).not.toHaveBeenCalled()
+    expect(band.getByRole('button', { name: /Code Review/i }).getAttribute('aria-pressed')).toBe(
+      'true',
+    )
+  } finally {
+    geometry.mockRestore()
+  }
 })

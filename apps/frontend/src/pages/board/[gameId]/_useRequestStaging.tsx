@@ -73,6 +73,7 @@ export function useRequestStaging(args: {
   const [shown, setShown] = useState(false)
   const locked = useRef(false)
   const band = useRef<HTMLDivElement>(null)
+  const catalogPreview = useRef<HTMLDivElement>(null)
   const fan = useRef<HTMLDivElement>(null)
   const resolve = useResolveFeedback(args.events ?? [], state.selfId, actions, () => {
     locked.current = false
@@ -246,6 +247,7 @@ export function useRequestStaging(args: {
         >
           {(Boolean(asking) || watching != null || held != null) && (
             <>
+              <div className={styles.catalogPreview} ref={catalogPreview} />
               <div className={styles.catalog}>
                 {/* A CARD IS NAMED BY CLICKING IT — the scene's own gesture
                     (`PickSpecificCardStory`, `OpponentTakesCardStory`, both of
@@ -257,6 +259,8 @@ export function useRequestStaging(args: {
                     keyboard — so the choice was there and could not be made. */}
                 <CardCatalog
                   cards={HOLDABLE}
+                  previewRoot={catalogPreview}
+                  previewSelected={watching != null}
                   open={enabled && !confirmed && held == null}
                   selected={asking ? named : watchedName}
                   chosen={held ?? (confirmed ? named : null)}

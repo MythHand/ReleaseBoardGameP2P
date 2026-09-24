@@ -45,6 +45,9 @@ const en = {
   handDefenseHint:
     'Switch to the opponent and pull a defence over the staged attack, or take the hit. Their hand holds every defence card, one copy each.',
   release: 'Release into a zone',
+  releaseCost: 'Release: pay a card',
+  releaseCostHint:
+    'Put Frontend down, then pull a hand card out of the fan to pay for it. The chosen card leaves the hand as its flight starts, stands beside the release, then goes to discard.',
   ddos: 'DDoS: the standing zone',
   alarm503: 'Error 503: the alarm',
   aiTrigger: 'AI trigger: a Crush',
@@ -117,6 +120,9 @@ const ru: Record<keyof typeof en, string> = {
   handDefenseHint:
     'Переключитесь на соперника и вытяните защиту поверх атаки или примите удар. В его руке все карты защиты, по одной копии.',
   release: 'Релиз в зону',
+  releaseCost: 'Релиз: оплатить картой',
+  releaseCostHint:
+    'Выложите Frontend, затем вытяните карту из руки для оплаты. Выбранная карта покидает руку с началом перелёта, ложится рядом с релизом и уходит в сброс.',
   ddos: 'DDoS: зона соперника',
   alarm503: 'Error 503: тревога',
   aiTrigger: 'Триггер AI: Crush',
