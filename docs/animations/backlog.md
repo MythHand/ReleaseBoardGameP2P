@@ -2259,3 +2259,15 @@ path described above: payment is now pulled from the fan through the shared
 The merge retains main's animated rejection return through `toHand`, together
 with this PR's synchronous duplicate-payment guard and invalidation of a flight
 on rematch or a newer hand projection. The payment regressions now use pulls.
+
+### Bug возвращается в руку, если окно атаки открылось во время перетаскивания — 2026-09-24
+
+**Воспроизведение.** Соперник выкладывает Release; другой игрок берёт Bug до оплаты релиза и
+отпускает в центре после открытия окна атаки. Карта возвращалась в руку без `ATTACK`, хотя движок
+уже разрешал атаку. `Hand` сохранял обработчик `onPlay` от начала перетаскивания и проверял старую
+проекцию. Обратный переход тоже был неверным: закрывшееся окно всё ещё позволяло отправить атаку.
+
+**Исправление.** Общий `Hand` вызывает актуальный обработчик при отпускании, сохраняя геометрию
+начатого жеста. Оба перехода проверены в `boardReactionWindow.test.tsx`; сценарий открытия окна
+воспроизведён в браузере на реальных Board и движке до и после правки. Локально исправлено;
+пользовательская проверка опубликованной версии ещё не выполнена.
