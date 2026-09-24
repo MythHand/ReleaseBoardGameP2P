@@ -72,6 +72,7 @@ letting it flash in place first).
 | `enterPose` | `presets.ts` | `enterPose(from, box)` → `string` | the transform that makes an element sitting in `box` LOOK like it sits in `from` (offset by centers + scale by width). The entry pose of a FLIP flight: paint the first frame with it before starting, or the element flashes in its final place. `foldIntoPair` uses the same call inside. |
 | `durationOf` **(internal)** | `presets.ts` | `durationOf(p, fallback=520)` | reads `p.duration`, else the fallback. The `520` default is the fallback for the variable-time presets. Not exported either. |
 | `SHAKE_SHAPES` | `presets.ts` | `{ settle, spring }` → `number[]` | the CHARACTER of a shake as fractions of the swing per frame — `settle` (a jolt and a calm-down) and `spring` (two full swings, then two smaller). Fractions, not px, so a character reads the same at any `amp`. `ShakeShape` is the key type. |
+| `SHAKE_FLINCH` | `presets.ts` | `{ amp: 9, dur: 460, shape: 'spring' }` | the flinch of a WHOLE element — a fan or a seat answering "no such card" — rather than the 7px `settle` default sized for an input. Pass it as `play('shake', el, SHAKE_FLINCH)`; the Security Bug miss plays it on the board and in its scene. |
 | `play` | `play.ts` | `play(name, el, params={})` → `Animation \| null` | registry dispatch; warns on unknown name; no-op without `el`/WAAPI |
 | `presetNames` | `play.ts` | `presetNames()` → `string[]` | the registry keys |
 | `wait` | `timing.ts` | `wait(ms)` → `Promise` | `setTimeout` promise — holds a beat between phases |

@@ -53,7 +53,7 @@ import type {
   Point,
   TableActions,
 } from '@release/ui'
-import { useArrow } from '@release/ui'
+import { centerOf, useArrow } from '@release/ui'
 import { type Rect, restTransform, useFlyer, usePairFold } from '@release/ui/animations'
 import {
   Fragment,
@@ -414,13 +414,8 @@ export function useDefenseStaging({
         // with the Sudo, so the card that arms the arrow is also the one whose
         // colour it takes, named here rather than re-derived by the board: the
         // scene's own `color="var(--cat-support)"`, read off the card standing.
-        const box = anchors.sudo.current?.getBoundingClientRect()
-        if (box)
-          arrowCtl.aim(
-            { x: box.left + box.width / 2, y: box.top + box.height / 2 },
-            dropped,
-            `var(--cat-${card.category})`,
-          )
+        const sudoEl = anchors.sudo.current
+        if (sudoEl) arrowCtl.aim(centerOf(sudoEl), dropped, `var(--cat-${card.category})`)
       })()
     },
     [anchors.sudo, arrowCtl.aim, sudoFlight.fly],

@@ -1854,8 +1854,8 @@ flinches in place with a "not in hand" note and leaves (miss).
    `phase === 'choose' && wanted`) does `setPhase('picked')`, which flips the catalog to `open={false}` with
    `chosen={wanted.id}` — the named cell holds enlarged while the rest leave — and `later(() => resolve(wanted),
    PICK_BEAT)`.
-3. `resolve(card)`: **miss** (`!inHand`) → `setPhase('miss')`, `play('shake', topHandRef.current, { amp:
-   MISS_SHAKE, dur: MISS_SHAKE_MS, shape: 'spring' })` — the fan flinches whole, in place —
+3. `resolve(card)`: **miss** (`!inHand`) → `setPhase('miss')`, `play('shake', topHandRef.current,
+   SHAKE_FLINCH)` — the fan flinches whole, in place —
    `later(setHandIn(false), MISS_HOLD)`, `later(backToIdle, MISS_HOLD + 560)`. **hit** → plant the wanted card
    into a random opponent slot; read that slot's rect (**I1**); compute the delta to the **stage centre**
    (`cx/cy` from `rootRef`, not `window`); `chosenUid = that slot` (its face renders `null`, so only the flyer
@@ -1873,7 +1873,7 @@ flinches in place with a "not in hand" note and leaves (miss).
 | reveal centre width | `REVEAL_W = 220` px |
 | centre hold before the drop | `REVEAL_HOLD = 820` ms |
 | miss shake + note | `MISS_HOLD = 1620` ms (+560 to idle) |
-| the flinch itself | `play('shake')`, `MISS_SHAKE = 9` / `MISS_SHAKE_MS = 460` / `shape: 'spring'` — a whole fan, not the 7px `settle` sized for an input |
+| the flinch itself | `play('shake')`, `SHAKE_FLINCH` = `{ amp: 9, dur: 460, shape: 'spring' }` — a whole fan, not the 7px `settle` sized for an input |
 | opponent fan / catalog cell width | `OPP_HAND = 6`, `GRID_W = 100` |
 | final drop | `useHandArrival` (`FLIGHT_MS = 480`) |
 
@@ -2048,7 +2048,7 @@ whole table, then either hands over to the projection (hit) or is followed by th
    the same ordering, for the same reason, as `drawBeat`'s standing trigger.
 3. **Miss** — the pending clears outright, so nothing in the projection survives it and the beat has to
    carry the whole scene or the table never learns the outcome. `wait(REQUEST_HOLD)` with the named card
-   standing, `play('shake', …, SHAKE)` on the target, the note, `wait(MISS_HOLD)`, `drop`. The target is
+   standing, `play('shake', …, SHAKE_FLINCH)` on the target, the note, `wait(MISS_HOLD)`, `drop`. The target is
    flinched **as they are rendered**: `seatOf(target)` to everyone watching, and `anchors.hand` — their
    own fan — when the miss is aimed at you, because you have no seat. One gesture, two renderings: the
    fan flinch is the playground's original and the seat flinch is its translation.
@@ -2102,7 +2102,7 @@ screen, since `live` has already taken the card out.
 |---|---|---|
 | the named card appears at the centre | `popIn` | 260 ms |
 | it stands before the outcome | `wait(REQUEST_HOLD)` | 820 ms |
-| the flinch | `play('shake', …, SHAKE)` | `{ amp: 9, dur: 460, shape: 'spring' }` — a whole seat or a whole fan flinching, not the 7px `settle` sized for an input |
+| the flinch | `play('shake', …, SHAKE_FLINCH)` | `{ amp: 9, dur: 460, shape: 'spring' }` — a whole seat or a whole fan flinching, not the 7px `settle` sized for an input |
 | the note, before the scene clears | `wait(MISS_HOLD)` | 1620 ms |
 | seat → centre | `takeFromSeat` | 460 ms |
 | centre → seat | `dealToSeat` | 460 ms |

@@ -11,7 +11,7 @@ import {
   wait,
 } from '@/animations'
 import { CARDS, cardById } from '@/cards'
-import Arrow, { useArrow } from '@/primitives/Arrow'
+import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
@@ -386,8 +386,8 @@ export default function DeckAnimationsStory() {
     if (id === SUDO) {
       take(2) // Sudo never plays alone — the empty second slot says so
       void flyToStage(item, rect, 0).then(() => {
-        const r = stageRefs.current[0]?.getBoundingClientRect()
-        if (r) aim({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, dropped)
+        const slot = stageRefs.current[0]
+        if (slot) aim(centerOf(slot), dropped)
       })
       return true
     }
@@ -397,8 +397,8 @@ export default function DeckAnimationsStory() {
       void flyToStage(item, rect, 0).then(() => {
         const only = decks.length <= 1 ? decks[0]?.id : undefined
         if (only != null) return resolveStage(() => splitEffect(only))
-        const r = stageRefs.current[0]?.getBoundingClientRect()
-        if (r) aim({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, dropped)
+        const slot = stageRefs.current[0]
+        if (slot) aim(centerOf(slot), dropped)
       })
       return true
     }
@@ -436,8 +436,10 @@ export default function DeckAnimationsStory() {
       if (id === MERGE) return resolveStage(() => mergeEffect(true))
       const only = decks.length <= 1 ? decks[0]?.id : undefined
       if (only != null) return resolveStage(() => enhancedBranchEffect(only))
-      const r = stageRefs.current[1]?.getBoundingClientRect()
-      if (r) aim({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, { x: r.left, y: r.top })
+      const slot = stageRefs.current[1]
+      if (!slot) return
+      const r = slot.getBoundingClientRect()
+      aim(centerOf(slot), { x: r.left, y: r.top })
     })
   }
 

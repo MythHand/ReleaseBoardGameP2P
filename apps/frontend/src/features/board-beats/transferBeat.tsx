@@ -2,7 +2,7 @@ import { useTranslation } from '@release/translation'
 import type { CardData } from '@release/ui'
 import { cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import { nextFrames, play, useFlyer, wait } from '@release/ui/animations'
+import { nextFrames, play, SHAKE_FLINCH, useFlyer, wait } from '@release/ui/animations'
 import type { RefObject } from 'react'
 import { useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
@@ -39,9 +39,6 @@ const REQUEST_HOLD = 820 // the named card stands at the centre before the outco
 // beat between the confirm and the outcome (`PickSpecificCardStory`).
 const PICK_BEAT = 620
 const MISS_HOLD = 1620 // the flinch and the note, before the scene clears
-// A whole seat (or a whole fan) flinching, not the 7px `settle` sized for an
-// input field — the story's own values.
-const SHAKE = { amp: 9, dur: 460, shape: 'spring' } as const
 
 // One flyer key for the whole run: there is never more than one card in the
 // air here, and a key IS a flyer — raising the same key twice replaces the
@@ -295,7 +292,7 @@ export function useTransferBeat(
         // what they own is the fan. One gesture, two renderings.
         const mine = plan.target === beat.base.selfId
         const flinch = mine ? a.hand.current : a.seatOf(plan.target)
-        play('shake', flinch, SHAKE)
+        play('shake', flinch, SHAKE_FLINCH)
         setMissed(true)
         await wait(MISS_HOLD)
         setMissed(false)
