@@ -47,7 +47,7 @@ const en = {
   release: 'Release into a zone',
   ddos: 'DDoS: the standing zone',
   alarm503: 'Error 503: the alarm',
-  aiTrigger: 'AI trigger: a Crush',
+  aiTrigger: 'AI trigger',
   ddosHint:
     'Your turn, five DDoS in hand, both opponent zones already standing. The first holds a Monitoring, a bare release and a release under Code Review; the second holds the AI pair — an AI Monitoring and an AI release. Throw one at each: a Monitoring is destroyed, a release goes back to its owner hand frozen for a round, a Code Review is discarded with the release it rode — and the AI cards go home to the events deck instead of the discard.',
   releaseHint:
@@ -55,7 +55,7 @@ const en = {
   alarm503Hint:
     'Nothing drawn yet. Take a card from the pile: Error 503 turns up and the alarm stands. Answer it with the Debugger in hand or by sacrificing the release in your zone.',
   aiTriggerHint:
-    'Nothing drawn yet. Take a card from the pile: the AI trigger reveals a Crush aimed at the release in your zone. Answer it with the Debugger, or sacrifice the release.',
+    'Pick the AI card below, then take a card from the pile: the AI trigger reveals it. The table is laid for what that card acts on — a release for a Crush, an empty slot for an AI release, two releases in the discard for Inside.',
   cherry: 'Cherry-pick',
   rebase: 'Rebase',
   upgrade: 'Upgrade',
@@ -119,7 +119,7 @@ const ru: Record<keyof typeof en, string> = {
   release: 'Релиз в зону',
   ddos: 'DDoS: зона соперника',
   alarm503: 'Error 503: тревога',
-  aiTrigger: 'Триггер AI: Crush',
+  aiTrigger: 'Триггер AI',
   ddosHint:
     'Ваш ход, пять DDoS в руке, зоны обоих соперников уже стоят. У первого мониторинг, обычный релиз и релиз под Code Review; у второго пара AI — мониторинг AI и релиз AI. Бросьте по одной в каждую цель: мониторинг уничтожается, релиз уходит владельцу в руку и заморожен на раунд, Code Review уходит в сброс вместе с релизом, а карты AI возвращаются в колоду событий, а не в сброс.',
   releaseHint:
@@ -127,7 +127,7 @@ const ru: Record<keyof typeof en, string> = {
   alarm503Hint:
     'Добора ещё не было. Возьмите карту из колоды: выпадет Error 503 и тревога встанет. Ответьте Debugger из руки или пожертвуйте релизом из своей зоны.',
   aiTriggerHint:
-    'Добора ещё не было. Возьмите карту из колоды: триггер AI откроет Crush, нацеленный на релиз в вашей зоне. Ответьте Debugger или пожертвуйте релизом.',
+    'Выберите AI-карту ниже и возьмите карту из колоды: триггер AI откроет её. Стол разложен под эту карту — релиз для Crush, пустое место для AI-релиза, два релиза в сбросе для Inside.',
   cherry: 'Cherry-pick',
   rebase: 'Rebase',
   upgrade: 'Upgrade',

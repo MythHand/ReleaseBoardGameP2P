@@ -1,7 +1,7 @@
-import { aiCardsPresent } from '@release/engine'
+import { aiCardsPresent, type ReleaseSlot } from '@release/engine'
 import { FAKE_EVENTS } from '@release/engine/fake'
 import { expect, it } from 'vitest'
-import { createScenario, engine, OPERATION_SCENARIOS, SCENARIOS } from './scenarios'
+import { AI_CARDS, createScenario, engine, OPERATION_SCENARIOS, SCENARIOS } from './scenarios'
 
 // EVERY PAGE IS THE SAME GAME, and this is what says so out loud: one setup, one
 // table shape, every preset built. A preset builds by PLAYING its way into
@@ -74,4 +74,27 @@ it('restarts with a fresh identity and the same deterministic card order', () =>
   expect(next.gameId).not.toBe(first.gameId)
   expect(next.players.you.hand).toEqual(original.players.you.hand)
   expect(next.players.you.hand).not.toEqual(first.players.you.hand)
+})
+
+// ONE PRESET, EVERY AI CARD. The choice on the stand is only worth having if
+// each card, drawn through the real engine, acts on the table laid for it: a
+// Crush with nothing to destroy, or an Inside with one release to hand over,
+// passes by without a question and reads as a broken card (owner, 24.09).
+it.each(AI_CARDS)('reveals %s and lets it act on the table laid for it', (card) => {
+  const state = createScenario('aiTrigger', 'debug-ai-card', card)
+  const drawn = engine.reduce(state, { type: 'DRAW', player: 'you', at: 1 })
+  expect(drawn.events).toContainEqual(
+    expect.objectContaining({ type: 'aiRevealed', eventCard: card }),
+  )
+  const { pending } = drawn.state
+  const zone = drawn.state.players.you.release
+  if (card.startsWith('ai-crush-'))
+    expect(pending).toMatchObject({ kind: 'crush', slot: card.slice('ai-crush-'.length) })
+  if (card.startsWith('ai-release-'))
+    expect(zone[card.slice('ai-release-'.length) as ReleaseSlot]).toBeDefined()
+  if (card === 'ai-monitoring') expect(zone.monitoring).toBeDefined()
+  if (card === 'ai-inside')
+    expect(pending).toMatchObject({ kind: 'pickFromDiscard', options: [{}, {}] })
+  if (card === 'ai-bad-vibe-coding') expect(pending).toMatchObject({ kind: 'handLimit' })
+  if (card === 'ai-error-503') expect(pending).toMatchObject({ kind: 'neutralize503' })
 })

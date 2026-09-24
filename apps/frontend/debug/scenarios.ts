@@ -1,4 +1,4 @@
-import type { Action, CardInstance, Event, GameState } from '@release/engine'
+import type { Action, CardInstance, Event, GameState, ReleaseSlot } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 
 export const engine = createFakeEngine()
@@ -27,6 +27,12 @@ export const SCENARIOS = [
   'aiTrigger',
 ] as const
 export type Scenario = (typeof SCENARIOS)[number]
+
+// THE AI CARD THE TRIGGER REVEALS — one preset, every AI card behind a choice,
+// rather than a dozen tabs in the scenario row (owner, 24.09). The list is the
+// game's own events deck, so a card added there is offered here without a copy.
+export const AI_CARDS: readonly string[] = FAKE_EVENTS.map((entry) => entry.id)
+export const DEFAULT_AI_CARD = 'ai-crush-frontend'
 
 const cards = [
   'release-frontend',
@@ -72,7 +78,11 @@ const BUG_VARIANTS = ['attack-legacy-code', 'attack-out-of-memory']
 
 // Deliberately stable card UIDs: restarting must reset the board's private
 // arrangement even when every card identity appears again in the next run.
-export function createScenario(scenario: Scenario, gameId: string): GameState {
+export function createScenario(
+  scenario: Scenario,
+  gameId: string,
+  aiCard: string = DEFAULT_AI_CARD,
+): GameState {
   const transfer = [
     'securityRequest',
     'securityGive',
@@ -109,7 +119,7 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
       // fix checked on it proves nothing about the rest (owner, 22.09).
       releaseCond: 'base',
       ai: 'base',
-      gitBranch: 'strategic',
+      gitBranch: 'base',
     },
     deck: FAKE_DECK,
     events: FAKE_EVENTS,
@@ -148,7 +158,7 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   if (scenario === 'release') return createReleaseScenario(initial)
   if (scenario === 'ddos') return createDdosScenario(initial)
   if (scenario === 'alarm503' || scenario === 'aiTrigger')
-    return createTriggerScenario(initial, scenario)
+    return createTriggerScenario(initial, scenario, aiCard)
   const operation = scenario.startsWith('branch')
     ? 'operation-git-branch'
     : scenario.startsWith('cherry')
@@ -539,6 +549,38 @@ function createDdosScenario(initial: GameState): GameState {
   }
 }
 
+// WHAT EACH AI CARD NEEDS ON THE TABLE to show its effect, read off the engine's
+// own `resolveAiEvent` (fake/triggers.ts). Every card starts from the same
+// table: a Frontend release in your zone — the 503's `sacrifice` method and the
+// slot a Crush Frontend aims at — a Debugger and a Hotfix in hand, and cards in
+// the pile under the trigger. Only what a card would otherwise find missing is
+// changed:
+//   Crush <slot>    — the release it destroys stands in its own slot;
+//   Release <slot>  — that slot is empty, or the card has nowhere to go;
+//   Inside          — two releases of different types in the discard, so the
+//                     pick is a choice rather than a card handed over.
+// AI Monitoring (its slot is empty), Good Vibe-Coding (the pile has cards), Bad
+// Vibe-Coding (the hand has cards), Hallucination and Error 503 (a Debugger and
+// a release to answer with) find what they need on the common table.
+function aiTable(aiCard: string): {
+  release: GameState['players'][string]['release']
+  discard: CardInstance[]
+} {
+  const slot = (prefix: string) =>
+    aiCard.startsWith(prefix) ? (aiCard.slice(prefix.length) as ReleaseSlot) : null
+  const crushed = slot('ai-crush-')
+  const placed = slot('ai-release-')
+  const standing: ReleaseSlot = crushed ?? 'frontend'
+  return {
+    release:
+      placed === standing ? {} : { [standing]: { card: instance(`release-${standing}`, 32) } },
+    discard:
+      aiCard === 'ai-inside'
+        ? [instance('release-backend', 33), instance('release-database', 34)]
+        : [],
+  }
+}
+
 // THE TRIGGERS ARE DRAWN, NEVER PLAYED — both fire the moment they turn up
 // (`fireTrigger`), and neither ever reaches a hand. So their presets put one on
 // TOP of a draw pile and leave the turn's draw still owed: the scene starts
@@ -550,13 +592,16 @@ function createDdosScenario(initial: GameState): GameState {
 //     spot. The third, a standing Monitoring, would answer inside the draw
 //     itself and show nothing — that case belongs to the release preset, where
 //     a Monitoring can actually be put down first.
-//   aiTrigger — the AI card reveals ONE event, picked out of the events deck by
-//     the seed. The deck is seeded with a single card so the preset shows the
-//     same event every run: a Crush aimed at the release standing in the zone,
-//     which is the AI effect that asks a question rather than passing by.
-function createTriggerScenario(initial: GameState, scenario: Scenario): GameState {
+//   aiTrigger — the AI card reveals ONE event, the one chosen on the stand. The
+//     deck is seeded with that single card, since the engine picks an event at
+//     random and a one-card deck is the only way a run repeats itself. The table
+//     is laid for what that card acts on (`aiTable`), and a card with nothing
+//     to act on passes by doing nothing — which is the engine's own rule, not
+//     a scene worth choosing.
+function createTriggerScenario(initial: GameState, scenario: Scenario, aiCard: string): GameState {
   const alarm = scenario === 'alarm503'
   const trigger = instance(alarm ? 'trigger-error-503' : 'trigger-ai', 30)
+  const table = alarm ? aiTable(DEFAULT_AI_CARD) : aiTable(aiCard)
   return {
     ...initial,
     eventSeq: 100,
@@ -568,17 +613,15 @@ function createTriggerScenario(initial: GameState, scenario: Scenario): GameStat
       ...initial.decks,
       // the trigger on top, and cards under it so the pile is not left empty
       main: [[trigger, ...cards.slice(0, 3).map((id, i) => instance(id, i + 40))]],
-      discard: [],
-      events: alarm ? initial.decks.events : [instance('ai-crush-frontend', 31)],
+      discard: table.discard,
+      events: alarm ? initial.decks.events : [instance(aiCard, 31)],
     },
     players: {
       ...initial.players,
       you: {
         ...initial.players.you,
         hand: [instance('protection-debugger', 0), instance('defense-hotfix', 1)],
-        // the release both presets need: the 503's `sacrifice` method, and the
-        // slot a Crush aims at
-        release: { frontend: { card: instance('release-frontend', 32) } },
+        release: table.release,
         openedAtDeal: [],
       },
       p2: {
