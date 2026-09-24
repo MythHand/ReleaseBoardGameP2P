@@ -62,6 +62,23 @@ catching up — the card blinks out on landing.
 under main), the "already there" guard, the write into `ctx.base` as well as the
 publish, and the removal direction as well as the addition.
 
+**Beats that still did not file what they flew** (found 24.09 on the AI trigger
+preset, where every AI card's trigger blinked in the discard):
+
+| Where | State |
+|---|---|
+| `aiBeat.tsx` — the trigger leaving right after the reveal (Hallucination, Good Vibe-Coding, an AI release, AI Monitoring, a Crush with no answer) | **Files it** through `settleInto` once it lands. The other road — a trigger leaving after its prompt is answered — was already right: the engine banks the trigger at the reveal, so the heap the beat restores holds it. |
+| `handLimitBeat.tsx` — the hand limit, and Bad Vibe-Coding's discard | **Files them** through `withLanded` once they land, on top of the cause it puts back. The shadow still leaves the heap alone while they fly. |
+| `defenseBeat.tsx`, `discardBeat.tsx`, `drawBeat.tsx`, `upgradeBeat.tsx`, `_useCherryPickStaging.tsx` | Send to the discard without filing. Not yet checked whether each one blinks — the open "Rollback: a single defence blinks in the discard" (#184) is `defenseBeat.tsx` and the same class. |
+
+**A card off its pile's counter as it takes off** — `features/board-beats/offThePile.ts`
+(24.09). No beat touched a pile's count: every counter held the card it had
+given up until the table had played out. The draw beat (every draw, Good
+Vibe-Coding's included) and the AI trigger leaving its pile go through it. The
+events deck does not yet: an AI card leaves it and comes back inside one beat,
+and the projection counts it home at once, so its counter needs the landing
+half as well — five roads home, not done.
+
 ---
 
 ## 2. A card going home to the events deck

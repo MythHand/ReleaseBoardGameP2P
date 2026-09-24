@@ -438,6 +438,19 @@ export type BeatPlan =
       homeward?: string
       causeward?: { card: string; eventId: number }
     }
+  // A Crush its owner refused to answer (owner, 24.09): Pass on the prompt, and
+  // the release it aimed at is destroyed in the batch that refuses it. The same
+  // ending as a Crush with no answer at its reveal — `tail` is that ending's
+  // own — and the AI card standing behind the prompt goes home with it.
+  | {
+      kind: 'crushRefused'
+      key: string
+      eventId: number
+      player: string
+      tail: Extract<AiTail, { kind: 'crush' }>
+      homeward?: string
+      causeward?: { card: string; eventId: number }
+    }
 
 // Reasons that CAN take a card out of a release slot — "can", not "always do".
 // Typed against the engine's own union rather than `string`, so renaming a reason
@@ -606,6 +619,31 @@ const pickedPlace = (before: BoardState): { picked?: true } => {
   return pending?.kind === 'handLimit' && pending.source ? { picked: true as const } : {}
 }
 
+// WHAT A CRUSH DESTROYED, and where it goes — one answer for both of a
+// Crush's endings: no answer at the reveal (`aiTailAfter`), and its owner
+// refusing to answer in a later batch (`crushRefused`, owner 24.09).
+function crushTailOf(
+  before: BoardState,
+  destroyed: { player: string; slot: string; card: string },
+  discardAfter: number | undefined,
+): Extract<AiTail, { kind: 'crush' }> {
+  const home =
+    releaseEventsOf(before, destroyed.player)?.[destroyed.slot as keyof ReleaseSlots] !== undefined
+  const aux = releaseSupportOf(before, destroyed.player)?.[destroyed.slot as keyof ReleaseSupport]
+  // Only the card that ends up on TOP of the discard has a pose the heap
+  // will actually rest it on — see `rest`'s own comment on `AiTail`.
+  const rest =
+    !home && !aux && discardAfter !== undefined ? standInScatter(discardAfter) : undefined
+  return {
+    kind: 'crush',
+    slot: destroyed.slot,
+    card: destroyed.card,
+    destination: home ? 'events' : 'discard',
+    ...(rest ? { rest } : {}),
+    ...(aux ? { codeReview: aux.id } : {}),
+  }
+}
+
 // What the AI card DID, read from the events behind it rather than from its own
 // id. That is this file's standing rule (see the DDoS note on `attacked`), and
 // here it earns its keep twice: `released`/`placed` following is what says the
@@ -631,23 +669,7 @@ function aiTailAfter(
   if (next?.type === 'placed') {
     return { kind: 'zone', slot: 'monitoring', card: next.card }
   }
-  if (next?.type === 'releaseDestroyed') {
-    const home =
-      releaseEventsOf(before, next.player)?.[next.slot as keyof ReleaseSlots] !== undefined
-    const aux = releaseSupportOf(before, next.player)?.[next.slot as keyof ReleaseSupport]
-    // Only the card that ends up on TOP of the discard has a pose the heap
-    // will actually rest it on — see `rest`'s own comment on `AiTail`.
-    const rest =
-      !home && !aux && discardAfter !== undefined ? standInScatter(discardAfter) : undefined
-    return {
-      kind: 'crush',
-      slot: next.slot,
-      card: next.card,
-      destination: home ? 'events' : 'discard',
-      ...(rest ? { rest } : {}),
-      ...(aux ? { codeReview: aux.id } : {}),
-    }
-  }
+  if (next?.type === 'releaseDestroyed') return crushTailOf(before, next, discardAfter)
   if (next?.type === 'turnEnded') return { kind: 'turnEnded' }
   const mimic = next?.type === 'revealed' && next.card === eventCard
   // A prompt is owed for THIS card — not merely "some pending exists", which a
@@ -1280,6 +1302,26 @@ export function planBeats(
         player: e.player,
         card: e.card,
         mine: e.player === before.selfId,
+        ...homewardOf(before),
+      })
+      continue
+    }
+    // A release destroyed while its owner owed an answer to a Crush is the
+    // refusal — the one road to `releaseDestroyed` that no reveal and no
+    // neutralize carries (an answered Crush destroys nothing, and the 503's
+    // sacrifice is read inside `neutralized` below).
+    if (
+      e.type === 'releaseDestroyed' &&
+      before.pending?.kind === 'crush' &&
+      before.pending.player === e.player
+    ) {
+      flush()
+      plans.push({
+        kind: 'crushRefused',
+        key: `refused:${e.id}`,
+        eventId: e.id,
+        player: e.player,
+        tail: crushTailOf(before, e, discardAfter),
         ...homewardOf(before),
       })
       continue

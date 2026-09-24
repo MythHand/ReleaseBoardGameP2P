@@ -33,7 +33,7 @@ import { useResolveFeedback } from './_useResolveFeedback'
 // contents are never projected), so there is no second renderer to race, and
 // the flight IS the whole of what the player is told happened. Reduced motion
 // still answers at once: a game action must never wait on an animation nobody
-// plays (`_useInsideStaging`'s rule).
+// plays.
 type Order = Record<number, string[]>
 
 // timings — the approved scene
@@ -158,8 +158,7 @@ export function useRebaseStaging(args: {
   useLayoutEffect(() => clearTimers, [])
 
   // Seeded from the offer, and re-seeded when a different pending opens. Keyed
-  // on the pending rather than the mount, the discipline `_useInsideStaging`
-  // states: a latch that outlives what it latches is a bug. `flying` is left
+  // on the pending rather than the mount, because a latch that outlives what it latches is a bug. `flying` is left
   // alone on purpose — it clears when its own flight lands, and a projection
   // tick clearing the pending mid-flight must not cut it short.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reseed only for a different offer, not a fresh projection object
@@ -272,8 +271,7 @@ export function useRebaseStaging(args: {
     }))
     const choice = { kind: 'reorderTop' as const, order: committed }
 
-    // A game action must never wait on an animation nobody plays
-    // (`_useInsideStaging`'s rule). The engine gets its answer either way;
+    // A game action must never wait on an animation nobody plays. The engine gets its answer either way;
     // only the moment differs.
     if (reduced) {
       setConfirmed(true)

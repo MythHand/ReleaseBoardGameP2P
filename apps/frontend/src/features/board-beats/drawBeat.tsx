@@ -4,6 +4,7 @@ import type { Rect } from '@release/ui/animations'
 import { nextFrames, play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
+import { offThePile } from './offThePile'
 import type { BeatPlan, PlannedDraw } from './planBeats'
 import { seatCardBox } from './seat'
 import { TABLE_HOLD, useToCentre } from './toCentre'
@@ -83,6 +84,8 @@ export function useDrawBeat(
       if (!cell || !centre) return Promise.resolve(null)
       const face = d.card ?? d.reveal?.card
       const card = (face ? cardById(face) : null) ?? COVER
+      // off the pile as it takes off, not when the table has played out
+      if (ctx.current) offThePile(ctx.current, d.pile)
       return toSlot({ key: 'draw', card, from: cardAreaOf(cell), to: centre })
     },
     [toSlot],
