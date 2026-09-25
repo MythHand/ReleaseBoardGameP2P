@@ -1,23 +1,25 @@
-/* The row of Release candidates coming out of the discard (#106, ai-inside).
-   Above the AI pair's own band — `cause`/`effect` read at 42% of the table
-   (`centre.ts`'s `CENTRE_TOP`) — so the standing AI card there (still public
-   while the choice is open) stays in view underneath rather than being
-   covered by the very row asking about it. */
+/* The row of Release candidates coming out of the discard (#106, ai-inside),
+   centred at 42% of the table — the height `AiCardsStory`'s own pick row
+   stands at (`.pickRow`). The bottom inset is what puts the flex centre there:
+   no transform, because the row stands inside `TableSurface`, which forbids
+   one on anything its cards could be pinned through. The confirm bar is the
+   surface's child, not this row's — nested here it pinned to the row's own
+   bottom and covered the cards. */
 .row {
   position: absolute;
-  inset-block-start: 18%;
+  inset-block: 0 16%;
   inset-inline: 0;
-  z-index: 40;
   display: flex;
   gap: 24px;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .cell {
   inline-size: 150px;
   padding: 0;
+  pointer-events: auto;
   cursor: pointer;
   background: none;
   border: 0;

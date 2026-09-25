@@ -26,6 +26,7 @@ export const SCENARIOS = [
   'ddos',
   'alarm503',
   'aiTrigger',
+  'aiInside',
 ] as const
 export type Scenario = (typeof SCENARIOS)[number]
 
@@ -148,7 +149,7 @@ export function createScenario(scenario: Scenario, gameId: string): GameState {
   if (transfer) return createTransferScenario(initial, scenario)
   if (scenario === 'release' || scenario === 'releaseCost') return createReleaseScenario(initial)
   if (scenario === 'ddos') return createDdosScenario(initial)
-  if (scenario === 'alarm503' || scenario === 'aiTrigger')
+  if (scenario === 'alarm503' || scenario === 'aiTrigger' || scenario === 'aiInside')
     return createTriggerScenario(initial, scenario)
   const operation = scenario.startsWith('branch')
     ? 'operation-git-branch'
@@ -555,8 +556,14 @@ function createDdosScenario(initial: GameState): GameState {
 //     the seed. The deck is seeded with a single card so the preset shows the
 //     same event every run: a Crush aimed at the release standing in the zone,
 //     which is the AI effect that asks a question rather than passing by.
+//   aiInside — the same draw, but the one event is Inside, over a discard that
+//     holds THREE releases and a card that is not one: more than one release is
+//     a choice (the row over the discard), and the non-release is what Inside
+//     must leave where it is. With a single release there is nothing to choose,
+//     and the board takes it on the spot.
 function createTriggerScenario(initial: GameState, scenario: Scenario): GameState {
   const alarm = scenario === 'alarm503'
+  const inside = scenario === 'aiInside'
   const trigger = instance(alarm ? 'trigger-error-503' : 'trigger-ai', 30)
   return {
     ...initial,
@@ -569,8 +576,17 @@ function createTriggerScenario(initial: GameState, scenario: Scenario): GameStat
       ...initial.decks,
       // the trigger on top, and cards under it so the pile is not left empty
       main: [[trigger, ...cards.slice(0, 3).map((id, i) => instance(id, i + 40))]],
-      discard: [],
-      events: alarm ? initial.decks.events : [instance('ai-crush-frontend', 31)],
+      discard: inside
+        ? [
+            instance('release-backend', 33),
+            instance('attack-bug', 34),
+            instance('release-database', 35),
+            instance('release-frontend', 36),
+          ]
+        : [],
+      events: alarm
+        ? initial.decks.events
+        : [instance(inside ? 'ai-inside' : 'ai-crush-frontend', 31)],
     },
     players: {
       ...initial.players,

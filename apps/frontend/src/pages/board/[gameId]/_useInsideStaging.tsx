@@ -1,5 +1,5 @@
 import type { TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardById } from '@release/ui'
+import { Card, ConfirmAction, cardById, TableSurface } from '@release/ui'
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import type { BoardState } from '~/entities/game/board'
@@ -85,31 +85,41 @@ export function useInsideStaging(args: {
 
   if (!ours || ours.options.length < 2 || confirmed) return { row: null }
 
+  // THE SHARED SURFACE, and the bar is ITS child, not the row's. The bar pins
+  // to the bottom of its positioned container; nested in the row it pinned to
+  // the bottom of the ROW — straight over the cards it asks about, so every
+  // click on a candidate landed on the bar, nothing could be picked, confirm
+  // stayed disabled and the pending never resolved: a stalled match whenever
+  // the discard held two releases or more. `TableSurface` is what Cherry-pick
+  // and Rebase already stand on, and the playground puts the bar at the stage
+  // level for the same reason (`AiCardsStory`).
   return {
     row: (
-      <div className={styles.row} data-testid="board-inside-row">
-        {ours.options.map((o) => {
-          const data = cardById(o.id)
-          if (!data) return null
-          return (
-            <button
-              key={o.uid}
-              type="button"
-              className={styles.cell}
-              onClick={() => setPicked(o.uid)}
-            >
-              <Card
-                card={data}
-                interactive={false}
-                width="100%"
-                state={picked === o.uid ? 'selected' : 'idle'}
-                // one out of a set — the uniform selection colour, never the
-                // per-category accent
-                accent="var(--select-accent)"
-              />
-            </button>
-          )
-        })}
+      <TableSurface testId="board-inside-surface" blockTestId="board-inside-scrim">
+        <div className={styles.row} data-testid="board-inside-row">
+          {ours.options.map((o) => {
+            const data = cardById(o.id)
+            if (!data) return null
+            return (
+              <button
+                key={o.uid}
+                type="button"
+                className={styles.cell}
+                onClick={() => setPicked(o.uid)}
+              >
+                <Card
+                  card={data}
+                  interactive={false}
+                  width="100%"
+                  state={picked === o.uid ? 'selected' : 'idle'}
+                  // one out of a set — the uniform selection colour, never the
+                  // per-category accent
+                  accent="var(--select-accent)"
+                />
+              </button>
+            )
+          })}
+        </div>
         <ConfirmAction
           open
           label={copy.confirm}
@@ -124,7 +134,7 @@ export function useInsideStaging(args: {
             actions?.onResolve?.({ kind: 'pickFromDiscard', card: picked })
           }}
         />
-      </div>
+      </TableSurface>
     ),
   }
 }

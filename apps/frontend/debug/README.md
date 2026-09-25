@@ -160,6 +160,11 @@ new attack animation. Restart resets the same card identities into a new game.
   Debugger in hand and a release to sacrifice. The AI preset seeds the events
   deck with a single card, so every run reveals the same Crush, aimed at the
   release standing in the zone.
+- **AI trigger: Inside:** the same draw, with Inside as the one event, over a
+  discard of three releases and a Bug. Two releases or more is a choice: the
+  row over the discard offers the releases only, a card is picked and
+  confirmed, and it goes to the hand while the rest stay in the discard. A
+  single release is taken on the spot, with nothing to choose.
 - **Defences in the defender's hand:** every preset that throws an attack gives
   the defender every defence card, one copy each — Hotfix, Rubber ducky, PR
   approved, Rollback, Not a bug, Works on my machine. A stand is where you reach

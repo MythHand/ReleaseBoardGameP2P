@@ -87,7 +87,9 @@ it('shows and resolves an Inside choice from the real human-only engine projecti
   const candidate = row.querySelector('[data-card="release-frontend"]')?.closest('button')
   expect(candidate).toBeTruthy()
   fireEvent.click(candidate as HTMLButtonElement)
-  fireEvent.click(within(row).getByRole('button', { name: props.copy.pending.confirm }))
+  // the bar is the surface's, not the row's — inside the row it covered the cards
+  const surface = screen.getByTestId('board-inside-surface')
+  fireEvent.click(within(surface).getByRole('button', { name: props.copy.pending.confirm }))
   expect(current.pending).toBeNull()
   expect(current.players.p1.hand).toContainEqual({ id: 'release-frontend', uid: 'review-fe' })
 })

@@ -163,6 +163,43 @@ describe('the row that takes a Release out of the discard (ai-inside)', () => {
     expect(onResolve).not.toHaveBeenCalled()
   })
 
+  // The confirm bar pins to the bottom of its positioned container. Nested in
+  // the row it pinned to the ROW's bottom — over the candidates — so no click
+  // ever reached a card, confirm stayed disabled and the match stalled with
+  // two releases or more in the discard. jsdom has no layout, so the structure
+  // is what is pinned: the bar is the surface's, never the row's.
+  it('picks a candidate and confirms it, with the bar standing outside the row', () => {
+    const base = makeBoardProps()
+    const onResolve = vi.fn()
+    render(
+      <Board
+        {...makeBoardProps({
+          state: {
+            ...base.state,
+            pending: pickingPending([
+              { uid: 'r1', id: 'release-frontend' },
+              { uid: 'r2', id: 'release-backend' },
+              { uid: 'r3', id: 'release-database' },
+            ]),
+          },
+          actions: { onResolve },
+        })}
+      />,
+    )
+    const surface = screen.getByTestId('board-inside-surface')
+    const row = screen.getByTestId('board-inside-row')
+    const cells = row.querySelectorAll('button')
+    expect(cells).toHaveLength(3)
+    const confirm = [...surface.querySelectorAll('button')].find((b) => !row.contains(b))
+    if (!confirm) throw new Error('the confirm bar is not on the surface')
+    expect(confirm.hasAttribute('disabled')).toBe(true)
+
+    fireEvent.click(cells[1])
+    expect(confirm.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(confirm)
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'pickFromDiscard', card: 'r2' })
+  })
+
   it('answers a single candidate without asking, and only once — and fires again for a distinct pending', () => {
     const base = makeBoardProps()
     const onResolve = vi.fn()
