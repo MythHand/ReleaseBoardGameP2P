@@ -28,8 +28,6 @@
 
   /* ===== Named hues — collected from component CSS modules ===== */
   --mint: #8fd9b0; /* positive / selection mint — Toggle on, win, "copied" */
-  --mint-light: #9ed9b6; /* selection thumb gradient — light stop (ModeSelect) */
-  --mint-dark: #6dbf96; /* selection thumb gradient — dark stop (ModeSelect) */
   --deep-green: #04140c; /* text on a --mint fill */
   --coral: #ff6b81; /* destructive / error — distinct from --cat-attack */
   --gold: #e3b341; /* caution accent (Badge warning, Dropdown) */
