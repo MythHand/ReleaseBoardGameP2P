@@ -109,10 +109,11 @@ describe('Crush against a slot that holds nothing (#70)', () => {
   })
 })
 
-// CRUSH IS ANSWERED BY A DEBUGGER OR A MONITORING, AND MAY BE REFUSED. The rules
-// forbid the 503's third method here — "Пожертвовать другой релиз нельзя: Crush
-// бьёт строго по своему типу релиза" (docs/rules/cards.md) — and Pass is "I do
-// not defend", the release it aims at destroyed (owner, 24.09).
+// CRUSH IS ANSWERED BY A DEBUGGER, AND MAY BE REFUSED. A standing Monitoring
+// answers it on its own (the block below). The rules forbid the 503's third
+// method here — "Пожертвовать другой релиз нельзя: Crush бьёт строго по своему
+// типу релиза" (docs/rules/cards.md) — and Pass is "I do not defend", the
+// release it aims at destroyed (owner, 24.09).
 describe('answering a Crush', () => {
   const dbg: CardInstance = { uid: 'protection-debugger#0', id: 'protection-debugger' }
   const fe: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
@@ -156,6 +157,126 @@ describe('answering a Crush', () => {
 
     expect(r.state.pending).toMatchObject({ kind: 'crush', player: 'p1' })
     expect(r.state.players.p1.release.frontend).toBeTruthy()
+  })
+})
+
+describe.each([
+  'frontend',
+  'backend',
+  'database',
+] as const)('Monitoring against Crush %s (#159)', (slot) => {
+  const release: CardInstance = { uid: `release-${slot}#guarded`, id: `release-${slot}` }
+  const dbg: CardInstance = { uid: 'protection-debugger#guarded', id: 'protection-debugger' }
+  const monitoring: CardInstance = {
+    uid: 'protection-monitoring#guarded',
+    id: 'protection-monitoring',
+  }
+  const aiMonitoring: CardInstance = {
+    uid: 'ai-monitoring#guarded',
+    id: 'protection-monitoring',
+    event: 'ai-monitoring',
+  }
+
+  it.each([
+    { name: 'Monitoring alone', monitor: monitoring, hand: [] },
+    { name: 'Monitoring with a Debugger', monitor: monitoring, hand: [dbg] },
+    { name: 'AI Monitoring alone', monitor: aiMonitoring, hand: [] },
+    { name: 'AI Monitoring with a Debugger', monitor: aiMonitoring, hand: [dbg] },
+  ])('automatically neutralizes with $name', ({ monitor, hand }) => {
+    const base = game()
+    const guarded: GameState = {
+      ...base,
+      players: {
+        ...base.players,
+        p1: {
+          ...base.players.p1,
+          hand,
+          release: { [slot]: { card: release }, monitoring: monitor },
+        },
+      },
+    }
+
+    const r = fireEvent(guarded, `ai-crush-${slot}`)
+
+    expect(r.state.pending).toBeNull()
+    expect(r.state.drawing).toBeNull()
+    expect(r.state.players.p1.hand).toEqual(hand)
+    expect(r.state.players.p1.release).toEqual({
+      [slot]: { card: release },
+      monitoring: monitor,
+    })
+    expect(r.state.decks.discard).toEqual([AI])
+    expect(r.state.decks.events).toEqual([{ uid: `ai-crush-${slot}#e0`, id: `ai-crush-${slot}` }])
+    expect(r.events.map((event) => event.type)).toEqual([
+      'drawn',
+      'aiRevealed',
+      'discarded',
+      'neutralized',
+    ])
+    const revealed = r.events.find((event) => event.type === 'aiRevealed')
+    expect(revealed).toMatchObject({
+      player: 'p1',
+      aiCard: 'trigger-ai',
+      eventCard: `ai-crush-${slot}`,
+    })
+    expect(r.events.find((event) => event.type === 'discarded')).toMatchObject({
+      card: 'trigger-ai',
+      reason: 'trigger',
+      parent: revealed?.id,
+    })
+    const neutralized = r.events.find((event) => event.type === 'neutralized')
+    expect(neutralized).toMatchObject({ player: 'p1', method: 'monitoring' })
+    expect(neutralized?.visibleTo).toBeUndefined()
+    expect(r.state.eventSeq).toBe(neutralized?.id)
+  })
+
+  it('does not spend a defense or report neutralization when the target slot is empty', () => {
+    const base = game()
+    const guarded: GameState = {
+      ...base,
+      players: {
+        ...base.players,
+        p1: { ...base.players.p1, hand: [dbg], release: { monitoring } },
+      },
+    }
+
+    const r = fireEvent(guarded, `ai-crush-${slot}`)
+
+    expect(r.state.pending).toBeNull()
+    expect(r.state.players.p1.hand).toEqual([dbg])
+    expect(r.state.players.p1.release).toEqual({ monitoring })
+    expect(r.events.map((event) => event.type)).toEqual(['drawn', 'aiRevealed', 'discarded'])
+    expect(r.state.decks.events).toEqual([{ uid: `ai-crush-${slot}#e0`, id: `ai-crush-${slot}` }])
+  })
+
+  it('still allows a Debugger response without Monitoring', () => {
+    const base = game()
+    const unguarded: GameState = {
+      ...base,
+      players: {
+        ...base.players,
+        p1: { ...base.players.p1, hand: [dbg], release: { [slot]: { card: release } } },
+      },
+    }
+    const fired = fireEvent(unguarded, `ai-crush-${slot}`)
+
+    expect(fired.state.pending).toMatchObject({
+      kind: 'crush',
+      player: 'p1',
+      slot,
+      source: `ai-crush-${slot}`,
+    })
+    const resolved = reduce(fired.state, {
+      type: 'RESOLVE',
+      player: 'p1',
+      choice: { kind: 'crush', method: 'debugger' },
+      at: 1100,
+    })
+
+    expect(resolved.state.pending).toBeNull()
+    expect(resolved.state.players.p1.hand).toEqual([])
+    expect(resolved.state.players.p1.release[slot]?.card).toEqual(release)
+    expect(resolved.state.decks.discard).toEqual([AI, dbg])
   })
 })
 

@@ -1,5 +1,5 @@
 import type { Event } from '@release/engine'
-import type { HandPlayDrop, TableActions } from '@release/ui'
+import type { HandCardState, HandPlayDrop, TableActions } from '@release/ui'
 import { Card, ConfirmAction, cardById, rowPlaceStyle, TableSurface, Typography } from '@release/ui'
 import { play, useFlyer } from '@release/ui/animations'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -113,10 +113,16 @@ export function useUpgradeStaging(args: {
     })()
     return true
   }
+  const handItems = state.you.hand.filter((c) => c.uid !== given)
+  const stateAt = (index: number): HandCardState =>
+    enabled && asked && !given && !confirmed && handItems[index] ? 'playable' : 'idle'
   const interaction = {
     asked: Boolean(enabled && asked),
     onHandPlay,
-    handItems: state.you.hand.filter((c) => c.uid !== given),
+    handItems,
+    stateAt,
+    accentAt: (index: number) =>
+      stateAt(index) === 'playable' ? 'var(--danger-accent)' : undefined,
     stagedUid: given,
     // THE STEP ANSWERS ON THE SURFACE, not in the fan. True from the moment the
     // cards become a choice and through the whole stretch after the answer is

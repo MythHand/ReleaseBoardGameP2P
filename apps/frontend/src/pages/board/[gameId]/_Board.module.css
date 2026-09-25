@@ -177,6 +177,8 @@
   box-shadow: 0 6px 20px var(--black-45);
 }
 
+/* the same end state, with no travel — the ask appears and disappears rather
+   than sliding, since nothing here depends on the motion to be understood */
 @media (prefers-reduced-motion: reduce) {
   .ask {
     transform: translate(-50%, 146px);

@@ -2927,7 +2927,10 @@ The `requestCard` catalogue and ConfirmAction share a full-table layer. The cata
 own scroll area above the bottom confirmation bar, with room for hover enlargement and the
 right rail. ConfirmAction must not be positioned inside a vertically centered catalogue:
 that anchors the bar to the card rows and hides choices (including the final wrapped row).
-Selection only arms the requested card; confirmation sends `requestCard` with its catalogue ID.
+A click selects the requested card and another click can change that choice; confirmation sends
+`requestCard` with its catalogue ID. Both the named catalogue and the anonymous opponent fan use click selection.
+The other viewers use `previewSelected` so the public choice remains readable even
+when the selected row is outside their independent scroll position.
 The existing `requested` / `handTransfer` beats handle the public reveal, transfer, and miss.
 
 
@@ -2941,3 +2944,14 @@ Local defense and neutralization beats await the staged carrier's `whenLanded` b
 Defense pair staging calls shared `usePairFold`; `_useBoardStaging` and `comboBeat` still have local
 fold implementations (see backlog). These notes describe code paths, not full browser parity
 between the board and playground.
+
+
+### Local drag handoff before event playback (#180)
+
+The actor has already carried the card onto the table. Publish its `StagedHandoff`
+in a layout effect registered **before** `useBeats`, after DOM refs bind but before
+any runner captures ownership. The host can accept the action in the same React
+commit as the drag. Publishing afterwards makes the runner see a remote play and
+start a duplicate hand-to-centre flight. Refresh on every commit, including the
+landing that binds the standing node. Other viewers, who have no local gesture,
+still animate the incoming card. Result animations continue for every viewer.

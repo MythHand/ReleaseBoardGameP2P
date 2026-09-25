@@ -422,8 +422,8 @@ const MODULES: Module[] = [
   {
     mod: 'CardCatalog',
     what: {
-      ru: 'Каталог выбора карты: набор карт лицом вверх, из которого называют одну. Не веер и не куча — карты разложены, чтобы их прочитали и сравнили, поэтому по ховеру ячейка ВЫРАСТАЕТ до читаемого размера, а не поднимается. Жизнь каталога — два пропса: open (выбор идёт: все ячейки живые) и chosen (названная держится увеличенной, пока остальные уезжают вниз); selected — то, на чём выбор заряжен, но ещё не подтверждён. Появление — стаггером по ячейкам. Подтверждение снаружи, обычно ConfirmAction: назвать карту необратимо. ГДЕ каталог стоит — дело сцены, блок занимает выданную область.',
-      en: 'The card-pick catalog: a set of face-up cards to name one from. Not a fan and not a heap — the cards are laid out to be read and compared, so on hover a cell GROWS to a readable size instead of lifting. Its life is two props: open (the choice is on: every cell alive) and chosen (the named one holds enlarged while the rest slide away); selected is what the choice is armed on but not yet committed. Entrance — a per-cell stagger. Confirmation lives outside, usually ConfirmAction: naming a card is irreversible. WHERE the catalog stands is the scene’s business; the block fills the area it is given.',
+      ru: 'Каталог выбора карты: набор карт лицом вверх, из которого называют одну. Не веер и не куча — карты разложены, чтобы их прочитали и сравнили, поэтому по ховеру ячейка ВЫРАСТАЕТ до читаемого размера, а не поднимается. Жизнь каталога — два пропса: open (выбор идёт: все ячейки живые) и chosen (названная держится увеличенной, пока остальные уезжают вниз); selected — то, на чём выбор заряжен, но ещё не подтверждён. Появление — стаггером по ячейкам. Подтверждение снаружи, обычно ConfirmAction: назвать карту необратимо. ГДЕ каталог стоит — дело сцены, блок занимает выданную область. В прокручиваемом каталоге борда (#160) previewRoot выносит увеличенную копию за overflow, сохраняя размер зон выбора; отдельная область ограничивает карту со свечением перед ConfirmAction и правой панелью. Прокрутка убирает прежнее ховер-превью, клавиатурный фокус также открывает чтение. previewSelected сохраняет публичный выбор читаемым для зрителя, даже если его строка вне собственной прокрутки.',
+      en: 'The card-pick catalog: a set of face-up cards to name one from. Not a fan and not a heap — the cards are laid out to be read and compared, so on hover a cell GROWS to a readable size instead of lifting. Its life is two props: open (the choice is on: every cell alive) and chosen (the named one holds enlarged while the rest slide away); selected is what the choice is armed on but not yet committed. Entrance — a per-cell stagger. Confirmation lives outside, usually ConfirmAction: naming a card is irreversible. WHERE the catalog stands is the scene’s business; the block fills the area it is given. In the board’s scrolling catalogue (#160), previewRoot places an enlarged visual copy outside overflow while choice hit targets stay fixed. Its reserved area keeps the card and glow clear of ConfirmAction and the right rail. Scrolling clears the old hover preview; keyboard focus also opens it. previewSelected keeps the public choice readable even when its row is outside this viewer’s scroll position.',
     },
     where: {
       ru: 'table/CardCatalog → PickSpecific, OpponentTakes',
@@ -665,8 +665,8 @@ const SCENARIOS: Scenario[] = [
   {
     name: { ru: 'System Upgrade', en: 'System Upgrade' },
     from: {
-      ru: 'На борде свой взнос вытягивается из настоящей руки и летит в центр до RESOLVE; принятый такт подхватывает этот носитель. Отказ возвращает карту в веер. Без анимации принятый ответ снимает блокировку без ожидания такта: следующий Upgrade снова принимает вытягивание. Чужие взносы летят от места игрока. pending.thrown сохраняет стоящие карты между батчами; sudo позволяет выбрать одну в руку. Все полёты используют измеренные слоты ряда шириной 150 px. Финальный base-такт держит ряд 2500 мс и сам отправляет его в сброс через useDiscardExit со стаггером 90 мс. Sudo-такт ведёт выбранную карту через центр в руку (useHandArrival) или к месту актёра; остальные узлы ряда уходят в сброс, без повторного общего такта.',
-      en: 'On the board, pull your contribution from the real hand; it reaches the centre before RESOLVE and the accepted beat adopts that carrier. Rejection restores the card to the fan. Reduced motion clears the accepted contribution lock without waiting for a beat, so the next Upgrade accepts another pull. Remote contributions fly from their seat. pending.thrown retains standing cards across batches; sudo offers one to take into the hand. All flights use measured 150 px row slots. The final base beat holds the row for 2500 ms and owns its useDiscardExit to the heap with a 90 ms stagger. The sudo beat carries the chosen card through the centre into the hand (useHandArrival) or to the actor’s seat; the remaining row nodes exit to discard without a repeated generic beat.',
+      ru: 'В #162 все карты руки обязанного игрока подсвечены до взноса; после отказа подсветка возвращается. На борде свой взнос вытягивается из настоящей руки и летит в центр до RESOLVE; принятый такт подхватывает этот носитель. Отказ возвращает карту в веер. Без анимации принятый ответ снимает блокировку без ожидания такта: следующий Upgrade снова принимает вытягивание. Чужие взносы летят от места игрока. pending.thrown сохраняет стоящие карты между батчами; sudo позволяет выбрать одну в руку. Все полёты используют измеренные слоты ряда шириной 150 px. Финальный base-такт держит ряд 2500 мс и сам отправляет его в сброс через useDiscardExit со стаггером 90 мс. Sudo-такт ведёт выбранную карту через центр в руку (useHandArrival) или к месту актёра; остальные узлы ряда уходят в сброс, без повторного общего такта.',
+      en: 'In #162, every card in the owed hand is highlighted until submission; rejection restores the highlight. On the board, pull your contribution from the real hand; it reaches the centre before RESOLVE and the accepted beat adopts that carrier. Rejection restores the card to the fan. Reduced motion clears the accepted contribution lock without waiting for a beat, so the next Upgrade accepts another pull. Remote contributions fly from their seat. pending.thrown retains standing cards across batches; sudo offers one to take into the hand. All flights use measured 150 px row slots. The final base beat holds the row for 2500 ms and owns its useDiscardExit to the heap with a 90 ms stagger. The sudo beat carries the chosen card through the centre into the hand (useHandArrival) or to the actor’s seat; the remaining row nodes exit to discard without a repeated generic beat.',
     },
     where: 'GitCards/SystemUpgrade',
     board:
@@ -748,6 +748,21 @@ const SCENARIOS: Scenario[] = [
 const ISSUES: Issue[] = [
   {
     what: {
+      ru: 'ЗАКРЫТО #163: дублирующая подсказка защиты в центре',
+      en: 'CLOSED #163: duplicate defense prompt at the centre',
+    },
+    problem: {
+      ru: 'Решение #163 заменяет прежний центральный вопрос #101: в base и sudo защите остаются карты руки и только Pass в доке. Блокировка случайного нажатия сохранена; повторный ответ заблокирован до принятия или отказа движка. Подсказки других решений сохранены.',
+      en: 'Decision #163 supersedes the #101 central question: base and sudo defense use the hand and only dock Pass. The accidental-click lockout remains; duplicate answers are blocked until engine acceptance or rejection. Other pending instructions remain.',
+    },
+    where: {
+      ru: 'pages/board/[gameId]/_Board.tsx, _useDefenseStaging.tsx',
+      en: 'pages/board/[gameId]/_Board.tsx, _useDefenseStaging.tsx',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
       ru: 'ЗАКРЫТО: после выбывания человека боты не продолжали партию',
       en: 'CLOSED: bots stopped after the human was eliminated',
     },
@@ -788,6 +803,36 @@ const ISSUES: Issue[] = [
     where: {
       ru: 'engine gameOver(lastStanding) + playground GameEnd (только release) + features/board-beats/gameEndBeat.tsx',
       en: 'engine gameOver(lastStanding) + playground GameEnd (release only) + features/board-beats/gameEndBeat.tsx',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
+      ru: 'Карта оплаты релиза оставалась в руке во время перелёта',
+      en: 'A clicked release cost stayed in the hand during its flight',
+    },
+    problem: {
+      ru: 'Исправлено: выбранная карта исключается из руки с начала перелёта и до обновления проекции. Повторная оплата блокируется; отказ движка возвращает карту для повторного выбора. Debug-сценарий Release: pay a card включает обязательную оплату.',
+      en: 'Fixed: the chosen cost leaves the hand at takeoff and stays out until the hand projection catches up. A second payment is blocked; rejection restores the choice. The Release: pay a card debug preset requires payment.',
+    },
+    where: {
+      ru: 'pages/board/[gameId]/_useBoardStaging.ts + debug/scenarios.ts',
+      en: 'pages/board/[gameId]/_useBoardStaging.ts + debug/scenarios.ts',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
+      ru: 'После drag карта повторно летела из руки в центр (#180)',
+      en: 'A local drag replayed the hand-to-centre flight (#180)',
+    },
+    problem: {
+      ru: 'Исправлено: Board публикует handoff текущего жеста перед layout effects очереди. Мгновенный ответ движка больше не запускает второй перенос из руки. Локальный drag владеет картой до передачи анимации результата; другие игроки и наблюдатели видят обычный вход. Регрессия использует настоящий движок и проверяет мгновенный/поздний ответ и удалённые роли.',
+      en: 'Fixed: Board publishes the current gesture handoff before the queue layout effects. A synchronous engine response no longer starts another flight from the hand. The local drag owns placement until the outcome takes over; other players and observers retain their incoming flight. Real-engine regression covers immediate/delayed responses and remote roles.',
+    },
+    where: {
+      ru: 'pages/board/[gameId]/_Board.tsx + __tests__/boardLocalHandoff.test.tsx',
+      en: 'pages/board/[gameId]/_Board.tsx + __tests__/boardLocalHandoff.test.tsx',
     },
     status: 'ok',
   },

@@ -46,3 +46,26 @@ describe('hudIn', () => {
     expect((frames[0] as { transform?: string }).transform).toBe('translate(-34px, 12px)')
   })
 })
+
+describe('playToReleaseZone', () => {
+  it('approaches Database above the neighboring Backend slot', () => {
+    const from = { left: 200, top: 100, width: 150, height: 200 }
+    const backend = { left: 390, top: 500, width: 100, height: 133 }
+    const database = { left: 500, top: 500, width: 100, height: 133 }
+    const { frames } = declared('playToReleaseZone', { from, to: database })
+    const via = frames[1]?.transform?.toString().match(/translate\(([-\d.]+)px, ([-\d.]+)px\)/)
+    expect(via).toBeTruthy()
+    const [dx, dy] = [Number(via?.[1]), Number(via?.[2])]
+    // By the time the card descends toward the release row, its centre is
+    // already aligned with Database and still above Backend's top edge.
+    expect(from.left + from.width / 2 + dx).toBe(database.left + database.width / 2)
+    expect(from.top + from.height / 2 + dy).toBeLessThan(backend.top)
+    expect(frames.at(-1)?.transform?.toString()).toContain('translate(275px, 366.5px)')
+  })
+
+  it('keeps the direct landing when the destination is already in the same column', () => {
+    const from = { left: 400, top: 100, width: 150, height: 200 }
+    const to = { left: 425, top: 500, width: 100, height: 133 }
+    expect(declared('playToReleaseZone', { from, to }).frames).toHaveLength(2)
+  })
+})

@@ -224,8 +224,8 @@ export default function Board({
   // once at run start (I8), not a render's worth of state it would have to
   // wait on. Built below, once `useBoardStaging` exists to build it FROM — but
   // declared here, ahead of `useBeats`, because the ref's IDENTITY is all the
-  // queue needs at this point; the layout effect that keeps `.current` current
-  // runs after every hook regardless of where it sits in the function.
+  // queue needs at this point. Its publisher is registered before the queue's
+  // effects so runners see the staging from the same commit.
   const discardPickRef = useRef<DiscardPickHandoff | null>(null)
   // the request surface's own hold, for the beat that plays a `requested`
   const requestPickRef = useRef<RequestPickHandoff | null>(null)
@@ -257,6 +257,17 @@ export default function Board({
   // over, the events that produced the board's first projection are the deal's
   // own, and replaying them as discards would fly cards that never left a hand
   // on screen.
+  // Publish before the queue starts a runner in its own layout effect. A
+  // synchronous host response can commit the drag and engine events together;
+  // publishing later makes every runner mistake that local play for a remote
+  // one and fly another copy from the hand. Keep this before useBeats: the
+  // local and local-neutralize cases in boardLocalHandoff.test.tsx fail with
+  // two incoming carriers if it moves below the queue's layout effects.
+  // Publish in commit, not render: the handoff includes DOM nodes which bind
+  // during commit, and an abandoned render must not replace a running beat's
+  // handoff. Run on every commit so landing refs refresh even when the staged
+  // card's identity has not changed.
+  useLayoutEffect(publishStagingHandoff)
   const beats = useBeats({
     // a card that lands IN the fan keeps the slot it landed in — see the queue's
     // own note; without it the card teleports the moment it has settled
@@ -532,6 +543,7 @@ export default function Board({
     },
     enabled: !(deal.active || beats.exclusive),
   })
+  const upgradeOwnsHand = upgrade.asked || upgrade.stagedUid != null
   const neutralizeOwnsHand = alarmMineOpen || neutralizing.staged != null
   // the answer once its own flight has landed (or at once under reduced
   // motion) — the same gate, and the same reason, as `stagedCover` above.
@@ -817,16 +829,15 @@ export default function Board({
   // no-op while the turn staging owns the fan — that list is already filtered —
   // and it empties the moment the cards come home, so a cancel's own return
   // into the fan is untouched.
-  const fanOwnerItems =
-    upgrade.asked || upgrade.stagedUid
-      ? upgrade.handItems
-      : discarding
-        ? handLimit.handItems
-        : defenseOwnsHand
-          ? defenseStaging.handItems
-          : neutralizeOwnsHand
-            ? neutralizing.handItems
-            : staging.handItems
+  const fanOwnerItems = upgradeOwnsHand
+    ? upgrade.handItems
+    : discarding
+      ? handLimit.handItems
+      : defenseOwnsHand
+        ? defenseStaging.handItems
+        : neutralizeOwnsHand
+          ? neutralizing.handItems
+          : staging.handItems
   const fanItems = useMemo(
     () =>
       staging.handOut.size === 0
@@ -840,91 +851,12 @@ export default function Board({
       stagedReleaseLocal)
     : undefined
 
-  // A DRAGGED play and the batch it produces can land in ONE commit (#168): a
-  // local host answers its own action synchronously, so the dispatch's own
-  // `staged: 'dispatched'` and the projection that accepted it arrive together
-  // — and `useBeats`'s layout effect, which runs BEFORE this component's own
-  // (it is called higher up), starts the beat inside that commit. The effect
-  // below would then write the handoff one commit too late: the beat has
-  // already read `null` and flown a second copy of the card the player just
-  // dragged onto the table, out of the hand slot it had left. So the turn
-  // side's handoff is ALSO written during render — the carry-forward ref write
-  // this file uses elsewhere. Only ever SET here: the clears, and the order
-  // the other three claimants (upgrade, defence, neutralize) are resolved in,
-  // stay in the effect below.
-  //
-  // THE DEFENCE SIDE HAS THE SAME RACE, and it is the same one commit: the
-  // defender drags a cover onto the attack, the host answers synchronously, and
-  // `defenseBeat.runCovered` reads this ref BEFORE its first await. Its own
-  // `!(mine && handoff)` branch then reads "nobody staged this" and flies a
-  // SECOND copy of the card out of the fan slot it has already left — the
-  // duplicate the defender sees beside the card they pulled. Asked in the same
-  // order the effect below asks it: a dispatched defence claims the handoff
-  // ahead of `answering`, which flickers false for exactly the commit that
-  // carries the engine's answer (#101, Fix D round 4).
-  const defenceDispatched =
-    defenseStaging.staged?.phase === 'dispatched' && defenseStaging.staged.main
-      ? defenseStaging.staged
-      : null
-  if (!upgrade.stagedUid && defenceDispatched?.main) {
-    handoffRef.current = {
-      mainUid: defenceDispatched.main.uid,
-      supportUid: defenceDispatched.support?.uid,
-      el: coverStagedRef.current,
-      release: defenseStaging.release,
-      whenLanded: defenseStaging.whenLanded,
-    }
-  } else if (!upgrade.stagedUid && !answering && !neutralizeOwnsHand) {
-    const dispatched = staging.staged
-    if (dispatched?.phase === 'dispatched' && dispatched.main) {
-      handoffRef.current = {
-        mainUid: dispatched.main.uid,
-        supportUid: dispatched.support?.uid,
-        el: dispatched.merged ? staging.pairNode() : soloStagedRef.current,
-        release: staging.release,
-      }
-    }
-  }
-
-  // The staging → beat handoff (#100): kept current in a layout effect,
-  // because `el` has to be the DOM node as THIS render actually committed it —
-  // the pair flyer once a partner has folded in, the solo staged node
-  // otherwise. `release` is the hook's own no-flight clear; the combo beat
-  // calls it once its own read of this says the staged play is the one
-  // standing where it is about to fold one in (I8).
-  //
-  // One ref, whichever hook is live (#101, Task 16): `answering` picks the
-  // source the same way every other call site does, so `defenseBeat.runCovered`
-  // reads OUR defence's own handoff for a `covered` beat, never a stale one
-  // left over from the turn hook. `coverStagedRef` only binds once
-  // `defenseStaging.landed` is true (both deps below), so `el` is non-null
-  // exactly when the static cover render is what is actually standing there —
-  // never a flyer that a reduced-motion path never raised (Carry #2).
-  //
-  // `defenseStaging.landed`/`.overlay` do not appear inside this effect's own
-  // body — biome's static check reads them as removable — but they are what
-  // makes it RE-RUN once `coverStagedRef.current` actually binds: `landed`
-  // flips true (and `overlay` drops back to `[]`) on the SAME render the
-  // static cover child mounts, and only a re-run of this effect, AFTER that
-  // commit, ever reads the ref's freshly-bound value. Dropping either
-  // dependency leaves `handoffRef.current.el` stuck at whatever it was the
-  // last time `staged`/`release` changed identity — typically null, from the
-  // instant right after the pull, before the ref had anything to bind to.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: landed/overlay gate a ref read, not a value the effect body itself references
-  useLayoutEffect(() => {
-    // The DEFENCE's own dispatched play claims the handoff first, and is asked
-    // about before `answering` rather than inside it (#101, Fix D round 4). The
-    // commit that carries the engine's answer renders `live` — `beats.shadow` is
-    // not set until the beat starts — so `answering` flickers false for exactly
-    // that one commit, and keying the branch on it wrote `null` here from the
-    // TURN side, which has nothing staged while a pending is open. A beat
-    // planned on the next commit would then read no handoff at all and treat our
-    // own defence as a rejoin, flying it in from the fan. Asking "does the
-    // defence gesture have a dispatched play" cannot flicker: it is the hook's
-    // own state, and it now survives that commit (`_useDefenseStaging`'s
-    // catch-up waits for its carrier). The two hooks are never both staged —
-    // the engine suspends normal play while a pending is open — so this cannot
-    // steal the turn side's handoff either.
+  // Read this render's staging only after its DOM refs have bound. This is a
+  // function declaration so the earlier layout effect can register it before
+  // useBeats, while its inputs are constructed later in the render.
+  function publishStagingHandoff() {
+    // Dispatched gestures retain ownership until their runner takes over,
+    // including the commit where the engine has already removed the pending.
     if (upgrade.stagedUid) {
       handoffRef.current = {
         mainUid: upgrade.stagedUid,
@@ -987,25 +919,7 @@ export default function Board({
             release: staging.release,
           }
         : null
-  }, [
-    upgrade.stagedUid,
-    upgrade.overlay,
-    answering,
-    defenseStaging.staged,
-    defenseStaging.landed,
-    defenseStaging.overlay,
-    defenseStaging.release,
-    alarmMineOpen,
-    neutralizeOwnsHand,
-    neutralizing.staged,
-    neutralizing.landed,
-    neutralizing.overlay,
-    neutralizing.release,
-    you.releaseUid,
-    staging.staged,
-    staging.pairNode,
-    staging.release,
-  ])
+  }
 
   // The grid, offered to the beat exactly while there IS one to take: the
   // RESOLVE is out (so the grid is complete and locked) and the cells are still
@@ -1185,21 +1099,16 @@ export default function Board({
     staging.cancel()
   }
 
-  // The dock owns declining, just as in DefenseReleaseStory. Once a defence
-  // has answered, its pending may linger until the next projection: no second
-  // answer is offered during that gap.
+  // Defense uses the hand and dock Pass only (#163). Other pending kinds
+  // retain their own instructions at the centre.
   const defencePhase = answering ? (defenseStaging.staged?.phase ?? null) : undefined
-  // Still ours to decide. A dispatched defence (or one in the instant between
-  // a rejection and its return flight) has already answered, so nothing is
-  // being asked and nothing may be offered — the standard `dock.ts` states for
-  // its own keys: offered only where the action behind it is legal RIGHT NOW.
-  const unanswered = answering && defencePhase !== 'dispatched' && defencePhase !== 'rejected'
-  // These decisions suppress the generic panel and need their own gesture hint.
-  // Ordinary defence needs no duplicate line; declining remains in the dock.
+  const unanswered =
+    answering &&
+    !defenseStaging.declined &&
+    defencePhase !== 'dispatched' &&
+    defencePhase !== 'rejected'
   let ask: string | null = null
-  if (unanswered && defencePhase === 'partner') {
-    ask = copy.table.askPartner
-  } else if (costPending) {
+  if (costPending) {
     // The line the approved scene shows at this step, worded as it words it: a
     // PULL. A release parked at the centre with no explanation reads as a stuck
     // play — which is why `DefenseReleaseStory` puts the ask with the cards
@@ -1215,12 +1124,6 @@ export default function Board({
   // Keep the last words during fade-out, with the hidden line inert.
   const lastAsk = useRef<string | null>(null)
   if (ask) lastAsk.current = ask
-
-  const declineAttack = () => {
-    // Keyboard activation has no mousedown to send an unpaired Sudo home.
-    if (defencePhase === 'partner') defenseStaging.cancel()
-    actions?.onResolve?.({ kind: 'defend', card: null })
-  }
 
   const isHost = role === 'host'
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
@@ -1945,6 +1848,7 @@ export default function Board({
               // every surface (owner, 22.09). The wrapper owns both rules and
               // reconciles them itself — see `.handWrap[data-inert]`.
               data-inert={handInert || undefined}
+              data-upgrade-discard={upgrade.asked || undefined}
               onMouseDown={handInert ? (e) => e.stopPropagation() : undefined}
             >
               <Hand
@@ -1984,25 +1888,29 @@ export default function Board({
                 // while a step is waiting on a choice from the fan, and only
                 // on the cards that answer it.
                 stateAt={
-                  discarding
-                    ? handLimit.stateAt
-                    : defenseOwnsHand
-                      ? defenseStaging.stateAt
-                      : neutralizeOwnsHand
-                        ? neutralizing.stateAt
-                        : staging.stateAt
+                  upgradeOwnsHand
+                    ? upgrade.stateAt
+                    : discarding
+                      ? handLimit.stateAt
+                      : defenseOwnsHand
+                        ? defenseStaging.stateAt
+                        : neutralizeOwnsHand
+                          ? neutralizing.stateAt
+                          : staging.stateAt
                 }
                 // no fan accent while a 503 is open: `neutralizing.accentAt`
                 // answers for a ZONE slot, and the fan's own lighting is
                 // entirely `stateAt`'s (the Debugger, or nothing).
                 accentAt={
-                  discarding
-                    ? handLimit.accentAt
-                    : defenseOwnsHand
-                      ? defenseStaging.accentAt
-                      : neutralizeOwnsHand
-                        ? undefined
-                        : staging.accentAt
+                  upgradeOwnsHand
+                    ? upgrade.accentAt
+                    : discarding
+                      ? handLimit.accentAt
+                      : defenseOwnsHand
+                        ? defenseStaging.accentAt
+                        : neutralizeOwnsHand
+                          ? undefined
+                          : staging.accentAt
                 }
                 // while the deal runs the hand is held: no clicks reach either
                 // gesture machine, and the cards that travelled closed stay
@@ -2027,7 +1935,7 @@ export default function Board({
                       : neutralizeOwnsHand
                         ? // a 503 is answered by a PULL, never by a click —
                           // one gesture per step, the same discipline the
-                          // defence's own `askPartner` line records
+                          // defence's partner-selection gesture records
                           undefined
                         : staging.onCardClick
                 }
@@ -2107,7 +2015,9 @@ export default function Board({
             paused={paused}
             onDraw={actions?.onDraw ? () => dockKey(actions.onDraw) : undefined}
             onPush={actions?.onPush ? () => dockKey(actions.onPush) : undefined}
-            onPass={answering ? (unanswered ? declineAttack : undefined) : actions?.onPass}
+            onPass={
+              answering ? (unanswered ? defenseStaging.onDecline : undefined) : actions?.onPass
+            }
           />
         </div>
         {/* you already passed on the open window — TurnDock has no notion of
@@ -2199,6 +2109,7 @@ export default function Board({
           />
         )}
 
+      {/* Instructions for non-defense decisions remain mounted for their fade. */}
       {lastAsk.current && (
         <div
           className={opening.ask}

@@ -332,7 +332,13 @@ export function resolveAiEvent(
       // opening the prompt made a player burn a Debugger, or sacrifice a
       // different release, against a threat that had no legal target.
       if (!state.players[player].release[slot]) return { ...state, eventSeq: log.seq }
-      // A Debugger or a standing Monitoring, and never a sacrifice: "Пожертвовать
+      // Standing Monitoring absorbs Crush automatically, just like Error 503.
+      // Neither the defense nor the threatened release needs to be spent.
+      if (state.players[player].release.monitoring) {
+        log.add({ type: 'neutralized', player, method: 'monitoring' })
+        return { ...state, eventSeq: log.seq }
+      }
+      // What is left to choose is a Debugger, and never a sacrifice: "Пожертвовать
       // другой релиз нельзя: Crush бьёт строго по своему типу релиза"
       // (docs/rules/cards.md, the Crush entry). The 503's third method is not
       // one of Crush's.

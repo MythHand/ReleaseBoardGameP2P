@@ -1,18 +1,28 @@
-/* THE CARDS ARE LAID OVER THE WHOLE TABLE, not into a strip of it. The cell you
-   point at grows to be read (`CardCatalog`: `scale(1.9)` on hover, `1.7` for the
-   one you named), and this box used to SCROLL — so the growing was cut off at
-   its edge, and the card you were trying to read was the one being clipped. The
-   catalogue's own grid is built to fill whatever area it is handed and to spill
-   nothing (`overflow: visible`, and the block's own comment says the area is the
-   consumer's to place); the padding existed only to buy room inside the clip.
-   The insets keep it clear of the seats above, the confirm bar below and the
-   rail on the right — that is all they are for. */
+/* Keep every row reachable above confirmation. The enlarged reading copy
+   lives in catalogPreview outside this scroller, including for other viewers. */
 .catalog {
   position: absolute;
   inset-block: 160px 170px;
   inset-inline: 24px 72px;
-  overflow: visible;
+  padding: 64px 48px;
+  overflow: auto;
   pointer-events: auto;
+}
+
+/* CardCatalog normally fills its parent's height. Here rows determine the
+   scrollable height; their reading preview lives outside this clipping box. */
+.catalog > div {
+  block-size: auto;
+}
+
+/* The preview can clear either scroll edge while staying above confirmation
+   and left of the rail. Its transparent hit area leaves every choice reachable. */
+.catalogPreview {
+  position: absolute;
+  inset-block: 12px 170px;
+  inset-inline: 24px 72px;
+  z-index: 20;
+  pointer-events: none;
 }
 
 

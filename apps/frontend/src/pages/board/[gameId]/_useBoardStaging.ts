@@ -127,7 +127,7 @@ export interface BoardStaging {
    * is the one travelling */
   carrying: string[]
   onHandPlay: (uid: string, drop: HandPlayDrop) => boolean
-  /** a click in the fan: the partner pick (the fold), the cost pick, or a
+  /** a click in the fan: the partner pick (the fold), or a
    * release played at rest. Returns whether this gesture TOOK the click — false
    * leaves it to the plain click gesture (`_useBoardInteractions`), which owns
    * the window's attack affordance. */
@@ -136,7 +136,6 @@ export interface BoardStaging {
   cancel: () => void
   /** the hand uids that may pay a staged release's cost — [] when none is owed */
   costOptions: string[]
-  /** a click in the fan pays the cost and dispatches the RESOLVE */
   /** the cost is PULLED out of the fan, the same gesture every other "give a
    *  card" step takes — see `onCostPlay` for why this is not a click */
   onCostPlay: (uid: string, drop: HandPlayDrop) => boolean
@@ -385,7 +384,7 @@ export function useBoardStaging({
   const [stage, setStage] = useState<StageState>('none')
   // `paidCost` — the card that paid the cost, once ITS OWN flight (below,
   // `onCostPick`) has landed. The engine never says which uid was spent — only
-  // the resolver knows, since it is the resolver's own click that named it —
+  // the resolver knows, since its own pull named it —
   // so this is the one place that can hold it. By the rules the cost is shown
   // open beside the release rather than discarded on the spot; the combo beat
   // moves it on (`clearPaidCost`).
@@ -412,12 +411,26 @@ export function useBoardStaging({
   // A FACT, never a memory: cleared by the projection no longer holding the
   // card, or by the card flying home when the engine refuses it.
   const [costGone, setCostGone] = useState<string | null>(null)
-  useEffect(() => {
-    if (costGone && !state.you.hand.some((c) => c.uid === costGone)) setCostGone(null)
-  }, [costGone, state.you.hand])
-  // …and the leg that RENDERS: while the carrier is bringing it to the cost
-  // place, nothing static may draw it.
+  // While the carrier travels, the cost slot must not draw a static copy.
   const [paying, setPaying] = useState<string | null>(null)
+  // Lock synchronously: two pulls in one render must dispatch only one cost.
+  // Identity also invalidates an async flight overtaken by a new hand or match.
+  const costPayment = useRef<{ uid: string } | null>(null)
+  const resetCostPayment = useCallback(() => {
+    costPayment.current = null
+    setPaying(null)
+    setCostGone(null)
+    setPaidCost(null)
+    costCarrier.drop('cost')
+  }, [costCarrier.drop])
+  useLayoutEffect(() => {
+    if (!costGone || state.you.hand.some((card) => card.uid === costGone)) return
+    if (paying) resetCostPayment()
+    else {
+      costPayment.current = null
+      setCostGone(null)
+    }
+  }, [costGone, paying, state.you.hand, resetCostPayment])
 
   // WHAT IS NOT IN THE FAN RIGHT NOW — the staged halves, and the release held
   // at the centre while its cost is owed. Exported rather than kept private,
@@ -563,6 +576,7 @@ export function useBoardStaging({
     // catch-up effect above clears it the moment the pending echoes back), so
     // this branch cannot be folded into the `s`-based cancel that follows.
     if (cost) {
+      if (costPayment.current) return
       arrowCtl.stop()
       actions?.onResolve?.({ kind: 'cancelRelease' })
       // A COMBO release is still staged at this point and a solo one is not,
@@ -699,6 +713,16 @@ export function useBoardStaging({
     actions,
     flyer.drop,
   ])
+
+  // A card waiting for a target belongs to the current turn only. When the
+  // timer ends that turn, no table click or Escape arrives to call `cancel`,
+  // so the card otherwise stays over the next player's decisions (including
+  // a System Upgrade discard owed by this seat). A dispatched play belongs to
+  // the beat instead and must keep its existing hand-off path.
+  useEffect(() => {
+    const waiting = stagedRef.current
+    if (waiting && waiting.phase !== 'dispatched' && state.turn !== state.selfId) cancel()
+  }, [state.turn, state.selfId, cancel])
 
   // While a support waits for a partner, the cards it can fold with keep
   // their own category accent — the support's own, per ComboStory (the TYPE
@@ -987,7 +1011,7 @@ export function useBoardStaging({
   // `drop('cost')` two lines below).
   const onCostPick = useCallback(
     (uid: string, at?: DOMRect) => {
-      if (!enabled || !costOptions.includes(uid)) return
+      if (!enabled || costPayment.current || !costOptions.includes(uid)) return
       // measured against `handItems` — the array the fan actually RENDERS
       // (the staged release is already excluded from it) — not `you.hand`,
       // which still carries it and so is one slot short of what is on screen:
@@ -997,9 +1021,8 @@ export function useBoardStaging({
       const index = handItems.findIndex((c) => c.uid === uid)
       const item = handItems[index]
       if (!item) return
-      // it leaves the fan NOW, in the commit the carrier takes it: `setPaying`
-      // and `raise` are both plain state writes made before anything awaits, so
-      // React batches them into one render
+      const attempt = { uid }
+      costPayment.current = attempt
       setPaying(uid)
       setCostGone(uid)
       void (async () => {
@@ -1025,12 +1048,15 @@ export function useBoardStaging({
         // the swap from carrier to static render happens in the SAME commit —
         // the approved source's own `payCost` idiom (`setCost` / `drop('fly')`
         // together) — so there is never a frame with neither on screen.
+        if (costPayment.current !== attempt) return
         setPaidCost({ uid, card: item.card, index })
         setPaying(null)
         costCarrier.drop('cost')
         costWatermarkRef.current = eventsRef.current.length
         actions?.onResolve?.({ kind: 'discardForRelease', card: uid })
-      })()
+      })().catch(() => {
+        if (costPayment.current === attempt) resetCostPayment()
+      })
     },
     [
       enabled,
@@ -1042,6 +1068,7 @@ export function useBoardStaging({
       costCarrier.toSlot,
       costCarrier.drop,
       actions,
+      resetCostPayment,
     ],
   )
 
@@ -1058,7 +1085,7 @@ export function useBoardStaging({
   // back to the fan, which settles the card home itself.
   const onCostPlay = useCallback(
     (uid: string, drop: HandPlayDrop): boolean => {
-      if (!enabled || !costOptions.includes(uid)) return false
+      if (!enabled || costPayment.current || !costOptions.includes(uid)) return false
       // let go over your own hand and nothing is spent — the card settles back
       // into the fan, which is what the fan does with a refused pull
       const hand = anchors.hand.current?.getBoundingClientRect()
@@ -1095,7 +1122,7 @@ export function useBoardStaging({
       // play gesture would start a play the engine is about to refuse.
       if (costOptions.length > 0) return true
       const s = stagedRef.current
-      // A click chooses a cost or a combo partner; it never starts a play.
+      // A click chooses a combo partner; it never starts a play.
       if (!s) return false
       if (s.phase !== 'partner' || !s.support) return false
       const item = handItems[index]
@@ -1419,6 +1446,7 @@ export function useBoardStaging({
     )
     if (!refused) return
     costWatermarkRef.current = events.length
+    costPayment.current = null
     setPaidCost(null)
     // it is coming back, so it is the fan's again — the flight below is what
     // puts it there, and until it lands the arrival's own carrier draws it
@@ -1489,13 +1517,14 @@ export function useBoardStaging({
     dispatchWatermarkRef.current = 0
     setCancelling(false)
     setStage('none')
-    setPaidCost(null)
+    resetCostPayment()
     pairApi.current.release()
     arrowCtl.stop()
     flyer.drop()
     arrival.reset()
     return () => {
       plainAttempt.current += 1
+      costPayment.current = null
     }
   }, [matchKey])
 

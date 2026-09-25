@@ -145,6 +145,62 @@ it('a pulled attack stages at the centre, aims, and a press on the seat dispatch
   expect(fanUids()).not.toContain('attack-bug#0')
 })
 
+it('returns an unplayed DDoS when the turn expires, so the hand can answer System Upgrade', async () => {
+  const base = makeBoardProps()
+  const uid = 'attack-ddos#0'
+  const ddos = cardById('attack-ddos')
+  if (!ddos) throw new Error('missing DDoS card')
+  const state = {
+    ...base.state,
+    you: {
+      ...base.state.you,
+      hand: [
+        { uid, card: ddos },
+        { uid: 'attack-bug#0', card: bug },
+      ],
+    },
+    turn: base.state.selfId,
+    hasDrawn: true,
+    playable: [uid],
+    targets: { [uid]: [{ kind: 'release' as const, player: 'p2', slot: 'database' as const }] },
+  }
+  const onPlay = vi.fn()
+  const onResolve = vi.fn()
+  const props = makeBoardProps({ state, actions: { onPlay, onResolve } })
+  const board = render(<Board {...props} />)
+
+  await pullCardFromFan(uid)
+  expect(screen.getByTestId('board-centre-staged')).toBeTruthy()
+  expect(fanUids()).not.toContain(uid)
+
+  board.rerender(
+    <Board
+      {...props}
+      state={{
+        ...state,
+        turn: 'p2',
+        playable: [],
+        pending: {
+          kind: 'systemUpgrade',
+          actor: 'p2',
+          owed: [state.selfId],
+          thrown: [],
+          sudo: false,
+          phase: 'discarding',
+          source: 'operation-system-upgrade',
+        },
+      }}
+    />,
+  )
+  await waitFor(() => expect(screen.queryByTestId('board-centre-staged')).toBeNull())
+  await waitFor(() => expect(fanUids()).toContain(uid))
+  await pullCardFromFan('attack-bug#0')
+  await waitFor(() =>
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'upgradeDiscard', card: 'attack-bug#0' }),
+  )
+  expect(onPlay).not.toHaveBeenCalled()
+})
+
 it('a pull of a no-target card is refused and the fan keeps it', async () => {
   render(boardWith({ targets: {} }))
   // attack-bug#0, not release-frontend#0: #101 (Task 8) gives a lone release
@@ -492,6 +548,8 @@ it.each([
         state: {
           ...base.state,
           you: { ...base.state.you, hand: COMBO_HAND },
+          turn: base.state.selfId,
+          hasDrawn: true,
           playable: ['release-frontend#0'],
           comboOptions: { 'support-code-review#0': ['release-frontend#0'] },
         },

@@ -144,6 +144,10 @@ new attack animation. Restart resets the same card identities into a new game.
   instead. Monitoring is in the hand too, for the other thing that goes into a
   zone. The opponent holds a Bug and a Sudo, so the window the fresh release
   opens has something to answer it.
+- **Release: pay a card:** the same hand with the game's base cost. Pull
+  Frontend onto the table, then pull Hotfix (or another available hand card)
+  out of the fan to pay. The selected card leaves the hand when its flight starts, stands
+  beside the release, then goes to discard. It must not reappear in the fan.
 - **DDoS: the standing zone:** your turn, five DDoS in hand, and two opponent
   zones already holding one of each thing a DDoS can aim at. The first seat has a
   Monitoring, a bare release and a release under Code Review; the second has the
