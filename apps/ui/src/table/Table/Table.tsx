@@ -1,5 +1,5 @@
 import type React from 'react'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { HEAP_SHOW } from '@/animations'
 import LangSwitcher from '@/blocks/LangSwitcher'
 import LobbyCode from '@/blocks/LobbyCode'
@@ -300,6 +300,17 @@ export default function Table({
     if (panel) lastOpen.current = panel
   }, [panel])
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
+  // The rules panel is built ahead and kept mounted (`Drawer`'s `prebuilt`), so
+  // an element made fresh here would re-render the whole rules text on every
+  // table render. One element per copy — as the board keeps it.
+  const rulesPanel = useMemo(
+    () => (
+      <ScrollArea className={styles.scrollPanel}>
+        <Rules copy={copy.rules} />
+      </ScrollArea>
+    ),
+    [copy.rules],
+  )
 
   return (
     <CardMotionProvider value={parallax}>
@@ -457,11 +468,7 @@ export default function Table({
           prebuilt={{
             rules: {
               width: DRAWER_WIDTH.rules,
-              node: (
-                <ScrollArea className={styles.scrollPanel}>
-                  <Rules copy={copy.rules} />
-                </ScrollArea>
-              ),
+              node: rulesPanel,
             },
           }}
           className={styles.drawer}
