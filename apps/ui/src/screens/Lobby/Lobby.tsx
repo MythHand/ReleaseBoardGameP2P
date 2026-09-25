@@ -93,6 +93,8 @@ export interface LobbyCopy {
   leave: string
   disbandTitle: string
   disbandText: string
+  leaveTitle: string
+  leaveText: string
   cancel: string
 }
 
@@ -142,6 +144,7 @@ export default function Lobby({
   const [spectators, setSpectators] = useState<Spectator[]>(MOCK_SPECTATORS)
   const [specCapacity, setSpecCapacity] = useState(8)
   const [disbandOpen, setDisbandOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
   const [lang, setLang] = useState<SwitchLang>(initialLang)
 
@@ -156,6 +159,7 @@ export default function Lobby({
   const specColor = specColorFor(specCapacity)
 
   const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
+  const me = players.find((p) => p.id === meId)
   const toggleReady = (id: number) =>
     setPlayers((ps) => ps.map((p) => (p.id === id ? { ...p, ready: !p.ready } : p)))
 
@@ -220,9 +224,15 @@ export default function Lobby({
             <ReleaseLogo className={styles.headLogo} blink={false} variant={lang} />
             <span className={styles.headDivider} />
             <h1 className={styles.title}>{copy.title}</h1>
-            {isHost && (
+            {/* the way out of the lobby, one place for everyone: the host
+                disbands it, anyone else leaves it — each behind a confirm */}
+            {isHost ? (
               <Button variant="dangerGhost" onClick={() => setDisbandOpen(true)}>
                 {copy.disband}
+              </Button>
+            ) : (
+              <Button variant="dangerGhost" onClick={() => setLeaveOpen(true)}>
+                {copy.leave}
               </Button>
             )}
           </div>
@@ -383,12 +393,15 @@ export default function Lobby({
             </div>
           </ScrollArea>
 
+          {/* [ READY ] repeats the toggle in my own row — same action, same state,
+              green while on; the host's [ START ] goes under it */}
           <div className={styles.actions}>
-            {isHost ? (
-              <Button disabled={!canStart}>{copy.start}</Button>
-            ) : (
-              <Button>{copy.leave}</Button>
+            {me && (
+              <Button aria-pressed={me.ready} onClick={() => toggleReady(me.id)}>
+                {copy.ready}
+              </Button>
             )}
+            {isHost && <Button disabled={!canStart}>{copy.start}</Button>}
           </div>
         </section>
 
@@ -413,6 +426,18 @@ export default function Lobby({
           </Button>
           <Button variant="danger" onClick={() => setDisbandOpen(false)}>
             {copy.disband}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={leaveOpen} onClose={() => setLeaveOpen(false)} title={copy.leaveTitle}>
+        <p className={styles.confirmText}>{copy.leaveText}</p>
+        <div className={styles.confirmActions}>
+          <Button variant="tech" onClick={() => setLeaveOpen(false)}>
+            {copy.cancel}
+          </Button>
+          <Button variant="danger" onClick={() => setLeaveOpen(false)}>
+            {copy.leave}
           </Button>
         </div>
       </Modal>

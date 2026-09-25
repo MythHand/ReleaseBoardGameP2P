@@ -47,6 +47,17 @@
   opacity: 1;
 }
 
+/* Pressed — a bracketed button that holds a state, the lobby's [ READY ]: green
+   while it is on (owner, 25.09). The same green, brackets and all, as the
+   keyboard focus above — the one green this button already speaks in. */
+.primary[aria-pressed='true'] {
+  color: var(--brand-green);
+}
+
+.primary[aria-pressed='true'] .bracket {
+  opacity: 1;
+}
+
 /* техническая — бордер-бокс */
 .tech {
   padding: 6px 10px;

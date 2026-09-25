@@ -408,6 +408,8 @@
     "leave": "leave",
     "disbandTitle": "Disband lobby?",
     "disbandText": "The lobby will be closed and all connected players disconnected. This cannot be undone.",
+    "leaveTitle": "Leave the lobby?",
+    "leaveText": "You will leave the lobby, and your seat will be freed.",
     "cancel": "cancel"
   },
   "moveHistory": {

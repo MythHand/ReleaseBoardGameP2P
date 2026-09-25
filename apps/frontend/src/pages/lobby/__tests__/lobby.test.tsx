@@ -226,13 +226,74 @@ it('Continue reveals the live session view (room code, roster, copy)', () => {
   expect(screen.getByText('lobbyCode.copyLink')).toBeTruthy()
 })
 
-it('LobbyView guest Leave tears the session down', () => {
+it('LobbyView guest leave confirm tears the session down', () => {
   const s = inSession()
   // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
   sessionValue = { ...s, isHost: false, state: { ...s.state!, selfId: 'p1' } }
   renderInRouter(<LobbyView />)
+  // Leaving sits where the host's disband does, behind a confirm of its own:
+  // the header button only opens it, the modal's own leave confirms.
   fireEvent.click(screen.getByText('lobbyScreen.leave'))
+  expect(sessionValue.leaveSession).not.toHaveBeenCalled()
+  expect(screen.getByText('lobbyScreen.leaveTitle')).toBeTruthy()
+  const leaveButtons = screen.getAllByText('lobbyScreen.leave')
+  fireEvent.click(leaveButtons[leaveButtons.length - 1])
   expect(sessionValue.leaveSession).toHaveBeenCalledOnce()
+})
+
+// [ READY ] repeats the toggle in the player's own row (owner, 25.09): the
+// same action, and green — pressed — while the player is ready.
+it('LobbyView gives a seated player a [ READY ] that toggles their readiness', () => {
+  const s = inSession()
+  // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
+  sessionValue = { ...s, isHost: false, state: { ...s.state!, selfId: 'p1' } }
+  renderInRouter(<LobbyView />)
+  const ready = screen.getByRole('button', { name: /lobbyScreen\.ready/ })
+  expect(ready.getAttribute('aria-pressed')).toBe('false')
+  fireEvent.click(ready)
+  expect(sessionValue.ready).toHaveBeenCalledOnce()
+})
+
+it('LobbyView puts the host’s [ READY ] above [ START ]', () => {
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  // the host is ready in the fixture: its own row's toggle and the button both
+  // read ready, pressed — the button is the one in the actions, before start
+  const start = screen.getByRole('button', { name: /lobbyScreen\.start/ })
+  const ready = screen
+    .getAllByRole('button', { name: /lobbyScreen\.ready/ })
+    .find((b) => b.parentElement === start.parentElement)
+  expect(ready?.getAttribute('aria-pressed')).toBe('true')
+  // biome-ignore lint/style/noNonNullAssertion: found in the same actions row
+  expect(ready!.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+it('LobbyView leaves a spectator’s actions empty', () => {
+  const s = inSession()
+  // biome-ignore lint/style/noNonNullAssertion: inSession() always seeds state
+  const state = s.state!
+  sessionValue = {
+    ...s,
+    isHost: false,
+    state: {
+      ...state,
+      selfId: 'g1',
+      peers: {
+        ...state.peers,
+        g1: {
+          id: 'g1',
+          memberId: 'member-g1',
+          name: 'Gus',
+          role: 'guest',
+          ready: false,
+          where: 'lobby',
+        },
+      },
+    },
+  }
+  renderInRouter(<LobbyView />)
+  expect(screen.queryByRole('button', { name: /lobbyScreen\.ready/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /lobbyScreen\.start/ })).toBeNull()
 })
 
 it('LobbyView host disband confirm tears the session down', () => {
