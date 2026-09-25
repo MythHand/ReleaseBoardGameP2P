@@ -193,7 +193,7 @@ export function deriveDock(
     // attack and being free to make one are opposite situations, and the dock
     // is read at a glance.
     //
-    // Every living responder may PASS (and UNPASS), holding attack cards or
+    // Every living responder may PASS, holding attack cards or
     // not — the "everyone passed, close early" rule is only reachable when the
     // card-less can concur too. Gating this on canAttackWith is what used to
     // make every window run its full clock.

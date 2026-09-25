@@ -16,7 +16,7 @@ import type { SeatCopy } from '@/table/Seat/Seat'
 import type { TurnDockCopy } from '@/table/TurnDock/TurnDock'
 import type { DockView } from './dock'
 import type { TableActions, TablePending, TableWindow } from './intents'
-import type { PendingPromptCopy, WindowCopy } from './PendingPrompt'
+import type { PendingPromptCopy } from './PendingPrompt'
 
 export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'chat'
 
@@ -182,7 +182,6 @@ export interface TableCopyBundle {
   turnDock: TurnDockCopy
   pause?: PauseGameCopy
   pending: PendingPromptCopy
-  window: WindowCopy
 }
 
 export interface TableSlots {

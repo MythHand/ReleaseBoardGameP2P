@@ -35,7 +35,6 @@ import type {
   TableTarget,
   TableWindow,
   TurnDockCopy,
-  WindowCopy,
 } from '@release/ui'
 import type { ReactNode } from 'react'
 
@@ -244,7 +243,6 @@ export interface BoardCopyBundle {
   turnDock: TurnDockCopy & { gameStart: string }
   pause?: PauseGameCopy
   pending: PendingPromptCopy
-  window: WindowCopy
 }
 
 /**

@@ -49,12 +49,6 @@ export interface PendingPromptProps {
   onResolve: (choice: TableChoice) => void
 }
 
-// Copy for the reaction window's own affordance — the unpass button shown
-// once you've already passed on it (TurnDock has no notion of "unpass").
-export interface WindowCopy {
-  unpass: string
-}
-
 // Hardcoded, catalogue-independent labels for the one closed enum a pending
 // may offer that isn't a card — NeutralizeMethodId. Not a card property, so
 // reading it is not "inspecting card tags/categories" — it mirrors

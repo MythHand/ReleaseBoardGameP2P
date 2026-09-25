@@ -282,7 +282,6 @@ function toHistoryEntry(
     case 'windowOpened':
     case 'windowClosed':
     case 'passed':
-    case 'unpassed':
     case 'attacked':
     case 'defended':
     case 'tookHit':

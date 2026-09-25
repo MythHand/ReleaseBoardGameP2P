@@ -38,8 +38,7 @@ export type Choice =
   | { kind: 'upgradeTake'; card: CardUid }
   // Taking a staged release back before its cost is paid. The `release` action
   // emits nothing until the cost lands, so no peer ever saw the play — which is
-  // why this carries no card and emits no event either. The same "I changed my
-  // mind" door `UNPASS` already opens for a pass.
+  // why this carries no card and emits no event either.
   | { kind: 'cancelRelease' }
 
 export type Action =
@@ -55,7 +54,6 @@ export type Action =
   | { type: 'PUSH'; player: PlayerId; at: number }
   | { type: 'ATTACK'; player: PlayerId; card: CardUid; combo?: CardUid; at: number }
   | { type: 'PASS'; player: PlayerId; at: number }
-  | { type: 'UNPASS'; player: PlayerId; at: number }
   | { type: 'WINDOW_EXPIRED'; at: number }
   // Keeper-only, like WINDOW_EXPIRED: starts the turn's inactivity clock when
   // no committed action has stamped one — in practice exactly once, for the

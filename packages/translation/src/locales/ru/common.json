@@ -214,9 +214,6 @@
       "action": "сбросить"
     }
   },
-  "window": {
-    "unpass": "отменить пас"
-  },
   "seat": {
     "eliminated": "выбыл",
     "disconnected": "нет связи",
@@ -441,7 +438,6 @@
     "tookHit": "принял удар",
     "turnEnded": "ход завершён",
     "turnStarted": "ход",
-    "unpassed": "вернулся",
     "upgradeTaken": "взял из центра",
     "upgradeThrown": "сброшено в центр",
     "windowClosed": "реакция завершена",

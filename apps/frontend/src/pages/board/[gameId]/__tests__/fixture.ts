@@ -58,7 +58,6 @@ export function makeBoardProps(over: Partial<BoardProps> = {}): BoardProps {
       lobbyCode: enCommon.lobbyCode,
       turnDock: enCommon.turnDock,
       pending: enCommon.pending,
-      window: enCommon.window,
     },
     // A frozen clock, so a test that does not care about the countdown gets a
     // stable one and a test that does overrides it with both bounds it needs.

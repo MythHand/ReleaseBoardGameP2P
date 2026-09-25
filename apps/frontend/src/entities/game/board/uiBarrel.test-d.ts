@@ -19,7 +19,6 @@ import {
   type SlotPlacement,
   slotPlacement,
   type TableOpponent,
-  type WindowCopy,
 } from '@release/ui'
 import {
   type Arriving,
@@ -60,7 +59,6 @@ type Assertions = [
   ReleaseSlots,
   SlotPlacement,
   TableOpponent,
-  WindowCopy,
   // …and the animation layer's own.
   Arriving,
   Landed,

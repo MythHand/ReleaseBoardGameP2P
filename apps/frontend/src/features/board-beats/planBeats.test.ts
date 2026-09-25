@@ -849,7 +849,6 @@ describe('planBeats — the answer to an attack (#101)', () => {
       [
         { id: 30, type: 'windowOpened', player: 'p1', slot: 'frontend', round: 1, deadline: 0 },
         { id: 31, type: 'passed', player: 'p2' },
-        { id: 32, type: 'unpassed', player: 'p2' },
         { id: 33, type: 'windowClosed', player: 'p1', slot: 'frontend' },
       ] as Event[],
       boardBefore(),

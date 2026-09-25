@@ -146,7 +146,6 @@ export {
   default as PendingPrompt,
   type PendingPromptCopy,
   type PendingPromptProps,
-  type WindowCopy,
 } from './table/Table/PendingPrompt'
 export { PILE_WIDTH, pileWidthFor } from './table/Table/piles'
 export type {

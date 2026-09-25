@@ -2,7 +2,6 @@ import type { Action, Target } from './actions'
 import { rulesFor } from './cards'
 import type { DeckEntry, Engine, GameConfig } from './engine'
 import type { Event } from './events'
-import { botAction } from './fake/bots'
 import { randomAt } from './rng'
 import {
   type CardInstance,
@@ -11,7 +10,6 @@ import {
   type PlayerId,
   type ReleaseSlot,
   type Setup,
-  seatOwing,
 } from './state'
 
 export interface ConformanceOptions {
@@ -717,7 +715,7 @@ export function describeEngine(
       //  - an open reaction window that never closes holds `state.window`
       //    (same rejection, different gate) — and closing is not guaranteed
       //    by unanimous PASS alone: it is probabilistic per responder per
-      //    step, the fuzzer never emits UNPASS, and a window can also close
+      //    step, and a window can also close
       //    by expiring once its deadline has passed.
       // This test is what turns either silent coverage loss into a red test.
       const driveProgress = (setup: Setup, seed: number) => {
@@ -1107,51 +1105,6 @@ export function describeEngine(
         // Without this, a bug that always used the first-round duration would
         // pass the check above simply because no later round was ever seen.
         expect(sawLaterRound).toBe(true)
-      })
-
-      it('genuinely revokes a pass with UNPASS', () => {
-        // Bot-driven to the first open window: any release a bot plays opens
-        // one immediately (bots never combo a Code Review), so this is quick
-        // and deterministic. PASS/UNPASS are then issued by hand, since no bot
-        // policy ever calls UNPASS.
-        const engine = make()
-        let state = engine.createGame(configFor(options, 1))
-        const at = 1
-        for (let i = 0; i < 200 && !state.window && !state.over; i += 1) {
-          const seat = seatOwing(state.pending) ?? state.turn.player
-          const action = botAction(engine, state, seat, at)
-          if (!action) break
-          state = engine.reduce(state, action).state
-        }
-        expect(
-          state.window,
-          'never reached an open reaction window to test UNPASS against',
-        ).not.toBeNull()
-        const owner = state.window?.target.player
-        const responders = state.seating.filter(
-          (id) => id !== owner && !state.eliminated.includes(id),
-        )
-        expect(responders.length).toBeGreaterThanOrEqual(2)
-        const [a, b] = responders
-
-        state = engine.reduce(state, { type: 'PASS', player: a, at }).state
-        expect(state.window?.passed).toContain(a)
-
-        state = engine.reduce(state, { type: 'UNPASS', player: a, at }).state
-        expect(state.window?.passed).not.toContain(a)
-
-        // If UNPASS were a no-op, `a` would still count as passed here, and the
-        // window would already have closed on `b`'s pass alone (2 of 2) instead
-        // of needing both again below — this is what would go undetected by
-        // only checking `passed` above.
-        state = engine.reduce(state, { type: 'PASS', player: b, at }).state
-        expect(
-          state.window,
-          'closed after only one of two responders had genuinely passed',
-        ).not.toBeNull()
-
-        state = engine.reduce(state, { type: 'PASS', player: a, at }).state
-        expect(state.window).toBeNull()
       })
 
       it('is the only card that reaches a protected release or a Monitoring', () => {

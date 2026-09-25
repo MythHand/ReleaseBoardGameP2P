@@ -42,13 +42,8 @@ describe('toAction', () => {
     })
   })
 
-  it('stamps a pass and an unpass', () => {
+  it('stamps a pass', () => {
     expect(toAction({ kind: 'pass' }, 'you', 1)).toEqual({ type: 'PASS', player: 'you', at: 1 })
-    expect(toAction({ kind: 'unpass' }, 'you', 2)).toEqual({
-      type: 'UNPASS',
-      player: 'you',
-      at: 2,
-    })
   })
 
   it('omits the player on WINDOW_EXPIRED, which belongs to no one', () => {
