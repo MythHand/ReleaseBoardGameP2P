@@ -149,17 +149,24 @@ new attack animation. Restart resets the same card identities into a new game.
   out of the fan to pay. The selected card leaves the hand when its flight starts, stands
   beside the release, then goes to discard. It must not reappear in the fan.
 - **DDoS: the standing zone:** your turn, five DDoS in hand, and two opponent
-  zones already holding one of each thing a DDoS can aim at. The first seat has
-  a Monitoring, a bare release and a release under Code Review; the second has
-  the AI pair, an AI Monitoring and an AI release. AI cards return to the events
-  deck rather than the discard. The zones start standing so every DDoS target
-  can be checked without replaying the setup.
-- **Error 503: the alarm / AI trigger: a Crush:** nothing has been drawn yet, and
-  the trigger sits on top of the pile — both cards fire on the draw and never
-  reach a hand. The 503 alarm stands because there are two ways to answer it, a
-  Debugger in hand and a release to sacrifice. The AI preset seeds the events
-  deck with a single card, so every run reveals the same Crush, aimed at the
-  release standing in the zone.
+  zones already holding one of each thing a DDoS can aim at. The first seat has a
+  Monitoring, a bare release and a release under Code Review; the second has the
+  AI pair, an AI Monitoring and an AI release, because an AI card leaving a zone
+  goes home to the events deck rather than to the discard — its own condition and
+  its own road off the table. DDoS is the one attack played on your own turn
+  against what is already standing, rather than into a reaction window, and the
+  one attack Code Review does not stop. The zones are written standing rather
+  than played into place: the throw is what this preset is for, and every card in
+  them would otherwise cost a turn of its own to put there.
+- **Error 503: the alarm / AI trigger:** nothing has been drawn yet, and the
+  trigger sits on top of the pile — both cards fire on the draw and never reach a
+  hand. The 503 alarm stands because there are two ways to answer it, a Debugger
+  in hand and a release to sacrifice. The AI preset is every AI card behind one
+  tab: the row beneath the toolbar picks which card the trigger reveals, and
+  picking one restarts the scene. The events deck is seeded with that single
+  card, so every run reveals it, and the table is laid for what it acts on — the
+  matching release for a Crush, an empty slot for an AI release, two releases of
+  different types in the discard for Inside (`aiTable` in `scenarios.ts`).
 - **Defences in the defender's hand:** every preset that throws an attack gives
   the defender every defence card, one copy each — Hotfix, Rubber ducky, PR
   approved, Rollback, Not a bug, Works on my machine. A stand is where you reach

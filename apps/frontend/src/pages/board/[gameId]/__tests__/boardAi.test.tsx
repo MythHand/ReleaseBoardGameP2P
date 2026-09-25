@@ -4,7 +4,7 @@
 // card is the render that carries the AI card across the batch gap: `source`
 // on a `crush` / `neutralize503` / `handLimit` / `pickFromDiscard` pending is
 // public for every peer, not just the one being asked.
-import { centreTransform } from '@release/ui'
+import { cardById, centreTransform } from '@release/ui'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import Board from '../_Board'
@@ -212,8 +212,17 @@ describe('the row that takes a Release out of the discard (ai-inside)', () => {
     expect(onResolve).toHaveBeenCalledTimes(1)
   })
 
-  it('shows an opponent nothing of the options', () => {
+  // THE SAME PICK, WATCHED. Inside is on Cherry-pick's surface now, and so is
+  // what the other seats get: the releases in the discard laid out as the actor
+  // sees them, the choice being made shown to them — and nothing they can press,
+  // because the answer is not theirs (owner, 24.09; it used to show them nothing).
+  it('lays the releases out for an opponent to watch, with nothing to answer', () => {
     const base = makeBoardProps()
+    const heapCard = (uid: string, id: string) => {
+      const card = cardById(id)
+      if (!card) throw new Error(`no card ${id}`)
+      return { uid, card, dx: 0, dy: 0, rot: 0 }
+    }
     render(
       <Board
         {...makeBoardProps({
@@ -221,12 +230,26 @@ describe('the row that takes a Release out of the discard (ai-inside)', () => {
             ...base.state,
             selfId: 'p2',
             pending: pickingPending([], 'you'),
+            decks: {
+              ...base.state.decks,
+              discardCount: 3,
+              discardHeap: [
+                heapCard('d1', 'release-frontend'),
+                heapCard('d2', 'attack-bug'),
+                heapCard('d3', 'release-backend'),
+              ],
+            },
           },
         })}
       />,
     )
-    expect(screen.queryByTestId('board-inside-row')).toBeNull()
-    // …but the AI card that asked is public, and stands
+    expect(screen.getByTestId('board-inside-row')).not.toBeNull()
+    const cells = ['d1', 'd2', 'd3'].map((uid) => screen.queryByTestId(`cherry-cell-${uid}`))
+    // the releases, and only them
+    expect(cells.map((cell) => cell !== null)).toEqual([true, false, true])
+    // …none of which this seat can take
+    for (const cell of cells) if (cell) expect((cell as HTMLButtonElement).disabled).toBe(true)
+    // …and the AI card that asked is public, and stands
     expect(screen.getByTestId('board-ai-effect')).not.toBeNull()
   })
 })

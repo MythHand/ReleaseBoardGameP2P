@@ -189,6 +189,9 @@ export function useBeats(args: {
   } = args
   const reduced = useReducedMotion()
   const [running, setRunning] = useState<Beat | null>(null)
+  // The alarm a running beat lit for itself partway through (`BeatRun`'s own
+  // `raiseAlarm`) — cleared as the next beat starts and when the queue drains.
+  const [raised, setRaised] = useState(false)
   // The same answer as `running`, but ahead of it: `drain()` sets this
   // synchronously, inside the very effect pass that queued the beat, while
   // `running` only says so once React has committed. So the effect GUARDS on
@@ -450,13 +453,24 @@ export function useBeats(args: {
           // Not exclusive: an AI card is read, not obeyed, and nothing about it
           // needs input dead.
           exclusive: false,
-          // The 503 mimic's own glow. A `standing` tail carries it too, because
-          // the alarm is owed for as long as the prompt is — same field, same
-          // reason, as `draw`'s `neutralized` case.
-          alarm:
-            plan.tail.kind === 'alarm' ||
-            (plan.tail.kind === 'standing' && plan.tail.alarm === true),
+          // The 503 mimic's glow is NOT the whole beat's: the beat opens with the
+          // trigger leaving its pile, and the mimic is only an alarm once its
+          // card has turned face up. The runner lights it at that moment
+          // (`raiseAlarm`, aiBeat.tsx); after the beat, the standing prompt
+          // keeps it lit (owner, 24.09 — it glowed before the card was seen).
+          alarm: false,
           run: (ctx) => ais.run(plan, ctx),
+        }
+      }
+      if (plan.kind === 'crushRefused') {
+        return {
+          key: plan.key,
+          base,
+          // Not exclusive, for the same reason as `aiEvent`: what a refused
+          // Crush destroys is read, not obeyed.
+          exclusive: false,
+          alarm: false,
+          run: (ctx) => ais.runRefused(plan, ctx),
         }
       }
       if (plan.kind === 'takenFromDiscard') {
@@ -507,6 +521,7 @@ export function useBeats(args: {
       transfers.runRequested,
       ais.run,
       ais.runTaken,
+      ais.runRefused,
       discardPick,
     ],
   )
@@ -548,6 +563,7 @@ export function useBeats(args: {
         runningRef.current = next
         setRunning(next)
         setAdvanced(null)
+        setRaised(false)
         // Where the beat ends up, tracked as it publishes. It starts at the
         // base, so a beat that publishes nothing hands its own board on
         // unchanged and the chain neither breaks nor invents a step.
@@ -560,7 +576,12 @@ export function useBeats(args: {
         // the finally below regardless, so a failure costs the animation and
         // never the state.
         try {
-          await next.run({ base: next.base, after: next.target ?? latest.current.live, publish })
+          await next.run({
+            base: next.base,
+            after: next.target ?? latest.current.live,
+            publish,
+            raiseAlarm: () => setRaised(true),
+          })
         } catch (err) {
           if (import.meta.env.DEV) console.error('[beats] %s failed', next.key, err)
         }
@@ -575,6 +596,7 @@ export function useBeats(args: {
       runningRef.current = null
       setRunning(null)
       setAdvanced(null)
+      setRaised(false)
     }
   }, [])
 
@@ -802,7 +824,7 @@ export function useBeats(args: {
       ...operations.overlay,
     ],
     exclusive: running?.exclusive ?? false,
-    alarm: running?.alarm ?? false,
+    alarm: (running?.alarm ?? false) || raised,
     // `running` (the state) is held for the whole drain, not per beat: `drain()`
     // clears it in its own `finally`, once the queue is empty. So this stays
     // true across the handover between two beats of one batch, which is exactly

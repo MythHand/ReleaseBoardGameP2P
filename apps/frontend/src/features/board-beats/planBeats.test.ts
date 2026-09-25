@@ -2218,3 +2218,45 @@ it('takes the lying defence out with the attack after the pick', () => {
     coverAux: { eventId: 4, card: 'support-sudo' },
   })
 })
+
+// A CRUSH ITS OWNER REFUSED (owner, 24.09). Pass on the prompt destroys the
+// release it aimed at in a batch of its own — `releaseDestroyed` alone, which
+// no reveal and no neutralize carries — and the board plays the ending a Crush
+// with no answer has at its reveal, with the AI card going home behind it.
+describe('a refused Crush', () => {
+  const crushOwed = {
+    pending: {
+      kind: 'crush',
+      player: 'p1',
+      slot: 'frontend',
+      methods: ['debugger'],
+      source: 'ai-crush-frontend',
+    },
+    aiCause: { card: 'trigger-ai', eventId: 3 },
+  } as Partial<BoardState>
+  const destroyed = (player = 'p1'): Event =>
+    ({
+      id: 20,
+      type: 'releaseDestroyed',
+      player,
+      slot: 'frontend',
+      card: 'release-frontend',
+    }) as Event
+
+  it('plays the Crush ending, and sends the Crush and its trigger on their way', () => {
+    const beats = planBeats([destroyed()], boardBefore(crushOwed))
+    expect(beats).toHaveLength(1)
+    expect(beats[0]).toMatchObject({
+      kind: 'crushRefused',
+      player: 'p1',
+      tail: { kind: 'crush', slot: 'frontend', card: 'release-frontend', destination: 'discard' },
+      homeward: 'ai-crush-frontend',
+      causeward: { card: 'trigger-ai', eventId: 3 },
+    })
+  })
+
+  it('reads nothing as a refusal when no Crush was owed by that player', () => {
+    const beats = planBeats([destroyed('p2')], boardBefore(crushOwed))
+    expect(beats.some((beat) => beat.kind === 'crushRefused')).toBe(false)
+  })
+})

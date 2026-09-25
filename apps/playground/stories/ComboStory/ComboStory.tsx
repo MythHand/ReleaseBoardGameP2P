@@ -12,7 +12,7 @@ import {
   wait,
 } from '@/animations'
 import { cardById } from '@/cards'
-import Arrow, { useArrow } from '@/primitives/Arrow'
+import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO } from '@/primitives/Card'
 import Pile from '@/primitives/Pile'
 import Hand from '@/table/Hand'
@@ -166,8 +166,10 @@ export default function ComboStory() {
   }
 
   const aimFromCentre = () => {
-    const c = centerRef.current?.getBoundingClientRect()
-    if (c) aim({ x: c.left + c.width / 2, y: c.top + c.height / 2 }, { x: c.left, y: c.top })
+    const el = centerRef.current
+    if (!el) return
+    const c = el.getBoundingClientRect()
+    aim(centerOf(el), { x: c.left, y: c.top })
   }
 
   const hideFlyer = () => {

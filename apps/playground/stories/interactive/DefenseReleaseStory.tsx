@@ -15,7 +15,7 @@ import {
 } from '@/animations'
 import { CARDS, cardById } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
-import Arrow, { useArrow } from '@/primitives/Arrow'
+import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Card, { CARD_RATIO, cardBoxIn } from '@/primitives/Card'
 import CardPair from '@/primitives/CardPair'
 import Pile from '@/primitives/Pile'
@@ -432,7 +432,8 @@ export default function DefenseReleaseStory() {
     drop('fly')
     setBusy(false)
     // the arrow starts where the Sudo now stands and follows the cursor
-    if (box) aim({ x: box.left + box.width / 2, y: box.top + box.height / 2 }, dropped)
+    const sudoEl = sudoRef.current
+    if (sudoEl) aim(centerOf(sudoEl), dropped)
   }
 
   // A card put onto the table WAITS for an answer from the hand, and pressing on

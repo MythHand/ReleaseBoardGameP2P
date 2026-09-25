@@ -109,6 +109,57 @@ describe('Crush against a slot that holds nothing (#70)', () => {
   })
 })
 
+// CRUSH IS ANSWERED BY A DEBUGGER, AND MAY BE REFUSED. A standing Monitoring
+// answers it on its own (the block below). The rules forbid the 503's third
+// method here — "Пожертвовать другой релиз нельзя: Crush бьёт строго по своему
+// типу релиза" (docs/rules/cards.md) — and Pass is "I do not defend", the
+// release it aims at destroyed (owner, 24.09).
+describe('answering a Crush', () => {
+  const dbg: CardInstance = { uid: 'protection-debugger#0', id: 'protection-debugger' }
+  const fe: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
+  const be: CardInstance = { uid: 'release-backend#0', id: 'release-backend' }
+  const crushed = () => {
+    const base = engine.createGame(config())
+    const state = game({
+      players: {
+        ...base.players,
+        p1: {
+          ...base.players.p1,
+          hand: [dbg],
+          release: { frontend: { card: fe }, backend: { card: be } },
+        },
+      },
+    })
+    return fireEvent(state, 'ai-crush-frontend').state
+  }
+
+  it('offers no sacrifice, even with another release standing', () => {
+    expect(crushed().pending).toMatchObject({ kind: 'crush', methods: ['debugger'] })
+  })
+
+  it('destroys the release it aims at when its owner passes', () => {
+    const r = reduce(crushed(), { type: 'PASS', player: 'p1', at: 2000 })
+
+    expect(r.state.pending).toBeNull()
+    expect(r.state.players.p1.release.frontend).toBeUndefined()
+    // only the aimed-at slot: the other release is no part of the refusal
+    expect(r.state.players.p1.release.backend).toBeTruthy()
+    // the Debugger was not spent — refusing is not answering
+    expect(r.state.players.p1.hand.map((c) => c.id)).toContain('protection-debugger')
+    expect(r.events).toContainEqual(
+      expect.objectContaining({ type: 'releaseDestroyed', player: 'p1', slot: 'frontend' }),
+    )
+  })
+
+  it('takes no refusal from anyone but its owner', () => {
+    const state = crushed()
+    const r = reduce(state, { type: 'PASS', player: 'p2', at: 2000 })
+
+    expect(r.state.pending).toMatchObject({ kind: 'crush', player: 'p1' })
+    expect(r.state.players.p1.release.frontend).toBeTruthy()
+  })
+})
+
 describe.each([
   'frontend',
   'backend',

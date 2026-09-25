@@ -39,6 +39,7 @@ import {
   ReleaseZone,
   Rules,
   rowPlaceStyle,
+  ScrollArea,
   Seat,
   Slider,
   type TableActions,
@@ -84,7 +85,6 @@ import { useBoardStaging } from './_useBoardStaging'
 import { useCherryPickStaging } from './_useCherryPickStaging'
 import { useDefenseStaging } from './_useDefenseStaging'
 import { useHandLimit } from './_useHandLimit'
-import { useInsideStaging } from './_useInsideStaging'
 import { useNeutralizeStaging } from './_useNeutralizeStaging'
 import { useRebaseStaging } from './_useRebaseStaging'
 import { useRequestStaging } from './_useRequestStaging'
@@ -486,21 +486,9 @@ export default function Board({
     onPickPreview,
     handoff: requestPickRef,
   })
-  // taking a Release back out of the discard (#106, `ai-inside`) — the row
-  // over the discard replaces the panel, the same way the band above
-  // replaces it for `requestCard`. No `matchKey`: the row's own local state
-  // clears itself the moment this hook stops holding an ours-`pickFromDiscard`
-  // pending, which happens whenever the pending resolves or changes kind —
-  // and it always does before a second one of the same kind can open.
-  const inside = useInsideStaging({
-    state,
-    actions,
-    copy: { prompt: copy.table.insidePrompt, confirm: copy.pending.confirm },
-    enabled: !(deal.active || beats.exclusive),
-  })
-  // Git Cherry-pick's own grid (#108) — the OTHER `pickFromDiscard`. Gated on
-  // `source` for the same reason Inside is: the two effects share a pending
-  // kind and nothing else.
+  // The pick out of the discard (#108) — Git Cherry-pick's grid, and Inside's
+  // release pick on the same surface (#106): one `pickFromDiscard` pending, one
+  // scene, the offer and the prompt told apart by its `source`.
   const cherry = useCherryPickStaging({
     handoff: discardPickRef,
     state,
@@ -510,6 +498,7 @@ export default function Board({
     onHandArrival: (order) => handOrder.place(order),
     copy: {
       prompt: copy.table.cherryPickPrompt,
+      insidePrompt: copy.table.insidePrompt,
       sudoPrompt: copy.table.cherryPickSudoPrompt,
       toHand: copy.table.cherryPickToHand,
       toDeck: copy.table.cherryPickToDeck,
@@ -774,7 +763,21 @@ export default function Board({
   // the surface — and out of it for the ask, whose answer IS a card pulled out
   // of the fan.
   const surfaceOwnsTable =
-    [cherry.grid, rebase.row, inside.row, requesting.band].some(Boolean) || upgrade.answering
+    [cherry.grid, rebase.row, requesting.band].some(Boolean) || upgrade.answering
+  // WHAT OF THE DISCARD STAYS ON THE PILE while a pick lays it out: nothing for
+  // a Cherry-pick, whose grid IS the whole discard, and everything but the
+  // releases for Inside, which offers only them. The Inside trigger standing at
+  // the centre is off the pile either way (`aiCause`).
+  const lifted = cherry.grid ? cherry.lifted : null
+  const pileHeap = (decks.discardHeap ?? []).filter(
+    (c) =>
+      c.uid !== `d${state.aiCause?.eventId}` &&
+      !(lifted === 'releases' && c.card.category === 'release'),
+  )
+  const liftedReleases =
+    lifted === 'releases'
+      ? (decks.discardHeap ?? []).filter((c) => c.card.category === 'release').length
+      : 0
   // The scene's own rule (`ComboStory`: `merged || playing`): while the play is
   // ON THE TABLE — standing at the centre, or anything of this gesture still in
   // the air — the fan stops answering the cursor for the same reason. The one
@@ -1179,6 +1182,17 @@ export default function Board({
     if (panel) lastOpen.current = panel
   }, [panel])
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
+  // The rules panel is built ahead and kept mounted (`Drawer`'s `prebuilt`), so
+  // an element made fresh here would re-render the whole rules text on every
+  // board render — every beat of every animation. One element per copy.
+  const rulesPanel = useMemo(
+    () => (
+      <ScrollArea className={kit.scrollPanel}>
+        <Rules copy={copy.rules} />
+      </ScrollArea>
+    ),
+    [copy.rules],
+  )
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening AND click-anywhere-cancels-staging (handleTableClick owns both); the accessible affordance for each is its own Escape handler above
@@ -1331,21 +1345,26 @@ export default function Board({
         <div className={enter} ref={anchors.discard}>
           <Pile
             label={copy.table.discard}
-            heap={
-              cherry.grid || beats.discardOut === 'taken'
-                ? []
-                : decks.discardHeap?.filter((c) => c.uid !== `d${state.aiCause?.eventId}`)
-            }
+            heap={lifted === 'all' || beats.discardOut === 'taken' ? [] : pileHeap}
             topCard={
-              cherry.grid || state.aiCause || beats.discardOut === 'taken' ? null : decks.discard
+              lifted === 'all' || state.aiCause || beats.discardOut === 'taken'
+                ? null
+                : lifted === 'releases'
+                  ? (pileHeap.at(-1)?.card ?? null)
+                  : decks.discard
             }
             // THE NUMBER IS ALWAYS THE TRUTH, including when it is zero. An
             // empty discard says `// 0` — that is what tells you it is empty,
             // and it is what a card returning to it passes under.
             //
             // The cherry grid holds the discard's own cards, so the pile it
-            // left really is empty and says so.
-            count={cherry.grid ? 0 : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0))}
+            // left really is empty and says so; Inside's holds the releases, so
+            // the pile says what is left without them.
+            count={
+              lifted === 'all'
+                ? 0
+                : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0) - liftedReleases)
+            }
             // THE WHOLE DISCARD LEAVES, not its top card. Before it flies to a
             // pile the heap collects itself into a straight stack and the
             // counter goes WITH it — that gathering IS the pile becoming one
@@ -2131,7 +2150,19 @@ export default function Board({
       </div>
 
       {/* выезжающая панель поверх контента (ширина — per-tab) */}
-      <Drawer open={panel !== null} width={drawerWidth} className={kit.drawer}>
+      <Drawer
+        open={panel !== null}
+        width={drawerWidth}
+        contentKey={panel}
+        // the rules are built ahead, not in the frames the panel widens in
+        prebuilt={{
+          rules: {
+            width: DRAWER_WIDTH.rules,
+            node: rulesPanel,
+          },
+        }}
+        className={kit.drawer}
+      >
         {panel === 'settings' && (
           <div className={kit.settings}>
             {hasUpperSettings && (
@@ -2211,11 +2242,6 @@ export default function Board({
             onKickSpectator={onKickSpectator}
           />
         )}
-        {panel === 'rules' && (
-          <div className={kit.scrollPanel}>
-            <Rules copy={copy.rules} />
-          </div>
-        )}
         {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
         {panel === 'chat' && <div className={kit.chatPanel}>{slots?.chat}</div>}
       </Drawer>
@@ -2266,7 +2292,6 @@ export default function Board({
       {neutralizing.overlay}
       {cherry.overlay}
       {requesting.band}
-      {inside.row}
       {cherry.grid}
       {rebase.row}
       {upgrade.surface}

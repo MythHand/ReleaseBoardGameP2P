@@ -13,6 +13,8 @@ export {
   PRESET_AVATARS,
   type PresetAvatarItem,
 } from './avatars/PresetAvatar'
+export type { BugRunnerProps } from './blocks/BugRunner'
+export { default as BugRunner } from './blocks/BugRunner'
 export type { ChatCopy, ChatMessage, ChatRole } from './blocks/Chat'
 export { default as Chat } from './blocks/Chat'
 export { default as GameSettings } from './blocks/GameSettings'

@@ -134,6 +134,11 @@ export const SHAKE_SHAPES = {
 
 export type ShakeShape = keyof typeof SHAKE_SHAPES
 
+// The flinch of a WHOLE element — a fan or a seat answering "no such card" —
+// not the 7px settle the preset defaults to for an input field. Named here so
+// the scene that approved it and the board that plays it read one force.
+export const SHAKE_FLINCH = { amp: 9, dur: 460, shape: 'spring' } as const
+
 // длительность из params (для travel-пресетов с переменным временем)
 const durationOf = (p?: Record<string, unknown>, fallback = 520): number =>
   typeof p?.duration === 'number' ? p.duration : fallback

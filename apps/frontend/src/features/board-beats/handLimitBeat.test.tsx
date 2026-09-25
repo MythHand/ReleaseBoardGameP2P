@@ -364,12 +364,17 @@ it('builds the grid itself for a discard that is not ours', async () => {
   ])
   expect(exits.items.map((item) => item.from)).toEqual(targets)
   expect(exits.items).toHaveLength(2)
-  expect(order.calls).toEqual(['publish', 'raise', 'move', 'move', 'send'])
+  // the shadow first, then the flights and the exit, then the heap the cards
+  // landed in — filed by the beat that flew them (toHeap.ts)
+  expect(order.calls).toEqual(['publish', 'raise', 'move', 'move', 'send', 'publish'])
 })
 
 // The shadow the beat publishes: the cards are gone from where they stood, and
-// the heap is left to the projection that already holds them.
-it('publishes the cards out of the hand and leaves the heap alone', async () => {
+// the heap is not touched while they fly — it would show them before they
+// arrive. Once they land the beat files them in itself: the heap it holds is
+// the one from before the batch, so left to the projection they are nowhere for
+// the frames in between and blink out as they land (toHeap.ts, owner 24.09).
+it('publishes the cards out of the hand, and files them into the heap once they land', async () => {
   raises.keys.length = 0
   exits.items.length = 0
   const published: BoardState[] = []
@@ -377,9 +382,13 @@ it('publishes the cards out of the hand and leaves the heap alone', async () => 
   const { api, Probe } = harness(null)
   render(<Probe />)
   await drive(() => api.beat?.run(plan(), ctx))
-  expect(published).toHaveLength(1)
+  expect(published).toHaveLength(2)
   expect(published[0].you.hand).toHaveLength(0)
   expect(published[0].decks.discardCount).toBe(base.decks.discardCount)
+  expect(published[1].decks.discardCount).toBe(base.decks.discardCount + plan().cards.length)
+  expect(published[1].decks.discardHeap?.map((card) => card.uid)).toEqual(
+    plan().cards.map((card) => `d${card.eventId}`),
+  )
 })
 
 // The road home (#106): the AI card standing behind this prompt
@@ -466,7 +475,12 @@ it('clears Bad Vibe’s standing pair and sends all three cards away together', 
     expect(home?.at).toBeLessThan(exits.startedAt + exits.holdMs)
     expect(bankedAt).toBeGreaterThanOrEqual(exits.startedAt + exits.holdMs)
     expect(published.find((state) => state.pending === null)?.decks.discardHeap).toEqual([])
-    expect(published.at(-1)?.decks.discardCount).toBe(1)
+    // the trigger back where it lay, and the card the hand gave up beside it
+    expect(published.at(-1)?.decks.discardCount).toBe(2)
+    expect(published.at(-1)?.decks.discardHeap?.map((card) => card.uid)).toEqual([
+      'd3',
+      `d${plan().cards[0].eventId}`,
+    ])
     expect(published.at(-1)?.pending).toBeNull()
     expect(published.at(-1)?.aiCause).toBeUndefined()
     expect(published.at(-1)?.you.hand.map((card) => card.uid)).toEqual(['u2'])
