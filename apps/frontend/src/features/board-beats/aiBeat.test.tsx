@@ -164,19 +164,37 @@ describe('aiBeat', () => {
       anchors,
       { base: before },
     )
-    const landed = published.at(-1)
-    const owner = player === 'p1' ? landed?.you : landed?.opponents.find((o) => o.id === player)
+    // the zone's own publish — the one that lands the AI card; the heap's own
+    // publish, once the trigger has landed, comes after it
+    const seat = (state: (typeof published)[number] | undefined) =>
+      player === 'p1' ? state?.you : state?.opponents.find((o) => o.id === player)
+    const landed = published.find((state) => seat(state)?.release[slot])
+    const owner = seat(landed)
     expect(owner?.release[slot]?.id).toBe(eventCard)
     expect(owner?.releaseId?.[slot]).toBe(rulesCard)
     expect(owner?.releaseEvent?.[slot]).toBe(eventCard)
     if (player === 'p1') expect(landed?.you.releaseUid?.[slot]).toBe('event')
     expect(landed?.you.hand).toEqual(before.you.hand)
-    expect(landed?.decks).toEqual(before.decks)
+    // the table's decks, but for the trigger's own pile: it gave the card up as
+    // the trigger took off, not when the table had played out (offThePile.ts)
+    expect(landed?.decks).toEqual({
+      ...before.decks,
+      main: before.decks.main.map((n, i) => (i === plan.pile ? n - 1 : n)),
+    })
     const order = callOrder()
-    expect(order.indexOf('publish-zone')).toBeGreaterThan(order.indexOf('play:playToReleaseZone'))
-    expect(order.indexOf('nextFrames')).toBeGreaterThan(order.indexOf('publish-zone'))
-    expect(order.indexOf('drop:eff')).toBeGreaterThan(order.indexOf('nextFrames'))
+    // the zone's own publish — the first after the flight into the slot; the
+    // pile's own, as the trigger took off, comes long before it (offThePile.ts)
+    const flown = order.indexOf('play:playToReleaseZone')
+    const zonePublish = order.indexOf('publish-zone', flown)
+    expect(zonePublish).toBeGreaterThan(flown)
+    expect(order.indexOf('nextFrames', zonePublish)).toBeGreaterThan(zonePublish)
+    expect(order.indexOf('drop:eff')).toBeGreaterThan(order.indexOf('nextFrames', zonePublish))
     expect(order.indexOf('trigger-landed')).toBeGreaterThan(order.indexOf('drop:eff'))
+    // …and the trigger, once landed, is in the heap — filed by this beat rather
+    // than left to the projection, or it blinks out as it lands (toHeap.ts)
+    expect(published.at(-1)?.decks.discardHeap?.map((card) => card.uid)).toContain(
+      `d${plan.triggerDiscardId}`,
+    )
   })
 
   const crushPlan = (destination: 'events' | 'discard') => ({

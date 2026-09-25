@@ -38,7 +38,8 @@
   line-height: 1.5;
 }
 
-.toolbar button[aria-pressed='true'] {
+.toolbar button[aria-pressed='true'],
+.actions button[aria-pressed='true'] {
   outline: 1px solid var(--mint);
   outline-offset: 2px;
 }

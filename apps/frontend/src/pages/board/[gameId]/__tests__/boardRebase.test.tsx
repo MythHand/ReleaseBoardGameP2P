@@ -83,8 +83,11 @@ describe('the row that answers Git Rebase', () => {
     })
     expect(screen.getByTestId('board-rebase-row')).not.toBeNull()
 
+    // `queryByRole`, not `getByRole`: every miss of a `getBy` builds an error
+    // that prints the whole DOM and its roles — the prebuilt rules panel
+    // included — and on CI those misses alone ate the wait.
     await vi.waitFor(
-      () => expect(screen.getByRole('button', { name: /confirm|подтвердить/i })).toBeTruthy(),
+      () => expect(screen.queryByRole('button', { name: /confirm|подтвердить/i })).not.toBeNull(),
       { timeout: 2000 },
     )
     // Move the third card to the front, then commit.
@@ -276,7 +279,7 @@ it('does not redeal an answered offer restored by the queue while its return set
   }
   const { rerender } = render(<Board {...base} state={state} actions={{ onResolve }} />)
   await vi.waitFor(
-    () => expect(screen.getByRole('button', { name: /confirm|подтвердить/i })).toBeTruthy(),
+    () => expect(screen.queryByRole('button', { name: /confirm|подтвердить/i })).not.toBeNull(),
     { timeout: 2000 },
   )
   fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))

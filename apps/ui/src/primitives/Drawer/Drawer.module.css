@@ -5,19 +5,83 @@
    parks exactly under that strip. With no rail (offset 0) the closed panel sits
    flush past the edge, as it always did. */
 .drawer {
+  /* one clock for the slide, the width and the content's fade */
+  --drawer-t: 320ms;
+
   position: absolute;
   inset-block: 0;
   z-index: var(--z-drawer);
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
+
+  /* The panel is a mask over its content (owner, 25.09): what lies past its
+     edge while the width travels is hidden, not squeezed in. */
+  overflow: hidden;
   background: color-mix(in srgb, var(--surface-1) 92%, var(--bg));
 
-  /* inline-size анимируется вместе со сдвигом — плавная смена ширины контента.
-     box-shadow travels with them because the closed panel drops it entirely —
-     see `.drawer:not(.open)` below. */
-  transition: transform 320ms var(--ease-soft), inline-size 320ms var(--ease-soft),
-    box-shadow 320ms var(--ease-soft);
+  /* inline-size анимируется вместе со сдвигом — край панели открывает и
+     закрывает содержимое, которое стоит на месте (`.layer`). box-shadow
+     travels with them because the closed panel drops it entirely — see
+     `.drawer:not(.open)` below. */
+  transition: transform var(--drawer-t) var(--ease-soft),
+    inline-size var(--drawer-t) var(--ease-soft), box-shadow var(--drawer-t) var(--ease-soft);
+}
+
+/* Coming out from behind the rail: the slide and the shadow travel, the width
+   does not — it is taken at once, where nobody sees it (see `arriving` in
+   Drawer.tsx). A transition is read from the style the change lands in, so
+   this has to be on the very commit the panel opens in. */
+.arriving {
+  transition: transform var(--drawer-t) var(--ease-soft),
+    box-shadow var(--drawer-t) var(--ease-soft);
+}
+
+/* One piece of content at its own width, pinned to the rail's side, so the
+   travelling edge never re-lays it out. The column and the padding are the
+   ones the panel itself used to carry: a tab that fills the panel
+   (`.panelFill` in the table) fills this. */
+.layer {
+  position: absolute;
+  inset-block: 0;
+  display: flex;
+  flex-direction: column;
+  inline-size: 100%;
+  padding: 20px;
+}
+
+.right .layer {
+  inset-inline-end: 0;
+}
+
+.left .layer {
+  inset-inline-start: 0;
+}
+
+/* A tab change under an open panel: the old content fades out while the new
+   one fades in, on the width's own clock — never one swapped for the other. */
+.entering {
+  animation: layer-in var(--drawer-t) var(--ease-soft);
+}
+
+.leaving {
+  pointer-events: none;
+  animation: layer-out var(--drawer-t) var(--ease-soft) forwards;
+}
+
+/* A prebuilt tab that is not the panel's: laid out at its own width and ready,
+   only not drawn — so showing it costs nothing to build. */
+.waiting {
+  visibility: hidden;
+}
+
+@keyframes layer-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes layer-out {
+  to {
+    opacity: 0;
+  }
 }
 
 /* Closed, the panel is parked BEHIND the rail: translated by its own width and
@@ -61,5 +125,14 @@
 @media (prefers-reduced-motion: reduce) {
   .drawer {
     transition: none;
+  }
+
+  .entering {
+    animation: none;
+  }
+
+  /* no fade, so no end of one to wait for: the old content is simply gone */
+  .leaving {
+    display: none;
   }
 }

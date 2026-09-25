@@ -4,7 +4,7 @@ import type { Action, CardInstance, Event } from '@release/engine'
 import { cardsPresent } from '@release/engine'
 import { botAction } from '@release/engine/fake'
 import { useTranslation } from '@release/translation'
-import { Button, Typography } from '@release/ui'
+import { Button, cardById, Typography } from '@release/ui'
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { toBoardOver, toBoardState } from '~/entities/game/board'
@@ -12,7 +12,15 @@ import { useNow } from '~/features/play-game/useNow'
 import { forViewer, rejectionsIn } from '~/network/session/audience'
 import Board from '~/pages/board/[gameId]/_Board'
 import { useDebugCopy } from './copy'
-import { createScenario, engine, SCENARIOS, type Scenario, seedLog } from './scenarios'
+import {
+  AI_CARDS,
+  createScenario,
+  DEFAULT_AI_CARD,
+  engine,
+  SCENARIOS,
+  type Scenario,
+  seedLog,
+} from './scenarios'
 import styles from './styles.module.css'
 
 type Intent = Action extends infer A ? (A extends Action ? Omit<A, 'at'> : never) : never
@@ -32,11 +40,21 @@ function reduceRun(run: Run, action: Action): Run {
   }
 }
 
-function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string }) {
+function ScenarioRun({
+  scenario,
+  gameId,
+  aiCard,
+  onAiCard,
+}: {
+  scenario: Scenario
+  gameId: string
+  aiCard: string
+  onAiCard: (card: string) => void
+}) {
   const { t, i18n } = useTranslation()
   const debug = useDebugCopy()
   const [run, dispatch] = useReducer(reduceRun, undefined, (): Run => {
-    const state = createScenario(scenario, gameId)
+    const state = createScenario(scenario, gameId, aiCard)
     // The seeded discard's own history, so the board can fold a heap out of
     // it (`seedLog`). Reported as already reflected below, so the queue
     // treats it as a table it arrived at rather than moves to replay.
@@ -157,6 +175,18 @@ function ScenarioRun({ scenario, gameId }: { scenario: Scenario; gameId: string 
             sideways under the cursor every time a pending opened or closed —
             and the buttons are the half you are aiming at. */}
         <div className={styles.actions}>
+          {/* which AI card the trigger reveals — picking one restarts the scene */}
+          {scenario === 'aiTrigger' &&
+            AI_CARDS.map((id) => (
+              <Button
+                key={id}
+                variant="tech"
+                aria-pressed={aiCard === id}
+                onClick={() => onAiCard(id)}
+              >
+                {cardById(id)?.name ?? id}
+              </Button>
+            ))}
           {scenario === 'elimination' && (
             <Button
               variant="tech"
@@ -293,8 +323,10 @@ function App() {
   const [selection, setSelection] = useState(() => ({
     scenario: SCENARIOS[0] as Scenario,
     gameId: crypto.randomUUID(),
+    aiCard: DEFAULT_AI_CARD,
   }))
-  const select = (scenario: Scenario) => setSelection({ scenario, gameId: crypto.randomUUID() })
+  const select = (scenario: Scenario, aiCard = selection.aiCard) =>
+    setSelection({ scenario, gameId: crypto.randomUUID(), aiCard })
 
   return (
     <main className={styles.app}>
@@ -314,7 +346,11 @@ function App() {
           {debug('restart')}
         </Button>
       </nav>
-      <ScenarioRun key={selection.gameId} {...selection} />
+      <ScenarioRun
+        key={selection.gameId}
+        {...selection}
+        onAiCard={(card) => select(selection.scenario, card)}
+      />
     </main>
   )
 }

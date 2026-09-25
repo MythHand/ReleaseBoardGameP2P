@@ -1,6 +1,6 @@
 import type React from 'react'
 import { type CSSProperties, useRef, useState } from 'react'
-import { play, useHandArrival } from '@/animations'
+import { play, SHAKE_FLINCH, useHandArrival } from '@/animations'
 import { CARDS } from '@/cards'
 import type { Card as CardType } from '@/cards/types'
 import { nextHandUid } from '@/mocks/hand'
@@ -27,8 +27,6 @@ const REVEAL_W = 220 // width the flown card reaches in the centre
 const OPP_HAND = 6 // opponent hand size
 const PICK_BEAT = 620 // chosen holds / others leave, before the opponent check
 const MISS_HOLD = 1620 // shake + note duration before the fan leaves (miss case)
-const MISS_SHAKE = 9 // the fan's flinch — a whole fan needs more than an input
-const MISS_SHAKE_MS = 460
 const GRID_W = 100 // card width in the choose-grid
 const INITIAL_HAND = 5 // the player already holds a hand
 
@@ -151,11 +149,7 @@ export default function PickSpecificCardStory() {
       // the fan flinches in place — the shared refusal gesture, in its springy
       // character and at the force a whole fan needs (the 7px settle default is
       // sized for an input field)
-      play('shake', topHandRef.current, {
-        amp: MISS_SHAKE,
-        dur: MISS_SHAKE_MS,
-        shape: 'spring',
-      })
+      play('shake', topHandRef.current, SHAKE_FLINCH)
       later(() => setHandIn(false), MISS_HOLD)
       later(backToIdle, MISS_HOLD + 560)
       return

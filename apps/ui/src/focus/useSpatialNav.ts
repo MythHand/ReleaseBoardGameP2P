@@ -1,4 +1,5 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback } from 'react'
+import { centerOf } from '@/primitives/Arrow/useArrow'
 
 // Spatial (grid-aware) arrow-key focus navigation, layered ON TOP of Tab —
 // Tab order is untouched; arrows just move focus to the geometrically nearest
@@ -37,11 +38,6 @@ function caretHoldsArrow(el: HTMLInputElement, dir: 'left' | 'right'): boolean {
   // A live selection collapses on the first arrow — let the field handle it.
   if (selectionStart !== selectionEnd) return true
   return dir === 'left' ? selectionStart !== 0 : selectionEnd !== value.length
-}
-
-function centerOf(el: HTMLElement): { x: number; y: number } {
-  const r = el.getBoundingClientRect()
-  return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
 }
 
 function nearestInDirection(

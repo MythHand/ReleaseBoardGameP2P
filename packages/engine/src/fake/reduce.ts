@@ -24,7 +24,7 @@ import { pruneEmptyPiles } from './piles'
 import { playableFor } from './project'
 import { onReorderTop } from './rebase'
 import { onCancelRelease, onDiscardForRelease, onPlay } from './release'
-import { fireTrigger, onDecline503, onNeutralize } from './triggers'
+import { fireTrigger, onDecline503, onDeclineCrush, onNeutralize } from './triggers'
 import { onUpgradeDiscard, onUpgradeTake } from './upgrade'
 import { onPass, onWindowExpired } from './window'
 
@@ -361,10 +361,14 @@ function dispatch(state: GameState, action: Action): Reduction {
       // 503 the presser owns is a decision, not a reaction window: PASS there
       // is "I will not neutralize" (#103 testing, problem 4), and `onPass`
       // would reject it twice over — no window is open, and a decision is
-      // pending. Every other PASS is the window's own.
-      return state.pending?.kind === 'neutralize503' && state.pending.player === action.player
-        ? onDecline503(state, action)
-        : onPass(state, action)
+      // pending. A Crush the presser owns is the same kind of decision: PASS is
+      // "I will not defend", and the release it aims at is destroyed (owner,
+      // 24.09). Every other PASS is the window's own.
+      if (state.pending?.kind === 'neutralize503' && state.pending.player === action.player)
+        return onDecline503(state, action)
+      if (state.pending?.kind === 'crush' && state.pending.player === action.player)
+        return onDeclineCrush(state, action)
+      return onPass(state, action)
     case 'WINDOW_EXPIRED':
       return onWindowExpired(state, action)
     case 'CLOCK_STARTED':

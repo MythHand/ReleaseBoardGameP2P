@@ -1,0 +1,59 @@
+/* The runner is a button — one press is its whole input — dressed as nothing:
+   no fill, no frame, the lobby shows through it. It takes the width AND the
+   height its place gives it and adds nothing to either: everything inside is
+   laid over it, so a header keeps the height its own content sets (owner,
+   25.09). It fills the height of whatever holds it — a sized box, or a row
+   that stretches it, as the lobby's header does. */
+.runner {
+  position: relative;
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: 100%;
+  min-block-size: 0;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+
+  /* Both sides fade out over `--fade`: obstacles come in out of the right fade
+     and leave into the left one. A mask is alpha, not paint — any opaque token
+     marks the part that shows. */
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--fg) var(--fade),
+    var(--fg) calc(100% - var(--fade)),
+    transparent
+  );
+}
+
+.runner:focus-visible {
+  outline: 1px dashed var(--white-18);
+  outline-offset: 2px;
+}
+
+/* laid over the block, centred in its height; sized in whole world units */
+.canvas {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  display: block;
+  margin-block: auto;
+  image-rendering: pixelated;
+}
+
+/* the score sits inside the clear part, clear of the right fade */
+.score {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: calc(var(--fade) + 4px);
+  display: flex;
+  gap: 12px;
+  color: var(--white-45);
+  pointer-events: none;
+}
+
+.best {
+  color: var(--white-25);
+}

@@ -259,6 +259,14 @@ export interface BeatRun {
   after?: BoardState
   base: BoardState
   publish: (state: BoardState) => void
+  /**
+   * Light the alarm glow NOW, from inside the beat — for an alarm that belongs
+   * to a moment in it rather than to the whole of it: an AI Error 503 is only
+   * an alarm once its card has turned face up, not from the first frame of the
+   * trigger leaving its pile. Goes out with the beat. Optional, because a beat
+   * run outside the queue (a test, a replay) has no glow to light.
+   */
+  raiseAlarm?: () => void
 }
 
 /**

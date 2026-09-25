@@ -64,6 +64,13 @@
   color: var(--white-45);
 }
 
+/* the mini-game takes whatever room the two sides of the header leave, and
+   the height they already set — stretched to it, adding none of its own */
+.runner {
+  flex: 1;
+  align-self: stretch;
+}
+
 /* правая часть шапки: код игры + переключатель языка в одну линию */
 .headRight {
   display: flex;
@@ -191,6 +198,7 @@
 /* действия лобби — всегда на виду внизу колонки игроков */
 .actions {
   display: flex;
+  flex-direction: column;
   gap: 16px;
   align-items: center;
   justify-content: center;

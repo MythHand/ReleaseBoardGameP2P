@@ -216,7 +216,7 @@ function bankAlarm(
 // carries it, and the marker sits at the paragraph in docs/rules/cards.md it
 // came from. Reachable only through the alarm the player owns — a `crush`
 // shares `onNeutralize` but not this: declining one destroys a slot rather than
-// its owner, which is a different rule and not one this task settled.
+// its owner, and that is `onDeclineCrush` below.
 export function onDecline503(state: GameState, action: Action & { type: 'PASS' }): Reduction {
   const pending = state.pending
   if (pending?.kind !== 'neutralize503') return reject(state, action, 'no 503 is owed by you')
@@ -239,6 +239,20 @@ export function onDecline503(state: GameState, action: Action & { type: 'PASS' }
     state: eliminate({ ...banked, pending: null, eventSeq: log.seq }, log, action.player),
     events: log.events,
   }
+}
+
+// Declining a Crush: the player can answer it and will not, so the release it
+// aims at is destroyed — the same outcome a player with no answer at all meets
+// (`destroySlot` without a reason, as `resolveAiEvent` calls it when nothing can
+// neutralize). The owner's answer, 24.09: Pass on a Crush is "I do not defend";
+// the rules text names the answers and not the refusal (docs/rules/backlog.md).
+export function onDeclineCrush(state: GameState, action: Action & { type: 'PASS' }): Reduction {
+  const pending = state.pending
+  if (pending?.kind !== 'crush') return reject(state, action, 'no crush is owed by you')
+  if (pending.player !== action.player) return reject(state, action, 'not your decision')
+  const log = createLog(state.eventSeq)
+  const destroyed = destroySlot({ ...state, pending: null }, log, action.player, pending.slot)
+  return { state: { ...destroyed, pending: null, eventSeq: log.seq }, events: log.events }
 }
 
 // Routes both trigger decisions: neutralize503 and crush share the same set of
@@ -324,7 +338,11 @@ export function resolveAiEvent(
         log.add({ type: 'neutralized', player, method: 'monitoring' })
         return { ...state, eventSeq: log.seq }
       }
-      const methods = neutralizeOptions(state, player)
+      // What is left to choose is a Debugger, and never a sacrifice: "Пожертвовать
+      // другой релиз нельзя: Crush бьёт строго по своему типу релиза"
+      // (docs/rules/cards.md, the Crush entry). The 503's third method is not
+      // one of Crush's.
+      const methods = neutralizeOptions(state, player).filter((m) => m !== 'sacrifice')
       if (methods.length === 0) return destroySlot(state, log, player, slot)
       return {
         ...state,
