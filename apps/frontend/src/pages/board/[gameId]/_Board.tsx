@@ -39,6 +39,7 @@ import {
   ReleaseZone,
   Rules,
   rowPlaceStyle,
+  ScrollArea,
   Seat,
   Slider,
   type TableActions,
@@ -2138,7 +2139,23 @@ export default function Board({
       </div>
 
       {/* выезжающая панель поверх контента (ширина — per-tab) */}
-      <Drawer open={panel !== null} width={drawerWidth} className={kit.drawer}>
+      <Drawer
+        open={panel !== null}
+        width={drawerWidth}
+        contentKey={panel}
+        // the rules are built ahead, not in the frames the panel widens in
+        prebuilt={{
+          rules: {
+            width: DRAWER_WIDTH.rules,
+            node: (
+              <ScrollArea className={kit.scrollPanel}>
+                <Rules copy={copy.rules} />
+              </ScrollArea>
+            ),
+          },
+        }}
+        className={kit.drawer}
+      >
         {panel === 'settings' && (
           <div className={kit.settings}>
             {hasUpperSettings && (
@@ -2217,11 +2234,6 @@ export default function Board({
             isHost={isHost}
             onKickSpectator={onKickSpectator}
           />
-        )}
-        {panel === 'rules' && (
-          <div className={kit.scrollPanel}>
-            <Rules copy={copy.rules} />
-          </div>
         )}
         {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
         {panel === 'chat' && <div className={kit.chatPanel}>{slots?.chat}</div>}
