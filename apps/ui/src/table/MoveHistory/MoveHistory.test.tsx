@@ -1,9 +1,6 @@
 import { render } from '@testing-library/react'
-import { expect, it, vi } from 'vitest'
-import { followTail } from './followTail'
-import MoveHistory, { type HistoryEntry } from './MoveHistory'
-
-vi.mock('./followTail', () => ({ followTail: vi.fn() }))
+import { expect, it } from 'vitest'
+import MoveHistory from './MoveHistory'
 
 const copy = { draw: 'draw', eliminated: 'is out' }
 
@@ -47,59 +44,29 @@ it("renders a system row's children instead of swallowing them", () => {
   expect(getByText('DDoS')).toBeTruthy()
 })
 
-// I2 (Important, whole-branch review #136): `ScrollArea` builds its
-// OverlayScrollbars instance in its own PASSIVE effect (a child of this
-// component) — but the follow used to run only in a LAYOUT effect, and React
-// flushes every layout effect in the tree before any passive effect starts.
-// So on the commit that first mounts a restored, non-empty history,
-// `viewport()` was still null and the follow was silently skipped — a reader
-// opening the tab on a long log landed on the OLDEST rows and stayed there
-// (`scrollTop === 0` reads as "the reader scrolled up" from then on).
-it('follows to the tail on the very first mount, not only on later arrivals', () => {
-  render(
-    <MoveHistory
-      copy={copy}
-      entries={[
-        { id: 1, who: 'you', kind: 'Draw', card: 'Bug' },
-        { id: 2, who: 'you', kind: 'Draw', card: 'DDoS' },
-      ]}
-    />,
-  )
-  expect(followTail).toHaveBeenCalled()
-})
-
-it('follows when a child is appended without changing the root count', () => {
-  const root: HistoryEntry = { id: 1, who: 'Ann', kind: 'attack', children: [] }
-  const { rerender } = render(<MoveHistory copy={copy} entries={[root]} />)
-  vi.mocked(followTail).mockClear()
-
-  rerender(
-    <MoveHistory
-      copy={copy}
-      entries={[{ ...root, children: [{ id: 2, who: 'Bo', kind: 'defend' }] }]}
-    />,
-  )
-
-  expect(followTail).toHaveBeenCalled()
-})
-
-it('follows when a grandchild is appended without changing root or child counts', () => {
-  const child: HistoryEntry = { id: 2, who: 'Bo', kind: 'defend', children: [] }
-  const root: HistoryEntry = { id: 1, who: 'Ann', kind: 'attack', children: [child] }
-  const { rerender } = render(<MoveHistory copy={copy} entries={[root]} />)
-  vi.mocked(followTail).mockClear()
-
-  rerender(
+// Newest first at the top level; a reaction stays under the entry it answers,
+// in the order it happened.
+it('lists the newest entry first and keeps children under their parent', () => {
+  const { container } = render(
     <MoveHistory
       copy={copy}
       entries={[
         {
-          ...root,
-          children: [{ ...child, children: [{ id: 3, who: 'Cy', kind: 'counter' }] }],
+          id: 1,
+          who: 'Ann',
+          kind: 'attack',
+          card: 'Bug',
+          children: [
+            { id: 2, who: 'Bo', kind: 'defend', card: 'Hotfix' },
+            { id: 3, who: 'Ann', kind: 'counter', card: 'Sudo' },
+          ],
         },
+        { id: 4, who: 'Bo', kind: 'Draw', card: 'DDoS' },
       ]}
     />,
   )
-
-  expect(followTail).toHaveBeenCalled()
+  const order = [...container.querySelectorAll('[data-accented]')].map(
+    (row) => row.querySelector('span')?.textContent,
+  )
+  expect(order).toEqual(['DDoS', 'Bug', 'Hotfix', 'Sudo'])
 })
