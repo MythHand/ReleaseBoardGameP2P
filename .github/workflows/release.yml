@@ -1,8 +1,6 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -13,13 +11,15 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    # The version-bump commit pushed back to main carries [skip ci], but guard
-    # against it anyway so a release never triggers another release.
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    # semantic-release only publishes from main; refuse other refs up front.
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: write
       issues: write
       pull-requests: write
+    outputs:
+      published: ${{ steps.release.outputs.new_release_published }}
+      tag: ${{ steps.release.outputs.new_release_git_tag }}
     steps:
       # main is protected (PR + review required), so GITHUB_TOKEN cannot push
       # the version-bump commit. RELEASE_TOKEN is a token of a repo admin
@@ -61,3 +61,17 @@ jobs:
       - name: Summary
         if: steps.release.outputs.new_release_published == 'true'
         run: echo "Released **${{ steps.release.outputs.new_release_git_tag }}**" >> "$GITHUB_STEP_SUMMARY"
+
+  # Ship the tag that was just released: the build runs from the release commit,
+  # so the deployed app carries the bumped version.
+  deploy:
+    name: Deploy ${{ needs.release.outputs.tag }}
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      ref: ${{ needs.release.outputs.tag }}
