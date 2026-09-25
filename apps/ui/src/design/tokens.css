@@ -136,11 +136,6 @@
   --orange-95: rgb(255 168 12 / 95%);
 
   /* ===== Gradients ===== */
-  --grad-selection: linear-gradient(
-    165deg,
-    var(--mint-light) 0%,
-    var(--mint-dark) 100%
-  ); /* выделенный сегмент ModeSelect (мятная заливка ползунка) */
   --grad-scrim: linear-gradient(
     90deg,
     var(--black-80) 0%,
