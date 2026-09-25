@@ -294,8 +294,17 @@ export function useBoardStaging({
   // candidate could start an overlapping second fold on top of the first.
   const foldingRef = useRef(false)
   const plainAttempt = useRef(0)
+  // Whose turn it was when the current staging began. An attack answering a
+  // reaction window is staged on somebody else's turn by design, so "not my
+  // turn" alone cannot tell a stale aim from a live one — only a staging that
+  // began on MY turn is left behind when the turn moves on.
+  const stagedOnTurnRef = useRef<string | undefined>(undefined)
+  const turnRef = useRef(state.turn)
+  turnRef.current = state.turn
 
   const commitStaged = (next: StagedPlay | null) => {
+    if (!next) stagedOnTurnRef.current = undefined
+    else if (!stagedRef.current) stagedOnTurnRef.current = turnRef.current
     stagedRef.current = next
     setStaged(next)
   }
@@ -714,15 +723,29 @@ export function useBoardStaging({
     flyer.drop,
   ])
 
-  // A card waiting for a target belongs to the current turn only. When the
+  // A card waiting for a target belongs to the turn it was staged on. When the
   // timer ends that turn, no table click or Escape arrives to call `cancel`,
   // so the card otherwise stays over the next player's decisions (including
   // a System Upgrade discard owed by this seat). A dispatched play belongs to
   // the beat instead and must keep its existing hand-off path.
+  //
+  // It reacts to the turn LEAVING me, not to "not my turn": an attack on a
+  // fresh release is staged on the opponent's turn and flies to the centre
+  // before it dispatches, and cancelling it mid-flight sent every such attack
+  // home (#193). `cancel` is read through a ref so that its re-creation on an
+  // unrelated render never re-runs this check.
+  const cancelRef = useRef(cancel)
+  cancelRef.current = cancel
   useEffect(() => {
     const waiting = stagedRef.current
-    if (waiting && waiting.phase !== 'dispatched' && state.turn !== state.selfId) cancel()
-  }, [state.turn, state.selfId, cancel])
+    if (
+      waiting &&
+      waiting.phase !== 'dispatched' &&
+      stagedOnTurnRef.current === state.selfId &&
+      state.turn !== state.selfId
+    )
+      cancelRef.current()
+  }, [state.turn, state.selfId])
 
   // While a support waits for a partner, the cards it can fold with keep
   // their own category accent — the support's own, per ComboStory (the TYPE
