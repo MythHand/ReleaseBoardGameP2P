@@ -1,7 +1,7 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
 import { DEFAULT_SETUP, isCounting, Message, ToastStack } from '@release/ui'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { type Panel, toBoardOver, toBoardState } from '~/entities/game/board'
@@ -41,6 +41,11 @@ export default function BoardPage() {
   const { gameId } = useParams()
   const [panel, setPanel] = useState<Panel | null>(null)
   const [chatToasts, setChatToasts] = useState(true)
+  // `returnObjects` builds a fresh object on every call; the rules are the
+  // heaviest block the board holds (built ahead in the side panel), so their
+  // copy keeps one identity until the language changes and the board can skip
+  // re-rendering them.
+  const rulesCopy = useMemo(() => t('rulesBlock', { returnObjects: true }), [t])
 
   // Where this peer is, for everyone else's results table.
   const { setWhere } = session
@@ -237,7 +242,7 @@ export default function BoardPage() {
         copy={{
           table: t('table', { returnObjects: true }),
           modes: t('gameModes', { returnObjects: true }),
-          rules: t('rulesBlock', { returnObjects: true }),
+          rules: rulesCopy,
           seat: t('seat', { returnObjects: true }),
           participants: t('participants', { returnObjects: true }),
           history: t('moveHistory', { returnObjects: true }),

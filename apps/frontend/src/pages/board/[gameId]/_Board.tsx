@@ -1182,6 +1182,17 @@ export default function Board({
     if (panel) lastOpen.current = panel
   }, [panel])
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
+  // The rules panel is built ahead and kept mounted (`Drawer`'s `prebuilt`), so
+  // an element made fresh here would re-render the whole rules text on every
+  // board render — every beat of every animation. One element per copy.
+  const rulesPanel = useMemo(
+    () => (
+      <ScrollArea className={kit.scrollPanel}>
+        <Rules copy={copy.rules} />
+      </ScrollArea>
+    ),
+    [copy.rules],
+  )
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening AND click-anywhere-cancels-staging (handleTableClick owns both); the accessible affordance for each is its own Escape handler above
@@ -2147,11 +2158,7 @@ export default function Board({
         prebuilt={{
           rules: {
             width: DRAWER_WIDTH.rules,
-            node: (
-              <ScrollArea className={kit.scrollPanel}>
-                <Rules copy={copy.rules} />
-              </ScrollArea>
-            ),
+            node: rulesPanel,
           },
         }}
         className={kit.drawer}
