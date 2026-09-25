@@ -1,6 +1,7 @@
 import { useTranslation } from '@release/translation'
 import {
   Badge,
+  BugRunner,
   Button,
   EmptySlot,
   GameSettings,
@@ -36,6 +37,7 @@ export default function LobbyView() {
   const openModal = useModalRoute()
 
   const [disbandOpen, setDisbandOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
 
   // Where this peer is, for everyone else's results table.
   const { setWhere } = session
@@ -52,6 +54,8 @@ export default function LobbyView() {
   const isHost = session.isHost
   const players = Object.values(state.peers).filter((p) => p.role === 'host' || p.role === 'player')
   const spectators = Object.values(state.peers).filter((p) => p.role === 'guest')
+  // me, when I hold a seat — a spectator has no readiness to give
+  const me = players.find((p) => p.id === state.selfId)
   const capacity = state.maxPlayers
   const minCapacity = Math.max(2, players.length)
   // What the table can actually give right now — capped by the free seats — as
@@ -76,7 +80,8 @@ export default function LobbyView() {
   const addBot = () => session.setBots(bots + 1)
   const removeBot = () => session.setBots(bots - 1)
 
-  const leave = () => {
+  const onLeaveConfirm = () => {
+    setLeaveOpen(false)
     session.leaveSession()
     navigate('/start')
   }
@@ -133,9 +138,15 @@ export default function LobbyView() {
             <Typography variant="pageTitle" className={styles.title}>
               {t('lobbyScreen.title')}
             </Typography>
-            {isHost && (
+            {/* the way out of the lobby, one place for everyone: the host
+                disbands it, anyone else leaves it — each behind a confirm */}
+            {isHost ? (
               <Button variant="dangerGhost" onClick={() => setDisbandOpen(true)}>
                 {t('lobbyScreen.disband')}
+              </Button>
+            ) : (
+              <Button variant="dangerGhost" onClick={() => setLeaveOpen(true)}>
+                {t('lobbyScreen.leave')}
               </Button>
             )}
           </div>
@@ -143,6 +154,8 @@ export default function LobbyView() {
             {t('lobbyScreen.subtitle')}
           </Typography>
         </div>
+        {/* the room between the two sides of the header is the mini-game's */}
+        <BugRunner label={t('lobbyScreen.bugRunner')} className={styles.runner} />
         <div className={styles.headRight}>
           <LobbyCode
             code={session.roomCode ?? ''}
@@ -282,13 +295,19 @@ export default function LobbyView() {
             </div>
           </div>
 
+          {/* [ READY ] repeats the toggle in my own row — same action, same state,
+              green while on; the host's [ START ] goes under it. A spectator has
+              no readiness, and leaving lives in the header: nothing here. */}
           <div className={styles.actions}>
-            {isHost ? (
+            {me && (
+              <Button aria-pressed={me.ready} onClick={() => session.ready()}>
+                {t('lobbyScreen.ready')}
+              </Button>
+            )}
+            {isHost && (
               <Button disabled={!session.canStart} onClick={startGame}>
                 {t('lobbyScreen.start')}
               </Button>
-            ) : (
-              <Button onClick={leave}>{t('lobbyScreen.leave')}</Button>
             )}
           </div>
         </section>
@@ -315,6 +334,24 @@ export default function LobbyView() {
           </Button>
           <Button variant="danger" onClick={onDisbandConfirm}>
             {t('lobbyScreen.disband')}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={leaveOpen}
+        onClose={() => setLeaveOpen(false)}
+        title={t('lobbyScreen.leaveTitle')}
+      >
+        <Typography variant="body" className={styles.confirmText}>
+          {t('lobbyScreen.leaveText')}
+        </Typography>
+        <div className={styles.confirmActions}>
+          <Button variant="tech" onClick={() => setLeaveOpen(false)}>
+            {t('lobbyScreen.cancel')}
+          </Button>
+          <Button variant="danger" onClick={onLeaveConfirm}>
+            {t('lobbyScreen.leave')}
           </Button>
         </div>
       </Modal>

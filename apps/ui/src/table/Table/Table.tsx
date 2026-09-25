@@ -442,7 +442,23 @@ export default function Table({
         <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
 
         {/* выезжающая панель поверх контента (ширина — per-tab) */}
-        <Drawer open={panel !== null} width={drawerWidth} className={styles.drawer}>
+        <Drawer
+          open={panel !== null}
+          width={drawerWidth}
+          contentKey={panel}
+          // the rules are built ahead, not in the frames the panel widens in
+          prebuilt={{
+            rules: {
+              width: DRAWER_WIDTH.rules,
+              node: (
+                <ScrollArea className={styles.scrollPanel}>
+                  <Rules copy={copy.rules} />
+                </ScrollArea>
+              ),
+            },
+          }}
+          className={styles.drawer}
+        >
           {panel === 'settings' && (
             <div className={styles.settings}>
               {hasUpperSettings && (
@@ -561,11 +577,6 @@ export default function Table({
               isHost={isHost}
               onKickSpectator={onKickSpectator}
             />
-          )}
-          {panel === 'rules' && (
-            <ScrollArea className={styles.scrollPanel}>
-              <Rules copy={copy.rules} />
-            </ScrollArea>
           )}
           {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
           {panel === 'chat' && <div className={styles.chatPanel}>{slots?.chat}</div>}

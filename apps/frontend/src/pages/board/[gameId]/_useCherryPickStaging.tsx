@@ -16,6 +16,18 @@ import { useResolveFeedback } from './_useResolveFeedback'
 // instead of animating a second copy from the discard. The heap is empty
 // while its cards are in the grid, matching the playground scene.
 const isTrigger = (id: string) => cardById(id)?.category === 'trigger'
+const isRelease = (id: string) => cardById(id)?.category === 'release'
+
+// THE TWO PICKS OUT OF THE DISCARD, ONE SURFACE. Git Cherry-pick lays the whole
+// discard out; Inside lays out only the releases in it (`discardOptions`, fake/
+// discard.ts). Both are one `pickFromDiscard` pending, and Inside used to have a
+// row of its own that only imitated this one — no surface over the table, no
+// confirm bar beneath, nothing for the other seats to watch (owner, 24.09). It
+// is this surface now: the offer is narrower and the prompt is its own, and
+// everything else — the deal out of the pile, the confirm, the card flown to
+// the hand, the rest flown home, the same pick watched from across the table —
+// is the same scene.
+const PICK_SOURCES: ReadonlySet<string> = new Set(['operation-git-cherry-pick', 'ai-inside'])
 
 // A card this seat is not entitled to know — the one going on the deck, seen
 // from across the table. It carries no face, only the base deck's back, and it
@@ -60,6 +72,8 @@ export function useCherryPickStaging(args: {
   onHandArrival: (order: string[], uid: string, at: number) => void
   copy: {
     prompt: string
+    /** Inside's own caption — the offer is the releases, not the whole discard */
+    insidePrompt: string
     sudoPrompt: string
     toHand: string
     toDeck: string
@@ -71,14 +85,22 @@ export function useCherryPickStaging(args: {
   pickPreview?: { player: string; card: string | null } | null
   /** this seat's own offer, on its way to the others */
   onPickPreview?: (card: string | null) => void
-}): { grid: ReactNode | null; overlay: ReactNode[]; gapAt: number | null; gapSize: number } {
+}): {
+  grid: ReactNode | null
+  overlay: ReactNode[]
+  gapAt: number | null
+  gapSize: number
+  /** what of the discard is out in the grid while it stands: all of it for a
+   *  Cherry-pick, only the releases for Inside — the pile shows the rest */
+  lifted: 'all' | 'releases' | null
+} {
   const { state, anchors, actions, copy, enabled } = args
   const reduced = useReducedMotion()
   const pending = state.pending
   const ours =
     enabled &&
     pending?.kind === 'pickFromDiscard' &&
-    pending.source === 'operation-git-cherry-pick' &&
+    PICK_SOURCES.has(pending.source ?? '') &&
     pending.player === state.selfId
       ? pending
       : null
@@ -96,18 +118,21 @@ export function useCherryPickStaging(args: {
   const theirs =
     enabled &&
     pending?.kind === 'pickFromDiscard' &&
-    pending.source === 'operation-git-cherry-pick' &&
+    PICK_SOURCES.has(pending.source ?? '') &&
     pending.player !== state.selfId
       ? pending
       : null
+  // Inside offers the releases alone, so a watching seat lays out only those —
+  // the same narrowing the engine applies to the actor's own options.
+  const releasesOnly = (ours ?? theirs)?.source === 'ai-inside'
   const watched = useMemo(
     () =>
       theirs
         ? (state.decks.discardHeap ?? []).flatMap((c) =>
-            c.uid ? [{ uid: c.uid, id: c.card.id }] : [],
+            c.uid && (!releasesOnly || isRelease(c.card.id)) ? [{ uid: c.uid, id: c.card.id }] : [],
           )
         : [],
-    [theirs, state.decks.discardHeap],
+    [theirs, releasesOnly, state.decks.discardHeap],
   )
 
   const [picks, setPicks] = useState<string[]>([])
@@ -128,15 +153,19 @@ export function useCherryPickStaging(args: {
   // easily outrun the flight it is honest about still being mid-air).
   const optionsRef = useRef<{ uid: string; id: string }[]>([])
   const sudoRef = useRef(false)
+  const insideRef = useRef(false)
   if (ours) {
     optionsRef.current = ours.options
     sudoRef.current = ours.picks === 2
+    insideRef.current = releasesOnly
   } else if (theirs) {
     // the same carry-forward, for the seat that only watches: the pending goes
     // the instant the engine answers, and the cards are still in the air
     optionsRef.current = watched
     sudoRef.current = theirs.picks === 2
+    insideRef.current = releasesOnly
   }
+  const inside = ours || theirs ? releasesOnly : insideRef.current
   const options = ours ? ours.options : theirs ? watched : optionsRef.current
   const sudo = ours ? ours.picks === 2 : theirs ? theirs.picks === 2 : sudoRef.current
   // ONE OFFER FOR BOTH SEATS — the actor's own, or the same pick seen from
@@ -197,8 +226,8 @@ export function useCherryPickStaging(args: {
     }
   })
 
-  // One candidate is not a choice — `_useInsideStaging`'s precedent, and
-  // #105's Decision 2 before it. Latched on the pending rather than the mount,
+  // One candidate is not a choice — #105's Decision 2, and the rule Inside
+  // kept when it had a row of its own. Latched on the pending rather than the mount,
   // so a second, distinct pending is free to fire again.
   const answered = useRef<string | null>(null)
   useEffect(() => {
@@ -356,8 +385,8 @@ export function useCherryPickStaging(args: {
       ...(deck ? { toDeck: deck } : {}),
     }
 
-    // A game action must never wait on an animation nobody plays
-    // (`_useInsideStaging`'s rule). Under reduced motion the RESOLVE goes now
+    // A game action must never wait on an animation nobody plays. Under
+    // reduced motion the RESOLVE goes now
     // and the grid simply unmounts.
     if (reduced) {
       setConfirmed(true)
@@ -637,7 +666,7 @@ export function useCherryPickStaging(args: {
       (ours != null && answeredKey.current === offerKey(ours)) ||
       (ours?.picks === 1 && ours.options.length < 2 && !manualRetry))
   ) {
-    return { grid: null, overlay, ...gaps }
+    return { grid: null, overlay, ...gaps, lifted: null }
   }
 
   // The scene's `phase === 'choose'`: the deal has finished and nothing is
@@ -662,7 +691,7 @@ export function useCherryPickStaging(args: {
       // happens before anything moves (Rebase's own `answered`, same rule).
       <TableSurface
         committed={confirmed}
-        testId="board-cherry-grid"
+        testId={inside ? 'board-inside-row' : 'board-cherry-grid'}
         blockTestId="board-cherry-scrim"
       >
         <div className={`${styles.cells} ${dealing ? styles.dealing : ''}`}>
@@ -729,7 +758,7 @@ export function useCherryPickStaging(args: {
           // actor's alone without a second condition saying so.
           open={choosing}
           label={copy.confirm}
-          caption={sudo ? copy.sudoPrompt : copy.prompt}
+          caption={inside ? copy.insidePrompt : sudo ? copy.sudoPrompt : copy.prompt}
           disabled={!ready}
           onConfirm={confirmPick}
         />
@@ -737,6 +766,7 @@ export function useCherryPickStaging(args: {
     ),
     overlay,
     ...gaps,
+    lifted: inside ? 'releases' : 'all',
   }
 }
 

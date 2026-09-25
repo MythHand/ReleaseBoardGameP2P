@@ -7,6 +7,7 @@ import { CLEAR_STEP, GATHER_HOLD } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
 import type { BeatPlan, DiscardCard } from './planBeats'
 import { toEventsDeck } from './toEventsDeck'
+import { withLanded } from './toHeap'
 import { withoutFlown } from './withoutFlown'
 
 // THE HAND LIMIT'S OWN EXIT (#104). The excess does not trickle into the heap
@@ -302,8 +303,17 @@ export function useHandLimitBeat(
       if (items.length + causeItems.length === 0) clearStanding()
       await Promise.all([
         latest.current.send([...items, ...causeItems], clearStanding).then(() => {
-          if (isStale() || causeItems.length === 0) return
-          const next = { ...ctx.base, decks: flown.decks }
+          if (isStale()) return
+          // the cause goes back into the heap it was taken out of for its flight…
+          const restored = causeItems.length > 0 ? { ...ctx.base, decks: flown.decks } : ctx.base
+          // …and the thrown cards land in it, filed by the beat that flew them:
+          // `flown` keeps the discard as it was before the batch, so without
+          // this they are nowhere until the projection catches up (toHeap.ts)
+          const next = withLanded(
+            restored,
+            plan.cards.map((c) => ({ eventId: c.eventId, card: c.card })),
+          )
+          if (next === ctx.base) return
           ctx.base = next
           ctx.publish(next)
         }),

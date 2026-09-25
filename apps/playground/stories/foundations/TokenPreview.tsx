@@ -97,8 +97,6 @@ function readTokens(): Token[] {
 
 const NAMED_HUES = [
   '--mint',
-  '--mint-light',
-  '--mint-dark',
   '--deep-green',
   '--coral',
   '--gold',
@@ -130,7 +128,7 @@ const RAMP_DEFS: { base: string; title: string; sub: string }[] = [
   { base: '--brand-green', title: 'Brand green', sub: 'tint' },
 ]
 
-// a token belongs to a ramp when it is "<base>-<number>" (excludes --mint-light etc.)
+// a token belongs to a ramp when it is "<base>-<number>" (excludes named hues like --deep-green)
 function rampBase(name: string): string | null {
   const m = name.match(/^(--(?:white|black|mint|coral|brand-green))-\d/)
   return m ? m[1] : null

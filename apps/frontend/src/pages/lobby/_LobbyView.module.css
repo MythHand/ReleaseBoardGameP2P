@@ -68,6 +68,13 @@
   color: var(--white-45);
 }
 
+/* the mini-game takes whatever room the two sides of the header leave, and
+   the height they already set — stretched to it, adding none of its own */
+.runner {
+  flex: 1;
+  align-self: stretch;
+}
+
 /* right side of the header: game code + language switch on one line */
 .headRight {
   display: flex;
@@ -186,6 +193,7 @@
 /* lobby actions — always visible at the foot of the players column */
 .actions {
   display: flex;
+  flex-direction: column;
   gap: 16px;
   align-items: center;
   justify-content: center;
