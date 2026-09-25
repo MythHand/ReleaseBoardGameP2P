@@ -1,8 +1,10 @@
-/* The screen is `min-block-size: 100%`, which needs a parent with a definite
-   height to resolve against — the app root only sets `min-block-size: 100vh`.
-   Same reason the board's own wrapper carries this, and `dvh` for the same
-   reason too: mobile browser chrome must not push content out of a viewport it
-   cannot scroll back. */
+/* The screen with the chat is `block-size: 100%` and keeps its own scroll
+   inside: the results scroll beside the chat panel, and the log scrolls inside
+   the panel. That needs a DEFINITE height to resolve against — with only a
+   `min-block-size` here, 100% resolved to `auto`, and every message grew the
+   whole page taller than the screen. So the page is exactly one screen, as in
+   the playground's `StatsChatStory`. `dvh` rather than `vh`: mobile browser
+   chrome must not push content out of a viewport it cannot scroll back. */
 .page {
-  min-block-size: 100dvh;
+  block-size: 100dvh;
 }

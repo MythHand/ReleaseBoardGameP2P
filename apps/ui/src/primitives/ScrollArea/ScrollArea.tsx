@@ -22,10 +22,9 @@ interface ScrollAreaProps {
   ref?: Ref<ScrollAreaHandle>
 }
 
-// Прокручиваемая область проекта: полоса лежит НАД содержимым, поэтому не
-// съедает ширину и не двигает раскладку, и её не видно, пока не прокручивают.
-// Тема `os-theme-release` живёт в global.css: класс библиотека ставит строкой, а
-// модульный CSS хеширует имена — оттуда его было бы не видно.
+// Прокручиваемая область проекта. Полосы прокрутки в проекте не показываются
+// нигде (global.css), поэтому и у библиотеки она скрыта: область прокручивается,
+// но ползунок не рисуется и не съедает ширину.
 //
 // Библиотека берётся ЯДРОМ, без React-обёртки: `overlayscrollbars-react` стоит
 // на 0.5.x с апреля 2024 и мажорной версии так и не получила, тогда как само
@@ -76,9 +75,8 @@ export default function ScrollArea({
 
 const OPTIONS: PartialOptions = {
   scrollbars: {
-    theme: 'os-theme-release',
-    // полосу видно только пока прокручивают, дальше она уходит сама
-    autoHide: 'scroll',
-    autoHideDelay: 600,
+    // no bar anywhere in the project (global.css) — the area still scrolls,
+    // its bar is just never drawn
+    visibility: 'hidden',
   },
 }
