@@ -410,6 +410,7 @@
     "disbandText": "The lobby will be closed and all connected players disconnected. This cannot be undone.",
     "leaveTitle": "Leave the lobby?",
     "leaveText": "You will leave the lobby, and your seat will be freed.",
+    "bugRunner": "Mini-game: press to make the bug jump",
     "cancel": "cancel"
   },
   "moveHistory": {

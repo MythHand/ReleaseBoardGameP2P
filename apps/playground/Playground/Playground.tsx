@@ -5,6 +5,7 @@ import AnimationAuditStory from '../stories/AnimationAuditStory'
 import AnimationsStory from '../stories/AnimationsStory'
 import ArrowStory from '../stories/ArrowStory'
 import AskLineBlock from '../stories/blocks/AskLineBlock'
+import BugRunnerBlock from '../stories/blocks/BugRunnerBlock'
 import ChatBlock from '../stories/blocks/ChatBlock'
 import ConfirmActionBlock from '../stories/blocks/ConfirmActionBlock'
 import GameOverBlock from '../stories/blocks/GameOverBlock'
@@ -246,6 +247,7 @@ const groups: Group[] = [
       { id: 'block-toast', title: 'Toast', render: () => <ToastBlock /> },
       { id: 'block-player-slot', title: 'Player slot', render: () => <PlayerSlotBlock /> },
       { id: 'block-lobby-code', title: 'Lobby code', render: () => <LobbyCodeBlock /> },
+      { id: 'block-bug-runner', title: 'Bug runner', render: () => <BugRunnerBlock /> },
       { id: 'block-lang-switcher', title: 'Lang switcher', render: () => <LangSwitcherBlock /> },
       { id: 'block-move-history', title: 'Move history', render: () => <MoveHistoryBlock /> },
       { id: 'block-reconnect', title: 'Reconnect', render: () => <ReconnectBlock /> },

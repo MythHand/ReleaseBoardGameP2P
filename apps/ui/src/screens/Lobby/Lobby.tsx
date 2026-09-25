@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from 'react'
+import BugRunner from '@/blocks/BugRunner'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
@@ -95,6 +96,8 @@ export interface LobbyCopy {
   disbandText: string
   leaveTitle: string
   leaveText: string
+  // the header's mini-game, as a screen reader names it
+  bugRunner: string
   cancel: string
 }
 
@@ -238,6 +241,8 @@ export default function Lobby({
           </div>
           <p className={styles.sub}>{copy.subtitle}</p>
         </div>
+        {/* the room between the two sides of the header is the mini-game's */}
+        <BugRunner label={copy.bugRunner} className={styles.runner} />
         <div className={styles.headRight}>
           <LobbyCode code={code} link={shareLink} copy={codeCopy} />
           <LangSwitcher value={lang} onChange={setLang} label={copy.language} />
