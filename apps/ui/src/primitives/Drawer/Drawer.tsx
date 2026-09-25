@@ -26,6 +26,10 @@ interface DrawerProps {
   // 25.09). Built once the page is idle, hidden until its id is the panel's,
   // never taken down. `children` carries nothing for these ids.
   prebuilt?: Record<string, { node: ReactNode; width?: number | string }>
+  // Build the prebuilt tabs now — the player is reaching for the panel. Where
+  // the browser cannot say when it is idle (Safari has no requestIdleCallback),
+  // this is the only moment they are built ahead of being opened.
+  warm?: boolean
   children: ReactNode
   className?: string
 }
@@ -55,6 +59,7 @@ export default function Drawer({
   width,
   contentKey,
   prebuilt,
+  warm = false,
   children,
   className = '',
 }: DrawerProps) {
@@ -83,21 +88,25 @@ export default function Drawer({
     shown.current = { open, layer: { key: contentKey, node: children, width } }
   })
 
-  // The prebuilt tabs go up when the page has a moment, and as a transition, so
-  // React builds them in slices between frames rather than in one block — the
-  // table may be animating its own opening at that very moment.
+  // The prebuilt tabs go up when the page has a moment — or when the player
+  // reaches for the panel, whichever comes first — and as a transition, so React
+  // builds them in slices between frames rather than in one block. There is no
+  // "at once" fallback where the browser cannot tell idle: at once is during
+  // the table's opening, and that is the stall this exists to avoid (and every
+  // board test paid for it, 25.09).
   const hasPrebuilt = prebuilt != null
   const [built, setBuilt] = useState(false)
   useEffect(() => {
-    if (!hasPrebuilt) return
+    if (!hasPrebuilt || built) return
     const build = () => startTransition(() => setBuilt(true))
-    if (typeof requestIdleCallback === 'function') {
-      const id = requestIdleCallback(build)
-      return () => cancelIdleCallback(id)
+    if (warm) {
+      build()
+      return
     }
-    const id = setTimeout(build)
-    return () => clearTimeout(id)
-  }, [hasPrebuilt])
+    if (typeof requestIdleCallback !== 'function') return
+    const id = requestIdleCallback(build)
+    return () => cancelIdleCallback(id)
+  }, [hasPrebuilt, built, warm])
 
   const isPrebuilt = (key: string | null | undefined) =>
     key != null && prebuilt != null && key in prebuilt

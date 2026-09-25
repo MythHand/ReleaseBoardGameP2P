@@ -171,6 +171,8 @@ export default function Table({
     onPauseToggleReady,
   } = room
   const [ownPanel, setOwnPanel] = useState<Panel | null>(null)
+  // the pointer has been on the rail: the drawer may build its heavy tab now
+  const [railReached, setRailReached] = useState(false)
   const controlled = panelProp !== undefined
   const panel = controlled ? panelProp : ownPanel
 
@@ -438,7 +440,12 @@ export default function Table({
         )}
 
         {/* вертикальный рейл у правого края — переключает панели drawer */}
-        <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
+        <TabRail
+          items={railItems}
+          active={panel}
+          onSelect={(id) => toggle(id as Panel)}
+          onPointerEnter={() => setRailReached(true)}
+        />
 
         {/* выезжающая панель поверх контента (ширина — per-tab) */}
         <Drawer
@@ -446,6 +453,7 @@ export default function Table({
           width={drawerWidth}
           contentKey={panel}
           // the rules are built ahead, not in the frames the panel widens in
+          warm={railReached}
           prebuilt={{
             rules: {
               width: DRAWER_WIDTH.rules,

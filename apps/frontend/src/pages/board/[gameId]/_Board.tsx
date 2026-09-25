@@ -345,6 +345,8 @@ export default function Board({
     onPauseToggleReady,
   } = room
   const [ownPanel, setOwnPanel] = useState<Panel | null>(null)
+  // the pointer has been on the rail: the drawer may build its heavy tab now
+  const [railReached, setRailReached] = useState(false)
   const controlled = panelProp !== undefined
   const panel = controlled ? panelProp : ownPanel
 
@@ -2138,7 +2140,12 @@ export default function Board({
           buttons would still take a click and a Tab stop, so a player could open
           a drawer they cannot see. */}
       <div className={cls(opening.railLayer, enter)} ref={anchors.rail} inert={entering}>
-        <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
+        <TabRail
+          items={railItems}
+          active={panel}
+          onSelect={(id) => toggle(id as Panel)}
+          onPointerEnter={() => setRailReached(true)}
+        />
       </div>
 
       {/* выезжающая панель поверх контента (ширина — per-tab) */}
@@ -2147,6 +2154,7 @@ export default function Board({
         width={drawerWidth}
         contentKey={panel}
         // the rules are built ahead, not in the frames the panel widens in
+        warm={railReached}
         prebuilt={{
           rules: {
             width: DRAWER_WIDTH.rules,
