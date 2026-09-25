@@ -208,6 +208,12 @@ export default function Hand({
   const grab = useRef<{ fracX: number; fracY: number } | null>(null)
   const cursor = useRef({ x: 0, y: 0 })
   const zoomHide = useRef<number | null>(null)
+  const playOnDrop = useRef(onPlay)
+  // Legality can change while a card is held (for example, a release opens
+  // its reaction window). Resolve the drop against the latest committed board.
+  useLayoutEffect(() => {
+    playOnDrop.current = onPlay
+  }, [onPlay])
 
   const n = items.length
   // Whether a card carried elsewhere should also close THIS drag mode is the
@@ -301,7 +307,7 @@ export default function Hand({
   // paint would put it at its static position — the hand's top-left corner, not
   // the cursor. A passive effect places it only after the browser is free to
   // paint that frame; this one places it before.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: drag is the trigger; handlers use the closures captured when the drag began
+  // biome-ignore lint/correctness/useExhaustiveDependencies: drag owns the geometry snapshot; playOnDrop reads the current play handler without restarting the gesture
   useLayoutEffect(() => {
     if (!drag) return
     const place = () => {
@@ -384,7 +390,7 @@ export default function Hand({
       // out of the hand → play, but only if the consumer accepts the drop;
       // otherwise the card glides back to where it came from (never vanishes)
       const accepted =
-        onPlay?.(drag.uid, {
+        playOnDrop.current?.(drag.uid, {
           x: e.clientX,
           y: e.clientY,
           rect: flyerRef.current?.getBoundingClientRect(),
