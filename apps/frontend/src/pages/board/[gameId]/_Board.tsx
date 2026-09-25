@@ -9,7 +9,6 @@
 import {
   Arrow,
   Badge,
-  Button,
   Card,
   CardPair,
   cardById,
@@ -2032,13 +2031,6 @@ export default function Board({
             }
           />
         </div>
-        {/* you already passed on the open window — TurnDock has no notion of
-            "unpass", so the affordance to take it back lives here instead */}
-        {state.window?.passed.includes(state.selfId) && (
-          <Button variant="tech" className={kit.unpass} onClick={() => actions?.onUnpass?.()}>
-            {copy.window.unpass}
-          </Button>
-        )}
       </div>
 
       {/* the engine is waiting on a decision from you — a pending owed to you

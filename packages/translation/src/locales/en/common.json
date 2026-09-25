@@ -214,9 +214,6 @@
       "action": "discard"
     }
   },
-  "window": {
-    "unpass": "cancel pass"
-  },
   "seat": {
     "eliminated": "eliminated",
     "disconnected": "offline",
@@ -444,7 +441,6 @@
     "tookHit": "took the hit",
     "turnEnded": "turn over",
     "turnStarted": "turn",
-    "unpassed": "back in",
     "upgradeTaken": "took from the centre",
     "upgradeThrown": "discarded to the centre",
     "windowClosed": "reaction over",

@@ -80,13 +80,6 @@ it('closes once every responder has passed', () => {
   expect(two.events.map((e) => e.type)).toEqual(['passed', 'windowClosed'])
 })
 
-it('lets a passer change their mind while the window lives', () => {
-  const passed = reduce(released(), { type: 'PASS', player: 'p2', at: 1001 })
-  const back = reduce(passed.state, { type: 'UNPASS', player: 'p2', at: 1002 })
-  expect(back.state.window?.passed).toEqual([])
-  expect(back.events.map((e) => e.type)).toEqual(['unpassed'])
-})
-
 it('refuses a pass from the release owner', () => {
   const s = released()
   const r = reduce(s, { type: 'PASS', player: 'p1', at: 1001 })
@@ -169,13 +162,6 @@ it('does not count DDoS as a reaction-window attack', () => {
   const ddos: CardInstance = { uid: 'attack-ddos#0', id: 'attack-ddos' }
   const s = released({ p2: [ddos] })
   expect(engine.project(s, 'p2').window?.canAttackWith).toEqual([])
-})
-
-it('rejects UNPASS from a player who has not passed', () => {
-  const s = released()
-  const r = reduce(s, { type: 'UNPASS', player: 'p2', at: 1001 })
-  expect(r.state).toBe(s)
-  expect(r.events.map((e) => e.type)).toEqual(['rejected'])
 })
 
 it('opens a 10s window for a later round', () => {

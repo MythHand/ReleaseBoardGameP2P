@@ -302,7 +302,6 @@ function ScenarioRun({
             lobbyCode: t('lobbyCode', { returnObjects: true }),
             turnDock: t('turnDock', { returnObjects: true }),
             pending: t('pending', { returnObjects: true }),
-            window: t('window', { returnObjects: true }),
           }}
           actions={{
             onPlay: (card, target, combo) =>
@@ -312,7 +311,6 @@ function ScenarioRun({
             onPush: () => send({ type: 'PUSH', player: viewer }),
             onAttack: (card, combo) => send({ type: 'ATTACK', player: viewer, card, combo }),
             onPass: () => send({ type: 'PASS', player: viewer }),
-            onUnpass: () => send({ type: 'UNPASS', player: viewer }),
           }}
         />
       </div>

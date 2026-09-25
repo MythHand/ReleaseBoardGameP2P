@@ -193,8 +193,8 @@ it('offers `attack` to a responder holding no attack card — passing is theirs 
 })
 
 it('tells the attack phase that this seat has already passed', () => {
-  // The pass is not a forfeit and not a closed door: the window still stands,
-  // so the dock says so and the key turns into "unpass" (TurnDock).
+  // The pass is final, but not a forfeit: the window still stands, so the dock
+  // says so and the key stays lit (TurnDock).
   const window: TableWindow = { ...windowOnYou, player: 'p2', passed: ['you'] }
   const d = deriveDock({ ...base, turn: 'p2', window }, 'you', 0)
   expect(d.state).toBe('attack')

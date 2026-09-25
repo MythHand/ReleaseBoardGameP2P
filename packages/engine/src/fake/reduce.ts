@@ -26,7 +26,7 @@ import { onReorderTop } from './rebase'
 import { onCancelRelease, onDiscardForRelease, onPlay } from './release'
 import { fireTrigger, onDecline503, onDeclineCrush, onNeutralize } from './triggers'
 import { onUpgradeDiscard, onUpgradeTake } from './upgrade'
-import { onPass, onUnpass, onWindowExpired } from './window'
+import { onPass, onWindowExpired } from './window'
 
 export { handLimitFor, nextSeat }
 
@@ -369,8 +369,6 @@ function dispatch(state: GameState, action: Action): Reduction {
       if (state.pending?.kind === 'crush' && state.pending.player === action.player)
         return onDeclineCrush(state, action)
       return onPass(state, action)
-    case 'UNPASS':
-      return onUnpass(state, action)
     case 'WINDOW_EXPIRED':
       return onWindowExpired(state, action)
     case 'CLOCK_STARTED':

@@ -20,7 +20,6 @@ export interface Game {
   push(): void
   attack(card: string, combo?: string): void
   pass(): void
-  unpass(): void
   resolve(choice: Choice): void
 }
 
@@ -159,7 +158,6 @@ export function useGame(): Game {
     push: () => submit({ type: 'PUSH' }),
     attack: (card, combo) => submit({ type: 'ATTACK', card, combo }),
     pass: () => submit({ type: 'PASS' }),
-    unpass: () => submit({ type: 'UNPASS' }),
     resolve: (choice) => submit({ type: 'RESOLVE', choice }),
   }
 }

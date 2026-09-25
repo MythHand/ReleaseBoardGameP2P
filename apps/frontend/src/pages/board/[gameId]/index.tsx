@@ -235,7 +235,6 @@ export default function BoardPage() {
           onPush: game.push,
           onAttack: game.attack,
           onPass: game.pass,
-          onUnpass: game.unpass,
           onResolve: game.resolve,
           onOverContinue: () => navigate(`/board/${gameId}/stats`),
         }}
@@ -251,7 +250,6 @@ export default function BoardPage() {
           lobbyCode: t('lobbyCode', { returnObjects: true }),
           turnDock: t('turnDock', { returnObjects: true }),
           pending: t('pending', { returnObjects: true }),
-          window: t('window', { returnObjects: true }),
         }}
       />
     </div>

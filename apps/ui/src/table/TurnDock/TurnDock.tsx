@@ -99,9 +99,8 @@ interface TurnDockProps {
   // reaction only: red danger tone (e.g. Error 503) vs the default amber
   danger?: boolean
   // 'attack' only: this seat has already passed on the open window. The key
-  // lights up rather than disappearing or changing its word — a pass is a
-  // statement about this moment, not a forfeit, and pressing the lit key takes
-  // it back for as long as the window stands.
+  // lights up rather than disappearing or changing its word, and pressing it
+  // again does nothing — a pass cannot be taken back.
   passed?: boolean
   // How the open window's passes stand, as a count: one dot per seat that may
   // attack, lit for each one that has passed. Never per player — the row says
@@ -113,8 +112,6 @@ interface TurnDockProps {
   onDraw?: () => void
   onPush?: () => void
   onPass?: () => void
-  // 'attack' with `passed`: the same key, pressed again, takes the pass back
-  onUnpass?: () => void
 }
 
 // The open window's passes, as a row of dots — one per seat that may attack,
@@ -191,7 +188,6 @@ export default function TurnDock({
   onDraw,
   onPush,
   onPass,
-  onUnpass,
 }: TurnDockProps) {
   const mine = state === 'draw' || state === 'push'
   const reactionDanger = state === 'reaction' && danger
@@ -221,11 +217,10 @@ export default function TurnDock({
   const actionMode = buttonMode ? 'btn' : state === 'exposed' ? 'dots' : 'name'
   const label = state === 'draw' ? copy.draw : state === 'push' ? copy.push : copy.pass
   const handler =
-    state === 'draw' ? onDraw : state === 'push' ? onPush : attackPassed ? onUnpass : onPass
+    state === 'draw' ? onDraw : state === 'push' ? onPush : attackPassed ? undefined : onPass
 
-  // re-arm the lockout whenever the actionable key changes (or reappears) —
-  // pass↔unpass is a change of action on one key, so it re-arms too.
-  const keyId = buttonMode ? `${state}${attackPassed ? ':unpass' : ''}` : 'idle'
+  // re-arm the lockout whenever the actionable key changes (or reappears)
+  const keyId = buttonMode ? `${state}${attackPassed ? ':passed' : ''}` : 'idle'
   const [keyLocked, setKeyLocked] = useState(true)
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyId is the re-arm trigger, not read inside
   useEffect(() => {

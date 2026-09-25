@@ -198,7 +198,6 @@ export interface TableActions {
   onPush?: () => void
   onAttack?: (card: string, combo?: string) => void
   onPass?: () => void
-  onUnpass?: () => void
   onResolve?: (choice: TableChoice) => void
   onWindowExpired?: () => void
   onOverContinue?: () => void

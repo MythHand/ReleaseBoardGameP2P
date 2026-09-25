@@ -148,7 +148,6 @@ function TurnDockLive({ copy, ctl }: { copy: Copy; ctl: Record<string, string> }
           passes={passes}
           paused={paused}
           onPass={() => setPassed(true)}
-          onUnpass={() => setPassed(false)}
         />
       </div>
     </div>

@@ -112,23 +112,6 @@ export function onPass(state: GameState, action: Action & { type: 'PASS' }): Red
   return { state: next, events: log.events }
 }
 
-export function onUnpass(state: GameState, action: Action & { type: 'UNPASS' }): Reduction {
-  const w = state.window
-  if (!w) return reject(state, action, 'no reaction window is open')
-  if (!w.passed.includes(action.player)) return reject(state, action, 'you have not passed')
-
-  const log = createLog(state.eventSeq)
-  log.add({ type: 'unpassed', player: action.player })
-  return {
-    state: {
-      ...state,
-      window: { ...w, passed: w.passed.filter((id) => id !== action.player) },
-      eventSeq: log.seq,
-    },
-    events: log.events,
-  }
-}
-
 export function onWindowExpired(
   state: GameState,
   action: Action & { type: 'WINDOW_EXPIRED' },
