@@ -43,11 +43,13 @@
   image-rendering: pixelated;
 }
 
-/* the score sits inside the clear part, clear of the right fade */
+/* the score sits inside the clear part, clear of the right fade — and clear of
+   the slot the "+n" of a payment takes to its right, so neither the "+n" fades
+   nor the score moves when it shows */
 .score {
   position: absolute;
   inset-block-start: 0;
-  inset-inline-end: calc(var(--fade) + 4px);
+  inset-inline-end: calc(var(--fade) + 4px + 36px);
   display: flex;
   gap: 12px;
   color: var(--white-45);
@@ -56,4 +58,26 @@
 
 .best {
   color: var(--white-25);
+}
+
+/* hidden until a payment's popIn; popOut leaves it hidden again */
+.bonus {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: calc(100% + 6px);
+  white-space: nowrap;
+  opacity: 0;
+}
+
+/* in the colour of what paid it */
+.hotfix {
+  color: var(--cat-defense);
+}
+
+.monitor {
+  color: var(--cat-protection);
+}
+
+.server {
+  color: var(--cat-release);
 }

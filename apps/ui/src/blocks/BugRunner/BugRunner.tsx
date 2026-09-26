@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from 'react'
+import { play } from '@/animations/play'
+import { wait } from '@/animations/timing'
 import Typography from '@/primitives/Typography'
 import styles from './BugRunner.module.css'
 import {
@@ -16,6 +18,7 @@ import {
   type Game,
   GROUND,
   newGame,
+  type Paid,
   type Phase,
   press,
   resize,
@@ -23,7 +26,15 @@ import {
   step,
   WORLD_H,
 } from './game'
-import { BUG_RUN_A, BUG_RUN_B, BUG_SIT, HOTFIX, MONITOR, type Sprite } from './sprites'
+import {
+  BUG_RUN_A,
+  BUG_RUN_B,
+  BUG_SIT,
+  HOTFIX,
+  MONITOR,
+  SERVER_BITES,
+  type Sprite,
+} from './sprites'
 
 export interface BugRunnerProps {
   // what the block is, for a screen reader — the kit carries no copy of its own
@@ -38,6 +49,7 @@ interface Palette {
   bug: string
   hotfix: string
   monitor: string
+  server: string
   ground: string
 }
 
@@ -49,6 +61,7 @@ function readPalette(el: Element): Palette {
     bug: token('--cat-attack'),
     hotfix: token('--cat-defense'),
     monitor: token('--cat-protection'),
+    server: token('--cat-release'),
     ground: token('--white-18'),
   }
 }
@@ -84,6 +97,9 @@ function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
   for (const o of g.obstacles) {
     if (o.kind === 'hotfix') {
       drawSprite(ctx, HOTFIX, o.x, ground - o.y - HOTFIX.length, p.hotfix, p.dark)
+    } else if (o.kind === 'server') {
+      const server = SERVER_BITES[o.bites ?? 0] ?? []
+      drawSprite(ctx, server, o.x, ground - o.y - server.length, p.server, p.dark)
     } else {
       // a monitor flies: it bobs a pixel as it goes
       const bob = Math.floor(g.t * 4) % 2
@@ -103,6 +119,8 @@ function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
 }
 
 const pad = (n: number) => String(n).padStart(5, '0')
+// how long a "+n" stays up between its popIn and its popOut
+const BONUS_HOLD = 600
 
 // A dinosaur game with the Bug as its hero, for the lobby's header: it sits
 // until clicked, then runs — jump the hotfixes on the road, stay down under the
@@ -115,6 +133,8 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(0)
+  const [paid, setPaid] = useState<Paid | null>(null)
+  const bonusRef = useRef<HTMLSpanElement>(null)
 
   const paint = useCallback(() => {
     const ctx = canvasRef.current?.getContext('2d')
@@ -164,6 +184,7 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
     const tick = (now: number) => {
       const g = step(game.current, (now - last) / 1000, Math.random, now)
       last = now
+      if (g.paid !== game.current.paid) setPaid(g.paid)
       game.current = g
       paint()
       setScore(scoreOf(g))
@@ -178,13 +199,49 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
     return () => cancelAnimationFrame(raf)
   }, [phase, paint])
 
-  const act = () => {
+  // A payment shows as "+n" beside the score for a moment: popIn, a hold,
+  // popOut. A new one while the last is still up takes its place and starts over.
+  useEffect(() => {
+    const el = bonusRef.current
+    if (!paid || !el) return
+    let live = true
+    for (const a of el.getAnimations?.() ?? []) a.cancel()
+    play('popIn', el)
+    void wait(BONUS_HOLD).then(() => {
+      if (live) play('popOut', el)
+    })
+    return () => {
+      live = false
+    }
+  }, [paid])
+
+  const act = useCallback(() => {
     const g = press(game.current, performance.now())
     if (g === game.current) return
     game.current = g
     setPhase(g.phase)
     paint()
-  }
+  }, [paint])
+
+  // The up arrow jumps from anywhere on the page, not only with the block in
+  // focus — unless the key is somebody else's: a field being typed in, or a
+  // control that has already handled it (the block itself, focused, included).
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'ArrowUp' || e.defaultPrevented) return
+      const target = e.target
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || target.closest('input, textarea, select'))
+      ) {
+        return
+      }
+      e.preventDefault()
+      act()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [act])
 
   // on the press, not the release: a jump that waits for the button to come up
   // is late by exactly the time the player took to let go
@@ -218,6 +275,13 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
           <Typography base="mono-xs" tk="tk-10" as="span">
             {pad(score)}
           </Typography>
+          <span ref={bonusRef} className={`${styles.bonus} ${paid ? styles[paid.kind] : ''}`}>
+            {paid && (
+              <Typography base="mono-xs" tk="tk-10" as="span">
+                {`+${paid.points}`}
+              </Typography>
+            )}
+          </span>
         </span>
       )}
     </button>
