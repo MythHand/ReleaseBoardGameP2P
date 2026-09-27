@@ -257,6 +257,13 @@
       "spectator": "spectator"
     }
   },
+  "voiceChat": {
+    "inVoice": "in voice",
+    "connect": "join",
+    "disconnect": "leave",
+    "volume": "overall volume",
+    "you": "you"
+  },
   "toasts": {
     "hide": "hide"
   },
@@ -384,6 +391,7 @@
     "removeBot": "Remove bot",
     "roleBot": "bot",
     "chat": "chat",
+    "voiceChat": "voice chat",
     "spectators": "Spectators",
     "specLimit": "Limit",
     "freeSlot": "free slot",

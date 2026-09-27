@@ -9,15 +9,15 @@
 }
 
 .roleHost {
-  --msg-role: var(--brand-green);
+  --msg-role: var(--role-host);
 }
 
 .rolePlayer {
-  --msg-role: var(--periwinkle);
+  --msg-role: var(--role-player);
 }
 
 .roleSpectator {
-  --msg-role: var(--white-80);
+  --msg-role: var(--role-spectator);
 }
 
 /* Первая реплика автора отбивается от предыдущей записи, склеенная идёт

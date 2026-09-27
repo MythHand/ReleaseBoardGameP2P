@@ -29,6 +29,8 @@ export default function Slider({
 }: SliderProps) {
   const thumb = color ?? '#8fd9b0'
   const percent = max > min ? ((value - min) / (max - min)) * 100 : 0
+  // the widest value the range can show, in characters
+  const valueChars = Math.max(String(min).length, String(max).length)
   const inputStyle = {
     '--thumb': thumb,
     ...(fill
@@ -51,7 +53,10 @@ export default function Slider({
         onChange={(e) => onChange?.(Number(e.target.value))}
         style={inputStyle}
       />
-      <span className={styles.value} style={color ? { color } : undefined}>
+      <span
+        className={styles.value}
+        style={{ minInlineSize: `${valueChars}ch`, ...(color ? { color } : {}) }}
+      >
         {value}
       </span>
     </div>

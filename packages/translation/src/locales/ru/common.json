@@ -257,6 +257,13 @@
       "spectator": "зритель"
     }
   },
+  "voiceChat": {
+    "inVoice": "в голосе",
+    "connect": "подключиться",
+    "disconnect": "отключиться",
+    "volume": "общая громкость",
+    "you": "ты"
+  },
   "toasts": {
     "hide": "скрыть"
   },
@@ -384,6 +391,7 @@
     "removeBot": "Убрать бота",
     "roleBot": "бот",
     "chat": "чат",
+    "voiceChat": "голосовой чат",
     "spectators": "Зрители",
     "specLimit": "Лимит",
     "freeSlot": "свободный слот",

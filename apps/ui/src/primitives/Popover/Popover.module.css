@@ -1,0 +1,39 @@
+.wrap {
+  display: flex;
+}
+
+/* anchored to the trigger; otherwise to whatever positioned box holds it */
+.onTrigger {
+  position: relative;
+}
+
+/* the panel dresses like Dropdown's menu, so the two read as one family */
+.panel {
+  --pad-inline: 18px;
+
+  position: absolute;
+  inset-block-start: calc(100% + 6px);
+  z-index: 5;
+  inline-size: max-content;
+  padding: 14px var(--pad-inline);
+  background: color-mix(in srgb, var(--surface-1) 96%, var(--bg));
+  border: 1px solid var(--white-14);
+  box-shadow: 0 16px 40px var(--black-50);
+}
+
+.end {
+  inset-inline-end: 0;
+}
+
+.start {
+  inset-inline-start: 0;
+}
+
+/* out by the padding and the border, so the content meets the anchor's edge */
+.flush.end {
+  inset-inline-end: calc(-1 * (var(--pad-inline) + 1px));
+}
+
+.flush.start {
+  inset-inline-start: calc(-1 * (var(--pad-inline) + 1px));
+}
