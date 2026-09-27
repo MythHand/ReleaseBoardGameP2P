@@ -31,9 +31,6 @@ interface Rect {
 interface MoveParams {
   from?: Rect
   to?: Rect
-  // Approach a release slot from its own column. A long straight diagonal to
-  // Database passes over Backend and reads as a landing in the wrong slot.
-  releaseApproach?: boolean
   rotate?: number
   // Разворот, С КОТОРОГО начинается перелёт. Нужен, когда карта уже лежит
   // повёрнутой и выпрямляется ПО ДОРОГЕ: веер соперника протянут к тебе и
@@ -53,16 +50,7 @@ interface MoveParams {
 // в правильной конечной позиции, без последующего рывка). fade — гасит opacity.
 const move = (
   el: Element,
-  {
-    from,
-    to,
-    releaseApproach = false,
-    rotate = 0,
-    rotateFrom = 0,
-    dx = 0,
-    dy = 0,
-    fade = false,
-  }: MoveParams = {},
+  { from, to, rotate = 0, rotateFrom = 0, dx = 0, dy = 0, fade = false }: MoveParams = {},
   duration = 460,
   easing = EASE,
 ): Animation | null => {
@@ -78,16 +66,7 @@ const move = (
     start.opacity = 1
     end.opacity = 0
   }
-  const approach: Keyframe[] =
-    releaseApproach && Math.abs(mx) > from.width / 2
-      ? [
-          {
-            offset: 0.55,
-            transform: `translate(${mx}px, ${my * 0.25}px) scale(${1 + (scale - 1) * 0.55}) rotate(${rotateFrom + (rotate - rotateFrom) * 0.55}deg)`,
-          },
-        ]
-      : []
-  return el.animate([start, ...approach, end], { duration, easing, fill: 'forwards' })
+  return el.animate([start, end], { duration, easing, fill: 'forwards' })
 }
 
 // FLIP-полёт на месте: элемент уже стоит там, где должен, поэтому анимируется
@@ -193,7 +172,7 @@ export const PRESETS: Record<string, Preset> = {
     move(el, p as MoveParams, 480, EASE),
   // Релиз — в слот зоны релиза, с лёгким снап-приземлением.
   playToReleaseZone: (el: Element, p?: Record<string, unknown>): Animation | null =>
-    move(el, { ...(p as MoveParams), releaseApproach: true }, 480, LAND),
+    move(el, p as MoveParams, 480, LAND),
   // Перенос разыгранной карты из центра в сброс.
   centerToDiscard: (el: Element, p?: Record<string, unknown>): Animation | null =>
     move(el, p as MoveParams, 420, EASE),
