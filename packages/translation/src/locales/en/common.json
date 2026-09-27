@@ -305,6 +305,7 @@
     "tabRules": "rules",
     "tabModes": "game mode",
     "tabChat": "chat",
+    "tabVoice": "voice chat",
     "chatToasts": "chat notifications",
     "chatToastsOn": "On",
     "chatToastsOff": "Off",

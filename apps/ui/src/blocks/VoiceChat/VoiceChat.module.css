@@ -1,3 +1,5 @@
+/* ---- the lobby's line ---- */
+
 /* the rest of the heading's line: the count, and the headphones at its end; the
    list of participants opens against this line */
 .line {
@@ -8,6 +10,39 @@
   align-items: center;
   min-inline-size: 0;
 }
+
+/* the popover's content sets its width, so nothing in a row can push past it */
+.popoverBody {
+  inline-size: 380px;
+}
+
+/* ---- the table's panel ---- */
+
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-block-size: 0;
+}
+
+/* dressed like the participants panel's head, the one beside it on the rail */
+.panelHead {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.panelTitle {
+  opacity: 0.6;
+}
+
+.panelScroll {
+  min-block-size: 0;
+}
+
+/* ---- shared ---- */
 
 .people {
   display: inline-flex;
@@ -25,18 +60,21 @@
   color: var(--white-45);
 }
 
+/* on the rail the tab's own colour, like every other tab */
+.tabOff {
+  display: flex;
+}
+
 /* in the voice chat: lit the colour that says "on the line" (Badge success) */
 .on {
   display: flex;
   color: var(--mint);
 }
 
-/* the list sets the popover's width, so nothing in a row can push past it */
-.panel {
+.voiceList {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  inline-size: 380px;
 }
 
 /* the chat's own volume, set off from the people below it */

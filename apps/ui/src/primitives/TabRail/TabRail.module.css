@@ -23,9 +23,14 @@
 .tab {
   composes: label-lg tk-16 from '../../design/typography.module.css';
   display: flex;
-  flex: 1;
+
+  /* as long as its label, never stretched to a share of the rail. The text runs
+     vertically, so the tab's inline axis is the rail's length: the padding
+     along the label is padding-inline. */
+  flex: none;
   align-items: center;
   justify-content: center;
+  padding-inline: 24px;
   color: var(--fg);
   cursor: pointer;
   background: transparent;
@@ -38,18 +43,12 @@
     color var(--t-base) var(--ease-soft);
 }
 
-/* вкладка-иконка (напр. настройки) — квадрат сверху, без растяжения и
-   вертикального текста */
+/* вкладка-иконка (напр. настройки) — квадрат, без вертикального текста: у неё
+   нет подписи, вдоль которой нужен отступ */
 .square {
-  flex: none;
   block-size: 56px;
+  padding-inline: 0;
   writing-mode: horizontal-tb;
-}
-
-/* вкладка своей высоты (item.height): не тянется вместе с остальными и не
-   сжимается — высоту ей ставит консьюмер инлайном */
-.fixed {
-  flex: none;
 }
 
 .tab:last-child {
