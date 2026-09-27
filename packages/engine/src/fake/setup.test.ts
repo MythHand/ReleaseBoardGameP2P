@@ -90,9 +90,9 @@ it('accounts for every card exactly once', () => {
   expect(new Set(all).size).toBe(total)
 })
 
-it('starts with one draw pile, an events deck and an empty discard', () => {
+it('starts with two draw piles, an events deck and an empty discard', () => {
   const s = createGame(config())
-  expect(s.decks.main).toHaveLength(1)
+  expect(s.decks.main).toHaveLength(2)
   expect(s.decks.events).toHaveLength(4)
   expect(s.decks.discard).toEqual([])
 })
@@ -106,10 +106,10 @@ it.each([
       { id: 'p1', name: 'Ann' },
       { id: 'p2', name: 'Bo' },
     ],
-    setup: { gitBranch },
+    setup: { gitBranch, startingDecks: 'one' },
   })
   const single = createGame(original)
-  const double = createGame({ ...original, setup: { gitBranch, startingDecks: 'two' } })
+  const double = createGame({ ...original, setup: { gitBranch } })
   // The 77-card fixture leaves 67 cards after two ordinary five-card hands.
   expect(double.decks.main.map((pile) => pile.length)).toEqual([34, 33])
   expect(double.players).toEqual(single.players)
@@ -117,17 +117,25 @@ it.each([
   expect(double.decks.events).toEqual(single.decks.events)
   expect(double.rngCursor).toBe(single.rngCursor)
   expect(double.ignored.setup).toEqual([])
-  expect(createGame({ ...original, setup: { gitBranch, startingDecks: 'two' } })).toEqual(double)
+  expect(createGame({ ...original, setup: { gitBranch, startingDecks: 'base' } })).toEqual(double)
 })
 
+// Base is two piles, and so is anything that is not a value of this setting:
+// an unknown one costs the setting, not the game (normalizeSetup).
 it.each<Record<string, string>>([
   {},
   { startingDecks: 'base' },
   { startingDecks: 'invalid' },
-])('keeps one starting pile for %j', (setup) => {
+])('splits into two starting piles for %j', (setup) => {
   const state = createGame(config({ setup }))
-  expect(state.decks.main).toHaveLength(1)
+  expect(state.decks.main).toHaveLength(2)
   expect(state.setup.startingDecks).toBe('base')
+})
+
+it('keeps one starting pile for 01', () => {
+  const state = createGame(config({ setup: { startingDecks: 'one' } }))
+  expect(state.decks.main).toHaveLength(1)
+  expect(state.setup.startingDecks).toBe('one')
 })
 
 it.each([
@@ -141,7 +149,7 @@ it.each([
         { id: 'p1', name: 'Ann' },
         { id: 'p2', name: 'Bo' },
       ],
-      setup: { gitBranch, startingDecks: 'two' },
+      setup: { gitBranch, startingDecks: 'base' },
       // No triggers: the draw completes without any pending decisions.
       deck: [
         { id: 'release-frontend', qty: 30 },

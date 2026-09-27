@@ -52,12 +52,9 @@ export const GAME_MODES: GameMode[] = [
   },
   {
     key: 'startingDecks',
-    // Two decks is the default and is named Base, while one deck is named 01.
-    // The values stay as they were: the engine, the wire and saved matches know
-    // them, and there `base` still means one deck.
     options: [
-      { value: 'two', label: 'Base' },
-      { value: 'base', label: '01' },
+      { value: 'base', label: 'Base' },
+      { value: 'one', label: '01' },
     ],
   },
 ]

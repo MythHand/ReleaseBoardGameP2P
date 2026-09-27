@@ -89,11 +89,12 @@ export function createGame(config: GameConfig): GameState {
   cursor = remaining.cursor
   // Split only after the ordinary deal and shuffle: the same seed still deals
   // the same hands, and no cards are added or removed by this lobby setting.
+  // Base is two piles; `one` keeps the whole rest as a single pile.
   const midpoint = Math.ceil(remaining.items.length / 2)
   const main =
-    normalized.setup.startingDecks === 'two'
-      ? [remaining.items.slice(0, midpoint), remaining.items.slice(midpoint)]
-      : [remaining.items]
+    normalized.setup.startingDecks === 'one'
+      ? [remaining.items]
+      : [remaining.items.slice(0, midpoint), remaining.items.slice(midpoint)]
 
   const eventDeck = shuffle(expand(config.events.filter((e) => SUPPORTED.has(e.id))), seed, cursor)
   cursor = eventDeck.cursor

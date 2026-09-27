@@ -3022,7 +3022,7 @@ it('preserves non-default lobby configuration when starting a rematch after rest
       releaseCond: 'easy',
       ai: 'no',
       gitBranch: 'strategic',
-      startingDecks: 'two',
+      startingDecks: 'one',
     }
     const restoredGameId = 'peer0-1'
     storedHostSession(restoredGameId)
@@ -3035,7 +3035,7 @@ it('preserves non-default lobby configuration when starting a rematch after rest
     await act(async () => {
       await Promise.resolve()
     })
-    expect(result.current.gameSync?.view.decks.piles).toEqual([47, 47])
+    expect(result.current.gameSync?.view.decks.piles).toEqual([94])
     act(() => {
       result.current.leaveGame()
       result.current.startGame([])
@@ -3045,7 +3045,7 @@ it('preserves non-default lobby configuration when starting a rematch after rest
     expect(rematchGameId).toBe('peer0-2')
     expect(result.current.state?.maxPlayers).toBe(3)
     expect(result.current.state?.setup).toEqual(nonDefaultSetup)
-    expect(result.current.gameSync?.view.decks.piles).toHaveLength(2)
+    expect(result.current.gameSync?.view.decks.piles).toHaveLength(1)
 
     act(() => {
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
@@ -3068,7 +3068,7 @@ it('syncs the host starting-pile setting to guests and carries it into consecuti
   })
   // Joining explicitly replaces any transport restored from this test's shared storage.
   const guestTransport = transports[transports.length - 1]
-  const setup = { ...hosted.result.current.state?.setup, startingDecks: 'two' }
+  const setup = { ...hosted.result.current.state?.setup, startingDecks: 'one' }
   act(() => hosted.result.current.setSetup(setup))
   // A setup change also emits a chat event; route the configuration message.
   const update = hostTransport.broadcast.mock.calls
@@ -3078,18 +3078,18 @@ it('syncs the host starting-pile setting to guests and carries it into consecuti
   if (!update) throw new Error('missing setup broadcast')
   expect(update).toEqual({ type: 'LOBBY_CONFIG_UPDATED', payload: { setup } })
   act(() => guestTransport.onMessage?.({ ...update, from: hostId, seq: 1 }))
-  expect(guest.result.current.state?.setup.startingDecks).toBe('two')
+  expect(guest.result.current.state?.setup.startingDecks).toBe('one')
   act(() => guest.result.current.setSetup({ startingDecks: 'base' }))
-  expect(guest.result.current.state?.setup.startingDecks).toBe('two')
+  expect(guest.result.current.state?.setup.startingDecks).toBe('one')
 
   act(() => hosted.result.current.startGame([]))
-  expect(hosted.result.current.gameSync?.view.decks.piles).toEqual([47, 47])
+  expect(hosted.result.current.gameSync?.view.decks.piles).toEqual([94])
   act(() => {
     hosted.result.current.leaveGame()
     hosted.result.current.startGame([])
   })
-  expect(hosted.result.current.gameSync?.view.decks.piles).toEqual([47, 47])
-  expect(hosted.result.current.state?.setup.startingDecks).toBe('two')
+  expect(hosted.result.current.gameSync?.view.decks.piles).toEqual([94])
+  expect(hosted.result.current.state?.setup.startingDecks).toBe('one')
 })
 
 it('falls back to the restored game setup for an older snapshot without lobby config', async () => {
@@ -3101,7 +3101,11 @@ it('falls back to the restored game setup for an older snapshot without lobby co
     gitBranch: 'strategic',
   }
   storedHostSession('g1')
-  const snapshot = storedKeeperSnapshot('peer0', 'g1', { setup: legacySetup })
+  // Dealt the way a game was before the axis existed — one draw pile — and then
+  // stripped of the axis below, as such a snapshot was stored.
+  const snapshot = storedKeeperSnapshot('peer0', 'g1', {
+    setup: { ...legacySetup, startingDecks: 'one' },
+  })
   // This snapshot predates the new axis, so omit the default that today's
   // createGame adds. Restore must still accept the historical shape.
   snapshot.state = { ...(snapshot.state as Record<string, unknown>), setup: legacySetup }

@@ -101,7 +101,7 @@ it.each([true, false])('allows only the host to select one starting pile (host: 
   if (isHost) {
     expect(sessionValue.setSetup).toHaveBeenCalledWith({
       ...sessionValue.state?.setup,
-      startingDecks: 'base',
+      startingDecks: 'one',
     })
   } else {
     expect(sessionValue.setSetup).not.toHaveBeenCalled()

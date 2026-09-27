@@ -12,6 +12,9 @@ const BASE: Setup = {
   releaseCond: 'base',
   ai: 'base',
   gitBranch: 'base',
+  // one draw pile: these tests stack its top and count single draws; Base's
+  // two piles are setup.test.ts's subject
+  startingDecks: 'one',
 }
 
 const config = (setup: Setup = BASE): GameConfig => ({

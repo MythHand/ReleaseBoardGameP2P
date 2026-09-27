@@ -45,7 +45,8 @@ function localSetup() {
 }
 
 it('delivers the subscriber its own view on every committed action', () => {
-  const { link } = localSetup()
+  const { ref, link } = localSetup()
+  const before = ref.current.state.decks.main.flat().length
   const seen: Sync[] = []
   link.subscribe((sync) => seen.push(sync))
 
@@ -53,7 +54,10 @@ it('delivers the subscriber its own view on every committed action', () => {
 
   expect(seen).toHaveLength(1)
   expect(seen[0].view.self.id).toBe('a')
-  expect(seen[0].view.turn.hasDrawn).toBe(true)
+  // the view is the one after the draw: cards have left the draw piles. Not
+  // `hasDrawn` — a trigger on the way holds the draw open, and which pile shape
+  // meets one is the deal's business, not the link's.
+  expect(seen[0].view.decks.piles.reduce((n, p) => n + p, 0)).toBeLessThan(before)
 })
 
 it('delivers a rejection to the actor who caused it', () => {

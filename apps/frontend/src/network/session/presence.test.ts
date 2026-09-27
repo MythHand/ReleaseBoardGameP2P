@@ -137,7 +137,12 @@ it('falls back to DRAW/PUSH when an absent seat holds the turn but its bot sugge
     engine: overreporting,
     state: {
       ...created.state,
-      turn: { ...created.state.turn, player: 'a', drawnFrom: [0] },
+      // drawn from every pile, whatever the setting dealt: the draw is done
+      turn: {
+        ...created.state.turn,
+        player: 'a',
+        drawnFrom: created.state.decks.main.map((_, i) => i),
+      },
       players: { ...created.state.players, a: { ...created.state.players.a, hand: [release] } },
     },
   }
@@ -177,7 +182,12 @@ it('logs the fallback PUSH`s events, not just the state it changed', () => {
     engine: overreporting,
     state: {
       ...created.state,
-      turn: { ...created.state.turn, player: 'a', drawnFrom: [0] },
+      // drawn from every pile, whatever the setting dealt: the draw is done
+      turn: {
+        ...created.state.turn,
+        player: 'a',
+        drawnFrom: created.state.decks.main.map((_, i) => i),
+      },
       players: { ...created.state.players, a: { ...created.state.players.a, hand: [release] } },
     },
   }
