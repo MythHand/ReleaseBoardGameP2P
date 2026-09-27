@@ -17,7 +17,9 @@ const played = vi.hoisted(() => ({
   // so the params reaching it — the cover's own tilt/offset (COVER_POSE) — are
   // observable here and worth pinning: a fly with no pose reads as a neat
   // stack, not a second play lying over the attack.
-  calls: [] as { name: string; params: Record<string, unknown> }[],
+  // `start` — where the flown element stood as the flight began: the start a
+  // travel reads off the card itself (`testing.tsx`'s `standing`)
+  calls: [] as { name: string; params: Record<string, unknown>; start?: unknown }[],
 }))
 // What `useDiscardExit`'s `send` actually received — not just that it was
 // called. `useDiscardExit`'s own `send` calls `play` through a SIBLING import
@@ -57,11 +59,12 @@ const patched = vi.hoisted(() => ({ lod: undefined as boolean | undefined }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
   const { useState } = await import('react')
+  const { standing } = await import('./testing')
   return {
     ...real,
-    play: (name: string, _el: unknown, params: Record<string, unknown> = {}) => {
+    play: (name: string, el: Element | null, params: Record<string, unknown> = {}) => {
       played.names.push(name)
-      played.calls.push({ name, params })
+      played.calls.push({ name, params, start: standing(el) })
       return { finished: Promise.resolve() } as unknown as Animation
     },
     useFlyer: (...args: Parameters<typeof real.useFlyer>) => {
@@ -179,7 +182,13 @@ function harness(handSlot: HTMLElement | null = null) {
       player === 'p1' ? null : { left: 0, top: 0, width: 150, height: 210 },
     seatOf: () => node(),
     handSlotAt: () => handSlot,
-    releaseSlot: () => node(),
+    // …and an opponent's zone reads at a glance, ours in full: `Seat` hands
+    // its zone `lod` and the zone says so on every slot (`zoneReading.ts`)
+    releaseSlot: (player: string) => {
+      const slot = node()
+      if (player !== 'p1') slot.dataset.lod = 'true'
+      return slot
+    },
     bindPile: () => {},
     bindSeat: () => {},
     bindReleaseSlot: () => {},
@@ -423,8 +432,8 @@ it('stands our own cover even with no handoff and no seat to fly from', async ()
   // it lands at the cover slot, in the cover's own pose — the same end state
   // the flight from a seat reaches
   const box = cover.getBoundingClientRect()
+  expect(flights[0].start).toEqual({ left: box.left, top: box.top, width: box.width })
   expect(flights[0].params).toMatchObject({
-    from: { left: box.left, top: box.top, width: box.width, height: box.height },
     to: { left: box.left, top: box.top, width: box.width, height: box.height },
     rotate: COVER_POSE.rot,
   })
@@ -480,9 +489,9 @@ it('flies our own defence out of the fan slot it left', async () => {
   const flights = played.calls.filter((c) => c.name === 'playToCenter')
   expect(flights).toHaveLength(1)
   const box = cover.getBoundingClientRect()
+  // the fan slot, not the cover slot it lands on — a real journey
+  expect(flights[0].start).toEqual({ left: 40, top: 60, width: 150 })
   expect(flights[0].params).toMatchObject({
-    // the fan slot, not the cover slot it lands on — a real journey
-    from: { left: 40, top: 60, width: 150, height: 210 },
     to: { left: box.left, top: box.top, width: box.width, height: box.height },
     rotate: COVER_POSE.rot,
   })
@@ -541,7 +550,7 @@ it('does not fly our own staged defence in from the fan a second time', async ()
   // and emphatically nothing from the fan slot the card left — the replay the
   // user watched. Asserted against the stub above, which is the only reason
   // this file can tell that box apart from the cover's.
-  expect(played.calls.map((c) => c.params.from)).not.toContainEqual(
+  expect(played.calls.map((c) => c.start)).not.toContainEqual(
     expect.objectContaining({ left: 40, top: 60 }),
   )
   // the cover slot is still what the exchange leaves from, untouched by any of
@@ -1072,8 +1081,8 @@ it('sends the AI card standing behind the prompt home once this batch answers it
   expect(home).toHaveLength(1)
   const effectBox = anchors.effect.current?.getBoundingClientRect()
   const eventsBox = anchors.eventsBox.current?.getBoundingClientRect()
+  expect(home[0].start).toMatchObject({ left: effectBox?.left, top: effectBox?.top })
   expect(home[0].params).toMatchObject({
-    from: { left: effectBox?.left, top: effectBox?.top },
     to: { left: eventsBox?.left, top: eventsBox?.top },
   })
 })

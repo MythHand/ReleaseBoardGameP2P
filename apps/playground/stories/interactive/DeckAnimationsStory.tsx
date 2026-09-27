@@ -219,7 +219,6 @@ export default function DeckAnimationsStory() {
         height: toRect.width * aspect,
       }
       const anim = play('gatherToDeck', elOf('pile'), {
-        from: fromRect,
         to: cardTo,
         duration: 560,
       })
@@ -280,13 +279,11 @@ export default function DeckAnimationsStory() {
       for (const d of decks.slice(1)) {
         const el = pileRefs.current[d.id]
         if (!el) continue
-        const r = el.getBoundingClientRect()
-        const a = play('absorbToDeck', el, { from: r, to: tRect, duration: MERGE_MS })
+        const a = play('absorbToDeck', el, { to: tRect, duration: MERGE_MS })
         if (a) flights.push(a.finished)
       }
       if (discardCount && discardFrom) {
         const a = play('absorbToDeck', elOf('pile'), {
-          from: discardFrom,
           to: tRect,
           duration: MERGE_MS,
         })
@@ -309,7 +306,7 @@ export default function DeckAnimationsStory() {
     const [el] = await raise([{ key: 'play', card: item.card, at: fromRect }])
     const toRect = stageRefs.current[slot]?.getBoundingClientRect()
     if (el && toRect) {
-      const anim = play('playToCenter', el, { from: fromRect, to: toRect })
+      const anim = play('playToCenter', el, { to: toRect })
       if (anim) await anim.finished
     }
     setStaged((s) => [...s, item])

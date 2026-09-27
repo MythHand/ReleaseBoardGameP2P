@@ -212,10 +212,7 @@ export default function Rebase({ selector }: { selector: ReactNode }) {
         el.style.width = `${r.width}px`
         el.style.margin = '0'
         el.style.zIndex = `${50 + (2 - i)}` // position 1 lands on top of the deck
-        later(
-          () => play('returnToDeck', el, { from: r, to: dc, duration: BACK_DUR }),
-          i * BACK_STEP,
-        )
+        later(() => play('returnToDeck', el, { to: dc, duration: BACK_DUR }), i * BACK_STEP)
       })
     })
   }

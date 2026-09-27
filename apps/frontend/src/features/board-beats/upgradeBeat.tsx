@@ -93,7 +93,7 @@ export function useUpgradeBeat(
         }
         beat.publish(ctx.base)
         const [el] = await raised
-        if (el) await play('playToCenter', el, { from, to: centre, duration: THROW_DUR })?.finished
+        if (el) await play('playToCenter', el, { to: centre, duration: THROW_DUR })?.finished
         pin(key, centre)
         const clear = async () => {
           const items = (plan.clear ?? []).flatMap((t) => {
@@ -125,8 +125,7 @@ export function useUpgradeBeat(
           } else {
             const seat = a.seatBox(take.player)
             if (chosen && seat)
-              await play('dealToSeat', chosen, { from: centre, to: seat, scale: SEAT_SHRINK })
-                ?.finished
+              await play('dealToSeat', chosen, { to: seat, scale: SEAT_SHRINK })?.finished
             ctx.base = {
               ...ctx.base,
               opponents: ctx.base.opponents.map((p) =>
@@ -162,8 +161,7 @@ export function useUpgradeBeat(
             height: target.height * THROW_SCALE,
           }
           const [el] = await raise([{ key: `upgrade:${t.eventId}`, card, at: from }])
-          if (el)
-            await play('playToCenter', el, { from, to: target, duration: THROW_DUR })?.finished
+          if (el) await play('playToCenter', el, { to: target, duration: THROW_DUR })?.finished
         }),
       )
       const pending = beat.base.pending

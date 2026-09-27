@@ -22,7 +22,6 @@ export const SCENARIOS = [
   'handDefense',
   'elimination',
   'release',
-  'releaseCost',
   'ddos',
   'alarm503',
   'aiTrigger',
@@ -156,7 +155,7 @@ export function createScenario(
   if (scenario === 'securityRelease' || scenario === 'securityHand')
     return createSecurityScenario(initial, scenario)
   if (transfer) return createTransferScenario(initial, scenario)
-  if (scenario === 'release' || scenario === 'releaseCost') return createReleaseScenario(initial)
+  if (scenario === 'release') return createReleaseScenario(initial)
   if (scenario === 'ddos') return createDdosScenario(initial)
   if (scenario === 'alarm503' || scenario === 'aiTrigger')
     return createTriggerScenario(initial, scenario, aiCard)

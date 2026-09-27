@@ -225,7 +225,7 @@ export default function ComboStory() {
       const key = main.card.name.toLowerCase()
       const toRect = slotRefs.current[key]?.getBoundingClientRect()
       if (toRect) {
-        const anim = play('playToReleaseZone', el, { from: cRect, to: toRect })
+        const anim = play('playToReleaseZone', el, { to: toRect })
         if (anim) await anim.finished
       }
       setReleased((r) => ({ ...r, [key]: { card: main.card, aux: aux.card } }))
@@ -274,7 +274,7 @@ export default function ComboStory() {
       const cRect = centerRef.current?.getBoundingClientRect()
       const [el] = await raise([{ key: 'enter', card: item.card, at: rect }])
       if (el && cRect) {
-        const anim = play('playToCenter', el, { from: rect, to: cRect })
+        const anim = play('playToCenter', el, { to: cRect })
         if (anim) await anim.finished
       }
       drop('enter')

@@ -302,7 +302,6 @@ export default function DefenseReleaseStory() {
     // to their LOD values over the flight, so nothing is swapped on arrival
     if (toLod) patch('fly', { content: faceOf(card, aux, true) })
     const anim = play('playToCenter', el, {
-      from,
       to,
       rotate: pose?.rot,
       dx: pose?.dx,
@@ -379,7 +378,7 @@ export default function DefenseReleaseStory() {
       ])
       if (el) {
         // a release lands with a snap — the one preset that is not playToCenter
-        const anim = play('playToReleaseZone', el, { from: fromRect, to: slot })
+        const anim = play('playToReleaseZone', el, { to: slot })
         if (anim) await anim.finished
       }
       setRelease((r) => ({ ...r, [slotKey]: relCard }))

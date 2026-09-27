@@ -242,7 +242,7 @@ export function useHandLimitBeat(
           await Promise.all(
             flying.map(async (f) => {
               const el = flyer.elOf(f.key)
-              const movement = el ? play('playToCenter', el, { from: f.from, to: f.box }) : null
+              const movement = el ? play('playToCenter', el, { to: f.box }) : null
               if (movement) {
                 await movement.finished
                 if (isStale()) return

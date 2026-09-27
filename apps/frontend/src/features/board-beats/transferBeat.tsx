@@ -386,7 +386,7 @@ export function useTransferBeat(
               els.map(async (b, i) => {
                 if (!b) return
                 await wait(i * OFFER_STEP)
-                const anim = play('takeFromSeat', b, { from, to: poses[i] })
+                const anim = play('takeFromSeat', b, { to: poses[i] })
                 if (anim) await anim.finished
               }),
             )
@@ -395,9 +395,9 @@ export function useTransferBeat(
             // flies on its own below, out of the same seat, so the offer is
             // cleared whole rather than one card short.
             await Promise.all(
-              els.map(async (b, i) => {
+              els.map(async (b) => {
                 if (!b) return
-                const anim = play('dealToSeat', b, { from: poses[i], to: from })
+                const anim = play('dealToSeat', b, { to: from })
                 if (anim) await anim.finished
               }),
             )
@@ -415,7 +415,6 @@ export function useTransferBeat(
           const [el] = await raised
           if (el) {
             const anim = play('takeFromSeat', el, {
-              from,
               to: held,
               rotateFrom: offerBox ? OFFER_TURN : 0,
             })
@@ -479,7 +478,7 @@ export function useTransferBeat(
           }
           const [el] = await raised
           if (el) {
-            const anim = play('playToCenter', el, { from: slot, to: centre })
+            const anim = play('playToCenter', el, { to: centre })
             if (anim) await anim.finished
             pin(KEY, centre)
           }
@@ -490,7 +489,7 @@ export function useTransferBeat(
           const to = seatCardBox(seat)
           const held = elOf(KEY)
           if (held) {
-            const anim = play('dealToSeat', held, { from: centre, to })
+            const anim = play('dealToSeat', held, { to })
             if (anim) await anim.finished
           }
           drop(KEY)
@@ -520,7 +519,7 @@ export function useTransferBeat(
         // cover flyer above now carries the crossing, so it stops here.
         clearPending()
         if (el) {
-          const out = play('takeFromSeat', el, { from, to: centre })
+          const out = play('takeFromSeat', el, { to: centre })
           if (out) await out.finished
           pin(KEY, centre)
           dropFromDonor(plan.from)
@@ -528,7 +527,7 @@ export function useTransferBeat(
             await wait(REVEAL_HOLD)
             patch(KEY, { faceDown: true })
           }
-          const home = play('dealToSeat', el, { from: centre, to })
+          const home = play('dealToSeat', el, { to })
           if (home) await home.finished
         }
         drop(KEY)

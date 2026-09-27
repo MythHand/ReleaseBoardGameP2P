@@ -863,7 +863,7 @@ export function useBoardStaging({
         const to = anchors.stage.current?.getBoundingClientRect()
         if (!reduced && from && to) {
           const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
-          if (el) await play('playToCenter', el, { from, to })?.finished
+          if (el) await play('playToCenter', el, { to })?.finished
           flyer.drop('stage')
         }
         // the carrier has dropped it (or, under reduced motion, there was
@@ -903,8 +903,7 @@ export function useBoardStaging({
             const to = (
               (place == null ? null : stageSlot(anchors, place)) ?? anchors.centre.current
             )?.getBoundingClientRect()
-            if (el && to)
-              await play('playToCenter', el, { from, to, ...attackPose(card.card) })?.finished
+            if (el && to) await play('playToCenter', el, { to, ...attackPose(card.card) })?.finished
           } catch {
             // A `void`ed body is watched by nobody: let it reject and the whole
             // app gets an unhandled rejection. The card is staged either way —
@@ -957,7 +956,7 @@ export function useBoardStaging({
           // what says it has been PLAYED), so the flight ends already turned —
           // the same `rotate`/`dx`/`dy` the combo and defence flights pass, for
           // the same reason.
-          if (el) await play('playToCenter', el, { from, to, ...attackPose(card.card) })?.finished
+          if (el) await play('playToCenter', el, { to, ...attackPose(card.card) })?.finished
           if (!current()) return
           flyer.drop('stage')
         }
@@ -1293,7 +1292,7 @@ export function useBoardStaging({
         void (async () => {
           try {
             const [el] = await flyer.raise([{ key: 'stage-main', card: main.card, at: mainHand }])
-            if (el) await play('playToCenter', el, { from: mainHand, to: place })?.finished
+            if (el) await play('playToCenter', el, { to: place })?.finished
           } catch {
             // a `void`ed body answers for its own failure — the card is staged
             // either way, the flight is only how it got there

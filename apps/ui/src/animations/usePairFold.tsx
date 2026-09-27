@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import CardPair, { PAIR_AUX_POSE } from '@/primitives/CardPair'
 import { play } from './play'
@@ -65,6 +65,9 @@ export function usePairFold() {
   const [pair, setPair] = useState<Mounted | null>(null)
   const nodeRef = useRef<HTMLDivElement | null>(null)
   const seq = useRef(0)
+  // scoped to this instance: another step's carriers share the list it renders
+  // in and count from one too (see `useFlyer`)
+  const scope = useId()
 
   /** the pair's node — for a caller that has something of its own to do with it */
   const node = () => nodeRef.current
@@ -108,7 +111,7 @@ export function usePairFold() {
 
   const overlay = pair && (
     <div
-      key={pair.seq} // a fresh node per fold (I5)
+      key={`${scope}${pair.seq}`} // a fresh node per fold (I5), this instance's own
       className={styles.flyer}
       ref={(el) => {
         nodeRef.current = el

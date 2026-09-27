@@ -5,7 +5,7 @@ import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@re
 import { type RefObject, useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
 import type { BeatPlan, DiscardCard } from './planBeats'
-import { shownSource } from './shownBeat'
+import { shownSource, withoutStaged } from './shownBeat'
 import { settleInto, withLanded, withoutLanded } from './toHeap'
 import { withoutFlown } from './withoutFlown'
 
@@ -318,6 +318,8 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       // staging ownership. No intermediate frame renders both copies.
       // A shown card was taken off the seat's counter when it was put out, so it
       // is taken off the centre now rather than off the seat a second time.
+      // Our own play leaves the centre's shown cards with the gesture (`withoutStaged`).
+      ctx.base = withoutStaged(ctx.base, handoff)
       ctx.publish(shown ? shown.next : withoutFlown(ctx.base, flown))
       handoff?.release()
       held.current = plan
@@ -327,12 +329,10 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       if (!handoff) {
         if (aux && starts && lands) {
           await Promise.all(
-            els.map((el, i) =>
-              el ? play('playToCenter', el, { from: starts[i], to: lands[i] })?.finished : null,
-            ),
+            els.map((el, i) => (el ? play('playToCenter', el, { to: lands[i] })?.finished : null)),
           )
         } else if (els[0]) {
-          await play('playToCenter', els[0], { from, to })?.finished
+          await play('playToCenter', els[0], { to })?.finished
         }
       }
       if (run !== epoch.current) return

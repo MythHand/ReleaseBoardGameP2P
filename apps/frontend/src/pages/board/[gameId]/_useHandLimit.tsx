@@ -291,7 +291,7 @@ export function useHandLimit({
       const [el] = await flyer.raise([{ key, card, at: from, layer: slot }])
       if (runId.current !== mine) return
       const to = cellEls.current[slot]?.getBoundingClientRect()
-      if (el && to) await play('playToCenter', el, { from, to })?.finished
+      if (el && to) await play('playToCenter', el, { to })?.finished
       if (runId.current !== mine) return
       // the real card takes over the cell as the carrier goes — one commit, no
       // gap for the eye to catch
@@ -404,7 +404,7 @@ export function useHandLimit({
       const el = backRef.current
       const to = cellEls.current[back.slot]?.getBoundingClientRect()
       if (!reduced && el && rect && to) {
-        await play('playToCenter', el, { from: rect, to })?.finished
+        await play('playToCenter', el, { to })?.finished
       }
       if (runId.current !== mine) return
       claimed.current.add(back.slot)

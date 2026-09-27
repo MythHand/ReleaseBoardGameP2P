@@ -172,7 +172,7 @@ export default function DrawCardStory() {
       // aim at the card area near the opponent's seat with a slight shrink
       // (not at the wide Seat — otherwise the card inflates to its width)
       const to = cardBoxIn(seatRect, fromRect.width * 0.7)
-      const anim = play('dealToSeat', el, { from: fromRect, to })
+      const anim = play('dealToSeat', el, { to })
       if (anim) await anim.finished
     }
     setOpponents((os) => os.map((o) => (o.id === oppId ? { ...o, handCount: o.handCount + 1 } : o)))
@@ -199,7 +199,7 @@ export default function DrawCardStory() {
     const [el] = await raise([{ key: 'ai', card: ai, at: from, faceDown: true }])
     if (el) {
       // aim at the large effect slot — the card arrives enlarged
-      const anim = play('drawToCenter', el, { from, to: toRect })
+      const anim = play('drawToCenter', el, { to: toRect })
       if (anim) await anim.finished
       pin('ai', toRect) // I4 — it now stands in the slot; the flip plays in place
     }
@@ -226,7 +226,7 @@ export default function DrawCardStory() {
     await wait(FLIP_MS)
     const el = elOf('eff')
     if (!el || !fromRect || !deckRect) return
-    const anim = play('returnToDeck', el, { from: fromRect, to: cardAreaOf(deckRect) })
+    const anim = play('returnToDeck', el, { to: cardAreaOf(deckRect) })
     if (anim) await anim.finished
   }
 
@@ -266,7 +266,7 @@ export default function DrawCardStory() {
       const from = cardAreaOf(deckCell)
       const [el] = await raise([{ key: 'draw', card, at: from, faceDown: true }])
       if (el) {
-        const anim = play('drawToCenter', el, { from, to: stageRect })
+        const anim = play('drawToCenter', el, { to: stageRect })
         if (anim) await anim.finished
         pin('draw', stageRect) // I4 — the next flight starts from where it stands
       }

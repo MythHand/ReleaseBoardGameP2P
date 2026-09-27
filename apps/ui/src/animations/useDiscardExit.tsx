@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardAreaOf, cardBoxIn } from '@/primitives/Card'
 import { PAIR_AUX } from '@/primitives/CardPair'
@@ -105,6 +105,9 @@ export function useDiscardExit(
   const [flights, setFlights] = useState<Flight[]>([])
   const [straight, setStraight] = useState(false)
   const refs = useRef<Record<string, HTMLDivElement | null>>({})
+  // scoped to this instance: a caller names its cards, and another step in the
+  // same rendered list may name one the same way (see `useFlyer`)
+  const scope = useId()
 
   const reset = () => {
     setFlights([])
@@ -198,11 +201,7 @@ export function useDiscardExit(
           console.error('useDiscardExit: no flyer for %s — is `overlay` rendered?', f.key)
         if (!el || !to) return
         if (f.delay) await wait(f.delay)
-        const anim = play(
-          'centerToDiscard',
-          el,
-          toDiscardParams(f.from, cardAreaOf(to), f.scatter, f.fade),
-        )
+        const anim = play('centerToDiscard', el, toDiscardParams(cardAreaOf(to), f.scatter, f.fade))
         if (anim) await anim.finished
       }),
     )
@@ -215,7 +214,7 @@ export function useDiscardExit(
 
   const overlay = flights.map((f) => (
     <div
-      key={f.key}
+      key={`${scope}${f.key}`}
       className={styles.flyer}
       // the table layer travels with the card — without it two flyers share one z
       // and paint in array order, which is not the stacking order. The base is the

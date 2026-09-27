@@ -12,6 +12,7 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     play: (name: string, el: Element | null, params?: Record<string, unknown>) => {
       animationsTrace.played.push(name)
       animationsTrace.params.push(params)
+      animationsTrace.markStart(el)
       return real.play(name, el, params)
     },
     useDiscardExit: () => ({

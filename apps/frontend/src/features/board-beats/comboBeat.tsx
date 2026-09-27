@@ -24,12 +24,13 @@ import {
 } from '~/entities/game/board'
 import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
-import { shownSource } from './shownBeat'
+import { adoptStaged, shownSource } from './shownBeat'
 import { useToCentre } from './toCentre'
 import { toEventsDeck } from './toEventsDeck'
 import { useToHand } from './toHand'
 import { settleInto } from './toHeap'
 import { withoutFlown } from './withoutFlown'
+import { readsAtGlance } from './zoneReading'
 
 // The carrier a DDoS's own effect needs: the card it struck. One card is one
 // carrier, and a release wearing a Code Review is one card — it stands in the
@@ -122,6 +123,29 @@ export function useComboBeat(
         (mine && handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
         a.seatBox(actor)
       if (!fromRect) return null
+      // ALREADY STANDING, ALREADY WHOLE. A play put out at the centre was
+      // watched arriving there — a release at the stage slot, a release with
+      // its Code Review folded in the row's first place, a Monitoring at the
+      // middle — so there is nothing left to bring in or to fold. Its carrier
+      // goes up exactly where and as it stands, in the commit its standing
+      // render comes down, and the caller flies it on from there. Folding it
+      // again at the middle was the road for a play nobody had seen, and read
+      // as the card sliding to the middle before it left for the zone (#168).
+      // An attack keeps its own landing below: it is not a release's road.
+      if (shown && main.category !== 'attack') {
+        const standing = flyer.raise([
+          aux
+            ? {
+                key: 'fold',
+                at: shown.rect,
+                content: <CardPair main={main} aux={aux} width="100%" />,
+              }
+            : { key: 'fold', at: shown.rect, card: main },
+        ])
+        takeOver()
+        const [el] = await standing
+        return el ?? null
+      }
       if (aux && main.category === 'attack') {
         const raisedPair = flyer.raise([
           { key: 'fold', at: fromRect, content: <CardPair main={main} aux={aux} width="100%" /> },
@@ -130,7 +154,6 @@ export function useComboBeat(
         const [el] = await raisedPair
         if (el) {
           await play('playToCenter', el, {
-            from: fromRect,
             to: cRect,
             rotate: ATTACK_POSE.rot,
             dx: ATTACK_POSE.dx,
@@ -293,7 +316,7 @@ export function useComboBeat(
           const spentHand = { ...ctx.base, you: { ...ctx.base.you, hand } }
           ctx.base = spentHand
           ctx.publish(spentHand)
-          handoff?.release()
+          adoptStaged(ctx, handoff)
         }
         // …AND EVERYTHING LEAVES AS ONE EXCHANGE — the same shape, and the same
         // helper, the defence's own resolution uses. LAYER COMES FROM POSITION,
@@ -400,7 +423,7 @@ export function useComboBeat(
             return
           }
           const seat = a.seatBox(hit.player)
-          if (node && seat) await play('dealToSeat', node, { from: overThrow, to: seat })?.finished
+          if (node && seat) await play('dealToSeat', node, { to: seat })?.finished
           pulled.drop(STRUCK)
         })()
 
@@ -541,7 +564,7 @@ export function useComboBeat(
         // Published FIRST, so the render that takes over exists before the node
         // that is standing there now is let go of.
         standAttack()
-        handoff.release()
+        adoptStaged(ctx, handoff)
         return
       }
       await nextFrames() // the shadow that renders `before` has committed (I2)
@@ -596,7 +619,7 @@ export function useComboBeat(
             const from = a.seatBox(plan.player)
             if (from) {
               const [el] = await flyer.raise([{ key: 'cost', at: from, card: costCard }])
-              if (el) await play('playToCenter', el, { from, to: costBox })?.finished
+              if (el) await play('playToCenter', el, { to: costBox })?.finished
             }
           }
           await wait(SHOW_HOLD)
@@ -648,7 +671,7 @@ export function useComboBeat(
       // — unlike `seatBox`, which is null for the local player. Nothing
       // measurable here means the projection resolves it unaided.
       if (!toRect) {
-        handoff?.release()
+        adoptStaged(ctx, handoff)
         return
       }
       if (handoff && plan.player === ctx.base.selfId && handoff.el && cRect) {
@@ -656,8 +679,8 @@ export function useComboBeat(
         // Only a merged pair ever gets here — `_Board.tsx`'s `soloStaged`
         // excludes a release on purpose, so `handoff.el` is null for a plain
         // one (see below).
-        await play('playToReleaseZone', handoff.el, { from: cRect, to: toRect })?.finished
-        handoff.release()
+        await play('playToReleaseZone', handoff.el, { to: toRect })?.finished
+        adoptStaged(ctx, handoff)
         return
       }
       // THE ACTOR'S OWN PLAIN RELEASE — it is already standing at the STAGE
@@ -693,7 +716,7 @@ export function useComboBeat(
         // one the cost leg above already uses for `clearPaidCost`.
         latest.current.takeStagedRelease?.current?.()
         const [el] = await flyer.raise([{ key: 'release', at: stageRect, card: standing }])
-        if (el) await play('playToReleaseZone', el, { from: stageRect, to: toRect })?.finished
+        if (el) await play('playToReleaseZone', el, { to: toRect })?.finished
         // dropped as the beat ends, so the carrier and the projection's own
         // zone render swap in one commit (`useBeats`'s drain does the rest of
         // that batch synchronously)
@@ -707,19 +730,25 @@ export function useComboBeat(
         // permanently hidden fan card, and calling it costs nothing: the
         // handoff is non-null only while a dispatched play stands, and the
         // release that just landed IS that play.
-        handoff?.release()
+        adoptStaged(ctx, handoff)
         return
       }
       if (!cRect) {
-        handoff?.release()
+        adoptStaged(ctx, handoff)
         return
       }
       const el = await foldIn(plan.player, plan.card, plan.codeReview, ctx)
       if (plan.slot === 'monitoring') await wait(SHOW_HOLD)
-      if (el) await play('playToReleaseZone', el, { from: cRect, to: toRect })?.finished
+      // …reading the way the slot it lands in reads, from the frame the flight
+      // starts. A zone draws a pair whole whoever's it is, so only a lone card
+      // has a reading to take.
+      if (!plan.codeReview && readsAtGlance(a.releaseSlot(plan.player, plan.slot))) {
+        flyer.patch('fold', { lod: true })
+      }
+      if (el) await play('playToReleaseZone', el, { to: toRect })?.finished
       flyer.drop('fold')
     },
-    [foldIn, flyer.drop, flyer.raise],
+    [foldIn, flyer.drop, flyer.patch, flyer.raise],
   )
 
   // pairToDiscard: the pending pair at the centre splits into two singles.

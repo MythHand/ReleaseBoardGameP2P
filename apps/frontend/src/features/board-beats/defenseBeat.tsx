@@ -10,6 +10,7 @@ import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
 import { toEventsDeck } from './toEventsDeck'
 import { useToHand } from './toHand'
+import { readsAtGlance } from './zoneReading'
 
 // The answer to an attack (#101): a defence covers what is standing at the
 // centre, and the whole exchange leaves together. `_useDefenseStaging.ts` is
@@ -146,7 +147,6 @@ export function useDefenseBeat(
         ])
         if (el) {
           await play('playToCenter', el, {
-            from,
             to: coverBox,
             rotate: COVER_POSE.rot,
             dx: COVER_POSE.dx,
@@ -247,7 +247,7 @@ export function useDefenseBeat(
               // as a blink rather than an arrival (owner, 22.09). The same
               // preset every other "card goes to a player" motion uses:
               // the deal, the hand limit, a card handed over.
-              if (el) await play('dealToSeat', el, { from: attackBox, to })?.finished
+              if (el) await play('dealToSeat', el, { to })?.finished
               flyer.drop('back')
             })()
           : undefined
@@ -343,7 +343,6 @@ export function useDefenseBeat(
         ])
         if (el) {
           await play('playToCenter', el, {
-            from,
             to: coverBox,
             rotate: COVER_POSE.rot,
             dx: COVER_POSE.dx,
@@ -480,7 +479,7 @@ export function useDefenseBeat(
   // ease to their LOD values over the CSS transitions already on them while
   // the flight carries the card across (`ComposedFace`'s own coupling).
   const runStolen = useCallback(
-    async (plan: Extract<BeatPlan, { kind: 'stolen' }>, ctx: BeatRun) => {
+    async (plan: Extract<BeatPlan, { kind: 'stolen' }>, _ctx: BeatRun) => {
       await nextFrames() // the shadow that renders `before` has committed (I2)
       const a = latest.current.anchors
       // `from` is the victim's slot as it stood BEFORE this batch (I1 — the
@@ -508,14 +507,15 @@ export function useDefenseBeat(
       }
       // A release stolen INTO OUR OWN zone (the reflected case, and any
       // future one) is read in full, not as LOD — only a crossing into an
-      // OPPONENT's zone gets the at-a-glance reading. The flip happens on
-      // the same frame the travel starts, so nothing is swapped on arrival.
-      if (plan.to !== ctx.base.selfId) {
+      // OPPONENT's zone gets the at-a-glance reading, and the thief's slot is
+      // what says which (`zoneReading.ts`). The flip happens on the same frame
+      // the travel starts, so nothing is swapped on arrival.
+      if (readsAtGlance(a.releaseSlot(plan.to, plan.slot))) {
         flyer.patch('steal', {
           content: <Card card={card} interactive={false} width="100%" lod />,
         })
       }
-      await play('playToCenter', el, { from, to })?.finished
+      await play('playToCenter', el, { to })?.finished
       flyer.drop('steal')
     },
     [flyer.raise, flyer.patch, flyer.drop],

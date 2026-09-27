@@ -11,6 +11,7 @@ import { HALLUCINATION_HOLD, TABLE_HOLD, useToCentre } from './toCentre'
 import { toEventsDeck } from './toEventsDeck'
 import { useToHand } from './toHand'
 import { settleInto } from './toHeap'
+import { readsAtGlance } from './zoneReading'
 
 // AN AI CARD, from the pile to whatever it turns out to mean.
 //
@@ -338,15 +339,16 @@ export function useAiBeat(
       // 5. …and the AI card takes the road its ending gives it.
       const effectOut = (async () => {
         if (plan.tail.kind === 'zone') {
-          const target = rectOf(a.releaseSlot(plan.player, plan.tail.slot))
+          const zoneSlot = a.releaseSlot(plan.player, plan.tail.slot)
+          const target = rectOf(zoneSlot)
           const el = elOf(EFF)
           if (el && target) {
             // …reading the way the zone it is entering reads, from the frame the
-            // travel starts — another seat's zone is the at-a-glance one, ours
-            // stays full. Same rule, and same reason, as a played release
-            // arriving in a zone (`comboBeat.runRelease`).
-            if (plan.player !== beat.base.selfId) patch(EFF, { lod: true })
-            const anim = play('playToReleaseZone', el, { from: effect, to: target })
+            // travel starts — asked of the slot (`zoneReading.ts`), the same
+            // answer a played release arriving in a zone gets
+            // (`comboBeat.runRelease`).
+            if (readsAtGlance(zoneSlot)) patch(EFF, { lod: true })
+            const anim = play('playToReleaseZone', el, { to: target })
             if (anim) await anim.finished
           }
           // The slot must own the card before its carrier lets go. The trigger
@@ -453,7 +455,7 @@ export function useAiBeat(
         const seat = a.seatBox(plan.player)
         const el = elOf(EFF)
         if (el && seat) {
-          const anim = play('dealToSeat', el, { from: centre, to: seat, scale: SEAT_SHRINK })
+          const anim = play('dealToSeat', el, { to: seat, scale: SEAT_SHRINK })
           if (anim) await anim.finished
         }
         drop(EFF)

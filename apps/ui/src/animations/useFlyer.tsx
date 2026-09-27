@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useId, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import Card from '@/primitives/Card'
 import type { Rect } from './scatter'
@@ -40,7 +40,7 @@ import styles from './useFlyer.module.css'
 // simply dropped after the resting card takes over (see Defense Release).
 //
 //   const [el] = await raise([{ key: 'draw', card, at: from, faceDown: true }])
-//   await play('drawToCenter', el, { from, to })?.finished
+//   await play('drawToCenter', el, { to })?.finished
 //   pin('draw', to)              // identity for the next flight
 //   patch('draw', { faceDown: false })
 //   drop('draw')
@@ -81,6 +81,12 @@ interface Held extends Raise {
 
 export function useFlyer() {
   const [held, setHeld] = useState<Held[]>([])
+  // WHOSE node it is. Several steps' carriers are rendered side by side in one
+  // list (the gesture's, the beats'), and each step counts its own `seq` from
+  // one — so a bare `seq` key collided with another step's node, React matched
+  // the two up, and a standing pair was rebuilt invisible while a cost card flew
+  // (#168). The key is scoped to this instance.
+  const scope = useId()
   const els = useRef<Record<string, HTMLDivElement | null>>({})
   const seq = useRef(0)
 
@@ -168,7 +174,7 @@ export function useFlyer() {
 
   const overlay = held.map((h) => (
     <div
-      key={h.seq}
+      key={`${scope}${h.seq}`}
       className={styles.flyer}
       ref={(el) => {
         els.current[h.key] = el

@@ -70,8 +70,7 @@ export const restTransform = (s: Scatter): string =>
  * structural, not hand-threaded. `fade` dissolves the card on the way in (a card
  * sinking beneath the visible top of the heap).
  */
-export const toDiscardParams = (from: Rect, to: Rect, s: Scatter, fade = false) => ({
-  from,
+export const toDiscardParams = (to: Rect, s: Scatter, fade = false) => ({
   to,
   rotate: s.rot,
   dx: s.dx,

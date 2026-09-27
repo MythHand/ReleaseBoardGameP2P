@@ -9,6 +9,7 @@ import {
   type BoardState,
   type ShownCard,
   type ShownPlace,
+  type StagedHandoff,
   shownLayout,
   shownPlaceOf,
 } from '~/entities/game/board'
@@ -78,6 +79,42 @@ export function shownSource(
   if (!rect) return null
   const gone = new Set(leaving.map((s) => s.uid))
   return { rect, next: { ...base, shown: (base.shown ?? []).filter((s) => !gone.has(s.uid)) } }
+}
+
+/**
+ * OUR OWN PLAY, TAKEN OVER FROM THE GESTURE: the cards it holds are no longer
+ * out at the centre, and the gesture lets go of them — in one commit.
+ *
+ * The engine takes a card off `shown` the moment it leaves the hand (`setHand`);
+ * the shadow a beat runs on is the board from BEFORE the batch, where our played
+ * card is still out. Released without this, the gesture held nothing, so the
+ * centre drew our shown card again from that shadow (`_Board.tsx` draws our own
+ * shown cards whenever the gesture does not hold them — the stand's viewer
+ * switch, a reconnect): a second DDoS stood at the middle while the real one
+ * flew to the discard, and vanished when the move ended (#168). Another
+ * player's card is taken off the same way by `shownSource`; this is ours.
+ */
+export function adoptStaged(ctx: BeatRun, handoff: StagedHandoff | null | undefined): void {
+  if (!handoff) return
+  const next = withoutStaged(ctx.base, handoff)
+  if (next !== ctx.base) {
+    ctx.base = next
+    ctx.publish(next)
+  }
+  handoff.release()
+}
+
+/** The board without the cards the gesture hands over — the half of `adoptStaged` a beat that publishes its own board needs. */
+export function withoutStaged(
+  base: BoardState,
+  handoff: StagedHandoff | null | undefined,
+): BoardState {
+  if (!handoff) return base
+  const gone = new Set([handoff.mainUid, handoff.supportUid])
+  const shown = base.shown ?? []
+  return shown.some((s) => gone.has(s.uid))
+    ? { ...base, shown: shown.filter((s) => !gone.has(s.uid)) }
+    : base
 }
 
 export function useShownBeat(anchors: BoardAnchors) {
@@ -204,7 +241,6 @@ export function useShownBeat(anchors: BoardAnchors) {
           els.map((el, i) =>
             el
               ? play('dealToSeat', el, {
-                  from: flights[i].at,
                   to,
                   rotateFrom: flights[i].tilt?.rot ?? 0,
                 })?.finished

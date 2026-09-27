@@ -84,7 +84,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
       setDiscardOut('taken')
       emptyDiscard(ctx)
       if (el) {
-        const anim = play('gatherToDeck', el, { from, to: cardAreaOf(toCell), duration: 560 })
+        const anim = play('gatherToDeck', el, { to: cardAreaOf(toCell), duration: 560 })
         if (anim) await anim.finished
       }
       await wait(STEP_HOLD)
@@ -149,7 +149,6 @@ export function useDeckBeat(anchors: BoardAnchors) {
             const el = wholePile(a.pileBox(i))
             if (!el) continue
             const anim = play('absorbToDeck', el, {
-              from: rectOf(el),
               to,
               duration: PILE_MERGE_MS,
             })
@@ -174,7 +173,6 @@ export function useDeckBeat(anchors: BoardAnchors) {
             emptyDiscard(ctx)
             if (el) {
               const anim = play('absorbToDeck', el, {
-                from: heapBox,
                 to,
                 duration: PILE_MERGE_MS,
               })

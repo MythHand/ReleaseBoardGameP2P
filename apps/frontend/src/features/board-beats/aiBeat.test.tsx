@@ -11,11 +11,12 @@ import {
   boxed,
   callOrder,
   nodeAt,
-  playedAll,
   playedNames,
   playedWith,
   renderBeat,
   runBeat,
+  spot,
+  startedAll,
   waitedMs,
 } from './testing'
 import { HALLUCINATION_HOLD, TABLE_HOLD } from './toCentre'
@@ -37,6 +38,7 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
       // index-aligned with `played` — `playedWith(name)` is what reads it, and
       // it is what tells "a flight happened" from "a flight aimed HERE"
       animationsTrace.params.push(params)
+      animationsTrace.markStart(el)
       return real.play(name, el, params)
     },
     wait: (ms: number) => {
@@ -221,10 +223,10 @@ describe('aiBeat', () => {
     // proved neither — the AI card's own `goHome` supplies a `returnToDeck` on
     // every crush there is, so no-op'ing the release's flight left this test,
     // the one named for #71's guarantee, entirely green.
-    const homes = playedAll('returnToDeck').map((params) => params?.from)
+    const homes = startedAll('returnToDeck')
     expect(homes).toHaveLength(2)
-    expect(homes).toContainEqual(ZONE_SLOT) // the release, out of the zone
-    expect(homes).toContainEqual(EFFECT_BOX) // the AI card, off the centre
+    expect(homes).toContainEqual(spot(ZONE_SLOT)) // the release, out of the zone
+    expect(homes).toContainEqual(spot(EFFECT_BOX)) // the AI card, off the centre
     // the ONLY thing in the heap is the trigger
     const keys = (anchors.exitSpy.mock.calls.flat(2) as { key: string }[]).map((c) => c.key)
     expect(keys).toEqual(['d3'])
@@ -239,7 +241,7 @@ describe('aiBeat', () => {
     // …and it did NOT also go home. Exactly one card takes that road here — the
     // AI card, off the centre — so this test cannot pass on the evidence the
     // events-deck one above is about, nor that one on this.
-    expect(playedAll('returnToDeck').map((params) => params?.from)).toEqual([EFFECT_BOX])
+    expect(startedAll('returnToDeck')).toEqual([spot(EFFECT_BOX)])
   })
 
   // A zone slot wearing a Code Review renders as a `CardPair`; the aux half is
@@ -292,9 +294,9 @@ describe('aiBeat', () => {
     expect(items.map((i) => i.key).sort()).toEqual(['crushedAux', 'd3'])
     // two go home and no more — the AI card and the release. A third would be
     // the Code Review taking a road that is not its own.
-    const homes = playedAll('returnToDeck').map((params) => params?.from)
+    const homes = startedAll('returnToDeck')
     expect(homes).toHaveLength(2)
-    expect(homes).toContainEqual(ZONE_SLOT)
+    expect(homes).toContainEqual(spot(ZONE_SLOT))
   })
 
   // I7 FOR A CARD WITH NO EVENT OF ITS OWN. `destroySlot` called without a
