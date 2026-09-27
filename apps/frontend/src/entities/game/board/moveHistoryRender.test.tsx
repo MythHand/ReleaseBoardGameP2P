@@ -30,6 +30,7 @@ const view: PlayerView = {
     frozen: [],
   },
   opponents: [{ id: 'p2', name: 'Bot', handCount: 0, release: {}, eliminated: true }],
+  shown: [],
   decks: { piles: [30], events: 8, discardCount: 2 },
   turn: { player: 'you', index: 4, hasDrawn: false },
   window: null,

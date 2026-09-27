@@ -2259,3 +2259,30 @@ describe('a refused Crush', () => {
     expect(beats.some((beat) => beat.kind === 'crushRefused')).toBe(false)
   })
 })
+
+// resolution.md §1: another player's card put out at the centre, or taken back,
+// is a beat; our own is where our gesture already put it.
+describe('a card shown at the centre', () => {
+  const shownBy = (player: string, id: number): Event =>
+    ({ id, type: 'shown', player, card: 'support-sudo' }) as Event
+  const takenBackBy = (player: string, id: number): Event =>
+    ({ id, type: 'takenBack', player, cards: ['support-sudo'] }) as Event
+
+  it('plans another player’s card coming out and going back, one beat each', () => {
+    const plans = planBeats([shownBy('p2', 1), takenBackBy('p2', 2)], boardBefore())
+    expect(plans).toEqual([
+      { kind: 'shown', key: 'shown:1', eventId: 1, player: 'p2', card: 'support-sudo' },
+      {
+        kind: 'takenBack',
+        key: 'takenBack:2',
+        eventId: 2,
+        player: 'p2',
+        cards: ['support-sudo'],
+      },
+    ])
+  })
+
+  it('plans nothing for our own — the gesture already put it there', () => {
+    expect(planBeats([shownBy('p1', 1), takenBackBy('p1', 2)], boardBefore())).toEqual([])
+  })
+})

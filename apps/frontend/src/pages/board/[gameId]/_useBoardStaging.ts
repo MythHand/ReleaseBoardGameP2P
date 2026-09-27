@@ -144,6 +144,12 @@ export interface BoardStaging {
    * Derived from `StageState` below, so the render asks one question instead
    * of three. */
   stageStanding: boolean
+  /** whether this gesture is holding anything of ours at the centre — a staged
+   * play, or a release on its way to, at or from the stage slot. While it is,
+   * our own cards at the centre are the gesture's to draw; once it holds
+   * nothing (the board was rebuilt: the stand's viewer switch, a reconnect),
+   * the projection is what still knows they are out (resolution.md §1). */
+  holdingCentre: boolean
   /** the card that paid a staged release's cost, once its own flight has
    * landed — held open beside the release until `clearPaidCost` below moves
    * it on (the combo beat's own job, #101 Task 11) */
@@ -454,12 +460,20 @@ export function useBoardStaging({
   // partner and Escape all send these cards home again, and that return is the
   // gesture working rather than a card escaping. So this says where the cards
   // are now, and says nothing at all the moment they are back in the hand.
+  //
+  // WHAT THE PROJECTION SAYS IS AT THE CENTRE is out of the fan too — one rule
+  // for every card, the release waiting for its cost among them (the engine
+  // shows it, with its Code Review, for as long as it waits).
   const handOut = useMemo(
     () =>
       new Set(
-        [staged?.support?.uid, staged?.main?.uid, cost?.release, paying, costGone].filter(
-          (uid): uid is string => Boolean(uid),
-        ),
+        [
+          staged?.support?.uid,
+          staged?.main?.uid,
+          ...(state.shown ?? []).filter((s) => s.player === state.selfId).map((s) => s.uid),
+          paying,
+          costGone,
+        ].filter((uid): uid is string => Boolean(uid)),
       ),
     // `paidCost` belongs here as much as the rest: the card lies OPEN BESIDE THE
     // RELEASE from the moment its flight lands until the beat takes it to the
@@ -468,7 +482,7 @@ export function useBoardStaging({
     // beat runs against is the board from before it did. Left in, the fan draws
     // a second copy of a card that is lying on the table, and it stays there
     // until the discard finally swallows it (owner, 22.09).
-    [staged, cost, paying, costGone],
+    [staged, state.shown, state.selfId, paying, costGone],
   )
 
   const handItems = useMemo(
@@ -667,6 +681,10 @@ export function useBoardStaging({
     plainAttempt.current += 1
     flyer.drop('stage')
     arrowCtl.stop()
+    // what was put out on the table goes back in everyone's view (resolution.md
+    // §1) — asked only while the engine is showing something of ours, so a
+    // cancel it has already answered (the turn ran out) asks nothing twice
+    if ((state.shown ?? []).some((c) => c.player === state.selfId)) actions?.onTakeBack?.()
     const cRect = anchors.centre.current?.getBoundingClientRect()
     if (reduced || !cRect) {
       pairApi.current.release()
@@ -719,6 +737,8 @@ export function useBoardStaging({
     arrowCtl.stop,
     cost,
     state.you.hand,
+    state.shown,
+    state.selfId,
     actions,
     flyer.drop,
   ])
@@ -867,6 +887,8 @@ export function useBoardStaging({
           : { support: card, main: null, phase: 'partner', merged: false },
       )
       setStage('none')
+      // it is out of the hand and on the table, in everyone's view (resolution.md §1)
+      actions?.onShow?.(card.uid)
       void (async () => {
         if (!reduced && from) {
           setCarrying([card.uid])
@@ -896,7 +918,7 @@ export function useBoardStaging({
         aimFromPlay(card, hasTarget ? null : 0)
       })()
     },
-    [anchors, reduced, flyer.raise, flyer.drop, aimFromPlay],
+    [anchors, reduced, flyer.raise, flyer.drop, aimFromPlay, actions],
   )
 
   // A standalone play is read at the centre before its effect is sent.
@@ -907,6 +929,8 @@ export function useBoardStaging({
       const attempt = ++plainAttempt.current
       commitStaged({ support: null, main: card, phase: 'aim', merged: false })
       setStage('none')
+      // read at the centre by the whole table while it waits (resolution.md §1)
+      actions?.onShow?.(card.uid)
       const current = () =>
         attempt === plainAttempt.current &&
         !cancellingRef.current &&
@@ -1179,6 +1203,8 @@ export function useBoardStaging({
       const sideBySide = support.card.id === 'support-sudo' && !stacked
       const merged = !sideBySide
       commitStaged({ support, main, phase: 'partner', merged })
+      // the card it goes with is out on the table too (resolution.md §1)
+      actions?.onShow?.(main.uid)
       // the fold is committed — irrevocable until `finish()` runs (ComboStory's
       // own `playing`); `cancel()` and a second click both refuse while this is
       // true, so nothing can race the automatic dispatch that follows the fold.
@@ -1492,7 +1518,9 @@ export function useBoardStaging({
     if (s?.phase !== 'dispatched') return
     const fresh = events.slice(dispatchWatermarkRef.current)
     const rejectedOurs = fresh.some((e) => {
-      if (e.type !== 'rejected' || !('card' in e.action)) return false
+      // the play itself — a SHOW names a card too, and its refusal is not one
+      if (e.type !== 'rejected' || (e.action.type !== 'PLAY' && e.action.type !== 'ATTACK'))
+        return false
       return (
         (s.main && e.action.card === s.main.uid) || (s.support && e.action.combo === s.support.uid)
       )
@@ -1615,6 +1643,7 @@ export function useBoardStaging({
     costOptions,
     onCostPlay,
     stageStanding: stage === 'standing',
+    holdingCentre: staged !== null || stage !== 'none',
     paidCost,
     clearPaidCost,
     takeStagedRelease,

@@ -634,8 +634,8 @@ const soloReleaseBefore: BoardState = {
   comboOptions: {},
 } as unknown as BoardState
 
-// The engine's answer to the play: it emits NOTHING and holds a pending
-// instead, so the release is still in the hand and only the pending moved.
+// The engine's answer to the play: the release is shown at the centre and a
+// pending holds it there — still in the hand, out of the fan (resolution.md §1).
 const soloReleasePending: BoardState = {
   ...soloReleaseBefore,
   playable: [],
@@ -645,6 +645,7 @@ const soloReleasePending: BoardState = {
     release: 'release-frontend#0',
     options: ['attack-bug#0'],
   },
+  shown: [{ player: 'p1', uid: 'release-frontend#0', card: card('release-frontend') }],
 } as unknown as BoardState
 
 const soloReleaseAfter: BoardState = {

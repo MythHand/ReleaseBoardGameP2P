@@ -311,6 +311,8 @@ function ScenarioRun({
             onPush: () => send({ type: 'PUSH', player: viewer }),
             onAttack: (card, combo) => send({ type: 'ATTACK', player: viewer, card, combo }),
             onPass: () => send({ type: 'PASS', player: viewer }),
+            onShow: (card) => send({ type: 'SHOW', player: viewer, card }),
+            onTakeBack: () => send({ type: 'TAKE_BACK', player: viewer }),
           }}
         />
       </div>

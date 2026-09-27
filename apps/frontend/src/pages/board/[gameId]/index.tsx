@@ -236,6 +236,8 @@ export default function BoardPage() {
           onAttack: game.attack,
           onPass: game.pass,
           onResolve: game.resolve,
+          onShow: game.show,
+          onTakeBack: game.takeBack,
           onOverContinue: () => navigate(`/board/${gameId}/stats`),
         }}
         copy={{

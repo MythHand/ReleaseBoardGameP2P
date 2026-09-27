@@ -24,6 +24,7 @@ import {
 } from '~/entities/game/board'
 import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
+import { shownSource } from './shownBeat'
 import { useToCentre } from './toCentre'
 import { toEventsDeck } from './toEventsDeck'
 import { useToHand } from './toHand'
@@ -107,13 +108,26 @@ export function useComboBeat(
       // FIRST slot (the same simplification `sourceOf` makes). Invisible on
       // screen; noted so it is not rediscovered as a bug.
       const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === cardId) : -1
+      // Put out at the centre first (resolution.md §1): the play starts where
+      // its cards stand, and their standing render goes down in the same commit
+      // the carrier taking them over goes up.
+      const shown = shownSource(ctx.base, actor, auxId ? [cardId, auxId] : [cardId], a)
+      const takeOver = () => {
+        if (!shown) return
+        ctx.base = shown.next
+        ctx.publish(shown.next)
+      }
       const fromRect =
-        (mine && handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ?? a.seatBox(actor)
+        shown?.rect ??
+        (mine && handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
+        a.seatBox(actor)
       if (!fromRect) return null
       if (aux && main.category === 'attack') {
-        const [el] = await flyer.raise([
+        const raisedPair = flyer.raise([
           { key: 'fold', at: fromRect, content: <CardPair main={main} aux={aux} width="100%" /> },
         ])
+        takeOver()
+        const [el] = await raisedPair
         if (el) {
           await play('playToCenter', el, {
             from: fromRect,
@@ -125,11 +139,13 @@ export function useComboBeat(
         }
         return el ?? null
       }
-      const [el] = await flyer.raise([
+      const raised = flyer.raise([
         aux
           ? { key: 'fold', at: cRect, content: <CardPair main={main} aux={aux} width="100%" /> }
           : { key: 'fold', at: cRect, card: main },
       ])
+      takeOver()
+      const [el] = await raised
       if (!el) return null
       for (const anim of el.getAnimations?.({ subtree: true }) ?? []) anim.cancel() // I3
       const mainEl = aux ? el.querySelector<HTMLElement>('[data-main]') : el

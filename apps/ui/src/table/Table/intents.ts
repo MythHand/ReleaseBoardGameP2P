@@ -44,9 +44,10 @@ export type TablePending =
   | {
       kind: 'discardForRelease'
       player: string
-      // The owner's own staged card, redacted for everyone else exactly as
-      // `options` is — mirrors the engine's PendingView (Decision 7).
-      release?: string
+      // The release standing at the centre while its cost is unpaid — public,
+      // the whole table sees it (resolution.md §1). Mirrors the engine's
+      // PendingView; `options` stays the owner's.
+      release: string
       options: string[]
     }
   | {
@@ -199,6 +200,11 @@ export interface TableActions {
   onAttack?: (card: string, combo?: string) => void
   onPass?: () => void
   onResolve?: (choice: TableChoice) => void
+  // What the table sees while a play is being made: a card of the hand put out
+  // at the centre, and everything put out taken back. Not moves — the play is
+  // still whatever completes it.
+  onShow?: (card: string) => void
+  onTakeBack?: () => void
   onWindowExpired?: () => void
   onOverContinue?: () => void
   // Legality is the engine's answer, never the UI's. Returns [] when the card

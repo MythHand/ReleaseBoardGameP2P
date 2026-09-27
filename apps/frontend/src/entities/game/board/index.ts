@@ -8,6 +8,13 @@ export {
   SHOW_HOLD,
   SUDO_POSE,
 } from './poses'
+export {
+  type ShownCard,
+  type ShownLayout,
+  type ShownPlace,
+  shownLayout,
+  shownPlaceOf,
+} from './shownLayout'
 export { toAction } from './toAction'
 export { toBoardOver } from './toBoardOver'
 export type { HistoryLabels } from './toBoardState'

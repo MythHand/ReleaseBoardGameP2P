@@ -69,6 +69,7 @@ const view = (): PlayerView => ({
     frozen: [],
   },
   opponents: [{ id: 'p2', name: 'Two', handCount: 2, release: {}, eliminated: false }],
+  shown: [],
   decks: { piles: [100], events: 21, discardCount: 0 },
   turn: { player: 'p1', index: 0, hasDrawn: false },
   window: null,

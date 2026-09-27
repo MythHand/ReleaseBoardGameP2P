@@ -5,6 +5,7 @@ import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@re
 import { type RefObject, useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
 import type { BeatPlan, DiscardCard } from './planBeats'
+import { shownSource } from './shownBeat'
 import { settleInto, withLanded, withoutLanded } from './toHeap'
 import { withoutFlown } from './withoutFlown'
 
@@ -255,9 +256,13 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
         ]
       })
       const hand = flown[0]?.source
+      // Another player's card they had put out at the centre first (resolution.md
+      // §1) is already standing there — it starts where it stands, not at the seat.
+      const shown = handoff || mine ? null : shownSource(ctx.base, plan.player, ids, a)
       const from = handoff
         ? to
-        : ((hand?.kind === 'hand' ? rectOf(a.handSlotAt(hand.index)) : null) ??
+        : (shown?.rect ??
+          (hand?.kind === 'hand' ? rectOf(a.handSlotAt(hand.index)) : null) ??
           a.seatBox(plan.player))
       if (!from) return
       // PAID FOR WITH SUDO: two cards, not one pair. They fly to the two places
@@ -281,13 +286,15 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
             height: cell.h,
           }))
         : null
+      // shown first, the two already stand in those two places of the row
+      const starts = shown ? lands : places
       const raised = flyer.raise(
-        aux && places
+        aux && starts
           ? [
-              { key: `${KEY}:aux`, at: places[0], content: <Card card={aux} width="100%" /> },
+              { key: `${KEY}:aux`, at: starts[0], content: <Card card={aux} width="100%" /> },
               {
                 key: KEY,
-                at: places[1],
+                at: starts[1],
                 content: (
                   <div data-public-operation="">
                     <Card card={main} width="100%" />
@@ -309,17 +316,19 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       )
       // The new carrier and the source removal commit together, including local
       // staging ownership. No intermediate frame renders both copies.
-      ctx.publish(withoutFlown(ctx.base, flown))
+      // A shown card was taken off the seat's counter when it was put out, so it
+      // is taken off the centre now rather than off the seat a second time.
+      ctx.publish(shown ? shown.next : withoutFlown(ctx.base, flown))
       handoff?.release()
       held.current = plan
       setStanding(true)
       const els = await raised
       if (run !== epoch.current) return
       if (!handoff) {
-        if (aux && places && lands) {
+        if (aux && starts && lands) {
           await Promise.all(
             els.map((el, i) =>
-              el ? play('playToCenter', el, { from: places[i], to: lands[i] })?.finished : null,
+              el ? play('playToCenter', el, { from: starts[i], to: lands[i] })?.finished : null,
             ),
           )
         } else if (els[0]) {

@@ -65,6 +65,9 @@ export interface BoardState {
   // survive the moment the board lets go of the pending.
   centreCover?: { card: string; sudo: boolean }
   aiCause?: { card: string; eventId: number }
+  // Every card put out at the centre while its play is being made — face up,
+  // whoever put it there (resolution.md §1). The projection's own list.
+  shown?: { player: string; uid: string; card: CardData }[]
   you: {
     name: string
     hand: HandItem[]

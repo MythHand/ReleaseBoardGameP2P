@@ -322,6 +322,11 @@ export type BeatPlan =
       codeReview?: string
       cost?: { eventId: number; card: string }
     }
+  // Another player put a card out at the centre while making a play, or took
+  // what they had put out back into the hand (resolution.md §1). Our own is
+  // where our gesture put it, so these are planned for the other seats only.
+  | { kind: 'shown'; key: string; eventId: number; player: string; card: string }
+  | { kind: 'takenBack'; key: string; eventId: number; player: string; cards: string[] }
   // The pending pair splitting back into two singles for the discard. `main`
   // is optional, not `aux`: a sudo Rollback banks only the sudo half (the
   // attack card returns to its owner's hand instead), so the pair this beat
@@ -862,6 +867,24 @@ export function planBeats(
       e.type === 'gameOver'
     )
       closeOperation()
+    // One event, one beat, the same as `released`: a card put out at the centre
+    // or taken back from it by another player.
+    if (e.type === 'shown' || e.type === 'takenBack') {
+      if (e.player === before.selfId) continue
+      flush()
+      plans.push(
+        e.type === 'shown'
+          ? { kind: 'shown', key: `shown:${e.id}`, eventId: e.id, player: e.player, card: e.card }
+          : {
+              kind: 'takenBack',
+              key: `takenBack:${e.id}`,
+              eventId: e.id,
+              player: e.player,
+              cards: e.cards,
+            },
+      )
+      continue
+    }
     if (e.type === 'operationPlayed') {
       closeOperation()
       flush()

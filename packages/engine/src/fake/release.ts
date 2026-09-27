@@ -16,6 +16,7 @@ import { openHandAttack, resolveDdos } from './handAttacks'
 import { mergePiles, splitPile } from './piles'
 import { playableFor } from './project'
 import { openReorderTop } from './rebase'
+import { show, takeBack } from './shown'
 import { openSystemUpgrade } from './upgrade'
 import { openWindow } from './window'
 
@@ -180,9 +181,15 @@ export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Red
     // The cost is a second card, so a lone release is unplayable.
     const spare = hand.filter((c) => c.uid !== action.card && c.uid !== codeReview)
     if (spare.length === 0) return reject(state, action, 'no card left to pay the release cost')
+    // It waits for its cost at the centre, in everyone's view (resolution.md
+    // §1) — whoever played it, and whether or not the table put it out first.
+    const shown = show(state, log, action.player, [
+      action.card,
+      ...(codeReview ? [codeReview] : []),
+    ])
     return {
       state: {
-        ...state,
+        ...shown,
         pending: {
           kind: 'discardForRelease',
           player: action.player,
@@ -190,7 +197,7 @@ export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Red
           ...(codeReview ? { codeReview } : {}),
         },
       },
-      events: [],
+      events: log.events,
     }
   }
 
@@ -349,8 +356,9 @@ export function onCancelRelease(state: GameState, action: Action & { type: 'RESO
   const pending = state.pending
   if (pending?.kind !== 'discardForRelease') return reject(state, action, 'no release staged')
   if (pending.player !== action.player) return reject(state, action, 'not your decision')
-  // Nothing moved when the release was staged — the card never left the hand
-  // (`onPlay` only sets the pending), so there is nothing to put back and
-  // nothing to announce. Clearing the pending IS the whole undo.
-  return { state: { ...state, pending: null }, events: [] }
+  // The release never left the hand — it only stood at the centre — so the
+  // undo is the pending cleared and the cards taken back, which the whole table
+  // sees just as it saw them put out.
+  const log = createLog(state.eventSeq)
+  return { state: { ...takeBack(state, log, action.player), pending: null }, events: log.events }
 }

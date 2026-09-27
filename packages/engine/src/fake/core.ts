@@ -46,7 +46,8 @@ export function reject(state: GameState, action: Action, reason: string): Reduct
 }
 
 // Both locks name cards in a hand, so a card that leaves the hand takes its
-// lock with it (#80). Left behind, a stale uid is not merely untidy: `frozen`
+// lock with it (#80) — and so does `shown`: a card put out at the centre that
+// was then played is no longer waiting there. Left behind, a stale uid is not merely untidy: `frozen`
 // is projected, so it hands its former owner the identity of a card now sitting
 // in someone else's hand — a leak of exactly the kind the projection exists to
 // prevent. Pruning here rather than at each mover means no future path that
@@ -63,6 +64,7 @@ export const setHand = (state: GameState, id: PlayerId, hand: PlayerState['hand'
         hand,
         frozen: me.frozen.filter((uid) => held.has(uid)),
         replayLocked: me.replayLocked.filter((uid) => held.has(uid)),
+        shown: me.shown.filter((uid) => held.has(uid)),
       },
     },
   }

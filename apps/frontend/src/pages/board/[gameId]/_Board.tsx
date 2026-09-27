@@ -67,7 +67,13 @@ import {
 // nothing to catch it — a type check cannot see a position. `opening` holds only
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
-import { ATTACK_POSE, COVER_POSE, SUDO_POSE, useBoardAnchors } from '~/entities/game/board'
+import {
+  ATTACK_POSE,
+  COVER_POSE,
+  SUDO_POSE,
+  shownLayout,
+  useBoardAnchors,
+} from '~/entities/game/board'
 import type {
   BoardProps,
   DiscardPickHandoff,
@@ -655,6 +661,31 @@ export default function Board({
       ? { support: staging.staged.support, main: staging.staged.main }
       : null
 
+  // WHAT ANOTHER PLAYER HAS PUT OUT AT THE CENTRE (resolution.md §1) — read off
+  // the projection and stood in the SAME places our own staging stands in
+  // (`shownLayout`, which the beat flying it in reads too). Our own cards are
+  // our own staging's to draw while it holds them; once it holds nothing — the
+  // board was rebuilt (the stand's viewer switch, a reconnect) — the projection
+  // is what still knows they are out, so they are drawn from it too.
+  const theirs = shownLayout(
+    (state.shown ?? []).filter((s) => s.player !== state.selfId || !staging.holdingCentre),
+  )
+  const theirPair = theirs.pair
+    ? { main: theirs.pair.main.card, aux: theirs.pair.aux.card, at: theirs.pair.at }
+    : null
+  const theirRow = theirs.row ? { support: theirs.row[0], main: theirs.row[1] } : null
+  const theirRelease = theirs.stage?.card ?? null
+  const theirSolo = theirs.solo?.card ?? null
+  // …and what the row holds, whoever's it is
+  const centreRow = assembling ?? theirRow
+  const rowTestIds = assembling
+    ? ['board-centre-staged', 'board-centre-partner']
+    : ['board-centre-shown', 'board-centre-shown']
+  // …and what stands at the middle. Ours only once the flyer has dropped it and
+  // no pair flyer owns the centre instead (ComboStory.tsx's own guard).
+  const ownSolo = soloStaged && !assembling && staging.overlay.length === 0 ? soloStaged.card : null
+  const centreSolo = ownSolo ?? theirSolo
+
   // The hue the arrow was ARMED with (#101, Fix B, Defect 5): whichever hook
   // aimed it named the colour of the card the line leaves, in the same call
   // that said where it starts. The board no longer re-derives that from
@@ -850,6 +881,8 @@ export default function Board({
     ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
       stagedReleaseLocal)
     : undefined
+  // whichever release is standing at the stage slot — ours, or another player's
+  const releaseAtStage = stagedRelease?.card ?? theirRelease
 
   // Read this render's staging only after its DOM refs have bound. This is a
   // function declaration so the earlier layout effect can register it before
@@ -1385,9 +1418,9 @@ export default function Board({
         style={centrePlaceStyle('release', 'stage')}
         data-centre-slot="stage"
         ref={anchors.stage}
-        {...previewProps(stagedRelease?.card ?? null)}
+        {...previewProps(releaseAtStage)}
       >
-        {stagedRelease && <Card card={stagedRelease.card} interactive={false} width="100%" />}
+        {releaseAtStage && <Card card={releaseAtStage} interactive={false} width="100%" />}
       </div>
       <div
         className={opening.costSlot}
@@ -1525,8 +1558,8 @@ export default function Board({
           and that gap is how the table asks what it goes with. Both places are
           real nodes, because the flight out of the fan aims at the first one
           and the static render fills the same node it aimed at. */}
-      {assembling &&
-        [assembling.support, assembling.main].map((card, i) => (
+      {centreRow &&
+        [centreRow.support, centreRow.main].map((card, i) => (
           <div
             // biome-ignore lint/suspicious/noArrayIndexKey: the index IS the place — a place keeps its identity while what stands in it changes
             key={i}
@@ -1540,15 +1573,24 @@ export default function Board({
                 enhances was still on its way in */}
             {card && !staging.carrying.includes(card.uid) && (
               <div
-                ref={i === 0 ? soloStagedRef : undefined}
+                ref={i === 0 && assembling ? soloStagedRef : undefined}
                 className={opening.centreCard}
-                data-testid={i === 0 ? 'board-centre-staged' : 'board-centre-partner'}
+                data-testid={rowTestIds[i]}
               >
                 <Card card={card.card} interactive={false} width="100%" />
               </div>
             )}
           </div>
         ))}
+      {/* another player's Code Review folded with its release — where our own
+          pair folds, the row's first place (`_useBoardStaging`'s fold box) */}
+      {theirPair?.at === 'row0' && (
+        <div className={opening.rowSlot} style={rowPlaceStyle('staging', 2, 0)}>
+          <div className={opening.centreCard} data-testid="board-centre-shown">
+            <CardPair main={theirPair.main} aux={theirPair.aux} width="100%" />
+          </div>
+        </div>
+      )}
 
       {/* the attack slot — where cards stand while the table is looking at them:
           the player's own cards gather here during the opening, and every drawn
@@ -1589,7 +1631,7 @@ export default function Board({
             the carrier or a return flight still holds it, the static render
             would double it (ComboStory.tsx's own guard on this). Once a
             partner folds in, the pair flyer below owns the centre instead. */}
-        {soloStaged && !assembling && staging.overlay.length === 0 && (
+        {centreSolo && (
           // IT LANDS IN THE POSE IT WILL KEEP. An attack rests at the centre
           // tilted (`ATTACK_POSE`, and I11: the tilt is what marks a card as
           // PLAYED), and this render used to be straight — so the card flew in
@@ -1597,14 +1639,27 @@ export default function Board({
           // standing render took over. The turn read as the card correcting
           // itself after it had already landed. The tilt lives on an INNER
           // element, so the node the beat measures stays the true card box (I6).
-          <div ref={soloStagedRef} className={opening.centreCard} data-testid="board-centre-staged">
-            {soloStaged.card.category === 'attack' ? (
+          <div
+            ref={ownSolo ? soloStagedRef : undefined}
+            className={opening.centreCard}
+            data-testid={ownSolo ? 'board-centre-staged' : 'board-centre-shown'}
+          >
+            {centreSolo.category === 'attack' ? (
               <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
-                <Card card={soloStaged.card} interactive={false} width="100%" />
+                <Card card={centreSolo} interactive={false} width="100%" />
               </div>
             ) : (
-              <Card card={soloStaged.card} interactive={false} width="100%" />
+              <Card card={centreSolo} interactive={false} width="100%" />
             )}
+          </div>
+        )}
+        {/* another player's attack lying on its Sudo — the stack our own staging
+            folds at the middle, at the played tilt */}
+        {!ownSolo && theirPair?.at === 'solo' && (
+          <div className={opening.centreCard} data-testid="board-centre-shown">
+            <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+              <CardPair main={theirPair.main} aux={theirPair.aux} width="100%" />
+            </div>
           </div>
         )}
         {centreAttack &&

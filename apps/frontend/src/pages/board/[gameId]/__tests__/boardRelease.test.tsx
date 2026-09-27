@@ -100,19 +100,37 @@ function costPending(options: string[]): TablePending {
   return { kind: 'discardForRelease', player: 'you', release: 'release-frontend#0', options }
 }
 
+// What the engine shows at the centre while a release waits for its cost: the
+// release — and, for a combo, its Code Review (`fake/release.ts`'s play,
+// resolution.md §1). The projection carries it beside the pending.
+function shownWhileOwed(
+  pending: TablePending | undefined,
+  hand: { uid: string; card: CardData }[],
+  uids: string[],
+) {
+  if (pending?.kind !== 'discardForRelease') return []
+  return hand.filter((c) => uids.includes(c.uid)).map((c) => ({ player: 'you', ...c }))
+}
+
 function releaseBoard(
   overrides: { pending?: TablePending; hand?: typeof HAND },
   actions: TableActions = {},
 ) {
   const base = makeBoardProps()
+  const hand = overrides.hand ?? HAND
   const props = makeBoardProps({
     state: {
       ...base.state,
-      you: { ...base.state.you, hand: overrides.hand ?? HAND },
+      you: { ...base.state.you, hand },
       turn: base.state.selfId,
       hasDrawn: true,
       playable: HAND.map((c) => c.uid),
       pending: overrides.pending ?? null,
+      shown: shownWhileOwed(
+        overrides.pending,
+        hand,
+        overrides.pending?.kind === 'discardForRelease' ? [overrides.pending.release] : [],
+      ),
     },
     actions,
   })
@@ -163,6 +181,10 @@ function comboReleaseBoard(overrides: { pending?: TablePending }, actions: Table
       playable: overrides.pending ? [] : COMBO_HAND.map((c) => c.uid),
       comboOptions: overrides.pending ? {} : { 'support-code-review#0': ['release-frontend#0'] },
       pending: overrides.pending ?? null,
+      shown: shownWhileOwed(overrides.pending, COMBO_HAND, [
+        'support-code-review#0',
+        'release-frontend#0',
+      ]),
     },
     actions,
   })
@@ -432,6 +454,7 @@ function costLitBoard(options: string[]) {
       hasDrawn: true,
       playable: [], // a pending suspends normal play — `playableFor`'s own first check
       pending: costPending(options),
+      shown: shownWhileOwed(costPending(options), HAND, ['release-frontend#0']),
     },
   })
   return <Board {...props} />
@@ -472,6 +495,7 @@ function costStateAt(enabled: boolean): (i: number) => string {
         hasDrawn: true,
         playable: [],
         pending: costPending(['attack-bug#0']),
+        shown: shownWhileOwed(costPending(['attack-bug#0']), HAND, ['release-frontend#0']),
       },
       anchors: useBoardAnchors(),
       events: [],
@@ -1125,6 +1149,10 @@ function comboCancelHarness() {
           playable: pending ? [] : COMBO_HAND.map((c) => c.uid),
           comboOptions: pending ? {} : { 'support-code-review#0': ['release-frontend#0'] },
           pending,
+          shown: shownWhileOwed(pending ?? undefined, COMBO_HAND, [
+            'support-code-review#0',
+            'release-frontend#0',
+          ]),
         } as typeof base.state,
         anchors,
         events: [],
@@ -1162,10 +1190,14 @@ it('hands the fan back when a combo cancel’s own flight is refused', async () 
     })
     // nothing landed, and nothing was going to — so the gesture put itself back
     expect(result.current.staged).toBeNull()
-    // the Code Review is in the fan again; the release itself stays out of it
-    // until the referee's answer clears the pending that names it
+    // both halves stay out of the fan until the referee's answer takes them
+    // back: while the cost is owed the engine shows the pair at the centre,
+    // and one `takenBack` returns both (resolution.md §1)
+    expect(result.current.handItems.map((c) => c.uid)).toEqual(['attack-bug#0'])
+    rerender({ pending: null })
     expect(result.current.handItems.map((c) => c.uid)).toEqual([
       'support-code-review#0',
+      'release-frontend#0',
       'attack-bug#0',
     ])
   } finally {
@@ -1281,6 +1313,7 @@ it('restores a rejected cost choice and lets it be retried without duplicate sub
           ...base.state,
           you: { ...base.state.you, hand: HAND },
           pending: costPending(['attack-bug#0']),
+          shown: shownWhileOwed(costPending(['attack-bug#0']), HAND, ['release-frontend#0']),
         },
         anchors: useBoardAnchors(),
         events,

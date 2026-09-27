@@ -23,6 +23,7 @@ import { useHandLimitBeat } from './handLimitBeat'
 import { type OperationLanded, useOperationBeat, withoutPendingOperation } from './operationBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
+import { useShownBeat } from './shownBeat'
 import { useTransferBeat } from './transferBeat'
 import { useUpgradeBeat } from './upgradeBeat'
 
@@ -218,6 +219,7 @@ export function useBeats(args: {
   const handLimits = useHandLimitBeat(anchors, handLimit)
   const transfers = useTransferBeat(anchors, requestPick, onHandArrival)
   const ais = useAiBeat(anchors, onHandArrival)
+  const shownCards = useShownBeat(anchors)
   // The operation beat first: System Upgrade's centre holds both its answers and
   // the operation card itself, and they leave together in the answers' own send
   // rather than in a beat of their own behind them.
@@ -312,6 +314,18 @@ export function useBeats(args: {
           // this beat's to hold.
           alarm: false,
           run: (ctx) => upgrades.run(plan, ctx),
+        }
+      }
+      if (plan.kind === 'shown' || plan.kind === 'takenBack') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) =>
+            plan.kind === 'shown'
+              ? shownCards.runShown(plan, ctx)
+              : shownCards.runTakenBack(plan, ctx),
         }
       }
       if (plan.kind === 'draw') {
@@ -522,6 +536,8 @@ export function useBeats(args: {
       ais.run,
       ais.runTaken,
       ais.runRefused,
+      shownCards.runShown,
+      shownCards.runTakenBack,
       discardPick,
     ],
   )
@@ -647,6 +663,7 @@ export function useBeats(args: {
     handLimits.reset()
     transfers.reset()
     ais.reset()
+    shownCards.reset()
   }, [intro?.key, live])
 
   // Adopt only after the match-boundary reset, or its cleanup would erase
@@ -820,6 +837,7 @@ export function useBeats(args: {
       ...handLimits.overlay,
       ...transfers.overlay,
       ...ais.overlay,
+      ...shownCards.overlay,
       ...upgrades.overlay,
       ...operations.overlay,
     ],

@@ -8,7 +8,11 @@ import type { BoardState } from './types'
 // One label per member of the engine's Event union — the adapter maps event
 // types to translated text, replacing the mock's free-form `kind` literals.
 // Task 15 adds the matching keys under `moveHistory` in both catalogs.
-export type HistoryLabels = Record<Event['type'], string>
+export type HistoryLabels = Record<HistoryEvent['type'], string>
+
+// A card put out at the centre and taken back is what the table sees while a
+// play is being made, not a move: it has no row in the history.
+type HistoryEvent = Exclude<Event, { type: 'shown' | 'takenBack' }>
 
 // `assetUrl` throws on a key the catalogue does not recognise, so a card id
 // the catalogue does not know cannot resolve through it — `toTableState` must
@@ -225,7 +229,7 @@ function attackerOf(
 // default means a new member of the engine's Event union fails `pnpm typecheck`
 // here rather than rendering as an unlabelled grey line nobody notices.
 function toHistoryEntry(
-  e: Event,
+  e: HistoryEvent,
   labels: HistoryLabels,
   nameOf: Map<string, string>,
   byId: Map<number, Event>,
@@ -545,7 +549,7 @@ export function buildHistoryTree(entries: HistoryEntry[]): HistoryEntry[] {
 // in the history. Keep the raw log intact; omit only a discard we can identify
 // from the immediately surrounding causal events. In particular, a later
 // discard of another copy of the same card remains a separate row.
-function historyEvents(events: Event[]): Event[] {
+function historyEvents(events: Event[]): HistoryEvent[] {
   const hidden = new Set<number>()
   const byId = new Map(events.map((event) => [event.id, event]))
 
@@ -598,7 +602,10 @@ function historyEvents(events: Event[]): Event[] {
     }
   }
 
-  return events.filter((event) => !hidden.has(event.id))
+  return events.filter(
+    (event): event is HistoryEvent =>
+      !hidden.has(event.id) && event.type !== 'shown' && event.type !== 'takenBack',
+  )
 }
 
 // The projection becomes a table: PlayerView + the event log + translated
@@ -688,6 +695,11 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
     // contract.test-d.ts. Both carry openedAt alongside deadline already.
     pending: view.pending,
     ...(aiCause ? { aiCause } : {}),
+    shown: view.shown.map((s) => ({
+      player: s.player,
+      uid: s.uid,
+      card: cardOrPlaceholder(s.card),
+    })),
     window: view.window,
     // Structural passthrough — the engine's own answer to which pairs a
     // support may start. participants/spectators are room facts and are

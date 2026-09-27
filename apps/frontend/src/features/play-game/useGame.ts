@@ -21,6 +21,9 @@ export interface Game {
   attack(card: string, combo?: string): void
   pass(): void
   resolve(choice: Choice): void
+  // a card put out at the centre while a play is made, and taken back
+  show(card: string): void
+  takeBack(): void
 }
 
 // The page's whole relationship with the game. It holds a `GameLink` and a
@@ -159,5 +162,7 @@ export function useGame(): Game {
     attack: (card, combo) => submit({ type: 'ATTACK', card, combo }),
     pass: () => submit({ type: 'PASS' }),
     resolve: (choice) => submit({ type: 'RESOLVE', choice }),
+    show: (card) => submit({ type: 'SHOW', card }),
+    takeBack: () => submit({ type: 'TAKE_BACK' }),
   }
 }
