@@ -299,6 +299,13 @@ export function useBoardStaging({
   // regardless of what `cancel()` does), and a second click on another
   // candidate could start an overlapping second fold on top of the first.
   const foldingRef = useRef(false)
+  // A CARD ON ITS WAY FROM THE FAN TO THE TABLE is not taken back mid-air: a
+  // cancel counts once the card stands, the way the fold above is not cancelled
+  // mid-fold. Without it a miss during the flight sent a second copy home from a
+  // place the card had not reached, while the first went on landing there — a
+  // lone release pulled to the stage slot did exactly that (#168). A ref, read
+  // by `cancel()` in the same tick a press can land in.
+  const arrivingRef = useRef(false)
   const plainAttempt = useRef(0)
   // Whose turn it was when the current staging began. An attack answering a
   // reaction window is staged on somebody else's turn by design, so "not my
@@ -471,6 +478,13 @@ export function useBoardStaging({
           staged?.support?.uid,
           staged?.main?.uid,
           ...(state.shown ?? []).filter((s) => s.player === state.selfId).map((s) => s.uid),
+          // IN THE AIR ON ITS WAY HOME: the carrier draws it until it lands, so
+          // the fan does not. Every other return was covered only because the
+          // gesture happened to hold its card until landing; a lone release is
+          // let go of at its cost step, so the fan drew it back in its old slot
+          // the moment the engine took the cancel, while its carrier was still
+          // flying to the gap — and it jumped there on landing (#168).
+          ...carrying,
           paying,
           costGone,
         ].filter((uid): uid is string => Boolean(uid)),
@@ -482,7 +496,7 @@ export function useBoardStaging({
     // beat runs against is the board from before it did. Left in, the fan draws
     // a second copy of a card that is lying on the table, and it stays there
     // until the discard finally swallows it (owner, 22.09).
-    [staged, state.shown, state.selfId, paying, costGone],
+    [staged, state.shown, state.selfId, carrying, paying, costGone],
   )
 
   const handItems = useMemo(
@@ -589,6 +603,8 @@ export function useBoardStaging({
   // group; the fan settles to projection order once `staged` clears).
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
   const cancel = useCallback(() => {
+    // still in the air on its way to the table: nothing to take back yet
+    if (arrivingRef.current) return
     // The release awaiting its cost is the one dispatched play that CAN be
     // taken back: the engine holds it as a pending and has emitted nothing, so
     // nobody else has seen it. The engine is told first and the card flies
@@ -862,8 +878,13 @@ export function useBoardStaging({
       void (async () => {
         const to = anchors.stage.current?.getBoundingClientRect()
         if (!reduced && from && to) {
-          const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
-          if (el) await play('playToCenter', el, { to })?.finished
+          arrivingRef.current = true
+          try {
+            const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
+            if (el) await play('playToCenter', el, { to })?.finished
+          } finally {
+            arrivingRef.current = false
+          }
           flyer.drop('stage')
         }
         // the carrier has dropped it (or, under reduced motion, there was
@@ -892,6 +913,7 @@ export function useBoardStaging({
       void (async () => {
         if (!reduced && from) {
           setCarrying([card.uid])
+          arrivingRef.current = true
           try {
             const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
             // MEASURED AFTER THE RAISE, not before it. A support waiting for its
@@ -909,6 +931,7 @@ export function useBoardStaging({
             // app gets an unhandled rejection. The card is staged either way —
             // the flight is how it got there, not whether it did.
           }
+          arrivingRef.current = false
           flyer.drop('stage')
           setCarrying([])
         }
@@ -949,14 +972,19 @@ export function useBoardStaging({
       void (async () => {
         const to = anchors.centre.current?.getBoundingClientRect()
         if (to && from) {
-          const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
-          if (!current()) return
-          // INTO THE POSE IT WILL REST IN, not into a flat landing it then
-          // corrects. An attack lies tilted at the centre (I11: the tilt is
-          // what says it has been PLAYED), so the flight ends already turned —
-          // the same `rotate`/`dx`/`dy` the combo and defence flights pass, for
-          // the same reason.
-          if (el) await play('playToCenter', el, { to, ...attackPose(card.card) })?.finished
+          arrivingRef.current = true
+          try {
+            const [el] = await flyer.raise([{ key: 'stage', card: card.card, at: from }])
+            if (!current()) return
+            // INTO THE POSE IT WILL REST IN, not into a flat landing it then
+            // corrects. An attack lies tilted at the centre (I11: the tilt is
+            // what says it has been PLAYED), so the flight ends already turned —
+            // the same `rotate`/`dx`/`dy` the combo and defence flights pass, for
+            // the same reason.
+            if (el) await play('playToCenter', el, { to, ...attackPose(card.card) })?.finished
+          } finally {
+            arrivingRef.current = false
+          }
           if (!current()) return
           flyer.drop('stage')
         }
@@ -1564,8 +1592,13 @@ export function useBoardStaging({
     commitStaged(null)
     cancellingRef.current = false
     foldingRef.current = false
+    arrivingRef.current = false
     dispatchWatermarkRef.current = 0
     setCancelling(false)
+    // a return the new match cut short still lets go of its card only when its
+    // own timer runs out, and the fan does not draw a card that is in the air —
+    // the new match's fan is whole at once, not a flight later
+    setCarrying([])
     setStage('none')
     resetCostPayment()
     pairApi.current.release()

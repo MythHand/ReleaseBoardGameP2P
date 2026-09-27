@@ -635,6 +635,51 @@ it('a new match takes the last one’s standing release off the table', async ()
   expect(result.current.handItems).toHaveLength(HAND.length)
 })
 
+// …and a card that was on its way HOME when the rematch came: the fan does not
+// draw a card in the air, and a return the new match cut short is not the new
+// fan's to wait for — it is whole at once.
+it('a new match does not wait on the last one’s card flying home', async () => {
+  const base = makeBoardProps()
+  const owed = costPending(['attack-bug#0'])
+  const { result, rerender } = renderHook(
+    ({ key, pending }: StagingProps) => {
+      const anchors = useBoardAnchors()
+      // a fan and a stage slot to measure, so the return really takes off
+      anchors.hand.current ??= document.createElement('div')
+      anchors.stage.current ??= document.createElement('div')
+      return useBoardStaging({
+        state: {
+          ...base.state,
+          you: { ...base.state.you, hand: HAND },
+          turn: base.state.selfId,
+          hasDrawn: true,
+          playable: pending ? [] : HAND.map((c) => c.uid),
+          pending,
+        },
+        anchors,
+        events: [],
+        enabled: true,
+        matchKey: key,
+      })
+    },
+    { initialProps: { key: 'g1', pending: null } as StagingProps },
+  )
+  await act(async () => {
+    result.current.onHandPlay('release-frontend#0', { x: 0, y: 0 })
+    await new Promise((r) => setTimeout(r, 600))
+  })
+  rerender({ key: 'g1', pending: owed })
+  await act(async () => {
+    result.current.cancel()
+    await new Promise((r) => setTimeout(r, 50))
+  })
+  // in the air on its way home: out of the fan
+  expect(result.current.handItems.some((c) => c.uid === 'release-frontend#0')).toBe(false)
+
+  rerender({ key: 'g2', pending: null })
+  expect(result.current.handItems).toHaveLength(HAND.length)
+})
+
 // The PAID COST's own half of the same boundary (#101, Fix D, finding 6). It
 // used to ride along in the test above as `expect(paidCost).toBeNull()`, with
 // nothing behind it: `paidCost` is set only when a cost pull's own flight lands
@@ -842,6 +887,63 @@ it('does not double-render the release while its own return flight is still carr
   expect(flyer).toBeTruthy()
   // …and the stage slot must not ALSO show a static copy of the same card
   expect(stage.querySelector('[data-card]')).toBeNull()
+})
+
+// A LONE RELEASE is let go of by the gesture at its cost step, so nothing but
+// the engine's own answer kept it out of the fan — and on a fast answer the fan
+// drew it back in its old slot while its carrier was still flying to the gap in
+// the middle, then it jumped there on landing (#168). A card in the air on its
+// way home is the carrier's to draw, not the fan's.
+const fanHolds = (id: string) =>
+  document.querySelector(`[data-hand-slot] [data-card="${id}"]`) !== null
+
+it('keeps a cancelled release out of the fan until its return flight lands', async () => {
+  const onResolve = vi.fn()
+  const { rerender } = render(releaseBoard({}, { onResolve }))
+  await pullCardFromFan('release-frontend#0')
+  rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
+  fireEvent.mouseDown(document.querySelector('[data-board-centre]')?.parentElement as HTMLElement)
+  // the engine takes the cancel at once: nothing owed, nothing shown
+  rerender(releaseBoard({}, { onResolve }))
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 50)) // well inside FLIGHT_MS (480ms)
+  })
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
+  expect(document.querySelector('[class*="arriving"]')).toBeTruthy()
+  expect(fanHolds('release-frontend')).toBe(false)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 600))
+  })
+  expect(fanHolds('release-frontend')).toBe(true)
+})
+
+// …and a card still on its way TO the table is not taken back: the cancel
+// counts once it stands. A miss during the release's flight to the stage slot
+// used to send a second copy home from a place the card had not reached, while
+// the first went on landing there (#168).
+it('takes nothing back while the release is still flying to the stage slot', async () => {
+  const animateSpy = holdFlightsOpen()
+  try {
+    const onResolve = vi.fn()
+    const { rerender } = render(releaseBoard({}, { onResolve }))
+    const index = HAND.findIndex((c) => c.uid === 'release-frontend#0')
+    const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
+    fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+    fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+    fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    rerender(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
+    fireEvent.mouseDown(document.querySelector('[data-board-centre]')?.parentElement as HTMLElement)
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(onResolve).not.toHaveBeenCalledWith({ kind: 'cancelRelease' })
+    expect(document.querySelector('[class*="arriving"]')).toBeNull()
+  } finally {
+    animateSpy.mockRestore()
+  }
 })
 
 // #101, Fix A (Defect 1, the doubling half): while the placement beat carries
