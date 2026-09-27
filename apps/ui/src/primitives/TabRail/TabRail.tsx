@@ -18,6 +18,9 @@ interface TabRailProps {
   active: string | null
   onSelect: (id: string) => void
   side?: 'right' | 'left'
+  // the pointer has come onto the rail — the player reaching for a panel, a
+  // moment before the click. The table warms its heaviest tab on it.
+  onPointerEnter?: () => void
   className?: string
 }
 
@@ -28,10 +31,11 @@ export default function TabRail({
   active,
   onSelect,
   side = 'right',
+  onPointerEnter,
   className = '',
 }: TabRailProps) {
   return (
-    <div className={`${styles.rail} ${styles[side]} ${className}`}>
+    <div className={`${styles.rail} ${styles[side]} ${className}`} onPointerEnter={onPointerEnter}>
       {items.map((it) => (
         <button
           key={it.id}

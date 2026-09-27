@@ -35,8 +35,9 @@ it('keeps the old content on screen, as the same node, while a new tab arrives',
 // node rather than building another.
 it('builds a prebuilt tab ahead, hidden, and shows the same node when asked', async () => {
   const prebuilt = { rules: { node: <p>rules</p>, width: 680 } }
+  // warmed: the player has reached for the rail
   const { getByText, rerender } = render(
-    <Drawer open={false} contentKey={null} prebuilt={prebuilt}>
+    <Drawer open={false} contentKey={null} prebuilt={prebuilt} warm>
       {null}
     </Drawer>,
   )
@@ -45,7 +46,7 @@ it('builds a prebuilt tab ahead, hidden, and shows the same node when asked', as
   expect(ahead.parentElement?.hasAttribute('inert')).toBe(true)
 
   rerender(
-    <Drawer open contentKey="rules" prebuilt={prebuilt}>
+    <Drawer open contentKey="rules" prebuilt={prebuilt} warm>
       {null}
     </Drawer>,
   )
@@ -79,6 +80,27 @@ it('takes the new width at once when it comes out, and animates it only once out
     </Drawer>,
   )
   expect(drawer.className).not.toContain(styles.arriving)
+})
+
+// Where the browser cannot say it is idle (jsdom here, Safari live), nothing is
+// built "at once" — that moment is the table's opening — only when warmed, or
+// when the tab is opened (25.09: every board test was paying for the rules).
+it('builds nothing ahead without an idle signal or a warm, until the tab is opened', async () => {
+  const prebuilt = { rules: { node: <p>rules</p>, width: 680 } }
+  const { queryByText, rerender } = render(
+    <Drawer open={false} contentKey={null} prebuilt={prebuilt}>
+      {null}
+    </Drawer>,
+  )
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(queryByText('rules')).toBeNull()
+
+  rerender(
+    <Drawer open contentKey="rules" prebuilt={prebuilt}>
+      {null}
+    </Drawer>,
+  )
+  expect(queryByText('rules')).not.toBeNull()
 })
 
 it('fades nothing when the panel opens straight onto another tab', () => {

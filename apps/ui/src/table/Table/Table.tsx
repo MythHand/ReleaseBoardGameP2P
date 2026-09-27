@@ -1,5 +1,5 @@
 import type React from 'react'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { HEAP_SHOW } from '@/animations'
 import LangSwitcher from '@/blocks/LangSwitcher'
 import LobbyCode from '@/blocks/LobbyCode'
@@ -171,6 +171,8 @@ export default function Table({
     onPauseToggleReady,
   } = room
   const [ownPanel, setOwnPanel] = useState<Panel | null>(null)
+  // the pointer has been on the rail: the drawer may build its heavy tab now
+  const [railReached, setRailReached] = useState(false)
   const controlled = panelProp !== undefined
   const panel = controlled ? panelProp : ownPanel
 
@@ -298,6 +300,17 @@ export default function Table({
     if (panel) lastOpen.current = panel
   }, [panel])
   const drawerWidth = DRAWER_WIDTH[panel ?? lastOpen.current]
+  // The rules panel is built ahead and kept mounted (`Drawer`'s `prebuilt`), so
+  // an element made fresh here would re-render the whole rules text on every
+  // table render. One element per copy — as the board keeps it.
+  const rulesPanel = useMemo(
+    () => (
+      <ScrollArea className={styles.scrollPanel}>
+        <Rules copy={copy.rules} />
+      </ScrollArea>
+    ),
+    [copy.rules],
+  )
 
   return (
     <CardMotionProvider value={parallax}>
@@ -438,7 +451,12 @@ export default function Table({
         )}
 
         {/* вертикальный рейл у правого края — переключает панели drawer */}
-        <TabRail items={railItems} active={panel} onSelect={(id) => toggle(id as Panel)} />
+        <TabRail
+          items={railItems}
+          active={panel}
+          onSelect={(id) => toggle(id as Panel)}
+          onPointerEnter={() => setRailReached(true)}
+        />
 
         {/* выезжающая панель поверх контента (ширина — per-tab) */}
         <Drawer
@@ -446,14 +464,11 @@ export default function Table({
           width={drawerWidth}
           contentKey={panel}
           // the rules are built ahead, not in the frames the panel widens in
+          warm={railReached}
           prebuilt={{
             rules: {
               width: DRAWER_WIDTH.rules,
-              node: (
-                <ScrollArea className={styles.scrollPanel}>
-                  <Rules copy={copy.rules} />
-                </ScrollArea>
-              ),
+              node: rulesPanel,
             },
           }}
           className={styles.drawer}
