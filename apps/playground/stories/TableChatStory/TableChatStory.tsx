@@ -5,7 +5,6 @@ import { ToastStack } from '@/blocks/Toast'
 import { VoicePanel, VoiceTabIcon } from '@/blocks/VoiceChat'
 import { CHAT_SELF, makeChat } from '@/mocks/chat'
 import { makeTable } from '@/mocks/table'
-import { makeVoiceOthers, VOICE_SELF } from '@/mocks/voice'
 import Message from '@/primitives/Message'
 import Table from '@/table/Table'
 import type { Panel } from '@/table/Table/types'
@@ -13,6 +12,7 @@ import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import TechBar from '../controls/TechBar'
 import { TechButton, TechField, TechLabel, TechSwitch } from '../controls/TechControls'
+import { useVoiceDemo, VoiceDemoControls } from '../voiceDemo'
 import styles from './TableChatStory.module.css'
 
 type GameOverCondition = 'release' | 'lastStanding'
@@ -136,27 +136,7 @@ export default function TableChatStory() {
   // host switch: the action clocks for the whole table
   const [timers, setTimers] = useState(true)
   const [chatToasts, setChatToasts] = useState(true)
-  // The voice chat's four scenes are two facts, as on the lobby page: am I in
-  // it, and is anyone else.
-  const [voiceOn, setVoiceOn] = useState(false)
-  const [voiceOccupied, setVoiceOccupied] = useState(false)
-  const [voiceOthers, setVoiceOthers] = useState(makeVoiceOthers)
-  const [voiceVolume, setVoiceVolume] = useState(100)
-  const voiceScene = voiceOn
-    ? voiceOccupied
-      ? 'on-others'
-      : 'on-alone'
-    : voiceOccupied
-      ? 'off-occupied'
-      : 'off-empty'
-  const setVoiceScene = (scene: string) => {
-    setVoiceOn(scene.startsWith('on'))
-    setVoiceOccupied(scene === 'off-occupied' || scene === 'on-others')
-  }
-  const voiceParticipants = [
-    ...(voiceOn ? [VOICE_SELF] : []),
-    ...(voiceOccupied ? voiceOthers : []),
-  ]
+  const voice = useVoiceDemo()
   const [ready, setReady] = useState<Set<string>>(() => new Set())
   // Anchor for the reaction demo states' sweep, reset each time either is
   // (re-)selected so switching back into it restarts the countdown. Keyed on
@@ -341,17 +321,7 @@ export default function TableChatStory() {
           onChange={(v) => setDock(v as DockDemo)}
         />
 
-        <TechSwitch
-          label="voice"
-          options={[
-            { value: 'off-empty', label: 'off · empty' },
-            { value: 'off-occupied', label: 'off · occupied' },
-            { value: 'on-alone', label: 'on · alone' },
-            { value: 'on-others', label: 'on · others' },
-          ]}
-          value={voiceScene}
-          onChange={setVoiceScene}
-        />
+        <VoiceDemoControls demo={voice} />
       </TechBar>
       <div className={styles.stage}>
         <Table
@@ -438,21 +408,12 @@ export default function TableChatStory() {
             ),
             voice: (
               <VoicePanel
+                {...voice.props}
                 title={tableCopy.tabVoice}
-                participants={voiceParticipants}
-                connected={voiceOn}
-                selfId={VOICE_SELF.id}
-                volume={voiceVolume}
                 copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
-                onConnect={() => setVoiceOn(true)}
-                onDisconnect={() => setVoiceOn(false)}
-                onVolumeChange={setVoiceVolume}
-                onParticipantVolumeChange={(id, v) =>
-                  setVoiceOthers((prev) => prev.map((p) => (p.id === id ? { ...p, volume: v } : p)))
-                }
               />
             ),
-            voiceTab: <VoiceTabIcon connected={voiceOn} />,
+            voiceTab: <VoiceTabIcon status={voice.status} />,
             toasts: (
               <ToastStack
                 items={toasts}

@@ -3,11 +3,11 @@ import { useState } from 'react'
 import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
 import VoiceChat from '@/blocks/VoiceChat'
 import { CHAT_SELF, makeChat } from '@/mocks/chat'
-import { makeVoiceOthers, VOICE_SELF } from '@/mocks/voice'
 import Lobby from '@/screens/Lobby'
 import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechSwitch } from '../controls/TechControls'
+import { useVoiceDemo, VoiceDemoControls } from '../voiceDemo'
 import styles from './LobbyChatStory.module.css'
 
 export default function LobbyChatStory() {
@@ -25,24 +25,7 @@ export default function LobbyChatStory() {
       { id: `local-${prev.length}`, who: CHAT_SELF, role: myRole, text, time: '20:17' },
     ])
   const shown = messages.map((m) => (m.system || m.who !== CHAT_SELF ? m : { ...m, role: myRole }))
-  // The voice chat's four scenes are two facts: am I in it, and is anyone else.
-  const [connected, setConnected] = useState(false)
-  const [occupied, setOccupied] = useState(false)
-  const [others, setOthers] = useState(makeVoiceOthers)
-  const [volume, setVolume] = useState(100)
-  const voiceScene = connected
-    ? occupied
-      ? 'on-others'
-      : 'on-alone'
-    : occupied
-      ? 'off-occupied'
-      : 'off-empty'
-  const setVoiceScene = (scene: string) => {
-    setConnected(scene.startsWith('on'))
-    setOccupied(scene === 'off-occupied' || scene === 'on-others')
-  }
-  const participants = [...(connected ? [VOICE_SELF] : []), ...(occupied ? others : [])]
-  const voiceCopy = pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })
+  const voice = useVoiceDemo()
   return (
     <div className={styles.root}>
       <TechBar>
@@ -73,17 +56,7 @@ export default function LobbyChatStory() {
           value={myRole}
           onChange={setMyRole}
         />
-        <TechSwitch
-          label="voice"
-          options={[
-            { value: 'off-empty', label: 'off · empty' },
-            { value: 'off-occupied', label: 'off · occupied' },
-            { value: 'on-alone', label: 'on · alone' },
-            { value: 'on-others', label: 'on · others' },
-          ]}
-          value={voiceScene}
-          onChange={setVoiceScene}
-        />
+        <VoiceDemoControls demo={voice} />
       </TechBar>
       {/* стартовый язык лобби берём из языка плейграунда; дальше им управляет
           встроенный в лобби свитчер. key переинициализирует экран при смене
@@ -108,17 +81,8 @@ export default function LobbyChatStory() {
           }
           voice={
             <VoiceChat
-              participants={participants}
-              connected={connected}
-              selfId={VOICE_SELF.id}
-              volume={volume}
-              copy={voiceCopy}
-              onConnect={() => setConnected(true)}
-              onDisconnect={() => setConnected(false)}
-              onVolumeChange={setVolume}
-              onParticipantVolumeChange={(id, v) =>
-                setOthers((prev) => prev.map((p) => (p.id === id ? { ...p, volume: v } : p)))
-              }
+              {...voice.props}
+              copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
             />
           }
         />

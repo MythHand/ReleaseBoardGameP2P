@@ -2,6 +2,7 @@ import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useState } from 'react'
 import Chat, { type ChatMessage } from '@/blocks/Chat'
+import VoiceChat from '@/blocks/VoiceChat'
 import { CHAT_SELF, makeChat } from '@/mocks/chat'
 import { makeStats } from '@/mocks/stats'
 import Stats, { type StatPlayer } from '@/screens/Stats'
@@ -9,6 +10,7 @@ import type { StatsCopy } from '@/screens/Stats/Stats'
 import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechSwitch, TechToggle } from '../controls/TechControls'
+import { useVoiceDemo, VoiceDemoControls } from '../voiceDemo'
 import styles from './StatsChatStory.module.css'
 
 const COPY: Record<'ru' | 'en', StatsCopy> = {
@@ -106,6 +108,7 @@ export default function StatsChatStory() {
       ...prev,
       { id: `local-${prev.length}`, who: CHAT_SELF, role: 'player', text, time: '20:41' },
     ])
+  const voice = useVoiceDemo()
   const swap = NAMES[names]
   const players = data.players.map((p, i) => ({
     ...p,
@@ -136,12 +139,16 @@ export default function StatsChatStory() {
         <TechToggle on={ties} onChange={setTies}>
           ties
         </TechToggle>
+        <VoiceDemoControls demo={voice} />
       </TechBar>
       <div className={styles.stage}>
         <Stats
           {...data}
           players={players}
-          copy={pick(lang, COPY)}
+          copy={{
+            ...pick(lang, COPY),
+            voiceChat: pick(lang, { ru: ruCommon.stats.voiceChat, en: enCommon.stats.voiceChat }),
+          }}
           lang={lang}
           onLangChange={setLang}
           bgTone={bg}
@@ -151,6 +158,12 @@ export default function StatsChatStory() {
               copy={pick(lang, { ru: ruCommon.chat, en: enCommon.chat })}
               selfName={CHAT_SELF}
               onSend={send}
+            />
+          }
+          voice={
+            <VoiceChat
+              {...voice.props}
+              copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
             />
           }
         />

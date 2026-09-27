@@ -65,10 +65,21 @@
   display: flex;
 }
 
-/* in the voice chat: lit the colour that says "on the line" (Badge success) */
-.on {
+/* the headphones by where I stand: blue while connecting, the "on the line"
+   green once in (Badge success), orange when the connection broke off */
+.connecting {
+  display: flex;
+  color: var(--periwinkle);
+}
+
+.connected {
   display: flex;
   color: var(--mint);
+}
+
+.interrupted {
+  display: flex;
+  color: var(--cat-operation);
 }
 
 .voiceList {

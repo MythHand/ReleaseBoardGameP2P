@@ -55,6 +55,24 @@
   box-shadow: -24px 0 48px var(--black-55);
 }
 
+/* the voice chat's line atop the dock, dressed like the table's panel heads;
+   a thin rule sets it off from the text chat below */
+.voiceLine {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+  padding-block-end: 14px;
+  padding-inline: 4px;
+  margin-block-end: 14px;
+  border-block-end: 1px solid var(--white-10);
+}
+
+.voiceTitle {
+  margin: 0;
+  opacity: 0.6;
+}
+
 /* ===== шапка ===== заголовок слева, свитчер языка по правой линии контента */
 .head {
   display: flex;

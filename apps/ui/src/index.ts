@@ -31,7 +31,12 @@ export { default as Rules } from './blocks/Rules'
 export { type ToastItem, ToastStack, type ToastStackCopy } from './blocks/Toast'
 export type { VideoPlayerCopy, VideoPlayerProps } from './blocks/VideoPlayer'
 export { default as VideoPlayer } from './blocks/VideoPlayer'
-export type { VoiceChatCopy, VoiceParticipant, VoiceRole } from './blocks/VoiceChat'
+export type {
+  VoiceChatCopy,
+  VoiceParticipant,
+  VoiceRole,
+  VoiceStatus,
+} from './blocks/VoiceChat'
 export { default as VoiceChat, VoicePanel, VoiceTabIcon } from './blocks/VoiceChat'
 export { default as Loader } from './boot'
 export { buildSequence } from './boot/lines'

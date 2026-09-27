@@ -61,6 +61,7 @@
     "colAttack": "attack",
     "colDefense": "defense",
     "toLobby": "to lobby",
+    "voiceChat": "voice chat",
     "location": {
       "game": "in game",
       "stats": "on stats",
@@ -260,7 +261,9 @@
   "voiceChat": {
     "inVoice": "in voice",
     "connect": "join",
+    "connecting": "connecting…",
     "disconnect": "leave",
+    "interrupted": "connection lost",
     "volume": "overall volume",
     "you": "you"
   },

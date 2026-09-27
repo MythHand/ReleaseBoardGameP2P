@@ -21,6 +21,9 @@ export type VoiceRole = MessageRole
 const ROLE_ORDER: Record<VoiceRole, number> = { host: 0, player: 1, spectator: 2 }
 
 export interface VoiceParticipant {
+  // the member's id — stable across reconnects, the way the text chat marks its
+  // own (`selfMemberId`); never the peer's connection id, which a reconnect
+  // replaces
   id: string
   name: string
   role: VoiceRole
@@ -28,12 +31,22 @@ export interface VoiceParticipant {
   volume: number
 }
 
+// Where my headphones stand. Joining is not instant — the browser asks for the
+// microphone, the calls take a moment — and a connection can break off while I
+// am in; so four states, not two.
+export type VoiceStatus = 'off' | 'connecting' | 'connected' | 'interrupted'
+
+// in the voice chat: connected, or still in it while the connection broke off
+const isIn = (status: VoiceStatus) => status === 'connected' || status === 'interrupted'
+
 export interface VoiceChatCopy {
   // what the person-and-count names, for a screen reader
   inVoice: string
-  // the headphones' two states, said aloud and on hover
+  // the headphones in each state, said aloud and on hover
   connect: string
+  connecting: string
   disconnect: string
+  interrupted: string
   // the chat's own volume, atop the list
   volume: string
   // marks me in the list of participants
@@ -43,7 +56,7 @@ export interface VoiceChatCopy {
 interface VoiceState {
   // who is in the voice chat right now — me included once I am connected
   participants: VoiceParticipant[]
-  connected: boolean
+  status: VoiceStatus
   // which participant is me: my own voice is not played back, so I have no
   // volume of my own in the list
   selfId?: string
@@ -70,24 +83,34 @@ function Count({ count }: { count: number }) {
   )
 }
 
-// the way in and out: headphones, lit once I am in
+// The way in and out: headphones coloured by where I stand. Off joins; while
+// connecting a press does nothing — a second one would start a second join —
+// yet the button keeps its colour and its hint (Button's own `disabled` would
+// fade both); connected, or broken off, a press leaves.
 function Headphones({
-  connected,
+  status,
   copy,
   onConnect,
   onDisconnect,
-}: Pick<VoiceState, 'connected' | 'copy' | 'onConnect' | 'onDisconnect'>) {
-  const label = connected ? copy.disconnect : copy.connect
+}: Pick<VoiceState, 'status' | 'copy' | 'onConnect' | 'onDisconnect'>) {
+  const label = {
+    off: copy.connect,
+    connecting: copy.connecting,
+    connected: copy.disconnect,
+    interrupted: `${copy.interrupted} · ${copy.disconnect}`,
+  }[status]
+  const action = status === 'off' ? onConnect : isIn(status) ? onDisconnect : undefined
   return (
     <Button
       variant="bare"
       aria-label={label}
-      aria-pressed={connected}
+      aria-pressed={status !== 'off'}
+      aria-disabled={status === 'connecting' || undefined}
       title={label}
-      onClick={connected ? onDisconnect : onConnect}
+      onClick={action}
       className={styles.join}
     >
-      <span className={connected ? styles.on : styles.off}>
+      <span className={styles[status]}>
         <HeadphonesIcon size={20} />
       </span>
     </Button>
@@ -100,7 +123,7 @@ function Headphones({
 // at the table.
 function VoiceList({
   participants,
-  connected,
+  status,
   selfId,
   volume,
   copy,
@@ -108,9 +131,11 @@ function VoiceList({
   onParticipantVolumeChange,
 }: VoiceState) {
   const listed = [...participants].sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role])
+  // the volumes are mine to set only while I am in
+  const tuning = isIn(status)
   return (
     <div className={styles.voiceList}>
-      {connected && (
+      {tuning && (
         <div className={`${styles.person} ${styles.overall}`}>
           <Typography base="mono-md" tk="tk-04" as="span" className={styles.name}>
             {copy.volume}
@@ -139,7 +164,7 @@ function VoiceList({
                 {p.name}
                 {self && <span className={styles.you}> · {copy.you}</span>}
               </Typography>
-              {connected && !self && (
+              {tuning && !self && (
                 <Slider
                   value={p.volume}
                   min={0}
@@ -216,11 +241,12 @@ export function VoicePanel({ title, ...state }: VoiceState & { title: string }) 
   )
 }
 
-// The rail tab's own face: headphones in the tab's colour, lit once I am in —
-// so the table tells I am in the voice chat with its panel closed.
-export function VoiceTabIcon({ connected }: { connected: boolean }) {
+// The rail tab's own face: headphones in the tab's colour while I am out, and in
+// the state's colour otherwise — so the table tells where I stand in the voice
+// chat with its panel closed.
+export function VoiceTabIcon({ status }: { status: VoiceStatus }) {
   return (
-    <span className={connected ? styles.on : styles.tabOff}>
+    <span className={status === 'off' ? styles.tabOff : styles[status]}>
       <HeadphonesIcon size={20} />
     </span>
   )

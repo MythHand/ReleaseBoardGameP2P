@@ -61,6 +61,7 @@
     "colAttack": "атак",
     "colDefense": "защит",
     "toLobby": "в лобби",
+    "voiceChat": "голосовой чат",
     "location": {
       "game": "в игре",
       "stats": "на статистике",
@@ -260,7 +261,9 @@
   "voiceChat": {
     "inVoice": "в голосе",
     "connect": "подключиться",
+    "connecting": "подключение…",
     "disconnect": "отключиться",
+    "interrupted": "связь прервана",
     "volume": "общая громкость",
     "you": "ты"
   },

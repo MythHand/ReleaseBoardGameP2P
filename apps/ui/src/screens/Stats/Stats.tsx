@@ -52,6 +52,9 @@ export interface StatsCopy {
   toLobby: string
   location: Record<Location, string>
   achievements: Record<MetricKey, { title: string; unit: string }>
+  // the voice chat's title in the dock — needed only with the `voice` slot, so
+  // optional, like `selfTag`
+  voiceChat?: string
 }
 
 interface StatsProps {
@@ -69,6 +72,10 @@ interface StatsProps {
   // слот переписки, а не её данные: экран даёт ей место у правого края, а чем
   // это место занять — решает консьюмер. Без слота экран прежний, во всю ширину.
   chat?: ReactNode
+  // The voice chat, in the same dock above the text chat, under a title in the
+  // dock's own small voice. A slot for the same reason as `chat`; either one
+  // alone opens the dock.
+  voice?: ReactNode
   // Leaving the results. Optional: without it the button still renders and does
   // nothing, which is how the playground shows the screen.
   onToLobby?: () => void
@@ -194,6 +201,7 @@ export default function Stats({
   onLangChange,
   bgTone = 'neutral',
   chat,
+  voice,
   onToLobby,
 }: StatsProps) {
   const winner = players.find((p) => p.id === winnerId)
@@ -331,7 +339,7 @@ export default function Stats({
   // Без чата экран длинный и прокручивается снаружи — как и был. С чатом место у
   // правого края занимает панель, которая никуда не едет, поэтому прокрутка
   // переезжает внутрь: экран ростом в своё окно, итоги едут в своём вьюпорте.
-  if (chat == null) {
+  if (chat == null && voice == null) {
     return (
       <div className={styles.stats}>
         <HudBackground tone={bgTone} className={styles.bgLayer} />
@@ -346,7 +354,22 @@ export default function Stats({
       <ScrollArea className={styles.main} contentClassName={styles.mainInner}>
         {body}
       </ScrollArea>
-      <aside className={styles.chatDock}>{chat}</aside>
+      <aside className={styles.chatDock}>
+        {/* the voice chat on top: one line under a title in the panels' own
+            small voice, a thin rule, and the text chat below — without a title
+            of its own, the feed and the field say what it is */}
+        {voice != null && (
+          <div className={styles.voiceLine}>
+            {copy.voiceChat && (
+              <Typography base="tag" tk="tk-10" as="h2" className={styles.voiceTitle}>
+                {copy.voiceChat}
+              </Typography>
+            )}
+            {voice}
+          </div>
+        )}
+        {chat}
+      </aside>
     </div>
   )
 }
