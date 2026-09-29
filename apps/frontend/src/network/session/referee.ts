@@ -22,6 +22,7 @@ export interface Session {
   engine: Engine
   state: GameState
   seats: Seat[]
+  spectators: string[]
   // Every event this match has emitted, in id order. The referee used to
   // reduce, fan out and forget — which is precisely why a peer that missed a
   // batch could never be told what was in it.
@@ -65,9 +66,12 @@ export function syncMessage(
 // than queued: its state is not a fold over deltas, so reconnecting only ever
 // needs one fresh projection.
 export function syncAll(session: Session, events: Event[]): Outgoing[] {
-  return session.seats
+  const seated = session.seats
     .filter((s): s is Seat & { peerId: string } => s.peerId !== null)
     .map((s) => ({ to: s.peerId, message: syncMessage(session, s.playerId, events) }))
+  if (session.spectators.length === 0) return seated
+  const message = spectatorSyncMessage(session, events)
+  return [...seated, ...session.spectators.map((to) => ({ to, message }))]
 }
 
 export function createSession(args: {
@@ -75,6 +79,7 @@ export function createSession(args: {
   keeperId: PlayerId
   engine: Engine
   seed: number
+  spectators?: string[]
   players: { playerId: PlayerId; peerId: string | null; name: string; bot?: boolean }[]
   setup: Setup
   deck: DeckEntry[]
@@ -108,6 +113,9 @@ export function createSession(args: {
     // first thing in the log too — a peer restoring the match needs it to draw
     // its own hand.
     log: dealt,
+    spectators: [...new Set(args.spectators ?? [])].filter(
+      (id) => !args.players.some((p) => p.peerId === id),
+    ),
   }
 
   return {
@@ -147,7 +155,7 @@ export const ABSENT_GRACE_MS = 30_000
 
 export function disconnect(session: Session, peerId: string, now: number): SessionResult {
   const seat = seatOfPeer(session, peerId)
-  if (!seat) return { session, outgoing: [] }
+  if (!seat) return unwatch(session, peerId)
 
   // The seat survives its connection: hand, pending and turn all live in
   // GameState, which never left the keeper.
@@ -500,6 +508,7 @@ export function adoptSession(args: {
     state: args.state,
     seats: args.seats,
     log: args.log ?? [],
+    spectators: [],
   }
 }
 
@@ -677,4 +686,33 @@ export function tick(session: Session, now: number): SessionResult {
   }
 
   return { session, outgoing: [] }
+}
+
+export function spectatorSyncMessage(session: Session, events: Event[], resync = false): Message {
+  return {
+    type: 'SYNC',
+    payload: {
+      view: session.engine.spectate(session.state),
+      events: forViewer(events, null),
+      ...(resync ? { resync: true } : {}),
+    },
+  }
+}
+
+export function watch(session: Session, peerId: string): SessionResult {
+  if (seatOfPeer(session, peerId) || session.spectators.includes(peerId))
+    return { session, outgoing: [] }
+  const next = { ...session, spectators: [...session.spectators, peerId] }
+  return {
+    session: next,
+    outgoing: [{ to: peerId, message: spectatorSyncMessage(next, next.log, true) }],
+  }
+}
+
+export function unwatch(session: Session, peerId: string): SessionResult {
+  if (!session.spectators.includes(peerId)) return { session, outgoing: [] }
+  return {
+    session: { ...session, spectators: session.spectators.filter((id) => id !== peerId) },
+    outgoing: [],
+  }
 }

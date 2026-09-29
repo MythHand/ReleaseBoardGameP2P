@@ -1,4 +1,4 @@
-import type { Action, Event, GameState, PlayerId, PlayerView, Setup } from '@release/engine'
+import type { Action, Event, GameState, GameView, PlayerId, Setup } from '@release/engine'
 import type { ChatEntry, MemberId } from '~/shared/chat/types'
 
 // A plain Omit over a union collapses it to its common members, so it has to
@@ -145,7 +145,7 @@ export type Message =
   // visible log, handed to a peer that rejoined. It is folded into history and
   // the discard heap, and it is NOT animated: a reconnect drops straight to the
   // live board, exactly as `isOpening` already says it must.
-  | { type: 'SYNC'; payload: { view: PlayerView; events: Event[]; resync?: boolean } }
+  | { type: 'SYNC'; payload: { view: GameView; events: Event[]; resync?: boolean } }
   // The only message carrying GameState, and only to a handover successor.
   | { type: 'KEEPER_STATE'; payload: { state: GameState } }
   // null is the death notice: the keeper is gone and the game cannot continue.

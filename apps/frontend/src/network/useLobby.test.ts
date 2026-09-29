@@ -2962,7 +2962,7 @@ it('hands the restored host its own table back without waiting for it to act', a
   // It is the hand the snapshot described, not a fresh deal.
   const engine = createFakeEngine()
   const expected = engine.project(snapshot.state as Parameters<typeof engine.project>[0], 'p1')
-  expect(result.current.gameSync?.view.self.hand.map((c) => c.uid)).toEqual(
+  expect(result.current.gameSync?.view.self?.hand.map((c) => c.uid)).toEqual(
     expected.self.hand.map((c) => c.uid),
   )
 

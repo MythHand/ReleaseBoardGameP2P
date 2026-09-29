@@ -115,7 +115,10 @@ export function useGame(): Game {
 
   // An intent carries neither player nor clock — the referee stamps both from
   // the connection it arrived on, so a peer cannot act for another seat.
-  const submit = (intent: Intent) => link?.submit(intent)
+  const submit = (intent: Intent) => {
+    if (sync?.view.self === null) return
+    link?.submit(intent)
+  }
 
   // `events` is one commit behind `view`: the effect above folds a sync into the
   // running feed only after the render that first saw it. The board's deal intro
@@ -150,7 +153,7 @@ export function useGame(): Game {
     pending.length > 0 && sync?.resync ? (pending.at(-1)?.id ?? restoredBase) : restoredBase
 
   return {
-    view: sync?.view ?? null,
+    view: sync?.view.self ? sync.view : null,
     events: pending.length > 0 ? mergeEvents(carried, pending) : carried,
     restoredThrough: restoredNow,
     play: (card, target, combo) => submit({ type: 'PLAY', card, target, combo }),
