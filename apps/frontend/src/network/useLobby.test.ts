@@ -2,6 +2,7 @@ import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, WINDOW_FIRST_MS } from '@rele
 import { act, renderHook as renderTestingHook } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
 import type { PrivateSeat } from '~/entities/game/seats'
+import { useGame } from '~/features/play-game/useGame'
 import type { ChatSystemEvent, UserChatEntry } from '~/shared/chat/types'
 import {
   clearChat,
@@ -9,6 +10,7 @@ import {
   clearSession,
   readChat,
   readKeeper,
+  readLog,
   readSession,
   type StoredKeeper,
   type StoredLobbyConfig,
@@ -52,6 +54,9 @@ interface FakeTransport {
 // vi.mock is hoisted above the imports, so the array it closes over has to be
 // hoisted too — otherwise the factory hits a temporal-dead-zone error.
 const { transports } = vi.hoisted(() => ({ transports: [] as FakeTransport[] }))
+
+let gameSession: UseLobby
+vi.mock('~/app/providers/SessionProvider', () => ({ useSession: () => gameSession }))
 
 const renderedLobbies: ReturnType<typeof renderTestingHook<UseLobby, unknown>>[] = []
 
@@ -4777,7 +4782,7 @@ it('restores the host spectator limit and does not revive persisted observer add
   expect(typesSentTo('watcher')).toEqual(['JOIN_REJECTED'])
 })
 
-it('captures a public snapshot before a board subscribes and persists returning to the lobby', async () => {
+it('keeps catch-up and live events before Board mounts, without replaying the restored history', async () => {
   const { result } = renderHook(() => useLobby())
   await act(async () => result.current.joinRoom('ABC-23D', 'Watcher', 'spectator'))
   const engine = createFakeEngine()
@@ -4817,11 +4822,36 @@ it('captures a public snapshot before a board subscribes and persists returning 
       type: 'SYNC',
       from: 'abc23d',
       seq: 4,
-      payload: { view: engine.spectate(state), events: [], resync: true },
+      payload: {
+        view: engine.spectate(state),
+        events: [{ id: 1, type: 'dealt', player: 'a', count: 5 }],
+        resync: true,
+      },
+    })
+    transports[0].onMessage?.({
+      type: 'SYNC',
+      from: 'abc23d',
+      seq: 5,
+      payload: {
+        view: engine.spectate(state),
+        events: [{ id: 2, type: 'drawn', player: 'a', pile: 0, deckSize: 20 }],
+      },
+    })
+    transports[0].onMessage?.({
+      type: 'SYNC',
+      from: 'abc23d',
+      seq: 6,
+      payload: { view: engine.spectate(state), events: [] },
     })
   })
   expect(result.current.gameSync?.view.self).toBeNull()
   expect(result.current.gameId).toBe('g1')
+  gameSession = result.current
+  const game = renderTestingHook(() => useGame())
+  expect(game.result.current.events.map((e) => e.id)).toEqual([1, 2])
+  expect(game.result.current.restoredThrough).toBe(1)
+  expect(readLog('g1')?.map((e) => e.id)).toEqual([1, 2])
+  game.unmount()
   transports[0].send.mockClear()
   act(() => {
     result.current.introReady()

@@ -96,7 +96,10 @@ export function useGame(): Game {
     if (syncEvents.length === 0) return
     // A resend is what this peer already ought to know. It belongs in the feed
     // and in the heap, and it belongs nowhere near the beat queue.
-    if (sync.resync) restoredThrough.current = syncEvents.at(-1)?.id ?? restoredThrough.current
+    restoredThrough.current = Math.max(
+      restoredThrough.current,
+      sync.restoredThrough ?? (sync.resync ? (syncEvents.at(-1)?.id ?? 0) : 0),
+    )
     setEvents((prev) => mergeEvents(prev, syncEvents))
   }, [sync])
 
@@ -144,12 +147,14 @@ export function useGame(): Game {
   // `pending` — and so in the `events` returned below — on THIS render. The ref
   // only advances inside that effect, which runs strictly after this render's
   // layout effects, so reading just `restoredThrough.current` here would lag
-  // the very feed it is supposed to cover. Mirror the effect's own rule
-  // (`events.at(-1)?.id ?? restoredThrough.current`) directly in the
-  // return expression, the same way `pending`/`carried` mirror it for `events`.
+  // the very feed it is supposed to cover. The session retains the exact
+  // catch-up boundary even when live events arrived in the same React batch.
+  // Plain link snapshots can still derive it from their resync flag.
   const restoredBase = sameGame ? restoredThrough.current : (incomingEvents.at(-1)?.id ?? 0)
-  const restoredNow =
-    pending.length > 0 && sync?.resync ? (pending.at(-1)?.id ?? restoredBase) : restoredBase
+  const restoredNow = Math.max(
+    restoredBase,
+    sync?.restoredThrough ?? (sync?.resync ? (pending.at(-1)?.id ?? 0) : 0),
+  )
 
   return {
     view: sync?.view ?? null,

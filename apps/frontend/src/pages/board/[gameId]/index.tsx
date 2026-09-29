@@ -135,6 +135,7 @@ export default function BoardPage() {
             attempt={session.reconnect.attempt}
             maxAttempts={session.reconnect.maxAttempts}
             status={session.reconnect.status === 'failed' ? 'failed' : 'trying'}
+            reason={session.errorKind === 'room-full' ? 'room-full' : undefined}
             onRetry={session.reconnect.retry}
             onLeave={() => {
               session.leaveSession()
@@ -197,6 +198,7 @@ export default function BoardPage() {
             attempt: session.reconnect.attempt,
             maxAttempts: session.reconnect.maxAttempts,
             status: session.reconnect.status === 'failed' ? 'failed' : 'trying',
+            reason: session.errorKind === 'room-full' ? 'room-full' : undefined,
           },
           onReconnectRetry: session.reconnect.retry,
           onReconnectLeave: () => {

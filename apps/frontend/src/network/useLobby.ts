@@ -72,6 +72,7 @@ import { isRelayable, relayTargets } from './session/relay'
 import { attachKeeper, createRemoteLink } from './session/remoteLink'
 import { restoreSeats } from './session/restore'
 import { createStartGate, type StartGate } from './session/startGate'
+import { accumulateSync, type SyncSnapshot } from './session/syncSnapshot'
 import { createTransport, type Transport } from './transport/peer'
 import type {
   JoinAvailability,
@@ -439,15 +440,13 @@ export interface UseLobby {
   gameId: string | null
   // The seam the page holds, and nothing else — it cannot tell a bot-driven
   // seat from a remote one, which is what keeps bot play and networked play on
-  // the same code path. Null until a game starts, and for a spectator, who has
-  // no seat to submit from.
+  // the same code path. Null until a game starts; a spectator subscribes to
+  // public updates but has no seat to submit from.
   gameLink: GameLink | null
-  // The most recent projection this peer received. Held here rather than
-  // subscribed to by the page, because the link is born inside the message
-  // handler and the page only mounts after navigating — a SYNC arriving in that
-  // gap would reach an empty listener set and be lost, leaving the player
-  // staring at an empty table until someone else moved.
-  gameSync: Sync | null
+  // Latest projection plus accumulated events and the catch-up watermark.
+  // The session outlives page navigation, so even several SYNCs before Board
+  // mounts (or before React commits) remain available to its history and beats.
+  gameSync: SyncSnapshot | null
   // The seating this match was dealt with, frozen at the deal and held until the
   // match is left. It is NOT derived from `state.peers`: the roster is live and
   // `applyPeerLeft` prunes a peer the instant its channel drops, so seats
@@ -530,7 +529,10 @@ export function useLobby(): UseLobby {
   const [lobbyActionError, setLobbyActionError] = useState<LobbyActionError | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameLink, setGameLink] = useState<GameLink | null>(null)
-  const [gameSync, setGameSync] = useState<Sync | null>(null)
+  const [gameSync, setGameSync] = useState<SyncSnapshot | null>(null)
+  const captureGameSync = useCallback((sync: Sync) => {
+    setGameSync((previous) => accumulateSync(previous, sync))
+  }, [])
   const [seats, setSeats] = useState<Seat[]>([])
   const transportRef = useRef<Transport | null>(null)
   const transportGenerationRef = useRef(0)
@@ -1222,7 +1224,7 @@ export function useLobby(): UseLobby {
             // to be kept by hand (session/remoteLink.ts:34).
             const remote = createRemoteLink({ transport: t, keeperPeerId: current.hostId })
             remoteRef.current = remote
-            remote.link.subscribe(setGameSync)
+            remote.link.subscribe(captureGameSync)
             setGameLink(() => remote.link)
           }
           // A rematch arrives as two separate DataChannel events — this frame,
@@ -1273,7 +1275,7 @@ export function useLobby(): UseLobby {
           break
       }
     },
-    [chatSession, commit, dispatch, applySeats, teardownSession, rememberGame],
+    [chatSession, commit, dispatch, applySeats, teardownSession, rememberGame, captureGameSync],
   )
 
   const createRoom = useCallback(
@@ -1712,7 +1714,8 @@ export function useLobby(): UseLobby {
         onCommit: persistKeeper,
       })
       keeperRef.current = keeper
-      keeper.link.subscribe(setGameSync)
+      setGameSync(null)
+      keeper.link.subscribe(captureGameSync)
       setGameLink(() => keeper.link)
 
       // Only the host is here; everyone else re-dials. Their JOIN_REQUEST
@@ -1770,6 +1773,7 @@ export function useLobby(): UseLobby {
     persistKeeper,
     rememberLobbyConfig,
     surfaceSetupError,
+    captureGameSync,
   ])
 
   const pushReconnectEvent = useCallback((kind: ReconnectEvent['kind'], attempt: number) => {
@@ -2271,12 +2275,13 @@ export function useLobby(): UseLobby {
         onCommit: persistKeeper,
       })
       keeperRef.current = keeper
-      keeper.link.subscribe(setGameSync)
+      setGameSync(null)
+      keeper.link.subscribe(captureGameSync)
       setGameLink(() => keeper.link)
 
       return { engine, session, keeper }
     },
-    [persistKeeper],
+    [persistKeeper, captureGameSync],
   )
 
   // Host-only: tell the table to follow, then move. The board route is keyed by

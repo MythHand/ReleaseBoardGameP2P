@@ -218,12 +218,15 @@ function BoardView({
   // over — not merely while it is `active`. `hudIn` only holds a block down
   // once its own animation exists, and the last of them is armed seconds in.
   const [introOver, setIntroOver] = useState(false)
+  // BoardView is keyed by match and viewer. The deal ends on this snapshot;
+  // subsequent moves belong to the beat queue and must not leak into its shadow.
+  const [openingLive] = useState(live)
   const onIntroDone = useCallback(() => {
     setIntroOver(true)
     intro?.onDone()
   }, [intro?.onDone])
   const deal = useDealIntro({
-    live,
+    live: openingLive,
     gameId: intro?.gameId ?? null,
     view: intro?.view ?? null,
     restoredThrough: playback?.restoredThrough ?? intro?.restoredThrough,
@@ -2287,6 +2290,7 @@ function BoardView({
           attempt={room.reconnect?.attempt ?? 1}
           maxAttempts={room.reconnect?.maxAttempts ?? 5}
           status={room.reconnect?.status ?? 'trying'}
+          reason={room.reconnect?.reason}
           onRetry={room.onReconnectRetry ?? (() => {})}
           onLeave={room.onReconnectLeave ?? (() => {})}
         />

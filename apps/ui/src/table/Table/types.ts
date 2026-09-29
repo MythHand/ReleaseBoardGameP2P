@@ -120,7 +120,12 @@ export interface TableRoom {
   // Present only while `connection` is 'reconnecting'. Absent, the overlay
   // still renders, on attempt 1 of 5 — a caller that knows it is dialing but
   // not how far along should not be forced to invent numbers.
-  reconnect?: { attempt: number; maxAttempts: number; status: 'trying' | 'failed' }
+  reconnect?: {
+    attempt: number
+    maxAttempts: number
+    status: 'trying' | 'failed'
+    reason?: 'room-full'
+  }
   onReconnectRetry?: () => void
   onReconnectLeave?: () => void
   disconnected?: string[]

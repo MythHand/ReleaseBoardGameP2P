@@ -632,6 +632,7 @@ function TableView({
             attempt={room.reconnect?.attempt ?? 1}
             maxAttempts={room.reconnect?.maxAttempts ?? 5}
             status={room.reconnect?.status ?? 'trying'}
+            reason={room.reconnect?.reason}
             onRetry={room.onReconnectRetry ?? (() => {})}
             onLeave={room.onReconnectLeave ?? (() => {})}
           />
