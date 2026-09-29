@@ -1,4 +1,5 @@
 // Data + logic
+
 //
 // The animation layer is NOT re-exported here. It is a vocabulary and its steps
 // — how a thing moves — rather than a thing to render, so it has its own entry:
@@ -47,6 +48,16 @@ export type { GameMode, GameModeCopy, GameModesCopy, Setup } from './game/modes'
 export { DEFAULT_SETUP, GAME_MODES } from './game/modes'
 export { NICKNAMES, randomNickname, sanitizeNickname } from './game/nicknames'
 export { default as GearIcon } from './icons/GearIcon'
+export {
+  isKeyboardControl,
+  KEYBOARD_PRIORITY,
+  type KeyBinding,
+  type KeyboardLayerOptions,
+  type KeyboardLayerState,
+  type KeyFocus,
+  type KeyResult,
+  useKeyboardLayer,
+} from './keyboard'
 export type { Point } from './primitives/Arrow'
 export { centerOf, default as Arrow, useArrow } from './primitives/Arrow'
 export { default as Avatar } from './primitives/Avatar'
