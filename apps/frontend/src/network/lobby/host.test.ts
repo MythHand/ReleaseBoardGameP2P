@@ -8,6 +8,8 @@ import {
   MAX_BOTS,
   setBots,
   setMaxPlayers,
+  setMaxSpectators,
+  setParticipantRole,
 } from './host'
 import { createLobbyState, type LobbyState, playerCount } from './state'
 
@@ -394,4 +396,96 @@ it('seats an unauthenticated mid-match join as a spectator when bots are seated'
     where: 'lobby',
   })
   expect(joined.outgoing.some((o) => o.message.type === 'SEAT_REBOUND')).toBe(false)
+})
+
+it('admits a voluntary spectator without consuming a player seat or readiness', () => {
+  const result = handleJoinRequest(base(4), 's', 'member-s', 'Sam', {
+    matchRunning: false,
+    requestedRole: 'spectator',
+  })
+  expect(result.accepted).toBe(true)
+  expect(result.state.peers.s).toMatchObject({ role: 'guest', ready: false })
+  expect(playerCount(result.state)).toBe(1)
+  expect(handleReady(result.state, 's').state).toBe(result.state)
+})
+
+it('rejects a spectator when spectating is disabled', () => {
+  const state = setMaxSpectators(base(4), 0).state
+  const result = handleJoinRequest(state, 's', 'member-s', 'Sam', {
+    matchRunning: false,
+    requestedRole: 'spectator',
+  })
+  expect(result.accepted).toBe(false)
+  expect(result.state).toBe(state)
+  expect(result.outgoing).toEqual([
+    {
+      to: 's',
+      message: {
+        type: 'JOIN_REJECTED',
+        payload: { reason: 'room-full', availability: { player: true, spectator: false } },
+      },
+    },
+  ])
+})
+
+it('admits only the first of two requests for the last spectator slot', () => {
+  const state = setMaxSpectators(base(2), 1).state
+  const first = handleJoinRequest(state, 's1', 'm1', 'One', { matchRunning: true })
+  const second = handleJoinRequest(first.state, 's2', 'm2', 'Two', { matchRunning: true })
+  expect(first.accepted).toBe(true)
+  expect(second.accepted).toBe(false)
+  expect(Object.keys(second.state.peers)).toEqual(['h', 's1'])
+  expect(setMaxSpectators(first.state, 0)).toEqual({
+    state: first.state,
+    outgoing: [],
+    error: 'spectators-full',
+  })
+})
+
+it('restores a seated player even when both quotas are full', () => {
+  let state = setMaxSpectators(base(2), 0).state
+  state = handleJoinRequest(state, 'p', 'mp', 'Player', { matchRunning: false }).state
+  const returned = handleJoinRequest(state, 'return', 'mr', 'Return', {
+    matchRunning: true,
+    requestedRole: 'spectator',
+    returningSeat: { playerId: 'p2', peerId: 'old', name: 'Return' },
+  })
+  expect(returned.accepted).toBe(true)
+  expect(returned.state.peers.return).toMatchObject({ role: 'player', ready: true, where: 'game' })
+})
+
+it('changes both participant roles and resets readiness', () => {
+  const joined = handleJoinRequest(base(4), 'p', 'mp', 'Player', { matchRunning: false }).state
+  const ready = handleReady(joined, 'p').state
+  const spectator = setParticipantRole(ready, 'p', 'spectator', false)
+  expect(spectator.state.peers.p).toMatchObject({ role: 'guest', ready: false })
+  expect(spectator.outgoing[0].message.type).toBe('PEER_JOINED')
+  expect(setParticipantRole(spectator.state, 'p', 'player', false).state.peers.p).toMatchObject({
+    role: 'player',
+    ready: false,
+  })
+})
+
+it('blocks moderation outside lobby and against host or bot seats', () => {
+  const state = handleJoinRequest(base(4), 'p', 'mp', 'Player', { matchRunning: false }).state
+  expect(setParticipantRole(state, 'h', 'spectator', false).error).toBe('invalid-target')
+  expect(setParticipantRole(state, 'bot:1', 'spectator', false).error).toBe('invalid-target')
+  expect(setParticipantRole(state, 'p', 'spectator', true).error).toBe('match-running')
+  state.peers.p.where = 'stats'
+  expect(setParticipantRole(state, 'p', 'spectator', false).error).toBe('invalid-target')
+})
+
+it('enforces quotas on role changes and atomically rejects excessive demotions', () => {
+  let state = setMaxSpectators(base(4), 0).state
+  for (const id of ['p1', 'p2', 'p3'])
+    state = handleJoinRequest(state, id, id, id, { matchRunning: false }).state
+  expect(setParticipantRole(state, 'p1', 'spectator', false).error).toBe('spectators-full')
+  expect(setMaxPlayers(state, 2)).toEqual({ state, outgoing: [], error: 'spectators-full' })
+  state = setMaxSpectators(state, 1).state
+  const extra = handleJoinRequest(state, 's', 's', 'Sam', { matchRunning: false }).state
+  expect(setParticipantRole(extra, 's', 'player', false).error).toBe('players-full')
+})
+
+it.each([NaN, Infinity, 1.5])('rejects malformed player limits %s', (value) => {
+  expect(setMaxPlayers(base(4), value).error).toBe('invalid-limit')
 })

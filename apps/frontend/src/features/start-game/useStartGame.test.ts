@@ -46,6 +46,7 @@ it('builds one name per effective bot, in seat order, from the host-seeded pick'
       selfId: 'host',
       hostId: 'host',
       maxPlayers: 6,
+      maxSpectators: 8,
       bots: 3,
       setup: {},
       peers: {

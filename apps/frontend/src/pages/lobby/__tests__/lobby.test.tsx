@@ -152,6 +152,7 @@ function inSession(): UseLobby {
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
+      maxSpectators: 8,
       bots: 0,
       setup: {
         handLimit: 'base',
@@ -320,6 +321,7 @@ it('LobbyView renders spectator section when guests present', () => {
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
+      maxSpectators: 8,
       bots: 0,
       setup: {
         handLimit: 'base',
