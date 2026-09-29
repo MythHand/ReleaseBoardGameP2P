@@ -337,6 +337,10 @@
 }
 
 /* Observers use every seat; the shared centre moves below the second row. */
+.table[data-spectator] {
+  --table-centre-top: 60%;
+}
+
 .table[data-spectator] .opponents {
   display: grid;
   grid-template-columns: repeat(3, max-content);
@@ -348,4 +352,25 @@
 
 .table[data-spectator]:is([data-seats="4"], [data-seats="5"], [data-seats="6"]) {
   --table-centre-top: 74%;
+}
+
+/* Public piles occupy one row below the seats. Their measured card boxes stay
+   untransformed so the same anchors can receive live flights. */
+.table[data-spectator] .decks,
+.table[data-spectator] .discard {
+  inset-block: 174px 142px;
+}
+
+.table[data-spectator]:is([data-seats="4"], [data-seats="5"], [data-seats="6"]) .decks,
+.table[data-spectator]:is([data-seats="4"], [data-seats="5"], [data-seats="6"]) .discard {
+  inset-block-start: 324px;
+}
+
+.table[data-spectator] .decksGrid {
+  grid-template-rows: auto;
+}
+
+.table[data-spectator] .eventsPile {
+  grid-row: auto;
+  grid-column: auto;
 }

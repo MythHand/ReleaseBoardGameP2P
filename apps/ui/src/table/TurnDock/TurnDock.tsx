@@ -255,7 +255,10 @@ export default function TurnDock({
   const labelSizer = longest(copy.draw, copy.push, copy.pass)
 
   return (
-    <HudSurface accent={accent} className={`${styles.dock} ${paused ? styles.paused : ''}`}>
+    <HudSurface
+      accent={accent}
+      className={`${styles.dock} ${spectatorLabel ? styles.spectator : ''} ${paused ? styles.paused : ''}`}
+    >
       <div className={styles.inner}>
         <div className={styles.top}>
           {spectatorLabel && <Badge tone="muted">{spectatorLabel}</Badge>}
@@ -288,6 +291,7 @@ export default function TurnDock({
 
         <div className={styles.body}>
           <RingTimer
+            size={spectatorLabel ? 40 : undefined}
             progress={idleRing ? 0 : progress}
             value={idleRing ? undefined : seconds}
             accent={accent}

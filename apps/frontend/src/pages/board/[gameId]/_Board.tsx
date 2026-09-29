@@ -1304,7 +1304,7 @@ function BoardView({
                   label={copy.table.deck}
                   deck="base"
                   count={count}
-                  width={pileWidthFor(decks.main.length)}
+                  width={you === null ? 80 : pileWidthFor(decks.main.length)}
                   countPos="tl"
                   boxRef={(el) => anchors.bindPile(i, el)}
                   // A PILE ANSWERS THE ARROW THE WAY A CARD DOES. `pickable`
@@ -1341,7 +1341,7 @@ function BoardView({
                 label={copy.table.events}
                 deck="ai"
                 count={decks.events}
-                width={150}
+                width={you === null ? 80 : 150}
                 countPos="tl"
                 boxRef={anchors.eventsBox}
               />
@@ -1389,7 +1389,7 @@ function BoardView({
             // The one case where the number is carried rather than shown.
             showCount={!beats.discardOut}
             gathered={beats.discardOut === 'gathering' || undefined}
-            width={116}
+            width={you === null ? 80 : 116}
             boxRef={anchors.discardBox}
           />
         </div>

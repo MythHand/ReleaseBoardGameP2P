@@ -60,7 +60,7 @@ function ScenarioRun({
     // treats it as a table it arrived at rather than moves to replay.
     return { state, events: seedLog(state), last: null }
   })
-  const [viewer, setViewer] = useState('you')
+  const [viewer, setViewer] = useState<string | null>('you')
   // HOW MANY CARDS THIS GAME HAS, counted once at the scene's own start. The
   // count itself is the engine's — the same census its conformance check is
   // built on, which knows every place a card can be, the air between a hand and
@@ -76,7 +76,10 @@ function ScenarioRun({
     setReady(true)
     send({ type: 'CLOCK_STARTED' })
   }, [send])
-  const view = useMemo(() => engine.project(run.state, viewer), [run.state, viewer])
+  const view = useMemo(
+    () => (viewer === null ? engine.spectate(run.state) : engine.project(run.state, viewer)),
+    [run.state, viewer],
+  )
   const events = useMemo(() => forViewer(run.events, viewer), [run.events, viewer])
   const labels = t('historyLabels', { returnObjects: true }) as Record<Event['type'], string>
   const board = useMemo(() => toBoardState(view, events, labels), [view, events, labels])
@@ -198,6 +201,9 @@ function ScenarioRun({
               {debug('nextBot')}
             </Button>
           )}
+          <Button variant="tech" aria-pressed={viewer === null} onClick={() => setViewer(null)}>
+            {debug('viewerSpectator')}
+          </Button>
           {run.state.seating.map((id) => (
             <Button
               key={id}
@@ -267,7 +273,7 @@ function ScenarioRun({
       </div>
       <div className={styles.board} data-debug-game-id={gameId}>
         <Board
-          key={viewer}
+          key={viewer ?? 'spectator'}
           state={board}
           over={toBoardOver(view)}
           now={now}
@@ -303,15 +309,19 @@ function ScenarioRun({
             turnDock: t('turnDock', { returnObjects: true }),
             pending: t('pending', { returnObjects: true }),
           }}
-          actions={{
-            onPlay: (card, target, combo) =>
-              send({ type: 'PLAY', player: viewer, card, target, combo }),
-            onResolve: (choice) => send({ type: 'RESOLVE', player: viewer, choice }),
-            onDraw: (pile) => send({ type: 'DRAW', player: viewer, pile }),
-            onPush: () => send({ type: 'PUSH', player: viewer }),
-            onAttack: (card, combo) => send({ type: 'ATTACK', player: viewer, card, combo }),
-            onPass: () => send({ type: 'PASS', player: viewer }),
-          }}
+          actions={
+            viewer === null
+              ? {}
+              : {
+                  onPlay: (card, target, combo) =>
+                    send({ type: 'PLAY', player: viewer, card, target, combo }),
+                  onResolve: (choice) => send({ type: 'RESOLVE', player: viewer, choice }),
+                  onDraw: (pile) => send({ type: 'DRAW', player: viewer, pile }),
+                  onPush: () => send({ type: 'PUSH', player: viewer }),
+                  onAttack: (card, combo) => send({ type: 'ATTACK', player: viewer, card, combo }),
+                  onPass: () => send({ type: 'PASS', player: viewer }),
+                }
+          }
         />
       </div>
     </>

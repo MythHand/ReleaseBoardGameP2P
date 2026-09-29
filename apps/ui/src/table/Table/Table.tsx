@@ -364,7 +364,7 @@ function TableView({
                 label={copy.table.deck}
                 deck="base"
                 count={count}
-                width={PILE_WIDTH}
+                width={you === null ? 80 : PILE_WIDTH}
                 countPos="tl"
               />
             ))}
@@ -374,7 +374,7 @@ function TableView({
                   label={copy.table.events}
                   deck="ai"
                   count={decks.events}
-                  width={150}
+                  width={you === null ? 80 : 150}
                   countPos="tl"
                 />
               </div>
@@ -391,7 +391,7 @@ function TableView({
             heapShow={HEAP_SHOW}
             topCard={decks.discard}
             count={decks.discardCount}
-            width={116}
+            width={you === null ? 80 : 116}
           />
         </div>
 
