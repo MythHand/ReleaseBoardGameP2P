@@ -6,6 +6,7 @@ import LobbyCode from '@/blocks/LobbyCode'
 import Rules from '@/blocks/Rules'
 import { CardMotionProvider } from '@/cards/cardMotion'
 import GearIcon from '@/icons/GearIcon'
+import { KEYBOARD_PRIORITY, useKeyboardLayer } from '@/keyboard'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
@@ -221,17 +222,37 @@ export default function Table({
     if (slotEl) arrow.aim(centerOf(slotEl))
   }, [gestures.phase, gestures.selected, arrow.aim, arrow.stop])
 
-  // Escape cancels an in-flight target selection. Bound to the window (not a
-  // React onKeyDown) so it fires regardless of what currently has focus, and
-  // — like the arrow's mousemove — only while there is something to cancel.
-  useEffect(() => {
-    if (gestures.phase !== 'selected') return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') gestures.cancel()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [gestures.phase, gestures.cancel])
+  useKeyboardLayer({
+    name: 'table-selection',
+    active: gestures.phase === 'selected',
+    priority: KEYBOARD_PRIORITY.screen,
+    bindings: [
+      {
+        key: 'Escape',
+        focus: 'any',
+        run: () => {
+          gestures.cancel()
+          return 'handled'
+        },
+      },
+    ],
+  })
+  useKeyboardLayer({
+    name: 'table-panel',
+    active: panel !== null,
+    priority: KEYBOARD_PRIORITY.panel,
+    bindings: [
+      {
+        key: 'Escape',
+        focus: 'any',
+        run: () => {
+          if (!controlled) setOwnPanel(null)
+          onPanelChange?.(null)
+          return 'handled'
+        },
+      },
+    ],
+  })
 
   // A click that lands outside any hand slot while a target is pending reads
   // as "changed my mind" — cancel. Clicks that land on a legal target already

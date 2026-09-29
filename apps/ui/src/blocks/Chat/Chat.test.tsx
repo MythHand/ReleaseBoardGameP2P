@@ -12,10 +12,12 @@ it('sends every line of a multi-line draft, not just the first', () => {
   const field = getByPlaceholderText(copy.placeholder)
 
   fireEvent.keyDown(field, { key: 'Enter', shiftKey: true })
+  expect(onSend).not.toHaveBeenCalled()
   fireEvent.change(field, { target: { value: 'первая\nвторая' } })
   fireEvent.keyDown(field, { key: 'Enter' })
 
   expect(onSend).toHaveBeenCalledWith('первая\nвторая')
+  expect(onSend).toHaveBeenCalledTimes(1)
 })
 
 // Перенос доезжает и до разметки. Видимым его делает `white-space: pre-wrap` в

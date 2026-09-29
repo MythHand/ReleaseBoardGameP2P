@@ -5,6 +5,57 @@ import Table from './Table'
 import styles from './Table.module.css'
 import { makeTableProps } from './testFixture'
 
+it('closes its drawer before cancelling the target selection on a later Escape', () => {
+  const base = makeTableProps()
+  const onPlay = vi.fn()
+  const { container, getByRole, getByTestId } = render(
+    <Table
+      {...base}
+      state={{ ...base.state, playable: [base.state.you.hand[0].uid] }}
+      actions={{
+        onPlay,
+        legalTargets: () => [{ kind: 'player', player: base.state.opponents[0].id }],
+      }}
+    />,
+  )
+  fireEvent.click(getByRole('button', { name: base.copy.table.tabHistory }))
+  fireEvent.mouseDown(container.querySelectorAll('[data-hand-slot]')[0])
+  const origin = () => container.querySelector(`.${arrowStyles.origin}`)
+  expect(origin()).toBeTruthy()
+  const drawer = getByTestId('panel-history').closest('[aria-hidden]')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(drawer?.getAttribute('aria-hidden')).toBe('true')
+  expect(origin()).toBeTruthy()
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(origin()).toBeNull()
+  expect(onPlay).not.toHaveBeenCalled()
+})
+
+it('reports a controlled drawer close without cancelling selection or changing the panel itself', () => {
+  const base = makeTableProps()
+  const onPanelChange = vi.fn()
+  const props = {
+    ...base,
+    state: { ...base.state, playable: [base.state.you.hand[0].uid] },
+    actions: {
+      onPlay: vi.fn(),
+      legalTargets: () => [{ kind: 'player' as const, player: base.state.opponents[0].id }],
+    },
+  }
+  const { container, getByTestId, rerender } = render(
+    <Table {...props} panel="history" onPanelChange={onPanelChange} />,
+  )
+  fireEvent.mouseDown(container.querySelectorAll('[data-hand-slot]')[0])
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(onPanelChange).toHaveBeenCalledExactlyOnceWith(null)
+  expect(getByTestId('panel-history')).toBeTruthy()
+  expect(container.querySelector(`.${arrowStyles.origin}`)).toBeTruthy()
+  rerender(<Table {...props} panel={null} onPanelChange={onPanelChange} />)
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(container.querySelector(`.${arrowStyles.origin}`)).toBeNull()
+  expect(props.actions.onPlay).not.toHaveBeenCalled()
+})
+
 it('renders the local player name and every opponent seat', () => {
   const props = makeTableProps()
   const { getByText } = render(<Table {...props} />)
