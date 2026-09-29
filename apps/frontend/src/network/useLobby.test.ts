@@ -1,3 +1,4 @@
+import type { GameState } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, WINDOW_FIRST_MS } from '@release/engine/fake'
 import { act, renderHook as renderTestingHook } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
@@ -2895,6 +2896,20 @@ const invalidKeeperSnapshots: [string, (snapshot: StoredKeeper) => void][] = [
   ],
   ['malformed state', (snapshot) => (snapshot.state = {})],
   [
+    'null shown cards',
+    (snapshot) => {
+      const state = snapshot.state as GameState
+      state.players.p1.shown = null as unknown as string[]
+    },
+  ],
+  [
+    'non-array shown cards',
+    (snapshot) => {
+      const state = snapshot.state as GameState
+      state.players.p1.shown = 'card' as unknown as string[]
+    },
+  ],
+  [
     'state for another game',
     (snapshot) => {
       snapshot.state = { ...(snapshot.state as Record<string, unknown>), gameId: 'other-game' }
@@ -2934,6 +2949,64 @@ it('restores a valid snapshot whose guest seat was already absent', async () => 
   expect(result.current.status).toBe('in-lobby')
   expect(result.current.gameId).toBe('g1')
   expect(transports).toHaveLength(1)
+})
+
+it('restores a legacy snapshot without shown cards and accepts the next show intent', async () => {
+  vi.useFakeTimers()
+  try {
+    storedHostSession('g1')
+    const snapshot = storedKeeperSnapshot('peer0')
+    const state = snapshot.state as GameState
+    const card = state.players.p1.hand[0]
+    for (const player of Object.values(state.players)) {
+      delete (player as Partial<typeof player>).shown
+    }
+    sessionStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
+
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(result.current.gameId).toBe('g1')
+    expect(result.current.gameSync?.view.shown).toEqual([])
+    expect(result.current.gameSync?.view.self.hand).toEqual(state.players.p1.hand)
+    expect(storedSession()?.gameId).toBe('g1')
+
+    act(() => result.current.gameLink?.submit({ type: 'SHOW', card: card.uid }))
+
+    expect(result.current.gameSync?.view.shown).toEqual([
+      { player: 'p1', uid: card.uid, card: card.id },
+    ])
+    act(() => vi.advanceTimersByTime(KEEPER_SAVE_MS))
+    const persisted = storedKeeper()?.state as GameState
+    expect(persisted.players.p1.shown).toEqual([card.uid])
+    expect(persisted.players.p2.shown).toEqual([])
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('preserves existing shown cards when another saved player has no shown field', async () => {
+  storedHostSession('g1')
+  const snapshot = storedKeeperSnapshot('peer0')
+  const state = snapshot.state as GameState
+  const card = state.players.p2.hand[0]
+  state.players.p2.shown = [card.uid]
+  delete (state.players.p1 as Partial<typeof state.players.p1>).shown
+  sessionStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  expect(result.current.gameSync?.view.shown).toEqual([
+    { player: 'p2', uid: card.uid, card: card.id },
+  ])
+  expect(result.current.gameSync?.view.opponents[0].handCount).toBe(
+    state.players.p2.hand.length - 1,
+  )
 })
 
 it('hands the restored host its own table back without waiting for it to act', async () => {

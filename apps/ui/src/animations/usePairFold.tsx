@@ -59,6 +59,7 @@ export interface Folding {
 
 interface Mounted extends Folding {
   seq: number
+  resting?: boolean
 }
 
 export function usePairFold() {
@@ -74,6 +75,10 @@ export function usePairFold() {
 
   /** the static render has taken over: the node can go */
   const release = () => setPair(null)
+
+  /** Restore an already folded pair after reconnect, without replaying its entrance. */
+  const stand = (it: Pick<Folding, 'main' | 'aux' | 'box' | 'pose'>) =>
+    setPair({ ...it, mainFrom: it.box, auxFrom: it.box, seq: ++seq.current, resting: true })
 
   const fold = async (it: Folding): Promise<void> => {
     setPair({ ...it, seq: ++seq.current })
@@ -113,6 +118,7 @@ export function usePairFold() {
     <div
       key={`${scope}${pair.seq}`} // a fresh node per fold (I5), this instance's own
       className={styles.flyer}
+      data-shown={pair.resting ? 'true' : undefined}
       ref={(el) => {
         nodeRef.current = el
       }}
@@ -128,5 +134,5 @@ export function usePairFold() {
     </div>
   )
 
-  return { overlay, fold, release, node, FOLD_MS }
+  return { overlay, fold, stand, release, node, FOLD_MS }
 }

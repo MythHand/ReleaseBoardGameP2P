@@ -12,6 +12,7 @@ import {
   type StagedHandoff,
   shownLayout,
   shownPlaceOf,
+  shownPlayerOffset,
 } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
 import { seatCardBox } from './seat'
@@ -33,7 +34,23 @@ const rectOf = (el: Element | null): Rect | null => {
 }
 
 /** Where a place of the centre is on screen right now — asked of the centre module for the row, whose places are not mounted until something stands in them. */
-export function placeRect(place: ShownPlace, a: BoardAnchors): Rect | null {
+export function placeRect(
+  place: ShownPlace,
+  a: BoardAnchors,
+  base?: BoardState,
+  player?: string,
+): Rect | null {
+  const rect = centrePlaceRect(place, a)
+  if (!rect || !base || !player) return rect
+  const width = a.centre.current?.parentElement?.getBoundingClientRect().width || window.innerWidth
+  const selfHeld = a.centre.current?.dataset.shownSelf === base.selfId
+  return {
+    ...rect,
+    left: rect.left + shownPlayerOffset(base.shown ?? [], base.selfId, player, width, selfHeld),
+  }
+}
+
+function centrePlaceRect(place: ShownPlace, a: BoardAnchors): Rect | null {
   if (place === 'stage') return rectOf(a.stage.current)
   const centre = rectOf(a.centre.current)
   if (!centre || place === 'solo') return centre
@@ -75,7 +92,7 @@ export function shownSource(
   const leaving = theirs.filter((s) => cards.includes(s.card.id))
   if (leaving.length === 0) return null
   const place = shownPlaceOf(shownLayout(theirs), leaving[0].uid)
-  const rect = place ? placeRect(place, a) : null
+  const rect = place ? placeRect(place, a, base, player) : null
   if (!rect) return null
   const gone = new Set(leaving.map((s) => s.uid))
   return { rect, next: { ...base, shown: (base.shown ?? []).filter((s) => !gone.has(s.uid)) } }
@@ -146,7 +163,7 @@ export function useShownBeat(anchors: BoardAnchors) {
       const standing: BoardState = { ...lifted, shown: [...(lifted.shown ?? []), card] }
       const layout = shownLayout(shownBy(standing, plan.player))
       const place = shownPlaceOf(layout, card.uid)
-      const to = place ? placeRect(place, a) : null
+      const to = place ? placeRect(place, a, standing, plan.player) : null
       const from = a.seatBox(plan.player)
 
       // IT MAKES A PAIR WITH A CARD ALREADY STANDING — the two fold together,
@@ -159,7 +176,7 @@ export function useShownBeat(anchors: BoardAnchors) {
         partner && held.has(partner.uid)
           ? shownPlaceOf(shownLayout(shownBy(lifted, plan.player)), partner.uid)
           : null
-      const partnerAt = partnerPlace ? placeRect(partnerPlace, a) : null
+      const partnerAt = partnerPlace ? placeRect(partnerPlace, a, lifted, plan.player) : null
       if (pair && partner && partnerAt && from && to) {
         const arriving = pair.main.uid === card.uid
         const folding = fold({
@@ -214,7 +231,7 @@ export function useShownBeat(anchors: BoardAnchors) {
       const back = theirs.filter((s) => plan.cards.includes(s.card.id))
       const flights = back.flatMap((s) => {
         const place = shownPlaceOf(layout, s.uid)
-        const at = place ? placeRect(place, a) : null
+        const at = place ? placeRect(place, a, ctx.base, plan.player) : null
         return at ? [{ card: s, at, tilt: tiltOf(place, s) }] : []
       })
       const gone = new Set(back.map((s) => s.uid))

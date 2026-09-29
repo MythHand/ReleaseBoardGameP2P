@@ -51,5 +51,9 @@ events — no peer ever knew»).
   card stands when it was shown, and take it off the centre rather than off the seat's count a
   second time.
 - **Gesture** — `_useBoardStaging` sends `SHOW` when a card is put out at the centre and
-  `TAKE_BACK` on a miss, Escape or a refused play, while the engine shows something of ours.
+  `TAKE_BACK` on a miss, Escape or a refused play after submitting `SHOW`, even before its
+  projection returns. The delayed shown projection stays suppressed until take-back is acknowledged.
+  Reconnect restores partner/target controls from the shown cards; an interrupted automatic play
+  resumes once if the current projection still permits it. A restored folded pair mounts at rest
+  through `usePairFold.stand`; reduced motion releases its carrier when the play is accepted.
 - **History** — `shown` and `takenBack` have no row in the move history.

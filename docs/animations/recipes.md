@@ -447,6 +447,17 @@ into an open window, aims for a target, or plays straight through to a release s
 beat takes the pair the rest of the way: resting as the pending exchange at the centre, or settling
 into the release zone.
 
+**Concurrent public staging (#211).** `shownLayout` reads one owner's cards at a time;
+Sudo and Code Review never pair across owners. The board gives each owner a separate row using
+`shownPlayerOffset`, derived from the occupied card/row spans. A single owner keeps the
+reference position; opponents alternate around the local gesture's original anchors, including
+before its SHOW echo arrives. The measured table width bounds the offsets; crowded rows compress
+spacing, and owner names are truncated with their full names available on hover. `shownBeat` uses the same offset for arrival, folding,
+TAKE_BACK and `shownSource` (consumed by attack/release and operation beats), so the next carrier
+starts where that owner's card was drawn. Rows reflow when the set of owners changes; no new
+movement preset or persistent reservation is introduced. A restored local support pair mounts at
+rest through `usePairFold.stand`; its entrance is not replayed.
+
 **Elements / refs**
 - `anchors.centre` — the merge target, the same node the plain-aim recipe stages onto.
 - `state.comboOptions[uid]` — the engine's own legal-partner list (`PlayerView.self.combos`, keyed

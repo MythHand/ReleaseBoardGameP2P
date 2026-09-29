@@ -1,4 +1,4 @@
-import type { CardData } from '@release/ui'
+import { type CardData, CENTRE_SLOTS, rowCells } from '@release/ui'
 
 /** A card put out at the centre while its play is being made (resolution.md §1). */
 export interface ShownCard {
@@ -58,4 +58,90 @@ export function shownPlaceOf(layout: ShownLayout, uid: string): ShownPlace | nul
   if (layout.row?.[0].uid === uid) return 'row0'
   if (layout.row?.[1]?.uid === uid) return 'row1'
   return null
+}
+
+/**
+ * Each owner's occupied span, using the centre module's card/row geometry.
+ * A missing local SHOW echo still reserves the gesture's two possible places.
+ */
+function shownSpan(cards: ShownCard[]) {
+  const row = rowCells('staging', 2)
+  const layout = shownLayout(cards)
+  if (layout.row || cards.length === 0) {
+    return {
+      left:
+        cards.length === 0
+          ? Math.min(row[0].dx - row[0].w / 2, CENTRE_SLOTS.stage.dx - CENTRE_SLOTS.stage.w / 2)
+          : row[0].dx - row[0].w / 2,
+      right: row[1].dx + row[1].w / 2,
+    }
+  }
+  const dx = layout.stage ? CENTRE_SLOTS.stage.dx : layout.pair?.at === 'row0' ? row[0].dx : 0
+  const w = row[0].w
+  return { left: dx - w / 2, right: dx + w / 2 }
+}
+
+/**
+ * A lone play retains the reference position. Concurrent owners pack by the
+ * space their cards occupy; opponents alternate around our fixed gesture.
+ * On a narrow table only the spacing compresses, keeping cards on screen.
+ * Rendering and flights read the same geometry and the same table width.
+ */
+export function shownPlayerOffset(
+  cards: ShownCard[],
+  selfId: string,
+  player: string,
+  tableWidth = Number.POSITIVE_INFINITY,
+  selfHeld = false,
+): number {
+  const owners = [...new Set(cards.map((card) => card.player))]
+  if (selfHeld && !owners.includes(selfId)) owners.push(selfId)
+  if (owners.length < 2) return 0
+  const spans = new Map(
+    owners.map((owner) => [owner, shownSpan(cards.filter((card) => card.player === owner))]),
+  )
+  const row = rowCells('staging', 2)
+  const gap = row[1].dx - row[0].dx - row[0].w
+  const offsets = new Map<string, number>()
+  const own = spans.get(selfId)
+  if (own) {
+    offsets.set(selfId, 0)
+    let left = own.left
+    let right = own.right
+    owners
+      .filter((owner) => owner !== selfId)
+      .forEach((owner, i) => {
+        const span = spans.get(owner)
+        if (!span) return
+        if (i % 2 === 0) {
+          const dx = left - gap - span.right
+          offsets.set(owner, dx)
+          left = dx + span.left
+        } else {
+          const dx = right + gap - span.left
+          offsets.set(owner, dx)
+          right = dx + span.right
+        }
+      })
+  } else {
+    const width =
+      [...spans.values()].reduce((total, span) => total + span.right - span.left, 0) +
+      gap * (owners.length - 1)
+    let left = -width / 2
+    for (const owner of owners) {
+      const span = spans.get(owner)
+      if (!span) continue
+      offsets.set(owner, left - span.left)
+      left += span.right - span.left + gap
+    }
+  }
+  const edge = Math.max(0, tableWidth / 2 - gap)
+  let compression = 1
+  for (const [owner, dx] of offsets) {
+    const span = spans.get(owner)
+    if (!span) continue
+    if (dx < 0) compression = Math.min(compression, (edge + span.left) / -dx)
+    if (dx > 0) compression = Math.min(compression, (edge - span.right) / dx)
+  }
+  return (offsets.get(player) ?? 0) * Math.max(0, compression)
 }

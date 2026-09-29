@@ -173,3 +173,24 @@ it('hands over an exit even when there is nothing to carry', async () => {
   })
   expect(result.current.standing).toBe(false)
 })
+
+it('takes both shown Sudo-operation cards from their owner’s shifted row', async () => {
+  const anchors = anchorsFixture()
+  const { result } = renderBeat(() => useOperationBeat(anchors))
+  const cards = [
+    { player: 'p1', uid: 'bug', id: 'attack-bug' },
+    { player: 'p2', uid: 'sudo', id: 'support-sudo' },
+    { player: 'p2', uid: 'branch', id: 'operation-git-branch' },
+  ].map(({ id, ...rest }) => {
+    const card = cardById(id)
+    if (!card) throw new Error(`unknown card ${id}`)
+    return { ...rest, card }
+  })
+  await runBeat(result.current.runPlaced, placed(true), anchors, {
+    base: { ...base, shown: cards },
+  })
+  expect(animationsTrace.starts).toEqual([
+    { left: 64, top: 300, width: 150 },
+    { left: 232, top: 300, width: 150 },
+  ])
+})

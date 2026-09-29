@@ -14,6 +14,7 @@ export {
   type ShownPlace,
   shownLayout,
   shownPlaceOf,
+  shownPlayerOffset,
 } from './shownLayout'
 export { toAction } from './toAction'
 export { toBoardOver } from './toBoardOver'

@@ -1,6 +1,6 @@
 import { cardById } from '@release/ui'
 import { describe, expect, it } from 'vitest'
-import { type ShownCard, shownLayout, shownPlaceOf } from './shownLayout'
+import { type ShownCard, shownLayout, shownPlaceOf, shownPlayerOffset } from './shownLayout'
 
 // Where another player's cards stand while they make a play (resolution.md §1)
 // — the same places our own staging stands a play in.
@@ -59,4 +59,30 @@ describe('shownLayout', () => {
     expect(shownLayout([])).toEqual({})
     expect(shownPlaceOf({}, BUG.uid)).toBeNull()
   })
+})
+
+it('spaces two and three solo owners by their occupied cards while keeping local staging at zero', () => {
+  const other = { ...BUG, player: 'p3', uid: 'other-bug' }
+  expect(shownPlayerOffset([BUG], 'you', 'p2')).toBe(0)
+  expect(shownPlayerOffset([BUG, other], 'you', 'p2')).toBe(-84)
+  expect(shownPlayerOffset([BUG, other], 'you', 'p3')).toBe(84)
+  const own = { ...BUG, player: 'you', uid: 'own-bug' }
+  expect(shownPlayerOffset([BUG, own, other], 'you', 'you')).toBe(0)
+  expect(shownPlayerOffset([BUG, own, other], 'you', 'p2')).toBe(-168)
+  expect(shownPlayerOffset([BUG, own, other], 'you', 'p3')).toBe(168)
+})
+
+it('keeps all six players inside the measured table, with distinct visible card positions', () => {
+  const cards = Array.from({ length: 6 }, (_, i) => ({ ...BUG, player: `p${i}`, uid: `bug${i}` }))
+  const offsets = cards.map(({ player }) => shownPlayerOffset(cards, 'p0', player, 800))
+  expect(offsets[0]).toBe(0)
+  expect(new Set(offsets).size).toBe(6)
+  expect(Math.min(...offsets) - 75).toBeGreaterThanOrEqual(-400)
+  expect(Math.max(...offsets) + 75).toBeLessThanOrEqual(400)
+  expect(offsets[1]).toBeLessThan(0)
+  expect(offsets[2]).toBeGreaterThan(0)
+})
+
+it('reserves the local gesture before its SHOW echo arrives', () => {
+  expect(shownPlayerOffset([BUG], 'you', 'p2', 800, true)).toBeLessThan(-150)
 })

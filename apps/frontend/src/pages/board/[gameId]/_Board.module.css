@@ -241,3 +241,24 @@
 .railLayer > * {
   pointer-events: auto;
 }
+
+/* Independent staging layouts share the table's coordinate system. Flights
+   apply the same owner offset before aiming at a place within the layout. */
+.shownGroup {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.shownGroup .rowSlot {
+  pointer-events: auto;
+}
+
+.shownOwner {
+  position: absolute;
+  inset-block-end: 100%;
+  margin-block-end: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

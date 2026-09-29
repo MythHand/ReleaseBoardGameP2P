@@ -339,6 +339,7 @@ function normalizeKeeperSnapshot(
   }
   const players = state.players as Record<string, unknown>
   if (Object.keys(players).length !== playerIds.length) return null
+  const normalizedPlayers: GameState['players'] = {}
   for (const playerId of playerIds) {
     const player = players[playerId]
     const privateSeat = privateByPlayer.get(playerId)
@@ -350,10 +351,18 @@ function normalizeKeeperSnapshot(
     ) {
       return null
     }
+    // Saves made before centre staging have no shown cards yet. Normalize
+    // before projection and adoption so subsequent reductions see the same state.
+    const { shown = [], ...savedPlayer } = player as GameState['players'][PlayerId]
+    normalizedPlayers[playerId] = { ...savedPlayer, shown }
+  }
+  const normalizedState: GameState = {
+    ...(snapshot.state as GameState),
+    players: normalizedPlayers,
   }
 
   try {
-    for (const playerId of playerIds) engine.project(snapshot.state as GameState, playerId)
+    for (const playerId of playerIds) engine.project(normalizedState, playerId)
   } catch {
     return null
   }
@@ -361,7 +370,7 @@ function normalizeKeeperSnapshot(
   return {
     gameId: snapshot.gameId,
     keeperId: snapshot.keeperId,
-    state: snapshot.state as GameState,
+    state: normalizedState,
     seats,
     privateSeats,
     log,

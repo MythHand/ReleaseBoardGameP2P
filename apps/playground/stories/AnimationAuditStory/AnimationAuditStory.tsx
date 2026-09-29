@@ -500,6 +500,16 @@ const SCENARIOS: Scenario[] = [
     where: 'CardPlay, DeckAnimations',
   },
   {
+    name: { ru: 'Одновременная подготовка карт', en: 'Concurrent public staging' },
+    from: {
+      ru: '#211: показанные карты группируются по владельцу; Sudo и Code Review не объединяются с чужой картой. Раздельные ряды используют ширину занятых карт и подписаны именами. Один владелец сохраняет прежние позиции; соперники располагаются по обе стороны локального жеста, включая ожидание SHOW. Ширина стола ограничивает сдвиги; при тесноте интервалы сжимаются. Восстановленная локальная пара монтируется на месте через usePairFold.stand без повторного прилёта. shownBeat читает тот же сдвиг для прилёта, складывания, возврата и следующего розыгрыша. При изменении списка владельцев ряды перераскладываются. Отдельный пресет движения не добавлялся.',
+      en: '#211: shown cards are grouped by owner; Sudo and Code Review never pair with another owner’s card. Separate rows use occupied card widths and display owner names. A single owner retains reference positions; opponents alternate around the local gesture, including while its SHOW echo is pending. The measured table width bounds offsets; crowded spacing compresses. A restored local pair mounts at rest through usePairFold.stand without replaying its entrance. shownBeat reads the same offset for arrival, folding, return and the next play. Rows reflow when the set of owners changes. No separate movement preset was added.',
+    },
+    where: 'DeckAnimations, Combo',
+    board:
+      'entities/game/board/shownLayout.ts, features/board-beats/shownBeat.tsx, pages/board/[gameId]/_Board.tsx',
+  },
+  {
     name: { ru: 'Переход состояния TurnDock', en: 'TurnDock state transition' },
     from: {
       ru: 'один фиксированный каркас, слоты не двигаются. Ключ/имя — ОДНА фикс-ширина (≈ «добор» + 18px с каждой стороны), не ресайзится и не прыгает. Текст (фаза, метка ключа, ник) — чистый фейд rollOut→rollIn через Swap, без движения. Держит рамку кнопки, меняется только метка + акцент (CSS-transition на --btn-accent). Имя соперника (первый вход и смена ника подряд) появляется одинаково: ждёт ухода предыдущего (delayIn), потом проявляется. «drawn»-бейдж — popIn/popOut (Reveal). Кольцо и точка стоят на месте: только морф акцента (transition на stroke/--dot) + дозаполнение кольца до полного (progress→1 при смене фазы). ДОБАВЛЕНО: две фазы, которых не хватало столу. attack — идёт чужое окно, и по нему можно ударить: ключ ЗАГОРАЕТСЯ (тот же выступ дока, только ярче — не плоская заливка), рядом точки по числу мест, которые ещё могут ударить, гаснущие с каждым пасом. exposed — окно висит над ТВОИМ релизом: цвет хода остаётся твоим, часы — окна, а в слоте ключа стоят те же точки, потому что нажимать нечего. Плюс правило про часы: смотрящий НЕ видит чужого отсчёта — это не его время, и число, на которое он не влияет, только дёргается перед ним; в ветке ожидания чужого решения кольцо полное и без цифры. Таймеры целиком выключаются настройкой хоста в настройках стола.',

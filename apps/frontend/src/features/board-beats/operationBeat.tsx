@@ -5,7 +5,7 @@ import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@re
 import { type RefObject, useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
 import type { BeatPlan, DiscardCard } from './planBeats'
-import { shownSource, withoutStaged } from './shownBeat'
+import { placeRect, shownSource, withoutStaged } from './shownBeat'
 import { settleInto, withLanded, withoutLanded } from './toHeap'
 import { withoutFlown } from './withoutFlown'
 
@@ -287,7 +287,12 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
           }))
         : null
       // shown first, the two already stand in those two places of the row
-      const starts = shown ? lands : places
+      const starts =
+        shown && lands
+          ? lands.map(
+              (land, i) => placeRect(i === 0 ? 'row0' : 'row1', a, ctx.base, plan.player) ?? land,
+            )
+          : places
       const raised = flyer.raise(
         aux && starts
           ? [
