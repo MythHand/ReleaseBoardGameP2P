@@ -1,6 +1,6 @@
 import { useTranslation } from '@release/translation'
 import { Chat, type ChatCopy, type ChatMessage } from '@release/ui'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import type { ChatSystemEvent, MemberId } from '~/shared/chat/types'
 import { toChatMessages } from './model'
@@ -10,11 +10,16 @@ export interface RoomChatView {
   notificationEntryIds: string[]
   selfMemberId: MemberId | null
   copy: ChatCopy
+  draft?: string
+  onDraftChange?: (draft: string) => void
   send(text: string): boolean
 }
 
 export function useRoomChatView(): RoomChatView {
   const session = useSession()
+  // Board may replace only its Chat slot on a visibility reset. Keep the
+  // unsent text in the route-level view hook, which survives that replacement.
+  const [draft, setDraft] = useState('')
   const { t, i18n } = useTranslation()
   const language = i18n.resolvedLanguage ?? i18n.language
   const time = useMemo(
@@ -96,6 +101,8 @@ export function useRoomChatView(): RoomChatView {
     messages,
     notificationEntryIds: session.chat.notificationEntryIds,
     selfMemberId: session.chat.selfMemberId,
+    draft,
+    onDraftChange: setDraft,
     copy: {
       placeholder: t('chat.placeholder'),
       send: t('chat.send'),
@@ -112,6 +119,8 @@ export function RoomChat({ view, className }: { view: RoomChatView; className?: 
       selfMemberId={view.selfMemberId ?? undefined}
       copy={view.copy}
       onSend={view.send}
+      draft={view.draft}
+      onDraftChange={view.onDraftChange}
       className={className}
     />
   )
