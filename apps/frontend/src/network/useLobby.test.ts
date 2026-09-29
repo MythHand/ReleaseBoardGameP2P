@@ -8,10 +8,13 @@ import {
   clearKeeper,
   clearSession,
   readChat,
+  readKeeper,
+  readSession,
   type StoredKeeper,
   type StoredLobbyConfig,
   type StoredSession,
   writeChat,
+  writeSession,
 } from '~/shared/lib/persistence'
 import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
 import { createSession, type Seat as RefereeSeat } from './session/referee'
@@ -145,6 +148,28 @@ afterEach(() => {
   renderedLobbies.length = 0
 })
 
+function acceptGuest(transport: FakeTransport, hostId: string) {
+  transport.onConnection?.(hostId)
+  transport.onMessage?.({
+    type: 'PEER_LIST',
+    from: hostId,
+    seq: 1,
+    payload: {
+      yourRole: 'player',
+      peers: [
+        {
+          id: transport.id,
+          memberId: transport.id,
+          name: 'Bo',
+          role: 'player',
+          ready: false,
+          where: 'lobby',
+        },
+      ],
+    },
+  })
+}
+
 it('formats a room code as ABC-123 from the peer id', () => {
   expect(formatRoomCode('abc123xyz')).toBe('ABC-123')
 })
@@ -168,7 +193,7 @@ it('a guest sends text intent only and waits for the canonical entry', async () 
   const { result } = renderHook(() => useLobby())
   await act(async () => result.current.joinRoom('F96-NMT', 'Bo'))
   const hostId = parseRoomCode('F96-NMT')
-  act(() => transports[0].onConnection?.(hostId))
+  act(() => acceptGuest(transports[0], hostId))
 
   act(() => expect(result.current.chat.send('  hello\nroom  ')).toBe(true))
 
@@ -770,7 +795,7 @@ it('reconnects after a host disconnect instead of keeping a stale error', async 
     transports[0].onError?.({ type: 'peer-unavailable', message: 'stale' })
   })
   act(() => {
-    transports[0].onConnection?.(hostId)
+    acceptGuest(transports[0], hostId)
   })
   await act(async () => {
     transports[0].onDisconnect?.(hostId)
@@ -835,7 +860,7 @@ async function liveGuestReturningToStart() {
   })
   const hostId = parseRoomCode('ABC-123')
   act(() => {
-    transports[0].onConnection?.(hostId)
+    acceptGuest(transports[0], hostId)
     transports[0].onMessage?.({
       type: 'GAME_STARTING',
       payload: { gameId: 'abc123-1', seats: SEATING },
@@ -1262,7 +1287,7 @@ it('puts the local resume token only in the guest-to-host join request', async (
     await result.current.joinRoom('ABC-123', 'Bo')
   })
   act(() => {
-    transports[0].onConnection?.('abc123')
+    acceptGuest(transports[0], 'abc123')
   })
 
   const frames = publicFrames(transports[0])
@@ -1273,7 +1298,7 @@ it('puts the local resume token only in the guest-to-host join request', async (
   expect(frames.filter((frame) => JSON.stringify(frame).includes(resumeToken ?? ''))).toEqual([
     {
       type: 'JOIN_REQUEST',
-      payload: { name: 'Bo', resumeToken },
+      payload: { name: 'Bo', resumeToken, requestedRole: 'player' },
     },
   ])
 })
@@ -1284,7 +1309,7 @@ it('rotates credentials between rooms so a former host cannot claim the later se
     await guest.result.current.joinRoom('AAA-111', 'Bo')
   })
   act(() => {
-    transports[0].onConnection?.('aaa111')
+    acceptGuest(transports[0], 'aaa111')
   })
   const roomAJoin = transports[0].send.mock.calls
     .filter((call) => call[0] === 'aaa111')
@@ -1296,7 +1321,7 @@ it('rotates credentials between rooms so a former host cannot claim the later se
     await guest.result.current.joinRoom('BBB-222', 'Bo')
   })
   act(() => {
-    transports[1].onConnection?.('bbb222')
+    acceptGuest(transports[1], 'bbb222')
   })
   const roomBJoin = transports[1].send.mock.calls
     .filter((call) => call[0] === 'bbb222')
@@ -1333,7 +1358,11 @@ it('rotates credentials between rooms so a former host cannot claim the later se
 
   expect(host.result.current.seats.find(({ name }) => name === 'Bo')?.peerId).toBe(GUEST)
   expect(host.result.current.state?.peers['mallory-peer']?.role).toBe('guest')
-  expect(hostTransport.authenticate).not.toHaveBeenCalledWith('mallory-peer')
+  expect(hostTransport.authenticate).toHaveBeenCalledWith('mallory-peer')
+  const publicSync = hostTransport.send.mock.calls.find(
+    ([to, message]) => to === 'mallory-peer' && message.type === 'SYNC',
+  )?.[1]
+  expect(publicSync?.payload.view.self).toBeNull()
 })
 
 it('rejects a duplicate credential during live lobby admission', async () => {
@@ -1581,7 +1610,10 @@ it('a guest tells the host when its intro is done', async () => {
   act(() => {
     transports[0].onMessage?.({
       type: 'GAME_STARTING',
-      payload: { gameId: hostId, seats: SEATING },
+      payload: {
+        gameId: hostId,
+        seats: SEATING.map((seat, i) => (i === 1 ? { ...seat, peerId: 'peer0' } : seat)),
+      },
       from: hostId,
     } as WireMessage)
   })
@@ -1774,7 +1806,7 @@ it('keeps the latest host lobby configuration in the stored room session', async
     result.current.setBots(2)
   })
 
-  expect(storedSession()?.lobbyConfig).toEqual({ maxPlayers: 3, setup, bots: 2 })
+  expect(storedSession()?.lobbyConfig).toEqual({ maxPlayers: 3, maxSpectators: 8, setup, bots: 2 })
 })
 
 it('persists the session when a room is joined', async () => {
@@ -1898,7 +1930,7 @@ it('tears down a kicked session and ignores its callbacks after a fresh join', a
   expect(result.current.chat.notificationEntryIds).toEqual(['chat-live'])
   expect(result.current.chat.selfMemberId).toBe('member-old')
   act(() => {
-    old.onConnection?.(hostId)
+    acceptGuest(old, hostId)
     old.onMessage?.({
       seq: 1,
       type: 'GAME_STARTING',
@@ -1930,7 +1962,7 @@ it('tears down a kicked session and ignores its callbacks after a fresh join', a
     })
     old.onDisconnect?.(hostId)
     old.onError?.({ type: 'network', message: 'late failure' })
-    old.onConnection?.(hostId)
+    acceptGuest(old, hostId)
   }
   act(fireStaleCallbacks)
   expect.soft(result.current.status).toBe('kicked')
@@ -1942,7 +1974,7 @@ it('tears down a kicked session and ignores its callbacks after a fresh join', a
   await act(async () => {
     await result.current.joinRoom('ABC-23D', 'Bo')
   })
-  act(() => transports[1].onConnection?.(parseRoomCode('ABC-23D')))
+  act(() => acceptGuest(transports[1], parseRoomCode('ABC-23D')))
   const freshState = result.current.state
   act(fireStaleCallbacks)
   expect(result.current.status).toBe('in-lobby')
@@ -2145,6 +2177,7 @@ it("stores private seating beside the referee's public seats", async () => {
     ])
     expect(stored?.lobbyConfig).toEqual({
       maxPlayers: result.current.state?.maxPlayers,
+      maxSpectators: 8,
       setup: result.current.state?.setup,
       bots: 2,
     })
@@ -2228,7 +2261,7 @@ it('revokes a stale same-id seat before a wrong-token guest can receive private 
     result.current.gameLink?.submit({ type: 'DRAW' })
   })
 
-  expect(sentTo(GUEST).filter((message) => message.type === 'SYNC')).toEqual([])
+  expect(publicSyncTo(GUEST).view.self).toBeNull()
 })
 
 it('revokes a stale same-id seat when the replacement sends malformed credentials', async () => {
@@ -2305,7 +2338,7 @@ it('rejects intents before and after invalid authentication, then accepts one af
     } as WireMessage)
   })
   expect(result.current.gameSync).toBe(beforeAuthentication)
-  expect(sentTo(GUEST).filter((message) => message.type === 'SYNC')).toEqual([])
+  expect(publicSyncTo(GUEST).view.self).toBeNull()
 
   act(() => {
     transports[0].receive({
@@ -2363,7 +2396,7 @@ it('rejects intro readiness before and after invalid authentication, then accept
       from: GUEST,
     } as WireMessage)
   })
-  expect(sentTo(GUEST).filter((message) => message.type === 'SYNC')).toEqual([])
+  expect(publicSyncTo(GUEST).view.self).toBeNull()
 
   act(() => {
     transports[0].receive({
@@ -2472,7 +2505,7 @@ it('reclaims a seat only with its exact private resume token', async () => {
         seq: 11,
       } as WireMessage)
     })
-    expect(sentTo('mallory-peer').some((message) => message.type === 'GAME_STARTING')).toBe(false)
+    expect(publicSyncTo('mallory-peer').view.self).toBeNull()
     expect(transports[0].broadcast).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'SEAT_REBOUND' }),
     )
@@ -3630,7 +3663,7 @@ it('rebuilds the guest game link on reconnect without dropping the frozen sync',
   const hostId = parseRoomCode('ABC-123')
   const first = transports[0]
   act(() => {
-    first.onConnection?.(hostId)
+    acceptGuest(first, hostId)
   })
   // A live match, which is what separates this from a lobby disconnect.
   act(() => {
@@ -3664,7 +3697,7 @@ it('rebuilds the guest game link on reconnect without dropping the frozen sync',
 
   const second = transports[1]
   await act(async () => {
-    second.onConnection?.(hostId)
+    acceptGuest(second, hostId)
     await Promise.resolve()
   })
   act(() => {
@@ -3722,7 +3755,7 @@ it('re-dials the stored room when the reload happened in the lobby', async () =>
   // same way every other guest test in this file drives it.
   const hostId = parseRoomCode('ABC-123')
   await act(async () => {
-    transports[0].onConnection?.(hostId)
+    acceptGuest(transports[0], hostId)
     await Promise.resolve()
   })
 
@@ -3741,7 +3774,7 @@ it('re-dials when an established lobby connection loses the restoring host', asy
   const hostId = parseRoomCode('ABC-123')
   const first = transports[0]
   act(() => {
-    first.onConnection?.(hostId)
+    acceptGuest(first, hostId)
   })
   expect(result.current.gameId).toBeNull()
 
@@ -3899,7 +3932,7 @@ async function replacedGuestTransport(options: { startGame?: boolean } = {}) {
   const liveTransport = transports[1]
   const hostId = parseRoomCode('ABC-123')
   act(() => {
-    liveTransport.onConnection?.(hostId)
+    acceptGuest(liveTransport, hostId)
     if (options.startGame) {
       liveTransport.onMessage?.({
         type: 'GAME_STARTING',
@@ -3920,7 +3953,7 @@ it('ignores a channel-open callback owned by a superseded transport', async () =
   const sendsBefore = liveTransport.send.mock.calls.length
 
   act(() => {
-    oldTransport.onConnection?.(hostId)
+    acceptGuest(oldTransport, hostId)
   })
 
   expect(liveTransport.send).toHaveBeenCalledTimes(sendsBefore)
@@ -4097,7 +4130,7 @@ it('retry() after a successful reconnect leaves the live transport alone', async
   })
   const hostId = parseRoomCode('ABC-123')
   await act(async () => {
-    transports[0].onConnection?.(hostId)
+    acceptGuest(transports[0], hostId)
     await Promise.resolve()
   })
   expect(result.current.reconnect.status).toBe('idle')
@@ -4149,7 +4182,7 @@ it("a superseded run's belated channel-open does not settle the run that replace
   // from the new joinRoom() call fires a real close later, but here it
   // reports success instead, on the outcome PeerJS actually delivered to it.
   await act(async () => {
-    transports[0].onConnection?.(hostId)
+    acceptGuest(transports[0], hostId)
     await Promise.resolve()
   })
 
@@ -4161,7 +4194,7 @@ it("a superseded run's belated channel-open does not settle the run that replace
 
   // The genuinely new dial's own outcome is still honored normally.
   await act(async () => {
-    transports[1].onConnection?.(hostId)
+    acceptGuest(transports[1], hostId)
     await Promise.resolve()
   })
   expect(result.current.reconnect.status).toBe('idle')
@@ -4208,7 +4241,7 @@ it("an earlier attempt's belated channel-open does not settle the next attempt i
     // every guest test in this file drives onConnection, arriving after
     // attempt 2 has already begun.
     await act(async () => {
-      transports[0].onConnection?.(hostId)
+      acceptGuest(transports[0], hostId)
       await Promise.resolve()
     })
     // Without a per-attempt (not merely per-run) token, this resolves
@@ -4222,7 +4255,7 @@ it("an earlier attempt's belated channel-open does not settle the next attempt i
 
     // Attempt 2's own outcome is still honored normally.
     await act(async () => {
-      transports[1].onConnection?.(hostId)
+      acceptGuest(transports[1], hostId)
       await Promise.resolve()
     })
     expect(result.current.reconnect.status).toBe('idle')
@@ -4280,7 +4313,7 @@ it("retry() firing while an earlier attempt's dial is still inside createTranspo
   const hostId = parseRoomCode('ABC-123')
   // The new run's own dial succeeds normally.
   await act(async () => {
-    transports[0].onConnection?.(hostId)
+    acceptGuest(transports[0], hostId)
     await Promise.resolve()
   })
 
@@ -4293,7 +4326,7 @@ it("retry() firing while an earlier attempt's dial is still inside createTranspo
   expect(result.current.reconnect.status).toBe('idle')
 })
 
-it('does not rebind or route a newcomer claiming a bot resume token into the match', async () => {
+it('admits a newcomer claiming a bot token as a spectator without rebinding the bot', async () => {
   const { result, unmount } = renderHook(() => useLobby())
   try {
     await act(async () => {
@@ -4312,9 +4345,7 @@ it('does not rebind or route a newcomer claiming a bot resume token into the mat
     })
     expect(result.current.state?.peers['new-peer'].role).toBe('guest')
     expect(result.current.seats).toEqual(seating)
-    expect(
-      transports[0].send.mock.calls.some(([, message]) => message.type === 'GAME_STARTING'),
-    ).toBe(false)
+    expect(publicSyncTo('new-peer').view.self).toBeNull()
   } finally {
     unmount()
   }
@@ -4421,4 +4452,401 @@ it('rebinds only the human seat when its resume token collides with a bot id', a
   } finally {
     unmount()
   }
+})
+
+// Spectator room lifecycle uses the same host transport and persistence as seated play.
+function joinWatcher(
+  peerId = 'watcher',
+  resumeToken = 'watcher-token',
+  resume?: { where: 'lobby' | 'game' | 'stats'; lastGameId: string | null },
+) {
+  transports[0].onMessage?.({
+    type: 'JOIN_REQUEST',
+    payload: {
+      name: 'Watcher',
+      resumeToken,
+      requestedRole: 'spectator',
+      ...(resume ? { resume } : {}),
+    },
+    from: peerId,
+    seq: 100,
+  })
+}
+const typesSentTo = (peerId: string) => sentTo(peerId).map((message) => message.type)
+function publicSyncTo(peerId: string) {
+  const sync = sentTo(peerId)
+    .filter((message) => message.type === 'SYNC')
+    .at(-1)
+  if (sync?.type !== 'SYNC') throw new Error('missing spectator sync')
+  return sync.payload
+}
+
+it('waits for host admission and preserves the requested spectator role', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('ABC-23D', 'Watcher', 'spectator'))
+  act(() => transports[0].onConnection?.('abc23d'))
+  expect(result.current.status).toBe('connecting')
+  expect(sentTo('abc23d')).toContainEqual({
+    type: 'JOIN_REQUEST',
+    payload: { name: 'Watcher', resumeToken: expect.any(String), requestedRole: 'spectator' },
+  })
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'PEER_LIST',
+      from: 'abc23d',
+      seq: 1,
+      payload: {
+        yourRole: 'guest',
+        peers: [
+          {
+            id: 'peer0',
+            memberId: 'watcher-member',
+            name: 'Watcher',
+            role: 'guest',
+            ready: false,
+            where: 'lobby',
+          },
+        ],
+      },
+    }),
+  )
+  expect(result.current.status).toBe('in-lobby')
+  expect(readSession()?.participantRole).toBe('spectator')
+})
+
+it('starts an admitted watcher without a seat and accepts watcher chat', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    joinWatcher()
+    result.current.startGame([])
+  })
+  expect(result.current.state?.peers.watcher.role).toBe('guest')
+  expect(result.current.seats).toHaveLength(2)
+  expect(publicSyncTo('watcher').view.self).toBeNull()
+  expect(publicSyncTo('watcher').resync).toBeUndefined()
+  expect(transports[0].authenticate).toHaveBeenCalledWith('watcher')
+  act(() =>
+    transports[0].receive({
+      type: 'CHAT_SEND',
+      payload: { text: 'Watching!' },
+      from: 'watcher',
+      seq: 101,
+    }),
+  )
+  expect(result.current.chat.entries.at(-1)).toMatchObject({
+    kind: 'message',
+    text: 'Watching!',
+    author: { role: 'spectator' },
+  })
+})
+
+it('sends GAME_STARTING before public catch-up on a late join', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.startGame([])
+    joinWatcher()
+  })
+  const types = typesSentTo('watcher')
+  expect(types).toEqual(
+    expect.arrayContaining(['PEER_LIST', 'CHAT_HISTORY', 'GAME_STARTING', 'SYNC']),
+  )
+  expect(types.indexOf('GAME_STARTING')).toBeLessThan(types.indexOf('SYNC'))
+  expect(publicSyncTo('watcher').resync).toBe(true)
+  expect(publicSyncTo('watcher').view.self).toBeNull()
+})
+
+it('denies a full watcher quota before changing roster or chat membership', async () => {
+  const { result } = await hostWithGuest()
+  act(() => result.current.setMaxSpectators(0))
+  const entries = result.current.chat.entries
+  const members = readChat(result.current.roomCode ?? '')?.members
+  act(() => joinWatcher())
+  expect(result.current.state?.peers.watcher).toBeUndefined()
+  expect(result.current.chat.entries).toEqual(entries)
+  expect(readChat(result.current.roomCode ?? '')?.members).toEqual(members)
+  expect(transports[0].disconnectPeer).toHaveBeenCalledWith('watcher', {
+    type: 'JOIN_REJECTED',
+    payload: { reason: 'room-full', availability: { player: true, spectator: false } },
+  })
+})
+
+it('replaces a live watcher at full quota without duplicating chat identity or subscription', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    result.current.setMaxSpectators(1)
+    joinWatcher()
+    result.current.startGame([])
+  })
+  const member = result.current.state?.peers.watcher.memberId
+  act(() => joinWatcher('replacement'))
+  expect(result.current.state?.peers.watcher).toBeUndefined()
+  expect(result.current.state?.peers.replacement.memberId).toBe(member)
+  expect(transports[0].disconnectPeer).toHaveBeenCalledWith(
+    'watcher',
+    expect.objectContaining({ type: 'PLAYER_KICKED' }),
+  )
+  expect(publicSyncTo('replacement').view.self).toBeNull()
+  act(() => transports[0].onDisconnect?.('watcher'))
+  expect(result.current.state?.peers.replacement).toBeDefined()
+})
+
+it('does not deliver watcher actions or spoofed previews and stops fanout after kick', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    joinWatcher()
+    result.current.startGame([])
+  })
+  const snapshot = result.current.gameSync
+  transports[0].relay.mockClear()
+  act(() => {
+    transports[0].receive({
+      type: 'INTENT',
+      payload: { intent: { type: 'DRAW' } },
+      from: 'watcher',
+      seq: 101,
+    })
+    transports[0].receive({
+      type: 'INTRO_READY',
+      payload: { gameId: result.current.gameId ?? '' },
+      from: 'watcher',
+      seq: 102,
+    })
+    transports[0].receive({ type: 'PLAYER_READY', payload: {}, from: 'watcher', seq: 103 })
+    transports[0].receive({
+      type: 'PICK_PREVIEW',
+      payload: { gameId: result.current.gameId ?? '', player: 'p1', card: 'private' },
+      from: 'watcher',
+      seq: 104,
+    })
+  })
+  expect(result.current.gameSync).toBe(snapshot)
+  expect(result.current.pickPreview).toBeNull()
+  expect(transports[0].relay).not.toHaveBeenCalled()
+  act(() => result.current.kick('watcher'))
+  const before = sentTo('watcher').length
+  act(() => {
+    result.current.introReady()
+    transports[0].receive({
+      type: 'INTRO_READY',
+      payload: { gameId: result.current.gameId ?? '' },
+      from: GUEST,
+      seq: 105,
+    })
+    result.current.gameLink?.submit({ type: 'DRAW' })
+    transports[0].onDisconnect?.('watcher')
+  })
+  expect(sentTo('watcher')).toHaveLength(before)
+  expect(
+    systemEvents(result.current).filter((event) => event.kind === 'memberKicked'),
+  ).toHaveLength(1)
+})
+
+it('keeps a returning watcher in the lobby for the old game and follows the next game', async () => {
+  const { result } = await hostWithGuest()
+  act(() => {
+    joinWatcher()
+    result.current.startGame([])
+  })
+  const oldGame = result.current.gameId
+  act(() => {
+    transports[0].receive({
+      type: 'WHEREABOUTS',
+      payload: { where: 'lobby' },
+      from: 'watcher',
+      seq: 101,
+    })
+    transports[0].onDisconnect?.('watcher')
+    joinWatcher('returned-watcher', 'watcher-token', { where: 'lobby', lastGameId: oldGame })
+  })
+  expect(typesSentTo('returned-watcher')).not.toContain('GAME_STARTING')
+  expect(typesSentTo('returned-watcher')).not.toContain('SYNC')
+  act(() => {
+    result.current.leaveGame()
+    result.current.startGame([])
+  })
+  expect(result.current.gameId).not.toBe(oldGame)
+  expect(publicSyncTo('returned-watcher').view.self).toBeNull()
+})
+
+it('exposes moderation errors and persists the spectator limit in room and keeper settings', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    act(() => {
+      result.current.setMaxSpectators(1)
+      result.current.setParticipantRole(GUEST, 'spectator')
+    })
+    expect(result.current.state?.peers[GUEST]).toMatchObject({ role: 'guest', ready: false })
+    act(() => result.current.setMaxSpectators(0))
+    expect(result.current.lobbyActionError).toBe('spectators-full')
+    expect(readSession()?.lobbyConfig?.maxSpectators).toBe(1)
+    act(() => {
+      result.current.setParticipantRole(GUEST, 'player')
+      result.current.startGame([])
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+    expect(readKeeper()?.lobbyConfig?.maxSpectators).toBe(1)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('treats room-full as terminal and ignores the retired dial callbacks', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('ABC-23D', 'Watcher', 'spectator'))
+  const dial = transports[0]
+  act(() => {
+    dial.onConnection?.('abc23d')
+    dial.onMessage?.({
+      type: 'JOIN_REJECTED',
+      from: 'abc23d',
+      seq: 1,
+      payload: { reason: 'room-full', availability: { player: true, spectator: false } },
+    })
+    dial.onDisconnect?.('abc23d')
+    dial.onConnection?.('abc23d')
+  })
+  expect(result.current.status).toBe('error')
+  expect(result.current.errorKind).toBe('room-full')
+  expect(result.current.joinAvailability).toEqual({ player: true, spectator: false })
+  expect(readSession()).toBeNull()
+  expect(transports).toHaveLength(1)
+})
+
+it('stops reconnecting a full spectator room until Retry and preserves the role and token', async () => {
+  vi.useFakeTimers()
+  try {
+    writeSession({
+      roomCode: 'ABC-23D',
+      name: 'Watcher',
+      role: 'guest',
+      participantRole: 'spectator',
+      where: 'stats',
+      gameId: 'g1',
+      joinedAt: Date.now(),
+    })
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    const hostId = 'abc23d'
+    await act(async () => {
+      transports[0].onConnection?.(hostId)
+      transports[0].onMessage?.({
+        type: 'JOIN_REJECTED',
+        from: hostId,
+        seq: 1,
+        payload: { reason: 'room-full', availability: { player: false, spectator: false } },
+      })
+      await Promise.resolve()
+    })
+    const first = sentTo(hostId).find((message) => message.type === 'JOIN_REQUEST')
+    expect(result.current.errorKind).toBe('room-full')
+    expect(result.current.reconnect.status).toBe('failed')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000)
+    })
+    expect(transports).toHaveLength(1)
+    await act(async () => {
+      result.current.reconnect.retry()
+      await Promise.resolve()
+    })
+    act(() => transports[1].onConnection?.(hostId))
+    const retry = transports[1].send.mock.calls.find(
+      ([, message]) => message.type === 'JOIN_REQUEST',
+    )?.[1]
+    expect(retry.payload).toEqual(first?.payload)
+    expect(retry.payload.requestedRole).toBe('spectator')
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('restores the host spectator limit and does not revive persisted observer addresses', async () => {
+  storedHostSession('g1')
+  storedKeeperSnapshot('peer0', 'g1', {
+    lobbyConfig: { maxPlayers: 4, maxSpectators: 0, setup: {} },
+  })
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(result.current.state?.maxSpectators).toBe(0)
+  act(() => joinWatcher())
+  expect(result.current.state?.peers.watcher).toBeUndefined()
+  expect(typesSentTo('watcher')).toEqual(['JOIN_REJECTED'])
+})
+
+it('captures a public snapshot before a board subscribes and persists returning to the lobby', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('ABC-23D', 'Watcher', 'spectator'))
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 17,
+    players: [
+      { id: 'a', name: 'Ann' },
+      { id: 'b', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  act(() => {
+    acceptGuest(transports[0], 'abc23d')
+    transports[0].onMessage?.({
+      type: 'PEER_JOINED',
+      from: 'abc23d',
+      seq: 2,
+      payload: {
+        id: 'peer0',
+        memberId: 'watcher',
+        name: 'Watcher',
+        role: 'guest',
+        ready: false,
+        where: 'game',
+      },
+    })
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      from: 'abc23d',
+      seq: 3,
+      payload: { gameId: 'g1', seats: SEATING },
+    })
+    transports[0].onMessage?.({
+      type: 'SYNC',
+      from: 'abc23d',
+      seq: 4,
+      payload: { view: engine.spectate(state), events: [], resync: true },
+    })
+  })
+  expect(result.current.gameSync?.view.self).toBeNull()
+  expect(result.current.gameId).toBe('g1')
+  transports[0].send.mockClear()
+  act(() => {
+    result.current.introReady()
+    result.current.previewPick('p1', 'private')
+  })
+  expect(transports[0].send).not.toHaveBeenCalled()
+  act(() => result.current.leaveGame())
+  expect(readSession()).toMatchObject({
+    participantRole: 'spectator',
+    where: 'lobby',
+    gameId: null,
+    lastGameId: 'g1',
+  })
+  expect(sentTo('abc23d')).toContainEqual({ type: 'WHEREABOUTS', payload: { where: 'lobby' } })
+})
+
+it('ignores host moderation invoked through a guest API', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('ABC-23D', 'Watcher', 'spectator'))
+  act(() => acceptGuest(transports[0], 'abc23d'))
+  const before = result.current.state
+  act(() => {
+    result.current.setMaxSpectators(0)
+    result.current.setParticipantRole('peer0', 'spectator')
+  })
+  expect(result.current.state).toBe(before)
+  expect(transports[0].broadcast).not.toHaveBeenCalled()
 })

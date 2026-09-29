@@ -186,7 +186,11 @@ export function rebind(
   const seats = session.seats.map((s) =>
     s.playerId === playerId ? { ...s, peerId, absentSince: null } : s,
   )
-  const next: Session = { ...session, seats }
+  const next: Session = {
+    ...session,
+    seats,
+    spectators: session.spectators.filter((id) => id !== peerId),
+  }
 
   // A turn deadline that expired while this seat was EMPTY was deferred, not
   // spent: `tick` refuses to fire a deadline against a seat with nobody in it,

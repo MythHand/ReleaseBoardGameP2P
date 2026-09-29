@@ -8,6 +8,7 @@ import {
   applyIntent,
   createSession,
   disconnect,
+  rebind,
   syncAll,
   unwatch,
   watch,
@@ -157,4 +158,15 @@ it('fans out bot changes to watchers through the same public stream', () => {
         frame.message.payload.view.self === null,
     ),
   ).toBe(true)
+})
+
+it('removes the public subscription when an observer authenticates its returning seat', () => {
+  const session = disconnect(game(), 'player', 100).session
+  const observing = watch(session, 'returned').session
+  const seated = rebind(observing, 'b', 'returned', 200).session
+  expect(seated.spectators).toEqual([])
+  const frames = syncAll(seated, [])
+  expect(frames.filter((entry) => entry.to === 'returned')).toHaveLength(1)
+  const frame = frames.find((entry) => entry.to === 'returned')?.message
+  expect(frame?.type === 'SYNC' && frame.payload.view.self?.id).toBe('b')
 })
