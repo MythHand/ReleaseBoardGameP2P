@@ -1,6 +1,6 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
-import { DEFAULT_SETUP, isCounting, Message, ToastStack } from '@release/ui'
+import { isCounting, Message, Reconnect, ToastStack } from '@release/ui'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
@@ -11,24 +11,6 @@ import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
 import Board from './_Board'
 import styles from './index.module.css'
-
-// What the table shows before the first projection arrives — a beat on a live
-// connection, indefinitely for a spectator, who holds no seat to be projected
-// to. Empty rather than fake: an invented hand would be a lie the player could
-// click on.
-const EMPTY_TABLE = {
-  you: { name: '', hand: [], release: {} },
-  opponents: [],
-  decks: { main: [], events: 0, discard: null, discardCount: 0 },
-  turn: undefined,
-  hasDrawn: false,
-  selfId: '',
-  history: [],
-  setup: DEFAULT_SETUP,
-  playable: [],
-  frozen: [],
-  targets: {},
-}
 
 export default function BoardPage() {
   // All Table copy comes from the central catalog via i18next — one namespace per
@@ -89,16 +71,6 @@ export default function BoardPage() {
 
   const spectators = Object.values(peerMap).filter((p) => p.role === 'guest')
 
-  // Whether this peer holds a seat — asked about ourselves the same way a
-  // participant is identified above. Only a seated peer is ever projected to,
-  // so only a seated peer gets the opening: a spectator's `game.view` is null
-  // for the whole match, the intro could never report done, and the board
-  // would sit behind its entering state (every block at opacity 0) for good.
-  // The question has to be asked HERE and not inside the board off `view`: a
-  // seated peer's first frame has no projection either, and unhiding on that
-  // would flash the table open and shut at every real game start.
-  const seated = participants.some((p) => p.id === session.state?.selfId)
-
   // `toTableOver` renames the engine's `over.winner` — a playerId minted as
   // p1..pN (see ~/entities/game/seats) — but Table.tsx resolves `over.winnerId`
   // against `room.participants`, which are peers keyed by *peer* id. PlayerId
@@ -124,13 +96,13 @@ export default function BoardPage() {
   // (the draw badge, the elimination suffix), `historyLabels` is one label per
   // member of the engine's Event union for the adapter to map onto.
   const labels = t('historyLabels', { returnObjects: true }) as Record<Event['type'], string>
-  const state = game.view ? toBoardState(game.view, game.events, labels) : EMPTY_TABLE
+  const state = game.view ? toBoardState(game.view, game.events, labels) : null
 
   // The clock runs only while the dock actually draws a counting ring, so it is
   // asked from the same predicate the ring is derived from. Restating that rule
   // here would let the two drift, and the countdown would freeze for whichever
   // state they stopped agreeing about.
-  const now = useNow(isCounting(state, state.selfId))
+  const now = useNow(state ? isCounting(state, state.selfId) : false)
   const notificationEntryIds = new Set(chat.notificationEntryIds)
   const toastItems = chat.messages
     .filter((message) =>
@@ -153,6 +125,26 @@ export default function BoardPage() {
       ),
     }))
 
+  if (!state)
+    return (
+      <div className={styles.page} data-testid="board-page" aria-busy="true">
+        {(session.restoring || session.reconnect.status !== 'idle') && (
+          <Reconnect
+            copy={t('reconnect', { returnObjects: true })}
+            host={session.roomCode ?? ''}
+            attempt={session.reconnect.attempt}
+            maxAttempts={session.reconnect.maxAttempts}
+            status={session.reconnect.status === 'failed' ? 'failed' : 'trying'}
+            onRetry={session.reconnect.retry}
+            onLeave={() => {
+              session.leaveSession()
+              void navigate('/start')
+            }}
+          />
+        )}
+      </div>
+    )
+
   return (
     <div className={styles.page} data-testid="board-page">
       <Board
@@ -161,20 +153,16 @@ export default function BoardPage() {
         now={now}
         panel={panel}
         onPanelChange={setPanel}
-        // The opening — for a seated peer only (see `seated` above). `onDone`
-        // reports this seat to the host's start gate: until every seat has
-        // reported (or the cap fires), no peer's action may reach the engine.
-        intro={
-          seated
-            ? {
-                gameId: session.gameId,
-                view: game.view,
-                events: game.events,
-                restoredThrough: game.restoredThrough,
-                onDone: session.introReady,
-              }
-            : undefined
-        }
+        playback={{ events: game.events, restoredThrough: game.restoredThrough }}
+        intro={{
+          gameId: session.gameId,
+          view: game.view,
+          events: game.events,
+          restoredThrough: game.restoredThrough,
+          onDone: () => {
+            if (game.view?.self) session.introReady()
+          },
+        }}
         // A pick another seat is offering but has not confirmed — it belongs to
         // the session, not to the game: the engine is told nothing until the
         // answer is submitted. Scoped to THIS match, so a frame that outlived
@@ -184,7 +172,9 @@ export default function BoardPage() {
             ? { player: session.pickPreview.player, card: session.pickPreview.card }
             : null
         }
-        onPickPreview={(card) => session.previewPick(state.selfId, card)}
+        onPickPreview={(card) => {
+          if (state.selfId !== null) session.previewPick(state.selfId, card)
+        }}
         room={{
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,

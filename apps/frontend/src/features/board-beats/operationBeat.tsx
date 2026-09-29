@@ -238,9 +238,10 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       const used = new Set<number>()
       const flown: DiscardCard[] = ids.flatMap((card, i) => {
         const uid = i === 0 ? handoff?.mainUid : handoff?.supportUid
-        const index = ctx.base.you.hand.findIndex(
-          (h, j) => !used.has(j) && (uid ? h.uid === uid : h.card.id === card),
-        )
+        const index =
+          ctx.base.you?.hand.findIndex(
+            (h, j) => !used.has(j) && (uid ? h.uid === uid : h.card.id === card),
+          ) ?? -1
         if (mine && index < 0) return []
         used.add(index)
         return [

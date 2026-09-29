@@ -84,6 +84,7 @@ export interface TurnDockCopy {
 }
 
 interface TurnDockProps {
+  spectatorLabel?: string
   state: TurnDockState
   // seconds left on the clock — the ticking number reads as the timer. Omitted
   // when the state has no deadline, which leaves a bare ring: a rendered `0`
@@ -177,6 +178,7 @@ function accentFor(state: TurnDockState, danger: boolean): string {
 
 export default function TurnDock({
   state,
+  spectatorLabel,
   seconds,
   progress,
   copy,
@@ -256,6 +258,7 @@ export default function TurnDock({
     <HudSurface accent={accent} className={`${styles.dock} ${paused ? styles.paused : ''}`}>
       <div className={styles.inner}>
         <div className={styles.top}>
+          {spectatorLabel && <Badge tone="muted">{spectatorLabel}</Badge>}
           <StatusDot accent={accent} pulse={state !== 'waiting'} />
           <Swap
             token={phase}

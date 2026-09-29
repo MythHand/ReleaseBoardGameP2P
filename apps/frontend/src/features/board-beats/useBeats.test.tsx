@@ -4,7 +4,7 @@ import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
 import { act, fireEvent, render } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { BoardAnchors, BoardState, IntroBeat } from '~/entities/game/board'
+import type { BoardAnchors, BoardState, IntroBeat, PlayerBoardState } from '~/entities/game/board'
 import { ELIM_DELAY } from './eliminateBeat'
 import { useBeats } from './useBeats'
 
@@ -87,7 +87,7 @@ const preDiscard = {
   setup: {},
   playable: [],
   frozen: [],
-} as unknown as BoardState
+} as unknown as PlayerBoardState
 
 // …and after: the card is gone from the hand and counted in the discard. The
 // beat's last frame has to equal THIS.
@@ -95,7 +95,7 @@ const afterDiscard = {
   ...preDiscard,
   you: { ...preDiscard.you, hand: [] },
   decks: { ...preDiscard.decks, discardCount: 1 },
-} as unknown as BoardState
+} as unknown as PlayerBoardState
 
 const discardEvent = {
   id: 4,
@@ -146,7 +146,7 @@ const preDeal = {
   ...preDiscard,
   you: { ...preDiscard.you, hand: [] },
   decks: { ...preDiscard.decks, main: [40] },
-} as unknown as BoardState
+} as unknown as PlayerBoardState
 
 function Probe({
   live,
@@ -188,10 +188,10 @@ function Probe({
           state is showing. This is what `handSlotAt` queries, so a queue that
           measures before the shadow commits finds nothing here and the flight
           is dropped, which is precisely the failure worth catching. */}
-      {shown.you.hand.map((c) => (
+      {shown.you?.hand.map((c) => (
         <div key={c.uid} data-hand-slot />
       ))}
-      <div data-testid="hand">{shown.you.hand.length}</div>
+      <div data-testid="hand">{shown.you?.hand.length}</div>
       <div data-testid="turn">{shown.turn}</div>
       {/* The deck tells the three states apart where the hand cannot: preDeal
           and afterDiscard both have an empty fan, and only the deck count says
@@ -309,7 +309,7 @@ const splitEvent = { id: 3, type: 'pilesChanged', piles: [4, 6] } as Event
 const afterBatch = {
   ...afterDiscard,
   decks: { ...afterDiscard.decks, main: [4, 6] },
-} as unknown as BoardState
+} as unknown as PlayerBoardState
 
 // A batch is planned in one pass against one projection, so every beat of it is
 // handed the same base. That is right for the FIRST beat and wrong for every
@@ -665,7 +665,7 @@ const sweptEvent = {
 const afterSweep = {
   ...preDiscard,
   decks: { ...preDiscard.decks, discardCount: 1 },
-} as unknown as BoardState
+} as unknown as PlayerBoardState
 
 it('lights the alarm while a gathered sweep runs, and drops it when the queue drains', async () => {
   motion.reduced = false
@@ -817,15 +817,16 @@ it.each([
 it.each([
   { condition: 'release', selfId: 'p2', role: 'losing player' },
   { condition: 'lastStanding', selfId: 'p2', role: 'losing player' },
-  { condition: 'release', selfId: 'observer', role: 'observer' },
-  { condition: 'lastStanding', selfId: 'observer', role: 'observer' },
+  { condition: 'release', selfId: null, role: 'observer' },
+  { condition: 'lastStanding', selfId: null, role: 'observer' },
 ] as const)('does not celebrate a $condition win on the $role board', async ({
   condition,
   selfId,
 }) => {
   vi.useFakeTimers()
   motion.reduced = false
-  const live = { ...preDiscard, selfId }
+  const live =
+    selfId === null ? { ...preDiscard, selfId: null, you: null } : { ...preDiscard, selfId }
   const event = { id: 99, type: 'gameOver', winner: 'p1', condition } as Event
   const { container, getByTestId, rerender } = render(
     <Probe live={live} events={[]} anchors={stub} />,

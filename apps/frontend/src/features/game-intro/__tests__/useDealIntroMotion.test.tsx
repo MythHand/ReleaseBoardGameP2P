@@ -136,8 +136,8 @@ it('opens on the pre-deal table and keeps the gate shut', () => {
   // The table as it stood BEFORE the deal: the whole base pile (what is left
   // plus the four that went out), nobody holding anything, no release zone yet.
   expect(shadow?.decks.main).toEqual([104])
-  expect(shadow?.you.hand).toEqual([])
-  expect(shadow?.you.release).toEqual({})
+  expect(shadow?.you?.hand).toEqual([])
+  expect(shadow?.you?.release).toEqual({})
   expect(shadow?.opponents[0].handCount).toBe(0)
   expect(shadow?.introPhase).toBe('setup')
   expect(onDone).not.toHaveBeenCalled()
@@ -222,4 +222,64 @@ it('collapses on a skip, reporting once', () => {
     result.current.finish()
   })
   expect(onDone).toHaveBeenCalledTimes(1)
+})
+
+it('keeps a public opening free of any private hand or zone', () => {
+  const seated = view()
+  const observer = {
+    ...seated,
+    self: null,
+    opponents: [
+      { id: seated.self.id, name: seated.self.name, handCount: 2, release: {}, eliminated: false },
+      ...seated.opponents,
+    ],
+  }
+  const table = {
+    ...live(),
+    selfId: null,
+    you: null,
+    opponents: observer.opponents.map((seat) => ({ ...seat, release: {} })),
+  }
+  const onDone = vi.fn()
+  const { result, unmount } = renderHook(() =>
+    useDealIntro({
+      live: table,
+      gameId: 'public',
+      view: observer,
+      events: events(),
+      refs: refs(),
+      onDone,
+    }),
+  )
+  act(() => {
+    void result.current.beat?.run({ base: table, publish: () => {} })
+  })
+  expect(result.current.active).toBe(true)
+  expect(result.current.shadow?.you).toBeNull()
+  expect(result.current.shadow?.selfId).toBeNull()
+  expect(result.current.shadow?.opponents.map((seat) => seat.handCount)).toEqual([0, 0])
+  unmount()
+})
+
+it('skips the opening on a catch-up even if nobody has played yet', () => {
+  const { result, unmount } = renderHook(() =>
+    useDealIntro({
+      live: live(),
+      gameId: 'restored',
+      view: view(),
+      events: events(),
+      refs: refs(),
+      restoredThrough: 2,
+      onDone: vi.fn(),
+    }),
+  )
+  act(() => {
+    void result.current.beat?.run(noopCtx())
+  })
+  try {
+    expect(result.current.active).toBe(false)
+    expect(result.current.shadow).toBeNull()
+  } finally {
+    unmount()
+  }
 })

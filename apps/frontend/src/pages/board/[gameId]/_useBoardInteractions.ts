@@ -28,7 +28,7 @@ export interface Options {
 export function useBoardInteractions({ state, actions }: Options) {
   const onCardClick = useCallback(
     (uid: string) => {
-      const item = state.you.hand.find((c) => c.uid === uid)
+      const item = state.you?.hand.find((c) => c.uid === uid)
       if (!item) return
 
       // The window's attack affordance reuses the hand: gated by
@@ -45,7 +45,7 @@ export function useBoardInteractions({ state, actions }: Options) {
       if ((state.targets?.[item.uid] ?? []).length > 0) return
       actions?.onPlay?.(item.uid, undefined, undefined)
     },
-    [state.you.hand, state.playable, state.window, state.targets, actions],
+    [state.you?.hand, state.playable, state.window, state.targets, actions],
   )
 
   return { onCardClick }

@@ -106,7 +106,9 @@ export function useComboBeat(
       // By id, first match — two copies of one card in hand fold from the
       // FIRST slot (the same simplification `sourceOf` makes). Invisible on
       // screen; noted so it is not rediscovered as a bug.
-      const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === cardId) : -1
+      const handIndex = mine
+        ? (ctx.base.you?.hand.findIndex((h) => h.card.id === cardId) ?? -1)
+        : -1
       const fromRect =
         (mine && handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ?? a.seatBox(actor)
       if (!fromRect) return null
@@ -262,7 +264,7 @@ export function useComboBeat(
         await wait(SHOW_HOLD)
         // Hand back the staged node and remove the spent instances from the
         // shadow in the same commit as the discard carrier takes over.
-        if (mine) {
+        if (mine && ctx.base.you) {
           const hand = [...ctx.base.you.hand]
           for (const spent of plan.spent) {
             const uid = spent.card === plan.card ? handoff?.mainUid : handoff?.supportUid

@@ -54,7 +54,21 @@ vi.mock('~/app/providers/SessionProvider', () => ({
 }))
 
 function session(peers: Record<string, unknown> = {}): UseLobby {
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 1,
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+    players: [
+      { id: 'p1', name: 'One' },
+      { id: 'p2', name: 'Two' },
+    ],
+  })
   return {
+    gameId: 'g1',
+    gameSync: { view: engine.spectate(state), events: [], resync: true },
     state: { selfId: 'me', hostId: 'me', maxPlayers: 6, setup: {}, peers },
     status: 'in-lobby',
     roomCode: 'YTG-N2Q',
@@ -69,6 +83,7 @@ function session(peers: Record<string, unknown> = {}): UseLobby {
     restoring: false,
     reconnect: { attempt: 0, maxAttempts: 5, status: 'idle', events: [], retry: vi.fn() },
     kick: vi.fn(),
+    introReady: vi.fn(),
     setWhere: vi.fn(),
     leaveGame: vi.fn(),
   } as unknown as UseLobby
@@ -162,10 +177,8 @@ it('shows a spectator the live table, not a board held hidden', async () => {
   })
   const { container } = renderBoard()
   await screen.findByTestId('board-page')
-  // A spectator holds no seat, so the keeper never projects to them and
-  // `game.view` stays null for good — an intro armed here could never report
-  // done, and every block it hides (`.enter`, opacity 0) would stay hidden for
-  // the whole match. So the opening is not armed for them at all.
+  // A public sync unlocks the table; the observer owns no local hand.
+  expect(screen.queryByTestId('board-you')).toBeNull()
   expect(container.querySelectorAll(`.${boardStyles.enter}`)).toHaveLength(0)
 })
 

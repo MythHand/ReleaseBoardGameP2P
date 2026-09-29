@@ -6,7 +6,7 @@
 // two will drift, and contract.test-d.ts is what makes the drift a compile
 // error instead of a misrender.
 
-import type { Event, PlayerView } from '@release/engine'
+import type { Event, GameView } from '@release/engine'
 import type {
   CardData,
   DockView,
@@ -57,7 +57,7 @@ export interface BoardOpponent {
 
 // Everything the engine's projection can answer. Assembled by the consumer's
 // adapter; nothing here is room- or session-shaped.
-export interface BoardState {
+interface BoardPayload {
   // Visual ownership only: an answered attack waits for its discard beat.
   centreAttack?: { card: string; sudo: boolean }
   // …and the defence lying over it, when a Works on my Machine turned the hit
@@ -65,27 +65,7 @@ export interface BoardState {
   // survive the moment the board lets go of the pending.
   centreCover?: { card: string; sudo: boolean }
   aiCause?: { card: string; eventId: number }
-  you: {
-    name: string
-    hand: HandItem[]
-    release: ReleaseSlots
-    releaseId?: Partial<Record<keyof ReleaseSlots, string>>
-    // A played Code Review lying under the release it protects.
-    support?: ReleaseSupport
-    eliminated?: boolean
-    // The uid of whatever stands in each slot. The kit's `ReleaseSlots` carries
-    // card DATA and no identity — it is domain-free by design — but a choice
-    // the engine has to act on names a uid (`neutralize503`'s sacrifice), so
-    // the adapter keeps them here rather than widening the kit's own type.
-    releaseUid?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
-    // Which of this player's release slots is a standing AI card wearing an
-    // ordinary id (`release-<slot>`), keyed to the events-deck id it actually
-    // goes home as. Same reasoning as `releaseUid`: the kit's `ReleaseSlots` is
-    // domain-free and has no member for it, so the adapter keeps it beside the
-    // slot rather than widening the kit's own type. Absent slot means an
-    // ordinary card.
-    releaseEvent?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
-  }
+
   opponents: BoardOpponent[]
   decks: {
     // One entry per draw pile, in the engine's own pile order — Git Branch
@@ -110,7 +90,6 @@ export interface BoardState {
   // first turn's clock.
   turnClock?: { openedAt: number; deadline: number } | null
   // the local player's id, as the projection names it (`PlayerView.self.id`)
-  selfId: string
   history: HistoryEntry[]
   setup: Setup
   playable: string[]
@@ -128,6 +107,35 @@ export interface BoardState {
   // phase; during the intro that state is the intro's shadow of the projection,
   // and this names which phase produced it. Absent means the live projection.
   introPhase?: 'setup' | 'dealing' | 'settling'
+}
+
+export interface PlayerHud {
+  name: string
+  hand: HandItem[]
+  release: ReleaseSlots
+  releaseId?: Partial<Record<keyof ReleaseSlots, string>>
+  // A played Code Review lying under the release it protects.
+  support?: ReleaseSupport
+  eliminated?: boolean
+  // The uid of whatever stands in each slot. The kit's `ReleaseSlots` carries
+  // card DATA and no identity — it is domain-free by design — but a choice
+  // the engine has to act on names a uid (`neutralize503`'s sacrifice), so
+  // the adapter keeps them here rather than widening the kit's own type.
+  releaseUid?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
+  // Which of this player's release slots is a standing AI card wearing an
+  // ordinary id (`release-<slot>`), keyed to the events-deck id it actually
+  // goes home as. Same reasoning as `releaseUid`: the kit's `ReleaseSlots` is
+  // domain-free and has no member for it, so the adapter keeps it beside the
+  // slot rather than widening the kit's own type. Absent slot means an
+  // ordinary card.
+  releaseEvent?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
+}
+
+export type PlayerBoardState = BoardPayload & { selfId: string; you: PlayerHud }
+export type SpectatorBoardState = BoardPayload & { selfId: null; you: null }
+export type BoardState = PlayerBoardState | SpectatorBoardState
+export function isPlayerBoard(state: BoardState): state is PlayerBoardState {
+  return state.selfId !== null
 }
 
 // Everything the session/P2P layer answers. The engine has no concept of a
@@ -362,6 +370,7 @@ export interface BoardOver {
 
 export interface BoardProps {
   state: BoardState
+  playback?: { events: Event[]; restoredThrough: number }
   room: BoardRoom
   copy: BoardCopyBundle
   slots?: BoardSlots
@@ -396,7 +405,7 @@ export interface BoardProps {
     // Which match this is, so the opening plays once per game rather than once
     // per peer — a PlayerView carries no game identity, and the route does.
     gameId: string | null
-    view: PlayerView | null
+    view: GameView | null
     events: Event[]
     // The highest event id already reflected in the projection this peer
     // started from (`Game.restoredThrough`) — everything up to it was restored,

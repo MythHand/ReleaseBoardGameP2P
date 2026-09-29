@@ -1,4 +1,4 @@
-import type { Choice, Event, PlayerView, Target } from '@release/engine'
+import type { Choice, Event, GameView, Target } from '@release/engine'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import type { Intent } from '~/network'
@@ -6,9 +6,8 @@ import { clearLog, readLog, writeLog } from '~/shared/lib/persistence'
 import { mergeEvents } from './mergeEvents'
 
 export interface Game {
-  // Null before the first projection arrives, and for a spectator, who holds no
-  // seat to be projected to.
-  view: PlayerView | null
+  // Null until the first private or public projection arrives.
+  view: GameView | null
   events: Event[]
   // The highest event id already reflected in the projection this peer starts
   // from — everything up to it was restored, not played, so the animation
@@ -153,7 +152,7 @@ export function useGame(): Game {
     pending.length > 0 && sync?.resync ? (pending.at(-1)?.id ?? restoredBase) : restoredBase
 
   return {
-    view: sync?.view.self ? sync.view : null,
+    view: sync?.view ?? null,
     events: pending.length > 0 ? mergeEvents(carried, pending) : carried,
     restoredThrough: restoredNow,
     play: (card, target, combo) => submit({ type: 'PLAY', card, target, combo }),

@@ -30,13 +30,7 @@ export interface TableOpponent {
 
 // Everything the engine's projection can answer. Assembled by the consumer's
 // adapter; nothing here is room- or session-shaped.
-export interface TableState {
-  you: {
-    name: string
-    hand: HandItem[]
-    release: ReleaseSlots
-    eliminated?: boolean
-  }
+interface TablePayload {
   opponents: TableOpponent[]
   decks: {
     // One entry per draw pile, in the engine's own pile order — Git Branch
@@ -61,7 +55,6 @@ export interface TableState {
   // first turn's clock.
   turnClock?: { openedAt: number; deadline: number } | null
   // the local player's id, as the projection names it (`PlayerView.self.id`)
-  selfId: string
   history: HistoryEntry[]
   setup: Setup
   playable: string[]
@@ -71,6 +64,20 @@ export interface TableState {
   // Keyed by card uid — the projection's answer to "what may pair with this",
   // so the kit looks the pairing up rather than deciding it.
   comboOptions?: Record<string, string[]>
+}
+
+export interface PlayerHud {
+  name: string
+  hand: HandItem[]
+  release: ReleaseSlots
+  eliminated?: boolean
+}
+
+export type PlayerTableState = TablePayload & { selfId: string; you: PlayerHud }
+export type SpectatorTableState = TablePayload & { selfId: null; you: null }
+export type TableState = PlayerTableState | SpectatorTableState
+export function isPlayerTable(state: TableState): state is PlayerTableState {
+  return state.selfId !== null
 }
 
 // Everything the session/P2P layer answers. The engine has no concept of a

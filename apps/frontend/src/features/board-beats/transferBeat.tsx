@@ -435,7 +435,7 @@ export function useTransferBeat(
             await latest.current.land(c, { card, from: at, fallbackKey: `t${plan.eventId}` })
           return
         }
-        if (plan.role === 'victim') {
+        if (plan.role === 'victim' && beat.base.you) {
           const a = latest.current.anchors
           const centre = rectOf(
             centreAttackOf(beat.base) ? (a.cost?.current ?? a.centre.current) : a.centre.current,
@@ -465,7 +465,7 @@ export function useTransferBeat(
           // leg marks separately, folded here into a publish this leg already
           // makes).
           const c0 = ctx.current
-          if (c0) {
+          if (c0?.base.you) {
             const hand = c0.base.you.hand.filter((_, i) => i !== index)
             const next = {
               ...c0.base,
