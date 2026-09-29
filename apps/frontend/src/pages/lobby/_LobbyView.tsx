@@ -58,7 +58,7 @@ export default function LobbyView() {
   // me, when I hold a seat — a spectator has no readiness to give
   const me = players.find((p) => p.id === state.selfId)
   const capacity = state.maxPlayers
-  const minCapacity = Math.max(2, players.length)
+  const minCapacity = 2
   // What the table can actually give right now — capped by the free seats — as
   // distinct from `state.bots`, the raw number the host asked for. They differ
   // whenever people fill or leave seats.
@@ -119,11 +119,30 @@ export default function LobbyView() {
     )
   }
 
-  // Kick is the only moderation action the protocol backs today — role changes
-  // (make spectator/player) have no wire message, so the menu carries just this.
-  const kickItems = (id: string) => [
-    { label: t('lobbyScreen.kick'), danger: true, onClick: () => session.kick(id) },
-  ]
+  const moderationItems = (peer: PeerInfo) => {
+    const toSpectator = peer.role !== 'guest'
+    const full = toSpectator
+      ? spectators.length >= state.maxSpectators
+      : players.length >= state.maxPlayers
+    const running = session.gameId !== null
+    return [
+      {
+        label: t(toSpectator ? 'lobbyScreen.makeSpectator' : 'lobbyScreen.makePlayer'),
+        disabled: full || running || peer.where !== 'lobby',
+        hint: t(
+          running
+            ? 'lobbyScreen.errors.match-running'
+            : full
+              ? toSpectator
+                ? 'lobbyScreen.errors.spectators-full'
+                : 'lobbyScreen.errors.players-full'
+              : 'lobbyScreen.errors.invalid-target',
+        ),
+        onClick: () => session.setParticipantRole(peer.id, toSpectator ? 'spectator' : 'player'),
+      },
+      { label: t('lobbyScreen.kick'), danger: true, onClick: () => session.kick(peer.id) },
+    ]
+  }
 
   return (
     <div className={styles.lobby}>
@@ -233,7 +252,7 @@ export default function LobbyView() {
                     }
                     status={renderStatus(p)}
                     dropdownLabel={t('lobbyScreen.actions')}
-                    dropdown={isHost && p.id !== state.selfId ? kickItems(p.id) : undefined}
+                    dropdown={isHost && p.id !== state.selfId ? moderationItems(p) : undefined}
                   />
                 ) : bot ? (
                   // Removal goes through the same ⋯ menu that kicks a person, and
@@ -276,9 +295,25 @@ export default function LobbyView() {
             <Typography variant="sectionTitle" className={`${styles.h} ${styles.hSpectators}`}>
               {t('lobbyScreen.spectators')}
               <Typography base="mono-md" tk="tk-10" as="span" className={styles.count}>
-                {spectators.length}
+                {spectators.length} / {state.maxSpectators}
               </Typography>
             </Typography>
+
+            {isHost && (
+              <Slider
+                className={styles.capRow}
+                label={t('lobbyScreen.specLimit')}
+                value={state.maxSpectators}
+                min={spectators.length}
+                max={28}
+                onChange={session.setMaxSpectators}
+              />
+            )}
+            {isHost && session.lobbyActionError && (
+              <Typography as="div" base="body" role="alert">
+                {t(`lobbyScreen.errors.${session.lobbyActionError}`)}
+              </Typography>
+            )}
 
             <div className={styles.list}>
               {spectators.map((s) => (
@@ -289,7 +324,7 @@ export default function LobbyView() {
                   youLabel={t('lobbyScreen.you')}
                   status={<Badge tone="muted">{t('lobbyScreen.roleGuest')}</Badge>}
                   dropdownLabel={t('lobbyScreen.actions')}
-                  dropdown={isHost ? kickItems(s.id) : undefined}
+                  dropdown={isHost ? moderationItems(s) : undefined}
                 />
               ))}
               {spectators.length === 0 && <EmptySlot>{t('lobbyScreen.noSpectators')}</EmptySlot>}

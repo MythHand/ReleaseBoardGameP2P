@@ -1,6 +1,6 @@
 import { en as enCommon, ru as ruCommon } from '@release/translation/catalog'
 import { useEffect, useMemo, useState } from 'react'
-import { makeTable } from '@/mocks/table'
+import { makeSpectatorTable, makeTable } from '@/mocks/table'
 import Table from '@/table/Table'
 import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
@@ -72,6 +72,8 @@ export default function TableStory() {
   const [opps, setOpps] = useState(3)
   const [end, setEnd] = useState<string | null>(null)
   const [view, setView] = useState<ViewState | null>(null)
+  const [viewer, setViewer] = useState<'player' | 'spectator'>('player')
+  const [entry, setEntry] = useState<'live' | 'late' | 'reconnect' | 'results'>('live')
   const [role, setRole] = useState<'host' | 'guest'>('host')
   const [dock, setDock] = useState<DockDemo>('push')
   const [specLimit, setSpecLimit] = useState(8)
@@ -213,6 +215,26 @@ export default function TableStory() {
     <div className={styles.root}>
       <TechBar>
         <TechSwitch
+          label={pick(lang, { ru: 'участие', en: 'viewer' })}
+          options={[
+            { value: 'player', label: pick(lang, { ru: 'игрок', en: 'player' }) },
+            { value: 'spectator', label: pick(lang, { ru: 'зритель', en: 'spectator' }) },
+          ]}
+          value={viewer}
+          onChange={setViewer}
+        />
+        <TechSwitch
+          label={pick(lang, { ru: 'вход', en: 'entry' })}
+          options={[
+            { value: 'live', label: 'live' },
+            { value: 'late', label: 'late join' },
+            { value: 'reconnect', label: 'reconnect' },
+            { value: 'results', label: 'results' },
+          ]}
+          value={entry}
+          onChange={setEntry}
+        />
+        <TechSwitch
           options={[
             { value: 'host', label: 'host' },
             { value: 'guest', label: 'guest' },
@@ -274,7 +296,11 @@ export default function TableStory() {
       </TechBar>
       <div className={styles.stage}>
         <Table
-          state={storyState}
+          state={
+            viewer === 'spectator'
+              ? makeSpectatorTable(([2, 3, 4, 5, 6] as const).find((n) => n === opps + 1) ?? 2)
+              : storyState
+          }
           room={{
             role,
             code: '4F2A-9K',
@@ -295,9 +321,10 @@ export default function TableStory() {
             pauseSelfId: 'you',
             pauseHostId,
             onPauseToggleReady: toggleSelfReady,
-            connection: view === 'youDisconnect' ? 'reconnecting' : 'online',
+            connection:
+              view === 'youDisconnect' || entry === 'reconnect' ? 'reconnecting' : 'online',
             reconnect:
-              view === 'youDisconnect'
+              view === 'youDisconnect' || entry === 'reconnect'
                 ? {
                     attempt: reconnectFailed ? 5 : 2,
                     maxAttempts: 5,
@@ -337,7 +364,13 @@ export default function TableStory() {
             pending: pick(lang, { ru: ruCommon.pending, en: enCommon.pending }),
             pause: pauseCopy,
           }}
-          over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
+          over={
+            entry === 'results'
+              ? { winnerId: 'p2', condition: 'release' }
+              : variant
+                ? { winnerId: variant.winnerId, condition: variant.condition }
+                : null
+          }
           actions={{ onOverContinue: () => setEnd(null) }}
           now={now}
           dock={{

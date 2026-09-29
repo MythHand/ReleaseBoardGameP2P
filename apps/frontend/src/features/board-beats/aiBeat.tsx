@@ -353,10 +353,13 @@ export function useAiBeat(
           // can still be flying, and later beats keep rendering this shadow.
           // Publish only this placement: the batch target may include effects
           // whose own animations have not run yet.
-          const slot = plan.tail.slot as keyof BoardState['you']['release']
+          const slot = plan.tail.slot as keyof NonNullable<BoardState['you']>['release']
           const card = plan.tail.card
           const place = <
-            T extends Pick<BoardState['you'], 'release' | 'releaseId' | 'releaseEvent'>,
+            T extends Pick<
+              NonNullable<BoardState['you']>,
+              'release' | 'releaseId' | 'releaseEvent'
+            >,
           >(
             owner: T,
           ) => ({
@@ -367,17 +370,24 @@ export function useAiBeat(
           })
           const mine = plan.player === beat.base.selfId
           const uid =
-            mine && beat.after?.you.releaseEvent?.[slot] === plan.eventCard
+            mine && beat.after?.you?.releaseEvent?.[slot] === plan.eventCard
               ? beat.after.you.releaseUid?.[slot]
               : undefined
           const next = {
             ...beat.base,
-            you: mine
+            ...(beat.base.you
               ? {
-                  ...place(beat.base.you),
-                  ...(uid ? { releaseUid: { ...beat.base.you.releaseUid, [slot]: uid } } : {}),
+                  selfId: beat.base.selfId,
+                  you: mine
+                    ? {
+                        ...place(beat.base.you),
+                        ...(uid
+                          ? { releaseUid: { ...beat.base.you.releaseUid, [slot]: uid } }
+                          : {}),
+                      }
+                    : beat.base.you,
                 }
-              : beat.base.you,
+              : { selfId: null, you: null }),
             opponents: beat.base.opponents.map((owner) =>
               owner.id === plan.player ? place(owner) : owner,
             ),

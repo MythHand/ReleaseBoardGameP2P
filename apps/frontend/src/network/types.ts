@@ -1,4 +1,4 @@
-import type { Action, Event, GameState, PlayerId, PlayerView, Setup } from '@release/engine'
+import type { Action, Event, GameState, GameView, PlayerId, Setup } from '@release/engine'
 import type { ChatEntry, MemberId } from '~/shared/chat/types'
 
 // A plain Omit over a union collapses it to its common members, so it has to
@@ -18,6 +18,18 @@ export type Intent = DistributiveOmit<
 // handed straight to `createGame`, so a second same-named type inside
 // `network/` could only ever drift away from the one that has to match.
 export type { Setup }
+
+export type JoinRole = 'player' | 'spectator'
+export interface JoinAvailability {
+  player: boolean
+  spectator: boolean
+}
+export interface JoinRequestPayload {
+  name: string
+  resumeToken: string
+  requestedRole?: JoinRole
+  resume?: { where: Where; lastGameId: string | null }
+}
 
 export type Role = 'host' | 'player' | 'guest'
 
@@ -54,7 +66,8 @@ export interface Seat {
 // Discriminated union of every protocol message ({ type, payload }).
 export type Message =
   // --- Lobby ---
-  | { type: 'JOIN_REQUEST'; payload: { name: string; resumeToken: string } }
+  | { type: 'JOIN_REQUEST'; payload: JoinRequestPayload }
+  | { type: 'JOIN_REJECTED'; payload: { reason: 'room-full'; availability: JoinAvailability } }
   | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: Role } }
   | {
       type: 'PEER_JOINED'
@@ -72,7 +85,10 @@ export type Message =
   // everyone went. Addressed to the host, which applies it and re-broadcasts the
   // updated PeerInfo — exactly the path PLAYER_READY takes.
   | { type: 'WHEREABOUTS'; payload: { where: Where } }
-  | { type: 'LOBBY_CONFIG_UPDATED'; payload: { maxPlayers?: number; setup?: Setup; bots?: number } }
+  | {
+      type: 'LOBBY_CONFIG_UPDATED'
+      payload: { maxPlayers?: number; maxSpectators?: number; setup?: Setup; bots?: number }
+    }
   | { type: 'LOBBY_DISBANDED'; payload: Record<string, never> }
   | { type: 'PLAYER_KICKED'; payload: { peerId: string; reason?: string } }
   | { type: 'TRANSFER_HOST'; payload: { newHostId: string } }
@@ -129,7 +145,7 @@ export type Message =
   // visible log, handed to a peer that rejoined. It is folded into history and
   // the discard heap, and it is NOT animated: a reconnect drops straight to the
   // live board, exactly as `isOpening` already says it must.
-  | { type: 'SYNC'; payload: { view: PlayerView; events: Event[]; resync?: boolean } }
+  | { type: 'SYNC'; payload: { view: GameView; events: Event[]; resync?: boolean } }
   // The only message carrying GameState, and only to a handover successor.
   | { type: 'KEEPER_STATE'; payload: { state: GameState } }
   // null is the death notice: the keeper is gone and the game cannot continue.

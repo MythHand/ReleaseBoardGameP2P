@@ -83,6 +83,7 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      maxSpectators: 8,
       bots: 0,
       setup: {},
       peers: {
@@ -124,6 +125,7 @@ it('never marks a bot seat offline', async () => {
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      maxSpectators: 8,
       bots: 1,
       setup: {},
       peers: {
@@ -168,6 +170,7 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      maxSpectators: 8,
       bots: 0,
       setup: {},
       peers: {

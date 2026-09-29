@@ -129,3 +129,24 @@ it('counts down to the live pile on an uneven deal too', () => {
   expect(plan.flights).toHaveLength(13)
   expect(plan.deckBefore - plan.flights.length).toBe(live)
 })
+
+it('deals every public seat without exposing a private hand', () => {
+  const player = view()
+  const publicView = {
+    ...player,
+    self: null,
+    opponents: [
+      { id: player.self.id, name: player.self.name, handCount: 5, release: {}, eliminated: false },
+      ...player.opponents,
+    ],
+  }
+  const plan = planDeal(publicView, feed())
+  expect(plan?.hand).toEqual([])
+  expect(plan?.flights).toHaveLength(15)
+  expect(plan?.flights.every((flight) => flight.to.kind === 'seat')).toBe(true)
+  expect(
+    plan?.flights
+      .filter((flight) => flight.round > 0)
+      .every((flight) => !flight.faceUp && flight.card === null),
+  ).toBe(true)
+})

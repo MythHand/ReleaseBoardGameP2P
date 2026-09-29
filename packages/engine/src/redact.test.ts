@@ -54,3 +54,22 @@ it('redacts blind transfers only for bystanders while keeping Security Bug trans
   expect(redactFor(transfer, 'p3')).toEqual({ id: 7, type: 'handTransfer', from: 'p1', to: 'p2' })
   expect(redactFor({ ...transfer, publicCard: true }, 'p3')).toMatchObject({ card: 'support-sudo' })
 })
+
+it('keeps public choreography without hidden faces for a spectator', () => {
+  expect(redactFor(drawn(), null)).toEqual({
+    id: 7,
+    type: 'drawn',
+    player: 'p1',
+    pile: 0,
+    deckSize: 39,
+  })
+  const transfer: Event = {
+    id: 8,
+    type: 'handTransfer',
+    from: 'p1',
+    to: 'p2',
+    card: 'support-sudo',
+  }
+  expect(redactFor(transfer, null)).toEqual({ id: 8, type: 'handTransfer', from: 'p1', to: 'p2' })
+  expect(redactFor({ ...transfer, publicCard: true }, null)).toMatchObject({ card: 'support-sudo' })
+})

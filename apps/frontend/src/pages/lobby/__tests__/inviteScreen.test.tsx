@@ -45,6 +45,10 @@ function base(): UseLobby {
     seats: [],
     error: null,
     errorKind: null,
+    joinAvailability: null,
+    lobbyActionError: null,
+    setMaxSpectators: vi.fn(),
+    setParticipantRole: vi.fn(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
@@ -106,10 +110,10 @@ it('shows the form when there is no session', () => {
   expect(screen.getByText('invite.joinCta')).toBeTruthy()
 })
 
-it('disables the spectator role, since guest mode is not supported yet', () => {
+it('offers the spectator role before connecting', () => {
   sessionValue = base()
   renderScreen()
-  expect(screen.getByText('invite.roleSpectator').closest('button')?.disabled).toBe(true)
+  expect(screen.getByText('invite.roleSpectator').closest('button')?.disabled).toBe(false)
   expect(screen.getByText('invite.rolePlayer').closest('button')?.disabled).toBe(false)
 })
 
@@ -195,7 +199,7 @@ it('submits with the code first and the nickname second', () => {
   renderAtLobby('F96-NMT')
   fireEvent.change(screen.getByLabelText('invite.nicknameLabel'), { target: { value: 'Ann' } })
   fireEvent.click(screen.getByText('invite.joinCta'))
-  expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann')
+  expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann', 'player')
 })
 
 // Pins the silent catch: a rejected joinRoom must leave the form up and must
@@ -210,7 +214,9 @@ it('stays on the form and does not navigate when the join rejects', async () => 
   fireEvent.change(screen.getByLabelText('invite.nicknameLabel'), { target: { value: 'Ann' } })
   fireEvent.click(screen.getByText('invite.joinCta'))
 
-  await waitFor(() => expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann'))
+  await waitFor(() =>
+    expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann', 'player'),
+  )
   // let the rejected promise's catch run before asserting on its aftermath
   await new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -242,4 +248,32 @@ it('leaves the nickname empty when arriving straight from an invite link', () =>
   sessionValue = base()
   renderAtLobby('F96-NMT')
   expect(screen.queryByDisplayValue('Ann')).toBeNull()
+})
+
+it('joins as a spectator and keeps the role when retrying a full room', async () => {
+  sessionValue = { ...base(), joinRoom: vi.fn().mockResolvedValue('F96-NMT') }
+  const { rerender } = renderAtLobby('F96-NMT', 'Ann')
+  fireEvent.click(screen.getByText('invite.roleSpectator'))
+  fireEvent.click(screen.getByText('invite.joinCta'))
+  await waitFor(() =>
+    expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann', 'spectator'),
+  )
+  sessionValue = {
+    ...sessionValue,
+    status: 'error',
+    errorKind: 'room-full',
+    joinAvailability: { player: true, spectator: false },
+  }
+  rerender(
+    <MemoryRouter initialEntries={[{ pathname: '/lobby/F96-NMT', state: { nickname: 'Ann' } }]}>
+      <Routes>
+        <Route path="/lobby/:lobbyId" element={<InviteScreen />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+  expect(screen.getByText('invite.fullStatus')).toBeTruthy()
+  fireEvent.click(screen.getByText('invite.retry'))
+  await waitFor(() =>
+    expect(sessionValue.joinRoom).toHaveBeenLastCalledWith('F96-NMT', 'Ann', 'spectator'),
+  )
 })

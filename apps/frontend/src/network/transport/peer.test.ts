@@ -229,3 +229,79 @@ it('relay forwards a wire frame verbatim, preserving the original sender', async
   expect(received.from).toBe('peer-9')
   expect(received.seq).toBe(7)
 })
+
+it('broadcasts and relays only to accepted inbound connections', async () => {
+  const transport = await createTransport({ onMessage: () => {} })
+  const pending = new FakeConn('pending')
+  const accepted = new FakeConn('accepted')
+  for (const conn of [pending, accepted]) {
+    lastPeer?.emit('connection', conn)
+    conn.emit('open')
+  }
+  transport.authenticate('accepted')
+  const message: Message = { type: 'LOBBY_DISBANDED', payload: {} }
+  transport.broadcast(message)
+  transport.relay(['pending', 'accepted'], { ...message, from: 'original', seq: 1 })
+  expect(pending.sent).toEqual([])
+  expect(accepted.sent).toHaveLength(2)
+  transport.send('pending', message)
+  expect(pending.sent).toHaveLength(1)
+})
+
+it('retires a rejected channel immediately and flushes its reason before closing', async () => {
+  const disconnected = vi.fn()
+  const received = vi.fn()
+  const transport = await createTransport({ onMessage: received, onDisconnect: disconnected })
+  const old = new FakeConn('watcher')
+  lastPeer?.emit('connection', old)
+  old.emit('open')
+  transport.authenticate('watcher')
+  let finish!: () => void
+  const sent = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  vi.spyOn(old, 'send').mockImplementation((frame) => {
+    old.sent.push(frame)
+    return sent
+  })
+  const close = vi.spyOn(old, 'close')
+  const rejection: Message = {
+    type: 'JOIN_REJECTED',
+    payload: { reason: 'room-full', availability: { player: false, spectator: false } },
+  }
+  const pending = transport.disconnectPeer('watcher', rejection)
+  expect(transport.connectedIds()).toEqual([])
+  expect(disconnected).toHaveBeenCalledExactlyOnceWith('watcher')
+  transport.broadcast({ type: 'LOBBY_DISBANDED', payload: {} })
+  old.emit('data', JSON.stringify({ type: 'PLAYER_READY', payload: {}, from: 'watcher', seq: 1 }))
+  expect(received).not.toHaveBeenCalled()
+  expect(old.sent.map((frame) => JSON.parse(frame).type)).toEqual(['JOIN_REJECTED'])
+  expect(close).not.toHaveBeenCalled()
+  const replacement = new FakeConn('watcher')
+  lastPeer?.emit('connection', replacement)
+  replacement.emit('open')
+  finish()
+  await pending
+  expect(close).toHaveBeenCalledExactlyOnceWith({ flush: true })
+  expect(replacement.closed).toBe(false)
+  old.emit('close')
+  expect(disconnected).toHaveBeenCalledTimes(1)
+  expect(transport.connectedIds()).toEqual(['watcher'])
+})
+
+it('closes once even when the final send fails', async () => {
+  const disconnected = vi.fn()
+  const transport = await createTransport({ onMessage: () => {}, onDisconnect: disconnected })
+  const connection = new FakeConn('watcher')
+  lastPeer?.emit('connection', connection)
+  connection.emit('open')
+  vi.spyOn(connection, 'send').mockImplementation(() => {
+    throw new Error('closed during send')
+  })
+  const close = vi.spyOn(connection, 'close')
+  await transport.disconnectPeer('watcher', { type: 'LOBBY_DISBANDED', payload: {} })
+  await transport.disconnectPeer('watcher')
+  connection.emit('close')
+  expect(close).toHaveBeenCalledTimes(1)
+  expect(disconnected).toHaveBeenCalledTimes(1)
+})

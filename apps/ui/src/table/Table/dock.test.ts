@@ -1,10 +1,10 @@
 import { deriveDock, isCounting } from './dock'
 import type { TablePending, TableWindow } from './intents'
-import type { TableState } from './types'
+import type { PlayerTableState } from './types'
 
-// `base` covers every TableState field except `turn` / `hasDrawn`, which each
+// `base` covers every PlayerTableState field except `turn` / `hasDrawn`, which each
 // test sets explicitly — that's the axis under test.
-const base: Omit<TableState, 'turn' | 'hasDrawn'> = {
+const base: Omit<PlayerTableState, 'turn' | 'hasDrawn'> = {
   you: { name: 'you', hand: [], release: {} },
   opponents: [{ id: 'p2', name: 'kernel_panic', handCount: 5, release: {} }],
   decks: { main: [40], events: 12, discardCount: 0 },
@@ -169,7 +169,7 @@ it('leaves an eliminated seat out of the dots, so a full row means the window is
   // The row fills exactly as the window runs out — the engine closes it early
   // when every LIVING responder has passed, so a dead seat must not hold a dot
   // that can never light.
-  const state: TableState = {
+  const state: PlayerTableState = {
     ...base,
     turn: 'you',
     hasDrawn: true,
@@ -205,7 +205,7 @@ it('tells the attack phase that this seat has already passed', () => {
 
 it('keeps an eliminated viewer at `waiting` even while a window runs', () => {
   const window: TableWindow = { ...windowOnYou, player: 'p2' }
-  const state: TableState = {
+  const state: PlayerTableState = {
     ...base,
     you: { ...base.you, eliminated: true },
     turn: 'p2',

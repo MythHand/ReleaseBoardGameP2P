@@ -131,7 +131,9 @@ export function useDefenseBeat(
         // destination is the honest answer to "it is here and I cannot say
         // where it came from": the card stands, in its own pose, and the
         // exchange leaves from something real.
-        const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.card) : -1
+        const handIndex = mine
+          ? (ctx.base.you?.hand.findIndex((h) => h.card.id === plan.card) ?? -1)
+          : -1
         const from =
           (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
           a.seatBox(plan.defender) ??
@@ -326,7 +328,7 @@ export function useDefenseBeat(
             ? rectOf(a.releaseSlot(plan.player, plan.slot))
             : null
         const handIndex = mine
-          ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.spent[0]?.card)
+          ? (ctx.base.you?.hand.findIndex((h) => h.card.id === plan.spent[0]?.card) ?? -1)
           : -1
         const from =
           fromSlot ??

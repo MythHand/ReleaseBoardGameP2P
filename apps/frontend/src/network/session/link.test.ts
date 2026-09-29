@@ -53,7 +53,7 @@ it('delivers the subscriber its own view on every committed action', () => {
   link.submit({ type: 'DRAW' })
 
   expect(seen).toHaveLength(1)
-  expect(seen[0].view.self.id).toBe('a')
+  expect(seen[0].view.self?.id).toBe('a')
   // the view is the one after the draw: cards have left the draw piles. Not
   // `hasDrawn` — a trigger on the way holds the draw open, and which pile shape
   // meets one is the deal's business, not the link's.
@@ -106,8 +106,8 @@ it('delivers each seat its own view when several links share one session', () =>
   expect(ref.current.state.turn.drawnFrom).not.toEqual([])
   expect(atA).toHaveLength(1)
   expect(atB).toHaveLength(1)
-  expect(atA[0].view.self.id).toBe('a')
-  expect(atB[0].view.self.id).toBe('b')
+  expect(atA[0].view.self?.id).toBe('a')
+  expect(atB[0].view.self?.id).toBe('b')
 })
 
 it('stops delivering to a closed link while its siblings keep playing', () => {
@@ -149,5 +149,5 @@ it('plays a seat that holds no connection at all', () => {
 
   expect(ref.current.state.turn.drawnFrom).not.toEqual([])
   expect(seen).toHaveLength(1)
-  expect(seen[0].view.self.id).toBe('a')
+  expect(seen[0].view.self?.id).toBe('a')
 })

@@ -14,6 +14,7 @@ export interface ReconnectCopy {
   confirmLeave: string
   cancel: string
   abortPrompt: string
+  roomFull: string
 }
 
 interface ReconnectProps {
@@ -23,6 +24,7 @@ interface ReconnectProps {
   attempt: number
   maxAttempts: number
   status: 'trying' | 'failed'
+  reason?: 'room-full'
   onRetry(): void
   onLeave(): void
 }
@@ -54,12 +56,16 @@ export default function Reconnect({
   attempt,
   maxAttempts,
   status,
+  reason,
   onRetry,
   onLeave,
 }: ReconnectProps) {
   const [confirmLeave, setConfirmLeave] = useState(false)
   const failed = status === 'failed'
-  const log = lines(host, attempt, maxAttempts, failed)
+  const log =
+    failed && reason === 'room-full'
+      ? [`$ target ${host}`, '', `× ${copy.roomFull}`]
+      : lines(host, attempt, maxAttempts, failed)
 
   return (
     <Overlay className={styles.over}>

@@ -1,12 +1,14 @@
-import type { Message, PeerInfo, Role, Seat, Where } from '../types'
+import type { JoinRole, Message, PeerInfo, Where } from '../types'
+import { type JoinAdmission, type JoinOptions, resolveJoinAdmission } from './admission'
 import {
   applyConfig,
   applyPeerJoined,
   applyPeerLeft,
-  assignRole,
   effectiveBots,
   type LobbyState,
   playerCount,
+  spectatorCount,
+  validSpectatorLimit,
 } from './state'
 
 export interface Outgoing {
@@ -14,7 +16,15 @@ export interface Outgoing {
   message: Message
 }
 
+export type LobbyActionError =
+  | 'invalid-limit'
+  | 'spectators-full'
+  | 'players-full'
+  | 'match-running'
+  | 'invalid-target'
+
 interface Result {
+  error?: LobbyActionError
   state: LobbyState
   outgoing: Outgoing[]
 }
@@ -28,24 +38,24 @@ export function handleJoinRequest(
   fromId: string,
   memberId: string,
   name: string,
-  options: {
-    matchRunning: boolean
-    returningSeat?: Seat
-    returningLobbyPeer?: Pick<PeerInfo, 'role' | 'ready' | 'where'>
-  },
-): Result {
-  // Role comes from the seat, never from assignRole. A returning player whose
-  // room filled up behind them would otherwise be handed 'guest' and silently
-  // demoted out of a match they are still seated in.
-  const role: Role = options.returningSeat
-    ? fromId === state.hostId
-      ? 'host'
-      : 'player'
-    : options.returningLobbyPeer
-      ? options.returningLobbyPeer.role
-      : options.matchRunning
-        ? 'guest'
-        : assignRole(state)
+  options: JoinOptions,
+): Result & JoinAdmission {
+  const admission = resolveJoinAdmission(state, fromId, options)
+  if (!admission.accepted)
+    return {
+      ...admission,
+      state,
+      outgoing: [
+        {
+          to: fromId,
+          message: {
+            type: 'JOIN_REJECTED',
+            payload: { reason: admission.reason, availability: admission.availability },
+          },
+        },
+      ],
+    }
+  const { role } = admission
 
   const peer: PeerInfo = {
     id: fromId,
@@ -56,12 +66,15 @@ export function handleJoinRequest(
     // or its results requires a new one, just like handleWhereabouts.
     ready: options.returningSeat
       ? true
-      : options.returningLobbyPeer?.where === 'lobby' && options.returningLobbyPeer.ready,
+      : role !== 'guest' &&
+        options.returningLobbyPeer?.where === 'lobby' &&
+        options.returningLobbyPeer.ready,
     where: options.returningSeat ? 'game' : 'lobby',
   }
   const next = applyPeerJoined(state, peer)
 
   return {
+    ...admission,
     state: next,
     outgoing: [
       {
@@ -75,7 +88,12 @@ export function handleJoinRequest(
         to: fromId,
         message: {
           type: 'LOBBY_CONFIG_UPDATED',
-          payload: { maxPlayers: state.maxPlayers, setup: state.setup, bots: state.bots },
+          payload: {
+            maxPlayers: state.maxPlayers,
+            maxSpectators: state.maxSpectators,
+            setup: state.setup,
+            bots: state.bots,
+          },
         },
       },
       {
@@ -105,7 +123,7 @@ export function handleJoinRequest(
 // spotting a wrong setting), matching the Toggle control in the lobby UI.
 export function handleReady(state: LobbyState, fromId: string): Result {
   const existing = state.peers[fromId]
-  if (existing?.where !== 'lobby') return { state, outgoing: [] }
+  if (existing?.where !== 'lobby' || existing.role === 'guest') return { state, outgoing: [] }
   const updated: PeerInfo = { ...existing, ready: !existing.ready }
   const next = applyPeerJoined(state, updated)
   return {
@@ -177,6 +195,7 @@ export function kick(state: LobbyState, peerId: string, reason?: string): Result
 }
 
 export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
+  if (!Number.isInteger(maxPlayers)) return { state, outgoing: [], error: 'invalid-limit' }
   const clamped = Math.min(6, Math.max(2, Math.trunc(maxPlayers)))
   // Lowering the cap must demote the now over-capacity players to guests in
   // join order, otherwise playerCount()/canStart() would still count them and
@@ -193,7 +212,7 @@ export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
         peers[peer.id] = peer
         players += 1
       } else {
-        const guest: PeerInfo = { ...peer, role: 'guest' }
+        const guest: PeerInfo = { ...peer, role: 'guest', ready: false }
         peers[peer.id] = guest
         demoted.push(guest)
       }
@@ -201,6 +220,8 @@ export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
       peers[peer.id] = peer
     }
   }
+  if (spectatorCount(state) + demoted.length > state.maxSpectators)
+    return { state, outgoing: [], error: 'spectators-full' }
   const next = applyConfig({ ...state, peers }, { maxPlayers: clamped })
   return {
     state: next,
@@ -260,5 +281,46 @@ export function disbandLobby(state: LobbyState): Result {
   return {
     state,
     outgoing: [{ to: 'broadcast', message: { type: 'LOBBY_DISBANDED', payload: {} } }],
+  }
+}
+
+export function setMaxSpectators(state: LobbyState, maxSpectators: number): Result {
+  if (!validSpectatorLimit(maxSpectators)) return { state, outgoing: [], error: 'invalid-limit' }
+  if (maxSpectators < spectatorCount(state))
+    return { state, outgoing: [], error: 'spectators-full' }
+  return {
+    state: applyConfig(state, { maxSpectators }),
+    outgoing: [
+      { to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { maxSpectators } } },
+    ],
+  }
+}
+
+export function setParticipantRole(
+  state: LobbyState,
+  peerId: string,
+  role: JoinRole,
+  matchRunning: boolean,
+): Result {
+  if (matchRunning) return { state, outgoing: [], error: 'match-running' }
+  const peer = state.peers[peerId]
+  if (
+    !peer ||
+    peer.role === 'host' ||
+    peer.id.startsWith('bot:') ||
+    peer.where !== 'lobby' ||
+    (role !== 'player' && role !== 'spectator')
+  )
+    return { state, outgoing: [], error: 'invalid-target' }
+  const assigned = role === 'spectator' ? 'guest' : 'player'
+  if (peer.role === assigned) return { state, outgoing: [] }
+  if (assigned === 'guest' && spectatorCount(state) >= state.maxSpectators)
+    return { state, outgoing: [], error: 'spectators-full' }
+  if (assigned === 'player' && playerCount(state) >= state.maxPlayers)
+    return { state, outgoing: [], error: 'players-full' }
+  const updated: PeerInfo = { ...peer, role: assigned, ready: false }
+  return {
+    state: applyPeerJoined(state, updated),
+    outgoing: [{ to: 'broadcast', message: { type: 'PEER_JOINED', payload: updated } }],
   }
 }

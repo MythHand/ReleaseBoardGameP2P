@@ -2282,3 +2282,13 @@ on rematch or a newer hand projection. The payment regressions now use pulls.
 ушёл, а `cancel` читает через ref. Тест с включённой анимацией в `boardReactionWindow.test.tsx`
 падает на старом коде и проходит на новом. Тесты #193 шли с reduced motion и потому эту причину
 не видели.
+
+### 2026-09-29 — публичный просмотр партии (#58)
+
+Добавлена отдельная nullable identity наблюдателя в Board и Table. Старое
+предположение, что зрителю не приходит projection, больше не действует:
+keeper отдаёт публичный snapshot и события. Ранее описанные player paths
+сохраняются; публичные раздача, полёты и pending используют те же модули.
+Поздний вход и resync пропускают историю через `restoredThrough`.
+Эталоны 2–6 мест: TableStory, TableChatStory; результаты: StatsChatStory.
+Решение о хлопушках только для победителя остаётся действующим.

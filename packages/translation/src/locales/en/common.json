@@ -48,7 +48,8 @@
     "retry": "retry",
     "connectError": "couldn't connect",
     "notFoundStatus": "game not found",
-    "homePage": "home page"
+    "homePage": "home page",
+    "fullStatus": "No free places for this role"
   },
   "stats": {
     "title": "Match results",
@@ -266,7 +267,8 @@
     "leave": "leave",
     "confirmLeave": "confirm",
     "cancel": "cancel",
-    "abortPrompt": "> abort session?"
+    "abortPrompt": "> abort session?",
+    "roomFull": "No places are available in this room. Try again later."
   },
   "table": {
     "youEliminated": "you are out",
@@ -408,7 +410,14 @@
     "leaveTitle": "Leave the lobby?",
     "leaveText": "You will leave the lobby, and your seat will be freed.",
     "bugRunner": "Mini-game: press to make the bug jump",
-    "cancel": "cancel"
+    "cancel": "cancel",
+    "errors": {
+      "invalid-limit": "Choose a whole number between 0 and 28, at least the number of connected spectators.",
+      "spectators-full": "No free spectator places. Increase the spectator limit first.",
+      "players-full": "No free player seats.",
+      "match-running": "Roles can be changed after the match.",
+      "invalid-target": "Only a human participant in the lobby can change roles."
+    }
   },
   "moveHistory": {
     "draw": "draw",

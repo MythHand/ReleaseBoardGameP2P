@@ -173,8 +173,8 @@ describe('aiBeat', () => {
     expect(owner?.release[slot]?.id).toBe(eventCard)
     expect(owner?.releaseId?.[slot]).toBe(rulesCard)
     expect(owner?.releaseEvent?.[slot]).toBe(eventCard)
-    if (player === 'p1') expect(landed?.you.releaseUid?.[slot]).toBe('event')
-    expect(landed?.you.hand).toEqual(before.you.hand)
+    if (player === 'p1') expect(landed?.you?.releaseUid?.[slot]).toBe('event')
+    expect(landed?.you?.hand).toEqual(before.you?.hand)
     // the table's decks, but for the trigger's own pile: it gave the card up as
     // the trigger took off, not when the table had played out (offThePile.ts)
     expect(landed?.decks).toEqual({
@@ -462,7 +462,7 @@ describe('runTaken — a Release comes back out of the discard (#106, Task 11)',
     expect(waitedMs()).toContain(420) // `flipCard`'s own duration — matches `goHome`
     expect(
       published.some(
-        (s) => s.you.hand.length === 1 && s.you.hand[0]?.card.id === 'release-frontend',
+        (s) => s.you?.hand.length === 1 && s.you?.hand[0]?.card.id === 'release-frontend',
       ),
     ).toBe(true)
   })
@@ -532,7 +532,7 @@ describe('runTaken — a Release comes back out of the discard (#106, Task 11)',
             },
           },
           publish: (state) => {
-            if (state.you.hand.length === 1) animationsTrace.order.push('received')
+            if (state.you?.hand.length === 1) animationsTrace.order.push('received')
             if (!state.aiCause && state.decks.discardHeap?.some((card) => card.uid === 'd3')) {
               animationsTrace.order.push('causeBanked')
             }

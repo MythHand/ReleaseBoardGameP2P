@@ -1,5 +1,5 @@
 import type { DeckEntry, Engine } from '../engine'
-import { project } from './project'
+import { project, spectate } from './project'
 import { legalTargets, reduce } from './reduce'
 import { createGame, setupEvents } from './setup'
 
@@ -61,5 +61,5 @@ export const FAKE_EVENTS: DeckEntry[] = [
 ]
 
 export function createFakeEngine(): Engine {
-  return { createGame, setupEvents, reduce, project, legalTargets }
+  return { createGame, setupEvents, reduce, project, spectate, legalTargets }
 }

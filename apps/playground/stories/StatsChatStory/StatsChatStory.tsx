@@ -95,6 +95,7 @@ const TIES: Record<string, Partial<StatPlayer>> = {
 
 export default function StatsChatStory() {
   const { lang, setLang } = useLang()
+  const [spectator, setSpectator] = useState(false)
   const [bg, setBg] = useState<'neutral' | 'positive'>('neutral')
   const [names, setNames] = useState<NameSet>('mixed')
   const [ties, setTies] = useState(false)
@@ -104,7 +105,13 @@ export default function StatsChatStory() {
   const send = (text: string) =>
     setMessages((prev) => [
       ...prev,
-      { id: `local-${prev.length}`, who: CHAT_SELF, role: 'player', text, time: '20:41' },
+      {
+        id: `local-${prev.length}`,
+        who: CHAT_SELF,
+        role: spectator ? 'spectator' : 'player',
+        text,
+        time: '20:41',
+      },
     ])
   const swap = NAMES[names]
   const players = data.players.map((p, i) => ({
@@ -115,6 +122,9 @@ export default function StatsChatStory() {
   return (
     <div className={styles.root}>
       <TechBar>
+        <TechToggle on={spectator} onChange={setSpectator}>
+          {pick(lang, { ru: 'зритель', en: 'spectator' })}
+        </TechToggle>
         <TechSwitch
           options={[
             { value: 'neutral', label: 'neutral' },
@@ -140,11 +150,12 @@ export default function StatsChatStory() {
       <div className={styles.stage}>
         <Stats
           {...data}
+          selfId={spectator ? undefined : data.selfId}
           players={players}
           copy={pick(lang, COPY)}
           lang={lang}
           onLangChange={setLang}
-          bgTone={bg}
+          bgTone={spectator ? 'neutral' : bg}
           chat={
             <Chat
               messages={messages}

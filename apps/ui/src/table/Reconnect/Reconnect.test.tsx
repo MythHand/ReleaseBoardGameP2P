@@ -9,6 +9,7 @@ const copy = {
   confirmLeave: 'confirm',
   cancel: 'cancel',
   abortPrompt: '> abort session?',
+  roomFull: 'No places are available in this room. Try again later.',
 }
 
 it('shows the real room code, not a placeholder', () => {

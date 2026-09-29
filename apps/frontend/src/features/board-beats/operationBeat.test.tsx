@@ -1,7 +1,7 @@
 import { cardById } from '@release/ui'
 import { act } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
-import type { BoardState, StagedHandoff } from '~/entities/game/board'
+import type { BoardState, PlayerBoardState, StagedHandoff } from '~/entities/game/board'
 import { useOperationBeat } from './operationBeat'
 import { anchorsFixture, animationsTrace, renderBeat, runBeat } from './testing'
 
@@ -45,7 +45,7 @@ const base = {
   setup: {},
   playable: [],
   frozen: [],
-} as unknown as BoardState
+} as unknown as PlayerBoardState
 it.each([
   false,
   true,
@@ -118,7 +118,7 @@ it('adopts a local stage without replaying entrance or leaving its hand copy', a
   )
   expect(animationsTrace.played).toEqual([])
   expect(handoff.release).toHaveBeenCalledOnce()
-  expect(published.at(-1)?.you.hand).toEqual([])
+  expect(published.at(-1)?.you?.hand).toEqual([])
   await act(async () => result.current.reset())
   expect(result.current.standing).toBe(false)
 })

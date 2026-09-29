@@ -14,7 +14,7 @@ import type { PlayerId } from './state'
 // So the identity is redacted and the event survives. The rule lives HERE
 // because the engine is the only party that knows which secrets exist; the
 // transport applies what it is handed and never re-derives it from a payload.
-export function redactFor(event: Event, viewerId: PlayerId): Event {
+export function redactFor(event: Event, viewerId: PlayerId | null): Event {
   if (event.type !== 'drawn' && event.type !== 'handTransfer') return event
   if (event.card === undefined) return event
   if (event.type === 'drawn' && event.player === viewerId) return event
