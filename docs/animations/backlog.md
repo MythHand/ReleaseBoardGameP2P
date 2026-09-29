@@ -19,6 +19,24 @@ so that is where a finding has to show up, in one line with a status. This file 
 in full: what it costs and what would close it. Enter it in both — the page so it is seen, here so
 it can be acted on.
 
+## Hidden-tab animation backlog — implemented #143 (2026-09-30)
+
+After returning to a hidden tab, Board used to replay old flights while the engine's
+reaction clock was already running. Board now discards its temporary playback instance
+on hide and restores the current projection without replaying the missed events. Queued
+delivery is absorbed through the first visible paint; subsequent events animate normally.
+An interrupted opening reports readiness once. Stale gesture callbacks cannot submit
+actions after their playback instance is gone, and automatic decisions wait for catch-up.
+
+The game session, private hand order, open panel and chat draft survive this boundary.
+An unpaid Release is restored from its pending decision. Only the local player's own
+published card selection is cleared; hiding an observer cannot erase another player's pick.
+
+Verified with eleven Board visibility regressions, a chat remount regression and real
+Chrome visibility changes across two tabs using the shared engine and BroadcastChannel.
+The return shows the current release/window without old flights; a later draw animates.
+The browser check substitutes a local action stream for PeerJS, not a full P2P match.
+
 ## Resolved pending feedback (2026-09-21)
 
 ### System Upgrade contributions were not highlighted — #162
