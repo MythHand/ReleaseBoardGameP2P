@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { LobbyState } from '~/network'
+import { botNames } from './botNames'
 import { useFollowGameStart, useStartGame } from './useStartGame'
 
 const navigate = vi.fn()
@@ -18,14 +19,6 @@ vi.mock('~/app/lib/viewTransition', () => ({
 vi.mock('~/app/providers/SessionProvider', () => ({
   useSession: () => session,
 }))
-// Echoes the key plus its interpolation, rather than a real catalog string —
-// this test is about the `network/` → `features/` boundary (network may not
-// import i18next, so `useStartGame` is where the names get built), not about
-// the copy itself. A real string would hide a swapped argument or an off-by-
-// one behind indistinguishable "Bot" text.
-vi.mock('@release/translation', () => ({
-  useTranslation: () => ({ t: (key: string, opts?: { n?: number }) => `${key}:${opts?.n}` }),
-}))
 
 beforeEach(() => {
   navigate.mockClear()
@@ -42,12 +35,10 @@ it('asks the session to start the game rather than navigating alone', () => {
   expect(navigate).not.toHaveBeenCalled()
 })
 
-// The seam docs/specs calls out by name: `network/` may not import i18next, so
-// the names travel down from here, already built, rather than a bot count.
-// Asserting only "startGame was called" (the test above) would miss a swapped
-// index or a name for the wrong bot entirely — this pins the count, the order,
-// and that each one carries its own `n`, not the same one repeated.
-it('builds one name per effective bot, in seat order, from the catalog key', () => {
+// The names travel down from here, already built, rather than a bot count.
+// They must be the very ones the lobby rows showed — the host-seeded pick —
+// so a bot does not get renamed on its way to the board.
+it('builds one name per effective bot, in seat order, from the host-seeded pick', () => {
   session = {
     gameId: null,
     startGame,
@@ -71,11 +62,7 @@ it('builds one name per effective bot, in seat order, from the catalog key', () 
   }
   const { result } = renderHook(() => useStartGame())
   result.current()
-  expect(startGame).toHaveBeenCalledWith([
-    'lobbyScreen.botName:1',
-    'lobbyScreen.botName:2',
-    'lobbyScreen.botName:3',
-  ])
+  expect(startGame).toHaveBeenCalledWith(botNames('host', 3))
 })
 
 it('stays put while no game has started', () => {

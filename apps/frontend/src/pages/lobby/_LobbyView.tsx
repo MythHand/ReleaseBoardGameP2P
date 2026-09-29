@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
+import { botNames } from '~/features/start-game/botNames'
 import { useStartGame } from '~/features/start-game/useStartGame'
 import { effectiveBots } from '~/network'
 import type { PeerInfo } from '~/network/types'
@@ -237,11 +238,11 @@ export default function LobbyView() {
                 ) : bot ? (
                   // Removal goes through the same ⋯ menu that kicks a person, and
                   // takes the count down by one rather than this particular row:
-                  // bots have no identity beyond their number, so the row that
-                  // disappears is always the last one.
+                  // bots have no identity beyond their number (the name is derived
+                  // from it), so the row that disappears is always the last one.
                   <PlayerSlot
                     key={key}
-                    name={t('lobbyScreen.botName', { n: bot })}
+                    name={botNames(state.hostId, bot)[bot - 1]}
                     badge={
                       <Badge tone="muted" size="sm" outlined>
                         {t('lobbyScreen.roleBot')}

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import { MAX_RECONNECT_ATTEMPTS, type UseLobby } from '~/entities/lobby'
+import { botNames } from '~/features/start-game/botNames'
 import LobbyView from '../_LobbyView'
 import LobbyPage from '../[lobbyId]'
 
@@ -94,14 +95,14 @@ it('shows the invite screen when there is no session', () => {
   expect(screen.getByText('invite.joinCta')).toBeTruthy()
 })
 
-it.each([true, false])('allows only the host to select two starting piles (host: %s)', (isHost) => {
+it.each([true, false])('allows only the host to select one starting pile (host: %s)', (isHost) => {
   sessionValue = { ...inSession(), isHost }
   renderInRouter(<LobbyView />)
-  fireEvent.click(screen.getByRole('button', { name: '2' }))
+  fireEvent.click(screen.getByRole('button', { name: '01' }))
   if (isHost) {
     expect(sessionValue.setSetup).toHaveBeenCalledWith({
       ...sessionValue.state?.setup,
-      startingDecks: 'two',
+      startingDecks: 'one',
     })
   } else {
     expect(sessionValue.setSetup).not.toHaveBeenCalled()
@@ -470,9 +471,9 @@ it('seats a bot from a free slot and shows it in the row above', () => {
   }
   renderInRouter(<LobbyView />)
 
-  // Two bot rows: one per bot the host asked for (inSession() seats 2 humans,
+  // Two bot rows, named by the host-seeded pick: one per bot the host asked for (inSession() seats 2 humans,
   // so 6 - 2 = 4 free seats comfortably cover the 2 asked for).
-  expect(screen.getAllByText('lobbyScreen.botName')).toHaveLength(2)
+  for (const name of botNames(session.state?.hostId ?? '', 2)) screen.getByText(name)
 
   // One button per remaining free seat; pressing any of them asks for one more
   // bot than the table currently shows, not one more than the stored ask.
@@ -521,7 +522,7 @@ it('hides the bot controls from a guest but not the bots', () => {
 
   expect(screen.queryByText('lobbyScreen.addBot')).toBeNull()
   expect(screen.queryByText('lobbyScreen.removeBot')).toBeNull()
-  expect(screen.getAllByText('lobbyScreen.botName')).toHaveLength(1)
+  screen.getByText(botNames(session.state?.hostId ?? '', 1)[0])
 })
 
 it('copies the bare room code through its separate header button', () => {

@@ -25,6 +25,9 @@ const config = (): GameConfig => ({
     releaseCond: 'base',
     ai: 'base',
     gitBranch: 'base',
+    // one draw pile: these tests read its size and the piles a choice offers;
+    // Base's two piles are setup.test.ts's subject
+    startingDecks: 'one',
   },
   deck: [
     { id: 'release-frontend', qty: 4 },
