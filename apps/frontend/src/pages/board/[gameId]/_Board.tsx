@@ -60,12 +60,6 @@ import {
   useRef,
   useState,
 } from 'react'
-// The screen's geometry is the KIT's stylesheet, imported rather than copied:
-// where every block sits, how big it is, what it overlaps. The board is a fork
-// of @release/ui's Table and the playground is where this screen is designed
-// and approved, so a second copy of those values would drift one at a time with
-// nothing to catch it — a type check cannot see a position. `opening` holds only
-// what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
 import { ATTACK_POSE, COVER_POSE, SUDO_POSE, useBoardAnchors } from '~/entities/game/board'
 import type {
@@ -80,6 +74,13 @@ import { useBeats, useEliminationPreload } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import { useHandOrder } from '~/features/hand-order/useHandOrder'
 import opening from './_Board.module.css'
+// The screen's geometry is the KIT's stylesheet, imported rather than copied:
+// where every block sits, how big it is, what it overlaps. The board is a fork
+// of @release/ui's Table and the playground is where this screen is designed
+// and approved, so a second copy of those values would drift one at a time with
+// nothing to catch it — a type check cannot see a position. `opening` holds only
+// what the deal adds on top.
+import { useBoardKeyboard } from './_useBoardKeyboard'
 import { useBoardStaging } from './_useBoardStaging'
 import { useCherryPickStaging } from './_useCherryPickStaging'
 import { useDefenseStaging } from './_useDefenseStaging'
@@ -956,37 +957,31 @@ export default function Board({
     takeStagedReleaseRef.current = staging.takeStagedRelease
   }, [staging.takeStagedRelease])
 
-  // Escape skips the opening. Same window binding and the same reason as the
-  // cancel above; `finish` is idempotent, so a second press is a no-op.
   const dealFinish = deal.finish
-  useEffect(() => {
-    if (!deal.active) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dealFinish()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [deal.active, dealFinish])
-
-  // Escape cancels a staged card the same way a miss on the table does —
-  // armed only while there is something to cancel (I8: a press after the play
-  // already dispatched must not turn into a return flight). Widened to a
-  // release awaiting its cost too (#101, Task 9): `staging.staged` is already
-  // null by the time `staging.costOptions` is populated — the catch-up effect
-  // in `_useBoardStaging.ts` clears it the moment the pending echoes back —
-  // so the release's own window has nothing else to key its arming off.
-  useEffect(() => {
-    const armed = staging.staged ?? staging.costOptions.length > 0
-    if (!armed || staging.dispatched) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') staging.cancel()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [staging.staged, staging.dispatched, staging.costOptions.length, staging.cancel])
+  useBoardKeyboard({
+    panel: {
+      active: panel !== null,
+      run: () => {
+        if (!controlled) setOwnPanel(null)
+        onPanelChange?.(null)
+      },
+    },
+    defense: {
+      active:
+        answering &&
+        Boolean(defenseStaging.staged) &&
+        defenseStaging.staged?.phase !== 'dispatched',
+      run: defenseStaging.cancel,
+    },
+    staged: {
+      active: Boolean(staging.staged ?? staging.costOptions.length > 0) && !staging.dispatched,
+      run: staging.cancel,
+    },
+    opening: { active: deal.active, run: dealFinish },
+  })
 
   // A release awaiting its cost has no `staging.staged` to key a click-based
-  // miss off (see the Escape effect above) — so its own "changed my mind" is a
+  // miss off (see the keyboard layer above) — so its own "changed my mind" is a
   // dedicated `mousedown` listener instead, ported from the approved source
   // (`DefenseReleaseStory`'s own `cancelStaged`/mousedown effect): the fan's
   // own pull gesture starts on mousedown too, so the press this has to ignore
@@ -1035,24 +1030,6 @@ export default function Board({
     root.addEventListener('mousedown', onMouseDown)
     return () => root.removeEventListener('mousedown', onMouseDown)
   }, [defenseStaging.staged?.phase, defenseStaging.cancel])
-
-  // Escape cancels a staged defence the same way a miss on the table does —
-  // see `handleTableClick`'s own `answering` branch below. Task 16's plain
-  // path commits and dispatches in the same tick (no cancellable aim phase),
-  // so this is armed only for the brief span between a rejection and
-  // `cancel()`'s own return flight taking over (`defenseStaging.cancel`'s own
-  // guard refuses anything still `phase: 'dispatched'`). A waiting Sudo
-  // (Task 17) is covered too — nothing here excludes `phase: 'partner'`.
-  useEffect(() => {
-    if (!answering) return
-    const s = defenseStaging.staged
-    if (!s || s.phase === 'dispatched') return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') defenseStaging.cancel()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [answering, defenseStaging.staged, defenseStaging.cancel])
 
   // The dock's own key under an unpaid release (#101). The scene already has
   // one rule for this: while an unpaid release stands, anything other than
