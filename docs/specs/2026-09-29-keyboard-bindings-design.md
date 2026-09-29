@@ -4,7 +4,7 @@
 **Issue:** [#119](https://github.com/MythHand/ReleaseBoardGameP2P/issues/119)  
 **Branch:** `feat/119-keyboard-bindings`  
 **Starting point:** `main` at `47a41b85`  
-**Status:** Architecture agreed in conversation; written specification awaiting review.
+**Status:** Written specification approved by the user on 2026-09-29.
 
 ## Intent and success criteria
 
