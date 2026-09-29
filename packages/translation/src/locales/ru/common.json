@@ -61,6 +61,7 @@
     "colAttack": "атак",
     "colDefense": "защит",
     "toLobby": "в лобби",
+    "voiceChat": "голосовой чат",
     "location": {
       "game": "в игре",
       "stats": "на статистике",
@@ -257,6 +258,20 @@
       "spectator": "зритель"
     }
   },
+  "voiceChat": {
+    "inVoice": "в голосе",
+    "connect": "подключиться",
+    "connecting": "подключение…",
+    "disconnect": "отключиться",
+    "interrupted": "связь прервана",
+    "volume": "общая громкость",
+    "you": "ты",
+    "mute": "выключить звук игрока",
+    "unmute": "включить звук игрока",
+    "muteMic": "выключить микрофон",
+    "unmuteMic": "включить микрофон",
+    "micMuted": "микрофон выключен"
+  },
   "toasts": {
     "hide": "скрыть"
   },
@@ -298,6 +313,7 @@
     "tabRules": "правила",
     "tabModes": "игровой режим",
     "tabChat": "чат",
+    "tabVoice": "голосовой чат",
     "chatToasts": "уведомления чата",
     "chatToastsOn": "Вкл",
     "chatToastsOff": "Выкл",
@@ -384,6 +400,7 @@
     "removeBot": "Убрать бота",
     "roleBot": "бот",
     "chat": "чат",
+    "voiceChat": "голосовой чат",
     "spectators": "Зрители",
     "specLimit": "Лимит",
     "freeSlot": "свободный слот",

@@ -61,6 +61,7 @@
     "colAttack": "attack",
     "colDefense": "defense",
     "toLobby": "to lobby",
+    "voiceChat": "voice chat",
     "location": {
       "game": "in game",
       "stats": "on stats",
@@ -257,6 +258,20 @@
       "spectator": "spectator"
     }
   },
+  "voiceChat": {
+    "inVoice": "in voice",
+    "connect": "join",
+    "connecting": "connecting…",
+    "disconnect": "leave",
+    "interrupted": "connection lost",
+    "volume": "overall volume",
+    "you": "you",
+    "mute": "mute player",
+    "unmute": "unmute player",
+    "muteMic": "mute microphone",
+    "unmuteMic": "unmute microphone",
+    "micMuted": "microphone off"
+  },
   "toasts": {
     "hide": "hide"
   },
@@ -298,6 +313,7 @@
     "tabRules": "rules",
     "tabModes": "game mode",
     "tabChat": "chat",
+    "tabVoice": "voice chat",
     "chatToasts": "chat notifications",
     "chatToastsOn": "On",
     "chatToastsOff": "Off",
@@ -384,6 +400,7 @@
     "removeBot": "Remove bot",
     "roleBot": "bot",
     "chat": "chat",
+    "voiceChat": "voice chat",
     "spectators": "Spectators",
     "specLimit": "Limit",
     "freeSlot": "free slot",

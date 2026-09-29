@@ -1142,7 +1142,7 @@ export default function Board({
     { id: 'participants', label: copy.table.tabParticipants },
     { id: 'rules', label: copy.table.tabRules },
     { id: 'modes', label: copy.table.tabModes },
-    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '', height: 155 }] : []),
+    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '' }] : []),
   ]
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать

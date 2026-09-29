@@ -11,6 +11,10 @@
 
 .slider {
   flex: 1;
+
+  /* a range input keeps a width of its own (~130px) unless allowed to shrink —
+     without this the row overflows any place narrower than that */
+  min-inline-size: 0;
   block-size: 2px;
   -webkit-appearance: none;
   appearance: none;
@@ -55,8 +59,9 @@
   box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand-green);
 }
 
+/* as wide as the longest value (the inline style sets it in ch — the face is
+   monospaced), so the track keeps its length while the number changes */
 .value {
-  composes: numeric from '../../design/typography.module.css';
-  min-inline-size: 18px;
-  text-align: center;
+  flex: none;
+  text-align: end;
 }

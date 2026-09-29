@@ -6,10 +6,6 @@ export interface TabRailItem {
   label: string
   // если задана — вкладка рендерит иконку (квадратная), а не вертикальный текст
   icon?: ReactNode
-  // фиксированная высота вкладки в px. Без неё вкладки делят полосу поровну;
-  // с ней вкладка занимает ровно своё, а остаток делят прочие. Нужна тем, кто
-  // в общий ряд не встаёт по смыслу, — их размер задаёт консьюмер, а не рейл.
-  height?: number
 }
 
 interface TabRailProps {
@@ -26,6 +22,11 @@ interface TabRailProps {
 
 // Controlled вертикальный таб-рейл. «Клик по активной → закрыть» решает
 // консьюмер в onSelect (рейл лишь сообщает, по какой вкладке кликнули).
+// A tab is as long as its own label, not a share of the rail: a short label
+// makes a short tab, and what the tabs leave free stays empty at the rail's end
+// (owner, 27.09). Tabs used to split the rail evenly, and a tab that wanted its
+// own size had to be given a height — which went on matching the others by
+// chance, whenever the rail's height made the shares come out close to it.
 export default function TabRail({
   items,
   active,
@@ -41,12 +42,8 @@ export default function TabRail({
           key={it.id}
           type="button"
           className={`${styles.tab} ${it.icon ? styles.square : ''} ${
-            it.height ? styles.fixed : ''
-          } ${active === it.id ? styles.tabOn : ''}`}
-          // высота — физическая, и это осознанно: у текстовой вкладки
-          // writing-mode вертикальный, а значит её block-size идёт ПОПЕРЁК
-          // полосы. Логическое свойство здесь задало бы ширину вместо высоты.
-          style={it.height ? { height: `${it.height}px` } : undefined}
+            active === it.id ? styles.tabOn : ''
+          }`}
           aria-label={it.icon ? it.label : undefined}
           onClick={() => onSelect(it.id)}
         >

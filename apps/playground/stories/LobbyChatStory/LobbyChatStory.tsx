@@ -1,11 +1,13 @@
 import { en as enCommon, ru as ruCommon } from '@release/translation/catalog'
 import { useState } from 'react'
 import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
+import VoiceChat from '@/blocks/VoiceChat'
 import { CHAT_SELF, makeChat } from '@/mocks/chat'
 import Lobby from '@/screens/Lobby'
 import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechSwitch } from '../controls/TechControls'
+import { useVoiceDemo, VoiceDemoControls } from '../voiceDemo'
 import styles from './LobbyChatStory.module.css'
 
 export default function LobbyChatStory() {
@@ -23,6 +25,7 @@ export default function LobbyChatStory() {
       { id: `local-${prev.length}`, who: CHAT_SELF, role: myRole, text, time: '20:17' },
     ])
   const shown = messages.map((m) => (m.system || m.who !== CHAT_SELF ? m : { ...m, role: myRole }))
+  const voice = useVoiceDemo()
   return (
     <div className={styles.root}>
       <TechBar>
@@ -53,6 +56,7 @@ export default function LobbyChatStory() {
           value={myRole}
           onChange={setMyRole}
         />
+        <VoiceDemoControls demo={voice} />
       </TechBar>
       {/* стартовый язык лобби берём из языка плейграунда; дальше им управляет
           встроенный в лобби свитчер. key переинициализирует экран при смене
@@ -73,6 +77,12 @@ export default function LobbyChatStory() {
               copy={pick(lang, { ru: ruCommon.chat, en: enCommon.chat })}
               selfName={CHAT_SELF}
               onSend={send}
+            />
+          }
+          voice={
+            <VoiceChat
+              {...voice.props}
+              copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
             />
           }
         />
