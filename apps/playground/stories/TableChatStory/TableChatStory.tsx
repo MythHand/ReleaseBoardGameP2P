@@ -413,7 +413,7 @@ export default function TableChatStory() {
                 copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
               />
             ),
-            voiceTab: <VoiceTabIcon status={voice.status} />,
+            voiceTab: <VoiceTabIcon status={voice.status} micOff={voice.props.micOff} />,
             toasts: (
               <ToastStack
                 items={toasts}

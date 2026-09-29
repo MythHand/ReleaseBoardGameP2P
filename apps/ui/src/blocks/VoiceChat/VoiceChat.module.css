@@ -13,12 +13,15 @@
 
 /* the popover's content sets its width, so nothing in a row can push past it;
    a column that shrinks into the popover's height limit, so the people inside
-   can scroll under the overall volume */
+   can scroll under the overall volume. It reaches over the popover's padding
+   at both ends and carries that padding inside instead: the people scroll to
+   the panel's very edges, not to a band short of them */
 .popoverBody {
   display: flex;
   flex-direction: column;
   inline-size: 380px;
   min-block-size: 0;
+  margin-block: calc(-1 * var(--pad-block));
 }
 
 /* ---- the table's panel ---- */
@@ -52,12 +55,37 @@
   color: var(--white-45);
 }
 
-.join {
+/* the microphone and the headphones at the line's end */
+.controls {
+  display: flex;
+  gap: 20px;
+  align-items: center;
   margin-inline-start: auto;
 }
 
 .off {
   display: flex;
+  color: var(--white-45);
+}
+
+/* a mute that is on — mine on a participant, or on my own microphone: the
+   danger button's red */
+.muted {
+  display: flex;
+  color: var(--coral);
+}
+
+/* a muted participant's volume: faded, and still free to move */
+.faded {
+  opacity: 0.5;
+}
+
+/* right after the name of a participant who turned their microphone off; sits
+   on the name's line and follows it when the name wraps */
+.micOff {
+  display: inline-flex;
+  margin-inline-start: 6px;
+  vertical-align: middle;
   color: var(--white-45);
 }
 
@@ -88,7 +116,6 @@
 .voiceList {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-block-size: 0;
 }
 
@@ -96,10 +123,27 @@
   min-block-size: 0;
 }
 
+/* the room under the overall volume's rule lives inside the scroll, not
+   between the two: the people scroll right up to the rule */
+.underOverall {
+  padding-block-start: 12px;
+}
+
 /* the chat's own volume, set off from the people below it */
 .overall {
   padding-block-end: 12px;
   border-block-end: 1px solid var(--white-10);
+}
+
+/* in the popover it leads, and takes back the top padding reached over */
+.popoverBody .overall {
+  padding-block-start: var(--pad-block);
+}
+
+/* in the popover with no overall volume above, the people lead: the top padding
+   reached over rides inside the scroll */
+.popoverBody .alone {
+  padding-block-start: var(--pad-block);
 }
 
 .list {
@@ -109,6 +153,11 @@
   padding: 0;
   margin: 0;
   list-style: none;
+}
+
+/* in the popover, the bottom padding it reached over, carried inside the scroll */
+.popoverBody .list {
+  padding-block-end: var(--pad-block);
 }
 
 .person {

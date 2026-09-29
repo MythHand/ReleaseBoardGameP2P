@@ -62,7 +62,6 @@
 /* as wide as the longest value (the inline style sets it in ch — the face is
    monospaced), so the track keeps its length while the number changes */
 .value {
-  composes: numeric from '../../design/typography.module.css';
   flex: none;
   text-align: end;
 }

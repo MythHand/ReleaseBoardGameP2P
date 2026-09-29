@@ -265,7 +265,12 @@
     "disconnect": "leave",
     "interrupted": "connection lost",
     "volume": "overall volume",
-    "you": "you"
+    "you": "you",
+    "mute": "mute player",
+    "unmute": "unmute player",
+    "muteMic": "mute microphone",
+    "unmuteMic": "unmute microphone",
+    "micMuted": "microphone off"
   },
   "toasts": {
     "hide": "hide"
