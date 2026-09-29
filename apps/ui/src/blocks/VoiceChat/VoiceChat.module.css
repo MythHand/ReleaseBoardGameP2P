@@ -11,9 +11,14 @@
   min-inline-size: 0;
 }
 
-/* the popover's content sets its width, so nothing in a row can push past it */
+/* the popover's content sets its width, so nothing in a row can push past it;
+   a column that shrinks into the popover's height limit, so the people inside
+   can scroll under the overall volume */
 .popoverBody {
+  display: flex;
+  flex-direction: column;
   inline-size: 380px;
+  min-block-size: 0;
 }
 
 /* ---- the table's panel ---- */
@@ -36,10 +41,6 @@
 
 .panelTitle {
   opacity: 0.6;
-}
-
-.panelScroll {
-  min-block-size: 0;
 }
 
 /* ---- shared ---- */
@@ -82,10 +83,17 @@
   color: var(--cat-operation);
 }
 
+/* the overall volume and the people: a column that may shrink, so only the
+   people scroll when the room runs out */
 .voiceList {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-block-size: 0;
+}
+
+.peopleScroll {
+  min-block-size: 0;
 }
 
 /* the chat's own volume, set off from the people below it */

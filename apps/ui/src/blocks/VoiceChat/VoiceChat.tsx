@@ -120,7 +120,8 @@ function Headphones({
 // The volumes and the people: the chat's own volume on top once I am in, then
 // everyone in it with a volume of their own. Every volume stands in one column
 // at the right edge, whatever holds the list — a popover in the lobby, a panel
-// at the table.
+// at the table. The overall volume stays put; only the people under it scroll
+// when there are more of them than room (owner, 29.09).
 function VoiceList({
   participants,
   status,
@@ -149,34 +150,36 @@ function VoiceList({
           />
         </div>
       )}
-      <ul className={styles.list}>
-        {listed.map((p) => {
-          const self = p.id === selfId
-          return (
-            <li key={p.id} className={styles.person}>
-              <Avatar name={p.name} size={24} />
-              <Typography
-                base="mono-md"
-                tk="tk-04"
-                as="span"
-                className={`${styles.name} ${styles[p.role]}`}
-              >
-                {p.name}
-                {self && <span className={styles.you}> · {copy.you}</span>}
-              </Typography>
-              {tuning && !self && (
-                <Slider
-                  value={p.volume}
-                  min={0}
-                  max={VOLUME_MAX}
-                  onChange={(v) => onParticipantVolumeChange?.(p.id, v)}
-                  className={styles.personVolume}
-                />
-              )}
-            </li>
-          )
-        })}
-      </ul>
+      <ScrollArea className={styles.peopleScroll}>
+        <ul className={styles.list}>
+          {listed.map((p) => {
+            const self = p.id === selfId
+            return (
+              <li key={p.id} className={styles.person}>
+                <Avatar name={p.name} size={24} />
+                <Typography
+                  base="mono-md"
+                  tk="tk-04"
+                  as="span"
+                  className={`${styles.name} ${styles[p.role]}`}
+                >
+                  {p.name}
+                  {self && <span className={styles.you}> · {copy.you}</span>}
+                </Typography>
+                {tuning && !self && (
+                  <Slider
+                    value={p.volume}
+                    min={0}
+                    max={VOLUME_MAX}
+                    onChange={(v) => onParticipantVolumeChange?.(p.id, v)}
+                    className={styles.personVolume}
+                  />
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </ScrollArea>
     </div>
   )
 }
@@ -207,6 +210,8 @@ export default function VoiceChat({
           ariaLabel={`${copy.inVoice} ${participants.length}`}
           trigger={<Count count={participants.length} />}
         >
+          {/* the popover is no taller than the room below it; the list shrinks
+              into it and its people scroll, as in the table's panel */}
           <div className={styles.popoverBody}>
             <VoiceList {...state} />
           </div>
@@ -234,9 +239,7 @@ export function VoicePanel({ title, ...state }: VoiceState & { title: string }) 
         {participants.length > 0 && <Count count={participants.length} />}
         <Headphones {...state} />
       </div>
-      <ScrollArea className={styles.panelScroll}>
-        <VoiceList {...state} />
-      </ScrollArea>
+      <VoiceList {...state} />
     </div>
   )
 }

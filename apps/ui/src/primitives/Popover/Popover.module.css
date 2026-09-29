@@ -14,6 +14,11 @@
   position: absolute;
   inset-block-start: calc(100% + 6px);
   z-index: 5;
+
+  /* a column, so content taller than the room below (the inline max-block-size)
+     can shrink into it and scroll inside */
+  display: flex;
+  flex-direction: column;
   inline-size: max-content;
   padding: 14px var(--pad-inline);
   background: color-mix(in srgb, var(--surface-1) 96%, var(--bg));

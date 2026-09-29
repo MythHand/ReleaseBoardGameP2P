@@ -43,6 +43,62 @@ it('closes on a press outside and keeps that press from reaching what is under i
   expect(onOutside).toHaveBeenCalledTimes(1)
 })
 
+// Review of #210: pressing the lobby's capacity range with the list open closed
+// the list and moved the range from 5 to 6 in one go. The press outside is
+// cancelled and stopped, so nothing under it acts on it.
+it('cancels a press outside, so a range under it does not act on it', () => {
+  const onRange = vi.fn()
+  render(
+    <>
+      <Popover trigger="open">
+        <span>panel</span>
+      </Popover>
+      <input
+        type="range"
+        aria-label="capacity"
+        onPointerDown={onRange}
+        onMouseDown={onRange}
+        onClick={onRange}
+      />
+    </>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'open' }))
+  const range = screen.getByRole('slider', { name: 'capacity' })
+  // the whole gesture, as a browser sends it: the press, then its click.
+  // fireEvent answers false when the event's default was cancelled.
+  expect(fireEvent.pointerDown(range)).toBe(false)
+  fireEvent.click(range)
+  expect(onRange).not.toHaveBeenCalled()
+  expect(screen.queryByText('panel')).toBeNull()
+})
+
+// A range inside, dragged past the panel's edge and let go outside: the press
+// began inside, so nothing closes.
+it('keeps open when a range inside is let go outside', () => {
+  render(
+    <Popover trigger="open">
+      <input type="range" aria-label="volume" />
+    </Popover>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'open' }))
+  fireEvent.pointerDown(screen.getByRole('slider', { name: 'volume' }))
+  fireEvent.click(document.body)
+  expect(screen.getByRole('slider', { name: 'volume' })).toBeTruthy()
+})
+
+it('is no taller than the room below it', () => {
+  render(
+    <Popover trigger="open">
+      <span>panel</span>
+    </Popover>,
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'open' }))
+  const panel = screen.getByText('panel').parentElement
+  // jsdom lays nothing out, so the panel's top reads 0: the room is the
+  // window's height less the margin kept from its bottom edge
+  expect(panel?.style.maxBlockSize).toBe(`${window.innerHeight - 36}px`)
+})
+
 it('stays open while it is used inside', () => {
   const { onInside } = scene()
   const inside = screen.getByRole('button', { name: 'inside' })

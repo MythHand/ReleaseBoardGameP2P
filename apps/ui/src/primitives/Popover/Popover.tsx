@@ -1,10 +1,20 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import Button, { type ButtonVariant } from '../Button'
 import styles from './Popover.module.css'
 
 // Page-wide "only one open at a time", the way Dropdown does it: an opening
 // popover broadcasts its id on window, and every other open one closes.
 const EXCLUSIVE_EVENT = 'ui-popover-open'
+// how far the panel keeps from the viewport's bottom edge (owner, 29.09)
+const ROOM_MARGIN = 36
 
 interface PopoverProps {
   // what the trigger button says or shows
@@ -34,8 +44,14 @@ interface PopoverProps {
 //
 // A press outside only closes it (owner, 27.09). It is the press, not the click
 // that follows, that closes — so a slider dragged past the panel's edge and let
-// go outside closes nothing — and the click that press turns into is spent on
-// the closing: whatever lay under it is not pressed by accident.
+// go outside closes nothing. The press itself is stopped and its default
+// cancelled — a range under it does not jump, a field does not take the focus
+// (review of #210) — and the click it turns into is spent on the closing too:
+// whatever lay under it is not pressed by accident.
+//
+// The panel is no taller than the room below it: it measures that room when it
+// opens and whenever the window resizes, and its content shrinks into it — a
+// long list scrolls inside rather than running off the screen.
 export default function Popover({
   trigger,
   variant = 'tech',
@@ -50,6 +66,20 @@ export default function Popover({
   const [open, setOpen] = useState(false)
   // the trigger and the panel: a press in here is not a press outside
   const wrapRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  // the room from the panel's top to the viewport's bottom, in px
+  const [room, setRoom] = useState<number | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const measure = () => {
+      const top = panelRef.current?.getBoundingClientRect().top ?? 0
+      setRoom(Math.max(0, window.innerHeight - top - ROOM_MARGIN))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -68,6 +98,10 @@ export default function Popover({
     }
     const onPress = (e: PointerEvent) => {
       if (wrapRef.current?.contains(e.target as Node)) return
+      // the press goes no further, and does nothing where it landed — cancelling
+      // it also holds back the mouse events a range or a field acts on
+      e.stopPropagation()
+      e.preventDefault()
       setOpen(false)
       window.addEventListener('click', swallow, true)
       // added while this press is being dispatched, so it answers the next one
@@ -113,7 +147,11 @@ export default function Popover({
         {trigger}
       </Button>
       {open && (
-        <div className={`${styles.panel} ${styles[align]} ${flush ? styles.flush : ''}`}>
+        <div
+          ref={panelRef}
+          className={`${styles.panel} ${styles[align]} ${flush ? styles.flush : ''}`}
+          style={room === null ? undefined : ({ maxBlockSize: `${room}px` } as CSSProperties)}
+        >
           {children}
         </div>
       )}

@@ -7,6 +7,10 @@
   display: flex;
   flex-direction: column;
   inline-size: 56px;
+
+  /* the tabs size their padding by the rail's own height, not the window's: in
+     the game the two match, but a rail can stand below a bar */
+  container-type: size;
   background: var(--surface-1);
 }
 
@@ -26,11 +30,14 @@
 
   /* as long as its label, never stretched to a share of the rail. The text runs
      vertically, so the tab's inline axis is the rail's length: the padding
-     along the label is padding-inline. */
+     along the label is padding-inline. It is 24px on a rail of 840px and up,
+     8px at 670px and below, and goes smoothly in between, so a short screen
+     still holds every tab (owner, 29.09). cqh, not cqb: the tab's own writing
+     mode is vertical, the rail's height is what is meant. */
   flex: none;
   align-items: center;
   justify-content: center;
-  padding-inline: 24px;
+  padding-inline: clamp(8px, 8px + (100cqh - 670px) * 16 / 170, 24px);
   color: var(--fg);
   cursor: pointer;
   background: transparent;
