@@ -95,14 +95,14 @@ it('shows the invite screen when there is no session', () => {
   expect(screen.getByText('invite.joinCta')).toBeTruthy()
 })
 
-it.each([true, false])('allows only the host to select two starting piles (host: %s)', (isHost) => {
+it.each([true, false])('allows only the host to select one starting pile (host: %s)', (isHost) => {
   sessionValue = { ...inSession(), isHost }
   renderInRouter(<LobbyView />)
-  fireEvent.click(screen.getByRole('button', { name: '2' }))
+  fireEvent.click(screen.getByRole('button', { name: '01' }))
   if (isHost) {
     expect(sessionValue.setSetup).toHaveBeenCalledWith({
       ...sessionValue.state?.setup,
-      startingDecks: 'two',
+      startingDecks: 'one',
     })
   } else {
     expect(sessionValue.setSetup).not.toHaveBeenCalled()

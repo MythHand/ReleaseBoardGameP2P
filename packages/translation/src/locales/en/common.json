@@ -359,8 +359,8 @@
     "startingDecks": {
       "title": "Starting draw decks",
       "options": {
-        "base": "One deck after dealing",
-        "two": "Split the remaining cards into two decks"
+        "base": "Split the remaining cards into two decks",
+        "one": "One deck after dealing"
       }
     }
   },

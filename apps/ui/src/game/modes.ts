@@ -53,8 +53,8 @@ export const GAME_MODES: GameMode[] = [
   {
     key: 'startingDecks',
     options: [
-      { value: 'base', label: '1' },
-      { value: 'two', label: '2' },
+      { value: 'base', label: 'Base' },
+      { value: 'one', label: '01' },
     ],
   },
 ]

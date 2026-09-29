@@ -405,8 +405,8 @@ const MODULES: Module[] = [
       en: 'Appear/disappear of a small element in a reserved slot (fade + scale), without shifting neighbours. Orchestrated by the Reveal component.',
     },
     where: {
-      ru: 'словарь → TurnDock/Reveal («drawn»-бейдж)',
-      en: 'registry → TurnDock/Reveal (the “drawn” badge)',
+      ru: 'словарь → TurnDock/Reveal («drawn»-бейдж), BugRunner («+n» бонуса)',
+      en: 'registry → TurnDock/Reveal (the “drawn” badge), BugRunner (the bonus “+n”)',
     },
     status: 'ok',
   },
@@ -731,6 +731,14 @@ const SCENARIOS: Scenario[] = [
       en: "no new presets were needed — the whole choreography is assembled from three existing ones. A plate arrives with play('hudIn', { dy: 18, dur: 260 }) on mount: the same «a block arrives at its place», only from below and short. It leaves with play('popOut'), and only the plate itself may take itself off the stage: the queue sets leaving, the plate awaits anim.finished and calls onLeft — dropping it on a timer would cut the animation in half. Neighbours shift by FLIP through play('flyFrom', { from: the previous rect, duration: 240 }): the plates are of DIFFERENT heights (someone else's reply inside, two lines or twelve), so there is no «one step» to move by — the rect is measured before and after the commit in useLayoutEffect and every delta is its own. A newly arrived plate is not in that measurement: it has no previous place, it has its own arrival. The column is pinned to the bottom and grows upward, so the oldest leaving (from the top) moves no neighbours at all, while a middle one leaving lowers those above it.",
     },
     where: 'blocks/Toast (ToastStack), Table + chat',
+  },
+  {
+    name: { ru: 'Бонус мини-игры с жуком: «+n»', en: 'The bug runner bonus: "+n"' },
+    from: {
+      ru: "новых пресетов не потребовалось — play('popIn'), wait(600), play('popOut'). Очки за перепрыгнутый хотфикс (+40), пройденный низом монитор (+20) и съеденный сервер (+120, +180, +240…) всплывают «+n» справа от счётчика, в цвете того, что заплатило. Место под «+n» зарезервировано: счётчик стоит левее на ширину слота, поэтому всплывашка не уходит в правую растушёвку и счётчик не дёргается. Узел живёт всегда и спрятан (opacity: 0), popIn/popOut держат состояние через fill: forwards. Новая выплата, пока старая ещё видна, снимает её анимации и начинает показ заново с новым числом.",
+      en: "no new presets were needed — play('popIn'), wait(600), play('popOut'). The points for a jumped hotfix (+40), a monitor run under (+20) and an eaten server (+120, +180, +240…) rise as \"+n\" to the right of the score, in the colour of what paid them. The \"+n\" has a reserved slot: the score stands left by the slot's width, so the pop never falls into the right fade and the score never jumps. The node is always there and hidden (opacity: 0); popIn/popOut hold the state with fill: forwards. A new payment while the last is still up cancels its animations and starts over with the new number.",
+    },
+    where: 'blocks/BugRunner (Bug runner), Lobby',
   },
 ]
 

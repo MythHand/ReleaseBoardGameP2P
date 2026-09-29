@@ -51,4 +51,79 @@ export const MONITOR: Sprite = [
   '...aaaaaa...',
 ]
 
+// Server — a system unit on its feet: two drive bays, a light, a vent. The bug
+// eats it from the left, the side it runs in from; every bite keeps a neon edge.
+export const SERVER: Sprite = [
+  'aaaaaaaaaa',
+  'adddddddda',
+  'adaaaaaada',
+  'adddddddda',
+  'adaaaaaada',
+  'adddddddda',
+  'adddddadda',
+  'adddddddda',
+  'addadadada',
+  'adddddddda',
+  'addadadada',
+  'adddddddda',
+  'aaaaaaaaaa',
+  '.aa....aa.',
+]
+const SERVER_BITTEN: Sprite = [
+  'aaaaaaaaaa',
+  'adddddddda',
+  'adaaaaaada',
+  '.aadddddda',
+  '..aaaaaada',
+  '..adddddda',
+  '..adddadda',
+  '.aadddddda',
+  'addadadada',
+  'adddddddda',
+  'addadadada',
+  'adddddddda',
+  'aaaaaaaaaa',
+  '.aa....aa.',
+]
+const SERVER_BITTEN_MORE: Sprite = [
+  'aaaaaaaaaa',
+  '.aadddddda',
+  '..aaaaaada',
+  '...aadddda',
+  '....aaaada',
+  '....adddda',
+  '....adadda',
+  '...aadddda',
+  '..aadadada',
+  '.aadddddda',
+  'addadadada',
+  'adddddddda',
+  'aaaaaaaaaa',
+  '.aa....aa.',
+]
+const SERVER_ALMOST_GONE: Sprite = [
+  '......aaaa',
+  '.....aadda',
+  '.....aaada',
+  '......aada',
+  '.......ada',
+  '.......ada',
+  '......aada',
+  '......adda',
+  '.....adada',
+  '....aaddda',
+  '...adadada',
+  '..aaddddda',
+  '..aaaaaaaa',
+  '.......aa.',
+]
+// by the bites taken: whole, bitten, bitten again, almost gone — the next bite
+// leaves nothing
+export const SERVER_BITES: readonly Sprite[] = [
+  SERVER,
+  SERVER_BITTEN,
+  SERVER_BITTEN_MORE,
+  SERVER_ALMOST_GONE,
+]
+
 export const sizeOf = (sprite: Sprite) => ({ w: sprite[0]?.length ?? 0, h: sprite.length })
