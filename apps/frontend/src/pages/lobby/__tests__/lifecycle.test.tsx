@@ -27,6 +27,7 @@ vi.mock('~/network/transport/peer', () => ({
       relay: vi.fn(),
       connectedIds: () => [],
       authenticate: vi.fn(),
+      disconnectPeer: vi.fn(async () => {}),
     }
   }),
 }))

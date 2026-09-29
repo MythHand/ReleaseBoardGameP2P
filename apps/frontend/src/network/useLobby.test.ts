@@ -36,6 +36,7 @@ interface FakeTransport {
   send: ReturnType<typeof vi.fn>
   relay: ReturnType<typeof vi.fn>
   connectedIds: () => string[]
+  disconnectPeer: ReturnType<typeof vi.fn>
   authenticate: ReturnType<typeof vi.fn>
   receive: (message: WireMessage) => void
   replaceConnection: (peerId: string) => void
@@ -74,6 +75,12 @@ vi.mock('./transport/peer', () => ({
         broadcast: vi.fn(),
         relay: vi.fn(),
         connectedIds: () => [],
+        disconnectPeer: vi.fn((peerId: string, finalMessage?: Message) => {
+          authenticated.delete(peerId)
+          args.onDisconnect?.(peerId)
+          if (finalMessage) fake.send(peerId, finalMessage)
+          return Promise.resolve()
+        }),
         authenticate: vi.fn((peerId: string) => authenticated.add(peerId)),
         receive: (message: WireMessage) => {
           if (message.type === 'JOIN_REQUEST' || authenticated.has(message.from)) {
@@ -3975,6 +3982,7 @@ it('does not resurrect a host create that resolves after teardown', async () => 
     send: vi.fn(),
     relay: vi.fn(),
     connectedIds: () => [],
+    disconnectPeer: vi.fn(async () => {}),
     authenticate: vi.fn(),
     receive: vi.fn(),
     replaceConnection: vi.fn(),
