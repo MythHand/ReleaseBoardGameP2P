@@ -1,4 +1,5 @@
-import { type TransitionEvent, useEffect, useState } from 'react'
+import { type TransitionEvent, useState } from 'react'
+import { KEYBOARD_PRIORITY, useKeyboardLayer } from '@/keyboard'
 import Typography from '../../primitives/Typography'
 import styles from './VideoPlayer.module.css'
 
@@ -50,16 +51,21 @@ export default function VideoPlayer({ src, copy, className = '' }: VideoPlayerPr
     else setMounted(false) // fully collapsed → drop the iframe
   }
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      setExpanded(false)
-      setOpen(false)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+  useKeyboardLayer({
+    name: 'video',
+    active: open,
+    priority: KEYBOARD_PRIORITY.panel,
+    bindings: [
+      {
+        key: 'Escape',
+        focus: 'any',
+        run: () => {
+          closeVideo()
+          return 'handled'
+        },
+      },
+    ],
+  })
 
   return (
     <div className={`${styles.videoPlayer} ${className}`}>

@@ -242,7 +242,7 @@ export default function Lobby({
           <p className={styles.sub}>{copy.subtitle}</p>
         </div>
         {/* the room between the two sides of the header is the mini-game's */}
-        <BugRunner label={copy.bugRunner} className={styles.runner} />
+        <BugRunner globalKeys label={copy.bugRunner} className={styles.runner} />
         <div className={styles.headRight}>
           <LobbyCode code={code} link={shareLink} copy={codeCopy} />
           <LangSwitcher value={lang} onChange={setLang} label={copy.language} />

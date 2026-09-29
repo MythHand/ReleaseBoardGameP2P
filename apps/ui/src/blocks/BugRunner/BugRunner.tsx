@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { play } from '@/animations/play'
 import { wait } from '@/animations/timing'
+import { KEYBOARD_PRIORITY, useKeyboardLayer } from '@/keyboard'
 import Typography from '@/primitives/Typography'
 import styles from './BugRunner.module.css'
 import {
@@ -39,6 +40,7 @@ import {
 export interface BugRunnerProps {
   // what the block is, for a screen reader — the kit carries no copy of its own
   label: string
+  globalKeys?: boolean
   className?: string
 }
 
@@ -125,7 +127,7 @@ const BONUS_HOLD = 600
 // A dinosaur game with the Bug as its hero, for the lobby's header: it sits
 // until clicked, then runs — jump the hotfixes on the road, stay down under the
 // monitors in the air. Transparent, and as wide as the room it is given.
-export default function BugRunner({ label, className = '' }: BugRunnerProps) {
+export default function BugRunner({ label, className = '', globalKeys = false }: BugRunnerProps) {
   const rootRef = useRef<HTMLButtonElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const game = useRef<Game>(newGame(0))
@@ -223,25 +225,28 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
     paint()
   }, [paint])
 
-  // The up arrow jumps from anywhere on the page, not only with the block in
-  // focus — unless the key is somebody else's: a field being typed in, or a
-  // control that has already handled it (the block itself, focused, included).
-  useEffect(() => {
-    const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== 'ArrowUp' || e.defaultPrevented) return
-      const target = e.target
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable || target.closest('input, textarea, select'))
-      ) {
-        return
-      }
-      e.preventDefault()
-      act()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [act])
+  useKeyboardLayer({
+    name: 'bug-runner',
+    active: globalKeys,
+    priority: KEYBOARD_PRIORITY.screen,
+    bindings: [
+      {
+        key: ' ',
+        run: () => {
+          act()
+          return 'handled'
+        },
+      },
+      {
+        key: 'ArrowUp',
+        repeat: true,
+        run: () => {
+          act()
+          return 'handled'
+        },
+      },
+    ],
+  })
 
   // on the press, not the release: a jump that waits for the button to come up
   // is late by exactly the time the player took to let go
@@ -251,6 +256,22 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
   }
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key !== ' ' && e.key !== 'ArrowUp' && e.key !== 'Enter') return
+    if (e.key === ' ') {
+      if (
+        e.defaultPrevented ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.shiftKey ||
+        e.nativeEvent.isComposing ||
+        e.nativeEvent.keyCode === 229
+      )
+        return
+      if (e.repeat) {
+        e.preventDefault()
+        return
+      }
+    }
     e.preventDefault()
     act()
   }

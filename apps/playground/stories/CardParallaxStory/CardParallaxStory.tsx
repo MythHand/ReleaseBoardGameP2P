@@ -1,4 +1,5 @@
-import { type CSSProperties, useEffect } from 'react'
+import { isKeyboardControl, KEYBOARD_PRIORITY, useKeyboardLayer } from '@release/ui'
+import { type CSSProperties, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { CARD_CONTENT, CARDS, CATEGORIES } from '@/cards'
 import CardParallax, { PARALLAX_CARDS } from '@/cards/CardParallax'
@@ -40,23 +41,31 @@ export default function CardParallaxStory() {
   const accent = CATEGORIES[selected.category].accent
   const content: CardContent | undefined = CARD_CONTENT[selected.id]?.[lang]
 
-  // ↑/↓ step through the cards (internal "pages"), mirroring the vertical rail
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
-      e.preventDefault()
-      const idx = CARDS.findIndex((c) => c.id === selected.id)
-      const next =
-        e.key === 'ArrowDown' ? Math.min(idx + 1, CARDS.length - 1) : Math.max(idx - 1, 0)
-      if (next === idx) return
-      // drop focus off the clicked rail item — otherwise the first arrow press
-      // makes it :focus-visible and its green outline sticks on the old entry
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-      void navigate(`/card-parallax/${CARDS[next].id}`)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [selected.id, navigate])
+  const railRef = useRef<HTMLElement>(null)
+  // The rail owns these arrows too; all other controls keep native navigation.
+  useKeyboardLayer({
+    name: 'card-parallax',
+    active: true,
+    priority: KEYBOARD_PRIORITY.screen,
+    bindings: ['ArrowUp', 'ArrowDown'].map((key) => ({
+      key,
+      repeat: true,
+      focus: (event: KeyboardEvent) =>
+        !isKeyboardControl(event) ||
+        (event.target instanceof HTMLElement &&
+          event.target.closest('button')?.parentElement === railRef.current),
+      run: () => {
+        const idx = CARDS.findIndex((c) => c.id === selected.id)
+        const next =
+          key === 'ArrowDown' ? Math.min(idx + 1, CARDS.length - 1) : Math.max(idx - 1, 0)
+        if (next !== idx) {
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+          void navigate(`/card-parallax/${CARDS[next].id}`)
+        }
+        return 'handled' as const
+      },
+    })),
+  })
 
   // render the composed face for cards that have one, the PNG face otherwise
   const parallaxConfig = PARALLAX_CARDS[selected.id]
@@ -114,7 +123,7 @@ export default function CardParallaxStory() {
       </TechBar>
 
       <div className={styles.main}>
-        <nav className={styles.rail}>
+        <nav ref={railRef} className={styles.rail}>
           {CARDS.map((card) => (
             <button
               type="button"
