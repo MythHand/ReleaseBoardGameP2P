@@ -155,7 +155,7 @@ export default function LobbyView() {
           </Typography>
         </div>
         {/* the room between the two sides of the header is the mini-game's */}
-        <BugRunner label={t('lobbyScreen.bugRunner')} className={styles.runner} />
+        <BugRunner label={t('lobbyScreen.bugRunner')} className={styles.runner} globalSpace />
         <div className={styles.headRight}>
           <LobbyCode
             code={session.roomCode ?? ''}

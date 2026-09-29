@@ -28,6 +28,8 @@ import { BUG_RUN_A, BUG_RUN_B, BUG_SIT, HOTFIX, MONITOR, type Sprite } from './s
 export interface BugRunnerProps {
   // what the block is, for a screen reader — the kit carries no copy of its own
   label: string
+  // Opt in for the lobby's runner; standalone previews keep keyboard input local.
+  globalSpace?: boolean
   className?: string
 }
 
@@ -107,7 +109,7 @@ const pad = (n: number) => String(n).padStart(5, '0')
 // A dinosaur game with the Bug as its hero, for the lobby's header: it sits
 // until clicked, then runs — jump the hotfixes on the road, stay down under the
 // monitors in the air. Transparent, and as wide as the room it is given.
-export default function BugRunner({ label, className = '' }: BugRunnerProps) {
+export default function BugRunner({ label, globalSpace = false, className = '' }: BugRunnerProps) {
   const rootRef = useRef<HTMLButtonElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const game = useRef<Game>(newGame(0))
@@ -178,13 +180,42 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
     return () => cancelAnimationFrame(raf)
   }, [phase, paint])
 
-  const act = () => {
+  const act = useCallback(() => {
     const g = press(game.current, performance.now())
     if (g === game.current) return
     game.current = g
     setPhase(g.phase)
     paint()
-  }
+  }, [paint])
+
+  useEffect(() => {
+    if (!globalSpace) return
+    const onSpace = (e: globalThis.KeyboardEvent) => {
+      if (
+        e.key !== ' ' ||
+        e.defaultPrevented ||
+        e.isComposing ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.shiftKey
+      )
+        return
+      // Text entry and other controls own their keys, including descendants of
+      // editable regions. The runner's focused key is already handled locally.
+      if (
+        e.target instanceof Element &&
+        e.target.closest(
+          'input, textarea, select, button, a[href], summary, [tabindex], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="textbox"]',
+        )
+      )
+        return
+      e.preventDefault()
+      if (!e.repeat) act()
+    }
+    window.addEventListener('keydown', onSpace)
+    return () => window.removeEventListener('keydown', onSpace)
+  }, [act, globalSpace])
 
   // on the press, not the release: a jump that waits for the button to come up
   // is late by exactly the time the player took to let go
@@ -195,6 +226,7 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key !== ' ' && e.key !== 'ArrowUp' && e.key !== 'Enter') return
     e.preventDefault()
+    if (e.key === ' ' && e.repeat) return
     act()
   }
 
