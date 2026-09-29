@@ -1,4 +1,6 @@
-import { type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from 'react'
+import { KEYBOARD_PRIORITY, useKeyboardLayer } from '@/keyboard'
+import { getKeyboardRegistry } from '@/keyboard/registry'
 import Typography from '../Typography'
 import styles from './Modal.module.css'
 
@@ -19,6 +21,42 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
   const dialogRef = useRef<HTMLDialogElement>(null)
   const returnRef = useRef<HTMLElement | null>(null)
   const titleId = useId()
+  const restoreFocus = useRef(false)
+  const { isTopOfPriority, stackIndex } = useKeyboardLayer({
+    name: `modal:${titleId}`,
+    active: mounted,
+    priority: KEYBOARD_PRIORITY.modal,
+    blockBelow: true,
+    root: () => dialogRef.current,
+    bindings: [
+      {
+        key: 'Escape',
+        focus: 'any',
+        run: () => {
+          if (open) onClose()
+          return 'handled'
+        },
+      },
+      {
+        key: 'Tab',
+        focus: 'any',
+        repeat: true,
+        modifiers: 'shift',
+        run: (e) => {
+          const dialog = dialogRef.current
+          if (!dialog) return 'handled'
+          const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
+          const current = focusable.indexOf(document.activeElement as HTMLElement)
+          // Drive every Tab manually, including Safari's default button skipping.
+          const next = e.shiftKey
+            ? focusable[current <= 0 ? focusable.length - 1 : current - 1]
+            : focusable[current >= focusable.length - 1 ? 0 : current + 1]
+          ;(next ?? dialog).focus()
+          return 'handled'
+        },
+      },
+    ],
+  })
 
   useEffect(() => {
     if (open) {
@@ -35,55 +73,33 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
     }
     setShown(false)
     const t = setTimeout(() => {
+      restoreFocus.current =
+        getKeyboardRegistry(window).topRoot(KEYBOARD_PRIORITY.modal) === dialogRef.current
       setMounted(false)
-      // Only restore focus if the trigger is still in the document. After a
-      // submit that navigates away the trigger is unmounted, and focusing a
-      // detached node is a silent no-op that strands focus at the document root.
-      if (returnRef.current?.isConnected) returnRef.current.focus()
-      returnRef.current = null
     }, 380)
     return () => clearTimeout(t)
   }, [open])
 
   // Move focus into the modal once it is visible
   useEffect(() => {
-    if (!shown || !dialogRef.current) return
+    if (!shown || !isTopOfPriority || !dialogRef.current) return
     const first = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)[0]
     ;(first ?? dialogRef.current).focus()
-  }, [shown])
+  }, [shown, isTopOfPriority])
 
-  // Keyboard: Escape to close + Tab-cycle focus trap.
-  // The listener is on `window` in the CAPTURE phase so it (a) fires for Escape
-  // even when focus has left the dialog (e.g. a click on the presentational
-  // backdrop) and (b) runs before the dialog's bubble-phase onKeyDown
-  // stopPropagation, which would otherwise swallow the event.
+  // Restore only after the closing layer has left the registry. A lower
+  // modal closing in the background must not move the top modal's focus.
   useEffect(() => {
-    if (!mounted) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-        return
-      }
-      if (e.key !== 'Tab') return
-      const dialog = dialogRef.current
-      if (!dialog) return
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE))
-      if (focusable.length === 0) return
-      // Always drive Tab manually so Safari (which skips buttons by default)
-      // still cycles through every focusable element inside the dialog; a -1
-      // index (focus outside the dialog) pulls it back to the first/last item.
-      e.preventDefault()
-      const current = focusable.indexOf(document.activeElement as HTMLElement)
-      if (e.shiftKey) {
-        focusable[current <= 0 ? focusable.length - 1 : current - 1].focus()
-      } else {
-        focusable[current >= focusable.length - 1 ? 0 : current + 1].focus()
-      }
+    if (mounted) return
+    const saved = returnRef.current
+    if (restoreFocus.current) {
+      const top = getKeyboardRegistry(window).topRoot(KEYBOARD_PRIORITY.modal)
+      if (saved?.isConnected && (!top || top.contains(saved))) saved.focus()
+      else if (top) (top.querySelector<HTMLElement>(FOCUSABLE) ?? top).focus()
     }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [mounted, onClose])
+    restoreFocus.current = false
+    returnRef.current = null
+  }, [mounted])
 
   if (!mounted) return null
 
@@ -91,6 +107,7 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
     // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-dismiss; accessible affordances are the close <button> + Escape handler; overlay is presentational
     <div
       className={`${styles.overlay} ${shown ? styles.shown : ''}`}
+      style={{ '--modal-stack': Math.max(0, stackIndex) } as CSSProperties}
       onClick={onClose}
       role="presentation"
     >
