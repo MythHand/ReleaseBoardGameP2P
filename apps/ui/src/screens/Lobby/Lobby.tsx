@@ -171,13 +171,13 @@ export default function Lobby({
   const kickSpectator = (id: number) => setSpectators((ss) => ss.filter((s) => s.id !== id))
   const toSpectator = (id: number) => {
     const p = players.find((x) => x.id === id)
-    if (!p) return
+    if (!p || p.host || spectators.length >= specCapacity) return
     setPlayers((ps) => ps.filter((x) => x.id !== id))
     setSpectators((ss) => [...ss, { id: p.id, name: p.name }])
   }
   const toPlayer = (id: number) => {
     const s = spectators.find((x) => x.id === id)
-    if (!s) return
+    if (!s || players.length >= capacity) return
     setSpectators((ss) => ss.filter((x) => x.id !== id))
     setPlayers((ps) => [...ps, { id: s.id, name: s.name, host: false, ready: false, online: true }])
   }
@@ -364,9 +364,12 @@ export default function Lobby({
                 className={styles.capRow}
                 label={copy.specLimit}
                 value={specCapacity}
-                min={0}
+                min={spectators.length}
                 max={SPEC_MAX}
-                onChange={setSpecCapacity}
+                onChange={(n) => {
+                  if (Number.isInteger(n) && n >= spectators.length && n <= SPEC_MAX)
+                    setSpecCapacity(n)
+                }}
                 color={specColor}
                 fill
               />

@@ -2226,7 +2226,7 @@ function BoardView({
                     <SettingsField label={copy.table.specLimit}>
                       <Slider
                         value={spectatorLimit ?? 0}
-                        min={0}
+                        min={spectators.length}
                         max={SPEC_MAX}
                         onChange={(n) => onSpectatorLimitChange?.(n)}
                         color={specColorFor(spectatorLimit ?? 0)}

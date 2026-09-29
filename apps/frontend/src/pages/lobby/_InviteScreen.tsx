@@ -6,6 +6,7 @@ import DiceIcon from '@/icons/DiceIcon'
 import { useGoToLobby } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
+import type { JoinRole } from '~/entities/lobby'
 import { useJoinLobby } from '~/features/join-lobby/useJoinLobby'
 import Form, { FormField } from '~/shared/ui/Form'
 import ScreenShell from '~/shared/ui/ScreenShell'
@@ -28,6 +29,8 @@ export default function InviteScreen() {
   const location = useLocation()
   const [name, setName] = useState((location.state as { nickname?: string } | null)?.nickname ?? '')
 
+  const [role, setRole] = useState<JoinRole>('player')
+
   // Connected, but the host's PEER_LIST hasn't landed yet: joinRoom seeds
   // `peers` with only the joiner, and applyPeerList swaps in the full roster
   // (which includes the host). So the host's absence IS "roster not yet here".
@@ -42,9 +45,11 @@ export default function InviteScreen() {
   // The action slot's status line — localized, never the raw PeerJS string.
   const status =
     session.status === 'error'
-      ? session.errorKind === 'not-found'
-        ? t('invite.notFoundStatus')
-        : t('invite.connectError')
+      ? session.errorKind === 'room-full'
+        ? t('invite.fullStatus')
+        : session.errorKind === 'not-found'
+          ? t('invite.notFoundStatus')
+          : t('invite.connectError')
       : null
 
   const lang = i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'
@@ -69,7 +74,7 @@ export default function InviteScreen() {
           try {
             // A setup failure rejects here and surfaces through
             // session.error/errorKind, so only navigate on success.
-            const formatted = await joinLobby(code, nickname)
+            const formatted = await joinLobby(code, nickname, role)
             goToLobby(formatted)
           } catch {
             // Already surfaced as failed / notFound; stay on the screen.
@@ -81,9 +86,6 @@ export default function InviteScreen() {
         </Typography>
 
         <div className={styles.fields}>
-          {/* Role choice comes first. Spectator is disabled: the host assigns
-                the role (assignRole) and the wire protocol carries no requested
-                role, so guest mode isn't supported yet. */}
           <div className={styles.role}>
             <Typography base="label-sm" tk="tk-16" as="span" className={styles.roleLabel}>
               {t('invite.roleTitle')}
@@ -92,13 +94,21 @@ export default function InviteScreen() {
               <button
                 type="button"
                 disabled={busy}
-                className={`${styles.roleOpt} ${styles.roleOptOn}`}
+                aria-pressed={role === 'player'}
+                onClick={() => setRole('player')}
+                className={`${styles.roleOpt} ${role === 'player' ? styles.roleOptOn : ''}`}
               >
                 <Typography base="label-md" tk="tk-12">
                   {t('invite.rolePlayer')}
                 </Typography>
               </button>
-              <button type="button" disabled className={styles.roleOpt}>
+              <button
+                type="button"
+                disabled={busy}
+                aria-pressed={role === 'spectator'}
+                onClick={() => setRole('spectator')}
+                className={`${styles.roleOpt} ${role === 'spectator' ? styles.roleOptOn : ''}`}
+              >
                 <Typography base="label-md" tk="tk-12">
                   {t('invite.roleSpectator')}
                 </Typography>

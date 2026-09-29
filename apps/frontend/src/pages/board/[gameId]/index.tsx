@@ -180,6 +180,8 @@ export default function BoardPage() {
           code: session.roomCode ?? undefined,
           participants,
           spectators,
+          spectatorLimit: session.state?.maxSpectators,
+          onSpectatorLimitChange: session.isHost ? session.setMaxSpectators : undefined,
           disconnected,
           // The overlay covers both ways a peer can be off the table: a guest
           // dialing its way back, and a host rebuilding the match it was
