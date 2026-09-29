@@ -1,23 +1,21 @@
-import { useTranslation } from '@release/translation'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { runViewTransition } from '~/app/lib/viewTransition'
 import { useSession } from '~/app/providers/SessionProvider'
 import { effectiveBots } from '~/network'
+import { botNames } from './botNames'
 
 // Host-start trigger. It broadcasts rather than navigating: the host used to
 // walk to the board alone, leaving every guest behind in the lobby.
 //
-// The bot names are built HERE and handed down. `network/` may not import
-// i18next, so the layer that owns the copy is the layer that supplies it.
+// The bot names are built HERE and handed down: `network/` knows bots only as a
+// count. They come from the same host-seeded pick the lobby rows show, so a
+// bot keeps its name from the lobby onto the board.
 export function useStartGame() {
   const session = useSession()
-  const { t } = useTranslation()
   return () => {
-    const bots = session.state ? effectiveBots(session.state) : 0
-    session.startGame(
-      Array.from({ length: bots }, (_, i) => t('lobbyScreen.botName', { n: i + 1 })),
-    )
+    const state = session.state
+    session.startGame(state ? botNames(state.hostId, effectiveBots(state)) : [])
   }
 }
 
