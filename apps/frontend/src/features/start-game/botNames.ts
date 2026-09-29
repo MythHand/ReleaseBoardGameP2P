@@ -1,16 +1,19 @@
 // Bot nicknames. They are proper names, the same in every locale, so they live
-// here rather than in the translation catalog.
+// here rather than in the translation catalog. Keep them free of real brand and
+// product names: a bot named after a model would claim that model plays it.
 export const BOT_NICKNAMES = [
-  'ClaudeBot',
-  'OpenBot',
-  'GeminBot',
-  'LlamaBot',
-  'GrokBot',
-  'CursorBot',
-  'CodexBot',
-  'SonnetBot',
-  'HaikuBot',
-  'OpusBot',
+  'BitBot',
+  'HashBot',
+  'NaNBot',
+  'HelloWorldBot',
+  'CtrlZBot',
+  'PanicBot',
+  'CoffeeBot',
+  'CopyPasteBot',
+  'ASAPBot',
+  'FinalFinalBot',
+  'BurgerBot',
+  'PixelPerfectBot',
 ] as const
 
 // A bot has no identity beyond its number, so its name is derived rather than
