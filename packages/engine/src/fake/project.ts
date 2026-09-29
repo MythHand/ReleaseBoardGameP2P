@@ -2,7 +2,7 @@ import type { Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
 import { emptyTally, type PlayerTally } from '../tally'
-import type { PlayerView, ReleasedView, ReleaseView } from '../view'
+import type { PlayerView, ReleasedView, ReleaseView, SpectatorView } from '../view'
 import { pendingView } from './attacks'
 import { attackTargets, drawObligationMet } from './core'
 import { canAttackWith } from './window'
@@ -179,9 +179,8 @@ function tallyView(state: GameState): Record<PlayerId, PlayerTally> | null {
 
 export function project(state: GameState, viewerId: PlayerId): PlayerView {
   const me = state.players[viewerId]
-  const top = state.decks.discard[state.decks.discard.length - 1]
-
   return {
+    ...publicView(state, viewerId),
     self: {
       id: me.id,
       name: me.name,
@@ -193,6 +192,16 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       combos: combosFor(state, viewerId),
       frozen: [...me.frozen],
     },
+  }
+}
+
+export function spectate(state: GameState): SpectatorView {
+  return { ...publicView(state, null), self: null }
+}
+
+function publicView(state: GameState, viewerId: PlayerId | null): Omit<PlayerView, 'self'> {
+  const top = state.decks.discard[state.decks.discard.length - 1]
+  return {
     opponents: state.seating
       .filter((id) => id !== viewerId)
       .map((id) => ({
@@ -224,7 +233,7 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       openedAt: state.window.openedAt,
       deadline: state.window.deadline,
       passed: [...state.window.passed],
-      canAttackWith: canAttackWith(state, viewerId),
+      canAttackWith: viewerId === null ? [] : canAttackWith(state, viewerId),
     },
     pending: pendingView(state, viewerId),
     setup: { ...state.setup },
