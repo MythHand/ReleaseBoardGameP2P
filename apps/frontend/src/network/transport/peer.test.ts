@@ -364,3 +364,25 @@ it('preserves peer-unavailable for a pending game data dial', async () => {
     message: 'Could not connect to peer host',
   })
 })
+
+it('retired data callbacks cannot misclassify the next dial as a media-only error', async () => {
+  const errors = vi.fn()
+  const transport = await createTransport({ onMessage: () => {}, onError: errors })
+  transport.connectTo('host')
+  await Promise.resolve()
+  const old = outboundConns.get('host')
+  if (!transport.media) throw new Error('Media port missing')
+  transport.media.call('host', {} as MediaStream, {
+    version: 1,
+    callerSessionId: 'a',
+    calleeSessionId: 'b',
+  })
+  transport.connectTo('host')
+  old?.emit('error', new Error('old connection error'))
+  errors.mockClear()
+  lastPeer?.emit('error', { type: 'peer-unavailable', message: 'Could not connect to peer host' })
+  expect(errors).toHaveBeenCalledWith({
+    type: 'peer-unavailable',
+    message: 'Could not connect to peer host',
+  })
+})

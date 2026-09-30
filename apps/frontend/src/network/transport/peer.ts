@@ -91,12 +91,18 @@ export function createTransport(args: {
     let opened = false
     let closed = false
     const dataDialPeers = new Set<string>()
+    const dataDials = new Map<string, DataConnection>()
+    const clearDataDial = (conn: DataConnection) => {
+      if (dataDials.get(conn.peer) !== conn) return
+      dataDials.delete(conn.peer)
+      dataDialPeers.delete(conn.peer)
+    }
     const media = createMediaPort(peer, dataDialPeers)
 
     const wire = (conn: DataConnection, authenticated = false) => {
       const generation: ConnectionGeneration = { connection: conn, authenticated, retired: false }
       conn.on('open', () => {
-        dataDialPeers.delete(conn.peer)
+        clearDataDial(conn)
         const previous = connections.get(conn.peer)
         if (previous?.connection === conn) return
         connections.set(conn.peer, generation)
@@ -124,14 +130,14 @@ export function createTransport(args: {
         }
       })
       conn.on('close', () => {
-        dataDialPeers.delete(conn.peer)
+        clearDataDial(conn)
         if (connections.get(conn.peer) !== generation) return
         generation.retired = true
         connections.delete(conn.peer)
         args.onDisconnect?.(conn.peer)
       })
       conn.on('error', (e) => {
-        dataDialPeers.delete(conn.peer)
+        clearDataDial(conn)
         if (generation.retired) return
         const active = connections.get(conn.peer)
         if (active && active !== generation) return
@@ -161,7 +167,9 @@ export function createTransport(args: {
         id: id as string,
         connectTo(peerId) {
           dataDialPeers.add(peerId)
-          wire(peer.connect(peerId), true)
+          const connection = peer.connect(peerId)
+          dataDials.set(peerId, connection)
+          wire(connection, true)
         },
         authenticate(peerId) {
           const generation = connections.get(peerId)
