@@ -76,7 +76,7 @@ export function useDiscardBeat(anchors: BoardAnchors, staging?: RefObject<Staged
       const flown: DiscardCard[] = []
       let adopted = false
       for (const c of plan.cards) {
-        const uid = c.source.kind === 'hand' ? ctx.base.you.hand[c.source.index]?.uid : undefined
+        const uid = c.source.kind === 'hand' ? ctx.base.you?.hand[c.source.index]?.uid : undefined
         const staged = uid != null && (uid === handoff?.mainUid || uid === handoff?.supportUid)
         const centre = staged ? rectOf(latest.current.anchors.centre.current) : null
         const aux = staged && uid === handoff?.supportUid

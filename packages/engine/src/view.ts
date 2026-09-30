@@ -238,3 +238,7 @@ export interface PlayerView {
   // one condition in project(), so a consumer that has one has the other.
   tally: Record<PlayerId, PlayerTally> | null
 }
+
+// A public viewer has no seat, hand, or private choices.
+export type SpectatorView = Omit<PlayerView, 'self'> & { self: null }
+export type GameView = PlayerView | SpectatorView

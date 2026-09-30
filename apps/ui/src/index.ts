@@ -160,6 +160,8 @@ export {
 export { PILE_WIDTH, pileWidthFor } from './table/Table/piles'
 export type {
   Panel,
+  PlayerTableState,
+  SpectatorTableState,
   TableChromeCopy as TableCopy,
   TableCopyBundle,
   TableOpponent,
@@ -169,6 +171,7 @@ export type {
   TableSlots,
   TableState,
 } from './table/Table/types'
+export { isPlayerTable } from './table/Table/types'
 // The line under the centre — where the table says what it is waiting for. It
 // hangs off CENTRE_TOP, so it ships beside the geometry it follows.
 export { default as AskLine } from './table/TableCentre/AskLine'

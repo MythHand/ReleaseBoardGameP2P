@@ -3,7 +3,7 @@ import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
 import { useState } from 'react'
 import { expect, it, vi } from 'vitest'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BoardAnchors, BoardState, PlayerBoardState } from '~/entities/game/board'
 import { useDrawBeat } from './drawBeat'
 import type { PlannedDraw } from './planBeats'
 import { TABLE_HOLD } from './toCentre'
@@ -101,7 +101,7 @@ const base = {
   setup: {},
   playable: [],
   frozen: [],
-} as unknown as BoardState
+} as unknown as PlayerBoardState
 
 const node = () => document.createElement('div')
 // The fan is RENDERED by the probe below and the step measures it — the same
@@ -141,7 +141,7 @@ function run(draws: PlannedDraw[], after?: BoardState) {
   function Probe() {
     // what the fan is showing, kept from what the beat publishes — the board's
     // own arrangement in miniature
-    const [fan, setFan] = useState<string[]>(base.you.hand.map((c) => c.uid))
+    const [fan, setFan] = useState<string[]>(base.you?.hand.map((c) => c.uid))
     const beat = useDrawBeat(anchors, (_order, uid, at) => commits.push({ uid, at }))
     start = () =>
       beat.run(
@@ -151,7 +151,7 @@ function run(draws: PlannedDraw[], after?: BoardState) {
           after,
           publish: (s) => {
             published.push(s)
-            setFan(s.you.hand.map((c) => c.uid))
+            setFan(s.you?.hand.map((c) => c.uid) ?? [])
             // A pending-carrying publish is the one shadow this beat commits
             // before it drops the carrier — that's the moment the ordering
             // test cares about, not every publish a run makes.
@@ -209,7 +209,7 @@ it('takes my own card to the centre, turns it over, and sits it in the fan', asy
   await go()
   expect(played.names).toContain('drawToCenter')
   // The hand it publishes is the fan the NEXT card of the batch must aim at.
-  expect(published.at(-1)?.you.hand.map((h) => h.card.id)).toEqual(['attack-bug'])
+  expect(published.at(-1)?.you?.hand.map((h) => h.card.id)).toEqual(['attack-bug'])
 })
 
 it('sends an opponent’s card to their seat, face down', async () => {
@@ -227,7 +227,7 @@ it('grows the fan between the cards of a multi-draw (I8)', async () => {
   arrivals.handLengths = []
   const { published, go } = run([draw(), draw({ key: 'w5', eventId: 5, card: 'attack-ddos' })])
   await go()
-  expect(published.at(-1)?.you.hand).toHaveLength(2)
+  expect(published.at(-1)?.you?.hand).toHaveLength(2)
   // The load-bearing assertion: the batch has one hand, so both draws feed
   // the SAME `useHandArrival` instance — the second card must aim at the fan
   // the first card actually grew to (1), not the length the batch started
@@ -262,7 +262,7 @@ it('lands a drawn card where the step puts it, and commits that slot', async () 
   // The committed slot IS the slot the card ended up in — the claim that makes
   // the commit worth anything. Asserted on the second card, the one whose slot
   // the first has already shifted.
-  const hand = published.at(-1)?.you.hand ?? []
+  const hand = published.at(-1)?.you?.hand ?? []
   expect(hand).toHaveLength(2)
   expect(hand[commits[1].at]?.uid).toBe('h5')
 })
@@ -278,11 +278,11 @@ it('lands the card under the uid the projection will know it by', async () => {
   const after = {
     ...base,
     you: { ...base.you, hand: [{ uid: 'p1#7', card: { id: 'attack-bug' } }] },
-  } as unknown as BoardState
+  } as unknown as PlayerBoardState
   const { published, commits, go } = run([draw()], after)
   await go()
   expect(commits.map((c) => c.uid)).toEqual(['p1#7'])
-  expect(published.at(-1)?.you.hand.map((h) => h.uid)).toEqual(['p1#7'])
+  expect(published.at(-1)?.you?.hand.map((h) => h.uid)).toEqual(['p1#7'])
 })
 
 it('reveals a trigger at the centre and files it in the discard itself', async () => {

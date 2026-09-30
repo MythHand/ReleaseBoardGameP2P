@@ -92,7 +92,7 @@ export function rowCells(row: CentreRow, n: number): RowCell[] {
 export const rowPlaceStyle = (row: CentreRow, n: number, i: number): CSSProperties => {
   const cell = rowCells(row, n)[i] ?? rowCells(row, 1)[0]
   return {
-    insetBlockStart: `${CENTRE_TOP}%`,
+    insetBlockStart: `var(--table-centre-top, ${CENTRE_TOP}%)`,
     insetInlineStart: '50%',
     inlineSize: `${cell.w}px`,
     transform: `translate(calc(-50% + ${cell.dx}px), -50%)`,

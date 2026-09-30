@@ -14,6 +14,8 @@ import {
   type SessionRef,
   seatOfPeer,
   syncAll,
+  unwatch,
+  watch,
 } from './referee'
 import type { StartGate } from './startGate'
 
@@ -108,6 +110,8 @@ export interface KeeperHandle {
   // projection with no account of how it came about.
   resync(events?: Event[]): void
   handleMessage(frame: WireMessage): void
+  watch(peerId: string): void
+  unwatch(peerId: string): void
   peerLeft(peerId: string): void
   peerReturned(playerId: PlayerId, peerId: string): void
   // Voluntary keeper handover: hand GameState to the successor privately and
@@ -193,6 +197,7 @@ export function attachKeeper(args: {
   args.gate?.onOpen(flush)
 
   const submitted = (peerId: string, intent: unknown) => {
+    if (!seatOfPeer(args.ref.current, peerId)) return
     if (gated()) {
       early.push({ peerId, intent })
       return
@@ -253,6 +258,12 @@ export function attachKeeper(args: {
       // and nothing else), so `payload` itself may be missing; `applyIntent`
       // takes it from here as `unknown` and checks the rest.
       submitted(frame.from, frame.payload?.intent)
+    },
+    watch(peerId) {
+      if (keeping) save(watch(args.ref.current, peerId))
+    },
+    unwatch(peerId) {
+      if (keeping) save(unwatch(args.ref.current, peerId))
     },
     peerLeft(peerId) {
       if (!keeping) return

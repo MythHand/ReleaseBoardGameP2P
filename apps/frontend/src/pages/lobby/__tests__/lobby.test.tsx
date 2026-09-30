@@ -63,6 +63,10 @@ function base(): UseLobby {
     seats: [],
     error: null,
     errorKind: null,
+    joinAvailability: null,
+    lobbyActionError: null,
+    setMaxSpectators: vi.fn(),
+    setParticipantRole: vi.fn(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
@@ -152,6 +156,7 @@ function inSession(): UseLobby {
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
+      maxSpectators: 8,
       bots: 0,
       setup: {
         handLimit: 'base',
@@ -320,6 +325,7 @@ it('LobbyView renders spectator section when guests present', () => {
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
+      maxSpectators: 8,
       bots: 0,
       setup: {
         handLimit: 'base',
@@ -531,4 +537,36 @@ it('copies the bare room code through its separate header button', () => {
   renderInRouter(<LobbyView />)
   fireEvent.click(screen.getByText('lobbyCode.copyCode'))
   expect(writeText).toHaveBeenCalledWith('ABC-23D')
+})
+
+it('lets the host moderate roles and the spectator limit', () => {
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  expect(screen.getByText('0 / 8')).toBeTruthy()
+  const sliders = screen.getAllByRole('slider')
+  const quota = sliders.find((slider) => slider.getAttribute('max') === '28')
+  expect(quota?.getAttribute('min')).toBe('0')
+  if (!quota) throw new Error('Missing spectator quota')
+  fireEvent.change(quota, { target: { value: '3' } })
+  expect(sessionValue.setMaxSpectators).toHaveBeenCalledWith(3)
+  fireEvent.click(screen.getByRole('button', { name: 'lobbyScreen.actions' }))
+  fireEvent.click(screen.getByText('lobbyScreen.makeSpectator'))
+  expect(sessionValue.setParticipantRole).toHaveBeenCalledWith('p1', 'spectator')
+})
+
+it('explains a full spectator quota without changing a role', () => {
+  sessionValue = inSession()
+  if (!sessionValue.state) throw new Error('Missing lobby')
+  sessionValue.state.maxSpectators = 0
+  renderInRouter(<LobbyView />)
+  fireEvent.click(screen.getByRole('button', { name: 'lobbyScreen.actions' }))
+  fireEvent.click(screen.getByText('lobbyScreen.makeSpectator'))
+  expect(screen.getByText('lobbyScreen.errors.spectators-full')).toBeTruthy()
+  expect(sessionValue.setParticipantRole).not.toHaveBeenCalled()
+})
+
+it('shows the host the reason a quota or role change was refused', () => {
+  sessionValue = { ...inSession(), lobbyActionError: 'spectators-full' }
+  renderInRouter(<LobbyView />)
+  expect(screen.getByRole('alert').textContent).toBe('lobbyScreen.errors.spectators-full')
 })

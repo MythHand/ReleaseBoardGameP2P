@@ -189,10 +189,15 @@ export function useUpgradeBeat(
       const answered = new Set(plan.throws.map((t) => t.player))
       const own = plan.throws.find((t) => t.player === beat.base.selfId)
       const ownUid =
-        own && (local?.mainUid ?? beat.base.you.hand.find((c) => c.card.id === own.card)?.uid)
+        own && (local?.mainUid ?? beat.base.you?.hand.find((c) => c.card.id === own.card)?.uid)
       const landed = {
         ...beat.base,
-        you: { ...beat.base.you, hand: beat.base.you.hand.filter((c) => c.uid !== ownUid) },
+        ...(beat.base.you
+          ? {
+              selfId: beat.base.selfId,
+              you: { ...beat.base.you, hand: beat.base.you.hand.filter((c) => c.uid !== ownUid) },
+            }
+          : { selfId: null, you: null }),
         opponents: beat.base.opponents.map((p) =>
           answered.has(p.id) ? { ...p, handCount: Math.max(0, p.handCount - 1) } : p,
         ),

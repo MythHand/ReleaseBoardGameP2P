@@ -470,7 +470,7 @@ const FROM_RELEASE = new Set<DiscardReason>(['destroyed', 'neutralized'])
 const slotHolding = (
   release: ReleaseSlots,
   card: string,
-  ids?: BoardState['you']['releaseId'],
+  ids?: NonNullable<BoardState['you']>['releaseId'],
 ): string | null =>
   (Object.keys(release) as (keyof ReleaseSlots)[]).find(
     (k) => (ids?.[k] ?? release[k]?.id) === card,
@@ -496,7 +496,7 @@ function sourceOf(
   // the id against the hand that is still on screen. Two copies of one card are
   // interchangeable to look at, so the first unclaimed one is right rather than
   // merely adequate — `claimed` is what stops a pair of them sharing a slot.
-  const index = before.you.hand.findIndex((h, i) => h.card.id === e.card && !claimed.has(i))
+  const index = before.you?.hand.findIndex((h, i) => h.card.id === e.card && !claimed.has(i)) ?? -1
   if (index < 0) return null
   claimed.add(index)
   return { kind: 'hand', index }
@@ -575,7 +575,7 @@ function revealAfter(
 // question of them, so it is its own two lines rather than a parameter on that.
 const releaseEventsOf = (before: BoardState, player: string) =>
   player === before.selfId
-    ? before.you.releaseEvent
+    ? before.you?.releaseEvent
     : before.opponents.find((o) => o.id === player)?.releaseEvent
 
 // The Code Review lying under a release, on the board that is still on screen
@@ -583,7 +583,7 @@ const releaseEventsOf = (before: BoardState, player: string) =>
 // lines for the same reason `releaseEventsOf` is.
 const releaseSupportOf = (before: BoardState, player: string) =>
   player === before.selfId
-    ? before.you.support
+    ? before.you?.support
     : before.opponents.find((o) => o.id === player)?.support
 
 // The AI card standing behind whatever prompt this batch answers, read off the
@@ -1267,7 +1267,7 @@ export function planBeats(
       // the card, so a grid measured there would deal one back too few.
       const donorHand =
         e.from === before.selfId
-          ? before.you.hand.length
+          ? (before.you?.hand.length ?? 0)
           : (before.opponents.find((o) => o.id === e.from)?.handCount ?? 0)
       plans.push({
         kind: 'handTransfer',

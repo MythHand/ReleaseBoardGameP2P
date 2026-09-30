@@ -27,3 +27,15 @@ void toKit
 void fromKit
 void overToKit
 void overFromKit
+
+import type { PlayerTableState, SpectatorTableState } from '@release/ui'
+import type { PlayerBoardState, SpectatorBoardState } from './types'
+
+const playerToKit = (state: PlayerBoardState): PlayerTableState => state
+const playerFromKit = (state: PlayerTableState): PlayerBoardState => state
+const spectatorToKit = (state: SpectatorBoardState): SpectatorTableState => state
+const spectatorFromKit = (state: SpectatorTableState): SpectatorBoardState => state
+void playerToKit
+void playerFromKit
+void spectatorToKit
+void spectatorFromKit

@@ -2,7 +2,7 @@ import type { Event } from '@release/engine'
 import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
 import { describe, expect, it } from 'vitest'
-import type { BoardState } from '~/entities/game/board'
+import type { PlayerBoardState } from '~/entities/game/board'
 import { standInScatter } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
 import { classifyPiles, planBeats } from './planBeats'
@@ -10,7 +10,7 @@ import { classifyPiles, planBeats } from './planBeats'
 const card = (id: string) =>
   cardById(id) ?? { id, name: id, category: 'attack', deck: 'base', art: '', tags: [], qty: 0 }
 
-const boardBefore = (over: Partial<BoardState> = {}): BoardState =>
+const boardBefore = (over: Partial<PlayerBoardState> = {}): PlayerBoardState =>
   ({
     you: {
       name: 'You',
@@ -30,7 +30,7 @@ const boardBefore = (over: Partial<BoardState> = {}): BoardState =>
     playable: [],
     frozen: [],
     ...over,
-  }) as BoardState
+  }) as PlayerBoardState
 
 const discarded = (id: number, over: Partial<Extract<Event, { type: 'discarded' }>> = {}): Event =>
   ({ id, type: 'discarded', player: 'p1', card: 'attack-bug', reason: 'effect', ...over }) as Event
@@ -62,7 +62,7 @@ const defended = (over: Partial<Extract<Event, { type: 'defended' }>> & { id: nu
 // The pending a resolving `defended`/`tookHit` sees on screen: `before` still
 // carries it, because the resolution hasn't happened yet as far as the board
 // shown before this batch is concerned (I1).
-type DefendPending = Extract<NonNullable<BoardState['pending']>, { kind: 'defend' }>
+type DefendPending = Extract<NonNullable<PlayerBoardState['pending']>, { kind: 'defend' }>
 const defendPending = (over: Partial<DefendPending> = {}): DefendPending =>
   ({
     kind: 'defend',
@@ -201,7 +201,7 @@ describe('planBeats', () => {
           options: [],
           source: 'ai-bad-vibe-coding',
         },
-      } as Partial<BoardState>),
+      } as Partial<PlayerBoardState>),
     )
     expect(beats[0]).toMatchObject({ homeward: 'ai-bad-vibe-coding' })
   })
@@ -222,7 +222,7 @@ describe('planBeats', () => {
           options: [],
           source: 'ai-bad-vibe-coding',
         },
-      } as Partial<BoardState>),
+      } as Partial<PlayerBoardState>),
     )
     expect(beats[0]).toMatchObject({ kind: 'handLimit', picked: true })
   })
@@ -245,7 +245,7 @@ describe('planBeats', () => {
         ],
         release: {},
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const [beat] = planBeats([discarded(4), discarded(5)], state)
     expect(beat.kind === 'discard' && beat.cards.map((c) => c.source)).toEqual([
       { kind: 'hand', index: 0 },
@@ -436,7 +436,9 @@ describe('planBeats — order', () => {
     ]
     const beats = planBeats(
       events,
-      boardBefore({ decks: { main: [0], events: 5, discardCount: 12 } } as Partial<BoardState>),
+      boardBefore({
+        decks: { main: [0], events: 5, discardCount: 12 },
+      } as Partial<PlayerBoardState>),
     )
     expect(beats.map((b) => b.kind)).toEqual(['reshuffle', 'draw'])
   })
@@ -591,7 +593,7 @@ describe('planBeats — the combo pair (#100)', () => {
   })
 
   it('resolution discards of the pending pair take the pair exit, others keep the discard beat', () => {
-    const withPending = boardBefore({ pending: defendPending() } as Partial<BoardState>)
+    const withPending = boardBefore({ pending: defendPending() } as Partial<PlayerBoardState>)
     const events = [
       tookHit({ id: 9 }),
       discarded(10, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
@@ -615,7 +617,7 @@ describe('planBeats — the combo pair (#100)', () => {
   it('a plain attack resolution routes its one discard through pairToDiscard too', () => {
     const withPending = boardBefore({
       pending: defendPending({ sudo: false }),
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const events = [
       tookHit({ id: 9 }),
       discarded(10, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
@@ -632,7 +634,7 @@ describe('planBeats — the combo pair (#100)', () => {
   // `discarded` for it ever arrives. The sudo match must not require a
   // `pairToDiscard` to already exist, or this half would have nothing to join.
   it('rollback return: only the sudo half flies out', () => {
-    const withPending = boardBefore({ pending: defendPending() } as Partial<BoardState>)
+    const withPending = boardBefore({ pending: defendPending() } as Partial<PlayerBoardState>)
     const events = [discarded(10, { player: 'p2', card: 'support-sudo', reason: 'attackSpent' })]
     const plans = planBeats(events, withPending)
     expect(plans).toEqual([
@@ -655,7 +657,7 @@ describe('planBeats — the combo pair (#100)', () => {
     // silent-vanish failure mode this test pins).
     const withPending = boardBefore({
       pending: defendPending({ player: 'p2', attacker: 'p1' }),
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const events = [
       discarded(9, { player: 'p2', card: 'defense-rollback', reason: 'defenceSpent' }),
       discarded(10, { player: 'p2', card: 'support-sudo', reason: 'defenceSpent' }),
@@ -685,7 +687,7 @@ describe('planBeats — the answer to an attack (#101)', () => {
   const pending = () =>
     boardBefore({
       pending: defendPending({ scope: 'release', sudo: false }),
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
 
   it('plans one exchange for a cancelling defence and claims both spent cards', () => {
     const plans = planBeats(
@@ -816,7 +818,7 @@ describe('planBeats — the answer to an attack (#101)', () => {
       ],
       boardBefore({
         pending: defendPending({ scope: 'release', sudo: true }),
-      } as Partial<BoardState>),
+      } as Partial<PlayerBoardState>),
     )
     // the sudo in this exchange is the ATTACKER's, so the defender comboed
     // nothing and the attack goes home to them
@@ -833,7 +835,7 @@ describe('planBeats — the answer to an attack (#101)', () => {
       ],
       boardBefore({
         pending: defendPending({ scope: 'release', sudo: true }),
-      } as Partial<BoardState>),
+      } as Partial<PlayerBoardState>),
     )
     expect(plans[0]).toMatchObject({ kind: 'covered', attackSudo: true })
     expect((plans[0] as { spent: unknown[] }).spent).toHaveLength(3)
@@ -862,7 +864,7 @@ describe('planBeats — the answer to an attack (#101)', () => {
         tookHit({ id: 9 }),
         discarded(10, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
       ],
-      boardBefore({ pending: defendPending({ scope: 'release' }) } as Partial<BoardState>),
+      boardBefore({ pending: defendPending({ scope: 'release' }) } as Partial<PlayerBoardState>),
     )
     expect(plans.map((p) => p.kind)).toEqual(['pairToDiscard'])
   })
@@ -897,7 +899,7 @@ describe('planBeats — the answer to an attack (#101)', () => {
           deadline: 0,
         } as Event,
       ],
-      boardBefore({ pending: defendPending({ scope: 'release' }) } as Partial<BoardState>),
+      boardBefore({ pending: defendPending({ scope: 'release' }) } as Partial<PlayerBoardState>),
     )
     expect(plans).toEqual([
       { kind: 'pairToDiscard', key: 'pairOut:10', main: { eventId: 10, card: 'attack-bug' } },
@@ -925,7 +927,7 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
       player: 'p1',
       card: 'trigger-error-503',
       methods: ['debugger'],
-    }) as NonNullable<BoardState['pending']>
+    }) as NonNullable<PlayerBoardState['pending']>
 
   it('plans a Debugger answer as one exchange', () => {
     const plans = planBeats(
@@ -979,7 +981,7 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
         release: { frontend: card('release-frontend') },
         support: { frontend: card('support-code-review') },
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const plans = planBeats(
       [
         neutralized({ id: 10, method: 'sacrifice' }),
@@ -1030,7 +1032,7 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
         release: { frontend: card('release-frontend') },
         releaseEvent: { frontend: 'ai-release-frontend' },
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const plans = planBeats(
       [
         neutralized({ id: 10, method: 'sacrifice' }),
@@ -1105,7 +1107,7 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
         methods: ['debugger'],
         source: 'ai-crush-frontend',
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const plans = planBeats(
       [
         neutralized({ id: 10 }),
@@ -1148,7 +1150,7 @@ describe('planBeats — the answer to an Error 503 (#102)', () => {
           methods: ['monitoring'],
           source: 'ai-crush-frontend',
         },
-      } as Partial<BoardState>),
+      } as Partial<PlayerBoardState>),
     )
     expect(plans.map((p) => p.kind)).toEqual(['neutralized'])
     expect(plans[0]).toMatchObject({
@@ -1353,7 +1355,7 @@ describe('planBeats — a 503 a standing Monitoring answers by itself (#103)', (
       player: 'p1',
       card: 'trigger-error-503',
       methods: ['monitoring'],
-    }) as NonNullable<BoardState['pending']>
+    }) as NonNullable<PlayerBoardState['pending']>
 
   // The engine answers it inside the draw that turned it up: no pending, no
   // gesture, one batch (`fake/triggers.ts` — the Monitoring branch). The
@@ -1647,7 +1649,7 @@ describe('planBeats — aiEvent (#106)', () => {
         release: { frontend: card('release-frontend') },
         releaseEvent: { frontend: 'ai-release-frontend' },
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const plain = boardBefore({
       you: {
         name: 'You',
@@ -1655,7 +1657,7 @@ describe('planBeats — aiEvent (#106)', () => {
         release: { frontend: card('release-frontend') },
         releaseEvent: {},
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const aiPlans = planBeats(batch, ai)
     const plainPlans = planBeats(batch, plain)
     expect(aiPlans.map((p) => p.kind)).toEqual(['aiEvent'])
@@ -1684,7 +1686,7 @@ describe('planBeats — aiEvent (#106)', () => {
         support: { frontend: card('support-code-review') },
         releaseEvent: {},
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const bare = boardBefore({
       you: {
         name: 'You',
@@ -1693,7 +1695,7 @@ describe('planBeats — aiEvent (#106)', () => {
         support: {},
         releaseEvent: {},
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     expect(planBeats(batch, protectedRelease)[0]).toMatchObject({
       tail: { kind: 'crush', card: 'release-frontend', codeReview: 'support-code-review' },
     })
@@ -1721,7 +1723,7 @@ describe('planBeats — aiEvent (#106)', () => {
           support: { backend: card('support-code-review') },
         },
       ],
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     expect(planBeats(batch, before)[0]).toMatchObject({
       tail: { kind: 'crush', codeReview: 'support-code-review' },
     })
@@ -1750,7 +1752,7 @@ describe('planBeats — aiEvent (#106)', () => {
         support: {},
         releaseEvent: {},
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const plan = planBeats(batch, before, null, 7)[0] as Extract<BeatPlan, { kind: 'aiEvent' }>
     expect(plan.tail).toMatchObject({ kind: 'crush', rest: standInScatter(7) })
     // and it is the STAND-IN's pose, never a real discard event's — those are
@@ -1774,7 +1776,7 @@ describe('planBeats — aiEvent (#106)', () => {
         support: { frontend: card('support-code-review') },
         releaseEvent: {},
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const goesHome = boardBefore({
       you: {
         name: 'You',
@@ -1783,7 +1785,7 @@ describe('planBeats — aiEvent (#106)', () => {
         support: {},
         releaseEvent: { frontend: 'ai-release-frontend' },
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     // buried under its own Code Review — `bankToDiscard` banks the spoils as
     // [release, codeReview], so the Code Review is the top and this one is
     // under it, with no entry of its own (docs/animations/backlog.md)
@@ -1859,7 +1861,7 @@ describe('planBeats — a Release comes back out of the discard (#106, Task 11)'
         picks: 1,
         source: 'ai-inside',
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const plans = planBeats(
       [{ id: 20, type: 'takenFromDiscard', player: 'p1', card: 'release-frontend', to: 'hand' }],
       before,
@@ -1885,7 +1887,7 @@ describe('planBeats — a Release comes back out of the discard (#106, Task 11)'
         picks: 1,
         source: 'operation-git-cherry-pick',
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const plans = planBeats(
       [{ id: 20, type: 'takenFromDiscard', player: 'p1', card: 'release-frontend', to: 'hand' }],
       before,
@@ -1903,7 +1905,7 @@ describe('planBeats — a Release comes back out of the discard (#106, Task 11)'
         picks: 1,
         source: 'missing-card',
       },
-    } as Partial<BoardState>)
+    } as Partial<PlayerBoardState>)
     const plans = planBeats(
       [{ id: 20, type: 'takenFromDiscard', player: 'p1', card: 'release-frontend', to: 'hand' }],
       before,
@@ -2091,7 +2093,7 @@ describe('public operation sequence', () => {
       raisedAt: 1,
       player: 'p2',
       source: 'operation-git-rebase',
-    } as BoardState['pending']
+    } as PlayerBoardState['pending']
     const plans = planBeats(
       [opened, discarded(2, { player: 'p2', card: 'operation-git-rebase' })],
       boardBefore(),
@@ -2152,7 +2154,7 @@ it.each([
     target: 'p1',
     attack: 'attack-bug',
     sudo: true,
-  } as BoardState['pending']
+  } as PlayerBoardState['pending']
   const plans = planBeats(
     [
       { id: 1, type: 'handTransfer', from: 'p1', to: 'p2', card: 'release-backend' },
@@ -2199,7 +2201,7 @@ it('takes the lying defence out with the attack after the pick', () => {
     sudo: false,
     cover: 'defense-works-on-my-machine',
     coverSudo: true,
-  } as BoardState['pending']
+  } as PlayerBoardState['pending']
   const plans = planBeats(
     [
       { id: 1, type: 'handTransfer', from: 'p2', to: 'p1', card: 'release-backend' },
@@ -2232,7 +2234,7 @@ describe('a refused Crush', () => {
       source: 'ai-crush-frontend',
     },
     aiCause: { card: 'trigger-ai', eventId: 3 },
-  } as Partial<BoardState>
+  } as Partial<PlayerBoardState>
   const destroyed = (player = 'p1'): Event =>
     ({
       id: 20,
@@ -2257,5 +2259,51 @@ describe('a refused Crush', () => {
   it('reads nothing as a refusal when no Crush was owed by that player', () => {
     const beats = planBeats([destroyed('p2')], boardBefore(crushOwed))
     expect(beats.some((beat) => beat.kind === 'crushRefused')).toBe(false)
+  })
+})
+
+it('plans public draws, transfers, release, defence, AI and upgrade using seats', () => {
+  const seated = boardBefore()
+  const publicBoard = {
+    ...seated,
+    selfId: null,
+    you: null,
+    opponents: [
+      {
+        id: seated.selfId,
+        name: seated.you.name,
+        handCount: seated.you.hand.length,
+        release: seated.you.release,
+      },
+      ...seated.opponents,
+    ],
+  }
+  const cases: Event[][] = [
+    [{ id: 1, type: 'drawn', player: 'p1', pile: 0, deckSize: 9 }],
+    [{ id: 2, type: 'handTransfer', from: 'p1', to: 'p2' }],
+    [released({ id: 3 })],
+    [defended({ id: 4 })],
+    [
+      { id: 5, type: 'drawn', player: 'p1', pile: 0, deckSize: 9 },
+      { id: 6, type: 'aiRevealed', player: 'p1', aiCard: 'trigger-ai', eventCard: 'ai-error-503' },
+      { id: 7, type: 'discarded', player: 'p1', card: 'trigger-ai', reason: 'trigger' },
+      { id: 8, type: 'revealed', player: 'p1', card: 'ai-error-503' },
+    ],
+    [{ id: 6, type: 'upgradeThrown', player: 'p1', card: 'attack-bug' }],
+  ]
+  const plans = cases.map((events) =>
+    planBeats(events, {
+      ...publicBoard,
+      pending: events[0].type === 'defended' ? defendPending() : null,
+    }),
+  )
+  expect(plans.map((list) => list.length > 0)).toEqual([true, true, true, true, true, true])
+  const [draw] = plans[0]
+  expect(draw.kind === 'draw' && draw.draws[0].mine).toBe(false)
+  expect(plans[1][0]).toMatchObject({ kind: 'handTransfer', role: 'watcher' })
+  const discards = planBeats([discarded(7)], publicBoard)
+  expect(discards[0]).toMatchObject({
+    kind: 'discard',
+    cards: [{ source: { kind: 'seat', player: 'p1' } }],
   })
 })

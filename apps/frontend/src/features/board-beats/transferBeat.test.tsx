@@ -185,7 +185,7 @@ it('sends a lost card from the fan into the taker seat, and never into a hand', 
 it('takes the lost card out of your own fan', async () => {
   const r = runTransfer(transferPlan({ from: 'p1', to: 'p2', role: 'victim' }))
   await r.go()
-  const hands = r.published.map((s) => s.you.hand.length)
+  const hands = r.published.map((s) => s.you?.hand.length)
   expect(hands).toContain(0)
 })
 
@@ -452,7 +452,7 @@ it('gives the selected physical copy from its parked rect when the hand has dupl
   } as BoardState
   const r = runTransfer(transferPlan({ role: 'victim', from: 'p1', to: 'p2' }), on)
   await r.go()
-  expect(r.published.at(-1)?.you.hand.map((c) => c.uid)).toEqual(['copy-one'])
+  expect(r.published.at(-1)?.you?.hand.map((c) => c.uid)).toEqual(['copy-one'])
   root.removeChild(centreNode)
 })
 

@@ -3,7 +3,13 @@ import type { Leaving, Rect } from '@release/ui/animations'
 import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
-import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
+import type {
+  BeatRun,
+  BoardAnchors,
+  BoardState,
+  PlayerBoardState,
+  StagedHandoff,
+} from '~/entities/game/board'
 import { useDiscardBeat } from './discardBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -64,7 +70,7 @@ const base = {
   setup: {},
   playable: [],
   frozen: [],
-} as unknown as BoardState
+} as unknown as PlayerBoardState
 
 const ctx: BeatRun = { base, publish: () => {} }
 
@@ -152,7 +158,7 @@ it.each([
   expect(exits.items).toHaveLength(paired ? 2 : 1)
   expect(exits.items[0]).toMatchObject({ from: centre, card: git, scatter: scatterAt(20) })
   expect(release).toHaveBeenCalledOnce()
-  expect(published.at(-1)?.you.hand).toEqual([])
+  expect(published.at(-1)?.you?.hand).toEqual([])
   if (paired) {
     expect(exits.items[0].layer).toBeGreaterThan(exits.items[1].layer ?? 0)
     expect(exits.items[1]).toMatchObject({ from: centre, card: support, scatter: scatterAt(21) })

@@ -1,9 +1,12 @@
 import { en as enCommon } from '@release/translation/catalog'
 import { makeTable } from '@/mocks/table'
-import type { TableProps } from './types'
+import type { PlayerTableState, TableProps } from './types'
 
 // Full, valid props for Table. Tests override only the slice they assert on:
 //   makeTableProps({ room: { ...base.room, role: 'guest' } })
+type PlayerProps = Omit<TableProps, 'state'> & { state: PlayerTableState }
+export function makeTableProps(over?: Partial<PlayerProps>): PlayerProps
+export function makeTableProps(over: Partial<TableProps>): TableProps
 export function makeTableProps(over: Partial<TableProps> = {}): TableProps {
   const mock = makeTable(3)
   return {

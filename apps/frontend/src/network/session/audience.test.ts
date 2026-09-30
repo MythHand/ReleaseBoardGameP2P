@@ -77,3 +77,16 @@ it('keeps blind transfers public with private faces, and named transfers fully p
   const named: Event = { ...blind, publicCard: true }
   expect(forViewer([named], 'c')).toEqual([named])
 })
+
+it('gives a null viewer only public events and public card disclosures', () => {
+  const blind: Event = { id: 5, type: 'handTransfer', from: 'a', to: 'b', card: 'support-sudo' }
+  const named: Event = { ...blind, id: 6, publicCard: true }
+  expect(forViewer([publicEvent, privateEvent, rejection, drawnEvent, blind, named], null)).toEqual(
+    [
+      publicEvent,
+      { id: 4, type: 'drawn', player: 'a', pile: 0, deckSize: 30 },
+      { id: 5, type: 'handTransfer', from: 'a', to: 'b' },
+      named,
+    ],
+  )
+})

@@ -492,6 +492,15 @@ const MODULES: Module[] = [
 // (rect measurements, FLIP, DOM order, key-remount, fixes), not a summary.
 const SCENARIOS: Scenario[] = [
   {
+    name: { ru: 'Зритель: публичный стол и раздача', en: 'Spectator: public table and deal' },
+    from: {
+      ru: 'Все 2–6 мест видны. Раздача и полёты идут к местам игроков; личной руки нет. Поздний вход и reconnect не проигрывают историю. Хлопушки остаются только победителю.',
+      en: 'All 2–6 seats are visible. Deal and flights target player seats, with no local hand. Late join and reconnect skip past events. Confetti remains winner-only.',
+    },
+    where: 'TableStory, TableChatStory, StatsChatStory',
+    board: 'features/game-intro/useDealIntro.ts, features/board-beats/useBeats.ts',
+  },
+  {
     name: { ru: 'Розыгрыш карты', en: 'Playing a card' },
     from: {
       ru: 'flyer (fixed) от rect карты → playToCenter (move 480, EASE) по центрам; wait — удержание; nextFrames перед стартом, чтобы новый узел успел отрисоваться; затем centerToDiscard (move 420) + jitter() на финальные rotate/dx/dy разброса. На борде розыгрыш начинается вытягиванием: Monitoring и Git без цели сначала достигают центра, затем отправляют действие. Клик по руке не начинает отдельный розыгрыш.',
