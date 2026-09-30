@@ -1,5 +1,7 @@
 import type { Peer } from 'peerjs'
-import { expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
+import { createVoiceCalls } from '../voice/calls'
+import { a, b, fakeAudio, fakeStream } from '../voice/testing/fakes'
 import { createMediaPort } from './media'
 
 class Emitter {
@@ -26,8 +28,75 @@ class Call extends Emitter {
   peerConnection = Object.assign(new EventTarget(), {
     getSenders: () => [this.sender],
     iceConnectionState: 'connected',
+    connectionState: 'connected',
   })
 }
+afterEach(() => vi.useRealTimers())
+it('recovers a ready outgoing call after DTLS failure while ICE remains connected', async () => {
+  vi.useFakeTimers()
+  const { peer, raw, port } = setup()
+  const replacement = new Call()
+  peer.call.mockReturnValueOnce(raw).mockReturnValueOnce(replacement)
+  const { audio, releases } = fakeAudio()
+  const state = vi.fn()
+  const manager = createVoiceCalls({ port, audio, self: a, onState: state })
+  manager.reconcile([a, b])
+  raw.emit('stream', fakeStream())
+  raw.peerConnection.dispatchEvent(new Event('iceconnectionstatechange'))
+  expect(state).toHaveBeenLastCalledWith({ readyMemberIds: ['b'], failedMemberIds: [] })
+  const detach = vi.spyOn(raw.peerConnection, 'removeEventListener')
+  raw.peerConnection.connectionState = 'failed'
+  raw.peerConnection.dispatchEvent(new Event('connectionstatechange'))
+  expect(raw.peerConnection.iceConnectionState).toBe('connected')
+  expect(state).toHaveBeenLastCalledWith({ readyMemberIds: [], failedMemberIds: ['b'] })
+  expect(raw.close).toHaveBeenCalledOnce()
+  expect(releases[0]).toHaveBeenCalledOnce()
+  expect(detach).toHaveBeenCalledWith('connectionstatechange', expect.any(Function))
+  await vi.advanceTimersByTimeAsync(3000)
+  expect(peer.call).toHaveBeenCalledTimes(2)
+  replacement.emit('stream', fakeStream())
+  replacement.peerConnection.dispatchEvent(new Event('iceconnectionstatechange'))
+  expect(state).toHaveBeenLastCalledWith({ readyMemberIds: ['b'], failedMemberIds: [] })
+  raw.peerConnection.dispatchEvent(new Event('connectionstatechange'))
+  expect(state).toHaveBeenLastCalledWith({ readyMemberIds: ['b'], failedMemberIds: [] })
+  manager.dispose()
+  port.close()
+  expect(vi.getTimerCount()).toBe(0)
+})
+it.each([
+  'failed',
+  'closed',
+])('accepts the caller retry after the receiving connection is %s without an ICE change', (terminalState) => {
+  const { peer, raw, port } = setup()
+  raw.peer = a.peerId
+  raw.metadata = {
+    version: 1,
+    callerSessionId: a.voiceSessionId,
+    calleeSessionId: b.voiceSessionId,
+  }
+  const state = vi.fn()
+  const manager = createVoiceCalls({ port, audio: fakeAudio().audio, self: b, onState: state })
+  manager.reconcile([a, b])
+  peer.emit('call', raw)
+  raw.emit('stream', fakeStream())
+  raw.peerConnection.dispatchEvent(new Event('iceconnectionstatechange'))
+  expect(state).toHaveBeenLastCalledWith({ readyMemberIds: ['a'], failedMemberIds: [] })
+  raw.peerConnection.connectionState = terminalState
+  raw.peerConnection.dispatchEvent(new Event('connectionstatechange'))
+  expect(state).toHaveBeenLastCalledWith({ readyMemberIds: [], failedMemberIds: ['a'] })
+  const replacement = new Call()
+  replacement.peer = raw.peer
+  replacement.metadata = raw.metadata
+  peer.emit('call', replacement)
+  expect(replacement.answer).toHaveBeenCalledOnce()
+  expect(replacement.close).not.toHaveBeenCalled()
+  replacement.emit('stream', fakeStream())
+  replacement.peerConnection.dispatchEvent(new Event('iceconnectionstatechange'))
+  expect(state).toHaveBeenLastCalledWith({ readyMemberIds: ['a'], failedMemberIds: [] })
+  expect(peer.call).not.toHaveBeenCalled()
+  manager.dispose()
+  port.close()
+})
 function setup() {
   const peer = new Emitter() as Emitter & {
     call: ReturnType<typeof vi.fn>

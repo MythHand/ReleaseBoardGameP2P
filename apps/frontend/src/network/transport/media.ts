@@ -22,11 +22,17 @@ export function createMediaPort(peer: Peer, dataDialPeers: ReadonlySet<string>):
     const ice = () => {
       if (pc) emit({ type: 'ice', state: pc.iceConnectionState })
     }
-    const attachIce = () => {
+    const connectionState = () => {
+      if (pc?.connectionState === 'failed') error(new Error('Media connection failed'))
+      else if (pc?.connectionState === 'closed') closedEvent()
+    }
+    const attachConnection = () => {
       if (pc === connection.peerConnection) return
       pc?.removeEventListener('iceconnectionstatechange', ice)
+      pc?.removeEventListener('connectionstatechange', connectionState)
       pc = connection.peerConnection
       pc?.addEventListener('iceconnectionstatechange', ice)
+      pc?.addEventListener('connectionstatechange', connectionState)
     }
     const stream = (value: MediaStream) => {
       lastStream = value
@@ -42,6 +48,7 @@ export function createMediaPort(peer: Peer, dataDialPeers: ReadonlySet<string>):
       closed = true
       listeners.clear()
       pc?.removeEventListener('iceconnectionstatechange', ice)
+      pc?.removeEventListener('connectionstatechange', connectionState)
       connection.off('stream', stream)
       connection.off('error', error)
       connection.off('close', closedEvent)
@@ -54,7 +61,7 @@ export function createMediaPort(peer: Peer, dataDialPeers: ReadonlySet<string>):
       answer(value) {
         if (!closed) {
           connection.answer(value)
-          attachIce()
+          attachConnection()
         }
       },
       async replaceTrack(track) {
@@ -88,7 +95,7 @@ export function createMediaPort(peer: Peer, dataDialPeers: ReadonlySet<string>):
     connection.on('stream', stream)
     connection.on('error', error)
     connection.on('close', closedEvent)
-    attachIce()
+    attachConnection()
     return call
   }
   const onIncoming = (connection: MediaConnection) => {
