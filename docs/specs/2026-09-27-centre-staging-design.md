@@ -51,5 +51,8 @@ events — no peer ever knew»).
   card stands when it was shown, and take it off the centre rather than off the seat's count a
   second time.
 - **Gesture** — `_useBoardStaging` sends `SHOW` when a card is put out at the centre and
-  `TAKE_BACK` on a miss, Escape or a refused play, while the engine shows something of ours.
+  `TAKE_BACK` on a miss, Escape or a refused play, while the engine shows something of ours. A
+  rebuilt board (a reload, the stand's viewer switch) finds our cards out with the gesture empty:
+  the gesture takes up the step it would be at, read off `shownLayout`, and one with nothing left
+  to choose goes home through the ordinary cancel.
 - **History** — `shown` and `takenBack` have no row in the move history.

@@ -53,6 +53,8 @@ import {
   type BoardState,
   MERGE_MS,
   SHOW_HOLD,
+  type ShownCard,
+  shownLayout,
 } from '~/entities/game/board'
 import { stageSlot } from '~/entities/game/board/stageSlot'
 import { useToCentre } from '~/features/board-beats/toCentre'
@@ -180,6 +182,12 @@ export interface Options {
   events: Event[] // the feed — watched for `rejected` after dispatch
   enabled: boolean // false while the deal or an exclusive beat owns the table
   /**
+   * A beat is running: the board draws the shadow — the table from before the
+   * batch, where a card we have just played is still shown at the centre — so
+   * what the table shows of ours says nothing about the gesture until it ends.
+   */
+  beatsRunning?: boolean
+  /**
    * The match this staging belongs to (#101, Fix C, finding 3). The board is
    * NOT remounted for a rematch — `_layout.tsx` gives `<Board>` no `key`, so
    * one component instance serves every match of a session — and everything
@@ -223,6 +231,7 @@ export function useBoardStaging({
   actions,
   events,
   enabled,
+  beatsRunning = false,
   matchKey = null,
   onHandArrival,
 }: Options): BoardStaging {
@@ -306,6 +315,10 @@ export function useBoardStaging({
   // lone release pulled to the stage slot did exactly that (#168). A ref, read
   // by `cancel()` in the same tick a press can land in.
   const arrivingRef = useRef(false)
+  // WE HAVE ASKED FOR OUR CARDS BACK and the table still shows them out: until it
+  // stops, what it shows is a take-back on its way, not a step to pick up again
+  // (the pick-up below). Cleared the moment the table shows nothing of ours.
+  const takeBackAsked = useRef(false)
   const plainAttempt = useRef(0)
   // Whose turn it was when the current staging began. An attack answering a
   // reaction window is staged on somebody else's turn by design, so "not my
@@ -618,6 +631,7 @@ export function useBoardStaging({
       if (costPayment.current) return
       arrowCtl.stop()
       actions?.onResolve?.({ kind: 'cancelRelease' })
+      takeBackAsked.current = true
       // A COMBO release is still staged at this point and a solo one is not,
       // and that asymmetry is deliberate on both sides (#101, Fix C): the
       // catch-up effect below clears `staged` for a solo release because
@@ -700,7 +714,10 @@ export function useBoardStaging({
     // what was put out on the table goes back in everyone's view (resolution.md
     // §1) — asked only while the engine is showing something of ours, so a
     // cancel it has already answered (the turn ran out) asks nothing twice
-    if ((state.shown ?? []).some((c) => c.player === state.selfId)) actions?.onTakeBack?.()
+    if ((state.shown ?? []).some((c) => c.player === state.selfId)) {
+      actions?.onTakeBack?.()
+      takeBackAsked.current = true
+    }
     const cRect = anchors.centre.current?.getBoundingClientRect()
     if (reduced || !cRect) {
       pairApi.current.release()
@@ -1610,6 +1627,122 @@ export function useBoardStaging({
       costPayment.current = null
     }
   }, [matchKey])
+
+  // A REBUILT BOARD PICKS THE STEP BACK UP (#168). What we put out at the centre
+  // is the table's to remember (resolution.md §1) and outlives the page; the
+  // step we were at with it — waiting for a partner, aiming, paying — lived only
+  // in this gesture, so a reload (or the stand's viewer switch) brought the cards
+  // back standing with nothing able to move them. An empty gesture that finds
+  // cards of ours out takes up the step it would be at had nothing been rebuilt,
+  // read off how they stand (`shownLayout`, the layout every viewer reads), and
+  // everything after — the lit partners, the arrow, Escape, the pick, the
+  // hand-over to the beat — runs the roads it always runs. Where nothing is left
+  // to choose, the play was on its way out: the step is taken up only for the
+  // cancel to send it home, the one road home there is.
+  //
+  // Declared AFTER the match wipe above, and it has to be: on a mount both run,
+  // in this order, and a pick-up ahead of the wipe was wiped straight away.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect; `cancel` is read through `cancelRef`, as the turn-leaving effect reads it
+  useLayoutEffect(() => {
+    const own = (state.shown ?? []).filter((s) => s.player === state.selfId)
+    if (own.length === 0) {
+      takeBackAsked.current = false
+      return
+    }
+    if (
+      !enabled ||
+      beatsRunning ||
+      takeBackAsked.current ||
+      stagedRef.current ||
+      stage !== 'none' ||
+      cancellingRef.current ||
+      foldingRef.current ||
+      arrivingRef.current
+    )
+      return
+    const layout = shownLayout(own)
+    const up = (s: ShownCard): StagedCard => ({ uid: s.uid, card: s.card, index: -1 })
+    const aims = (uid: string) => (state.targets?.[uid] ?? []).length > 0
+    // The pair stands where it folded, both halves already there: the fold is
+    // the degenerate one — from its place to its place, at once — the mount
+    // reduced motion gives a pair too.
+    const standPair = (main: StagedCard, aux: StagedCard, box: Rect, pose?: string) =>
+      void pairApi.current.fold({
+        main: main.card,
+        aux: aux.card,
+        mainFrom: box,
+        auxFrom: box,
+        box,
+        pose,
+        dur: 0,
+      })
+
+    if (layout.row && !layout.row[1]) {
+      // a support waiting for its partner, in the row's first place
+      const support = up(layout.row[0])
+      commitStaged({ support, main: null, phase: 'partner', merged: false })
+      if ((state.comboOptions?.[support.uid] ?? []).length > 0) aimFromPlay(support, 0)
+      else cancelRef.current()
+      return
+    }
+    if (layout.row?.[1]) {
+      // a sudo beside its git operation, the operation choosing its pile
+      const support = up(layout.row[0])
+      const main = up(layout.row[1])
+      commitStaged({ support, main, phase: 'target', merged: false })
+      if (aims(main.uid) && !rebaseAllPiles(main.card, support.card)) aimFromPlay(main, 1)
+      else cancelRef.current()
+      return
+    }
+    if (layout.solo) {
+      // a card aiming, at the middle
+      const main = up(layout.solo)
+      commitStaged({ support: null, main, phase: 'aim', merged: false })
+      if (aims(main.uid)) aimFromPlay(main, null)
+      else cancelRef.current()
+      return
+    }
+    const cRect = anchors.centre.current?.getBoundingClientRect()
+    if (layout.pair && cRect) {
+      const support = up(layout.pair.aux)
+      const main = up(layout.pair.main)
+      if (layout.pair.at === 'row0') {
+        // a Code Review riding its release: while the cost is owed the two wait
+        // as a dispatched pair in the row's first place, as they did before
+        if (cost?.release !== main.uid) {
+          commitStaged({ support, main, phase: 'target', merged: true })
+          cancelRef.current()
+          return
+        }
+        commitStaged({ support, main, phase: 'dispatched', merged: true })
+        standPair(main, support, stageSlot(anchors, 0)?.getBoundingClientRect() ?? cRect)
+        return
+      }
+      // a sudo under its attack, at the middle, the attack choosing its target
+      commitStaged({ support, main, phase: 'target', merged: true })
+      if (!aims(main.uid)) {
+        cancelRef.current()
+        return
+      }
+      standPair(main, support, cRect, restTransform(ATTACK_POSE))
+      aimFromPlay(main, null)
+    }
+    // A release alone waits for its cost off the engine's own pending, which
+    // outlives a reload already: nothing to pick up.
+  }, [
+    state.shown,
+    state.selfId,
+    state.targets,
+    state.comboOptions,
+    enabled,
+    beatsRunning,
+    staged,
+    stage,
+    cancelling,
+    cost,
+    anchors,
+    aimFromPlay,
+  ])
 
   // the combo beat's own clear (#100) — no flight, just done. Unguarded, unlike
   // `cancel()`: the beat only ever calls this once ITS OWN read of the handoff

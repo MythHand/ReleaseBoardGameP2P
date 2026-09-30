@@ -8,9 +8,9 @@
 // file's header for why.
 
 import type { Event } from '@release/engine'
-import type { CardData, TableActions, TableTarget, TableWindow } from '@release/ui'
+import type { CardData, TableActions, TablePending, TableTarget, TableWindow } from '@release/ui'
 import { cardById } from '@release/ui'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 // same reach, for the return-flight step's own overlay node — pins that a
 // merged cancel carries BOTH halves as one flight, not one arriving node with
@@ -19,8 +19,10 @@ import handArrivalStyles from '@/animations/useHandArrival.module.css'
 // Arrow's CSS Module classnames are not part of `@release/ui`'s public barrel
 // — reached into the same way `boardComponent.test.tsx` does.
 import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
+import { type ShownCard, useBoardAnchors } from '~/entities/game/board'
 import { mockReducedMotion } from '~/test/reducedMotion'
 import Board from '../_Board'
+import { useBoardStaging } from '../_useBoardStaging'
 import { makeBoardProps } from './fixture'
 
 // biome-ignore lint/style/noNonNullAssertion: both ids are known catalogue entries
@@ -917,4 +919,172 @@ it('folds a sudo and the attack it enhances into a stack at the middle', async (
   // and the assembling row is over — neither half stands in it any more
   expect(document.querySelector('[data-stage-slot="0"]')).toBeFalsy()
   expect(document.querySelector('[data-testid="board-centre-partner"]')).toBeFalsy()
+})
+
+// ===== a rebuilt board picks the step back up (#168) =====
+//
+// A reload — or the stand's viewer switch — rebuilds the board with nothing in
+// the gesture, while the table still shows our cards out at the centre
+// (resolution.md §1). The gesture takes up the step it would be at had nothing
+// been rebuilt, and every road after it is the ordinary one.
+
+const mine = (uid: string): ShownCard => {
+  const held = COMBO_HAND.find((c) => c.uid === uid)
+  if (!held) throw new Error(`not in the combo hand: ${uid}`)
+  return { player: 'you', uid, card: held.card }
+}
+
+function rebuiltState(over: {
+  shown: string[]
+  targets?: Record<string, TableTarget[]>
+  comboOptions?: Record<string, string[]>
+  pending?: TablePending | null
+}) {
+  const base = makeBoardProps()
+  return {
+    ...base.state,
+    you: { ...base.state.you, hand: COMBO_HAND },
+    turn: base.state.selfId,
+    hasDrawn: true,
+    playable: COMBO_HAND.map((c) => c.uid),
+    targets: over.targets ?? {},
+    comboOptions: over.comboOptions ?? {},
+    shown: over.shown.map(mine),
+    pending: over.pending ?? null,
+  }
+}
+
+function rebuiltBoard(over: Parameters<typeof rebuiltState>[0], actions: TableActions = {}) {
+  return <Board {...makeBoardProps({ state: rebuiltState(over), actions })} />
+}
+
+const settle = () =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+
+const SUDO_WAITING = {
+  shown: ['support-sudo#0'],
+  comboOptions: { 'support-sudo#0': ['attack-bug#0'] },
+}
+
+it('picks a waiting Sudo back up: its partners light, and Escape takes it back', () => {
+  const onTakeBack = vi.fn()
+  comboOut = ['support-sudo#0']
+  render(rebuiltBoard(SUDO_WAITING, { onTakeBack }))
+  expect(fanUids()).not.toContain('support-sudo#0')
+  expect(comboAccentOf('attack-bug#0')).toBe('var(--cat-support)')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('does not pick the Sudo up again while the take-back is on its way', async () => {
+  const onTakeBack = vi.fn()
+  comboOut = ['support-sudo#0']
+  const { rerender } = render(rebuiltBoard(SUDO_WAITING, { onTakeBack }))
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await settle()
+  // the table has not answered yet: it still shows the Sudo out
+  rerender(rebuiltBoard(SUDO_WAITING, { onTakeBack }))
+  await settle()
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+  expect(comboAccentOf('attack-bug#0')).toBeNull()
+})
+
+it('picks an aiming card back up: a press on its target plays it', async () => {
+  const onPlay = vi.fn()
+  render(rebuiltBoard({ shown: ['attack-bug#0'], targets: BUG_SEAT_TARGET }, { onPlay }))
+  await pressSeat('p2')
+  expect(onPlay).toHaveBeenCalledWith('attack-bug#0', { kind: 'player', player: 'p2' }, undefined)
+})
+
+it('picks a Sudo beside its git operation back up, the operation choosing its pile', () => {
+  const onTakeBack = vi.fn()
+  render(
+    rebuiltBoard(
+      {
+        shown: ['support-sudo#0', 'operation-git-cherry-pick#0'],
+        targets: { 'operation-git-cherry-pick#0': [{ kind: 'pile', pile: 0 }] },
+      },
+      { onTakeBack },
+    ),
+  )
+  // both stand in the row, unfolded, and neither is in the fan
+  expect(screen.getByTestId('board-centre-partner')).toBeTruthy()
+  expect(fanUids()).not.toContain('support-sudo#0')
+  expect(fanUids()).not.toContain('operation-git-cherry-pick#0')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('picks a Sudo under its attack back up as the pair, and a press on the target plays both', async () => {
+  const onPlay = vi.fn()
+  render(
+    rebuiltBoard(
+      { shown: ['support-sudo#0', 'attack-bug#0'], targets: BUG_SEAT_TARGET },
+      { onPlay },
+    ),
+  )
+  await settle()
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
+  await pressSeat('p2')
+  expect(onPlay).toHaveBeenCalledWith(
+    'attack-bug#0',
+    { kind: 'player', player: 'p2' },
+    'support-sudo#0',
+  )
+})
+
+it('picks a Code Review riding its release back up while the cost is owed, and a press on the table cancels it', async () => {
+  const onResolve = vi.fn()
+  render(
+    rebuiltBoard(
+      {
+        shown: ['support-code-review#0', 'release-frontend#0'],
+        pending: {
+          kind: 'discardForRelease',
+          player: 'you',
+          release: 'release-frontend#0',
+          options: ['attack-bug#0'],
+        },
+      },
+      { onResolve },
+    ),
+  )
+  await settle()
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
+  // the cancel a combo release's cost step has always had: a press on the
+  // table, away from anything lit (boardRelease.test.tsx, Fix C finding 2)
+  fireEvent.mouseDown(document.querySelector('[data-board-centre]')?.parentElement as HTMLElement)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 60)) // well inside the flight (480ms)
+  })
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
+  // both halves go home — not the release alone, the Code Review left behind
+  expect(document.querySelectorAll('[class*="arriving"] [data-card]').length).toBe(2)
+})
+
+it('sends a card with nothing left to choose home', () => {
+  const onTakeBack = vi.fn()
+  // the card was on its way out: no target to aim it at any more
+  render(rebuiltBoard({ shown: ['attack-bug#0'] }, { onTakeBack }))
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('leaves the step alone while a beat runs on the table from before', () => {
+  const state = rebuiltState(SUDO_WAITING)
+  const { result, rerender } = renderHook(
+    ({ running }: { running: boolean }) =>
+      useBoardStaging({
+        state,
+        anchors: useBoardAnchors(),
+        events: [],
+        enabled: true,
+        beatsRunning: running,
+      }),
+    { initialProps: { running: true } },
+  )
+  expect(result.current.staged).toBeNull()
+  rerender({ running: false })
+  expect(result.current.staged?.phase).toBe('partner')
 })

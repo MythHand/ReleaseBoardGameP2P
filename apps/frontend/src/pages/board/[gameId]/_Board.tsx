@@ -366,6 +366,7 @@ export default function Board({
     actions,
     events: intro?.events ?? [],
     enabled: !(deal.active || beats.exclusive),
+    beatsRunning: beats.running,
     onHandArrival: (order) => handOrder.place(order),
 
     // the match boundary (#101, Fix C, finding 3) — `<Board>` is not remounted
