@@ -190,3 +190,9 @@ it('shows public counters to a spectator without marking a player as self', () =
   expect(screen.getByText('3')).toBeTruthy()
   expect(screen.queryByText('stats.selfTag')).toBeNull()
 })
+
+it('renders the room voice slot under its translated title', () => {
+  render(<StatsPage />)
+  expect(screen.getByText('stats.voiceChat')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'voiceChat.connect' })).toBeTruthy()
+})

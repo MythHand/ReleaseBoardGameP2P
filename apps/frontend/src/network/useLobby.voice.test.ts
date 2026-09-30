@@ -187,6 +187,7 @@ it('waits for both roster admission and chat identity before announcing voice on
   })
   const t = transports[0]
   const hostId = 'abcdef'
+  frame(t, 'VOICE_ROSTER', { authorityId: 'authority', revision: 0, participants: [] }, hostId)
   const peers = [
     {
       id: hostId,
@@ -216,6 +217,28 @@ it('waits for both roster admission and chat identity before announcing voice on
   })
   expect(getUserMedia).toHaveBeenCalledOnce()
   expect(t.send).toHaveBeenCalledWith(hostId, expect.objectContaining({ type: 'VOICE_JOIN' }))
+  const join = vi
+    .mocked(t.send)
+    .mock.calls.find(([, message]) => message.type === 'VOICE_JOIN')?.[1]
+  if (join?.type !== 'VOICE_JOIN') throw new Error('Missing admitted voice session')
+  frame(
+    t,
+    'VOICE_ROSTER',
+    {
+      authorityId: 'authority',
+      revision: 1,
+      participants: [
+        {
+          memberId: 'viewer-member',
+          peerId: t.id,
+          voiceSessionId: join.payload.voiceSessionId,
+          micOff: false,
+        },
+      ],
+    },
+    hostId,
+  )
+  expect(hook.result.current.voice.status).toBe('connected')
   frame(t, 'PLAYER_KICKED', { peerId: t.id }, hostId)
   expect(hook.result.current.voice.status).toBe('off')
   expect(hook.result.current.status).toBe('kicked')

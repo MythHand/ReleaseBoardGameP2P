@@ -513,3 +513,12 @@ it('sends the game-over continue action to this game’s own stats route', async
   expect(await screen.findByTestId('stats-page')).toBeTruthy()
   expect(router.state.location.pathname).toBe('/board/g1/stats')
 })
+
+it('connects board voice using the session facade and keeps it on route unmount', () => {
+  const page = renderBoard()
+  fireEvent.click(screen.getByRole('button', { name: 'voice chat' }))
+  fireEvent.click(screen.getByRole('button', { name: 'join' }))
+  expect(sessionValue.voice.connect).toHaveBeenCalledOnce()
+  page.unmount()
+  expect(sessionValue.voice.disconnect).not.toHaveBeenCalled()
+})

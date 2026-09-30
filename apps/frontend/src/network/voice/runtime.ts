@@ -414,6 +414,7 @@ export function createRoomVoice(options: {
       if (!parsed || !context || disposed) return true
       if (parsed.type === 'VOICE_ROSTER') {
         if (
+          !context.admitted ||
           parsed.from !== context.hostPeerId ||
           context.selfPeerId === context.hostPeerId ||
           retiredAuthorities.has(parsed.payload.authorityId)

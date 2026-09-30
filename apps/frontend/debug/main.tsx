@@ -4,7 +4,15 @@ import type { Action, CardInstance, Event } from '@release/engine'
 import { cardsPresent } from '@release/engine'
 import { botAction } from '@release/engine/fake'
 import { useTranslation } from '@release/translation'
-import { Button, cardById, Typography } from '@release/ui'
+import {
+  Button,
+  cardById,
+  Typography,
+  VoicePanel,
+  type VoiceParticipant,
+  type VoiceStatus,
+  VoiceTabIcon,
+} from '@release/ui'
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { toBoardOver, toBoardState } from '~/entities/game/board'
@@ -61,6 +69,34 @@ function ScenarioRun({
     return { state, events: seedLog(state), last: null }
   })
   const [viewer, setViewer] = useState<string | null>('you')
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('off')
+  const [micOff, setMicOff] = useState(true)
+  const [voiceVolume, setVoiceVolume] = useState(100)
+  const [voicePeople, setVoicePeople] = useState<VoiceParticipant[]>(() =>
+    Array.from({ length: 14 }, (_, i) => ({
+      id: `member-${i}`,
+      name: `participant_${i + 1}`,
+      role: i === 0 ? 'host' : i < 6 ? 'player' : 'spectator',
+      volume: 100,
+      micOff: i % 3 === 0,
+    })),
+  )
+  const voiceProps = {
+    participants: voicePeople,
+    status: voiceStatus,
+    micOff,
+    volume: voiceVolume,
+    selfId: viewer === null ? 'member-6' : 'member-0',
+    copy: t('voiceChat', { returnObjects: true }),
+    onConnect: () => setVoiceStatus('connected'),
+    onDisconnect: () => setVoiceStatus('off'),
+    onMicChange: setMicOff,
+    onVolumeChange: setVoiceVolume,
+    onParticipantVolumeChange: (id: string, volume: number) =>
+      setVoicePeople((people) => people.map((p) => (p.id === id ? { ...p, volume } : p))),
+    onParticipantMuteChange: (id: string, muted: boolean) =>
+      setVoicePeople((people) => people.map((p) => (p.id === id ? { ...p, muted } : p))),
+  }
   // HOW MANY CARDS THIS GAME HAS, counted once at the scene's own start. The
   // count itself is the engine's — the same census its conformance check is
   // built on, which knows every place a card can be, the air between a hand and
@@ -117,6 +153,18 @@ function ScenarioRun({
     <>
       <div className={styles.status}>
         <div className={styles.controls}>
+          {(['off', 'connecting', 'connected', 'interrupted'] as const).map((status) => (
+            <Button
+              key={status}
+              variant="tech"
+              aria-pressed={voiceStatus === status}
+              onClick={() => setVoiceStatus(status)}
+            >
+              {t(
+                `voiceChat.${({ off: 'connect', connecting: 'connecting', connected: 'disconnect', interrupted: 'interrupted' } as const)[status]}`,
+              )}
+            </Button>
+          ))}
           {/* The instruction shares the controls' row instead of owning one of
               its own: it is a sentence, and a sentence is the cheapest thing on
               this bar to give up height for. The whole of it stays reachable —
@@ -284,6 +332,11 @@ function ScenarioRun({
             // the seeded discard is where this table STARTS, not something it plays
             restoredThrough: seeded,
             onDone: onIntroDone,
+          }}
+          slots={{
+            voice: <VoicePanel {...voiceProps} title={t('table.tabVoice')} />,
+            voiceTab: <VoiceTabIcon status={voiceStatus} micOff={micOff} />,
+            chat: <Typography base="body">{t('chat.empty')}</Typography>,
           }}
           room={{
             role: 'host',

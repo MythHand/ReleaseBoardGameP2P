@@ -105,6 +105,7 @@ const DRAWER_WIDTH: Record<Panel, number> = {
   participants: 420, // участники — как история
   modes: 680, // режимы — как правила
   rules: 680, // правила — сильно шире
+  voice: 420,
   chat: 420, // чат — как история
 }
 
@@ -1150,6 +1151,7 @@ function BoardView({
   const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
   const hostControls = canLimitSpectators || canPause
   const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
+  const hasVoice = Boolean(slots?.voice) && Boolean(copy.table.tabVoice)
   const canChatToasts = hasChat && Boolean(onChatToastsChange) && Boolean(copy.table.chatToasts)
   const hasUpperSettings = Boolean(lang && onLangChange) || Boolean(code) || canChatToasts
 
@@ -1159,16 +1161,18 @@ function BoardView({
     { id: 'participants', label: copy.table.tabParticipants },
     { id: 'rules', label: copy.table.tabRules },
     { id: 'modes', label: copy.table.tabModes },
-    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '' }] : []),
   ]
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
   // (свитчер языка и/или код игры); служебный слот под визуальные опции
   const hasSettings =
     Boolean(onLangChange) || Boolean(code) || canChatToasts || Boolean(hostControls)
-  const railItems: TabRailItem[] = hasSettings
-    ? [{ id: 'settings', label: copy.table.settings, icon: <GearIcon /> }, ...textTabs]
-    : textTabs
+  const railItems: TabRailItem[] = [
+    ...(hasSettings ? [{ id: 'settings', label: copy.table.settings, icon: <GearIcon /> }] : []),
+    ...(hasVoice ? [{ id: 'voice', label: copy.table.tabVoice ?? '', icon: slots?.voiceTab }] : []),
+    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '' }] : []),
+    ...textTabs,
+  ]
 
   // завершение партии — оверлей поверх стола (триггерится извне)
   // The end is announced once the board has finished SHOWING how it was reached
@@ -2267,6 +2271,7 @@ function BoardView({
           />
         )}
         {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
+        {panel === 'voice' && <div className={kit.panelFill}>{slots?.voice}</div>}
         {panel === 'chat' && <div className={kit.chatPanel}>{slots?.chat}</div>}
       </Drawer>
 

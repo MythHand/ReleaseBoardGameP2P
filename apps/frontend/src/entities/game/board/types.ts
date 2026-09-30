@@ -38,7 +38,7 @@ import type {
 } from '@release/ui'
 import type { ReactNode } from 'react'
 
-export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'chat'
+export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'voice' | 'chat'
 
 export interface BoardOpponent {
   id: string
@@ -238,6 +238,7 @@ export interface BoardChromeCopy {
   tabParticipants: string
   tabRules: string
   tabModes: string
+  tabVoice?: string
   tabChat?: string
 }
 
@@ -365,6 +366,8 @@ export interface BoardSlots {
   // match, and the consumer's non-fatal error notice.
   corner?: ReactNode
   banner?: ReactNode
+  voice?: ReactNode
+  voiceTab?: ReactNode
   chat?: ReactNode
   toasts?: ReactNode
 }

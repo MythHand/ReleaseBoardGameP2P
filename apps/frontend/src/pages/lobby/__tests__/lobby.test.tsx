@@ -573,3 +573,15 @@ it('shows the host the reason a quota or role change was refused', () => {
   renderInRouter(<LobbyView />)
   expect(screen.getByRole('alert').textContent).toBe('lobbyScreen.errors.spectators-full')
 })
+
+it('shows voice above chat and joins through the session facade', () => {
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  const voiceTitle = screen.getByText('lobbyScreen.voiceChat')
+  const chatTitle = screen.getByText('lobbyScreen.chat')
+  expect(
+    voiceTitle.compareDocumentPosition(chatTitle) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'voiceChat.connect' }))
+  expect(sessionValue.voice.connect).toHaveBeenCalledOnce()
+})

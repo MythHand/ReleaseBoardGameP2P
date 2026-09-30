@@ -271,7 +271,17 @@
     "unmute": "unmute player",
     "muteMic": "mute microphone",
     "unmuteMic": "unmute microphone",
-    "micMuted": "microphone off"
+    "micMuted": "microphone off",
+    "issues": {
+      "microphoneDenied": "Microphone access was denied. You can listen. Press the microphone button after allowing access in your browser.",
+      "microphoneMissing": "No microphone is available. You can listen. Connect a microphone and press the microphone button.",
+      "permissionUnsupported": "Microphone access is unavailable in this browser. You can listen if audio playback is supported.",
+      "permissionTimeout": "The microphone request timed out. You can listen. Press the microphone button to try again.",
+      "captureFailed": "The microphone could not start. You can listen. Press the microphone button to try again.",
+      "audioBlocked": "Audio playback is blocked. Leave voice chat and join again to enable sound.",
+      "callFailed": "Some voice connections are interrupted. Reconnection is in progress. Leave and rejoin voice chat if sound does not return.",
+      "roomDisconnected": "The room connection was lost. Voice will resume after reconnection."
+    }
   },
   "toasts": {
     "hide": "hide"

@@ -214,3 +214,9 @@
   justify-content: flex-end;
   margin-block-start: auto;
 }
+
+.voiceLine {
+  padding-block-end: 20px;
+  margin-block-end: 20px;
+  border-block-end: 1px solid var(--white-08);
+}
