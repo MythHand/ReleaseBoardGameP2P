@@ -7,6 +7,7 @@ import { useSession } from '~/app/providers/SessionProvider'
 import { type Panel, toBoardOver, toBoardState } from '~/entities/game/board'
 import { seatsFor } from '~/entities/game/seats'
 import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
+import { copyText } from '~/features/copy/copyText'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
 import Board from './_Board'
@@ -177,6 +178,7 @@ export default function BoardPage() {
           if (state.selfId !== null) session.previewPick(state.selfId, card)
         }}
         room={{
+          onCopy: copyText,
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,
           participants,

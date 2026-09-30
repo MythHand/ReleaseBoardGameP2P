@@ -12,6 +12,7 @@ import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import TechBar from '../controls/TechBar'
 import { TechButton, TechField, TechLabel, TechSwitch } from '../controls/TechControls'
+import { copyText } from '../copyText'
 import { useVoiceDemo, VoiceDemoControls } from '../voiceDemo'
 import styles from './TableChatStory.module.css'
 
@@ -353,6 +354,7 @@ export default function TableChatStory() {
               : storyState
           }
           room={{
+            onCopy: copyText,
             role,
             code: '4F2A-9K',
             participants: base.participants,

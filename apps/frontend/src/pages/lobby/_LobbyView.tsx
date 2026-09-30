@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
+import { copyText } from '~/features/copy/copyText'
 import { botNames } from '~/features/start-game/botNames'
 import { useStartGame } from '~/features/start-game/useStartGame'
 import { effectiveBots } from '~/network'
@@ -178,6 +179,7 @@ export default function LobbyView() {
         <BugRunner label={t('lobbyScreen.bugRunner')} className={styles.runner} />
         <div className={styles.headRight}>
           <LobbyCode
+            onCopy={copyText}
             code={session.roomCode ?? ''}
             link={shareUrl}
             copy={t('lobbyCode', { returnObjects: true })}
