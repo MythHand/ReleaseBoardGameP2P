@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import type { PeerInfo, Seat, UseLobby } from '~/network'
+import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import LobbyPage from '~/pages/lobby/[lobbyId]'
 import StatsPage from '../stats'
 
@@ -66,6 +67,7 @@ function makeSession(over: Partial<UseLobby> = {}): UseLobby {
     gameLink: null,
     gameSync: null,
     seats: SEATS,
+    voice: createFakeVoiceFacade(),
     chat: {
       entries: [],
       notificationEntryIds: [],

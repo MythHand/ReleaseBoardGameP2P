@@ -1,14 +1,16 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
-import { isCounting, Message, Reconnect, ToastStack } from '@release/ui'
+import { isCounting, Message, Reconnect, ToastStack, VoiceTabIcon } from '@release/ui'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { type Panel, toBoardOver, toBoardState } from '~/entities/game/board'
 import { seatsFor } from '~/entities/game/seats'
 import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
+import { copyText } from '~/features/copy/copyText'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
+import { RoomVoice, useRoomVoiceView } from '~/features/voice-chat/RoomVoice'
 import Board from './_Board'
 import styles from './index.module.css'
 
@@ -18,6 +20,7 @@ export default function BoardPage() {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const chat = useRoomChatView()
+  const voice = useRoomVoiceView()
   const game = useGame()
   const navigate = useNavigate()
   const { gameId } = useParams()
@@ -177,6 +180,7 @@ export default function BoardPage() {
           if (state.selfId !== null) session.previewPick(state.selfId, card)
         }}
         room={{
+          onCopy: copyText,
           role: session.isHost ? 'host' : 'guest',
           code: session.roomCode ?? undefined,
           participants,
@@ -214,6 +218,8 @@ export default function BoardPage() {
           onChatToastsChange: setChatToasts,
         }}
         slots={{
+          voice: <RoomVoice view={voice} panelTitle={t('table.tabVoice')} />,
+          voiceTab: <VoiceTabIcon status={voice.status} micOff={voice.micOff} />,
           chat: <RoomChat view={chat} />,
           toasts: (
             <ToastStack

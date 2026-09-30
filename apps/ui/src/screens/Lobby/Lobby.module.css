@@ -149,6 +149,21 @@
   min-block-size: 0;
 }
 
+/* the voice chat's heading and the chat itself on one line; it keeps its height,
+   and the text chat below takes what is left */
+.voiceLine {
+  display: flex;
+  flex: none;
+  gap: 12px;
+  align-items: center;
+  margin-block-end: 28px;
+}
+
+/* a heading on a line of its own — the line sets the spacing */
+.hInline {
+  margin: 0;
+}
+
 /* ===== колонка игроков ===== */
 .players {
   display: flex;

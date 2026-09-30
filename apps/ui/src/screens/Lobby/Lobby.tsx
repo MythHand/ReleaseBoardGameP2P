@@ -29,6 +29,7 @@ interface Spectator {
 }
 interface LobbyProps {
   code?: string
+  onCopy?: (text: string) => Promise<boolean>
   initialCapacity?: number
   initialPlayers?: Player[]
   role?: 'host' | 'guest'
@@ -51,6 +52,10 @@ interface LobbyProps {
   // откуда берутся сообщения, ни как они устроены — он только даёт им место.
   // Без слота колонки нет и сетка остаётся из двух, как была.
   chat?: ReactNode
+  // Voice chat, in the same column above the text chat: it stands on its own
+  // heading's line, after the title. A slot for the same reason as `chat`;
+  // either one alone opens the column.
+  voice?: ReactNode
 }
 
 // Весь видимый текст лобби приходит из набора по языку — экран сам переключает
@@ -73,6 +78,8 @@ export interface LobbyCopy {
   roleBot: string
   // заголовок колонки чата — сам блок чата своего заголовка не имеет
   chat: string
+  // the voice chat's heading in that column — the block has none of its own either
+  voiceChat: string
   spectators: string
   specLimit: string
   freeSlot: string
@@ -124,6 +131,7 @@ function specColorFor(n: number) {
 
 export default function Lobby({
   code = '4F2A-9K',
+  onCopy,
   link,
   initialCapacity = 5,
   initialPlayers = MOCK_PLAYERS,
@@ -136,6 +144,7 @@ export default function Lobby({
   rulesBlockCopy,
   lobbyScreenCopy,
   chat,
+  voice,
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
@@ -244,12 +253,12 @@ export default function Lobby({
         {/* the room between the two sides of the header is the mini-game's */}
         <BugRunner label={copy.bugRunner} className={styles.runner} />
         <div className={styles.headRight}>
-          <LobbyCode code={code} link={shareLink} copy={codeCopy} />
+          <LobbyCode onCopy={onCopy} code={code} link={shareLink} copy={codeCopy} />
           <LangSwitcher value={lang} onChange={setLang} label={copy.language} />
         </div>
       </header>
 
-      <div className={`${styles.grid} ${chat == null ? '' : styles.gridChat}`}>
+      <div className={`${styles.grid} ${chat == null && voice == null ? '' : styles.gridChat}`}>
         {/* слева — режимы */}
         <section className={styles.modes}>
           <h2 className={styles.h}>
@@ -413,11 +422,22 @@ export default function Lobby({
           </div>
         </section>
 
-        {/* самая правая — чат, если его дали */}
-        {chat != null && (
+        {/* самая правая — чат, если его дали; голосовой — над ним, своей группой */}
+        {(chat != null || voice != null) && (
           <section className={styles.chatCol}>
-            <h2 className={styles.h}>{copy.chat}</h2>
-            {chat}
+            {/* the voice chat is one line: its heading, then the chat itself */}
+            {voice != null && (
+              <div className={styles.voiceLine}>
+                <h2 className={`${styles.h} ${styles.hInline}`}>{copy.voiceChat}</h2>
+                {voice}
+              </div>
+            )}
+            {chat != null && (
+              <>
+                <h2 className={styles.h}>{copy.chat}</h2>
+                {chat}
+              </>
+            )}
           </section>
         )}
       </div>

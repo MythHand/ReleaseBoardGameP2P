@@ -6,6 +6,7 @@ import LobbyCode from '@/blocks/LobbyCode'
 import Rules from '@/blocks/Rules'
 import { CardMotionProvider } from '@/cards/cardMotion'
 import GearIcon from '@/icons/GearIcon'
+import HeadphonesIcon from '@/icons/HeadphonesIcon'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
@@ -52,6 +53,7 @@ const DRAWER_WIDTH: Record<Panel, number> = {
   modes: 680, // режимы — как правила
   rules: 680, // правила — сильно шире
   chat: 420, // переписка — как история
+  voice: 420, // the voice chat — like the text chat beside it
 }
 
 const EMPTY_RELEASE: ReleaseSlots = {
@@ -263,17 +265,30 @@ function TableView({
   const hasUpperSettings =
     Boolean(lang && onLangChange) || Boolean(code) || Boolean(onParallaxChange) || canChatToasts
 
-  // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку.
-  // Чат стоит последним, то есть у нижнего края: это не панель про партию, а
-  // разговор рядом с ней, и он не должен вклиниваться между её вкладками.
-  const textTabs: TabRailItem[] = [
+  const hasVoice = Boolean(slots?.voice) && Boolean(copy.table.tabVoice)
+
+  // The rail's tabs, top to bottom. The conversation comes first, right under
+  // the settings: the voice chat's square tab, then the text chat — the tabs a
+  // player reaches for during a match, a short way from the gear rather than
+  // across the whole rail (owner, 27.09). The match's own panels follow. It is
+  // still not a panel about the match, so it does not sit among them.
+  const conversationTabs: TabRailItem[] = [
+    ...(hasVoice
+      ? [
+          {
+            id: 'voice',
+            label: copy.table.tabVoice ?? '',
+            icon: slots?.voiceTab ?? <HeadphonesIcon />,
+          },
+        ]
+      : []),
+    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '' }] : []),
+  ]
+  const matchTabs: TabRailItem[] = [
     { id: 'history', label: copy.table.tabHistory },
     { id: 'participants', label: copy.table.tabParticipants },
     { id: 'rules', label: copy.table.tabRules },
     { id: 'modes', label: copy.table.tabModes },
-    // высота фиксированная: чат в общий ряд не встаёт по смыслу, и делить полосу
-    // поровну с панелями партии ему незачем
-    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '', height: 155 }] : []),
   ]
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
@@ -284,9 +299,11 @@ function TableView({
     Boolean(onParallaxChange) ||
     canChatToasts ||
     Boolean(hostControls)
-  const railItems: TabRailItem[] = hasSettings
-    ? [{ id: 'settings', label: copy.table.settings, icon: <GearIcon /> }, ...textTabs]
-    : textTabs
+  const railItems: TabRailItem[] = [
+    ...(hasSettings ? [{ id: 'settings', label: copy.table.settings, icon: <GearIcon /> }] : []),
+    ...conversationTabs,
+    ...matchTabs,
+  ]
 
   // завершение партии — оверлей поверх стола (триггерится извне)
   const overWinner = over ? participants.find((p) => p.id === over.winnerId) : null
@@ -506,7 +523,13 @@ function TableView({
                     <SettingsField label={copy.table.codeTitle} inline>
                       {/* копирует клик по самому коду — отдельной кнопке в
                           строке настроек делать нечего */}
-                      <LobbyCode code={code} copy={copy.lobbyCode} copyOnCode showLabel={false} />
+                      <LobbyCode
+                        onCopy={room.onCopy}
+                        code={code}
+                        copy={copy.lobbyCode}
+                        copyOnCode
+                        showLabel={false}
+                      />
                     </SettingsField>
                   )}
                   {onParallaxChange && copy.table.parallax && (
@@ -609,6 +632,7 @@ function TableView({
           )}
           {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
           {panel === 'chat' && <div className={styles.chatPanel}>{slots?.chat}</div>}
+          {panel === 'voice' && <div className={styles.panelFill}>{slots?.voice}</div>}
         </Drawer>
 
         {/* pause window — over the play area, below the right-hand nav (its own
