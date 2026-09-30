@@ -26,6 +26,12 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
   const playback = new Map<string, { gain: GainNode; release(): void }>()
   const settings = new Map<string, ParticipantAudioSettings>()
   const observers = new Set<() => void>()
+  const stateListeners = new Set<(ready: boolean) => void>()
+  const failedDecoders = new Set<object>()
+  const outputReady = () => context.state === 'running' && failedDecoders.size === 0
+  const notifyOutput = () => {
+    for (const listener of [...stateListeners]) listener(outputReady())
+  }
   let microphone: MediaStreamTrack | undefined
   let micOff = true
   let disposal: Promise<void> | undefined
@@ -36,11 +42,13 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
       if (context.state !== 'running') throw new Error('Audio output blocked')
     },
     subscribeState(listener) {
-      const handler = () => listener(context.state === 'running')
+      stateListeners.add(listener)
+      const handler = () => listener(outputReady())
       context.addEventListener('statechange', handler)
       const release = () => {
         context.removeEventListener('statechange', handler)
         observers.delete(release)
+        stateListeners.delete(listener)
       }
       observers.add(release)
       return release
@@ -62,6 +70,11 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
     },
     attach(memberId, stream) {
       playback.get(memberId)?.release()
+      // Chromium starts remote RTP decoding through a playing media element.
+      // Keep it muted: the Web Audio graph owns the only audible output path.
+      const decoder = new Audio()
+      decoder.muted = true
+      decoder.srcObject = stream
       const source = context.createMediaStreamSource(stream)
       const gain = context.createGain()
       const setting = settings.get(memberId) ?? { volume: 100, muted: false }
@@ -74,12 +87,20 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
         release: () => {
           if (released) return
           released = true
+          decoder.pause()
+          decoder.srcObject = null
           source.disconnect()
           gain.disconnect()
+          if (failedDecoders.delete(entry)) notifyOutput()
           if (playback.get(memberId) === entry) playback.delete(memberId)
         },
       }
       playback.set(memberId, entry)
+      void decoder.play().catch(() => {
+        if (released) return
+        failedDecoders.add(entry)
+        notifyOutput()
+      })
       return entry.release
     },
     setMasterVolume(volume) {
