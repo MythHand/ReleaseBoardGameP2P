@@ -14,6 +14,9 @@ class FakeConn {
     if (!this.handlers[event]) this.handlers[event] = []
     this.handlers[event].push(cb)
   }
+  off(event: string, cb: (arg: unknown) => void) {
+    this.handlers[event] = (this.handlers[event] ?? []).filter((handler) => handler !== cb)
+  }
   emit(event: string, arg?: unknown) {
     for (const cb of this.handlers[event] ?? []) cb(arg)
   }
@@ -34,8 +37,10 @@ let lastPeer: FakePeer | null = null
 
 class FakePeer {
   id: string
+  static created = 0
   private handlers: Record<string, ((arg: unknown) => void)[]> = {}
   constructor(id?: string) {
+    FakePeer.created++
     this.id = id ?? 'self-generated'
     lastPeer = this
   }
@@ -52,6 +57,16 @@ class FakePeer {
     outboundConns.set(peerId, conn)
     queueMicrotask(() => conn.emit('open'))
     return conn
+  }
+  call(peerId: string, _stream: MediaStream, options: { metadata: unknown }) {
+    return Object.assign(new FakeConn(peerId), {
+      connectionId: 'media-1',
+      metadata: options.metadata,
+      answer: vi.fn(),
+    })
+  }
+  off(event: string, cb: (arg: unknown) => void) {
+    this.handlers[event] = (this.handlers[event] ?? []).filter((handler) => handler !== cb)
   }
   destroy() {}
 }
@@ -304,4 +319,48 @@ it('closes once even when the final send fails', async () => {
   connection.emit('close')
   expect(close).toHaveBeenCalledTimes(1)
   expect(disconnected).toHaveBeenCalledTimes(1)
+})
+
+it('uses its single Peer for media and scopes media-only errors away from the game', async () => {
+  const errors = vi.fn()
+  const before = FakePeer.created
+  const transport = await createTransport({ onMessage: () => {}, onError: errors })
+  if (!transport.media) throw new Error('Media port missing')
+  const call = transport.media.call('audio-only', {} as MediaStream, {
+    version: 1,
+    callerSessionId: 'a',
+    calleeSessionId: 'b',
+  })
+  const mediaErrors = vi.fn()
+  call.subscribe(mediaErrors)
+  lastPeer?.emit('error', {
+    type: 'peer-unavailable',
+    message: 'Could not connect to peer audio-only',
+  })
+  expect(mediaErrors).toHaveBeenCalledWith({
+    type: 'error',
+    error: { type: 'peer-unavailable', message: 'Could not connect to peer audio-only' },
+  })
+  expect(errors).not.toHaveBeenCalled()
+  expect(FakePeer.created - before).toBe(1)
+  lastPeer?.emit('error', { type: 'webrtc', message: 'negotiation failed' })
+  expect(errors).toHaveBeenCalledWith({ type: 'connection', message: 'negotiation failed' })
+  lastPeer?.emit('error', { type: 'network', message: 'socket lost' })
+  expect(errors).toHaveBeenCalledWith({ type: 'network', message: 'socket lost' })
+})
+it('preserves peer-unavailable for a pending game data dial', async () => {
+  const errors = vi.fn()
+  const transport = await createTransport({ onMessage: () => {}, onError: errors })
+  if (!transport.media) throw new Error('Media port missing')
+  transport.media.call('host', {} as MediaStream, {
+    version: 1,
+    callerSessionId: 'a',
+    calleeSessionId: 'b',
+  })
+  transport.connectTo('host')
+  lastPeer?.emit('error', { type: 'peer-unavailable', message: 'Could not connect to peer host' })
+  expect(errors).toHaveBeenCalledWith({
+    type: 'peer-unavailable',
+    message: 'Could not connect to peer host',
+  })
 })
