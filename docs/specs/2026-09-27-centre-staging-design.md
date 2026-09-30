@@ -51,8 +51,13 @@ events — no peer ever knew»).
   card stands when it was shown, and take it off the centre rather than off the seat's count a
   second time.
 - **Gesture** — `_useBoardStaging` sends `SHOW` when a card is put out at the centre and
-  `TAKE_BACK` on a miss, Escape or a refused play, while the engine shows something of ours. A
-  rebuilt board (a reload, the stand's viewer switch) finds our cards out with the gesture empty:
-  the gesture takes up the step it would be at, read off `shownLayout`, and one with nothing left
-  to choose goes home through the ordinary cancel.
+  `TAKE_BACK` on every cancel — a miss, Escape or a refused play — whether or not the engine has
+  confirmed the card out yet. From the cancel until our `takenBack` arrives, the cards asked back
+  are home for the player: the centre does not draw them off the projection, the fan does not
+  give them up, whatever the table still says of them. A rebuilt board (a reload, the stand's
+  viewer switch) finds our cards out with the gesture empty: the gesture takes up the step it
+  would be at, read off `shownLayout`, and one with nothing left to choose goes home through the
+  ordinary cancel.
+- **Transport** — every connection opens ordered (`reliable: true`), so the keeper receives a
+  player's `SHOW` and `TAKE_BACK` in the order they were made.
 - **History** — `shown` and `takenBack` have no row in the move history.

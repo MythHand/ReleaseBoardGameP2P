@@ -669,9 +669,12 @@ export default function Board({
   // (`shownLayout`, which the beat flying it in reads too). Our own cards are
   // our own staging's to draw while it holds them; once it holds nothing — the
   // board was rebuilt (the stand's viewer switch, a reconnect) — the projection
-  // is what still knows they are out, so they are drawn from it too.
+  // is what still knows they are out, so they are drawn from it too. Save a card
+  // we have asked back: it is home for us, whatever the table still says (#168).
   const theirs = shownLayout(
-    (state.shown ?? []).filter((s) => s.player !== state.selfId || !staging.holdingCentre),
+    (state.shown ?? []).filter(
+      (s) => s.player !== state.selfId || (!staging.holdingCentre && !staging.returning.has(s.uid)),
+    ),
   )
   const theirPair = theirs.pair
     ? { main: theirs.pair.main.card, aux: theirs.pair.aux.card, at: theirs.pair.at }

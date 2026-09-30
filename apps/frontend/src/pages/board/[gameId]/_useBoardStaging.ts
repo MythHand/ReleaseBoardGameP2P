@@ -81,6 +81,8 @@ const sameTarget = (a: TableTarget, b: TableTarget): boolean => {
   }
 }
 
+const NONE: ReadonlySet<string> = new Set()
+
 // The projection's target offer describes a solo play. Sudo Rebase applies
 // to every draw pile, while Sudo Branch still splits the chosen one.
 const rebaseAllPiles = (main: CardData, support: CardData | null) =>
@@ -152,6 +154,9 @@ export interface BoardStaging {
    * nothing (the board was rebuilt: the stand's viewer switch, a reconnect),
    * the projection is what still knows they are out (resolution.md §1). */
   holdingCentre: boolean
+  /** the uids we have asked back and the keeper has not answered for yet: home
+   * for this player already, whatever the table still says of them (#168) */
+  returning: ReadonlySet<string>
   /** the card that paid a staged release's cost, once its own flight has
    * landed — held open beside the release until `clearPaidCost` below moves
    * it on (the combo beat's own job, #101 Task 11) */
@@ -315,10 +320,33 @@ export function useBoardStaging({
   // lone release pulled to the stage slot did exactly that (#168). A ref, read
   // by `cancel()` in the same tick a press can land in.
   const arrivingRef = useRef(false)
-  // WE HAVE ASKED FOR OUR CARDS BACK and the table still shows them out: until it
-  // stops, what it shows is a take-back on its way, not a step to pick up again
-  // (the pick-up below). Cleared the moment the table shows nothing of ours.
-  const takeBackAsked = useRef(false)
+  // THE CARDS WE HAVE ASKED BACK, until the keeper answers (#168). A cancel asks
+  // at once, whether or not the table has confirmed the card out yet, and from
+  // that moment the card is home for this player. Whatever the table says of it
+  // before the answer — still out, or put out late by the confirmation of the
+  // very play being taken back — is a take-back on its way: the centre does not
+  // draw it, the fan does not give it up, the pick-up below does not take it.
+  // The answer is our own `takenBack`; putting the card out again starts afresh.
+  const [askedBack, setAskedBack] = useState<ReadonlySet<string>>(NONE)
+  const askedAt = useRef(0)
+  const askBack = (uids: (string | undefined)[]) => {
+    askedAt.current = eventsRef.current.length
+    setAskedBack(new Set(uids.filter((uid): uid is string => Boolean(uid))))
+  }
+  // Put out at the centre, in everyone's view (resolution.md §1) — and no longer
+  // on its way back, if it was.
+  const showOut = useCallback(
+    (uid: string) => {
+      actions?.onShow?.(uid)
+      setAskedBack((back) => {
+        if (!back.has(uid)) return back
+        const next = new Set(back)
+        next.delete(uid)
+        return next
+      })
+    },
+    [actions],
+  )
   const plainAttempt = useRef(0)
   // Whose turn it was when the current staging began. An attack answering a
   // reaction window is staged on somebody else's turn by design, so "not my
@@ -490,7 +518,10 @@ export function useBoardStaging({
         [
           staged?.support?.uid,
           staged?.main?.uid,
-          ...(state.shown ?? []).filter((s) => s.player === state.selfId).map((s) => s.uid),
+          // …save a card we have asked back: it is home for us already
+          ...(state.shown ?? [])
+            .filter((s) => s.player === state.selfId && !askedBack.has(s.uid))
+            .map((s) => s.uid),
           // IN THE AIR ON ITS WAY HOME: the carrier draws it until it lands, so
           // the fan does not. Every other return was covered only because the
           // gesture happened to hold its card until landing; a lone release is
@@ -509,7 +540,7 @@ export function useBoardStaging({
     // beat runs against is the board from before it did. Left in, the fan draws
     // a second copy of a card that is lying on the table, and it stays there
     // until the discard finally swallows it (owner, 22.09).
-    [staged, state.shown, state.selfId, carrying, paying, costGone],
+    [staged, state.shown, state.selfId, askedBack, carrying, paying, costGone],
   )
 
   const handItems = useMemo(
@@ -631,7 +662,7 @@ export function useBoardStaging({
       if (costPayment.current) return
       arrowCtl.stop()
       actions?.onResolve?.({ kind: 'cancelRelease' })
-      takeBackAsked.current = true
+      askBack([cost.release, stagedRef.current?.support?.uid])
       // A COMBO release is still staged at this point and a solo one is not,
       // and that asymmetry is deliberate on both sides (#101, Fix C): the
       // catch-up effect below clears `staged` for a solo release because
@@ -712,12 +743,13 @@ export function useBoardStaging({
     flyer.drop('stage')
     arrowCtl.stop()
     // what was put out on the table goes back in everyone's view (resolution.md
-    // §1) — asked only while the engine is showing something of ours, so a
-    // cancel it has already answered (the turn ran out) asks nothing twice
-    if ((state.shown ?? []).some((c) => c.player === state.selfId)) {
-      actions?.onTakeBack?.()
-      takeBackAsked.current = true
-    }
+    // §1) — asked EVERY time (#168): the keeper may not have confirmed the card
+    // out yet, and a cancel that stayed silent until it did left that late
+    // confirmation to put the card back on the table after the player had taken
+    // it home. A take-back the keeper finds nothing to answer (the turn ran out
+    // and it took the card back itself) is simply refused.
+    actions?.onTakeBack?.()
+    askBack([s.support?.uid, s.main?.uid])
     const cRect = anchors.centre.current?.getBoundingClientRect()
     if (reduced || !cRect) {
       pairApi.current.release()
@@ -926,7 +958,7 @@ export function useBoardStaging({
       )
       setStage('none')
       // it is out of the hand and on the table, in everyone's view (resolution.md §1)
-      actions?.onShow?.(card.uid)
+      showOut(card.uid)
       void (async () => {
         if (!reduced && from) {
           setCarrying([card.uid])
@@ -957,7 +989,7 @@ export function useBoardStaging({
         aimFromPlay(card, hasTarget ? null : 0)
       })()
     },
-    [anchors, reduced, flyer.raise, flyer.drop, aimFromPlay, actions],
+    [anchors, reduced, flyer.raise, flyer.drop, aimFromPlay, showOut],
   )
 
   // A standalone play is read at the centre before its effect is sent.
@@ -969,7 +1001,7 @@ export function useBoardStaging({
       commitStaged({ support: null, main: card, phase: 'aim', merged: false })
       setStage('none')
       // read at the centre by the whole table while it waits (resolution.md §1)
-      actions?.onShow?.(card.uid)
+      showOut(card.uid)
       const current = () =>
         attempt === plainAttempt.current &&
         !cancellingRef.current &&
@@ -1009,7 +1041,7 @@ export function useBoardStaging({
         dispatch()
       })()
     },
-    [actions, anchors.centre, reduced, flyer.raise, flyer.drop],
+    [actions, anchors.centre, reduced, flyer.raise, flyer.drop, showOut],
   )
 
   // GESTURE — pulling a card out of the fan puts it on the table. A card with
@@ -1248,7 +1280,7 @@ export function useBoardStaging({
       const merged = !sideBySide
       commitStaged({ support, main, phase: 'partner', merged })
       // the card it goes with is out on the table too (resolution.md §1)
-      actions?.onShow?.(main.uid)
+      showOut(main.uid)
       // the fold is committed — irrevocable until `finish()` runs (ComboStory's
       // own `playing`); `cancel()` and a second click both refuse while this is
       // true, so nothing can race the automatic dispatch that follows the fold.
@@ -1424,6 +1456,7 @@ export function useBoardStaging({
       stageSoloRelease,
       stageAtCentre,
       actions,
+      showOut,
       cancel,
       costOptions,
       onCostPlay,
@@ -1617,6 +1650,7 @@ export function useBoardStaging({
     // the new match's fan is whole at once, not a flight later
     setCarrying([])
     setStage('none')
+    setAskedBack(NONE)
     resetCostPayment()
     pairApi.current.release()
     arrowCtl.stop()
@@ -1644,15 +1678,14 @@ export function useBoardStaging({
   // in this order, and a pick-up ahead of the wipe was wiped straight away.
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect; `cancel` is read through `cancelRef`, as the turn-leaving effect reads it
   useLayoutEffect(() => {
-    const own = (state.shown ?? []).filter((s) => s.player === state.selfId)
-    if (own.length === 0) {
-      takeBackAsked.current = false
-      return
-    }
+    // what we have asked back is not a step to take up: it is on its way home
+    const own = (state.shown ?? []).filter(
+      (s) => s.player === state.selfId && !askedBack.has(s.uid),
+    )
+    if (own.length === 0) return
     if (
       !enabled ||
       beatsRunning ||
-      takeBackAsked.current ||
       stagedRef.current ||
       stage !== 'none' ||
       cancellingRef.current ||
@@ -1732,6 +1765,7 @@ export function useBoardStaging({
   }, [
     state.shown,
     state.selfId,
+    askedBack,
     state.targets,
     state.comboOptions,
     enabled,
@@ -1743,6 +1777,17 @@ export function useBoardStaging({
     anchors,
     aimFromPlay,
   ])
+
+  // THE KEEPER HAS ANSWERED OUR TAKE-BACK: the table has taken our cards back
+  // (`takenBack` for us, after we asked), so what it shows of ours from here on
+  // is the table's word again.
+  useEffect(() => {
+    if (askedBack.size === 0) return
+    const answered = events
+      .slice(askedAt.current)
+      .some((e) => e.type === 'takenBack' && e.player === state.selfId)
+    if (answered) setAskedBack(NONE)
+  }, [events, askedBack, state.selfId])
 
   // the combo beat's own clear (#100) — no flight, just done. Unguarded, unlike
   // `cancel()`: the beat only ever calls this once ITS OWN read of the handoff
@@ -1809,6 +1854,7 @@ export function useBoardStaging({
     onCostPlay,
     stageStanding: stage === 'standing',
     holdingCentre: staged !== null || stage !== 'none',
+    returning: askedBack,
     paidCost,
     clearPaidCost,
     takeStagedRelease,

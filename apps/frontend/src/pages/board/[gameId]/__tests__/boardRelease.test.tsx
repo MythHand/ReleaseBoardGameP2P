@@ -1292,10 +1292,15 @@ it('hands the fan back when a combo cancel’s own flight is refused', async () 
     })
     // nothing landed, and nothing was going to — so the gesture put itself back
     expect(result.current.staged).toBeNull()
-    // both halves stay out of the fan until the referee's answer takes them
-    // back: while the cost is owed the engine shows the pair at the centre,
-    // and one `takenBack` returns both (resolution.md §1)
-    expect(result.current.handItems.map((c) => c.uid)).toEqual(['attack-bug#0'])
+    // both halves are home for the player at once, though the referee has not
+    // answered yet and the table still shows the pair owed at the centre: we
+    // asked them back, so what the table says of them now is a take-back on its
+    // way (#168) — and nothing is taken out of the fan when it lands
+    expect(result.current.handItems.map((c) => c.uid)).toEqual([
+      'support-code-review#0',
+      'release-frontend#0',
+      'attack-bug#0',
+    ])
     rerender({ pending: null })
     expect(result.current.handItems.map((c) => c.uid)).toEqual([
       'support-code-review#0',

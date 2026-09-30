@@ -139,7 +139,14 @@ export function createTransport(args: {
       resolve({
         id: id as string,
         connectTo(peerId) {
-          wire(peer.connect(peerId), true)
+          // ORDERED (#168). Without `reliable`, PeerJS opens the channel with
+          // `ordered: false`, and nothing here puts frames back in order: a
+          // player's take-back could reach the keeper ahead of the put-out it
+          // answers and be refused, and the put-out then left the card on the
+          // table the player had taken it off. The keeper runs a player's
+          // intents one by one; this makes them arrive in the order made — and
+          // the keeper's own syncs back in the order sent.
+          wire(peer.connect(peerId, { reliable: true }), true)
         },
         authenticate(peerId) {
           const generation = connections.get(peerId)

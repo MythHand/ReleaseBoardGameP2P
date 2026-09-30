@@ -49,7 +49,7 @@ const BUG_TARGETS: Record<string, TableTarget[]> = {
 }
 
 function boardWith(
-  overrides: { targets?: Record<string, TableTarget[]> },
+  overrides: { targets?: Record<string, TableTarget[]>; shown?: ShownCard[] },
   actions: TableActions = {},
   // the feed `useBoardStaging` watches for a `rejected` reply — Board only
   // hands events through via `intro.events`, so a `rejected` test routes them
@@ -66,6 +66,7 @@ function boardWith(
       hasDrawn: true,
       playable: HAND.map((c) => c.uid),
       targets: overrides.targets ?? {},
+      shown: overrides.shown ?? [],
     },
     actions,
     intro: events.length > 0 ? { gameId: null, view: null, events, onDone: () => {} } : undefined,
@@ -1087,4 +1088,51 @@ it('leaves the step alone while a beat runs on the table from before', () => {
   expect(result.current.staged).toBeNull()
   rerender({ running: false })
   expect(result.current.staged?.phase).toBe('partner')
+})
+
+// ===== a take-back the keeper has not answered yet (#168) =====
+//
+// A guest's cancel can land before the keeper's confirmation of the put-out
+// has come back. The take-back goes at once, and until the keeper answers it
+// the card is home for the player, whatever the table says of it meanwhile.
+
+const bugOut = (): ShownCard => ({ player: 'you', uid: 'attack-bug#0', card: bug })
+const bugTakenBack: Event = { id: 50, type: 'takenBack', player: 'you', cards: ['attack-bug'] }
+
+it('asks the card back even before the table has confirmed it out', async () => {
+  const onTakeBack = vi.fn()
+  // the table never shows it out: the keeper has not answered the put-out yet
+  render(boardWith({ targets: BUG_TARGETS }, { onTakeBack }))
+  await pullCardFromFan('attack-bug#0')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('keeps a card asked back home when the late confirmation of its put-out arrives', async () => {
+  const onTakeBack = vi.fn()
+  const { rerender } = render(boardWith({ targets: BUG_TARGETS }, { onTakeBack }))
+  await pullCardFromFan('attack-bug#0')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await settle()
+  // the keeper's confirmation of the put-out, late: the table shows the card out
+  rerender(boardWith({ targets: BUG_TARGETS, shown: [bugOut()] }, { onTakeBack }))
+  await settle()
+  expect(fanUids()).toContain('attack-bug#0')
+  expect(screen.queryByTestId('board-centre-shown')).toBeNull()
+  expect(screen.queryByTestId('board-centre-staged')).toBeNull()
+  // not picked up and sent home a second time
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('takes the table’s word again once the keeper has answered the take-back', async () => {
+  const { rerender } = render(boardWith({ targets: BUG_TARGETS }))
+  await pullCardFromFan('attack-bug#0')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await settle()
+  // the answer: our cards taken back
+  rerender(boardWith({ targets: BUG_TARGETS }, {}, [bugTakenBack]))
+  // a card of ours out on the table now is the table's word again — a rebuilt
+  // board picks it up
+  rerender(boardWith({ targets: BUG_TARGETS, shown: [bugOut()] }, {}, [bugTakenBack]))
+  expect(screen.getByTestId('board-centre-staged')).toBeTruthy()
 })
