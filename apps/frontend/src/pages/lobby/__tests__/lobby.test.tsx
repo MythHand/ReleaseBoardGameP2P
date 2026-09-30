@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import { MAX_RECONNECT_ATTEMPTS, type UseLobby } from '~/entities/lobby'
 import { botNames } from '~/features/start-game/botNames'
+import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import LobbyView from '../_LobbyView'
 import LobbyPage from '../[lobbyId]'
 
@@ -67,6 +68,7 @@ function base(): UseLobby {
     lobbyActionError: null,
     setMaxSpectators: vi.fn(),
     setParticipantRole: vi.fn(),
+    voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
@@ -151,6 +153,7 @@ function inSession(): UseLobby {
     status: 'in-lobby',
     roomCode: 'ABC-23D',
     isHost: true,
+    voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: 'member-h', send: sendChat },
     state: {
       selfId: 'h',

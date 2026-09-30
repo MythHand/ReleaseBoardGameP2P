@@ -2,6 +2,7 @@ import type { GameView, PlayerView } from '@release/engine'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { PeerInfo, Seat } from '~/network'
+import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import StatsPage from '../stats'
 
 const goToLobby = vi.fn()
@@ -30,6 +31,7 @@ vi.mock('~/app/providers/SessionProvider', () => ({
     // The seating frozen at the deal, as the session holds it (#19) — not
     // something this page derives from a roster that changes under it.
     seats,
+    voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: 'member-a', send: sendChat },
     leaveGame,
     setWhere,

@@ -211,7 +211,8 @@ export function createRoomVoice(options: {
   }
   const broadcastAuthority = () => {
     if (!context || !authority) return
-    context.transport.broadcast({ type: 'VOICE_ROSTER', payload: authority.roster })
+    if (context.transport.media)
+      context.transport.broadcast({ type: 'VOICE_ROSTER', payload: authority.roster })
     acceptRoster(authority.roster)
   }
   const intent = (message: VoiceIntent) => {

@@ -10,3 +10,5 @@ export {
   type UseLobby,
   useLobby,
 } from './useLobby'
+export type { VoiceIssue, VoiceSnapshot } from './voice/runtime'
+export type { RoomVoiceFacade } from './voice/useRoomVoice'
