@@ -393,6 +393,13 @@ export interface BoardProps {
   pickPreview?: { player: string; card: string | null } | null
   /** the local surface's own offer, on its way to the other seats */
   onPickPreview?: (card: string | null) => void
+  /**
+   * This player's own refusals — the table's "no" to something it sent — apart
+   * from `intro.events`: a refusal is not a move, never enters the history, and
+   * its id is not one of the feed's (#168). The gestures read it to take a
+   * refused card home.
+   */
+  rejections?: Event[]
   // The opening. Present only on a fresh entry; the board renders the intro's
   // shadow of `state` while it runs and the live `state` afterwards.
   intro?: {

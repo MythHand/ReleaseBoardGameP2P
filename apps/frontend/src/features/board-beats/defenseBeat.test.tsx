@@ -1220,7 +1220,55 @@ it('keeps a reflected hand attack visible while only the defence leaves', async 
     effect: 'reflect' as const,
     spent: [{ eventId: 14, card: 'defense-hotfix', reason: 'defenceSpent' as const }],
   }
-  await drive(() => api.beat?.runCovered(plan, { base, publish: (s) => published.push(s) }))
+  // the board from before the batch, with the attack still owed its answer —
+  // the only board a reflection is ever played against
+  const withAttack = {
+    ...base,
+    pending: {
+      kind: 'defend',
+      player: 'p1',
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      sudo: false,
+    },
+  } as unknown as BoardState
+  await drive(() =>
+    api.beat?.runCovered(plan, { base: withAttack, publish: (s) => published.push(s) }),
+  )
   expect(published.at(-1)?.pending).toBeNull()
   expect(published.at(-1)?.centreAttack).toEqual({ card: 'attack-bug', sudo: false })
+})
+
+// The exchange lands in the heap as it lay on the table (#168): the attack
+// under the defence, and the defence's Sudo tucked under its own card — the
+// order the projection's own heap keeps (`toDiscardHeap`), though the engine
+// banks the Sudo after its card. Filed by event, the two swapped places the
+// moment the projection took over, and the pile blinked (owner's recording).
+it('lands a defence played with Sudo in the heap with the Sudo under it', async () => {
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: BoardState[] = []
+  const plan = {
+    ...cancelPlan(),
+    sudo: 'support-sudo',
+    spent: [
+      { eventId: 13, card: 'attack-bug', reason: 'attackSpent' as const },
+      { eventId: 14, card: 'defense-hotfix', reason: 'defenceSpent' as const },
+      { eventId: 15, card: 'support-sudo', reason: 'defenceSpent' as const },
+    ],
+  }
+  const withAttack = {
+    ...base,
+    pending: {
+      kind: 'defend',
+      player: 'p1',
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      sudo: false,
+    },
+  } as unknown as BoardState
+  await drive(() =>
+    api.beat?.runCovered(plan, { base: withAttack, publish: (s) => published.push(s) }),
+  )
+  expect(published.at(-1)?.decks.discardHeap?.map((h) => h.uid)).toEqual(['d13', 'd15', 'd14'])
 })

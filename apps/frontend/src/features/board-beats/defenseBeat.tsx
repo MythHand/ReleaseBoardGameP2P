@@ -6,10 +6,12 @@ import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
 import { ATTACK_POSE, COVER_POSE, SHOW_HOLD } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
+import { liftOff, setDown } from './cardPlace'
 import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
 import { toEventsDeck } from './toEventsDeck'
 import { useToHand } from './toHand'
+import { settleInto } from './toHeap'
 import { readsAtGlance } from './zoneReading'
 
 // The answer to an attack (#101): a defence covers what is standing at the
@@ -133,11 +135,9 @@ export function useDefenseBeat(
         // where it came from": the card stands, in its own pose, and the
         // exchange leaves from something real.
         const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.card) : -1
-        const from =
-          (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
-          a.seatBox(plan.defender) ??
-          coverBox
-        const [el] = await flyer.raise([
+        const seat = a.seatBox(plan.defender)
+        const from = (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ?? seat ?? coverBox
+        const raised = flyer.raise([
           {
             key: 'cover',
             at: from,
@@ -145,6 +145,18 @@ export function useDefenseBeat(
             card: ownSudo ? undefined : defence,
           },
         ])
+        // …and the place it left stops drawing it in the commit its carrier goes
+        // up: our fan, or the count of the hand it came out of (`cardPlace.ts`)
+        const held = handIndex >= 0 ? ctx.base.you.hand[handIndex] : undefined
+        liftOff(
+          ctx,
+          held
+            ? [{ kind: 'hand', uid: held.uid }]
+            : seat
+              ? [{ kind: 'seat', player: plan.defender }]
+              : [],
+        )
+        const [el] = await raised
         if (el) {
           await play('playToCenter', el, {
             to: coverBox,
@@ -268,17 +280,44 @@ export function useDefenseBeat(
       // the attack leaving for its hand are one moment, not two gestures.
       // What the centre was drawing off the pending goes down in the commit
       // the exit's carriers go up — the step's own `takeOff`.
-      const letGoOfThePending = () =>
-        ctx.publish({
-          ...ctx.base,
-          pending: null,
-          ...(reflected ? { centreAttack: { card: plan.attackCard, sudo: plan.attackSudo } } : {}),
-        })
+      //
+      // Through `cardPlace`, so the attack leaves every field the centre draws it
+      // from and the run's base moves with it — the Rollback's landing below
+      // builds on that base, and a base still holding the pending brought the
+      // attack back to the centre as it landed in the fan. A reflected attack
+      // stays, and so does the defence that turned it, if the exit does not take
+      // it: both stand on as the answered exchange's own fields. Our own cover
+      // carrier comes down in the same commit — the exit's copy, or the cover's
+      // standing render, is what draws it from here (#168).
+      const coverStays = reflected && !defenceSpent
+      const letGoOfThePending = () => {
+        liftOff(ctx, [{ kind: 'centre', card: plan.attackCard }])
+        if (reflected)
+          setDown(ctx, [
+            {
+              kind: 'centre',
+              attack: { card: plan.attackCard, sudo: plan.attackSudo },
+              ...(coverStays ? { cover: { card: plan.card, sudo: Boolean(ownSudo) } } : {}),
+            },
+          ])
+        flyer.drop('cover')
+      }
+      // …and what landed lies in the heap from the commit the carriers come down,
+      // as it lay on the table: the attack under the defence that covered it,
+      // and each pair's Sudo tucked under its own card. The layer says so, not
+      // the event order — the engine banks the Sudo a moment AFTER its card, and
+      // filed by event it lay on top, then swapped under once the projection's
+      // own heap (`toDiscardHeap`) took over (owner's recording, 02.10)
+      const filed = [attackAux, attackSpent, defenceAux, defenceSpent].flatMap((s, layer) =>
+        s ? [{ ...s, layer }] : [],
+      )
       // nothing flies, so the step never runs it — but the pending still has to
       // be let go of, or the answered attack keeps standing at the centre
       if (items.length === 0) letGoOfThePending()
       await Promise.all([
-        items.length > 0 ? latest.current.send(items, letGoOfThePending) : undefined,
+        items.length > 0
+          ? latest.current.send(items, letGoOfThePending).then(() => settleInto(ctx, filed))
+          : undefined,
         returning,
       ])
       flyer.drop('cover')

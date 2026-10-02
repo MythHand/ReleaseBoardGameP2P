@@ -70,6 +70,22 @@ export const setHand = (state: GameState, id: PlayerId, hand: PlayerState['hand'
   }
 }
 
+/** Everything the player has put out at the centre goes back into the hand, in
+ *  everyone's view (resolution.md §1). Here rather than beside `show`, because
+ *  the time to attack a release takes cards back too, and that module sits above
+ *  the put-out one. */
+export function takeBack(state: GameState, log: Log, player: PlayerId): GameState {
+  const me = state.players[player]
+  if (me.shown.length === 0) return state
+  const cards = me.shown.flatMap((uid) => me.hand.find((c) => c.uid === uid)?.id ?? [])
+  if (cards.length > 0) log.add({ type: 'takenBack', player, cards })
+  return {
+    ...state,
+    players: { ...state.players, [player]: { ...me, shown: [] } },
+    eventSeq: log.seq,
+  }
+}
+
 // The TS Action type does not survive JSON deserialization, so an action from a
 // remote peer may be any shape at all. Validating once at the entry point means
 // every handler can destructure freely, and no later handler can reopen the hole.

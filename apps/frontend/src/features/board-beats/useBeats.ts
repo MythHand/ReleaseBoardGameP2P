@@ -10,6 +10,7 @@ import type {
   StagedHandoff,
 } from '~/entities/game/board'
 import type { DiscardPickHandoff, RequestPickHandoff } from '~/entities/game/board/types'
+import { trace, tracing } from '~/shared/lib/debugTrace'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useAiBeat } from './aiBeat'
 import { useComboBeat } from './comboBeat'
@@ -26,6 +27,15 @@ import { planBeats } from './planBeats'
 import { useShownBeat } from './shownBeat'
 import { useTransferBeat } from './transferBeat'
 import { useUpgradeBeat } from './upgradeBeat'
+
+// A board a beat starts from or publishes, as the stand's recorder writes it
+// down (#168): the hand, what is out at the centre, what is pending.
+const glance = (b: BoardState) => ({
+  hand: b.you.hand.map((c) => `${c.card.name} ${c.uid}`),
+  shown: (b.shown ?? []).map((s) => `${s.player}:${s.card.name}`),
+  pending: b.pending?.kind ?? null,
+  centreAttack: b.centreAttack?.card ?? null,
+})
 
 // The board's beat queue. `useGame` accumulates engine events off the wire in
 // BATCHES — a peer can receive several moves in one sync — so a board that
@@ -577,6 +587,8 @@ export function useBeats(args: {
         // behind on the planned one, which is the very flicker this closes.
         next.base = next.after?.ended ?? next.base
         runningRef.current = next
+        const key = next.key
+        if (tracing()) trace('beat', { key, exclusive: next.exclusive, base: glance(next.base) })
         setRunning(next)
         setAdvanced(null)
         setRaised(false)
@@ -586,6 +598,7 @@ export function useBeats(args: {
         let ended = next.base
         const publish = (state: BoardState) => {
           ended = state
+          if (tracing()) trace('beatPublish', { key, ...glance(state) })
           setAdvanced(state)
         }
         // A beat that throws must not hold the board: the shadow is dropped in
@@ -600,7 +613,9 @@ export function useBeats(args: {
           })
         } catch (err) {
           if (import.meta.env.DEV) console.error('[beats] %s failed', next.key, err)
+          trace('beatError', { key, error: String(err) })
         }
+        if (tracing()) trace('beatEnd', { key, ended: glance(ended) })
         // Even after a throw: whatever it managed to publish IS on screen, and
         // the beat behind it has to animate away from that and not from a board
         // two states back.
@@ -610,6 +625,7 @@ export function useBeats(args: {
     } finally {
       draining.current = false
       runningRef.current = null
+      trace('beatsDone')
       setRunning(null)
       setAdvanced(null)
       setRaised(false)

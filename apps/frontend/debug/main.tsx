@@ -5,13 +5,14 @@ import { cardsPresent } from '@release/engine'
 import { botAction } from '@release/engine/fake'
 import { useTranslation } from '@release/translation'
 import { Button, cardById, Typography } from '@release/ui'
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { toBoardOver, toBoardState } from '~/entities/game/board'
 import { useNow } from '~/features/play-game/useNow'
 import { forViewer, rejectionsIn } from '~/network/session/audience'
 import Board from '~/pages/board/[gameId]/_Board'
 import { useDebugCopy } from './copy'
+import { type Recorder, useRecorder } from './recorder'
 import {
   AI_CARDS,
   createScenario,
@@ -40,26 +41,55 @@ function reduceRun(run: Run, action: Action): Run {
   }
 }
 
+// What the table holds after a step, for the recorder: whose turn, what is
+// waiting, the window, and every player's cards out at the centre.
+function tableOf(state: Run['state']) {
+  return {
+    turn: state.turn.player,
+    pending: state.pending?.kind ?? null,
+    window: state.window && {
+      release: state.window.target.player,
+      round: state.window.round,
+      deadline: state.window.deadline,
+    },
+    shown: Object.fromEntries(
+      state.seating.map((id) => [
+        id,
+        state.players[id].shown.map(
+          (uid) => `${state.players[id].hand.find((c) => c.uid === uid)?.id ?? '?'} ${uid}`,
+        ),
+      ]),
+    ),
+  }
+}
+
 function ScenarioRun({
   scenario,
   gameId,
   aiCard,
   onAiCard,
+  recorder,
 }: {
   scenario: Scenario
   gameId: string
   aiCard: string
   onAiCard: (card: string) => void
+  recorder: Recorder
 }) {
   const { t, i18n } = useTranslation()
   const debug = useDebugCopy()
-  const [run, dispatch] = useReducer(reduceRun, undefined, (): Run => {
+  const { note } = recorder
+  const [run, setRun] = useState((): Run => {
     const state = createScenario(scenario, gameId, aiCard)
     // The seeded discard's own history, so the board can fold a heap out of
     // it (`seedLog`). Reported as already reflected below, so the queue
     // treats it as a table it arrived at rather than moves to replay.
     return { state, events: seedLog(state), last: null }
   })
+  // The engine answers in the same tick the board asks, as a keeper on this
+  // machine would — and the recorder writes both down right there, between the
+  // board's own lines, rather than a render later.
+  const runRef = useRef(run)
   const [viewer, setViewer] = useState('you')
   // HOW MANY CARDS THIS GAME HAS, counted once at the scene's own start. The
   // count itself is the engine's — the same census its conformance check is
@@ -71,13 +101,30 @@ function ScenarioRun({
   const [seeded] = useState(() => run.events.at(-1)?.id ?? 0)
   const [ready, setReady] = useState(false)
   const now = useNow(ready)
-  const send = useCallback((intent: Intent) => dispatch({ ...intent, at: Date.now() }), [])
+  const send = useCallback(
+    (intent: Intent) => {
+      const action: Action = { ...intent, at: Date.now() }
+      const next = reduceRun(runRef.current, action)
+      runRef.current = next
+      note('action', { action, events: next.last?.events, table: tableOf(next.state) })
+      setRun(next)
+    },
+    [note],
+  )
   const onIntroDone = useCallback(() => {
     setReady(true)
     send({ type: 'CLOCK_STARTED' })
   }, [send])
   const view = useMemo(() => engine.project(run.state, viewer), [run.state, viewer])
   const events = useMemo(() => forViewer(run.events, viewer), [run.events, viewer])
+  // the viewer's own refusals, sent to that seat alone, as the keeper sends them
+  const rejections = useMemo(
+    () =>
+      rejectionsIn(run.events).filter(
+        (e) => e.type === 'rejected' && 'player' in e.action && e.action.player === viewer,
+      ),
+    [run.events, viewer],
+  )
   const labels = t('historyLabels', { returnObjects: true }) as Record<Event['type'], string>
   const board = useMemo(() => toBoardState(view, events, labels), [view, events, labels])
 
@@ -203,7 +250,10 @@ function ScenarioRun({
               key={id}
               variant="tech"
               aria-pressed={viewer === id}
-              onClick={() => setViewer(id)}
+              onClick={() => {
+                note('viewer', { viewer: id })
+                setViewer(id)
+              }}
             >
               {debug(
                 id === 'you' ? 'viewerYou' : id === 'p2' ? 'viewerOpponent' : 'viewerObserver',
@@ -263,6 +313,25 @@ function ScenarioRun({
               {debug('opponentDiscard')}
             </Button>
           )}
+          {/* the recorder, at the far end of the same row — see `recorder.ts` */}
+          <div className={styles.recorder}>
+            <Button
+              variant="tech"
+              aria-pressed={recorder.recording}
+              onClick={recorder.recording ? recorder.stop : recorder.start}
+            >
+              {debug(recorder.recording ? 'recordStop' : 'recordStart')}
+            </Button>
+            <Button
+              variant="tech"
+              disabled={recorder.recording || recorder.count === 0}
+              title={recorder.saved ?? undefined}
+              onClick={() => recorder.save(scenario)}
+            >
+              {debug(recorder.saved ? 'recordSaved' : 'recordSave')}
+              {recorder.count > 0 && ` · ${recorder.count}`}
+            </Button>
+          </div>
         </div>
       </div>
       <div className={styles.board} data-debug-game-id={gameId}>
@@ -279,6 +348,7 @@ function ScenarioRun({
             restoredThrough: seeded,
             onDone: onIntroDone,
           }}
+          rejections={rejections}
           room={{
             role: 'host',
             participants: run.state.seating.map((id) => ({
@@ -327,8 +397,19 @@ function App() {
     gameId: crypto.randomUUID(),
     aiCard: DEFAULT_AI_CARD,
   }))
-  const select = (scenario: Scenario, aiCard = selection.aiCard) =>
+  // held here, above the scene, so a recording goes on across a restart
+  const recorder = useRecorder()
+  const select = (scenario: Scenario, aiCard = selection.aiCard) => {
+    recorder.note('scenario', { scenario, aiCard })
     setSelection({ scenario, gameId: crypto.randomUUID(), aiCard })
+  }
+  const record = {
+    ...recorder,
+    start: () => {
+      recorder.start()
+      recorder.note('scenario', { scenario: selection.scenario, aiCard: selection.aiCard })
+    },
+  }
 
   return (
     <main className={styles.app}>
@@ -352,6 +433,7 @@ function App() {
         key={selection.gameId}
         {...selection}
         onAiCard={(card) => select(selection.scenario, card)}
+        recorder={record}
       />
     </main>
   )

@@ -13,6 +13,7 @@ import {
   shownLayout,
   shownPlaceOf,
 } from '~/entities/game/board'
+import { liftOff, type Place } from './cardPlace'
 import type { BeatPlan } from './planBeats'
 import { seatCardBox } from './seat'
 import { useToCentre } from './toCentre'
@@ -82,29 +83,33 @@ export function shownSource(
 }
 
 /**
- * OUR OWN PLAY, TAKEN OVER FROM THE GESTURE: the cards it holds are no longer
- * out at the centre, and the gesture lets go of them — in one commit.
+ * OUR OWN PLAY, TAKEN OVER FROM THE GESTURE: the cards it holds are nowhere the
+ * board draws them any more, and the gesture lets go of them — in one commit.
  *
- * The engine takes a card off `shown` the moment it leaves the hand (`setHand`);
- * the shadow a beat runs on is the board from BEFORE the batch, where our played
- * card is still out. Released without this, the gesture held nothing, so the
- * centre drew our shown card again from that shadow (`_Board.tsx` draws our own
- * shown cards whenever the gesture does not hold them — the stand's viewer
- * switch, a reconnect): a second DDoS stood at the middle while the real one
- * flew to the discard, and vanished when the move ended (#168). Another
- * player's card is taken off the same way by `shownSource`; this is ours.
+ * The shadow a beat runs on is the board from BEFORE the batch, where our played
+ * card is still in the hand AND still out at the centre. Released with either
+ * left in, the gesture held nothing and the board drew the card from what was
+ * left: a second DDoS stood at the middle while the real one flew to the
+ * discard (#168), and an accepted attack came back into the fan for a frame
+ * before the centre took it (owner's recordings, 02.10). Every place the card is
+ * drawn from is `cardPlace`'s to know; this names the card.
  */
 export function adoptStaged(ctx: BeatRun, handoff: StagedHandoff | null | undefined): void {
   if (!handoff) return
-  const next = withoutStaged(ctx.base, handoff)
-  if (next !== ctx.base) {
-    ctx.base = next
-    ctx.publish(next)
-  }
-  handoff.release()
+  liftOff(ctx, stagedPlaces(handoff), handoff)
 }
 
-/** The board without the cards the gesture hands over — the half of `adoptStaged` a beat that publishes its own board needs. */
+const stagedPlaces = (handoff: StagedHandoff): Place[] =>
+  [handoff.mainUid, handoff.supportUid].flatMap((uid) =>
+    uid ? [{ kind: 'hand' as const, uid }] : [],
+  )
+
+/**
+ * The board without the cards the gesture hands over, off the CENTRE only. Kept
+ * for the operation beat alone, which still takes its card out of the hand by
+ * position afterwards (`withoutFlown`) — taking it out by uid here first would
+ * move every position after it. Goes when that beat moves onto `cardPlace`.
+ */
 export function withoutStaged(
   base: BoardState,
   handoff: StagedHandoff | null | undefined,

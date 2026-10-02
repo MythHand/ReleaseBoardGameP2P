@@ -429,7 +429,7 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
 // Monitoring comes along because it is the OTHER thing that goes into a zone,
 // and nothing else on this stand ever puts one there (owner, 20.09).
 function createReleaseScenario(initial: GameState): GameState {
-  const { take, piles } = fromTheGame(initial, ['you', 'p2'])
+  const { take, piles } = fromTheGame(initial, ['you', 'p2', 'p3'])
   return {
     ...initial,
     eventSeq: 100,
@@ -457,6 +457,15 @@ function createReleaseScenario(initial: GameState): GameState {
       p2: {
         ...initial.players.p2,
         hand: [take('attack-bug'), take('support-sudo')],
+        release: {},
+        openedAtDeal: [],
+      },
+      // A second opponent with an attack of their own: one attack is dealt with
+      // at a time (resolution.md §1), and a card put out after the first one has
+      // to have somebody to come from (#168).
+      p3: {
+        ...initial.players.p3,
+        hand: [take('attack-bug')],
         release: {},
         openedAtDeal: [],
       },

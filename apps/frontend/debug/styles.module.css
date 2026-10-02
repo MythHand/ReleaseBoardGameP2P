@@ -60,6 +60,15 @@
   display: none;
 }
 
+/* the recorder keeps to the far end of the row, apart from the scene's own
+   switches: it records the scene, it is not part of it */
+.recorder {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
 /* the instruction rides in the controls' row and gives way to them: it takes
    what is left and ends in an ellipsis rather than wrapping into a second row */
 .hint {

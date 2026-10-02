@@ -613,25 +613,20 @@ it('does not show the defense pair already folded before its entry poses are pai
   const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[0]
   fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
   fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  // no `await` above this line: the commit the pair mounts in. It is shown from
+  // that very commit — the Sudo and the defence stop being drawn anywhere else
+  // in it, and a pair kept hidden for two more frames left nothing on the table
+  // for those frames (#168, one card one place) — and it is never shown without
+  // its halves already standing in their entry poses.
   const carrier = document.querySelector<HTMLElement>(`.${pairFoldStyles.flyer}`)
   expect(carrier).not.toBeNull()
-  expect(carrier?.dataset.shown).not.toBe('true')
-  const entryPoses: string[] = []
-  const observer = new MutationObserver(() => {
-    if (carrier?.dataset.shown !== 'true' || entryPoses.length > 0) return
-    entryPoses.push(
-      carrier.querySelector<HTMLElement>('[data-main]')?.style.transform ?? '',
-      carrier.querySelector<HTMLElement>('[data-aux]')?.style.transform ?? '',
-    )
-  })
-  if (carrier) observer.observe(carrier, { attributes: true, attributeFilter: ['data-shown'] })
+  expect(carrier?.dataset.shown).toBe('true')
+  expect(carrier?.querySelector<HTMLElement>('[data-main]')?.style.transform).toBeTruthy()
+  expect(carrier?.querySelector<HTMLElement>('[data-aux]')?.style.transform).toBeTruthy()
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 80))
   })
-  observer.disconnect()
   geometry.mockRestore()
-  expect(entryPoses).toHaveLength(2)
-  expect(entryPoses.every(Boolean)).toBe(true)
 })
 
 // Fix round 1 (Important 3): mechanic 3 (the fold lock) had no test at all.

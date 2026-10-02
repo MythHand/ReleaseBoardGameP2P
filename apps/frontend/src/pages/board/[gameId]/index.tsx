@@ -175,6 +175,8 @@ export default function BoardPage() {
               }
             : undefined
         }
+        // the keeper's "no" to what this seat sent: a refused card goes home
+        rejections={game.rejections}
         // A pick another seat is offering but has not confirmed — it belongs to
         // the session, not to the game: the engine is told nothing until the
         // answer is submitted. Scoped to THIS match, so a frame that outlived

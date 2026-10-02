@@ -4,7 +4,7 @@ import type { Leaving } from '@release/ui/animations'
 import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
 import { useComboBeat } from './comboBeat'
 import type { BeatPlan } from './planBeats'
@@ -209,7 +209,13 @@ async function drive(run: () => Promise<void> | undefined) {
   }
 }
 
-const ctx: BeatRun = { base, publish: () => {} }
+// A run of its own for every test, as the queue gives every beat one: a beat
+// moves its run's base as it publishes, and a run shared across tests handed
+// each test the board the one before it had left.
+let ctx: BeatRun = { base, publish: () => {} }
+beforeEach(() => {
+  ctx = { base, publish: () => {} }
+})
 
 // ===== attackPlaced =====
 
@@ -511,14 +517,16 @@ it('publishes our own attack too when the answer arrives in the same batch', asy
   expect(release).toHaveBeenCalledTimes(1)
   expect(played.names).not.toContain('foldIntoPair')
   // …and the attack it left standing is published, so the cover has something
-  // to cover
-  expect(published).toHaveLength(1)
-  expect(published[0].pending).toMatchObject({
+  // to cover — and it is still standing on the board the beat ends on, where the
+  // card that left the hand for it is no longer in the fan (#168)
+  const last = published.at(-1)
+  expect(last?.pending).toMatchObject({
     kind: 'defend',
     player: 'p2',
     attacker: 'p1',
     attackCard: 'attack-bug',
   })
+  expect(last?.you.hand.map((h) => h.uid)).not.toContain('u1')
 })
 
 // It DECLINES over a standing pending rather than replacing it (#101, Fix D,

@@ -26,6 +26,11 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# --- Debug stand recordings ---
+# What the stand's recorder saves through the dev server: a session's own
+# diary, read and thrown away, never part of the tree.
+apps/frontend/debug/logs/
+
 # --- Worktrees ---
 # Isolated checkouts of this same repo. Each carries its own .git and must
 # never enter the tree: unignored, a stray `add -A` in the main checkout

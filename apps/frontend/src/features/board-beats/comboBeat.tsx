@@ -17,11 +17,13 @@ import {
   ATTACK_POSE,
   type BeatRun,
   type BoardAnchors,
+  type BoardState,
   COVER_POSE,
   MERGE_MS,
   SHOW_HOLD,
   type StagedHandoff,
 } from '~/entities/game/board'
+import { liftOff, type Place } from './cardPlace'
 import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
 import { adoptStaged, shownSource } from './shownBeat'
@@ -537,7 +539,11 @@ export function useComboBeat(
         // reachable the moment a turn-played DDoS started logging `attacked`,
         // which is the fix this rides in behind.
         if (plan.resolved) return
-        ctx.publish({
+        // …and into the run's base, not only onto the screen: what the beat
+        // publishes next — the gesture letting go of the card — builds on the
+        // base, and a base without this put the centre back to empty for the
+        // frame the gesture let go in (#168, the owner's recordings, 02.10)
+        const next: BoardState = {
           ...ctx.base,
           pending: {
             kind: 'defend',
@@ -551,7 +557,9 @@ export function useComboBeat(
             deadline: 0,
             scope: 'hand',
           },
-        })
+        }
+        ctx.base = next
+        ctx.publish(next)
       }
 
       // Adopted without comparing cards, and structurally so: the event names
@@ -814,12 +822,25 @@ export function useComboBeat(
       // The centre stops holding it in the same commit the carriers go up —
       // published through `takeOff` rather than after the flight, which is
       // what left the card standing there while its own copy flew away. Both
-      // halves of the centre go down together: the attack and what covered it.
+      // halves of the centre go down together: the attack and what covered it,
+      // off EVERY field the centre draws them from — the answered attack's own
+      // fields, and the pending that still owes the answer in the board from
+      // before the batch (#168: the attack stood under its own flight for the
+      // whole of it, owner's recordings 02.10).
+      const leaving: Place[] = [mainRef, auxRef, coverRef, coverAuxRef].flatMap((ref) =>
+        ref ? [{ kind: 'centre' as const, card: ref.card }] : [],
+      )
+      // …and the heap has them the moment the carriers come down, as they lay:
+      // the attack under what covered it, each pair's Sudo tucked under its own
+      // card — by layer, not by event, since the Sudo is banked after its card
+      // and the projection's own heap (`toDiscardHeap`) puts it under
+      const filed = [auxRef, mainRef, coverAuxRef, coverRef].flatMap((ref, layer) =>
+        ref ? [{ ...ref, layer }] : [],
+      )
       if (items.length > 0)
-        await latest.current.send(items, () => {
-          if (ctx.base.centreAttack || ctx.base.centreCover)
-            ctx.publish({ ...ctx.base, centreAttack: undefined, centreCover: undefined })
-        })
+        await latest.current
+          .send(items, () => liftOff(ctx, leaving))
+          .then(() => settleInto(ctx, filed))
     },
     [],
   )

@@ -51,11 +51,12 @@ const BUG_TARGETS: Record<string, TableTarget[]> = {
 function boardWith(
   overrides: { targets?: Record<string, TableTarget[]>; shown?: ShownCard[] },
   actions: TableActions = {},
-  // the feed `useBoardStaging` watches for a `rejected` reply — Board only
-  // hands events through via `intro.events`, so a `rejected` test routes them
-  // that way. `view: null` keeps `gameKey` (_Board.tsx) null, so the opening
-  // itself never arms and this stays a plain events channel.
+  // the feed — Board only hands events through via `intro.events`. `view:
+  // null` keeps `gameKey` (_Board.tsx) null, so the opening itself never arms
+  // and this stays a plain events channel.
   events: Event[] = [],
+  // this player's own refusals, on their own list as the page hands them over
+  rejections: Event[] = [],
 ) {
   const base = makeBoardProps()
   const props = makeBoardProps({
@@ -70,6 +71,7 @@ function boardWith(
     },
     actions,
     intro: events.length > 0 ? { gameId: null, view: null, events, onDone: () => {} } : undefined,
+    rejections,
   })
   return <Board {...props} />
 }
@@ -238,23 +240,19 @@ it('a rejected action returns the staged card', async () => {
   await pullCardFromFan('attack-bug#0')
   await pressSeat('p2')
   expect(onPlay).toHaveBeenCalledWith('attack-bug#0', { kind: 'player', player: 'p2' }, undefined)
-  // the engine answers with a rejection in the feed; the projection itself is
-  // unchanged (the fixture's HAND never actually loses the card) — this pins
-  // the hook's own `dispatchedRef.current = false` write ahead of `cancel()`
-  // in the rejected watcher: without it, `cancel()`'s own guard reads the
-  // stale `true` and refuses the very return it was just called to perform.
-  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [rejectedEvent('attack-bug#0')]))
+  // the engine answers with a refusal; the projection itself is unchanged (the
+  // fixture's HAND never actually loses the card) — this pins the phase moved
+  // off 'dispatched' ahead of `cancel()`: without it, `cancel()`'s own guard
+  // refuses the very return it was just called to perform.
+  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [], [rejectedEvent('attack-bug#0')]))
   await waitFor(() => expect(fanUids()).toContain('attack-bug#0'))
 })
 
 // Backported from #117's bdf037f (#116 review, point 3): `useGame` accumulates
-// events for the whole match (never trims), so an unwatermarked scan of the
-// whole feed keeps finding a card's OWN past rejection forever. A fresh
-// re-dispatch of the same card must not read that stale entry as ITS OWN
-// rejection the moment anything else lands in the feed — the watermark
-// discipline `useBeats` already applies to this same array (there keyed by
-// event id across the whole match; here by length, captured fresh at every
-// dispatch).
+// a player's refusals for the whole match (never trims), so a scan of the whole
+// list keeps finding a card's OWN past refusal forever. A fresh re-dispatch of
+// the same card must not read that stale entry as ITS OWN refusal the moment
+// anything else lands — each refusal is read once, as it arrives (#168).
 it('a stale rejection for a returned card does not cancel its fresh re-dispatch', async () => {
   const onPlay = vi.fn()
   const { rerender } = render(boardWith({ targets: BUG_TARGETS }, { onPlay }))
@@ -262,7 +260,8 @@ it('a stale rejection for a returned card does not cancel its fresh re-dispatch'
   await pressSeat('p2')
   expect(onPlay).toHaveBeenCalledTimes(1)
   // first attempt rejected — the card returns to the fan (as above)
-  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [rejectedEvent('attack-bug#0')]))
+  const first = [rejectedEvent('attack-bug#0')]
+  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [], first))
   await waitFor(() => expect(fanUids()).toContain('attack-bug#0'))
 
   // a second, legitimate dispatch of the SAME card
@@ -271,14 +270,16 @@ it('a stale rejection for a returned card does not cancel its fresh re-dispatch'
   expect(onPlay).toHaveBeenCalledTimes(2)
 
   // an unrelated event lands (any sync between this dispatch and its
-  // acceptance) — the feed still carries the FIRST attempt's own rejection,
-  // since it only ever grows. Without a watermark this would be misread as
-  // THIS dispatch's own rejection and cancel it right back to the fan.
+  // acceptance) — the list still carries the FIRST attempt's own refusal,
+  // since it only ever grows. Read again, it would be misread as THIS
+  // dispatch's own and cancel it right back to the fan.
   rerender(
-    boardWith({ targets: BUG_TARGETS }, { onPlay }, [
-      rejectedEvent('attack-bug#0'),
-      { id: 2, type: 'turnEnded', player: 'p2' },
-    ]),
+    boardWith(
+      { targets: BUG_TARGETS },
+      { onPlay },
+      [{ id: 2, type: 'turnEnded', player: 'p2' }],
+      [...first],
+    ),
   )
   await act(async () => {
     await new Promise((r) => setTimeout(r, 700))
@@ -1131,8 +1132,8 @@ it('takes the table’s word again once the keeper has answered the take-back', 
   await settle()
   // the answer: our cards taken back
   rerender(boardWith({ targets: BUG_TARGETS }, {}, [bugTakenBack]))
-  // a card of ours out on the table now is the table's word again — a rebuilt
-  // board picks it up
+  // a card of ours out on the table now is the table's word again: the centre
+  // draws it from the table, no longer hidden as a card on its way home
   rerender(boardWith({ targets: BUG_TARGETS, shown: [bugOut()] }, {}, [bugTakenBack]))
-  expect(screen.getByTestId('board-centre-staged')).toBeTruthy()
+  expect(screen.getByTestId('board-centre-shown')).toBeTruthy()
 })

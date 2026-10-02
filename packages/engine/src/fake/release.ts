@@ -10,13 +10,14 @@ import {
   type Log,
   reject,
   setHand,
+  takeBack,
 } from './core'
 import { openPickFromDiscard } from './discard'
 import { openHandAttack, resolveDdos } from './handAttacks'
 import { mergePiles, splitPile } from './piles'
 import { playableFor } from './project'
 import { openReorderTop } from './rebase'
-import { show, takeBack } from './shown'
+import { show } from './shown'
 import { openSystemUpgrade } from './upgrade'
 import { openWindow } from './window'
 

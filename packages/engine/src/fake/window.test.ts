@@ -3,7 +3,13 @@ import type { CardInstance, GameState, Setup } from '../state'
 import { createLog } from './core'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
 import { reduce } from './reduce'
-import { handOverWindow, openWindow, WINDOW_FIRST_MS, WINDOW_NEXT_MS } from './window'
+import {
+  handOverWindow,
+  openWindow,
+  SUDO_PARTNER_MS,
+  WINDOW_FIRST_MS,
+  WINDOW_NEXT_MS,
+} from './window'
 
 const engine = createFakeEngine()
 
@@ -250,5 +256,93 @@ describe('handOverWindow', () => {
     )
     expect(next.window).toBeNull()
     expect(next.over).toEqual({ winner: 'p1', condition: 'release' })
+  })
+})
+
+// ===== one attack at a time (resolution.md §1; owner, 02.10) =====
+//
+// Everyone may attack a fresh release, but one attack is dealt with at a time:
+// whoever put theirs out at the centre first is the one, and until it is dealt
+// with nobody else may put one out. A Sudo put out to attack with has its own
+// time for the attack to join it; an attack card alone has none.
+
+const BUG3: CardInstance = { uid: 'attack-bug#1', id: 'attack-bug' }
+
+describe('one attack at a time', () => {
+  it('refuses a second responder’s attack while the first is out, and the first goes through', () => {
+    const s = released({ p2: [BUG], p3: [BUG3] })
+    const first = reduce(s, { type: 'SHOW', player: 'p2', card: BUG.uid, at: 1100 })
+    expect(first.events.map((e) => e.type)).toEqual(['shown'])
+
+    const late = reduce(first.state, { type: 'SHOW', player: 'p3', card: BUG3.uid, at: 1101 })
+    expect(late.events).toMatchObject([{ type: 'rejected', reason: 'another attack is out' }])
+    const straight = reduce(first.state, { type: 'ATTACK', player: 'p3', card: BUG3.uid, at: 1102 })
+    expect(straight.events.map((e) => e.type)).toEqual(['rejected'])
+    // and it is not offered to them meanwhile
+    expect(engine.project(first.state, 'p3').window?.canAttackWith).toEqual([])
+
+    const attack = reduce(first.state, { type: 'ATTACK', player: 'p2', card: BUG.uid, at: 1103 })
+    expect(attack.events.map((e) => e.type)).toContain('attacked')
+    // while it is dealt with, nobody puts another out
+    const during = reduce(attack.state, { type: 'SHOW', player: 'p3', card: BUG3.uid, at: 1104 })
+    expect(during.events).toMatchObject([
+      { type: 'rejected', reason: 'an attack is being dealt with' },
+    ])
+  })
+
+  it('gives a Sudo its own time for the attack to join it', () => {
+    const s = released({ p2: [SUDO, BUG] })
+    const sudo = reduce(s, { type: 'SHOW', player: 'p2', card: SUDO.uid, at: 2000 })
+    expect(sudo.state.window).toMatchObject({
+      held: 'p2',
+      openedAt: 2000,
+      deadline: 2000 + SUDO_PARTNER_MS,
+    })
+    const joined = reduce(sudo.state, { type: 'SHOW', player: 'p2', card: BUG.uid, at: 2100 })
+    expect(joined.events.map((e) => e.type)).toEqual(['shown'])
+    const attack = reduce(joined.state, {
+      type: 'ATTACK',
+      player: 'p2',
+      card: BUG.uid,
+      combo: SUDO.uid,
+      at: 2200,
+    })
+    expect(attack.events).toMatchObject([{ type: 'attacked', sudo: true }])
+  })
+
+  it('sends the Sudo home when its time runs out, and the time to attack starts anew', () => {
+    const s = released({ p2: [SUDO, BUG] })
+    const sudo = reduce(s, { type: 'SHOW', player: 'p2', card: SUDO.uid, at: 2000 })
+    const early = reduce(sudo.state, { type: 'WINDOW_EXPIRED', at: 2000 + SUDO_PARTNER_MS - 1 })
+    expect(early.events.map((e) => e.type)).toEqual(['rejected'])
+
+    const over = 2000 + SUDO_PARTNER_MS
+    const out = reduce(sudo.state, { type: 'WINDOW_EXPIRED', at: over })
+    expect(out.events).toMatchObject([
+      { type: 'takenBack', player: 'p2', cards: ['support-sudo'] },
+      { type: 'windowOpened', player: 'p1', round: 2, deadline: over + WINDOW_NEXT_MS },
+    ])
+    expect(out.state.players.p2.shown).toEqual([])
+    expect(out.state.window?.held).toBeUndefined()
+  })
+
+  it('starts the time to attack anew when the Sudo is taken back', () => {
+    const s = released({ p2: [SUDO, BUG] })
+    const sudo = reduce(s, { type: 'SHOW', player: 'p2', card: SUDO.uid, at: 2000 })
+    const back = reduce(sudo.state, { type: 'TAKE_BACK', player: 'p2', at: 5000 })
+    expect(back.events).toMatchObject([
+      { type: 'takenBack', player: 'p2' },
+      { type: 'windowOpened', round: 2, deadline: 5000 + WINDOW_NEXT_MS },
+    ])
+  })
+
+  it('sends an attack card still out home when the time to attack runs out', () => {
+    const s = released()
+    const end = 1000 + WINDOW_FIRST_MS
+    const shown = reduce(s, { type: 'SHOW', player: 'p2', card: BUG.uid, at: end - 1 })
+    const out = reduce(shown.state, { type: 'WINDOW_EXPIRED', at: end })
+    expect(out.events.map((e) => e.type)).toEqual(['takenBack', 'windowClosed'])
+    expect(out.state.players.p2.shown).toEqual([])
+    expect(out.state.window).toBeNull()
   })
 })

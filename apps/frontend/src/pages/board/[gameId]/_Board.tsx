@@ -85,6 +85,7 @@ import type {
 import { useBeats, useEliminationPreload } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import { useHandOrder } from '~/features/hand-order/useHandOrder'
+import { trace, tracing } from '~/shared/lib/debugTrace'
 import opening from './_Board.module.css'
 import { useBoardStaging } from './_useBoardStaging'
 import { useCherryPickStaging } from './_useCherryPickStaging'
@@ -189,6 +190,7 @@ export default function Board({
   intro,
   pickPreview,
   onPickPreview,
+  rejections,
 }: BoardProps) {
   // ===== the opening =====
   // Every node a flight aims at or leaves from — the board's own registry, not
@@ -365,6 +367,7 @@ export default function Board({
     anchors,
     actions,
     events: intro?.events ?? [],
+    rejections,
     enabled: !(deal.active || beats.exclusive),
     beatsRunning: beats.running,
     onHandArrival: (order) => handOrder.place(order),
@@ -889,6 +892,78 @@ export default function Board({
     : undefined
   // whichever release is standing at the stage slot — ours, or another player's
   const releaseAtStage = stagedRelease?.card ?? theirRelease
+
+  // THE FRAME, for the stand's recorder (#168): what this render puts on the
+  // screen — which table it draws from, the fan, every part of the centre, the
+  // gesture and the beats. Written only when it differs from the last one, so a
+  // clock tick that changes nothing on the table writes nothing. Silent in the
+  // game: nothing is gathered unless the stand is recording.
+  const lastFrame = useRef('')
+  useLayoutEffect(() => {
+    if (!tracing()) return
+    const named = (c: { card: { name: string }; uid?: string } | null | undefined) =>
+      c ? `${c.card.name}${c.uid ? ` ${c.uid}` : ''}` : null
+    type Slots = Partial<
+      Record<'frontend' | 'backend' | 'database' | 'monitoring', { name: string } | null>
+    >
+    const zone = (release: Slots, support?: Slots) =>
+      (['frontend', 'backend', 'database', 'monitoring'] as const).flatMap((slot) => {
+        const card = release[slot]
+        if (!card) return []
+        const under = support?.[slot]
+        return [`${slot}:${card.name}${under ? `+${under.name}` : ''}`]
+      })
+    const frame = {
+      table: deal.shadow ? 'deal' : beats.shadow ? 'beat' : 'live',
+      fan: fanItems.map(named),
+      centre: {
+        middle: centreSolo?.name ?? null,
+        row: centreRow ? [named(centreRow.support), named(centreRow.main)] : null,
+        pair: theirPair
+          ? `${theirPair.main.name}+${theirPair.aux.name}`
+          : staging.staged?.merged
+            ? `${staging.staged.main?.card.name}+${staging.staged.support?.card.name}`
+            : null,
+        stage: releaseAtStage?.name ?? null,
+        attack: centreAttack
+          ? `${centreAttack.attackCard}${centreAttack.sudo ? '+sudo' : ''}`
+          : null,
+        cover: standingCover?.card.name ?? null,
+      },
+      shown: (state.shown ?? []).map((s) => `${s.player}:${s.card.name}`),
+      zones: Object.fromEntries([
+        [state.selfId, zone(state.you.release, state.you.support)],
+        ...state.opponents.map((o) => [o.id, zone(o.release, o.support)]),
+      ]),
+      hands: Object.fromEntries(state.opponents.map((o) => [o.id, o.handCount])),
+      decks: {
+        piles: state.decks.main,
+        events: state.decks.events,
+        discard: state.decks.discardCount,
+        discardTop: state.decks.discardHeap?.at(-1)?.card.name ?? state.decks.discard?.name ?? null,
+      },
+      pending: state.pending?.kind ?? null,
+      fanOwner: upgradeOwnsHand
+        ? 'upgrade'
+        : discarding
+          ? 'handLimit'
+          : defenseOwnsHand
+            ? 'defence'
+            : neutralizeOwnsHand
+              ? 'neutralize'
+              : 'play',
+      gesture: staging.staged?.phase ?? null,
+      defence: defenseStaging.staged?.phase ?? null,
+      notInFan: [...staging.handOut],
+      arrow: staging.arrow.active,
+      flying: { gesture: staging.overlay.length, beats: beats.overlays.length },
+      beat: beats.running,
+    }
+    const text = JSON.stringify(frame)
+    if (text === lastFrame.current) return
+    lastFrame.current = text
+    trace('frame', frame)
+  })
 
   // Read this render's staging only after its DOM refs have bound. This is a
   // function declaration so the earlier layout effect can register it before

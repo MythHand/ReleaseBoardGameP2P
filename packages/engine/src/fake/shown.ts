@@ -1,7 +1,8 @@
 import type { Action } from '../actions'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId } from '../state'
-import { createLog, type Log, reject } from './core'
+import { createLog, type Log, reject, takeBack } from './core'
+import { attackOut, endSudoTime, respondersFor, SUDO_PARTNER_MS } from './window'
 
 // WHAT IS PUT OUT AT THE CENTRE IS SEEN BY EVERYONE (resolution.md §1).
 //
@@ -28,25 +29,38 @@ export function show(state: GameState, log: Log, player: PlayerId, uids: CardUid
   }
 }
 
-/** Everything the player has put out goes back into the hand, in everyone's view. */
-export function takeBack(state: GameState, log: Log, player: PlayerId): GameState {
-  const me = state.players[player]
-  if (me.shown.length === 0) return state
-  const cards = me.shown.flatMap((uid) => me.hand.find((c) => c.uid === uid)?.id ?? [])
-  if (cards.length > 0) log.add({ type: 'takenBack', player, cards })
-  return { ...withShown(state, player, []), eventSeq: log.seq }
-}
-
 export function onShow(state: GameState, action: Action & { type: 'SHOW' }): Reduction {
   if (state.over) return reject(state, action, 'game is over')
   if (state.eliminated.includes(action.player)) return reject(state, action, 'you are out')
   const me = state.players[action.player]
   if (!me) return reject(state, action, 'unknown player')
-  if (!me.hand.some((c) => c.uid === action.card))
-    return reject(state, action, 'you do not hold that card')
+  const card = me.hand.find((c) => c.uid === action.card)
+  if (!card) return reject(state, action, 'you do not hold that card')
   if (me.shown.includes(action.card)) return reject(state, action, 'that card is already out')
+  // THE TIME TO ATTACK A FRESH RELEASE: one attack is dealt with at a time
+  // (resolution.md §1). Whoever reached the table first is the one; a card put
+  // out after it, or while it is being dealt with, is refused and goes home.
+  const w = state.window
+  const responder = w != null && respondersFor(state, w.target.player).includes(action.player)
+  if (responder) {
+    if (state.pending) return reject(state, action, 'an attack is being dealt with')
+    const out = attackOut(state)
+    if (out && out !== action.player) return reject(state, action, 'another attack is out')
+  }
   const log = createLog(state.eventSeq)
-  return { state: show(state, log, action.player, [action.card]), events: log.events }
+  const shown = show(state, log, action.player, [action.card])
+  // A Sudo put out to attack with holds the time: its attack has its own span
+  // to join it, and that is the time running now (owner, 02.10).
+  if (responder && w && !w.held && card.id === 'support-sudo') {
+    const held = {
+      ...w,
+      held: action.player,
+      openedAt: action.at,
+      deadline: action.at + SUDO_PARTNER_MS,
+    }
+    return { state: { ...shown, window: held }, events: log.events }
+  }
+  return { state: shown, events: log.events }
 }
 
 export function onTakeBack(state: GameState, action: Action & { type: 'TAKE_BACK' }): Reduction {
@@ -54,5 +68,8 @@ export function onTakeBack(state: GameState, action: Action & { type: 'TAKE_BACK
   if (!me) return reject(state, action, 'unknown player')
   if (me.shown.length === 0) return reject(state, action, 'nothing is out at the centre')
   const log = createLog(state.eventSeq)
+  // the Sudo holding the time goes home: its time ends with it
+  if (state.window?.held === action.player)
+    return { state: endSudoTime(state, log, action.at), events: log.events }
   return { state: takeBack(state, log, action.player), events: log.events }
 }

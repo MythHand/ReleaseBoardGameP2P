@@ -79,6 +79,11 @@ export interface ReactionWindow {
   deadline: number
   // Revocable: passing only means "fine, close early". A passer may still attack.
   passed: PlayerId[]
+  // A Sudo put out at the centre to attack with holds the time: its own span
+  // for the attack to join it (`SUDO_PARTNER_MS`), carried as this window's
+  // deadline. Gone with the Sudo — it runs out or is taken back, and the time
+  // to attack the release starts anew (owner, 02.10).
+  held?: PlayerId
 }
 
 // Cards remain at the centre until the whole hand-attack decision resolves.
