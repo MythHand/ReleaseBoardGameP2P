@@ -25,7 +25,7 @@ const exits = vi.hoisted(() => ({ items: [] as Leaving[] }))
 // release (`drop('draw')`). Both are wrapped below so the standing-trigger
 // test can assert the publish happened first — the whole point of I2's
 // "publish first, drop second" comment in drawBeat.tsx.
-const order = vi.hoisted(() => ({ log: [] as string[] }))
+const order = vi.hoisted(() => ({ log: [] as string[], frames: false }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
   return {
@@ -33,6 +33,12 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     wait: (ms: number) => {
       played.waits.push(ms)
       return real.wait(ms)
+    },
+    // logged only where a test asks (`order.frames`): every other test pins its
+    // log exactly, and frames waited elsewhere would read as noise there
+    nextFrames: () => {
+      if (order.frames) order.log.push('nextFrames')
+      return real.nextFrames()
     },
     play: (name: string) => {
       played.names.push(name)
@@ -334,4 +340,23 @@ it('raises the unanswered 503 alarm as soon as the flip settles', async () => {
   await go()
   expect(published.at(-1)?.pending?.kind).toBe('neutralize503')
   expect(played.waits).not.toContain(TABLE_HOLD)
+})
+
+// …IN ONE COMMIT: the carrier comes down in the commit the alarm stands in, with
+// no frames waited between — two of them drew the alarm standing AND on its
+// carrier (owner's recordings, #168)
+it('takes the standing 503’s carrier down in the commit it stands in', async () => {
+  order.log = []
+  order.frames = true
+  try {
+    const { go } = run([draw({ card: undefined, reveal: { card: 'trigger-error-503' } })])
+    await go()
+  } finally {
+    order.frames = false
+  }
+  const stood = order.log.indexOf('publish:pending')
+  const dropped = order.log.indexOf('drop:draw')
+  expect(stood).toBeGreaterThanOrEqual(0)
+  expect(dropped).toBeGreaterThan(stood)
+  expect(order.log.slice(stood, dropped)).not.toContain('nextFrames')
 })

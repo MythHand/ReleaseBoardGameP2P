@@ -1396,3 +1396,41 @@ it('flies the AI trigger under the exchange it leaves with, as the heap files th
   expect(layerOf('trigger-ai')).toBe(0)
   expect(layerOf('protection-debugger')).toBe(1)
 })
+
+// ===== stolen — one card, one place (#168) =====
+// The victim's zone lets go of the release as its carrier goes up, and the
+// thief's has it as the carrier comes down: it stood in the victim's slot for
+// the whole crossing, and was nowhere once it landed.
+it('lets the victim’s zone go of a stolen release as it takes off, and lands it in the thief’s', async () => {
+  played.names = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const robbed = {
+    ...base,
+    you: { ...base.you, release: { frontend: cardById('release-frontend') } },
+  } as unknown as BoardState
+  const published: BoardState[] = []
+  let liftedAfter: string[] | null = null
+  await drive(() =>
+    api.beat?.runStolen(
+      {
+        kind: 'stolen',
+        key: 'stolen:20',
+        eventId: 20,
+        from: 'p1',
+        to: 'p2',
+        slot: 'frontend',
+        card: 'release-frontend',
+      },
+      {
+        base: robbed,
+        publish: (s) => {
+          published.push(s)
+          if (liftedAfter === null && !s.you.release.frontend) liftedAfter = [...played.names]
+        },
+      },
+    ),
+  )
+  expect(liftedAfter).toEqual([])
+  expect(published.at(-1)?.opponents[0].release.frontend?.id).toBe('release-frontend')
+})

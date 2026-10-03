@@ -23,7 +23,7 @@ import {
   SHOW_HOLD,
   type StagedHandoff,
 } from '~/entities/game/board'
-import { liftOff, type Place } from './cardPlace'
+import { type Landing, liftOff, type Place, setDown } from './cardPlace'
 import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
 import { adoptStaged, shownSource } from './shownBeat'
@@ -55,6 +55,8 @@ const rectOf = (el: Element | null): Rect | null => {
   const r = el.getBoundingClientRect()
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
+
+type ZoneSlot = Extract<Place, { kind: 'zone' }>['slot']
 
 export function useComboBeat(
   anchors: BoardAnchors,
@@ -115,10 +117,29 @@ export function useComboBeat(
       // its cards stand, and their standing render goes down in the same commit
       // the carrier taking them over goes up.
       const shown = shownSource(ctx.base, actor, auxId ? [cardId, auxId] : [cardId], a)
+      // …and a play nobody saw put out leaves the hand it comes out of, in the
+      // same commit: our fan on a rejoin, or the count of theirs. Left to the
+      // projection, the seat counted the card for the whole flight to the
+      // centre and on to the zone (#168).
+      const held = handIndex >= 0 ? ctx.base.you.hand[handIndex] : undefined
+      const heldAux =
+        held && auxId
+          ? ctx.base.you.hand.find((h, i) => i !== handIndex && h.card.id === auxId)
+          : undefined
       const takeOver = () => {
-        if (!shown) return
-        ctx.base = shown.next
-        ctx.publish(shown.next)
+        if (shown) {
+          ctx.base = shown.next
+          ctx.publish(shown.next)
+          return
+        }
+        liftOff(
+          ctx,
+          held
+            ? [held, heldAux].flatMap((h) => (h ? [{ kind: 'hand' as const, uid: h.uid }] : []))
+            : mine
+              ? []
+              : [{ kind: 'seat', player: actor, count: auxId ? 2 : 1 }],
+        )
       }
       const fromRect =
         shown?.rect ??
@@ -626,7 +647,10 @@ export function useComboBeat(
           if (plan.player !== ctx.base.selfId) {
             const from = a.seatBox(plan.player)
             if (from) {
-              const [el] = await flyer.raise([{ key: 'cost', at: from, card: costCard }])
+              const raised = flyer.raise([{ key: 'cost', at: from, card: costCard }])
+              // off the count of the hand it came out of, as its carrier goes up
+              liftOff(ctx, [{ kind: 'seat', player: plan.player }])
+              const [el] = await raised
               if (el) await play('playToCenter', el, { to: costBox })?.finished
             }
           }
@@ -674,6 +698,23 @@ export function useComboBeat(
       const { anchors: a } = latest.current
       const cRect = rectOf(a.centre.current)
       const toRect = rectOf(a.releaseSlot(plan.player, plan.slot))
+      // WHERE IT LANDS HAS IT in the commit its carrier comes down (`setDown`): the
+      // zone, with the Code Review under it. Left to the projection, the slot
+      // stood empty from the landing until the queue handed over (#168).
+      const slot = plan.slot as ZoneSlot
+      const inZone = (): Landing[] => {
+        const uid = plan.player === ctx.base.selfId ? ctx.after?.you.releaseUid?.[slot] : undefined
+        return [
+          {
+            kind: 'zone',
+            player: plan.player,
+            slot,
+            card: plan.card,
+            ...(plan.codeReview ? { under: plan.codeReview } : {}),
+            ...(uid ? { uid } : {}),
+          },
+        ]
+      }
       // `releaseSlot` resolves for EVERY seat, our own included (`_Board.tsx`
       // binds one through `ReleaseZone`'s fixed SLOTS array, occupied or not)
       // — unlike `seatBox`, which is null for the local player. Nothing
@@ -688,6 +729,8 @@ export function useComboBeat(
         // excludes a release on purpose, so `handoff.el` is null for a plain
         // one (see below).
         await play('playToReleaseZone', handoff.el, { to: toRect })?.finished
+        // the zone has it in the commit the gesture lets go of it
+        setDown(ctx, inZone())
         adoptStaged(ctx, handoff)
         return
       }
@@ -725,10 +768,8 @@ export function useComboBeat(
         latest.current.takeStagedRelease?.current?.()
         const [el] = await flyer.raise([{ key: 'release', at: stageRect, card: standing }])
         if (el) await play('playToReleaseZone', el, { to: toRect })?.finished
-        // dropped as the beat ends, so the carrier and the projection's own
-        // zone render swap in one commit (`useBeats`'s drain does the rest of
-        // that batch synchronously)
-        flyer.drop('release')
+        // the zone has it in the commit the carrier comes down (`setDown`)
+        setDown(ctx, inZone(), () => flyer.drop('release'))
         // Unconditionally, before returning: this branch now shadows the
         // `if (!cRect)` line below that used to be the only thing releasing a
         // handoff on the way past. A non-null handoff here would have to be a
@@ -754,7 +795,7 @@ export function useComboBeat(
         flyer.patch('fold', { lod: true })
       }
       if (el) await play('playToReleaseZone', el, { to: toRect })?.finished
-      flyer.drop('fold')
+      setDown(ctx, inZone(), () => flyer.drop('fold'))
     },
     [foldIn, flyer.drop, flyer.patch, flyer.raise],
   )

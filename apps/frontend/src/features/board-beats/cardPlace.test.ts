@@ -197,6 +197,25 @@ describe('withCard', () => {
   })
 })
 
+describe('withCard — an AI release', () => {
+  it('lands with both its marks: the rules card it stands for and its own events-deck card', () => {
+    const empty = board({ you: { name: 'You', hand: [], release: {} } } as Partial<BoardState>)
+    for (const player of ['p1', 'p2']) {
+      const next = withCard(empty, {
+        kind: 'zone',
+        player,
+        slot: 'frontend',
+        card: 'ai-release-frontend',
+        ai: { id: 'release-frontend', event: 'ai-release-frontend' },
+      })
+      const owner = player === 'p1' ? next.you : next.opponents[0]
+      expect(owner.release.frontend?.id).toBe('ai-release-frontend')
+      expect(owner.releaseId?.frontend).toBe('release-frontend')
+      expect(owner.releaseEvent?.frontend).toBe('ai-release-frontend')
+    }
+  })
+})
+
 describe('liftOff / setDown', () => {
   it('publishes the board without the card once, moves the base, then lets the gesture go', () => {
     const order: string[] = []

@@ -568,7 +568,7 @@ export function useDefenseBeat(
   // ease to their LOD values over the CSS transitions already on them while
   // the flight carries the card across (`ComposedFace`'s own coupling).
   const runStolen = useCallback(
-    async (plan: Extract<BeatPlan, { kind: 'stolen' }>, _ctx: BeatRun) => {
+    async (plan: Extract<BeatPlan, { kind: 'stolen' }>, ctx: BeatRun) => {
       await nextFrames() // the shadow that renders `before` has committed (I2)
       const a = latest.current.anchors
       // `from` is the victim's slot as it stood BEFORE this batch (I1 — the
@@ -580,9 +580,17 @@ export function useDefenseBeat(
       const to = rectOf(a.releaseSlot(plan.to, plan.slot))
       const card = cardById(plan.card)
       if (!from || !to || !card) return // nothing measurable: the projection resolves it
-      const [el] = await flyer.raise([
+      const raised = flyer.raise([
         { key: 'steal', at: from, content: <Card card={card} interactive={false} width="100%" /> },
       ])
+      // ONE CARD, ONE PLACE (#168): the victim's zone lets go of it in the commit
+      // its carrier goes up, and the thief's has it in the commit the carrier
+      // comes down. Neither was published: it stood in the victim's slot for
+      // the whole crossing, and was nowhere once it landed, until the queue
+      // handed over.
+      const slot = plan.slot as ZoneSlot
+      liftOff(ctx, [{ kind: 'zone', player: plan.from, slot }])
+      const [el] = await raised
       if (!el) {
         // `drop` unconditionally, the same idiom `runCovered`'s rollback leg
         // and its own tail already keep (#101, Task 15 review). Not a leak
@@ -605,7 +613,12 @@ export function useDefenseBeat(
         })
       }
       await play('playToCenter', el, { to })?.finished
-      flyer.drop('steal')
+      const uid = plan.to === ctx.base.selfId ? ctx.after?.you.releaseUid?.[slot] : undefined
+      setDown(
+        ctx,
+        [{ kind: 'zone', player: plan.to, slot, card: plan.card, ...(uid ? { uid } : {}) }],
+        () => flyer.drop('steal'),
+      )
     },
     [flyer.raise, flyer.patch, flyer.drop],
   )

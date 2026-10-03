@@ -454,9 +454,12 @@ function createReleaseScenario(initial: GameState): GameState {
       },
       // The window a fresh release opens is answered by somebody, so the
       // opponent holds something to answer it with.
+      // …and each opponent holds a Security Bug too: the attack that takes the
+      // release for itself, so a release crossing from your zone into theirs
+      // can be played on this board (owner, 03.10).
       p2: {
         ...initial.players.p2,
-        hand: [take('attack-bug'), take('support-sudo')],
+        hand: [take('attack-bug'), take('support-sudo'), take('attack-security-bug')],
         release: {},
         openedAtDeal: [],
       },
@@ -465,7 +468,7 @@ function createReleaseScenario(initial: GameState): GameState {
       // to have somebody to come from (#168).
       p3: {
         ...initial.players.p3,
-        hand: [take('attack-bug')],
+        hand: [take('attack-bug'), take('attack-security-bug')],
         release: {},
         openedAtDeal: [],
       },

@@ -1,8 +1,8 @@
 import { cardAreaOf, cardBoxIn, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import { nextFrames, play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
+import { play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
-import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BeatRun, BoardAnchors } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
 import { liftOff, type Place, setDown } from './cardPlace'
 import { offThePile } from './offThePile'
@@ -378,43 +378,32 @@ export function useAiBeat(
             const anim = play('playToReleaseZone', el, { to: target })
             if (anim) await anim.finished
           }
-          // The slot must own the card before its carrier lets go. The trigger
-          // can still be flying, and later beats keep rendering this shadow.
-          // Publish only this placement: the batch target may include effects
-          // whose own animations have not run yet.
-          const slot = plan.tail.slot as keyof BoardState['you']['release']
-          const card = plan.tail.card
-          const place = <
-            T extends Pick<BoardState['you'], 'release' | 'releaseId' | 'releaseEvent'>,
-          >(
-            owner: T,
-          ) => ({
-            ...owner,
-            release: { ...owner.release, [slot]: event },
-            releaseId: { ...owner.releaseId, [slot]: card },
-            releaseEvent: { ...owner.releaseEvent, [slot]: plan.eventCard },
-          })
+          // The slot has the card in the commit its carrier comes down — the
+          // module's own landing (`setDown`), AI marks and all — never two frames
+          // later, which drew it in the slot and on the carrier at once. The
+          // trigger can still be flying, and later beats keep rendering this
+          // shadow. Only this placement is published: the batch target may
+          // include effects whose own animations have not run yet.
+          const slot = plan.tail.slot as ZoneSlot
           const mine = plan.player === beat.base.selfId
           const uid =
             mine && beat.after?.you.releaseEvent?.[slot] === plan.eventCard
               ? beat.after.you.releaseUid?.[slot]
               : undefined
-          const next = {
-            ...beat.base,
-            you: mine
-              ? {
-                  ...place(beat.base.you),
-                  ...(uid ? { releaseUid: { ...beat.base.you.releaseUid, [slot]: uid } } : {}),
-                }
-              : beat.base.you,
-            opponents: beat.base.opponents.map((owner) =>
-              owner.id === plan.player ? place(owner) : owner,
-            ),
-          }
-          beat.base = next
-          beat.publish(next)
-          await nextFrames()
-          drop(EFF)
+          setDown(
+            beat,
+            [
+              {
+                kind: 'zone',
+                player: plan.player,
+                slot,
+                card: plan.eventCard,
+                ai: { id: plan.tail.card, event: plan.eventCard },
+                ...(uid ? { uid } : {}),
+              },
+            ],
+            () => drop(EFF),
+          )
           return
         }
         await goHome(EFF, effect)

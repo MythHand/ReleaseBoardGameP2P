@@ -1,7 +1,7 @@
 import type { CardData } from '@release/ui'
 import { cardAreaOf, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import { nextFrames, play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
+import { play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import { offThePile } from './offThePile'
@@ -154,7 +154,9 @@ export function useDrawBeat(
             c.base = next
             c.publish(next)
           }
-          await nextFrames() // the publish above has committed (I2)
+          // …and the carrier comes down in the same commit (`setDown`'s rule):
+          // waiting two frames between drew the alarm standing AND on its
+          // carrier, twice over (owner's recordings, 03.10)
           drop('draw')
           continue
         }

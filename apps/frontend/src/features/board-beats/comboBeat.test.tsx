@@ -268,8 +268,12 @@ it('publishes the attack it just folded in, so the cover has something to cover'
   }
   // `base` has no pending — this peer is seeing the throw for the first time
   await drive(() => api.beat?.runAttack(plan, { base, publish: (s) => published.push(s) }))
-  expect(published).toHaveLength(1)
-  expect(published[0].pending).toMatchObject({
+  // the thrower's hand is one card lighter as it takes off (#168); the
+  // attack itself is published once, with the answer it owes
+  expect(published[0].opponents[0].handCount).toBe(2)
+  const owing = published.filter((s) => s.pending)
+  expect(owing).toHaveLength(1)
+  expect(owing[0].pending).toMatchObject({
     kind: 'defend',
     player: 'p3',
     attacker: 'p2',
@@ -421,7 +425,9 @@ it('never says an answer is owed for an attack that cannot be answered', async (
     resolved: true,
   }
   await drive(() => api.beat?.runAttack(plan, { base, publish: (s) => published.push(s) }))
-  expect(published).toHaveLength(0)
+  // the thrower's hand lightens as the card takes off (#168); the pending
+  // is what this pins, and it is the one it was
+  expect(published.every((s) => s.pending === base.pending)).toBe(true)
 })
 
 // The one peer this must never do it for. `options` is redacted for everyone
@@ -444,7 +450,9 @@ it('never tells us a defence is owed when the answer would be ours', async () =>
     target: 'p1', // us
   }
   await drive(() => api.beat?.runAttack(plan, { base, publish: (s) => published.push(s) }))
-  expect(published).toHaveLength(0)
+  // the thrower's hand lightens as the card takes off (#168); the pending
+  // is what this pins, and it is the one it was
+  expect(published.every((s) => s.pending === base.pending)).toBe(true)
 })
 
 // And it stays out of the way in the ordinary case: the pending was already on
@@ -483,7 +491,9 @@ it('publishes nothing when the attack was already standing before this batch', a
       { base: standing, publish: (s) => published.push(s) },
     ),
   )
-  expect(published).toHaveLength(0)
+  // the thrower's hand lightens as the card takes off (#168); the pending
+  // is what this pins, and it is the one it was
+  expect(published.every((s) => s.pending === standing.pending)).toBe(true)
 })
 
 // ===== Fix D, finding 7 — the ACTOR's own corner of the same batch =====
@@ -561,7 +571,9 @@ it('never replaces a pending that is already standing', async () => {
       { base: owing, publish: (s) => published.push(s) },
     ),
   )
-  expect(published).toHaveLength(0)
+  // the thrower's hand lightens as the card takes off (#168); the pending
+  // is what this pins, and it is the one it was
+  expect(published.every((s) => s.pending === owing.pending)).toBe(true)
 })
 
 it('lands an opponent’s attack in its table pose and keeps that pose for the discard', async () => {
@@ -1100,4 +1112,93 @@ it('reset() drops a pair-out flight parked mid-air', async () => {
   hang.on = false
   hang.release?.()
   await running
+})
+
+// ===== releases into zones — one card, one place (#168) =====
+// A release leaves the hand it came out of as its carrier goes up, and its zone
+// has it in the commit the carrier comes down. The seat counted it for the
+// whole flight, and the slot stood empty from the landing until the queue
+// handed over.
+
+it('lifts an unseen release off the thrower’s seat as it takes off, and lands it in their zone', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: BoardState[] = []
+  let liftedAfter: string[] | null = null
+  await drive(() =>
+    api.beat?.runRelease(
+      {
+        kind: 'releasePlaced',
+        key: 'release:7',
+        eventId: 7,
+        player: 'p2',
+        slot: 'backend',
+        card: 'release-backend',
+        codeReview: 'support-code-review',
+      },
+      {
+        base,
+        publish: (s) => {
+          published.push(s)
+          if (liftedAfter === null && s.opponents[0].handCount === 1)
+            liftedAfter = [...played.names]
+        },
+      },
+    ),
+  )
+  // the release and its Code Review, both off the count before anything moved
+  expect(liftedAfter).toEqual([])
+  const landed = published.at(-1)
+  expect(landed?.opponents[0].release.backend?.id).toBe('release-backend')
+  expect(landed?.opponents[0].support?.backend?.id).toBe('support-code-review')
+})
+
+it('lifts an opponent’s cost off their seat as it takes off', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  render(<Probe />)
+  let liftedAfter: string[] | null = null
+  await drive(() =>
+    api.beat?.runRelease(
+      {
+        kind: 'releasePlaced',
+        key: 'release:7',
+        eventId: 7,
+        player: 'p2',
+        slot: 'backend',
+        card: 'release-backend',
+        cost: { eventId: 6, card: 'attack-bug' },
+      },
+      {
+        base,
+        publish: (s) => {
+          if (liftedAfter === null && s.opponents[0].handCount === 2)
+            liftedAfter = [...played.names]
+        },
+      },
+    ),
+  )
+  expect(liftedAfter).toEqual([])
+})
+
+it('lands the actor’s own plain release in their zone as its carrier comes down', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  render(<Probe takeStagedRelease={{ current: () => {} }} />)
+  const published: BoardState[] = []
+  await drive(() =>
+    api.beat?.runRelease(
+      {
+        kind: 'releasePlaced',
+        key: 'release:7',
+        eventId: 7,
+        player: 'p1',
+        slot: 'frontend',
+        card: 'release-frontend',
+      },
+      { ...soloReleaseCtx, publish: (s) => published.push(s) },
+    ),
+  )
+  expect(published.at(-1)?.you.release.frontend?.id).toBe('release-frontend')
 })

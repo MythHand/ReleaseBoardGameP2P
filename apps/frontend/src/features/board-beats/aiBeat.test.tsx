@@ -194,8 +194,12 @@ describe('aiBeat', () => {
     const flown = order.indexOf('play:playToReleaseZone')
     const zonePublish = order.indexOf('publish-zone', flown)
     expect(zonePublish).toBeGreaterThan(flown)
-    expect(order.indexOf('nextFrames', zonePublish)).toBeGreaterThan(zonePublish)
-    expect(order.indexOf('drop:eff')).toBeGreaterThan(order.indexOf('nextFrames', zonePublish))
+    // …and the carrier comes down in that same commit, with no frames waited
+    // between: two of them drew the card in the slot and on its carrier at once
+    // (owner's recordings, #168)
+    const dropped = order.indexOf('drop:eff')
+    expect(dropped).toBeGreaterThan(zonePublish)
+    expect(order.slice(zonePublish, dropped)).not.toContain('nextFrames')
     expect(order.indexOf('trigger-landed')).toBeGreaterThan(order.indexOf('drop:eff'))
     // …and the trigger, once landed, is in the heap — filed by this beat rather
     // than left to the projection, or it blinks out as it lands (toHeap.ts)

@@ -540,3 +540,54 @@ it('takes the card out of the place the fan names, not one of its own choosing',
   }
   expect(played.takeStarts[0]).toEqual(spot(pickedRect))
 })
+
+// ONE COMMIT (#168): a watcher's board lets go of the named card standing at the
+// centre in the commit its flyer goes up — the taker's leg already does. Let go
+// only once the flyer had mounted, the card stood at the centre AND on its
+// flyer for two frames.
+it('lets a watcher’s board go of the named card in the commit its flyer goes up', async () => {
+  const on = {
+    ...base,
+    pending: { kind: 'giveCard', player: 'p2', attacker: 'p3', requested: 'attack-bug' },
+  } as unknown as BoardState
+  const plan = transferPlan({
+    role: 'watcher',
+    from: 'p2',
+    to: 'p3',
+    named: true,
+    card: 'attack-bug',
+  })
+  let flyerUp: boolean | null = null
+  let container: HTMLElement | null = null
+  const runner: { start?: () => Promise<void> } = {}
+  function Probe() {
+    const beat = useTransferBeat(anchors)
+    runner.start = () =>
+      beat.runTransfer(plan, {
+        base: on,
+        publish: (s) => {
+          if (flyerUp === null && s.pending === null)
+            flyerUp = Boolean(container?.innerHTML.includes('data-card="attack-bug"'))
+        },
+      })
+    return <>{beat.overlay}</>
+  }
+  container = render(<Probe />).container
+  vi.useFakeTimers()
+  try {
+    let done = false
+    const finished = runner.start?.().then(() => {
+      done = true
+    })
+    while (!done) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+    }
+    await finished
+  } finally {
+    vi.useRealTimers()
+  }
+  // let go before the flyer was on screen — the two land in one commit
+  expect(flyerUp).toBe(false)
+})

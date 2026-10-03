@@ -509,7 +509,7 @@ export function useTransferBeat(
         const from = seatCardBox(fromSeat)
         const to = seatCardBox(toSeat)
         const publicCard = plan.card ? cardById(plan.card) : null
-        const [el] = await raise([
+        const raised = raise([
           { key: KEY, card: publicCard ?? COVER, at: from, faceDown: !publicCard },
         ])
         // TAKEOFF, watcher leg: the `giveCard` pending is public even to a
@@ -518,6 +518,9 @@ export function useTransferBeat(
         // static centre render as everyone else's until this fires. Our own
         // cover flyer above now carries the crossing, so it stops here.
         clearPending()
+        // …in the commit that flyer goes up, as the taker's leg does: awaited
+        // first, the card stood at the centre AND on its flyer for two frames
+        const [el] = await raised
         if (el) {
           const out = play('takeFromSeat', el, { to: centre })
           if (out) await out.finished

@@ -66,6 +66,9 @@ export function withoutCard(board: BoardState, place: Place): BoardState {
       return { ...board, you: { ...board.you, hand }, shown }
     }
     case 'seat':
+      // nobody there, or nothing left to take: the board as it was, so a beat
+      // never publishes a table that did not change
+      if (!board.opponents.some((o) => o.id === place.player && o.handCount > 0)) return board
       return {
         ...board,
         opponents: board.opponents.map((o) =>
@@ -188,7 +191,17 @@ export type Landing =
   | { kind: 'hand'; uid: string; card: string; at?: number }
   | { kind: 'shown'; player: string; uid: string; card: string }
   | { kind: 'seat'; player: string; count?: number }
-  | { kind: 'zone'; player: string; slot: Slot; card: string; under?: string; uid?: string }
+  | {
+      kind: 'zone'
+      player: string
+      slot: Slot
+      card: string
+      under?: string
+      uid?: string
+      // an AI release: the rules card it stands for (`releaseId`) and its own
+      // events-deck card (`releaseEvent`) — the two marks `withoutInZone` clears
+      ai?: { id: string; event: string }
+    }
   | { kind: 'heap'; filed: Filed[] }
   // a card banked with no `discarded` event of its own: the heap's top stand-in
   | { kind: 'heapTop'; card: string; count: number; banked?: number }
@@ -229,6 +242,14 @@ export function withCard(board: BoardState, to: Landing): BoardState {
       const card = data(to.card)
       if (!card) return board
       const under = to.under ? (data(to.under) ?? null) : null
+      const ai = to.ai
+      const marked = <T extends { releaseId?: object; releaseEvent?: object }>(owner: T) =>
+        ai
+          ? {
+              releaseId: { ...owner.releaseId, [to.slot]: ai.id },
+              releaseEvent: { ...owner.releaseEvent, [to.slot]: ai.event },
+            }
+          : {}
       if (to.player === board.selfId) {
         const you = board.you
         return {
@@ -238,6 +259,7 @@ export function withCard(board: BoardState, to: Landing): BoardState {
             release: { ...you.release, [to.slot]: card },
             support: under ? { ...you.support, [to.slot]: under } : you.support,
             releaseUid: to.uid ? { ...you.releaseUid, [to.slot]: to.uid } : you.releaseUid,
+            ...marked(you),
           },
         }
       }
@@ -249,6 +271,7 @@ export function withCard(board: BoardState, to: Landing): BoardState {
                 ...o,
                 release: { ...o.release, [to.slot]: card },
                 support: under ? { ...o.support, [to.slot]: under } : o.support,
+                ...marked(o),
               }
             : o,
         ),
