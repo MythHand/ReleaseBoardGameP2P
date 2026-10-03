@@ -1,6 +1,6 @@
 import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
-import type { BoardState } from '~/entities/game/board'
+import { type BoardState, standInScatter } from '~/entities/game/board'
 
 // WHAT LANDED IN THE DISCARD, PUT THERE BY THE BEAT THAT FLEW IT.
 //
@@ -55,12 +55,24 @@ export const inTableOrder = (filed: Filed[]): Filed[] =>
  */
 export function withLanded(state: BoardState, filed: Filed[]): BoardState {
   const heap = [...(state.decks.discardHeap ?? [])]
+  // A STAND-IN ON TOP STAYS THE TOP until the count passes the one it is named
+  // by (`withStandIn`): it stands for the card banked last, so a card filed
+  // beneath that count lies under it — the order the projection folds them in.
+  // Two cards of one batch can land in either order (a refused crush's release
+  // and the trigger beside it, 03.10), and the heap must not depend on which.
+  const last = heap.at(-1)
+  const standIn = last?.uid?.startsWith('top') ? Number(last.uid.slice(3)) : null
+  const under = standIn === null ? undefined : heap.pop()
   let added = 0
   for (const item of inTableOrder(filed)) {
     const card = cardById(item.card)
     if (!card || heap.some((entry) => entry.uid === `d${item.eventId}`)) continue
     heap.push({ uid: `d${item.eventId}`, card, ...scatterAt(item.eventId) })
     added++
+  }
+  if (under) {
+    if (standIn !== null && state.decks.discardCount + added <= standIn) heap.push(under)
+    else heap.splice(heap.length - added, 0, under)
   }
   if (added === 0) return state
   return {
@@ -91,6 +103,39 @@ export function settleInto(
   if (next === ctx.base) return
   ctx.base = next
   ctx.publish(next)
+}
+
+/**
+ * A card BANKED IN SILENCE — destroyed with no `discarded` event of its own, so
+ * the heap has nothing to key it by — resting where the projection rests it:
+ * the stand-in for the discard's top, keyed by the count once it is banked
+ * (`toDiscardHeap`, `standInScatter`). The flight lands on that same pose, so
+ * the card neither jumps as it lands nor when the live board takes over.
+ *
+ * An earlier stand-in is no longer the top and goes, the way the projection
+ * drops it. `banked` is how many cards the count takes in — a release and the
+ * Code Review under it are two, and only the one on top is drawn.
+ */
+export function withStandIn(
+  state: BoardState,
+  top: { card: string; count: number; banked?: number },
+): BoardState {
+  const uid = `top${top.count}`
+  const card = cardById(top.card)
+  const heap = state.decks.discardHeap ?? []
+  if (!card || heap.some((entry) => entry.uid === uid)) return state
+  return {
+    ...state,
+    decks: {
+      ...state.decks,
+      discardHeap: [
+        ...heap.filter((entry) => !entry.uid?.startsWith('top')),
+        { uid, card, ...standInScatter(top.count) },
+      ],
+      discard: card,
+      discardCount: state.decks.discardCount + (top.banked ?? 1),
+    },
+  }
 }
 
 /**

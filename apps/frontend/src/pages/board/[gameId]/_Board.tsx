@@ -68,8 +68,10 @@ import {
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
 import {
+  ALARM_POSE,
   ATTACK_POSE,
   COVER_POSE,
+  glowsFor,
   SUDO_POSE,
   shownLayout,
   useBoardAnchors,
@@ -458,7 +460,7 @@ export default function Board({
   // raises no `pending` at all (the engine eliminates in the same batch as
   // the reveal), so without this the hand would fly away with nothing on
   // screen explaining it.
-  const glowStrong = (pendingNeutralize != null && alarmMine) || beats.alarm
+  const glowStrong = glowsFor(state.pending, state.selfId) || beats.alarm
   // An Error 503 or AI Crush owed to US means the neutralize hook owns the fan and the
   // zone — the third staging hook, and the third mutually exclusive one: the
   // engine suspends normal play while a pending is open, and a pending has one
@@ -1790,7 +1792,7 @@ export default function Board({
                 data-testid="board-centre-alarm"
                 data-pending-play
               >
-                <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+                <div className={opening.pose} style={{ transform: restTransform(ALARM_POSE) }}>
                   <Card card={data} interactive={false} width="100%" />
                 </div>
               </div>

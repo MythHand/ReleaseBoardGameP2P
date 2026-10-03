@@ -17,6 +17,9 @@ export const ATTACK_POSE: Pose = { rot: -4, dx: 0, dy: 0 }
 /** …and the defence covers it at a different one, offset, so the two read as
  *  two separate plays rather than one neat stack */
 export const COVER_POSE: Pose = { rot: 6, dx: 16, dy: -12 }
+/** an Error 503 stands straight: drawn from the deck, it lands at the centre
+ *  with no tilt and leaves the same way (Error503Story — owner, 03.10) */
+export const ALARM_POSE: Pose = { rot: 0, dx: 0, dy: 0 }
 /** the defender's own Sudo waits in its own place, left of the attack — it is
  *  not part of the pair until a defence is chosen for it */
 export const SUDO_POSE: Pose = { rot: -7, dx: 0, dy: 0 }

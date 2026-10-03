@@ -10,17 +10,19 @@ import {
 } from '@release/ui/animations'
 import { type RefObject, useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
-import { GATHER_HOLD } from '~/entities/game/board'
+import { ALARM_POSE, GATHER_HOLD } from '~/entities/game/board'
+import { liftOff } from './cardPlace'
 import type { BeatPlan, DiscardCard } from './planBeats'
+import { settleInto } from './toHeap'
 import { withoutFlown } from './withoutFlown'
 
 // A card leaves the table for the discard. The movement itself belongs to the
 // shared step (`useDiscardExit`); what lives here is only where each card
 // starts from, and the wait that makes measuring it honest.
 //
-// No onLanded: the heap is derived from these same events in toBoardState, so
-// the cards this step flew are already in the projection it hands over to. A
-// second set of books here would be a second source for one heap.
+// And it is in the heap from the commit its carrier comes down, filed by this
+// beat like every other exit's (`toHeap`): the projection holds it too, but
+// only once the queue hands over, and between the two the card was nowhere.
 
 const rectOf = (el: Element | null): Rect | null => {
   if (!el) return null
@@ -92,13 +94,15 @@ export function useDiscardBeat(anchors: BoardAnchors, staging?: RefObject<Staged
           adopted ||= staged
         }
       }
-      if (items.length === 0) return
+      if (items.length === 0 && !plan.alarm) return
       // TAKEOFF: the fan has already let go of these cards — publish now, before
       // the flight itself, or the board would show the card twice for as long as
       // the flight lasts (once mid-air, once still sitting in its slot). The
       // discard end is deliberately left at `ctx.base`'s own — see
-      // `withoutFlown`'s comment for why.
-      ctx.publish(withoutFlown(ctx.base, flown))
+      // `withoutFlown`'s comment for why. The run's base moves with it: the
+      // heap is filed on it once they land.
+      ctx.base = withoutFlown(ctx.base, flown)
+      ctx.publish(ctx.base)
       // Pile selection stages Git cards at the centre. Hand that render to
       // the exit together with the shadow update, rather than flying a copy
       // from the old fan slot (which may already hold a different card).
@@ -153,10 +157,51 @@ export function useDiscardBeat(anchors: BoardAnchors, staging?: RefObject<Staged
           flyer.drop()
         }
       }
-      // nothing stands: the fan let go of these cards at the TAKEOFF publish
-      // above, which has to happen there and not here — the sweep runs in
-      // between, and it gathers the very cards this send then scatters.
-      await latest.current.send(items, null)
+      // THE ERROR 503 THE PLAYER PASSED leaves with them (owner, 03.10): from
+      // where it stands, straight, in this same send and under the rest — the
+      // engine banks it first. Before, nothing flew it and the projection
+      // put it in the heap in one jump.
+      const alarm = plan.alarm
+      const alarmCard = alarm ? cardById(alarm.card) : null
+      const alarmBox = alarm ? rectOf(latest.current.anchors.centre.current) : null
+      const under = alarm ? 1 : 0
+      const sent: Leaving[] = [
+        ...(alarm && alarmCard && alarmBox
+          ? [
+              {
+                key: `d${alarm.eventId}`,
+                card: alarmCard,
+                from: alarmBox,
+                pose: ALARM_POSE,
+                scatter: scatterAt(alarm.eventId),
+                layer: 0,
+              },
+            ]
+          : []),
+        ...items.map((it) => (under ? { ...it, layer: (it.layer ?? 0) + under } : it)),
+      ]
+      // …as they lay, the alarm at the bottom (`toHeap`)
+      const filed = [
+        ...(alarm ? [{ ...alarm, layer: 0 }] : []),
+        ...flown.map((c, i) => ({
+          eventId: c.eventId,
+          card: c.card,
+          layer: (items[i].layer ?? 0) + under,
+        })),
+      ]
+      // What stands is the alarm alone: the fan let go of the swept cards at
+      // the TAKEOFF publish above, which has to happen there and not here — the
+      // sweep runs in between, and it gathers the very cards this send then
+      // scatters. The alarm leaves the centre in the commit its carrier goes up.
+      const letGoOfTheAlarm = alarm
+        ? () => {
+            liftOff(ctx, [{ kind: 'centre', card: alarm.card }])
+          }
+        : null
+      await latest.current.send(sent, letGoOfTheAlarm)
+      // nothing measured to fly it: it still leaves (a no-op once it has)
+      letGoOfTheAlarm?.()
+      settleInto(ctx, filed)
     },
     [toLeaving, flyer.raise, flyer.patch, flyer.glide, flyer.drop],
   )

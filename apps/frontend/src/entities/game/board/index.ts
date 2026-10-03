@@ -1,5 +1,7 @@
+export { glowsFor } from './alarm'
 export { type BoardAnchors, useBoardAnchors } from './anchors'
 export {
+  ALARM_POSE,
   ATTACK_POSE,
   CLEAR_STEP,
   COVER_POSE,

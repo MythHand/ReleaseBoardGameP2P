@@ -1213,6 +1213,46 @@ describe('planBeats — the sweep (#102)', () => {
     ])
   })
 
+  // THE ERROR 503 THE PLAYER PASSED leaves with their cards (owner, 03.10). It
+  // stands at the centre, where no source is ever found, and its `discarded`
+  // comes BEFORE the `eliminated` — so it was skipped, and the projection put
+  // it in the heap in one jump.
+  const passedAlarm = () =>
+    boardBefore({
+      pending: {
+        kind: 'neutralize503',
+        player: 'p1',
+        card: 'trigger-error-503',
+        methods: ['debugger'],
+      },
+    } as unknown as Partial<BoardState>)
+
+  it('sends the Error 503 a player passed with the sweep it opens', () => {
+    const plans = planBeats(
+      [
+        discarded(19, { card: 'trigger-error-503', reason: 'trigger' }),
+        eliminated({ id: 20 }),
+        discarded(21, { card: 'attack-bug', reason: 'effect' }),
+      ],
+      passedAlarm(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['discard', 'eliminated'])
+    expect(plans[0]).toMatchObject({
+      gather: true,
+      alarm: { eventId: 19, card: 'trigger-error-503' },
+      cards: [{ eventId: 21, card: 'attack-bug' }],
+    })
+  })
+
+  it('sends it alone when the player had nothing left to sweep', () => {
+    const plans = planBeats(
+      [discarded(19, { card: 'trigger-error-503', reason: 'trigger' }), eliminated({ id: 20 })],
+      passedAlarm(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['discard', 'eliminated'])
+    expect(plans[0]).toMatchObject({ alarm: { eventId: 19 }, cards: [] })
+  })
+
   it('leaves an ordinary discard ungathered', () => {
     const plans = planBeats([discarded(21, { reason: 'effect' })], boardBefore())
     expect((plans[0] as { gather?: true }).gather).toBeUndefined()
@@ -1810,6 +1850,24 @@ describe('planBeats — aiEvent (#106)', () => {
     expect(owed.map((p) => p.kind)).toEqual(['aiEvent'])
     expect(nothing[0]).toMatchObject({ tail: { kind: 'none' } })
     expect(owed[0]).toMatchObject({ tail: { kind: 'standing' } })
+  })
+
+  // A CRUSH OWED TO US lights the glow at the reveal too — the board's own rule
+  // (`glowsFor`), read at the moment the card turns up rather than once its
+  // prompt is published, and only on the board that will keep it lit (03.10)
+  it('lights the alarm at the reveal for a Crush owed to this board, and only for it', () => {
+    const crush = (player: string) => ({
+      kind: 'crush' as const,
+      player,
+      slot: 'frontend' as const,
+      methods: ['debugger' as const],
+      source: 'ai-crush-frontend',
+    })
+    const ours = planBeats(aiBatch(), boardBefore(), crush('p1'))
+    const theirs = planBeats(aiBatch(), boardBefore(), crush('p2'))
+    expect(ours[0]).toMatchObject({ tail: { kind: 'standing', alarm: true } })
+    expect(theirs[0]).toMatchObject({ tail: { kind: 'standing' } })
+    expect(theirs[0]).not.toMatchObject({ tail: { alarm: true } })
   })
 
   it('lights the alarm for the 503 mimic, standing or not', () => {

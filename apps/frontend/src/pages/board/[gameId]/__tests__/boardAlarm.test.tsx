@@ -7,8 +7,10 @@
 // every sibling suite that needs a pending builds its own board with it
 // straight from `makeBoardProps`.
 
+import { restTransform } from '@release/ui/animations'
 import { render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
+import { ALARM_POSE, ATTACK_POSE } from '~/entities/game/board'
 import Board from '../_Board'
 import { makeBoardProps } from './fixture'
 
@@ -54,6 +56,16 @@ function alarmBoard(player: string) {
 it('stands the alarm at the centre while the decision is ours', () => {
   render(<Board {...alarmBoard('you')} />)
   expect(screen.getByTestId('board-centre-alarm')).toBeTruthy()
+})
+
+// …STRAIGHT, as Error503Story stands it: drawn from the deck, it lands with no
+// tilt. A tilt put on it at rest turned it the moment the table took it over
+// from its flight (owner, 03.10).
+it('stands the alarm straight', () => {
+  render(<Board {...alarmBoard('you')} />)
+  const pose = screen.getByTestId('board-centre-alarm').firstElementChild as HTMLElement
+  expect(pose.style.transform).toBe(restTransform(ALARM_POSE))
+  expect(pose.style.transform).not.toBe(restTransform(ATTACK_POSE))
 })
 
 it('lights the table strongly, under the hand, when the alarm is ours', () => {

@@ -4,6 +4,7 @@ import { nextFrames, play, scatterAt, useDiscardExit, wait } from '@release/ui/a
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
+import { liftOff, type Place, setDown } from './cardPlace'
 import { offThePile } from './offThePile'
 import type { AiTail, BeatPlan } from './planBeats'
 import { SEAT_SHRINK } from './seat'
@@ -43,6 +44,7 @@ const CRUSHED = 'crushed' // the release a crush destroys — its own carrier, i
 const CRUSHED_AUX = 'crushedAux'
 
 type CrushTail = Extract<AiTail, { kind: 'crush' }>
+type ZoneSlot = Extract<Place, { kind: 'zone' }>['slot']
 
 const rectOf = (el: Element | null): Rect | null => {
   if (!el) return null
@@ -88,9 +90,9 @@ export function useAiBeat(
   // answer at the reveal (`run`), and one its owner refused to answer in a
   // later batch (`runRefused`, owner 24.09). The release becomes a flyer
   // exactly where it stands, and the zone lets go of it in the same commit — a
-  // card cannot be in a slot and in the air at once.
+  // card cannot be in a slot and in the air at once (`liftOff`).
   const raiseCrushed = useCallback(
-    async (player: string, tail: CrushTail): Promise<Rect | null> => {
+    async (beat: BeatRun, player: string, tail: CrushTail): Promise<Rect | null> => {
       const a = latest.current.anchors
       const card = cardById(tail.card)
       const aux = tail.codeReview ? cardById(tail.codeReview) : null
@@ -110,7 +112,11 @@ export function useAiBeat(
           ? [{ key: CRUSHED_AUX, card: aux, at: (auxFrom ?? crushedFrom) as Rect }]
           : []),
       ]
-      if (going.length > 0) await raise(going)
+      // the carriers go up and the zone lets go before anything is awaited —
+      // one commit; the Code Review under it leaves with it
+      const raised = going.length > 0 ? raise(going) : null
+      liftOff(beat, [{ kind: 'zone', player, slot: tail.slot as ZoneSlot }])
+      if (raised) await raised
       return crushedFrom
     },
     [raise],
@@ -134,8 +140,13 @@ export function useAiBeat(
   // two are recorded in `docs/animations/backlog.md` rather than papered
   // over with an invented pose — an omitted scatter takes a fresh
   // `jitter()`, which is at least honestly arbitrary.
+  //
+  // WHERE IT LANDS HAS IT IN THE COMMIT ITS CARRIER COMES DOWN (`setDown`): the
+  // events deck counts it back, or the heap rests it as the stand-in for its
+  // top. Dropped with nothing filed, it was nowhere until the live board caught
+  // up — or, while the zone still drew it, back in its slot.
   const sendCrushed = useCallback(
-    async (tail: CrushTail, crushedFrom: Rect) => {
+    async (beat: BeatRun, tail: CrushTail, crushedFrom: Rect) => {
       const card = cardById(tail.card)
       const aux = tail.codeReview ? cardById(tail.codeReview) : null
       // The Code Review is never an events-deck card, so it always takes the
@@ -155,7 +166,7 @@ export function useAiBeat(
         // bug this closes).
         if (tail.destination === 'events') {
           await goHome(CRUSHED, crushedFrom)
-          drop(CRUSHED)
+          setDown(beat, [{ kind: 'events' }], () => drop(CRUSHED))
           return
         }
         await latest.current.exit.send(
@@ -170,7 +181,15 @@ export function useAiBeat(
           // nothing stands: handed over as its own `node`
           null,
         )
-        drop(CRUSHED)
+        // only the heap's top has a place there; a release buried under its
+        // own Code Review has none (docs/animations/backlog.md)
+        setDown(
+          beat,
+          tail.rest && tail.restCount !== undefined
+            ? [{ kind: 'heapTop', card: tail.card, count: tail.restCount }]
+            : [],
+          () => drop(CRUSHED),
+        )
       })()
       await Promise.all([mainOut, auxOut])
     },
@@ -200,7 +219,6 @@ export function useAiBeat(
       // rendering this very card at `effect` while the carrier below is
       // about to fly away from that same rect.
       const c = ctx.current
-      const decks = c?.base.decks
       // what the table was drawing goes in the commit the carriers go up —
       // the step's own `takeOff`; with nothing to fly it has to happen anyway
       const letGoOfTheCause = () => {
@@ -213,10 +231,13 @@ export function useAiBeat(
       const causeOut =
         causeItems.length > 0
           ? latest.current.exit.send(causeItems, letGoOfTheCause).then(() => {
-              if (!c || !decks || ctx.current !== c) return
-              const next = { ...c.base, decks }
-              c.base = next
-              c.publish(next)
+              // …and it is in the heap as it lands, filed like every other card
+              // (`toHeap`) — not the decks as they stood before the flight,
+              // which took back whatever else had landed meanwhile: the release
+              // a refused crush destroys was gone again the moment it was filed
+              // (owner's recording, 03.10)
+              if (!c || !plan.causeward || ctx.current !== c) return
+              settleInto(c, [plan.causeward])
             })
           : undefined
       const ai = plan.homeward ? cardById(plan.homeward) : null
@@ -265,10 +286,35 @@ export function useAiBeat(
       await toSlot({ key: EFF, card: event, from: cardAreaOf(events), to: effect })
       await wait(BEFORE_FLIP)
       patch(EFF, { faceDown: false })
-      // the 503 mimic is an alarm from the moment it is seen, and not before
+      // an alarm from the moment it is seen, and not before — the 503 mimic, or
+      // a prompt that glows on this board (`AiTail.standing.alarm`, `glowsFor`)
       if (plan.tail.kind === 'alarm' || (plan.tail.kind === 'standing' && plan.tail.alarm))
         beat.raiseAlarm?.()
       await wait(AFTER_FLIP)
+
+      // A PROMPT IS LIVE THE MOMENT ITS CARD IS SEEN. The cause and the effect
+      // stay on the table until the prompt is answered, so there is nothing for
+      // a reading hold to wait on: the table takes both over now, with the
+      // prompt they raise, and the answer is open from the frame the card has
+      // turned (owner, 03.10 — every AI card that asks, not only Crush). Held
+      // first, the hand stood locked and dimmed for the whole hold with the
+      // table already glowing. The carriers come down in the same commit the
+      // table draws them (`setDown`'s rule): waiting two frames between showed
+      // both cards twice.
+      // Their exits belong to the batch that answers the prompt, even though
+      // the engine banked the trigger when it revealed the effect.
+      if (plan.tail.kind === 'standing') {
+        const next = {
+          ...beat.base,
+          pending: beat.after?.pending ?? beat.base.pending,
+          aiCause: { card: plan.trigger, eventId: plan.triggerDiscardId },
+        }
+        beat.base = next
+        beat.publish(next)
+        drop(TRIG)
+        drop(EFF)
+        return
+      }
 
       // 3. the table reads them. Hallucination lingers twice as long — the
       //    scene's own doubling, not a judgement made here. This is the ONE
@@ -283,29 +329,10 @@ export function useAiBeat(
       //    plan, not a second id check here.
       await wait(plan.eventCard === 'ai-hallucination' ? HALLUCINATION_HOLD : TABLE_HOLD)
 
-      // A prompt keeps both its cause and effect on the table. Publish the
-      // standing render before releasing the flyers so neither card disappears
-      // between the reveal and the pending state. Their exits belong to the
-      // batch that answers the prompt, even though the engine banked the trigger
-      // when it revealed the effect.
-      if (plan.tail.kind === 'standing') {
-        const next = {
-          ...beat.base,
-          pending: beat.after?.pending ?? beat.base.pending,
-          aiCause: { card: plan.trigger, eventId: plan.triggerDiscardId },
-        }
-        beat.base = next
-        beat.publish(next)
-        await nextFrames()
-        drop(TRIG)
-        drop(EFF)
-        return
-      }
-
       // The destroyed release becomes a flyer exactly where it stands, and the
       // zone lets go of it in the same commit — `raiseCrushed`.
       const crushedFrom =
-        plan.tail.kind === 'crush' ? await raiseCrushed(plan.player, plan.tail) : null
+        plan.tail.kind === 'crush' ? await raiseCrushed(beat, plan.player, plan.tail) : null
 
       // 4. the trigger goes to the heap, on the scatter its own event id
       //    produces — one value, two readers (I7), so the heap rests it exactly
@@ -416,7 +443,7 @@ export function useAiBeat(
       // DRAW's own event id, under which nothing rests at all.
       const crushedOut =
         plan.tail.kind === 'crush' && crushedFrom
-          ? sendCrushed(plan.tail, crushedFrom)
+          ? sendCrushed(beat, plan.tail, crushedFrom)
           : Promise.resolve()
 
       await Promise.all([triggerOut, effectOut, crushedOut])
@@ -491,9 +518,9 @@ export function useAiBeat(
   const runRefused = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'crushRefused' }>, beat: BeatRun) => {
       ctx.current = beat
-      const from = await raiseCrushed(plan.player, plan.tail)
+      const from = await raiseCrushed(beat, plan.player, plan.tail)
       await Promise.all([
-        from ? sendCrushed(plan.tail, from) : Promise.resolve(),
+        from ? sendCrushed(beat, plan.tail, from) : Promise.resolve(),
         leaveTheStanding(plan),
       ])
     },

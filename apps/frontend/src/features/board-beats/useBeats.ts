@@ -474,11 +474,12 @@ export function useBeats(args: {
           // Not exclusive: an AI card is read, not obeyed, and nothing about it
           // needs input dead.
           exclusive: false,
-          // The 503 mimic's glow is NOT the whole beat's: the beat opens with the
-          // trigger leaving its pile, and the mimic is only an alarm once its
-          // card has turned face up. The runner lights it at that moment
-          // (`raiseAlarm`, aiBeat.tsx); after the beat, the standing prompt
-          // keeps it lit (owner, 24.09 — it glowed before the card was seen).
+          // An AI card's glow is NOT the whole beat's: the beat opens with the
+          // trigger leaving its pile, and the card is only an alarm once it has
+          // turned face up — the 503 mimic, or a Crush owed to us (`glowsFor`).
+          // The runner lights it at that moment (`raiseAlarm`, aiBeat.tsx);
+          // after the beat, the standing prompt keeps it lit (owner, 24.09 — it
+          // glowed before the card was seen; 03.10 — a Crush lit late).
           alarm: false,
           run: (ctx) => ais.run(plan, ctx),
         }

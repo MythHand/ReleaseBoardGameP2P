@@ -5,7 +5,7 @@ import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
-import { ATTACK_POSE, COVER_POSE } from '~/entities/game/board'
+import { ALARM_POSE, COVER_POSE } from '~/entities/game/board'
 import { useDefenseBeat } from './defenseBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -851,7 +851,7 @@ it('covers the alarm and takes both away as one exchange', async () => {
   expect(exits.items[0].scatter).toEqual(scatterAt(11))
   expect(exits.items[1].scatter).toEqual(scatterAt(12))
   // and each starts from the tilt it was resting at (I6/I9)
-  expect(exits.items[0].pose).toEqual(ATTACK_POSE)
+  expect(exits.items[0].pose).toEqual(ALARM_POSE)
   expect(exits.items[1].pose).toEqual(COVER_POSE)
 })
 
@@ -1130,8 +1130,16 @@ it('keeps the AI trigger out of the heap while the neutralized exchange is still
       await vi.advanceTimersByTimeAsync(1000)
     })
     await flight
-    expect(published.at(-1)?.decks.discardHeap?.map((card) => card.uid)).toEqual(['d3'])
-    expect(published.at(-1)?.decks.discardCount).toBe(1)
+    // landed, it is back — and so is everything that landed with it, filed as it
+    // lay: the trigger, the alarm, the Debugger over it. Putting back the decks
+    // from before the flight left the alarm and the Debugger nowhere until the
+    // live board caught up (owner's recording, 03.10)
+    expect(published.at(-1)?.decks.discardHeap?.map((card) => card.uid)).toEqual([
+      'd3',
+      'd11',
+      'd12',
+    ])
+    expect(published.at(-1)?.decks.discardCount).toBe(3)
   } finally {
     hang.on = false
     act(() => {
@@ -1271,4 +1279,120 @@ it('lands a defence played with Sudo in the heap with the Sudo under it', async 
     api.beat?.runCovered(plan, { base: withAttack, publish: (s) => published.push(s) }),
   )
   expect(published.at(-1)?.decks.discardHeap?.map((h) => h.uid)).toEqual(['d13', 'd15', 'd14'])
+})
+
+// ===== neutralized — one card, one place (#168) =====
+// The answer leaves where it stood in the commit its carrier goes up, the way
+// `runCovered`'s does. The stand recorded our Debugger back in the fan for its
+// whole flight to the discard, and the 503's answer gone once it had landed.
+
+it('takes our own Debugger off the fan in the commit the gesture lets go of it', async () => {
+  exits.items.length = 0
+  const { api, Probe } = harness()
+  const published: BoardState[] = []
+  const withDebugger = {
+    ...base,
+    you: { ...base.you, hand: [{ uid: 'dbg', card: cardById('protection-debugger') }] },
+  } as unknown as BoardState
+  let handAtRelease: string[] | undefined
+  const release = vi.fn(() => {
+    handAtRelease = published.at(-1)?.you.hand.map((h) => h.uid)
+  })
+  const staging = {
+    current: { mainUid: 'dbg', el: node(), release },
+  } as unknown as RefObject<StagedHandoff | null>
+  render(<Probe staging={staging} />)
+  await drive(() =>
+    api.beat?.runNeutralized(
+      { ...debuggerPlan(), player: 'p1' },
+      { base: withDebugger, publish: (s) => published.push(s) },
+    ),
+  )
+  expect(release).toHaveBeenCalledOnce()
+  expect(handAtRelease).toEqual([])
+})
+
+it('lowers the answering seat’s hand as its Debugger takes off', async () => {
+  played.names = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  let liftedAfter: string[] | null = null
+  await drive(() =>
+    api.beat?.runNeutralized(debuggerPlan(), {
+      base,
+      publish: (s) => {
+        if (liftedAfter === null && s.opponents[0].handCount === 2) liftedAfter = [...played.names]
+      },
+    }),
+  )
+  expect(liftedAfter).toEqual([])
+  expect(played.names).toContain('playToCenter')
+})
+
+it('takes a sacrificed release out of its zone as it takes off', async () => {
+  played.names = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const zoned = {
+    ...base,
+    opponents: [{ ...base.opponents[0], release: { frontend: cardById('release-frontend') } }],
+  } as unknown as BoardState
+  let liftedAfter: string[] | null = null
+  await drive(() =>
+    api.beat?.runNeutralized(
+      {
+        ...debuggerPlan(),
+        method: 'sacrifice',
+        slot: 'frontend',
+        destination: 'discard',
+        spent: [{ eventId: 12, card: 'release-frontend' }],
+      },
+      {
+        base: zoned,
+        publish: (s) => {
+          if (liftedAfter === null && !s.opponents[0].release.frontend)
+            liftedAfter = [...played.names]
+        },
+      },
+    ),
+  )
+  expect(liftedAfter).toEqual([])
+  expect(played.names).toContain('playToCenter')
+})
+
+it('counts a sacrificed AI release back into the events deck as it lands', async () => {
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: BoardState[] = []
+  await drive(() =>
+    api.beat?.runNeutralized(
+      {
+        ...debuggerPlan(),
+        method: 'sacrifice',
+        slot: 'frontend',
+        destination: 'events',
+        spent: [{ eventId: 12, card: 'release-frontend' }],
+      },
+      { base, publish: (s) => published.push(s) },
+    ),
+  )
+  expect(published.at(-1)?.decks.events).toBe(6)
+})
+
+// The AI trigger beside the prompt leaves with the answer, and flies UNDER it —
+// the order the heap files them in. At one layer with the answer it rode over
+// the Debugger and lay under it the moment both landed (owner's recording, 03.10).
+it('flies the AI trigger under the exchange it leaves with, as the heap files them', async () => {
+  exits.items.length = 0
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.runNeutralized(
+      { ...debuggerPlan(), alarm: undefined, causeward: { card: 'trigger-ai', eventId: 3 } },
+      ctx,
+    ),
+  )
+  const layerOf = (id: string) => exits.items.find((i) => i.card.id === id)?.layer
+  expect(layerOf('trigger-ai')).toBe(0)
+  expect(layerOf('protection-debugger')).toBe(1)
 })
