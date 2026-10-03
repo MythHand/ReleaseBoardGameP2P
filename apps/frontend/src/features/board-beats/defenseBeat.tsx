@@ -58,7 +58,7 @@ export function useDefenseBeat(
   // carrier passed between two beats' hooks is how this codebase has already
   // grown two latch bugs of that family (`useBeats.ts`'s own comments).
   const sendHomeward = useCallback(
-    async (id: string) => {
+    async (id: string, ctx: BeatRun) => {
       const a = latest.current.anchors
       const card = cardById(id)
       const from = rectOf(a.effect.current)
@@ -74,7 +74,8 @@ export function useDefenseBeat(
         deck: a.eventsBox.current,
         turnFaceDown: () => flyer.patch('homeward', { faceDown: true }),
       })
-      flyer.drop('homeward')
+      // back in the events deck's count in the commit its carrier comes down
+      setDown(ctx, [{ kind: 'events' }], () => flyer.drop('homeward'))
     },
     [flyer.raise, flyer.patch, flyer.drop],
   )
@@ -552,7 +553,7 @@ export function useDefenseBeat(
           ? latest.current.send(flying, letGoOfTheCause).then(() => settleInto(ctx, filed))
           : undefined,
         sacrificedHome,
-        plan.homeward ? sendHomeward(plan.homeward) : undefined,
+        plan.homeward ? sendHomeward(plan.homeward, ctx) : undefined,
       ])
       flyer.drop('cover')
     },

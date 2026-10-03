@@ -1835,6 +1835,35 @@ describe('planBeats — aiEvent (#106)', () => {
   })
 
   // THE PAIR THAT MATTERS #2 — two batches identical AND empty
+  // …and with a Code Review the Code Review IS the top, so it carries the pose
+  // (owner, 17.09: they go as they lay, Code Review on top; #168)
+  it('gives a crushed release’s Code Review the heap’s top pose', () => {
+    const batch: Event[] = [
+      { id: 1, type: 'drawn', player: 'p1', pile: 0, deckSize: 30 },
+      {
+        id: 2,
+        type: 'aiRevealed',
+        player: 'p1',
+        aiCard: 'trigger-ai',
+        eventCard: 'ai-crush-frontend',
+      },
+      { id: 3, type: 'discarded', player: 'p1', card: 'trigger-ai', reason: 'trigger' },
+      { id: 4, type: 'releaseDestroyed', player: 'p1', slot: 'frontend', card: 'release-frontend' },
+    ] as Event[]
+    const withReview = boardBefore({
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        support: { frontend: card('support-code-review') },
+        releaseEvent: {},
+      },
+    } as Partial<BoardState>)
+    expect(planBeats(batch, withReview, null, 7)[0]).toMatchObject({
+      tail: { codeReviewRest: standInScatter(7), restCount: 7 },
+    })
+  })
+
   it('separates a prompt that is owed from nothing having happened, using `owed`', () => {
     const batch = aiBatch()
     const before = boardBefore()

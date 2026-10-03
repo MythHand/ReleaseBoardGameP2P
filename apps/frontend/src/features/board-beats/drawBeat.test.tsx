@@ -360,3 +360,16 @@ it('takes the standing 503’s carrier down in the commit it stands in', async (
   expect(dropped).toBeGreaterThan(stood)
   expect(order.log.slice(stood, dropped)).not.toContain('nextFrames')
 })
+
+// A trigger that goes straight to the discard is IN the heap as its carrier
+// comes down, filed by this beat like every other exit's (#168): dropped with
+// nothing filed, it was nowhere until the projection caught up.
+it('files a trigger that goes straight to the discard as its carrier comes down', async () => {
+  exits.items = []
+  const { published, go } = run([
+    draw({ card: undefined, reveal: { card: 'trigger-error-503', discardId: 6 } }),
+  ])
+  await go()
+  const filed = published.find((s) => s.decks.discardHeap?.some((c) => c.uid === 'd6'))
+  expect(filed?.decks.discardCount).toBe(1)
+})

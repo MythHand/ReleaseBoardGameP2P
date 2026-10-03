@@ -182,11 +182,13 @@ describe('aiBeat', () => {
     expect(owner?.releaseEvent?.[slot]).toBe(eventCard)
     if (player === 'p1') expect(landed?.you.releaseUid?.[slot]).toBe('event')
     expect(landed?.you.hand).toEqual(before.you.hand)
-    // the table's decks, but for the trigger's own pile: it gave the card up as
-    // the trigger took off, not when the table had played out (offThePile.ts)
+    // the table's decks, but for the trigger's own pile and the events deck:
+    // each gave its card up as that card took off, not when the table had
+    // played out (offThePile.ts; the events deck since #168)
     expect(landed?.decks).toEqual({
       ...before.decks,
       main: before.decks.main.map((n, i) => (i === plan.pile ? n - 1 : n)),
+      events: before.decks.events - 1,
     })
     const order = callOrder()
     // the zone's own publish — the first after the flight into the slot; the
@@ -329,9 +331,10 @@ describe('aiBeat', () => {
   })
 
   // The contrast, and the recorded gap: a release buried under its own Code
-  // Review is not the heap's top, so the plan carries no pose for it — and the
-  // Code Review has no entry of its own either. The trigger beside them is what
-  // a card WITH a real `discarded` id looks like.
+  // Review is not the heap's top, so the plan carries no pose for it. The Code
+  // Review's own pose arrives only from the plan (`codeReviewRest`, pinned in
+  // the crushed-release tests below) — a tail without one claims nothing. The
+  // trigger beside them is what a card WITH a real `discarded` id looks like.
   it('claims a heap pose only for the card the heap actually rests', async () => {
     const slot = protectedSlot()
     const anchors = anchorsFixture({ releaseSlot: () => slot })
@@ -355,6 +358,56 @@ describe('aiBeat', () => {
   // commit the carrier comes down. The stand recorded it in its slot for the
   // whole flight and after, and gone from everywhere once its carrier dropped.
   describe('a crushed release, one place at a time', () => {
+    // THE CODE REVIEW is the discard's top when the release under it is
+    // crushed — banked after it — so it rests as the heap's stand-in, both
+    // cards counted (#168; owner, 17.09: they go as they lay, Code Review on top)
+    it('rests the Code Review as the heap’s top, both cards counted', async () => {
+      const slot = protectedSlot()
+      const anchors = anchorsFixture({ releaseSlot: () => slot })
+      const { result } = renderBeat(() => useAiBeat(anchors))
+      const published: BoardState[] = []
+      const base = {
+        you: {
+          name: 'You',
+          hand: [],
+          release: { frontend: cardById('release-frontend') },
+          support: { frontend: cardById('support-code-review') },
+        },
+        opponents: [],
+        decks: { main: [10], events: 5, discardCount: 4, discardHeap: [] },
+        selfId: 'p1',
+        history: [],
+        setup: {},
+        playable: [],
+        frozen: [],
+      } as unknown as BoardState
+      const rest = standInScatter(7)
+      await runBeat(
+        result.current.run,
+        {
+          ...crushPlan('discard'),
+          tail: {
+            ...crushPlan('discard').tail,
+            codeReview: 'support-code-review',
+            codeReviewRest: rest,
+            restCount: 7,
+          },
+        },
+        anchors,
+        { base, publish: (s) => published.push(s) },
+      )
+      const items = anchors.exitSpy.mock.calls.flat(2) as { key: string; scatter?: unknown }[]
+      expect(items.find((i) => i.key === 'crushedAux')?.scatter).toEqual(rest)
+      const last = published.at(-1)
+      expect(last?.decks.discardHeap?.at(-1)).toMatchObject({
+        uid: 'top7',
+        card: expect.objectContaining({ id: 'support-code-review' }),
+        ...rest,
+      })
+      // the trigger, the release under its Code Review, and the Code Review
+      expect(last?.decks.discardCount).toBe(7)
+    })
+
     const crushedBase = {
       you: { name: 'You', hand: [], release: { frontend: cardById('release-frontend') } },
       opponents: [],
@@ -763,5 +816,90 @@ describe('runTaken — a Release comes back out of the discard (#106, Task 11)',
     const cleared = stamps.find((st) => st.pending === null)
     expect(cleared).toBeDefined()
     expect(cleared?.plays).not.toContain('returnToDeck')
+  })
+})
+
+// WHAT A CARD LEAVES, IT LEAVES AS IT TAKES OFF (#168): the events deck gives
+// up the AI card as it rises and counts it back as it lands home; the heap gives
+// up the release Inside picks as it rises.
+describe('the events deck and the heap, one place at a time', () => {
+  const traced = () => {
+    const states: BoardState[] = []
+    const publish = (state: BoardState) => {
+      states.push(state)
+      animationsTrace.order.push(`publish:${states.length - 1}`)
+    }
+    return { states, publish }
+  }
+
+  it('counts the AI card out of the events deck as it rises, and back in as it lands home', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    const { states, publish } = traced()
+    await runBeat(
+      result.current.run,
+      {
+        kind: 'aiEvent' as const,
+        key: 'ai:1',
+        eventId: 1,
+        player: 'p1',
+        pile: 0,
+        trigger: 'trigger-ai',
+        triggerDiscardId: 3,
+        eventCard: 'ai-bad-vibe-coding',
+        tail: { kind: 'none' as const },
+      },
+      anchors,
+      { publish },
+    )
+    const order = callOrder()
+    const out = states.findIndex((s) => s.decks.events === 4)
+    const back = states.findIndex((s, i) => i > out && s.decks.events === 5)
+    expect(out).toBeGreaterThanOrEqual(0)
+    // off the deck before its own flight starts (the second one, after the trigger's)
+    const flights = order.flatMap((step, i) => (step === 'play:drawToCenter' ? [i] : []))
+    expect(order.indexOf(`publish:${out}`)).toBeLessThan(flights[1])
+    expect(back).toBeGreaterThan(out)
+    expect(order.indexOf(`publish:${back}`)).toBeLessThan(order.indexOf('drop:eff'))
+  })
+
+  it('takes the release Inside picks off the heap as it rises', async () => {
+    const anchors = anchorsFixture()
+    const { result } = renderBeat(() => useAiBeat(anchors))
+    const { states, publish } = traced()
+    const base = {
+      you: { name: 'You', hand: [], release: {} },
+      opponents: [],
+      decks: {
+        main: [10],
+        events: 5,
+        discardCount: 1,
+        discardHeap: [{ uid: 'd4', card: cardById('release-frontend'), ...scatterAt(4) }],
+      },
+      selfId: 'p1',
+      history: [],
+      setup: {},
+      playable: [],
+      frozen: [],
+    } as unknown as BoardState
+    await runBeat(
+      result.current.runTaken,
+      {
+        kind: 'takenFromDiscard' as const,
+        key: 'taken:20',
+        eventId: 20,
+        player: 'p1',
+        card: 'release-frontend',
+        mine: true,
+      },
+      anchors,
+      { base, publish },
+    )
+    const lifted = states.findIndex((s) => s.decks.discardHeap?.length === 0)
+    expect(lifted).toBeGreaterThanOrEqual(0)
+    expect(states[lifted].decks.discardCount).toBe(0)
+    expect(callOrder().indexOf(`publish:${lifted}`)).toBeLessThan(
+      callOrder().indexOf('play:drawToCenter'),
+    )
   })
 })

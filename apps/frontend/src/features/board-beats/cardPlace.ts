@@ -1,6 +1,6 @@
 import { type CardData, cardById } from '@release/ui'
 import type { BoardState, CentreOperation } from '~/entities/game/board'
-import { type Filed, withLanded, withoutLanded, withStandIn } from './toHeap'
+import { type Filed, withLanded, withoutLanded, withoutTopCopy, withStandIn } from './toHeap'
 
 // ONE CARD, ONE PLACE (#168; docs/animations/beat-copies.md §5).
 //
@@ -37,8 +37,10 @@ export type Place =
   | { kind: 'zone'; player: string; slot: Slot }
   // a System Upgrade row, by the seat whose answer stands there — one per seat
   | { kind: 'upgrade'; player: string }
-  // the discard heap, by the `discarded` event the card lies on
+  // the discard heap, by the `discarded` event the card lies on…
   | { kind: 'heap'; eventId: number }
+  // …or, taken back out, by the card alone: its topmost copy (`withoutTopCopy`)
+  | { kind: 'heap'; card: string }
   // a draw pile's count
   | { kind: 'pile'; pile: number }
   // the events deck's count
@@ -91,7 +93,9 @@ export function withoutCard(board: BoardState, place: Place): BoardState {
       return { ...board, pending: { ...pending, thrown } }
     }
     case 'heap':
-      return withoutLanded(board, [{ eventId: place.eventId }])
+      return 'eventId' in place
+        ? withoutLanded(board, [{ eventId: place.eventId }])
+        : withoutTopCopy(board, place.card)
     case 'pile': {
       const main = board.decks.main
       if ((main[place.pile] ?? 0) <= 0) return board

@@ -99,9 +99,18 @@ export type AiTail =
        */
       rest?: Scatter
       /**
-       * The discard's count that stand-in is keyed by — the one `rest` was read
-       * with, so the beat files the card under the very name and pose the
-       * projection then draws it with. Present exactly when `rest` is.
+       * The pose of the Code Review tucked under the release, when there is one:
+       * banked AFTER the release (`[release, codeReview]`), it is the discard's
+       * top, so it is the card the heap's stand-in draws — the release under it
+       * still has nothing (docs/animations/backlog.md). As the cards lay on the
+       * table, Code Review on top (owner, 17.09).
+       */
+      codeReviewRest?: Scatter
+      /**
+       * The discard's count that stand-in is keyed by — the one `rest` (or
+       * `codeReviewRest`) was read with, so the beat files the card under the
+       * very name and pose the projection then draws it with. Present exactly
+       * when one of them is.
        */
       restCount?: number
       /**
@@ -655,12 +664,16 @@ function crushTailOf(
   // will actually rest it on — see `rest`'s own comment on `AiTail`.
   const rest =
     !home && !aux && discardAfter !== undefined ? standInScatter(discardAfter) : undefined
+  // …and with a Code Review, the Code Review IS that card
+  const codeReviewRest =
+    aux && discardAfter !== undefined ? standInScatter(discardAfter) : undefined
   return {
     kind: 'crush',
     slot: destroyed.slot,
     card: destroyed.card,
     destination: home ? 'events' : 'discard',
     ...(rest ? { rest, restCount: discardAfter } : {}),
+    ...(codeReviewRest ? { codeReviewRest, restCount: discardAfter } : {}),
     ...(aux ? { codeReview: aux.id } : {}),
   }
 }

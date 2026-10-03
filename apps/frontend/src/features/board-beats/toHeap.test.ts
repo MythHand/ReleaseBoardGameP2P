@@ -2,7 +2,7 @@ import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
 import { describe, expect, it } from 'vitest'
 import { type BoardState, standInScatter } from '~/entities/game/board'
-import { withLanded, withStandIn } from './toHeap'
+import { withLanded, withoutTopCopy, withStandIn } from './toHeap'
 
 const c = (id: string) => cardById(id) as NonNullable<ReturnType<typeof cardById>>
 
@@ -52,5 +52,23 @@ describe('withStandIn', () => {
     expect(next.decks.discardHeap?.at(-1)).toMatchObject(standInScatter(5))
     expect(next.decks.discardCount).toBe(5)
     expect(next.decks.discard?.id).toBe('release-frontend')
+  })
+})
+
+describe('withoutTopCopy', () => {
+  // the event names the card, not which copy: the topmost copy leaves, the one
+  // the projection takes out for `takenFromDiscard`
+  it('takes the topmost copy of the card out of the heap', () => {
+    const next = withoutTopCopy(
+      heapOf(3, [
+        ['d1', 'release-frontend'],
+        ['d2', 'attack-bug'],
+        ['d3', 'release-frontend'],
+      ]),
+      'release-frontend',
+    )
+    expect(uids(next)).toEqual(['d1', 'd2'])
+    expect(next.decks.discardCount).toBe(2)
+    expect(next.decks.discard?.id).toBe('attack-bug')
   })
 })

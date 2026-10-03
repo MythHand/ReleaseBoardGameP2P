@@ -591,3 +591,44 @@ it('lets a watcher’s board go of the named card in the commit its flyer goes u
   // let go before the flyer was on screen — the two land in one commit
   expect(flyerUp).toBe(false)
 })
+
+// THE DONOR'S HAND, as the card leaves it (#168): one card lighter in the
+// commit its carrier goes up, for the taker and for a watcher alike. It used to
+// lighten only once the card had reached the centre.
+it.each([
+  ['the taker', transferPlan()],
+  ['a watcher', transferPlan({ role: 'watcher', from: 'p2', to: 'p3', named: true })],
+] as const)('lightens the donor’s hand as the card takes off, for %s', async (_who, plan) => {
+  let liftedAfter: string[] | null = null
+  const runner: { start?: () => Promise<void> } = {}
+  function Probe() {
+    const beat = useTransferBeat(anchors)
+    runner.start = () =>
+      beat.runTransfer(plan, {
+        base,
+        publish: (s) => {
+          if (liftedAfter === null && s.opponents[0].handCount === 4)
+            liftedAfter = [...played.names]
+        },
+      })
+    return <>{beat.overlay}</>
+  }
+  render(<Probe />)
+  vi.useFakeTimers()
+  try {
+    let done = false
+    const finished = runner.start?.().then(() => {
+      done = true
+    })
+    while (!done) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+    }
+    await finished
+  } finally {
+    vi.useRealTimers()
+  }
+  expect(liftedAfter).not.toBeNull()
+  expect(liftedAfter).not.toContain('takeFromSeat')
+})

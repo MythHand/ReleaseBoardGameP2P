@@ -139,6 +139,33 @@ export function withStandIn(
 }
 
 /**
+ * A card TAKEN BACK OUT of the discard — Inside's pick. The event names the
+ * card, not which copy, so the topmost copy leaves: the one the projection
+ * takes out for a `takenFromDiscard` (`toDiscardHeap`), so the heap the beat
+ * draws while the card is in the air is the heap the live board then draws.
+ */
+export function withoutTopCopy(state: BoardState, card: string): BoardState {
+  const heap = state.decks.discardHeap ?? []
+  let at = -1
+  for (let i = heap.length - 1; i >= 0; i--) {
+    if (heap[i].card.id !== card) continue
+    at = i
+    break
+  }
+  if (at < 0) return state
+  const remaining = heap.filter((_, i) => i !== at)
+  return {
+    ...state,
+    decks: {
+      ...state.decks,
+      discardHeap: remaining,
+      discard: remaining.at(-1)?.card,
+      discardCount: Math.max(0, state.decks.discardCount - 1),
+    },
+  }
+}
+
+/**
  * The opposite direction, and the one only an operation needs: its own cards are
  * STANDING at the centre while the pile already counts them, so they come out of
  * the heap for as long as they stand there.

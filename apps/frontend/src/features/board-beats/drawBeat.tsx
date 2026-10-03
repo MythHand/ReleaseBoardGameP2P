@@ -9,6 +9,7 @@ import type { BeatPlan, PlannedDraw } from './planBeats'
 import { seatCardBox } from './seat'
 import { TABLE_HOLD, useToCentre } from './toCentre'
 import { useToHand } from './toHand'
+import { settleInto } from './toHeap'
 
 // A card is drawn. One flight to the centre, then a branch on who drew it and
 // what it turned out to be — the scene is `DrawCardStory`, driven here by the
@@ -122,6 +123,11 @@ export function useDrawBeat(
               // so the step flies that very node and there is no copy to hide
               null,
             )
+            // …and it is in the heap in the commit its carrier comes down,
+            // filed by this beat like every other exit's (`toHeap`): dropped
+            // with nothing filed, it was nowhere until the projection caught up
+            const c = ctx.current
+            if (c) settleInto(c, [{ eventId: d.reveal.discardId, card: d.reveal.card }])
             drop('draw')
             continue
           }

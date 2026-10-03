@@ -152,11 +152,39 @@ export function useAiBeat(
       // The Code Review is never an events-deck card, so it always takes the
       // ordinary road even when the release it protected does not — the same
       // split, for the same reason, `defenseBeat`'s sacrifice leg makes.
+      // It is the discard's top — banked after the release — so it flies onto
+      // the heap's stand-in pose and rests there as it lands, the release under
+      // it counted with it when that went to the discard too (`codeReviewRest`).
       const auxOut = aux
         ? latest.current.exit
-            // nothing stands: handed over as its own `node`
-            .send([{ key: CRUSHED_AUX, card: aux, node: elOf(CRUSHED_AUX) }], null)
-            .then(() => drop(CRUSHED_AUX))
+            .send(
+              [
+                {
+                  key: CRUSHED_AUX,
+                  card: aux,
+                  node: elOf(CRUSHED_AUX),
+                  ...(tail.codeReviewRest ? { scatter: tail.codeReviewRest } : {}),
+                },
+              ],
+              // nothing stands: handed over as its own `node`
+              null,
+            )
+            .then(() =>
+              setDown(
+                beat,
+                tail.codeReviewRest && tail.restCount !== undefined
+                  ? [
+                      {
+                        kind: 'heapTop',
+                        card: aux.id,
+                        count: tail.restCount,
+                        banked: tail.destination === 'discard' ? 2 : 1,
+                      },
+                    ]
+                  : [],
+                () => drop(CRUSHED_AUX),
+              ),
+            )
         : Promise.resolve()
       const mainOut = (async () => {
         if (!card) return
@@ -254,7 +282,9 @@ export function useAiBeat(
             deck: a.eventsBox.current,
             turnFaceDown: () => patch('homeward', { faceDown: true }),
           })
-          drop('homeward')
+          // back in the events deck's count as its carrier comes down
+          if (c) setDown(c, [{ kind: 'events' }], () => drop('homeward'))
+          else drop('homeward')
         }
       }
       await causeOut
@@ -283,6 +313,8 @@ export function useAiBeat(
       await wait(AFTER_FLIP)
 
       // 2. the events deck gives up the card that explains it
+      //    — off its counter as it takes off, the way the pile gives up the trigger
+      liftOff(beat, [{ kind: 'events' }])
       await toSlot({ key: EFF, card: event, from: cardAreaOf(events), to: effect })
       await wait(BEFORE_FLIP)
       patch(EFF, { faceDown: false })
@@ -407,7 +439,8 @@ export function useAiBeat(
           return
         }
         await goHome(EFF, effect)
-        drop(EFF)
+        // back in the events deck's count in the commit its carrier comes down
+        setDown(beat, [{ kind: 'events' }], () => drop(EFF))
       })()
 
       // …and the destroyed release takes the road the plan already worked out,
@@ -461,6 +494,9 @@ export function useAiBeat(
       if (!card || !heap || !centre) return
       // out of the heap and up to the centre, face up — `AiCardsStory`'s own
       // `insideGrab`, held for the same `SHOW_HOLD`
+      // — and the heap lets go of it as it takes off (`cardPlace`): left in, it
+      // lay in the discard for the whole show and its flight on (#168)
+      liftOff(beat, [{ kind: 'heap', card: plan.card }])
       await toSlot({ key: EFF, card, from: cardAreaOf(heap), to: centre, faceDown: false })
       await wait(SHOW_HOLD)
       const from = rectOf(elOf(EFF))
