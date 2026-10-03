@@ -7,6 +7,7 @@ import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
+import { settleInto } from './toHeap'
 import { useUpgradeBeat } from './upgradeBeat'
 
 // One shared timeline, stamped with the fake clock, so the second card's START
@@ -266,12 +267,20 @@ it('holds the final base row before its measured cards leave for discard', async
   final.clear = [{ eventId: 2, player: 'p2', card: 'attack-bug' }]
   await drive(() => api.beat?.run(final, ctx))
   expect(leftAt - publishedAt).toBeGreaterThanOrEqual(2500)
+  // it leaves on a carrier of the exit, raised where the card stands — every
+  // card of the send rides one ladder of layers, whatever surface held it
   expect(timeline.exits).toHaveBeenCalledWith([
     expect.objectContaining({
       key: 'upgrade-exit:2',
-      node: expect.any(HTMLElement),
+      from: expect.objectContaining({ left: 100, width: 150 }),
     }),
   ])
+  expect(timeline.exits.mock.calls[0][0]).not.toContainEqual(
+    expect.objectContaining({ node: expect.anything() }),
+  )
+  // …and the row stops drawing it in the commit that carrier goes up
+  const raised = ctx.publish.mock.calls.find(([s]) => s.pending?.thrown?.length === 0)
+  expect(raised).toBeDefined()
   expect(ctx.publish.mock.lastCall?.[0].pending).toBeNull()
 })
 
@@ -336,19 +345,21 @@ it.each([
   } as Extract<BeatPlan, { kind: 'upgrade' }>
   await drive(() => api.beat?.run(take, { ...ctx, base: before }))
   expect(timeline.motions[0]).toBe('playToCenter')
+  // the card that stays behind leaves on a carrier raised where IT stands (p3's
+  // place), and the row stops drawing it in the commit that carrier goes up
   expect(timeline.exits).toHaveBeenCalledWith([
     expect.objectContaining({
       key: 'upgrade-exit:2',
-      // the CARD leaves, not the place it stands in: the place carries the row's
-      // own positioning, and a flight's first frame would write that away
-      node: expect.objectContaining({
-        dataset: expect.objectContaining({ upgradeCard: '' }),
-        parentElement: expect.objectContaining({
-          dataset: expect.objectContaining({ upgradeSlot: 'p3' }),
-        }),
-      }),
+      from: expect.objectContaining({ left: 274, width: 150 }),
     }),
   ])
+  expect(
+    ctx.publish.mock.calls.some(
+      ([s]) =>
+        s.pending?.kind === 'systemUpgrade' &&
+        !s.pending.thrown.some((t: { player: string }) => t.player === 'p3'),
+    ),
+  ).toBe(true)
   const result = ctx.publish.mock.lastCall?.[0] as BoardState
   expect(result.pending).toBeNull()
   if (player === 'p1') {
@@ -360,4 +371,76 @@ it.each([
     expect(timeline.motions).toContain('dealToSeat')
     expect(result.opponents[0].handCount).toBe(3)
   }
+})
+
+// THE ANSWERS ARE IN THE HEAP THE MOMENT THEY LAND, put there by this beat like
+// every other exit's. Left to the beat's last publish they were nowhere between
+// their carriers coming down and that publish (owner's recording, 03.10) — and
+// they lie above the System Upgrade, which the engine discarded first.
+it('files the answers into the heap as they land, above the System Upgrade card', async () => {
+  timeline.exits.mockClear()
+  const upgradeCard = cardById('operation-system-upgrade')
+  if (!upgradeCard) throw new Error('no System Upgrade card')
+  const { api, ctx } = harness({
+    handOver: (run) => ({
+      items: [{ key: 'operation-exit:9', card: upgradeCard, layer: 1 }],
+      takeOff: () => {},
+      settle: () => settleInto(run, [{ eventId: 9, card: 'operation-system-upgrade', layer: 1 }]),
+    }),
+  })
+  const final = {
+    ...plan([{ eventId: 1, player: 'p2', card: 'attack-bug' }]),
+    clear: [{ eventId: 3, player: 'p2', card: 'attack-bug' }],
+  }
+  await drive(() => api.beat?.run(final, ctx))
+  // still inside the System Upgrade — before the beat hands the table on
+  const landed = ctx.publish.mock.calls
+    .map(([s]) => s as BoardState)
+    .find(
+      (s) =>
+        s.pending?.kind === 'systemUpgrade' && s.decks.discardHeap?.some((c) => c.uid === 'd3'),
+    )
+  expect(landed?.decks.discardHeap?.map((c) => c.uid)).toEqual(['d9', 'd3'])
+  expect(landed?.decks.discardCount).toBe(2)
+})
+
+// …and with Sudo, where the beat's last publish waits for the taken card to
+// reach its seat: the card left in the row is in the heap long before that.
+it('has the card left in the row in the heap while the taken one is still on its way', async () => {
+  timeline.exits.mockClear()
+  timeline.motions = []
+  const { api, ctx } = harness()
+  const before = {
+    ...base,
+    opponents: [{ id: 'p4', name: 'Four', handCount: 2, release: {} }],
+    pending: {
+      kind: 'systemUpgrade',
+      actor: 'p4',
+      owed: [],
+      sudo: true,
+      phase: 'picking',
+      source: 'operation-system-upgrade',
+      thrown: [
+        { player: 'p2', card: { uid: 'chosen', id: 'attack-bug' } },
+        { player: 'p3', card: { uid: 'remaining', id: 'defense-hotfix' } },
+      ],
+    },
+  } as BoardState
+  const take = {
+    kind: 'upgrade',
+    key: 'upgrade-take:1',
+    throws: [],
+    take: { player: 'p4', card: 'attack-bug', uid: 'chosen', fromPlayer: 'p2' },
+    clear: [{ eventId: 2, player: 'p3', card: 'defense-hotfix' }],
+  } as Extract<BeatPlan, { kind: 'upgrade' }>
+  let filedAfter: string[] | null = null
+  ctx.publish.mockImplementation((s: BoardState) => {
+    if (filedAfter === null && s.decks.discardHeap?.some((c) => c.uid === 'd2'))
+      filedAfter = [...timeline.motions]
+  })
+  await drive(() => api.beat?.run(take, { ...ctx, base: before }))
+  // filed while the taken card had not yet set off for its seat
+  expect(filedAfter).not.toBeNull()
+  expect(filedAfter).not.toContain('dealToSeat')
+  expect(timeline.motions).toContain('dealToSeat')
 })

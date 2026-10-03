@@ -104,24 +104,6 @@ const stagedPlaces = (handoff: StagedHandoff): Place[] =>
     uid ? [{ kind: 'hand' as const, uid }] : [],
   )
 
-/**
- * The board without the cards the gesture hands over, off the CENTRE only. Kept
- * for the operation beat alone, which still takes its card out of the hand by
- * position afterwards (`withoutFlown`) — taking it out by uid here first would
- * move every position after it. Goes when that beat moves onto `cardPlace`.
- */
-export function withoutStaged(
-  base: BoardState,
-  handoff: StagedHandoff | null | undefined,
-): BoardState {
-  if (!handoff) return base
-  const gone = new Set([handoff.mainUid, handoff.supportUid])
-  const shown = base.shown ?? []
-  return shown.some((s) => gone.has(s.uid))
-    ? { ...base, shown: shown.filter((s) => !gone.has(s.uid)) }
-    : base
-}
-
 export function useShownBeat(anchors: BoardAnchors) {
   const { overlay: flyerOverlay, raise, drop, toSlot } = useToCentre()
   const { overlay: pairOverlay, fold, release } = usePairFold()

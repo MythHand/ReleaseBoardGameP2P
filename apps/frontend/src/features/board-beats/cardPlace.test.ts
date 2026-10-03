@@ -136,6 +136,30 @@ describe('withoutCard', () => {
     expect(theirs.opponents[0].release.backend).toBeNull()
   })
 
+  it('takes one seat’s answer out of the System Upgrade row and leaves the rest standing', () => {
+    const row = board({
+      pending: {
+        kind: 'systemUpgrade',
+        actor: 'p1',
+        owed: [],
+        sudo: true,
+        phase: 'picking',
+        source: 'operation-system-upgrade',
+        thrown: [
+          { player: 'p2', card: { uid: 'a', id: 'attack-bug' } },
+          { player: 'p3', card: { uid: 'b', id: 'defense-hotfix' } },
+        ],
+      },
+    } as unknown as Partial<BoardState>)
+    const next = withoutCard(row, { kind: 'upgrade', player: 'p3' })
+    expect(next.pending).toMatchObject({ kind: 'systemUpgrade', actor: 'p1' })
+    expect(
+      next.pending?.kind === 'systemUpgrade' && next.pending.thrown.map((t) => t.player),
+    ).toEqual(['p2'])
+    const none = board()
+    expect(withoutCard(none, { kind: 'upgrade', player: 'p3' })).toBe(none)
+  })
+
   it('lowers the counts a card leaves: a seat, a pile, the events deck', () => {
     expect(withoutCard(board(), { kind: 'seat', player: 'p2' }).opponents[0].handCount).toBe(2)
     expect(withoutCard(board(), { kind: 'pile', pile: 1 }).decks.main).toEqual([5, 1])

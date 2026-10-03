@@ -67,9 +67,12 @@ it.each([
     expect((lands[0] + lands[1]) / 2).toBeCloseTo(400)
   }
   expect(published.at(-1)?.opponents[0].handCount).toBe(sudo ? 1 : 2)
-  expect(result.current.standing).toBe(true)
   // landed: the table draws it now — the carrier (the flight layer) is down
-  expect(result.current.landed).toEqual({ card: 'operation-git-branch', sudo })
+  expect(published.at(-1)?.centreOperation).toEqual({
+    card: 'operation-git-branch',
+    sudo,
+    spent: placed(sudo).spent,
+  })
   expect(view.container.querySelector('[data-public-operation]')).toBeNull()
   expect(anchors.exitSpy).not.toHaveBeenCalled()
   const exited = await runBeat(
@@ -88,8 +91,7 @@ it.each([
     sudo ? ['d4', 'd3'] : ['d3'],
   )
   expect(anchors.exitSpy.mock.calls[0][0]).toHaveLength(sudo ? 2 : 1)
-  expect(result.current.standing).toBe(false)
-  expect(result.current.landed).toBeNull()
+  expect(exited.published.at(-1)?.centreOperation).toBeUndefined()
 })
 it('adopts a local stage without replaying entrance or leaving its hand copy', async () => {
   const anchors = anchorsFixture()
@@ -98,7 +100,7 @@ it('adopts a local stage without replaying entrance or leaving its hand copy', a
     el: document.createElement('div'),
     release: vi.fn(),
   }
-  const { result } = renderBeat(() => useOperationBeat(anchors, { current: handoff }))
+  const { result, view } = renderBeat(() => useOperationBeat(anchors, { current: handoff }))
   const mine = {
     ...base,
     you: {
@@ -119,9 +121,11 @@ it('adopts a local stage without replaying entrance or leaving its hand copy', a
   )
   expect(animationsTrace.played).toEqual([])
   expect(handoff.release).toHaveBeenCalledOnce()
+  // the table takes it over from the gesture: out of the hand, standing at the
+  // centre — and no carrier stood in for it in between
   expect(published.at(-1)?.you.hand).toEqual([])
-  await act(async () => result.current.reset())
-  expect(result.current.standing).toBe(false)
+  expect(published.at(-1)?.centreOperation?.card).toBe('operation-git-branch')
+  expect(view.container.querySelector('[data-public-operation]')).toBeNull()
 })
 
 // THE HAND-OVER IS THE SAME EXIT, and that means both halves of it: the cards
@@ -149,8 +153,7 @@ it.each([false, true])('files the handed-over card into the heap too (sudo=%s)',
   expect(ctx.base.decks.discardHeap?.map((c) => c.uid)).toEqual(sudo ? ['d4', 'd3'] : ['d3'])
   expect(ctx.base.decks.discardCount).toBe(sudo ? 2 : 1)
   // …and the card is off the table, which is what the settle is FOR
-  expect(result.current.standing).toBe(false)
-  expect(result.current.landed).toBeNull()
+  expect(ctx.base.centreOperation).toBeUndefined()
 })
 
 // A card with nothing to fly still has to leave. The only thing that ever takes
@@ -162,14 +165,14 @@ it('hands over an exit even when there is nothing to carry', async () => {
   const { published } = await runBeat(result.current.runPlaced, placed(false), anchors, { base })
   // the card IS standing, and by the time the centre is emptied there is
   // nothing left to measure it against
-  expect(result.current.standing).toBe(true)
+  expect(published.at(-1)?.centreOperation).toBeDefined()
   anchors.centre.current = null
   const ctx = { base: (published.at(-1) ?? base) as BoardState, publish: () => {} }
   const over = result.current.handOver(ctx)
-  expect(over).not.toBeNull()
-  act(() => {
-    over?.takeOff()
-    over?.settle()
-  })
-  expect(result.current.standing).toBe(false)
+  expect(over?.items).toEqual([])
+  // an exit with nothing in the air never runs `takeOff` — the settle alone
+  // has to take the card off the centre and file it
+  act(() => over?.settle())
+  expect(ctx.base.centreOperation).toBeUndefined()
+  expect(ctx.base.decks.discardHeap?.map((c) => c.uid)).toEqual(['d3'])
 })

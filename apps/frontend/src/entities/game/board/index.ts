@@ -28,6 +28,7 @@ export type {
   BoardRoom,
   BoardSlots,
   BoardState,
+  CentreOperation,
   HandLimitHandoff,
   IntroBeat,
   Panel,

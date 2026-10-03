@@ -743,7 +743,9 @@ export default function Board({
     if (!held || !cover) return null
     return { card: cover, aux: held.sudo ? cardById('support-sudo') : null }
   })()
-  const operationSource = pendingSourceCard?.category === 'operation' ? pendingSourceCard : null
+  // the operation standing at the centre — while our own gesture still holds
+  // the play it put out there, the gesture draws it and the table does not
+  const centreOperation = staging.staged ? null : state.centreOperation
 
   // the release standing at the stage slot while its cost is unpaid — read
   // ONCE, same reason as `pendingDefend` above, and its OWNERSHIP stated here
@@ -1794,22 +1796,19 @@ export default function Board({
               </div>
             )
           })()}
-        {operationSource && !beats.operationStanding && !staging.staged && (
-          <div className={opening.centreCard} data-testid="board-operation-pending">
-            <Card card={operationSource} interactive={false} width="100%" />
-          </div>
-        )}
-        {/* The operation card once it has landed: resting on the table, so the
-            effect's own surface (a pick grid, a row) opens OVER it. The beat
-            keeps it here across batches until its exit takes it to the heap. */}
-        {beats.operationLanded &&
+        {/* The operation standing at the centre: resting on the table, so the
+            effect's own surface (a pick grid, a row) opens OVER it. One field of
+            the board draws it (`centreOperation`) — the projection's while its
+            effect runs, a beat's while it moves it. While our own gesture still
+            holds the play it put out, the gesture draws it. */}
+        {centreOperation &&
           (() => {
-            const main = cardById(beats.operationLanded.card)
+            const main = cardById(centreOperation.card)
             // A sudo does NOT lie under the card it paid for: it stands beside
             // it, in its own place of the centre's row — the same two places the
             // play was assembled in, so standing is where assembling left it.
             // The row is rendered outside this slot, below.
-            if (!main || beats.operationLanded.sudo) return null
+            if (!main || centreOperation.sudo) return null
             return (
               <div
                 className={opening.centreCard}
@@ -1829,9 +1828,9 @@ export default function Board({
           its own position. The operation keeps `data-public-operation` — its own
           exit finds it by that — and the sudo is named beside it, so that exit
           can take it from where it actually stands. */}
-      {beats.operationLanded?.sudo &&
+      {centreOperation?.sudo &&
         (() => {
-          const main = cardById(beats.operationLanded.card)
+          const main = cardById(centreOperation.card)
           const aux = cardById('support-sudo')
           if (!main || !aux) return null
           return [aux, main].map((card, i) => (

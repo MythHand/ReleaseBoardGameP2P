@@ -21,7 +21,7 @@ import { useDrawBeat } from './drawBeat'
 import { useEliminateBeat } from './eliminateBeat'
 import { useGameEndBeat } from './gameEndBeat'
 import { useHandLimitBeat } from './handLimitBeat'
-import { type OperationLanded, useOperationBeat, withoutPendingOperation } from './operationBeat'
+import { useOperationBeat } from './operationBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
 import { useShownBeat } from './shownBeat'
@@ -120,9 +120,6 @@ export interface Beats {
    * collecting itself into one stack, or already held by a carrier and gone
    * from its own spot */
   discardOut: 'gathering' | 'taken' | null
-  operationStanding: boolean
-  /** the operation card resting at the centre — the table draws it, under any surface */
-  operationLanded: OperationLanded | null
   shadow: BoardState | null
   overlays: ReactNode[]
   exclusive: boolean
@@ -682,14 +679,15 @@ export function useBeats(args: {
     shownCards.reset()
   }, [intro?.key, live])
 
-  // Adopt only after the match-boundary reset, or its cleanup would erase
-  // the restored carrier on the same commit. A late intro key is another
-  // match-boundary reset, even when the restore watermark stays unchanged.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: live/events supply the snapshot at the restore boundary
+  // A restore, or reduced motion, cancels the operation's own flights. What
+  // stands at the centre is not restored here: the projection answers it
+  // (`centreOperation`), so a rebuilt board already has it. A late intro key is
+  // another match-boundary reset, even when the restore watermark stays
+  // unchanged.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the intro key is the match boundary this re-runs on
   useLayoutEffect(() => {
     if (reduced || (restoredThrough ?? 0) > 0) operations.reset()
-    if (!reduced && (restoredThrough ?? 0) > 0) operations.restore(live, events)
-  }, [intro?.key, reduced, restoredThrough, operations.reset, operations.restore])
+  }, [intro?.key, reduced, restoredThrough, operations.reset])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
   // fresh object cannot re-arm it, and React 19 StrictMode's double invoke plays
@@ -773,7 +771,9 @@ export function useBeats(args: {
     const before = settled.current
     settled.current = live
     const fresh = events.filter((e) => e.id > seen.current)
-    if (fresh.length === 0 && !operations.standing) return
+    // An operation standing at the centre can be answered with no event at all
+    // (a pending resolved in silence): the plan reads that off the two boards.
+    if (fresh.length === 0 && !before.centreOperation) return
     seen.current = fresh.at(-1)?.id ?? seen.current
     // Reduced motion collapses every beat to its end state, and the end state is
     // the projection the board already holds — so there is nothing to do but
@@ -818,13 +818,10 @@ export function useBeats(args: {
     unqueued.length > 0 &&
     planBeats(unqueued, settled.current, live.pending, live.decks.discardCount).length > 0
 
-  const reducedPending = reduced ? withoutPendingOperation(live, events) : live
   return {
     /** the pile a split has mounted but not yet flown in — it stays invisible */
     splittingPile: decks.splitting,
     discardOut: decks.discardOut,
-    operationStanding: operations.standing,
-    operationLanded: operations.landed,
     // The shadow is what the running beat has published, or its own base while
     // it has published nothing yet. The one exception is the opening, which
     // publishes a whole shape of its own rather than animating away from a
@@ -833,15 +830,8 @@ export function useBeats(args: {
     // beat reports done, so the handover to the live projection is the queue's
     // own last frame.
     shadow:
-      reducedPending === live
-        ? operations.standing
-          ? operations.withoutHeld(
-              (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ??
-                (awaitingBatch ? settled.current : live),
-            )
-          : ((running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ??
-            (awaitingBatch ? settled.current : null))
-        : reducedPending,
+      (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ??
+      (awaitingBatch ? settled.current : null),
     overlays: [
       ...discards.overlay,
       ...draws.overlay,

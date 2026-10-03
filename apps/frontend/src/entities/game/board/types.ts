@@ -55,6 +55,13 @@ export interface BoardOpponent {
   releaseEvent?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
 }
 
+/** An operation standing at the centre: its card, its Sudo, and the `discarded` events they lie on. */
+export interface CentreOperation {
+  card: string
+  sudo: boolean
+  spent: { eventId: number; card: string }[]
+}
+
 // Everything the engine's projection can answer. Assembled by the consumer's
 // adapter; nothing here is room- or session-shaped.
 export interface BoardState {
@@ -65,6 +72,11 @@ export interface BoardState {
   // survive the moment the board lets go of the pending.
   centreCover?: { card: string; sudo: boolean }
   aiCause?: { card: string; eventId: number }
+  // An operation standing at the centre while its effect is being resolved, and
+  // the Sudo beside it when it was paid for with one. Its own cards are banked
+  // the moment it is played, so the heap is drawn without them for as long as
+  // they stand here (`spent`, the `discarded` events they lie on).
+  centreOperation?: CentreOperation
   // Every card put out at the centre while its play is being made — face up,
   // whoever put it there (resolution.md §1). The projection's own list.
   shown?: { player: string; uid: string; card: CardData }[]

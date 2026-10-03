@@ -1,5 +1,5 @@
 import { type CardData, cardById } from '@release/ui'
-import type { BoardState } from '~/entities/game/board'
+import type { BoardState, CentreOperation } from '~/entities/game/board'
 import { type Filed, withLanded, withoutLanded } from './toHeap'
 
 // ONE CARD, ONE PLACE (#168; docs/animations/beat-copies.md §5).
@@ -19,9 +19,6 @@ import { type Filed, withLanded, withoutLanded } from './toHeap'
 // place. And the two moments that must share one commit with the carrier are
 // one call each: `liftOff` in the run the carrier goes up in, `setDown` in the
 // run it comes down in.
-//
-// Not here yet: an operation standing at the centre. Its standing is the
-// operation beat's own state (`operations.standing`), not a field of the board.
 
 type Slot = 'frontend' | 'backend' | 'database' | 'monitoring'
 
@@ -34,10 +31,12 @@ export type Place =
   // an opponent's closed hand: only its count is drawn
   | { kind: 'seat'; player: string; count?: number }
   // standing at the centre, by the card's id: an attack and what covers it,
-  // the 503 alarm, the AI effect, the AI cause
+  // the 503 alarm, the AI effect, the AI cause, an operation
   | { kind: 'centre'; card: string }
   // a release zone's slot, with what rides under the card there
   | { kind: 'zone'; player: string; slot: Slot }
+  // a System Upgrade row, by the seat whose answer stands there — one per seat
+  | { kind: 'upgrade'; player: string }
   // the discard heap, by the `discarded` event the card lies on
   | { kind: 'heap'; eventId: number }
   // a draw pile's count
@@ -79,6 +78,15 @@ export function withoutCard(board: BoardState, place: Place): BoardState {
       return withoutAtCentre(board, place.card)
     case 'zone':
       return withoutInZone(board, place.player, place.slot)
+    case 'upgrade': {
+      // the row IS the pending's `thrown`: the answer leaves it, the System
+      // Upgrade itself goes on
+      const pending = board.pending
+      if (pending?.kind !== 'systemUpgrade') return board
+      const thrown = pending.thrown.filter((t) => t.player !== place.player)
+      if (thrown.length === pending.thrown.length) return board
+      return { ...board, pending: { ...pending, thrown } }
+    }
     case 'heap':
       return withoutLanded(board, [{ eventId: place.eventId }])
     case 'pile': {
@@ -96,7 +104,7 @@ export function withoutCard(board: BoardState, place: Place): BoardState {
 }
 
 // EVERY FIELD THE CENTRE IS DRAWN FROM, for one card (`_Board.tsx`: the centre
-// attack, the cover, the alarm, the AI effect and cause).
+// attack, the cover, the alarm, the AI effect and cause, the operation).
 function withoutAtCentre(board: BoardState, card: string): BoardState {
   let next = board
   const pending = board.pending
@@ -129,6 +137,10 @@ function withoutAtCentre(board: BoardState, card: string): BoardState {
   if (next.centreCover?.card === card) next = { ...next, centreCover: undefined }
   else if (sudo && next.centreCover?.sudo)
     next = { ...next, centreCover: { ...next.centreCover, sudo: false } }
+  // an operation leaves WITH the Sudo standing beside it — one play, and the
+  // Sudo has no place of its own once the card it paid for is gone. A lone Sudo
+  // named here is an attack's or a defence's, never the operation's.
+  if (next.centreOperation?.card === card) next = { ...next, centreOperation: undefined }
   // the AI cause stands beside its own copy in the heap, which the board leaves
   // out while it stands — so leaving the centre, it leaves the heap too, until
   // its flight lands it there (`withoutAiCause`, aiCauseExit.ts)
@@ -184,6 +196,7 @@ export type Landing =
       kind: 'centre'
       attack?: { card: string; sudo: boolean }
       cover?: { card: string; sudo: boolean }
+      operation?: CentreOperation
     }
 
 const data = (id: string): CardData | undefined => cardById(id) ?? undefined
@@ -256,6 +269,7 @@ export function withCard(board: BoardState, to: Landing): BoardState {
         ...board,
         ...(to.attack ? { centreAttack: to.attack } : {}),
         ...(to.cover ? { centreCover: to.cover } : {}),
+        ...(to.operation ? { centreOperation: to.operation } : {}),
       }
   }
 }

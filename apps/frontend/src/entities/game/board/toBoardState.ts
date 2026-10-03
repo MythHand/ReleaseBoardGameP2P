@@ -3,6 +3,7 @@ import type { HeapCard, HistoryEntry, ReleaseSupport } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
 import type { Scatter } from '@release/ui/animations'
 import { scatterAt } from '@release/ui/animations'
+import { standingOperation } from './standingOperation'
 import type { BoardState } from './types'
 
 // One label per member of the engine's Event union — the adapter maps event
@@ -641,6 +642,16 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
   const aiCause =
     reveal?.type === 'aiRevealed' && filed ? { card: reveal.aiCard, eventId: filed.id } : undefined
 
+  // An operation standing at the centre is drawn there and nowhere else: its own
+  // cards come out of the heap and its count for as long as it stands (one card,
+  // one place — `centreOperation` above, `cardPlace`).
+  const centreOperation = standingOperation(view.pending, visible)
+  const discardTop = view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined
+  const fullHeap = toDiscardHeap(visible, discardTop, view.decks.discardCount)
+  const standing = new Set(centreOperation?.spent.map((c) => `d${c.eventId}`))
+  const discardHeap = fullHeap.filter((c) => !c.uid || !standing.has(c.uid))
+  const lifted = fullHeap.length - discardHeap.length
+
   return {
     you: {
       name: view.self.name,
@@ -667,13 +678,9 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       // these, and a split has to be visible for Git Branch to be aimable.
       main: view.decks.piles,
       events: view.decks.events,
-      discard: view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined,
-      discardHeap: toDiscardHeap(
-        visible,
-        view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined,
-        view.decks.discardCount,
-      ),
-      discardCount: view.decks.discardCount,
+      discard: lifted ? discardHeap.at(-1)?.card : discardTop,
+      discardHeap,
+      discardCount: Math.max(0, view.decks.discardCount - lifted),
     },
     turn: view.turn.player,
     hasDrawn: view.turn.hasDrawn,
@@ -695,6 +702,7 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
     // contract.test-d.ts. Both carry openedAt alongside deadline already.
     pending: view.pending,
     ...(aiCause ? { aiCause } : {}),
+    ...(centreOperation ? { centreOperation } : {}),
     shown: view.shown.map((s) => ({
       player: s.player,
       uid: s.uid,

@@ -1037,3 +1037,42 @@ it('keeps the AI cause on the table while its event asks for a choice', () => {
   expect(result.aiCause).toEqual({ card: 'trigger-ai', eventId: 11 })
   expect(toBoardState(view, log, labels).aiCause).toBeUndefined()
 })
+
+// AN OPERATION STANDING AT THE CENTRE is drawn there and nowhere else. The engine
+// banks its cards the moment it is played, so while its pending stands the heap
+// and its count are answered without them — on every board, reduced motion and
+// a rebuilt one included — and the operation itself, with its Sudo, is a field
+// of the table rather than something a beat has to remember.
+it.each([
+  ['operation-git-rebase', { kind: 'reorderTop', player: 'p2', source: 'operation-git-rebase' }],
+  [
+    'operation-system-upgrade',
+    { kind: 'systemUpgrade', actor: 'p2', source: 'operation-system-upgrade', sudo: true },
+  ],
+])('stands %s at the centre, out of the heap, until its pending resolves', (source, pending) => {
+  const log = [
+    { id: 1, type: 'operationPlayed', player: 'p2', card: source, sudo: true },
+    { id: 2, type: 'discarded', player: 'p2', card: source, reason: 'effect' },
+    { id: 3, type: 'discarded', player: 'p2', card: 'support-sudo', reason: 'effect' },
+  ] as Event[]
+  const decks = { ...view.decks, discardCount: 2, discardTop: 'support-sudo' }
+  const standing = toBoardState(
+    { ...view, decks, pending: pending as PlayerView['pending'] },
+    log,
+    labels,
+  )
+  expect(standing.centreOperation).toEqual({
+    card: source,
+    sudo: true,
+    spent: [
+      { eventId: 2, card: source },
+      { eventId: 3, card: 'support-sudo' },
+    ],
+  })
+  expect(standing.decks.discardHeap).toEqual([])
+  expect(standing.decks.discardCount).toBe(0)
+  const answered = toBoardState({ ...view, decks, pending: null }, log, labels)
+  expect(answered.centreOperation).toBeUndefined()
+  expect(answered.decks.discardHeap?.map((c) => c.uid)).toEqual(['d3', 'd2'])
+  expect(answered.decks.discardCount).toBe(2)
+})
