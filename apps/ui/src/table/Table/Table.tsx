@@ -467,6 +467,10 @@ export default function Table({
           <div className={styles.toasts}>{slots.toasts}</div>
         )}
 
+        {/* the voice chat's notices: where the microphone and the headphones
+            stand in the open voice panel, open or not (owner, 30.09) */}
+        {slots?.voiceNotices && <div className={styles.voiceNotices}>{slots.voiceNotices}</div>}
+
         {/* вертикальный рейл у правого края — переключает панели drawer */}
         <TabRail
           items={railItems}
