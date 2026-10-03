@@ -788,7 +788,17 @@ export function describeEngine(
             const serialized = JSON.stringify(engine.project(state, viewer))
             for (const other of state.seating) {
               if (other === viewer) continue
+              // The one hand card the whole table may see: one its owner has PUT
+              // OUT at the centre — a release waiting on its cost, a Sudo on its
+              // partner (resolution.md §1, «Выложенное на стол видно всем»). Read
+              // off the state, not off the view: only what the owner really put
+              // out is excused, and the rest of the hand stays forbidden. Owed
+              // since `shown` existed; no fixed-seed run reached one inside 150
+              // steps until the base decks became two piles (#209) moved the
+              // trajectory onto a release being paid for.
+              const putOut = new Set(state.players[other].shown)
               for (const c of state.players[other].hand) {
+                if (putOut.has(c.uid)) continue
                 expect(serialized, `${viewer} can see ${other}'s ${c.uid}`).not.toContain(c.uid)
               }
             }
