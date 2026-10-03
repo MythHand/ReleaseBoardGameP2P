@@ -1,2 +1,8 @@
-export type { VoiceChatCopy, VoiceParticipant, VoiceRole, VoiceStatus } from './VoiceChat'
-export { default, VoicePanel, VoiceTabIcon } from './VoiceChat'
+export type {
+  VoiceChatCopy,
+  VoiceIssue,
+  VoiceParticipant,
+  VoiceRole,
+  VoiceStatus,
+} from './VoiceChat'
+export { default, VoiceNotices, VoicePanel, VoiceTabIcon } from './VoiceChat'

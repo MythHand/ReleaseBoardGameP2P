@@ -1,3 +1,6 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { play } from '@/animations/play'
+import { useAppear } from '@/blocks/Toast/useAppear'
 import HeadphonesIcon from '@/icons/HeadphonesIcon'
 import MicrophoneSlashIcon from '@/icons/MicrophoneSlashIcon'
 import PersonIcon from '@/icons/PersonIcon'
@@ -70,7 +73,23 @@ export interface VoiceChatCopy {
   unmuteMic: string
   // beside the name of a participant who turned their microphone off
   micMuted: string
+  // the cross that closes a notice before its time
+  close: string
 }
+
+// What went wrong with my voice, as the place hands it in: one at a time, the
+// network's to tell. It concerns either my microphone or my connection — the
+// button it explains carries it in its hint for as long as it lasts.
+export interface VoiceIssue {
+  // which problem this is; a new key is a new notice
+  key: string
+  title: string
+  text: string
+  concerns: 'microphone' | 'connection'
+}
+
+// how long a notice stays, ms — as long as a chat toast (ToastStack's hold)
+const NOTICE_HOLD = 6000
 
 interface VoiceState {
   // who is in the voice chat right now — me included once I am connected
@@ -109,18 +128,23 @@ function Count({ count }: { count: number }) {
 // The way in and out: headphones coloured by where I stand. Off joins; while
 // connecting a press does nothing — a second one would start a second join —
 // yet the button keeps its colour and its hint (Button's own `disabled` would
-// fade both); connected, or broken off, a press leaves.
+// fade both); connected, or broken off, a press leaves. A connection issue,
+// while it lasts, names what broke in place of the plain "connection lost".
 function Headphones({
   status,
   copy,
+  issue,
   onConnect,
   onDisconnect,
-}: Pick<VoiceState, 'status' | 'copy' | 'onConnect' | 'onDisconnect'>) {
+}: Pick<VoiceState, 'status' | 'copy' | 'onConnect' | 'onDisconnect'> & {
+  issue?: VoiceIssue | null
+}) {
+  const broke = issue?.concerns === 'connection' ? issue.title : copy.interrupted
   const label = {
     off: copy.connect,
     connecting: copy.connecting,
     connected: copy.disconnect,
-    interrupted: `${copy.interrupted} · ${copy.disconnect}`,
+    interrupted: `${broke} · ${copy.disconnect}`,
   }[status]
   const action = status === 'off' ? onConnect : isIn(status) ? onDisconnect : undefined
   return (
@@ -140,15 +164,20 @@ function Headphones({
 }
 
 // My own microphone, left of the headphones and only while I am in: grey while
-// it works, red once I turned it off (owner, 29.09).
+// it works, red once I turned it off (owner, 29.09). A microphone issue, while it
+// lasts, says in the hint why it is off.
 function Mic({
   status,
   micOff = false,
   copy,
+  issue,
   onMicChange,
-}: Pick<VoiceState, 'status' | 'micOff' | 'copy' | 'onMicChange'>) {
+}: Pick<VoiceState, 'status' | 'micOff' | 'copy' | 'onMicChange'> & {
+  issue?: VoiceIssue | null
+}) {
   if (!isIn(status)) return null
-  const label = micOff ? copy.unmuteMic : copy.muteMic
+  const action = micOff ? copy.unmuteMic : copy.muteMic
+  const label = issue?.concerns === 'microphone' ? `${issue.title} · ${action}` : action
   return (
     <Button
       variant="bare"
@@ -164,15 +193,214 @@ function Mic({
   )
 }
 
+interface LiveNotice {
+  id: number
+  issue: VoiceIssue
+  // its leave has begun: still on screen, playing its way out
+  leaving: boolean
+}
+
+const startLeave = (id: number) => (prev: LiveNotice[]) =>
+  prev.map((l) => (l.id === id ? { ...l, leaving: true } : l))
+
+// One notice: a chat toast's dress — the black plate, a title and a text — with a
+// cross on the right. It comes down from above and plays its own way out, then
+// says so (`onLeft`), like a toast.
+function Notice({
+  id,
+  issue,
+  leaving,
+  closeLabel,
+  onClose,
+  onLeft,
+  onHover,
+}: {
+  id: number
+  issue: VoiceIssue
+  leaving: boolean
+  closeLabel: string
+  onClose: (id: number) => void
+  onLeft: (id: number) => void
+  onHover: (over: boolean) => void
+}) {
+  const left = useCallback(() => onLeft(id), [onLeft, id])
+  const ref = useAppear<HTMLDivElement>(leaving, left, -18)
+  return (
+    <div
+      ref={ref}
+      role="status"
+      className={styles.notice}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+    >
+      <div className={styles.noticeBody}>
+        <Typography
+          base="mono-sm"
+          tk="tk-02"
+          as="div"
+          className={`${styles.noticeTitle} ${styles[issue.concerns]}`}
+        >
+          {issue.title}
+        </Typography>
+        <Typography as="p" base="body-sm" className={styles.noticeText}>
+          {issue.text}
+        </Typography>
+      </div>
+      <button
+        type="button"
+        className={styles.noticeClose}
+        aria-label={closeLabel}
+        title={closeLabel}
+        onClick={() => onClose(id)}
+      >
+        ✕
+      </button>
+    </div>
+  )
+}
+
+// The notices under the microphone and the headphones (owner, 30.09). A problem
+// shows once, over whatever lies below, and goes by itself after a while — or
+// on its cross; one that is over takes its notice with it. Several at once stand
+// one under another. Hovering holds them all, the way a chat toast is held.
+function Notices({ issue, closeLabel }: { issue?: VoiceIssue | null; closeLabel: string }) {
+  const [live, setLive] = useState<LiveNotice[]>([])
+  const [paused, setPaused] = useState(false)
+  const lastKey = useRef<string | null>(null)
+  const nextId = useRef(0)
+
+  useEffect(() => {
+    const key = issue?.key ?? null
+    if (key === lastKey.current) return
+    lastKey.current = key
+    if (!issue) {
+      setLive((prev) => prev.map((l) => ({ ...l, leaving: true })))
+      return
+    }
+    setLive((prev) =>
+      prev.some((l) => l.issue.key === issue.key && !l.leaving)
+        ? prev
+        : [...prev, { id: nextId.current++, issue, leaving: false }],
+    )
+  }, [issue])
+
+  // Each notice holds for its time; hovering lifts every clock, leaving sets
+  // them again in full — the chat toasts' rule (ToastStack).
+  const timers = useRef(new Map<number, number>())
+  useEffect(() => {
+    const map = timers.current
+    if (paused) {
+      for (const t of map.values()) clearTimeout(t)
+      map.clear()
+      return
+    }
+    for (const l of live) {
+      if (l.leaving || map.has(l.id)) continue
+      map.set(
+        l.id,
+        window.setTimeout(() => setLive(startLeave(l.id)), NOTICE_HOLD),
+      )
+    }
+    for (const [id, t] of map) {
+      if (!live.some((l) => l.id === id && !l.leaving)) {
+        clearTimeout(t)
+        map.delete(id)
+      }
+    }
+  }, [live, paused])
+
+  useEffect(() => {
+    const map = timers.current
+    return () => {
+      for (const t of map.values()) clearTimeout(t)
+      map.clear()
+    }
+  }, [])
+
+  // the last one gone takes the pointer's hold with it: it left under the
+  // pointer, so no leave event will come to lift it
+  useEffect(() => {
+    if (live.length === 0) setPaused(false)
+  }, [live.length])
+
+  const close = useCallback((id: number) => setLive(startLeave(id)), [])
+  const remove = useCallback((id: number) => setLive((prev) => prev.filter((l) => l.id !== id)), [])
+
+  // The ones below ride up into a gone one's place rather than jump: each
+  // notice's place is measured before and after the redraw and the difference
+  // played (flyFrom) — the chat toasts' own way (ToastStack). A new one has no
+  // place to come from; it has its own arrival.
+  const nodes = useRef(new Map<number, HTMLElement>())
+  const rects = useRef(new Map<number, DOMRect>())
+  useLayoutEffect(() => {
+    for (const [id, el] of nodes.current) {
+      const now = el.getBoundingClientRect()
+      const was = rects.current.get(id)
+      if (was && Math.abs(was.top - now.top) > 0.5) {
+        play('flyFrom', el, { from: was, duration: 240 })
+      }
+      rects.current.set(id, now)
+    }
+    for (const id of [...rects.current.keys()]) {
+      if (!nodes.current.has(id)) rects.current.delete(id)
+    }
+  })
+
+  if (live.length === 0) return null
+  return (
+    <div className={styles.notices}>
+      {live.map((l) => (
+        <div
+          key={l.id}
+          ref={(el) => {
+            if (el) nodes.current.set(l.id, el)
+            else nodes.current.delete(l.id)
+          }}
+        >
+          <Notice
+            id={l.id}
+            issue={l.issue}
+            leaving={l.leaving}
+            closeLabel={closeLabel}
+            onClose={close}
+            onLeft={remove}
+            onHover={setPaused}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // The microphone and the headphones, one pair at the end of the line, with the
-// same room between them wherever they stand (owner, 29.09).
-function Controls(state: VoiceState) {
+// same room between them wherever they stand (owner, 29.09); the notices hang
+// under the pair — unless the place hangs them itself (the table's panel).
+function Controls({
+  issue,
+  notices = true,
+  ...state
+}: VoiceState & { issue?: VoiceIssue | null; notices?: boolean }) {
   return (
     <span className={styles.controls}>
-      <Mic {...state} />
-      <Headphones {...state} />
+      <Mic {...state} issue={issue} />
+      <Headphones {...state} issue={issue} />
+      {notices && <Notices issue={issue} closeLabel={state.copy.close} />}
     </span>
   )
+}
+
+// The notices on their own, for a place whose microphone and headphones can be
+// out of sight: the table, where the voice panel closes into the rail. They
+// hang under whatever positioned box holds them, as they hang under the pair;
+// the table gives them the pair's place in the open panel (owner, 30.09).
+export function VoiceNotices({
+  issue,
+  copy,
+}: {
+  issue?: VoiceIssue | null
+  copy: Pick<VoiceChatCopy, 'close'>
+}) {
+  return <Notices issue={issue} closeLabel={copy.close} />
 }
 
 // The volumes and the people: the chat's own volume on top once I am in, then
@@ -284,11 +512,13 @@ function VoiceList({
 // headphones. The volumes live behind the count too. An empty voice chat shows
 // no count. Like Chat it names nothing itself — the place it stands in does.
 // Its state arrives through props, because where the voices come from is not
-// the kit's to know.
+// the kit's to know — what went wrong with them too (`issue`), shown as a
+// notice under the microphone and the headphones.
 export default function VoiceChat({
   className = '',
+  issue,
   ...state
-}: VoiceState & { className?: string }) {
+}: VoiceState & { issue?: VoiceIssue | null; className?: string }) {
   const { participants, copy } = state
   return (
     <div className={`${styles.line} ${className}`}>
@@ -310,7 +540,7 @@ export default function VoiceChat({
           </div>
         </Popover>
       )}
-      <Controls {...state} />
+      <Controls {...state} issue={issue} />
     </div>
   )
 }
@@ -321,7 +551,13 @@ export default function VoiceChat({
 // rail. Everything the lobby keeps behind the count is out in the open here: the
 // head says what it is, how many are in it and holds the headphones; the
 // volumes and the people follow. The title is the place's to give.
-export function VoicePanel({ title, ...state }: VoiceState & { title: string }) {
+// An issue only names itself in the buttons' hints here: the table hangs its
+// notices where the panel can close away from them (VoiceNotices).
+export function VoicePanel({
+  title,
+  issue,
+  ...state
+}: VoiceState & { title: string; issue?: VoiceIssue | null }) {
   const { participants } = state
   return (
     <div className={styles.panel}>
@@ -330,7 +566,7 @@ export function VoicePanel({ title, ...state }: VoiceState & { title: string }) 
           {title}
         </Typography>
         {participants.length > 0 && <Count count={participants.length} />}
-        <Controls {...state} />
+        <Controls {...state} issue={issue} notices={false} />
       </div>
       <VoiceList {...state} />
     </div>
